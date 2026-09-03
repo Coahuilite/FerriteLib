@@ -3,7 +3,7 @@
 ## Current durable state
 
 - Repository split out of the Universal Squeaker tree on 2026-09-03. FerriteLib is a prerequisite mod,
-  `coahuilite.ferritelib`, display name FerriteLib, `modVersion` 0.1.0. No remote, nothing published.
+  `coahuilite.ferritelib`, display name FerriteLib, `modVersion` 0.2.0. No remote, nothing published.
 - Provenance: `Source/FerriteLib.UiKit/**` and `tools/FerriteLib.UiKit.Tests/**` were copied out of the
   US repo at US commit `0fe60b0` after a file-for-file `diff -r` check, then amended there. US retains
   its own history; this repo's history starts at the split.
@@ -29,19 +29,20 @@
 - Still unverified in game, both cheap, both in `TODO.md` §1: the guard's deliberate duplicate-DLL
   branch, and the failure shape when the carrier is absent. Everything else in this file remains
   compile-time, stub-harness or reference-assembly evidence — say so rather than implying a game run.
-- **The pre-1.0 minor rule was widened, and it was not a documentation-only edit.** Observed in the
-  working tree on 2026-09-04 while this file was being tidied, uncommitted: `FerriteLibVersion.Api`
-  `0.1.0 → 0.2.0`, `About/About.xml <modVersion>` moving with it, and the comment's rule changed from "a
-  minor bump IS breaking" to "**any** change to the public surface a consumer compiles against - addition
-  or break - bumps minor". The trigger recorded in the code was an additive type shipped without an Api
-  bump: an older installed carrier passed `Require`, and the desync detonated later as a
-  `TypeLoadException` inside `UiHost.Draw` instead of as a readable prerequisite error. Recorded here as
-  **in flight, not verified** - confirm against `Kernel/FerriteLibVersion.cs` and gate 1 before repeating
-  either version, and note that every doc in this repo that says "0.1.0" or states the narrow rule
-  (`AGENTS.md`'s two-version-axes invariant, `HANDOFF.md` §4) is describing the old one.
-  The wider lesson is durable even if that commit never lands: **`Require`'s range assertion only protects
-  a consumer if additive changes also move the axis.** Pinning minor is what turns "the carrier is older
-  than the DLL I compiled against" from a draw-time crash into a reportable message.
+- **Two hard rules inherited from the series, both easy to violate by accident.** Nothing in this library
+  may persist data into a save - a prerequisite must survive being uninstalled, and a save-written flag is
+  the one side effect a player cannot undo. And `../squeaky_ratkin` is never written: SR is a separate
+  product with its own brand and `SR_` prefix, and this repo's neutrality lane exists to keep even its
+  vocabulary out of here.
+- **A `Require` desync is now a named verdict, and that is the durable part** (2026-09-04, `b2006a0`):
+  the report must carry `MISMATCH`, the loaded `Api`, and the consumer's compiled floor, so a stale
+  carrier is a readable prerequisite error rather than a `TypeLoadException` at first draw. Harness
+  coverage for it is `FerriteLibVersionTests`' "A consumer compiled above the loaded carrier gets a named
+  MISMATCH, not a pass". Lesson worth keeping even if the version numbers move again: **`Require` only
+  protects a consumer if additive changes also move the axis** - pinning the compiled minor is what makes
+  "the carrier is older than the DLL I built against" observable. So the axis is not only a breaking-change
+  counter; it is a "does this carrier contain what I compiled against" counter, which pre-1.0 is the same
+  bump.
 
 ## What was verified, and how
 
@@ -118,15 +119,72 @@
   or in the harness, and the harness's own audit tests drive `UiThemeDraw.Label` directly, so they cannot
   see the gap either.
 
+## Structure and where things live
+
+Paths and roles only; any line/file count here would be false within a day (see the predicate rule in
+"Enduring corrections"). Re-derive with `git ls-files`.
+
+- `Source/FerriteLib.UiKit/Kernel/` - the whole payload surface. `net472`, `TreatWarningsAsErrors`,
+  `Nullable` on, output pinned to `1.6/Assemblies/` because that path is what consumers bind to.
+  - Page model: `UiHost` (per-window façade, `IDisposable`), `UiSession`, `UiLayoutEngine` (the largest
+    file by far), `UiLayoutManifest`, `UiLayoutSnapshot`, `UiBindings`/`IUiBindings`, `UiWidgetRegistry`,
+    `KernelCoreWidgetRegistrar`, `UiWidgetContext`, `UiElementSpec`, `UiSessionGuard`, `UiValueState`,
+    `UiNative` (the IMGUI interop seam), `UiPopup`, `UiChartPointChange`, the contract exceptions, and
+    `Widgets/` (7 kinds).
+  - Visual core: `UiTheme`, `UiThemeDraw`, `UiFitAudit`, `UiKitFonts`, `UiFont`, `ITextMetrics`,
+    `VerseFerriteTextMetrics`.
+  - `FerriteLibVersion` is BCL-only on purpose: no Verse, no UnityEngine, so a consumer can call
+    `Require` from its earliest constructor and the harness can test it with no stubs at all.
+- `tools/FerriteLib.UiKit.Tests/` - a plain `Main()` runner (no test framework), 11 lane files plus
+  `Program` and `StubTextWidth`, with 4 standalone stub projects under `Stubs/`.
+- `scripts/verify-local.ps1` (7 gates, `-PackDev` adds packaging) and `scripts/pack-dev.ps1`.
+- `About/About.xml`, `LoadFolders.xml`, `LICENSE`, `1.6/Assemblies/` (the DLL and PDB are gitignored; only
+  `.gitkeep` is tracked, so a fresh clone has no payload until it builds).
+
+## Consumer contract, in the direction that hurts
+
+- **`UiHost` is per-window and disposable; the consumer disposes it.** US does so from its own window's
+  `PreClose`, a Verse hook that does not exist here. Nothing in this library may hold process-wide
+  interaction state - that is what keeps two hosts in one game session from touching each other.
+- **Schema=2 is the only shipped manifest schema**, and the consumer embeds its manifests as assembly
+  resources and loads them with `GetManifestResourceStream` - a call that lives in US, not here.
+  `UiLayoutManifest.ParseFile` has no production caller.
+- **Popups are session-owned and window-spaced.** A surface that opens a popup publishes its covered rect
+  through `UiSession.SetPopupRect`, which only `UiPopup.DrawOptionList` does; `UiNative`'s yield guard
+  cannot fire without it. Geometry comes from `UiPopup.RectFor`, never from a local copy.
+- **Naming hazard from the consumer side**: five substrings are banned in US's own `UI/**` (see
+  "Enduring corrections"); all are legal here, but a public type carrying one becomes the consumer's red
+  gate the moment it appears in a US file.
+- Three symbols people keep assuming live here are **not** from this repo: `SessionRevisionBumper` (a US
+  private class), `PreClose` (Verse), `GetManifestResourceStream` (BCL, called in US). Searching this tree
+  for them returns nothing, by design.
+
+## How verification is described here
+
+- A PASS is recorded with its scope and its evidence class. The classes in this repo are, weakest to
+  strongest: reference-assembly read, stub harness, compile-time, and in-game observation - and only the
+  last is written as "proven in a running game".
+- **Scope an assertion to the region that can legitimately carry the defect.** Gate 6's first version
+  searched the whole `LICENSE` for the Exhibit B sentence and went red on a *correct* licence, because the
+  reproduced MPL body always contains that sample notice.
+- **Assertion order is part of an assertion.** A `Copy-Item LICENSE` placed before the staging directory's
+  `Remove-Item` would have shipped a package with no licence while every gate stayed green; any claim
+  about package contents must run after the tree is final.
+- Mutation-test a new gate, not only the new feature. Half of `VerifyThemeColorsDoNotAffectLayout` is a
+  future-regression guard rather than present evidence, and it is labelled that way for exactly this
+  reason.
+
 ## Gates and what each actually proves
 
-Seven gates in `scripts/verify-local.ps1`: 1 harness, 2 Dev build, 3 Release build, 4 payload present,
-5 content-free, 6 LICENSE, 7 About.xml identity. Gate 6 proves only what is visible from inside this
-repo: the file exists, carries the MPL-2.0 title, still contains Exhibit B and section 10.4, and does
-not apply the incompatibility notice in its header block. It does **not** compare the text against a
-consumer's copy, and no script in this repo refers to a sibling repo at all (checked: no
-`Get-FileHash`, no `..\` path in `scripts/`). The byte-parity assertion is consumer-side - US's own
-gate 10 hashes both copies.
+Seven gates in `scripts/verify-local.ps1`: 1 harness, 2 Dev build (`FER_DEV`, warnings-as-errors), 3
+Release build (warnings-as-errors), 4 payload present, 5 content-free (named-path probe for `Defs`,
+`Patches`, `Languages`, `Sounds`, `Textures`, `ThingSets` under `1.6/` - probed as names, not filtered
+from an enumeration, so an empty tree cannot pass vacuously), 6 LICENSE, 7 About.xml identity. Gate 6
+proves only what is visible from inside this repo: the file exists, carries the MPL-2.0 title, still
+contains Exhibit B and section 10.4, and does not apply the incompatibility notice in its header block.
+It does **not** compare the text against a consumer's copy, and no script in this repo refers to a
+sibling repo at all (checked: no `Get-FileHash`, no `..\` path in `scripts/`). The byte-parity assertion
+is consumer-side - US's own gate 10 hashes both copies.
 
 Dated correction, 2026-09-04: earlier text here credited gate 6 (as "the seventh") with a SHA-256
 comparison to the consumer's copy. It never ran one. The consequence is not cosmetic: **a `LICENSE`
@@ -134,15 +192,15 @@ edited or truncated in this repo cannot turn any gate here red**; only a US gate
 when the sibling tree is present. Anything that repeats "byte-identical to the consumer's copy" as a
 property of this repo's gates is wrong in the same way.
 
-The harness is 13 test files carrying 62 named assertions. (The older wording here was "13 lanes",
+The harness is 13 test files carrying 63 named assertions. (The older wording here was "13 lanes",
 which counted files and read like an assertion count - prefer the explicit numbers.) Three assertion
 groups are worth naming because they are the reason this repo can be trusted across a boundary:
 
-- Version contract lane (10 assertions): range accept/reject, pre-1.0 minor-is-breaking, inverted range
-  as a caller error, exact-API acceptance, duplicate-carrier detection driven through the internal
-  decision function, range-vs-duplicate report separation, empty-copy-list safety, and the
-  Api↔`modVersion` major/minor lock. Mutation-checked: breaking the duplicate condition and desyncing
-  `modVersion` each fail exactly one lane.
+- Version contract lane (11 assertions): range accept/reject, the pre-1.0 bump rule, inverted range as
+  a caller error, exact-API acceptance, duplicate-carrier detection driven through the internal
+  decision function, range-vs-duplicate report separation, the named `MISMATCH` desync report,
+  empty-copy-list safety, and the `Api` ↔ `modVersion` major/minor lock. Mutation-checked: breaking the
+  duplicate condition and desyncing `modVersion` each fail exactly one lane.
 - Neutrality lane (3 assertions): scans both trees case-insensitively for product words and
   case-sensitively for prefixes, **throws if a scanned tree is missing** rather than passing on an
   empty enumeration, plants literals into both trees as a positive control, and pins the single
@@ -172,22 +230,21 @@ colour token currently feeds layout — it is a future-regression guard, not pre
   If a future theme or fallback wants its own key, that key belongs here and needs both language files.
 - `UiTheme.DarkGold` is a **template**: each access returns a fresh instance. It used to be a shared
   mutable singleton, which is harmless with one consumer and cross-talk with two.
-- **A count without its predicate is not a measurement.** The figures in `HANDOFF.md` §3/§9 were written
-  as "excl. obj/bin" while being produced by a `find`-and-sum that matched nothing (`find` prints these
-  paths with backslashes, so `-not -path '*/obj/*'` never fires). The obj-inclusive and hand-authored
-  numbers differ, and only one pair was labelled honestly. Restated 2026-09-04 with the predicate
-  attached: hand-authored, git-tracked - library **35 files / 5,376 lines** (Kernel top level 27 / 4,175,
-  `Kernel/Widgets/` 7 / 1,198, `Properties/AssemblyInfo.cs` 1 / 3), harness **13 files / 4,115 lines /
-  62 named assertions**, stub sources **4 files / 672 lines** in 4 assemblies. Reproduce with
-  `git ls-files` + `wc -l`, never with a `-path` filter.
-- **The `UiSourceInvariantTests` list in `HANDOFF.md` §6 has a phantom entry.** The consumer's code bans
-  five substrings (`UiInteract`, `Palette`, `SurfaceFrame`, `UiText`, `UiValueStore`); `UiPanel` is named
-  in both repos' prose but is in no source list anywhere
-  (`../UniversalSqueaker/tools/UniversalSqueakerUiLogicTests/UiSourceInvariantTests.cs:103`). Harmless
-  direction of error - it over-bans, never under-bans - but it sent a session looking for a rule that
-  does not exist.
-- **Documentation describes a commit, and code keeps moving.** `HANDOFF.md` §9 anchored itself to
-  `958ac7d` as "the last code commit before this handoff"; `44b00c5` landed roughly twenty minutes into
-  this session's read and made three of its rows stale, including the assertion count in the file's own
-  status line. A SHA anchor in a prose doc is not a guard against staleness, it is a claim about a moment.
-  Prefer re-measuring to re-anchoring.
+- **A count without its predicate is not a measurement.** A `find -not -path '*/obj/*'` never matches on
+  this platform (paths are printed with backslashes), so any count taken that way silently includes
+  MSBuild's generated `AssemblyInfo`/`AssemblyAttributes` files. Count with `git ls-files` + `wc -l`
+  instead: generated output is untracked, so it cannot leak in. Derived at `3b549d6`: library 35 files /
+  5,381 lines (Kernel top level 27 / 4,180, `Kernel/Widgets/` 7 / 1,198, `Properties/AssemblyInfo.cs`
+  1 / 3), harness 13 files / 4,152 lines / 63 named assertions, stub sources 4 files / 672 lines in 4
+  assemblies. **These move within hours, not days** - two landed while this bullet was being written.
+  Treat them as a snapshot of a command, never as a fact to quote.
+- **The consumer's banned-substring list is five names, not six.** `UiSourceInvariantTests` forbids
+  `UiInteract`, `Palette`, `SurfaceFrame`, `UiText`, `UiValueStore`
+  (`../UniversalSqueaker/tools/UniversalSqueakerUiLogicTests/UiSourceInvariantTests.cs:103`). `UiPanel`
+  appears in prose in both repos and in no source list anywhere. The error is in the safe direction - it
+  over-bans, never under-bans - but it sends a session hunting for a rule that does not exist, and the
+  phantom still lives in the consumer's own `MEMORY.md`.
+- **Documentation describes a moment, not a state.** A commit anchor in a prose doc rots the next time
+  code lands; during this tidy the tree moved `958ac7d → 44b00c5 → c2aca8e → b2006a0 → 3b549d6` in about
+  thirty minutes, retiring a "measured at <sha>" claim twice. Prefer a re-derivable command and a date
+  over an anchor nobody re-checks.
