@@ -21,6 +21,11 @@
   by hand and skips it silently reintroduces "covered trigger steals the option click", which is
   exactly the defect the US side reported and fixed the same day. Any new dropdown-shaped surface must
   go through `UiPopup`; a second copy of either rule is a defect, not a style choice.
+- **Contract axis is 0.2.0 (2026-09-04, `b2006a0`) and the bump rule is tightened**: pre-1.0, any
+  change to the public surface — additions included — bumps `Api.Minor`, and `About/About.xml
+  <modVersion>` moves with it. The 0.1.0 → 0.2.0 bump exists because an additive type (UiPopup)
+  shipped without one and a consumer desynced into a TypeLoadException inside UiHost.Draw; the
+  tightened rule is what makes Require's readable-report promise hold in both directions.
 - Still unverified in game, both cheap, both in `TODO.md` §1: the guard's deliberate duplicate-DLL
   branch, and the failure shape when the carrier is absent. Everything else in this file remains
   compile-time, stub-harness or reference-assembly evidence — say so rather than implying a game run.
