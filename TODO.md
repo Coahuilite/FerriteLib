@@ -22,15 +22,22 @@ never executed inside the game and both are load-bearing:
 
 ## 2. Second consumer: NivarianGrandStructure
 
-Ruled shape: NGS's consumer assembly uses UiKit directly; `MegastructureFramework` keeps only
-megastructure capability and sheds its UI. Its `Window_MegastructureNavigation` + `MegastructureNavigationUi`
-and the `MSF_Navigation_*` key set move to the consumer side.
-
-- [ ] Before touching NGS: it currently builds against a machine-local game path, so decide whether it
-      moves to the same RimRef + relative-reference scheme as US.
+- [ ] Before touching NGS: it builds against a machine-local game path, so decide whether it moves to
+      the same RimRef + relative-reference scheme US and this repo use.
 - [ ] First NGS slice should be a **dialog-shaped** surface (the operator-console family), not the
       tactical table. The table is a full-screen world-overlay window with hand-flowed rects and
       per-window private interaction state; it is the worst available first test of a page model.
+- [ ] Settled by the maintainer, and it narrows the earlier separation proposal: the colonist-bar
+      navigation affordance **stays in `MegastructureFramework`**, because the framework must at least
+      let a player find a pawn inside a megastructure. Only the **window** moves to the consumer.
+      Recorded consequence, so the rule is not written down as something it no longer is: "the
+      framework owns capability and zero UI" is now false, and "zero translation keys" is
+      unreachable - `MegastructureRecords.cs:87-88` owns `MSF_Navigation_Open` and
+      `MSF_Navigation_OpenDesc`, the affordance's label and description. The boundary that survives is:
+      **the framework may own the affordance that reaches an in-world thing, including its own two
+      strings; it may not own a window, a layout, or a session.** Dependency direction is unaffected -
+      `MegastructureFramework` still takes no reference to this library, because an affordance label
+      needs no UiKit. Verify that holds when the work is actually done rather than assuming it.
 - [ ] Record what the table needs from the library. If it needs only theme + drawing helpers + text
       metrics, that is the visual-core seam paying for itself; if it needs the session and the engine,
       the boundary claim in AGENTS.md is too narrow and should be revised from evidence.

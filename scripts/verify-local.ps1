@@ -14,7 +14,8 @@ $ErrorActionPreference = "Stop"
 #   3   library Release build (TreatWarningsAsErrors)
 #   4   mod payload present at the path consumers bind to
 #   5   payload is content-free: no Defs, Patches, Languages, Sounds or Textures under 1.6
-#       (a Dev build legitimately leaves a .pdb in the payload folder; pack-dev strips it)
+#   6   LICENSE present and full MPL-2.0, with no applied incompatibility notice
+#   7   About.xml identity (packageId, modVersion present and parsable as a Version)
 # -PackDev: after all checks pass, produce the dev mod package and the consumable NuGet package.
 #
 # The neutrality guard, the visual-core/page-model boundary and the two version axes all run INSIDE
@@ -87,6 +88,31 @@ Invoke-Check 'carries no game content (assemblies-only mod)' `
             if (Test-Path -LiteralPath $probe) {
                 throw "FerriteLib ships assemblies only, found a content directory: $probe"
             }
+        }
+    }
+
+Invoke-Check 'LICENSE present and MPL-2.0' `
+    'manually' `
+    {
+        $licensePath = Join-Path $root 'LICENSE'
+        if (-not (Test-Path -LiteralPath $licensePath -PathType Leaf)) {
+            throw "FerriteLib has no LICENSE file."
+        }
+        $text = Get-Content -LiteralPath $licensePath -Raw
+        if ($text -notmatch 'Mozilla Public License Version 2\.0') { throw 'LICENSE is not the MPL-2.0 text.' }
+        # A truncated paste is the realistic failure: someone copies the header and stops.
+        if ($text -notmatch 'Exhibit B') { throw 'LICENSE is missing Exhibit B; the text is truncated.' }
+        if ($text -notmatch '10\.4\. Distributing Source Code Form') { throw 'LICENSE is missing section 10.4; the text is truncated.' }
+        # Deliberately NOT declared incompatible with secondary licenses: that would bar the assembly
+        # from being combined with GPL-family mods, and nothing here needs it.
+        #
+        # Scoped to the header block on purpose. The full MPL text reproduced below always contains
+        # Exhibit B's sample notice, so searching the whole file reports a defect in every correct
+        # copy of the licence - the assertion that failed here, not the file.
+        $separator = $text.IndexOf('-----')
+        $header = if ($separator -gt 0) { $text.Substring(0, $separator) } else { $text }
+        if ($header -match 'Incompatible With Secondary Licenses., as defined') {
+            throw 'The applied notice declares incompatibility with secondary licenses; that was meant to stay allowed.'
         }
     }
 

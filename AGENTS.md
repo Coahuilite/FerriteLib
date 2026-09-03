@@ -13,6 +13,11 @@
   entire contribution is `1.6/Assemblies/FerriteLib.UiKit.dll`. There are therefore zero translation
   keys here today — do not add a `Languages/` folder to "fix" a missing string; the string belongs to
   whichever consumer renders it.
+- License is **MPL-2.0** across the Coahuilite mod series, `LICENSE` byte-identical in each repo, and
+  deliberately **not** carrying an "Incompatible With Secondary Licenses" notice, so the assembly can
+  still be combined with GPL-family mods. A distributed mod package is an *Executable Form*, so MPL 3.2
+  obliges us to say how to get source: `pack-dev.ps1` copies `LICENSE` into the package, and
+  `verify-local` gate 6 rejects a truncated paste or an applied incompatibility notice.
 - Log prefix for the library's own diagnostics: `[FerriteLib.UiKit]`. It is not a Def prefix and not a
   packageId.
 - Known consumers: `coahuilite.universalsqueaker` (Universal Squeaker, first and only one wired so

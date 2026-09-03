@@ -34,6 +34,14 @@ Copy-Item -LiteralPath (Join-Path $root 'About\About.xml') -Destination (Join-Pa
 Copy-Item -LiteralPath (Join-Path $root 'LoadFolders.xml') -Destination (Join-Path $stageDir 'LoadFolders.xml') -Force
 Copy-Item -LiteralPath (Join-Path $payloadDir 'FerriteLib.UiKit.dll') -Destination (Join-Path $stageDir '1.6\Assemblies\FerriteLib.UiKit.dll') -Force
 
+# MPL-2.0 section 3.2: a distributed Executable Form must say how to obtain the Source Code Form, so
+# the licence text travels inside the mod package rather than living only in the repository.
+$licenseSource = Join-Path $root 'LICENSE'
+if (-not (Test-Path -LiteralPath $licenseSource -PathType Leaf)) {
+    throw "Missing LICENSE: the carrier package is MPL-2.0 covered and must ship the licence text."
+}
+Copy-Item -LiteralPath $licenseSource -Destination (Join-Path $stageDir 'LICENSE') -Force
+
 $label = (Select-String -LiteralPath $projectFile -Pattern '<VersionPrefix>(.*?)</VersionPrefix>').Matches[0].Groups[1].Value
 $suffixNode = (Select-String -LiteralPath $projectFile -Pattern '<VersionSuffix>(.*?)</VersionSuffix>')
 if ($suffixNode) { $label = "$label-$($suffixNode.Matches[0].Groups[1].Value)" }
