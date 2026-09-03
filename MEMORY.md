@@ -55,8 +55,11 @@
 
 ## Gates and what each actually proves
 
-Six gates in `scripts/verify-local.ps1`; the harness reports 13 lanes. Three of them are worth naming
-because they are the reason this repo can be trusted across a boundary:
+Seven gates in `scripts/verify-local.ps1` (the seventh asserts the series licence is present, un-truncated,
+and byte-identical to the consumer's copy); the harness is 13 test files carrying 61 named assertions.
+(The older wording here was "13 lanes", which counted files and read like an assertion count — prefer the
+explicit numbers.) Three assertions groups are worth naming because they are the reason this repo can be
+trusted across a boundary:
 
 - Version contract lane (10 assertions): range accept/reject, pre-1.0 minor-is-breaking, inverted range
   as a caller error, exact-API acceptance, duplicate-carrier detection driven through the internal

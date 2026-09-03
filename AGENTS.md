@@ -20,8 +20,9 @@
   `verify-local` gate 6 rejects a truncated paste or an applied incompatibility notice.
 - Log prefix for the library's own diagnostics: `[FerriteLib.UiKit]`. It is not a Def prefix and not a
   packageId.
-- Known consumers: `coahuilite.universalsqueaker` (Universal Squeaker, first and only one wired so
-  far), `coahuilite.nivariansgrandstructure` (planned next).
+- Known consumers: `coahuilite.universalsqueaker` (Universal Squeaker, the only one wired so far, and the
+  only one whose behaviour this library's shape has been validated against).
+  `coahuilite.nivariansgrandstructure` is **deferred by maintainer decision (2026-09-04)**, not scheduled.
 
 ## What this library is for
 
@@ -62,11 +63,16 @@ the visual core without the whole DLL.
   composited through a RenderTexture blit, not expected to sort above the HUD.
 - **API freeze is gated on a second wired consumer**, not on features. Until NivarianGrandStructure
   actually builds against this surface, the public API is provisional and breaking changes are expected.
+  **Caveat added with the publication decision (2026-09-04, `TODO.md` §5)**: "breaking changes are
+  expected" is true *within our own repos* because we release in lockstep. It stops being free the moment
+  a Workshop page carries a stable packageId, because a third party can then compile against this surface
+  and lockstep cannot protect them. Do not read this invariant as licence to break things after publishing;
+  the invited-vs-unsupported call on the page is what settles it, and it has not been made yet.
 
 ## Build and verification
 
 ```powershell
-pwsh -NoProfile -File scripts/verify-local.ps1          # 6 gates
+pwsh -NoProfile -File scripts/verify-local.ps1          # 7 gates
 pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev # + mod zip and NuGet package
 ```
 
