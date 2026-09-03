@@ -26,6 +26,13 @@
   <modVersion>` moves with it. The 0.1.0 → 0.2.0 bump exists because an additive type (UiPopup)
   shipped without one and a consumer desynced into a TypeLoadException inside UiHost.Draw; the
   tightened rule is what makes Require's readable-report promise hold in both directions.
+- **Pointer-space contract (2026-09-04, `9a197a2`)**: inside scroll/group scopes `Event.current.mousePosition`
+  arrives in the container's draw space, while popup rects are published in Host window space. Any
+  comparison between the two must convert through the caller's `ctx` origin (`UiNative.PointerPositionIn`);
+  comparing raw is the defect that stole every covered option click in game. The stub harness now models
+  IMGUI group origins, hot-control capture/activation and per-pass control ids, and two pump lanes drive
+  real event passes (flat and scrolled+offset); restoring the raw comparison fails the scrolled lane with
+  the same trace signature as the in-game log.
 - Still unverified in game, both cheap, both in `TODO.md` §1: the guard's deliberate duplicate-DLL
   branch, and the failure shape when the carrier is absent. Everything else in this file remains
   compile-time, stub-harness or reference-assembly evidence — say so rather than implying a game run.
