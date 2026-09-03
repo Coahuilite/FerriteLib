@@ -12,6 +12,15 @@
   `FerriteLib.UiKit.dll` present only in the carrier mod, with no red text and no type-load failure. The
   sibling-`HintPath` + `<Private>False` design is therefore correct, and "ship a copy / go NuGet with
   Private=true" is rejected on evidence rather than preference. This was the top open risk and it is gone.
+- **`UiPopup` is the single popup geometry and input primitive (2026-09-04, `44b00c5`).** `RectFor`
+  (below / flip above / pin to viewport top / horizontal clamp / unpublished-viewport pass-through)
+  and `DrawOptionList` (panel, single-line option rows, `UiSession.SetPopupRect` publication, row
+  hit-test, consume-close-callback) live in one place; `DropdownWidget` and the US composite
+  `UsKernelDraw.Dropdown` both delegate to it. The publication is what makes
+  `UiNative.DropdownButtonCore`'s yield guard able to fire at all — a consumer that redraws popup rows
+  by hand and skips it silently reintroduces "covered trigger steals the option click", which is
+  exactly the defect the US side reported and fixed the same day. Any new dropdown-shaped surface must
+  go through `UiPopup`; a second copy of either rule is a defect, not a style choice.
 - Still unverified in game, both cheap, both in `TODO.md` §1: the guard's deliberate duplicate-DLL
   branch, and the failure shape when the carrier is absent. Everything else in this file remains
   compile-time, stub-harness or reference-assembly evidence — say so rather than implying a game run.
