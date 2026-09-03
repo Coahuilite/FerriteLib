@@ -100,3 +100,21 @@ Each item is expected to delete a workaround, not add a layer.
       metadata, so nothing here depends on it; if someone wants it, it is a two-minute in-game test.
 - [x] License settled: MPL-2.0 across the series, `LICENSE` verbatim and without the Exhibit B
       incompatibility notice, copied into the distributed package by `pack-dev.ps1`.
+
+## 5. Publication as a real prerequisite — decided 2026-09-04
+
+- [ ] FerriteLib will get its own Workshop page and US will be released **in lockstep** with it, per the
+      maintainer's decision. The dual-version-line cost was raised and answered: synchronised releases
+      carry it, and `FerriteLibVersion.Require`'s range assertion is what catches a player who updated US
+      but not the carrier — that path already degrades to a readable error rather than a crash.
+- [ ] **Sequencing consequence, which is the one thing this decision actually changes**: publishing freezes
+      the public surface in practice, because subscribers keep whatever shipped and a later breaking
+      change hits them. §3 and the per-surface theme restructure in §4 are all breaking by their own
+      admission. So either land them **before the first upload**, or accept that they stop being
+      breaking edits and become compatibility shims from that moment. This is a one-time ordering choice,
+      not a permanent constraint — decide it once, before the upload, rather than discovering it after.
+- [ ] A no-content library mod will draw "what is this doing in my mod list". Its `description` has to
+      answer that in one sentence, name the mods that need it, and say plainly that it has no content of
+      its own and must not be uninstalled while a consumer is present.
+- [ ] `About.xml` currently carries a placeholder-grade description and no preview. Both are player-facing
+      on a Workshop page and are not yet written.
