@@ -88,7 +88,7 @@ public static class UiNative
     /// </summary>
     public static bool DropdownButton(Rect rect, string elementId, UiSession session)
     {
-        return DropdownButtonCore(rect, elementId, session, rect);
+        return DropdownButtonCore(rect, elementId, session, rect, null);
     }
 
     /// <summary>
@@ -101,10 +101,10 @@ public static class UiNative
     public static bool DropdownButton(Rect rect, string elementId, UiWidgetContext ctx)
     {
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
-        return DropdownButtonCore(rect, elementId, ctx.Session, ctx.ToWindowRect(rect));
+        return DropdownButtonCore(rect, elementId, ctx.Session, ctx.ToWindowRect(rect), ctx);
     }
 
-    private static bool DropdownButtonCore(Rect rect, string elementId, UiSession session, Rect anchor)
+    private static bool DropdownButtonCore(Rect rect, string elementId, UiSession session, Rect anchor, UiWidgetContext? ctx)
     {
         if (session == null) throw new ArgumentNullException(nameof(session));
         if (string.IsNullOrEmpty(elementId)) throw new ArgumentException("Dropdown element id is required.", nameof(elementId));
@@ -112,13 +112,16 @@ public static class UiNative
         // A popup drawn over this trigger must win the click. The popup pass runs after content, so
         // without this a pointer inside both rects would toggle this trigger first and silently drop
         // the selection the popup row was about to make.
-        bool yields = YieldsToCoveringPopup(session, elementId);
+        bool yields = YieldsToCoveringPopup(session, elementId, PointerPositionIn(ctx));
         if (Trace != null && session.OpenPopupId != null)
         {
+            Vector2 local = PointerPosition();
+            Vector2 window = PointerPositionIn(ctx);
             Trace("trigger id=" + elementId
                 + " owner=" + session.OpenPopupId
                 + " event=" + (Event.current != null ? Event.current.type.ToString() : "none")
-                + " pointer=" + Describe(PointerPosition())
+                + " pointerLocal=" + Describe(local)
+                + " pointerWindow=" + Describe(window)
                 + " rect=" + (session.OpenPopupRect.HasValue ? Describe(session.OpenPopupRect.Value) : "null")
                 + " yields=" + (yields ? "true" : "false"));
         }
@@ -263,6 +266,32 @@ public static class UiNative
         return current != null && current.type == EventType.MouseDrag && current.button == 0;
     }
 
+    /// <summary>
+    /// True when another element's popup currently covers the pointer. The owning element itself is
+    /// excluded so its trigger keeps normal toggle-to-close behaviour. The pointer arrives in the
+    /// caller's draw space (inside scroll/group scopes it is NOT window space), so it is converted
+    /// with the same origin the trigger's own anchor used; comparing the raw event position against
+    /// the window-space popup rect is the 2026-09-04 bug that let covered triggers steal every click.
+    /// </summary>
+    private static bool YieldsToCoveringPopup(UiSession session, string elementId, Vector2 pointerWindow)
+    {
+        string? owner = session.OpenPopupId;
+        if (owner == null || string.Equals(owner, elementId, StringComparison.Ordinal)) return false;
+        return session.IsPointOverPopup(pointerWindow);
+    }
+
+    /// <summary>
+    /// The event pointer translated into Host window space through the caller's own origin, so it is
+    /// comparable with the published popup rect. Callers without a context (already window-space)
+    /// keep the raw position.
+    /// </summary>
+    private static Vector2 PointerPositionIn(UiWidgetContext? ctx)
+    {
+        Vector2 point = PointerPosition();
+        if (ctx == null) return point;
+        return ctx.ToWindowRect(new Rect(point.x, point.y, 0f, 0f)).position;
+    }
+
     public static bool IsPointerUp()
     {
         if (DebugMousePositionEnabled) return DebugMouseUp;
@@ -287,16 +316,6 @@ public static class UiNative
     {
         return rect.x.ToString("F1", CultureInfo.InvariantCulture) + "," + rect.y.ToString("F1", CultureInfo.InvariantCulture)
             + "," + rect.width.ToString("F1", CultureInfo.InvariantCulture) + "," + rect.height.ToString("F1", CultureInfo.InvariantCulture);
-    }
-    /// <summary>
-    /// True when another element's popup currently covers the pointer. The owning element itself is
-    /// excluded so its trigger keeps normal toggle-to-close behaviour.
-    /// </summary>
-    private static bool YieldsToCoveringPopup(UiSession session, string elementId)
-    {
-        string? owner = session.OpenPopupId;
-        if (owner == null || string.Equals(owner, elementId, StringComparison.Ordinal)) return false;
-        return session.IsPointOverPopup(PointerPosition());
     }
 
     /// <summary>

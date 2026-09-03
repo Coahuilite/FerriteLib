@@ -28,6 +28,8 @@ internal static class KernelPopupTests
     public static int RunAll()
     {
         int failures = 0;
+        failures += Run("Covered trigger yields under a real IMGUI event pump", VerifyCoveredTriggerYieldsUnderRealEventPump);
+        failures += Run("Covered trigger yields inside a scrolled, offset container", VerifyCoveredTriggerYieldsInsideScrolledOffsetContainer);
         failures += Run("Scroll dropdown anchor/popup share Host window space", VerifyScrollDropdownWindowSpace);
         failures += Run("Popup row over a lower trigger selects, and does not open that trigger", VerifyPopupWinsOverCoveredTrigger);
         failures += Run("Popup flips above the trigger instead of leaving the viewport", VerifyPopupFlipsIntoViewport);
@@ -254,6 +256,190 @@ internal static class KernelPopupTests
         }
     }
 
+    /// <summary>
+    /// The overlap lane above clicks through UiNative.ButtonOverride, which proves our yield logic but
+    /// not its interaction with the native control contract the game actually runs. This lane pumps
+    /// real event passes (Layout/MouseDown/MouseUp/Repaint) through the faithful stub ButtonInvisible
+    /// (hot-control capture on down, activation on up, event consumption) with no override and no
+    /// debug seam: if a control drawn earlier in the pass can still steal the option click, it steals
+    /// it here.
+    /// </summary>
+    private static void VerifyCoveredTriggerYieldsUnderRealEventPump()
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+
+        const string xml =
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Column Id=\"col\" Gap=\"2\">"
+            + "<Widget Id=\"first\" Kind=\"input/dropdown\" OptionsBind=\"Options\" />"
+            + "<Widget Id=\"second\" Kind=\"input/dropdown\" OptionsBind=\"Options\" />"
+            + "</Column>"
+            + "</UiPage>";
+
+        UiLayoutManifest manifest = UiLayoutManifest.Parse(xml);
+        var bindings = new UiBindings();
+        string first = "x";
+        string second = "x";
+        bindings.BindValue("first", () => first, value => first = value);
+        bindings.BindValue("second", () => second, value => second = value);
+        bindings.BindOptions("Options", () => new List<string> { "x", "y" });
+
+        using UiHost host = new(Scope, manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+
+        var trace = new List<string>();
+        UiNative.Trace = trace.Add;
+        Vector2 openClick = new(10f, 10f);
+        Vector2 optionClick = new(10f, 55f);
+        try
+        {
+            Pump(host, EventType.Layout, openClick);
+            Pump(host, EventType.MouseDown, openClick);
+            Pump(host, EventType.MouseUp, openClick);
+            Pump(host, EventType.Repaint, openClick);
+
+            if (!host.Session.IsPopupOpen("first"))
+            {
+                throw new Exception("real-event pump did not open the first dropdown; trace: " + string.Join(" | ", trace));
+            }
+
+            if (!host.Session.OpenPopupRect.HasValue)
+            {
+                throw new Exception("popup rect was not published under the real-event pump");
+            }
+
+            Pump(host, EventType.Layout, optionClick);
+            Pump(host, EventType.MouseDown, optionClick);
+            Pump(host, EventType.MouseUp, optionClick);
+            Pump(host, EventType.Repaint, optionClick);
+
+            if (!string.Equals(first, "y", StringComparison.Ordinal))
+            {
+                throw new Exception("option under a lower trigger did not select under the real-event pump (first='" + first + "'); trace: " + string.Join(" | ", trace));
+            }
+
+            if (host.Session.IsPopupOpen("second"))
+            {
+                throw new Exception("the covered trigger stole the click under the real-event pump; trace: " + string.Join(" | ", trace));
+            }
+
+            if (host.Session.IsPopupOpen("first"))
+            {
+                throw new Exception("popup stayed open after its option was selected under the real-event pump");
+            }
+        }
+        finally
+        {
+            UiNative.Trace = null;
+            Event.current = null;
+            GUIUtility.hotControl = 0;
+        }
+    }
+
+    private static void Pump(UiHost host, EventType type, Vector2 point)
+    {
+        // Compiled against the real UnityEngine surface (Krafs ref): Event has no public constructor,
+        // so take an instance from the static factory and overwrite the fields the lanes need. At
+        // runtime this binds to the stub Event, which mirrors the same shape; a fresh instance per
+        // pass is also what makes the stub's control-id counter reset per pass.
+        Event e = Event.KeyboardEvent("space");
+        e.type = type;
+        e.button = 0;
+        e.mousePosition = point;
+        Event.current = e;
+        host.DrawFrame(new Rect(0f, 0f, 300f, 300f));
+        Event.current = null;
+    }
+
+
+    /// <summary>
+    /// Regression for the 2026-09-04 in-game failure: inside a scroll container under a non-zero
+    /// viewport origin, the event pointer lives in the container's draw space while the published
+    /// popup rect lives in Host window space. Comparing them raw made every yield decision false and
+    /// let the covered trigger steal the option click. The lane derives the container origin from a
+    /// probe pass (trace reports both spaces), then clicks the overlapping option in draw space and
+    /// demands the selection land without the lower dropdown opening.
+    /// </summary>
+    private static void VerifyCoveredTriggerYieldsInsideScrolledOffsetContainer()
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+        UiWidgetRegistry.Register(Scope, HeightWidgetKind, () => new HeightWidget());
+
+        const string xml =
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Scroll Id=\"scroll\" Height=\"200\">"
+            + "<Column Id=\"col\" Gap=\"2\">"
+            + "<Widget Id=\"spacer\" Kind=\"" + HeightWidgetKind + "\" Height=\"300\" />"
+            + "<Widget Id=\"first\" Kind=\"input/dropdown\" OptionsBind=\"Options\" />"
+            + "<Widget Id=\"second\" Kind=\"input/dropdown\" OptionsBind=\"Options\" />"
+            + "</Column>"
+            + "</Scroll>"
+            + "</UiPage>";
+
+        UiLayoutManifest manifest = UiLayoutManifest.Parse(xml);
+        var bindings = new UiBindings();
+        string first = "x";
+        string second = "x";
+        bindings.BindValue("first", () => first, value => first = value);
+        bindings.BindValue("second", () => second, value => second = value);
+        bindings.BindOptions("Options", () => new List<string> { "x", "y" });
+
+        using UiHost host = new(Scope, manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        host.Session.SetScrollPosition("scroll", new Vector2(0f, 40f));
+
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(300f, 300f));
+        host.Session.OpenPopup("first", snapshot.RectById["first"]);
+
+        var trace = new List<string>();
+        UiNative.Trace = trace.Add;
+        try
+        {
+            // First pass publishes the popup rect; the trace also reveals the container origin,
+            // because a draw-space point at (0,0) maps to the origin in window space.
+            Pump(host, EventType.Repaint, new Vector2(0f, 0f));
+
+            if (!host.Session.IsPopupOpen("first") || !host.Session.OpenPopupRect.HasValue)
+            {
+                throw new Exception("scrolled container did not open/publish the popup; trace: " + string.Join(" | ", trace));
+            }
+
+            Rect popup = host.Session.OpenPopupRect.Value;
+
+            // The pumped pointer is window space; the stub group model presents it to the content
+            // pass in container-local space and to the popup pass in window space, exactly like the
+            // real IMGUI groups do in game.
+            Vector2 optionClick = new(popup.x + 10f, popup.y + 27f);
+            Pump(host, EventType.Layout, optionClick);
+            Pump(host, EventType.MouseDown, optionClick);
+            Pump(host, EventType.MouseUp, optionClick);
+            Pump(host, EventType.Repaint, optionClick);
+
+            // Premise: the covered trigger must have seen the converted pointer inside the popup,
+            // otherwise this lane would pass without the overlap ever existing.
+            if (!trace.Exists(line => line.IndexOf("id=second", StringComparison.Ordinal) >= 0
+                && line.IndexOf("yields=true", StringComparison.Ordinal) >= 0))
+            {
+                throw new Exception("the lower trigger never saw the pointer inside the popup; overlap premise broken; trace: " + string.Join(" | ", trace));
+            }
+
+            if (!string.Equals(first, "y", StringComparison.Ordinal))
+            {
+                throw new Exception("option under a lower trigger did not select inside the scrolled container (first='" + first + "'); trace: " + string.Join(" | ", trace));
+            }
+
+            if (host.Session.IsPopupOpen("second"))
+            {
+                throw new Exception("the covered trigger stole the click inside the scrolled container; trace: " + string.Join(" | ", trace));
+            }
+        }
+        finally
+        {
+            UiNative.Trace = null;
+            Event.current = null;
+            GUIUtility.hotControl = 0;
+        }
+    }
     /// <summary>
     /// A popup that would run past the bottom of the Host viewport cannot be clicked at all, so it must
     /// flip above its trigger rather than be clipped away.

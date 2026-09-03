@@ -303,11 +303,38 @@ public static class Widgets
 
     public static bool ButtonInvisible(Rect rect)
     {
-        return false;
+        return ButtonInvisibleCore(rect);
     }
 
     public static bool ButtonInvisible(Rect rect, bool doSound)
     {
+        return ButtonInvisibleCore(rect);
+    }
+
+    // Faithful to the contract the game actually runs: MouseDown over the rect captures the hot
+    // control and consumes the event; MouseUp with a matching hot control over the rect activates and
+    // consumes it. A stub that always returned false could not express a click being stolen by a
+    // control drawn earlier in the same pass - the exact failure shape reported from the game.
+    private static bool ButtonInvisibleCore(Rect rect)
+    {
+        Event? e = Event.current;
+        if (e == null || e.button != 0) return false;
+
+        int id = GUIUtility.GetControlID(0, FocusType.Passive);
+        if (e.type == EventType.MouseDown && Mouse.IsOver(rect))
+        {
+            GUIUtility.hotControl = id;
+            e.Use();
+            return false;
+        }
+
+        if (e.type == EventType.MouseUp && GUIUtility.hotControl == id)
+        {
+            GUIUtility.hotControl = 0;
+            e.Use();
+            return Mouse.IsOver(rect);
+        }
+
         return false;
     }
 
@@ -332,20 +359,24 @@ public static class Widgets
 
     public static void BeginScrollView(Rect outRect, ref Vector2 scrollPosition, Rect viewRect)
     {
-        ScrollViewDepth++;
-        BeginScrollViewCalls++;
+        BeginScrollView(outRect, ref scrollPosition, viewRect, true);
     }
 
     public static void BeginScrollView(Rect outRect, ref Vector2 scrollPosition, Rect viewRect, bool showVerticalScrollbar)
     {
         ScrollViewDepth++;
         BeginScrollViewCalls++;
+        // Real scroll views open a GUI group whose origin is the visible out rect minus the scroll
+        // offset; controls inside then draw and hit-test in content-local space. The stub models that
+        // so pointer-space defects like the 2026-09-04 click theft are expressible in the harness.
+        UnityEngine.GUI.BeginGroup(new Rect(outRect.x - scrollPosition.x, outRect.y - scrollPosition.y, viewRect.width, viewRect.height));
     }
 
     public static void EndScrollView()
     {
         if (ScrollViewDepth > 0) ScrollViewDepth--;
         EndScrollViewCalls++;
+        UnityEngine.GUI.EndGroup();
     }
 }
 
@@ -353,7 +384,10 @@ public static class Mouse
 {
     public static bool IsOver(Rect rect)
     {
-        return false;
+        Event? e = Event.current;
+        if (e == null) return false;
+        Vector2 p = e.mousePosition;
+        return p.x >= rect.x && p.x <= rect.xMax && p.y >= rect.y && p.y <= rect.yMax;
     }
 }
 

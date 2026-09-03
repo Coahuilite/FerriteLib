@@ -15,6 +15,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\UnityEngineStub\UnityEngineStub.csproj" />
+    <!-- The real Assembly-CSharp references UnityEngine.IMGUIModule; the faithful ButtonInvisible
+         model needs Event/GUIUtility from the IMGUI stub. -->
+    <ProjectReference Include="..\UnityEngineImGuiStub\UnityEngineImGuiStub.csproj" />
   </ItemGroup>
 
 </Project>
