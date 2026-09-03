@@ -31,6 +31,7 @@ internal static class KernelPopupTests
         failures += Run("Scroll dropdown anchor/popup share Host window space", VerifyScrollDropdownWindowSpace);
         failures += Run("Popup row over a lower trigger selects, and does not open that trigger", VerifyPopupWinsOverCoveredTrigger);
         failures += Run("Popup flips above the trigger instead of leaving the viewport", VerifyPopupFlipsIntoViewport);
+        failures += Run("UiPopup rect rules: below, flip, pin, clamp, unpublished viewport", VerifyUiPopupRectRules);
         return failures;
     }
 
@@ -296,6 +297,47 @@ internal static class KernelPopupTests
         {
             UiNative.ButtonOverride = null;
             UiNative.DebugMousePositionEnabled = false;
+        }
+    }
+
+    /// <summary>
+    /// The rect rule every popup consumer shares, asserted branch by branch because each host-driven
+    /// lane only exercises one: below the anchor when it fits, flipped above when only that fits,
+    /// pinned to the viewport top when it fits neither, clamped horizontally past the right edge, and
+    /// untouched while the host has published no viewport at all.
+    /// </summary>
+    private static void VerifyUiPopupRectRules()
+    {
+        Rect viewport = new(0f, 0f, 400f, 300f);
+
+        Rect below = UiPopup.RectFor(new Rect(100f, 200f, 80f, 24f), 2, viewport);
+        if (below.y != 224f || below.height != 48f)
+        {
+            throw new Exception("a popup that fits below must stay below its anchor: " + below);
+        }
+
+        Rect flipped = UiPopup.RectFor(new Rect(100f, 270f, 80f, 24f), 2, viewport);
+        if (Math.Abs(flipped.yMax - 270f) > 0.01f)
+        {
+            throw new Exception("a popup that cannot fit below must flip above its anchor: " + flipped);
+        }
+
+        Rect pinned = UiPopup.RectFor(new Rect(100f, 100f, 80f, 24f), 20, viewport);
+        if (pinned.y != viewport.y)
+        {
+            throw new Exception("a popup taller than both sides' room must pin to the viewport top: " + pinned);
+        }
+
+        Rect right = UiPopup.RectFor(new Rect(360f, 100f, 80f, 24f), 2, viewport);
+        if (right.xMax > viewport.xMax + 0.01f)
+        {
+            throw new Exception("a popup past the right edge must clamp horizontally: " + right);
+        }
+
+        Rect unpublished = UiPopup.RectFor(new Rect(100f, 200f, 80f, 24f), 2, new Rect(0f, 0f, 0f, 0f));
+        if (unpublished.y != 224f)
+        {
+            throw new Exception("without a published viewport the plain below-anchor placement must stay: " + unpublished);
         }
     }
 
