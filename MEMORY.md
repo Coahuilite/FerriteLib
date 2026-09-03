@@ -7,10 +7,14 @@
 - Provenance: `Source/FerriteLib.UiKit/**` and `tools/FerriteLib.UiKit.Tests/**` were copied out of the
   US repo at US commit `0fe60b0` after a file-for-file `diff -r` check, then amended there. US retains
   its own history; this repo's history starts at the split.
-- **Nothing in this repository has been verified inside a running game.** Everything below is backed by
-  compilation, the stub harness, or reference-assembly inspection. The cross-mod assembly binding
-  (US's `UniversalSqueaker.dll` resolving its `FerriteLib.UiKit` reference through RimWorld at load
-  time) has never executed. That is the top open risk, in `TODO.md`.
+- **Cross-mod assembly binding is proven in a running game (2026-09-04).** US, shipping no FerriteLib
+  payload of its own, loaded and ran its whole settings page and camera overlay with
+  `FerriteLib.UiKit.dll` present only in the carrier mod, with no red text and no type-load failure. The
+  sibling-`HintPath` + `<Private>False` design is therefore correct, and "ship a copy / go NuGet with
+  Private=true" is rejected on evidence rather than preference. This was the top open risk and it is gone.
+- Still unverified in game, both cheap, both in `TODO.md` §1: the guard's deliberate duplicate-DLL
+  branch, and the failure shape when the carrier is absent. Everything else in this file remains
+  compile-time, stub-harness or reference-assembly evidence — say so rather than implying a game run.
 
 ## What was verified, and how
 

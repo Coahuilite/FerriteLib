@@ -1,24 +1,42 @@
 # TODO
 
-## 1. In-game verification — the only thing that can invalidate the split (blocking)
+## 1. In-game verification — status after the 2026-09-04 session
 
-Everything so far is compile-time, stub-harness and reference-assembly evidence. Two assumptions have
-never executed inside the game and both are load-bearing:
+The blocking risk is cleared. What remains is two branches that only change code if they surprise us.
 
-- [ ] **Cross-mod assembly binding.** `UniversalSqueaker.dll` carries an assembly reference to
-      `FerriteLib.UiKit`, satisfied at runtime by the carrier mod. Verify by installing both mods and
-      simply opening the US settings page. If RimWorld's resolver does not hand it the carrier's copy,
-      the sibling-`HintPath` design is wrong and the NuGet/`Private=true` question reopens.
-- [ ] **The carrier guard's own report path.** With both mods installed, confirm `Require` passes and
-      logs nothing; then copy `FerriteLib.UiKit.dll` into US's `1.6/Assemblies` deliberately and confirm
-      the `DUPLICATE CARRIER` line appears with both paths. This is the branch no harness can reach by
-      natural means.
-- [ ] **Language switch mid-window.** With the settings page open, change the game language and confirm
-      text bands re-measure (the cache key now includes `TranslationRevision`). Reproduce the old shape
-      first if possible: before the fix, English→Chinese or back should have left stale bands.
-      `usdiag evt=ui.text.overflow` with detailed logging on must stay silent afterwards.
-- [ ] FerriteLib appears in the mod list as "FerriteLib" with no content side effects, and toggling it
-      off makes the game refuse to load US with a readable unmet-dependency message.
+- [x] **Cross-mod assembly binding.** PROVEN. US installed without any FerriteLib payload of its own
+      resolved its `FerriteLib.UiKit` reference from the carrier mod, opened the settings page and the
+      camera overlay, and logged no error. Consequence: the sibling-`HintPath` + `<Private>False` design
+      stands, and shipping a copy / `Private=true` is rejected on evidence rather than on preference.
+- [x] **`Require` passes silently** when exactly one carrier is loaded — observed as no red text.
+- [x] FerriteLib appears in the mod list with no content side effects.
+- [ ] **The carrier guard's duplicate branch.** Copy `FerriteLib.UiKit.dll` into the *installed*
+      `Mods/UniversalSqueaker/1.6/Assemblies` (not the repo — three gates refuse it there, deliberately)
+      and restart. Record **which** of three outcomes occurs; all three are valid results, so this is not
+      a pass/fail test:
+      1. `DUPLICATE CARRIER` naming both paths → the guard works as designed.
+      2. No error and US runs → RimWorld deduped by assembly identity, so enumerating loaded assemblies
+         cannot see the second copy. The guard is then dead weight in exactly the case it was written
+         for, and it must compare file location/identity instead of counting names.
+      3. The game errors before US's constructor runs → the engine rejects duplicate assembly names
+         itself; the guard's value drops to build time, which the gates already cover.
+      `Verse.ModAssemblyHandler` installs a global AssemblyResolve (measured), so outcome 2 is the
+      likely one. **Do not read "no error" as a pass.**
+- [ ] **Failure shape with the carrier absent.** Disable or remove FerriteLib and report what the player
+      actually sees: a readable unmet-dependency message, a silent absence, or an exception wall. This is
+      the path a real user hits first and the only remaining item about a user-visible outcome.
+- [ ] **Bilingual overflow across two launches** (replaces the withdrawn "language switch mid-window").
+      That item is unreachable: switching language requires a restart, the restart destroys the settings
+      window, and `UiHost` with its cached snapshot is per-window, so a new window always sees a new
+      language. `TranslationRevision` in the cache key is harness-proven insurance against a future
+      in-place switch, **not** a fix for an observable defect, and must not be described louder than that.
+      What only the game can still tell us is real glyph advance: launch once in Chinese and once in
+      English, walk all five workspaces plus the overlay with detailed logging on, and confirm
+      `usdiag evt=ui.text.overflow` stays silent.
+      Optional 30-second edge: if `activeLanguage.folderName` changes when a language is *selected* while
+      Keyed tables only take effect after restart, then opening Options from the main menu, switching and
+      returning without restarting is a half-switched state. Look for visible misalignment; if none,
+      record it unreachable and add no mechanism.
 
 ## 2. Second consumer: NivarianGrandStructure
 
@@ -80,4 +98,5 @@ Each item is expected to delete a workaround, not add a layer.
 - [ ] Optional experiment: whether RimWorld tolerates an unknown tag in `About.xml`. The parsed tag set
       is closed (`ModMetaDataInternal`, 24 names) and no tolerance could be proven from stripped
       metadata, so nothing here depends on it; if someone wants it, it is a two-minute in-game test.
-- [ ] License for this mod is still undecided by the maintainer. No `LICENSE` file has been invented.
+- [x] License settled: MPL-2.0 across the series, `LICENSE` verbatim and without the Exhibit B
+      incompatibility notice, copied into the distributed package by `pack-dev.ps1`.
