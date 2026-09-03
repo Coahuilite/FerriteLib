@@ -180,6 +180,8 @@ internal static class KernelPopupTests
 
         // Triggers: first (0,0,300,28), second (0,30,300,28). First's popup covers y 28..76, so its
         // second option row (y 52..76) sits on top of the second trigger.
+        var trace = new List<string>();
+        UiNative.Trace = trace.Add;
         var click = new Vector2(10f, 55f);
         try
         {
@@ -233,10 +235,21 @@ internal static class KernelPopupTests
             {
                 throw new Exception("the lower dropdown's value changed without being opened (second='" + second + "')");
             }
+
+            if (!trace.Exists(line => line.IndexOf("yields=true", StringComparison.Ordinal) >= 0))
+            {
+                throw new Exception("the covered trigger never logged a yield decision: " + string.Join(" | ", trace));
+            }
+
+            if (!trace.Exists(line => line.IndexOf("option fired", StringComparison.Ordinal) >= 0))
+            {
+                throw new Exception("the option row never logged a fire: " + string.Join(" | ", trace));
+            }
         }
         finally
         {
             UiNative.ButtonOverride = null;
+            UiNative.Trace = null;
             UiNative.DebugMousePositionEnabled = false;
         }
     }

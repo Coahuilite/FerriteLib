@@ -112,8 +112,18 @@ public static class UiNative
         // A popup drawn over this trigger must win the click. The popup pass runs after content, so
         // without this a pointer inside both rects would toggle this trigger first and silently drop
         // the selection the popup row was about to make.
-        if (YieldsToCoveringPopup(session, elementId)) return false;
+        bool yields = YieldsToCoveringPopup(session, elementId);
+        if (Trace != null && session.OpenPopupId != null)
+        {
+            Trace("trigger id=" + elementId
+                + " owner=" + session.OpenPopupId
+                + " event=" + (Event.current != null ? Event.current.type.ToString() : "none")
+                + " pointer=" + Describe(PointerPosition())
+                + " rect=" + (session.OpenPopupRect.HasValue ? Describe(session.OpenPopupRect.Value) : "null")
+                + " yields=" + (yields ? "true" : "false"));
+        }
 
+        if (yields) return false;
         if (!Button(rect)) return false;
 
         if (session.IsPopupOpen(elementId))
@@ -137,7 +147,15 @@ public static class UiNative
         if (session == null) throw new ArgumentNullException(nameof(session));
         if (string.IsNullOrEmpty(elementId)) throw new ArgumentException("Dropdown element id is required.", nameof(elementId));
 
-        return session.IsPopupOpen(elementId) && Button(rowRect);
+        bool fired = session.IsPopupOpen(elementId) && Button(rowRect);
+        if (Trace != null && fired)
+        {
+            Trace("option fired id=" + elementId
+                + " event=" + (Event.current != null ? Event.current.type.ToString() : "none")
+                + " row=" + Describe(rowRect));
+        }
+
+        return fired;
     }
 
     public static float Slider(Rect rect, string elementId, UiSession session, float value, float min, float max, out bool changed)
@@ -252,6 +270,24 @@ public static class UiNative
         return current != null && current.type == EventType.MouseUp && current.button == 0;
     }
 
+    /// <summary>
+    /// Optional diagnostic sink for the input-routing decisions this type makes. The library stays
+    /// neutral: it reports caller-agnostic facts (element ids, rects, event types) and never logs
+    /// them itself; a consumer wires the hook to its own log when it needs in-game truth about click
+    /// routing that no stub harness can reproduce.
+    /// </summary>
+    public static Action<string>? Trace;
+
+    private static string Describe(Vector2 point)
+    {
+        return point.x.ToString("F1", CultureInfo.InvariantCulture) + "," + point.y.ToString("F1", CultureInfo.InvariantCulture);
+    }
+
+    internal static string Describe(Rect rect)
+    {
+        return rect.x.ToString("F1", CultureInfo.InvariantCulture) + "," + rect.y.ToString("F1", CultureInfo.InvariantCulture)
+            + "," + rect.width.ToString("F1", CultureInfo.InvariantCulture) + "," + rect.height.ToString("F1", CultureInfo.InvariantCulture);
+    }
     /// <summary>
     /// True when another element's popup currently covers the pointer. The owning element itself is
     /// excluded so its trigger keeps normal toggle-to-close behaviour.

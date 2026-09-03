@@ -72,6 +72,10 @@ public static class UiPopup
         // Published for the *next* frame's content pass: a click on a popup row is delivered in a
         // later frame than the one that drew the row, and only the triggers below can yield to it.
         ctx.Session.SetPopupRect(popupRect);
+        if (UiNative.Trace != null)
+        {
+            UiNative.Trace("publish id=" + elementId + " rect=" + UiNative.Describe(popupRect));
+        }
         UiThemeDraw.Panel(popupRect, ctx.Theme);
 
         for (int i = 0; i < options.Count; i++)
