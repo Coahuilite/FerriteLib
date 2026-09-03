@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>FerriteLib.UiKit</AssemblyName>
+    <RootNamespace>FerriteLib.UiKit</RootNamespace>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionSuffix>dev</VersionSuffix>
+    <AssemblyVersion>$(VersionPrefix).0</AssemblyVersion>
+    <FileVersion>$(VersionPrefix).0</FileVersion>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <OutputPath>..\..\1.6\Assemblies\</OutputPath>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- 本地离线环境：禁用 NuGet 漏洞审计，避免无网时被提升为错误。 -->
+    <NuGetAudit>false</NuGetAudit>
+    <RestoreUseStaticGraphEvaluation>true</RestoreUseStaticGraphEvaluation>
+  </PropertyGroup>
+
+  <!-- NuGet packaging: this assembly is what consumer mods compile against. The mod payload DLL and
+       the package both come out of this one project, so a consumer can never compile against a
+       different source than the DLL it will bind to at runtime. -->
+  <PropertyGroup>
+    <PackageId>FerriteLib.UiKit</PackageId>
+    <!-- The custom OutputPath points at the mod payload folder, and MSBuild derives
+         PackageOutputPath from it - which would drop the .nupkg next to the shipped DLL and risk
+         packaging a package inside a mod. Pin it to an ignored artifacts folder instead. -->
+    <PackageOutputPath>$(MSBuildThisFileDirectory)..\..\artifacts\package\</PackageOutputPath>
+    <Description>FerriteLib UiKit reference assembly for consumer mods. Runtime payload ships in the coahuilite.ferritelib mod; do not copy the DLL into a consumer package.</Description>
+    <Authors>Coahuilite</Authors>
+    <IncludeSymbols>false</IncludeSymbols>
+    <IncludeSource>false</IncludeSource>
+    <NoWarn>NU5128</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Dev'">
+    <DefineConstants>$(DefineConstants);FER_DEV</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reference-only: the game's managed surface. PrivateAssets keeps it out of the package's
+         dependency list, so a consumer's own pinned RimRef version is never overridden from here. -->
+    <PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4871" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

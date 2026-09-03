@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FerriteLib is a prerequisite mod: it ships no Defs, no Languages and no content. Its whole payload
+  is 1.6/Assemblies/FerriteLib.UiKit.dll, which consumer mods compile against through the local NuGet
+  feed and bind to at runtime.
+
+  The two version axes live apart on purpose:
+    - modVersion below is the RELEASE axis, parsed by the game and readable at runtime.
+    - FerriteLib.UiKit.Kernel.FerriteLibVersion.Api is the CONTRACT axis, and it is what consumers
+      assert against. The harness holds that the two agree on major.minor, so this field cannot drift.
+
+  RimWorld parses a closed tag set out of About.xml (packageId, name, shortName, author(s),
+  modIconPath, modVersion, url, description, steamAppId, supportedVersions, targetVersion,
+  modDependencies, load{Before,After}, incompatibleWith, forceLoad{Before,After} plus the *ByVersion
+  variants) and there is no catch-all, so no custom marker tag is used here.
+
+  Display name is confirmed as "FerriteLib". License stays undecided by maintainer; nothing is
+  published and no remote is configured.
+-->
+<ModMetaData>
+  <packageId>coahuilite.ferritelib</packageId>
+  <name>FerriteLib</name>
+  <author>Coahuilite</author>
+  <modVersion>0.1.0</modVersion>
+  <url></url>
+  <supportedVersions><li>1.6</li></supportedVersions>
+  <description>FerriteLib shared runtime library. Prerequisite for Coahuilite mods that use it; it adds no game content of its own.</description>
+</ModMetaData>

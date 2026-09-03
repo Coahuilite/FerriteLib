@@ -1,0 +1,25 @@
+# 编译输出
+bin/
+obj/
+*.dll
+*.pdb
+
+# 构建产物与本地 feed（feed 实体在仓库外，这里只挡意外落回本地的包）
+dist/
+artifacts/
+*.nupkg
+About/PublishedFileId.txt
+
+# IDE / OS / local tools
+.vs/
+.idea/
+.vscode/
+*.user
+Thumbs.db
+.DS_Store
+*.tmp
+*.temp
+*.bak
+*.orig
+*.log
+.slim/

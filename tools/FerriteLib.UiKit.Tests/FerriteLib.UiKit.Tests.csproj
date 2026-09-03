@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>FerriteLib.UiKit.Tests</AssemblyName>
+    <RootNamespace>FerriteLib.UiKit.Tests</RootNamespace>
+    <!-- 本地离线环境：禁用 NuGet 漏洞审计，避免无网 NU1900 噪声。 -->
+    <NuGetAudit>false</NuGetAudit>
+    <!-- 动态 MSBuild 项目遍历在本机 SDK 10 工作负载解析器下会静默失败；静态图恢复可稳定通过。 -->
+    <RestoreUseStaticGraphEvaluation>true</RestoreUseStaticGraphEvaluation>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj" />
+    <PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4871" />
+
+    <!-- 桩项目的源码位于本项目目录树下，但它们是独立的桩程序集，不能参与本项目的编译。 -->
+    <Compile Remove="Stubs\**\*.cs" />
+  </ItemGroup>
+
+  <!-- Krafs.Rimworld.Ref 只提供编译期 ref 程序集（不可执行）。测试运行时需要可执行的最小
+       UnityEngine.CoreModule / Assembly-CSharp 桩程序集。它们不参与本项目的编译引用，因此
+       不写成 ProjectReference，而是在主构建后显式构建并复制到输出目录。 -->
+  <Target Name="BuildAndCopyUiKitRuntimeStubs" AfterTargets="Build">
+    <Exec Command="dotnet build &quot;Stubs\UnityEngineStub\UnityEngineStub.csproj&quot; -c $(Configuration) --nologo -v quiet"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <Exec Command="dotnet build &quot;Stubs\UnityEngineImGuiStub\UnityEngineImGuiStub.csproj&quot; -c $(Configuration) --nologo -v quiet"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <Exec Command="dotnet build &quot;Stubs\UnityEngineTextRenderingModuleStub\UnityEngineTextRenderingModuleStub.csproj&quot; -c $(Configuration) --nologo -v quiet"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <Exec Command="dotnet build &quot;Stubs\VerseStub\VerseStub.csproj&quot; -c $(Configuration) --nologo -v quiet"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <ItemGroup>
+      <UiKitRuntimeStub Include="$(MSBuildProjectDirectory)\bin\stubs\unityengine\UnityEngine.CoreModule.dll" />
+      <UiKitRuntimeStub Include="$(MSBuildProjectDirectory)\bin\stubs\unityengine-imgui\UnityEngine.IMGUIModule.dll" />
+      <UiKitRuntimeStub Include="$(MSBuildProjectDirectory)\bin\stubs\unityengine-textrendering\UnityEngine.TextRenderingModule.dll" />
+      <UiKitRuntimeStub Include="$(MSBuildProjectDirectory)\bin\stubs\verse\Assembly-CSharp.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(UiKitRuntimeStub)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>
