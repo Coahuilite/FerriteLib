@@ -75,8 +75,47 @@ Each item is expected to delete a workaround, not add a layer.
       `SessionRevisionBumper`, the help-panel's hand-written before/after text diff, and those
       source-text assertions.
 - [ ] **Owned hit stack.** Produce a z-ordered `(rect, element)` list during arrange and dispatch input
-      topmost-first. Deletes `YieldsToCoveringPopup`, the previous-frame `OpenPopupRect` reasoning, and
-      the popup-specific coordinate conversions.
+      topmost-first. **Half done by `44b00c5`:** `UiPopup.RectFor` is now the only popup rect rule and
+      `UiPopup.DrawOptionList` the only publisher of the covered rect, so the popup-specific coordinate
+      conversions are gone. What is left is `YieldsToCoveringPopup` (`UiNative.cs:259`, still called at
+      `:115`) and the previous-frame `OpenPopupRect` reasoning, which still model one popup rather than a
+      stack of overlapping surfaces.
+- [ ] **Close the fit-audit's two blind spots, or record them as exemptions.** `UiFitAudit.Check` runs
+      only inside `UiThemeDraw.Label`, but `VerseWidgets.Label` is also called from
+      `UiLayoutEngine.cs:1049` (the `Title`/`TitleKey` band on `Section`/`Surface` containers, reached at
+      `:1028`) and from `StepperSliderWidget.cs:164` (its `Label`/`LabelKey` and the `−`/`+` glyphs).
+      Overflow there is unreportable by construction, and `KernelTextAuditTests` cannot see it either
+      because it drives `UiThemeDraw.Label` directly. Either route both through `UiThemeDraw.Label`
+      (preferred - it deletes a duplicate rather than adding a layer) or state the exemption in the gate's
+      own comment and stop calling `Label` the single text outlet. No evidence yet that a real string
+      overflows on either path; do not describe this as a fixed bug.
+- [ ] **Decide what to do with the four widget kinds nobody consumes.** `section/header`, `state/empty`,
+      `input/mode-row` and `input/stepper-slider` are registered unconditionally by
+      `KernelCoreWidgetRegistrar` and have zero references in the consumer's `Source/**` (grep, 2026-09-04).
+      Before any freeze or public invitation, either give them a real consumer, delete them, or say in the
+      page text that they are unproven. Right now the honest statement of this library's validated surface
+      is "3 of 7 kinds", not 7.
+- [ ] **Make the licence-parity guard two-sided, or stop calling it ours.** `HANDOFF.md` §2 claimed our
+      gate 6 compares `LICENSE` with the consumer's copy; it does not - only US's gate 10 does
+      (`../UniversalSqueaker/scripts/verify-local.ps1:141-146`), and it silently skips when our file is
+      absent. A truncated or edited licence here cannot redden anything in this repo. Two clean options:
+      pin the expected SHA-256 of the series licence as a literal in this repo and assert it locally
+      (self-contained, no sibling dependency, and mutation-testable by editing `LICENSE`), or record the
+      asymmetry as accepted policy. A sibling path check is not a third option: it would make this
+      library's gates depend on a consumer tree, which is the vacuous-guard shape `MEMORY.md` ("Neutrality
+      lane") records as the reason the neutrality scan was moved inside this repo in the first place.
+- [ ] **Give the harness `Stubs/**` a local guard.** The consumer's `UniversalSqueakerKernelHostTests`
+      builds our four stub projects by relative path and copies them out of `bin/stubs/<name>/`, so that
+      tree is a published surface. Renaming a stub project or its output folder breaks the consumer while
+      all seven gates here stay green. A five-line assertion that the four project paths and their expected
+      assembly names exist would close the hole without introducing a cross-repo dependency.
+- [ ] **Keep the boundary guard's symbol list alive, or make it transitive.**
+      `VerifyVisualCoreIsPageModelFree` rejects lines naming fourteen hand-maintained page-model symbols in
+      seven visual-core files. `UiPopup` (added on `44b00c5`) is in neither list, so
+      `UiThemeDraw → UiPopup → UiSession` would pass while breaking the "usable without a Host" claim the
+      lane exists to hold. Cheapest fix: add `UiPopup` to the page-model array and mutate-test it by
+      planting a `UiPopup` call in a visual-core file. Real fix, later: derive the page-model set from the
+      types instead of a list nobody remembers to update.
 - [ ] Clean up `UiLayoutManifest.ParseFile`: it has no production caller. Either wire a real
       load-from-disk path (which is the only thing that would make XML authoring worth its cost) or
       delete it and the `Schema="2"` version slot with it.
@@ -123,3 +162,27 @@ Each item is expected to delete a workaround, not add a layer.
       its own and must not be uninstalled while a consumer is present.
 - [ ] `About.xml` currently carries a placeholder-grade description and no preview. Both are player-facing
       on a Workshop page and are not yet written.
+
+## 6. Tracked-file defects found by the 2026-09-04 read-only audit
+
+These are claims inside this repository that the code contradicts. The two in the memory files were
+corrected on the spot per `HANDOFF.md` §0; the rest need a decision or a small edit.
+
+- [ ] `About/About.xml`'s header comment carries two stale claims: **"License stays undecided by
+      maintainer"** (MPL-2.0 was adopted in `5a2fb72` and gate 6 enforces it) and consumers binding
+      **"through the local NuGet feed"** (the scheme is a sibling `HintPath` + `<Private>False`; §4 keeps
+      the feed deliberately off). The comment block ships inside the mod package, so it is a durable text
+      a reader will meet. Fix the wording, and treat the `description` rewrite in §5 as the same edit.
+- [ ] `HANDOFF.md` §6 listed a sixth banned substring, `UiPanel`, which exists in no source list in
+      either repo. Corrected in place; the note stands in `MEMORY.md` because the same phantom is still in
+      the consumer's `MEMORY.md:81` prose and will come back from there.
+- [ ] `MEMORY.md` credited the licence check with being "the seventh" gate and with asserting
+      byte-identity to the consumer's copy. Both corrected (it is gate 6, and the parity half is not ours).
+- [ ] Open question worth one line of policy: is a one-directional series guard acceptable at all, given
+      that the neutrality guard was moved *into* this repo precisely because a consumer-side check passed
+      vacuously after the split? §3 above is the actionable version of that question.
+
+**Method note for whoever picks this up.** Every figure in §6 was produced with `git ls-files` +
+`wc -l`/`grep -c` and a read of the named line, not from a prose document. When a number or a
+gate-capability claim is repeated from `HANDOFF.md`/`MEMORY.md` without re-deriving it, it inherits
+whatever error the last author measured into it - which is how three defects above survived a day.
