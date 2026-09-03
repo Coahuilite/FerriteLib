@@ -21,7 +21,7 @@
   <packageId>coahuilite.ferritelib</packageId>
   <name>FerriteLib</name>
   <author>Coahuilite</author>
-  <modVersion>0.1.0</modVersion>
+  <modVersion>0.2.0</modVersion>
   <url></url>
   <supportedVersions><li>1.6</li></supportedVersions>
   <description>FerriteLib shared runtime library. Prerequisite for Coahuilite mods that use it; it adds no game content of its own.</description>

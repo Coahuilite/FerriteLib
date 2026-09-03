@@ -35,10 +35,15 @@ public static class FerriteLibVersion
     public const string CarrierAssemblyName = "FerriteLib.UiKit";
 
     /// <summary>
-    /// The contract axis. While <see cref="Version.Major"/> is 0, a <see cref="Version.Minor"/> bump
-    /// IS a breaking change, so pre-1.0 consumers pin minor as well as major.
+    /// The contract axis. While <see cref="Version.Major"/> is 0, ANY change to the public surface a
+    /// consumer compiles against — addition or break — bumps <see cref="Version.Minor"/>, so a
+    /// consumer that pins the minor it was compiled against fails <see cref="Require"/> with a
+    /// readable report when the loaded carrier is older than that, instead of surfacing later as a
+    /// TypeLoadException at first draw. The rule was tightened on 2026-09-04 after exactly that
+    /// failure shape reached a maintainer machine: an additive type (UiPopup) shipped without an Api
+    /// bump, the old installed carrier passed Require, and the desync exploded inside UiHost.Draw.
     /// </summary>
-    public static readonly Version Api = new Version(0, 1, 0);
+    public static readonly Version Api = new Version(0, 2, 0);
 
     /// <summary>Human-readable identity for logs.</summary>
     public static string Describe()

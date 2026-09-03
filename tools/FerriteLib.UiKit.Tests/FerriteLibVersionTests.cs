@@ -24,6 +24,7 @@ internal static class FerriteLibVersionTests
         failures += Run("Exactly one carrier copy is loaded here", VerifySingleCarrierCopy);
         failures += Run("Two carrier copies are reported as a duplicate", VerifyDuplicateCopiesDetected);
         failures += Run("A range mismatch is never labelled a duplicate", VerifyRangeMismatchIsNotDuplicate);
+        failures += Run("A consumer compiled above the loaded carrier gets a named MISMATCH, not a pass", VerifyDesyncReportNamesLoadedApi);
         failures += Run("No copies still yields a range verdict", VerifyEmptyCopyListIsSafe);
         failures += Run("Contract axis agrees with About.xml release axis", VerifyApiMatchesModVersion);
         failures += Run("Carrier name matches this assembly", VerifyCarrierName);
@@ -269,6 +270,42 @@ internal static class FerriteLibVersionTests
         if (!string.Equals(actual, Carrier, StringComparison.Ordinal))
         {
             throw new Exception("Guard looks for '" + Carrier + "' but lives in '" + actual + "'");
+        }
+    }
+
+    /// <summary>
+    /// The 2026-09-04 incident, at the seam that can actually express it: the decision compares the
+    /// range against the Api of the library assembly that is EXECUTING (in production, the loaded
+    /// carrier), so "consumer compiled against a newer surface" is a range whose floor sits above the
+    /// executing Api. That direction must fail, and the report must name both the loaded Api and the
+    /// consumer's floor, because that report is the whole readable-error promise.
+    /// </summary>
+    private static void VerifyDesyncReportNamesLoadedApi()
+    {
+        Version api = FerriteLib.UiKit.Kernel.FerriteLibVersion.Api;
+        Version compiledAgainst = new Version(api.Major, api.Minor + 1, 0);
+        var copies = new List<FerriteLib.UiKit.Kernel.FerriteLibVersion.CarrierCopy>
+        {
+            new FerriteLib.UiKit.Kernel.FerriteLibVersion.CarrierCopy(api + ".0", "Mods/FerriteLib/1.6/Assemblies/FerriteLib.UiKit.dll", true)
+        };
+
+        bool ok = FerriteLib.UiKit.Kernel.FerriteLibVersion.Evaluate(
+            compiledAgainst,
+            new Version(api.Major, api.Minor + 2, 0),
+            "coahuilite.consumerone",
+            copies,
+            out string diagnostic);
+
+        if (ok)
+        {
+            throw new Exception("A consumer whose compiled floor sits above the loaded Api must fail Require");
+        }
+
+        if (diagnostic.IndexOf("MISMATCH", StringComparison.Ordinal) < 0
+            || diagnostic.IndexOf(api.ToString(), StringComparison.Ordinal) < 0
+            || diagnostic.IndexOf(compiledAgainst.ToString(), StringComparison.Ordinal) < 0)
+        {
+            throw new Exception("The desync report must name MISMATCH, the loaded Api and the consumer floor: " + diagnostic);
         }
     }
 
