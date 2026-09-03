@@ -107,12 +107,17 @@ Each item is expected to delete a workaround, not add a layer.
       maintainer's decision. The dual-version-line cost was raised and answered: synchronised releases
       carry it, and `FerriteLibVersion.Require`'s range assertion is what catches a player who updated US
       but not the carrier — that path already degrades to a readable error rather than a crash.
-- [ ] **Sequencing consequence, which is the one thing this decision actually changes**: publishing freezes
-      the public surface in practice, because subscribers keep whatever shipped and a later breaking
-      change hits them. §3 and the per-surface theme restructure in §4 are all breaking by their own
-      admission. So either land them **before the first upload**, or accept that they stop being
-      breaking edits and become compatibility shims from that moment. This is a one-time ordering choice,
-      not a permanent constraint — decide it once, before the upload, rather than discovering it after.
+- [ ] **The one thing this decision actually changes: publishing makes the library referenceable by
+      strangers.** With lockstep releases and one consumer, a breaking change is genuinely fine - our own
+      mismatch path already degrades to a readable `Require` error rather than a crash. What is not
+      reversible is that a Workshop page with a stable packageId turns `FerriteLib.UiKit` into something
+      any modder can compile against, and from their first build our breaking edits become their breakage.
+      That is the real one-way door, and it is independent of our own discipline.
+      Decide before the upload, in one line on the page: is third-party use **invited** (then §3 and the
+      per-surface theme restructure in §4 should land first, because they are breaking by their own
+      admission and will stop being cheap afterwards), or **unsupported** (then we may keep breaking it
+      for as long as US is the only consumer, and say so plainly). Both are fine; discovering the choice
+      after someone builds on us is the only bad outcome.
 - [ ] A no-content library mod will draw "what is this doing in my mod list". Its `description` has to
       answer that in one sentence, name the mods that need it, and say plainly that it has no content of
       its own and must not be uninstalled while a consumer is present.
