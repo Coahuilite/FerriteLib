@@ -27,12 +27,18 @@ $githubDir = Join-Path $root 'dist\github'
 $stageDir = Join-Path $githubDir 'FerriteLib'
 $zipDir = $githubDir
 
-# --- the tag must be a strict SemVer tag, and only a tag ------------------------------------------
-$semVerTagPattern = '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:(?:0|[1-9]\d*)|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:(?:0|[1-9]\d*)|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?$'
-if ($Version -notmatch $semVerTagPattern) {
-    throw "Version must be a strict SemVer 2.0 tag (vMAJOR.MINOR.PATCH, optional prerelease suffix): $Version"
+# --- the tag must be a release or an rc, and only a tag -------------------------------------------
+# Mirrors .github/workflows/release.yml: vBASE, or vBASE-rcN with N >= 1. The rc scheme is the trial
+# mechanism (maintainer decision 2026-09-05): each iteration that goes to players gets the next
+# number, and the final release must point at the same commit as the last rc. A tag that is neither
+# form cannot be packed, so no mislabelled asset can reach the release page.
+$tagPattern = '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc([1-9]\d*))?$'
+if ($Version -notmatch $tagPattern) {
+    throw "Version must be vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-rcN (N >= 1): $Version"
 }
-$baseVersion = ($Version -replace '^v', '') -replace '-.*$', ''
+$baseVersion = "$($Matches[1]).$($Matches[2]).$($Matches[3])"   # what the DLL inside must report
+# The rc suffix lives only in the artifact name and version.txt (via $Version below); the identity
+# axes compare on the base, because the DLL's version resource does not carry the suffix.
 
 # --- axis 1: the tag must name the build axis, or the page lies about its own artifact -------------
 # pack-dev.ps1 derives the dev label from <VersionPrefix>; this derives the release label from the tag.

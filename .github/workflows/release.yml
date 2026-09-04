@@ -28,7 +28,8 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          # Must match ci.yml (see the note there for why 10.0.x is the pinned major).
+          dotnet-version: '10.0.x'
 
       - name: Verify the tag is a release of this exact commit on main
         shell: pwsh
@@ -38,10 +39,16 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $tag = $env:RELEASE_TAG
 
-          # 1. Shape: strict SemVer, so the release page never carries a label nothing can compare.
-          $pattern = '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:(?:0|[1-9]\d*)|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:(?:0|[1-9]\d*)|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?$'
-          if ($tag -notmatch $pattern) { throw "Release tag must be vMAJOR.MINOR.PATCH with an optional prerelease suffix: $tag" }
-          $base = (($tag -replace '^v', '') -replace '-.*$', '')
+          # 1. Shape. Prereleases are rc-only (maintainer decision, 2026-09-05): every iteration
+          #    before the release takes a tag vBASE-rcN, N starting at 1 and incrementing; a bare
+          #    vBASE is the final release. Other suffixes (-dev, -alpha, -fix1, rc0) are rejected so
+          #    the release page speaks exactly two dialects. SemVer-compatible: rcN is still a valid
+          #    prerelease label, so GitHub's "is this a prerelease" rule and any version parser keep
+          #    working, and rc1 < rc2 < BASE orders correctly.
+          $pattern = '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc([1-9]\d*))?$'
+          if ($tag -notmatch $pattern) { throw "Release tag must be vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-rcN (N >= 1): $tag" }
+          $base = "$($Matches[1]).$($Matches[2]).$($Matches[3])"
+          $rc = $Matches[4]
 
           # 2. The tag must name the build axis, which is what the artifact gets called.
           [xml]$csproj = Get-Content -LiteralPath 'Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj' -Raw
@@ -52,17 +59,46 @@ jobs:
             throw "Tag v$base does not match <VersionPrefix>$buildAxis. Retag, or bump the build axis and rebuild; do not rename the artifact."
           }
 
-          # 3. Tag the merge commit on main, not a feature branch tip: a release whose commit is not in
-          #    main's history is a build of code that is not in the trunk anyone reads.
+          # 3. Tag the merge commit on main, not a feature branch tip: a release whose commit is not
+          #    in main's history is a build of code that is not in the trunk anyone reads.
           git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
           if ($LASTEXITCODE -ne 0) { throw 'Could not fetch origin/main.' }
           $commit = (git rev-parse 'HEAD^{commit}').Trim()
           git merge-base --is-ancestor $commit refs/remotes/origin/main
           if ($LASTEXITCODE -ne 0) { throw "Tag commit $commit is not in origin/main history. Merge to main, then tag." }
 
+          # 4. rc ordering, and the release-equals-tested-rc invariant. Iterations strictly go rc1,
+          #    rc2, ... (a skipped or reused number means a trial was retagged over, which is how
+          #    changelog/artifact mismatches get born). Once any rc exists for a base, the bare
+          #    vBASE must point at the SAME commit as the highest rc: players tested exactly the
+          #    bytes that ship, and "one more fix right before release" becomes rc(N+1) with its own
+          #    trial instead of an untested final tag. Tags are local here because checkout used
+          #    fetch-depth: 0; no network call is made.
+          $maxRc = 0
+          foreach ($t in @(git tag --list "v$base-rc*")) {
+            if ($t -and $t -match '-rc([1-9]\d*)$') {
+              $n = [int]$Matches[1]
+              if ($n -gt $maxRc) { $maxRc = $n }
+            }
+          }
+          if ($rc) {
+            if ([int]$rc -ne ($maxRc + 1)) {
+              throw "Tag $tag is out of order: highest existing rc for v$base is rc$maxRc, so the next iteration must be v$base-rc$($maxRc + 1)."
+            }
+          } elseif ($maxRc -gt 0) {
+            $lastRcRef = "v$base-rc$maxRc"
+            $lastRcCommit = (git rev-list -n 1 $lastRcRef 2>$null | Select-Object -First 1)
+            if (-not $lastRcCommit) { throw "Cannot resolve $lastRcRef locally; checkout must carry all tags (fetch-depth: 0)." }
+            if ($commit -ne $lastRcCommit.Trim()) {
+              throw "Final release v$base must tag the same commit as $lastRcRef, the exact build testers tried. HEAD is $commit but $lastRcRef was $lastRcCommit. Land the fix, then cut v$base-rc$($maxRc + 1) and trial that."
+            }
+          }
+
       - name: Restore
         shell: pwsh
-        run: dotnet restore FerriteLib.slnx --nologo
+        run: |
+          dotnet restore Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj --nologo
+          dotnet restore tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj --nologo
 
       # Order matters. verify-local's Dev/Release build gates leave 1.6/Assemblies/ carrying a
       # -dev version suffix, and pack-release.ps1 refuses to publish that identity. So the gates run
@@ -103,7 +139,28 @@ jobs:
           $ErrorActionPreference = 'Stop'
           [xml]$about = Get-Content -LiteralPath 'About/About.xml' -Raw
           $packageId = $about.SelectSingleNode('/ModMetaData/packageId').InnerText.Trim()
+
+          # rc mechanism (2026-09-05): every trial of a base is vBASE-rcN. Show testers what changed
+          # since the previous trial (or since the last base's final release for rc1), because the
+          # whole point of the rc number is "try exactly this delta".
+          $tag = $env:RELEASE_TAG
+          $all = @(& git tag --list 'v*' --sort=v:refname)
+          $idx = [Array]::IndexOf($all, $tag)
+          $prevTag = if ($idx -gt 0) { $all[$idx - 1] } else { $null }
+          if ($prevTag) {
+            $range = "$prevTag..$tag"
+            $commits = @(& git log --oneline "$range" 2>$null)
+          } else {
+            $range = $tag
+            $commits = @(& git log --oneline -10 $tag 2>$null)
+          }
+          $delta = if ($commits.Count -gt 0) { ($commits | ForEach-Object { "- $_" }) -join "`n" } else { "- (no recorded commits in range)" }
+          $isRc = $tag -match '-rc[1-9]\d*$'
+          $trialNote = if ($isRc) { "This is a **release candidate**: an early-testing build. Try it, and report what breaks - problems found here are problems not shipped to everyone." } else { "This is the stable release. It carries the same bytes as its last release candidate; the identity table below names the commit." }
+          $deltaTitle = if ($prevTag) { "## Changes since $prevTag" } else { "## Changes" }
           $body = @"
+          $trialNote
+
           FerriteLib is a **prerequisite library mod** for Coahuilite mods that use its UI kit. It adds no game content of any kind - no Defs, no patches, no textures - and its entire payload is ``1.6/Assemblies/FerriteLib.UiKit.dll``.
 
           ## Installing
@@ -124,6 +181,10 @@ jobs:
           | Asset SHA-256 | ``$env:ASSET_SHA256`` |
 
           The consumer repository links to this release instead of shipping its own copy, so the SHA-256 above is the one true digest of ``FerriteLib.UiKit.dll`` for this version.
+
+          $deltaTitle
+
+          $delta
 
           ## Status
 

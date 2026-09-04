@@ -22,14 +22,24 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          # 10.0.x: every gate run in this repo's history used 10.0.204, so the runner reproduces
+          # the machine the evidence was produced on. (8.0.x builds this repo fine on a clean
+          # checkout - measured - but an obj/ restored by one SDK major fails NETSDK1047 when the
+          # other builds it, so mixing majors across CI and local is the trap, and pinning to the
+          # proven major keeps both sides identical. net472 targeting resolves via NuGet either way.)
+          dotnet-version: '10.0.x'
 
-      # Required before verify-local: gate 1 runs `dotnet run --no-restore`, and a fresh checkout has
-      # no obj/ to restore from. net472 reference assemblies come from the restore graph (they are not
-      # installed as a developer pack on the runner), so this step is also what proves the targeting
-      # packs resolve from NuGet alone.
+      # Required before verify-local: gate 1 runs `dotnet run --no-restore`, and a fresh checkout
+      # has no obj/ to restore from. Two explicit projects, not a solution file: this repo ships
+      # no .sln/.slnx on purpose (slnx additionally needs SDK >= 9.0.200, and a sibling's CI shows
+      # the file buys nothing a pipeline can't do in one more line). net472 reference assemblies
+      # come from the restore graph - Krafs.Rimworld.Ref mirrors the game's Managed folder - so
+      # this step is also what proves the targeting packs resolve from NuGet alone.
       - name: Restore
-        run: dotnet restore FerriteLib.slnx --nologo
+        shell: pwsh
+        run: |
+          dotnet restore Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj --nologo
+          dotnet restore tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj --nologo
 
       - name: "Verify (7 gates: harness, Dev/Release builds, payload, content-free, LICENSE, identity)"
         shell: pwsh
