@@ -209,3 +209,19 @@ jobs:
           # generate_release_notes here: the body above is written for a player, not a changelog,
           # and the auto-generated notes would bury the install steps under commit titles.
           prerelease: ${{ contains(github.ref_name, '-') }}
+
+      # Close the loop. Everything above verifies inputs; this verifies the OUTPUT as the platform
+      # actually holds it: published (not draft), the prerelease boolean matches the tag dialect
+      # (GitHub never infers it from the name - a mis-flagged rc silently becomes "Latest"), exactly
+      # one asset, its server-computed digest equals the zip we packed, /releases/latest still hands
+      # out a stable release, and no v* tag is left without a release. Excluding nothing: if this
+      # step fails, the release exists but is wrong, which is precisely when a red X matters most.
+      - name: Verify the release on the platform
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          ./scripts/verify-release.ps1 -Tag $env:RELEASE_TAG `
+            -Repo "$env:GITHUB_REPOSITORY" `
+            -ZipLocal "dist/github/FerriteLib-$env:RELEASE_TAG.zip"
