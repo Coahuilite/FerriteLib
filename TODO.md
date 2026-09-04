@@ -183,12 +183,16 @@ item below, which remains the one irreversible call.
 - [ ] **US side: the link itself** - **cross-repo write, needs maintainer authorization.** The mechanism is
       one derived line in US's release body plus one pin, and it must be derived from a single source so the
       two cannot drift:
-      `PrerequisiteApiMin` in `UniversalSqueaker/Source/UniversalSqueaker/Mod.cs:22` is already the truth for
-      which lib minor US compiled against (`0.2.0`, with `PrerequisiteApiMax = 0.3.0`). US's `release.yml`
-      should turn that into `https://github.com/Coahuilite/ferritelib/releases/tag/v<min>` and fail the
-      release if (a) that release does not exist, or (b) a lib payload is present in US's own stage
-      directory - the last check already exists as `stage-package.ps1:41-45` and US gate 9, and both stay
-      valid under this decision unchanged.
+      `PrerequisiteApiMin` / `PrerequisiteApiMax` in `UniversalSqueaker/Source/UniversalSqueaker/Mod.cs:22-23`
+      (currently `0.2.0` / `0.3.0`) is the truth for which lib range US was compiled against, so the link must
+      be **resolved from that range, not string-built from the floor**: `v0.2.0` is the minimum, but if lib
+      has since shipped `v0.2.3`, linking to `tag/v0.2.0` sends players to an older carrier than the one US
+      was tested against. US's `release.yml` should list lib's releases, take the highest whose base version
+      satisfies `>= min` and `< max`, and then fail the release if (a) no release satisfies the range, (b) the
+      chosen release is a prerelease while US is being released as stable, or (c) a lib payload exists in US's
+      own stage directory. (c) already exists as `stage-package.ps1:41-45` and US gate 9; both stay valid
+      under this decision unchanged. Pin the resolved tag into the release body, so the pairing is a published
+      fact rather than something a reader has to recompute.
 - [ ] **US's CI needs the sibling checkout pinned to a path, not just a repo.** Two repos in one runner
       workspace: `actions/checkout@v4` with `repository: Coahuilite/ferritelib` and
       **`path: ../ferritelib`** (default path would be `ferritelib` *inside* the workspace and every pinned
@@ -213,6 +217,20 @@ item below, which remains the one irreversible call.
       its own and must not be uninstalled while a consumer is present.
 - [ ] `About.xml` currently carries a placeholder-grade description and no preview. Both are player-facing
       on a Workshop page and are not yet written.
+- [ ] **No `README.md` and no `CONTRIBUTING.md` exist yet, and the first push makes the absence
+      conspicuous.** The release body written by `release.yml` now carries the player-facing explanation
+      (what a no-content prerequisite is, how to unzip it, why not to copy the DLL), so a README is not a
+      release blocker - but a public repository with no README reads as abandoned, and "what is this doing
+      in my mod list" needs answering somewhere a browser can find without opening a release. Scope it to
+      what is true: what the two layers are, that it ships no content, that the shipped payload is one
+      DLL, how to verify locally (`pwsh scripts/verify-local.ps1`, 7 gates), and which mods need it. Keep
+      counts out of it, same rule as `AGENTS.md`.
+- [ ] **Decide whether third-party use is invited, and let that decide `CONTRIBUTING.md`'s existence.**
+      If invited, `§3` and the per-surface theme restructure in `§4` land first and a contributing guide is
+      part of the offer. If unsupported, say so in the README and do not write a contributing guide that
+      implies otherwise. This is the same one-way door as the Workshop page above, and GitHub publishing
+      opens it a little: a stable packageId plus a browsable repository is what a modder compiles against
+      whether or not anyone invited them.
 
 ## 6. Documentation hygiene: what this audit found, and the rule that keeps it from coming back
 
