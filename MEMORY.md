@@ -100,6 +100,20 @@
   methods / 152 public static. `Verse.Window` carries a `UnityEngine.GUI/WindowFunction` field, i.e. the
   game's window manager is an adapter over IMGUI's `GUI.Window`. It references `IMGUIModule` and
   `TextRenderingModule`, never `UnityEngine.UI` or `UIModule`.
+- **GitHub's prerelease state is a stored boolean, never parsed from the tag name** (verified via
+  `gh api` against the live SqueakyRatkin data and the REST docs, 2026-09-05): `POST /releases`
+  defaults `prerelease:false`, and SR's `v0.1.0-rc1`/`v0.3.2-pre1` carry `true` only because their
+  workflow set it. `/releases/latest` is "most recent non-prerelease, non-draft, ordered by
+  **created_at of the tagged commit**" (SR's later-created `v0.3.2-pre1` did not dethrone `v0.3.0`),
+  and returns **404 when only prereleases exist** - which is the normal state during a bare-repo
+  rc-only window, not an error. Release assets additionally carry a **server-computed
+  `assets[].digest`** (`sha256:<hex>`), verified byte-equal against a local `sha256sum` of SR's own
+  zip: the platform can attest to artifact identity, so a self-published hash is not the only line
+  of evidence. Consequence encoded in code: `release.yml` sets the flag from the tag dialect AND
+  `scripts/verify-release.ps1` re-checks the platform state after publishing (draft/flag/asset-name/
+  digest/latest-pointer/tags-without-release), because a manual web-UI release that forgot the flag
+  would otherwise promote an rc to "Latest" silently. Exit codes: 0 verified, 1 mismatch, throw =
+  tag shape outside the rc scheme.
 - **uGUI / UIElements assemblies do ship** (`UnityEngine.UI.dll`, `UnityEngine.UIModule.dll`,
   `Unity.TextMeshPro.dll`, `UnityEngine.UIElementsModule.dll`), so they are referenceable by a mod. The
   constraint that actually matters is compositing, not availability: IMGUI draws above every Canvas.

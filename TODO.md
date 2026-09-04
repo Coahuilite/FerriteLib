@@ -193,6 +193,10 @@ item below, which remains the one irreversible call.
       own stage directory. (c) already exists as `stage-package.ps1:41-45` and US gate 9; both stay valid
       under this decision unchanged. Pin the resolved tag into the release body, so the pairing is a published
       fact rather than something a reader has to recompute.
+      After US's first release, run `scripts/verify-release.ps1` from this repo against it
+      (`-Repo Coahuilite/universalsqueaker -AssetPrefix UniversalSqueaker`): the checks are generic
+      (prerelease-flag-vs-tag, draft, single asset, digest, latest-pointer, dangling tags) and US has
+      the same rc exposure once its own trials start.
 - [ ] **US's CI needs the sibling checkout pinned to a path, not just a repo.** Two repos in one runner
       workspace: `actions/checkout@v4` with `repository: Coahuilite/ferritelib` and
       **`path: ../ferritelib`** (default path would be `ferritelib` *inside* the workspace and every pinned
