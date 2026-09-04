@@ -1,0 +1,27 @@
+# Determinism, not style. pack-release.ps1 prints a SHA-256 into the public release body and stages
+# LICENSE / About.xml / LoadFolders.xml byte-for-byte out of the working tree, so the artifact's digest
+# is only meaningful if every checkout of the same commit yields the same bytes. With core.autocrlf=true
+# (the Windows default, and what a windows-latest runner uses) a fresh clone turned LICENSE into
+# 16127 bytes where the repository's own checkout had 15780 - 347 lines, 347 stray CRs. The digest on
+# the release page then describes whoever happened to build it, not the commit.
+#
+# Index content is already LF, so this changes no stored file; it stops checkout from rewriting them.
+* text=auto eol=lf
+
+# A gitignored DLL never enters a checkout, so these lines guard against a future asset being added by
+# accident and silently re-encoded: byte-exact is the requirement for anything that ships inside a mod.
+*.dll binary
+*.pdb binary
+*.ogg binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.mp3 binary
+*.wav binary
+*.zip binary
+*.nupkg binary
+
+# Replays and fixtures compare as raw bytes; a converted line ending is a content change there.
+# (This repo has no such files yet - the rule is here so the first one lands correctly.)
+fixtures/** text eol=lf
