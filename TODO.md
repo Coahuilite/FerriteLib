@@ -141,12 +141,62 @@ Each item is expected to delete a workaround, not add a layer.
 - [x] License settled: MPL-2.0 across the series, `LICENSE` verbatim and without the Exhibit B
       incompatibility notice, copied into the distributed package by `pack-dev.ps1`.
 
-## 5. Publication as a real prerequisite — decided 2026-09-04
+## 5. Publication — form decided 2026-09-05: two repos, two release pages, linked not copied
 
-- [ ] FerriteLib will get its own Workshop page and US will be released **in lockstep** with it, per the
-      maintainer's decision. The dual-version-line cost was raised and answered: synchronised releases
-      carry it, and `FerriteLibVersion.Require`'s range assertion is what catches a player who updated US
-      but not the carrier — that path already degrades to a readable error rather than a crash.
+**The decision.** FerriteLib publishes its own GitHub Release and stays the single carrier of
+`FerriteLib.UiKit.dll`. Universal Squeaker publishes its own release containing only its own package, and
+**every US release body links to the specific lib release it was compiled against**. Players therefore
+install two mods from two pages; no DLL is ever duplicated, rebuilt by a foreign pipeline, or re-attached.
+
+Workshop is still the later step, unchanged from the 2026-09-04 decision: FerriteLib gets its own page and
+US is released in lockstep with it. GitHub-first early testing does not pre-empt that, and it does not make
+the library referenceable-by-strangers any more than a stable packageId will — see the invited/unsupported
+item below, which remains the one irreversible call.
+
+- [ ] **Pre-push privacy scan on the full reachable history** (this repo has no remote yet, so the scan
+      runs *before* the first push rather than as a cleanup after it). Measured clean on 2026-09-05 at
+      `fc59b60`: zero absolute paths in any reachable blob, zero emails/tokens/15-digit ids, no binary ever
+      added on any commit (`git log --all --diff-filter=A`), single commit identity
+      `Coahuilite <19252128+Coahuilite@users.noreply.github.com>`. Repeat the scan if anything lands between
+      then and the push. The sibling repository paid for this lesson already: its published tags still reach
+      a deleted `.slim/codemap.json`, and cleaning it needs a force-push plus tag rebuild.
+      `git grep -I -E "[A-Za-z]:[\\\\/](Users|WorkSpace)" $(git rev-list --all)`.
+- [ ] **Name the remote repository `ferritelib`, lowercase.** Three places in US pin that exact name and
+      layout: `UniversalSqueaker.csproj:49` (`..\..\..\ferritelib\1.6\Assemblies\FerriteLib.UiKit.dll`),
+      `UniversalSqueakerKernelHostTests.csproj:19` (`FerriteLibHarness`), and its `verify-local.ps1:37`
+      (`$carrierDll`) plus the LICENSE comparison at `:141`. A `FerriteLib`-cased remote works by accident
+      on Windows and macOS and breaks on a Linux runner; keeping it lowercase also matches the packageId's
+      last segment. Display name stays "FerriteLib".
+- [ ] **Create the repository and push** - **external action, needs maintainer authorization.** Suggested
+      shape, one line each:
+      `gh repo create Coahuilite/ferritelib --public --description "RimWorld 1.6 prerequisite mod: the FerriteLib.UiKit shared UI library. Ships no game content."` →
+      `git remote add origin <ssh url>` → `git push -u origin main`.
+      Then the first rehearsal release: tag on `main`'s tip only (`release.yml` rejects an off-trunk tag),
+      `git tag v0.2.0 && git push origin v0.2.0`, and confirm the Actions run produces
+      `FerriteLib-v0.2.0.zip` whose SHA-256 matches a local `pack-release.ps1` run of the same commit.
+      Note the token in use has scopes `gist, read:org, repo` and **no `workflow` scope**, so the first push
+      that includes `.github/workflows/*` may be rejected; grant the scope or add the workflows through the
+      web UI before pushing them.
+- [ ] **Fill `About/About.xml <url>`** (currently empty at `:25`). It is the only pointer a player or
+      modder gets inside the game, and there is no Workshop id to put there yet. Do not add a
+      `<steamAppId>` before any Workshop upload.
+- [ ] **US side: the link itself** - **cross-repo write, needs maintainer authorization.** The mechanism is
+      one derived line in US's release body plus one pin, and it must be derived from a single source so the
+      two cannot drift:
+      `PrerequisiteApiMin` in `UniversalSqueaker/Source/UniversalSqueaker/Mod.cs:22` is already the truth for
+      which lib minor US compiled against (`0.2.0`, with `PrerequisiteApiMax = 0.3.0`). US's `release.yml`
+      should turn that into `https://github.com/Coahuilite/ferritelib/releases/tag/v<min>` and fail the
+      release if (a) that release does not exist, or (b) a lib payload is present in US's own stage
+      directory - the last check already exists as `stage-package.ps1:41-45` and US gate 9, and both stay
+      valid under this decision unchanged.
+- [ ] **US's CI needs the sibling checkout pinned to a path, not just a repo.** Two repos in one runner
+      workspace: `actions/checkout@v4` with `repository: Coahuilite/ferritelib` and
+      **`path: ../ferritelib`** (default path would be `ferritelib` *inside* the workspace and every pinned
+      relative reference above would miss). Add `dotnet restore` for each project before
+      `verify-local.ps1` - see the `--no-restore` note in `MEMORY.md`.
+- [ ] **The four widget kinds nobody consumes** (`section/header`, `state/empty`, `input/mode-row`,
+      `input/stepper-slider`) become public on the day this repo is public. See §3 for the decision; it is
+      cheaper to make before the first release than after somebody compiles against them.
 - [ ] **The one thing this decision actually changes: publishing makes the library referenceable by
       strangers.** With lockstep releases and one consumer, a breaking change is genuinely fine - our own
       mismatch path already degrades to a readable `Require` error rather than a crash. What is not

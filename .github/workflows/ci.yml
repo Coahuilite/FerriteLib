@@ -1,0 +1,35 @@
+name: CI
+
+# Push/PR check for the prerequisite mod: the seven local gates, on a clean checkout, with nothing
+# assumed about a sibling repository. US's own CI is the place that pair is verified; a green run here
+# means the library is internally sound, not that a consumer still compiles against it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # Required before verify-local: gate 1 runs `dotnet run --no-restore`, and a fresh checkout has
+      # no obj/ to restore from. net472 reference assemblies come from the restore graph (they are not
+      # installed as a developer pack on the runner), so this step is also what proves the targeting
+      # packs resolve from NuGet alone.
+      - name: Restore
+        run: dotnet restore FerriteLib.slnx --nologo
+
+      - name: "Verify (7 gates: harness, Dev/Release builds, payload, content-free, LICENSE, identity)"
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/verify-local.ps1

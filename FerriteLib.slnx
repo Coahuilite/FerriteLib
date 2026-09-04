@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj" />
+  <Project Path="tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj" />
+</Solution>

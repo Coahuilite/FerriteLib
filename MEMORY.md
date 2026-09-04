@@ -50,6 +50,46 @@
   "the carrier is older than the DLL I built against" observable. So the axis is not only a breaking-change
   counter; it is a "does this carrier contain what I compiled against" counter, which pre-1.0 is the same
   bump.
+- **Publication form decided (2026-09-05, maintainer): two repositories, two release pages, linked
+  rather than copied.** `coahuilite.ferritelib` publishes its own GitHub Release and remains the **only**
+  publisher of `FerriteLib.UiKit.dll`; Universal Squeaker publishes its own release carrying **only its own
+  package**, and every US release body links to the specific lib release its `PrerequisiteApiMin` was
+  compiled against. Deliberately rejected: rebuilding the lib artifact inside US's pipeline (two builders
+  for one DLL, so the bytes a player holds have no single provenance) and re-attaching lib's zip to US's
+  page (two pages that both look canonical, and a split download counter - the count is the demand signal
+  during early testing). `actions/download-artifact` cannot cross repositories anyway, so Releases, not
+  artifacts, is the sanctioned carrier between them.
+- **There are three version axes, not two, and only two were locked.** Contract axis
+  `FerriteLibVersion.Api`, release axis `About/About.xml <modVersion>`, and - the one no document named -
+  the **build axis**, `Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj <VersionPrefix>`, which is what
+  `pack-dev.ps1:45` derives the artifact name and `version.txt` from. The 0.2.0 move updated the first two
+  and left the third at 0.1.0, so seven gates stayed green while the packaging script was preparing a zip
+  labelled 0.1.0 around a 0.2.0 DLL. FerriteLibVersionTests now asserts all three agree
+  ("Build axis in the csproj matches the other two axes", 66 named assertions total as of `fc59b60` + this
+  change), and the assertion is **mutation-proven in one direction only**: reverting `<VersionPrefix>` to
+  0.1.0 fails exactly that one assertion and nothing else. The reverse case - a future axis living in a
+  fourth file - is guarded by no test, because no such file exists yet.
+- **A release asset must be built after the gates run, not during them.** `verify-local.ps1`'s Dev and
+  Release build gates leave `1.6/Assemblies/FerriteLib.UiKit.dll` carrying `0.2.0-dev+<sha>` in its version
+  resource, and that is the correct identity for a dev rehearsal - so `pack-release.ps1` refuses it (tested:
+  `Payload is a dev build ...`) and the release workflow rebuilds with `-p:VersionSuffix=` to get the bare
+  `0.2.0+<sha>`. Anyone who wires these steps in the other order gets a red pack step, not a mislabelled
+  package.
+- **The two zip shapes differ on purpose, and the difference is user-visible.** `pack-dev.ps1` archives
+  `(Join-Path $stageDir '*')` - contents at the zip root - because a dev rehearsal copies into a folder that
+  already exists. `pack-release.ps1` archives `$stageDir` itself, so the archive contains a top-level
+  `FerriteLib/` and a player unzipping straight into `Mods/` gets `Mods/FerriteLib/About/About.xml` instead
+  of a `LoadFolders.xml` loose in `Mods/`. Verified by listing the produced zip
+  (`FerriteLib/1.6/Assemblies/FerriteLib.UiKit.dll`, `FerriteLib/LICENSE`, `FerriteLib/version.txt`).
+- **GitHub policy does not constrain this shape of distribution** (read from `github/site-policy` and
+  `github/docs`, 2026-09-05): Releases are documented as packaging software "for other people to download
+  and use", with a stated limit of 1000 assets per release, 2 GiB per file, and **"no limit on the total
+  size of a release, nor bandwidth usage"**. The AUP's excessive-bandwidth clause (§9) is a
+  relative-to-similar-features test, and its 10 GiB/month figures are Git **LFS** quotas - which this repo
+  does not use, because no binary is tracked at all. What the policies actually prohibit is using raw/file
+  hosting as a hotlinked CDN and shipping malware; a 45 KiB mod zip is neither. Cross-repo consumption of
+  a public release needs no special permission: `GITHUB_TOKEN` with `contents: read`, or a plain
+  `browser_download_url`.
 
 ## What was verified, and how
 

@@ -27,6 +27,7 @@ internal static class FerriteLibVersionTests
         failures += Run("A consumer compiled above the loaded carrier gets a named MISMATCH, not a pass", VerifyDesyncReportNamesLoadedApi);
         failures += Run("No copies still yields a range verdict", VerifyEmptyCopyListIsSafe);
         failures += Run("Contract axis agrees with About.xml release axis", VerifyApiMatchesModVersion);
+        failures += Run("Build axis in the csproj matches the other two axes", VerifyBuildAxisMatchesContract);
         failures += Run("Carrier name matches this assembly", VerifyCarrierName);
         return failures;
     }
@@ -261,6 +262,62 @@ internal static class FerriteLibVersionTests
             throw new Exception(
                 "Contract axis " + api + " and release axis " + modVersion
                 + " disagree on major.minor. Bump both together or neither.");
+        }
+    }
+
+    /// <summary>
+    /// The third axis: what the SHIPPED ARTIFACT is called. pack-dev.ps1 and pack-github.ps1 both
+    /// derive the package label and version.txt from csproj &lt;VersionPrefix&gt;, so if that value drifts
+    /// from the contract and release axes the published page announces one number while the DLL inside
+    /// the zip reports another - and the two gates that exist for the other axes cannot see it, because
+    /// neither reads the csproj. This happened on 2026-09-04: the axes moved to 0.2.0 for the UiPopup
+    /// addition while VersionPrefix stayed at 0.1.0, and seven gates stayed green.
+    /// </summary>
+    private static void VerifyBuildAxisMatchesContract()
+    {
+        string projectPath = Path.Combine(
+            RepoRoot(), "Source", "FerriteLib.UiKit", "FerriteLib.UiKit.csproj");
+        if (!File.Exists(projectPath))
+        {
+            throw new Exception("No csproj to read the build axis from: " + projectPath);
+        }
+
+        string text = File.ReadAllText(projectPath);
+        string open = "<VersionPrefix>", close = "</VersionPrefix>";
+        int at = text.IndexOf(open, StringComparison.Ordinal);
+        if (at < 0)
+        {
+            throw new Exception("csproj carries no <VersionPrefix>; the packaging label has no source");
+        }
+
+        int from = at + open.Length;
+        int end = text.IndexOf(close, from, StringComparison.Ordinal);
+        if (end < 0)
+        {
+            throw new Exception("csproj <VersionPrefix> is not closed");
+        }
+
+        string label = text.Substring(from, end - from).Trim();
+        // Exactly one occurrence: two means the packaging scripts' first-match selector is picking
+        // arbitrarily between them, which is the same defect class as an unpinned axis.
+        if (CountMatches(text, open) != 1)
+        {
+            throw new Exception(
+                "csproj declares <VersionPrefix> " + CountMatches(text, open)
+                + " times; the packaging label would come from whichever match is read first");
+        }
+
+        if (!Version.TryParse(label, out Version? build))
+        {
+            throw new Exception("csproj <VersionPrefix> is not a Version: '" + label + "'");
+        }
+
+        Version api = FerriteLib.UiKit.Kernel.FerriteLibVersion.Api;
+        if (build.Major != api.Major || build.Minor != api.Minor)
+        {
+            throw new Exception(
+                "Build axis " + label + " disagrees with contract axis " + api
+                + "; a published package would carry a label the shipped DLL contradicts.");
         }
     }
 

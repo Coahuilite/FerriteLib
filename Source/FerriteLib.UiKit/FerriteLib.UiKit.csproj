@@ -7,7 +7,12 @@
     <Nullable>enable</Nullable>
     <AssemblyName>FerriteLib.UiKit</AssemblyName>
     <RootNamespace>FerriteLib.UiKit</RootNamespace>
-    <VersionPrefix>0.1.0</VersionPrefix>
+    <!-- Third version axis: the BUILD axis. It names the shipped artifact - pack-dev.ps1 reads it for
+         the dev zip label, pack-release.ps1 checks the tag against it - so it must move together with
+         the contract axis (FerriteLibVersion.Api) and the release axis (About.xml <modVersion>).
+         FerriteLibVersionTests locks all three, because a published package whose label contradicts
+         the DLL inside it is invisible to the two gates that only read the other two axes. -->
+    <VersionPrefix>0.2.0</VersionPrefix>
     <VersionSuffix>dev</VersionSuffix>
     <AssemblyVersion>$(VersionPrefix).0</AssemblyVersion>
     <FileVersion>$(VersionPrefix).0</FileVersion>

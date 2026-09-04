@@ -1,0 +1,139 @@
+name: Release
+
+# Push a SemVer tag (v0.2.0, v0.2.1-pre1) and this publishes the mod package that players download.
+#
+# This repository is the ONLY publisher of FerriteLib.UiKit.dll. Consumer repositories link to the
+# asset produced here instead of shipping or rebuilding their own copy - two carriers of the same
+# assembly bind by load order through RimWorld's single global AssemblyResolve, and the copy that
+# loses has no way to find out. So the artifact's identity is part of the contract, not a detail:
+# the tag, the build axis, the DLL's own version resource and the release notes all have to agree,
+# and each of those agreements is checked below rather than assumed.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # creating a GitHub Release
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the ancestry check below needs origin/main, not a depth-1 clone
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Verify the tag is a release of this exact commit on main
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:RELEASE_TAG
+
+          # 1. Shape: strict SemVer, so the release page never carries a label nothing can compare.
+          $pattern = '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:(?:0|[1-9]\d*)|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:(?:0|[1-9]\d*)|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?$'
+          if ($tag -notmatch $pattern) { throw "Release tag must be vMAJOR.MINOR.PATCH with an optional prerelease suffix: $tag" }
+          $base = (($tag -replace '^v', '') -replace '-.*$', '')
+
+          # 2. The tag must name the build axis, which is what the artifact gets called.
+          [xml]$csproj = Get-Content -LiteralPath 'Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj' -Raw
+          $prefix = @($csproj.SelectNodes('/Project/PropertyGroup/VersionPrefix'))
+          if ($prefix.Count -ne 1) { throw "Expected exactly one <VersionPrefix>, found $($prefix.Count)." }
+          if ($prefix[0].InnerText.Trim() -ne $base) {
+            throw "Tag v$base does not match <VersionPrefix>$($prefix[0].InnerText.Trim())".Trim()
+          }
+
+          # 3. Tag the merge commit on main, not a feature branch tip: a release whose commit is not in
+          #    main's history is a build of code that is not in the trunk anyone reads.
+          git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
+          if ($LASTEXITCODE -ne 0) { throw 'Could not fetch origin/main.' }
+          $commit = (git rev-parse 'HEAD^{commit}').Trim()
+          git merge-base --is-ancestor $commit refs/remotes/origin/main
+          if ($LASTEXITCODE -ne 0) { throw "Tag commit $commit is not in origin/main history. Merge to main, then tag." }
+
+      - name: Restore
+        run: dotnet restore FerriteLib.slnx --nologo
+
+      # Order matters. verify-local's Dev/Release build gates leave 1.6/Assemblies/ carrying a
+      # -dev version suffix, and pack-release.ps1 refuses to publish that identity. So the gates run
+      # first, on the tree exactly as tagged, and only then is the payload rebuilt as the artifact.
+      - name: Verify (7 gates)
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/verify-local.ps1
+
+      - name: Build the release payload
+        run: dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release -p:VersionSuffix= --nologo
+
+      - name: Pack the release asset
+        id: pack
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # No -AllowDirtyTree: the runner's checkout is clean by construction, so if this ever trips,
+          # something has written into the tracked tree mid-pipeline and the artifact is unattributable.
+          ./scripts/pack-release.ps1 -Version $env:RELEASE_TAG | Tee-Object -FilePath pack-release.log
+          $zip = "dist/github/FerriteLib-$env:RELEASE_TAG.zip"
+          if (-not (Test-Path -LiteralPath $zip -PathType Leaf)) { throw "Expected asset was not produced: $zip" }
+          $hash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash
+          "asset=$zip" >> $env:GITHUB_OUTPUT
+          "sha256=$hash" >> $env:GITHUB_OUTPUT
+          "commit=$((git rev-parse --short=12 HEAD))" >> $env:GITHUB_OUTPUT
+
+      - name: Write the release body
+        id: body
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          ASSET_SHA256: ${{ steps.pack.outputs.sha256 }}
+          ASSET_COMMIT: ${{ steps.pack.outputs.commit }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [xml]$about = Get-Content -LiteralPath 'About/About.xml' -Raw
+          $packageId = $about.SelectSingleNode('/ModMetaData/packageId').InnerText.Trim()
+          $body = @"
+          FerriteLib is a **prerequisite library mod** for Coahuilite mods that use its UI kit. It adds no game content of any kind - no Defs, no patches, no textures - and its entire payload is ``1.6/Assemblies/FerriteLib.UiKit.dll``.
+
+          ## Installing
+
+          1. Unzip this archive **directly into** ``RimWorld/Mods/``. It contains a top-level ``FerriteLib`` folder, so the result is ``Mods/FerriteLib/...``.
+          2. Install the mod that needs it (currently Universal Squeaker) from its own releases page.
+          3. Enable both in the mod list. RimWorld will warn if the consumer is enabled without this one.
+
+          Do **not** copy ``FerriteLib.UiKit.dll`` into another mod's folder. Exactly one carrier of that assembly may be installed; two of them bind by load order through the game's single global ``AssemblyResolve`` and the copy that loses has no way to find out.
+
+          ## Version identity
+
+          | | |
+          |---|---|
+          | Package id | ``$packageId`` |
+          | Release | ``$env:RELEASE_TAG`` |
+          | Built from commit | ``$env:ASSET_COMMIT`` |
+          | Asset SHA-256 | ``$env:ASSET_SHA256`` |
+
+          The consumer repository links to this release instead of shipping its own copy, so the SHA-256 above is the one true digest of ``FerriteLib.UiKit.dll`` for this version.
+
+          ## Status
+
+          Pre-1.0: the public API is still provisional and a minor bump is a breaking change. The supported range a consumer asserts lives in its own code, because RimWorld's ``modDependencies`` cannot express a version at all.
+          "@
+          $body | Out-File -FilePath release-body.md -Encoding utf8NoBOM
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/github/FerriteLib-${{ github.ref_name }}.zip
+          body_path: release-body.md
+          draft: false
+          # A tag with a prerelease suffix is a prerelease; everything else is a release. No
+          # generate_release_notes here: the body above is written for a player, not a changelog,
+          # and the auto-generated notes would bury the install steps under commit titles.
+          prerelease: ${{ contains(github.ref_name, '-') }}
