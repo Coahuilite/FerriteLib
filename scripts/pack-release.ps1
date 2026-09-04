@@ -73,6 +73,19 @@ if ($status.Count -gt 0 -and -not $AllowDirtyTree) {
     throw ("Working tree is dirty ({0} path(s)); a published asset must come from the exact commit it names. Commit them or pass -AllowDirtyTree for a local rehearsal." -f $status.Count)
 }
 
+# --- axis 3b: the bytes must name the commit being released ---------------------------------------
+# AssemblyInformationalVersion carries the source revision the SDK embedded at BUILD time, so it is the
+# only thing inside the artifact that says what it was compiled from. On the release workflow the build
+# runs on the tagged checkout, so this matches by construction; locally it catches the ordinary mistake
+# of packing a DLL built before the commit you are about to tag - which is exactly what happened on
+# 2026-09-05, where a mutation test left 1.6/Assemblies/ built from the previous commit. Skipped under
+# -AllowDirtyTree, the rehearsal path, because there the tree is by definition not what gets published.
+if (-not $AllowDirtyTree) {
+    if ($informational -notlike "*$commit*") {
+        throw "Payload was built from a different commit than HEAD: its version resource says '$informational', HEAD is $commit. Rebuild after committing, or pass -AllowDirtyTree for a local rehearsal."
+    }
+}
+
 # --- gate 4: the source tree must still be content-free -------------------------------------------
 # The gates prove this about the repository; the package is what a player receives, so the same named-path
 # probe runs against the staging directory. A filtered enumeration would pass vacuously on an empty tree,
