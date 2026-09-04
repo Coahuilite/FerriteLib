@@ -13,9 +13,18 @@ on:
 permissions:
   contents: read
 
+# rc iteration is fast push-tag cycles; a new push cancels the in-flight check of the same branch
+# instead of letting the runner spend Windows minutes on a commit that is already superseded.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   gates:
     runs-on: windows-latest
+    # The whole gate suite measures ~10s on a clean clone; the minute is runner startup, not us.
+    # A hung runner should burn 10, not the 360 default.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 

@@ -20,6 +20,9 @@ permissions:
 jobs:
   release:
     runs-on: windows-latest
+    # 15 covers gates (~10s measured) plus runner setup slack; the default 360 only ever
+    # converts a hung runner into an hours-long ghost.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
