@@ -47,8 +47,9 @@ jobs:
           [xml]$csproj = Get-Content -LiteralPath 'Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj' -Raw
           $prefix = @($csproj.SelectNodes('/Project/PropertyGroup/VersionPrefix'))
           if ($prefix.Count -ne 1) { throw "Expected exactly one <VersionPrefix>, found $($prefix.Count)." }
-          if ($prefix[0].InnerText.Trim() -ne $base) {
-            throw "Tag v$base does not match <VersionPrefix>$($prefix[0].InnerText.Trim())".Trim()
+          $buildAxis = $prefix[0].InnerText.Trim()
+          if ($buildAxis -ne $base) {
+            throw "Tag v$base does not match <VersionPrefix>$buildAxis. Retag, or bump the build axis and rebuild; do not rename the artifact."
           }
 
           # 3. Tag the merge commit on main, not a feature branch tip: a release whose commit is not in
@@ -60,15 +61,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Tag commit $commit is not in origin/main history. Merge to main, then tag." }
 
       - name: Restore
+        shell: pwsh
         run: dotnet restore FerriteLib.slnx --nologo
 
       # Order matters. verify-local's Dev/Release build gates leave 1.6/Assemblies/ carrying a
       # -dev version suffix, and pack-release.ps1 refuses to publish that identity. So the gates run
       # first, on the tree exactly as tagged, and only then is the payload rebuilt as the artifact.
       - name: Verify (7 gates)
-        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/verify-local.ps1
+        shell: pwsh
+        run: ./scripts/verify-local.ps1
 
       - name: Build the release payload
+        shell: pwsh
         run: dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release -p:VersionSuffix= --nologo
 
       - name: Pack the release asset

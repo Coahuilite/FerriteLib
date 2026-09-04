@@ -32,4 +32,5 @@ jobs:
         run: dotnet restore FerriteLib.slnx --nologo
 
       - name: "Verify (7 gates: harness, Dev/Release builds, payload, content-free, LICENSE, identity)"
-        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/verify-local.ps1
+        shell: pwsh
+        run: ./scripts/verify-local.ps1
