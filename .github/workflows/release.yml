@@ -76,7 +76,11 @@ jobs:
           #    fetch-depth: 0; no network call is made.
           $maxRc = 0
           foreach ($t in @(git tag --list "v$base-rc*")) {
-            if ($t -and $t -match '-rc([1-9]\d*)$') {
+            if (-not $t) { continue }
+            # Exclude the tag being verified: on a checkout of v0.2.0-rc2 the local tag list already
+            # contains rc2 itself, so counting it would demand rc3 and reject every legitimate push.
+            if ($t -eq $tag) { continue }
+            if ($t -match '-rc([1-9]\d*)$') {
               $n = [int]$Matches[1]
               if ($n -gt $maxRc) { $maxRc = $n }
             }
