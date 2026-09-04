@@ -114,6 +114,14 @@
   digest/latest-pointer/tags-without-release), because a manual web-UI release that forgot the flag
   would otherwise promote an rc to "Latest" silently. Exit codes: 0 verified, 1 mismatch, throw =
   tag shape outside the rc scheme.
+- Two consequences of the stored-flag fact, both confirmed against docs and the gate logic:
+  (a) the web UI's pre-release checkbox is "Optionally … select" - never auto-ticked from the tag
+  name - so a hand-clicked rc release defaults to STABLE and steals "Latest"; that is precisely
+  the state `verify-release.ps1` step 2 catches. (b) A bad rc is fixed by deleting release **and**
+  tag, then re-pushing the same rc number: the ordering gate recomputes maxRc from tags surviving
+  on the runner's checkout, so re-cutting rc2 after deleting rc2 passes while rc3-after-rc1 fails.
+  Immutable releases (SR's live releases show `immutable:false`, the default) would forbid exactly
+  that retag path, so do not enable the setting while rc churn is the workflow.
 - **uGUI / UIElements assemblies do ship** (`UnityEngine.UI.dll`, `UnityEngine.UIModule.dll`,
   `Unity.TextMeshPro.dll`, `UnityEngine.UIElementsModule.dll`), so they are referenceable by a mod. The
   constraint that actually matters is compositing, not availability: IMGUI draws above every Canvas.
