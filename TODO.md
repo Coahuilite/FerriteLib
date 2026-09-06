@@ -200,15 +200,12 @@ item below, which remains the one irreversible call.
       (`-Repo Coahuilite/universalsqueaker -AssetPrefix UniversalSqueaker`): the checks are generic
       (prerelease-flag-vs-tag, draft, single asset, digest, latest-pointer, dangling tags) and US has
       the same rc exposure once its own trials start.
-- [ ] **Cross-repo hash anchor: `0fe60b0` will move when US rewrites its history.** US's first-cloud-upload
-      plan (maintainer ruling 2026-09-06, written up in `../UniversalSqueaker/docs/first-cloud-upload-zh.md`)
-      is a targeted blob rewrite to clear 7 dirty historical blobs (one personal home-directory path plus
-      workspace-topology paths; US's working tree and commit messages measured clean at `73b0b6a`). Every
-      commit after US's #33 changes hash, and this repo's `MEMORY.md:8` cites US `0fe60b0` as the split
-      anchor. When US's session reports the new hash from its `filter-repo` commit-map, update `MEMORY.md:8`
-      here. Until then the citation stands: US has no remote, so nothing published references the old graph.
-      Method (three-vector triage, blast-radius quantification, functional-vs-semantic reference split):
-      `modding_documents/privacy-debt-vector-triage-zh.md`.
+- [x] **Cross-repo hash anchor applied 2026-09-07.** US executed its targeted blob rewrite and reported
+      the commit-map mapping `0fe60b0 -> 6c7053a`; `MEMORY.md:8` now cites the new hash with the old one
+      recorded as its pre-rewrite name. Verified independently from this repo: `6c7053a` is reachable from
+      US `main` and carries the identical message; `0fe60b0` resolves only as a dangling local object.
+      US's one-time guide was deleted pre-push (their ruling; survivors folded into US `MEMORY.md`), so
+      the method pointer is `modding_documents/privacy-debt-vector-triage-zh.md`, not the guide.
 - [ ] **US's CI needs the sibling checkout pinned to a path, not just a repo.** Two repos in one runner
       workspace: `actions/checkout@v4` with `repository: Coahuilite/ferritelib` and
       **`path: ../ferritelib`** (default path would be `ferritelib` *inside* the workspace and every pinned

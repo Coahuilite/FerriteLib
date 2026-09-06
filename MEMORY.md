@@ -5,8 +5,10 @@
 - Repository split out of the Universal Squeaker tree on 2026-09-03. FerriteLib is a prerequisite mod,
   `coahuilite.ferritelib`, display name FerriteLib, `modVersion` 0.2.0. No remote, nothing published.
 - Provenance: `Source/FerriteLib.UiKit/**` and `tools/FerriteLib.UiKit.Tests/**` were copied out of the
-  US repo at US commit `0fe60b0` after a file-for-file `diff -r` check, then amended there. US retains
-  its own history; this repo's history starts at the split.
+  US repo at US commit `6c7053a` after a file-for-file `diff -r` check, then amended there. US retains
+  its own history; this repo's history starts at the split. `6c7053a` is the post-rewrite hash of what was
+  `0fe60b0` until US's 2026-09-06 targeted blob rewrite (verified: same message byte-for-byte, reachable
+  from US `main`; the old object is dangling locally only).
 - **Cross-mod assembly binding is proven in a running game (2026-09-04).** US, shipping no FerriteLib
   payload of its own, loaded and ran its whole settings page and camera overlay with
   `FerriteLib.UiKit.dll` present only in the carrier mod, with no red text and no type-load failure. The
