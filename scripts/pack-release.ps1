@@ -160,9 +160,14 @@ foreach ($required in @('LICENSE', 'LoadFolders.xml', 'version.txt', 'About\Abou
 # and the digest becomes a pure function of the commit (verified: entry CRCs were already identical;
 # mtimes were the only divergence).
 $commitDate = [DateTime]::Parse((& git -C $root log -1 --format=%aI $commit)).ToUniversalTime()
-Get-ChildItem -LiteralPath $githubDir -Recurse -Force | ForEach-Object {
-    $_.LastWriteTime = $commitDate
-}
+# Order is load-bearing: on NTFS, rewriting a child's mtime bumps the parent directory's mtime to
+# now. Enumerating top-down (the default) therefore re-dirties every directory right after pinning
+# it - measured: file entries held the commit date while the 1.6/ directory entry still carried the
+# wall clock. Files first, then directories deepest-first, so each directory is pinned after its
+# last child.
+Get-ChildItem -LiteralPath $githubDir -Recurse -Force |
+    Sort-Object { [bool]$_.PSIsContainer }, @{ Expression = { $_.FullName.Length }; Descending = $true } |
+    ForEach-Object { $_.LastWriteTime = $commitDate }
 $zipPath = Join-Path $zipDir "FerriteLib-$Version.zip"
 if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
 Compress-Archive -Path $stageDir -DestinationPath $zipPath -Force
