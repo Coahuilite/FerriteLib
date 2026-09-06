@@ -1,0 +1,54 @@
+# FerriteLib
+
+[English](./README.md) | [**中文**](./README.zh-CN.md)
+
+RimWorld 1.6 的**无内容前置模组**。FerriteLib 只携带一个程序集——`FerriteLib.UiKit.dll`——供 Coahuilite
+模组编译与运行时绑定。它不添加任何 Def、补丁、语言、贴图：单独启用它对游戏零影响。如果你的模组列表里
+出现了它而没有任何依赖它的模组，说明消费者已被卸载或禁用；只有在没有已启用模组依赖它时，才可以禁用本模组。
+
+## 库提供什么
+
+两层，刻意分离：
+
+1. **声明式页面引擎**——XML 清单、受约束布局、类型化绑定、按窗口会话、控件注册表、创建期契约校验。
+   消费者代码只写业务逻辑与绑定，结构活在 XML 里。
+2. **视觉核心**——主题令牌、绘制助手、文本测量、文本适配审计与版本契约。**不采用页面模型也能单独使用。**
+   两层边界由门禁强制（非口头约定）：视觉核心文件不得提及任何页面模型类型。
+
+## 依赖要求
+
+- RimWorld 1.6
+- 消费者需同时启用本模组与其自身模组；缺本模组时游戏会给出警告。**不要**把 `FerriteLib.UiKit.dll`
+  复制进其他模组的目录——同一程序集只允许一个载体：两份副本会经由游戏唯一的全局 `AssemblyResolve`
+  按加载序绑定，落败的一方毫无察觉。
+
+## 身份
+
+- packageId：`coahuilite.ferritelib`
+- 命名空间根：`FerriteLib.UiKit`（内核表面：`FerriteLib.UiKit.Kernel`）
+- 日志前缀：`[FerriteLib.UiKit]`
+- 许可证：MPL-2.0，全文随每个包分发（包内 `LICENSE`）
+
+## 给模组开发者
+
+RimWorld 的 `modDependencies` 无法表达版本，消费者必须在自己的构造函数里断言 API 区间——
+`FerriteLibVersion.Require(min, max, packageId, out report)` 会枚举已加载载体并报告冲突，失败信息可读。
+编译请针对本仓库 GitHub Release 资产中的 DLL（发布页正文标注其 SHA-256）；程序集目标 `net472`。
+公共 API 处于 **1.0 之前、暂定状态**：minor 递增即破坏性变更，冻结决定以第二个接入消费者为门槛。
+
+**当前不主动征集第三方贡献**——API 冻结 / 邀请与否是维护者的未决裁决（见 `TODO.md` §5）。欢迎缺陷报告；
+表面暂定期间，PR 不承诺合并。
+
+## 本地验证与构建
+
+```powershell
+pwsh -NoProfile -File scripts/verify-local.ps1            # 门禁套件（harness + 双 flavor 构建 + 载荷 + 无内容 + 许可 + 身份）
+pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev   # + dev 模组包与 NuGet 包（dist/、artifacts/）
+pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory   # 三向量隐私门禁，任何 push 前执行
+```
+
+## 文档索引
+
+- 协议 / 不变量：`AGENTS.md` · 已核事实：`MEMORY.md` · 行动面：`TODO.md`
+- 发布流程与 rc 方案：`.github/workflows/release.yml` 头注释（tag 方言即契约：`vBASE-rcN` 试版，
+  裸 `vBASE` 必须落在最后一个 rc 的同一提交上）

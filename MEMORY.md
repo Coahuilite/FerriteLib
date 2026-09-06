@@ -14,7 +14,7 @@
   `FerriteLib.UiKit.dll` present only in the carrier mod, with no red text and no type-load failure. The
   sibling-`HintPath` + `<Private>False` design is therefore correct, and "ship a copy / go NuGet with
   Private=true" is rejected on evidence rather than preference. This was the top open risk and it is gone.
-- **`UiPopup` is the single popup geometry and input primitive (2026-09-04, `44b00c5`).** `RectFor`
+- **`UiPopup` is the single popup geometry and input primitive (2026-09-04, `4dd97bf`).** `RectFor`
   (below / flip above / pin to viewport top / horizontal clamp / unpublished-viewport pass-through)
   and `DrawOptionList` (panel, single-line option rows, `UiSession.SetPopupRect` publication, row
   hit-test, consume-close-callback) live in one place; `DropdownWidget` and the US composite
@@ -23,12 +23,12 @@
   by hand and skips it silently reintroduces "covered trigger steals the option click", which is
   exactly the defect the US side reported and fixed the same day. Any new dropdown-shaped surface must
   go through `UiPopup`; a second copy of either rule is a defect, not a style choice.
-- **Contract axis is 0.2.0 (2026-09-04, `b2006a0`) and the bump rule is tightened**: pre-1.0, any
+- **Contract axis is 0.2.0 (2026-09-04, `a05fddf`) and the bump rule is tightened**: pre-1.0, any
   change to the public surface — additions included — bumps `Api.Minor`, and `About/About.xml
   <modVersion>` moves with it. The 0.1.0 → 0.2.0 bump exists because an additive type (UiPopup)
   shipped without one and a consumer desynced into a TypeLoadException inside UiHost.Draw; the
   tightened rule is what makes Require's readable-report promise hold in both directions.
-- **Pointer-space contract (2026-09-04, `9a197a2`)**: inside scroll/group scopes `Event.current.mousePosition`
+- **Pointer-space contract (2026-09-04, `72afa23`)**: inside scroll/group scopes `Event.current.mousePosition`
   arrives in the container's draw space, while popup rects are published in Host window space. Any
   comparison between the two must convert through the caller's `ctx` origin (`UiNative.PointerPositionIn`);
   comparing raw is the defect that stole every covered option click in game. The stub harness now models
@@ -43,7 +43,7 @@
   the one side effect a player cannot undo. And `../squeaky_ratkin` is never written: SR is a separate
   product with its own brand and `SR_` prefix, and this repo's neutrality lane exists to keep even its
   vocabulary out of here.
-- **A `Require` desync is now a named verdict, and that is the durable part** (2026-09-04, `b2006a0`):
+- **A `Require` desync is now a named verdict, and that is the durable part** (2026-09-04, `a05fddf`):
   the report must carry `MISMATCH`, the loaded `Api`, and the consumer's compiled floor, so a stale
   carrier is a readable prerequisite error rather than a `TypeLoadException` at first draw. Harness
   coverage for it is `FerriteLibVersionTests`' "A consumer compiled above the loaded carrier gets a named
@@ -67,7 +67,7 @@
   `pack-dev.ps1:45` derives the artifact name and `version.txt` from. The 0.2.0 move updated the first two
   and left the third at 0.1.0, so seven gates stayed green while the packaging script was preparing a zip
   labelled 0.1.0 around a 0.2.0 DLL. FerriteLibVersionTests now asserts all three agree
-  ("Build axis in the csproj matches the other two axes", 66 named assertions total as of `fc59b60` + this
+  ("Build axis in the csproj matches the other two axes", 66 named assertions total as of `382e862` + this
   change), and the assertion is **mutation-proven in one direction only**: reverting `<VersionPrefix>` to
   0.1.0 fails exactly that one assertion and nothing else. The reverse case - a future axis living in a
   fourth file - is guarded by no test, because no such file exists yet.
@@ -125,7 +125,7 @@
   Immutable releases (SR's live releases show `immutable:false`, the default) would forbid exactly
   that retag path, so do not enable the setting while rc churn is the workflow.
 - **The release zip's digest was a function of the build clock, not the commit** (measured 2026-09-07,
-  fixed in `22716c7`). `Compress-Archive` stamps each entry from the staged file's mtime, and staging
+  fixed in `f6347d4`). `Compress-Archive` stamps each entry from the staged file's mtime, and staging
   rewrites those mtimes to now: two packs of one commit gave different SHA-256s over identical content.
   Pinning the tree's mtimes first does not fix it — NTFS bumps a directory's mtime whenever anything
   under it is touched, and the compressor's own traversal re-dirties directories mid-run (measured:
@@ -294,7 +294,7 @@ groups are worth naming because they are the reason this repo can be trusted acr
 - The guard is a **name-list check, not a transitive one**: it reads the seven visual-core files and
   rejects any line naming one of fourteen page-model symbols. So it catches `UiThemeDraw` → `UiSession`
   directly, but not `UiThemeDraw` → `UiPopup` → `UiSession`, because `UiPopup` is in neither list — it
-  joined the tree on `44b00c5`, after the guard was written, and appears in neither array of
+  joined the tree on `4dd97bf`, after the guard was written, and appears in neither array of
   `KernelContractTests.VerifyVisualCoreIsPageModelFree`. The two-layer claim is true of the code as it
   stands and unenforced along that one new path. Read from both arrays; no mutation test of this hole has
   been run, and the hole is currently hypothetical — nothing in the visual core calls `UiPopup`.
@@ -316,7 +316,7 @@ colour token currently feeds layout — it is a future-regression guard, not pre
 - **A count without its predicate is not a measurement.** A `find -not -path '*/obj/*'` never matches on
   this platform (paths are printed with backslashes), so any count taken that way silently includes
   MSBuild's generated `AssemblyInfo`/`AssemblyAttributes` files. Count with `git ls-files` + `wc -l`
-  instead: generated output is untracked, so it cannot leak in. Derived at `3b549d6`: library 35 files /
+  instead: generated output is untracked, so it cannot leak in. Derived at `12dacb4`: library 35 files /
   5,381 lines (Kernel top level 27 / 4,180, `Kernel/Widgets/` 7 / 1,198, `Properties/AssemblyInfo.cs`
   1 / 3), harness 13 files / 4,152 lines / 63 named assertions, stub sources 4 files / 672 lines in 4
   assemblies. **These move within hours, not days** - two landed while this bullet was being written.
@@ -328,6 +328,6 @@ colour token currently feeds layout — it is a future-regression guard, not pre
   over-bans, never under-bans - but it sends a session hunting for a rule that does not exist, and the
   phantom still lives in the consumer's own `MEMORY.md`.
 - **Documentation describes a moment, not a state.** A commit anchor in a prose doc rots the next time
-  code lands; during this tidy the tree moved `958ac7d → 44b00c5 → c2aca8e → b2006a0 → 3b549d6` in about
+  code lands; during this tidy the tree moved `958ac7d → 4dd97bf → 632a9a3 → a05fddf → 12dacb4` in about
   thirty minutes, retiring a "measured at <sha>" claim twice. Prefer a re-derivable command and a date
   over an anchor nobody re-checks.

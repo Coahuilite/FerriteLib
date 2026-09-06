@@ -38,23 +38,23 @@ The blocking risk is cleared. What remains is two branches that only change code
       returning without restarting is a half-switched state. Look for visible misalignment; if none,
       record it unreachable and add no mechanism.
 
-## 2. Second consumer: NivarianGrandStructure
+## 2. Second consumer: the withheld sibling mod
 
-- [ ] Before touching NGS: it builds against a machine-local game path, so decide whether it moves to
+- [ ] Before touching it: it builds against a machine-local game path, so decide whether it moves to
       the same RimRef + relative-reference scheme US and this repo use.
-- [ ] First NGS slice should be a **dialog-shaped** surface (the operator-console family), not the
+- [ ] First slice should be a **dialog-shaped** surface (the operator-console family), not the
       tactical table. The table is a full-screen world-overlay window with hand-flowed rects and
       per-window private interaction state; it is the worst available first test of a page model.
 - [ ] Settled by the maintainer, and it narrows the earlier separation proposal: the colonist-bar
-      navigation affordance **stays in `MegastructureFramework`**, because the framework must at least
+      navigation affordance **stays in `its framework`**, because the framework must at least
       let a player find a pawn inside a megastructure. Only the **window** moves to the consumer.
       Recorded consequence, so the rule is not written down as something it no longer is: "the
       framework owns capability and zero UI" is now false, and "zero translation keys" is
-      unreachable - `MegastructureRecords.cs:87-88` owns `MSF_Navigation_Open` and
-      `MSF_Navigation_OpenDesc`, the affordance's label and description. The boundary that survives is:
+      unreachable - `its records file` owns `the affordance's label key` and
+      `the affordance's description key`, the affordance's label and description. The boundary that survives is:
       **the framework may own the affordance that reaches an in-world thing, including its own two
       strings; it may not own a window, a layout, or a session.** Dependency direction is unaffected -
-      `MegastructureFramework` still takes no reference to this library, because an affordance label
+      `its framework` still takes no reference to this library, because an affordance label
       needs no UiKit. Verify that holds when the work is actually done rather than assuming it.
 - [ ] Record what the table needs from the library. If it needs only theme + drawing helpers + text
       metrics, that is the visual-core seam paying for itself; if it needs the session and the engine,
@@ -75,7 +75,7 @@ Each item is expected to delete a workaround, not add a layer.
       `SessionRevisionBumper`, the help-panel's hand-written before/after text diff, and those
       source-text assertions.
 - [ ] **Owned hit stack.** Produce a z-ordered `(rect, element)` list during arrange and dispatch input
-      topmost-first. **Half done by `44b00c5`:** `UiPopup.RectFor` is now the only popup rect rule and
+      topmost-first. **Half done by `4dd97bf`:** `UiPopup.RectFor` is now the only popup rect rule and
       `UiPopup.DrawOptionList` the only publisher of the covered rect, so the popup-specific coordinate
       conversions are gone. What is left is `YieldsToCoveringPopup` (`UiNative.cs:259`, still called at
       `:115`) and the previous-frame `OpenPopupRect` reasoning, which still model one popup rather than a
@@ -112,7 +112,7 @@ Each item is expected to delete a workaround, not add a layer.
       assembly names exist would close the hole without introducing a cross-repo dependency.
 - [ ] **Keep the boundary guard's symbol list alive, or make it transitive.**
       `VerifyVisualCoreIsPageModelFree` rejects lines naming fourteen hand-maintained page-model symbols in
-      seven visual-core files. `UiPopup` (added on `44b00c5`) is in neither list, so
+      seven visual-core files. `UiPopup` (added on `4dd97bf`) is in neither list, so
       `UiThemeDraw → UiPopup → UiSession` would pass while breaking the "usable without a Host" claim the
       lane exists to hold. Cheapest fix: add `UiPopup` to the page-model array and mutate-test it by
       planting a `UiPopup` call in a visual-core file. Real fix, later: derive the page-model set from the
@@ -155,16 +155,17 @@ item below, which remains the one irreversible call.
 
 - [ ] **Pre-push privacy scan on the full reachable history** (this repo has no remote yet, so the scan
       runs *before* the first push rather than as a cleanup after it). Re-measured clean 2026-09-07 at
-      `22716c7` across all three vectors independently: working tree 0, commit messages 0, full-history
+      `f6347d4` across all three vectors independently: working tree 0, commit messages 0, full-history
       blobs 0; zero emails/tokens/15-digit ids, no binary ever added (`git log --all --diff-filter=A`),
       single commit identity `Coahuilite <19252128+Coahuilite@users.noreply.github.com>`. The 09-05
-      measurement at `fc59b60` was real but did not survive the next day's own session: a TODO note
-      quoting US's literal personal path put one dirty blob into history (`bd77927`), caught only by
-      re-running the blob scan - the working-tree fix commit did not remove it. Disposed by squashing
-      the two tip commits (adjacent, zero references anywhere, no remote: blast radius nil, tree hash
-      verified identical). Lesson recorded in `MEMORY.md`: **each vector must be re-scanned after any
-      commit lands; a clean tree says nothing about history, and a scrubbed file says nothing about the
-      blob its dirty version already became.** The sibling repository paid for this lesson twice.
+      measurement at `382e862` was real but did not survive the next day's own session: a TODO note
+      quoting US's literal personal path put one dirty blob into history, caught only by re-running the
+      blob scan - the working-tree fix commit did not remove it. Disposed by squashing the two tip
+      commits (adjacent, zero references anywhere, no remote: blast radius nil, tree hash verified
+      identical; the squashed hashes are deliberately not cited - they no longer resolve). Lesson
+      recorded in `MEMORY.md`: **each vector must be re-scanned after any commit lands; a clean tree
+      says nothing about history, and a scrubbed file says nothing about the blob its dirty version
+      already became.** The sibling repository paid for this lesson twice.
       `git grep -I -E "[A-Za-z]:[\\\\/](Users|WorkSpace)" $(git rev-list --all)`.
 - [x] **Repository name ruled by the maintainer 2026-09-07: `FerriteLib`, PascalCase** — matching the
       series convention (`SqueakyRatkin`, `UniversalSqueaker`, both measured live on GitHub). The earlier

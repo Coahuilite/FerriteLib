@@ -24,5 +24,7 @@
   <modVersion>0.2.0</modVersion>
   <url>https://github.com/Coahuilite/FerriteLib</url>
   <supportedVersions><li>1.6</li></supportedVersions>
-  <description>FerriteLib shared runtime library. Prerequisite for Coahuilite mods that use it; it adds no game content of its own.</description>
+  <description>FerriteLib 是无内容前置模组：它不添加任何游戏内容（无 Def、无补丁、无贴图），全部载荷只有一个程序集 1.6/Assemblies/FerriteLib.UiKit.dll，供使用其 UI 内核的 Coahuilite 模组（目前为 Universal Squeaker）在运行时绑定。有模组依赖它时请勿卸载或禁用本模组。
+
+FerriteLib is a no-content prerequisite mod: it adds nothing to the game (no Defs, no patches, no textures). Its entire payload is one assembly, 1.6/Assemblies/FerriteLib.UiKit.dll, bound at runtime by Coahuilite mods that use its UI kernel (currently Universal Squeaker). Do not uninstall or disable it while a mod depends on it.</description>
 </ModMetaData>

@@ -24,8 +24,10 @@
 - Log prefix for the library's own diagnostics: `[FerriteLib.UiKit]`. It is not a Def prefix and not a
   packageId.
 - Known consumers: `coahuilite.universalsqueaker` (Universal Squeaker, the only one wired so far, and the
-  only one whose behaviour this library's shape has been validated against).
-  `coahuilite.nivariansgrandstructure` is **deferred by maintainer decision (2026-09-04)**, not scheduled.
+  only one whose behaviour this library's shape has been validated against). The second, planned consumer
+  is **an unreleased sibling mod (name withheld from published documents per the 2026-09-06 neutrality
+  ruling; identity lives in the maintainer-local `HANDOFF.md`)** — deferred by maintainer decision
+  (2026-09-04), not scheduled.
 
 ## What this library is for
 
@@ -64,8 +66,8 @@ the visual core without the whole DLL.
   IMGUI by design. A Canvas/uGUI surface cannot be placed above the game's IMGUI (verified: IMGUI
   composites last; `GUI.depth` orders IMGUI against IMGUI), so any future non-IMGUI backend has to be
   composited through a RenderTexture blit, not expected to sort above the HUD.
-- **API freeze is gated on a second wired consumer**, not on features. Until NivarianGrandStructure
-  actually builds against this surface, the public API is provisional and breaking changes are expected.
+- **API freeze is gated on a second wired consumer**, not on features. Until the withheld-name sibling
+  mod actually builds against this surface, the public API is provisional and breaking changes are expected.
   **Caveat added with the publication decision (2026-09-04, `TODO.md` §5)**: "breaking changes are
   expected" is true *within our own repos* because we release in lockstep. It stops being free the moment
   a Workshop page carries a stable packageId, because a third party can then compile against this surface

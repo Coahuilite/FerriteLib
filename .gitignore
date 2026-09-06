@@ -24,3 +24,6 @@ Thumbs.db
 *.log
 .slim/
 .opencode/
+
+# 本地交接文档（维护者裁决 2026-09-07：不入库，已从全部历史移除；同 US 先例）
+HANDOFF.md
