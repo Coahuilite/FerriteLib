@@ -238,19 +238,15 @@ item below, which remains the one irreversible call.
       admission and will stop being cheap afterwards), or **unsupported** (then we may keep breaking it
       for as long as US is the only consumer, and say so plainly). Both are fine; discovering the choice
       after someone builds on us is the only bad outcome.
-- [ ] A no-content library mod will draw "what is this doing in my mod list". Its `description` has to
-      answer that in one sentence, name the mods that need it, and say plainly that it has no content of
-      its own and must not be uninstalled while a consumer is present.
-- [ ] `About.xml` currently carries a placeholder-grade description and no preview. Both are player-facing
-      on a Workshop page and are not yet written.
-- [ ] **No `README.md` and no `CONTRIBUTING.md` exist yet, and the first push makes the absence
-      conspicuous.** The release body written by `release.yml` now carries the player-facing explanation
-      (what a no-content prerequisite is, how to unzip it, why not to copy the DLL), so a README is not a
-      release blocker - but a public repository with no README reads as abandoned, and "what is this doing
-      in my mod list" needs answering somewhere a browser can find without opening a release. Scope it to
-      what is true: what the two layers are, that it ships no content, that the shipped payload is one
-      DLL, how to verify locally (`pwsh scripts/verify-local.ps1`, 7 gates), and which mods need it. Keep
-      counts out of it, same rule as `AGENTS.md`.
+- [~] `About.xml` description rewritten 2026-09-07 (bilingual, answers "what is this doing in my mod
+      list", says not to uninstall while a consumer is present). **Preview image still missing** - it is
+      a Workshop-page asset and the Workshop step is undecided; nothing player-facing is published
+      without it.
+- [x] **README landed with the push 2026-09-07**: `README.md` + `README.zh-CN.md`, bilingual interlinked,
+      scoped to what is true (two layers, no content, one DLL, verify commands, which mods need it), no
+      counts. `CONTRIBUTING.md` deliberately **not** written - its existence is the item below's output,
+      and the README states the currently-true stance (bug reports welcome, PRs not promised while the
+      surface is provisional).
 - [ ] **Decide whether third-party use is invited, and let that decide `CONTRIBUTING.md`'s existence.**
       If invited, `§3` and the per-surface theme restructure in `§4` land first and a contributing guide is
       part of the offer. If unsupported, say so in the README and do not write a contributing guide that
