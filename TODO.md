@@ -183,10 +183,15 @@ item below, which remains the one irreversible call.
       Rehearsal executed in the rc dialect: `v0.2.0-rc1` tagged on the tip, Actions Release run green,
       **the platform's server-computed digest `sha256:e8a54be6…` equals a local `pack-release.ps1` run
       of the same commit byte-for-byte** — the digest-determinism fix from this morning is what made
-      that check meaningful; it would have failed on timing before it. Bare `v0.2.0` then tagged the
-      same commit (final-state anchor held), its release verified by `scripts/verify-release.ps1`
-      (published / flag stable / single asset / latest=v0.2.0 / no dangling tags, exit 0). CI on main
-      green on the first run.
+      that check meaningful; it would have failed on timing before it. CI on main green on the first run.
+      **Overstep corrected the same day:** the bare `v0.2.0` was also tagged and released in that flow,
+      and the maintainer ruled it premature - the push authorization covered the repo and the rc trial,
+      not ending the trial. Release and tag withdrawn (`gh release delete --cleanup-tag`); the page is
+      back to rc-only, `/releases/latest` 404s as the scheme intends. Consequence encoded by the gate,
+      not by trust: the tip has moved past rc1's commit since, so the eventual stable is `v0.2.0-rc2` at
+      the then-tip plus the bare tag on that same commit - a bare `v0.2.0` on today's tip would be
+      rejected by `release.yml`'s final-state anchor. Cutting a stable release is a maintainer decision,
+      never a pipeline step.
 - [x] **`About/About.xml <url>` filled 2026-09-07** with `https://github.com/Coahuilite/FerriteLib` —
       the naming ruling made the url a pure function of a decided value. It is the only pointer a player
       or modder gets inside the game. No Workshop id exists yet, and no `<steamAppId>` goes in before any

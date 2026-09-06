@@ -6,7 +6,8 @@
 ## Project identity
 
 - RimWorld 1.6 **prerequisite mod** `coahuilite.ferritelib`, display name **FerriteLib**. Published on
-  GitHub as `Coahuilite/FerriteLib` (public, first release `v0.2.0` on 2026-09-07); Workshop pending.
+  GitHub as `Coahuilite/FerriteLib` (public) in the **rc-only trial window** (first asset `v0.2.0-rc1`,
+  2026-09-07; no bare release until the maintainer ends the trial); Workshop pending.
 - Payload is one assembly: `FerriteLib.UiKit`, namespace root `FerriteLib.UiKit`, kernel surface
   `FerriteLib.UiKit.Kernel`.
 - It ships **no game content of any kind**: no Defs, no Patches, no Languages, no textures. The mod's

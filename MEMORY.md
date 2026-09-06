@@ -3,12 +3,15 @@
 ## Current durable state
 
 - Repository split out of the Universal Squeaker tree on 2026-09-03. FerriteLib is a prerequisite mod,
-  `coahuilite.ferritelib`, display name FerriteLib, `modVersion` 0.2.0. **Published 2026-09-07:** GitHub
-  repo `Coahuilite/FerriteLib` (public), releases `v0.2.0-rc1` + `v0.2.0` on the same commit, platform
-  digest matched a local pack byte-for-byte; Workshop still pending. History was rewritten once before
-  the push (HANDOFF.md removed from all revisions; the buffer is now gitignored and local-only), so
-  pre-rewrite lib hashes cited anywhere are stale — ledger in `.git/filter-repo/commit-map`, US-facing
-  drift list in `HANDOFF.md`.
+  `coahuilite.ferritelib`, display name FerriteLib, `modVersion` 0.2.0. **Published 2026-09-07 in the
+  rc-only window:** GitHub repo `Coahuilite/FerriteLib` (public), sole release `v0.2.0-rc1` (prerelease),
+  its platform digest matched a local pack byte-for-byte; `/releases/latest` 404s, which is the correct
+  state while only rc iterations exist. A bare `v0.2.0` was tagged the same day and **withdrawn the same
+  day by maintainer ruling** - cutting the stable tag was outside the push authorization: the rc scheme
+  exists precisely so "the trial is over" stays a deliberate decision (see `TODO.md` §5). Workshop still
+  pending. History was rewritten once before the push (HANDOFF.md removed from all revisions; the buffer
+  is now gitignored and local-only), so pre-rewrite lib hashes cited anywhere are stale — ledger in
+  `.git/filter-repo/commit-map`, US-facing drift list in `HANDOFF.md`.
 - Provenance: `Source/FerriteLib.UiKit/**` and `tools/FerriteLib.UiKit.Tests/**` were copied out of the
   US repo at US commit `6c7053a` after a file-for-file `diff -r` check, then amended there. US retains
   its own history; this repo's history starts at the split. `6c7053a` is the post-rewrite hash of what was
