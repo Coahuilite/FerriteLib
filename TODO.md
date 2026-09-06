@@ -153,20 +153,16 @@ US is released in lockstep with it. GitHub-first early testing does not pre-empt
 the library referenceable-by-strangers any more than a stable packageId will — see the invited/unsupported
 item below, which remains the one irreversible call.
 
-- [ ] **Pre-push privacy scan on the full reachable history** (this repo has no remote yet, so the scan
-      runs *before* the first push rather than as a cleanup after it). Re-measured clean 2026-09-07 at
-      `f6347d4` across all three vectors independently: working tree 0, commit messages 0, full-history
-      blobs 0; zero emails/tokens/15-digit ids, no binary ever added (`git log --all --diff-filter=A`),
-      single commit identity `Coahuilite <19252128+Coahuilite@users.noreply.github.com>`. The 09-05
-      measurement at `382e862` was real but did not survive the next day's own session: a TODO note
-      quoting US's literal personal path put one dirty blob into history, caught only by re-running the
-      blob scan - the working-tree fix commit did not remove it. Disposed by squashing the two tip
-      commits (adjacent, zero references anywhere, no remote: blast radius nil, tree hash verified
-      identical; the squashed hashes are deliberately not cited - they no longer resolve). Lesson
-      recorded in `MEMORY.md`: **each vector must be re-scanned after any commit lands; a clean tree
-      says nothing about history, and a scrubbed file says nothing about the blob its dirty version
-      already became.** The sibling repository paid for this lesson twice.
-      `git grep -I -E "[A-Za-z]:[\\\\/](Users|WorkSpace)" $(git rev-list --all)`.
+- [x] **Pre-push privacy scan on the full reachable history — executed clean before the 2026-09-07 push.**
+      Final run at the pushed tip `bdbeae0` via `scripts/privacy-audit.ps1 -FullHistory`: working tree 0,
+      commit messages 0, all 34 historical revisions 0, single noreply identity. The scan's own history
+      lesson stands: the 09-05 measurement at `382e862` was real but did not survive the next day's own
+      session - a TODO note quoting US's literal personal path put one dirty blob into history, caught
+      only by re-running the blob scan (a working-tree fix commit does not remove it). Disposed by
+      squashing the two tip commits; the squashed hashes are deliberately not cited - they no longer
+      resolve. **Each vector must be re-scanned after any commit lands; a clean tree says nothing about
+      history, and a scrubbed file says nothing about the blob its dirty version already became.** The
+      sibling repository paid for this lesson twice.
 - [x] **Repository name ruled by the maintainer 2026-09-07: `FerriteLib`, PascalCase** — matching the
       series convention (`SqueakyRatkin`, `UniversalSqueaker`, both measured live on GitHub). The earlier
       "lowercase or a Linux runner breaks" argument is void on evidence: GitHub resolves owner/repo
@@ -180,27 +176,22 @@ item below, which remains the one irreversible call.
       Availability measured 2026-09-07: both variants free under the owner, zero global name collisions
       (`Ferrite*` hits are unrelated projects), the `FerriteLib` user/org handle is free, and NuGet
       `FerriteLib` / `FerriteLib.UiKit` are both unclaimed (404) — relevant only if §4's feed ever turns on.
-- [ ] **Create the repository and push** - **external action, needs maintainer authorization.** Suggested
-      shape, one line each:
-      `gh repo create Coahuilite/FerriteLib --public --description "RimWorld 1.6 prerequisite mod: the FerriteLib.UiKit shared UI library. Ships no game content."` →
-      `git remote add origin <ssh url>` → `git push -u origin main`.
-      Then the first rehearsal release, following the rc ordering gate in `release.yml` (step "Verify the
-      tag is a release of this exact commit on main", checks 4 at `:73-102` — NOT a `verify-local` gate;
-      that script has seven checks and none of them look at tags): tag the rc first (`git tag v0.2.0-rc1`
-      on `main`'s tip, push, confirm the Actions run produces `FerriteLib-v0.2.0-rc1.zip` whose SHA-256
-      matches a local `pack-release.ps1` run of the same commit), then the bare `v0.2.0` on that **same**
-      commit — once any rc exists for a base, the workflow rejects a bare tag that points anywhere else,
-      so "one more fix right before release" must become rc(N+1) and get its own trial. `release.yml`
-      derives the prerelease flag from the tag dialect, so the rc release is flagged automatically and
-      cannot steal Latest.
-      Note the token in use has scopes `gist, read:org, repo` and **no `workflow` scope**, so the first push
-      that includes `.github/workflows/*` may be rejected; grant the scope or add the workflows through the
-      web UI before pushing them.
+- [x] **Repository created and pushed 2026-09-07 (maintainer authorization this session).**
+      `gh repo create Coahuilite/FerriteLib --public` → SSH remote → `git push -u origin main` at
+      `bdbeae0`. The token's missing `workflow` scope never bit: the push went over SSH, and both
+      workflow files landed and ran (measured: `contents/.github/workflows` lists ci.yml + release.yml).
+      Rehearsal executed in the rc dialect: `v0.2.0-rc1` tagged on the tip, Actions Release run green,
+      **the platform's server-computed digest `sha256:e8a54be6…` equals a local `pack-release.ps1` run
+      of the same commit byte-for-byte** — the digest-determinism fix from this morning is what made
+      that check meaningful; it would have failed on timing before it. Bare `v0.2.0` then tagged the
+      same commit (final-state anchor held), its release verified by `scripts/verify-release.ps1`
+      (published / flag stable / single asset / latest=v0.2.0 / no dangling tags, exit 0). CI on main
+      green on the first run.
 - [x] **`About/About.xml <url>` filled 2026-09-07** with `https://github.com/Coahuilite/FerriteLib` —
-      the naming ruling above made the url a pure function of a decided value, so it no longer waits on
-      the push. It is the only pointer a player or modder gets inside the game. No Workshop id exists
-      yet, and no `<steamAppId>` goes in before any Workshop upload. If the repository is ever renamed,
-      this line and the two pack scripts' source pointers move together.
+      the naming ruling made the url a pure function of a decided value. It is the only pointer a player
+      or modder gets inside the game. No Workshop id exists yet, and no `<steamAppId>` goes in before any
+      Workshop upload. If the repository is ever renamed, this line and the two pack scripts' source
+      pointers move together.
 - [ ] **US side: the link itself** - **cross-repo write, needs maintainer authorization.** The mechanism is
       one derived line in US's release body plus one pin, and it must be derived from a single source so the
       two cannot drift:
