@@ -195,9 +195,11 @@ item below, which remains the one irreversible call.
       Note the token in use has scopes `gist, read:org, repo` and **no `workflow` scope**, so the first push
       that includes `.github/workflows/*` may be rejected; grant the scope or add the workflows through the
       web UI before pushing them.
-- [ ] **Fill `About/About.xml <url>`** (currently empty at `:25`). It is the only pointer a player or
-      modder gets inside the game, and there is no Workshop id to put there yet. Do not add a
-      `<steamAppId>` before any Workshop upload.
+- [x] **`About/About.xml <url>` filled 2026-09-07** with `https://github.com/Coahuilite/FerriteLib` —
+      the naming ruling above made the url a pure function of a decided value, so it no longer waits on
+      the push. It is the only pointer a player or modder gets inside the game. No Workshop id exists
+      yet, and no `<steamAppId>` goes in before any Workshop upload. If the repository is ever renamed,
+      this line and the two pack scripts' source pointers move together.
 - [ ] **US side: the link itself** - **cross-repo write, needs maintainer authorization.** The mechanism is
       one derived line in US's release body plus one pin, and it must be derived from a single source so the
       two cannot drift:
