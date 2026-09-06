@@ -124,6 +124,18 @@
   on the runner's checkout, so re-cutting rc2 after deleting rc2 passes while rc3-after-rc1 fails.
   Immutable releases (SR's live releases show `immutable:false`, the default) would forbid exactly
   that retag path, so do not enable the setting while rc churn is the workflow.
+- **The release zip's digest was a function of the build clock, not the commit** (measured 2026-09-07,
+  fixed in `22716c7`). `Compress-Archive` stamps each entry from the staged file's mtime, and staging
+  rewrites those mtimes to now: two packs of one commit gave different SHA-256s over identical content.
+  Pinning the tree's mtimes first does not fix it — NTFS bumps a directory's mtime whenever anything
+  under it is touched, and the compressor's own traversal re-dirties directories mid-run (measured:
+  files held the pinned date, `1.6/` still carried the wall clock). The fix writes timestamps into the
+  archive directly (`ZipArchive.CreateEntry` + explicit `LastWriteTime` = the commit's author date,
+  sorted enumeration). Verified: two packs 5s apart, `cmp` clean, `1B7D57E0…`. The DLL was never the
+  problem — same-path and clone-path Release builds hash identically (`0c62df…`), and the earlier
+  "clone inserts CRs" vector is closed by `.gitattributes`. Consequence for the rehearsal: the
+  "CI zip SHA-256 matches a local pack of the same commit" check in `TODO.md` §5 is now meaningful;
+  before this fix it could only pass by luck of timing.
 - **uGUI / UIElements assemblies do ship** (`UnityEngine.UI.dll`, `UnityEngine.UIModule.dll`,
   `Unity.TextMeshPro.dll`, `UnityEngine.UIElementsModule.dll`), so they are referenceable by a mod. The
   constraint that actually matters is compositing, not availability: IMGUI draws above every Canvas.

@@ -154,12 +154,17 @@ the library referenceable-by-strangers any more than a stable packageId will —
 item below, which remains the one irreversible call.
 
 - [ ] **Pre-push privacy scan on the full reachable history** (this repo has no remote yet, so the scan
-      runs *before* the first push rather than as a cleanup after it). Measured clean on 2026-09-05 at
-      `fc59b60`: zero absolute paths in any reachable blob, zero emails/tokens/15-digit ids, no binary ever
-      added on any commit (`git log --all --diff-filter=A`), single commit identity
-      `Coahuilite <19252128+Coahuilite@users.noreply.github.com>`. Repeat the scan if anything lands between
-      then and the push. The sibling repository paid for this lesson already: its published tags still reach
-      a deleted `.slim/codemap.json`, and cleaning it needs a force-push plus tag rebuild.
+      runs *before* the first push rather than as a cleanup after it). Re-measured clean 2026-09-07 at
+      `22716c7` across all three vectors independently: working tree 0, commit messages 0, full-history
+      blobs 0; zero emails/tokens/15-digit ids, no binary ever added (`git log --all --diff-filter=A`),
+      single commit identity `Coahuilite <19252128+Coahuilite@users.noreply.github.com>`. The 09-05
+      measurement at `fc59b60` was real but did not survive the next day's own session: a TODO note
+      quoting US's literal personal path put one dirty blob into history (`bd77927`), caught only by
+      re-running the blob scan - the working-tree fix commit did not remove it. Disposed by squashing
+      the two tip commits (adjacent, zero references anywhere, no remote: blast radius nil, tree hash
+      verified identical). Lesson recorded in `MEMORY.md`: **each vector must be re-scanned after any
+      commit lands; a clean tree says nothing about history, and a scrubbed file says nothing about the
+      blob its dirty version already became.** The sibling repository paid for this lesson twice.
       `git grep -I -E "[A-Za-z]:[\\\\/](Users|WorkSpace)" $(git rev-list --all)`.
 - [ ] **Name the remote repository `ferritelib`, lowercase.** Three places in US pin that exact name and
       layout: `UniversalSqueaker.csproj:49` (`..\..\..\ferritelib\1.6\Assemblies\FerriteLib.UiKit.dll`),
