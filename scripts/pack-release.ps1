@@ -153,24 +153,37 @@ foreach ($required in @('LICENSE', 'LoadFolders.xml', 'version.txt', 'About\Abou
 # a release asset is unzipped straight into Mods/ by a player, so the folder has to be inside the
 # archive or they get a Loose LoadFolders.xml in their Mods directory. Same choice the sibling
 # repository makes on its release path (pack-github.ps1 stages the directory, not the glob).
-# Deterministic timestamps: Compress-Archive stamps each entry with its file's mtime, and staging
-# just rewrote those mtimes to wall-clock now - so two packs of the same commit differed by seconds
-# and the printed SHA-256 described the build machine's clock, not the release. Normalize the whole
-# stage tree to the tagged commit's author date: the artifact's timestamps then point at the source,
-# and the digest becomes a pure function of the commit (verified: entry CRCs were already identical;
-# mtimes were the only divergence).
-$commitDate = [DateTime]::Parse((& git -C $root log -1 --format=%aI $commit)).ToUniversalTime()
-# Order is load-bearing: on NTFS, rewriting a child's mtime bumps the parent directory's mtime to
-# now. Enumerating top-down (the default) therefore re-dirties every directory right after pinning
-# it - measured: file entries held the commit date while the 1.6/ directory entry still carried the
-# wall clock. Files first, then directories deepest-first, so each directory is pinned after its
-# last child.
-Get-ChildItem -LiteralPath $githubDir -Recurse -Force |
-    Sort-Object { [bool]$_.PSIsContainer }, @{ Expression = { $_.FullName.Length }; Descending = $true } |
-    ForEach-Object { $_.LastWriteTime = $commitDate }
+# Deterministic archive. Compress-Archive stamps each entry from the file's mtime, and staging
+# rewrites those mtimes to wall-clock now - so two packs of one commit produced different SHA-256s
+# over byte-identical content (measured 2026-09-07: 13FC9E.. vs 5080CE.., 4 seconds apart). Pinning
+# the tree's mtimes first does not fix it either: NTFS bumps a directory's mtime whenever anything
+# under it is touched, and the compressor's own traversal re-dirties directories mid-run (measured:
+# every file entry held the pinned date while 1.6/ still carried the wall clock). So the timestamps
+# go into the archive directly: every entry gets the tagged commit's author date, entry order is a
+# sorted enumeration, and the digest is a pure function of the commit.
+$commitDate = [DateTimeOffset]::Parse((& git -C $root log -1 --format=%aI $commit)).ToUniversalTime()
 $zipPath = Join-Path $zipDir "FerriteLib-$Version.zip"
 if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
-Compress-Archive -Path $stageDir -DestinationPath $zipPath -Force
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$archive = [System.IO.Compression.ZipFile]::Open($zipPath, [System.IO.Compression.ZipArchiveMode]::Create)
+try {
+    $stageFull = (Resolve-Path -LiteralPath $stageDir).Path.TrimEnd('\')
+    $items = @(Get-ChildItem -LiteralPath $stageDir -Recurse -Force | ForEach-Object {
+        $rel = $_.FullName.Substring($stageFull.Length + 1).Replace('\', '/')
+        if ($_.PSIsContainer) { "$rel/" } else { $rel }
+    } | Sort-Object)
+    foreach ($rel in $items) {
+        $entry = $archive.CreateEntry("FerriteLib/$rel", [System.IO.Compression.CompressionLevel]::Optimal)
+        $entry.LastWriteTime = $commitDate
+        if (-not $rel.EndsWith('/')) {
+            $src = [System.IO.Path]::Combine($stageFull, $rel.Replace('/', '\'))
+            $in = [System.IO.File]::OpenRead($src)
+            $out = $entry.Open()
+            try { $in.CopyTo($out) } finally { $out.Dispose(); $in.Dispose() }
+        }
+    }
+} finally { $archive.Dispose() }
 
 # The digest printed here is what the release body must quote, and what a consumer's CI verifies when it
 # links to this artifact instead of rebuilding it. One canonical copy: the page that owns the binary.
