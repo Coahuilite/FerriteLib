@@ -116,13 +116,17 @@ if (-not (Test-Path -LiteralPath $licenseSource -PathType Leaf)) {
 Copy-Item -LiteralPath $licenseSource -Destination (Join-Path $stageDir 'LICENSE') -Force
 
 # Identity, so a player's installed copy can be traced to a commit without a game log.
-# Use the full tag, not $baseVersion: a prerelease rehearsal build (v0.2.1-pre1) whose version.txt says
+# Use the full tag, not $baseVersion: an rc rehearsal build (v0.2.1-rc1) whose version.txt says
 # "0.2.1" is indistinguishable from the real 0.2.1 on the player's disk, and that is exactly the window
 # where early testers are being asked to tell us which build they hit.
 $releaseLabel = $Version -replace '^v', ''
+# MPL-2.0 3.2 wants the Executable Form to say where the Source Code Form lives. LICENSE carries the
+# terms, not the location, so the pointer goes here: on the release runner the platform names the repo;
+# locally the maintainer's 2026-09-07 naming ruling is the source of truth.
+$sourceUrl = if ($env:GITHUB_REPOSITORY) { "$($env:GITHUB_SERVER_URL)/$env:GITHUB_REPOSITORY" } else { 'https://github.com/Coahuilite/FerriteLib' }
 [System.IO.File]::WriteAllText(
     (Join-Path $stageDir 'version.txt'),
-    "FerriteLib $releaseLabel`r`ncommit $shortCommit`r`n")
+    "FerriteLib $releaseLabel`r`ncommit $shortCommit`r`nsource $sourceUrl`r`n")
 
 # Debug symbols are not part of a release payload.
 $pdbs = @(Get-ChildItem -LiteralPath $stageDir -Recurse -File -Filter '*.pdb')

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   FerriteLib is a prerequisite mod: it ships no Defs, no Languages and no content. Its whole payload
-  is 1.6/Assemblies/FerriteLib.UiKit.dll, which consumer mods compile against through the local NuGet
-  feed and bind to at runtime.
+  is 1.6/Assemblies/FerriteLib.UiKit.dll, which consumer mods compile against by a relative sibling
+  reference (Private=false, so the DLL ships only here) and bind to at runtime.
 
   The two version axes live apart on purpose:
     - modVersion below is the RELEASE axis, parsed by the game and readable at runtime.
@@ -14,8 +14,8 @@
   modDependencies, load{Before,After}, incompatibleWith, forceLoad{Before,After} plus the *ByVersion
   variants) and there is no catch-all, so no custom marker tag is used here.
 
-  Display name is confirmed as "FerriteLib". License stays undecided by maintainer; nothing is
-  published and no remote is configured.
+  Display name is confirmed as "FerriteLib", and so is the repository name (PascalCase, maintainer
+  ruling 2026-09-07; the packageId stays lowercase - it is a save-data reference). License is MPL-2.0.
 -->
 <ModMetaData>
   <packageId>coahuilite.ferritelib</packageId>

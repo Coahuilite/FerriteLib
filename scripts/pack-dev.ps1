@@ -45,7 +45,9 @@ Copy-Item -LiteralPath $licenseSource -Destination (Join-Path $stageDir 'LICENSE
 $label = (Select-String -LiteralPath $projectFile -Pattern '<VersionPrefix>(.*?)</VersionPrefix>').Matches[0].Groups[1].Value
 $suffixNode = (Select-String -LiteralPath $projectFile -Pattern '<VersionSuffix>(.*?)</VersionSuffix>')
 if ($suffixNode) { $label = "$label-$($suffixNode.Matches[0].Groups[1].Value)" }
-[System.IO.File]::WriteAllText((Join-Path $stageDir 'version.txt'), "FerriteLib $label`r`n")
+# The source pointer is MPL-2.0 3.2's requirement on an Executable Form; see pack-release.ps1 for the
+# full note. Dev packages are local rehearsals, but they ship the same shape as the release asset.
+[System.IO.File]::WriteAllText((Join-Path $stageDir 'version.txt'), "FerriteLib $label`r`nsource https://github.com/Coahuilite/FerriteLib`r`n")
 
 $pdbs = @(Get-ChildItem -LiteralPath $stageDir -Recurse -File -Filter '*.pdb')
 if ($pdbs.Count -gt 0) { $pdbs | Remove-Item -Force }

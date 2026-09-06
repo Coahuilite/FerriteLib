@@ -166,22 +166,32 @@ item below, which remains the one irreversible call.
       commit lands; a clean tree says nothing about history, and a scrubbed file says nothing about the
       blob its dirty version already became.** The sibling repository paid for this lesson twice.
       `git grep -I -E "[A-Za-z]:[\\\\/](Users|WorkSpace)" $(git rev-list --all)`.
-- [ ] **Name the remote repository `ferritelib`, lowercase.** Three places in US pin that exact name and
-      layout: `UniversalSqueaker.csproj:49` (`..\..\..\ferritelib\1.6\Assemblies\FerriteLib.UiKit.dll`),
-      `UniversalSqueakerKernelHostTests.csproj:19` (`FerriteLibHarness`), and its `verify-local.ps1:37`
-      (`$carrierDll`) plus the LICENSE comparison at `:141`. A `FerriteLib`-cased remote works by accident
-      on Windows and macOS and breaks on a Linux runner; keeping it lowercase also matches the packageId's
-      last segment. Display name stays "FerriteLib".
+- [x] **Repository name ruled by the maintainer 2026-09-07: `FerriteLib`, PascalCase** — matching the
+      series convention (`SqueakyRatkin`, `UniversalSqueaker`, both measured live on GitHub). The earlier
+      "lowercase or a Linux runner breaks" argument is void on evidence: GitHub resolves owner/repo
+      case-insensitively (measured: `repos/Coahuilite/squeakyratkin` redirects to `SqueakyRatkin`), US's
+      workflows reference the carrier via `repository:` (an API lookup) plus a literal checkout
+      `path: ci-ferritelib` that no repo-name case affects, and both runners are windows-latest anyway.
+      Machine identity stays lowercase where it is load-bearing: packageId `coahuilite.ferritelib`
+      (save-data reference, immutable) and the local sibling directory `ferritelib` (what the csproj
+      HintPath actually resolves). Creating `Coahuilite/FerriteLib` also squat-proofs the variants:
+      GitHub forbids a second case-variant under one owner, so every misspelling redirects here.
+      Availability measured 2026-09-07: both variants free under the owner, zero global name collisions
+      (`Ferrite*` hits are unrelated projects), the `FerriteLib` user/org handle is free, and NuGet
+      `FerriteLib` / `FerriteLib.UiKit` are both unclaimed (404) — relevant only if §4's feed ever turns on.
 - [ ] **Create the repository and push** - **external action, needs maintainer authorization.** Suggested
       shape, one line each:
-      `gh repo create Coahuilite/ferritelib --public --description "RimWorld 1.6 prerequisite mod: the FerriteLib.UiKit shared UI library. Ships no game content."` →
+      `gh repo create Coahuilite/FerriteLib --public --description "RimWorld 1.6 prerequisite mod: the FerriteLib.UiKit shared UI library. Ships no game content."` →
       `git remote add origin <ssh url>` → `git push -u origin main`.
-      Then the first rehearsal release, following the rc gate this repo's own `verify-local.ps1` enforces:
-      tag the rc first (`git tag v0.2.0-rc1` on `main`'s tip, push, confirm the Actions run produces
-      `FerriteLib-v0.2.0-rc1.zip` whose SHA-256 matches a local `pack-release.ps1` run of the same commit),
-      then the bare `v0.2.0` on that **same** commit (the final-state anchor: bare tag == highest-rc commit;
-      tagging `v0.2.0` without a preceding rc trips gate 8). `release.yml` derives the prerelease flag from
-      the tag dialect, so the rc release is flagged automatically and cannot steal Latest.
+      Then the first rehearsal release, following the rc ordering gate in `release.yml` (step "Verify the
+      tag is a release of this exact commit on main", checks 4 at `:73-102` — NOT a `verify-local` gate;
+      that script has seven checks and none of them look at tags): tag the rc first (`git tag v0.2.0-rc1`
+      on `main`'s tip, push, confirm the Actions run produces `FerriteLib-v0.2.0-rc1.zip` whose SHA-256
+      matches a local `pack-release.ps1` run of the same commit), then the bare `v0.2.0` on that **same**
+      commit — once any rc exists for a base, the workflow rejects a bare tag that points anywhere else,
+      so "one more fix right before release" must become rc(N+1) and get its own trial. `release.yml`
+      derives the prerelease flag from the tag dialect, so the rc release is flagged automatically and
+      cannot steal Latest.
       Note the token in use has scopes `gist, read:org, repo` and **no `workflow` scope**, so the first push
       that includes `.github/workflows/*` may be rejected; grant the scope or add the workflows through the
       web UI before pushing them.
@@ -211,11 +221,15 @@ item below, which remains the one irreversible call.
       US `main` and carries the identical message; `0fe60b0` resolves only as a dangling local object.
       US's one-time guide was deleted pre-push (their ruling; survivors folded into US `MEMORY.md`), so
       the method pointer is `modding_documents/privacy-debt-vector-triage-zh.md`, not the guide.
-- [ ] **US's CI needs the sibling checkout pinned to a path, not just a repo.** Two repos in one runner
-      workspace: `actions/checkout@v4` with `repository: Coahuilite/ferritelib` and
-      **`path: ../ferritelib`** (default path would be `ferritelib` *inside* the workspace and every pinned
-      relative reference above would miss). Add `dotnet restore` for each project before
-      `verify-local.ps1` - see the `--no-restore` note in `MEMORY.md`.
+- [x] **US's CI dependency chain — settled by US's own session, superseding this sketch.** What was
+      written here (`path: ../ferritelib`) is impossible: `actions/checkout` resolves `path` inside
+      `GITHUB_WORKSPACE` and throws on anything outside (US verified against the action's own
+      `input-helper.ts`). US landed the working variant — carrier checkout to the `ci-ferritelib/`
+      subdir, build there, run-step copy to the sibling path the HintPath expects (path math verified
+      in US `MEMORY.md`). Follow-through for the name ruling above: US's two workflows still say
+      `repository: Coahuilite/ferritelib` — case-insensitive resolution means it works either way, but
+      align it to `Coahuilite/FerriteLib` when US next touches those files. **Cross-repo write: report,
+      do not edit.**
 - [ ] **The four widget kinds nobody consumes** (`section/header`, `state/empty`, `input/mode-row`,
       `input/stepper-slider`) become public on the day this repo is public. See §3 for the decision; it is
       cheaper to make before the first release than after somebody compiles against them.
@@ -256,11 +270,10 @@ Every item below was produced by reading code and both repos' scripts, not by re
 claims that were circulating in prose turned out not to hold; all four are corrected in `MEMORY.md`, and
 these are the follow-throughs.
 
-- [ ] `About/About.xml`'s header comment carries two stale claims: **"License stays undecided by
-      maintainer"** (MPL-2.0 was adopted in `5a2fb72` and gate 6 enforces the text) and consumers binding
-      **"through the local NuGet feed"** (the scheme is a sibling `HintPath` + `<Private>False`; §4 keeps
-      the feed deliberately off). The comment ships inside the mod package, so it is a durable text a
-      reader will meet. Fix it together with the `description` rewrite in §5.
+- [x] `About/About.xml`'s header comment stale claims fixed 2026-09-07: "License stays undecided" now
+      names MPL-2.0, "local NuGet feed" now describes the actual sibling-`HintPath` + `<Private>False`
+      scheme, and the comment records the repository-name ruling next to the display-name confirmation.
+      The comment ships inside the mod package, so it is a durable text a reader will meet.
 - [x] Gate 6's licence claim corrected in `MEMORY.md`: it is the sixth gate, and it asserts local text
       structure only. The cross-repo parity half belongs to the consumer, so `MEMORY.md` must keep naming
       it that way.

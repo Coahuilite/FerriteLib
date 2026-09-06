@@ -1,6 +1,6 @@
 name: Release
 
-# Push a SemVer tag (v0.2.0, v0.2.1-pre1) and this publishes the mod package that players download.
+# Push a SemVer tag (v0.2.0, v0.2.1-rc1) and this publishes the mod package that players download.
 #
 # This repository is the ONLY publisher of FerriteLib.UiKit.dll. Consumer repositories link to the
 # asset produced here instead of shipping or rebuilding their own copy - two carriers of the same
@@ -187,7 +187,7 @@ jobs:
           | Built from commit | ``$env:ASSET_COMMIT`` |
           | Asset SHA-256 | ``$env:ASSET_SHA256`` |
 
-          The consumer repository links to this release instead of shipping its own copy, so the SHA-256 above is the one true digest of ``FerriteLib.UiKit.dll`` for this version.
+          The consumer repository links to this release instead of shipping its own copy, so the SHA-256 above is the one true digest of ``FerriteLib.UiKit.dll`` for this version. The full source of this exact build is ``$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY`` at tag ``$env:RELEASE_TAG`` (commit ``$env:ASSET_COMMIT``); the license terms travel inside the package as ``LICENSE``.
 
           $deltaTitle
 

@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][string]$Tag,
-    [string]$Repo = "Coahuilite/ferritelib",
+    [string]$Repo = "Coahuilite/FerriteLib",
     [string]$AssetPrefix = 'FerriteLib',
     [string]$ZipLocal
 )
