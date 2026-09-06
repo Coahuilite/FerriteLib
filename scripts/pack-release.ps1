@@ -153,6 +153,16 @@ foreach ($required in @('LICENSE', 'LoadFolders.xml', 'version.txt', 'About\Abou
 # a release asset is unzipped straight into Mods/ by a player, so the folder has to be inside the
 # archive or they get a Loose LoadFolders.xml in their Mods directory. Same choice the sibling
 # repository makes on its release path (pack-github.ps1 stages the directory, not the glob).
+# Deterministic timestamps: Compress-Archive stamps each entry with its file's mtime, and staging
+# just rewrote those mtimes to wall-clock now - so two packs of the same commit differed by seconds
+# and the printed SHA-256 described the build machine's clock, not the release. Normalize the whole
+# stage tree to the tagged commit's author date: the artifact's timestamps then point at the source,
+# and the digest becomes a pure function of the commit (verified: entry CRCs were already identical;
+# mtimes were the only divergence).
+$commitDate = [DateTime]::Parse((& git -C $root log -1 --format=%aI $commit)).ToUniversalTime()
+Get-ChildItem -LiteralPath $githubDir -Recurse -Force | ForEach-Object {
+    $_.LastWriteTime = $commitDate
+}
 $zipPath = Join-Path $zipDir "FerriteLib-$Version.zip"
 if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
 Compress-Archive -Path $stageDir -DestinationPath $zipPath -Force
