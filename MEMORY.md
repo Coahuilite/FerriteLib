@@ -93,6 +93,22 @@
   `Payload is a dev build ...`) and the release workflow rebuilds with `-p:VersionSuffix=` to get the bare
   `0.2.0+<sha>`. Anyone who wires these steps in the other order gets a red pack step, not a mislabelled
   package.
+- **One OutputPath for two configurations is a silent wrong-artifact hazard, and it bit the packaging
+  path directly (measured 2026-09-07).** Dev and Release both write `1.6/Assemblies/FerriteLib.UiKit.dll`.
+  Immediately after a full `verify-local -PackDev -StageOnly` run, the file at that path was a
+  **Dev-configuration assembly of 98,304 bytes**, while a forced Release rebuild of the same commit
+  produces **91,136 bytes** — an incremental `dotnet build -c Release` reported "up to date" against
+  `obj\Release` and never touched the payload, because up-to-dateness is judged per-configuration while the
+  output path is shared. `pack-dev.ps1` copies *that path*, so without a forced rebuild it would stage the
+  wrong bytes under a `version.txt` that still reads `0.3.0-dev+<sha>` — nothing downstream could tell, and
+  the staged folder is exactly what an in-game verification pass installs. Fixed by `--no-incremental` in
+  `pack-dev.ps1`, verified end to end: staged DLL and payload hash byte-identical
+  (`89defb11…`), `AssemblyConfigurationAttribute = Release`,
+  `AssemblyInformationalVersion = 0.3.0-dev+<branch tip>`. The general rule: **when two configurations share
+  one output path, "the build said it was current" is not evidence about the bytes on disk** — compare the
+  artifact, not the build log. Note the same sharing is why a stale `.pdb` can sit beside the payload
+  (Release sets `DebugType=none`, so it never rewrites or removes the Dev gate's pdb); `pack-dev` strips
+  pdbs from the staged folder for exactly that reason.
 - **The two zip shapes differ on purpose, and the difference is user-visible.** `pack-dev.ps1` archives
   `(Join-Path $stageDir '*')` - contents at the zip root - because a dev rehearsal copies into a folder that
   already exists. `pack-release.ps1` archives `$stageDir` itself, so the archive contains a top-level

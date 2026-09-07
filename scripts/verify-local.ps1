@@ -1,6 +1,9 @@
 param(
     [string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot),
     [switch]$PackDev,
+    # With -PackDev: lay out the installable mod folder but write no zip and no nupkg. The gates run
+    # first either way, so a directory rehearsal is still a gated artifact.
+    [switch]$StageOnly,
     [switch]$NoRestore
 )
 
@@ -138,8 +141,16 @@ Invoke-Check 'About.xml identity is present and well-formed' `
     }
 
 if ($PackDev) {
-    & (Join-Path $PSScriptRoot 'pack-dev.ps1') -ProjectRoot $root
+    if ($StageOnly) {
+        & (Join-Path $PSScriptRoot 'pack-dev.ps1') -ProjectRoot $root -StageOnly
+    }
+    else {
+        & (Join-Path $PSScriptRoot 'pack-dev.ps1') -ProjectRoot $root
+    }
     if ($LASTEXITCODE -ne 0) { throw "pack-dev failed." }
+}
+elseif ($StageOnly) {
+    Write-Host '[verify] -StageOnly without -PackDev does nothing; pass both.'
 }
 
 Remove-Item -LiteralPath $tempLog -Force -ErrorAction SilentlyContinue

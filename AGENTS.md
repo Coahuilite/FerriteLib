@@ -84,9 +84,14 @@ funnel files are named by the containment gate, and that list is the measurement
 ## Build and verification
 
 ```powershell
-pwsh -NoProfile -File scripts/verify-local.ps1          # 7 gates
-pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev # + mod zip and NuGet package
+pwsh -NoProfile -File scripts/verify-local.ps1              # 7 gates
+pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev     # + mod zip and NuGet package
+pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev -StageOnly   # + installable folder only, no archive
 ```
+
+`-StageOnly` lays out `dist/dev/FerriteLib/` for an in-game pass without producing a zip or a nupkg;
+the gates run first either way, so a directory rehearsal is a gated artifact. `pack-dev.ps1` builds with
+`--no-incremental` because Dev and Release share the payload path — see `MEMORY.md`.
 
 Consumers reference the payload by relative sibling path with `Private=false` (measured rationale:
 `MEMORY.md`). The `1.6/Assemblies/` output path and the `tools/.../Stubs/` tree with its `bin/stubs/`
