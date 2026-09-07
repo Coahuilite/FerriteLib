@@ -275,6 +275,27 @@
   ever called it would stop compiling against the payload while every gate here stayed green. Neither is
   visible to a gate in this repo; both are exactly the shape `TODO.md` §3's "give the harness `Stubs/**`
   a local guard" item exists to catch, and that item is now load-bearing rather than tidy.
+- **FL→US round 2 (2026-09-07) is OPEN in `HANDOFF.md`, and it started as a confession.** Gathering
+  packaging evidence to offer the consumer, FL's own `pack-dev` was found asserting `build=dev` over a
+  Release-configured assembly — the rule under S1 below was broken here first (fixed `f2f4dd0`). Six items
+  are on US, all cited to `file:line`, none edited: S1 measure the payload's configuration instead of
+  trusting a caller-supplied label (observable in US because `US_DEV` gates `SqueakLog`'s `Auto` dev-logging
+  and the footer revision, so a mis-staged dev folder loses the diagnostics an in-game pass reads);
+  S2 `stage-package.ps1`'s `-CreateZip` archives the stage dir's *contents*, which `release.yml:128-131`
+  documents as a hazard and works around in the caller while `pack-dev` still passes it unconditionally;
+  S3 five separate places guard the one fact that Workshop identity must not ship, where copying
+  `About.xml` as a file instead of `About/` as a directory removes the need for all five; S4 two archive
+  writers with two naming schemes and a CI digest no second run reproduces; S5 US's carrier "gate" only
+  tests existence — `Invoke-Check`'s second parameter is a display string — and FL's S1 fix is what makes
+  that visible, since the sibling path now legitimately holds Dev bytes; S6 `US_STEAM` gates two source
+  sites that no configuration, workflow, or script in US defines.
+- **The Store build of PowerShell ships a trimmed `System.Reflection.Metadata`: `PEReader` has no
+  `GetMetadataReader` (measured 2026-09-07, `Microsoft.PowerShell_7.6.5` Appx).** Any packaging or gate
+  code that reads assembly attributes must therefore either go through `Assembly.LoadFile` in a **child
+  process** — FL's `Get-AssemblyConfiguration` does, because the payload is copied moments later in the
+  same session and a loaded handle would survive it — or accept that the check works only on hosts where
+  the metadata reader exists. A gate that passes on the maintainer's machine and throws on a
+  contributor's is worse than no gate; this is the same failure class as a vacuous enumeration.
 
 ## Consumer coverage, measured 2026-09-04
 

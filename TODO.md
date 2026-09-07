@@ -1,6 +1,16 @@
 # TODO
 
-## 0. Release the round-1 surface (branch `feat/round-1-0.3.0`)
+## 0. Open HANDOFF rounds and the round-1 release (branch `feat/round-1-0.3.0`)
+
+- [ ] **FL→US round 2 (2026-09-07) — OPEN, awaiting US's review.** Filed in `HANDOFF.md`: S1 the stager
+      must measure the payload's build configuration instead of accepting a caller-supplied label (FL had
+      this defect and fixed it at `f2f4dd0`; US's version is observable because `US_DEV` gates live
+      diagnostics); S2 the dev archive is shaped wrong and US's own CI comment already documents why;
+      S3 five places guard one fact about Workshop identity; S4 two archive writers, two name schemes, one
+      non-reproducible digest; S5 US's carrier gate checks existence only, and FL's S1 fix now makes the
+      sibling's configuration vary; S6 `US_STEAM` gates code no build axis defines. Report-and-wait: FL
+      edits nothing in US. On US's verdict, file accepted items as work packages here and in US's TODO, then
+      close the body.
 
 Round 1 is SCHEDULED and, on this branch, implemented: P1–P6 (P3 landed here rather than slipping to
 0.3.x — it is session-scoped, provenance-cited and lane-tested, and holding it back would cost US the
