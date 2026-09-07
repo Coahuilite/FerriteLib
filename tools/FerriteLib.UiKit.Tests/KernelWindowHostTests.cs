@@ -11,9 +11,9 @@ namespace FerriteLib.UiKit.Tests;
 /// harness, which is why the <c>Verse.Window</c> stub slice landed with it rather than after it.
 /// <para>
 /// The load-bearing tests are the failure contract, because that is the part a rewrite gets wrong: a
-/// pass that throws must NOT show the notice inside itself, and must not retry synchronously. The rest
-/// pin the acceptance conditions that are invisible in review — size arriving only from a provider,
-/// chrome geometry owned by the shell, and a close affordance that closes the window.
+/// pass that throws must NOT show the notice inside itself, and must not retry synchronously. Note the
+/// division of labour with item C — a widget that throws mid-draw is recovered by the engine and never
+/// reaches this shell; what the shell guards is a page that cannot be entered at all.
 /// </para>
 /// </summary>
 internal static class KernelWindowHostTests
@@ -28,9 +28,10 @@ internal static class KernelWindowHostTests
         try
         {
             VerifyHappyPassBuildsOneHostAndDrawsNoNotice();
-            VerifyThrowingPassTripsTheNoticeOnTheNextPassOnly();
+            VerifyFailingPassTripsTheNoticeOnTheNextPassOnly();
             VerifyFailingNoticeIsTerminalAndNeverRetries();
             VerifyUnmetPrerequisiteBlocksHostCreation();
+            VerifyWidgetFailureIsRecoveredBelowTheShell();
             VerifyCloseAffordanceClosesTheWindow();
             VerifyPreCloseDisposesTheOwnedHost();
             VerifyWindowSizeComesOnlyFromTheProvider();
@@ -58,19 +59,18 @@ internal static class KernelWindowHostTests
     }
 
     /// <summary>
-    /// Condition (c). The throwing pass stays quiet and the notice appears on the following pass —
+    /// Condition (c). The failing pass stays quiet and the notice appears on the following pass —
     /// a synchronous switch would draw the notice inside the IMGUI pass that already claimed layout
     /// state for the page.
     /// </summary>
-    private static void VerifyThrowingPassTripsTheNoticeOnTheNextPassOnly()
+    private static void VerifyFailingPassTripsTheNoticeOnTheNextPassOnly()
     {
-        var window = new TestWindow(LaneScope()) { Explode = true };
+        var window = new TestWindow(LaneScope()) { FailOnCreate = true };
         window.windowRect = new Rect(0f, 0f, 900f, 700f);
 
         window.WindowOnGUI();
-        Check(window.Failures == 1, "the failed pass reported the exception once");
-        Check(window.Notices.Count == 0, "the failed pass drew no notice — the switch is deferred");
-        Check(!window.SessionAlive, "the failed pass disposed the host it owned");
+        Check(window.Failures == 1, "the failing pass reported the exception once");
+        Check(window.Notices.Count == 0, "the failing pass drew no notice — the switch is deferred");
 
         window.WindowOnGUI();
         Check(window.Notices.Count == 1 && window.Notices[0] == UiWindowNotice.PageUnavailable,
@@ -84,7 +84,7 @@ internal static class KernelWindowHostTests
     /// </summary>
     private static void VerifyFailingNoticeIsTerminalAndNeverRetries()
     {
-        var window = new TestWindow(LaneScope()) { Explode = true };
+        var window = new TestWindow(LaneScope()) { FailOnCreate = true };
         window.windowRect = new Rect(0f, 0f, 900f, 700f);
 
         for (int i = 0; i < 4; i++)
@@ -93,7 +93,7 @@ internal static class KernelWindowHostTests
         }
 
         Check(window.HostCreations == 1, "after a failure the shell never builds a second host");
-        Check(window.Failures == 1, "a terminal notice does not re-run the throwing pass");
+        Check(window.Failures == 1, "a terminal notice does not re-run the failing pass");
         Check(window.Notices.Count == 3, "the notice is then drawn on every remaining pass");
     }
 
@@ -107,6 +107,24 @@ internal static class KernelWindowHostTests
         Check(window.HostCreations == 0, "an unmet prerequisite never reaches page creation");
         Check(window.Notices.Count == 1 && window.Notices[0] == UiWindowNotice.Prerequisite,
             "and the window names which failure it is, not a generic one");
+    }
+
+    /// <summary>
+    /// The two recovery layers must not collapse into one. Item C gives the engine per-element
+    /// recovery; if that ever stopped working, this widget failure would climb into the shell and the
+    /// whole window would go terminal — which is what this asserts does NOT happen.
+    /// </summary>
+    private static void VerifyWidgetFailureIsRecoveredBelowTheShell()
+    {
+        var window = new TestWindow(LaneScope()) { ExplodeWidget = true };
+        window.windowRect = new Rect(0f, 0f, 900f, 700f);
+
+        window.WindowOnGUI();
+        window.WindowOnGUI();
+
+        Check(window.Notices.Count == 0, "a widget that throws never reaches the shell's failure contract");
+        Check(window.Failures == 0, "and the window does not go terminal over one control");
+        Check(window.HostCreations == 1, "the page keeps the host it already built");
     }
 
     private static void VerifyCloseAffordanceClosesTheWindow()
@@ -127,8 +145,8 @@ internal static class KernelWindowHostTests
         Check(window.CloseCalls == 1, "the close affordance closes the window");
         Check(window.Notices.Count == 0, "and closing is not mistaken for a failure");
 
-        // One button only, sitting inside the title band and against the right edge: the shell owns
-        // this geometry, so it is the shell that must place it.
+        // One button only, inside the title band and against the right edge: the shell owns this
+        // geometry, so it is the shell that must place it.
         Check(window.CloseRects.Count == 1, "the chrome draws exactly one interactive affordance");
         Rect close = window.CloseRects[0];
         Check(close.y >= 0f && close.yMax <= TestShell.TitleBar, "the affordance lives in the title band");
@@ -150,8 +168,7 @@ internal static class KernelWindowHostTests
 
     /// <summary>
     /// Condition (a): the first consumer's screen-fraction clamp must not become the library's default.
-    /// With no provider the shell reports the game's own size; with one it reports exactly that,
-    /// unchanged.
+    /// With no provider the shell reports the game's own size; with one it reports exactly that.
     /// </summary>
     private static void VerifyWindowSizeComesOnlyFromTheProvider()
     {
@@ -198,8 +215,8 @@ internal static class KernelWindowHostTests
         public const float Padding = 20f;
     }
 
-    /// <summary>A page kind that can be told to blow up mid-draw, which is the failure the contract is for.</summary>
-    private sealed class ThrowingWidget : IUiWidget
+    /// <summary>The page the shell hosts; optionally throws mid-draw to exercise item C's recovery.</summary>
+    private sealed class PageWidget : IUiWidget
     {
         public string Kind => TestWindow.WidgetKind;
 
@@ -218,7 +235,7 @@ internal static class KernelWindowHostTests
         {
             if (ctx.Bindings.TryGet("explode", out bool explode) && explode)
             {
-                throw new InvalidOperationException("planted page failure");
+                throw new InvalidOperationException("planted widget failure");
             }
 
             UiThemeDraw.Label(rect, "page", ctx.Theme);
@@ -236,8 +253,8 @@ internal static class KernelWindowHostTests
         public TestWindow(string scope)
         {
             this.scope = scope;
-            UiWidgetRegistry.Register(scope, WidgetKind, () => new ThrowingWidget());
-            bindings.BindValue("explode", () => Explode, _ => { });
+            UiWidgetRegistry.Register(scope, WidgetKind, () => new PageWidget());
+            bindings.BindValue("explode", () => ExplodeWidget, _ => { });
         }
 
         public readonly List<UiWindowNotice> Notices = new();
@@ -247,7 +264,8 @@ internal static class KernelWindowHostTests
         public int CloseCalls;
         public int BasePreCloseCalls;
         public bool Prerequisite = true;
-        public bool Explode;
+        public bool FailOnCreate;
+        public bool ExplodeWidget;
         public Vector2? Size;
         public Rect ContentRect;
         public string FailureText = "";
@@ -255,7 +273,7 @@ internal static class KernelWindowHostTests
         public bool SessionAlive => observedSession != null && observedSession.IsActive;
 
         public bool LastFailureMentionsPlantedError
-            => FailureText.IndexOf("planted page failure", StringComparison.Ordinal) >= 0;
+            => FailureText.IndexOf("planted window host failure", StringComparison.Ordinal) >= 0;
 
         protected override UiTheme Theme => UiTheme.DarkGold;
 
@@ -272,6 +290,11 @@ internal static class KernelWindowHostTests
         protected override UiHost CreateHost()
         {
             HostCreations++;
+            if (FailOnCreate)
+            {
+                throw new InvalidOperationException("planted window host failure");
+            }
+
             UiLayoutManifest manifest = UiLayoutManifest.Parse(
                 "<UiPage Schema=\"2\" Source=\"" + scope + "\">"
                 + "<Widget Id=\"page\" Kind=\"" + WidgetKind + "\" />"

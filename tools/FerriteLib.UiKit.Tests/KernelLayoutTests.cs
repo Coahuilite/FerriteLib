@@ -351,10 +351,14 @@ internal static class KernelLayoutTests
             threw = true;
         }
 
-        Check(threw, "Clip child exception propagates");
-        Check(ReadStaticInt(typeof(GUI), "GroupDepth") == 0, "Clip group depth restored after exception");
+        // Item C moved this contract: a child draw failure is now recovered by the tree, so the clip
+        // group must NOT see an exception at all. The invariant this test exists for — Begin/EndGroup
+        // balanced and depth restored — is what it asserts, whichever way the failure travels.
+        Check(!threw, "Clip child exception is recovered by the engine, not leaked through the group");
+        Check(ReadStaticInt(typeof(GUI), "GroupDepth") == 0, "Clip group depth restored after the child failure");
         Check(ReadStaticInt(typeof(GUI), "BeginGroupCalls") == ReadStaticInt(typeof(GUI), "EndGroupCalls"),
-            "Clip Begin/EndGroup balanced after exception");
+            "Clip Begin/EndGroup balanced after the child failure");
+        Check(ctx.Session.TrippedComponentIds.Count > 0, "and the recovery is recorded in the session");
     }
 
     private static string ScrollXml()

@@ -33,6 +33,7 @@ internal static class KernelContractTests
         failures += Run("Translation revision invalidates the layout cache", VerifyTranslationRevisionInvalidatesLayout);
         failures += Run("Theme colour tokens cannot move geometry", VerifyThemeColorsDoNotAffectLayout);
         failures += Run("Visual core never depends on the page model", VerifyVisualCoreIsPageModelFree);
+        failures += Run("Engine recovers a throwing widget without ending the frame", VerifyEngineOwnsPerElementRecovery);
         return failures;
     }
 
@@ -643,6 +644,116 @@ internal static class KernelContractTests
             }
         }
     }
+
+    /// <summary>
+    /// Item C: recovery belongs to the tree. A widget that throws during measure or draw must trip its
+    /// session slot and keep the frame alive; before this, nothing inside the library called
+    /// <c>UiSessionGuard</c> at all, so a single bad control ended the page for the whole window.
+    /// </summary>
+    private static void VerifyEngineOwnsPerElementRecovery()
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+        UiWidgetRegistry.Register("recover-test", "test/throwing", () => new ThrowingWidget());
+        UiWidgetRegistry.Register("recover-test", "test/recording", () => new RecordingWidget());
+
+        UiLayoutManifest manifest = UiLayoutManifest.Parse(
+            "<UiPage Schema=\"2\" Source=\"recover-test\">"
+            + "<Column Id=\"c\" Gap=\"4\">"
+            + "<Widget Id=\"boom\" Kind=\"test/throwing\" />"
+            + "<Widget Id=\"fine\" Kind=\"test/recording\" />"
+            + "</Column>"
+            + "</UiPage>");
+
+        var bindings = new UiBindings();
+        using UiHost host = new("recover-test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+
+        var viewport = new Rect(0f, 0f, 300f, 200f);
+        RecordingWidget.Draws = 0;
+        try
+        {
+            host.DrawFrame(viewport);
+            host.DrawFrame(viewport);
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("A throwing widget ended the frame instead of tripping its slot: " + ex.Message);
+        }
+
+        bool trippedBoom = false;
+        foreach (string id in host.Session.TrippedComponentIds)
+        {
+            if (id.IndexOf("boom", StringComparison.Ordinal) >= 0) trippedBoom = true;
+        }
+
+        if (!trippedBoom)
+        {
+            throw new Exception("The failing element was not recorded as tripped in its session.");
+        }
+
+        if (RecordingWidget.Draws != 2)
+        {
+            throw new Exception("A sibling stopped drawing after another element tripped (draws=" + RecordingWidget.Draws + ")");
+        }
+
+        bool diagnosticCarried = false;
+        foreach (string id in host.Session.TrippedComponentIds)
+        {
+            if (host.Session.TryGetTripLog(id, out string logged)
+                && logged.IndexOf("planted widget failure", StringComparison.Ordinal) >= 0)
+            {
+                diagnosticCarried = true;
+            }
+        }
+
+        if (!diagnosticCarried)
+        {
+            throw new Exception("The trip carries no diagnostic, so a recovery would be silent in the log.");
+        }
+    }
+
+    private sealed class ThrowingWidget : IUiWidget
+    {
+        public string Kind => "test/throwing";
+
+        public void Configure(UiElementSpec spec)
+        {
+        }
+
+        public void Validate(IUiBindings bindings, string elementPath)
+        {
+        }
+
+        public float Measure(UiWidgetContext ctx) => throw new InvalidOperationException("planted widget failure");
+
+        public void Draw(Rect rect, UiWidgetContext ctx)
+        {
+            throw new InvalidOperationException("planted widget failure");
+        }
+    }
+
+    private sealed class RecordingWidget : IUiWidget
+    {
+        public static int Draws;
+
+        public string Kind => "test/recording";
+
+        public void Configure(UiElementSpec spec)
+        {
+        }
+
+        public void Validate(IUiBindings bindings, string elementPath)
+        {
+        }
+
+        public float Measure(UiWidgetContext ctx) => 20f;
+
+        public void Draw(Rect rect, UiWidgetContext ctx)
+        {
+            Draws++;
+        }
+    }
+
 
     private static string RepoRoot()
     {

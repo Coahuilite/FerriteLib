@@ -40,6 +40,12 @@ public sealed class UiLayoutEngine
     }
 
     private const float SectionTitleHeight = 22f;
+
+    /// <summary>
+    /// Height a tripped element keeps. Recovery must not resize the page: an element that collapses to
+    /// zero moves every sibling, so a single failing control would still reshape the whole layout.
+    /// </summary>
+    private const float RecoveryBandHeight = 22f;
     // Reserved width for a vertical scrollbar drawn inside the right edge of a Scroll viewport.
     // Matches Verse.GenUI.ScrollBarWidth (16f), the convention the US pages already follow.
     private const float ScrollbarWidth = 16f;
@@ -190,9 +196,15 @@ public sealed class UiLayoutEngine
                     {
                         DrawContainer(entry, drawRect, entryCtx);
                     }
-                    else
+                    else if (entry.Widget != null)
                     {
-                        entry.Widget?.Draw(drawRect, entryCtx);
+                        // Recovery is the tree's job, not each widget's. Before this the guard existed
+                        // but nothing in the library called it: the documented "recovery lives in the
+                        // per-widget guard" contract was consumer opt-in fiction, and a core widget that
+                        // threw took the whole frame — and with it the shell's page — down with it. A
+                        // tripped element now records into the session and paints a stable band, so one
+                        // bad control cannot end the page. (FL→US round 1, item C.)
+                        UiSessionGuard.DrawWidget(entry.Widget, drawRect, entryCtx, entry.Path);
                     }
                 }
                 finally
@@ -324,7 +336,7 @@ public sealed class UiLayoutEngine
             // widgets (e.g. stacked narrow Mood rows) agree with the Draw pass, which already uses
             // entry.MeasureWidth via WithViewWidth.
             UiWidgetContext measureCtx = ctx.WithViewWidth(width);
-            float height = ResolveHeight(spec, widget, measureCtx, width);
+            float height = ResolveHeight(spec, widget, measureCtx, width, path);
             var leaf = new PlacedEntry
             {
                 Spec = spec,
@@ -814,14 +826,14 @@ public sealed class UiLayoutEngine
         return Math.Max(1f, innerWidth);
     }
 
-    private static float ResolveHeight(UiElementSpec spec, IUiWidget widget, UiWidgetContext ctx, float width)
+    private static float ResolveHeight(UiElementSpec spec, IUiWidget widget, UiWidgetContext ctx, float width, string path)
     {
         if (spec.TryGetAttribute("Height", out string raw))
         {
             string value = raw.Trim();
             if (value.Length == 0 || string.Equals(value, "Auto", StringComparison.OrdinalIgnoreCase))
             {
-                return Math.Max(0f, widget.Measure(ctx));
+                return MeasuredHeight(widget, ctx, path);
             }
 
             if (float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float fixedHeight))
@@ -833,7 +845,22 @@ public sealed class UiLayoutEngine
                 $"Widget id=\"{spec.Id}\" (Kind=\"{spec.Kind}\") has invalid Height '{raw}'; expected a number or Auto.");
         }
 
-        return Math.Max(0f, widget.Measure(ctx));
+        return MeasuredHeight(widget, ctx, path);
+    }
+
+    /// <summary>
+    /// One widget's measured height, recovered through the session if the widget throws. The guard is
+    /// here rather than in each widget because a measurement that dies takes the whole arrange pass
+    /// with it, and the tree — not the control — owns whether the page survives that. The fallback keeps
+    /// the element's slot instead of collapsing it, so a trip cannot reshuffle the rest of the page.
+    /// </summary>
+    private static float MeasuredHeight(IUiWidget widget, UiWidgetContext ctx, string path)
+    {
+        // The guard is here rather than in each widget because a measurement that dies takes the whole
+        // arrange pass with it, and the tree — not the control — owns whether the page survives that.
+        // The fallback keeps the element's slot instead of collapsing it, so a trip cannot reshuffle
+        // the rest of the page.
+        return Math.Max(0f, UiSessionGuard.MeasureWidget(widget, ctx, path, RecoveryBandHeight));
     }
 
     private static float ResolveContainerHeight(UiElementSpec spec, float naturalHeight, float availableHeight)

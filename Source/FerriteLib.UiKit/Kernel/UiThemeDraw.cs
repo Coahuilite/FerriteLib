@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using Verse;
 
@@ -174,6 +175,26 @@ public static class UiThemeDraw
                 break;
         }
         Surface(rect, theme, fill, border);
+    }
+
+    /// <summary>
+    /// The stable paint of an element the tree recovered after it threw: a warning-toned band carrying
+    /// the layout path it was supposed to occupy. Deliberately generic — the library owns no product
+    /// vocabulary and no translation keys, so it reports the slot's identity rather than a sentence
+    /// nobody declared. The diagnostic text lives in the session, not here.
+    /// </summary>
+    public static void RecoveryBand(Rect rect, UiTheme theme, string elementPath)
+    {
+        if (rect.width <= 1f || rect.height <= 1f) return;
+
+        Surface(rect, theme, theme.Warning, theme.Border);
+        Label(
+            new Rect(rect.x + 6f, rect.y, Math.Max(1f, rect.width - 12f), rect.height),
+            elementPath ?? "",
+            theme,
+            theme.TextOnDanger,
+            UiFont.Tiny,
+            singleLine: true);
     }
 
     /// <summary>Paints a status treatment and centers its short, reusable badge label.</summary>
