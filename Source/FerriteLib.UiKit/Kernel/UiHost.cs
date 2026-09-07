@@ -39,6 +39,10 @@ public sealed class UiHost : IDisposable
 
         engine = new UiLayoutEngine(source);
         session = new UiSession();
+
+        // The runtime half of the dependency-reality rule: building a tree is what makes this mod a
+        // live consumer rather than a declared one, and Require reports who has done it.
+        UiHostLedger.Record(source);
     }
 
     public IUiBindings Bindings => bindings;

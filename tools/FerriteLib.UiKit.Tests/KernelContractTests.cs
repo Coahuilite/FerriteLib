@@ -34,6 +34,7 @@ internal static class KernelContractTests
         failures += Run("Theme colour tokens cannot move geometry", VerifyThemeColorsDoNotAffectLayout);
         failures += Run("Visual core never depends on the page model", VerifyVisualCoreIsPageModelFree);
         failures += Run("Engine recovers a throwing widget without ending the frame", VerifyEngineOwnsPerElementRecovery);
+        failures += Run("Require names the page trees this process built", VerifyHostLedgerSurfacesInRequire);
         return failures;
     }
 
@@ -642,6 +643,44 @@ internal static class KernelContractTests
                     }
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// The runtime half of D-1: <see cref="UiHost"/>'s constructor records its manifest source, and
+    /// <c>Require</c> names what has actually been built. This is what separates a mod that uses the
+    /// library from one that merely declares it, without any handshake API between the two assemblies.
+    /// </summary>
+    private static void VerifyHostLedgerSurfacesInRequire()
+    {
+        string source = "ledger-" + Guid.NewGuid().ToString("N");
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+
+        UiLayoutManifest manifest = UiLayoutManifest.Parse(
+            "<UiPage Schema=\"2\" Source=\"" + source + "\">"
+            + "<Widget Id=\"b\" Kind=\"chrome/banner\" Text=\"x\" />"
+            + "</UiPage>");
+
+        var bindings = new UiBindings();
+        using (new UiHost(source, manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation()))
+        {
+        }
+
+        FerriteLibVersion.Require(
+            FerriteLibVersion.Api,
+            new Version(FerriteLibVersion.Api.Major, FerriteLibVersion.Api.Minor + 1, 0),
+            "coahuilite.testconsumer",
+            out string diagnostic);
+
+        if (diagnostic.IndexOf(source, StringComparison.Ordinal) < 0)
+        {
+            throw new Exception("Require did not name the page tree this process built: " + diagnostic);
+        }
+
+        if (diagnostic.IndexOf("none yet", StringComparison.Ordinal) >= 0)
+        {
+            throw new Exception("Require reported no hosts even though one was built: " + diagnostic);
         }
     }
 

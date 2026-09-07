@@ -156,8 +156,15 @@ public static class UiWidgetRegistry
             return all.ToArray();
         }
     }
-
-    public static void Clear()
+    /// <summary>
+    /// Wipes every scope's registrations. Internal (FL→US round 1, item D): as a public call it let any
+    /// third-party mod erase registrations it never made, process-wide, and the mods that lost their
+    /// kinds would have had no way to find out who did it — the same invisibility that makes two
+    /// carriers of this DLL a hazard. Only this library's own harness needs it, and
+    /// <c>InternalsVisibleTo("FerriteLib.UiKit.Tests")</c> is already in place. Verified before the flip:
+    /// no call site in the wired consumer's Source tree, tools or scripts.
+    /// </summary>
+    internal static void Clear()
     {
         lock (Gate)
         {
