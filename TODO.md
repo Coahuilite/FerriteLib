@@ -196,6 +196,35 @@ US is released in lockstep with it. GitHub-first early testing does not pre-empt
 the library referenceable-by-strangers any more than a stable packageId will — see the invited/unsupported
 item below, which remains the one irreversible call.
 
+**Packaging shape, settled 2026-09-07 after reading both siblings' scripts.** Three channels, one staging
+engine (`scripts/stage-package.ps1`), thin identity packers — the ancestor repo's structure, adopted because
+this repo's two independent staging copies had already drifted apart in a way that cost a debugging pass.
+The three artifacts and what each one guarantees:
+
+| channel | artifact | identity rule | archive |
+|---|---|---|---|
+| `pack-dev.ps1` | `dist/dev/FerriteLib/` — the folder an in-game pass installs | dirty tree allowed, `-dirty` in the label | none (`-Zip` on request) |
+| `pack-release.ps1` | `dist/github/FerriteLib-<tag>.zip` — what CI attaches | tag grammar + build axis + clean tree (rehearsal hatch `-AllowDirtyTree`) | deterministic, top-level `FerriteLib/` |
+| `pack-steam.ps1` | `dist/steam/FerriteLib/` — what the uploader points at | same as GitHub, plus **no** dirty-tree hatch: it is the last step | none, by design |
+
+Design consequences worth stating because they are the parts a later editor is tempted to "tidy": the
+`-dev` payload refusal lives in the stager so GitHub and Steam cannot diverge on it; only GitHub archives,
+which confines the entry-timestamp problem to the one digest that is public; `version.txt` always carries
+`build=` and `commit=` so any folder can be attributed without opening its DLL; and `About/PublishedFileId.txt`
+is never staged anywhere because the stager copies `About.xml` as a file, not the directory — Workshop
+identity is created locally at upload time.
+
+- [ ] **Steam upload itself is not scripted and should not be, until the Workshop decision lands.** SR's
+      precedent is manual upload from the staged directory (`上传人工，非 SteamCMD`), and nothing here changes
+      that: `pack-steam.ps1` produces the folder and prints the payload hash, and the upload still waits on
+      the maintainer's invited/unsupported call below and on the missing preview image. Revisit only if
+      rc churn makes hand-uploading the actual bottleneck.
+- [ ] **Optional consolidation, cross-repo, one round at the earliest:** collapse Dev/Release into one
+      configuration with a flavor property, the way SR's `SqueakyBuildFlavor` does. That deletes the
+      shared-OutputPath hazard `MEMORY.md` records and the `--no-incremental` workaround with it. It is not
+      free: US's `scripts/build-dev.ps1` drives `-c Dev` on this project, so the change lands in a round
+      with its migration, not in a packaging cleanup.
+
 - [x] **Pre-push privacy scan on the full reachable history — executed clean before the 2026-09-07 push.**
       Final run at the pushed tip `bdbeae0` via `scripts/privacy-audit.ps1 -FullHistory`: working tree 0,
       commit messages 0, all 34 historical revisions 0, single noreply identity. The scan's own history

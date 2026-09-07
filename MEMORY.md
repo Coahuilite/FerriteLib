@@ -111,9 +111,11 @@
   2026-09-07) — and pinning mtimes first does not fix it, because NTFS re-dirties a directory during the
   compressor's own walk. So the timestamps are written into the archive: sorted enumeration, every entry
   at the tagged commit's author date, top-level `FerriteLib/` inside so a player unzipping into `Mods/`
-  does not get a loose `LoadFolders.xml`. Re-verified after the consolidation: two packs of one commit,
-  `B3C37669…` both times. The dev channel can still emit a zip on request (`-Zip`) for when a folder has
-  to travel as one file; that one is not deterministic and nothing quotes its digest.
+  does not get a loose `LoadFolders.xml`. Re-verified after the consolidation by packing one commit twice
+  across a clock tick and getting the same SHA-256 both times. No digest value is ever quoted in these
+  files: it is a function of the commit, and a stale one reads like a live contract. The dev channel can
+  still emit a zip on request (`-Zip`) for when a folder has to travel as one file; that one is not
+  deterministic and nothing quotes its digest.
 - **One OutputPath for two configurations is a silent wrong-artifact hazard, and it bit packaging
   directly (measured 2026-09-07).** Dev and Release both write `1.6/Assemblies/FerriteLib.UiKit.dll`.
   Right after a full `verify-local -PackDev` run the file at that path was a **Dev-configuration
@@ -122,8 +124,8 @@
   payload, because up-to-dateness is judged per-configuration while the output path is shared. The
   packager copies *that path*, so without a forced rebuild it stages the wrong bytes under a
   `version.txt` that still reads dev+sha — indistinguishable downstream, and the staged folder is exactly
-  what an in-game verification pass installs. Fixed by `--no-incremental`, verified end to end: staged
-  DLL byte-identical to the payload (`89defb11…`), `AssemblyConfigurationAttribute = Release`,
+  what an in-game verification pass installs. Fixed by `--no-incremental`, verified end to end: the staged
+  DLL was byte-identical to the payload, with `AssemblyConfigurationAttribute = Release` and
   `AssemblyInformationalVersion = 0.3.0-dev+<branch tip>`. General rule: **when two configurations share
   one output path, "the build said it was current" is not evidence about the bytes on disk** — compare the
   artifact, not the build log. The structural cure is the sibling repos' shape (one configuration, flavor
