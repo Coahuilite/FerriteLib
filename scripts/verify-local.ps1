@@ -1,7 +1,8 @@
 param(
     [string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot),
-    # Stage the installable dev folder after the gates. It is a directory by design (pack-dev.ps1);
-    # -PackZip and -PackNupkg add the artifacts that only other purposes need.
+    # Stage the dev folder after the gates. It is a directory by design (pack-dev.ps1), and placing it
+    # in a game Mods directory is never done here — that is the developer's step. -PackZip and
+    # -PackNupkg add the artifacts that only other purposes need.
     [switch]$PackDev,
     [switch]$PackZip,
     [switch]$PackNupkg,
@@ -20,7 +21,8 @@ $ErrorActionPreference = "Stop"
 #   5   payload is content-free: no Defs, Patches, Languages, Sounds or Textures under 1.6
 #   6   LICENSE present and full MPL-2.0, with no applied incompatibility notice
 #   7   About.xml identity (packageId, modVersion present and parsable as a Version)
-# -PackDev: after all checks pass, stage the installable dev folder (a directory, not an archive).
+# -PackDev: after all checks pass, stage the dev folder (a directory, not an archive). Placing it
+#   in a game Mods directory is the developer's own step - no script here writes outside the repository.
 #   -PackZip also writes the dev zip; -PackNupkg also writes the consumer reference package. Both are
 #   opt-in because nothing on the dev path needs them.
 #

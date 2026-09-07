@@ -56,7 +56,7 @@ promised a merge while the surface is provisional.
 
 ```powershell
 pwsh -NoProfile -File scripts/verify-local.ps1            # the gate suite (harness + builds + payload + content-free + licence + identity)
-pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev   # + the installable dev folder (dist/dev/FerriteLib, no archive)
+pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev   # + staged dev folder dist/dev/FerriteLib (no archive; you place it)
 pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory   # three-vector privacy gate, run before any push
 ```
 

@@ -85,10 +85,15 @@ funnel files are named by the containment gate, and that list is the measurement
 
 ```powershell
 pwsh -NoProfile -File scripts/verify-local.ps1                       # 7 gates
-pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev              # + installable dev folder
+pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev              # + staged dev folder (placement is manual)
 pwsh -NoProfile -File scripts/pack-release.ps1 -Version v0.3.0-rc2   # + GitHub asset (what CI runs)
 pwsh -NoProfile -File scripts/pack-steam.ps1  -Version v0.3.0-rc2    # + Workshop upload folder
 ```
+
+`-PackDev` stages `dist/dev/FerriteLib/` and stops there. No script under `scripts/` writes outside the
+repository, and putting a folder into a game `Mods/` directory — by copy, symlink or junction — is the
+developer's own step (see Boundaries): the Windows shortcut in particular would bind this repo's build
+output to a machine-local layout another developer cannot see, reproduce, or often create.
 
 Three channels, one staging engine. `stage-package.ps1` decides what a package *is* — the five allowed
 files, the content probe, the licence copy, `version.txt`, and the closed-set assertion that stops a
@@ -129,3 +134,9 @@ engine, and the attribution is the incentive; item ids are proposer-given and ne
   authorization. Local commits are fine.
 - No personal absolute paths, log excerpts, tokens or `PublishedFileId.txt` values in tracked files;
   consumer references are relative by design.
+- **No script places a mod in the game.** Nothing under `scripts/` writes outside the repository, and no
+  step copies, links or junctions anything into a `Mods/` directory: that is the developer's own action on
+  their own machine. The Windows shortcut in particular — a junction or symlink from `Mods/` back into the
+  repo — is never automated: it makes build output part of a machine-local layout another developer cannot
+  see from a clone, cannot reproduce, and on some setups cannot create without elevation. Keep the
+  artifacts under `dist/` and say where they are.

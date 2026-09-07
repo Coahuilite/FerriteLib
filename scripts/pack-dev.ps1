@@ -1,7 +1,8 @@
 param(
     [string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot),
-    # The rehearsal is a folder, not an archive: drop it into Mods/ and run the game. -Zip exists for
-    # the cases where a folder actually has to travel as one file.
+    # The rehearsal is a folder, not an archive. -Zip exists for the cases where a folder actually has
+    # to travel as one file; the normal case is that a developer moves it into their own game directory
+    # by hand, which is exactly why this script does not offer to do it.
     [switch]$Zip,
     # The NuGet package is a compile-time convenience for repositories on this machine; consumers bind
     # to the payload by sibling path, and a feed is deliberately on hold (MEMORY). So it is opt-in.
@@ -11,9 +12,15 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# Dev channel: the thinnest thing that can be installed. No identity gate, no archive, no package
+# Dev channel: the thinnest artifact that can be staged. No identity gate, no archive, no package
 # feed — those belong to the channels that publish. All the staging rules live in stage-package.ps1;
-# this file decides only what a dev artifact is called and where it goes.
+# this file decides only what a dev artifact is called and where it lands inside dist/.
+#
+# Boundary, deliberate and not to be automated away: this script writes nothing outside the repository,
+# and specifically never touches the game's Mods directory. Placing a mod there is the developer's step.
+# The convenient Windows shortcut — a junction or symlink from Mods/ into the repo — would make this
+# repository's build output part of a machine-local layout that another developer cannot see, cannot
+# reproduce from a clone, and on some setups cannot create without elevated privileges.
 
 $root = [System.IO.Path]::GetFullPath($ProjectRoot)
 $projectFile = Join-Path $root 'Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj'
@@ -55,7 +62,7 @@ if ($Zip) { $stageArgs.CreateZip = $true }
 & (Join-Path $PSScriptRoot 'stage-package.ps1') @stageArgs
 if ($LASTEXITCODE -ne 0) { throw "stage-package failed with exit code $LASTEXITCODE." }
 
-Write-Host "[pack-dev] install by copying the folder into Mods/: $stageDir"
+Write-Host "[pack-dev] staged folder -> $stageDir  (moving it into a game Mods directory is your step, not this script's)"
 
 if ($Nupkg) {
     & dotnet pack $projectFile -c Release --nologo -v minimal

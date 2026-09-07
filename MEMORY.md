@@ -98,7 +98,7 @@
   named paths, the licence copy, `version.txt` (`build=` / `commit=` / source), and the optional
   deterministic archive. `pack-dev` / `pack-release` / `pack-steam` own identity and nothing else. The
   split they replaced had already drifted: the dev folder's `version.txt` carried no `build=` or
-  `commit=` line, so an installed dev folder could not say which configuration built its DLL, and that
+  `commit=` line, so a staged dev folder could not say which configuration built its DLL, and that
   had to be read out of the assembly's metadata by hand. The closed set is mutation-proved both ways —
   copying `1.6/` recursively instead of the one DLL trips "missing 1.6/Assemblies/FerriteLib.UiKit.dll",
   and a deliberately copied `.gitkeep` trips "carries files it must not". Deliberate asymmetries, each
@@ -124,7 +124,7 @@
   payload, because up-to-dateness is judged per-configuration while the output path is shared. The
   packager copies *that path*, so without a forced rebuild it stages the wrong bytes under a
   `version.txt` that still reads dev+sha — indistinguishable downstream, and the staged folder is exactly
-  what an in-game verification pass installs. Fixed by `--no-incremental`, verified end to end: the staged
+  what a developer picks up for an in-game pass. Fixed by `--no-incremental`, verified end to end: the staged
   DLL was byte-identical to the payload, with `AssemblyConfigurationAttribute = Release` and
   `AssemblyInformationalVersion = 0.3.0-dev+<branch tip>`. General rule: **when two configurations share
   one output path, "the build said it was current" is not evidence about the bytes on disk** — compare the

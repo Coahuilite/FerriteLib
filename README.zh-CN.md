@@ -47,7 +47,7 @@ RimWorld 的 `modDependencies` 无法表达版本，消费者必须在自己的�
 
 ```powershell
 pwsh -NoProfile -File scripts/verify-local.ps1            # 门禁套件（harness + 双 flavor 构建 + 载荷 + 无内容 + 许可 + 身份）
-pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev   # + 可直接安装的 dev 目录（dist/dev/FerriteLib，不产出归档）
+pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev   # + 暂存的 dev 目录 dist/dev/FerriteLib（不产出归档；放哪个 Mods 目录自己动手）
 pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory   # 三向量隐私门禁，任何 push 前执行
 ```
 
