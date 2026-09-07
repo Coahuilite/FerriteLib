@@ -162,9 +162,10 @@ if ($CreateZip) {
     finally { $archive.Dispose() }
 
     # The digest printed here is what the release body quotes and what a consumer CI compares against.
-    # Shape: the archive contains a top-level FerriteLib/, because a player unzips a release asset
-    # straight into Mods/ and must not get a loose LoadFolders.xml there. The dev and steam folders are
-    # used in place, which is exactly why they are not archived.
+    # Shape: the archive contains a top-level FerriteLib/, because the release page tells a player to
+    # unzip it into their Mods folder and they must not end up with a loose LoadFolders.xml there. The
+    # dev and steam folders are handed over as folders and installed by whoever wants them, which is
+    # exactly why they are not archived.
     $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash
     Write-Host "[stage-package] asset  -> $zipPath"
     Write-Host "[stage-package] sha256 -> $hash"
