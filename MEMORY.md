@@ -33,11 +33,15 @@
   by hand and skips it silently reintroduces "covered trigger steals the option click", which is
   exactly the defect the US side reported and fixed the same day. Any new dropdown-shaped surface must
   go through `UiPopup`; a second copy of either rule is a defect, not a style choice.
-- **Contract axis is 0.2.0 (2026-09-04, `a05fddf`) and the bump rule is tightened**: pre-1.0, any
-  change to the public surface — additions included — bumps `Api.Minor`, and `About/About.xml
-  <modVersion>` moves with it. The 0.1.0 → 0.2.0 bump exists because an additive type (UiPopup)
-  shipped without one and a consumer desynced into a TypeLoadException inside UiHost.Draw; the
-  tightened rule is what makes Require's readable-report promise hold in both directions.
+- **Contract axis is 0.3.0 (2026-09-07, branch `feat/round-1-0.3.0`) and the bump rule is tightened**:
+  pre-1.0, any change to the public surface — additions included — bumps `Api.Minor`, and
+  `About/About.xml <modVersion>` moves with it. The 0.1.0 → 0.2.0 bump exists because an additive type
+  (UiPopup) shipped without one and a consumer desynced into a TypeLoadException inside UiHost.Draw; the
+  tightened rule is what makes Require's readable-report promise hold in both directions. The 0.2.0 →
+  0.3.0 move is the entire US→FL round-1 surface (P1–P6 plus FL-side A–E) as **one** bump: a bump per
+  item would make the axis measure churn instead of contract, and the release coupling the review resolved
+  is one consumer migration against one carrier. The branch is not tagged and not released — cutting a
+  stable stays a maintainer decision.
 - **Pointer-space contract (2026-09-04, `72afa23`)**: inside scroll/group scopes `Event.current.mousePosition`
   arrives in the container's draw space, while popup rects are published in Host window space. Any
   comparison between the two must convert through the caller's `ctx` origin (`UiNative.PointerPositionIn`);
@@ -45,9 +49,11 @@
   IMGUI group origins, hot-control capture/activation and per-pass control ids, and two pump lanes drive
   real event passes (flat and scrolled+offset); restoring the raw comparison fails the scrolled lane with
   the same trace signature as the in-game log.
-- Still unverified in game, both cheap, both in `TODO.md` §1: the guard's deliberate duplicate-DLL
-  branch, and the failure shape when the carrier is absent. Everything else in this file remains
-  compile-time, stub-harness or reference-assembly evidence — say so rather than implying a game run.
+- Still unverified in game, all cheap, all in `TODO.md` §1: the guard's deliberate duplicate-DLL branch,
+  the failure shape when the carrier is absent, and — new with round 1 — the window shell against the real
+  window stack, the two text paths that just came into the fit audit, and an engine-side recovery trip.
+  Everything else in this file remains compile-time, stub-harness or reference-assembly evidence — say so
+  rather than implying a game run.
 - **Two hard rules inherited from the series, both easy to violate by accident.** Nothing in this library
   may persist data into a save - a prerequisite must survive being uninstalled, and a save-written flag is
   the one side effect a player cannot undo. And `../squeaky_ratkin` is never written: SR is a separate
@@ -103,6 +109,16 @@
   a public release needs no special permission: `GITHUB_TOKEN` with `contents: read`, or a plain
   `browser_download_url`.
 
+- **Licence shape across the series** (measured 2026-09-07): MPL-2.0 everywhere; `LICENSE` is
+  byte-identical between this repo and Universal Squeaker (same SHA-256), while SqueakyRatkin carries
+  the bare MPL text without the repo-level Exhibit A notice header — so "byte-identical in each repo"
+  is true of the lib/consumer pair, not of the whole series. The notice deliberately carries no
+  "Incompatible With Secondary Licenses" statement, so the assembly may still be combined with
+  GPL-family mods. A distributed mod package is an *Executable Form*, so MPL 3.2's source-availability
+  duty is met by `pack-dev.ps1` copying `LICENSE` into the package; gate 6 rejects a truncated paste
+  or an applied incompatibility notice (and its limits are stated in "Gates and what each actually
+  proves" — parity against a consumer's copy is consumer-side).
+
 ## What was verified, and how
 
 - **RimWorld 1.6 UI surface**, read from `Krafs.Rimworld.Ref 1.6.4871` with dnlib (that package mirrors
@@ -112,6 +128,20 @@
   methods / 152 public static. `Verse.Window` carries a `UnityEngine.GUI/WindowFunction` field, i.e. the
   game's window manager is an adapter over IMGUI's `GUI.Window`. It references `IMGUIModule` and
   `TextRenderingModule`, never `UnityEngine.UI` or `UIModule`.
+- **`Verse.Window`'s overridable surface, read member-by-member from the same 1.6.4871 reference
+  assembly while writing `UiWindowHost` — these four facts each cost a failed run when guessed.** The type
+  is `public abstract`; `DoWindowContents(Rect)` is **public abstract** (so `Margin`-style protected
+  assumptions do not transfer to it); `Margin` is **protected virtual, getter only** (a `sealed override
+  float Margin => 0f` is how the shell takes the content inset away from the game); `InitialSize` is
+  **public virtual, getter only**. The constructor is `Window(IWindowDrawing customWindowDrawing = null)`
+  — a derived parameterless `base()` compiles onto *that* slot, so a runtime stub that declares only an
+  implicit parameterless constructor dies with `MissingMethodException: Void
+  Verse.Window..ctor(Verse.IWindowDrawing)`, which is exactly what the first shell-lane run reported.
+  And `Close` is `Close(bool doCloseSound = true)`, not `Close()`: same failure class, same discovery.
+  `WindowLayer` is `{GameUI, Dialog, SubSuper, Super}`. Read the signatures from the reference assembly
+  with `System.Reflection.Metadata` (`PEReader` → `GetMetadataReader`; in PowerShell that is the
+  extension method `[System.Reflection.Metadata.PEReaderExtensions]::GetMetadataReader($pe)`, not an
+  instance method) before writing either side of a stub.
 - **GitHub's prerelease state is a stored boolean, never parsed from the tag name** (verified via
   `gh api` against the live SqueakyRatkin data and the REST docs, 2026-09-05): `POST /releases`
   defaults `prerelease:false`, and SR's `v0.1.0-rc1`/`v0.3.2-pre1` carry `true` only because their
@@ -172,7 +202,12 @@
 - **net472 reference-assembly traps** hit while writing this repo's own code, all compile-verified:
   `string.IsNullOrEmpty` carries no `[NotNullWhen(false)]` (CS8602 on the ternary that returns it);
   `string.Split(char, StringSplitOptions)` is advertised but throws `MissingMethodException` at
-  runtime; `string.Contains(string, StringComparison)` likewise does not exist at runtime.
+  runtime; `string.Contains(string, StringComparison)` likewise does not exist at runtime. Two more
+  found writing the containment lane, same class and same asymmetry (compile green, runtime red):
+  **`Path.GetRelativePath(string, string)`** and **`string.TrimStart()`** with no arguments. The scan
+  now walks leading whitespace by hand and computes the relative path itself. The rule that generalises
+  these: a member the reference assembly advertises is a *claim*, and the runtime this harness actually
+  executes against is `net472`, so only a run proves it.
 
 ## Cross-repo couplings that no gate in this repo can see
 
@@ -191,6 +226,12 @@
   DLL-only staging while gates 1-12 passed, proving the stub sources and `LICENSE` are as load-bearing
   as the payload. The checkout is deliberately unpinned (tracks this repo's default branch, so lib-side
   breakage goes red in US's CI early); the release-body link is the pinned half - see `TODO.md` §5.
+  **Round 1 grew that published surface twice, in both directions.** `VerseStubs` gained
+  `Verse.Window`/`Verse.WindowLayer`/`Verse.IWindowDrawing` so `UiWindowHost` is drivable at all (P2
+  condition b), and `UiWidgetRegistry.Clear` went **internal** (item D), so a consumer harness that had
+  ever called it would stop compiling against the payload while every gate here stayed green. Neither is
+  visible to a gate in this repo; both are exactly the shape `TODO.md` §3's "give the harness `Stubs/**`
+  a local guard" item exists to catch, and that item is now load-bearing rather than tidy.
 
 ## Consumer coverage, measured 2026-09-04
 
@@ -205,16 +246,139 @@
   four kinds are unvalidated in a running game, not merely unused - and a third party compiling against
   them would be the first real test of them. Evidence: source-level grep across both repos; no new game
   run.
-- **Two text paths bypass the fit audit today, so `UiThemeDraw.Label` is not "the single text outlet".**
-  `UiFitAudit.Check` is called from exactly one place, `UiThemeDraw.cs:24`, but `VerseWidgets.Label` is
-  called from three: `UiThemeDraw.cs:34` (audited), `UiLayoutEngine.cs:1049` (reached by
-  `DrawContainer`'s `Title`/`TitleKey` handling for `Section`/`Surface` containers, `UiLayoutEngine.cs:1028`)
-  and `StepperSliderWidget.cs:164` (the widget's own `Label`/`LabelKey` and its `-`/`+` glyphs). So
-  container titles and stepper labels are invisible to the text-fit audit: `BeginElement(entry.Path)`
-  attributes findings, but with no `Check` on those paths there is nothing to attribute. This is a
-  coverage fact, not a proven defect - no overflow on those two paths has been observed anywhere, in-game
-  or in the harness, and the harness's own audit tests drive `UiThemeDraw.Label` directly, so they cannot
-  see the gap either.
+- **`UiThemeDraw.Label` is the single text outlet as of 2026-09-07; it was not before.** The two bypasses
+  (`UiLayoutEngine`'s container `Title`/`TitleKey` band and `StepperSliderWidget`'s label and `−`/`+`
+  glyphs) were deleted by round-1 item A, so `UiFitAudit.Check` now sees those strings and
+  `BeginElement(entry.Path)` has something to attribute. Still a coverage fact, not a fixed bug: no
+  overflow on either path has ever been observed, in game or in the harness. Two consequences of routing
+  rather than re-implementing: those paths now set `Text.Anchor` explicitly (`MiddleLeft`, the outlet's
+  default) where the deleted copies inherited the ambient anchor, and the harness audit tests still drive
+  the outlet directly, so they cover the outlet and not the routes into it.
+- **`UiWindowHost` owns window chrome; a consumer's window is a subclass, not a re-implementation.**
+  Round-1 P2, and the only round-1 item that *shrinks* the escape surface instead of adding capability:
+  a consumer forced to write its own `Window` keeps being tempted to write widgets there too, and the
+  proven result was a settings window whose close button reached past the kernel. What the shell owns:
+  exactly one `UiHost` (built inside the guarded pass, disposed on `PreClose`), the chrome paint (one
+  theme, no second palette), the close affordance, and `Margin => 0f` so it insets its own content. What
+  it never owns: the window's **size** — `InitialSizePolicy` is a provider whose unset default is the
+  game's own `Window.InitialSize`, because freezing the first consumer's screen-fraction clamp would put
+  its taste into the freeze surface. Modality (`forcePause`, `absorbInputAroundWindow`,
+  `preventCameraMotion`, `layer`) is likewise left to the consumer to set.
+  The failure contract is the part that looks wrong and is not: a pass that throws reports once,
+  disposes its host and draws **nothing**; the notice appears on the *next* pass, drawn from a clean
+  IMGUI state, and is terminal for the instance (no retry, no second host). A synchronous switch would
+  repaint the notice inside the pass that already claimed layout for the page. Do not "improve" it.
+  Chrome geometry virtuals (title band 56, padding 20, accent rule 3, close 110×30) are the shell's own
+  layout, generalised from the first proven implementation and overridable — a different kind of thing
+  from window size, and worth keeping distinct when a second consumer disagrees with them.
+- **The hover-claim machine is the session's (P3), and its clock is IMGUI passes.** `Session.Frame`
+  increments once per `BeginFrame`, i.e. once per IMGUI pass — **not** once per rendered frame. Say the
+  unit out loud before sizing a grace window: the settings window opens with `forcePause`, where game
+  time freezes and any seconds-based grace would never expire, which is why the consumer's hand-rolled
+  machine was already frame-count based and why the proposal's `graceSeconds` was dropped during review.
+  `HoverGraceFrames` is a session property the consumer sets and defaults to **0** (the plain per-pass
+  clear, which is what the library did before), so no consumer's number became a library default.
+  Two rules the tests pin, because both are easy to lose in a rewrite: a claim the boundary *restored*
+  does not re-arm the grace window (that is what stops a superseded claim pinning the panel forever),
+  and the pass immediately after a live claim is blank by design — a still-hovered widget re-claims
+  inside it.
+- **`UiThemeDraw.Solid` and `UiThemeDraw.RecoveryBand` joined the visual core in 0.3.0.** `Solid` is the
+  library's only fill primitive, and widgets call it instead of `Verse.Widgets.DrawBoxSolid` — that is
+  what makes the funnel short enough to gate. `RecoveryBand` is the fixed paint of a tripped element.
+  Neither takes a session, so both stay on the visual-core side of the boundary.
+- **Backend containment is a gate, not a convention, and the funnel is five files.**
+  `KernelContainmentTests` scans `Source/**` for qualified calls to `GUI.` / `GUIUtility` / `Event.current`
+  / `Mouse.` / `Text.` / `VerseWidgets` (plus the `Verse.`/`UnityEngine.`-qualified forms and
+  `Verse.Widgets` spelled out) and requires each hit to be a name its file is allowed to reach. The list
+  after item A is `UiNative.cs`, `UiThemeDraw.cs`, `UiLayoutEngine.cs` (its four structural scopes only),
+  `UiSessionGuard.cs`, `VerseFerriteTextMetrics.cs`. Two rules keep the list honest: an allowlisted file
+  that no longer reaches one of its granted names is a failure, and `UiWindowHost.cs` is deliberately
+  **absent**, which is what makes the shell's "zero raw backend calls" acceptance line enforceable
+  (mutation-proved: a planted `Verse.Mouse.IsOver` there reddens the lane with file and name).
+  Two corrections against the review's own prose, both measured after A: the sketched list named
+  `UiKitFonts.cs`, which has no backend call at all (it maps an enum), and item A's text named three
+  violations where its acceptance line implied nine — `Widgets/` also held four `DrawBoxSolid` fills in
+  the chart and one in the stepper, and the engine held a five-rect copy of `UiThemeDraw.Surface`. The
+  acceptance line was the requirement; the enumeration was not.
+- **Recovery belongs to the tree now (item C).** `UiLayoutEngine` wraps every element's Measure and Draw
+  through `UiSessionGuard`: a throwing control records into its session slot (one log line per slot, with
+  kind, path and stack), restores font/colour, and paints `UiThemeDraw.RecoveryBand` — a warning-toned
+  band carrying its layout path, no strings the library does not own. Before this the guard existed and
+  nothing in the library called it, so the documented contract was consumer opt-in fiction. Two details
+  that cost a cycle each: the recovery key is the engine's arranged **entry path**, not
+  `ctx.ElementPath` (the draw pass reuses the host context with only width and origin adjusted, so the
+  context path is the page root for every element and would collapse every recovery into one slot), and
+  the engine-facing entry points take the widget rather than an `Action`/`Func`, because the engine draws
+  every element on every IMGUI pass and a delegate argument allocates a closure per call on the hottest
+  path in the library. Consumer-facing delegate forms remain for controls whose fallback paint is the
+  consumer's design.
+
+## Ecosystem protocol — full form, provenance, and the metric
+
+The AGENTS section carries the operational rules; this is why they exist and how they were derived, so
+an edge case can be judged without re-running the audit that produced them.
+
+- **Derived from measurement, not taste.** The FL-side adversarial audit (2026-09-07) graded the
+  library retained-B / boundary-B / ecosystem-C; the same day's US compliance round produced the
+  P1–P5 proposals. US's 16 `us/*` kinds are the *success* case — a consumer weighed the options,
+  built, and stayed in the tree. The failures are exactly the raw-backend call sites: 4 in US
+  (`Mouse.IsOver` at the settings-window close button, `UsKernelDraw` help-hover ×2, the Mod-settings
+  shell button) plus one in FL's own `UiNative.IsFocusLost` — raw `Mouse.IsOver` beside its own
+  private wrapper. Every one of the five traces to a missing primitive, which is why the ladder is
+  "make the tree the cheap, reliable, visible path" and not "forbid the platform's only GUI API"
+  (that one cannot be enforced by anything in .NET or in RimWorld).
+- **The metric is tree-membership, not built-in usage.** The library can never ship every control —
+  one manifest reference out of 17 shipped kinds (US's own pages, "Consumer coverage" above) is the
+  proof that speculative coverage misses. What the library can own is identity, state, invalidation,
+  recovery, and the audit surface. A bespoke kind inside a manifest page feeds all of those; a raw
+  call replacing even a correct library kind feeds none. Baseline was 5 raw sites across both trees
+  (2026-09-07); FL's own one (`UiNative.IsFocusLost`) is gone and FL's remainder is gated, so the
+  count standing today is **US's 4**, measured in its tree, not claimed from this one. Target: 0
+  outside registered exemptions, the first registered exemption being world-space rendering
+  (`GenMapUI` class of calls — no session, no hit-test, permanent by ruling). The count is what the
+  consumer's gate should report against `tools/dependency-reality.ps1` rule (c); this repo cannot
+  measure it without depending on a consumer tree, which is the vacuous-guard shape already recorded
+  twice in the neutrality lane.
+- **Why exemptions carry rent.** An allowlist without a named closing item drifts back into permanent
+  undocumented self-implementation; the live specimen is US's diagnostics panel — 704 lines of
+  hand-rolled immediate UI borrowing only the theme vocabulary. Written ruling + capability gap + TODO
+  reference turns each bypass into debt with a due date instead of a precedent.
+- **Promotion-gate provenance, by item.** P1 (hover primitive), P2 (window shell), P3 (hover-claim
+  machine) each cite consumer code that was forced to hand-roll them — that is the provenance test
+  passing. The P2 ruling that US's 60–75 % / 800×600 clamp is consumer policy (size arrives as a
+  provider, never as a library default) is the no-consumer-numbers clause applied before anything
+  shipped. The gate's inverse also binds: `input/dropdown`, `input/stepper-slider`, `input/mode-row`
+  and friends carry zero manifest consumption and are dealt with by the P5/§3 fix-or-delete, not kept
+  "for symmetry".
+- **Harvest loop — run once end to end, template set (2026-09-07).** Consumer compliance audit →
+  HANDOFF round → FL review against code, per item a verdict / correction / refusal, line-cited → the
+  accepted set lands as ONE pre-1.0 minor bump, shipped in lockstep with the consumer's migration
+  commit → FL answers with the items it owes the consumer (self-containment fixes, the containment
+  gate, engine-owned recovery, static retirement, the D-1 checker). The corrections are the point: two
+  of five proposals misstated the very code they cited (`Dragging` is live, read by `LineChartWidget`;
+  P3's grace machine is frame-count, not seconds, and there is no "frame counter the layout cache
+  uses" to reuse — the cache is revision-keyed). Review discipline: verdict against code, not intent —
+  and the same discipline applied to the review itself found two more (see the containment fact: an
+  allowlisted file with nothing in it, and an enumeration narrower than its own acceptance line).
+  Round lifecycle and section kinds are pinned in each repo's HANDOFF header; round numbers
+  count on the library side and name the initiating consumer in full (`US→FL round 1`) —
+  attribution is deliberate incentive, since this library grows only from consumer feedback.
+  **Round 1 is CLOSED on the library side**: landed on `feat/round-1-0.3.0`, its bodies trimmed from
+  the buffer, the permanent record here and in `TODO.md` §0. Closing was contingent on the work
+  existing, not on the prose being filed — a trimmed round whose items are still open would be the
+  triage failure the buffer header names. Not shipped: the tag waits for US's migration commit and for
+  a maintainer decision.
+- **What a closed round costs the next one.** Round 1 answered a consumer audit with six public-surface
+  items and five library-owed items in one bump; that is the largest single change this repo has made
+  and it stayed reviewable only because every item cited consumer code that already existed. The
+  template's constraint is therefore not effort per item but evidence per item: an ask with no citation
+  into a consumer tree does not enter a round at all, and this repo's owed items are owed items, not
+  speculative features — the containment gate, engine recovery and the static retirement all existed as
+  defects before anyone proposed them.
+- **One-assembly stance reaffirmed under this protocol.** The visual-core/page-model split already
+  passes a name-level gate; a second assembly would double the version axes to keep in step for zero
+  new boundary. The re-open trigger stays exactly one: a consumer needs the visual core without the
+  whole DLL.
 
 ## Structure and where things live
 
@@ -223,7 +387,8 @@ Paths and roles only; any line/file count here would be false within a day (see 
 
 - `Source/FerriteLib.UiKit/Kernel/` - the whole payload surface. `net472`, `TreatWarningsAsErrors`,
   `Nullable` on, output pinned to `1.6/Assemblies/` because that path is what consumers bind to.
-  - Page model: `UiHost` (per-window façade, `IDisposable`), `UiSession`, `UiLayoutEngine` (the largest
+  - Page model: `UiHost` (per-window façade, `IDisposable`), `UiWindowHost` (the window shell: chrome,
+    one owned host, the deferred-notice failure contract), `UiSession`, `UiLayoutEngine` (the largest
     file by far), `UiLayoutManifest`, `UiLayoutSnapshot`, `UiBindings`/`IUiBindings`, `UiWidgetRegistry`,
     `KernelCoreWidgetRegistrar`, `UiWidgetContext`, `UiElementSpec`, `UiSessionGuard`, `UiValueState`,
     `UiNative` (the IMGUI interop seam), `UiPopup`, `UiChartPointChange`, the contract exceptions, and
@@ -231,10 +396,22 @@ Paths and roles only; any line/file count here would be false within a day (see 
   - Visual core: `UiTheme`, `UiThemeDraw`, `UiFitAudit`, `UiKitFonts`, `UiFont`, `ITextMetrics`,
     `VerseFerriteTextMetrics`.
   - `FerriteLibVersion` is BCL-only on purpose: no Verse, no UnityEngine, so a consumer can call
-    `Require` from its earliest constructor and the harness can test it with no stubs at all.
-- `tools/FerriteLib.UiKit.Tests/` - a plain `Main()` runner (no test framework), 11 lane files plus
-  `Program` and `StubTextWidth`, with 4 standalone stub projects under `Stubs/`.
-- `scripts/verify-local.ps1` (7 gates, `-PackDev` adds packaging) and `scripts/pack-dev.ps1`.
+    `Require` from its earliest constructor and the harness can test it with no stubs at all. That claim
+    now has one bounded exception worth knowing before it is repeated: since item E, `Require` reads
+    `UiHostLedger`, which is itself BCL-only (a `List<string>` behind a lock, append-only, no reset), so
+    the version lane still runs without loading a single stub — but it is no longer a *pure* function of
+    its arguments. The pure decision stays in `Evaluate`, which is what the tests drive directly; the
+    ledger line is added in `Require` only.
+- `tools/FerriteLib.UiKit.Tests/` - a plain `Main()` runner (no test framework), lane files plus
+  `Program` and `StubTextWidth`, with 4 standalone stub projects under `Stubs/`. Two of the lanes are
+  gates over source text rather than over behaviour: `FerriteLibNeutralityTests` (product vocabulary)
+  and `KernelContainmentTests` (backend contact, per-file and per-symbol allowlist). Both carry positive
+  controls, because a scan over files is exactly the check that passes vacuously when a path moves.
+- `tools/dependency-reality.ps1` - the D-1 reference checker FL owns the rule text for: AssemblyRef,
+  page-model MemberRef contact, and declared-chrome allowlisting over a consumer tree, with `-SelfTest`
+  proving the source scan can fire.
+- `scripts/verify-local.ps1` (7 gates, `-PackDev` adds packaging) and `scripts/pack-dev.ps1`. The three
+  source-text gates and the version axes all run *inside* gate 1; the gate count is not the check count.
 - `About/About.xml`, `LoadFolders.xml`, `LICENSE`, `1.6/Assemblies/` (the DLL and PDB are gitignored; only
   `.gitkeep` is tracked, so a fresh clone has no payload until it builds).
 

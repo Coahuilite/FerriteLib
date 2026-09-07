@@ -1,8 +1,30 @@
 # TODO
 
-## 1. In-game verification — status after the 2026-09-04 session
+## 0. Release the round-1 surface (branch `feat/round-1-0.3.0`)
 
-The blocking risk is cleared. What remains is two branches that only change code if they surprise us.
+Round 1 is SCHEDULED and, on this branch, implemented: P1–P6 (P3 landed here rather than slipping to
+0.3.x — it is session-scoped, provenance-cited and lane-tested, and holding it back would cost US the
+lockstep migration) plus FL-side items A–E, on the 0.3.0 contract axis. What is left is release work,
+not design work.
+
+- [ ] **Ship 0.3.0 in lockstep with US's migration commit — maintainer decision, never a session's.**
+      US currently asserts `[0.2.0, 0.3.0)`, so a 0.3.0 carrier against an unmigrated US is a readable
+      prerequisite notice by design — correct, but player-visible. Tag dialect: `v0.3.0-rc1` at the
+      then-tip, bare tag only on the commit that ends the trial (`MEMORY.md`, publication state).
+- [ ] **Cross-repo follow-through — report, do not edit** (`AGENTS.md` Boundaries):
+      US's migration commit owns flipping its four raw `Mouse.IsOver` sites onto `UiNative.IsMouseOver`,
+      re-expressing its settings window as a `UiWindowHost`, moving its grace machine onto
+      `Session.BeginHoverClaimFrame/ClaimHover/HoverClaim`, adopting `UiBindings.ActiveTabKey`, and
+      raising `PrerequisiteApiMin/Max` to `[0.3.0, 0.4.0)`. Its `release.yml` still lacks the
+      lib-release link (`§5`) and its two workflows still say `Coahuilite/ferritelib`. Report the new
+      surface with the deletion paths, not as a wish list.
+- [ ] **US's boundary gate may adopt containment rule (c)** from `tools/dependency-reality.ps1`; FL owns
+      the rule text and the tool, so a consumer that restates the rules must point here instead.
+
+## 1. In-game verification — status after the 2026-09-07 round-1 branch
+
+The blocking risk is cleared. What remains is two branches from the split plus three new ones the
+round-1 surface introduced; every one of the five only changes code if it surprises us.
 
 - [x] **Cross-mod assembly binding.** PROVEN. US installed without any FerriteLib payload of its own
       resolved its `FerriteLib.UiKit` reference from the carrier mod, opened the settings page and the
@@ -37,6 +59,25 @@ The blocking risk is cleared. What remains is two branches that only change code
       Keyed tables only take effect after restart, then opening Options from the main menu, switching and
       returning without restarting is a half-switched state. Look for visible misalignment; if none,
       record it unreachable and add no mechanism.
+- [ ] **The window shell has never been opened in a game.** `UiWindowHost` is compile-verified against
+      `Krafs.Rimworld.Ref 1.6.4871` and lane-verified against the `Verse.Window` stub slice, and the two
+      signature facts that killed the first harness runs (`Window..ctor(IWindowDrawing)` and
+      `Close(bool doCloseSound = true)`) were read from the reference assembly rather than guessed. That
+      is still not a game run: the shell must be opened once through the real window stack, where
+      `WindowOnGUI`'s actual group/matrix plumbing, `layer = Dialog` ordering and the close-sound path
+      are all live. A signature the ref assembly and the stub agree on and the executable disagrees with
+      shows up here and nowhere else.
+- [ ] **Two text paths just came into the fit audit.** Container titles and the stepper-slider's label
+      and `−`/`+` glyphs used to bypass `UiFitAudit.Check`; item A routed them through
+      `UiThemeDraw.Label`, so they can now report overflow they never could report before, and they also
+      changed vertical anchor from ambient to `MiddleLeft`. Walk the pages with detailed logging on and
+      look for newly-reported overflows and for visible title misalignment. Absence of both is the
+      result to record; either surprise reshapes A, not the audit.
+- [ ] **Engine-owned recovery has never tripped in a game.** Item C moved per-widget recovery into the
+      tree, so a throwing core widget now paints a warning band with its layout path and trips its
+      session slot. The band's paint (theme `Warning` fill, `TextOnDanger` path text) has only ever been
+      seen in a stub. Force one trip by hand — a temporary consumer widget that throws — and confirm the
+      page keeps drawing around it and the log line appears once per slot.
 
 ## 2. Second consumer: the withheld sibling mod
 
@@ -80,15 +121,16 @@ Each item is expected to delete a workaround, not add a layer.
       conversions are gone. What is left is `YieldsToCoveringPopup` (`UiNative.cs:259`, still called at
       `:115`) and the previous-frame `OpenPopupRect` reasoning, which still model one popup rather than a
       stack of overlapping surfaces.
-- [ ] **Close the fit-audit's two blind spots, or record them as exemptions.** `UiFitAudit.Check` runs
-      only inside `UiThemeDraw.Label`, but `VerseWidgets.Label` is also called from
-      `UiLayoutEngine.cs:1049` (the `Title`/`TitleKey` band on `Section`/`Surface` containers, reached at
-      `:1028`) and from `StepperSliderWidget.cs:164` (its `Label`/`LabelKey` and the `−`/`+` glyphs).
-      Overflow there is unreportable by construction, and `KernelTextAuditTests` cannot see it either
-      because it drives `UiThemeDraw.Label` directly. Either route both through `UiThemeDraw.Label`
-      (preferred - it deletes a duplicate rather than adding a layer) or state the exemption in the gate's
-      own comment and stop calling `Label` the single text outlet. No evidence yet that a real string
-      overflows on either path; do not describe this as a fixed bug.
+- [x] **Fit-audit blind spots closed by round-1 item A (2026-09-07, this branch).** Both bypasses went:
+      the engine's private `DrawLabel` and `StepperSliderWidget`'s copy now call `UiThemeDraw.Label`, so
+      `UiFitAudit.Check` sees container titles and stepper glyphs, and `Label` can honestly be called the
+      single text outlet again. The engine also lost its hand-copied border rule (`DrawSurface` →
+      `UiThemeDraw.Panel/Base`). Recorded consequence, because it is a behaviour change and not only a
+      dedup: those two paths now paint with `Text.Anchor` set explicitly (`MiddleLeft`, the outlet's
+      default) where the deleted copies inherited the ambient anchor — an alignment shift nobody observed
+      in game, and still no evidence that a real string overflows on either path.
+      `KernelTextAuditTests` still drives `UiThemeDraw.Label` directly, so it covers the outlet, not the
+      two routes into it.
 - [ ] **Decide what to do with the four widget kinds nobody consumes.** `section/header`, `state/empty`,
       `input/mode-row` and `input/stepper-slider` are registered unconditionally by
       `KernelCoreWidgetRegistrar` and have zero references in the consumer's `Source/**` (grep, 2026-09-04).
@@ -111,12 +153,13 @@ Each item is expected to delete a workaround, not add a layer.
       all seven gates here stay green. A five-line assertion that the four project paths and their expected
       assembly names exist would close the hole without introducing a cross-repo dependency.
 - [ ] **Keep the boundary guard's symbol list alive, or make it transitive.**
-      `VerifyVisualCoreIsPageModelFree` rejects lines naming fourteen hand-maintained page-model symbols in
-      seven visual-core files. `UiPopup` (added on `4dd97bf`) is in neither list, so
-      `UiThemeDraw → UiPopup → UiSession` would pass while breaking the "usable without a Host" claim the
-      lane exists to hold. Cheapest fix: add `UiPopup` to the page-model array and mutate-test it by
-      planting a `UiPopup` call in a visual-core file. Real fix, later: derive the page-model set from the
-      types instead of a list nobody remembers to update.
+      `VerifyVisualCoreIsPageModelFree` rejects lines naming hand-maintained page-model symbols in
+      seven visual-core files. `UiWindowHost` was added to that array with P2 and is mutation-proved (a
+      planted mention in `UiThemeDraw.cs` fails the lane). `UiPopup` — added on `4dd97bf` — is still in
+      neither list, so `UiThemeDraw → UiPopup → UiSession` would pass while breaking the "usable without
+      a Host" claim the lane exists to hold. Cheapest fix: add `UiPopup` and mutate-test it the same way
+      `UiWindowHost` was. Real fix, later: derive the page-model set from the types instead of a list
+      nobody remembers to update.
 - [ ] Clean up `UiLayoutManifest.ParseFile`: it has no production caller. Either wire a real
       load-from-disk path (which is the only thing that would make XML authoring worth its cost) or
       delete it and the `Schema="2"` version slot with it.
@@ -242,11 +285,16 @@ item below, which remains the one irreversible call.
       reversible is that a Workshop page with a stable packageId turns `FerriteLib.UiKit` into something
       any modder can compile against, and from their first build our breaking edits become their breakage.
       That is the real one-way door, and it is independent of our own discipline.
-      Decide before the upload, in one line on the page: is third-party use **invited** (then §3 and the
-      per-surface theme restructure in §4 should land first, because they are breaking by their own
+      Decide before the upload, in one line on the page: is third-party use **invited** (then `§3` and the
+      per-surface theme restructure in `§4` should land first, because they are breaking by their own
       admission and will stop being cheap afterwards), or **unsupported** (then we may keep breaking it
       for as long as US is the only consumer, and say so plainly). Both are fine; discovering the choice
       after someone builds on us is the only bad outcome.
+      Round 1 enlarged the door without changing its nature: `UiWindowHost` is the largest new freeze
+      surface the library has ever shipped, and it landed **before** the second wired consumer exists —
+      which is exactly the pressure the freeze rule waits for, so the shell is provisional in a way that
+      a theme token is not. If the call is "invited", the shell is the item most likely to need reshaping
+      once a second consumer pressures it; say so on the page rather than implying the chrome API is done.
 - [~] `About.xml` description rewritten 2026-09-07 (bilingual, answers "what is this doing in my mod
       list", says not to uninstall while a consumer is present). **Preview image still missing** - it is
       a Workshop-page asset and the Workshop step is undecided; nothing player-facing is published

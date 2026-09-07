@@ -13,12 +13,16 @@ to disable only when no enabled mod depends on it.
 Two layers, kept separable on purpose:
 
 1. **A declarative page engine** — XML manifests, constrained layout, typed bindings, per-window
-   sessions, a widget registry, and creation-time contract validation. Consumer code writes business
-   logic and bindings; structure lives in XML.
+   sessions, a widget registry, creation-time contract validation, per-element recovery, and a window
+   shell that owns the chrome (background, title, close affordance) so a consumer never has to leave the
+   tree to open a page. Consumer code writes business logic and bindings; structure lives in XML.
 2. **A visual core** — theme tokens, drawing helpers, text measurement, text-fit audit, and the version
    contract. Reachable *without* adopting the page model.
 
-The split is enforced by a gate, not by convention: no visual-core file may name a page-model type.
+Both boundaries are gates, not conventions: no visual-core file may name a page-model type, and every
+call into the game's immediate-mode surface must live in one of the five named funnel files. Outside
+them, raw IMGUI is unsupported and unmeasurable rather than forbidden — it is invisible to the harness,
+the fit audit and session recovery, which is the whole point of the tree.
 
 ## Requirements
 
