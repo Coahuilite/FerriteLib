@@ -13,7 +13,6 @@ public sealed class UiSession : IDisposable
 {
     private readonly Dictionary<string, Vector2> scrollPositions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, UiValueState> valueStates = new(StringComparer.Ordinal);
-    private readonly HashSet<string> expandedIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> trippedComponentIds = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> trippedLogs = new(StringComparer.Ordinal);
     private int? ownedHotControl;
@@ -23,21 +22,44 @@ public sealed class UiSession : IDisposable
     private Rect? openPopupRect;
     private Rect hostViewport;
     private string? scrollTargetElementId;
+    private string hoverClaim = "";
+    private string hoverHeld = "";
+    private int hoverClaimStamp;
+    private int hoverGraceLeft;
 
     /// <summary>True until <see cref="Dispose"/> is called.</summary>
     public bool IsActive { get; private set; } = true;
 
+    /// <summary>
+    /// How many further passes a hover claim keeps explaining the panel after the pointer leaves, in
+    /// <see cref="Frame"/> units. Part of the claim machine's contract rather than a library default:
+    /// the consumer that needed the grace picks its length, the library only owns the rule.
+    /// </summary>
+    public int HoverGraceFrames { get; set; }
+
+    /// <summary>
+    /// Monotonic per-pass counter, incremented once by <see cref="BeginFrame"/>. This is the clock the
+    /// hover-claim machine runs on (US→FL round 1, P3) — deliberately not wall-clock: the settings
+    /// window opens with <c>forcePause</c>, where game time freezes and a seconds-based grace would
+    /// never expire. One increment is one IMGUI pass, not one rendered frame; the consumer's own
+    /// hand-rolled machine already proved that base.
+    /// </summary>
+    public int Frame { get; private set; }
+
     /// <summary>Monotonic revision bumped when dynamic content changes. Used for layout cache keys.</summary>
     public int ContentRevision { get; private set; }
+
+    /// <summary>
+    /// The id a hover claim is currently explaining, or null when nothing is claimed. Read it after
+    /// <see cref="BeginFrame"/>; widgets refresh it during the pass with <see cref="ClaimHover"/>.
+    /// </summary>
+    public string? HoverClaim => hoverClaim.Length > 0 ? hoverClaim : null;
 
     /// <summary>Session-scoped value/control state keyed by stable element id.</summary>
     public IReadOnlyDictionary<string, UiValueState> ValueStates => valueStates;
 
     /// <summary>Session-scoped scroll positions keyed by scroll container id.</summary>
     public IReadOnlyDictionary<string, Vector2> ScrollPositions => scrollPositions;
-
-    /// <summary>Session-scoped expanded/collapsed ids.</summary>
-    public IReadOnlyCollection<string> ExpandedIds => expandedIds;
 
     /// <summary>Component ids currently tripped into session fallback.</summary>
     public IReadOnlyCollection<string> TrippedComponentIds => trippedComponentIds;
@@ -146,6 +168,8 @@ public sealed class UiSession : IDisposable
     public void BeginFrame()
     {
         EnsureActive();
+        Frame++;
+        BeginHoverClaimFrame();
         // Per-frame transient flags are reset by each control as it reads/writes its own state;
         // no global reset is needed because state is session-owned.
     }
@@ -190,19 +214,46 @@ public sealed class UiSession : IDisposable
         scrollPositions[elementId] = position;
     }
 
-    public bool IsExpanded(string elementId)
+    /// <summary>
+    /// Runs the hover-claim frame boundary: a claim refreshed by <see cref="ClaimHover"/> during the
+    /// previous pass is held and cleared (widgets re-claim as they draw, so a stationary pointer never
+    /// reads as stale); with no fresh claim the held one is restored for <see cref="HoverGraceFrames"/>
+    /// more passes, which is what stops the pointer crossing a gap between two controls from flashing
+    /// the overview. A live claim always replaces the held one in the same pass, so nothing pins.
+    /// Called by <see cref="BeginFrame"/>; exposed for hosts that drive passes by hand.
+    /// </summary>
+    public void BeginHoverClaimFrame()
     {
-        return elementId != null && expandedIds.Contains(elementId);
+        EnsureActive();
+        bool claimedLastFrame = hoverClaim.Length > 0 && hoverClaimStamp == Frame - 1;
+        if (claimedLastFrame)
+        {
+            hoverHeld = hoverClaim;
+            hoverGraceLeft = HoverGraceFrames;
+            hoverClaim = "";
+        }
+        else if (hoverGraceLeft > 0)
+        {
+            hoverClaim = hoverHeld;
+            hoverGraceLeft--;
+        }
+        else
+        {
+            hoverClaim = "";
+        }
     }
 
-    public void ToggleExpanded(string elementId)
+    /// <summary>
+    /// Claims the hover-help surface for <paramref name="elementId"/> for this pass. Frame-stamped, so
+    /// <see cref="BeginHoverClaimFrame"/> can tell a claim made this pass from one it restored itself —
+    /// the distinction a consumer had to hand-roll before this existed.
+    /// </summary>
+    public void ClaimHover(string elementId)
     {
-        if (string.IsNullOrEmpty(elementId)) return;
+        if (elementId == null) throw new ArgumentNullException(nameof(elementId));
         EnsureActive();
-        if (!expandedIds.Add(elementId))
-        {
-            expandedIds.Remove(elementId);
-        }
+        hoverClaim = elementId;
+        hoverClaimStamp = Frame;
     }
 
     public bool IsTripped(string elementId)
@@ -282,7 +333,10 @@ public sealed class UiSession : IDisposable
 
         scrollPositions.Clear();
         valueStates.Clear();
-        expandedIds.Clear();
+        hoverClaim = "";
+        hoverHeld = "";
+        hoverClaimStamp = 0;
+        hoverGraceLeft = 0;
         trippedComponentIds.Clear();
         trippedLogs.Clear();
         popupDrawActions.Clear();

@@ -9,6 +9,12 @@ namespace FerriteLib.UiKit.Kernel;
 /// Schema=2 layout manifest parser. The parser is strict and safe: DTD/external entities are
 /// prohibited, depth/node limits are enforced, and text content is rejected. Kind registration and
 /// typed binding validation happen later in <see cref="UiHost"/> so parsing stays independent.
+/// <para>
+/// Contract on the <c>Tab</c> attribute: an element carrying <c>Tab="X"</c> is hidden unless the
+/// consumer exposes <see cref="UiBindings.ActiveTabKey"/> as a <c>string</c> value binding whose current
+/// value equals <c>X</c> (case-insensitive). The engine reads that one key and no other; elements
+/// without <c>Tab</c> are always visible.
+/// </para>
 /// </summary>
 public sealed class UiLayoutManifest
 {

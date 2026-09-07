@@ -990,7 +990,7 @@ public sealed class UiLayoutEngine
             return false;
         }
 
-        string activeTab = ctx.Bindings.TryGet("active-tab", out string current) ? current : "";
+        string activeTab = ctx.Bindings.TryGet(UiBindings.ActiveTabKey, out string current) ? current : "";
         return !string.Equals(tab.Trim(), activeTab, StringComparison.OrdinalIgnoreCase);
     }
 
