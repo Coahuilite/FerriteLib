@@ -42,8 +42,10 @@ public static class FerriteLibVersion
     /// TypeLoadException at first draw. The rule was tightened on 2026-09-04 after exactly that
     /// failure shape reached a maintainer machine: an additive type (UiPopup) shipped without an Api
     /// bump, the old installed carrier passed Require, and the desync exploded inside UiHost.Draw.
+    /// The 0.2.0 → 0.3.0 move is the US→FL round-1 set: P1, P2, P3, P4, P5 and P6 plus items A–E all
+    /// touched this surface, and they ship as one bump rather than one per item.
     /// </summary>
-    public static readonly Version Api = new Version(0, 2, 0);
+    public static readonly Version Api = new Version(0, 3, 0);
 
     /// <summary>Human-readable identity for logs.</summary>
     public static string Describe()
