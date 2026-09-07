@@ -84,14 +84,24 @@ funnel files are named by the containment gate, and that list is the measurement
 ## Build and verification
 
 ```powershell
-pwsh -NoProfile -File scripts/verify-local.ps1              # 7 gates
-pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev     # + mod zip and NuGet package
-pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev -StageOnly   # + installable folder only, no archive
+pwsh -NoProfile -File scripts/verify-local.ps1                       # 7 gates
+pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev              # + installable dev folder
+pwsh -NoProfile -File scripts/pack-release.ps1 -Version v0.3.0-rc2   # + GitHub asset (what CI runs)
+pwsh -NoProfile -File scripts/pack-steam.ps1  -Version v0.3.0-rc2    # + Workshop upload folder
 ```
 
-`-StageOnly` lays out `dist/dev/FerriteLib/` for an in-game pass without producing a zip or a nupkg;
-the gates run first either way, so a directory rehearsal is a gated artifact. `pack-dev.ps1` builds with
-`--no-incremental` because Dev and Release share the payload path — see `MEMORY.md`.
+Three channels, one staging engine. `stage-package.ps1` decides what a package *is* — the five allowed
+files, the content probe, the licence copy, `version.txt`, and the closed-set assertion that stops a
+stray `.pdb` or repository-only file riding along. `pack-dev` / `pack-release` / `pack-steam` decide
+identity and nothing else: dev tolerates a dirty tree and says so in its label, github requires the tag
+shape and the build axis, steam additionally requires a clean tree. Only the GitHub channel archives —
+a dev rehearsal and a Workshop upload are folders — which also confines the archive-timestamp problem
+to the one artifact whose digest must be public. Dev writes no NuGet package; `-Nupkg` asks for one,
+since consumers bind to the payload by sibling path.
+
+`About/PublishedFileId.txt` is gitignored and the stager copies `About.xml` as a file rather than the
+`About` directory, so no dev or GitHub artifact can carry Workshop identity; the upload step creates it
+inside `dist/steam/FerriteLib/About/` locally.
 
 Consumers reference the payload by relative sibling path with `Private=false` (measured rationale:
 `MEMORY.md`). The `1.6/Assemblies/` output path and the `tools/.../Stubs/` tree with its `bin/stubs/`

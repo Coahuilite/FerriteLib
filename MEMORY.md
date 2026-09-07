@@ -87,34 +87,51 @@
   change), and the assertion is **mutation-proven in one direction only**: reverting `<VersionPrefix>` to
   0.1.0 fails exactly that one assertion and nothing else. The reverse case - a future axis living in a
   fourth file - is guarded by no test, because no such file exists yet.
-- **A release asset must be built after the gates run, not during them.** `verify-local.ps1`'s Dev and
-  Release build gates leave `1.6/Assemblies/FerriteLib.UiKit.dll` carrying `0.2.0-dev+<sha>` in its version
-  resource, and that is the correct identity for a dev rehearsal - so `pack-release.ps1` refuses it (tested:
-  `Payload is a dev build ...`) and the release workflow rebuilds with `-p:VersionSuffix=` to get the bare
-  `0.2.0+<sha>`. Anyone who wires these steps in the other order gets a red pack step, not a mislabelled
-  package.
-- **One OutputPath for two configurations is a silent wrong-artifact hazard, and it bit the packaging
-  path directly (measured 2026-09-07).** Dev and Release both write `1.6/Assemblies/FerriteLib.UiKit.dll`.
-  Immediately after a full `verify-local -PackDev -StageOnly` run, the file at that path was a
-  **Dev-configuration assembly of 98,304 bytes**, while a forced Release rebuild of the same commit
-  produces **91,136 bytes** — an incremental `dotnet build -c Release` reported "up to date" against
-  `obj\Release` and never touched the payload, because up-to-dateness is judged per-configuration while the
-  output path is shared. `pack-dev.ps1` copies *that path*, so without a forced rebuild it would stage the
-  wrong bytes under a `version.txt` that still reads `0.3.0-dev+<sha>` — nothing downstream could tell, and
-  the staged folder is exactly what an in-game verification pass installs. Fixed by `--no-incremental` in
-  `pack-dev.ps1`, verified end to end: staged DLL and payload hash byte-identical
-  (`89defb11…`), `AssemblyConfigurationAttribute = Release`,
-  `AssemblyInformationalVersion = 0.3.0-dev+<branch tip>`. The general rule: **when two configurations share
+- **A release asset must be built after the gates run, not during them.** The Dev and Release build
+  gates leave `1.6/Assemblies/FerriteLib.UiKit.dll` carrying a `-dev` version suffix, and that is the
+  correct identity for a rehearsal — so the github and steam channels refuse it (`Payload is a dev
+  build ...`, asserted in `stage-package.ps1` so the two cannot diverge on it) and the release workflow
+  rebuilds with `-p:VersionSuffix=` between the gates and the pack to get the bare `0.3.0+<sha>`.
+  Anyone wiring these steps in the other order gets a red pack step, not a mislabelled package.
+- **Three channels, one staging engine — the consolidation of two copies of the same rules.**
+  `stage-package.ps1` owns what a package *is*: a closed set of five allowed files, the content probe on
+  named paths, the licence copy, `version.txt` (`build=` / `commit=` / source), and the optional
+  deterministic archive. `pack-dev` / `pack-release` / `pack-steam` own identity and nothing else. The
+  split they replaced had already drifted: the dev folder's `version.txt` carried no `build=` or
+  `commit=` line, so an installed dev folder could not say which configuration built its DLL, and that
+  had to be read out of the assembly's metadata by hand. The closed set is mutation-proved both ways —
+  copying `1.6/` recursively instead of the one DLL trips "missing 1.6/Assemblies/FerriteLib.UiKit.dll",
+  and a deliberately copied `.gitkeep` trips "carries files it must not". Deliberate asymmetries, each
+  with a reason: dev tolerates a dirty tree and writes `-dirty` into its label; github has
+  `-AllowDirtyTree` as a rehearsal hatch only; steam has none, because it is the last step.
+- **Only the GitHub channel archives, and its archive is a function of the commit.** A dev rehearsal and
+  a Workshop upload are folders used in place, so the entry-timestamp problem is confined to the one
+  artifact whose digest is public. `Compress-Archive` stamps entries from staged mtimes, which staging
+  itself rewrites — two packs of one commit gave different SHA-256s over identical content (measured
+  2026-09-07) — and pinning mtimes first does not fix it, because NTFS re-dirties a directory during the
+  compressor's own walk. So the timestamps are written into the archive: sorted enumeration, every entry
+  at the tagged commit's author date, top-level `FerriteLib/` inside so a player unzipping into `Mods/`
+  does not get a loose `LoadFolders.xml`. Re-verified after the consolidation: two packs of one commit,
+  `B3C37669…` both times. The dev channel can still emit a zip on request (`-Zip`) for when a folder has
+  to travel as one file; that one is not deterministic and nothing quotes its digest.
+- **One OutputPath for two configurations is a silent wrong-artifact hazard, and it bit packaging
+  directly (measured 2026-09-07).** Dev and Release both write `1.6/Assemblies/FerriteLib.UiKit.dll`.
+  Right after a full `verify-local -PackDev` run the file at that path was a **Dev-configuration
+  assembly of 98,304 bytes**, where a forced Release rebuild of the same commit is **91,136**: an
+  incremental `dotnet build -c Release` reported "up to date" against `obj\Release` and never touched the
+  payload, because up-to-dateness is judged per-configuration while the output path is shared. The
+  packager copies *that path*, so without a forced rebuild it stages the wrong bytes under a
+  `version.txt` that still reads dev+sha — indistinguishable downstream, and the staged folder is exactly
+  what an in-game verification pass installs. Fixed by `--no-incremental`, verified end to end: staged
+  DLL byte-identical to the payload (`89defb11…`), `AssemblyConfigurationAttribute = Release`,
+  `AssemblyInformationalVersion = 0.3.0-dev+<branch tip>`. General rule: **when two configurations share
   one output path, "the build said it was current" is not evidence about the bytes on disk** — compare the
-  artifact, not the build log. Note the same sharing is why a stale `.pdb` can sit beside the payload
-  (Release sets `DebugType=none`, so it never rewrites or removes the Dev gate's pdb); `pack-dev` strips
-  pdbs from the staged folder for exactly that reason.
-- **The two zip shapes differ on purpose, and the difference is user-visible.** `pack-dev.ps1` archives
-  `(Join-Path $stageDir '*')` - contents at the zip root - because a dev rehearsal copies into a folder that
-  already exists. `pack-release.ps1` archives `$stageDir` itself, so the archive contains a top-level
-  `FerriteLib/` and a player unzipping straight into `Mods/` gets `Mods/FerriteLib/About/About.xml` instead
-  of a `LoadFolders.xml` loose in `Mods/`. Verified by listing the produced zip
-  (`FerriteLib/1.6/Assemblies/FerriteLib.UiKit.dll`, `FerriteLib/LICENSE`, `FerriteLib/version.txt`).
+  artifact, not the build log. The structural cure is the sibling repos' shape (one configuration, flavor
+  by property, as SR's `SqueakyBuildFlavor`), but switching this csproj to it is a cross-repo change —
+  the consumer's `build-dev.ps1` drives `-c Dev` on this project — so it belongs to a round, not to a
+  packaging cleanup. The same sharing explains a stale `.pdb` beside the payload (Release sets
+  `DebugType=none`, so it neither rewrites nor removes the Dev gate's pdb); the closed set now keeps it
+  out of packages, which is why no strip step is needed for it.
 - **GitHub policy does not constrain this shape of distribution** (read from `github/site-policy` and
   `github/docs`, 2026-09-05): Releases are documented as packaging software "for other people to download
   and use", with a stated limit of 1000 assets per release, 2 GiB per file, and **"no limit on the total

@@ -56,11 +56,9 @@ promised a merge while the surface is provisional.
 
 ```powershell
 pwsh -NoProfile -File scripts/verify-local.ps1            # the gate suite (harness + builds + payload + content-free + licence + identity)
-pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev   # + dev mod package and NuGet package (dist/, artifacts/)
+pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev   # + the installable dev folder (dist/dev/FerriteLib, no archive)
 pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory   # three-vector privacy gate, run before any push
 ```
-
-## Documentation index
 
 - Protocol / invariants: `AGENTS.md` · durable facts: `MEMORY.md` · action surface: `TODO.md`
 - Release flow and rc scheme: `.github/workflows/release.yml` header comments (the tag dialect is the
