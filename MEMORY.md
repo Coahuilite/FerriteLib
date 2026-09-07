@@ -10,8 +10,10 @@
   day by maintainer ruling** - cutting the stable tag was outside the push authorization: the rc scheme
   exists precisely so "the trial is over" stays a deliberate decision (see `TODO.md` §5). Workshop still
   pending. History was rewritten once before the push (HANDOFF.md removed from all revisions; the buffer
-  is now gitignored and local-only), so pre-rewrite lib hashes cited anywhere are stale — ledger in
-  `.git/filter-repo/commit-map`, US-facing drift list in `HANDOFF.md`.
+  is now gitignored and local-only), so pre-rewrite lib hashes cited anywhere are stale. Maintainer
+  ruling 2026-09-07 closes the follow-up duty: no repo in the series will be rewritten again to fix a
+  hash citation and no more re-pointing - a dangling hash is archaeology, not damage. The one-time
+  ledger stays at `.git/filter-repo/commit-map` for anyone who cares.
 - Provenance: `Source/FerriteLib.UiKit/**` and `tools/FerriteLib.UiKit.Tests/**` were copied out of the
   US repo at US commit `6c7053a` after a file-for-file `diff -r` check, then amended there. US retains
   its own history; this repo's history starts at the split. `6c7053a` is the post-rewrite hash of what was
@@ -184,7 +186,11 @@
   **all seven gates in this repo stay green**, because nothing here builds or references the sibling.
   Same shape one level up: US's gate 6 asserts this repo's payload DLL exists at
   `../ferritelib/1.6/Assemblies/FerriteLib.UiKit.dll`, so a broken build here goes red over there first.
-  Evidence: read from both csproj/scripts on 2026-09-04, source-level only.
+  Evidence upgraded 2026-09-07 from source-level to **runner-proven**: US's `ci.yml` checks this repo out
+  by canonical name and stages the WHOLE tree at the sibling path - its first run died on gate 13 with
+  DLL-only staging while gates 1-12 passed, proving the stub sources and `LICENSE` are as load-bearing
+  as the payload. The checkout is deliberately unpinned (tracks this repo's default branch, so lib-side
+  breakage goes red in US's CI early); the release-body link is the pinned half - see `TODO.md` §5.
 
 ## Consumer coverage, measured 2026-09-04
 
@@ -246,6 +252,13 @@ Paths and roles only; any line/file count here would be false within a day (see 
 - **Naming hazard from the consumer side**: five substrings are banned in US's own `UI/**` (see
   "Enduring corrections"); all are legal here, but a public type carrying one becomes the consumer's red
   gate the moment it appears in a US file.
+- **Byte-comparison against this repo only means something if the consumer pins LF too.** US's licence
+  gate compares its `LICENSE` against this repo's byte-for-byte; with only a corpus rule in its own
+  `.gitattributes`, a windows-latest checkout (`core.autocrlf=true`) gave US 16127 B against this repo's
+  15780 B - every CI run would have failed on line endings alone. US adopted `* text=auto eol=lf`
+  (`eadb931`, 2026-09-07). Read back as a lib-side constraint: this repo's own `* text=auto eol=lf` line
+  is part of the consumer contract - dropping it would silently break any consumer that hashes or
+  byte-compares carrier files on a Windows runner.
 - Three symbols people keep assuming live here are **not** from this repo: `SessionRevisionBumper` (a US
   private class), `PreClose` (Verse), `GetManifestResourceStream` (BCL, called in US). Searching this tree
   for them returns nothing, by design.

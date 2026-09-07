@@ -209,7 +209,11 @@ item below, which remains the one irreversible call.
       chosen release is a prerelease while US is being released as stable, or (c) a lib payload exists in US's
       own stage directory. (c) already exists as `stage-package.ps1:41-45` and US gate 9; both stay valid
       under this decision unchanged. Pin the resolved tag into the release body, so the pairing is a published
-      fact rather than something a reader has to recompute.
+      fact rather than something a reader has to recompute. Status 2026-09-07 (US feedback round): US's CI
+      carrier checkout is deliberately **unpinned** - it tracks this repo's default branch so lib breakage
+      surfaces early in US's CI (measured: its gate 13 death on DLL-only staging caught a real staging bug);
+      that makes the release-body link the only pinned half, and US's `release.yml` does not carry it yet
+      (grep: no tag link, no digest line). The item stays open until US lands it.
       After US's first release, run `scripts/verify-release.ps1` from this repo against it
       (`-Repo Coahuilite/universalsqueaker -AssetPrefix UniversalSqueaker`): the checks are generic
       (prerelease-flag-vs-tag, draft, single asset, digest, latest-pointer, dangling tags) and US has
