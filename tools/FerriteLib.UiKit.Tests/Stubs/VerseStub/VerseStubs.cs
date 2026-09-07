@@ -423,3 +423,114 @@ public static class LanguageDatabase
     public static LoadedLanguage? defaultLanguage;
     public static string DefaultLangFolderName = "";
 }
+
+/// <summary>
+/// Real RimWorld layer order, measured from the 1.6.4871 reference assembly. Only the names the shell
+/// and its consumers assign to are declared.
+/// </summary>
+public enum WindowLayer
+{
+    GameUI = 0,
+    Dialog = 1,
+    SubSuper = 2,
+    Super = 3
+}
+
+/// <summary>
+/// Only the type identity is load-bearing: it appears in <see cref="Window"/>'s constructor signature,
+/// which every derived constructor binds to. The game's interface carries the drawing hooks a window
+/// delegates its chrome to — exactly the job <c>UiWindowHost</c> does in-library — so no harness path
+/// ever supplies an implementation.
+/// </summary>
+public interface IWindowDrawing
+{
+}
+
+/// <summary>
+/// Minimal executable slice of <c>Verse.Window</c>, added for the US→FL round-1 window shell (P2,
+/// condition b: the shell is invisible to the kernel-host lane without it). The shape mirrors the real
+/// type wherever the difference would change which IL binds — abstract type, public abstract
+/// <c>DoWindowContents</c>, protected virtual <c>Margin</c>, public virtual <c>InitialSize</c>, public
+/// virtual <c>WindowOnGUI</c>, and the <c>IWindowDrawing</c> constructor.
+/// <para>
+/// <c>WindowOnGUI</c> performs the inRect plumbing the game does — offset the content rect by
+/// <c>Margin</c> and dispatch — so a lane can drive a real window pass through a member that exists
+/// in the game as well. No stub-only recorders: a lane observes behaviour by overriding the real
+/// virtuals (<c>Close</c>, <c>PreClose</c>), which is also what proves those overrides bind.
+/// </para>
+/// </summary>
+public abstract class Window
+{
+    public const float StandardMargin = 12f;
+
+    /// <summary>
+    /// Real constructor, read from the 1.6.4871 reference assembly:
+    /// <c>public Window(IWindowDrawing customWindowDrawing = null)</c>. A derived constructor's
+    /// parameterless <c>base()</c> call compiles onto this slot, so a stub with only an implicit
+    /// parameterless constructor dies at first use with
+    /// <c>MissingMethodException: Void Verse.Window..ctor(Verse.IWindowDrawing)</c> — which is exactly
+    /// what the first run of the window-shell lane reported.
+    /// </summary>
+    public Window(IWindowDrawing? customWindowDrawing = null)
+    {
+    }
+
+    public WindowLayer layer;
+    public string optionalTitle = "";
+    public bool doCloseX = true;
+    public bool doCloseButton = true;
+    public bool closeOnAccept = true;
+    public bool closeOnCancel = true;
+    public bool closeOnClickedOutside;
+    public bool forcePause;
+    public bool preventCameraMotion = true;
+    public bool doWindowBackground = true;
+    public bool absorbInputAroundWindow;
+    public bool draggable = true;
+    public bool drawShadow = true;
+    public bool focusWhenOpened = true;
+    public Rect windowRect;
+
+    protected virtual float Margin => StandardMargin;
+
+    public virtual Vector2 InitialSize => new Vector2(600f, 600f);
+    public abstract void DoWindowContents(Rect inRect);
+
+    public virtual void PreOpen()
+    {
+    }
+
+    public virtual void PostOpen()
+    {
+    }
+
+    public virtual void PreClose()
+    {
+    }
+
+    public virtual void PostClose()
+    {
+    }
+
+    /// <summary>
+    /// Real signature, read from the 1.6.4871 reference assembly: <c>public virtual void
+    /// Close(bool doCloseSound = true)</c>. The parameter is load-bearing — a shell compiled against
+    /// the ref assembly emits a call to the bool overload, so a stub that declares a parameterless
+    /// Close is a MissingMethodException at first click instead of a closed window.
+    /// </summary>
+    public virtual void Close(bool doCloseSound = true)
+    {
+    }
+
+    /// <summary>One window pass, as the game's window stack would drive it.</summary>
+    public virtual void WindowOnGUI()
+    {
+        float margin = Margin;
+        var inRect = new Rect(
+            windowRect.x + margin,
+            windowRect.y + margin,
+            Math.Max(1f, windowRect.width - margin * 2f),
+            Math.Max(1f, windowRect.height - margin * 2f));
+        DoWindowContents(inRect);
+    }
+}

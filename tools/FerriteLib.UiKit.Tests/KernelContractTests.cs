@@ -604,6 +604,7 @@ internal static class KernelContractTests
         string[] pageModel =
         {
             "UiHost",
+            "UiWindowHost",
             "UiSession",
             "UiSessionGuard",
             "UiLayoutEngine",
