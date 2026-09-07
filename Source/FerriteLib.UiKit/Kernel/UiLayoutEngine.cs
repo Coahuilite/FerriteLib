@@ -1014,10 +1014,16 @@ public sealed class UiLayoutEngine
 
         if (drawSurface)
         {
-            DrawSurface(rect, string.Equals(kind, "Section", StringComparison.Ordinal)
-                ? ctx.Theme.Panel
-                : ctx.Theme.Base,
-                ctx.Theme.Border);
+            // The two container surfaces are exactly the theme's Panel/Base treatments; routing them
+            // through UiThemeDraw keeps one border rule instead of a hand-copied five-rect version.
+            if (string.Equals(kind, "Section", StringComparison.Ordinal))
+            {
+                UiThemeDraw.Panel(rect, ctx.Theme);
+            }
+            else
+            {
+                UiThemeDraw.Base(rect, ctx.Theme);
+            }
         }
 
         if (HasTitle(entry.Spec))
@@ -1025,35 +1031,13 @@ public sealed class UiLayoutEngine
             Padding padding = ParsePadding(entry.Spec);
             float innerWidth = Math.Max(1f, rect.width - padding.Left - padding.Right);
             var headerRect = new Rect(rect.x + padding.Left, rect.y + padding.Top, innerWidth, SectionTitleHeight);
-            DrawLabel(headerRect, ReadTitle(entry.Spec, ctx), ctx.Theme.TextPrimary, ctx);
+            // One text outlet: routing the container title through UiThemeDraw.Label is what makes it
+            // visible to the fit audit (BeginElement above already attributes by path), which the
+            // engine's own private Label copy could never do.
+            UiThemeDraw.Label(headerRect, ReadTitle(entry.Spec, ctx), ctx.Theme, ctx.Theme.TextPrimary);
         }
     }
 
-    private static void DrawSurface(Rect rect, Color fill, Color border)
-    {
-        VerseWidgets.DrawBoxSolid(rect, fill);
-        VerseWidgets.DrawBoxSolid(new Rect(rect.x, rect.y, rect.width, 1f), border);
-        VerseWidgets.DrawBoxSolid(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), border);
-        VerseWidgets.DrawBoxSolid(new Rect(rect.x, rect.y, 1f, rect.height), border);
-        VerseWidgets.DrawBoxSolid(new Rect(rect.xMax - 1f, rect.y, 1f, rect.height), border);
-    }
-
-    private static void DrawLabel(Rect rect, string text, Color color, UiWidgetContext ctx)
-    {
-        Color oldColor = GUI.color;
-        GameFont oldFont = Text.Font;
-        try
-        {
-            Text.Font = UiKitFonts.ToGameFont(ctx.Theme.DefaultFont);
-            GUI.color = color;
-            VerseWidgets.Label(rect, text);
-        }
-        finally
-        {
-            Text.Font = oldFont;
-            GUI.color = oldColor;
-        }
-    }
 
     private static string ReadTitle(UiElementSpec spec, UiWidgetContext ctx)
     {

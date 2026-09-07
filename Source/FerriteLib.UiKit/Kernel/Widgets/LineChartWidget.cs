@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
-using VerseWidgets = Verse.Widgets;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
@@ -138,7 +137,7 @@ public sealed class LineChartWidget : IUiWidget
                     ctx.Session.CaptureHotControl(controlId);
                     state.Dragging = true;
                     state.Cursor = i;
-                    Event.current?.Use();
+                    UiNative.ConsumePointerEvent();
                     break;
                 }
             }
@@ -156,7 +155,7 @@ public sealed class LineChartWidget : IUiWidget
                     InvokeChange(state.Cursor, updated, ctx);
                 }
 
-                Event.current?.Use();
+                UiNative.ConsumePointerEvent();
             }
         }
 
@@ -164,7 +163,7 @@ public sealed class LineChartWidget : IUiWidget
         {
             ctx.Session.ReleaseHotControl(controlId);
             state.Dragging = false;
-            Event.current?.Use();
+            UiNative.ConsumePointerEvent();
         }
     }
     private void InvokeChange(int index, Vector2 point, UiWidgetContext ctx)
@@ -244,10 +243,10 @@ public sealed class LineChartWidget : IUiWidget
         for (int i = 1; i <= 3; i++)
         {
             float fx = plotRect.x + plotRect.width * i / 4f;
-            VerseWidgets.DrawBoxSolid(new Rect(fx, plotRect.y, 1f, plotRect.height), theme.Divider);
+            UiThemeDraw.Solid(new Rect(fx, plotRect.y, 1f, plotRect.height), theme.Divider);
 
             float fy = plotRect.y + plotRect.height * i / 4f;
-            VerseWidgets.DrawBoxSolid(new Rect(plotRect.x, fy, plotRect.width, 1f), theme.Divider);
+            UiThemeDraw.Solid(new Rect(plotRect.x, fy, plotRect.width, 1f), theme.Divider);
         }
     }
 
@@ -260,7 +259,7 @@ public sealed class LineChartWidget : IUiWidget
             bool isHovered = i == hovered;
             float size = isHovered ? HoverPointSize : PointSize;
             var pointRect = new Rect(pixel.x - size * 0.5f, pixel.y - size * 0.5f, size, size);
-            VerseWidgets.DrawBoxSolid(pointRect, isHovered ? theme.HoverPoint : theme.AccentGold);
+            UiThemeDraw.Solid(pointRect, isHovered ? theme.HoverPoint : theme.AccentGold);
         }
     }
 
@@ -310,7 +309,7 @@ public sealed class LineChartWidget : IUiWidget
             float t = steps == 1 ? 1f : step / (float)(steps - 1);
             float px = a.x + dx * t;
             float py = a.y + dy * t;
-            VerseWidgets.DrawBoxSolid(new Rect(px, py, 1f, 1f), color);
+            UiThemeDraw.Solid(new Rect(px, py, 1f, 1f), color);
         }
     }
 

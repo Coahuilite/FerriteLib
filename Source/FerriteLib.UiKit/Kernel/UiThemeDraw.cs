@@ -192,7 +192,13 @@ public static class UiThemeDraw
         Label(rect, text, theme, textColor, font ?? UiFont.Tiny, TextAnchor.MiddleCenter, singleLine: true);
     }
 
-    private static void Solid(Rect rect, Color color)
+    /// <summary>
+    /// Paints one axis-aligned solid rect. This is the only fill primitive in the library: widgets that
+    /// need a rule, a glyph cell or a data point call this instead of reaching for
+    /// <c>Verse.Widgets.DrawBoxSolid</c>, which is what keeps the backend-contact allowlist short enough
+    /// to gate (see the harness containment lane).
+    /// </summary>
+    public static void Solid(Rect rect, Color color)
     {
         if (rect.width > 0f && rect.height > 0f)
         {

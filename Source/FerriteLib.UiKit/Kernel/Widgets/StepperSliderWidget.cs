@@ -1,9 +1,6 @@
 using System;
 using System.Globalization;
 using UnityEngine;
-using Verse;
-
-using VerseWidgets = Verse.Widgets;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
@@ -83,7 +80,9 @@ public sealed class StepperSliderWidget : IUiWidget
         string label = ReadLabel(ctx);
         if (label.Length > 0)
         {
-            DrawLabel(new Rect(x, y, LabelWidth, height), label, ctx.Theme.TextPrimary, ctx.Theme.DefaultFont);
+            // Through the theme's text outlet, so this label is covered by the fit audit like every
+            // other string the kernel draws (its private copy was one of the audit's blind spots).
+            UiThemeDraw.Label(new Rect(x, y, LabelWidth, height), label, ctx.Theme, ctx.Theme.TextPrimary);
             x += LabelWidth + Gap;
         }
 
@@ -149,26 +148,10 @@ public sealed class StepperSliderWidget : IUiWidget
 
     private static void DrawButton(Rect rect, string text, UiTheme theme)
     {
-        VerseWidgets.DrawBoxSolid(rect, theme.Raised);
-        DrawLabel(rect, text, theme.TextPrimary, theme.DefaultFont);
+        UiThemeDraw.Solid(rect, theme.Raised);
+        UiThemeDraw.Label(rect, text, theme, theme.TextPrimary, anchor: TextAnchor.MiddleCenter);
     }
 
-    private static void DrawLabel(Rect rect, string text, Color color, UiFont font)
-    {
-        Color oldColor = GUI.color;
-        GameFont oldFont = Text.Font;
-        try
-        {
-            Text.Font = UiKitFonts.ToGameFont(font);
-            GUI.color = color;
-            VerseWidgets.Label(rect, text);
-        }
-        finally
-        {
-            Text.Font = oldFont;
-            GUI.color = oldColor;
-        }
-    }
 
     private float ReadHeight()
     {
