@@ -124,16 +124,24 @@
   payload, because up-to-dateness is judged per-configuration while the output path is shared. The
   packager copies *that path*, so without a forced rebuild it stages the wrong bytes under a
   `version.txt` that still reads dev+sha — indistinguishable downstream, and the staged folder is exactly
-  what a developer picks up for an in-game pass. Fixed by `--no-incremental`, verified end to end: the staged
-  DLL was byte-identical to the payload, with `AssemblyConfigurationAttribute = Release` and
-  `AssemblyInformationalVersion = 0.3.0-dev+<branch tip>`. General rule: **when two configurations share
-  one output path, "the build said it was current" is not evidence about the bytes on disk** — compare the
-  artifact, not the build log. The structural cure is the sibling repos' shape (one configuration, flavor
-  by property, as SR's `SqueakyBuildFlavor`), but switching this csproj to it is a cross-repo change —
-  the consumer's `build-dev.ps1` drives `-c Dev` on this project — so it belongs to a round, not to a
-  packaging cleanup. The same sharing explains a stale `.pdb` beside the payload (Release sets
-  `DebugType=none`, so it neither rewrites nor removes the Dev gate's pdb); the closed set now keeps it
-  out of packages, which is why no strip step is needed for it.
+  what a developer picks up for an in-game pass. `--no-incremental` fixes the freshness half only.
+  **Forcing the rebuild did not make the label true.** Until 2026-09-07 `pack-dev` built `-c Release` while
+  passing `BuildFlavor = 'dev'`, so every dev folder shipped a `version.txt` reading `build=dev` over an
+  assembly stamped `AssemblyConfigurationAttribute = Release` — and because the Dev configuration is where
+  `FER_DEV` lives, the artifact an in-game pass installs had the dev constants compiled out. The consumer's
+  `build-dev.ps1` was building this project with `-c Dev` all along, so the two repos read the same label as
+  opposite bytes. The gate is now on the measurement, not the claim: `stage-package.ps1` reads the
+  configuration attribute out of the payload and refuses a channel whose bytes do not match its name
+  (`dev` requires Dev, `github`/`steam` require Release), and `pack-dev` builds `-c Dev --no-incremental`.
+  Read in a child process — `Assembly.LoadFile` in the packaging session would hold a handle on the shipped
+  DLL, and `MetadataReader` is unavailable on the Store build of PowerShell, whose trimmed
+  `System.Reflection.Metadata` has no `PEReader.GetMetadataReader` (measured 2026-09-07). General rule:
+  **when two configurations share one output path, "the build said it was current" is not evidence about the
+  bytes on disk** — compare the artifact, not the build log, and derive the label from the artifact rather
+  than from a parameter. `FER_DEV` currently gates no source, so this changed no behaviour; it is the check
+  that will catch the day it does. The same sharing explains a stale `.pdb` beside the payload (Release sets
+  `DebugType=none`, so it neither rewrites nor removes the Dev gate's pdb); the closed set keeps it out of
+  packages, which is why no strip step is needed for it.
 - **GitHub policy does not constrain this shape of distribution** (read from `github/site-policy` and
   `github/docs`, 2026-09-05): Releases are documented as packaging software "for other people to download
   and use", with a stated limit of 1000 assets per release, 2 GiB per file, and **"no limit on the total

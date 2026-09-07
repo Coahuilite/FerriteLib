@@ -97,7 +97,10 @@ output to a machine-local layout another developer cannot see, reproduce, or oft
 
 Three channels, one staging engine. `stage-package.ps1` decides what a package *is* — the five allowed
 files, the content probe, the licence copy, `version.txt`, and the closed-set assertion that stops a
-stray `.pdb` or repository-only file riding along. `pack-dev` / `pack-release` / `pack-steam` decide
+stray `.pdb` or repository-only file riding along. It also **measures** the payload's build configuration
+and refuses a channel whose bytes do not match its name (`dev` requires a Dev-configured assembly,
+`github`/`steam` a Release-configured one), so `version.txt`'s `build=` line is derived from the DLL and
+never supplied by the caller. `pack-dev` / `pack-release` / `pack-steam` decide
 identity and nothing else: dev tolerates a dirty tree and says so in its label, github requires the tag
 shape and the build axis, steam additionally requires a clean tree. Only the GitHub channel archives —
 a dev rehearsal and a Workshop upload are folders — which also confines the archive-timestamp problem

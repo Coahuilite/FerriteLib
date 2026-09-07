@@ -26,14 +26,18 @@ $root = [System.IO.Path]::GetFullPath($ProjectRoot)
 $projectFile = Join-Path $root 'Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj'
 $stageDir = Join-Path $root 'dist\dev\FerriteLib'
 
-# Build first, and force it: Dev and Release share one OutputPath (1.6/Assemblies/), so an incremental
-# Release build can report itself up to date against obj\Release while the file at the payload path was
-# written by the Dev gate. Measured 2026-09-07: the payload was a Dev-configuration assembly of 98,304
-# bytes after a full verify-local run, where a forced Release rebuild of the same commit is 91,136.
-# Copying whatever sits there would stage the wrong bytes under a label that still reads dev+sha, so
-# nothing downstream could tell. Determinism makes forcing the rebuild cheap (MEMORY).
-& dotnet build $projectFile -c Release --no-incremental --nologo -v minimal
-if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
+# Build first, and build the flavor this channel is named for. Two things are being forced here:
+#
+# 1. Freshness. Dev and Release share one OutputPath (1.6/Assemblies/), and up-to-dateness is judged
+#    per-configuration, so an incremental build can report itself current while the file at the payload
+#    path was written by the other configuration. Measured 2026-09-07: after a full verify-local run the
+#    payload was a Dev-configuration assembly of 98,304 bytes, where a forced Release rebuild of the same
+#    commit is 91,136. Copying whatever sits there would stage bytes under a label that cannot describe
+#    them. --no-incremental removes the guess.
+# 2. Truth. This folder's version.txt says build=dev, so the assembly must be the Dev configuration.
+#    stage-package.ps1 now reads the stamp out of the DLL instead of taking the caller's word for it.
+& dotnet build $projectFile -c Dev --no-incremental --nologo -v minimal
+if ($LASTEXITCODE -ne 0) { throw 'Dev build failed.' }
 
 # The label comes from the build axis, exactly like the artifact name in pack-release: one source for
 # the number, or the folder and the DLL inside it can disagree.

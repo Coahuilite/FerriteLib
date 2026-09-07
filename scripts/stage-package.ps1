@@ -53,6 +53,39 @@ foreach ($required in @($projectFile, $payloadDll, $aboutXml, $loadFolders, $lic
         throw "Missing packaging input: $required"
     }
 }
+# --- measure the flavor, do not trust the caller's word ------------------------------------------
+# -BuildFlavor is a claim made by whichever packer invoked this engine; the DLL has its own record of
+# which configuration produced it (MSBuild stamps AssemblyConfigurationAttribute from $(Configuration)).
+# Comparing the two is what makes version.txt's `build=` line a measurement. Without it, a channel can
+# label a Release-configured assembly `dev` — which is exactly what this repository's own pack-dev did
+# from 0.2.0 until 2026-09-07, while the consumer's build-dev was compiling the sibling with -c Dev.
+#
+# Read in a child process rather than in this one: the payload is copied moments later and, on the dev
+# path, rebuilt by the next gate — an Assembly.LoadFile here would keep a handle on the shipped DLL for
+# the rest of the session. MetadataReader is not an option either: the Store build of PowerShell ships a
+# trimmed System.Reflection.Metadata whose PEReader has no GetMetadataReader (measured 2026-09-07), and a
+# packaging gate that works only on the maintainer's host is worse than no gate.
+function Get-AssemblyConfiguration {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $env:FERRITELIB_STAMP_TARGET = $Path
+    try {
+        $shell = Join-Path $PSHOME 'pwsh.exe'
+        if (-not (Test-Path -LiteralPath $shell -PathType Leaf)) { $shell = 'pwsh' }
+        $probe = '$a=[System.Reflection.Assembly]::LoadFile($env:FERRITELIB_STAMP_TARGET); foreach ($t in [System.Reflection.CustomAttributeData]::GetCustomAttributes($a)) { if ($t.AttributeType.Name -eq "AssemblyConfigurationAttribute") { $t.ConstructorArguments[0].Value; break } }'
+        $out = @(& $shell -NoProfile -NonInteractive -Command $probe)
+        if ($LASTEXITCODE -ne 0) { throw "Reading the payload's configuration stamp failed (exit $LASTEXITCODE)." }
+        return (@($out | ForEach-Object { "$_".Trim() } | Where-Object { $_ }) -join '')
+    } finally { Remove-Item Env:FERRITELIB_STAMP_TARGET -ErrorAction SilentlyContinue }
+}
+
+$stamp = Get-AssemblyConfiguration -Path $payloadDll
+$expectedStamp = if ($BuildFlavor -eq 'dev') { 'Dev' } else { 'Release' }
+if ([string]::IsNullOrWhiteSpace($stamp)) {
+    throw "Payload has no AssemblyConfigurationAttribute; cannot verify it was built as $expectedStamp."
+}
+if ($stamp -ne $expectedStamp) {
+    throw "Channel '$BuildFlavor' requires a $expectedStamp-configured payload, but $payloadDll reports '$stamp'. Build the matching configuration: pack-dev forces -c Dev --no-incremental, the publish channels build -c Release."
+}
 
 $releaseBase = ($VersionLabel -replace '^v', '') -replace '[-+].*$', ''
 
