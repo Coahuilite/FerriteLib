@@ -2,34 +2,34 @@
 
 ## 0. Open HANDOFF rounds and the round-1 release (branch `feat/round-1-0.3.0`)
 
-- [ ] **FL→US round 2 (2026-09-07) — OPEN, awaiting US's review.** Filed in `HANDOFF.md`: S1 the stager
-      must measure the payload's build configuration instead of accepting a caller-supplied label (FL had
-      this defect and fixed it at `f2f4dd0`; US's version is observable because `US_DEV` gates live
-      diagnostics); S2 the dev archive is shaped wrong and US's own CI comment already documents why;
-      S3 five places guard one fact about Workshop identity; S4 two archive writers, two name schemes, one
-      non-reproducible digest; S5 US's carrier gate checks existence only, and FL's S1 fix now makes the
-      sibling's configuration vary; S6 `US_STEAM` gates code no build axis defines. Report-and-wait: FL
-      edits nothing in US. On US's verdict, file accepted items as work packages here and in US's TODO, then
-      close the body.
+
+- [ ] **US→FL round 3 (2026-09-08) — SCHEDULED.** Filed as "round 2", renumbered to 3 under the
+      global-counter rule. Verdicts (buffer, `996a6bc`-verified): N1+N2 accepted as ONE 0.4.0 package
+      (filed in §3), N3 closed as verdict (b) with `input/stepper-slider` queued in §3's
+      delete-or-reshape consequence. 0.3.0 stays frozen as scoped. US consumed the verdicts same-day
+      and its own TODO now bans new pixel thresholds pre-0.4.0 — first round where the review bound
+      the consumer as tightly as the library. Pointer lives until the round closes on the 0.4.0 ship.
 
 Round 1 is SCHEDULED and, on this branch, implemented: P1–P6 (P3 landed here rather than slipping to
 0.3.x — it is session-scoped, provenance-cited and lane-tested, and holding it back would cost US the
 lockstep migration) plus FL-side items A–E, on the 0.3.0 contract axis. What is left is release work,
 not design work.
 
-- [ ] **Ship 0.3.0 in lockstep with US's migration commit — maintainer decision, never a session's.**
-      US currently asserts `[0.2.0, 0.3.0)`, so a 0.3.0 carrier against an unmigrated US is a readable
-      prerequisite notice by design — correct, but player-visible. Tag dialect: `v0.3.0-rc1` at the
-      then-tip, bare tag only on the commit that ends the trial (`MEMORY.md`, publication state).
-- [ ] **Cross-repo follow-through — report, do not edit** (`AGENTS.md` Boundaries):
-      US's migration commit owns flipping its four raw `Mouse.IsOver` sites onto `UiNative.IsMouseOver`,
-      re-expressing its settings window as a `UiWindowHost`, moving its grace machine onto
-      `Session.BeginHoverClaimFrame/ClaimHover/HoverClaim`, adopting `UiBindings.ActiveTabKey`, and
-      raising `PrerequisiteApiMin/Max` to `[0.3.0, 0.4.0)`. Its `release.yml` still lacks the
-      lib-release link (`§5`) and its two workflows still say `Coahuilite/ferritelib`. Report the new
-      surface with the deletion paths, not as a wish list.
-- [ ] **US's boundary gate may adopt containment rule (c)** from `tools/dependency-reality.ps1`; FL owns
-      the rule text and the tool, so a consumer that restates the rules must point here instead.
+- [ ] **Ship 0.3.0 — the last gate is the maintainer's trial decision, nothing else.** US's migration
+      commit landed (`7777cbe`, gate re-verified by FL read-only: pin `[0.3.0,0.4.0)` at `Mod.cs:27-28`,
+      thin `UiWindowHost`, zero raw hovers, gate 14 green), so the lockstep precondition round 1 set is
+      **met**. Tag dialect unchanged: `v0.3.0-rc1` at the then-tip, bare tag only on the commit that
+      ends the trial (`MEMORY.md`, publication state). Merging `feat/round-1-0.3.0` into `main` and the
+      tag itself are both maintainer actions, never a session's.
+- [ ] **Cross-repo follow-through — report, do not edit** (`AGENTS.md` Boundaries). Remaining after
+      `7777cbe`: (a) CLOSED by re-derivation 2026-09-08 — the phantom `UiPanel` is resolved at source:
+      US's scan now lists six names including `UiPanel`
+      (`UiSourceInvariantTests.cs:153`, commented as the round-2 fix), and its MEMORY's two prose hits
+      describe that list accurately. The same re-derivation that closed it nearly missed it the other
+      way: the scan lives in `tools/`, not in `scripts/*.ps1`, so a scripts-only grep reports "no scan
+      at all". See `MEMORY.md` enduring corrections; (b) its release body gains the lib-release link
+      only once this repo publishes a 0.3.0 asset — blocked by the bullet above, not by US. Full
+      ledger: buffer's standing annex.
 
 ## 1. In-game verification — status after the 2026-09-07 round-1 branch
 
@@ -114,6 +114,21 @@ round-1 surface introduced; every one of the five only changes code if it surpri
 ## 3. Retained-mode roadmap (this library's own, after the split is proven)
 
 Each item is expected to delete a workaround, not add a layer.
+- [ ] **0.4.0 responsiveness package (US→FL round 3, N1+N2 — one package, both or neither).** In the
+      `Resolve*` region: `Width="Auto"` on Row/Column children resolves to **text-natural width** —
+      `ITextMetrics.MeasureWidth` over the child's declared label set (named by the kind's attribute
+      schema), capped by the budget after fixed siblings; `Min`/`Max` clamp the distribution; the
+      equal-split fallback stays byte-identical (nav 192 / help 232 remain fixed). General widget
+      natural-size measurement is deferred until a second citation. One container-level `Breakpoint`
+      (single numeric against the container's own inner width) selects declared `Cols`/`Hidden`/
+      direction variants — closing the `02:44` deliverable and the `04:105` acceptance row US's own
+      contract docs already promised; no expression language (`01:29` red line). Acceptance: harness
+      lanes on `StubTextWidth` drive a narrow→wide re-arrange without window reopen and a positive
+      control proving an Auto column tracks the stubbed glyph width; manifest docs carry the
+      `ContentRevision` coupling of auto widths. Attached consequence (N3 verdict (b)):
+      `input/stepper-slider` stays zero-consumption, so this package's landing triggers its
+      delete-or-reshape decision — reshape only as the N1 mechanism proving itself, never as a longer
+      attribute list.
 
 - [ ] **Element/identity layer.** Today widget instances are keyed by *path*, the tree is carried as a
       flat list plus `SubtreeCount` index arithmetic, and components hold no state. Introduce a real
@@ -366,7 +381,10 @@ these are the follow-throughs.
 - [x] Consumer banned-substring list corrected to five names; the phantom `UiPanel` still sits in the
       consumer's own `MEMORY.md:81` prose and will travel back into this repo from there unless fixed at
       source. Worth a one-line correction over the fence next time that repo is open (its docs, not its
-      code).
+      code). RESOLVED at source 2026-09-08: US added `UiPanel` to the scan
+      (`UiSourceInvariantTests.cs:153`) rather than deleting it from the rule; the list is now six and
+      the prose is accurate. Re-derived, not re-trusted — the earlier "re-verified" claim was itself
+      wrong in the other direction, for the same reason this bullet exists.
 - [ ] **Standing rule, once this repo has a Workshop page:** a gate's *capability* is whatever its script
       does, and the only way to keep prose honest is to name the file and line range when claiming one.
       "Gate 6 rejects divergence from a consumer's copy" survived one full revision cycle because it read

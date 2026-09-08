@@ -83,8 +83,8 @@
   `pack-dev.ps1:45` derives the artifact name and `version.txt` from. The 0.2.0 move updated the first two
   and left the third at 0.1.0, so seven gates stayed green while the packaging script was preparing a zip
   labelled 0.1.0 around a 0.2.0 DLL. FerriteLibVersionTests now asserts all three agree
-  ("Build axis in the csproj matches the other two axes", 66 named assertions total as of `382e862` + this
-  change), and the assertion is **mutation-proven in one direction only**: reverting `<VersionPrefix>` to
+  ("Build axis in the csproj matches the other two axes"; the harness holds 71 named assertions as of
+  2026-09-08 — re-derive with `grep -c 'Run("' tools/FerriteLib.UiKit.Tests/*Tests.cs`, never quote), and the assertion is **mutation-proven in one direction only**: reverting `<VersionPrefix>` to
   0.1.0 fails exactly that one assertion and nothing else. The reverse case - a future axis living in a
   fourth file - is guarded by no test, because no such file exists yet.
 - **A release asset must be built after the gates run, not during them.** The Dev and Release build
@@ -275,7 +275,7 @@
   ever called it would stop compiling against the payload while every gate here stayed green. Neither is
   visible to a gate in this repo; both are exactly the shape `TODO.md` §3's "give the harness `Stubs/**`
   a local guard" item exists to catch, and that item is now load-bearing rather than tidy.
-- **FL→US round 2 (2026-09-07) is OPEN in `HANDOFF.md`, and it started as a confession.** Gathering
+- **FL→US round 2 (2026-09-07) — CLOSED, and it started as a confession.** Gathering
   packaging evidence to offer the consumer, FL's own `pack-dev` was found asserting `build=dev` over a
   Release-configured assembly — the rule under S1 below was broken here first (fixed `f2f4dd0`). Six items
   are on US, all cited to `file:line`, none edited: S1 measure the payload's configuration instead of
@@ -288,7 +288,31 @@
   writers with two naming schemes and a CI digest no second run reproduces; S5 US's carrier "gate" only
   tests existence — `Invoke-Check`'s second parameter is a display string — and FL's S1 fix is what makes
   that visible, since the sibling path now legitimately holds Dev bytes; S6 `US_STEAM` gates two source
-  sites that no configuration, workflow, or script in US defines.
+  sites that no configuration, workflow, or script in US defines. Closed 2026-09-08: US executed
+  same-day (`1a8dd51`), re-reviewed by fresh reproduction rather than self-report (negative-control
+  refusal, byte-identical double-pack digest, dev-carrier gate-red-then-green, final 14/14), and FL
+  verified the disposition by running US's gate 14 read-only — zero raw hovers, exactly two
+  rule-backed exemptions, scanner self-test armed.
+- **US→FL round 3 (2026-09-08, filed as "round 2" and renumbered — the round counter is now explicitly
+  global across directions, next-unused at filing, later filer yields) is REVIEWED with the first
+  consumer-cited engine shortfall.** N1/N2 accepted as one 0.4.0 package: `Width="Auto"` resolves to
+  text-natural width via `ITextMetrics.MeasureWidth` (the seam that has always said "content-driven
+  column widths need a width budget" while the engine never called it), capped after fixed siblings,
+  `Min`/`Max` clamps, equal-split fallback intact; plus one container-level `Breakpoint` — together
+  closing the "有限 responsive vocabulary" deliverable (`02:44`) and its acceptance row (`04:105`) that
+  the rebuild contract shipped as a promise and not as code. N3 verdict (b): layered editing stays
+  consumer-side; `input/stepper-slider`, still zero-consumption, enters the unproven-is-debt queue
+  and any reshape must be N1's mechanism, not new attributes. Recorded with approval: this is the
+  filing template — both-sides-recomputable provenance (the 4 px degenerate interval recomputed here
+  and confirmed), boundary-first, explicit not-asked list, and the consumer's own unblocked plan.
+  SCHEDULED 2026-09-08: the package is filed in `TODO.md` §3, the buffer header reads SCHEDULED, and US
+  consumed the verdicts the same day — its own TODO now forbids new pixel thresholds before 0.4.0, and
+  its independently found mood-default bottom-layer defect (`CreateDefault` not identity vs a 1/1/One
+  view-model seed) corroborates the N3(b) verdict from the consumer side: layered-override semantics
+  really were not a core widget's job. Separately verified this pass: US's migration commit `7777cbe`
+  landed and honors round-1 P2 condition (a) from the outside (size policy kept as a provider, shell
+  thin, pin `[0.3.0, 0.4.0)`) — with it, the last code-side precondition of the 0.3.0 release is met
+  and only the maintainer's trial decision remains gated.
 - **The Store build of PowerShell ships a trimmed `System.Reflection.Metadata`: `PEReader` has no
   `GetMetadataReader` (measured 2026-09-07, `Microsoft.PowerShell_7.6.5` Appx).** Any packaging or gate
   code that reads assembly attributes must therefore either go through `Assembly.LoadFile` in a **child
@@ -396,9 +420,10 @@ an edge case can be judged without re-running the audit that produced them.
   proof that speculative coverage misses. What the library can own is identity, state, invalidation,
   recovery, and the audit surface. A bespoke kind inside a manifest page feeds all of those; a raw
   call replacing even a correct library kind feeds none. Baseline was 5 raw sites across both trees
-  (2026-09-07); FL's own one (`UiNative.IsFocusLost`) is gone and FL's remainder is gated, so the
-  count standing today is **US's 4**, measured in its tree, not claimed from this one. Target: 0
-  outside registered exemptions, the first registered exemption being world-space rendering
+  (2026-09-07); today the count is **zero** outside registered exemptions: FL's own leak
+  (`UiNative.IsFocusLost`) is gone and the funnel is containment-gated, while US's four flipped with
+  its 0.3.0 migration — FL verified by a read-only live run of US's gate 14 (2026-09-08). The one
+  registered exemption left is world-space rendering
   (`GenMapUI` class of calls — no session, no hit-test, permanent by ruling). The count is what the
   consumer's gate should report against `tools/dependency-reality.ps1` rule (c); this repo cannot
   measure it without depending on a consumer tree, which is the vacuous-guard shape already recorded
@@ -583,12 +608,15 @@ colour token currently feeds layout — it is a future-regression guard, not pre
   1 / 3), harness 13 files / 4,152 lines / 63 named assertions, stub sources 4 files / 672 lines in 4
   assemblies. **These move within hours, not days** - two landed while this bullet was being written.
   Treat them as a snapshot of a command, never as a fact to quote.
-- **The consumer's banned-substring list is five names, not six.** `UiSourceInvariantTests` forbids
-  `UiInteract`, `Palette`, `SurfaceFrame`, `UiText`, `UiValueStore`
-  (`../UniversalSqueaker/tools/UniversalSqueakerUiLogicTests/UiSourceInvariantTests.cs:103`). `UiPanel`
-  appears in prose in both repos and in no source list anywhere. The error is in the safe direction - it
-  over-bans, never under-bans - but it sends a session hunting for a rule that does not exist, and the
-  phantom still lives in the consumer's own `MEMORY.md`.
+- **The consumer's banned-substring list is six names, enforced by a C# invariant test — not by any
+  `scripts/*.ps1` gate.** `UiSourceInvariantTests` forbids `UiInteract`, `Palette`, `SurfaceFrame`,
+  `UiText`, `UiValueStore`, `UiPanel`
+  (`../UniversalSqueaker/tools/UniversalSqueakerUiLogicTests/UiSourceInvariantTests.cs:153`, as of
+  2026-09-08). Two traps live here. First, a cross-repo re-check that greps the consumer's `scripts/`
+  finds "no scan at all" and concludes the rule is a phantom — the gate is a test project, so the check
+  must target `tools/`. Second, `UiPanel` used to be prose-only (five names scanned, six claimed); after
+  FL→US round 2 reported it, US added it to the list rather than deleting it from the rule, so the scan
+  and the memory now agree at six. The phantom is resolved at source; do not re-report it.
 - **Documentation describes a moment, not a state.** A commit anchor in a prose doc rots the next time
   code lands; during this tidy the tree moved `958ac7d → 4dd97bf → 632a9a3 → a05fddf → 12dacb4` in about
   thirty minutes, retiring a "measured at <sha>" claim twice. Prefer a re-derivable command and a date
