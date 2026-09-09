@@ -3,8 +3,9 @@
 ## Current durable state
 
 - Repository split out of the Universal Squeaker tree on 2026-09-03. FerriteLib is a prerequisite mod,
-  `coahuilite.ferritelib`, display name FerriteLib, `modVersion` 0.2.0. **Published 2026-09-07 in the
-  rc-only window:** GitHub repo `Coahuilite/FerriteLib` (public), sole release `v0.2.0-rc1` (prerelease),
+  `coahuilite.ferritelib`, display name FerriteLib; its release axis `<modVersion>` is **0.3.0 in the
+  tree** (round 1 moved all three axes, `0daf06e` — re-derive, never quote). **Published 2026-09-07 in
+  the rc-only window:** GitHub repo `Coahuilite/FerriteLib` (public), sole release `v0.2.0-rc1`,
   its platform digest matched a local pack byte-for-byte; `/releases/latest` 404s, which is the correct
   state while only rc iterations exist. A bare `v0.2.0` was tagged the same day and **withdrawn the same
   day by maintainer ruling** - cutting the stable tag was outside the push authorization: the rc scheme
@@ -54,6 +55,23 @@
   window stack, the two text paths that just came into the fit audit, and an engine-side recovery trip.
   Everything else in this file remains compile-time, stub-harness or reference-assembly evidence — say so
   rather than implying a game run.
+- **Text fit: the harness measures a model, not a font.** There are two rulers and only one of them is
+  assertable. The production one is `VerseFerriteTextMetrics` — `Text.CalcSize` / `Text.CalcHeight` under
+  an explicit save/restore of `Text.Font`, `Text.Anchor` and `Text.WordWrap`, with `WordWrap = false` on
+  the width path because wrapping caps the reported width and hides exactly the overflow the caller is
+  looking for. The harness one is `StubTextWidth.Of`: `units × em × 0.5`, where `units` counts 2 for a
+  character in the CJK/full-width ranges and 1 otherwise and `em` is 12/16/18 by `UiFont` — a **linear
+  function of character count with a single script split**. Whatever Verse returns for a real font
+  asset, the stub does not model it, so any agreement between a lane number and an in-game width is
+  coincidence rather than evidence. What the lanes can therefore prove: that `Width="Auto"` consults a
+  width budget, tracks the widest of the kind's declared label set, respects the `MinWidth`/`MaxWidth`
+  clamp, and re-arranges when a `Breakpoint` threshold is crossed. What they cannot prove: that an Auto
+  column actually hugs a translated string, or that a measured interval is degenerate, in game — which
+  is why `TODO.md` §1 is the critical path and not the backlog. The round-3 "CJK-vs-Latin glyph positive
+  control" is a control on the **model**, not a measurement of the game's font; do not cite it as
+  in-game geometry. Re-derive both rulers from
+  `Source/FerriteLib.UiKit/Kernel/VerseFerriteTextMetrics.cs` and `tools/FerriteLib.UiKit.Tests/StubTextWidth.cs`
+  instead of from this paragraph.
 - **Two hard rules inherited from the series, both easy to violate by accident.** Nothing in this library
   may persist data into a save - a prerequisite must survive being uninstalled, and a save-written flag is
   the one side effect a player cannot undo. And `../squeaky_ratkin` is never written: SR is a separate
@@ -319,9 +337,12 @@
   listed it** — the N1 defect had a library-side twin: a manifest could not size a stepper-slider column
   at all; (3) `Narrow`/`NarrowCols`/`NarrowHidden` are rejected without a governing `Breakpoint`
   (self/parent) because a narrow-state attribute under no threshold is the silent no-op the creation
-  contract exists to stop. SCHEDULED→CLOSED 2026-09-09: package implemented and lane-proven (289
-  harness assertions incl. the narrow→wide re-arrange on one engine, the CJK-vs-Latin glyph positive
-  control, and seven creation-time refusals); permanent record is this bullet plus the manifest contract
+  contract exists to stop. SCHEDULED→CLOSED 2026-09-09: package implemented and lane-proven — **289
+  assertion results at run time** (re-derive: `dotnet run --project tools/FerriteLib.UiKit.Tests -c Release
+  --nologo | grep -c '^  ok:'`; distinct from the 80 *named lanes*, which is a source count — a count
+  without its predicate is not a measurement), including the narrow→wide re-arrange on one engine, the
+  CJK-vs-Latin glyph positive control (a control on the stub's model, see "Text fit"), and seven
+  creation-time refusals; permanent record is this bullet plus the manifest contract
   doc; US's migration `7777cbe` and the maintainer's trial decision remain the only gates on the ship.
 - **The Store build of PowerShell ships a trimmed `System.Reflection.Metadata`: `PEReader` has no
   `GetMetadataReader` (measured 2026-09-07, `Microsoft.PowerShell_7.6.5` Appx).** Any packaging or gate
@@ -439,9 +460,17 @@ an edge case can be judged without re-running the audit that produced them.
   measure it without depending on a consumer tree, which is the vacuous-guard shape already recorded
   twice in the neutrality lane.
 - **Why exemptions carry rent.** An allowlist without a named closing item drifts back into permanent
-  undocumented self-implementation; the live specimen is US's diagnostics panel — 704 lines of
-  hand-rolled immediate UI borrowing only the theme vocabulary. Written ruling + capability gap + TODO
-  reference turns each bypass into debt with a due date instead of a precedent.
+  undocumented self-implementation; the live specimen is US's diagnostics panel — 703 lines of
+  hand-rolled immediate UI borrowing only the theme vocabulary
+  (`../UniversalSqueaker/Source/UniversalSqueaker/Diagnostics/SqueakDiagnosticsPanel.cs`; re-derive with
+  `wc -l`, never quote). Written ruling + capability gap + TODO reference turns each bypass into debt
+  with a due date instead of a precedent. **The due date is now dated by the consumer, not by us:** US
+  opened the migration of this panel onto `UiWindowHost` + `UiHost` in its own buffer on 2026-09-09
+  (§1, "devpanel"), stating that the shell surface it measured is sufficient and it asks FL for nothing
+  — so it is not a round and takes no number, and the round-4 slot stays unused. Two things follow when
+  it lands: US's gate 14 whitelist goes 2 → 1 (re-derive from its `scripts/ui-boundary-audit.ps1`), and
+  this bullet must be re-derived, because its specimen will no longer exist. If the migration instead
+  turns up a shell-level defect, that is the event that opens FL round 4.
 - **Promotion-gate provenance, by item.** P1 (hover primitive), P2 (window shell), P3 (hover-claim
   machine) each cite consumer code that was forced to hand-roll them — that is the provenance test
   passing. The P2 ruling that US's 60–75 % / 800×600 clamp is consumer policy (size arrives as a
@@ -631,6 +660,17 @@ colour token currently feeds layout — it is a future-regression guard, not pre
   code lands; during this tidy the tree moved `958ac7d → 4dd97bf → 632a9a3 → a05fddf → 12dacb4` in about
   thirty minutes, retiring a "measured at <sha>" claim twice. Prefer a re-derivable command and a date
   over an anchor nobody re-checks.
+- **A report-only item with no delivery channel is not queued, it is lost.** The reclassification of the
+  round-3 package from 0.4.0 to 0.3.0 was recorded here and in the buffer annex with the instruction that
+  US's docs "should re-point when that repo is next open". US then rewrote its own `TODO.md` and
+  `HANDOFF.md` on 2026-09-09, and its three "0.4.0 package" lines (`TODO.md:9,46,60`) plus its summary of
+  FL's round-3 state (`HANDOFF.md:5`, "REVIEWED, pending scheduling") survived that rewrite unchanged.
+  A sibling session does not read our buffer, and a buffer rewrite is precisely the moment when stale
+  cross-repo status is *not* consulted. So an outstanding ledger item must be handed to the user for
+  delivery at the next FL session, not parked on the sibling's own diligence.
+- **A ref pair rots like a SHA anchor.** "`0.3.x` and `main` both at `19cfdcc`" was true for hours. Say
+  the predicate instead and let it be re-checked: `git diff --name-only main 0.3.x` returning only `.md`
+  paths is what "the tested bytes and the shipped bytes are one tree" means.
 - **A green pre-push privacy scan says nothing about the identity a remote merge button will stamp.**
   The 2026-09-07 scan passed at the pushed tip; the 2026-09-09 PR #1 merge added one commit whose
   author is the clicker's display name (`Fe <…@users.noreply…>`), GitHub itself as committer, and the

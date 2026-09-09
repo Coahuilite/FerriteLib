@@ -1,6 +1,6 @@
 # TODO
 
-## 0. Open HANDOFF rounds and the round-1 release (branch `0.3.x`)
+## 0. No open HANDOFF rounds; the round-1 release and the outstanding cross-repo reports (branch `0.3.x`)
 
 - [x] **US→FL round 3 (2026-09-08) — CLOSED, implemented 2026-09-09.** Filed as "round 2", renumbered
       to 3 under the global-counter rule. Verdicts (buffer, `996a6bc`-verified): N1+N2 accepted as ONE
@@ -9,7 +9,9 @@
       evidence-forced deviations (MinWidth/MaxWidth not Min/Max — value-range collision; Width joins
       the common widget attributes — the engine read it while no schema allowed it; narrow-state
       attributes refused without a governing Breakpoint) — all three in `MEMORY.md` round-3 entry,
-      which is also the permanent record. US's own docs still say 0.4.0; report, never edit (annex).
+      which is also the permanent record. US's own docs still say 0.4.0 and still date this round as
+      pending scheduling: report, never edit, and hand it over at the next FL session rather than
+      waiting for the sibling to notice (see the bullet below and `MEMORY.md`).
       The pointer retires with this check: nothing from round 3 stays open on the FL side.
 
 Round 1 is SCHEDULED and, on this branch, implemented: P1–P6 (P3 landed here rather than slipping to
@@ -32,19 +34,27 @@ not design work.
       describe that list accurately. The same re-derivation that closed it nearly missed it the other
       way: the scan lives in `tools/`, not in `scripts/*.ps1`, so a scripts-only grep reports "no scan
       at all". See `MEMORY.md` enduring corrections; (b) its release body gains the lib-release link
-      only once this repo publishes a 0.3.0 asset — blocked by the bullet above, not by US. Full
-      ledger: buffer's standing annex.
+      only once this repo publishes a 0.3.0 asset — blocked by the bullet above, not by US; (c) **added
+      2026-09-09 after a live re-derivation of both trees**: US's docs now lag FL's round-3 state in two
+      ways — its `HANDOFF.md:5` still labels the round "REVIEWED, pending scheduling" although FL closed
+      and implemented it (PR #1 merged, so `main` carries the round-3 surface), and `TODO.md:9,46,60`
+      pair that stale status with the withdrawn "0.4.0 package" label. This one is *handed over*, not
+      parked: US rewrote its own buffer and TODO the same day the refile was recorded and neither line
+      moved, which is the lesson now in `MEMORY.md` ("A report-only item with no delivery channel is not
+      queued, it is lost"). Full ledger: buffer's standing annex.
 
 ## 1. In-game verification — the round-3 package makes this the next thing to do (2026-09-09)
 
 - [ ] **GO TO THE GAME SOON. This section is now the critical path, not the backlog.** The merge of
       PR #1 put the first geometry-changing surface in front of a game: Auto columns size from
       measured glyph advance, and `Breakpoint`/`Narrow`/`Cols`/`NarrowHidden` re-arrange live on
-      width. The harness proves them against `StubTextWidth`'s linear model — real Verse glyph
-      advance is not linear and exists only in game (`MEMORY.md`, "Text fit"), so every lane here
-      is a future-regression guard, not a mutation proof of in-game geometry. The branch sync
-      (2026-09-09: `0.3.x` ff'd to the merge commit, both refs at `19cfdcc`) means the shipped
-      bytes and the tested bytes are one tree. Procedure: `verify-local.ps1 -PackDev`, place
+      width. The harness proves them against `StubTextWidth`'s linear character-count model, which is not
+      the game's ruler (`MEMORY.md`, "Text fit: the harness measures a model, not a font"), so every lane
+      here is a future-regression guard and not a mutation proof of in-game geometry. The branch sync of
+      2026-09-09 ff'd `0.3.x` to the PR #1 merge; `0.3.x` has carried docs-only commits since, so the
+      check is a predicate and not a SHA pair:
+      `git diff --name-only main 0.3.x` must return `.md` files only, and that is what "the tested bytes
+      and the shipped bytes are one tree" means. Procedure: `verify-local.ps1 -PackDev`, place
       `dist/dev/FerriteLib/` plus US's migrated build into your own `Mods/` by hand (never a
       script, never a link — Boundaries), then check: factor labels hug their translated names at
       both extremes of the mood card, no degenerate slider interval survives US's threshold
