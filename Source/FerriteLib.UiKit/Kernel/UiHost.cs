@@ -151,21 +151,27 @@ public sealed class UiHost : IDisposable
     {
         foreach (UiElementSpec root in manifest.Roots)
         {
-            ValidateElement(root, root.Id.Length > 0 ? root.Id : root.Kind);
+            ValidateElement(root, root.Id.Length > 0 ? root.Id : root.Kind, parentNarrowCapable: false);
         }
     }
 
+    // Layout vocabulary belongs to the tree, not to the kind: Width/MinWidth/MaxWidth and the
+    // narrow-state visibility variant are read by the engine for every child, so they are allowed
+    // on widgets too. Before round 3 this was a live defect: ResolveColumnWidths already read
+    // Width on any child, yet no core kind's schema listed it — a manifest could not size a
+    // stepper-slider column at all (US->FL round 3, N1's library-side specimen).
     private static readonly HashSet<string> CommonWidgetAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Id", "Kind", "Hidden", "Tab"
+        "Id", "Kind", "Hidden", "Tab", "Width", "MinWidth", "MaxWidth", "NarrowHidden"
     };
 
     private static readonly HashSet<string> ContainerAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Width", "Fill"
+        "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Width", "Fill",
+        "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden"
     };
 
-    private void ValidateElement(UiElementSpec spec, string path)
+    private void ValidateElement(UiElementSpec spec, string path, bool parentNarrowCapable)
     {
         bool isWidget = string.Equals(spec.Kind, "Widget", StringComparison.Ordinal)
             || !IsContainerKind(spec.Kind);
@@ -210,10 +216,146 @@ public sealed class UiHost : IDisposable
             ValidateAttributes(spec, path, isContainer: true);
         }
 
+        bool selfNarrowCapable = spec.TryGetAttribute("Breakpoint", out _);
+        ValidateLayoutAttributes(spec, path, isContainer: !isWidget, selfNarrowCapable, parentNarrowCapable);
+
         foreach (UiElementSpec child in spec.Children)
         {
             string childPath = path + "/" + (child.Id.Length > 0 ? child.Id : child.Kind);
-            ValidateElement(child, childPath);
+            ValidateElement(child, childPath, selfNarrowCapable);
+        }
+    }
+
+    /// <summary>
+    /// Creation-time grammar for the responsive vocabulary (US->FL round 3, N1+N2). The engine
+    /// degrades malformed values to "not declared" so a programmatically built spec cannot crash a
+    /// frame; a MANIFEST that ships them is a contract error, caught here where the element, the
+    /// attribute and the path are all still known.
+    /// </summary>
+    private void ValidateLayoutAttributes(
+        UiElementSpec spec, string path, bool isContainer, bool selfNarrowCapable, bool parentNarrowCapable)
+    {
+        if (spec.TryGetAttribute("Width", out string widthRaw))
+        {
+            string width = widthRaw.Trim();
+            bool auto = string.Equals(width, "Auto", StringComparison.OrdinalIgnoreCase);
+            if (!auto && (!float.TryParse(width, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out float parsed) || parsed <= 0f))
+            {
+                throw new UiContractException(
+                    $"Element id=\"{spec.Id}\" at '{path}' has invalid Width '{widthRaw}'; expected a positive number or Auto.",
+                    source, spec.Id, spec.Kind, path);
+            }
+        }
+
+        ValidatePositiveNumber(spec, path, "MinWidth");
+        ValidatePositiveNumber(spec, path, "MaxWidth");
+        if (spec.TryGetAttribute("MinWidth", out string minRaw)
+            && spec.TryGetAttribute("MaxWidth", out string maxRaw)
+            && float.TryParse(minRaw.Trim(), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float minW)
+            && float.TryParse(maxRaw.Trim(), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float maxW)
+            && minW > maxW)
+        {
+            throw new UiContractException(
+                $"Element id=\"{spec.Id}\" at '{path}' declares MinWidth {minRaw} above MaxWidth {maxRaw}.",
+                source, spec.Id, spec.Kind, path);
+        }
+
+        // A narrow-state attribute under no Breakpoint is the silent no-op this library's creation
+        // contract exists to stop: the author believes they declared a variant that can never fire.
+        if (spec.TryGetAttribute("NarrowHidden", out _) && !parentNarrowCapable)
+        {
+            throw new UiContractException(
+                $"Element id=\"{spec.Id}\" at '{path}' declares NarrowHidden but its parent carries no Breakpoint; nothing can ever make it narrow.",
+                source, spec.Id, spec.Kind, path);
+        }
+
+        if (!isContainer)
+        {
+            foreach (string containerOnly in new[] { "Breakpoint", "Narrow", "Cols", "NarrowCols" })
+            {
+                if (spec.TryGetAttribute(containerOnly, out _))
+                {
+                    throw new UiContractException(
+                        $"'{containerOnly}' at '{path}' is container vocabulary; the engine never reads it on a widget.",
+                        source, spec.Id, spec.Kind, path);
+                }
+            }
+
+            return;
+        }
+
+        ValidatePositiveNumber(spec, path, "Breakpoint");
+        ValidatePositiveInteger(spec, path, "Cols");
+        ValidatePositiveInteger(spec, path, "NarrowCols");
+
+        if (spec.TryGetAttribute("Narrow", out string narrowRaw) && !selfNarrowCapable)
+        {
+            throw new UiContractException(
+                $"Container id=\"{spec.Id}\" at '{path}' declares Narrow but carries no Breakpoint; the variant could never be selected.",
+                source, spec.Id, spec.Kind, path);
+        }
+
+        if (spec.TryGetAttribute("Narrow", out narrowRaw))
+        {
+            string narrow = narrowRaw.Trim();
+            bool rowBecomesStacked = string.Equals(spec.Kind, "Row", StringComparison.Ordinal)
+                && (string.Equals(narrow, "Column", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(narrow, "Stack", StringComparison.OrdinalIgnoreCase));
+            bool stackBecomesRow = (string.Equals(spec.Kind, "Column", StringComparison.Ordinal)
+                    || string.Equals(spec.Kind, "Stack", StringComparison.Ordinal)
+                    || string.Equals(spec.Kind, "Section", StringComparison.Ordinal)
+                    || string.Equals(spec.Kind, "Surface", StringComparison.Ordinal))
+                && string.Equals(narrow, "Row", StringComparison.OrdinalIgnoreCase);
+            if (!rowBecomesStacked && !stackBecomesRow)
+            {
+                throw new UiContractException(
+                    $"Container id=\"{spec.Id}\" at '{path}' declares Narrow '{narrowRaw}'; only Row may name Column/Stack and only a vertical stack may name Row.",
+                    source, spec.Id, spec.Kind, path);
+            }
+        }
+
+        if (spec.TryGetAttribute("NarrowCols", out _))
+        {
+            if (!spec.TryGetAttribute("Cols", out _))
+            {
+                throw new UiContractException(
+                    $"Wrap id=\"{spec.Id}\" at '{path}' declares NarrowCols without Cols; the narrow variant needs the wide value to select between.",
+                    source, spec.Id, spec.Kind, path);
+            }
+
+            if (!selfNarrowCapable)
+            {
+                throw new UiContractException(
+                    $"Wrap id=\"{spec.Id}\" at '{path}' declares NarrowCols but carries no Breakpoint; nothing can ever make it narrow.",
+                    source, spec.Id, spec.Kind, path);
+            }
+        }
+    }
+
+    private void ValidatePositiveNumber(UiElementSpec spec, string path, string attribute)
+    {
+        if (!spec.TryGetAttribute(attribute, out string raw)) return;
+        if (!float.TryParse(raw.Trim(), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float value) || value <= 0f)
+        {
+            throw new UiContractException(
+                $"Element id=\"{spec.Id}\" at '{path}' has invalid {attribute} '{raw}'; expected a positive number.",
+                source, spec.Id, spec.Kind, path);
+        }
+    }
+
+    private void ValidatePositiveInteger(UiElementSpec spec, string path, string attribute)
+    {
+        if (!spec.TryGetAttribute(attribute, out string raw)) return;
+        if (!int.TryParse(raw.Trim(), System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out int value) || value <= 0)
+        {
+            throw new UiContractException(
+                $"Element id=\"{spec.Id}\" at '{path}' has invalid {attribute} '{raw}'; expected a positive integer.",
+                source, spec.Id, spec.Kind, path);
         }
     }
 

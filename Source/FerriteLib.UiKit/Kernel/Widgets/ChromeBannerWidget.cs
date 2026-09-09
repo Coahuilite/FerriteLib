@@ -25,7 +25,8 @@ public sealed class ChromeBannerWidget : IUiWidget
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new ChromeBannerWidget(),
-            new[] { "Id", "Kind", "Bind", "Text", "TextKey", "Height", "Tab", "Hidden" });
+            new[] { "Id", "Kind", "Bind", "Text", "TextKey", "Height", "Tab", "Hidden" },
+            new[] { "Text", "TextKey" });
     }
 
     public void Configure(UiElementSpec spec)

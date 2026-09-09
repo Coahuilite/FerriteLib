@@ -35,7 +35,8 @@ public sealed class DropdownWidget : IUiWidget
                 "Option5", "Value5", "Option6", "Value6", "Option7", "Value7", "Option8", "Value8",
                 "Option9", "Value9", "Option10", "Value10", "Option11", "Value11", "Option12", "Value12",
                 "Option13", "Value13", "Option14", "Value14", "Option15", "Value15", "Option16", "Value16"
-            });
+            },
+            new[] { "Label", "LabelKey" });
     }
 
     public void Configure(UiElementSpec spec)

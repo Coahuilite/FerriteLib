@@ -83,8 +83,8 @@
   `pack-dev.ps1:45` derives the artifact name and `version.txt` from. The 0.2.0 move updated the first two
   and left the third at 0.1.0, so seven gates stayed green while the packaging script was preparing a zip
   labelled 0.1.0 around a 0.2.0 DLL. FerriteLibVersionTests now asserts all three agree
-  ("Build axis in the csproj matches the other two axes"; the harness holds 71 named assertions as of
-  2026-09-08 — re-derive with `grep -c 'Run("' tools/FerriteLib.UiKit.Tests/*Tests.cs`, never quote), and the assertion is **mutation-proven in one direction only**: reverting `<VersionPrefix>` to
+  ("Build axis in the csproj matches the other two axes"; the harness holds 80 named assertions as of
+  2026-09-09 — re-derive with `grep -c 'Run("' tools/FerriteLib.UiKit.Tests/*Tests.cs`, never quote), and the assertion is **mutation-proven in one direction only**: reverting `<VersionPrefix>` to
   0.1.0 fails exactly that one assertion and nothing else. The reverse case - a future axis living in a
   fourth file - is guarded by no test, because no such file exists yet.
 - **A release asset must be built after the gates run, not during them.** The Dev and Release build
@@ -294,25 +294,35 @@
   verified the disposition by running US's gate 14 read-only — zero raw hovers, exactly two
   rule-backed exemptions, scanner self-test armed.
 - **US→FL round 3 (2026-09-08, filed as "round 2" and renumbered — the round counter is now explicitly
-  global across directions, next-unused at filing, later filer yields) is REVIEWED with the first
-  consumer-cited engine shortfall.** N1/N2 accepted as one 0.4.0 package: `Width="Auto"` resolves to
-  text-natural width via `ITextMetrics.MeasureWidth` (the seam that has always said "content-driven
-  column widths need a width budget" while the engine never called it), capped after fixed siblings,
-  `Min`/`Max` clamps, equal-split fallback intact; plus one container-level `Breakpoint` — together
+  global across directions, next-unused at filing, later filer yields) is CLOSED, implemented on 0.3.x
+  2026-09-09.** The first consumer-cited engine shortfall: N1/N2 accepted as one package —
+  `Width="Auto"` resolves to text-natural width via `ITextMetrics.MeasureWidth` (the seam that has always
+  said "content-driven column widths need a width budget" while the engine never called it), capped after
+  fixed siblings, clamped, equal-split fallback intact; plus one container-level `Breakpoint` — together
   closing the "有限 responsive vocabulary" deliverable (`02:44`) and its acceptance row (`04:105`) that
   the rebuild contract shipped as a promise and not as code. N3 verdict (b): layered editing stays
-  consumer-side; `input/stepper-slider`, still zero-consumption, enters the unproven-is-debt queue
-  and any reshape must be N1's mechanism, not new attributes. Recorded with approval: this is the
-  filing template — both-sides-recomputable provenance (the 4 px degenerate interval recomputed here
-  and confirmed), boundary-first, explicit not-asked list, and the consumer's own unblocked plan.
-  SCHEDULED 2026-09-08: the package is filed in `TODO.md` §3, the buffer header reads SCHEDULED, and US
-  consumed the verdicts the same day — its own TODO now forbids new pixel thresholds before 0.4.0, and
-  its independently found mood-default bottom-layer defect (`CreateDefault` not identity vs a 1/1/One
-  view-model seed) corroborates the N3(b) verdict from the consumer side: layered-override semantics
-  really were not a core widget's job. Separately verified this pass: US's migration commit `7777cbe`
-  landed and honors round-1 P2 condition (a) from the outside (size policy kept as a provider, shell
-  thin, pin `[0.3.0, 0.4.0)`) — with it, the last code-side precondition of the 0.3.0 release is met
-  and only the maintainer's trial decision remains gated.
+  consumer-side; `input/stepper-slider`'s reshape is exactly the N1 mechanism proving itself — its
+  `LabelWidth = 80f` (the library-side specimen of the complaint) is now measured. Recorded with approval:
+  this is the filing template — both-sides-recomputable provenance (the 4 px degenerate interval
+  recomputed and confirmed), boundary-first, explicit not-asked list, consumer's own unblocked plan.
+  **The maintainer refiled the package from 0.4.0 to 0.3.0 (2026-09-09): 0.3.0 had never been published,
+  so additions before first publication cost no contract axis** — the freeze argument ("don't move the
+  goalpost again") applied to a release already visible to strangers; an rc that never shipped has no
+  goalpost to move. US's pin `[0.3.0, 0.4.0)` already covers it. US's own docs still say "0.4.0 package"
+  (its TODO lines pinning the threshold ban and the reopen note to 0.4.0) — report, never edit; the
+  reclassification is in FL's buffer annex for its next session.
+  Implementation deviations, each forced by evidence the review text did not carry: (1) the width clamps
+  are **`MinWidth`/`MaxWidth`, not `Min`/`Max`** — StepperSlider's schema already owns `Min`/`Max` as its
+  slider value range, and the control named in N1's own provenance would have silently received
+  value-range numbers as width clamps; (2) `Width`/`MinWidth`/`MaxWidth`/`NarrowHidden` joined the
+  common widget attributes because the engine read `Width` on children while **no core kind's schema
+  listed it** — the N1 defect had a library-side twin: a manifest could not size a stepper-slider column
+  at all; (3) `Narrow`/`NarrowCols`/`NarrowHidden` are rejected without a governing `Breakpoint`
+  (self/parent) because a narrow-state attribute under no threshold is the silent no-op the creation
+  contract exists to stop. SCHEDULED→CLOSED 2026-09-09: package implemented and lane-proven (289
+  harness assertions incl. the narrow→wide re-arrange on one engine, the CJK-vs-Latin glyph positive
+  control, and seven creation-time refusals); permanent record is this bullet plus the manifest contract
+  doc; US's migration `7777cbe` and the maintainer's trial decision remain the only gates on the ship.
 - **The Store build of PowerShell ships a trimmed `System.Reflection.Metadata`: `PEReader` has no
   `GetMetadataReader` (measured 2026-09-07, `Microsoft.PowerShell_7.6.5` Appx).** Any packaging or gate
   code that reads assembly attributes must therefore either go through `Assembly.LoadFile` in a **child

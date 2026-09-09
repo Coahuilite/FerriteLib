@@ -20,7 +20,8 @@ public sealed class SectionHeaderWidget : IUiWidget
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new SectionHeaderWidget(),
-            new[] { "Id", "Kind", "Title", "TitleKey", "Height", "Tab", "Hidden" });
+            new[] { "Id", "Kind", "Title", "TitleKey", "Height", "Tab", "Hidden" },
+            new[] { "Title", "TitleKey" });
     }
 
     public void Configure(UiElementSpec spec)

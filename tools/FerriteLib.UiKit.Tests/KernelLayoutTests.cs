@@ -34,6 +34,15 @@ internal static class KernelLayoutTests
         Run("Multiple Fill siblings share the remainder", VerifyMultipleFillsShareRemainder);
         Run("Row widths subtract sibling gaps", VerifyRowWidthsSubtractGaps);
         Run("Tab-gated elements use active-tab", VerifyTabVisibility);
+        Run("Auto column hugs its label's measured width (N1)", VerifyAutoWidthTracksGlyphModel);
+        Run("MinWidth/MaxWidth clamp the natural width (N1)", VerifyAutoMinWidthMaxWidthClamp);
+        Run("Auto widths are capped by the budget fixed siblings leave (N1)", VerifyAutoCappedByBudget);
+        Run("Stack child with Width=Auto hugs its label (N1)", VerifyStackAutoChildHugsLabel);
+        Run("Core stepper-slider is Auto-measurable through its declared label set (N1+N3)", VerifyCoreKindAutoMeasurable);
+        Run("Breakpoint flips Row to a stack without reopening (N2)", VerifyBreakpointDirectionFlip);
+        Run("NarrowHidden children vanish only in the narrow state (N2)", VerifyNarrowHidden);
+        Run("Wrap Cols/NarrowCols pin the column count per state (N2)", VerifyWrapColsResponsive);
+        Run("Responsive vocabulary is rejected before it can silently no-op (N2 grammar)", VerifyResponsiveValidation);
         return failures;
     }
 
@@ -302,6 +311,224 @@ internal static class KernelLayoutTests
         Rect right = snapshot.RectById["right"];
         Check(Near(snapshot.RectById["middle"].width, 400f), "Auto width subtracts fixed siblings and both gaps");
         Check(Near(right.xMax, 800f), "Right sibling ends exactly at the Row boundary");
+    }
+
+    // --- US->FL round 3: N1 (Auto width) and N2 (Breakpoint) lanes -------------------------------
+    // StubTextWidth: Small em=16 → a Latin letter is 8px, a CJK ideograph 16px. Asserting exact
+    // numbers against that model is the positive control: a column that tracked a constant instead
+    // of the glyph advance could not pass both the CJK and the Latin case.
+
+    private const string TestLabelKind = "test/label";
+
+    private static void RegisterLabeledTestWidget()
+    {
+        RegisterTestWidget(10f, null, false);
+        UiWidgetRegistry.Register(
+            Scope,
+            TestLabelKind,
+            () => new RecordingWidget(10f, null, false),
+            new[] { "Height", "Label" },
+            new[] { "Label" });
+    }
+
+    private static void VerifyAutoWidthTracksGlyphModel()
+    {
+        RegisterLabeledTestWidget();
+
+        string Row(string label) =>
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\">"
+            + "<Widget Id=\"cap\" Kind=\"" + TestLabelKind + "\" Width=\"Auto\" Label=\"" + label + "\" Height=\"10\" />"
+            + "<Widget Id=\"rest\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "</Row></UiPage>";
+
+        UiLayoutSnapshot cjk = Arrange(Row("音量"), 400f, 600f).Snapshot;
+        Check(Near(cjk.RectById["cap"].width, 32f), "CJK two-ideograph label column = 32px (2×16)");
+        Check(Near(cjk.RectById["rest"].width, 368f), "unsized sibling takes the remainder");
+
+        UiLayoutSnapshot latin = Arrange(Row("ab"), 400f, 600f).Snapshot;
+        Check(Near(latin.RectById["cap"].width, 16f), "same character count, Latin advance = 16px — the column tracks glyphs, not a constant");
+    }
+
+    private static void VerifyAutoMinWidthMaxWidthClamp()
+    {
+        RegisterLabeledTestWidget();
+
+        string xml =
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\">"
+            + "<Widget Id=\"floor\" Kind=\"" + TestLabelKind + "\" Width=\"Auto\" Label=\"ab\" MinWidth=\"40\" Height=\"10\" />"
+            + "<Widget Id=\"ceil\" Kind=\"" + TestLabelKind + "\" Width=\"Auto\" Label=\"音量\" MaxWidth=\"10\" Height=\"10\" />"
+            + "<Widget Id=\"rest\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "</Row></UiPage>";
+
+        UiLayoutSnapshot snapshot = Arrange(xml, 400f, 600f).Snapshot;
+        Check(Near(snapshot.RectById["floor"].width, 40f), "MinWidth raises the 16px natural width to 40");
+        Check(Near(snapshot.RectById["ceil"].width, 10f), "MaxWidth caps the 32px natural width to 10");
+        Check(Near(snapshot.RectById["rest"].width, 350f), "flex sibling shares what the clamped autos leave");
+    }
+
+    private static void VerifyAutoCappedByBudget()
+    {
+        RegisterLabeledTestWidget();
+
+        string xml =
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\">"
+            + "<Widget Id=\"fixed\" Kind=\"" + TestWidgetKind + "\" Width=\"90\" Height=\"10\" />"
+            + "<Widget Id=\"cap\" Kind=\"" + TestLabelKind + "\" Width=\"Auto\" Label=\"音量音量\" Height=\"10\" />"
+            + "</Row></UiPage>";
+
+        UiLayoutSnapshot snapshot = Arrange(xml, 100f, 600f).Snapshot;
+        Check(Near(snapshot.RectById["fixed"].width, 90f), "fixed siblings are never squeezed");
+        Check(Near(snapshot.RectById["cap"].width, 10f), "the Auto column is capped by the budget the fixed sibling leaves, not by its 64px natural width");
+    }
+
+    private static void VerifyStackAutoChildHugsLabel()
+    {
+        RegisterLabeledTestWidget();
+
+        string xml =
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Column Id=\"column\">"
+            + "<Widget Id=\"cap\" Kind=\"" + TestLabelKind + "\" Width=\"Auto\" Label=\"ab\" Height=\"10\" />"
+            + "<Widget Id=\"full\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "</Column></UiPage>";
+
+        UiLayoutSnapshot snapshot = Arrange(xml, 400f, 600f).Snapshot;
+        Check(Near(snapshot.RectById["cap"].width, 16f), "stack child with Width=Auto hugs its label");
+        Check(Near(snapshot.RectById["full"].width, 400f), "unsized stack children keep the full width");
+    }
+
+    private static void VerifyCoreKindAutoMeasurable()
+    {
+        RegisterTestWidget(10f, null, false);
+
+        string xml =
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\">"
+            + "<Widget Id=\"slider\" Kind=\"input/stepper-slider\" Width=\"Auto\" Label=\"音量\" Height=\"28\" />"
+            + "<Widget Id=\"rest\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "</Row></UiPage>";
+
+        UiLayoutSnapshot snapshot = Arrange(xml, 400f, 600f).Snapshot;
+        Check(Near(snapshot.RectById["slider"].width, 32f),
+            "the core stepper-slider's declared label set feeds the same Auto seam (N3's reshape is N1 proving itself)");
+    }
+
+    private static void VerifyBreakpointDirectionFlip()
+    {
+        RegisterTestWidget(10f, null, false);
+
+        string xml =
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\" Breakpoint=\"200\" Narrow=\"Column\" Gap=\"4\">"
+            + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "<Widget Id=\"b\" Kind=\"" + TestWidgetKind + "\" Height=\"20\" />"
+            + "</Row></UiPage>";
+
+        // One engine, one session: re-arranged at two widths. This is the acceptance shape the
+        // rebuild contract demands — a width change re-lays out, nothing is reopened.
+        UiLayoutEngine engine = new(Scope);
+        UiWidgetContext ctx = CreateContext();
+        UiLayoutManifest manifest = Parse(xml);
+
+        UiLayoutSnapshot wide = engine.ArrangeRoots(ctx, new Vector2(400f, 600f), manifest.Roots);
+        Check(Near(wide.RectById["a"].y, wide.RectById["b"].y), "wide: Row lays its children side by side");
+        Check(wide.RectById["b"].x > wide.RectById["a"].x, "wide: siblings advance in x");
+
+        UiLayoutSnapshot narrow = engine.ArrangeRoots(ctx, new Vector2(150f, 600f), manifest.Roots);
+        Check(narrow.RectById["b"].y > narrow.RectById["a"].y, "narrow: the same engine re-arranges to one-per-line");
+        Check(Near(narrow.RectById["a"].x, narrow.RectById["b"].x), "narrow: siblings share the column's x");
+
+        UiLayoutSnapshot restored = engine.ArrangeRoots(ctx, new Vector2(400f, 600f), manifest.Roots);
+        Check(Near(restored.RectById["b"].y, restored.RectById["a"].y), "wide again: the flip is stateless, no residue from the narrow pass");
+    }
+
+    private static void VerifyNarrowHidden()
+    {
+        RegisterTestWidget(10f, null, false);
+
+        string xml =
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\" Breakpoint=\"200\">"
+            + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "<Widget Id=\"b\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" NarrowHidden=\"true\" />"
+            + "</Row></UiPage>";
+
+        UiLayoutSnapshot wide = Arrange(xml, 400f, 600f).Snapshot;
+        Check(wide.RectById.ContainsKey("b"), "wide: the NarrowHidden child is present");
+
+        UiLayoutSnapshot narrow = Arrange(xml, 150f, 600f).Snapshot;
+        Check(!narrow.RectById.ContainsKey("b"), "narrow: it is gone from the snapshot");
+        Check(narrow.RectById.ContainsKey("a"), "and only it — the sibling is untouched");
+    }
+
+    private static void VerifyWrapColsResponsive()
+    {
+        RegisterTestWidget(10f, null, false);
+
+        string xml =
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Wrap Id=\"wrap\" Breakpoint=\"200\" Cols=\"2\" NarrowCols=\"1\">"
+            + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "<Widget Id=\"b\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "<Widget Id=\"c\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "<Widget Id=\"d\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "</Wrap></UiPage>";
+
+        UiLayoutSnapshot wide = Arrange(xml, 400f, 600f).Snapshot;
+        Check(Near(wide.RectById["b"].x, 200f) && Near(wide.RectById["b"].y, 0f), "wide: Cols=2 puts the second child in the second column");
+        Check(Near(wide.RectById["c"].x, 0f) && Near(wide.RectById["c"].y, 10f), "wide: the third child wraps to the second row");
+
+        UiLayoutSnapshot narrow = Arrange(xml, 150f, 600f).Snapshot;
+        Check(Near(narrow.RectById["b"].x, 0f) && Near(narrow.RectById["b"].y, 10f), "narrow: NarrowCols=1 forces one column — the 响应式列数 acceptance row");
+        Check(Near(narrow.RectById["d"].y, 30f), "narrow: all four children stack");
+    }
+
+    private static void VerifyResponsiveValidation()
+    {
+        RegisterTestWidget(10f, null, false);
+        UiWidgetRegistry.Register(
+            Scope, "test/sized", () => new RecordingWidget(10f, null, false), new[] { "Height" });
+
+        // The latent N1 specimen: a schematized kind could not carry Width at all before round 3.
+        Host("<Row Id=\"r\"><Widget Id=\"a\" Kind=\"test/sized\" Width=\"Auto\" Height=\"10\" /></Row>");
+        Check(true, "Width=Auto passes creation on a kind whose schema never listed it");
+
+        Reject("<Row Id=\"r\"><Widget Id=\"a\" Kind=\"test/sized\" Width=\"wide\" Height=\"10\" /></Row>", "invalid Width grammar");
+        Reject("<Widget Id=\"a\" Kind=\"test/sized\" Cols=\"2\" Height=\"10\" />", "Cols is container vocabulary, rejected on a widget");
+        Reject("<Wrap Id=\"w\" Breakpoint=\"200\" Narrow=\"Column\"><Widget Id=\"a\" Kind=\"test/sized\" /></Wrap>", "Narrow=Column rejected on a Wrap");
+        Reject("<Wrap Id=\"w\" NarrowCols=\"1\"><Widget Id=\"a\" Kind=\"test/sized\" /></Wrap>", "NarrowCols without Cols rejected");
+        Reject("<Row Id=\"r\"><Widget Id=\"a\" Kind=\"test/sized\" Width=\"Auto\" MinWidth=\"50\" MaxWidth=\"20\" Height=\"10\" /></Row>", "MinWidth above MaxWidth rejected");
+        Reject("<Row Id=\"r\" Breakpoint=\"soon\"><Widget Id=\"a\" Kind=\"test/sized\" /></Row>", "non-numeric Breakpoint rejected");
+        Reject("<Wrap Id=\"w\" Cols=\"2\" NarrowCols=\"1\"><Widget Id=\"a\" Kind=\"test/sized\" /></Wrap>", "NarrowCols without Breakpoint rejected (the narrow state could never arrive)");
+        Reject("<Row Id=\"r\"><Widget Id=\"a\" Kind=\"test/sized\" NarrowHidden=\"true\" /></Row>", "NarrowHidden under a parent without Breakpoint rejected");
+        Reject("<Column Id=\"c\" Narrow=\"Row\"><Widget Id=\"a\" Kind=\"test/sized\" /></Column>", "Narrow without Breakpoint rejected");
+    }
+
+    private static void Host(string body)
+    {
+        using UiHost host = new(
+            Scope,
+            UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"" + Scope + "\">" + body + "</UiPage>"),
+            new UiBindings(),
+            UiTheme.DarkGold,
+            new StubMetrics(),
+            new StubTranslation());
+    }
+
+    private static void Reject(string body, string what)
+    {
+        try
+        {
+            Host(body);
+            Check(false, what + " — but the host accepted it");
+        }
+        catch (UiContractException)
+        {
+            Check(true, what + " — rejected at creation");
+        }
     }
 
     private static void VerifyTabVisibility()

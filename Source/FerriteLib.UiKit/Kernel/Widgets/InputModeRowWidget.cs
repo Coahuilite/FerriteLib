@@ -34,6 +34,11 @@ public sealed class InputModeRowWidget : IUiWidget
                 "Value3", "Title3", "Description3", "Value4", "Title4", "Description4",
                 "Value5", "Title5", "Description5", "Value6", "Title6", "Description6",
                 "Value7", "Title7", "Description7", "Value8", "Title8", "Description8"
+            },
+            new[] {
+                "Title1", "Description1", "Title2", "Description2", "Title3", "Description3",
+                "Title4", "Description4", "Title5", "Description5", "Title6", "Description6",
+                "Title7", "Description7", "Title8", "Description8"
             });
     }
 

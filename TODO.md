@@ -1,14 +1,16 @@
 # TODO
 
-## 0. Open HANDOFF rounds and the round-1 release (branch `feat/round-1-0.3.0`)
+## 0. Open HANDOFF rounds and the round-1 release (branch `0.3.x`)
 
-
-- [ ] **US→FL round 3 (2026-09-08) — SCHEDULED.** Filed as "round 2", renumbered to 3 under the
-      global-counter rule. Verdicts (buffer, `996a6bc`-verified): N1+N2 accepted as ONE 0.4.0 package
-      (filed in §3), N3 closed as verdict (b) with `input/stepper-slider` queued in §3's
-      delete-or-reshape consequence. 0.3.0 stays frozen as scoped. US consumed the verdicts same-day
-      and its own TODO now bans new pixel thresholds pre-0.4.0 — first round where the review bound
-      the consumer as tightly as the library. Pointer lives until the round closes on the 0.4.0 ship.
+- [x] **US→FL round 3 (2026-09-08) — CLOSED, implemented 2026-09-09.** Filed as "round 2", renumbered
+      to 3 under the global-counter rule. Verdicts (buffer, `996a6bc`-verified): N1+N2 accepted as ONE
+      package, N3 closed as verdict (b). **Maintainer refiled 0.4.0 → 0.3.0 (2026-09-09): the release
+      never shipped, so its contract axis has no goalpost to move.** Landed on `0.3.x` with three
+      evidence-forced deviations (MinWidth/MaxWidth not Min/Max — value-range collision; Width joins
+      the common widget attributes — the engine read it while no schema allowed it; narrow-state
+      attributes refused without a governing Breakpoint) — all three in `MEMORY.md` round-3 entry,
+      which is also the permanent record. US's own docs still say 0.4.0; report, never edit (annex).
+      The pointer retires with this check: nothing from round 3 stays open on the FL side.
 
 Round 1 is SCHEDULED and, on this branch, implemented: P1–P6 (P3 landed here rather than slipping to
 0.3.x — it is session-scoped, provenance-cited and lane-tested, and holding it back would cost US the
@@ -18,9 +20,11 @@ not design work.
 - [ ] **Ship 0.3.0 — the last gate is the maintainer's trial decision, nothing else.** US's migration
       commit landed (`7777cbe`, gate re-verified by FL read-only: pin `[0.3.0,0.4.0)` at `Mod.cs:27-28`,
       thin `UiWindowHost`, zero raw hovers, gate 14 green), so the lockstep precondition round 1 set is
-      **met**. Tag dialect unchanged: `v0.3.0-rc1` at the then-tip, bare tag only on the commit that
-      ends the trial (`MEMORY.md`, publication state). Merging `feat/round-1-0.3.0` into `main` and the
-      tag itself are both maintainer actions, never a session's.
+      **met**. The branch is now `0.3.x` (renamed 2026-09-09 when the round-3 package joined 0.3.0):
+      0.3.0 = P1–P6 + FL-side A–E + N1/N2 responsiveness + the measured slider label. Tag dialect
+      unchanged: `v0.3.0-rc1` at the then-tip, bare tag only on the commit that ends the trial
+      (`MEMORY.md`, publication state). Remote merges are merge-commit only (squash/rebase buttons
+      disabled server-side 2026-09-09); merging into `main` and the tag itself stay maintainer calls.
 - [ ] **Cross-repo follow-through — report, do not edit** (`AGENTS.md` Boundaries). Remaining after
       `7777cbe`: (a) CLOSED by re-derivation 2026-09-08 — the phantom `UiPanel` is resolved at source:
       US's scan now lists six names including `UiPanel`
@@ -114,21 +118,13 @@ round-1 surface introduced; every one of the five only changes code if it surpri
 ## 3. Retained-mode roadmap (this library's own, after the split is proven)
 
 Each item is expected to delete a workaround, not add a layer.
-- [ ] **0.4.0 responsiveness package (US→FL round 3, N1+N2 — one package, both or neither).** In the
-      `Resolve*` region: `Width="Auto"` on Row/Column children resolves to **text-natural width** —
-      `ITextMetrics.MeasureWidth` over the child's declared label set (named by the kind's attribute
-      schema), capped by the budget after fixed siblings; `Min`/`Max` clamp the distribution; the
-      equal-split fallback stays byte-identical (nav 192 / help 232 remain fixed). General widget
-      natural-size measurement is deferred until a second citation. One container-level `Breakpoint`
-      (single numeric against the container's own inner width) selects declared `Cols`/`Hidden`/
-      direction variants — closing the `02:44` deliverable and the `04:105` acceptance row US's own
-      contract docs already promised; no expression language (`01:29` red line). Acceptance: harness
-      lanes on `StubTextWidth` drive a narrow→wide re-arrange without window reopen and a positive
-      control proving an Auto column tracks the stubbed glyph width; manifest docs carry the
-      `ContentRevision` coupling of auto widths. Attached consequence (N3 verdict (b)):
-      `input/stepper-slider` stays zero-consumption, so this package's landing triggers its
-      delete-or-reshape decision — reshape only as the N1 mechanism proving itself, never as a longer
-      attribute list.
+- [x] **Responsiveness package (US→FL round 3, N1+N2) — landed 2026-09-09 on `0.3.x`, refiled from
+      0.4.0 to 0.3.0 by maintainer order.** Shipped shape and the three evidence-forced deviations
+      (`MinWidth`/`MaxWidth`; `Width` into the common widget vocabulary; narrow-state attributes
+      refused without a governing `Breakpoint`) are recorded in `MEMORY.md`'s round-3 entry, with the
+      harness lanes as the acceptance evidence (glyph-model positive control, one-engine narrow→wide
+      re-arrange, `Cols`/`NarrowCols` grid, seven creation-time refusals). The N3 consequence landed
+      too: `input/stepper-slider`'s label band is measured, not the 80f constant.
 
 - [ ] **Element/identity layer.** Today widget instances are keyed by *path*, the tree is carried as a
       flat list plus `SubtreeCount` index arithmetic, and components hold no state. Introduce a real
