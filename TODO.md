@@ -1,6 +1,6 @@
 # TODO
 
-## 0. No open HANDOFF rounds; the round-1 release and the outstanding cross-repo reports (branch `0.3.x`)
+## 0. No open HANDOFF rounds; the round-1 release and the one remaining cross-repo report (branch `0.3.x`)
 
 - [x] **US→FL round 3 (2026-09-08) — CLOSED, implemented 2026-09-09.** Filed as "round 2", renumbered
       to 3 under the global-counter rule. Verdicts (buffer, `996a6bc`-verified): N1+N2 accepted as ONE
@@ -38,10 +38,15 @@ not design work.
       2026-09-09 after a live re-derivation of both trees**: US's docs now lag FL's round-3 state in two
       ways — its `HANDOFF.md:5` still labels the round "REVIEWED, pending scheduling" although FL closed
       and implemented it (PR #1 merged, so `main` carries the round-3 surface), and `TODO.md:9,46,60`
-      pair that stale status with the withdrawn "0.4.0 package" label. This one is *handed over*, not
-      parked: US rewrote its own buffer and TODO the same day the refile was recorded and neither line
-      moved, which is the lesson now in `MEMORY.md` ("A report-only item with no delivery channel is not
-      queued, it is lost"). Full ledger: buffer's standing annex.
+      pair that stale status with the withdrawn "0.4.0 package" label — **DELIVERED and fixed 2026-09-10**:
+      the maintainer authorised a cross-directory read followed by direct edits to the sibling, and the
+      corrections landed as US `2951934` (its `TODO.md:8,9,46,60`, one durable capability line in its
+      `MEMORY.md`, and its local buffer's FL-state summary plus a dated "FL 递交" section recording every
+      line this session changed there so a US session can audit or revert them). It is closed *because it
+      was applied*, not because it was reported: US had rewritten the very same files on 2026-09-09 with
+      the refile already recorded here, and none of those lines moved — see `MEMORY.md`, "A report-only
+      item with no delivery channel is not queued, it is lost". What stays open on this axis is only (b),
+      the lib-release link in US's release body, which waits on this repo's own `v0.3.0` cut.
 
 ## 1. In-game verification — the round-3 package makes this the next thing to do (2026-09-09)
 

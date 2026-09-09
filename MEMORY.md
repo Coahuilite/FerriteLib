@@ -286,7 +286,12 @@
   by canonical name and stages the WHOLE tree at the sibling path - its first run died on gate 13 with
   DLL-only staging while gates 1-12 passed, proving the stub sources and `LICENSE` are as load-bearing
   as the payload. The checkout is deliberately unpinned (tracks this repo's default branch, so lib-side
-  breakage goes red in US's CI early); the release-body link is the pinned half - see `TODO.md` §5.
+  breakage goes red in US's CI early); the release-body link is the pinned half - see `TODO.md` §5. That
+  channel is **two-directional, and only the hostile direction was ever written down**: an unpinned
+  default branch also carries every capability we merge but do not publish, which is how round 3's
+  `Width="Auto"`/`Breakpoint` reached US's CI while no 0.3.0 asset exists. Consequence: "not released
+  yet" is never a reason a surface on `main` is unusable, so the rc window's freeze discipline has to be
+  enforced at the tag and not at the branch.
   **Round 1 grew that published surface twice, in both directions.** `VerseStubs` gained
   `Verse.Window`/`Verse.WindowLayer`/`Verse.IWindowDrawing` so `UiWindowHost` is drivable at all (P2
   condition b), and `UiWidgetRegistry.Clear` went **internal** (item D), so a consumer harness that had
@@ -663,11 +668,15 @@ colour token currently feeds layout — it is a future-regression guard, not pre
 - **A report-only item with no delivery channel is not queued, it is lost.** The reclassification of the
   round-3 package from 0.4.0 to 0.3.0 was recorded here and in the buffer annex with the instruction that
   US's docs "should re-point when that repo is next open". US then rewrote its own `TODO.md` and
-  `HANDOFF.md` on 2026-09-09, and its three "0.4.0 package" lines (`TODO.md:9,46,60`) plus its summary of
-  FL's round-3 state (`HANDOFF.md:5`, "REVIEWED, pending scheduling") survived that rewrite unchanged.
-  A sibling session does not read our buffer, and a buffer rewrite is precisely the moment when stale
-  cross-repo status is *not* consulted. So an outstanding ledger item must be handed to the user for
-  delivery at the next FL session, not parked on the sibling's own diligence.
+  `HANDOFF.md` on 2026-09-09, and its three "0.4.0 package" lines plus its summary of FL's round-3 state
+  ("REVIEWED, pending scheduling") survived that rewrite unchanged. A sibling session does not read our
+  buffer, and a buffer rewrite is precisely the moment when stale cross-repo status is *not* consulted.
+  **Resolved 2026-09-10, and the resolution is the rule**: the maintainer authorised this session to
+  inspect and then edit the sibling's docs directly, and the four stale claims landed as US `2951934`
+  (its `TODO.md:8,9,46,60`, one durable line in its `MEMORY.md`, its local buffer's FL-state summary and
+  pointer index). So an outstanding ledger item goes to the user *with an offer to apply it*: `AGENTS.md`
+  Boundaries make the sibling read-only by default, only an authorization turns a report into a fix, and
+  the report alone was never the delivery.
 - **A ref pair rots like a SHA anchor.** "`0.3.x` and `main` both at `19cfdcc`" was true for hours. Say
   the predicate instead and let it be re-checked: `git diff --name-only main 0.3.x` returning only `.md`
   paths is what "the tested bytes and the shipped bytes are one tree" means.
