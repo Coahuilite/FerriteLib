@@ -35,7 +35,21 @@ not design work.
       only once this repo publishes a 0.3.0 asset — blocked by the bullet above, not by US. Full
       ledger: buffer's standing annex.
 
-## 1. In-game verification — status after the 2026-09-07 round-1 branch
+## 1. In-game verification — the round-3 package makes this the next thing to do (2026-09-09)
+
+- [ ] **GO TO THE GAME SOON. This section is now the critical path, not the backlog.** The merge of
+      PR #1 put the first geometry-changing surface in front of a game: Auto columns size from
+      measured glyph advance, and `Breakpoint`/`Narrow`/`Cols`/`NarrowHidden` re-arrange live on
+      width. The harness proves them against `StubTextWidth`'s linear model — real Verse glyph
+      advance is not linear and exists only in game (`MEMORY.md`, "Text fit"), so every lane here
+      is a future-regression guard, not a mutation proof of in-game geometry. The branch sync
+      (2026-09-09: `0.3.x` ff'd to the merge commit, both refs at `19cfdcc`) means the shipped
+      bytes and the tested bytes are one tree. Procedure: `verify-local.ps1 -PackDev`, place
+      `dist/dev/FerriteLib/` plus US's migrated build into your own `Mods/` by hand (never a
+      script, never a link — Boundaries), then check: factor labels hug their translated names at
+      both extremes of the mood card, no degenerate slider interval survives US's threshold
+      deletion, language switch re-measures an Auto column, and the narrow→wide flip is smooth
+      while dragging the window. Record findings against §3's shipped shape here.
 
 The blocking risk is cleared. What remains is two branches from the split plus three new ones the
 round-1 surface introduced; every one of the five only changes code if it surprises us.
@@ -246,16 +260,22 @@ identity is created locally at upload time.
       free: US's `scripts/build-dev.ps1` drives `-c Dev` on this project, so the change lands in a round
       with its migration, not in a packaging cleanup.
 
-- [x] **Pre-push privacy scan on the full reachable history — executed clean before the 2026-09-07 push.**
-      Final run at the pushed tip `bdbeae0` via `scripts/privacy-audit.ps1 -FullHistory`: working tree 0,
-      commit messages 0, all 34 historical revisions 0, single noreply identity. The scan's own history
-      lesson stands: the 09-05 measurement at `382e862` was real but did not survive the next day's own
-      session - a TODO note quoting US's literal personal path put one dirty blob into history, caught
-      only by re-running the blob scan (a working-tree fix commit does not remove it). Disposed by
-      squashing the two tip commits; the squashed hashes are deliberately not cited - they no longer
-      resolve. **Each vector must be re-scanned after any commit lands; a clean tree says nothing about
-      history, and a scrubbed file says nothing about the blob its dirty version already became.** The
-      sibling repository paid for this lesson twice.
+- [ ] **Pre-push privacy scan on the full reachable history — reopened 2026-09-09: every content
+      vector still clean, the identity vector is not.** The 2026-09-07 run at `bdbeae0` (working tree
+      0, messages 0, all 34 revisions 0, single noreply identity) stands for what it scanned; the
+      merge of PR #1 put `Fe <19252128+Coahuilite@…>` on the reachable history — GitHub's web merge
+      button stamps the PR clicker's display name as author (committer `GitHub <noreply@github.com>`
+      is platform boilerplate, not a leak). The bare local name `Fe` is the only personal signal
+      anywhere; the email stays the noreply form the gate itself admits. `privacy-audit.ps1
+      -FullHistory` now FAILS on `identity uniqueness (3)`; it will keep failing until the history is
+      rewritten, which the 2026-09-07 ruling forbids for hash citations but this is not — a dangling
+      citation is archaeology, a leaked display name on a public repo is the thing the scan exists to
+      catch, and this repo's tags are rc-only so nothing external anchors on these SHAs yet.
+      **Decision + action belong to the maintainer:** amend the one commit's author to the series
+      identity (or filter-repo the single commit), force-push both branches, re-run the scan green,
+      and only then cut `v0.3.0-rc1`. The scan's own lesson applies to itself: a clean tree says
+      nothing about history — re-run `-FullHistory` after any commit lands, which is exactly how this
+      regression was caught instead of shipped.
 - [x] **Repository name ruled by the maintainer 2026-09-07: `FerriteLib`, PascalCase** — matching the
       series convention (`SqueakyRatkin`, `UniversalSqueaker`, both measured live on GitHub). The earlier
       "lowercase or a Linux runner breaks" argument is void on evidence: GitHub resolves owner/repo

@@ -631,3 +631,11 @@ colour token currently feeds layout — it is a future-regression guard, not pre
   code lands; during this tidy the tree moved `958ac7d → 4dd97bf → 632a9a3 → a05fddf → 12dacb4` in about
   thirty minutes, retiring a "measured at <sha>" claim twice. Prefer a re-derivable command and a date
   over an anchor nobody re-checks.
+- **A green pre-push privacy scan says nothing about the identity a remote merge button will stamp.**
+  The 2026-09-07 scan passed at the pushed tip; the 2026-09-09 PR #1 merge added one commit whose
+  author is the clicker's display name (`Fe <…@users.noreply…>`), GitHub itself as committer, and the
+  `-FullHistory` identity vector went red through no edit of ours. The scan must be re-run after
+  remote-side history events, not only before pushes — the same rule it already states for commits,
+  extended to merge buttons, tags' absence and any other hand that writes to the graph. The fix is
+  cheap while the repo is rc-only (amend the one merge commit's author, force-push both branches;
+  `v0.2.0-rc1` sits below and is unaffected); it is expensive the day a stable tag cites these SHAs.
