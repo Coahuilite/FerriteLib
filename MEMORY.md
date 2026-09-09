@@ -191,6 +191,71 @@
   or an applied incompatibility notice (and its limits are stated in "Gates and what each actually
   proves" — parity against a consumer's copy is consumer-side).
 
+## Charter — what this library is for
+
+- **The founding spec, transcribed.** `Coahuilite/UniversalSqueaker@09366f8:docs/ui-shared-library-design-zh.md`
+  (状态：已接受, 2026-08-24) — written in the consumer's repository, which is why this one never held its own
+  rationale until now. It set out to extract "XML 编排引擎 + 基础 UI 组件" out of US into a **private general
+  UI library**, phase one serving only US and driven by US's needs, with neutrality as a hard red line (no
+  consumer types, no product literals, `object ViewState` passthrough, neutral `UiCommand`, injected
+  `ITextMetrics`), and these non-goals: not a public or general UI framework, no uGUI/UIElements path, no
+  reflection, DI or code generation, no code or expressions inside manifest XML, and no requirement that hot
+  reload be able to add a C# widget kind. Planned packageId was `coahuilite.ferritelib.uikit`; shipped is
+  `coahuilite.ferritelib` with assembly `FerriteLib.UiKit`. **Two clauses have been overtaken by fact:** the
+  repository has been public since 2026-09-07, and on 2026-09-10 the maintainer ruled the posture
+  "referenceable by strangers, held to general-library standards". That retires "现阶段只服务 US" and keeps the
+  non-goals, because the backend, reflection and codegen refusals were never about secrecy — they are the
+  library's shape.
+- **The irreducible core of a retained layer on an immediate host, and where this library actually stands**
+  (surveyed 2026-09-10 against egui, Unity IMGUI and UIElements, Flutter, React, RmlUi, Godot; those are
+  external sources, so the conclusion is recorded as reasoning and the FL half as measurement). An immediate
+  host re-derives geometry and paints in frame order by itself, so a retained layer must own only five
+  things: identity that survives insertion and reordering; a hit-and-layer stack with a capture owner; a
+  focus owner plus a traversal rule; an invalidation and wake clock; coordinate-space bookkeeping. Layout
+  algorithm, text shaping, style cascade, clipping, popup space, animation and IME are negotiable, and FL
+  deliberately keeps them in-library — that is a choice, not a requirement. Measured standing, item by item:
+  identity exists in *shape* (`UiSession.GetOrCreateValueState(elementId)` over a per-session dictionary of
+  `UiValueState { FloatValue, EditText, Dragging, Focused, Cursor }`) but its key is a path string, and an
+  unnamed sibling of the same kind collides — §3's element-identity item in `TODO.md` is precisely this; the
+  hit stack is single-popup by design (`UiValueState`'s own doc says dropdown openness is session-owned, one
+  popup per session) and §3's hit-stack item is its generalisation; focus is real for one control family
+  (`UiNative.cs:173-236`) and **there is no traversal rule at all**, while the attribute word `Tab` here
+  means a workspace tab (`UiLayoutEngine.cs:1249` resolves it against `UiBindings.ActiveTabKey`), a naming
+  hazard the next reader will trip on; the wake clock is legitimately delegated to the game because the game
+  repaints every frame, which leaves `Session.ContentRevision` as the only invalidation signal — that is what
+  §3's announce item replaces; coordinate-space bookkeeping is the strongest column (the pointer-space
+  contract and the `UiPopup` rect rules, both mutation-proved).
+- **Three load-bearing premises demoted to their real evidence class (2026-09-10).** (i) "IMGUI composites
+  above every Canvas" is the stated reason a uGUI backend is a non-goal, but what is measured in this file is
+  only that those assemblies ship and that `Assembly-CSharp` and `Verse.Window` reference `IMGUIModule` and
+  `TextRenderingModule` and never `UnityEngine.UI`/`UIModule`. The ordering claim is standard Unity behaviour
+  with no measurement of this game's camera or sort setup on record: keep it as design inference. The
+  non-goal survives without it, because the game's own windows are IMGUI adapters and a second backend could
+  not reach the game's chrome anyway. (ii) The same reference read recorded
+  `Verse.Window.Window(IWindowDrawing customWindowDrawing = null)` — a drawing seam inside the game's window
+  manager that nobody has examined. Whether Verse honours it, and whether a non-IMGUI surface could live
+  inside a real window, is an IL-level question and is unverified; it is the only known question that could
+  move the backend non-goal. (iii) The recollection that XML was chosen for "原版布局和热更" is half true:
+  declarative layout is real, hot update is owned by nobody. US supplies its manifest as an embedded
+  assembly resource (`Coahuilite/UniversalSqueaker@09366f8:Source/UniversalSqueaker/UI/UsKernelSettingsHost.cs:29,319`),
+  so a layout edit recompiles the consumer, and this library's only disk-reading entry point
+  (`UiLayoutManifest.ParseFile`) has zero callers. The spec never promised the harder half either — it
+  explicitly declined hot-reloading a new kind — so `TODO.md` §3 now carries the fork openly: wire a real
+  load path, or delete the dead entry and stop implying a capability nothing owns.
+- **Ecosystem calibration for the public ruling (surveyed 2026-09-10, external sources).** The RimWorld
+  ecosystem has no formal modding API and no way to declare a prerequisite version, which this repo's own
+  read of `Verse.ModRequirement` confirms independently. The framework-prerequisite convention is real
+  nevertheless: ship a runtime DLL under `Assemblies/`, publish a compile-time-only NuGet (often a `.Ref`
+  package), and have consumers declare `modDependencies` plus `loadAfter`. The nearest UI-layer analogues are
+  `Cosmere.Lightweave` — a composable IMGUI framework shipped as a prerequisite mod with NuGet, whose
+  About.xml calls itself a shared dependency while its README says primitives may break their API freely
+  because all its consumers are owned — `Nebulae.RimWorld.UI` (published, self-described personal library),
+  and `BetterFloatMenu` (prerequisite-free NuGet helper whose major version tracks the game); `RimHUD` is the
+  only UI mod found that carries an explicit `apiVersion`. The lesson worth refusing to skip: **structural
+  invitation and contractual support are separate axes, and every precedent found picked one and neglected
+  the other.** The 2026-09-10 ruling commits FL to saying both out loud — the README states who may compile
+  against it, and the contributing doc, now owed, states what will not break.
+
 ## What was verified, and how
 
 - **RimWorld 1.6 UI surface**, read from `Krafs.Rimworld.Ref 1.6.4871` with dnlib (that package mirrors
@@ -333,7 +398,10 @@
   `Width="Auto"` resolves to text-natural width via `ITextMetrics.MeasureWidth` (the seam that has always
   said "content-driven column widths need a width budget" while the engine never called it), capped after
   fixed siblings, clamped, equal-split fallback intact; plus one container-level `Breakpoint` — together
-  closing the "有限 responsive vocabulary" deliverable (`02:44`) and its acceptance row (`04:105`) that
+  closing the "有限 responsive vocabulary" deliverable
+  (`Coahuilite/UniversalSqueaker@09366f8:docs/uikit-rebuild/02-brownfield-cutover-matrix-zh.md:44`) and its
+  acceptance row (`…:docs/uikit-rebuild/04-verification-and-acceptance-zh.md:105`, same repository and
+  revision) that
   the rebuild contract shipped as a promise and not as code. N3 verdict (b): layered editing stays
   consumer-side; `input/stepper-slider`'s reshape is exactly the N1 mechanism proving itself — its
   `LabelWidth = 80f` (the library-side specimen of the complaint) is now measured. Recorded with approval:

@@ -15,6 +15,16 @@
 - Exactly one consumer is wired, so every validated-against-a-real-page claim rests on that one tree; its
   identity and coverage are `MEMORY.md` facts, and un-wired candidates stay unnamed.
 
+## Purpose and non-goals
+
+The product is a **retained UI layer over RimWorld's immediate-mode `Verse` GUI**: structure lives in data
+(an XML manifest plus typed bindings), and the five things a consumer cannot hand-roll safely — identity,
+state, invalidation, recovery, and one audit surface — are owned here. The library is worth what a
+consumer's tree keeps inside it, not what it ships in controls. Non-goals (no uGUI backend, no reflection,
+DI or codegen, no expressions in manifest XML, no Def hot-reload promise, no world-space rendering), the
+evidence classes behind each, and the 2026-09-10 ruling that the library is referenceable by strangers and
+held to general-library standards: `MEMORY.md`, "Charter".
+
 ## The two layers
 
 1. **Declarative page engine** — XML manifest, constrained layout, typed bindings, per-window session,
@@ -80,10 +90,9 @@ Unproven surface is debt, not inventory: zero-citation kinds and session axes ge
 a cited consumer's proven form, never kept "for symmetry".
 
 Raw IMGUI outside the tree is not forbidden — it is unsupported and unmeasurable: the harness, the fit
-audit, session recovery, popup geometry rules and the dependency-reality proof bind to tree code only.
-The ecosystem metric is raw-backend call sites outside the funnel files; the funnel files are named by
-the containment gate, and that list is everything this repo can measure alone. The cross-repo total is a
-maintainer-side number: cite it with its date and never as something a clone can reproduce.
+audit, session recovery, popup geometry rules and the dependency-reality proof bind to tree code only. The
+metric is raw-backend call sites outside the funnel files the containment gate names; the cross-repo total
+is a maintainer-side number, never a measurement a clone can reproduce.
 
 ## Build and verification
 

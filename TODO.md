@@ -215,14 +215,32 @@ Each item is expected to delete a workaround, not add a layer.
       nobody remembers to update.
 - [ ] Clean up `UiLayoutManifest.ParseFile`: it has no production caller. Either wire a real
       load-from-disk path (which is the only thing that would make XML authoring worth its cost) or
-      delete it and the `Schema="2"` version slot with it.
+      delete it and the `Schema="2"` version slot with it. **What the fork actually decides, measured
+      2026-09-10:** the library today owns no path from a manifest to a running window — US reads its XML
+      out of an embedded assembly resource, so layout edits recompile the consumer, and hot-reloaded layout
+      is a capability nobody holds (`MEMORY.md` Charter). Deleting the entry closes the implication; wiring
+      it must also answer where a mod's XML lives, when it is re-read, and what a parse failure looks like
+      to a player, or the library has bought a second source of truth for the sake of a demo.
+- [ ] **Keyboard focus has no traversal rule** (found while mapping the library against a retained layer's
+      irreducible core, 2026-09-10 — see `MEMORY.md` Charter). `UiNative.cs:173-236` gives one control
+      family real focus state, and nothing in the library moves focus between elements on keyboard input.
+      Naming hazard to settle in the same pass: `Tab` is already taken for workspace tabs
+      (`UiLayoutEngine.cs:1249`, resolved against `UiBindings.ActiveTabKey`), so a keyboard axis needs a
+      different word — do not overload it and make the manifest unreadable.
+- [ ] **`Verse.Window`'s custom-drawing seam is unexamined.** The reference read recorded
+      `Window(IWindowDrawing customWindowDrawing = null)` (`MEMORY.md`), i.e. the game's own window manager
+      takes a drawing delegate. Whether Verse honours it is an IL-level question, and it is the only known
+      fact that could move the "no non-IMGUI backend" non-goal; answer it before anyone builds a case on the
+      current wording, which rests on a compositing-order claim this repo has never measured.
 
 ## 4. Deferred by decision, with the upgrade path written down
 
 - [ ] **Package feed / registry — deliberately not now.** Measured reason in `MEMORY.md`: same-version
       republish is not re-fetched, and build metadata is stripped from the cache identity, so a
-      hash-suffixed dev version provides false freshness. Revisit when any of these is true: a remote
-      exists, a second machine builds consumers, or an outside party consumes the library. Upgrade path
+      hash-suffixed dev version provides false freshness. **Two of three revisit triggers are now met
+      (2026-09-10):** a remote exists, and the public ruling means an outside party may consume the
+      library; a second machine building consumers is still false. The ecosystem's own answer is a
+      compile-time-only `.Ref` NuGet package alongside the runtime DLL (`MEMORY.md` Charter). Upgrade path
       if revisited: `0.1.0-dev.<sha>` prerelease label + floating consumer version + drop
       `--no-restore` from the cross-repo gates (otherwise they go green against a stale graph).
       GitHub Packages was checked and rejected for a different reason: it requires a token to *install*
@@ -395,12 +413,18 @@ identity is created locally at upload time.
       counts. `CONTRIBUTING.md` deliberately **not** written - its existence is the item below's output,
       and the README states the currently-true stance (bug reports welcome, PRs not promised while the
       surface is provisional).
-- [ ] **Decide whether third-party use is invited, and let that decide `CONTRIBUTING.md`'s existence.**
-      If invited, `§3` and the per-surface theme restructure in `§4` land first and a contributing guide is
-      part of the offer. If unsupported, say so in the README and do not write a contributing guide that
-      implies otherwise. This is the same one-way door as the Workshop page above, and GitHub publishing
-      opens it a little: a stable packageId plus a browsable repository is what a modder compiles against
-      whether or not anyone invited them.
+- [x] **Third-party use: ruled INVITED on 2026-09-10** (maintainer), which settles the item that had been
+      open since the Workshop decision — "a stable packageId plus a browsable repository is what a modder
+      compiles against whether or not anyone invited them" was the correct read, and the ruling accepts it
+      instead of tolerating it. Consequences, all now derived rather than optional: §3's identity layer,
+      announce, hit stack and focus traversal plus §4's per-surface theme restructure are **pre-stable
+      debt**, because every one of them is breaking by its own admission and the cheap moment to pay is
+      before anything compiles against the current shape; a `CONTRIBUTING.md` is owed as the second half of
+      the offer (`MEMORY.md` Charter: the nearest precedent, Lightweave, advertises itself as a shared
+      dependency in About.xml while its README says primitives may break freely — invitation without
+      contract is the failure mode this repo now has to refuse); and `README.md`'s "PRs are not promised
+      while the surface is provisional" line stays true only while it is paired with a written list of what
+      the provisional surface will not do.
 
 ## 6. Documentation hygiene: what this audit found, and the rule that keeps it from coming back
 

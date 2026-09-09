@@ -48,9 +48,11 @@ of this repository (the release body quotes its SHA-256); the assembly is `net47
 **pre-1.0 and provisional**: a minor bump is a breaking change, and the freeze decision is gated on a
 second wired consumer.
 
-**Third-party contributions are not currently solicited** — the API freeze / invited-vs-unsupported
-call is an open maintainer decision (see `TODO.md` §5). Bug reports are welcome; a PR cannot be
-promised a merge while the surface is provisional.
+**Third-party use is invited (maintainer ruling 2026-09-10).** Compile against the release asset, and open
+an issue when the library forced you to hand-roll something — a citation into your own working code is how
+this library grows; a request alone is not. Bug reports are always welcome. A PR is not promised a merge
+while the API is provisional, and `CONTRIBUTING.md` does not exist yet: when the surface freezes, what will
+and will not break afterwards is written down there.
 
 ## Local verification and build
 
