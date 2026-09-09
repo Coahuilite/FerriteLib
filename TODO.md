@@ -331,11 +331,13 @@ identity is created locally at upload time.
 - [ ] **US side: the link itself** - **cross-repo write, needs maintainer authorization.** The mechanism is
       one derived line in US's release body plus one pin, and it must be derived from a single source so the
       two cannot drift:
-      `PrerequisiteApiMin` / `PrerequisiteApiMax` in `UniversalSqueaker/Source/UniversalSqueaker/Mod.cs:22-23`
-      (currently `0.2.0` / `0.3.0`) is the truth for which lib range US was compiled against, so the link must
-      be **resolved from that range, not string-built from the floor**: `v0.2.0` is the minimum, but if lib
-      has since shipped `v0.2.3`, linking to `tag/v0.2.0` sends players to an older carrier than the one US
-      was tested against. US's `release.yml` should list lib's releases, take the highest whose base version
+      `PrerequisiteApiMin` / `PrerequisiteApiMax` in
+      `Coahuilite/UniversalSqueaker@09366f8:Source/UniversalSqueaker/Mod.cs:27-28` (both re-derived
+      2026-09-09: `0.3.0` / `0.4.0`) is the truth for which lib range US was compiled against, so the link must
+      be **resolved from that range, not string-built from the floor**: the floor is only the minimum, so if
+      lib has since shipped a later patch inside the window, linking to the floor's tag sends players to an
+      older carrier than the one US was tested against. US's `release.yml` should list lib's releases and
+      take the highest whose base version
       satisfies `>= min` and `< max`, and then fail the release if (a) no release satisfies the range, (b) the
       chosen release is a prerelease while US is being released as stable, or (c) a lib payload exists in US's
       own stage directory. (c) already exists as `stage-package.ps1:41-45` and US gate 9; both stay valid
@@ -361,10 +363,10 @@ identity is created locally at upload time.
       `GITHUB_WORKSPACE` and throws on anything outside (US verified against the action's own
       `input-helper.ts`). US landed the working variant — carrier checkout to the `ci-ferritelib/`
       subdir, build there, run-step copy to the sibling path the HintPath expects (path math verified
-      in US `MEMORY.md`). Follow-through for the name ruling above: US's two workflows still say
-      `repository: Coahuilite/ferritelib` — case-insensitive resolution means it works either way, but
-      align it to `Coahuilite/FerriteLib` when US next touches those files. **Cross-repo write: report,
-      do not edit.**
+      in US `MEMORY.md`). Follow-through closed by re-derivation 2026-09-09: US's two workflows now read
+      `repository: Coahuilite/FerriteLib` (`ci.yml:40`, `release.yml:36`), so the case alignment this bullet
+      asked for is done — the case-insensitive-resolution note survives only as archaeology. No FL action;
+      **cross-repo write, report, do not edit.**
 - [ ] **The four widget kinds nobody consumes** (`section/header`, `state/empty`, `input/mode-row`,
       `input/stepper-slider`) become public on the day this repo is public. See §3 for the decision; it is
       cheaper to make before the first release than after somebody compiles against them.
