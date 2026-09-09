@@ -74,9 +74,20 @@
   instead of from this paragraph.
 - **Two hard rules inherited from the series, both easy to violate by accident.** Nothing in this library
   may persist data into a save - a prerequisite must survive being uninstalled, and a save-written flag is
-  the one side effect a player cannot undo. And `../squeaky_ratkin` is never written: SR is a separate
-  product with its own brand and `SR_` prefix, and this repo's neutrality lane exists to keep even its
-  vocabulary out of here.
+  the one side effect a player cannot undo. And the Squeaky Ratkin repo (`coahuilite.squeakyratkin`) is
+  never a write target: SR is a separate product with its own brand and `SR_` prefix, and this repo's
+  neutrality lane exists to keep even its vocabulary out of here.
+- **This repository answers for itself alone (maintainer ruling 2026-09-10, `AGENTS.md` Boundaries).** The
+  repo is public, and a clone contains no carrier, no sibling mod and no consumer tree: the
+  one-library/two-consumers lockstep layout is this maintainer's machine, not the project's shape. Four
+  consequences, all now policy rather than preference: no rule, gate, script or piece of evidence here may
+  require an outside tree; consumer evidence is **transcribed** into this file as
+  `owner/repo@sha:path:line` plus the excerpt and what it proved (US is public so its permalinks resolve
+  for anyone; a deferred candidate's never can, which is exactly why transcription is mandatory); the
+  cross-repo raw-backend count is a maintainer-side number, not a reproducible measurement; and the
+  round/buffer protocol lives only in maintainer-local `HANDOFF.md`, which is gitignored, so no tracked
+  file may depend on reading it. Writing outside this repo is authorized per session and per instruction —
+  the 2026-09-10 sibling doc fixes were granted that way and treated as maintenance, not as a new channel.
 - **A `Require` desync is now a named verdict, and that is the durable part** (2026-09-04, `a05fddf`):
   the report must carry `MISMATCH`, the loaded `Api`, and the consumer's compiled floor, so a stale
   carrier is a readable prerequisite error rather than a `TypeLoadException` at first draw. Harness
@@ -273,15 +284,15 @@
 ## Cross-repo couplings that no gate in this repo can see
 
 - **The consumer's harness compiles this repo's stub projects.**
-  `../UniversalSqueaker/tools/UniversalSqueakerKernelHostTests/UniversalSqueakerKernelHostTests.csproj`
-  sets `FerriteLibHarness` to `../../../ferritelib/tools/FerriteLib.UiKit.Tests` and, in a post-build
-  target, runs `dotnet build` on all four projects under `tools/FerriteLib.UiKit.Tests/Stubs/` and copies
+  `Coahuilite/UniversalSqueaker@09366f8:tools/UniversalSqueakerKernelHostTests/UniversalSqueakerKernelHostTests.csproj`
+  points `FerriteLibHarness` at a sibling checkout of this repo and, in a post-build target, runs
+  `dotnet build` on all four projects under `tools/FerriteLib.UiKit.Tests/Stubs/` and copies
   their output from `bin/stubs/<name>/`. So the Stubs tree - directory names, project names, assembly
   names (`Assembly-CSharp.dll`, `UnityEngine.CoreModule.dll`, ...) and that `bin/stubs/` output shape -
   is a de-facto published surface. Renaming or relocating any of it breaks the consumer's gate 13 while
   **all seven gates in this repo stay green**, because nothing here builds or references the sibling.
-  Same shape one level up: US's gate 6 asserts this repo's payload DLL exists at
-  `../ferritelib/1.6/Assemblies/FerriteLib.UiKit.dll`, so a broken build here goes red over there first.
+  Same shape one level up: US's gate 6 asserts, through its own sibling path, that this repo's payload
+  exists at `1.6/Assemblies/FerriteLib.UiKit.dll`, so a broken build here goes red over there first.
   Evidence upgraded 2026-09-07 from source-level to **runner-proven**: US's `ci.yml` checks this repo out
   by canonical name and stages the WHOLE tree at the sibling path - its first run died on gate 13 with
   DLL-only staging while gates 1-12 passed, proving the stub sources and `LICENSE` are as load-bearing
@@ -466,10 +477,10 @@ an edge case can be judged without re-running the audit that produced them.
   twice in the neutrality lane.
 - **Why exemptions carry rent.** An allowlist without a named closing item drifts back into permanent
   undocumented self-implementation; the live specimen is US's diagnostics panel — 703 lines of
-  hand-rolled immediate UI borrowing only the theme vocabulary
-  (`../UniversalSqueaker/Source/UniversalSqueaker/Diagnostics/SqueakDiagnosticsPanel.cs`; re-derive with
-  `wc -l`, never quote). Written ruling + capability gap + TODO reference turns each bypass into debt
-  with a due date instead of a precedent. **The due date is now dated by the consumer, not by us:** US
+  hand-rolled immediate UI borrowing only the theme vocabulary, pinned to a revision so that count cannot
+  rot silently (`Coahuilite/UniversalSqueaker@09366f8:Source/UniversalSqueaker/Diagnostics/SqueakDiagnosticsPanel.cs`).
+  Written ruling + capability gap + TODO reference turns each bypass into debt with a due date instead
+  of a precedent. **The due date is now dated by the consumer, not by us:** US
   opened the migration of this panel onto `UiWindowHost` + `UiHost` in its own buffer on 2026-09-09
   (§1, "devpanel"), stating that the shell surface it measured is sufficient and it asks FL for nothing
   — so it is not a round and takes no number, and the round-4 slot stays unused. Two things follow when
@@ -654,9 +665,9 @@ colour token currently feeds layout — it is a future-regression guard, not pre
   Treat them as a snapshot of a command, never as a fact to quote.
 - **The consumer's banned-substring list is six names, enforced by a C# invariant test — not by any
   `scripts/*.ps1` gate.** `UiSourceInvariantTests` forbids `UiInteract`, `Palette`, `SurfaceFrame`,
-  `UiText`, `UiValueStore`, `UiPanel`
-  (`../UniversalSqueaker/tools/UniversalSqueakerUiLogicTests/UiSourceInvariantTests.cs:153`, as of
-  2026-09-08). Two traps live here. First, a cross-repo re-check that greps the consumer's `scripts/`
+  `UiText`, `UiValueStore`, `UiPanel`, at
+  `Coahuilite/UniversalSqueaker@09366f8:tools/UniversalSqueakerUiLogicTests/UiSourceInvariantTests.cs:153`.
+  Two traps live here. First, a cross-repo re-check that greps the consumer's `scripts/`
   finds "no scan at all" and concludes the rule is a phantom — the gate is a test project, so the check
   must target `tools/`. Second, `UiPanel` used to be prose-only (five names scanned, six claimed); after
   FL→US round 2 reported it, US added it to the list rather than deleting it from the rule, so the scan

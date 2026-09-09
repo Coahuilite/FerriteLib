@@ -190,13 +190,16 @@ Each item is expected to delete a workaround, not add a layer.
 - [ ] **Make the licence-parity guard two-sided, or stop calling it ours.** Gate 6 is credited, in prose
       that has since circulated between both repos, with comparing `LICENSE` against the consumer's copy.
       It does not - only US's gate 10 does
-      (`../UniversalSqueaker/scripts/verify-local.ps1:141-146`), and it skips silently when our file is
+      (`Coahuilite/UniversalSqueaker@09366f8:scripts/verify-local.ps1:141-146`), and it skips silently when our file is
       absent. A truncated or edited licence here cannot redden anything in this repo. Two clean options:
       pin the expected SHA-256 of the series licence as a literal in this repo and assert it locally
       (self-contained, no sibling dependency, and mutation-testable by editing `LICENSE`), or record the
       asymmetry as accepted policy. A sibling path check is not a third option: it would make this
       library's gates depend on a consumer tree, which is the vacuous-guard shape `MEMORY.md` ("Neutrality
-      lane") records as the reason the neutrality scan was moved inside this repo in the first place.
+      lane") records as the reason the neutrality scan was moved inside this repo in the first place. The
+      2026-09-10 narrowing of `AGENTS.md` Boundaries (this repo answers for this repo alone; a clone has no
+      consumer tree) settles the choice in favour of the pinned literal — it is now a policy consequence,
+      not just a preference.
 - [ ] **Give the harness `Stubs/**` a local guard.** The consumer's `UniversalSqueakerKernelHostTests`
       builds our four stub projects by relative path and copies them out of `bin/stubs/<name>/`, so that
       tree is a published surface. Renaming a stub project or its output folder breaks the consumer while
@@ -351,7 +354,8 @@ identity is created locally at upload time.
       recorded as its pre-rewrite name. Verified independently from this repo: `6c7053a` is reachable from
       US `main` and carries the identical message; `0fe60b0` resolves only as a dangling local object.
       US's one-time guide was deleted pre-push (their ruling; survivors folded into US `MEMORY.md`), so
-      the method pointer is `modding_documents/privacy-debt-vector-triage-zh.md`, not the guide.
+      the method pointer is `modding_documents/privacy-debt-vector-triage-zh.md`, which is maintainer-local
+      and present in no clone.
 - [x] **US's CI dependency chain — settled by US's own session, superseding this sketch.** What was
       written here (`path: ../ferritelib`) is impossible: `actions/checkout` resolves `path` inside
       `GITHUB_WORKSPACE` and throws on anything outside (US verified against the action's own

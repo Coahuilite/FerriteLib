@@ -12,8 +12,8 @@
 - Namespace root `FerriteLib.UiKit`, kernel surface `FerriteLib.UiKit.Kernel`, log prefix
   `[FerriteLib.UiKit]` (not a Def prefix, not a packageId).
 - Release/publication state (rc-only window, tag rules, hash ledger): `MEMORY.md` — never restate it here.
-- Known consumers: Universal Squeaker (wired; the only behaviour this shape is validated against) and
-  one sibling deferred — its identity lives in maintainer-local `HANDOFF.md`, published docs stay neutral.
+- Exactly one consumer is wired, so every validated-against-a-real-page claim rests on that one tree; its
+  identity and coverage are `MEMORY.md` facts, and un-wired candidates stay unnamed.
 
 ## The two layers
 
@@ -45,9 +45,9 @@ assembly and no `FerriteLib.Core`; re-open only if a consumer needs the visual c
   composites through a RenderTexture blit, never "above the HUD".
 - **Map-layer rendering is permanently outside UiKit.** `GenMapUI` and its family carry no session and
   no hit-test semantics to bind to, so world-space text (pawn-head marks and friends) is something this
-  library cannot provide — a non-goal, not a backlog item (ruled in the US→FL round 1 review). A
-  consumer's whitelist entry for it is policy-backed and is not renegotiated per PR; the boundary that
-  remains is that anything drawn into a window goes through the tree.
+  library cannot provide — a non-goal, not a backlog item. A consumer's whitelist entry for it is
+  policy-backed and is not renegotiated per PR; the boundary that remains is that anything drawn into a
+  window goes through the tree.
 - **API freeze is gated on the second wired consumer**, not on features; until it builds against this
   surface, the API is provisional. After a Workshop page carries the stable packageId, "breaking
   changes are expected" stops being free — the invited-vs-unsupported call (`TODO.md` §5) is open and
@@ -56,7 +56,9 @@ assembly and no `FerriteLib.Core`; re-open only if a consumer needs the visual c
 ## Ecosystem protocol (how this library may grow)
 
 Growth has one legal source: a real consumer was forced to hand-roll something, the code exists, and the
-shape is generally providable. A request is not evidence; a citation into a consumer tree is.
+shape is generally providable. A request is not evidence; a citation into a consumer tree is — and as no
+clone has that tree, the citation must be transcribed into `MEMORY.md`: `owner/repo@sha:path:line`, the
+excerpt, and what it proved. A public permalink may accompany it, never replace it.
 
 Consumer ladder when the library lacks something:
 
@@ -64,8 +66,9 @@ Consumer ladder when the library lacks something:
    axes. This is the recommended destination for anything consumer-specific; identity, state,
    invalidation, recovery and harness visibility stay with the library. A window is no longer an
    exception to this: `UiWindowHost` owns the chrome, so a page never has to leave the tree to exist.
-2. **Propose promotion** — one release after it survives, via a HANDOFF round (harvest loop and full
-   form, with provenance and the metric: `MEMORY.md`).
+2. **Propose promotion** — one release after it survives, carrying the transcription above plus the
+   metric. Outside contributors propose by issue; the maintainer-side vehicle is a `HANDOFF` round
+   (harvest loop and full form: `MEMORY.md`).
 3. **Register an exemption** — only for what structurally cannot live in a page tree, which after the
    round-1 shell is world-space rendering and nothing else currently known. Allowlisted file + written
    ruling + named closing item: rent, not exit.
@@ -78,8 +81,9 @@ a cited consumer's proven form, never kept "for symmetry".
 
 Raw IMGUI outside the tree is not forbidden — it is unsupported and unmeasurable: the harness, the fit
 audit, session recovery, popup geometry rules and the dependency-reality proof bind to tree code only.
-The ecosystem metric is raw-backend call sites outside the funnel files, counted across both repos; the
-funnel files are named by the containment gate, and that list is the measurement.
+The ecosystem metric is raw-backend call sites outside the funnel files; the funnel files are named by
+the containment gate, and that list is everything this repo can measure alone. The cross-repo total is a
+maintainer-side number: cite it with its date and never as something a clone can reproduce.
 
 ## Build and verification
 
@@ -90,10 +94,8 @@ pwsh -NoProfile -File scripts/pack-release.ps1 -Version v0.3.0-rc2   # + GitHub 
 pwsh -NoProfile -File scripts/pack-steam.ps1  -Version v0.3.0-rc2    # + Workshop upload folder
 ```
 
-`-PackDev` stages `dist/dev/FerriteLib/` and stops there. No script under `scripts/` writes outside the
-repository, and putting a folder into a game `Mods/` directory — by copy, symlink or junction — is the
-developer's own step (see Boundaries): the Windows shortcut in particular would bind this repo's build
-output to a machine-local layout another developer cannot see, reproduce, or often create.
+`-PackDev` stages `dist/dev/FerriteLib/` and stops there: nothing under `scripts/` writes outside the
+repository, and installing a folder into a game `Mods/` directory is the developer's own step (Boundaries).
 
 Three channels, one staging engine. `stage-package.ps1` decides what a package *is* — the five allowed
 files, the content probe, the licence copy, `version.txt`, and the closed-set assertion that stops a
@@ -105,41 +107,36 @@ identity and nothing else: dev tolerates a dirty tree and says so in its label, 
 shape and the build axis, steam additionally requires a clean tree. Only the GitHub channel archives —
 a dev rehearsal and a Workshop upload are folders — which also confines the archive-timestamp problem
 to the one artifact whose digest must be public. Dev writes no NuGet package; `-Nupkg` asks for one,
-since consumers bind to the payload by sibling path.
+since a consumer may want the payload as a package instead of a folder.
 
 `About/PublishedFileId.txt` is gitignored and the stager copies `About.xml` as a file rather than the
 `About` directory, so no dev or GitHub artifact can carry Workshop identity; the upload step creates it
 inside `dist/steam/FerriteLib/About/` locally.
 
-Consumers reference the payload by relative sibling path with `Private=false` (measured rationale:
-`MEMORY.md`). The `1.6/Assemblies/` output path and the `tools/.../Stubs/` tree with its `bin/stubs/`
-shape are de-facto published surfaces the consumer's harness builds against — relocating any of them
-breaks the consumer while every gate here stays green.
+A consumer integrates through the published GitHub Release asset; a same-level sibling folder with
+`Private=false` is one developer's lockstep arrangement, not a contract and not a layout a clone can
+assume (rationale: `MEMORY.md`). Either way `1.6/Assemblies/` and the `tools/.../Stubs/` tree with its
+`bin/stubs/` shape are de-facto published surfaces — relocating them breaks a consumer's harness while
+every gate here stays green.
 
 ## Memory protocol
 
-Same three-file split as the sibling repos: `AGENTS.md` stable, `MEMORY.md` the only volatile ledger,
-`TODO.md` the action surface. Record a PASS only with its scope and evidence source, saying which half
-is mutation-proven and which is only a future-regression guard. `HANDOFF.md` is transport, never
-the system of record, and carries three section kinds with distinct lifecycles (pinned in its own
-header): a session buffer (read-and-drop next session), cross-repo **rounds**
-(`OPEN→REVIEWED→SCHEDULED→CLOSED`; proposal + review share one file; each repo consolidates only
-its own buffer; an un-CLOSED round keeps a pointer line in `TODO.md`, and closing means the bodies
-are gone from the buffer), and a standing local annex (never emptied). Rounds count on the library
-side and name the initiating consumer in full — consumer feedback is this library's only growth
-engine, and the attribution is the incentive; item ids are proposer-given and never renumbered.
+Three-file split: `AGENTS.md` stable, `MEMORY.md` the only volatile ledger, `TODO.md` the action surface.
+Record a PASS only with its scope and evidence source, saying which half is mutation-proven and which is
+only a future-regression guard. Cross-repo coordination lives in maintainer-local `HANDOFF.md`, which is
+gitignored: its section kinds and round lifecycle are pinned in that file's own header, no tracked file
+may depend on reading it, and an un-CLOSED round keeps a pointer line in `TODO.md`.
 
 ## Boundaries
 
-- Default scope is this repository root plus read-only inspection of sibling repos a consumer contract
-  requires.
+- Default scope is this repository alone: a public checkout holds no sibling mod and no consumer tree, so
+  no rule, gate, script or evidence here may require one. Another repo is read-only, and only for a
+  session the maintainer names; writing one needs their authorization in that same instruction.
 - No `git remote`, no push, no tag, no release, no registry publish without explicit maintainer
   authorization. Local commits are fine.
-- No personal absolute paths, log excerpts, tokens or `PublishedFileId.txt` values in tracked files;
-  consumer references are relative by design.
+- No personal absolute paths, log excerpts, tokens or `PublishedFileId.txt` values in tracked files, and no
+  `../<sibling>` citations either — external evidence is a transcription or a public permalink.
 - **No script places a mod in the game.** Nothing under `scripts/` writes outside the repository, and no
-  step copies, links or junctions anything into a `Mods/` directory: that is the developer's own action on
-  their own machine. The Windows shortcut in particular — a junction or symlink from `Mods/` back into the
-  repo — is never automated: it makes build output part of a machine-local layout another developer cannot
-  see from a clone, cannot reproduce, and on some setups cannot create without elevation. Keep the
-  artifacts under `dist/` and say where they are.
+  step copies, links or junctions anything into a `Mods/` directory — a link back into the repo would bind
+  build output to a machine-local layout another clone cannot see, reproduce, or (without elevation)
+  create. Keep artifacts under `dist/` and say where they are.
