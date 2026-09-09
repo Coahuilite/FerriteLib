@@ -1,105 +1,145 @@
 # AGENTS.md — FerriteLib
 
-> Memory agreement for AI agents working in this repository. This file is the stable layer; volatile
-> state lives in `MEMORY.md`, work items in `TODO.md`.
+> Stable layer: only the rules a session must hold before acting. Everything evidenced, measured, or
+> dated lives in `MEMORY.md`; everything actionable in `TODO.md`. Read `MEMORY.md` before claiming
+> project context.
 
 ## Project identity
 
-- RimWorld 1.6 **prerequisite mod** `coahuilite.ferritelib`, display name **FerriteLib**. Published on
-  GitHub as `Coahuilite/FerriteLib` (public) in the **rc-only trial window** (first asset `v0.2.0-rc1`,
-  2026-09-07; no bare release until the maintainer ends the trial); Workshop pending.
-- Payload is one assembly: `FerriteLib.UiKit`, namespace root `FerriteLib.UiKit`, kernel surface
-  `FerriteLib.UiKit.Kernel`.
-- It ships **no game content of any kind**: no Defs, no Patches, no Languages, no textures. The mod's
-  entire contribution is `1.6/Assemblies/FerriteLib.UiKit.dll`. There are therefore zero translation
-  keys here today — do not add a `Languages/` folder to "fix" a missing string; the string belongs to
-  whichever consumer renders it.
-- License is **MPL-2.0** across the Coahuilite mod series. `LICENSE` is byte-identical between this repo
-  and Universal Squeaker (measured 2026-09-07: same SHA-256); SqueakyRatkin carries the bare MPL text
-  without the repo-level Exhibit A notice header, so "byte-identical in each repo" is true of the
-  lib/consumer pair, not the whole series. The notice is deliberately **not** accompanied by an
-  "Incompatible With Secondary Licenses" statement, so the assembly can still be combined with
-  GPL-family mods. A distributed mod package is an *Executable Form*, so MPL 3.2 obliges us to say how
-  to get source: `pack-dev.ps1` copies `LICENSE` into the package, and `verify-local` gate 6 rejects a
-  truncated paste or an applied incompatibility notice.
-- Log prefix for the library's own diagnostics: `[FerriteLib.UiKit]`. It is not a Def prefix and not a
-  packageId.
-- Known consumers: `coahuilite.universalsqueaker` (Universal Squeaker, the only one wired so far, and the
-  only one whose behaviour this library's shape has been validated against). The second, planned consumer
-  is **an unreleased sibling mod (name withheld from published documents per the 2026-09-06 neutrality
-  ruling; identity lives in the maintainer-local `HANDOFF.md`)** — deferred by maintainer decision
-  (2026-09-04), not scheduled.
+- RimWorld 1.6 prerequisite mod `coahuilite.ferritelib` (display **FerriteLib**, MPL-2.0). The entire
+  payload is `1.6/Assemblies/FerriteLib.UiKit.dll` — zero Defs, Patches, Languages, textures. Never add
+  a `Languages/` folder to "fix" a missing string; the string belongs to whichever consumer renders it.
+- Namespace root `FerriteLib.UiKit`, kernel surface `FerriteLib.UiKit.Kernel`, log prefix
+  `[FerriteLib.UiKit]` (not a Def prefix, not a packageId).
+- Release/publication state (rc-only window, tag rules, hash ledger): `MEMORY.md` — never restate it here.
+- Known consumers: Universal Squeaker (wired; the only behaviour this shape is validated against) and
+  one sibling deferred — its identity lives in maintainer-local `HANDOFF.md`, published docs stay neutral.
 
-## What this library is for
+## The two layers
 
-Two things, kept separable on purpose:
+1. **Declarative page engine** — XML manifest, constrained layout, typed bindings, per-window session,
+   widget registry, creation-time contract validation.
+2. **Visual core** — theme tokens, drawing helpers, text measurement, fit audit, version contract;
+   reachable without adopting the page model.
 
-1. A **declarative page engine** — XML manifest, constrained layout, typed bindings, per-window
-   session, widget registry, creation-time contract validation. Consumer code writes business logic and
-   bindings; structure lives in XML.
-2. A **visual core** — theme tokens, drawing helpers, text measurement, text-fit audit, and the version
-   contract. Reachable *without* adopting the page model.
-
-The split between those two is enforced, not documented: `KernelContractTests.VerifyVisualCoreIsPageModelFree`
-fails if any visual-core file names a page-model type. That gate is the reason there is currently **one
-assembly and no `FerriteLib.Core` package** — the boundary is already airtight, and a second assembly
-would only add a second version contract to keep in step. Re-open the question only if a consumer needs
-the visual core without the whole DLL.
+The split is enforced (`KernelContractTests.VerifyVisualCoreIsPageModelFree`), which is why there is one
+assembly and no `FerriteLib.Core`; re-open only if a consumer needs the visual core without the whole DLL.
 
 ## Invariants (stop and ask before violating)
 
-- **Single carrier.** This mod is the only shipper of `FerriteLib.UiKit.dll`. Two mods shipping it bind
-  by load order through RimWorld's one global `AssemblyResolve`, and the copy that loses has no way to
-  find out. `FerriteLibVersion.Require` enumerates loaded copies and reports the collision; the report
-  is the only detector.
-- **Neutrality.** No consumer's product vocabulary may appear in the library or its harness, checked
-  case-insensitively for words and case-sensitively for identifier prefixes. `coahuilite` is allowed —
-  it is the series namespace, not a product. The guard is self-applied from inside this repo with a
-  positive control and a self-exemption pinned to the scanner file itself.
-- **Two version axes, never conflated.** The contract axis is `FerriteLibVersion.Api` (hand-authored;
-  pre-1.0, a minor bump IS breaking). The release axis is `About/About.xml <modVersion>`. The harness
-  pins them together on major/minor. `AssemblyInformationalVersion` embeds the commit SHA and must
-  never be used as a compatibility value.
-- **RimWorld's `modDependencies` cannot express a version** (`ModRequirement` parses only `packageId`,
-  `alternativePackageIds`, `displayName`). Every consumer must assert the API range in its own
-  constructor; do not assume the game will do it.
-- **IMGUI is the only input and compositing authority in RimWorld.** The kernel renders through Verse
-  IMGUI by design. A Canvas/uGUI surface cannot be placed above the game's IMGUI (verified: IMGUI
-  composites last; `GUI.depth` orders IMGUI against IMGUI), so any future non-IMGUI backend has to be
-  composited through a RenderTexture blit, not expected to sort above the HUD.
-- **API freeze is gated on a second wired consumer**, not on features. Until the withheld-name sibling
-  mod actually builds against this surface, the public API is provisional and breaking changes are expected.
-  **Caveat added with the publication decision (2026-09-04, `TODO.md` §5)**: "breaking changes are
-  expected" is true *within our own repos* because we release in lockstep. It stops being free the moment
-  a Workshop page carries a stable packageId, because a third party can then compile against this surface
-  and lockstep cannot protect them. Do not read this invariant as licence to break things after publishing;
-  the invited-vs-unsupported call on the page is what settles it, and it has not been made yet.
+- **Single carrier.** Only this mod ships `FerriteLib.UiKit.dll`. Two copies bind by load order through
+  the game's one global `AssemblyResolve` and the losing copy cannot find out;
+  `FerriteLibVersion.Require` enumerates loaded copies and its collision report is the only detector.
+- **Neutrality.** No consumer's product vocabulary in the library or its harness — words
+  case-insensitively, identifier prefixes case-sensitively; `coahuilite` is the series namespace,
+  allowed. The guard is self-applied here with a positive control and a path-pinned self-exemption.
+- **Version axes.** Contract `FerriteLibVersion.Api` (pre-1.0: a minor bump IS breaking, and any public
+  addition bumps minor too), release `About/About.xml <modVersion>`, build csproj `VersionPrefix` — the
+  harness pins all three. `AssemblyInformationalVersion` embeds the commit SHA and is never a
+  compatibility value.
+- **The game cannot express a prerequisite version** (`ModRequirement` parses only `packageId`,
+  `alternativePackageIds`, `displayName`); every consumer asserts the API range in its own constructor.
+
+- **IMGUI is RimWorld's only input and compositing authority.** The kernel renders through Verse IMGUI
+  by design; a Canvas/uGUI surface cannot sort above the game's IMGUI, so any future non-IMGUI backend
+  composites through a RenderTexture blit, never "above the HUD".
+- **Map-layer rendering is permanently outside UiKit.** `GenMapUI` and its family carry no session and
+  no hit-test semantics to bind to, so world-space text (pawn-head marks and friends) is something this
+  library cannot provide — a non-goal, not a backlog item (ruled in the US→FL round 1 review). A
+  consumer's whitelist entry for it is policy-backed and is not renegotiated per PR; the boundary that
+  remains is that anything drawn into a window goes through the tree.
+- **API freeze is gated on the second wired consumer**, not on features; until it builds against this
+  surface, the API is provisional. After a Workshop page carries the stable packageId, "breaking
+  changes are expected" stops being free — the invited-vs-unsupported call (`TODO.md` §5) is open and
+  is a maintainer decision, never a session's.
+
+## Ecosystem protocol (how this library may grow)
+
+Growth has one legal source: a real consumer was forced to hand-roll something, the code exists, and the
+shape is generally providable. A request is not evidence; a citation into a consumer tree is.
+
+Consumer ladder when the library lacks something:
+
+1. **Compose it on the tree** — own widget kind via the registry, on `UiNative` primitives and session
+   axes. This is the recommended destination for anything consumer-specific; identity, state,
+   invalidation, recovery and harness visibility stay with the library. A window is no longer an
+   exception to this: `UiWindowHost` owns the chrome, so a page never has to leave the tree to exist.
+2. **Propose promotion** — one release after it survives, via a HANDOFF round (harvest loop and full
+   form, with provenance and the metric: `MEMORY.md`).
+3. **Register an exemption** — only for what structurally cannot live in a page tree, which after the
+   round-1 shell is world-space rendering and nothing else currently known. Allowlisted file + written
+   ruling + named closing item: rent, not exit.
+
+Promotion gate — all four or it stays consumer-side: provenance cited; neutral, and no consumer's
+numbers as library defaults; no new process-wide mutable statics; a harness-drivable lane exists.
+
+Unproven surface is debt, not inventory: zero-citation kinds and session axes get deleted or reshaped to
+a cited consumer's proven form, never kept "for symmetry".
+
+Raw IMGUI outside the tree is not forbidden — it is unsupported and unmeasurable: the harness, the fit
+audit, session recovery, popup geometry rules and the dependency-reality proof bind to tree code only.
+The ecosystem metric is raw-backend call sites outside the funnel files, counted across both repos; the
+funnel files are named by the containment gate, and that list is the measurement.
 
 ## Build and verification
 
 ```powershell
-pwsh -NoProfile -File scripts/verify-local.ps1          # 7 gates
-pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev # + mod zip and NuGet package
+pwsh -NoProfile -File scripts/verify-local.ps1                       # 7 gates
+pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev              # + staged dev folder (placement is manual)
+pwsh -NoProfile -File scripts/pack-release.ps1 -Version v0.3.0-rc2   # + GitHub asset (what CI runs)
+pwsh -NoProfile -File scripts/pack-steam.ps1  -Version v0.3.0-rc2    # + Workshop upload folder
 ```
 
-Consumers reference the built payload **by relative sibling path**, not through a package feed. Measured
-reason (`MEMORY.md`): NuGet strips build metadata from the cache identity, so a `0.1.0-dev+<sha>` republish
-still lands in one stale `lib/0.1.0-dev` folder, and the consumer gates run with restore disabled, so a
-floating version would go green against the previously resolved graph. `dotnet pack` is kept working so
-that switching to a feed or a registry later is a source-line change, not a redesign.
+`-PackDev` stages `dist/dev/FerriteLib/` and stops there. No script under `scripts/` writes outside the
+repository, and putting a folder into a game `Mods/` directory — by copy, symlink or junction — is the
+developer's own step (see Boundaries): the Windows shortcut in particular would bind this repo's build
+output to a machine-local layout another developer cannot see, reproduce, or often create.
+
+Three channels, one staging engine. `stage-package.ps1` decides what a package *is* — the five allowed
+files, the content probe, the licence copy, `version.txt`, and the closed-set assertion that stops a
+stray `.pdb` or repository-only file riding along. It also **measures** the payload's build configuration
+and refuses a channel whose bytes do not match its name (`dev` requires a Dev-configured assembly,
+`github`/`steam` a Release-configured one), so `version.txt`'s `build=` line is derived from the DLL and
+never supplied by the caller. `pack-dev` / `pack-release` / `pack-steam` decide
+identity and nothing else: dev tolerates a dirty tree and says so in its label, github requires the tag
+shape and the build axis, steam additionally requires a clean tree. Only the GitHub channel archives —
+a dev rehearsal and a Workshop upload are folders — which also confines the archive-timestamp problem
+to the one artifact whose digest must be public. Dev writes no NuGet package; `-Nupkg` asks for one,
+since consumers bind to the payload by sibling path.
+
+`About/PublishedFileId.txt` is gitignored and the stager copies `About.xml` as a file rather than the
+`About` directory, so no dev or GitHub artifact can carry Workshop identity; the upload step creates it
+inside `dist/steam/FerriteLib/About/` locally.
+
+Consumers reference the payload by relative sibling path with `Private=false` (measured rationale:
+`MEMORY.md`). The `1.6/Assemblies/` output path and the `tools/.../Stubs/` tree with its `bin/stubs/`
+shape are de-facto published surfaces the consumer's harness builds against — relocating any of them
+breaks the consumer while every gate here stays green.
 
 ## Memory protocol
 
-Same three-file split as the sibling consumer repos: `AGENTS.md` stable, `MEMORY.md` the only volatile
-ledger, `TODO.md` the action surface. Read `MEMORY.md` before claiming project context. Record a PASS
-only with its scope and its evidence source, and say which half of a check is mutation-proven versus
-which half is only a future-regression guard.
+Same three-file split as the sibling repos: `AGENTS.md` stable, `MEMORY.md` the only volatile ledger,
+`TODO.md` the action surface. Record a PASS only with its scope and evidence source, saying which half
+is mutation-proven and which is only a future-regression guard. `HANDOFF.md` is transport, never
+the system of record, and carries three section kinds with distinct lifecycles (pinned in its own
+header): a session buffer (read-and-drop next session), cross-repo **rounds**
+(`OPEN→REVIEWED→SCHEDULED→CLOSED`; proposal + review share one file; each repo consolidates only
+its own buffer; an un-CLOSED round keeps a pointer line in `TODO.md`, and closing means the bodies
+are gone from the buffer), and a standing local annex (never emptied). Rounds count on the library
+side and name the initiating consumer in full — consumer feedback is this library's only growth
+engine, and the attribution is the incentive; item ids are proposer-given and never renumbered.
 
 ## Boundaries
 
-- Default scope is this repository root plus the read-only inspection of sibling repos a consumer
-  contract requires.
+- Default scope is this repository root plus read-only inspection of sibling repos a consumer contract
+  requires.
 - No `git remote`, no push, no tag, no release, no registry publish without explicit maintainer
   authorization. Local commits are fine.
-- No personal absolute paths, log excerpts, tokens or `PublishedFileId.txt` values in tracked files.
-  Consumer references are relative by design, so nothing here needs a machine path.
+- No personal absolute paths, log excerpts, tokens or `PublishedFileId.txt` values in tracked files;
+  consumer references are relative by design.
+- **No script places a mod in the game.** Nothing under `scripts/` writes outside the repository, and no
+  step copies, links or junctions anything into a `Mods/` directory: that is the developer's own action on
+  their own machine. The Windows shortcut in particular — a junction or symlink from `Mods/` back into the
+  repo — is never automated: it makes build output part of a machine-local layout another developer cannot
+  see from a clone, cannot reproduce, and on some setups cannot create without elevation. Keep the
+  artifacts under `dist/` and say where they are.

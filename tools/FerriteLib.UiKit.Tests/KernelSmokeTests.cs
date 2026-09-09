@@ -119,10 +119,15 @@ internal static class KernelSmokeTests
             new StubMetrics(),
             new StubTranslation());
 
+        // The popup pass runs after the content pass and is NOT inside the per-element guard (item C
+        // recovers element draws; a popup callback is the host's own work). Failing there still has to
+        // leave the frame balanced, which is the invariant this test was written to hold.
+        host.Session.RegisterPopupDraw(() => throw new InvalidOperationException("draw failure"));
+
         try
         {
             host.DrawFrame(new Rect(0f, 0f, 400f, 200f));
-            throw new Exception("DrawFrame did not propagate the draw failure");
+            throw new Exception("DrawFrame did not propagate the popup-pass failure");
         }
         catch (InvalidOperationException ex) when (ex.Message == "draw failure")
         {
@@ -132,7 +137,7 @@ internal static class KernelSmokeTests
         if (!host.Session.IsActive) throw new Exception("DrawFrame disposed the session");
         if (host.Session.PopupDrawActions.Count != 0)
         {
-            throw new Exception("DrawFrame did not run EndFrame after the draw failure");
+            throw new Exception("DrawFrame did not run EndFrame after the popup-pass failure");
         }
         host.Close();
     }

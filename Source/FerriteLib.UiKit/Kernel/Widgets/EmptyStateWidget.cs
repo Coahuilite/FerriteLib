@@ -21,7 +21,8 @@ public sealed class EmptyStateWidget : IUiWidget
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new EmptyStateWidget(),
-            new[] { "Id", "Kind", "Text", "TextKey", "Height", "Tab", "Hidden" });
+            new[] { "Id", "Kind", "Text", "TextKey", "Height", "Tab", "Hidden" },
+            new[] { "Text", "TextKey" });
     }
 
     public void Configure(UiElementSpec spec)

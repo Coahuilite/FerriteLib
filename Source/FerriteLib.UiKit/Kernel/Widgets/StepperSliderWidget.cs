@@ -1,9 +1,6 @@
 using System;
 using System.Globalization;
 using UnityEngine;
-using Verse;
-
-using VerseWidgets = Verse.Widgets;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
@@ -17,7 +14,11 @@ public sealed class StepperSliderWidget : IUiWidget
     public const string Kind = "input/stepper-slider";
 
     private const float DefaultHeight = 28f;
-    private const float LabelWidth = 80f;
+    // The label band is measured, never hard-coded: the 80f constant this replaces was the
+    // library-side specimen of the N1 complaint (US->FL round 3), and its removal is the accepted
+    // reshape — the same text-natural seam Width="Auto" uses, proving itself in the library's own
+    // widget. The pad keeps glyphs off the band edge; it is not a size floor.
+    private const float LabelPad = 4f;
     private const float DefaultButtonWidth = 24f;
     private const float DefaultFieldWidth = 64f;
     private const float Gap = 6f;
@@ -34,7 +35,8 @@ public sealed class StepperSliderWidget : IUiWidget
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new StepperSliderWidget(),
-            new[] { "Id", "Kind", "Bind", "Min", "Max", "Step", "Format", "Live", "ButtonWidth", "FieldWidth", "Height", "Label", "LabelKey", "Tab", "Hidden" });
+            new[] { "Id", "Kind", "Bind", "Min", "Max", "Step", "Format", "Live", "ButtonWidth", "FieldWidth", "Height", "Label", "LabelKey", "Tab", "Hidden" },
+            new[] { "Label", "LabelKey" });
     }
 
     public void Configure(UiElementSpec spec)
@@ -79,12 +81,14 @@ public sealed class StepperSliderWidget : IUiWidget
         float x = rect.x;
         float y = rect.y;
         float height = rect.height;
-
         string label = ReadLabel(ctx);
         if (label.Length > 0)
         {
-            DrawLabel(new Rect(x, y, LabelWidth, height), label, ctx.Theme.TextPrimary, ctx.Theme.DefaultFont);
-            x += LabelWidth + Gap;
+            // Through the theme's text outlet, so this label is covered by the fit audit like every
+            // other string the kernel draws (its private copy was one of the audit's blind spots).
+            float labelWidth = Math.Max(1f, ctx.Metrics.MeasureWidth(label, ctx.Theme.DefaultFont) + LabelPad);
+            UiThemeDraw.Label(new Rect(x, y, labelWidth, height), label, ctx.Theme, ctx.Theme.TextPrimary);
+            x += labelWidth + Gap;
         }
 
         Rect minusRect = new(x, y, buttonWidth, height);
@@ -149,26 +153,10 @@ public sealed class StepperSliderWidget : IUiWidget
 
     private static void DrawButton(Rect rect, string text, UiTheme theme)
     {
-        VerseWidgets.DrawBoxSolid(rect, theme.Raised);
-        DrawLabel(rect, text, theme.TextPrimary, theme.DefaultFont);
+        UiThemeDraw.Solid(rect, theme.Raised);
+        UiThemeDraw.Label(rect, text, theme, theme.TextPrimary, anchor: TextAnchor.MiddleCenter);
     }
 
-    private static void DrawLabel(Rect rect, string text, Color color, UiFont font)
-    {
-        Color oldColor = GUI.color;
-        GameFont oldFont = Text.Font;
-        try
-        {
-            Text.Font = UiKitFonts.ToGameFont(font);
-            GUI.color = color;
-            VerseWidgets.Label(rect, text);
-        }
-        finally
-        {
-            Text.Font = oldFont;
-            GUI.color = oldColor;
-        }
-    }
 
     private float ReadHeight()
     {

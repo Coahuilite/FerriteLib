@@ -19,6 +19,10 @@ public static class UiWidgetRegistry
         new(StringComparer.Ordinal);
     private static readonly Dictionary<string, Dictionary<string, IReadOnlyCollection<string>>> AttributeSchemas =
         new(StringComparer.Ordinal);
+    // Which attributes carry the text a kind draws as its own label. This is what Width="Auto"
+    // measures: the kind, not the engine, names its label attributes (US->FL round 3, N1).
+    private static readonly Dictionary<string, Dictionary<string, IReadOnlyCollection<string>>> LabelAttributes =
+        new(StringComparer.Ordinal);
     private static bool coreInitialized;
 
     public static void InitializeCore()
@@ -33,7 +37,7 @@ public static class UiWidgetRegistry
 
     public static void Register(string scope, string kind, Func<IUiWidget> factory)
     {
-        Register(scope, kind, factory, null);
+        Register(scope, kind, factory, null, null);
     }
 
     /// <summary>
@@ -46,6 +50,22 @@ public static class UiWidgetRegistry
         string kind,
         Func<IUiWidget> factory,
         IReadOnlyCollection<string>? allowedAttributes)
+    {
+        Register(scope, kind, factory, allowedAttributes, null);
+    }
+
+    /// <summary>
+    /// Additionally declares which of the kind's attributes carry its own label text. A container
+    /// child with <c>Width="Auto"</c> is measured over this set (each value resolved through
+    /// translation when the attribute name ends in <c>Key</c>); kinds that register no label set
+    /// cannot be Auto-measured and fall back to the unsized distribution.
+    /// </summary>
+    public static void Register(
+        string scope,
+        string kind,
+        Func<IUiWidget> factory,
+        IReadOnlyCollection<string>? allowedAttributes,
+        IReadOnlyCollection<string>? labelAttributes)
     {
         if (scope == null) throw new ArgumentNullException(nameof(scope));
         if (kind == null) throw new ArgumentNullException(nameof(kind));
@@ -78,6 +98,17 @@ public static class UiWidgetRegistry
 
                 schemas[kind] = new HashSet<string>(allowedAttributes, StringComparer.OrdinalIgnoreCase);
             }
+
+            if (labelAttributes != null)
+            {
+                if (!LabelAttributes.TryGetValue(scope, out Dictionary<string, IReadOnlyCollection<string>>? labelSets))
+                {
+                    labelSets = new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.Ordinal);
+                    LabelAttributes.Add(scope, labelSets);
+                }
+
+                labelSets[kind] = new HashSet<string>(labelAttributes, StringComparer.OrdinalIgnoreCase);
+            }
         }
     }
 
@@ -100,6 +131,31 @@ public static class UiWidgetRegistry
                 && coreSchemas.TryGetValue(kind, out IReadOnlyCollection<string>? coreSchema))
             {
                 return coreSchema;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the label-attribute set for a kind (exact scope first, core scope fallback), or null
+    /// when the kind declared none. Null means "not Auto-measurable", never "measure everything".
+    /// </summary>
+    public static IReadOnlyCollection<string>? GetLabelAttributes(string scope, string kind)
+    {
+        lock (Gate)
+        {
+            if (LabelAttributes.TryGetValue(scope, out Dictionary<string, IReadOnlyCollection<string>>? labelSets)
+                && labelSets.TryGetValue(kind, out IReadOnlyCollection<string>? set))
+            {
+                return set;
+            }
+
+            if (!string.Equals(scope, CoreScope, StringComparison.Ordinal)
+                && LabelAttributes.TryGetValue(CoreScope, out Dictionary<string, IReadOnlyCollection<string>>? coreSets)
+                && coreSets.TryGetValue(kind, out IReadOnlyCollection<string>? coreSet))
+            {
+                return coreSet;
             }
         }
 
@@ -156,13 +212,21 @@ public static class UiWidgetRegistry
             return all.ToArray();
         }
     }
-
-    public static void Clear()
+    /// <summary>
+    /// Wipes every scope's registrations. Internal (FL→US round 1, item D): as a public call it let any
+    /// third-party mod erase registrations it never made, process-wide, and the mods that lost their
+    /// kinds would have had no way to find out who did it — the same invisibility that makes two
+    /// carriers of this DLL a hazard. Only this library's own harness needs it, and
+    /// <c>InternalsVisibleTo("FerriteLib.UiKit.Tests")</c> is already in place. Verified before the flip:
+    /// no call site in the wired consumer's Source tree, tools or scripts.
+    /// </summary>
+    internal static void Clear()
     {
         lock (Gate)
         {
             Scopes.Clear();
             AttributeSchemas.Clear();
+            LabelAttributes.Clear();
             coreInitialized = false;
         }
     }

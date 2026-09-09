@@ -28,7 +28,10 @@ internal static class KernelSessionTests
             VerifyPopupDrawCallbacksAreSessionScoped();
             VerifyDropdownHelpersUseSessionState();
             VerifyHotControlOwnershipIsSessionScoped();
-            VerifyDisposeReleasesOnlyOwnedCapture();
+            VerifyHoverClaimHoldsAcrossATransitGap();
+            VerifyHoverClaimReleasesAfterItsGraceWindow();
+            VerifyLiveHoverClaimReplacesTheHeldOne();
+            VerifyZeroGraceHoverClaimClearsEveryPass();
         }
         finally
         {
@@ -284,6 +287,91 @@ internal static class KernelSessionTests
             "no native button hit does not open the popup");
     }
 
+
+    // ---- P3: the session-owned hover-claim machine ----------------------------------------
+    // These pin the two rules the consumer had to hand-roll, and the one distinction that is easy
+    // to lose in a rewrite: a claim the boundary restored is NOT the same as a claim a widget made,
+    // so restoring must not re-arm the grace window forever.
+
+    private static void VerifyHoverClaimHoldsAcrossATransitGap()
+    {
+        using UiSession session = new();
+        session.HoverGraceFrames = 2;
+
+        session.BeginFrame();
+        session.ClaimHover("control-a");
+        Check(session.HoverClaim == "control-a", "the claim is visible in the pass that made it");
+
+        session.BeginFrame();
+        Check(session.HoverClaim == null, "the frame boundary clears the claim so widgets must re-claim");
+
+        // Pointer crossing the gap between two controls: nobody claims this pass.
+        session.BeginFrame();
+        Check(session.HoverClaim == "control-a", "a gap pass re-presents the held claim instead of flashing the overview");
+    }
+
+    private static void VerifyHoverClaimReleasesAfterItsGraceWindow()
+    {
+        using UiSession session = new();
+        session.HoverGraceFrames = 2;
+
+        session.BeginFrame();
+        session.ClaimHover("control-a");
+
+        string?[] seen = new string?[4];
+        for (int i = 0; i < seen.Length; i++)
+        {
+            session.BeginFrame();
+            seen[i] = session.HoverClaim;
+        }
+
+        Check(seen[0] == null, "pass 1 after the claim is the boundary pass, which clears");
+        Check(seen[1] == "control-a" && seen[2] == "control-a", "grace holds the claim for exactly the configured passes");
+        Check(seen[3] == null, "the claim is released once the grace window is spent");
+    }
+
+    private static void VerifyLiveHoverClaimReplacesTheHeldOne()
+    {
+        using UiSession session = new();
+        session.HoverGraceFrames = 3;
+
+        session.BeginFrame();
+        session.ClaimHover("control-a");
+
+        session.BeginFrame();
+        session.ClaimHover("control-b");
+        Check(session.HoverClaim == "control-b", "a live claim replaces the held one in the same pass");
+
+        // Three gap passes with no claims. The first is the boundary pass that follows a real claim,
+        // so it is blank by design (a still-hovered widget re-claims inside it); the grace window
+        // carries from the second. None of them may show a: if a restored claim re-armed the window,
+        // the superseded one would come back and pin the panel.
+        session.BeginFrame();
+        string? gap1 = session.HoverClaim;
+        session.BeginFrame();
+        string? gap2 = session.HoverClaim;
+        session.BeginFrame();
+        string? gap3 = session.HoverClaim;
+
+        Check(gap2 == "control-b" && gap3 == "control-b", "the grace window carries the newer claim");
+        Check(gap1 != "control-a" && gap2 != "control-a" && gap3 != "control-a",
+            "the superseded claim never comes back");
+    }
+
+    private static void VerifyZeroGraceHoverClaimClearsEveryPass()
+    {
+        using UiSession session = new();
+        Check(session.HoverGraceFrames == 0, "grace defaults to zero, so a host that opts out behaves as before");
+
+        session.BeginFrame();
+        session.ClaimHover("control-a");
+
+        session.BeginFrame();
+        Check(session.HoverClaim == null, "with no grace the machine is the plain per-pass clear");
+
+        session.BeginFrame();
+        Check(session.HoverClaim == null, "and nothing is carried into a later pass");
+    }
     private static void ResetStaticTestSeams()
     {
         UiSessionGuard.LogWarningOverride = null;

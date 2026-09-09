@@ -1,63 +1,75 @@
 param(
-    [string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot)
+    [string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot),
+    # The rehearsal is a folder, not an archive. -Zip exists for the cases where a folder actually has
+    # to travel as one file; the normal case is that a developer moves it into their own game directory
+    # by hand, which is exactly why this script does not offer to do it.
+    [switch]$Zip,
+    # The NuGet package is a compile-time convenience for repositories on this machine; consumers bind
+    # to the payload by sibling path, and a feed is deliberately on hold (MEMORY). So it is opt-in.
+    [switch]$Nupkg
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# Produces both FerriteLib artifacts from one build, in the order that keeps them honest:
-#   1. the mod payload folder (dist/dev/FerriteLib/...), which is what a player installs, and
-#   2. the NuGet package (artifacts/package/...), which is what a consumer mod compiles against.
+# Dev channel: the thinnest artifact that can be staged. No identity gate, no archive, no package
+# feed — those belong to the channels that publish. All the staging rules live in stage-package.ps1;
+# this file decides only what a dev artifact is called and where it lands inside dist/.
 #
-# They come out of the SAME build of the SAME csproj. That is deliberate: if the packaged reference
-# assembly were built separately from the shipped payload, a consumer could compile against one and
-# bind to the other, and the version contract would be checking a number nobody can tie to a DLL.
+# Boundary, deliberate and not to be automated away: this script writes nothing outside the repository,
+# and specifically never touches the game's Mods directory. Placing a mod there is the developer's step.
+# The convenient Windows shortcut — a junction or symlink from Mods/ into the repo — would make this
+# repository's build output part of a machine-local layout that another developer cannot see, cannot
+# reproduce from a clone, and on some setups cannot create without elevated privileges.
 
 $root = [System.IO.Path]::GetFullPath($ProjectRoot)
 $projectFile = Join-Path $root 'Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj'
-$distDir = Join-Path $root 'dist\dev'
-$stageDir = Join-Path $distDir 'FerriteLib'
-$payloadDir = Join-Path $root '1.6\Assemblies'
+$stageDir = Join-Path $root 'dist\dev\FerriteLib'
 
-& dotnet build $projectFile -c Release --nologo -v minimal
-if ($LASTEXITCODE -ne 0) { throw "Release build failed." }
+# Build first, and build the flavor this channel is named for. Two things are being forced here:
+#
+# 1. Freshness. Dev and Release share one OutputPath (1.6/Assemblies/), and up-to-dateness is judged
+#    per-configuration, so an incremental build can report itself current while the file at the payload
+#    path was written by the other configuration. Measured 2026-09-07: after a full verify-local run the
+#    payload was a Dev-configuration assembly of 98,304 bytes, where a forced Release rebuild of the same
+#    commit is 91,136. Copying whatever sits there would stage bytes under a label that cannot describe
+#    them. --no-incremental removes the guess.
+# 2. Truth. This folder's version.txt says build=dev, so the assembly must be the Dev configuration.
+#    stage-package.ps1 now reads the stamp out of the DLL instead of taking the caller's word for it.
+& dotnet build $projectFile -c Dev --no-incremental --nologo -v minimal
+if ($LASTEXITCODE -ne 0) { throw 'Dev build failed.' }
 
-if (-not (Test-Path -LiteralPath (Join-Path $payloadDir 'FerriteLib.UiKit.dll') -PathType Leaf)) {
-    throw "Build produced no payload at $payloadDir"
+# The label comes from the build axis, exactly like the artifact name in pack-release: one source for
+# the number, or the folder and the DLL inside it can disagree.
+$prefixMatch = Select-String -LiteralPath $projectFile -Pattern '<VersionPrefix>(.*?)</VersionPrefix>'
+if (-not $prefixMatch) { throw 'csproj carries no <VersionPrefix>; the build axis has no home.' }
+$label = $prefixMatch.Matches[0].Groups[1].Value.Trim() + '-dev'
+
+$shortCommit = (& git -C $root rev-parse --short=12 HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or -not $shortCommit) { throw 'Cannot resolve the current commit for the dev label.' }
+
+# A dev folder built from uncommitted work is normal; it just has to say so. The suffix is the reason
+# an in-game report can be traced to a tree that no longer exists.
+$dirty = @(& git -C $root status --porcelain --untracked-files=normal)
+if ($LASTEXITCODE -ne 0) { throw 'git status failed; cannot label the dev artifact.' }
+if ($dirty.Count -gt 0) { $shortCommit += '-dirty' }
+
+$stageArgs = @{
+    ProjectRoot  = $root
+    StageDir     = $stageDir
+    VersionLabel = $label
+    BuildFlavor  = 'dev'
+    CommitLabel  = $shortCommit
 }
+if ($Zip) { $stageArgs.CreateZip = $true }
 
-# --- mod package -------------------------------------------------------------
-if (Test-Path -LiteralPath $stageDir) { Remove-Item -LiteralPath $stageDir -Recurse -Force }
-$null = New-Item -ItemType Directory -Path (Join-Path $stageDir '1.6\Assemblies') -Force
-$null = New-Item -ItemType Directory -Path (Join-Path $stageDir 'About') -Force
-Copy-Item -LiteralPath (Join-Path $root 'About\About.xml') -Destination (Join-Path $stageDir 'About\About.xml') -Force
-Copy-Item -LiteralPath (Join-Path $root 'LoadFolders.xml') -Destination (Join-Path $stageDir 'LoadFolders.xml') -Force
-Copy-Item -LiteralPath (Join-Path $payloadDir 'FerriteLib.UiKit.dll') -Destination (Join-Path $stageDir '1.6\Assemblies\FerriteLib.UiKit.dll') -Force
+& (Join-Path $PSScriptRoot 'stage-package.ps1') @stageArgs
+if ($LASTEXITCODE -ne 0) { throw "stage-package failed with exit code $LASTEXITCODE." }
 
-# MPL-2.0 section 3.2: a distributed Executable Form must say how to obtain the Source Code Form, so
-# the licence text travels inside the mod package rather than living only in the repository.
-$licenseSource = Join-Path $root 'LICENSE'
-if (-not (Test-Path -LiteralPath $licenseSource -PathType Leaf)) {
-    throw "Missing LICENSE: the carrier package is MPL-2.0 covered and must ship the licence text."
+Write-Host "[pack-dev] staged folder -> $stageDir  (moving it into a game Mods directory is your step, not this script's)"
+
+if ($Nupkg) {
+    & dotnet pack $projectFile -c Release --nologo -v minimal
+    if ($LASTEXITCODE -ne 0) { throw 'dotnet pack failed.' }
+    Write-Host "[pack-dev] nupkg -> $root\artifacts\package (not published anywhere; see MEMORY for why a feed is on hold)"
 }
-Copy-Item -LiteralPath $licenseSource -Destination (Join-Path $stageDir 'LICENSE') -Force
-
-$label = (Select-String -LiteralPath $projectFile -Pattern '<VersionPrefix>(.*?)</VersionPrefix>').Matches[0].Groups[1].Value
-$suffixNode = (Select-String -LiteralPath $projectFile -Pattern '<VersionSuffix>(.*?)</VersionSuffix>')
-if ($suffixNode) { $label = "$label-$($suffixNode.Matches[0].Groups[1].Value)" }
-# The source pointer is MPL-2.0 3.2's requirement on an Executable Form; see pack-release.ps1 for the
-# full note. Dev packages are local rehearsals, but they ship the same shape as the release asset.
-[System.IO.File]::WriteAllText((Join-Path $stageDir 'version.txt'), "FerriteLib $label`r`nsource https://github.com/Coahuilite/FerriteLib`r`n")
-
-$pdbs = @(Get-ChildItem -LiteralPath $stageDir -Recurse -File -Filter '*.pdb')
-if ($pdbs.Count -gt 0) { $pdbs | Remove-Item -Force }
-$zipPath = Join-Path $distDir "FerriteLib-dev-v$label.zip"
-if (Test-Path -LiteralPath $zipPath -PathType Leaf) { Remove-Item -LiteralPath $zipPath -Force }
-Compress-Archive -Path (Join-Path $stageDir '*') -DestinationPath $zipPath
-Write-Host "[pack-dev] staged mod package -> $stageDir"
-Write-Host "[pack-dev] zip -> $zipPath"
-
-# --- consumer reference package ---------------------------------------------
-& dotnet pack $projectFile -c Release --nologo -v minimal
-if ($LASTEXITCODE -ne 0) { throw "dotnet pack failed." }
-Write-Host "[pack-dev] nupkg -> $root\artifacts\package (not published anywhere; see MEMORY for why a feed is on hold)"

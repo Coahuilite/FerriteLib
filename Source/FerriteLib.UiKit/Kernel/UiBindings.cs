@@ -9,6 +9,15 @@ namespace FerriteLib.UiKit.Kernel;
 /// </summary>
 public sealed class UiBindings : IUiBindings
 {
+
+    /// <summary>
+    /// The value-binding key the layout engine reads to decide which <c>Tab</c>-attributed elements are
+    /// visible. The engine used to hard-read this magic string out of consumer-supplied bindings without
+    /// ever declaring it, so a consumer had to guess the spelling and a wrong guess was a silently
+    /// invisible page (US→FL round 1, P4). Register it as a <c>string</c> value binding; a consumer that
+    /// never registers it is not broken — <c>Tab</c> simply reads as no active tab, as before.
+    /// </summary>
+    public const string ActiveTabKey = "active-tab";
     private abstract class ValueDescriptor
     {
         public abstract Type ValueType { get; }

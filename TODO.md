@@ -1,8 +1,44 @@
 # TODO
 
-## 1. In-game verification — status after the 2026-09-04 session
+## 0. Open HANDOFF rounds and the round-1 release (branch `0.3.x`)
 
-The blocking risk is cleared. What remains is two branches that only change code if they surprise us.
+- [x] **US→FL round 3 (2026-09-08) — CLOSED, implemented 2026-09-09.** Filed as "round 2", renumbered
+      to 3 under the global-counter rule. Verdicts (buffer, `996a6bc`-verified): N1+N2 accepted as ONE
+      package, N3 closed as verdict (b). **Maintainer refiled 0.4.0 → 0.3.0 (2026-09-09): the release
+      never shipped, so its contract axis has no goalpost to move.** Landed on `0.3.x` with three
+      evidence-forced deviations (MinWidth/MaxWidth not Min/Max — value-range collision; Width joins
+      the common widget attributes — the engine read it while no schema allowed it; narrow-state
+      attributes refused without a governing Breakpoint) — all three in `MEMORY.md` round-3 entry,
+      which is also the permanent record. US's own docs still say 0.4.0; report, never edit (annex).
+      The pointer retires with this check: nothing from round 3 stays open on the FL side.
+
+Round 1 is SCHEDULED and, on this branch, implemented: P1–P6 (P3 landed here rather than slipping to
+0.3.x — it is session-scoped, provenance-cited and lane-tested, and holding it back would cost US the
+lockstep migration) plus FL-side items A–E, on the 0.3.0 contract axis. What is left is release work,
+not design work.
+
+- [ ] **Ship 0.3.0 — the last gate is the maintainer's trial decision, nothing else.** US's migration
+      commit landed (`7777cbe`, gate re-verified by FL read-only: pin `[0.3.0,0.4.0)` at `Mod.cs:27-28`,
+      thin `UiWindowHost`, zero raw hovers, gate 14 green), so the lockstep precondition round 1 set is
+      **met**. The branch is now `0.3.x` (renamed 2026-09-09 when the round-3 package joined 0.3.0):
+      0.3.0 = P1–P6 + FL-side A–E + N1/N2 responsiveness + the measured slider label. Tag dialect
+      unchanged: `v0.3.0-rc1` at the then-tip, bare tag only on the commit that ends the trial
+      (`MEMORY.md`, publication state). Remote merges are merge-commit only (squash/rebase buttons
+      disabled server-side 2026-09-09); merging into `main` and the tag itself stay maintainer calls.
+- [ ] **Cross-repo follow-through — report, do not edit** (`AGENTS.md` Boundaries). Remaining after
+      `7777cbe`: (a) CLOSED by re-derivation 2026-09-08 — the phantom `UiPanel` is resolved at source:
+      US's scan now lists six names including `UiPanel`
+      (`UiSourceInvariantTests.cs:153`, commented as the round-2 fix), and its MEMORY's two prose hits
+      describe that list accurately. The same re-derivation that closed it nearly missed it the other
+      way: the scan lives in `tools/`, not in `scripts/*.ps1`, so a scripts-only grep reports "no scan
+      at all". See `MEMORY.md` enduring corrections; (b) its release body gains the lib-release link
+      only once this repo publishes a 0.3.0 asset — blocked by the bullet above, not by US. Full
+      ledger: buffer's standing annex.
+
+## 1. In-game verification — status after the 2026-09-07 round-1 branch
+
+The blocking risk is cleared. What remains is two branches from the split plus three new ones the
+round-1 surface introduced; every one of the five only changes code if it surprises us.
 
 - [x] **Cross-mod assembly binding.** PROVEN. US installed without any FerriteLib payload of its own
       resolved its `FerriteLib.UiKit` reference from the carrier mod, opened the settings page and the
@@ -37,6 +73,25 @@ The blocking risk is cleared. What remains is two branches that only change code
       Keyed tables only take effect after restart, then opening Options from the main menu, switching and
       returning without restarting is a half-switched state. Look for visible misalignment; if none,
       record it unreachable and add no mechanism.
+- [ ] **The window shell has never been opened in a game.** `UiWindowHost` is compile-verified against
+      `Krafs.Rimworld.Ref 1.6.4871` and lane-verified against the `Verse.Window` stub slice, and the two
+      signature facts that killed the first harness runs (`Window..ctor(IWindowDrawing)` and
+      `Close(bool doCloseSound = true)`) were read from the reference assembly rather than guessed. That
+      is still not a game run: the shell must be opened once through the real window stack, where
+      `WindowOnGUI`'s actual group/matrix plumbing, `layer = Dialog` ordering and the close-sound path
+      are all live. A signature the ref assembly and the stub agree on and the executable disagrees with
+      shows up here and nowhere else.
+- [ ] **Two text paths just came into the fit audit.** Container titles and the stepper-slider's label
+      and `−`/`+` glyphs used to bypass `UiFitAudit.Check`; item A routed them through
+      `UiThemeDraw.Label`, so they can now report overflow they never could report before, and they also
+      changed vertical anchor from ambient to `MiddleLeft`. Walk the pages with detailed logging on and
+      look for newly-reported overflows and for visible title misalignment. Absence of both is the
+      result to record; either surprise reshapes A, not the audit.
+- [ ] **Engine-owned recovery has never tripped in a game.** Item C moved per-widget recovery into the
+      tree, so a throwing core widget now paints a warning band with its layout path and trips its
+      session slot. The band's paint (theme `Warning` fill, `TextOnDanger` path text) has only ever been
+      seen in a stub. Force one trip by hand — a temporary consumer widget that throws — and confirm the
+      page keeps drawing around it and the log line appears once per slot.
 
 ## 2. Second consumer: the withheld sibling mod
 
@@ -63,6 +118,13 @@ The blocking risk is cleared. What remains is two branches that only change code
 ## 3. Retained-mode roadmap (this library's own, after the split is proven)
 
 Each item is expected to delete a workaround, not add a layer.
+- [x] **Responsiveness package (US→FL round 3, N1+N2) — landed 2026-09-09 on `0.3.x`, refiled from
+      0.4.0 to 0.3.0 by maintainer order.** Shipped shape and the three evidence-forced deviations
+      (`MinWidth`/`MaxWidth`; `Width` into the common widget vocabulary; narrow-state attributes
+      refused without a governing `Breakpoint`) are recorded in `MEMORY.md`'s round-3 entry, with the
+      harness lanes as the acceptance evidence (glyph-model positive control, one-engine narrow→wide
+      re-arrange, `Cols`/`NarrowCols` grid, seven creation-time refusals). The N3 consequence landed
+      too: `input/stepper-slider`'s label band is measured, not the 80f constant.
 
 - [ ] **Element/identity layer.** Today widget instances are keyed by *path*, the tree is carried as a
       flat list plus `SubtreeCount` index arithmetic, and components hold no state. Introduce a real
@@ -80,15 +142,16 @@ Each item is expected to delete a workaround, not add a layer.
       conversions are gone. What is left is `YieldsToCoveringPopup` (`UiNative.cs:259`, still called at
       `:115`) and the previous-frame `OpenPopupRect` reasoning, which still model one popup rather than a
       stack of overlapping surfaces.
-- [ ] **Close the fit-audit's two blind spots, or record them as exemptions.** `UiFitAudit.Check` runs
-      only inside `UiThemeDraw.Label`, but `VerseWidgets.Label` is also called from
-      `UiLayoutEngine.cs:1049` (the `Title`/`TitleKey` band on `Section`/`Surface` containers, reached at
-      `:1028`) and from `StepperSliderWidget.cs:164` (its `Label`/`LabelKey` and the `−`/`+` glyphs).
-      Overflow there is unreportable by construction, and `KernelTextAuditTests` cannot see it either
-      because it drives `UiThemeDraw.Label` directly. Either route both through `UiThemeDraw.Label`
-      (preferred - it deletes a duplicate rather than adding a layer) or state the exemption in the gate's
-      own comment and stop calling `Label` the single text outlet. No evidence yet that a real string
-      overflows on either path; do not describe this as a fixed bug.
+- [x] **Fit-audit blind spots closed by round-1 item A (2026-09-07, this branch).** Both bypasses went:
+      the engine's private `DrawLabel` and `StepperSliderWidget`'s copy now call `UiThemeDraw.Label`, so
+      `UiFitAudit.Check` sees container titles and stepper glyphs, and `Label` can honestly be called the
+      single text outlet again. The engine also lost its hand-copied border rule (`DrawSurface` →
+      `UiThemeDraw.Panel/Base`). Recorded consequence, because it is a behaviour change and not only a
+      dedup: those two paths now paint with `Text.Anchor` set explicitly (`MiddleLeft`, the outlet's
+      default) where the deleted copies inherited the ambient anchor — an alignment shift nobody observed
+      in game, and still no evidence that a real string overflows on either path.
+      `KernelTextAuditTests` still drives `UiThemeDraw.Label` directly, so it covers the outlet, not the
+      two routes into it.
 - [ ] **Decide what to do with the four widget kinds nobody consumes.** `section/header`, `state/empty`,
       `input/mode-row` and `input/stepper-slider` are registered unconditionally by
       `KernelCoreWidgetRegistrar` and have zero references in the consumer's `Source/**` (grep, 2026-09-04).
@@ -111,12 +174,13 @@ Each item is expected to delete a workaround, not add a layer.
       all seven gates here stay green. A five-line assertion that the four project paths and their expected
       assembly names exist would close the hole without introducing a cross-repo dependency.
 - [ ] **Keep the boundary guard's symbol list alive, or make it transitive.**
-      `VerifyVisualCoreIsPageModelFree` rejects lines naming fourteen hand-maintained page-model symbols in
-      seven visual-core files. `UiPopup` (added on `4dd97bf`) is in neither list, so
-      `UiThemeDraw → UiPopup → UiSession` would pass while breaking the "usable without a Host" claim the
-      lane exists to hold. Cheapest fix: add `UiPopup` to the page-model array and mutate-test it by
-      planting a `UiPopup` call in a visual-core file. Real fix, later: derive the page-model set from the
-      types instead of a list nobody remembers to update.
+      `VerifyVisualCoreIsPageModelFree` rejects lines naming hand-maintained page-model symbols in
+      seven visual-core files. `UiWindowHost` was added to that array with P2 and is mutation-proved (a
+      planted mention in `UiThemeDraw.cs` fails the lane). `UiPopup` — added on `4dd97bf` — is still in
+      neither list, so `UiThemeDraw → UiPopup → UiSession` would pass while breaking the "usable without
+      a Host" claim the lane exists to hold. Cheapest fix: add `UiPopup` and mutate-test it the same way
+      `UiWindowHost` was. Real fix, later: derive the page-model set from the types instead of a list
+      nobody remembers to update.
 - [ ] Clean up `UiLayoutManifest.ParseFile`: it has no production caller. Either wire a real
       load-from-disk path (which is the only thing that would make XML authoring worth its cost) or
       delete it and the `Schema="2"` version slot with it.
@@ -152,6 +216,35 @@ Workshop is still the later step, unchanged from the 2026-09-04 decision: Ferrit
 US is released in lockstep with it. GitHub-first early testing does not pre-empt that, and it does not make
 the library referenceable-by-strangers any more than a stable packageId will — see the invited/unsupported
 item below, which remains the one irreversible call.
+
+**Packaging shape, settled 2026-09-07 after reading both siblings' scripts.** Three channels, one staging
+engine (`scripts/stage-package.ps1`), thin identity packers — the ancestor repo's structure, adopted because
+this repo's two independent staging copies had already drifted apart in a way that cost a debugging pass.
+The three artifacts and what each one guarantees:
+
+| channel | artifact | identity rule | archive |
+|---|---|---|---|
+| `pack-dev.ps1` | `dist/dev/FerriteLib/` — the folder an in-game pass installs | dirty tree allowed, `-dirty` in the label | none (`-Zip` on request) |
+| `pack-release.ps1` | `dist/github/FerriteLib-<tag>.zip` — what CI attaches | tag grammar + build axis + clean tree (rehearsal hatch `-AllowDirtyTree`) | deterministic, top-level `FerriteLib/` |
+| `pack-steam.ps1` | `dist/steam/FerriteLib/` — what the uploader points at | same as GitHub, plus **no** dirty-tree hatch: it is the last step | none, by design |
+
+Design consequences worth stating because they are the parts a later editor is tempted to "tidy": the
+`-dev` payload refusal lives in the stager so GitHub and Steam cannot diverge on it; only GitHub archives,
+which confines the entry-timestamp problem to the one digest that is public; `version.txt` always carries
+`build=` and `commit=` so any folder can be attributed without opening its DLL; and `About/PublishedFileId.txt`
+is never staged anywhere because the stager copies `About.xml` as a file, not the directory — Workshop
+identity is created locally at upload time.
+
+- [ ] **Steam upload itself is not scripted and should not be, until the Workshop decision lands.** SR's
+      precedent is manual upload from the staged directory (`上传人工，非 SteamCMD`), and nothing here changes
+      that: `pack-steam.ps1` produces the folder and prints the payload hash, and the upload still waits on
+      the maintainer's invited/unsupported call below and on the missing preview image. Revisit only if
+      rc churn makes hand-uploading the actual bottleneck.
+- [ ] **Optional consolidation, cross-repo, one round at the earliest:** collapse Dev/Release into one
+      configuration with a flavor property, the way SR's `SqueakyBuildFlavor` does. That deletes the
+      shared-OutputPath hazard `MEMORY.md` records and the `--no-incremental` workaround with it. It is not
+      free: US's `scripts/build-dev.ps1` drives `-c Dev` on this project, so the change lands in a round
+      with its migration, not in a packaging cleanup.
 
 - [x] **Pre-push privacy scan on the full reachable history — executed clean before the 2026-09-07 push.**
       Final run at the pushed tip `bdbeae0` via `scripts/privacy-audit.ps1 -FullHistory`: working tree 0,
@@ -242,11 +335,16 @@ item below, which remains the one irreversible call.
       reversible is that a Workshop page with a stable packageId turns `FerriteLib.UiKit` into something
       any modder can compile against, and from their first build our breaking edits become their breakage.
       That is the real one-way door, and it is independent of our own discipline.
-      Decide before the upload, in one line on the page: is third-party use **invited** (then §3 and the
-      per-surface theme restructure in §4 should land first, because they are breaking by their own
+      Decide before the upload, in one line on the page: is third-party use **invited** (then `§3` and the
+      per-surface theme restructure in `§4` should land first, because they are breaking by their own
       admission and will stop being cheap afterwards), or **unsupported** (then we may keep breaking it
       for as long as US is the only consumer, and say so plainly). Both are fine; discovering the choice
       after someone builds on us is the only bad outcome.
+      Round 1 enlarged the door without changing its nature: `UiWindowHost` is the largest new freeze
+      surface the library has ever shipped, and it landed **before** the second wired consumer exists —
+      which is exactly the pressure the freeze rule waits for, so the shell is provisional in a way that
+      a theme token is not. If the call is "invited", the shell is the item most likely to need reshaping
+      once a second consumer pressures it; say so on the page rather than implying the chrome API is done.
 - [~] `About.xml` description rewritten 2026-09-07 (bilingual, answers "what is this doing in my mod
       list", says not to uninstall while a consumer is present). **Preview image still missing** - it is
       a Workshop-page asset and the Workshop step is undecided; nothing player-facing is published
@@ -279,7 +377,10 @@ these are the follow-throughs.
 - [x] Consumer banned-substring list corrected to five names; the phantom `UiPanel` still sits in the
       consumer's own `MEMORY.md:81` prose and will travel back into this repo from there unless fixed at
       source. Worth a one-line correction over the fence next time that repo is open (its docs, not its
-      code).
+      code). RESOLVED at source 2026-09-08: US added `UiPanel` to the scan
+      (`UiSourceInvariantTests.cs:153`) rather than deleting it from the rule; the list is now six and
+      the prose is accurate. Re-derived, not re-trusted — the earlier "re-verified" claim was itself
+      wrong in the other direction, for the same reason this bullet exists.
 - [ ] **Standing rule, once this repo has a Workshop page:** a gate's *capability* is whatever its script
       does, and the only way to keep prose honest is to name the file and line range when claiming one.
       "Gate 6 rejects divergence from a consumer's copy" survived one full revision cycle because it read

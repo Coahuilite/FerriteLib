@@ -40,6 +40,12 @@ public sealed class UiLayoutEngine
     }
 
     private const float SectionTitleHeight = 22f;
+
+    /// <summary>
+    /// Height a tripped element keeps. Recovery must not resize the page: an element that collapses to
+    /// zero moves every sibling, so a single failing control would still reshape the whole layout.
+    /// </summary>
+    private const float RecoveryBandHeight = 22f;
     // Reserved width for a vertical scrollbar drawn inside the right edge of a Scroll viewport.
     // Matches Verse.GenUI.ScrollBarWidth (16f), the convention the US pages already follow.
     private const float ScrollbarWidth = 16f;
@@ -82,7 +88,7 @@ public sealed class UiLayoutEngine
         float y = 0f;
         foreach (UiElementSpec root in roots)
         {
-            if (IsHidden(root, ctx)) continue;
+            if (IsHidden(root, ctx, narrow: false)) continue;
 
             MeasuredBox child = MeasureElement(
                 ctx,
@@ -190,9 +196,15 @@ public sealed class UiLayoutEngine
                     {
                         DrawContainer(entry, drawRect, entryCtx);
                     }
-                    else
+                    else if (entry.Widget != null)
                     {
-                        entry.Widget?.Draw(drawRect, entryCtx);
+                        // Recovery is the tree's job, not each widget's. Before this the guard existed
+                        // but nothing in the library called it: the documented "recovery lives in the
+                        // per-widget guard" contract was consumer opt-in fiction, and a core widget that
+                        // threw took the whole frame — and with it the shell's page — down with it. A
+                        // tripped element now records into the session and paints a stable band, so one
+                        // bad control cannot end the page. (FL→US round 1, item C.)
+                        UiSessionGuard.DrawWidget(entry.Widget, drawRect, entryCtx, entry.Path);
                     }
                 }
                 finally
@@ -324,7 +336,7 @@ public sealed class UiLayoutEngine
             // widgets (e.g. stacked narrow Mood rows) agree with the Draw pass, which already uses
             // entry.MeasureWidth via WithViewWidth.
             UiWidgetContext measureCtx = ctx.WithViewWidth(width);
-            float height = ResolveHeight(spec, widget, measureCtx, width);
+            float height = ResolveHeight(spec, widget, measureCtx, width, path);
             var leaf = new PlacedEntry
             {
                 Spec = spec,
@@ -345,36 +357,90 @@ public sealed class UiLayoutEngine
 
     private MeasuredBox MeasureContainer(UiWidgetContext ctx, UiElementSpec spec, float width, float availableHeight, string path)
     {
-        string kind = GetContainerKind(spec);
+        string declaredKind = GetContainerKind(spec);
         Padding padding = ParsePadding(spec);
         float gap = ReadGap(spec);
         float titleHeight = HasTitle(spec) ? SectionTitleHeight : 0f;
         float innerWidth = Math.Max(1f, width - padding.Left - padding.Right);
         float innerY = padding.Top + titleHeight;
 
+        // N2 (US->FL round 3): one numeric threshold against this container's own inner width.
+        // The narrow state selects the declared variants — direction (Narrow), column count
+        // (NarrowCols) and per-child visibility (NarrowHidden) — and nothing else; there is no
+        // expression language here by standing decision.
+        bool narrow = IsNarrow(spec, innerWidth);
+        string kind = ResolveEffectiveKind(spec, declaredKind, narrow);
+
         if (string.Equals(kind, "Row", StringComparison.Ordinal))
         {
-            return MeasureRow(ctx, spec, kind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, path);
+            return MeasureRow(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, path, narrow);
         }
 
         if (string.Equals(kind, "Wrap", StringComparison.Ordinal))
         {
-            return MeasureWrap(ctx, spec, kind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, path);
+            return MeasureWrap(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, path, narrow);
         }
 
         if (string.Equals(kind, "Overlay", StringComparison.Ordinal))
         {
-            return MeasureOverlay(ctx, spec, kind, width, padding, titleHeight, innerWidth, innerY, availableHeight, path);
+            return MeasureOverlay(ctx, spec, declaredKind, width, padding, titleHeight, innerWidth, innerY, availableHeight, path, narrow);
         }
 
         if (string.Equals(kind, "Scroll", StringComparison.Ordinal))
         {
-            return MeasureScroll(ctx, spec, kind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, path);
+            return MeasureScroll(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, path, narrow);
         }
 
         // Stack, Column, Section, Surface and Clip are vertical stacks. Clip additionally becomes
         // a structural group during Draw.
-        return MeasureStack(ctx, spec, kind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, path);
+        return MeasureStack(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, path, narrow);
+    }
+
+    private static bool IsNarrow(UiElementSpec spec, float innerWidth)
+    {
+        if (!spec.TryGetAttribute("Breakpoint", out string raw))
+        {
+            return false;
+        }
+
+        // Malformed thresholds are rejected at creation time (UiHost); a value that still fails to
+        // parse here can only come from a programmatically built spec, and degrades to never-narrow.
+        if (!float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float breakpoint)
+            || breakpoint <= 0f)
+        {
+            return false;
+        }
+
+        return innerWidth < breakpoint;
+    }
+
+    private static string ResolveEffectiveKind(UiElementSpec spec, string declaredKind, bool narrow)
+    {
+        if (!narrow || !spec.TryGetAttribute("Narrow", out string alternative))
+        {
+            return declaredKind;
+        }
+
+        alternative = alternative.Trim();
+        bool declaredIsRow = string.Equals(declaredKind, "Row", StringComparison.Ordinal);
+        if (declaredIsRow
+            && (string.Equals(alternative, "Column", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(alternative, "Stack", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "Column";
+        }
+
+        if (!declaredIsRow
+            && string.Equals(alternative, "Row", StringComparison.OrdinalIgnoreCase)
+            && (string.Equals(declaredKind, "Column", StringComparison.Ordinal)
+                || string.Equals(declaredKind, "Stack", StringComparison.Ordinal)
+                || string.Equals(declaredKind, "Section", StringComparison.Ordinal)
+                || string.Equals(declaredKind, "Surface", StringComparison.Ordinal)))
+        {
+            return "Row";
+        }
+
+        return declaredKind;
     }
 
     private MeasuredBox MeasureStack(
@@ -388,12 +454,23 @@ public sealed class UiLayoutEngine
         float innerWidth,
         float innerY,
         float availableHeight,
-        string path)
+        string path,
+        bool narrow)
     {
         var visible = new List<UiElementSpec>();
         foreach (UiElementSpec child in spec.Children)
         {
-            if (!IsHidden(child, ctx)) visible.Add(child);
+            if (!IsHidden(child, ctx, narrow)) visible.Add(child);
+        }
+
+        // Per-child width: a stack child is full-width unless it declares Width="Auto", in which
+        // case its slot hugs its own label text (N1). The pre-pass and the arrange pass must use
+        // the same width or a wrap-sensitive child measures its height against a band it will not
+        // be drawn in.
+        var childWidths = new float[visible.Count];
+        for (int i = 0; i < visible.Count; i++)
+        {
+            childWidths[i] = ResolveStackChildWidth(visible[i], innerWidth, ctx);
         }
 
         // Fill-aware vertical allocation. A pre-pass measures the flow height of every non-Fill
@@ -417,7 +494,7 @@ public sealed class UiLayoutEngine
             }
 
             string childPath = path + "/" + (visible[i].Id.Length > 0 ? visible[i].Id : visible[i].Kind);
-            float flow = MeasureElement(ctx, visible[i], innerWidth, availableInner, childPath).Height;
+            float flow = MeasureElement(ctx, visible[i], childWidths[i], availableInner, childPath).Height;
             flowHeights[i] = flow;
             nonFillTotal += flow;
         }
@@ -451,7 +528,7 @@ public sealed class UiLayoutEngine
                 childAvailable = Math.Max(0f, availableInner - (y - innerY) - reservedAfter);
             }
 
-            MeasuredBox childBox = MeasureElement(ctx, child, innerWidth, childAvailable, childPath);
+            MeasuredBox childBox = MeasureElement(ctx, child, childWidths[i], childAvailable, childPath);
             childBox = OffsetBox(childBox, padding.Left, y);
             box.Entries.AddRange(childBox.Entries);
             y += childBox.Height;
@@ -487,15 +564,16 @@ public sealed class UiLayoutEngine
         float innerWidth,
         float innerY,
         float availableHeight,
-        string path)
+        string path,
+        bool narrow)
     {
         var visible = new List<UiElementSpec>();
         foreach (UiElementSpec child in spec.Children)
         {
-            if (!IsHidden(child, ctx)) visible.Add(child);
+            if (!IsHidden(child, ctx, narrow)) visible.Add(child);
         }
 
-        float[] widths = ResolveColumnWidths(visible, innerWidth, gap);
+        float[] widths = ResolveColumnWidths(visible, innerWidth, gap, ctx);
         var box = new MeasuredBox { Width = width, Height = 0f };
         float x = padding.Left;
         float maxHeight = 0f;
@@ -539,27 +617,40 @@ public sealed class UiLayoutEngine
         float innerWidth,
         float innerY,
         float availableHeight,
-        string path)
+        string path,
+        bool narrow)
     {
         var box = new MeasuredBox { Width = width, Height = 0f };
         float x = padding.Left;
         float y = innerY;
         float lineHeight = 0f;
         bool firstInLine = true;
+        int placedInLine = 0;
+
+        // N2's column variant: declared Cols (wide) / NarrowCols (narrow) fix a uniform grid —
+        // the acceptance row the rebuild contract promised ("响应式列数") is a column COUNT, and
+        // a count is only declarable if the grid can be pinned. Without either, flow-by-width
+        // stays exactly as shipped.
+        int cols = ResolveWrapCols(spec, narrow);
+        float cellWidth = cols > 0
+            ? Math.Max(1f, (innerWidth - gap * (cols - 1)) / cols)
+            : 0f;
 
         foreach (UiElementSpec child in spec.Children)
         {
-            if (IsHidden(child, ctx)) continue;
+            if (IsHidden(child, ctx, narrow)) continue;
 
-            float childWidth = ResolveWrapWidth(child, innerWidth);
+            float childWidth = cols > 0 ? cellWidth : ResolveWrapWidth(child, innerWidth, ctx);
             string childPath = path + "/" + (child.Id.Length > 0 ? child.Id : child.Kind);
 
-            if (!firstInLine && x + childWidth > padding.Left + innerWidth)
+            bool lineFull = cols > 0 ? placedInLine >= cols : x + childWidth > padding.Left + innerWidth;
+            if (!firstInLine && lineFull)
             {
                 x = padding.Left;
                 y += lineHeight + gap;
                 lineHeight = 0f;
                 firstInLine = true;
+                placedInLine = 0;
             }
 
             MeasuredBox childBox = MeasureElement(
@@ -574,6 +665,7 @@ public sealed class UiLayoutEngine
             x += childWidth + gap;
             lineHeight = Math.Max(lineHeight, childBox.Height);
             firstInLine = false;
+            placedInLine++;
         }
 
         float contentHeight = Math.Max(0f, y + lineHeight - innerY);
@@ -605,14 +697,15 @@ public sealed class UiLayoutEngine
         float innerWidth,
         float innerY,
         float availableHeight,
-        string path)
+        string path,
+        bool narrow)
     {
         var box = new MeasuredBox { Width = width, Height = 0f };
         float maxHeight = 0f;
 
         foreach (UiElementSpec child in spec.Children)
         {
-            if (IsHidden(child, ctx)) continue;
+            if (IsHidden(child, ctx, narrow)) continue;
 
             string childPath = path + "/" + (child.Id.Length > 0 ? child.Id : child.Kind);
             MeasuredBox childBox = MeasureElement(ctx, child, innerWidth, availableHeight, childPath);
@@ -650,11 +743,12 @@ public sealed class UiLayoutEngine
         float innerWidth,
         float innerY,
         float availableHeight,
-        string path)
+        string path,
+        bool narrow)
     {
         var entries = new List<PlacedEntry>();
         float naturalContentHeight = MeasureScrollContent(
-            ctx, spec, innerWidth, padding, gap, innerY, availableHeight, path, entries);
+            ctx, spec, innerWidth, padding, gap, innerY, availableHeight, path, entries, narrow);
 
         float naturalHeight = padding.Top + titleHeight + naturalContentHeight + padding.Bottom;
         float viewportHeight = ResolveContainerHeight(spec, naturalHeight, availableHeight);
@@ -672,7 +766,8 @@ public sealed class UiLayoutEngine
             float reservedInnerWidth = Math.Max(1f, contentWidth - padding.Left - padding.Right);
             entries.Clear();
             float reflowedContentHeight = MeasureScrollContent(
-                ctx, spec, reservedInnerWidth, padding, gap, innerY, availableHeight, path, entries);
+                ctx, spec, reservedInnerWidth, padding, gap, innerY, availableHeight, path, entries,
+                IsNarrow(spec, reservedInnerWidth));
             naturalHeight = padding.Top + titleHeight + reflowedContentHeight + padding.Bottom;
         }
 
@@ -707,21 +802,22 @@ public sealed class UiLayoutEngine
         float innerY,
         float availableHeight,
         string path,
-        List<PlacedEntry> entries)
+        List<PlacedEntry> entries,
+        bool narrow)
     {
         float y = innerY;
         bool first = true;
 
         foreach (UiElementSpec child in spec.Children)
         {
-            if (IsHidden(child, ctx)) continue;
+            if (IsHidden(child, ctx, narrow)) continue;
 
             if (!first) y += gap;
             string childPath = path + "/" + (child.Id.Length > 0 ? child.Id : child.Kind);
             MeasuredBox childBox = MeasureElement(
                 ctx,
                 child,
-                contentInnerWidth,
+                ResolveStackChildWidth(child, contentInnerWidth, ctx),
                 Math.Max(0f, availableHeight - (y - innerY)),
                 childPath);
             childBox = OffsetBox(childBox, padding.Left, y);
@@ -802,26 +898,136 @@ public sealed class UiLayoutEngine
             || string.Equals(kind, "Overlay", StringComparison.Ordinal);
     }
 
-    private static float ResolveWrapWidth(UiElementSpec spec, float innerWidth)
+    /// <summary>Numeric Width on a child; Auto and malformed values are not fixed.</summary>
+    private static bool TryFixedWidth(UiElementSpec spec, out float width)
     {
-        if (spec.TryGetAttribute("Width", out string raw)
-            && float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out float fixedWidth)
-            && fixedWidth > 0f)
+        width = 0f;
+        return spec.TryGetAttribute("Width", out string raw)
+            && float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out width)
+            && width > 0f;
+    }
+
+    private static bool IsAutoWidth(UiElementSpec spec)
+    {
+        return spec.TryGetAttribute("Width", out string raw)
+            && string.Equals(raw.Trim(), "Auto", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Text-natural width of a child (N1): the maximum measured advance over the label attributes
+    /// its kind declared at registration, each resolved through translation when the attribute
+    /// name ends in Key. Zero means "not Auto-measurable" — a kind without a declared label set,
+    /// or with none of them filled — and the caller falls back to the unsized distribution.
+    /// General widget natural-size measurement stays unshipped until a second citation makes it
+    /// real; this seam is deliberately text-only.
+    /// </summary>
+    private static float MeasureLabelWidth(UiElementSpec spec, UiWidgetContext ctx)
+    {
+        IReadOnlyCollection<string>? labels = UiWidgetRegistry.GetLabelAttributes(ctx.Source, spec.Kind);
+        if (labels == null) return 0f;
+
+        float widest = 0f;
+        foreach (string attribute in labels)
+        {
+            if (!spec.TryGetAttribute(attribute, out string value)) continue;
+            value = value.Trim();
+            if (value.Length == 0) continue;
+
+            string text = attribute.EndsWith("Key", StringComparison.OrdinalIgnoreCase)
+                ? ctx.Translation.Translate(value)
+                : value;
+            widest = Math.Max(widest, ctx.Metrics.MeasureWidth(text, ctx.Theme.DefaultFont));
+        }
+
+        return widest;
+    }
+
+    /// <summary>MinWidth/MaxWidth clamp, applied only when declared (absent attributes change nothing).</summary>
+    private static float ClampDeclaredWidth(UiElementSpec spec, float width)
+    {
+        if (spec.TryGetAttribute("MinWidth", out string raw)
+            && float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float min)
+            && min > 0f)
+        {
+            width = Math.Max(width, min);
+        }
+
+        if (spec.TryGetAttribute("MaxWidth", out string raw2)
+            && float.TryParse(raw2.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float max)
+            && max > 0f)
+        {
+            width = Math.Min(width, max);
+        }
+
+        return width;
+    }
+
+    private static float ResolveWrapWidth(UiElementSpec spec, float innerWidth, UiWidgetContext ctx)
+    {
+        if (TryFixedWidth(spec, out float fixedWidth))
         {
             return fixedWidth;
+        }
+
+        if (IsAutoWidth(spec))
+        {
+            float natural = ClampDeclaredWidth(spec, MeasureLabelWidth(spec, ctx));
+            if (natural > 0f) return Math.Min(natural, innerWidth);
+            // fall through: not measurable, keep the historical full-row width
         }
 
         return Math.Max(1f, innerWidth);
     }
 
-    private static float ResolveHeight(UiElementSpec spec, IUiWidget widget, UiWidgetContext ctx, float width)
+    /// <summary>
+    /// A vertical-stack child's slot width: full inner width, except a child that declares
+    /// Width="Auto" and measures a positive label width hugs that width instead.
+    /// </summary>
+    private static float ResolveStackChildWidth(UiElementSpec spec, float innerWidth, UiWidgetContext ctx)
+    {
+        if (IsAutoWidth(spec))
+        {
+            float natural = ClampDeclaredWidth(spec, MeasureLabelWidth(spec, ctx));
+            if (natural > 0f) return Math.Min(natural, innerWidth);
+        }
+
+        return Math.Max(1f, innerWidth);
+    }
+
+    /// <summary>
+    /// Declared column count for a Wrap (N2): NarrowCols in the narrow state, Cols otherwise;
+    /// zero means "no fixed grid, flow by width" — the shipped behavior.
+    /// </summary>
+    private static int ResolveWrapCols(UiElementSpec spec, bool narrow)
+    {
+        if (narrow && TryReadInt(spec, "NarrowCols", out int narrowCols) && narrowCols > 0)
+        {
+            return narrowCols;
+        }
+
+        if (TryReadInt(spec, "Cols", out int cols) && cols > 0)
+        {
+            return cols;
+        }
+
+        return 0;
+    }
+
+    private static bool TryReadInt(UiElementSpec spec, string attribute, out int value)
+    {
+        value = 0;
+        return spec.TryGetAttribute(attribute, out string raw)
+            && int.TryParse(raw.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+    }
+
+    private static float ResolveHeight(UiElementSpec spec, IUiWidget widget, UiWidgetContext ctx, float width, string path)
     {
         if (spec.TryGetAttribute("Height", out string raw))
         {
             string value = raw.Trim();
             if (value.Length == 0 || string.Equals(value, "Auto", StringComparison.OrdinalIgnoreCase))
             {
-                return Math.Max(0f, widget.Measure(ctx));
+                return MeasuredHeight(widget, ctx, path);
             }
 
             if (float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float fixedHeight))
@@ -833,7 +1039,22 @@ public sealed class UiLayoutEngine
                 $"Widget id=\"{spec.Id}\" (Kind=\"{spec.Kind}\") has invalid Height '{raw}'; expected a number or Auto.");
         }
 
-        return Math.Max(0f, widget.Measure(ctx));
+        return MeasuredHeight(widget, ctx, path);
+    }
+
+    /// <summary>
+    /// One widget's measured height, recovered through the session if the widget throws. The guard is
+    /// here rather than in each widget because a measurement that dies takes the whole arrange pass
+    /// with it, and the tree — not the control — owns whether the page survives that. The fallback keeps
+    /// the element's slot instead of collapsing it, so a trip cannot reshuffle the rest of the page.
+    /// </summary>
+    private static float MeasuredHeight(IUiWidget widget, UiWidgetContext ctx, string path)
+    {
+        // The guard is here rather than in each widget because a measurement that dies takes the whole
+        // arrange pass with it, and the tree — not the control — owns whether the page survives that.
+        // The fallback keeps the element's slot instead of collapsing it, so a trip cannot reshuffle
+        // the rest of the page.
+        return Math.Max(0f, UiSessionGuard.MeasureWidget(widget, ctx, path, RecoveryBandHeight));
     }
 
     private static float ResolveContainerHeight(UiElementSpec spec, float naturalHeight, float availableHeight)
@@ -891,35 +1112,67 @@ public sealed class UiLayoutEngine
             || spec.TryGetAttribute("TitleKey", out string key) && key.Trim().Length > 0;
     }
 
-    private static float[] ResolveColumnWidths(IReadOnlyList<UiElementSpec> children, float innerWidth, float gap)
+    private static float[] ResolveColumnWidths(
+        IReadOnlyList<UiElementSpec> children, float innerWidth, float gap, UiWidgetContext ctx)
     {
         var widths = new float[children.Count];
         float fixedSum = 0f;
-        int autoCount = 0;
+        int flexCount = 0;
+        var autoSlots = new List<int>();
 
         for (int i = 0; i < children.Count; i++)
         {
-            if (children[i].TryGetAttribute("Width", out string raw)
-                && float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out float fixedWidth)
-                && fixedWidth > 0f)
+            if (TryFixedWidth(children[i], out float fixedWidth))
             {
                 widths[i] = fixedWidth;
                 fixedSum += fixedWidth;
             }
+            else if (IsAutoWidth(children[i]))
+            {
+                autoSlots.Add(i);
+            }
             else
             {
-                widths[i] = 0f;
-                autoCount++;
+                flexCount++;
             }
         }
 
         float totalGap = gap * Math.Max(0, children.Count - 1);
-        float remaining = Math.Max(0f, innerWidth - totalGap - fixedSum);
-        float autoWidth = autoCount > 0 ? Math.Max(1f, remaining / autoCount) : 0f;
+
+        // Auto columns take their measured natural width first (N1: "the label column is as wide
+        // as its widest label"), clamped by declared Min/Max, then capped collectively by what
+        // the fixed siblings leave behind: when the autos do not fit, they shrink proportionally
+        // and flex siblings keep at least their historical floor.
+        float autoBudget = Math.Max(0f, innerWidth - totalGap - fixedSum);
+        float autoNaturalTotal = 0f;
+        var autoNaturals = new float[autoSlots.Count];
+        for (int s = 0; s < autoSlots.Count; s++)
+        {
+            float natural = ClampDeclaredWidth(children[autoSlots[s]], MeasureLabelWidth(children[autoSlots[s]], ctx));
+            autoNaturals[s] = Math.Max(1f, natural);
+            autoNaturalTotal += autoNaturals[s];
+        }
+
+        float autoScale = autoNaturalTotal > autoBudget && autoNaturalTotal > 0f
+            ? autoBudget / autoNaturalTotal
+            : 1f;
+        float autoSum = 0f;
+        for (int s = 0; s < autoSlots.Count; s++)
+        {
+            float w = Math.Max(1f, autoNaturals[s] * autoScale);
+            widths[autoSlots[s]] = w;
+            autoSum += w;
+        }
+
+        float remaining = Math.Max(0f, innerWidth - totalGap - fixedSum - autoSum);
+        float flexWidth = flexCount > 0 ? Math.Max(1f, remaining / flexCount) : 0f;
 
         for (int i = 0; i < widths.Length; i++)
         {
-            if (widths[i] <= 0f) widths[i] = autoWidth;
+            if (widths[i] <= 0f && !autoSlots.Contains(i))
+            {
+                widths[i] = ClampDeclaredWidth(children[i], flexWidth);
+            }
         }
 
         return widths;
@@ -973,8 +1226,16 @@ public sealed class UiLayoutEngine
             $"Element id=\"{spec.Id}\" (Kind=\"{spec.Kind}\") has invalid Gap '{raw}'.");
     }
 
-    private static bool IsHidden(UiElementSpec spec, UiWidgetContext ctx)
+    private static bool IsHidden(UiElementSpec spec, UiWidgetContext ctx, bool narrow)
     {
+        if (narrow
+            && spec.TryGetAttribute("NarrowHidden", out string narrowRaw)
+            && (string.Equals(narrowRaw.Trim(), "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(narrowRaw.Trim(), "1", StringComparison.Ordinal)))
+        {
+            return true;
+        }
+
         if (spec.TryGetAttribute("Hidden", out string raw))
         {
             string value = raw.Trim();
@@ -990,7 +1251,7 @@ public sealed class UiLayoutEngine
             return false;
         }
 
-        string activeTab = ctx.Bindings.TryGet("active-tab", out string current) ? current : "";
+        string activeTab = ctx.Bindings.TryGet(UiBindings.ActiveTabKey, out string current) ? current : "";
         return !string.Equals(tab.Trim(), activeTab, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -1014,10 +1275,16 @@ public sealed class UiLayoutEngine
 
         if (drawSurface)
         {
-            DrawSurface(rect, string.Equals(kind, "Section", StringComparison.Ordinal)
-                ? ctx.Theme.Panel
-                : ctx.Theme.Base,
-                ctx.Theme.Border);
+            // The two container surfaces are exactly the theme's Panel/Base treatments; routing them
+            // through UiThemeDraw keeps one border rule instead of a hand-copied five-rect version.
+            if (string.Equals(kind, "Section", StringComparison.Ordinal))
+            {
+                UiThemeDraw.Panel(rect, ctx.Theme);
+            }
+            else
+            {
+                UiThemeDraw.Base(rect, ctx.Theme);
+            }
         }
 
         if (HasTitle(entry.Spec))
@@ -1025,35 +1292,13 @@ public sealed class UiLayoutEngine
             Padding padding = ParsePadding(entry.Spec);
             float innerWidth = Math.Max(1f, rect.width - padding.Left - padding.Right);
             var headerRect = new Rect(rect.x + padding.Left, rect.y + padding.Top, innerWidth, SectionTitleHeight);
-            DrawLabel(headerRect, ReadTitle(entry.Spec, ctx), ctx.Theme.TextPrimary, ctx);
+            // One text outlet: routing the container title through UiThemeDraw.Label is what makes it
+            // visible to the fit audit (BeginElement above already attributes by path), which the
+            // engine's own private Label copy could never do.
+            UiThemeDraw.Label(headerRect, ReadTitle(entry.Spec, ctx), ctx.Theme, ctx.Theme.TextPrimary);
         }
     }
 
-    private static void DrawSurface(Rect rect, Color fill, Color border)
-    {
-        VerseWidgets.DrawBoxSolid(rect, fill);
-        VerseWidgets.DrawBoxSolid(new Rect(rect.x, rect.y, rect.width, 1f), border);
-        VerseWidgets.DrawBoxSolid(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), border);
-        VerseWidgets.DrawBoxSolid(new Rect(rect.x, rect.y, 1f, rect.height), border);
-        VerseWidgets.DrawBoxSolid(new Rect(rect.xMax - 1f, rect.y, 1f, rect.height), border);
-    }
-
-    private static void DrawLabel(Rect rect, string text, Color color, UiWidgetContext ctx)
-    {
-        Color oldColor = GUI.color;
-        GameFont oldFont = Text.Font;
-        try
-        {
-            Text.Font = UiKitFonts.ToGameFont(ctx.Theme.DefaultFont);
-            GUI.color = color;
-            VerseWidgets.Label(rect, text);
-        }
-        finally
-        {
-            Text.Font = oldFont;
-            GUI.color = oldColor;
-        }
-    }
 
     private static string ReadTitle(UiElementSpec spec, UiWidgetContext ctx)
     {

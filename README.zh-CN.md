@@ -10,10 +10,14 @@ RimWorld 1.6 的**无内容前置模组**。FerriteLib 只携带一个程序集�
 
 两层，刻意分离：
 
-1. **声明式页面引擎**——XML 清单、受约束布局、类型化绑定、按窗口会话、控件注册表、创建期契约校验。
+1. **声明式页面引擎**——XML 清单、受约束布局、类型化绑定、按窗口会话、控件注册表、创建期契约校验、
+   逐控件失败恢复，以及一个自带 chrome（背景、标题、关闭按钮）的窗口外壳，让消费者无需跳出树就能开页。
    消费者代码只写业务逻辑与绑定，结构活在 XML 里。
 2. **视觉核心**——主题令牌、绘制助手、文本测量、文本适配审计与版本契约。**不采用页面模型也能单独使用。**
-   两层边界由门禁强制（非口头约定）：视觉核心文件不得提及任何页面模型类型。
+
+两条边界都是门禁，不是口头约定：视觉核心文件不得提及任何页面模型类型；对游戏即时模式界面的每次调用
+都必须落在五个指定漏斗文件之内。树外的原生 IMGUI 并非被禁止，而是不被支持、也不被度量——它对 harness、
+适配审计与会话恢复三者同时不可见，这正是使用页面树的理由。
 
 ## 依赖要求
 
@@ -43,7 +47,7 @@ RimWorld 的 `modDependencies` 无法表达版本，消费者必须在自己的�
 
 ```powershell
 pwsh -NoProfile -File scripts/verify-local.ps1            # 门禁套件（harness + 双 flavor 构建 + 载荷 + 无内容 + 许可 + 身份）
-pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev   # + dev 模组包与 NuGet 包（dist/、artifacts/）
+pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev   # + 暂存的 dev 目录 dist/dev/FerriteLib（不产出归档；放哪个 Mods 目录自己动手）
 pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory   # 三向量隐私门禁，任何 push 前执行
 ```
 

@@ -1,6 +1,11 @@
 param(
     [string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot),
+    # Stage the dev folder after the gates. It is a directory by design (pack-dev.ps1), and placing it
+    # in a game Mods directory is never done here — that is the developer's step. -PackZip and
+    # -PackNupkg add the artifacts that only other purposes need.
     [switch]$PackDev,
+    [switch]$PackZip,
+    [switch]$PackNupkg,
     [switch]$NoRestore
 )
 
@@ -16,7 +21,10 @@ $ErrorActionPreference = "Stop"
 #   5   payload is content-free: no Defs, Patches, Languages, Sounds or Textures under 1.6
 #   6   LICENSE present and full MPL-2.0, with no applied incompatibility notice
 #   7   About.xml identity (packageId, modVersion present and parsable as a Version)
-# -PackDev: after all checks pass, produce the dev mod package and the consumable NuGet package.
+# -PackDev: after all checks pass, stage the dev folder (a directory, not an archive). Placing it
+#   in a game Mods directory is the developer's own step - no script here writes outside the repository.
+#   -PackZip also writes the dev zip; -PackNupkg also writes the consumer reference package. Both are
+#   opt-in because nothing on the dev path needs them.
 #
 # The neutrality guard, the visual-core/page-model boundary and the two version axes all run INSIDE
 # gate 1, from the library's own harness, each with a positive control. There is no second copy of
@@ -138,7 +146,10 @@ Invoke-Check 'About.xml identity is present and well-formed' `
     }
 
 if ($PackDev) {
-    & (Join-Path $PSScriptRoot 'pack-dev.ps1') -ProjectRoot $root
+    $packArgs = @{ ProjectRoot = $root }
+    if ($PackZip) { $packArgs.Zip = $true }
+    if ($PackNupkg) { $packArgs.Nupkg = $true }
+    & (Join-Path $PSScriptRoot 'pack-dev.ps1') @packArgs
     if ($LASTEXITCODE -ne 0) { throw "pack-dev failed." }
 }
 

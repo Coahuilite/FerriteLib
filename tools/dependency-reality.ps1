@@ -1,0 +1,246 @@
+# FerriteLib — dependency-reality checker (D-1)
+#
+# What this answers: a mod that DECLARES FerriteLib as a prerequisite but never uses the runtime is a
+# build-time convention with no enforcement, and the series has already produced one. This turns it into
+# a red exit code. FL owns the rule text below; a consumer's own boundary gate may adopt rule (c) and
+# should read this file rather than restate it.
+#
+#   (a) assembly-reference  the checked DLL's AssemblyRef table must name FerriteLib.UiKit
+#   (b) page-model contact  at least one MemberRef must target a page-model type, i.e. the mod actually
+#                           drives the declarative layer rather than only borrowing the theme helpers
+#   (c) chrome allowlist    every SOURCE file that calls the game's immediate-mode surface must appear
+#                           in the mod's declared ui-chrome allowlist (needs -SourceRoot + -Allowlist)
+#
+# Rule (c) is the same measurement as the library's own containment gate (see
+# tools/FerriteLib.UiKit.Tests/KernelContainmentTests.cs), applied to a consumer tree: raw backend calls
+# are not forbidden, but they are declared, counted and named, or they are a failure.
+#
+# Usage:
+#   pwsh -NoProfile -File tools/dependency-reality.ps1 -Assembly <path-to-mod.dll> `
+#        [-SourceRoot <dir>] [-Allowlist <file>] [-SelfTest]
+#
+# Exit codes: 0 = every requested rule holds; 1 = a rule failed; 2 = the inputs were unusable.
+# The tool never writes anything, and it takes no personal absolute paths — a consumer passes its own
+# relative shape from its own harness.
+
+[CmdletBinding()]
+param(
+    [string]$Assembly,
+    [string]$SourceRoot,
+    [string]$Allowlist,
+    [switch]$SelfTest
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+$CarrierName = 'FerriteLib.UiKit'
+
+# The declarative layer. Contact with any of these is what makes "uses the library" more than
+# "compiles against the library".
+$PageModelTypes = @(
+    'UiHost',
+    'UiWindowHost',
+    'UiSession',
+    'IUiBindings',
+    'UiBindings',
+    'UiWidgetRegistry',
+    'UiLayoutManifest',
+    'UiLayoutEngine',
+    'IUiWidget',
+    'UiWidgetContext',
+    'UiSessionGuard',
+    'UiPopup'
+)
+
+# The game's immediate-mode surface, as qualified member accesses.
+$BackendPattern = '(?<![A-Za-z0-9_.])(UnityEngine\.|Verse\.)?(GUI|GUIUtility|Mouse|Text|VerseWidgets|Widgets|Event)\s*\.\s*[A-Za-z_][A-Za-z0-9_]*'
+
+function Find-BackendCalls {
+    param([string]$Root)
+
+    $found = New-Object System.Collections.Generic.List[string]
+    if (-not (Test-Path -LiteralPath $Root -PathType Container)) {
+        throw "Source root is not a directory: $Root"
+    }
+
+    foreach ($file in Get-ChildItem -LiteralPath $Root -Recurse -Filter *.cs -File) {
+        $normalized = $file.FullName -replace '[\\/]', [string][System.IO.Path]::DirectorySeparatorChar
+        if ($normalized.Contains("$([System.IO.Path]::DirectorySeparatorChar)obj$([System.IO.Path]::DirectorySeparatorChar)")) { continue }
+        if ($normalized.Contains("$([System.IO.Path]::DirectorySeparatorChar)bin$([System.IO.Path]::DirectorySeparatorChar)")) { continue }
+
+        $lines = @(Get-Content -LiteralPath $file.FullName -Encoding UTF8)
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            $line = $lines[$i]
+            $probe = $line.TrimStart()
+            if ($probe.StartsWith('//')) { continue }
+            if ($probe -match $BackendPattern) {
+                $found.Add(("{0}:{1}" -f $file.FullName, ($i + 1)))
+            }
+        }
+    }
+
+    return $found
+}
+
+function Test-AssemblyRules {
+    param([string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Assembly not found: $Path"
+    }
+
+    Add-Type -AssemblyName System.Reflection.Metadata
+    Add-Type -AssemblyName System.Collections.Immutable
+
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        $pe = New-Object System.Reflection.PortableExecutable.PEReader($stream)
+        if (-not $pe.HasMetadata) { throw "Not a managed assembly: $Path" }
+        $md = [System.Reflection.Metadata.PEReaderExtensions]::GetMetadataReader($pe)
+
+        # (a) AssemblyRef table
+        $referencesCarrier = $false
+        foreach ($h in $md.AssemblyReferences) {
+            if ($md.GetAssemblyReference($h).GetAssemblyName().Name -eq $CarrierName) { $referencesCarrier = $true }
+        }
+
+        # (b) MemberRef -> TypeRef -> page-model type. Every FerriteLib type name is library-specific
+        # enough that the namespace is checked for attribution and not for discrimination.
+        $pageModelHits = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
+        foreach ($h in $md.MemberReferences) {
+            $member = $md.GetMemberReference($h)
+            $handle = $member.Parent
+            $typeName = $null
+            $typeNamespace = $null
+            if ($handle.Kind -eq [System.Reflection.Metadata.HandleKind]::TypeReference) {
+                $tr = $md.GetTypeReference([System.Reflection.Metadata.TypeReferenceHandle]$handle)
+                $typeName = $md.GetString($tr.Name)
+                $typeNamespace = $md.GetString($tr.Namespace)
+            }
+            if ($null -eq $typeName) { continue }
+            if ($typeNamespace -ne $CarrierName -and -not $typeNamespace.StartsWith("$CarrierName.")) { continue }
+            if ($PageModelTypes -contains $typeName) { [void]$pageModelHits.Add($typeName) }
+        }
+
+        return [pscustomobject]@{
+            ReferencesCarrier = $referencesCarrier
+            PageModelHits     = @($pageModelHits)
+        }
+    }
+    finally {
+        $stream.Dispose()
+    }
+}
+
+function Get-AllowedFileNames {
+    param([string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Allowlist not found: $Path"
+    }
+
+    $names = New-Object System.Collections.Generic.List[string]
+    foreach ($raw in Get-Content -LiteralPath $Path -Encoding UTF8) {
+        $entry = $raw.Trim()
+        if ($entry.Length -eq 0 -or $entry.StartsWith('#')) { continue }
+        $names.Add($entry)
+    }
+    return $names
+}
+
+$failures = New-Object System.Collections.Generic.List[string]
+$checked = 0
+
+if ($SelfTest) {
+    # A scan that finds nothing because a path moved or a pattern broke is the vacuous-guard failure
+    # this repository has been burned by twice, so the tool proves it can fire before it reports clean.
+    $sandbox = Join-Path ([System.IO.Path]::GetTempPath()) ('fl-depdip-' + [guid]::NewGuid().ToString('N'))
+    try {
+        New-Item -ItemType Directory -Path $sandbox | Out-Null
+        Set-Content -LiteralPath (Join-Path $sandbox 'Planted.cs') -Encoding UTF8 -Value @(
+            'class Planted { void M() { bool b = Verse.Mouse.IsOver(default); } }',
+            '// Mouse.IsOver in a comment must not count'
+        )
+        $planted = @(Find-BackendCalls -Root $sandbox)
+        if ($planted.Count -ne 1) {
+            Write-Error "SELFTEST: expected exactly 1 planted backend call site, got $($planted.Count). The source scan is not trustworthy." -ErrorAction Continue
+            exit 1
+        }
+        if (-not $planted[0].EndsWith(':1')) {
+            Write-Error "SELFTEST: planted site was not reported on line 1: $($planted[0])" -ErrorAction Continue
+            exit 1
+        }
+        Write-Host "selftest ok: the source scan finds a planted call and ignores a comment"
+    }
+    finally {
+        Remove-Item -LiteralPath $sandbox -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+if ([string]::IsNullOrWhiteSpace($Assembly) -and [string]::IsNullOrWhiteSpace($SourceRoot)) {
+    if ($SelfTest -and $failures.Count -eq 0) {
+        Write-Host '[dependency-reality] selftest only: scan proven live, no target supplied.'
+        exit 0
+    }
+
+    Write-Host 'nothing to check: pass -Assembly and/or -SourceRoot (or -SelfTest)'
+    exit 2
+}
+
+if (-not [string]::IsNullOrWhiteSpace($Assembly)) {
+    $checked++
+    $result = Test-AssemblyRules -Path $Assembly
+
+    if (-not $result.ReferencesCarrier) {
+        # (b) is about a reference that is never exercised; with no reference at all it has nothing to
+        # say, and reporting both would read as two defects where there is one.
+        $failures.Add("(a) $Assembly declares no AssemblyRef to $CarrierName, so it cannot be a consumer at all")
+    }
+    elseif ($result.PageModelHits.Count -eq 0) {
+        $failures.Add("(b) $Assembly references $CarrierName but never touches the page model (" + ($PageModelTypes -join ', ') + '); a prerequisite it cannot exercise is dead weight for the player')
+    }
+    else {
+        Write-Host ("page-model contact: " + ($result.PageModelHits -join ', '))
+    }
+}
+
+if (-not [string]::IsNullOrWhiteSpace($SourceRoot)) {
+    if ([string]::IsNullOrWhiteSpace($Allowlist)) {
+        Write-Host 'rule (c) needs both -SourceRoot and -Allowlist'
+        exit 2
+    }
+
+    $checked++
+    $allowed = Get-AllowedFileNames -Path $Allowlist
+    $allowedFull = @($allowed | ForEach-Object { [System.IO.Path]::GetFullPath((Join-Path $SourceRoot $_)) })
+    $sites = @(Find-BackendCalls -Root $SourceRoot)
+
+    $offending = New-Object System.Collections.Generic.List[string]
+    foreach ($site in $sites) {
+        $file = $site.Substring(0, $site.LastIndexOf(':'))
+        if ($allowedFull -notcontains [System.IO.Path]::GetFullPath($file)) {
+            if ($offending -notcontains $file) { $offending.Add($file) }
+        }
+    }
+
+    foreach ($file in $allowedFull) {
+        if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
+            $failures.Add("(c) allowlist names a file that no longer exists: $file — an exemption nobody claimed is not an exemption, it is a hole left open")
+        }
+    }
+
+    if ($offending.Count -gt 0) {
+        $failures.Add("(c) undeclared raw backend call sites (" + $offending.Count + " file(s)): " + ($offending -join '; ') + ' — register them in the ui-chrome allowlist with a written ruling, or funnel them through the library')
+    }
+    else {
+        Write-Host ("raw backend call sites: " + $sites.Count + ", all inside the declared allowlist")
+    }
+}
+
+foreach ($failure in $failures) {
+    Write-Host "FAIL $failure"
+}
+
+if ($failures.Count -gt 0) { exit 1 }
+Write-Host "[dependency-reality] $($checked) rule group(s) checked, all satisfied."
+exit 0

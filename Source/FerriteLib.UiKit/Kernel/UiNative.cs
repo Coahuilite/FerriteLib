@@ -21,6 +21,7 @@ public static class UiNative
     internal static bool DebugMouseUp;
     internal static bool DebugEnter;
     internal static bool DebugFocusLost;
+    internal static bool DebugLayoutEvent;
     internal static int DebugHotControl;
     internal static int DebugControlIdCounter;
     internal static Func<Rect, float, float, float, float>? SliderOverride;
@@ -172,16 +173,6 @@ public static class UiNative
         if (changed || !state.Focused)
         {
             state.EditText = FormatValue(newValue, "0.##");
-        }
-
-        if (IsMouseDownOver(rect) || IsMouseDragOver(rect))
-        {
-            state.Dragging = true;
-        }
-
-        if (IsMouseUpOver(rect))
-        {
-            state.Dragging = false;
         }
 
         return newValue;
@@ -359,24 +350,31 @@ public static class UiNative
     {
         if (DebugMousePositionEnabled) return DebugMouseDown && IsMouseOver(rect);
         Event? current = Event.current;
-        return current != null && current.type == EventType.MouseDown && current.button == 0 && Mouse.IsOver(rect);
+        return current != null && current.type == EventType.MouseDown && current.button == 0 && IsMouseOver(rect);
     }
 
     public static bool IsMouseDragOver(Rect rect)
     {
         if (DebugMousePositionEnabled) return DebugMouseDrag && IsMouseOver(rect);
         Event? current = Event.current;
-        return current != null && current.type == EventType.MouseDrag && current.button == 0 && Mouse.IsOver(rect);
+        return current != null && current.type == EventType.MouseDrag && current.button == 0 && IsMouseOver(rect);
     }
 
     public static bool IsMouseUpOver(Rect rect)
     {
         if (DebugMousePositionEnabled) return DebugMouseUp && IsMouseOver(rect);
         Event? current = Event.current;
-        return current != null && current.type == EventType.MouseUp && current.button == 0 && Mouse.IsOver(rect);
+        return current != null && current.type == EventType.MouseUp && current.button == 0 && IsMouseOver(rect);
     }
 
-    private static bool IsMouseOver(Rect rect)
+    /// <summary>
+    /// The library's one hover primitive, and the only place in the assembly that asks the backend
+    /// whether the pointer is inside a rect. Public because a consumer that reads
+    /// <c>UnityEngine.Mouse.IsOver</c> instead gets correct in-game behaviour and harness-invisible
+    /// behaviour at the same time: this form honours the <c>DebugMousePositionEnabled</c> seam, so a
+    /// hover-driven control is drivable by the kernel-host lane. (US→FL round 1, P1.)
+    /// </summary>
+    public static bool IsMouseOver(Rect rect)
     {
         if (DebugMousePositionEnabled)
         {
@@ -398,6 +396,19 @@ public static class UiNative
             && (current.keyCode == KeyCode.Return || current.keyCode == KeyCode.KeypadEnter);
     }
 
+    /// <summary>
+    /// True during IMGUI's layout pass, when controls are registered but no input event is being
+    /// dispatched. Consumers gate frame-transient work (scroll-position seeding, overlay bookkeeping)
+    /// on it so it runs once per pass instead of once per event. Behind the <c>DebugLayoutEvent</c>
+    /// seam, so a harness can drive either pass without a live IMGUI loop. (US→FL round 1, P6.)
+    /// </summary>
+    public static bool IsLayoutEvent()
+    {
+        if (DebugLayoutEvent) return true;
+        Event? current = Event.current;
+        return current != null && current.type == EventType.Layout;
+    }
+
     public static bool IsFocusLost(Rect rect)
     {
         if (DebugFocusLost) return true;
@@ -405,7 +416,7 @@ public static class UiNative
         return current != null
             && current.type == EventType.MouseDown
             && current.button == 0
-            && !Mouse.IsOver(rect);
+            && !IsMouseOver(rect);
     }
 
     private static float NativeHorizontalSlider(Rect rect, float value, float min, float max)

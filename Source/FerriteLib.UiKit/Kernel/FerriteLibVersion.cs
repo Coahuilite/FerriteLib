@@ -42,8 +42,10 @@ public static class FerriteLibVersion
     /// TypeLoadException at first draw. The rule was tightened on 2026-09-04 after exactly that
     /// failure shape reached a maintainer machine: an additive type (UiPopup) shipped without an Api
     /// bump, the old installed carrier passed Require, and the desync exploded inside UiHost.Draw.
+    /// The 0.2.0 → 0.3.0 move is the US→FL round-1 set: P1, P2, P3, P4, P5 and P6 plus items A–E all
+    /// touched this surface, and they ship as one bump rather than one per item.
     /// </summary>
-    public static readonly Version Api = new Version(0, 2, 0);
+    public static readonly Version Api = new Version(0, 3, 0);
 
     /// <summary>Human-readable identity for logs.</summary>
     public static string Describe()
@@ -59,7 +61,8 @@ public static class FerriteLibVersion
     /// <param name="minimumInclusive">Lowest API version the consumer was compiled and verified against.</param>
     /// <param name="maximumExclusive">First API version the consumer has NOT been verified against.</param>
     /// <param name="consumerPackageId">Caller's packageId, for attribution in the report.</param>
-    /// <param name="diagnostic">One summary line plus one line per loaded copy. Safe to log whole.</param>
+    /// <param name="diagnostic">One summary line, one line per loaded copy, and one line naming the
+    /// page trees this process has actually built. Safe to log whole.</param>
     public static bool Require(Version minimumInclusive, Version maximumExclusive, string consumerPackageId, out string diagnostic)
     {
         if (minimumInclusive == null) throw new ArgumentNullException(nameof(minimumInclusive));
@@ -69,7 +72,35 @@ public static class FerriteLibVersion
             throw new ArgumentException("The accepted API range must end above where it starts.", nameof(maximumExclusive));
         }
 
-        return Evaluate(minimumInclusive, maximumExclusive, consumerPackageId, CollectCarrierCopies(), out diagnostic);
+        if (!Evaluate(minimumInclusive, maximumExclusive, consumerPackageId, CollectCarrierCopies(), out diagnostic))
+        {
+            diagnostic = diagnostic + Environment.NewLine + DescribeHosts();
+            return false;
+        }
+
+        string hosts = DescribeHosts();
+        if (hosts.Length > 0)
+        {
+            diagnostic = diagnostic + Environment.NewLine + hosts;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// One line about which page trees this process actually built, from <see cref="UiHostLedger"/>.
+    /// Empty when nothing has been built yet, which is the shape that answers "declared the
+    /// prerequisite, does not use the runtime" without any handshake API between the two mods.
+    /// </summary>
+    private static string DescribeHosts()
+    {
+        string ledger = UiHostLedger.Describe();
+        if (ledger.Length == 0)
+        {
+            return "  page trees built in this process: none yet";
+        }
+
+        return ledger;
     }
 
     /// <summary>

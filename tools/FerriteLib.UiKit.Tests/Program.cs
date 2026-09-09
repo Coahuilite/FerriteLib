@@ -61,6 +61,12 @@ internal static class Program
         Console.WriteLine("Kernel contract (greenfield)...");
         failures += KernelContractTests.RunAll();
 
+        Console.WriteLine("Kernel window shell (P2 chrome + failure contract)...");
+        failures += KernelWindowHostTests.RunAll();
+
+        Console.WriteLine("Kernel backend containment (funnel allowlist)...");
+        failures += KernelContainmentTests.RunAll();
+
         Console.WriteLine("Kernel popup/window-space (greenfield)...");
         failures += KernelPopupTests.RunAll();
 

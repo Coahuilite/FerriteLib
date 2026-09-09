@@ -9,6 +9,24 @@ namespace FerriteLib.UiKit.Kernel;
 /// Schema=2 layout manifest parser. The parser is strict and safe: DTD/external entities are
 /// prohibited, depth/node limits are enforced, and text content is rejected. Kind registration and
 /// typed binding validation happen later in <see cref="UiHost"/> so parsing stays independent.
+/// <para>
+/// Contract on the <c>Tab</c> attribute: an element carrying <c>Tab="X"</c> is hidden unless the
+/// consumer exposes <see cref="UiBindings.ActiveTabKey"/> as a <c>string</c> value binding whose current
+/// value equals <c>X</c> (case-insensitive). The engine reads that one key and no other; elements
+/// without <c>Tab</c> are always visible.
+/// <para>
+/// Contract on the responsive vocabulary (US→FL round 3, N1+N2): a child's <c>Width</c> is a
+/// positive number or <c>Auto</c> — Auto resolves to the text-natural width of the label
+/// attributes its kind declared at registration (containers: <c>Title</c>/<c>TitleKey</c>),
+/// clamped by <c>MinWidth</c>/<c>MaxWidth</c> and capped by the budget the fixed siblings leave;
+/// a kind that declared no label set falls back to the unsized equal distribution, unchanged.
+/// A container's <c>Breakpoint</c> is one positive number measured against that container's own
+/// inner width; below it the declared variants apply — <c>Narrow</c> (direction), <c>NarrowCols</c>
+/// (Wrap column count, alongside <c>Cols</c>), <c>NarrowHidden</c> (per child). Auto widths are
+/// arranged geometry: they land in the snapshot, so the engine's existing content/translation
+/// revision discipline is their invalidation — a label change or language switch re-arranges,
+/// and no consumer may cache an Auto rect across revisions.
+/// </para>
 /// </summary>
 public sealed class UiLayoutManifest
 {
