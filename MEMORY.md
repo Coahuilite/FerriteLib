@@ -752,6 +752,19 @@
   be a read-only element whose data side says `Tone="danger"`, and that is settled by one written precedence
   rule (state beats author). Cascade machinery becomes a requirement only once competing sources outnumber
   what a written rule can carry; today the count is one.
+- **What a third consumer could do today, measured rather than assumed (2026-09-10, for the §5
+  invited-vs-unsupported call).** Appearance is already customisable at **window** granularity with zero
+  library change: `UiWindowHost.Theme` is an abstract property, `UiTheme` exposes **20 settable colours plus
+  one settable font**, and `DarkGold` hands out a fresh instance per call so two mods re-tinting "the
+  default" cannot repaint each other. A third mod could therefore ship a wholly different palette today, and
+  could register its own kinds through the public registry and draw as it likes — ladder rung 1. What it
+  could not do is assign a role per element from data (`Tone=`) or adjust density at all (no geometry
+  tokens). Note also that `DefaultFont` is geometry-bearing — it feeds text measurement — so that knob moves
+  layout with it and is covered by `ITextMetrics` and the fit audit; it is not a cosmetic setting. Finally,
+  the binding constraints on a third consumer are not version numbers: they are the single-carrier invariant
+  (only this mod ships the DLL, and `FerriteLibVersion.Require`'s collision report is the only detector) and
+  the open §5 ruling on whether outside mods are invited to compile against this surface at all. A third
+  wired consumer does not get blocked by the API freeze — it is the event the freeze is gated on.
 - **The library ships 7 widget kinds; 3 are reachable from outside, 4 have no consumer at all.** US's two
   Schema=2 manifests reference exactly one library kind, `chrome/banner`. Two more library kinds are used, but
   *not* through a manifest: `UsFilterBarWidget` instantiates `DropdownWidget` and
