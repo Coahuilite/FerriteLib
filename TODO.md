@@ -252,35 +252,56 @@ Each item is expected to delete a workaround, not add a layer.
       in a lane that proves the warning fires, then refuse at the minor boundary. Needs a declared
       deprecated-attribute table (per kind, with the redirect target) and a harness lane driving both ends.
 - [ ] **Re-derive the kind vocabulary against `AGENTS.md`'s "What earns a kind" (rule added 2026-09-10).**
-      Two of the seven registered kinds look like they fail their own test: `section/header` is a labelled
-      band (a container with a title and a tone), and `chrome/banner` is a painted strip with text — neither
-      owns interaction state, a content-driven measure, or a hit rule. `state/empty` is the borderline case
-      worth keeping, because its `Measure` wraps a sentence through `ITextMetrics`, which is precisely a
-      measure contract a manifest cannot express. Decide per kind: keep, demote to container attributes, or
-      replace with a recipe that returns element specs (recipes are C# surface, so they get tier entries;
-      they are never widget instances, because composing by type is the bypass the metric counts). This
-      item is the four-unconsumed-kinds decision rewritten with a criterion instead of a shrug.
-- [ ] **The carrier's own diagnostic surface — built as a dev-mode window, never as a mod-settings page
-      (evaluated 2026-09-10; reasoning in `MEMORY.md` Charter).** What it must contain: the version contract
-      and `Require` verdict, the duplicate-carrier report, and one cell per **atomic** kind with a
-      worst-case string in both scripts, so the unconsumed kinds get real-glyph evidence without waiting for
-      a consumer's page. The constraint that decides the shape: this library owns zero translation keys and
-      gate 5 refuses `1.6/Languages/` by name, so the page carries literal English developer copy — the same
-      stance `UiSessionGuard` already takes in its log line — which also means it is a developer surface by
-      construction and must never grow a player-facing role.
-- [ ] **Second section of that window: the registered-kind census.** Print every scope and kind that loaded
-      assemblies registered, each with its allowed-attribute schema and its declared label set, capped and
-      totalled the way `UiFitAudit.MaxReports` does it. This is the half that finds work: a foreign kind with
-      an empty schema or a label set nobody declared is a hand-rolled bypass announcing itself. Two hard
-      rules with it: **metadata only — never instantiate a consumer's kind inside the carrier's window**, or
-      we run their code under our recovery banner and inherit their failures; and printing their scope string
-      at runtime is not a neutrality breach, since the scan governs this repository's source, not observed
-      data on screen.
-- [ ] **Write the demo rule before the window exists: rendering a kind here is not consumption.** Promotion
-      evidence stays "a page in another repository that a player used and whose needs forced the shape"; the
-      diagnostic window is a lane that proves a kind renders, measures and recovers under real metrics and
-      proves nothing about whether it should exist. Without this line the window turns the honest coverage
-      statement in `MEMORY.md` ("3 of 7 kinds validated") into a number that means nothing.
+      Measured per kind in this repository rather than judged by taste. `section/header` **fails**: its
+      `Measure` returns a declared or default height and its `Draw` is one `UiThemeDraw.Label` plus a 1px
+      divider, while the engine's own container already carries a `Title`/`TitleKey` band — the kind
+      duplicates a container attribute. `chrome/banner` and `state/empty` **pass on one shared capability
+      only**: a wrapped string whose Measure reserves the wrapped height, which is the behaviour of a missing
+      leaf atom named twice. `input/mode-row` (column count derived from width, selection read and written
+      through one binding), `input/dropdown` (session-owned popup anchor plus covered-rect publication),
+      `input/stepper-slider` (value, focus and commit interlock) and `chart/line` (hot-control capture with
+      per-point drag state) own something a manifest cannot express, and they stay.
+- [ ] **Design the leaf vocabulary from what the consumer hand-rolls, then demote onto it.** The measurement
+      is in `MEMORY.md`: inside its own kinds the wired consumer calls `UiNative.Button` 14 times,
+      `UiNative.NumberField` 4, `UiNative.Slider` 3 and `UiNative.TextField` 2, while this library's manifest
+      vocabulary is eleven structural element names plus a `Widget` leaf host — **no clickable leaf, no plain
+      text leaf, no rule, no bare slider**. That asymmetry explains the coverage numbers better than any
+      preference does: consumers build leaves because the vocabulary cannot reach them, and some of our
+      "kinds" are leaves wearing composites. Sequence matters — propose the atom set (wrapped text, button,
+      rule, slider, number field), prove each in the diagnostic window under real glyphs, and only then fold
+      `section/header`, `chrome/banner` and `state/empty` into compositions, so the 0.4.0 sweep corrects the
+      vocabulary instead of adding to it.
+- [ ] **The carrier's own diagnostic surface — shipped as a page *spec* a consumer mounts, not as a settings
+      page and not as a carrier-owned window (evaluated 2026-09-10; reasoning in `MEMORY.md` Charter).** The
+      proposal was a mod-settings page listing the version contract and the atomic kinds; what killed that
+      shape is measured, not argued: this assembly has **no `Verse.Mod` subclass and no `ModSettings` at all**,
+      so a settings row means adding a game-facing door and rewriting the README's claim that enabling the
+      carrier changes nothing, and a dev-menu door needs a Harmony patch, which the series refuses. The shape
+      that needs neither: a factory returning an `UiElementSpec` tree plus an `IUiBindings` view over live
+      registry, version and carrier-collision data, **with every caption passed in as a parameter** — so the
+      mounting consumer owns the keys, the carrier still ships zero Defs and zero strings, and the census
+      reaches a real window in a real session. Content: the `Require` verdict and the duplicate-carrier report,
+      one cell per **atomic** kind with worst-case strings in both scripts, and no composite cells.
+      Sequencing rule: it ships *with* a mount or not at all — an unmounted factory is the speculative surface
+      this protocol refuses. The mount that already exists is the consumer's diagnostics panel (its migration
+      onto `UiWindowHost` is in flight), which makes this round-4 material rather than a library gift.
+- [ ] **Second section of that spec: the registered-kind census.** Every scope and kind the loaded assemblies
+      registered, each with its allowed-attribute schema and declared label set — the view that finds work,
+      because a foreign kind with an empty schema or an undeclared label set is a hand-rolled bypass
+      announcing itself. Two hard rules: **metadata only, never instantiate a consumer's kind in a page the
+      carrier built**, and cap/total it the way `UiFitAudit.MaxReports` does. Runtime printing of a consumer's
+      scope string is not a neutrality breach; the scan governs this repository's source, not observed data.
+- [ ] **Amend the carrier's self-description the moment any door is added.** `README.md` (both languages) and
+      the `About.xml` description currently promise that enabling FerriteLib changes nothing in the game, and
+      gate 5 enforces the assemblies-only payload by refusing a content directory by name. If a `Mod` /
+      `ModSettings` door is ever built anyway, that sentence and the identity line move in the same commit —
+      a promise the gates cannot check is exactly the class of drift §6 exists to catch.
+- [ ] **Prove the self-check spec in a lane before anybody mounts it.** Build it in the stub harness: every
+      registered kind gets a cell; a planted fake kind that throws at Draw must land as a `RecoveryBand` row
+      instead of killing the page; the census must list a planted foreign scope with its schema and label set
+      while never instantiating it. What no lane can do is show real glyph advance, so this green says nothing
+      to the coverage count in `MEMORY.md` — `AGENTS.md` "Our own demo is not consumption" is the rule that
+      keeps the two claims apart.
 
 ## 4. Deferred by decision, with the upgrade path written down
 

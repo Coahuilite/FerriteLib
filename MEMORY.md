@@ -342,25 +342,35 @@
   part: this library owns **zero translation keys** (`AGENTS.md` identity), gate 5 refuses a `1.6/Languages/`
   directory by name, and `IUiTranslation` is injected precisely so the library never has to say a sentence
   alone. A page the library owns therefore has no legitimate source for its own text.
-  **The resolution that keeps both intact is a dev-mode diagnostic window with literal English copy, not a
-  mod-settings page.** Literal developer copy is already the library's stance in one place —
-  `UiSessionGuard` logs an English line and that is accepted — so the page is English by construction and
-  stays that way, no folder appears under `1.6/`, gate 5 and the payload identity are untouched, and the
-  mod-settings list is not the right host anyway: it is the game's IMGUI layout, not ours, so it demos the
-  worst geometry in the worst place while telling every player that a no-content carrier has opinions.
-  **And the demo rule, which is the part that has to be written down before the code exists: rendering a kind
-  in our own diagnostic window is not consumption.** Consumption is a page in another repository that a
-  player uses and whose needs forced a shape; that is the only evidence the promotion gate accepts, and the
-  diagnostic window is a *lane* — it proves a kind renders, measures and recovers under the real font, and it
-  proves nothing about whether the kind should exist. Without this line the page becomes a self-citation
-  machine, and the honest count in `MEMORY.md` ("3 of 7 kinds validated") would quietly read "7 of 7" while
-  meaning nothing of the sort. The consumer-registry tab (a second section listing every scope and kind
-  registered by loaded assemblies, with each kind's allowed attributes and label set) is the more valuable
-  half and follows the same rule: **report metadata only, never instantiate a foreign kind inside the
-  carrier's own window**, because that runs consumer code under our recovery banner and attributes its
-  failures to us. Printing a consumer's scope or kind string at runtime is not a neutrality violation — the
-  scan forbids product vocabulary in this repository's source, not observed data on screen — and the cap
-  should follow `UiFitAudit.MaxReports`: bounded listing with a reported total, never an unbounded tree.
+  **The entry-point fact that settles the shape (verified 2026-09-10).** This assembly contains no
+  `Verse.Mod` subclass and no `ModSettings` (`grep -rn "class .*: Mod\\b\\|ModSettings\\|Harmony" Source` →
+  0 hits), so the carrier has no door into the game's UI at all today. Any self-owned surface therefore needs
+  one added: a settings row means a `Mod` subclass plus a `ModSettings`, which contradicts the README's
+  current claim that enabling the carrier alone changes nothing in the game, and a dev-menu entry needs a
+  Harmony patch, which the series refuses. So the shape that gets the evidence without buying a new game
+  surface is neither a settings page nor a carrier-owned window: **the library ships the self-check as a page
+  *spec*, and a consumer mounts it.** Concretely — a factory returning an `UiElementSpec` tree plus an
+  `IUiBindings` view over live registry, version and carrier-collision data, with every caption passed in as
+  a parameter. That single move satisfies four constraints at once: the carrier still ships zero Defs, zero
+  keys and zero `1.6/Languages/`; the strings problem disappears because the mounting consumer owns the
+  translation keys, which is exactly what the identity rule says the string's owner should do; the census
+  reaches a real window in a real game session, which is what the evidence was needed for; and no new
+  process-wide state is added, because the spec is built on demand.
+  **Two rules with it.** *Our own demo is not consumption* (now in `AGENTS.md`): the factory renders a kind,
+  measures it and recovers it under the real font, and proves nothing about whether the kind should exist, so
+  it can never raise the validated-surface count or serve as promotion provenance. And the census section is
+  **metadata only — never instantiate a foreign kind inside a page the carrier built**, because that runs a
+  consumer's code under our recovery banner and inherits its failures; report scope, kind, allowed attributes
+  and declared label set, capped and totalled the way `UiFitAudit.MaxReports` does it. Printing a consumer's
+  scope or kind string at runtime is not a neutrality breach — the scan governs this repository's source, not
+  observed data on screen.
+  **The cost of this shape, stated so it is not discovered later:** an unmounted factory is precisely the
+  speculative surface this library's own protocol refuses to keep, so it must ship with a mount, not before
+  one. The mount that already exists is the consumer's diagnostics panel, whose migration onto
+  `UiWindowHost` + `UiHost` is in flight on its side — which makes the self-check page round-4 material: a
+  cited consumer surface that wants the thing, rather than a library gift nobody asked for. Until that lands,
+  the harness is the only mount, and the harness cannot show real glyphs, so §1's geometric questions stay
+  open no matter how good the factory is.
 
 ## What was verified, and how
 
@@ -547,17 +557,44 @@
 
 ## Consumer coverage, measured 2026-09-04
 
+- **The vocabulary has no leaf atoms, and that is the measured cause of both the unconsumed kinds and the
+  consumer's re-wrapping (counted 2026-09-10).** This library registers 7 kinds — re-derive with
+  `grep -rhoE 'const string Kind = "[^"]+"' Source | sort -u` — and not one of them is a leaf a page author
+  would reach for first: there is no plain text, no button, no rule, no spacer, no badge, no icon. What the
+  wired consumer does instead is measurable: `grep -rhoE "UiNative\\.[A-Za-z]+" --include=*.cs
+  <consumer>/Source | sort | uniq -c` reports `Button` **14**, `IsMouseOver` 5, `ClampValue` 5,
+  `NumberField` 4, `Slider` 3, `TextField` 2 — i.e. the consumer builds its own controls out of the funnel's
+  primitives because the vocabulary offers no atoms, and it registers `us/*` kinds for the results (23
+  distinct kind strings today; re-derive against its published tree, this number is not ours to keep).
+  Consequences, all source-level evidence with no new game run: manifest-referenced library kinds number
+  **one** (`chrome/banner`) out of the whole vocabulary; two more (`input/dropdown`, `chart/line`) are used by
+  instantiating the widget class as a composition part, which is the bypass the tree-membership rule counts
+  even when it stays inside the tree; and four kinds are referenced nowhere in the consumer's source. The
+  honest coverage statement is still "3 of 7 kinds touched", and the reason is structural, not
+  marketing: a page author who wants a label and a button is offered neither.
+- **Which is why "start from atoms" is the right instinct, and why the composites can stay offered.** The
+  rule now in `AGENTS.md` ("What earns a kind") is the version of this finding that survives contact with a
+  second consumer: an atom earns registration by being the smallest thing that needs a measure contract, an
+  interaction owner, or a hit/geometry rule; a composite earns it the same way, not by being convenient.
+  Under that test the current seven split cleanly — `chart/line`, `input/dropdown` and `input/stepper-slider`
+  own state or geometry the manifest cannot express; `state/empty` owns a wrapped-text measure contract
+  (borderline: it is the missing text atom wearing a card); `section/header` and `chrome/banner` own nothing
+  but a label and a rule, which is the missing atoms speaking; and `input/mode-row` is a grid of the missing
+  button wearing a row, which the consumer's own `us/mode-row` already re-implants. So the 0.4.x answer is
+  additive-then-subtractive: introduce the leaf set (`core/label`, `core/button`, `core/rule`, plus
+  `core/text` with the wrap-measure contract `state/empty` and `chrome/banner` duplicate), then let the
+  composites be **recipes that return element specs** — a convenience layer that costs no vocabulary entry and
+  keeps the tree-membership metric honest, because a recipe still emits specs the engine lays out and the
+  audit sees, while a widget instance the consumer news up does not.
 - **The library ships 7 widget kinds; 3 are reachable from outside, 4 have no consumer at all.** US's two
-  Schema=2 manifests reference exactly one library kind, `chrome/banner`, out of 17 kinds total (16
-  consumer `us/*` + 1 here). Two more library kinds are used, but *not* through a manifest:
-  `UsFilterBarWidget` instantiates `DropdownWidget` and `UsAttenuationEditorWidget` instantiates
-  `LineChartWidget` directly as composition parts. `section/header`, `state/empty`, `input/mode-row` and
-  `input/stepper-slider` are registered here and appear nowhere in US's `Source/**` (grep, zero hits) -
-  `input/mode-row` most pointedly, because US ships its own `us/mode-row`. Consequence for the freeze and
-  for the invited-vs-unsupported call: "validated against one consumer" is narrower than it sounds. Those
-  four kinds are unvalidated in a running game, not merely unused - and a third party compiling against
-  them would be the first real test of them. Evidence: source-level grep across both repos; no new game
-  run.
+  Schema=2 manifests reference exactly one library kind, `chrome/banner`. Two more library kinds are used, but
+  *not* through a manifest: `UsFilterBarWidget` instantiates `DropdownWidget` and
+  `UsAttenuationEditorWidget` instantiates `LineChartWidget` directly as composition parts.
+  `section/header`, `state/empty`, `input/mode-row` and `input/stepper-slider` are registered here and appear
+  nowhere in the consumer's source — `input/mode-row` most pointedly, because the consumer ships its own.
+  Consequence for the freeze and for the invited-vs-unsupported call: "validated against one consumer" is
+  narrower than it sounds; those four kinds are unvalidated in a running game, not merely unused, and a third
+  party compiling against them would be the first real test of them. Evidence: source-level counts; no game run.
 - **`UiThemeDraw.Label` is the single text outlet as of 2026-09-07; it was not before.** The two bypasses
   (`UiLayoutEngine`'s container `Title`/`TitleKey` band and `StepperSliderWidget`'s label and `−`/`+`
   glyphs) were deleted by round-1 item A, so `UiFitAudit.Check` now sees those strings and

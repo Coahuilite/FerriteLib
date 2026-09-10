@@ -107,6 +107,12 @@ chrome is a container plus attributes, and a composite worth handing to two cons
 returns element specs — never a registered kind, and never a widget instance, because composing by type is
 the bypass the tree-membership metric counts.
 
+**Our own demo is not consumption.** Rendering a kind in this library's diagnostic surface proves it draws,
+measures and recovers under the real font; it proves nothing about whether the kind should exist, and it is
+never provenance for the promotion gate. Consumption is a page in another repository that a player uses and
+whose needs forced the shape — the only evidence the gate accepts, and the only thing that may raise the
+validated-surface count.
+
 Unproven surface is debt, not inventory: zero-citation kinds and session axes get deleted or reshaped to
 a cited consumer's proven form, never kept "for symmetry".
 
