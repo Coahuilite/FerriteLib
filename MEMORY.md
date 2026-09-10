@@ -572,20 +572,70 @@
   even when it stays inside the tree; and four kinds are referenced nowhere in the consumer's source. The
   honest coverage statement is still "3 of 7 kinds touched", and the reason is structural, not
   marketing: a page author who wants a label and a button is offered neither.
-- **Which is why "start from atoms" is the right instinct, and why the composites can stay offered.** The
-  rule now in `AGENTS.md` ("What earns a kind") is the version of this finding that survives contact with a
-  second consumer: an atom earns registration by being the smallest thing that needs a measure contract, an
-  interaction owner, or a hit/geometry rule; a composite earns it the same way, not by being convenient.
-  Under that test the current seven split cleanly — `chart/line`, `input/dropdown` and `input/stepper-slider`
-  own state or geometry the manifest cannot express; `state/empty` owns a wrapped-text measure contract
-  (borderline: it is the missing text atom wearing a card); `section/header` and `chrome/banner` own nothing
-  but a label and a rule, which is the missing atoms speaking; and `input/mode-row` is a grid of the missing
-  button wearing a row, which the consumer's own `us/mode-row` already re-implants. So the 0.4.x answer is
-  additive-then-subtractive: introduce the leaf set (`core/label`, `core/button`, `core/rule`, plus
-  `core/text` with the wrap-measure contract `state/empty` and `chrome/banner` duplicate), then let the
-  composites be **recipes that return element specs** — a convenience layer that costs no vocabulary entry and
-  keeps the tree-membership metric honest, because a recipe still emits specs the engine lays out and the
-  audit sees, while a widget instance the consumer news up does not.
+- **Which is why "start from atoms" is the right instinct — and why the surviving composites keep their
+  names.** The `AGENTS.md` rule ("What earns a kind") is ownership-based, not atomicity-based, and the survey
+  in the next bullet is what pinned that down after an earlier draft of the rule said the opposite. Under the
+  ownership test the seven split: `chart/line`, `input/dropdown`, `input/stepper-slider` and `input/mode-row`
+  own state or geometry a manifest cannot express; `state/empty` and `chrome/banner` own one capability
+  between them — a wrapped string whose `Measure` reserves the wrapped height — which is the missing text atom
+  named twice; `section/header` owns nothing the container's existing `Title`/`TitleKey` band does not already
+  give, and that duplication (not compositeness) is the only reason a name is up for retirement here. So the
+  0.4.x sequence is additive-then-re-filling: introduce the leaf set (`core/label`, `core/text` carrying the
+  wrap measure, `core/button`, `core/rule`, `core/slider`, `core/number-field`), prove each in the self-check
+  spec under real glyphs, then rebuild the composites' innards as explicit compositions over those atoms.
+- **Atoms-first is industry-normal; "composites should not be registered vocabulary" is not (surveyed
+  2026-09-10; ten targets, official documentation opened in-session, not blogs).** The claim "a UI kit's core
+  is its atoms" is true in all ten. The claim "therefore composites should be functions, not names" is false
+  in all ten, and four of them actively instruct users to add named composite types to the vocabulary.
+  - WPF documents the atom taxonomy (`ContentControl`, `ItemsControl`, `Panel`, `Decorator`, `TextBlock`) and
+    keeps composites named, restyling rather than dissolving them: "Classes that inherit from the Control
+    class contain a ControlTemplate, which allows the consumer of a control to radically change the control's
+    appearance without having to create a new subclass."
+    (learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/ and .../wpf/controls/wpf-content-model)
+  - .NET MAUI: "The main control groups used to create the user interface of a .NET MAUI app are pages,
+    layouts, and views," with `CollectionView`/`DatePicker`/`TwoPaneView` as named rows and `ContentView` as
+    the named type for a reusable custom control (learn.microsoft.com/en-us/dotnet/maui/user-interface/controls/).
+  - Unity UIElements registers a custom control into the document vocabulary through `[UxmlElement]` on a
+    `VisualElement` subclass, and prices exactly the artifacts our rule prices — attribute schema ("Keep UXML
+    attributes primitive"), namespace prefix, library visibility. Composition appears once, as a tip ("you
+    might achieve the same outcomes … Assemble your UI from existing elements"), not as a rule
+    (docs.unity3d.com/6000.6/Documentation/Manual/UIE-create-custom-controls.html).
+  - Android: "Android provides a straightforward XML vocabulary that corresponds to the View classes and
+    subclasses," and the compound-control recipe "brings together a number of more atomic controls or views
+    into a logical group of items that can be treated as a single thing" — a new *named* thing
+    (developer.android.com/develop/ui/views/layout/custom-views/custom-components).
+  - Jetpack Compose is the strongest industry case for names-as-functions ("You can write your own composable
+    function to combine these layouts into a more elaborate layout that suits your app"), and even there the
+    same page uses named composites that Material ships (`Card`, `Scaffold`)
+    (developer.android.com/develop/ui/compose/layouts/basics).
+  - Flutter: "You create a layout by composing widgets to build more complex widgets," and the architecture
+    doc makes the two tiers coexist by design — Material and Cupertino are named control sets built on the
+    composition primitives (docs.flutter.dev/ui/layout and docs.flutter.dev/resources/architectural-overview).
+  - SwiftUI: "You compose custom views out of built-in views that SwiftUI provides, plus other composite views
+    that you've already defined," and the composed result is declared as a named `View` struct
+    (developer.apple.com/documentation/swiftui/declaring-a-custom-view).
+  - Godot keeps `Label`/`Button`/`Panel`/`HBoxContainer` named and runs a whole tutorial on adding your own
+    named `Control` subclass ("Creating your own custom controls that act just the way you want them to is an
+    obsession of almost every GUI programmer"), covering `_draw`, `_gui_input`, `_get_minimum_size` and theme
+    notifications (docs.godotengine.org/en/latest/tutorials/ui/custom_gui_controls.html).
+  - RmlUi is the atom-minimalist and the nearest miss on the second claim — "Very few custom elements are
+    required as most of the power in RmlUi comes from styling elements with RCSS to produce the desired
+    layout" — and that same library's composites (the `input` family, `tabset`/`tab`, `datagrid`) are
+    registered tags bound by name through `RegisterElementInstancer()`
+    (mikke89.github.io/RmlUiDoc/pages/rml/elements.html and .../pages/cpp_manual/custom_elements.html).
+  - Qz-UILib (Minecraft, the founding spec's own author, closest to us in scale and motivation) exposes both
+    tiers: a scene/flex/portal/virtual-grid structure layer plus roughly twenty named composite controls
+    assembled through the Java API. It deleted its HTML-like declarative stack wholesale in a breaking major
+    and **still** kept the composites as named classes, with a hand-maintained LTS stable-API list as the
+    contract (github.com/QuanhuZeYu/Qz-UILib, `docs/使用文档/01-入门/项目定位与能力边界.md` at branch `4.0`).
+  **What does not transfer, and why the correction is narrower than the headline:** every toolkit above keeps
+  named composites *alongside* a style or template layer that absorbs the long tail (WPF `ControlTemplate`,
+  Unity USS, RmlUi RCSS, Compose functions, SwiftUI view bodies). This library has no style layer — the
+  manifest is the only data surface — so our kind list carries pressure theirs do not, and that is the local
+  reason the "composites become recipes" draft looked right. The draft was still wrong: with no style layer,
+  dissolving composites into C# deletes the only place a mod author can reach them without compiling, which is
+  exactly the hole the consumer fell into. Evidence class: documentation read this session; no game run, no
+  code change beyond this correction.
 - **The library ships 7 widget kinds; 3 are reachable from outside, 4 have no consumer at all.** US's two
   Schema=2 manifests reference exactly one library kind, `chrome/banner`. Two more library kinds are used, but
   *not* through a manifest: `UsFilterBarWidget` instantiates `DropdownWidget` and

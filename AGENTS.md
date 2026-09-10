@@ -102,10 +102,12 @@ numbers as library defaults; no new process-wide mutable statics; a harness-driv
 **What earns a kind.** Registering a widget kind is not shipping a convenience, it is freezing vocabulary:
 every kind brings an attribute schema, a declared label set, a tier entry and eventually a deprecation debt.
 A kind is earned by owning what a manifest cannot express — per-element interaction state, a measure
-contract over its own content, or a hit/geometry rule. Something that only arranges children and paints
-chrome is a container plus attributes, and a composite worth handing to two consumers is a recipe that
-returns element specs — never a registered kind, and never a widget instance, because composing by type is
-the bypass the tree-membership metric counts.
+contract over its own content, or a hit/geometry rule. The test is about ownership, not about being atomic:
+a composite may hold a name (no surveyed toolkit dissolves its named composites into atom-only code —
+`MEMORY.md`), but it must not duplicate a surface the engine already carries, and once the atoms exist its
+innards must be an explicit composition over them, so the name stays stable and the tree inside is rebuilt.
+What never earns a name is a widget instance handed out by type: composing by type is the bypass the
+tree-membership metric counts.
 
 **Our own demo is not consumption.** Rendering a kind in this library's diagnostic surface proves it draws,
 measures and recovers under the real font; it proves nothing about whether the kind should exist, and it is

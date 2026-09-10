@@ -261,16 +261,19 @@ Each item is expected to delete a workaround, not add a layer.
       through one binding), `input/dropdown` (session-owned popup anchor plus covered-rect publication),
       `input/stepper-slider` (value, focus and commit interlock) and `chart/line` (hot-control capture with
       per-point drag state) own something a manifest cannot express, and they stay.
-- [ ] **Design the leaf vocabulary from what the consumer hand-rolls, then demote onto it.** The measurement
-      is in `MEMORY.md`: inside its own kinds the wired consumer calls `UiNative.Button` 14 times,
-      `UiNative.NumberField` 4, `UiNative.Slider` 3 and `UiNative.TextField` 2, while this library's manifest
-      vocabulary is eleven structural element names plus a `Widget` leaf host — **no clickable leaf, no plain
-      text leaf, no rule, no bare slider**. That asymmetry explains the coverage numbers better than any
-      preference does: consumers build leaves because the vocabulary cannot reach them, and some of our
-      "kinds" are leaves wearing composites. Sequence matters — propose the atom set (wrapped text, button,
-      rule, slider, number field), prove each in the diagnostic window under real glyphs, and only then fold
-      `section/header`, `chrome/banner` and `state/empty` into compositions, so the 0.4.0 sweep corrects the
-      vocabulary instead of adding to it.
+- [ ] **Design the leaf vocabulary from what the consumer hand-rolls, then rebuild the composites on top of
+      it.** The measurement is in `MEMORY.md`: inside its own kinds the wired consumer calls
+      `UiNative.Button` 14 times, `UiNative.NumberField` 4, `UiNative.Slider` 3 and `UiNative.TextField` 2,
+      while this library's manifest vocabulary is eleven structural element names plus a `Widget` leaf host —
+      **no clickable leaf, no plain text leaf, no rule, no bare slider**. That asymmetry explains the coverage
+      numbers better than any preference does: consumers build leaves because the vocabulary cannot reach
+      them. Sequence: propose the atom set (wrapped text, button, rule, slider, number field), prove each in
+      the self-check spec under real glyphs, then re-express `chrome/banner` and `state/empty` as compositions
+      over the text atom **while keeping their names** — the survey in `MEMORY.md` found no toolkit that
+      dissolves named composites into atom-only code, and ours has no style layer to absorb the long tail
+      instead, so retiring a reachable name would push authors into C#. `section/header` is the exception, and
+      the reason written down for it is that it duplicates the container's `Title` band, not that it is
+      composite.
 - [ ] **The carrier's own diagnostic surface — shipped as a page *spec* a consumer mounts, not as a settings
       page and not as a carrier-owned window (evaluated 2026-09-10; reasoning in `MEMORY.md` Charter).** The
       proposal was a mod-settings page listing the version contract and the atomic kinds; what killed that
