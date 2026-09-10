@@ -381,6 +381,20 @@
   methods / 152 public static. `Verse.Window` carries a `UnityEngine.GUI/WindowFunction` field, i.e. the
   game's window manager is an adapter over IMGUI's `GUI.Window`. It references `IMGUIModule` and
   `TextRenderingModule`, never `UnityEngine.UI` or `UIModule`.
+- **The game has no style layer to inherit, measured from the same 1.6.4871 reference assembly (2026-09-10).**
+  `Assembly-CSharp` has zero hits for `WidgetDef`, `WidgetAppearanceDef`, `appearanceDef`, `GUISkin`,
+  `StyleSet`, `StyleSheet`, `VisualElement`, `UIElements`, `UXML` and `USS`, and its assembly references are
+  exactly six modules (`AssetBundle`, `Audio`, `Core`, `IMGUIModule`, `Physics`, `TextRenderingModule`) — so
+  the game uses neither Unity's uGUI nor UI Toolkit (the layer that carries UXML/USS) in its own code, even
+  though `UnityEngine.UIElementsModule.dll` **does** ship in `Data/Managed` with a real selector engine
+  inside it (`Selector` 35 hits, `StyleSheet` 29, `StyleSet` 39). `GUIStyle` appears once and `GUISkin` not
+  at all, i.e. Unity's IMGUI skin mechanism is effectively unused: the game writes appearance at each call
+  site through `GUI.color` and `Text.Font`. **This corrects a recollection that mattered** — a
+  `WidgetDef`-shaped appearance Def was assumed to exist; it does not in 1.6. So the game's only
+  data-driven appearance channel is ordinary Defs plus XML Patch operations, and that channel is closed to us
+  by identity (zero Defs in the payload, gate 5 refuses a content directory). Consequence: a stylesheet here
+  would not be adopting a host mechanism, it would be inventing a second resolver inside a library whose
+  compositor cannot even be layered above IMGUI.
 - **`Verse.Window`'s overridable surface, read member-by-member from the same 1.6.4871 reference
   assembly while writing `UiWindowHost` — these four facts each cost a failed run when guessed.** The type
   is `public abstract`; `DoWindowContents(Rect)` is **public abstract** (so `Margin`-style protected
@@ -636,6 +650,27 @@
   dissolving composites into C# deletes the only place a mod author can reach them without compiling, which is
   exactly the hole the consumer fell into. Evidence class: documentation read this session; no game run, no
   code change beyond this correction.
+- **The appearance layer exists in C# and is unreachable from data (census 2026-09-10).** Three measurements,
+  all from this repository's source. (1) Across the seven kinds' allowed-attribute whitelists the only visual
+  knobs are `Height`, `ButtonWidth`, `FieldWidth`, `Tab` and `Hidden` — no `Tone`, no `Style`, no `Variant`,
+  no color, no font, no padding anywhere in the manifest vocabulary, so a page author cannot express "this
+  banner is a warning" without writing code. (2) `UiTheme` is a token bag of **colors and one font**: no
+  geometry tokens (padding, spacing, gap, radius), and the seven widget files hold 275 numeric-literal
+  tokens (`grep -rhno` over the files — a token count, not a per-constant audit), so density is not
+  adjustable at any granularity. (3) The semantic style layer that does exist is code-side: `UiThemeDraw`
+  exposes 14 named outlets (`Surface`, `SectionBand`, `AccentRail`, `FocusRail`,
+  `StatusTreatment`, `RecoveryBand`, `StatusBadge`, …) and `UiStatusTone` is a six-value enum (`Neutral`,
+  `Active`, `Success`, `Warning`, `Danger`, `Disabled`). The roles are therefore already named centrally;
+  what is missing is a **binding from a manifest attribute to an existing role**, not a rule engine.
+  Evidence against building more than that today: the wired consumer never re-tints — it takes
+  `UiTheme.DarkGold` as-is (`Mod.cs:154`; both diagnostics windows hold a
+  `static readonly UiTheme WindowTheme = UiTheme.DarkGold`) and its source has zero `GUI.color`, zero
+  `new Color(` and zero `ColorDef.` hits — the measured pressure is in the atom axis, not the appearance
+  axis. The cheap shape, once a citation exists: add `Tone` to the atom schemas (closed enum, already named,
+  no new semantics) and move the geometry constants into `UiTheme` so `ButtonWidth`/`FieldWidth` stop being
+  per-kind vocabulary. The expensive shape (selectors, cascade, specificity, a parsed style file) has no
+  provenance, has no host counterpart to interoperate with, and collides with measurement order: the fit
+  audit must know the resolved font before `Measure` (`ITextMetrics`, the `Breakpoint` rule).
 - **The library ships 7 widget kinds; 3 are reachable from outside, 4 have no consumer at all.** US's two
   Schema=2 manifests reference exactly one library kind, `chrome/banner`. Two more library kinds are used, but
   *not* through a manifest: `UsFilterBarWidget` instantiates `DropdownWidget` and

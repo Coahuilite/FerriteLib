@@ -274,6 +274,18 @@ Each item is expected to delete a workaround, not add a layer.
       instead, so retiring a reachable name would push authors into C#. `section/header` is the exception, and
       the reason written down for it is that it duplicates the container's `Title` band, not that it is
       composite.
+- [ ] **Bind the existing role vocabulary into the manifest; do not build a stylesheet.** The census is in
+      `MEMORY.md`: the manifest's only visual knobs today are `Height`, `ButtonWidth`, `FieldWidth`, `Tab`
+      and `Hidden`, while the roles already exist centrally as `UiStatusTone` (six values) behind
+      `UiThemeDraw`'s 14 named outlets, and `UiTheme` carries no geometry tokens at all (275 numeric
+      literals across the seven widget files). Two cheap moves, each gated on a citation into a consumer
+      tree: add `Tone` to the atom schemas once the atoms exist, and move the geometry constants into
+      `UiTheme` so width knobs stop being per-kind vocabulary. Refuse selectors, cascade and specificity
+      until somebody is forced to hand-roll them — RimWorld has no style layer to interoperate with
+      (`Assembly-CSharp` in 1.6.4871 has zero `WidgetDef`, `GUISkin`, `StyleSheet` and `UIElements` hits, and
+      references no UI module beyond IMGUI and text rendering), so a parsed style file would be a second
+      resolver with no host counterpart plus a measurement-order problem: the fit audit needs the resolved
+      font before `Measure`.
 - [ ] **The carrier's own diagnostic surface — shipped as a page *spec* a consumer mounts, not as a settings
       page and not as a carrier-owned window (evaluated 2026-09-10; reasoning in `MEMORY.md` Charter).** The
       proposal was a mod-settings page listing the version contract and the atomic kinds; what killed that
