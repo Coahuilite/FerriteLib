@@ -215,18 +215,15 @@ Each item is expected to delete a workaround, not add a layer.
       nobody remembers to update.
 - [ ] Clean up `UiLayoutManifest.ParseFile`: it has no production caller. Either wire a real
       load-from-disk path (which is the only thing that would make XML authoring worth its cost) or
-      delete it and the `Schema="2"` version slot with it. **What the fork actually decides, measured
-      2026-09-10:** the library today owns no path from a manifest to a running window — US reads its XML
-      out of an embedded assembly resource, so layout edits recompile the consumer, and hot-reloaded layout
-      is a capability nobody holds (`MEMORY.md` Charter). Deleting the entry closes the implication; wiring
-      it must also answer where a mod's XML lives, when it is re-read, and what a parse failure looks like
-      to a player, or the library has bought a second source of truth for the sake of a demo.
-- [ ] **Keyboard focus has no traversal rule** (found while mapping the library against a retained layer's
-      irreducible core, 2026-09-10 — see `MEMORY.md` Charter). `UiNative.cs:173-236` gives one control
-      family real focus state, and nothing in the library moves focus between elements on keyboard input.
-      Naming hazard to settle in the same pass: `Tab` is already taken for workspace tabs
-      (`UiLayoutEngine.cs:1249`, resolved against `UiBindings.ActiveTabKey`), so a keyboard axis needs a
-      different word — do not overload it and make the manifest unreadable.
+      delete it and the `Schema="2"` version slot with it. **The intent is written straight here because
+      this item's own wording had drifted it:** the requirement on XML is that it declares page layout and
+      composes the kinds the library already provides. Hot-adding a widget kind from data was never asked
+      for — the founding spec declined even that harder variant — so the fork is not "how do we hot-reload
+      components" but "who hands the library the manifest string". Today that is the consumer (US embeds it
+      as an assembly resource: `MEMORY.md` Charter), which is coherent and needs nothing from us. A disk
+      path would buy exactly one thing — editing layout without recompiling the consumer — and would then
+      owe an answer on where the file lives, when it is re-read, and what a parse failure shows a player.
+      Deleting the dead entry costs nothing and stops implying a capability nobody owns.
 - [ ] **`Verse.Window`'s custom-drawing seam is unexamined.** The reference read recorded
       `Window(IWindowDrawing customWindowDrawing = null)` (`MEMORY.md`), i.e. the game's own window manager
       takes a drawing delegate. Whether Verse honours it is an IL-level question, and it is the only known
@@ -245,6 +242,15 @@ Each item is expected to delete a workaround, not add a layer.
       `--no-restore` from the cross-repo gates (otherwise they go green against a stale graph).
       GitHub Packages was checked and rejected for a different reason: it requires a token to *install*
       even public packages.
+- [ ] **Keyboard focus traversal — deferred by maintainer decision 2026-09-10**, not by oversight: RimWorld
+      players drive the mouse, so this is not worth a public-surface change inside the 0.3 window. The
+      upgrade path is written so it is a resumption and not a rediscovery. `UiNative.cs:173-236` already
+      keeps per-element focus state in `UiValueState`, so what is missing is a focus *owner* on the session
+      plus a traversal rule over the visible elements in tree order; the comparable Minecraft library solves
+      it with a `focusable` flag whose signal drives Tab-ring membership (`MEMORY.md` Charter). The
+      expensive half is naming, and it must be decided with this item: `Tab` already means a workspace tab
+      (`UiLayoutEngine.cs:1249`, resolved against `UiBindings.ActiveTabKey`), so a keyboard axis needs a
+      different word and that word is schema, not a local rename.
 - [ ] Theme token restructure to per-surface (fill, border) pairs, so a consumer can express a chrome
       family other than DarkGold's — including the game's own, which today is not representable. Do
       this before freezing, since it is breaking.
@@ -425,6 +431,34 @@ identity is created locally at upload time.
       contract is the failure mode this repo now has to refuse); and `README.md`'s "PRs are not promised
       while the surface is provisional" line stays true only while it is paired with a written list of what
       the provisional surface will not do.
+- [ ] **Published-contract proposal, awaiting maintainer approval** (designed on 2026-09-10 because the
+      public ruling needs it and the reasoning, not the menu, was asked for). Four parts, none of them
+      breaking, so all four can land before the in-game walkthrough:
+  1. **Tier the surface by hand**: one file listing every public type as stable, public-unstable, or
+     internal, plus a harness lane that snapshots the stable list — an addition fails the lane and has to
+     be accepted together with a minor bump, which makes the breaking event visible at the commit that
+     causes it instead of at release time. Rationale: a binary-compatibility tool is heavier than our
+     surface warrants, and the nearest comparable project runs a hand-maintained tier list enforced
+     socially plus by architecture-guard tests, which is a proven shape at this scale.
+  2. **Stop asking strangers to compile against a loadable carrier.** Cheapest step: publish a
+     `FerriteLib.UiKit.props` import file as a release asset (one `Reference` with a `HintPath` derived from
+     `$(MSBuildThisFileDirectory)`, `Private=false`, `SpecificVersion=false`), which deletes
+     clone-and-guess without shipping a copyable DLL. Second step, only if someone needs it: a metadata-only
+     `.Ref` package pushed on the bare tag — and its real argument is safety, not convenience, because a
+     reference assembly carries `ReferenceAssemblyAttribute` and runtimes refuse to execute it, which turns
+     this library's first invariant (one carrier) from etiquette into a loud failure at the moment a
+     stranger tries to impersonate it.
+  3. **Say the compatibility promise in one sentence**, in both READMEs and in the release body: inside
+     `[min, max)` no stable-tier signature is removed or changed; anything added bumps minor, and pre-1.0 a
+     minor bump *is* the breaking signal; a consumer compiled above the loaded carrier gets the named
+     `FerriteLibVersion.Require` mismatch rather than a `TypeLoadException` at first draw.
+  4. **Give the manifest vocabulary a retirement rule** taken from the industry answer instead of invented:
+     an attribute we mean to remove is accepted-and-ignored for one minor with a lane that proves the
+     warning fires, then refused at creation. Blanket leniency on unknown attributes is how a data format
+     rots, and our fail-closed creation contract is an asset worth keeping sharp.
+      What this buys is the missing half of the invitation; what it deliberately excludes is a NuGet feed,
+      any back-compat shim layer, and multi-version support. The breaking debt (per-surface theme, element
+      identity, announce) is unaffected by this proposal and still sits behind §1.
 
 ## 6. Documentation hygiene: what this audit found, and the rule that keeps it from coming back
 
@@ -454,6 +488,12 @@ these are the follow-throughs.
 - [ ] Open question worth one line of policy: is a one-directional series guard acceptable at all, given
       that the neutrality scan was moved *into* this repo precisely because a consumer-side check passed
       vacuously after the split? The actionable version is §3's two-sided-guard item.
+- [ ] **Queued documentation work (2026-09-10), not to be written in this pass:** `docs/design-charter.md`
+      carrying the tier-by-tier comparison of a retained layer's irreducible core against this library's
+      actual standing, one external source per row. The substance already exists as prose in `MEMORY.md`
+      "Charter"; the file exists so a stranger can be shown *why* the number is five rather than being told.
+      Write it together with the API-tier list if §5's contract proposal is approved, so one document answers
+      purpose and promise and the two are never maintained apart.
 
 **Method note for whoever picks this up.** Derive every number with `git ls-files` + `wc -l` / `grep -c`,
 and every gate claim from a read of the named range. A figure or capability repeated from prose inherits

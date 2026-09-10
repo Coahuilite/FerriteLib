@@ -256,6 +256,44 @@
   the other.** The 2026-09-10 ruling commits FL to saying both out loud — the README states who may compile
   against it, and the contributing doc, now owed, states what will not break.
 
+- **What the industry converges on, transcribed (surveyed 2026-09-10 against Unity UXML/USS, WPF/MAUI/WinUI
+  XAML, Android XML plus Compose, Godot scenes, Flutter, SwiftUI/UIKit, RmlUi and RimWorld Defs — external
+  primary docs, so this is a conclusion, not a measurement).** Three decisions are made identically by every
+  format that keeps a data file at all. A usable element kind is always a **compiled type resolved through a
+  registry**: XAML maps a namespace to a CLR namespace and assembly, Android uses the qualified class name as
+  the tag, Unity generates an element's attribute vocabulary from `[UxmlAttribute]` on a `[UxmlElement]`
+  partial class, RmlUi binds tags to a registered `ElementInstancer`, and in RimWorld the tags literally *are*
+  the public fields of a `Def` subclass. The data file always splits **structure, values and appearance**.
+  And invalidation is **always an imperative call on the framework, never something the data expresses**.
+  They diverge only on whether a data file exists (Flutter, SwiftUI and Compose delete the question) and how
+  loudly unknown syntax fails (RmlUi ignores it, RimWorld errors, this library refuses at creation). So the
+  instinct behind our manifest format — XML declares page layout over kinds the DLL already provides — is the
+  common shape rather than an idiosyncrasy, and the two moves that would abandon it are code in the manifest
+  and a vocabulary that grows without compiling, both already non-goals. Worth copying and already held: the
+  per-kind attribute schema, and the kind-declared natural size behind `Width="Auto"`. Not held and owed: a
+  written retirement rule for attributes (§5's contract proposal). Worth refusing on the record: loops,
+  conditionals and expressions in data, runtime kind discovery, and blanket tolerance of unknown tags.
+- **The closest specimen found, and the half of it that failed (Qz-UILib, `github.com/QuanhuZeYu/Qz-UILib`,
+  Minecraft 1.7.10 / GTNH, Java; surveyed 2026-09-10 from its repository — external, recorded as report).**
+  It has our host problem, an immediate per-frame GUI layer (vanilla `GuiScreen`), and solves it as a retained
+  scene stack: reactive signals → per-node dirty marks that **bubble upward only** → incremental flex layout
+  with `cachedLayout` short-circuits → an immutable paint plan rebuilt per frame from cached fragments →
+  immediate GL behind a backend port. Its own ban list names the two designs it tried and threw out:
+  version-number comparison, and downward recursive dirty marking. Identity is a keyed list reconciler that
+  reuses nodes by key and computes a longest-increasing-subsequence over the old indices to find zero-move
+  items. Keyboard focus is real there — a `focusable` flag whose signal drives Tab-ring membership — which is
+  the cost we declined in §4. The cautionary half is that it began declarative in the maximal sense (an
+  HTML-like document tree, a CSS-like stylesheet layer, documents pushed from a server) and **deleted the
+  whole stack in a breaking major**, with recorded costs of roughly twenty-five browser-semantics bugfixes in
+  one minor, layout-reuse debt from the downward marking, god-class splits and two dozen stale documents; its
+  capability-boundary doc now says no HTML/CSS/JS parsing or browser semantics, and no exposing GUI lifecycle
+  or GL internals to page authors. The lesson is a boundary, not a verdict: declarative *structure over a
+  compiled vocabulary* is industry-normal, declarative *semantics imported from the web* is what was bought
+  and sold back at this scale. Its own distribution answer is Maven plus JitPack with semver tags, and its
+  stability promise is a hand-maintained three-tier list (stable / public-unstable / internal) enforced
+  socially plus by architecture-guard tests, with no binary-compatibility tool — the shape §5's proposal
+  copies, chosen because a tool heavier than the surface is a promise nobody keeps.
+
 ## What was verified, and how
 
 - **RimWorld 1.6 UI surface**, read from `Krafs.Rimworld.Ref 1.6.4871` with dnlib (that package mirrors
