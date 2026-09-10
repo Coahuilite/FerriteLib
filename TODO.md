@@ -314,19 +314,29 @@ Each item is expected to delete a workaround, not add a layer.
       which is why `UiStatusTone.Disabled` has zero producers (`MEMORY.md`). Do not add the writability read
       in the same change as the table: the table is deduplication, the read is a public API addition and
       therefore 0.4.0 material.
-- [ ] **Style capability, staged by contract cost (decomposed 2026-09-10; reasoning and non-goals in
-      `MEMORY.md`).** Stage 0 is the internal dedup above — no bump, doable any time. Stages 1-3 land in the
-      0.4.0 sweep **together with the leaf atoms**: per-surface and geometry tokens (already pre-stable debt
-      under the §5 INVITED ruling), then `Tone`/`Emphasis` onto the atom schemas, then the
-      resolve-before-measure store with its harness lane and the role-name deprecation channel. Stage 4
-      (page- and container-level scope carriers plus the written precedence chain) waits for a real page that
-      needs to scope a subtree; stage 5 (the `IUiBindings` writability read) ships with whichever of the two
-      first needs a `Disabled` producer. Do not build the non-goals: no selectors, no specificity, no
-      `@media`, no separate style file, no runtime mutation.
-      Validation policy for stage 3, per the failure ladder in `MEMORY.md`: structure stays fail-closed
-      (page-fatal, bucket 2), appearance values go fail-soft — an unknown `Tone` falls back to the default
-      treatment and reports, because its worst case is an element that looks plain, not a page that means
-      something else.
+- [ ] **Style capability, staged by contract cost (decomposed 2026-09-10; scope CONFIRMED by the maintainer
+      the same day — reasoning and non-goals in `MEMORY.md`).** The governing rule is the use/extend
+      boundary: XML is the surface for **using** components, layout and appearance, and C# is the surface for
+      **extending** the vocabulary by registering a kind. Measured against it, layout complies and appearance
+      does not, so all three appearance classes are in scope: (a) a colour scheme selectable per window and
+      per region, (b) density (row height, padding, font size), (c) role tags per element. Stage 0 is the
+      internal dedup above — no bump, doable any time. Stages 1-3 land in the 0.4.0 sweep **together with the
+      leaf atoms**: per-surface and geometry tokens (already pre-stable debt under the §5 INVITED ruling),
+      then the scheme, density and `Tone`/`Emphasis` attributes onto the atom schemas, then the
+      resolve-before-`Measure` pass with its harness lane and the role-name deprecation channel. Precedence
+      is nearest-wins — element > region > window > library default — written down, with no selectors and no
+      specificity arithmetic. **Inheritance is asymmetric and that asymmetry is the design:** scheme and
+      density inherit, roles do not, because a region marked danger makes everything inside it read as
+      dangerous. Stage 4 shrinks accordingly — the region level is in scope now, the page level waits for a
+      cited need; stage 5 (the `IUiBindings` writability read) ships with whichever change first needs a
+      `Disabled` producer. Cross-page sharing is explicitly **not** built: reuse rides the registry, not a
+      shared style document. Nor are the other non-goals: no selectors, no specificity, no `@media`, no
+      separate style file, no runtime mutation.
+      Validation policy for stage 3, per the failure ladder in `MEMORY.md` and the maintainer's ruling:
+      structure stays fail-closed (page-fatal, bucket 2), appearance values go fail-soft — an unknown `Tone`
+      falls back to the default treatment — and fail-soft must not mean silent: the fallback is logged,
+      reported through the fit audit's channel and exercised in a harness lane, because the web's weakness
+      here is that a dropped declaration fails invisibly and gets found by a user instead of by its author.
 - [ ] **The carrier's own diagnostic surface — shipped as a page *spec* a consumer mounts, not as a settings
       page and not as a carrier-owned window (evaluated 2026-09-10; reasoning in `MEMORY.md` Charter).** The
       proposal was a mod-settings page listing the version contract and the atomic kinds; what killed that
@@ -431,22 +441,21 @@ identity is created locally at upload time.
       free: US's `scripts/build-dev.ps1` drives `-c Dev` on this project, so the change lands in a round
       with its migration, not in a packaging cleanup.
 
-- [ ] **Pre-push privacy scan on the full reachable history — reopened 2026-09-09: every content
-      vector still clean, the identity vector is not.** The 2026-09-07 run at `bdbeae0` (working tree
-      0, messages 0, all 34 revisions 0, single noreply identity) stands for what it scanned; the
-      merge of PR #1 put `Fe <19252128+Coahuilite@…>` on the reachable history — GitHub's web merge
-      button stamps the PR clicker's display name as author (committer `GitHub <noreply@github.com>`
-      is platform boilerplate, not a leak). The bare local name `Fe` is the only personal signal
-      anywhere; the email stays the noreply form the gate itself admits. `privacy-audit.ps1
-      -FullHistory` now FAILS on `identity uniqueness (3)`; it will keep failing until the history is
-      rewritten, which the 2026-09-07 ruling forbids for hash citations but this is not — a dangling
-      citation is archaeology, a leaked display name on a public repo is the thing the scan exists to
-      catch, and this repo's tags are rc-only so nothing external anchors on these SHAs yet.
-      **Decision + action belong to the maintainer:** amend the one commit's author to the series
-      identity (or filter-repo the single commit), force-push both branches, re-run the scan green,
-      and only then cut `v0.3.0-rc1`. The scan's own lesson applies to itself: a clean tree says
-      nothing about history — re-run `-FullHistory` after any commit lands, which is exactly how this
-      regression was caught instead of shipped.
+- [x] **Pre-push privacy scan: the identity vector was a gate bug, not a leak (ruled and fixed
+      2026-09-10).** The 2026-09-09 reopening said `Fe <19252128+Coahuilite@…>` on the PR #1 merge commit had
+      to be rewritten out of history. Checked against the source the maintainer named: `gh api user` reports
+      login `Coahuilite`, id `19252128`, name **`Fe`**, email `null` — so `Fe` is that account's own
+      GitHub-published display name, and GitHub's web merge button stamps exactly that as the author of a
+      squash-or-merge commit; the committer `GitHub <noreply@github.com>` is platform boilerplate. One human,
+      one account, one noreply address. **The leak vector is the email address, never the display name**, so
+      the gate now measures accounts: any non-noreply author or committer address fails, more than one
+      distinct noreply account fails, and display-name variance inside one account is reported instead of
+      fatal. Positive control run before trusting it: a real mailbox → foreign 1; two accounts → 2; the same
+      name on two accounts → 2; this repository's history → 1 account, 2 names, `PRIVACY AUDIT CLEAN` across
+      76 revisions. Consequences: no history rewrite, no force-push, `v0.3.0-rc1` is unblocked on this axis,
+      and the amend-and-force-push instruction this item used to carry is superseded. Standing rule
+      unchanged: re-run `-FullHistory` after any commit lands, because a clean tree says nothing about
+      history — that is how this was caught at all.
 - [x] **Repository name ruled by the maintainer 2026-09-07: `FerriteLib`, PascalCase** — matching the
       series convention (`SqueakyRatkin`, `UniversalSqueaker`, both measured live on GitHub). The earlier
       "lowercase or a Linux runner breaks" argument is void on evidence: GitHub resolves owner/repo

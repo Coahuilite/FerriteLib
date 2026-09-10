@@ -821,10 +821,13 @@
   `UiWindowNotice.Prerequisite` from `Require`'s readable report. (4) A duplicate carrier is
   `FerriteLibVersion.Require`'s collision report. **So the accurate cost of putting style in the manifest is
   not "it blows up" — it is that style errors land in bucket 2 (page-fatal) instead of bucket 1
-  (element-contained), because creation-time validation is page-scoped by design.** The decision that follows
-  belongs to stage 3: fail **closed** on structure, because a mis-named element means the page means
-  something else, and fail **soft** on appearance values, because a mis-named `Tone` should degrade to the
-  default treatment plus a report — its worst case is an element that looks plain.
+  (element-contained), because creation-time validation is page-scoped by design. **Ruled by the maintainer
+  on 2026-09-10: appearance must never take the page down — the same way a broken stylesheet leaves a web
+  document still rendering, only badly dressed. So stage 3 fails closed on structure, because a mis-named
+  element means the page means something else, and soft on appearance values: an unknown `Tone` falls back to
+  the default treatment. Fail-soft must not mean silent — the web's own weakness here is that a dropped
+  declaration fails invisibly and is found by a user rather than by its author — so the fallback is logged,
+  reported through the fit audit's channel, and exercised in a harness lane.
 - **The web analogy corrected: we are not HTML and CSS merged, we are HTML with no author CSS at all
   (2026-09-10).** The manifest carries structure, identity (`Id`, `Kind`, `Tab`, `Hidden`), binding references
   and three geometry attributes (`Height`, `ButtonWidth`, `FieldWidth`); style is in no file — it lives in
@@ -837,6 +840,32 @@
   cannot ship apart from its own role assignments. What it costs is sharing across pages — two pages wanting
   one look copy the attributes, which moves today's duplication from C# into XML — and the fact that every
   appearance knob added to the schema is permanent vocabulary.
+- **The requirement, stated as a boundary rather than a feature (maintainer Q&A, 2026-09-10).** "XML 就能
+  调用组件、确定布局、改变外观；其他作者用 C# 注册自己的组件." Read as a rule: **the use surface must not
+  require a compiler; the extension surface may.** Measured against it, layout already complies and
+  appearance does not — the manifest's entire visual vocabulary is `Height`, `ButtonWidth`, `FieldWidth`,
+  `Tab`, `Hidden` — so the gap is not "we lack CSS", it is a hole in this library's own stated boundary, and
+  that is why closing it needs no provenance citation: the boundary is the justification. Confirmed scope is
+  all three classes, not one: a colour scheme selectable per window and per region (the NGS ice-blue case),
+  density (row height, padding, font size), and role tags per element. Precedence is nearest-wins — element
+  > region > window > library default — because the sources are nested in the tree, so no matching modes and
+  no specificity arithmetic are required; the engine CSS exists for is exactly the thing our shape lacks the
+  need for. **Inheritance is asymmetric by design: scheme and density inherit, roles do not.** A region
+  tagged danger would make every control inside it read as dangerous and destroy the information the tag
+  exists to carry, and that is the argument any future request to make `Tone` inherit must answer.
+  Cross-page sharing was declined, with a real substitute: reuse rides the extension surface (a registered
+  kind), not a shared style document.
+- **The privacy gate measures accounts, not display names (ruled and implemented 2026-09-10).** `gh api
+  user` reports login `Coahuilite`, id `19252128`, name `Fe`, email `null` — so the `Fe` sitting on the
+  PR #1 web-merge commit is that account's own GitHub-published display name, which is precisely what
+  GitHub's merge button stamps as author, and the committer `GitHub <noreply@github.com>` is platform
+  boilerplate. One human, one account, one noreply address: the earlier "three identities, rewrite the
+  history" reading was a gate bug, not a leak. The email address is the leak vector, so `privacy-audit.ps1`
+  now fails on any non-noreply author or committer address and on more than one distinct noreply account,
+  while reporting display-name variance rather than treating it as fatal. Positive control: a real mailbox
+  → foreign 1; two accounts → 2; one name across two accounts → 2; this repository → account 1, names 2,
+  `PRIVACY AUDIT CLEAN` across 76 revisions. Consequences: no rewrite, no force-push, `v0.3.0-rc1` is
+  unblocked on this axis, and the §5 instruction to amend and force-push is superseded by this record.
 - **The library ships 7 widget kinds; 3 are reachable from outside, 4 have no consumer at all.** US's two
   Schema=2 manifests reference exactly one library kind, `chrome/banner`. Two more library kinds are used, but
   *not* through a manifest: `UsFilterBarWidget` instantiates `DropdownWidget` and
