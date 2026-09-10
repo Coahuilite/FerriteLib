@@ -697,6 +697,25 @@
   (`0.38, 0.14, 0.11`) under two names with no users — unproven surface inside the token bag, which this
   library's own rule treats as debt rather than inventory: either a cited consumer shapes them apart or one
   of the two goes. Evidence: source-level counts in both repositories; no game run.
+- **The scattering is real, and its cause is an unqueryable table, not a missing stylesheet (measured
+  2026-09-10).** Three vectors, named at the line. (1) `DropdownWidget.DrawField:127` and
+  `InputModeRowWidget.DrawOption:114` hold the same two-token mapping verbatim — `selected ? Selected :
+  Raised` plus `selected ? AccentGold : Border` — which is exactly what `UiThemeDraw.StatusTreatment`
+  already computes for `Active` and `Neutral` (its switch: `Active` ⇒ Selected + AccentGold, default ⇒
+  Raised + Border). (2) The tone-to-text mapping lives inside `StatusBadge:204-213` as a private `switch`,
+  so the two widgets re-derive `selected ? TextOnGold : TextPrimary` by hand; the tables disagree on one
+  entry deliberately (a badge's neutral text is `TextSecondary`, a field's is `TextPrimary`), which is the
+  first concrete evidence that **tone alone does not determine text colour** — prominence is a second axis,
+  and any role vocabulary must carry it or it will keep being re-invented per widget. (3) The same text
+  inset is spelled two ways: `DropdownWidget` uses a named `TextPadding` constant, `InputModeRowWidget:117`
+  hardcodes `6f` and `12f`; across the seven widget files the geometry constants run 40 × `1f` (the
+  hairline), 7 × `2f` (the rail width), 5 × `6f`, 3 × `28f`, with no token source anywhere. **Why a
+  stylesheet would not have prevented this:** a component that fills a rect imperatively needs the resolved
+  value *back*, and CSS-shaped systems do not hand it out casually — Unity's own UIElements ships a
+  `resolvedStyle` query for precisely that reason (`StyleResolved` appears 5 times in
+  `UnityEngine.UIElementsModule.dll` in 1.6.4871, the module the game never references). So the prerequisite
+  is a queryable, complete treatment table shared by the outlets and the widgets. Whether a data-side
+  `Tone=` attribute ever sits on top of it stays the separate, citation-gated question.
 - **The library ships 7 widget kinds; 3 are reachable from outside, 4 have no consumer at all.** US's two
   Schema=2 manifests reference exactly one library kind, `chrome/banner`. Two more library kinds are used, but
   *not* through a manifest: `UsFilterBarWidget` instantiates `DropdownWidget` and

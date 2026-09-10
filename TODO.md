@@ -297,6 +297,18 @@ Each item is expected to delete a workaround, not add a layer.
       shapes them apart or one name goes in the 0.4.0 sweep — an unproven token in the bag is the same debt
       class as an unproven kind, and the self-check page will put the duplication on screen where a player
       can be pointed at it.
+- [ ] **Make the tone treatment table queryable, then route the three call sites through it.** The
+      duplication is measured in `MEMORY.md`: `DropdownWidget.DrawField:127` and
+      `InputModeRowWidget.DrawOption:114` re-implement, verbatim, the `Active`/`Neutral` rows of
+      `UiThemeDraw.StatusTreatment`, and both re-derive a text colour that currently lives inside
+      `StatusBadge`'s private switch. Shape of the fix: one internal table returning fill, border **and**
+      text for a tone plus a prominence flag, with `StatusTreatment` and `StatusBadge` consuming it so the
+      three sites cannot drift. Equivalence is checkable before writing it — `Active` ⇒ Selected +
+      AccentGold + TextOnGold, `Neutral` ⇒ Raised + Border + TextPrimary, which is what both widgets paint
+      today. Keep it `internal` until the 0.4.0 sweep: a public addition bumps the contract minor, and the
+      wired consumer pins `[0.3.0, 0.4.0)`. The prominence flag exists because the badge's neutral text is
+      `TextSecondary` while a field's is `TextPrimary` — do not resolve that by adding tone values, which
+      would widen a public enum for a library-internal distinction.
 - [ ] **The carrier's own diagnostic surface — shipped as a page *spec* a consumer mounts, not as a settings
       page and not as a carrier-owned window (evaluated 2026-09-10; reasoning in `MEMORY.md` Charter).** The
       proposal was a mod-settings page listing the version contract and the atomic kinds; what killed that
