@@ -314,6 +314,15 @@ Each item is expected to delete a workaround, not add a layer.
       which is why `UiStatusTone.Disabled` has zero producers (`MEMORY.md`). Do not add the writability read
       in the same change as the table: the table is deduplication, the read is a public API addition and
       therefore 0.4.0 material.
+- [ ] **Style capability, staged by contract cost (decomposed 2026-09-10; reasoning and non-goals in
+      `MEMORY.md`).** Stage 0 is the internal dedup above — no bump, doable any time. Stages 1-3 land in the
+      0.4.0 sweep **together with the leaf atoms**: per-surface and geometry tokens (already pre-stable debt
+      under the §5 INVITED ruling), then `Tone`/`Emphasis` onto the atom schemas, then the
+      resolve-before-measure store with its harness lane and the role-name deprecation channel. Stage 4
+      (page- and container-level scope carriers plus the written precedence chain) waits for a real page that
+      needs to scope a subtree; stage 5 (the `IUiBindings` writability read) ships with whichever of the two
+      first needs a `Disabled` producer. Do not build the non-goals: no selectors, no specificity, no
+      `@media`, no separate style file, no runtime mutation.
 - [ ] **The carrier's own diagnostic surface — shipped as a page *spec* a consumer mounts, not as a settings
       page and not as a carrier-owned window (evaluated 2026-09-10; reasoning in `MEMORY.md` Charter).** The
       proposal was a mod-settings page listing the version contract and the atomic kinds; what killed that

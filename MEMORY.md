@@ -752,8 +752,9 @@
   be a read-only element whose data side says `Tone="danger"`, and that is settled by one written precedence
   rule (state beats author). Cascade machinery becomes a requirement only once competing sources outnumber
   what a written rule can carry; today the count is one.
-- **What a third consumer could do today, measured rather than assumed (2026-09-10, for the §5
-  invited-vs-unsupported call).** Appearance is already customisable at **window** granularity with zero
+- **What a third consumer could do today, measured rather than assumed (2026-09-10; the §5
+  invited-vs-unsupported call was ruled invited the same day, and this census is written for what that
+  ruling now owes).** Appearance is already customisable at **window** granularity with zero
   library change: `UiWindowHost.Theme` is an abstract property, `UiTheme` exposes **20 settable colours plus
   one settable font**, and `DarkGold` hands out a fresh instance per call so two mods re-tinting "the
   default" cannot repaint each other. A third mod could therefore ship a wholly different palette today, and
@@ -763,8 +764,35 @@
   layout with it and is covered by `ITextMetrics` and the fit audit; it is not a cosmetic setting. Finally,
   the binding constraints on a third consumer are not version numbers: they are the single-carrier invariant
   (only this mod ships the DLL, and `FerriteLibVersion.Require`'s collision report is the only detector) and
-  the open §5 ruling on whether outside mods are invited to compile against this surface at all. A third
-  wired consumer does not get blocked by the API freeze — it is the event the freeze is gated on.
+  the invitation itself, which turns the pre-stable debt list in §3/§4 into a schedule rather than an
+  option. A third wired consumer does not get blocked by the API freeze — it is the event the freeze waits for.
+- **What a cascading style capability actually requires here, decomposed 2026-09-10.** The §5 INVITED
+  ruling turns the breaking parts into pre-stable debt rather than options, so the work separates into five
+  pieces, and the surveyed systems say the first three are the whole useful part. (1) *The resolved-value
+  store* — one table keyed by `(role, prominence[, writability])` returning fill/border/text, immutable per
+  element and session-scoped: session-scoped because the promotion gate forbids new process-wide mutable
+  statics, immutable because `Measure` must see the same font the draw will use. (2) *The token shape fix*
+  already filed in §4 — per-surface `(fill, border)` pairs, which is also what makes the game's own look
+  representable at all — plus geometry tokens, since a role that cannot vary spacing has bought very little.
+  (3) *Role vocabulary on the atoms* — `Tone` and `Emphasis` as attributes, which is why the leaf atoms are a
+  prerequisite: a role has nothing to attach to while the manifest offers no text or button. (4) *Scope
+  carriers* — page- and container-level style with a **written** precedence chain, state > element >
+  container > page > theme > default. This is the only piece where "cascade" earns its keep and the only one
+  needing inheritance, and inheritance stays limited to font and emphasis because arbitrary inheritance is
+  what makes a resolved value unauditable. (5) *The writability read* on `IUiBindings`, which finally
+  produces `Disabled`. Explicit non-goals, each with its reason: no selector matching and no specificity
+  arithmetic, because positional precedence covers the real cases and stays auditable; no `@media`, because
+  the cited narrower mechanism is the shipped `Breakpoint`; no separate stylesheet file, because the game has
+  no style layer to interoperate with, so a new file kind buys a loader, a path contract and a second
+  validation entry point and nothing else; no runtime style mutation, because live state is already resolved
+  per frame in the draw and that is what keeps it harness-drivable. Role names take the §5 deprecation clause
+  like any other attribute: redirect for at least one minor, removal only at a minor boundary.
+- **The carrier rationale is not in question, and it is not what the §5 ruling was about (restated
+  2026-09-10).** This mod exists as a prerequisite that ships the library to other consumers — that is its
+  identity, not a cost to justify, and nothing about a style layer changes it. What the invited/unsupported
+  call was actually about is narrower and remains the reason the ordering above matters: whether strangers may
+  compile against the surface, which decides when the freeze clock starts and therefore how cheap each
+  breaking piece still is. Ruled invited on 2026-09-10, so the pre-stable list is now a debt schedule.
 - **The library ships 7 widget kinds; 3 are reachable from outside, 4 have no consumer at all.** US's two
   Schema=2 manifests reference exactly one library kind, `chrome/banner`. Two more library kinds are used, but
   *not* through a manifest: `UsFilterBarWidget` instantiates `DropdownWidget` and
