@@ -711,11 +711,25 @@
   hardcodes `6f` and `12f`; across the seven widget files the geometry constants run 40 × `1f` (the
   hairline), 7 × `2f` (the rail width), 5 × `6f`, 3 × `28f`, with no token source anywhere. **Why a
   stylesheet would not have prevented this:** a component that fills a rect imperatively needs the resolved
-  value *back*, and CSS-shaped systems do not hand it out casually — Unity's own UIElements ships a
-  `resolvedStyle` query for precisely that reason (`StyleResolved` appears 5 times in
-  `UnityEngine.UIElementsModule.dll` in 1.6.4871, the module the game never references). So the prerequisite
-  is a queryable, complete treatment table shared by the outlets and the widgets. Whether a data-side
-  `Tone=` attribute ever sits on top of it stays the separate, citation-gated question.
+  value *back*, and CSS-shaped systems do not hand it the rules — they hand it a resolved view. Unity's
+  UIElements makes that view first-class: `IResolvedStyle` appears 157 times in the metadata of
+  `UnityEngine.UIElementsModule.dll` in 1.6.4871, with `resolvedStyle` on the element (`get_resolvedStyle`)
+  and `resolvedValues` beside it, while `Specificity` appears 6 times and `StyleResolver`/`ComputedStyles`
+  not at all. That module ships in `Data/Managed` and the game never references it. So the prerequisite is a
+  queryable, complete treatment table shared by the outlets and the widgets; whether a data-side `Tone=`
+  attribute ever sits on top of it stays the separate, citation-gated question.
+- **Two different things get called "resolution", and keeping them apart is the whole argument (2026-09-10,
+  written after the maintainer asked why resolution must precede the table).** (A) *Style resolution* is the
+  computation from a rule set plus an element's place in the tree to that element's effective values —
+  matching, cascade, inheritance — and **its output is the per-element resolved-value table**. Nothing draws
+  from rules directly, so "resolution before table" is not a sequencing preference: the table simply *is* the
+  output. (B) *Pre-measure determinacy* is a separate requirement that concrete numbers exist before text is
+  measured, which is why any future style surface must settle before `Measure` (`ITextMetrics`, the
+  `Breakpoint` rule). FerriteLib has no rule set and needs no selectors, so its table key is already
+  explicit — tone plus prominence — and what it lacks is the output side of (A): turning the two switches
+  that already exist into values somebody can read. Consequence for sequencing: build the table first. A
+  data-side `Tone=` is only a new input to it, whereas shipping `Tone=` first leaves every widget copying
+  the switch again, now with an XML value in hand.
 - **The library ships 7 widget kinds; 3 are reachable from outside, 4 have no consumer at all.** US's two
   Schema=2 manifests reference exactly one library kind, `chrome/banner`. Two more library kinds are used, but
   *not* through a manifest: `UsFilterBarWidget` instantiates `DropdownWidget` and
