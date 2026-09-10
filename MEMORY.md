@@ -443,6 +443,19 @@
   "clone inserts CRs" vector is closed by `.gitattributes`. Consequence for the rehearsal: the
   "CI zip SHA-256 matches a local pack of the same commit" check in `TODO.md` §5 is now meaningful;
   before this fix it could only pass by luck of timing.
+- **What advancing to 0.4.0 means, and why 0.3.0 is the number that should ship first (reasoned 2026-09-10).**
+  All three axes sit at 0.3.0 (`FerriteLibVersion.Api`, `About/About.xml <modVersion>`, csproj
+  `VersionPrefix`) while the sole tag is `v0.2.0-rc1`, so **0.3.0 is currently a contract value that no
+  release has ever carried** — and US already pins `[0.3.0, 0.4.0)` against a number nobody can install. The
+  pending work (leaf atoms plus the three style classes plus the per-surface token restructure) is public
+  additions with one breaking restructure, which under the pre-1.0 rule — a minor bump IS breaking, and any
+  public addition bumps minor — is exactly 0.4.0 material. Cutting `v0.3.0-rc1` first costs nothing the rc
+  discipline does not already handle: the prerelease flag is derived from the tag dialect,
+  `verify-release.ps1` re-checks platform state after publishing, and a bad rc is fixed by deleting release
+  and tag and re-pushing the same number. The sequencing that does matter runs the other way: **do not let a
+  second consumer wire against 0.3.x and then break `UiTheme`** — 0.4.0 is the last minor where the
+  per-surface restructure is cheap, and because the API freeze is gated on the second wired consumer, the
+  style sweep has to land before NGS or anyone else builds against the shell.
 - **uGUI / UIElements assemblies do ship** (`UnityEngine.UI.dll`, `UnityEngine.UIModule.dll`,
   `Unity.TextMeshPro.dll`, `UnityEngine.UIElementsModule.dll`), so they are referenceable by a mod. The
   constraint that actually matters is compositing, not availability: IMGUI draws above every Canvas.
@@ -1192,6 +1205,9 @@ colour token currently feeds layout — it is a future-regression guard, not pre
   author is the clicker's display name (`Fe <…@users.noreply…>`), GitHub itself as committer, and the
   `-FullHistory` identity vector went red through no edit of ours. The scan must be re-run after
   remote-side history events, not only before pushes — the same rule it already states for commits,
-  extended to merge buttons, tags' absence and any other hand that writes to the graph. The fix is
-  cheap while the repo is rc-only (amend the one merge commit's author, force-push both branches;
-  `v0.2.0-rc1` sits below and is unaffected); it is expensive the day a stable tag cites these SHAs.
+  extended to merge buttons, tags' absence and any other hand that writes to the graph. **The fix planned
+  here — amend the merge commit's author and force-push both branches — was overtaken on 2026-09-10:
+  `gh api user` shows `Fe` is this account's own GitHub-published display name, so the vector was a gate bug
+  rather than a leak, and the gate now measures accounts instead of name strings (see the privacy-gate
+  record in this file). The lesson about re-running after remote-side history events stands; the
+  history-rewrite advice does not.**
