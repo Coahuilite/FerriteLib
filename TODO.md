@@ -229,6 +229,24 @@ Each item is expected to delete a workaround, not add a layer.
       takes a drawing delegate. Whether Verse honours it is an IL-level question, and it is the only known
       fact that could move the "no non-IMGUI backend" non-goal; answer it before anyone builds a case on the
       current wording, which rests on a compositing-order claim this repo has never measured.
+- [ ] **The 0.4.0 sweep, as one breaking window (tier list, 2026-09-10).** Internalise the
+      internalize-candidate types (`KernelCoreWidgetRegistrar`, `UiLayoutEngine`, and the six kind classes
+      nobody names) and, first, add the stable container of `const string` kind identifiers they need in
+      place of `SomeWidget.Kind`; bundle it with the per-surface theme restructure, the element identity
+      layer and the announce operation, because pre-1.0 each of those is its own minor bump and paying them
+      separately means three breaking releases where the debt has one natural home. `MEMORY.md` records the
+      count that makes this a decision and not a preference: 20 of 40 public types are blocked from stable by
+      exactly these debts.
+- [ ] **`UiHost.MeasureAndArrange` / `UiHost.Draw(snapshot)` have no cited use.** The harness exercises the
+      two-phase split (caching and revalidation lanes), but neither the wired consumer nor `UiWindowHost`
+      names it — the shell drives `DrawFrame`. So either a consumer supplies the need the split was built for
+      (measure before you know the window's size) or the split becomes part of the internalise sweep above.
+      Leaving public surface that only our own tests call is the same debt as an unconsumed widget kind.
+- [ ] **A deprecation channel for manifest attributes, per the 2026-09-10 ruling.** Today
+      `UiHost.ValidateAttributes` refuses an unlisted attribute outright, which is correct for unknown names
+      and wrong for a name we are retiring: the ruling is accept-and-redirect for at least one minor, warning
+      in a lane that proves the warning fires, then refuse at the minor boundary. Needs a declared
+      deprecated-attribute table (per kind, with the redirect target) and a harness lane driving both ends.
 
 ## 4. Deferred by decision, with the upgrade path written down
 
@@ -431,34 +449,27 @@ identity is created locally at upload time.
       contract is the failure mode this repo now has to refuse); and `README.md`'s "PRs are not promised
       while the surface is provisional" line stays true only while it is paired with a written list of what
       the provisional surface will not do.
-- [ ] **Published-contract proposal, awaiting maintainer approval** (designed on 2026-09-10 because the
-      public ruling needs it and the reasoning, not the menu, was asked for). Four parts, none of them
-      breaking, so all four can land before the in-game walkthrough:
-  1. **Tier the surface by hand**: one file listing every public type as stable, public-unstable, or
-     internal, plus a harness lane that snapshots the stable list — an addition fails the lane and has to
-     be accepted together with a minor bump, which makes the breaking event visible at the commit that
-     causes it instead of at release time. Rationale: a binary-compatibility tool is heavier than our
-     surface warrants, and the nearest comparable project runs a hand-maintained tier list enforced
-     socially plus by architecture-guard tests, which is a proven shape at this scale.
-  2. **Stop asking strangers to compile against a loadable carrier.** Cheapest step: publish a
-     `FerriteLib.UiKit.props` import file as a release asset (one `Reference` with a `HintPath` derived from
-     `$(MSBuildThisFileDirectory)`, `Private=false`, `SpecificVersion=false`), which deletes
-     clone-and-guess without shipping a copyable DLL. Second step, only if someone needs it: a metadata-only
-     `.Ref` package pushed on the bare tag — and its real argument is safety, not convenience, because a
-     reference assembly carries `ReferenceAssemblyAttribute` and runtimes refuse to execute it, which turns
-     this library's first invariant (one carrier) from etiquette into a loud failure at the moment a
-     stranger tries to impersonate it.
-  3. **Say the compatibility promise in one sentence**, in both READMEs and in the release body: inside
-     `[min, max)` no stable-tier signature is removed or changed; anything added bumps minor, and pre-1.0 a
-     minor bump *is* the breaking signal; a consumer compiled above the loaded carrier gets the named
-     `FerriteLibVersion.Require` mismatch rather than a `TypeLoadException` at first draw.
-  4. **Give the manifest vocabulary a retirement rule** taken from the industry answer instead of invented:
-     an attribute we mean to remove is accepted-and-ignored for one minor with a lane that proves the
-     warning fires, then refused at creation. Blanket leniency on unknown attributes is how a data format
-     rots, and our fail-closed creation contract is an asset worth keeping sharp.
-      What this buys is the missing half of the invitation; what it deliberately excludes is a NuGet feed,
-      any back-compat shim layer, and multi-version support. The breaking debt (per-surface theme, element
-      identity, announce) is unaffected by this proposal and still sits behind §1.
+- [x] **Published-contract proposal — approved by the maintainer on 2026-09-10 ("草案我们先用；真实需求总比
+      虚空打靶强")**, with the deprecation clause strengthened: an attribute under retirement keeps working,
+      **redirected** to its replacement, for at least one minor, and full removal happens only at a minor
+      boundary. Status of each part:
+  1. **DONE** — `docs/api-tiers.md` (40 exported types: 12 stable, 20 public-unstable, 8
+     internalize-candidate) with `FerriteLibApiTierTests` enforcing classification, staleness, the pinned
+     stable list and a planted-name control. Mutation-proven by renaming a stable entry: four red lanes with
+     exact names, green on restore.
+  2. **Half-approved, both halves open.** The `.props` release asset (compile reference without shipping a
+     runnable DLL) is the step to take; the metadata-only `.Ref` package waits until a stranger needs it.
+     **Briefing owed to the maintainer, on his request and not yet delivered:** explain concretely what a
+     `.props` file is versus a `.Ref` package, why one is a build-script include and the other is a
+     non-executable metadata assembly, and which promise each one buys. Do not let the next session assume
+     he already knows; he asked to be told after the decision, not before it.
+  3. **Decided, wording owed.** The one-sentence promise goes into both READMEs now, and into the release
+     body when `v0.3.0-rc1` is cut — the last one is the cutter's step, not a script change to land blind,
+     because `release.yml`'s body is what a player reads.
+  4. **Ruled, not implemented** — tracked in §3 as the deprecation channel item; the current creation
+     contract refuses unknown attributes outright, so there is today no mechanism to accept-and-redirect.
+      What this deliberately still excludes is a NuGet feed, any back-compat shim layer, and multi-version
+      support.
 
 ## 6. Documentation hygiene: what this audit found, and the rule that keeps it from coming back
 

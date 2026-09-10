@@ -25,6 +25,19 @@ DI or codegen, no expressions in manifest XML, no Def hot-reload promise, no wor
 evidence classes behind each, and the 2026-09-10 ruling that the library is referenceable by strangers and
 held to general-library standards: `MEMORY.md`, "Charter".
 
+## Compatibility and retirement
+
+The promise is `docs/api-tiers.md`: **stable** types keep their signatures inside the `[min, max)` range a
+consumer compiles against, **public-unstable** types are usable but expected to change shape, and
+**internalize-candidate** types are public only by history. A harness lane classifies every exported type
+against that file and pins the stable list, so an addition to the public surface fails until it is decided
+in two places.
+
+Manifest vocabulary retires the way code does, and never silently: a deprecated attribute keeps working —
+redirected to its replacement, not ignored — for at least one minor, and removal happens only at a minor
+boundary (maintainer ruling 2026-09-10). A minor bump is the breaking signal pre-1.0, which makes this the
+one mechanism that lets the library say "compile against what you tested" without lying.
+
 ## The two layers
 
 1. **Declarative page engine** — XML manifest, constrained layout, typed bindings, per-window session,

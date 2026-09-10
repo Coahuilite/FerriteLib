@@ -50,9 +50,11 @@ second wired consumer.
 
 **Third-party use is invited (maintainer ruling 2026-09-10).** Compile against the release asset, and open
 an issue when the library forced you to hand-roll something — a citation into your own working code is how
-this library grows; a request alone is not. Bug reports are always welcome. A PR is not promised a merge
-while the API is provisional, and `CONTRIBUTING.md` does not exist yet: when the surface freezes, what will
-and will not break afterwards is written down there.
+this library grows; a request alone is not. Bug reports are always welcome. What we will not break is a
+per-type promise rather than a per-release one: `docs/api-tiers.md` marks every exported type **stable** or
+**public-unstable**, and only stable types keep their signatures inside the `[min, max)` range you compiled
+against — anything else, recompile at each minor. A PR is not promised a merge while the surface stays
+provisional, and `CONTRIBUTING.md` is written when the freeze lands.
 
 ## Local verification and build
 

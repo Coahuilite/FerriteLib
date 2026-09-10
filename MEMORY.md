@@ -88,6 +88,21 @@
   round/buffer protocol lives only in maintainer-local `HANDOFF.md`, which is gitignored, so no tracked
   file may depend on reading it. Writing outside this repo is authorized per session and per instruction —
   the 2026-09-10 sibling doc fixes were granted that way and treated as maintenance, not as a new channel.
+- **The public promise is now an artifact: `docs/api-tiers.md` plus its guard lane (2026-09-10).** The
+  payload exports 40 types; the document classifies them 12 stable, 20 public-unstable, 8
+  internalize-candidate, and every entry carries the reason it sits where it does.
+  `tools/FerriteLib.UiKit.Tests/FerriteLibApiTierTests.cs` reads that file against the assembly's exported
+  types and asserts four things: every public type is classified exactly once, no entry names a type that
+  has gone, the stable list equals a second copy pinned inside the test (so a promotion or demotion needs two
+  deliberate edits in one commit), and a planted unclassified name is actually reported. Mutation evidence:
+  renaming one stable entry reddened all four lanes with the exact names, and restoring it turned them green
+  again — that makes this the repo's only prose-backed claim of its shape that has been broken and re-fixed
+  rather than merely written. What the list forces, and the reason to write it before the next release rather
+  than after: the three known breaking debts block 20 of the 40 types from stability, so there is exactly one
+  cheap window to pay them — **0.4.0 as one sweep** — while paying them separately would produce three
+  breaking minors out of what should be one. The internalise sweep needs one thing first: the 8 candidates
+  are kind classes whose `Kind` constants consumers may copy, so a stable container of kind-name constants
+  has to exist before the classes go internal (`TODO.md` §3).
 - **A `Require` desync is now a named verdict, and that is the durable part** (2026-09-04, `a05fddf`):
   the report must carry `MISMATCH`, the loaded `Api`, and the consumer's compiled floor, so a stale
   carrier is a readable prerequisite error rather than a `TypeLoadException` at first draw. Harness
@@ -112,8 +127,9 @@
   `pack-dev.ps1:45` derives the artifact name and `version.txt` from. The 0.2.0 move updated the first two
   and left the third at 0.1.0, so seven gates stayed green while the packaging script was preparing a zip
   labelled 0.1.0 around a 0.2.0 DLL. FerriteLibVersionTests now asserts all three agree
-  ("Build axis in the csproj matches the other two axes"; the harness holds 80 named assertions as of
-  2026-09-09 — re-derive with `grep -c 'Run("' tools/FerriteLib.UiKit.Tests/*Tests.cs`, never quote), and the assertion is **mutation-proven in one direction only**: reverting `<VersionPrefix>` to
+  ("Build axis in the csproj matches the other two axes"; the harness holds 84 named lanes as of 2026-09-10
+  — re-derive with `grep -c 'Run("' tools/FerriteLib.UiKit.Tests/*Tests.cs`, never quote), and the assertion
+  is **mutation-proven in one direction only**: reverting `<VersionPrefix>` to
   0.1.0 fails exactly that one assertion and nothing else. The reverse case - a future axis living in a
   fourth file - is guarded by no test, because no such file exists yet.
 - **A release asset must be built after the gates run, not during them.** The Dev and Release build
@@ -382,7 +398,9 @@
   **`Path.GetRelativePath(string, string)`** and **`string.TrimStart()`** with no arguments. The scan
   now walks leading whitespace by hand and computes the relative path itself. The rule that generalises
   these: a member the reference assembly advertises is a *claim*, and the runtime this harness actually
-  executes against is `net472`, so only a run proves it.
+  executes against is `net472`, so only a run proves it. **Recurred 2026-09-10 while writing the API-tier
+  lane**, which is the strongest argument for the bullet existing: the trap was already written down, and
+  the code still reached for the advertised overload until the run refused it.
 
 ## Cross-repo couplings that no gate in this repo can see
 
@@ -461,8 +479,9 @@
   (self/parent) because a narrow-state attribute under no threshold is the silent no-op the creation
   contract exists to stop. SCHEDULED→CLOSED 2026-09-09: package implemented and lane-proven — **289
   assertion results at run time** (re-derive: `dotnet run --project tools/FerriteLib.UiKit.Tests -c Release
-  --nologo | grep -c '^  ok:'`; distinct from the 80 *named lanes*, which is a source count — a count
-  without its predicate is not a measurement), including the narrow→wide re-arrange on one engine, the
+  --nologo | grep -c '^  ok:'`; distinct from the *named lanes*, which is a source count — and both move
+  with every lane, which is the point of recording the predicate: a count without one is not a measurement),
+  including the narrow→wide re-arrange on one engine, the
   CJK-vs-Latin glyph positive control (a control on the stub's model, see "Text fit"), and seven
   creation-time refusals; permanent record is this bullet plus the manifest contract
   doc; US's migration `7777cbe` and the maintainer's trial decision remain the only gates on the ship.

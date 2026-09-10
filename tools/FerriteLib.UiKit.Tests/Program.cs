@@ -73,6 +73,9 @@ internal static class Program
         Console.WriteLine("FerriteLib version contract + carrier guard...");
         failures += FerriteLibVersionTests.RunAll();
 
+        Console.WriteLine("FerriteLib public-API tiers (docs/api-tiers.md guard)...");
+        failures += FerriteLibApiTierTests.RunAll();
+
         Console.WriteLine("FerriteLib neutrality (no product vocabulary anywhere)...");
         failures += FerriteLibNeutralityTests.RunAll();
     }
