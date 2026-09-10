@@ -286,6 +286,17 @@ Each item is expected to delete a workaround, not add a layer.
       references no UI module beyond IMGUI and text rendering), so a parsed style file would be a second
       resolver with no host counterpart plus a measurement-order problem: the fit audit needs the resolved
       font before `Measure`.
+      Priority note (raised by the maintainer's 2026-09-10 question about our buttons): this binding is worth
+      more here than the raw citation count suggests, because we own every state appearance — the kernel
+      draws no game texture, `UiNative.Button` is `VerseWidgets.ButtonInvisible`, and vanilla's free
+      hover/pressed/disabled chrome is ours to draw by hand. Still no resolver: a selector engine in front of
+      `UiThemeDraw` deletes no drawing code and only adds matching.
+- [ ] **Settle the duplicate tone tokens before the atoms make them visible.** `UiTheme.Warning` and
+      `UiTheme.Danger` are the same RGB under two names, and no library widget selects `Warning`, `Danger`,
+      `Success`, `TextSecondary` or `TextDisabled` at all (`MEMORY.md`, tone census). Either a cited consumer
+      shapes them apart or one name goes in the 0.4.0 sweep — an unproven token in the bag is the same debt
+      class as an unproven kind, and the self-check page will put the duplication on screen where a player
+      can be pointed at it.
 - [ ] **The carrier's own diagnostic surface — shipped as a page *spec* a consumer mounts, not as a settings
       page and not as a carrier-owned window (evaluated 2026-09-10; reasoning in `MEMORY.md` Charter).** The
       proposal was a mod-settings page listing the version contract and the atomic kinds; what killed that

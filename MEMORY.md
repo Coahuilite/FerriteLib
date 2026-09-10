@@ -671,6 +671,32 @@
   per-kind vocabulary. The expensive shape (selectors, cascade, specificity, a parsed style file) has no
   provenance, has no host counterpart to interoperate with, and collides with measurement order: the fit
   audit must know the resolved font before `Measure` (`ITextMetrics`, the `Breakpoint` rule).
+- **The divergence from the game's look is total on the chrome side and honest on the internals side (census
+  2026-09-10, raised by the maintainer's question "our buttons already look different — is that style?").**
+  Yes, it is style: appearance, not behaviour. Where it lives, measured: the kernel has **zero** texture
+  references (no `Texture2D`, no `TexUI`, no `ContentFinderProxy`), every surface is a flat
+  `UiThemeDraw.Solid` → `Verse.Widgets.DrawBoxSolid` fill plus 1px solid rules, and `UiNative.Button` is
+  `VerseWidgets.ButtonInvisible` — the chrome-free hit-test. Of the game's chrome-producing helpers
+  (`ButtonText` 9 string hits, `DrawTab` 37, `DrawWindow` 6, `TexUI` present) in 1.6.4871 the kernel calls
+  none. The one inherited thing is the typeface: `UiKitFonts.ToGameFont` maps our three sizes onto
+  `GameFont.Tiny/Small/Medium`. **Two atoms still render vanilla pixels inside our chrome**:
+  `UiNative.TextField` → `VerseWidgets.TextField` and `UiNative.Slider` → `VerseWidgets.HorizontalSlider`, so
+  a text field's caret and a stepper-slider's track are the game's while their surroundings are ours.
+  Consequence for the style-layer question: because we own every state appearance — vanilla gets
+  hover/pressed/disabled free from its texture button, we draw `Selected`/`Raised`/`AccentGold` ourselves —
+  the attribute-to-role binding is worth more here than in a toolkit that inherits a host look. It is still
+  not a reason to build a resolver: a selector engine in front of these outlets would delete no drawing code
+  and only add matching.
+- **The tone vocabulary is half-wired, and one pair of tokens is a duplicate (measured 2026-09-10).** Across
+  the seven widget files the only theme tokens ever selected are `Selected`, `Raised`, `Border`,
+  `AccentGold` and `HoverPoint`; `Warning`, `Danger`, `Success`, `TextSecondary` and `TextDisabled` are picked
+  by no library widget, and the state mapping is `selected ? Selected : Raised` (dropdown, mode-row) plus
+  `isHovered ? HoverPoint : AccentGold` (chart). The semantic outlets `UiThemeDraw.StatusTreatment` and
+  `StatusBadge` are exercised **only by the consumer** (`UsNavWidget.cs:104`, `UsDiagnosticsWidgets.cs:317`),
+  using `Active`/`Neutral`/`Success`. And `UiTheme.Warning` and `UiTheme.Danger` are the same RGB
+  (`0.38, 0.14, 0.11`) under two names with no users — unproven surface inside the token bag, which this
+  library's own rule treats as debt rather than inventory: either a cited consumer shapes them apart or one
+  of the two goes. Evidence: source-level counts in both repositories; no game run.
 - **The library ships 7 widget kinds; 3 are reachable from outside, 4 have no consumer at all.** US's two
   Schema=2 manifests reference exactly one library kind, `chrome/banner`. Two more library kinds are used, but
   *not* through a manifest: `UsFilterBarWidget` instantiates `DropdownWidget` and
