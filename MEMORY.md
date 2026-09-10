@@ -3,10 +3,12 @@
 ## Current durable state
 
 - Repository split out of the Universal Squeaker tree on 2026-09-03. FerriteLib is a prerequisite mod,
-  `coahuilite.ferritelib`, display name FerriteLib; its release axis `<modVersion>` is **0.3.0 in the
-  tree** (round 1 moved all three axes, `0daf06e` — re-derive, never quote). **Published 2026-09-07 in
-  the rc-only window:** GitHub repo `Coahuilite/FerriteLib` (public), sole release `v0.2.0-rc1`,
-  its platform digest matched a local pack byte-for-byte; `/releases/latest` 404s, which is the correct
+  `coahuilite.ferritelib`, display name FerriteLib. The three version axes are re-derived from the tree and
+  never quoted from this file (`grep -n 'Api = new Version' Source/FerriteLib.UiKit/Kernel/FerriteLibVersion.cs`,
+  `<modVersion>` in `About/About.xml`, `<VersionPrefix>` in the csproj) — and note that `main` and `0.4.x`
+  now differ on all three, the released line against the open sweep. **Published in the rc-only window:**
+  GitHub repo `Coahuilite/FerriteLib` (public); releases `v0.2.0-rc1` and, cut 2026-09-10, `v0.3.0-rc1` from
+  merge commit `6a92331` on `main`; `/releases/latest` still 404s, which is the correct
   state while only rc iterations exist. A bare `v0.2.0` was tagged the same day and **withdrawn the same
   day by maintainer ruling** - cutting the stable tag was outside the push authorization: the rc scheme
   exists precisely so "the trial is over" stays a deliberate decision (see `TODO.md` §5). Workshop still
@@ -456,6 +458,25 @@
   second consumer wire against 0.3.x and then break `UiTheme`** — 0.4.0 is the last minor where the
   per-surface restructure is cheap, and because the API freeze is gated on the second wired consumer, the
   style sweep has to land before NGS or anyone else builds against the shell.
+- **v0.3.0-rc1 is cut, and the deterministic-archive claim is proven across machines (2026-09-10).**
+  Sequence: `0.3.x` merged into `main` at `6a92331` — the release workflow demands the tag commit be in
+  `main`'s history ("Merge to main, then tag"), so a release cannot come from a feature-branch tip — then a
+  lightweight tag `v0.3.0-rc1` (matching `v0.2.0-rc1`'s type) was pushed and CI ran the same three steps the
+  local rehearsal does, finishing green including its own post-publish platform check. Local
+  `verify-release.ps1 -Tag v0.3.0-rc1`: published, `prerelease = True` matching the tag dialect, single
+  asset `FerriteLib-v0.3.0-rc1.zip` at 50166 bytes, no stable release so `/releases/latest` 404s, every `v*`
+  tag has a release. **The cross-machine proof:** a local `dotnet build -c Release -p:VersionSuffix=`
+  followed by `pack-release.ps1` at the tag commit produced `sha256 1609552d…`, byte-identical to the
+  platform's server-computed `assets[].digest` — the first time §5's "CI zip SHA-256 matches a local pack of
+  the same commit" check has run against a real published asset instead of a rehearsal. An earlier rehearsal
+  at the pre-merge tip produced a different size, which is the commit label doing its job rather than drift.
+- **A consumer's CI follows the default branch, not the dev line (measured in US's `ci.yml:37-40`,
+  2026-09-10).** Its carrier checkout passes `repository: Coahuilite/FerriteLib` with **no `ref:`**, so it
+  builds whatever `main` holds. Consequence for the newly opened `0.4.x`: bumping all three axes there
+  cannot break US's CI, because `main` still carries the 0.3 contract — but a machine whose sibling
+  `../ferritelib` checkout sits on `0.4.x` will make US fail `Require` with a readable report until US
+  re-pins to `[0.4.0, 0.5.0)`. That re-pin is a cross-repo write: report it in a round, never edit it from
+  this repository.
 - **uGUI / UIElements assemblies do ship** (`UnityEngine.UI.dll`, `UnityEngine.UIModule.dll`,
   `Unity.TextMeshPro.dll`, `UnityEngine.UIElementsModule.dll`), so they are referenceable by a mod. The
   constraint that actually matters is compositing, not availability: IMGUI draws above every Canvas.

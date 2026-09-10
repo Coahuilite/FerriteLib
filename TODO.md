@@ -456,15 +456,16 @@ identity is created locally at upload time.
       and the amend-and-force-push instruction this item used to carry is superseded. Standing rule
       unchanged: re-run `-FullHistory` after any commit lands, because a clean tree says nothing about
       history — that is how this was caught at all.
-- [ ] **Release sequencing for the style sweep (reasoned 2026-09-10; `MEMORY.md`).** Cut `v0.3.0-rc1` from
-      the current tip — all three axes already read 0.3.0, the tree is clean, and both `verify-local` and the
-      full-history privacy scan are green — so that US's `[0.3.0, 0.4.0)` pin points at something
-      installable. Then open `0.4.x` for the leaf atoms plus the three style classes (per-surface scheme,
-      density, role tags) and the `UiTheme` restructure, bumping all three axes in one commit and
-      re-classifying every new public type in `docs/api-tiers.md`. US's re-pin to `[0.4.0, 0.5.0)` is a
-      cross-repo write: report it in a round, never edit it from this repository. The order is load-bearing,
-      not cosmetic — a second consumer wiring against 0.3.x before the restructure freezes the exact shape we
-      already know must break.
+- [~] **Release sequencing for the style sweep — first half done 2026-09-10.** `v0.3.0-rc1` is cut from
+      `main` at `6a92331` and published by CI with the prerelease flag correct, one asset, and
+      `/releases/latest` still 404 as the rc window requires; a local pack at the tag commit matched the
+      platform's digest byte-for-byte, which is the first real exercise of §5's cross-machine check rather
+      than a rehearsal. Second half is open: the `0.4.x` line now carries all three axes at 0.4.0 and holds
+      the leaf atoms plus the three style classes (per-surface scheme, density, role tags) and the `UiTheme`
+      restructure, and every new public type needs its `docs/api-tiers.md` classification in the same
+      commit. US's re-pin to `[0.4.0, 0.5.0)` is a cross-repo write — report it in a round, never edit it
+      here — and until that lands the sibling checkout has to stay on a 0.3-axis branch, because `Require`
+      will correctly refuse the pair.
 - [x] **Repository name ruled by the maintainer 2026-09-07: `FerriteLib`, PascalCase** — matching the
       series convention (`SqueakyRatkin`, `UniversalSqueaker`, both measured live on GitHub). The earlier
       "lowercase or a Linux runner breaks" argument is void on evidence: GitHub resolves owner/repo

@@ -21,7 +21,7 @@
   <packageId>coahuilite.ferritelib</packageId>
   <name>FerriteLib</name>
   <author>Coahuilite</author>
-  <modVersion>0.3.0</modVersion>
+  <modVersion>0.4.0</modVersion>
   <url>https://github.com/Coahuilite/FerriteLib</url>
   <supportedVersions><li>1.6</li></supportedVersions>
   <description>FerriteLib 是无内容前置模组：它不添加任何游戏内容（无 Def、无补丁、无贴图），全部载荷只有一个程序集 1.6/Assemblies/FerriteLib.UiKit.dll，供使用其 UI 内核的 Coahuilite 模组（目前为 Universal Squeaker）在运行时绑定。有模组依赖它时请勿卸载或禁用本模组。
