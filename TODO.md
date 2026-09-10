@@ -323,6 +323,10 @@ Each item is expected to delete a workaround, not add a layer.
       needs to scope a subtree; stage 5 (the `IUiBindings` writability read) ships with whichever of the two
       first needs a `Disabled` producer. Do not build the non-goals: no selectors, no specificity, no
       `@media`, no separate style file, no runtime mutation.
+      Validation policy for stage 3, per the failure ladder in `MEMORY.md`: structure stays fail-closed
+      (page-fatal, bucket 2), appearance values go fail-soft — an unknown `Tone` falls back to the default
+      treatment and reports, because its worst case is an element that looks plain, not a page that means
+      something else.
 - [ ] **The carrier's own diagnostic surface — shipped as a page *spec* a consumer mounts, not as a settings
       page and not as a carrier-owned window (evaluated 2026-09-10; reasoning in `MEMORY.md` Charter).** The
       proposal was a mod-settings page listing the version contract and the atomic kinds; what killed that

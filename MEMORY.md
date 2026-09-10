@@ -809,6 +809,34 @@
   those properties is a `<Styles>` section inside the existing manifest, matching on kind and role names only
   with no descendant selectors, and it is deferred not because it is hard but because the number of competing
   sources it would have to arbitrate between is one.
+- **Failure granularity, and what co-locating style in the manifest really costs (read from the shell and the
+  guard, 2026-09-10, answering the maintainer's "写错了整个炸了").** Four buckets, not one wall. (1) A widget
+  throwing in Draw or Measure is tripped **per element id** by `UiSessionGuard` and paints a `RecoveryBand`
+  in that element's rect while the rest of the page continues. (2) A creation-time contract failure — unknown
+  element name, unknown attribute, missing required attribute, a narrow-state attribute with no governing
+  `Breakpoint` — takes the **page** down, not the window: `UiWindowHost.DoWindowContents` wraps `CreateHost()`
+  and `DrawFrame()` in one try, keeps the exception, and trips `UiWindowNotice.PageUnavailable` on the
+  **next** frame — deliberately, because the throwing pass already claimed layout state, and the code comment
+  forbids "improving" that into a synchronous retry. (3) An unmet version contract shows
+  `UiWindowNotice.Prerequisite` from `Require`'s readable report. (4) A duplicate carrier is
+  `FerriteLibVersion.Require`'s collision report. **So the accurate cost of putting style in the manifest is
+  not "it blows up" — it is that style errors land in bucket 2 (page-fatal) instead of bucket 1
+  (element-contained), because creation-time validation is page-scoped by design.** The decision that follows
+  belongs to stage 3: fail **closed** on structure, because a mis-named element means the page means
+  something else, and fail **soft** on appearance values, because a mis-named `Tone` should degrade to the
+  default treatment plus a report — its worst case is an element that looks plain.
+- **The web analogy corrected: we are not HTML and CSS merged, we are HTML with no author CSS at all
+  (2026-09-10).** The manifest carries structure, identity (`Id`, `Kind`, `Tab`, `Hidden`), binding references
+  and three geometry attributes (`Height`, `ButtonWidth`, `FieldWidth`); style is in no file — it lives in
+  `UiThemeDraw` and the two switches, with the values in a C# bag. In web terms `UiThemeDraw` is the **UA
+  stylesheet** and the author layer simply does not exist. Which is why the maintainer's ordering intuition is
+  both right and useful: the browser runs HTML parse, CSSOM, **style recalc**, layout, paint, and the planned
+  resolve-before-`Measure` pass is exactly the style-recalc slot, existing for the same reason the browser
+  puts it there — rules need a tree to attach to, and layout needs resolved numbers. What co-location buys
+  here is one loader, one validation entry, an unchanged closed payload file set, and atomicity, since a page
+  cannot ship apart from its own role assignments. What it costs is sharing across pages — two pages wanting
+  one look copy the attributes, which moves today's duplication from C# into XML — and the fact that every
+  appearance knob added to the schema is permanent vocabulary.
 - **The library ships 7 widget kinds; 3 are reachable from outside, 4 have no consumer at all.** US's two
   Schema=2 manifests reference exactly one library kind, `chrome/banner`. Two more library kinds are used, but
   *not* through a manifest: `UsFilterBarWidget` instantiates `DropdownWidget` and
