@@ -3,7 +3,8 @@
 # messages do not imply clean blobs. Vector 1: tracked files at HEAD. Vector 2: commit
 # messages (all refs). Vector 3: every reachable revision (-FullHistory only). Plus:
 # credential patterns, PublishedFileId VALUES (wording mentions are policy text and must
-# not self-trip), and author/committer identity uniqueness. Exit 0 = everything clean.
+# not self-trip), and one-account author/committer identity - measured by email address, never by
+# display name. Exit 0 = everything clean.
 [CmdletBinding()]
 param(
     [switch]$FullHistory
@@ -66,19 +67,44 @@ try {
     $messages = git log --all --format='%s%n%b' | Out-String
     Scan-Text 'vector2 commit messages' $messages
     Write-Host 'vector2 (commit messages): scanned'
-    # ---- Identity uniqueness ----
-    # Author and committer are collected separately: a combined format string
-    # puts two identities on one line and no single-identity regex can match it.
+    # ---- Identity: one account, measured by email ----
+    # Author and committer are collected separately: a combined format string puts two
+    # identities on one line and no single-identity regex can match it.
+    #
+    # The leak vector is the EMAIL, not the display name. A stamped name is whatever the
+    # authoring tool chose, and GitHub's web merge button stamps the account's own public
+    # display name - verified against `gh api user`, which reports login Coahuilite, id
+    # 19252128, name Fe, email null. So a second name carrying the same noreply address is
+    # the same human and the same account, not a second identity, and rewriting published
+    # history to make one string appear twice would buy no privacy at all. The platform
+    # committer (GitHub <noreply@github.com>) is web-merge boilerplate and carries nothing.
+    # What still fails: any address that is not the noreply form (a real mailbox is the
+    # thing this check exists to catch), and more than one distinct noreply account.
     $ids = @(
         @(git log --all --format='%an <%ae>') +
         @(git log --all --format='%cn <%ce>') |
         Sort-Object -Unique
     )
-    $badIds = @($ids | Where-Object { $_ -notmatch '^[^<]+ <[0-9]+\+[^@]+@users\.noreply\.github\.com>$' })
-    if ($ids.Count -ne 1 -or $badIds.Count -ne 0) {
-        Add-Failure "identity uniqueness (unique identities: $($ids.Count))" ($ids -join "`n")
+    $accounts = @()
+    $foreign = @()
+    foreach ($id in $ids) {
+        if ($id -match '^[^<]+ <([0-9]+\+[^@]+)@users\.noreply\.github\.com>$') {
+            $accounts += $Matches[1]
+        } elseif ($id -eq 'GitHub <noreply@github.com>') {
+            # web-merge committer, not an identity
+        } else {
+            $foreign += $id
+        }
     }
-    Write-Host "identity: $($ids.Count) unique identity/identities"
+    $accounts = @($accounts | Sort-Object -Unique)
+    if ($foreign.Count -gt 0) {
+        Add-Failure "identity: non-noreply author/committer address(es)" ($foreign -join "`n")
+    }
+    if ($accounts.Count -ne 1) {
+        Add-Failure "identity: expected exactly one GitHub account, found $($accounts.Count)" ($accounts -join "`n")
+    }
+    $names = @($ids | ForEach-Object { ($_ -split ' <', 2)[0] } | Where-Object { $_ -ne 'GitHub' } | Sort-Object -Unique)
+    Write-Host "identity: account $($accounts -join ', ') - $($names.Count) stamped display name(s): $($names -join ', ')"
 
     # ---- Vector 3: historical blobs (opt-in) ----
     if ($FullHistory) {

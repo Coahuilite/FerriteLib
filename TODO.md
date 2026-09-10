@@ -1,6 +1,6 @@
 # TODO
 
-## 0. Open HANDOFF rounds and the round-1 release (branch `0.3.x`)
+## 0. No open HANDOFF rounds; the round-1 release and the one remaining cross-repo report (branch `0.3.x`)
 
 - [x] **US→FL round 3 (2026-09-08) — CLOSED, implemented 2026-09-09.** Filed as "round 2", renumbered
       to 3 under the global-counter rule. Verdicts (buffer, `996a6bc`-verified): N1+N2 accepted as ONE
@@ -9,7 +9,9 @@
       evidence-forced deviations (MinWidth/MaxWidth not Min/Max — value-range collision; Width joins
       the common widget attributes — the engine read it while no schema allowed it; narrow-state
       attributes refused without a governing Breakpoint) — all three in `MEMORY.md` round-3 entry,
-      which is also the permanent record. US's own docs still say 0.4.0; report, never edit (annex).
+      which is also the permanent record. US's own docs still say 0.4.0 and still date this round as
+      pending scheduling: report, never edit, and hand it over at the next FL session rather than
+      waiting for the sibling to notice (see the bullet below and `MEMORY.md`).
       The pointer retires with this check: nothing from round 3 stays open on the FL side.
 
 Round 1 is SCHEDULED and, on this branch, implemented: P1–P6 (P3 landed here rather than slipping to
@@ -32,10 +34,35 @@ not design work.
       describe that list accurately. The same re-derivation that closed it nearly missed it the other
       way: the scan lives in `tools/`, not in `scripts/*.ps1`, so a scripts-only grep reports "no scan
       at all". See `MEMORY.md` enduring corrections; (b) its release body gains the lib-release link
-      only once this repo publishes a 0.3.0 asset — blocked by the bullet above, not by US. Full
-      ledger: buffer's standing annex.
+      only once this repo publishes a 0.3.0 asset — blocked by the bullet above, not by US; (c) **added
+      2026-09-09 after a live re-derivation of both trees**: US's docs now lag FL's round-3 state in two
+      ways — its `HANDOFF.md:5` still labels the round "REVIEWED, pending scheduling" although FL closed
+      and implemented it (PR #1 merged, so `main` carries the round-3 surface), and `TODO.md:9,46,60`
+      pair that stale status with the withdrawn "0.4.0 package" label — **DELIVERED and fixed 2026-09-10**:
+      the maintainer authorised a cross-directory read followed by direct edits to the sibling, and the
+      corrections landed as US `2951934` (its `TODO.md:8,9,46,60`, one durable capability line in its
+      `MEMORY.md`, and its local buffer's FL-state summary plus a dated "FL 递交" section recording every
+      line this session changed there so a US session can audit or revert them). It is closed *because it
+      was applied*, not because it was reported: US had rewritten the very same files on 2026-09-09 with
+      the refile already recorded here, and none of those lines moved — see `MEMORY.md`, "A report-only
+      item with no delivery channel is not queued, it is lost". What stays open on this axis is only (b),
+      the lib-release link in US's release body, which waits on this repo's own `v0.3.0` cut.
 
-## 1. In-game verification — status after the 2026-09-07 round-1 branch
+## 1. In-game verification — the round-3 package makes this the next thing to do (2026-09-09)
+
+- [ ] **GO TO THE GAME SOON. This section is now the critical path, not the backlog.** The merge of
+      PR #1 put the first geometry-changing surface in front of a game: Auto columns size from
+      measured glyph advance, and `Breakpoint`/`Narrow`/`Cols`/`NarrowHidden` re-arrange live on
+      width. The harness proves them against `StubTextWidth`'s linear character-count model, which is not
+      the game's ruler (`MEMORY.md`, "Text fit: the harness measures a model, not a font"), so every lane
+      here is a future-regression guard and not a mutation proof of in-game geometry. The branch sync of
+      2026-09-09 ff'd `0.3.x` to the PR #1 merge; `0.3.x` has carried docs-only commits since, so the
+      check is a predicate and not a SHA pair:
+      `git diff --name-only main 0.3.x` must return `.md` files only, and that is what "the tested bytes
+      and the shipped bytes are one tree" means. **The procedure and the seven live checks are a form, not
+      more prose: `docs/in-game-walkthrough.md`.** Fill one row per check there and write the outcome into
+      this section — a blank row is not a pass, and "no error" is not one either (§1's duplicate-carrier
+      check has three valid outcomes and the point is to learn which one the game picks).
 
 The blocking risk is cleared. What remains is two branches from the split plus three new ones the
 round-1 surface introduced; every one of the five only changes code if it surprises us.
@@ -154,20 +181,28 @@ Each item is expected to delete a workaround, not add a layer.
       two routes into it.
 - [ ] **Decide what to do with the four widget kinds nobody consumes.** `section/header`, `state/empty`,
       `input/mode-row` and `input/stepper-slider` are registered unconditionally by
-      `KernelCoreWidgetRegistrar` and have zero references in the consumer's `Source/**` (grep, 2026-09-04).
-      Before any freeze or public invitation, either give them a real consumer, delete them, or say in the
-      page text that they are unproven. Right now the honest statement of this library's validated surface
-      is "3 of 7 kinds", not 7.
+      `KernelCoreWidgetRegistrar`, with zero references in the wired consumer's source — re-derive against
+      that project's published tree at a pinned revision (`Coahuilite/UniversalSqueaker@09366f8`, or
+      `gh api` on it), because the count in the next sentence is five days old. Before any
+      freeze they are given a real consumer, deleted, or declared unproven in the page text; the honest
+      statement of this library's validated surface is "3 of 7 kinds", not 7. **The criterion now exists**
+      (`AGENTS.md` "What earns a kind", plus the per-kind re-derivation item below), so this item is no
+      longer a shrug: each of the four either passes the ownership test and stays, or fails it and becomes a
+      container, an attribute, or a recipe.
+
 - [ ] **Make the licence-parity guard two-sided, or stop calling it ours.** Gate 6 is credited, in prose
       that has since circulated between both repos, with comparing `LICENSE` against the consumer's copy.
       It does not - only US's gate 10 does
-      (`../UniversalSqueaker/scripts/verify-local.ps1:141-146`), and it skips silently when our file is
+      (`Coahuilite/UniversalSqueaker@09366f8:scripts/verify-local.ps1:141-146`), and it skips silently when our file is
       absent. A truncated or edited licence here cannot redden anything in this repo. Two clean options:
       pin the expected SHA-256 of the series licence as a literal in this repo and assert it locally
       (self-contained, no sibling dependency, and mutation-testable by editing `LICENSE`), or record the
       asymmetry as accepted policy. A sibling path check is not a third option: it would make this
       library's gates depend on a consumer tree, which is the vacuous-guard shape `MEMORY.md` ("Neutrality
-      lane") records as the reason the neutrality scan was moved inside this repo in the first place.
+      lane") records as the reason the neutrality scan was moved inside this repo in the first place. The
+      2026-09-10 narrowing of `AGENTS.md` Boundaries (this repo answers for this repo alone; a clone has no
+      consumer tree) settles the choice in favour of the pinned literal — it is now a policy consequence,
+      not just a preference.
 - [ ] **Give the harness `Stubs/**` a local guard.** The consumer's `UniversalSqueakerKernelHostTests`
       builds our four stub projects by relative path and copies them out of `bin/stubs/<name>/`, so that
       tree is a published surface. Renaming a stub project or its output folder breaks the consumer while
@@ -183,18 +218,178 @@ Each item is expected to delete a workaround, not add a layer.
       nobody remembers to update.
 - [ ] Clean up `UiLayoutManifest.ParseFile`: it has no production caller. Either wire a real
       load-from-disk path (which is the only thing that would make XML authoring worth its cost) or
-      delete it and the `Schema="2"` version slot with it.
+      delete it and the `Schema="2"` version slot with it. **The intent is written straight here because
+      this item's own wording had drifted it:** the requirement on XML is that it declares page layout and
+      composes the kinds the library already provides. Hot-adding a widget kind from data was never asked
+      for — the founding spec declined even that harder variant — so the fork is not "how do we hot-reload
+      components" but "who hands the library the manifest string". Today that is the consumer (US embeds it
+      as an assembly resource: `MEMORY.md` Charter), which is coherent and needs nothing from us. A disk
+      path would buy exactly one thing — editing layout without recompiling the consumer — and would then
+      owe an answer on where the file lives, when it is re-read, and what a parse failure shows a player.
+      Deleting the dead entry costs nothing and stops implying a capability nobody owns.
+- [ ] **`Verse.Window`'s custom-drawing seam is unexamined.** The reference read recorded
+      `Window(IWindowDrawing customWindowDrawing = null)` (`MEMORY.md`), i.e. the game's own window manager
+      takes a drawing delegate. Whether Verse honours it is an IL-level question, and it is the only known
+      fact that could move the "no non-IMGUI backend" non-goal; answer it before anyone builds a case on the
+      current wording, which rests on a compositing-order claim this repo has never measured.
+- [ ] **The 0.4.0 sweep, as one breaking window (tier list, 2026-09-10).** Four parts, and they belong in
+      one minor because pre-1.0 each would otherwise be its own breaking release — `MEMORY.md` records the
+      count that makes this arithmetic rather than taste: 20 of 40 public types are blocked from stable by
+      exactly these debts. (a) Per-surface theme tokens (§4). (b) Element identity. (c) Announce. (d) The
+      internalise sweep: `KernelCoreWidgetRegistrar`, `UiLayoutEngine` and the six kind classes the
+      internalize-candidate tier names, which needs the stable container of `const string` kind identifiers
+      first so a manifest author never has to write `SomeWidget.Kind`. Fold into (d) the decision below about
+      kinds that do not earn registration: the cheapest way to shrink the frozen vocabulary is to stop
+      registering things that are really a container plus attributes.
+- [ ] **`UiHost.MeasureAndArrange` / `UiHost.Draw(snapshot)` have no cited use.** The harness exercises the
+      two-phase split (caching and revalidation lanes), but neither the wired consumer nor `UiWindowHost`
+      names it — the shell drives `DrawFrame`. So either a consumer supplies the need the split was built for
+      (measure before you know the window's size) or the split becomes part of the internalise sweep above.
+      Leaving public surface that only our own tests call is the same debt as an unconsumed widget kind.
+- [ ] **A deprecation channel for manifest attributes, per the 2026-09-10 ruling.** Today
+      `UiHost.ValidateAttributes` refuses an unlisted attribute outright, which is correct for unknown names
+      and wrong for a name we are retiring: the ruling is accept-and-redirect for at least one minor, warning
+      in a lane that proves the warning fires, then refuse at the minor boundary. Needs a declared
+      deprecated-attribute table (per kind, with the redirect target) and a harness lane driving both ends.
+- [ ] **Re-derive the kind vocabulary against `AGENTS.md`'s "What earns a kind" (rule added 2026-09-10).**
+      Measured per kind in this repository rather than judged by taste. `section/header` **fails**: its
+      `Measure` returns a declared or default height and its `Draw` is one `UiThemeDraw.Label` plus a 1px
+      divider, while the engine's own container already carries a `Title`/`TitleKey` band — the kind
+      duplicates a container attribute. `chrome/banner` and `state/empty` **pass on one shared capability
+      only**: a wrapped string whose Measure reserves the wrapped height, which is the behaviour of a missing
+      leaf atom named twice. `input/mode-row` (column count derived from width, selection read and written
+      through one binding), `input/dropdown` (session-owned popup anchor plus covered-rect publication),
+      `input/stepper-slider` (value, focus and commit interlock) and `chart/line` (hot-control capture with
+      per-point drag state) own something a manifest cannot express, and they stay.
+- [ ] **Design the leaf vocabulary from what the consumer hand-rolls, then rebuild the composites on top of
+      it.** The measurement is in `MEMORY.md`: inside its own kinds the wired consumer calls
+      `UiNative.Button` 14 times, `UiNative.NumberField` 4, `UiNative.Slider` 3 and `UiNative.TextField` 2,
+      while this library's manifest vocabulary is eleven structural element names plus a `Widget` leaf host —
+      **no clickable leaf, no plain text leaf, no rule, no bare slider**. That asymmetry explains the coverage
+      numbers better than any preference does: consumers build leaves because the vocabulary cannot reach
+      them. Sequence: propose the atom set (wrapped text, button, rule, slider, number field), prove each in
+      the self-check spec under real glyphs, then re-express `chrome/banner` and `state/empty` as compositions
+      over the text atom **while keeping their names** — the survey in `MEMORY.md` found no toolkit that
+      dissolves named composites into atom-only code, and ours has no style layer to absorb the long tail
+      instead, so retiring a reachable name would push authors into C#. `section/header` is the exception, and
+      the reason written down for it is that it duplicates the container's `Title` band, not that it is
+      composite.
+- [ ] **Bind the existing role vocabulary into the manifest; do not build a stylesheet.** The census is in
+      `MEMORY.md`: the manifest's only visual knobs today are `Height`, `ButtonWidth`, `FieldWidth`, `Tab`
+      and `Hidden`, while the roles already exist centrally as `UiStatusTone` (six values) behind
+      `UiThemeDraw`'s 14 named outlets, and `UiTheme` carries no geometry tokens at all (275 numeric
+      literals across the seven widget files). Two cheap moves, each gated on a citation into a consumer
+      tree: add `Tone` to the atom schemas once the atoms exist, and move the geometry constants into
+      `UiTheme` so width knobs stop being per-kind vocabulary. Refuse selectors, cascade and specificity
+      until somebody is forced to hand-roll them — RimWorld has no style layer to interoperate with
+      (`Assembly-CSharp` in 1.6.4871 has zero `WidgetDef`, `GUISkin`, `StyleSheet` and `UIElements` hits, and
+      references no UI module beyond IMGUI and text rendering), so a parsed style file would be a second
+      resolver with no host counterpart plus a measurement-order problem: the fit audit needs the resolved
+      font before `Measure`.
+      Priority note (raised by the maintainer's 2026-09-10 question about our buttons): this binding is worth
+      more here than the raw citation count suggests, because we own every state appearance — the kernel
+      draws no game texture, `UiNative.Button` is `VerseWidgets.ButtonInvisible`, and vanilla's free
+      hover/pressed/disabled chrome is ours to draw by hand. Still no resolver: a selector engine in front of
+      `UiThemeDraw` deletes no drawing code and only adds matching.
+- [ ] **Settle the duplicate tone tokens before the atoms make them visible.** `UiTheme.Warning` and
+      `UiTheme.Danger` are the same RGB under two names, and no library widget selects `Warning`, `Danger`,
+      `Success`, `TextSecondary` or `TextDisabled` at all (`MEMORY.md`, tone census). Either a cited consumer
+      shapes them apart or one name goes in the 0.4.0 sweep — an unproven token in the bag is the same debt
+      class as an unproven kind, and the self-check page will put the duplication on screen where a player
+      can be pointed at it.
+- [ ] **Make the tone treatment table queryable, then route the three call sites through it.** The
+      duplication is measured in `MEMORY.md`: `DropdownWidget.DrawField:127` and
+      `InputModeRowWidget.DrawOption:114` re-implement, verbatim, the `Active`/`Neutral` rows of
+      `UiThemeDraw.StatusTreatment`, and both re-derive a text colour that currently lives inside
+      `StatusBadge`'s private switch. Shape of the fix: one internal table returning fill, border **and**
+      text for a tone plus a prominence flag, with `StatusTreatment` and `StatusBadge` consuming it so the
+      three sites cannot drift. Equivalence is checkable before writing it — `Active` ⇒ Selected +
+      AccentGold + TextOnGold, `Neutral` ⇒ Raised + Border + TextPrimary, which is what both widgets paint
+      today. Keep it `internal` until the 0.4.0 sweep: a public addition bumps the contract minor, and the
+      wired consumer pins `[0.3.0, 0.4.0)`. The prominence flag exists because the badge's neutral text is
+      `TextSecondary` while a field's is `TextPrimary` — do not resolve that by adding tone values, which
+      would widen a public enum for a library-internal distinction.
+      Input shape: the table's key is `(tone, prominence)` today and gains writability the moment a
+      read-side query exists on `IUiBindings` — `BindReadOnly` has six consumer citations and no read path,
+      which is why `UiStatusTone.Disabled` has zero producers (`MEMORY.md`). Do not add the writability read
+      in the same change as the table: the table is deduplication, the read is a public API addition and
+      therefore 0.4.0 material.
+- [ ] **Style capability, staged by contract cost (decomposed 2026-09-10; scope CONFIRMED by the maintainer
+      the same day — reasoning and non-goals in `MEMORY.md`).** The governing rule is the use/extend
+      boundary: XML is the surface for **using** components, layout and appearance, and C# is the surface for
+      **extending** the vocabulary by registering a kind. Measured against it, layout complies and appearance
+      does not, so all three appearance classes are in scope: (a) a colour scheme selectable per window and
+      per region, (b) density (row height, padding, font size), (c) role tags per element. Stage 0 is the
+      internal dedup above — no bump, doable any time. Stages 1-3 land in the 0.4.0 sweep **together with the
+      leaf atoms**: per-surface and geometry tokens (already pre-stable debt under the §5 INVITED ruling),
+      then the scheme, density and `Tone`/`Emphasis` attributes onto the atom schemas, then the
+      resolve-before-`Measure` pass with its harness lane and the role-name deprecation channel. Precedence
+      is nearest-wins — element > region > window > library default — written down, with no selectors and no
+      specificity arithmetic. **Inheritance is asymmetric and that asymmetry is the design:** scheme and
+      density inherit, roles do not, because a region marked danger makes everything inside it read as
+      dangerous. Stage 4 shrinks accordingly — the region level is in scope now, the page level waits for a
+      cited need; stage 5 (the `IUiBindings` writability read) ships with whichever change first needs a
+      `Disabled` producer. Cross-page sharing is explicitly **not** built: reuse rides the registry, not a
+      shared style document. Nor are the other non-goals: no selectors, no specificity, no `@media`, no
+      separate style file, no runtime mutation.
+      Validation policy for stage 3, per the failure ladder in `MEMORY.md` and the maintainer's ruling:
+      structure stays fail-closed (page-fatal, bucket 2), appearance values go fail-soft — an unknown `Tone`
+      falls back to the default treatment — and fail-soft must not mean silent: the fallback is logged,
+      reported through the fit audit's channel and exercised in a harness lane, because the web's weakness
+      here is that a dropped declaration fails invisibly and gets found by a user instead of by its author.
+- [ ] **The carrier's own diagnostic surface — shipped as a page *spec* a consumer mounts, not as a settings
+      page and not as a carrier-owned window (evaluated 2026-09-10; reasoning in `MEMORY.md` Charter).** The
+      proposal was a mod-settings page listing the version contract and the atomic kinds; what killed that
+      shape is measured, not argued: this assembly has **no `Verse.Mod` subclass and no `ModSettings` at all**,
+      so a settings row means adding a game-facing door and rewriting the README's claim that enabling the
+      carrier changes nothing, and a dev-menu door needs a Harmony patch, which the series refuses. The shape
+      that needs neither: a factory returning an `UiElementSpec` tree plus an `IUiBindings` view over live
+      registry, version and carrier-collision data, **with every caption passed in as a parameter** — so the
+      mounting consumer owns the keys, the carrier still ships zero Defs and zero strings, and the census
+      reaches a real window in a real session. Content: the `Require` verdict and the duplicate-carrier report,
+      one cell per **atomic** kind with worst-case strings in both scripts, and no composite cells.
+      Sequencing rule: it ships *with* a mount or not at all — an unmounted factory is the speculative surface
+      this protocol refuses. The mount that already exists is the consumer's diagnostics panel (its migration
+      onto `UiWindowHost` is in flight), which makes this round-4 material rather than a library gift.
+- [ ] **Second section of that spec: the registered-kind census.** Every scope and kind the loaded assemblies
+      registered, each with its allowed-attribute schema and declared label set — the view that finds work,
+      because a foreign kind with an empty schema or an undeclared label set is a hand-rolled bypass
+      announcing itself. Two hard rules: **metadata only, never instantiate a consumer's kind in a page the
+      carrier built**, and cap/total it the way `UiFitAudit.MaxReports` does. Runtime printing of a consumer's
+      scope string is not a neutrality breach; the scan governs this repository's source, not observed data.
+- [ ] **Amend the carrier's self-description the moment any door is added.** `README.md` (both languages) and
+      the `About.xml` description currently promise that enabling FerriteLib changes nothing in the game, and
+      gate 5 enforces the assemblies-only payload by refusing a content directory by name. If a `Mod` /
+      `ModSettings` door is ever built anyway, that sentence and the identity line move in the same commit —
+      a promise the gates cannot check is exactly the class of drift §6 exists to catch.
+- [ ] **Prove the self-check spec in a lane before anybody mounts it.** Build it in the stub harness: every
+      registered kind gets a cell; a planted fake kind that throws at Draw must land as a `RecoveryBand` row
+      instead of killing the page; the census must list a planted foreign scope with its schema and label set
+      while never instantiating it. What no lane can do is show real glyph advance, so this green says nothing
+      to the coverage count in `MEMORY.md` — `AGENTS.md` "Our own demo is not consumption" is the rule that
+      keeps the two claims apart.
 
 ## 4. Deferred by decision, with the upgrade path written down
 
 - [ ] **Package feed / registry — deliberately not now.** Measured reason in `MEMORY.md`: same-version
       republish is not re-fetched, and build metadata is stripped from the cache identity, so a
-      hash-suffixed dev version provides false freshness. Revisit when any of these is true: a remote
-      exists, a second machine builds consumers, or an outside party consumes the library. Upgrade path
+      hash-suffixed dev version provides false freshness. **Two of three revisit triggers are now met
+      (2026-09-10):** a remote exists, and the public ruling means an outside party may consume the
+      library; a second machine building consumers is still false. The ecosystem's own answer is a
+      compile-time-only `.Ref` NuGet package alongside the runtime DLL (`MEMORY.md` Charter). Upgrade path
       if revisited: `0.1.0-dev.<sha>` prerelease label + floating consumer version + drop
       `--no-restore` from the cross-repo gates (otherwise they go green against a stale graph).
       GitHub Packages was checked and rejected for a different reason: it requires a token to *install*
       even public packages.
+- [ ] **Keyboard focus traversal — deferred by maintainer decision 2026-09-10**, not by oversight: RimWorld
+      players drive the mouse, so this is not worth a public-surface change inside the 0.3 window. The
+      upgrade path is written so it is a resumption and not a rediscovery. `UiNative.cs:173-236` already
+      keeps per-element focus state in `UiValueState`, so what is missing is a focus *owner* on the session
+      plus a traversal rule over the visible elements in tree order; the comparable Minecraft library solves
+      it with a `focusable` flag whose signal drives Tab-ring membership (`MEMORY.md` Charter). The
+      expensive half is naming, and it must be decided with this item: `Tab` already means a workspace tab
+      (`UiLayoutEngine.cs:1249`, resolved against `UiBindings.ActiveTabKey`), so a keyboard axis needs a
+      different word and that word is schema, not a local rename.
 - [ ] Theme token restructure to per-surface (fill, border) pairs, so a consumer can express a chrome
       family other than DarkGold's — including the game's own, which today is not representable. Do
       this before freezing, since it is breaking.
@@ -246,16 +441,30 @@ identity is created locally at upload time.
       free: US's `scripts/build-dev.ps1` drives `-c Dev` on this project, so the change lands in a round
       with its migration, not in a packaging cleanup.
 
-- [x] **Pre-push privacy scan on the full reachable history — executed clean before the 2026-09-07 push.**
-      Final run at the pushed tip `bdbeae0` via `scripts/privacy-audit.ps1 -FullHistory`: working tree 0,
-      commit messages 0, all 34 historical revisions 0, single noreply identity. The scan's own history
-      lesson stands: the 09-05 measurement at `382e862` was real but did not survive the next day's own
-      session - a TODO note quoting US's literal personal path put one dirty blob into history, caught
-      only by re-running the blob scan (a working-tree fix commit does not remove it). Disposed by
-      squashing the two tip commits; the squashed hashes are deliberately not cited - they no longer
-      resolve. **Each vector must be re-scanned after any commit lands; a clean tree says nothing about
-      history, and a scrubbed file says nothing about the blob its dirty version already became.** The
-      sibling repository paid for this lesson twice.
+- [x] **Pre-push privacy scan: the identity vector was a gate bug, not a leak (ruled and fixed
+      2026-09-10).** The 2026-09-09 reopening said `Fe <19252128+Coahuilite@…>` on the PR #1 merge commit had
+      to be rewritten out of history. Checked against the source the maintainer named: `gh api user` reports
+      login `Coahuilite`, id `19252128`, name **`Fe`**, email `null` — so `Fe` is that account's own
+      GitHub-published display name, and GitHub's web merge button stamps exactly that as the author of a
+      squash-or-merge commit; the committer `GitHub <noreply@github.com>` is platform boilerplate. One human,
+      one account, one noreply address. **The leak vector is the email address, never the display name**, so
+      the gate now measures accounts: any non-noreply author or committer address fails, more than one
+      distinct noreply account fails, and display-name variance inside one account is reported instead of
+      fatal. Positive control run before trusting it: a real mailbox → foreign 1; two accounts → 2; the same
+      name on two accounts → 2; this repository's history → 1 account, 2 names, `PRIVACY AUDIT CLEAN` across
+      76 revisions. Consequences: no history rewrite, no force-push, `v0.3.0-rc1` is unblocked on this axis,
+      and the amend-and-force-push instruction this item used to carry is superseded. Standing rule
+      unchanged: re-run `-FullHistory` after any commit lands, because a clean tree says nothing about
+      history — that is how this was caught at all.
+- [ ] **Release sequencing for the style sweep (reasoned 2026-09-10; `MEMORY.md`).** Cut `v0.3.0-rc1` from
+      the current tip — all three axes already read 0.3.0, the tree is clean, and both `verify-local` and the
+      full-history privacy scan are green — so that US's `[0.3.0, 0.4.0)` pin points at something
+      installable. Then open `0.4.x` for the leaf atoms plus the three style classes (per-surface scheme,
+      density, role tags) and the `UiTheme` restructure, bumping all three axes in one commit and
+      re-classifying every new public type in `docs/api-tiers.md`. US's re-pin to `[0.4.0, 0.5.0)` is a
+      cross-repo write: report it in a round, never edit it from this repository. The order is load-bearing,
+      not cosmetic — a second consumer wiring against 0.3.x before the restructure freezes the exact shape we
+      already know must break.
 - [x] **Repository name ruled by the maintainer 2026-09-07: `FerriteLib`, PascalCase** — matching the
       series convention (`SqueakyRatkin`, `UniversalSqueaker`, both measured live on GitHub). The earlier
       "lowercase or a Linux runner breaks" argument is void on evidence: GitHub resolves owner/repo
@@ -293,11 +502,13 @@ identity is created locally at upload time.
 - [ ] **US side: the link itself** - **cross-repo write, needs maintainer authorization.** The mechanism is
       one derived line in US's release body plus one pin, and it must be derived from a single source so the
       two cannot drift:
-      `PrerequisiteApiMin` / `PrerequisiteApiMax` in `UniversalSqueaker/Source/UniversalSqueaker/Mod.cs:22-23`
-      (currently `0.2.0` / `0.3.0`) is the truth for which lib range US was compiled against, so the link must
-      be **resolved from that range, not string-built from the floor**: `v0.2.0` is the minimum, but if lib
-      has since shipped `v0.2.3`, linking to `tag/v0.2.0` sends players to an older carrier than the one US
-      was tested against. US's `release.yml` should list lib's releases, take the highest whose base version
+      `PrerequisiteApiMin` / `PrerequisiteApiMax` in
+      `Coahuilite/UniversalSqueaker@09366f8:Source/UniversalSqueaker/Mod.cs:27-28` (both re-derived
+      2026-09-09: `0.3.0` / `0.4.0`) is the truth for which lib range US was compiled against, so the link must
+      be **resolved from that range, not string-built from the floor**: the floor is only the minimum, so if
+      lib has since shipped a later patch inside the window, linking to the floor's tag sends players to an
+      older carrier than the one US was tested against. US's `release.yml` should list lib's releases and
+      take the highest whose base version
       satisfies `>= min` and `< max`, and then fail the release if (a) no release satisfies the range, (b) the
       chosen release is a prerelease while US is being released as stable, or (c) a lib payload exists in US's
       own stage directory. (c) already exists as `stage-package.ps1:41-45` and US gate 9; both stay valid
@@ -316,16 +527,17 @@ identity is created locally at upload time.
       recorded as its pre-rewrite name. Verified independently from this repo: `6c7053a` is reachable from
       US `main` and carries the identical message; `0fe60b0` resolves only as a dangling local object.
       US's one-time guide was deleted pre-push (their ruling; survivors folded into US `MEMORY.md`), so
-      the method pointer is `modding_documents/privacy-debt-vector-triage-zh.md`, not the guide.
+      the method pointer is `modding_documents/privacy-debt-vector-triage-zh.md`, which is maintainer-local
+      and present in no clone.
 - [x] **US's CI dependency chain — settled by US's own session, superseding this sketch.** What was
       written here (`path: ../ferritelib`) is impossible: `actions/checkout` resolves `path` inside
       `GITHUB_WORKSPACE` and throws on anything outside (US verified against the action's own
       `input-helper.ts`). US landed the working variant — carrier checkout to the `ci-ferritelib/`
       subdir, build there, run-step copy to the sibling path the HintPath expects (path math verified
-      in US `MEMORY.md`). Follow-through for the name ruling above: US's two workflows still say
-      `repository: Coahuilite/ferritelib` — case-insensitive resolution means it works either way, but
-      align it to `Coahuilite/FerriteLib` when US next touches those files. **Cross-repo write: report,
-      do not edit.**
+      in US `MEMORY.md`). Follow-through closed by re-derivation 2026-09-09: US's two workflows now read
+      `repository: Coahuilite/FerriteLib` (`ci.yml:40`, `release.yml:36`), so the case alignment this bullet
+      asked for is done — the case-insensitive-resolution note survives only as archaeology. No FL action;
+      **cross-repo write, report, do not edit.**
 - [ ] **The four widget kinds nobody consumes** (`section/header`, `state/empty`, `input/mode-row`,
       `input/stepper-slider`) become public on the day this repo is public. See §3 for the decision; it is
       cheaper to make before the first release than after somebody compiles against them.
@@ -354,12 +566,39 @@ identity is created locally at upload time.
       counts. `CONTRIBUTING.md` deliberately **not** written - its existence is the item below's output,
       and the README states the currently-true stance (bug reports welcome, PRs not promised while the
       surface is provisional).
-- [ ] **Decide whether third-party use is invited, and let that decide `CONTRIBUTING.md`'s existence.**
-      If invited, `§3` and the per-surface theme restructure in `§4` land first and a contributing guide is
-      part of the offer. If unsupported, say so in the README and do not write a contributing guide that
-      implies otherwise. This is the same one-way door as the Workshop page above, and GitHub publishing
-      opens it a little: a stable packageId plus a browsable repository is what a modder compiles against
-      whether or not anyone invited them.
+- [x] **Third-party use: ruled INVITED on 2026-09-10** (maintainer), which settles the item that had been
+      open since the Workshop decision — "a stable packageId plus a browsable repository is what a modder
+      compiles against whether or not anyone invited them" was the correct read, and the ruling accepts it
+      instead of tolerating it. Consequences, all now derived rather than optional: §3's identity layer,
+      announce, hit stack and focus traversal plus §4's per-surface theme restructure are **pre-stable
+      debt**, because every one of them is breaking by its own admission and the cheap moment to pay is
+      before anything compiles against the current shape; a `CONTRIBUTING.md` is owed as the second half of
+      the offer (`MEMORY.md` Charter: the nearest precedent, Lightweave, advertises itself as a shared
+      dependency in About.xml while its README says primitives may break freely — invitation without
+      contract is the failure mode this repo now has to refuse); and `README.md`'s "PRs are not promised
+      while the surface is provisional" line stays true only while it is paired with a written list of what
+      the provisional surface will not do.
+- [x] **Published-contract proposal — approved by the maintainer on 2026-09-10 ("草案我们先用；真实需求总比
+      虚空打靶强")**, with the deprecation clause strengthened: an attribute under retirement keeps working,
+      **redirected** to its replacement, for at least one minor, and full removal happens only at a minor
+      boundary. Status of each part:
+  1. **DONE** — `docs/api-tiers.md` (40 exported types: 12 stable, 20 public-unstable, 8
+     internalize-candidate) with `FerriteLibApiTierTests` enforcing classification, staleness, the pinned
+     stable list and a planted-name control. Mutation-proven by renaming a stable entry: four red lanes with
+     exact names, green on restore.
+  2. **Half-approved, both halves open.** The `.props` release asset (compile reference without shipping a
+     runnable DLL) is the step to take; the metadata-only `.Ref` package waits until a stranger needs it.
+     **Briefing owed to the maintainer, on his request and not yet delivered:** explain concretely what a
+     `.props` file is versus a `.Ref` package, why one is a build-script include and the other is a
+     non-executable metadata assembly, and which promise each one buys. Do not let the next session assume
+     he already knows; he asked to be told after the decision, not before it.
+  3. **Decided, wording owed.** The one-sentence promise goes into both READMEs now, and into the release
+     body when `v0.3.0-rc1` is cut — the last one is the cutter's step, not a script change to land blind,
+     because `release.yml`'s body is what a player reads.
+  4. **Ruled, not implemented** — tracked in §3 as the deprecation channel item; the current creation
+     contract refuses unknown attributes outright, so there is today no mechanism to accept-and-redirect.
+      What this deliberately still excludes is a NuGet feed, any back-compat shim layer, and multi-version
+      support.
 
 ## 6. Documentation hygiene: what this audit found, and the rule that keeps it from coming back
 
@@ -389,6 +628,12 @@ these are the follow-throughs.
 - [ ] Open question worth one line of policy: is a one-directional series guard acceptable at all, given
       that the neutrality scan was moved *into* this repo precisely because a consumer-side check passed
       vacuously after the split? The actionable version is §3's two-sided-guard item.
+- [ ] **Queued documentation work (2026-09-10), not to be written in this pass:** `docs/design-charter.md`
+      carrying the tier-by-tier comparison of a retained layer's irreducible core against this library's
+      actual standing, one external source per row. The substance already exists as prose in `MEMORY.md`
+      "Charter"; the file exists so a stranger can be shown *why* the number is five rather than being told.
+      Write it together with the API-tier list if §5's contract proposal is approved, so one document answers
+      purpose and promise and the two are never maintained apart.
 
 **Method note for whoever picks this up.** Derive every number with `git ls-files` + `wc -l` / `grep -c`,
 and every gate claim from a read of the named range. A figure or capability repeated from prose inherits

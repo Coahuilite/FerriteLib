@@ -40,8 +40,11 @@ RimWorld 的 `modDependencies` 无法表达版本，消费者必须在自己的�
 编译请针对本仓库 GitHub Release 资产中的 DLL（发布页正文标注其 SHA-256）；程序集目标 `net472`。
 公共 API 处于 **1.0 之前、暂定状态**：minor 递增即破坏性变更，冻结决定以第二个接入消费者为门槛。
 
-**当前不主动征集第三方贡献**——API 冻结 / 邀请与否是维护者的未决裁决（见 `TODO.md` §5）。欢迎缺陷报告；
-表面暂定期间，PR 不承诺合并。
+**第三方使用已被邀请（维护者裁决 2026-09-10）。** 请针对 Release 资产编译；当你被迫手写了本库本该提供的
+东西时开一个 issue——指向你自己可用代码的引用就是这个库的成长方式，只有请求不算。缺陷报告始终欢迎。
+「不会破坏什么」是按类型承诺、不是按版本承诺：`docs/api-tiers.md` 把每个导出类型标成 **stable** 或
+**public-unstable**，只有 stable 类型在你编译时所用的 `[min, max)` 区间内保持签名不变，其余类型每个 minor
+都要重新编译。API 暂定期间 PR 不承诺合并，`CONTRIBUTING.md` 等表面冻结时再写。
 
 ## 本地验证与构建
 
@@ -54,5 +57,6 @@ pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory   # 三向量隐私
 ## 文档索引
 
 - 协议 / 不变量：`AGENTS.md` · 已核事实：`MEMORY.md` · 行动面：`TODO.md`
+- 哪些类型承诺不破坏：`docs/api-tiers.md` · 只有你能跑的实机走查清单：`docs/in-game-walkthrough.md`
 - 发布流程与 rc 方案：`.github/workflows/release.yml` 头注释（tag 方言即契约：`vBASE-rcN` 试版，
   裸 `vBASE` 必须落在最后一个 rc 的同一提交上）

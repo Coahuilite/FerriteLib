@@ -48,9 +48,13 @@ of this repository (the release body quotes its SHA-256); the assembly is `net47
 **pre-1.0 and provisional**: a minor bump is a breaking change, and the freeze decision is gated on a
 second wired consumer.
 
-**Third-party contributions are not currently solicited** — the API freeze / invited-vs-unsupported
-call is an open maintainer decision (see `TODO.md` §5). Bug reports are welcome; a PR cannot be
-promised a merge while the surface is provisional.
+**Third-party use is invited (maintainer ruling 2026-09-10).** Compile against the release asset, and open
+an issue when the library forced you to hand-roll something — a citation into your own working code is how
+this library grows; a request alone is not. Bug reports are always welcome. What we will not break is a
+per-type promise rather than a per-release one: `docs/api-tiers.md` marks every exported type **stable** or
+**public-unstable**, and only stable types keep their signatures inside the `[min, max)` range you compiled
+against — anything else, recompile at each minor. A PR is not promised a merge while the surface stays
+provisional, and `CONTRIBUTING.md` is written when the freeze lands.
 
 ## Local verification and build
 
@@ -61,5 +65,7 @@ pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory   # three-vector pr
 ```
 
 - Protocol / invariants: `AGENTS.md` · durable facts: `MEMORY.md` · action surface: `TODO.md`
+- Which types we will not break: `docs/api-tiers.md` · the in-game checks only you can run:
+  `docs/in-game-walkthrough.md`
 - Release flow and rc scheme: `.github/workflows/release.yml` header comments (the tag dialect is the
   contract: `vBASE-rcN` trials, bare `vBASE` on the last rc's commit)

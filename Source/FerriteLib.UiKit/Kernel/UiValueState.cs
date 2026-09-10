@@ -9,7 +9,6 @@ namespace FerriteLib.UiKit.Kernel;
 /// <see cref="UiSession"/> (one popup per session), and a grep across the library, its harness and the
 /// wired consumer found no reader of either field. An unused state axis is not spare inventory, it is a
 /// second source of truth waiting to drift (US→FL round 1, P5).
-/// (US→FL round 1, P5).
 /// </para>
 /// </summary>
 public sealed class UiValueState

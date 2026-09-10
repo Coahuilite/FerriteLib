@@ -3,8 +3,9 @@
 ## Current durable state
 
 - Repository split out of the Universal Squeaker tree on 2026-09-03. FerriteLib is a prerequisite mod,
-  `coahuilite.ferritelib`, display name FerriteLib, `modVersion` 0.2.0. **Published 2026-09-07 in the
-  rc-only window:** GitHub repo `Coahuilite/FerriteLib` (public), sole release `v0.2.0-rc1` (prerelease),
+  `coahuilite.ferritelib`, display name FerriteLib; its release axis `<modVersion>` is **0.3.0 in the
+  tree** (round 1 moved all three axes, `0daf06e` — re-derive, never quote). **Published 2026-09-07 in
+  the rc-only window:** GitHub repo `Coahuilite/FerriteLib` (public), sole release `v0.2.0-rc1`,
   its platform digest matched a local pack byte-for-byte; `/releases/latest` 404s, which is the correct
   state while only rc iterations exist. A bare `v0.2.0` was tagged the same day and **withdrawn the same
   day by maintainer ruling** - cutting the stable tag was outside the push authorization: the rc scheme
@@ -54,11 +55,54 @@
   window stack, the two text paths that just came into the fit audit, and an engine-side recovery trip.
   Everything else in this file remains compile-time, stub-harness or reference-assembly evidence — say so
   rather than implying a game run.
+- **Text fit: the harness measures a model, not a font.** There are two rulers and only one of them is
+  assertable. The production one is `VerseFerriteTextMetrics` — `Text.CalcSize` / `Text.CalcHeight` under
+  an explicit save/restore of `Text.Font`, `Text.Anchor` and `Text.WordWrap`, with `WordWrap = false` on
+  the width path because wrapping caps the reported width and hides exactly the overflow the caller is
+  looking for. The harness one is `StubTextWidth.Of`: `units × em × 0.5`, where `units` counts 2 for a
+  character in the CJK/full-width ranges and 1 otherwise and `em` is 12/16/18 by `UiFont` — a **linear
+  function of character count with a single script split**. Whatever Verse returns for a real font
+  asset, the stub does not model it, so any agreement between a lane number and an in-game width is
+  coincidence rather than evidence. What the lanes can therefore prove: that `Width="Auto"` consults a
+  width budget, tracks the widest of the kind's declared label set, respects the `MinWidth`/`MaxWidth`
+  clamp, and re-arranges when a `Breakpoint` threshold is crossed. What they cannot prove: that an Auto
+  column actually hugs a translated string, or that a measured interval is degenerate, in game — which
+  is why `TODO.md` §1 is the critical path and not the backlog. The round-3 "CJK-vs-Latin glyph positive
+  control" is a control on the **model**, not a measurement of the game's font; do not cite it as
+  in-game geometry. Re-derive both rulers from
+  `Source/FerriteLib.UiKit/Kernel/VerseFerriteTextMetrics.cs` and `tools/FerriteLib.UiKit.Tests/StubTextWidth.cs`
+  instead of from this paragraph.
 - **Two hard rules inherited from the series, both easy to violate by accident.** Nothing in this library
   may persist data into a save - a prerequisite must survive being uninstalled, and a save-written flag is
-  the one side effect a player cannot undo. And `../squeaky_ratkin` is never written: SR is a separate
-  product with its own brand and `SR_` prefix, and this repo's neutrality lane exists to keep even its
-  vocabulary out of here.
+  the one side effect a player cannot undo. And the Squeaky Ratkin repo (`coahuilite.squeakyratkin`) is
+  never a write target: SR is a separate product with its own brand and `SR_` prefix, and this repo's
+  neutrality lane exists to keep even its vocabulary out of here.
+- **This repository answers for itself alone (maintainer ruling 2026-09-10, `AGENTS.md` Boundaries).** The
+  repo is public, and a clone contains no carrier, no sibling mod and no consumer tree: the
+  one-library/two-consumers lockstep layout is this maintainer's machine, not the project's shape. Four
+  consequences, all now policy rather than preference: no rule, gate, script or piece of evidence here may
+  require an outside tree; consumer evidence is **transcribed** into this file as
+  `owner/repo@sha:path:line` plus the excerpt and what it proved (US is public so its permalinks resolve
+  for anyone; a deferred candidate's never can, which is exactly why transcription is mandatory); the
+  cross-repo raw-backend count is a maintainer-side number, not a reproducible measurement; and the
+  round/buffer protocol lives only in maintainer-local `HANDOFF.md`, which is gitignored, so no tracked
+  file may depend on reading it. Writing outside this repo is authorized per session and per instruction —
+  the 2026-09-10 sibling doc fixes were granted that way and treated as maintenance, not as a new channel.
+- **The public promise is now an artifact: `docs/api-tiers.md` plus its guard lane (2026-09-10).** The
+  payload exports 40 types; the document classifies them 12 stable, 20 public-unstable, 8
+  internalize-candidate, and every entry carries the reason it sits where it does.
+  `tools/FerriteLib.UiKit.Tests/FerriteLibApiTierTests.cs` reads that file against the assembly's exported
+  types and asserts four things: every public type is classified exactly once, no entry names a type that
+  has gone, the stable list equals a second copy pinned inside the test (so a promotion or demotion needs two
+  deliberate edits in one commit), and a planted unclassified name is actually reported. Mutation evidence:
+  renaming one stable entry reddened all four lanes with the exact names, and restoring it turned them green
+  again — that makes this the repo's only prose-backed claim of its shape that has been broken and re-fixed
+  rather than merely written. What the list forces, and the reason to write it before the next release rather
+  than after: the three known breaking debts block 20 of the 40 types from stability, so there is exactly one
+  cheap window to pay them — **0.4.0 as one sweep** — while paying them separately would produce three
+  breaking minors out of what should be one. The internalise sweep needs one thing first: the 8 candidates
+  are kind classes whose `Kind` constants consumers may copy, so a stable container of kind-name constants
+  has to exist before the classes go internal (`TODO.md` §3).
 - **A `Require` desync is now a named verdict, and that is the durable part** (2026-09-04, `a05fddf`):
   the report must carry `MISMATCH`, the loaded `Api`, and the consumer's compiled floor, so a stale
   carrier is a readable prerequisite error rather than a `TypeLoadException` at first draw. Harness
@@ -83,8 +127,9 @@
   `pack-dev.ps1:45` derives the artifact name and `version.txt` from. The 0.2.0 move updated the first two
   and left the third at 0.1.0, so seven gates stayed green while the packaging script was preparing a zip
   labelled 0.1.0 around a 0.2.0 DLL. FerriteLibVersionTests now asserts all three agree
-  ("Build axis in the csproj matches the other two axes"; the harness holds 80 named assertions as of
-  2026-09-09 — re-derive with `grep -c 'Run("' tools/FerriteLib.UiKit.Tests/*Tests.cs`, never quote), and the assertion is **mutation-proven in one direction only**: reverting `<VersionPrefix>` to
+  ("Build axis in the csproj matches the other two axes"; the harness holds 84 named lanes as of 2026-09-10
+  — re-derive with `grep -c 'Run("' tools/FerriteLib.UiKit.Tests/*Tests.cs`, never quote), and the assertion
+  is **mutation-proven in one direction only**: reverting `<VersionPrefix>` to
   0.1.0 fails exactly that one assertion and nothing else. The reverse case - a future axis living in a
   fourth file - is guarded by no test, because no such file exists yet.
 - **A release asset must be built after the gates run, not during them.** The Dev and Release build
@@ -162,6 +207,171 @@
   or an applied incompatibility notice (and its limits are stated in "Gates and what each actually
   proves" — parity against a consumer's copy is consumer-side).
 
+## Charter — what this library is for
+
+- **The founding spec, transcribed.** `Coahuilite/UniversalSqueaker@09366f8:docs/ui-shared-library-design-zh.md`
+  (状态：已接受, 2026-08-24) — written in the consumer's repository, which is why this one never held its own
+  rationale until now. It set out to extract "XML 编排引擎 + 基础 UI 组件" out of US into a **private general
+  UI library**, phase one serving only US and driven by US's needs, with neutrality as a hard red line (no
+  consumer types, no product literals, `object ViewState` passthrough, neutral `UiCommand`, injected
+  `ITextMetrics`), and these non-goals: not a public or general UI framework, no uGUI/UIElements path, no
+  reflection, DI or code generation, no code or expressions inside manifest XML, and no requirement that hot
+  reload be able to add a C# widget kind. Planned packageId was `coahuilite.ferritelib.uikit`; shipped is
+  `coahuilite.ferritelib` with assembly `FerriteLib.UiKit`. **Two clauses have been overtaken by fact:** the
+  repository has been public since 2026-09-07, and on 2026-09-10 the maintainer ruled the posture
+  "referenceable by strangers, held to general-library standards". That retires "现阶段只服务 US" and keeps the
+  non-goals, because the backend, reflection and codegen refusals were never about secrecy — they are the
+  library's shape.
+- **The irreducible core of a retained layer on an immediate host, and where this library actually stands**
+  (surveyed 2026-09-10 against egui, Unity IMGUI and UIElements, Flutter, React, RmlUi, Godot; those are
+  external sources, so the conclusion is recorded as reasoning and the FL half as measurement). An immediate
+  host re-derives geometry and paints in frame order by itself, so a retained layer must own only five
+  things: identity that survives insertion and reordering; a hit-and-layer stack with a capture owner; a
+  focus owner plus a traversal rule; an invalidation and wake clock; coordinate-space bookkeeping. Layout
+  algorithm, text shaping, style cascade, clipping, popup space, animation and IME are negotiable, and FL
+  deliberately keeps them in-library — that is a choice, not a requirement. Measured standing, item by item:
+  identity exists in *shape* (`UiSession.GetOrCreateValueState(elementId)` over a per-session dictionary of
+  `UiValueState { FloatValue, EditText, Dragging, Focused, Cursor }`) but its key is a path string, and an
+  unnamed sibling of the same kind collides — §3's element-identity item in `TODO.md` is precisely this; the
+  hit stack is single-popup by design (`UiValueState`'s own doc says dropdown openness is session-owned, one
+  popup per session) and §3's hit-stack item is its generalisation; focus is real for one control family
+  (`UiNative.cs:173-236`) and **there is no traversal rule at all**, while the attribute word `Tab` here
+  means a workspace tab (`UiLayoutEngine.cs:1249` resolves it against `UiBindings.ActiveTabKey`), a naming
+  hazard the next reader will trip on; the wake clock is legitimately delegated to the game because the game
+  repaints every frame, which leaves `Session.ContentRevision` as the only invalidation signal — that is what
+  §3's announce item replaces; coordinate-space bookkeeping is the strongest column (the pointer-space
+  contract and the `UiPopup` rect rules, both mutation-proved).
+- **Three load-bearing premises demoted to their real evidence class (2026-09-10).** (i) "IMGUI composites
+  above every Canvas" is the stated reason a uGUI backend is a non-goal, but what is measured in this file is
+  only that those assemblies ship and that `Assembly-CSharp` and `Verse.Window` reference `IMGUIModule` and
+  `TextRenderingModule` and never `UnityEngine.UI`/`UIModule`. The ordering claim is standard Unity behaviour
+  with no measurement of this game's camera or sort setup on record: keep it as design inference. The
+  non-goal survives without it, because the game's own windows are IMGUI adapters and a second backend could
+  not reach the game's chrome anyway. (ii) The same reference read recorded
+  `Verse.Window.Window(IWindowDrawing customWindowDrawing = null)` — a drawing seam inside the game's window
+  manager that nobody has examined. Whether Verse honours it, and whether a non-IMGUI surface could live
+  inside a real window, is an IL-level question and is unverified; it is the only known question that could
+  move the backend non-goal. (iii) The recollection that XML was chosen for "原版布局和热更" is half true:
+  declarative layout is real, hot update is owned by nobody. US supplies its manifest as an embedded
+  assembly resource (`Coahuilite/UniversalSqueaker@09366f8:Source/UniversalSqueaker/UI/UsKernelSettingsHost.cs:29,319`),
+  so a layout edit recompiles the consumer, and this library's only disk-reading entry point
+  (`UiLayoutManifest.ParseFile`) has zero callers. The spec never promised the harder half either — it
+  explicitly declined hot-reloading a new kind — so `TODO.md` §3 now carries the fork openly: wire a real
+  load path, or delete the dead entry and stop implying a capability nothing owns.
+- **Ecosystem calibration for the public ruling (surveyed 2026-09-10, external sources).** The RimWorld
+  ecosystem has no formal modding API and no way to declare a prerequisite version, which this repo's own
+  read of `Verse.ModRequirement` confirms independently. The framework-prerequisite convention is real
+  nevertheless: ship a runtime DLL under `Assemblies/`, publish a compile-time-only NuGet (often a `.Ref`
+  package), and have consumers declare `modDependencies` plus `loadAfter`. The nearest UI-layer analogues are
+  `Cosmere.Lightweave` — a composable IMGUI framework shipped as a prerequisite mod with NuGet, whose
+  About.xml calls itself a shared dependency while its README says primitives may break their API freely
+  because all its consumers are owned — `Nebulae.RimWorld.UI` (published, self-described personal library),
+  and `BetterFloatMenu` (prerequisite-free NuGet helper whose major version tracks the game); `RimHUD` is the
+  only UI mod found that carries an explicit `apiVersion`. The lesson worth refusing to skip: **structural
+  invitation and contractual support are separate axes, and every precedent found picked one and neglected
+  the other.** The 2026-09-10 ruling commits FL to saying both out loud — the README states who may compile
+  against it, and the contributing doc, now owed, states what will not break.
+
+- **What the industry converges on, transcribed (surveyed 2026-09-10 against Unity UXML/USS, WPF/MAUI/WinUI
+  XAML, Android XML plus Compose, Godot scenes, Flutter, SwiftUI/UIKit, RmlUi and RimWorld Defs — external
+  primary docs, so this is a conclusion, not a measurement).** Three decisions are made identically by every
+  format that keeps a data file at all. A usable element kind is always a **compiled type resolved through a
+  registry**: XAML maps a namespace to a CLR namespace and assembly, Android uses the qualified class name as
+  the tag, Unity generates an element's attribute vocabulary from `[UxmlAttribute]` on a `[UxmlElement]`
+  partial class, RmlUi binds tags to a registered `ElementInstancer`, and in RimWorld the tags literally *are*
+  the public fields of a `Def` subclass. The data file always splits **structure, values and appearance**.
+  And invalidation is **always an imperative call on the framework, never something the data expresses**.
+  They diverge only on whether a data file exists (Flutter, SwiftUI and Compose delete the question) and how
+  loudly unknown syntax fails (RmlUi ignores it, RimWorld errors, this library refuses at creation). So the
+  instinct behind our manifest format — XML declares page layout over kinds the DLL already provides — is the
+  common shape rather than an idiosyncrasy, and the two moves that would abandon it are code in the manifest
+  and a vocabulary that grows without compiling, both already non-goals. Worth copying and already held: the
+  per-kind attribute schema, and the kind-declared natural size behind `Width="Auto"`. Not held and owed: a
+  written retirement rule for attributes (§5's contract proposal). Worth refusing on the record: loops,
+  conditionals and expressions in data, runtime kind discovery, and blanket tolerance of unknown tags.
+- **The closest specimen found, and the half of it that failed (Qz-UILib, `github.com/QuanhuZeYu/Qz-UILib`,
+  Minecraft 1.7.10 / GTNH, Java; surveyed 2026-09-10 from its repository — external, recorded as report).**
+  It has our host problem, an immediate per-frame GUI layer (vanilla `GuiScreen`), and solves it as a retained
+  scene stack: reactive signals → per-node dirty marks that **bubble upward only** → incremental flex layout
+  with `cachedLayout` short-circuits → an immutable paint plan rebuilt per frame from cached fragments →
+  immediate GL behind a backend port. Its own ban list names the two designs it tried and threw out:
+  version-number comparison, and downward recursive dirty marking. Identity is a keyed list reconciler that
+  reuses nodes by key and computes a longest-increasing-subsequence over the old indices to find zero-move
+  items. Keyboard focus is real there — a `focusable` flag whose signal drives Tab-ring membership — which is
+  the cost we declined in §4. The cautionary half is that it began declarative in the maximal sense (an
+  HTML-like document tree, a CSS-like stylesheet layer, documents pushed from a server) and **deleted the
+  whole stack in a breaking major**, with recorded costs of roughly twenty-five browser-semantics bugfixes in
+  one minor, layout-reuse debt from the downward marking, god-class splits and two dozen stale documents; its
+  capability-boundary doc now says no HTML/CSS/JS parsing or browser semantics, and no exposing GUI lifecycle
+  or GL internals to page authors. The lesson is a boundary, not a verdict: declarative *structure over a
+  compiled vocabulary* is industry-normal, declarative *semantics imported from the web* is what was bought
+  and sold back at this scale. Its own distribution answer is Maven plus JitPack with semver tags, and its
+  stability promise is a hand-maintained three-tier list (stable / public-unstable / internal) enforced
+  socially plus by architecture-guard tests, with no binary-compatibility tool — the shape §5's proposal
+  copies, chosen because a tool heavier than the surface is a promise nobody keeps.
+- **"Headless core, own persistence layer, decoupled" — what the author's phrase maps onto in code, and
+  what it means for us.** The author told the maintainer (2026-09-10, oral relay) that Qz-UILib gave up the
+  web-style implementation but kept a self-written headless core and a persistence layer, decoupled. Read
+  against the repository, the sentence separates into two claims of different strength. The headless half is
+  exactly what the code shows: `ui.scene`'s node/layout/runtime/input hold geometry, dirty marks, signals and
+  interaction state and issue no GL; the frame ends in `ScenePaintEngine` producing an immutable paint plan
+  from per-node cached fragments, replayed through a `UiRenderBackend` port, and its ban list forbids the
+  paint engine from importing the deleted `ui.dom`/`ui.paint`/`ui.layout`/`ui.component`/`ui.control`
+  namespaces. So "decoupled" means *one interface plus one replayer between what the UI is and how pixels
+  appear* — and the thing they deleted was the browser-semantics layer, not the retained tree, which survived
+  and got stricter. The "persistence" half is ambiguous and worth asking him about directly: in the code the
+  persistent structure is the retained node tree with typed property slots, the signal store, and
+  `SceneKeyedListReconciler` (reuse nodes by key, longest-increasing-subsequence over old indices to find
+  zero-move items) — that is persistence of interaction state across frames. A separate `club.heiqi.config`
+  family (~86 classes, `ConfigUI`, schema, field renderers) is the layer that persists settings to storage.
+  If he meant the second one, it is a different seam than ours and we have no equivalent problem: this
+  library writes nothing anywhere, by series rule.
+  **Consequence for FerriteLib, and it is a refusal:** the shape validates our funnel design rather than
+  asking us to copy it. We are already headless where it costs nothing — measurement goes through
+  `ITextMetrics` and the harness runs because the engine never touches a real font — but our paint side is
+  coupled to Verse on purpose, and the coupling is named and gated by five files (`KernelContainmentTests`).
+  Adding a `UiRenderBackend` port would buy an abstraction with one implementation and a non-goal behind it,
+  which is exactly the speculative surface this library's protocol exists to refuse. What we owe instead is
+  keeping the host-free seams host-free: nothing outside the five funnel files learns that IMGUI exists.
+- **The carrier's own diagnostic surface, evaluated 2026-09-10 (maintainer proposal: a settings page that
+  shows the version contract and every atomic component, not the composites).** Three things it uniquely
+  buys, none of which any lane can substitute: it is the only rendering evidence that exists when no consumer
+  is installed; it is the only way to push the unconsumed kinds through real glyph metrics without waiting on
+  somebody's page; and it turns `Require`'s verdict and the duplicate-carrier report from a log line into
+  something a player can be pointed at. One thing it collides with, and the collision is the interesting
+  part: this library owns **zero translation keys** (`AGENTS.md` identity), gate 5 refuses a `1.6/Languages/`
+  directory by name, and `IUiTranslation` is injected precisely so the library never has to say a sentence
+  alone. A page the library owns therefore has no legitimate source for its own text.
+  **The entry-point fact that settles the shape (verified 2026-09-10).** This assembly contains no
+  `Verse.Mod` subclass and no `ModSettings` (`grep -rn "class .*: Mod\\b\\|ModSettings\\|Harmony" Source` →
+  0 hits), so the carrier has no door into the game's UI at all today. Any self-owned surface therefore needs
+  one added: a settings row means a `Mod` subclass plus a `ModSettings`, which contradicts the README's
+  current claim that enabling the carrier alone changes nothing in the game, and a dev-menu entry needs a
+  Harmony patch, which the series refuses. So the shape that gets the evidence without buying a new game
+  surface is neither a settings page nor a carrier-owned window: **the library ships the self-check as a page
+  *spec*, and a consumer mounts it.** Concretely — a factory returning an `UiElementSpec` tree plus an
+  `IUiBindings` view over live registry, version and carrier-collision data, with every caption passed in as
+  a parameter. That single move satisfies four constraints at once: the carrier still ships zero Defs, zero
+  keys and zero `1.6/Languages/`; the strings problem disappears because the mounting consumer owns the
+  translation keys, which is exactly what the identity rule says the string's owner should do; the census
+  reaches a real window in a real game session, which is what the evidence was needed for; and no new
+  process-wide state is added, because the spec is built on demand.
+  **Two rules with it.** *Our own demo is not consumption* (now in `AGENTS.md`): the factory renders a kind,
+  measures it and recovers it under the real font, and proves nothing about whether the kind should exist, so
+  it can never raise the validated-surface count or serve as promotion provenance. And the census section is
+  **metadata only — never instantiate a foreign kind inside a page the carrier built**, because that runs a
+  consumer's code under our recovery banner and inherits its failures; report scope, kind, allowed attributes
+  and declared label set, capped and totalled the way `UiFitAudit.MaxReports` does it. Printing a consumer's
+  scope or kind string at runtime is not a neutrality breach — the scan governs this repository's source, not
+  observed data on screen.
+  **The cost of this shape, stated so it is not discovered later:** an unmounted factory is precisely the
+  speculative surface this library's own protocol refuses to keep, so it must ship with a mount, not before
+  one. The mount that already exists is the consumer's diagnostics panel, whose migration onto
+  `UiWindowHost` + `UiHost` is in flight on its side — which makes the self-check page round-4 material: a
+  cited consumer surface that wants the thing, rather than a library gift nobody asked for. Until that lands,
+  the harness is the only mount, and the harness cannot show real glyphs, so §1's geometric questions stay
+  open no matter how good the factory is.
+
 ## What was verified, and how
 
 - **RimWorld 1.6 UI surface**, read from `Krafs.Rimworld.Ref 1.6.4871` with dnlib (that package mirrors
@@ -171,6 +381,20 @@
   methods / 152 public static. `Verse.Window` carries a `UnityEngine.GUI/WindowFunction` field, i.e. the
   game's window manager is an adapter over IMGUI's `GUI.Window`. It references `IMGUIModule` and
   `TextRenderingModule`, never `UnityEngine.UI` or `UIModule`.
+- **The game has no style layer to inherit, measured from the same 1.6.4871 reference assembly (2026-09-10).**
+  `Assembly-CSharp` has zero hits for `WidgetDef`, `WidgetAppearanceDef`, `appearanceDef`, `GUISkin`,
+  `StyleSet`, `StyleSheet`, `VisualElement`, `UIElements`, `UXML` and `USS`, and its assembly references are
+  exactly six modules (`AssetBundle`, `Audio`, `Core`, `IMGUIModule`, `Physics`, `TextRenderingModule`) — so
+  the game uses neither Unity's uGUI nor UI Toolkit (the layer that carries UXML/USS) in its own code, even
+  though `UnityEngine.UIElementsModule.dll` **does** ship in `Data/Managed` with a real selector engine
+  inside it (`Selector` 35 hits, `StyleSheet` 29, `StyleSet` 39). `GUIStyle` appears once and `GUISkin` not
+  at all, i.e. Unity's IMGUI skin mechanism is effectively unused: the game writes appearance at each call
+  site through `GUI.color` and `Text.Font`. **This corrects a recollection that mattered** — a
+  `WidgetDef`-shaped appearance Def was assumed to exist; it does not in 1.6. So the game's only
+  data-driven appearance channel is ordinary Defs plus XML Patch operations, and that channel is closed to us
+  by identity (zero Defs in the payload, gate 5 refuses a content directory). Consequence: a stylesheet here
+  would not be adopting a host mechanism, it would be inventing a second resolver inside a library whose
+  compositor cannot even be layered above IMGUI.
 - **`Verse.Window`'s overridable surface, read member-by-member from the same 1.6.4871 reference
   assembly while writing `UiWindowHost` — these four facts each cost a failed run when guessed.** The type
   is `public abstract`; `DoWindowContents(Rect)` is **public abstract** (so `Margin`-style protected
@@ -219,6 +443,19 @@
   "clone inserts CRs" vector is closed by `.gitattributes`. Consequence for the rehearsal: the
   "CI zip SHA-256 matches a local pack of the same commit" check in `TODO.md` §5 is now meaningful;
   before this fix it could only pass by luck of timing.
+- **What advancing to 0.4.0 means, and why 0.3.0 is the number that should ship first (reasoned 2026-09-10).**
+  All three axes sit at 0.3.0 (`FerriteLibVersion.Api`, `About/About.xml <modVersion>`, csproj
+  `VersionPrefix`) while the sole tag is `v0.2.0-rc1`, so **0.3.0 is currently a contract value that no
+  release has ever carried** — and US already pins `[0.3.0, 0.4.0)` against a number nobody can install. The
+  pending work (leaf atoms plus the three style classes plus the per-surface token restructure) is public
+  additions with one breaking restructure, which under the pre-1.0 rule — a minor bump IS breaking, and any
+  public addition bumps minor — is exactly 0.4.0 material. Cutting `v0.3.0-rc1` first costs nothing the rc
+  discipline does not already handle: the prerelease flag is derived from the tag dialect,
+  `verify-release.ps1` re-checks platform state after publishing, and a bad rc is fixed by deleting release
+  and tag and re-pushing the same number. The sequencing that does matter runs the other way: **do not let a
+  second consumer wire against 0.3.x and then break `UiTheme`** — 0.4.0 is the last minor where the
+  per-surface restructure is cheap, and because the API freeze is gated on the second wired consumer, the
+  style sweep has to land before NGS or anyone else builds against the shell.
 - **uGUI / UIElements assemblies do ship** (`UnityEngine.UI.dll`, `UnityEngine.UIModule.dll`,
   `Unity.TextMeshPro.dll`, `UnityEngine.UIElementsModule.dll`), so they are referenceable by a mod. The
   constraint that actually matters is compositing, not availability: IMGUI draws above every Canvas.
@@ -250,25 +487,32 @@
   **`Path.GetRelativePath(string, string)`** and **`string.TrimStart()`** with no arguments. The scan
   now walks leading whitespace by hand and computes the relative path itself. The rule that generalises
   these: a member the reference assembly advertises is a *claim*, and the runtime this harness actually
-  executes against is `net472`, so only a run proves it.
+  executes against is `net472`, so only a run proves it. **Recurred 2026-09-10 while writing the API-tier
+  lane**, which is the strongest argument for the bullet existing: the trap was already written down, and
+  the code still reached for the advertised overload until the run refused it.
 
 ## Cross-repo couplings that no gate in this repo can see
 
 - **The consumer's harness compiles this repo's stub projects.**
-  `../UniversalSqueaker/tools/UniversalSqueakerKernelHostTests/UniversalSqueakerKernelHostTests.csproj`
-  sets `FerriteLibHarness` to `../../../ferritelib/tools/FerriteLib.UiKit.Tests` and, in a post-build
-  target, runs `dotnet build` on all four projects under `tools/FerriteLib.UiKit.Tests/Stubs/` and copies
+  `Coahuilite/UniversalSqueaker@09366f8:tools/UniversalSqueakerKernelHostTests/UniversalSqueakerKernelHostTests.csproj`
+  points `FerriteLibHarness` at a sibling checkout of this repo and, in a post-build target, runs
+  `dotnet build` on all four projects under `tools/FerriteLib.UiKit.Tests/Stubs/` and copies
   their output from `bin/stubs/<name>/`. So the Stubs tree - directory names, project names, assembly
   names (`Assembly-CSharp.dll`, `UnityEngine.CoreModule.dll`, ...) and that `bin/stubs/` output shape -
   is a de-facto published surface. Renaming or relocating any of it breaks the consumer's gate 13 while
   **all seven gates in this repo stay green**, because nothing here builds or references the sibling.
-  Same shape one level up: US's gate 6 asserts this repo's payload DLL exists at
-  `../ferritelib/1.6/Assemblies/FerriteLib.UiKit.dll`, so a broken build here goes red over there first.
+  Same shape one level up: US's gate 6 asserts, through its own sibling path, that this repo's payload
+  exists at `1.6/Assemblies/FerriteLib.UiKit.dll`, so a broken build here goes red over there first.
   Evidence upgraded 2026-09-07 from source-level to **runner-proven**: US's `ci.yml` checks this repo out
   by canonical name and stages the WHOLE tree at the sibling path - its first run died on gate 13 with
   DLL-only staging while gates 1-12 passed, proving the stub sources and `LICENSE` are as load-bearing
   as the payload. The checkout is deliberately unpinned (tracks this repo's default branch, so lib-side
-  breakage goes red in US's CI early); the release-body link is the pinned half - see `TODO.md` §5.
+  breakage goes red in US's CI early); the release-body link is the pinned half - see `TODO.md` §5. That
+  channel is **two-directional, and only the hostile direction was ever written down**: an unpinned
+  default branch also carries every capability we merge but do not publish, which is how round 3's
+  `Width="Auto"`/`Breakpoint` reached US's CI while no 0.3.0 asset exists. Consequence: "not released
+  yet" is never a reason a surface on `main` is unusable, so the rc window's freeze discipline has to be
+  enforced at the tag and not at the branch.
   **Round 1 grew that published surface twice, in both directions.** `VerseStubs` gained
   `Verse.Window`/`Verse.WindowLayer`/`Verse.IWindowDrawing` so `UiWindowHost` is drivable at all (P2
   condition b), and `UiWidgetRegistry.Clear` went **internal** (item D), so a consumer harness that had
@@ -299,7 +543,10 @@
   `Width="Auto"` resolves to text-natural width via `ITextMetrics.MeasureWidth` (the seam that has always
   said "content-driven column widths need a width budget" while the engine never called it), capped after
   fixed siblings, clamped, equal-split fallback intact; plus one container-level `Breakpoint` — together
-  closing the "有限 responsive vocabulary" deliverable (`02:44`) and its acceptance row (`04:105`) that
+  closing the "有限 responsive vocabulary" deliverable
+  (`Coahuilite/UniversalSqueaker@09366f8:docs/uikit-rebuild/02-brownfield-cutover-matrix-zh.md:44`) and its
+  acceptance row (`…:docs/uikit-rebuild/04-verification-and-acceptance-zh.md:105`, same repository and
+  revision) that
   the rebuild contract shipped as a promise and not as code. N3 verdict (b): layered editing stays
   consumer-side; `input/stepper-slider`'s reshape is exactly the N1 mechanism proving itself — its
   `LabelWidth = 80f` (the library-side specimen of the complaint) is now measured. Recorded with approval:
@@ -319,9 +566,13 @@
   listed it** — the N1 defect had a library-side twin: a manifest could not size a stepper-slider column
   at all; (3) `Narrow`/`NarrowCols`/`NarrowHidden` are rejected without a governing `Breakpoint`
   (self/parent) because a narrow-state attribute under no threshold is the silent no-op the creation
-  contract exists to stop. SCHEDULED→CLOSED 2026-09-09: package implemented and lane-proven (289
-  harness assertions incl. the narrow→wide re-arrange on one engine, the CJK-vs-Latin glyph positive
-  control, and seven creation-time refusals); permanent record is this bullet plus the manifest contract
+  contract exists to stop. SCHEDULED→CLOSED 2026-09-09: package implemented and lane-proven — **289
+  assertion results at run time** (re-derive: `dotnet run --project tools/FerriteLib.UiKit.Tests -c Release
+  --nologo | grep -c '^  ok:'`; distinct from the *named lanes*, which is a source count — and both move
+  with every lane, which is the point of recording the predicate: a count without one is not a measurement),
+  including the narrow→wide re-arrange on one engine, the
+  CJK-vs-Latin glyph positive control (a control on the stub's model, see "Text fit"), and seven
+  creation-time refusals; permanent record is this bullet plus the manifest contract
   doc; US's migration `7777cbe` and the maintainer's trial decision remain the only gates on the ship.
 - **The Store build of PowerShell ships a trimmed `System.Reflection.Metadata`: `PEReader` has no
   `GetMetadataReader` (measured 2026-09-07, `Microsoft.PowerShell_7.6.5` Appx).** Any packaging or gate
@@ -333,17 +584,310 @@
 
 ## Consumer coverage, measured 2026-09-04
 
+- **The vocabulary has no leaf atoms, and that is the measured cause of both the unconsumed kinds and the
+  consumer's re-wrapping (counted 2026-09-10).** This library registers 7 kinds — re-derive with
+  `grep -rhoE 'const string Kind = "[^"]+"' Source | sort -u` — and not one of them is a leaf a page author
+  would reach for first: there is no plain text, no button, no rule, no spacer, no badge, no icon. What the
+  wired consumer does instead is measurable: `grep -rhoE "UiNative\\.[A-Za-z]+" --include=*.cs
+  <consumer>/Source | sort | uniq -c` reports `Button` **14**, `IsMouseOver` 5, `ClampValue` 5,
+  `NumberField` 4, `Slider` 3, `TextField` 2 — i.e. the consumer builds its own controls out of the funnel's
+  primitives because the vocabulary offers no atoms, and it registers `us/*` kinds for the results (23
+  distinct kind strings today; re-derive against its published tree, this number is not ours to keep).
+  Consequences, all source-level evidence with no new game run: manifest-referenced library kinds number
+  **one** (`chrome/banner`) out of the whole vocabulary; two more (`input/dropdown`, `chart/line`) are used by
+  instantiating the widget class as a composition part, which is the bypass the tree-membership rule counts
+  even when it stays inside the tree; and four kinds are referenced nowhere in the consumer's source. The
+  honest coverage statement is still "3 of 7 kinds touched", and the reason is structural, not
+  marketing: a page author who wants a label and a button is offered neither.
+- **Which is why "start from atoms" is the right instinct — and why the surviving composites keep their
+  names.** The `AGENTS.md` rule ("What earns a kind") is ownership-based, not atomicity-based, and the survey
+  in the next bullet is what pinned that down after an earlier draft of the rule said the opposite. Under the
+  ownership test the seven split: `chart/line`, `input/dropdown`, `input/stepper-slider` and `input/mode-row`
+  own state or geometry a manifest cannot express; `state/empty` and `chrome/banner` own one capability
+  between them — a wrapped string whose `Measure` reserves the wrapped height — which is the missing text atom
+  named twice; `section/header` owns nothing the container's existing `Title`/`TitleKey` band does not already
+  give, and that duplication (not compositeness) is the only reason a name is up for retirement here. So the
+  0.4.x sequence is additive-then-re-filling: introduce the leaf set (`core/label`, `core/text` carrying the
+  wrap measure, `core/button`, `core/rule`, `core/slider`, `core/number-field`), prove each in the self-check
+  spec under real glyphs, then rebuild the composites' innards as explicit compositions over those atoms.
+- **Atoms-first is industry-normal; "composites should not be registered vocabulary" is not (surveyed
+  2026-09-10; ten targets, official documentation opened in-session, not blogs).** The claim "a UI kit's core
+  is its atoms" is true in all ten. The claim "therefore composites should be functions, not names" is false
+  in all ten, and four of them actively instruct users to add named composite types to the vocabulary.
+  - WPF documents the atom taxonomy (`ContentControl`, `ItemsControl`, `Panel`, `Decorator`, `TextBlock`) and
+    keeps composites named, restyling rather than dissolving them: "Classes that inherit from the Control
+    class contain a ControlTemplate, which allows the consumer of a control to radically change the control's
+    appearance without having to create a new subclass."
+    (learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/ and .../wpf/controls/wpf-content-model)
+  - .NET MAUI: "The main control groups used to create the user interface of a .NET MAUI app are pages,
+    layouts, and views," with `CollectionView`/`DatePicker`/`TwoPaneView` as named rows and `ContentView` as
+    the named type for a reusable custom control (learn.microsoft.com/en-us/dotnet/maui/user-interface/controls/).
+  - Unity UIElements registers a custom control into the document vocabulary through `[UxmlElement]` on a
+    `VisualElement` subclass, and prices exactly the artifacts our rule prices — attribute schema ("Keep UXML
+    attributes primitive"), namespace prefix, library visibility. Composition appears once, as a tip ("you
+    might achieve the same outcomes … Assemble your UI from existing elements"), not as a rule
+    (docs.unity3d.com/6000.6/Documentation/Manual/UIE-create-custom-controls.html).
+  - Android: "Android provides a straightforward XML vocabulary that corresponds to the View classes and
+    subclasses," and the compound-control recipe "brings together a number of more atomic controls or views
+    into a logical group of items that can be treated as a single thing" — a new *named* thing
+    (developer.android.com/develop/ui/views/layout/custom-views/custom-components).
+  - Jetpack Compose is the strongest industry case for names-as-functions ("You can write your own composable
+    function to combine these layouts into a more elaborate layout that suits your app"), and even there the
+    same page uses named composites that Material ships (`Card`, `Scaffold`)
+    (developer.android.com/develop/ui/compose/layouts/basics).
+  - Flutter: "You create a layout by composing widgets to build more complex widgets," and the architecture
+    doc makes the two tiers coexist by design — Material and Cupertino are named control sets built on the
+    composition primitives (docs.flutter.dev/ui/layout and docs.flutter.dev/resources/architectural-overview).
+  - SwiftUI: "You compose custom views out of built-in views that SwiftUI provides, plus other composite views
+    that you've already defined," and the composed result is declared as a named `View` struct
+    (developer.apple.com/documentation/swiftui/declaring-a-custom-view).
+  - Godot keeps `Label`/`Button`/`Panel`/`HBoxContainer` named and runs a whole tutorial on adding your own
+    named `Control` subclass ("Creating your own custom controls that act just the way you want them to is an
+    obsession of almost every GUI programmer"), covering `_draw`, `_gui_input`, `_get_minimum_size` and theme
+    notifications (docs.godotengine.org/en/latest/tutorials/ui/custom_gui_controls.html).
+  - RmlUi is the atom-minimalist and the nearest miss on the second claim — "Very few custom elements are
+    required as most of the power in RmlUi comes from styling elements with RCSS to produce the desired
+    layout" — and that same library's composites (the `input` family, `tabset`/`tab`, `datagrid`) are
+    registered tags bound by name through `RegisterElementInstancer()`
+    (mikke89.github.io/RmlUiDoc/pages/rml/elements.html and .../pages/cpp_manual/custom_elements.html).
+  - Qz-UILib (Minecraft, the founding spec's own author, closest to us in scale and motivation) exposes both
+    tiers: a scene/flex/portal/virtual-grid structure layer plus roughly twenty named composite controls
+    assembled through the Java API. It deleted its HTML-like declarative stack wholesale in a breaking major
+    and **still** kept the composites as named classes, with a hand-maintained LTS stable-API list as the
+    contract (github.com/QuanhuZeYu/Qz-UILib, `docs/使用文档/01-入门/项目定位与能力边界.md` at branch `4.0`).
+  **What does not transfer, and why the correction is narrower than the headline:** every toolkit above keeps
+  named composites *alongside* a style or template layer that absorbs the long tail (WPF `ControlTemplate`,
+  Unity USS, RmlUi RCSS, Compose functions, SwiftUI view bodies). This library has no style layer — the
+  manifest is the only data surface — so our kind list carries pressure theirs do not, and that is the local
+  reason the "composites become recipes" draft looked right. The draft was still wrong: with no style layer,
+  dissolving composites into C# deletes the only place a mod author can reach them without compiling, which is
+  exactly the hole the consumer fell into. Evidence class: documentation read this session; no game run, no
+  code change beyond this correction.
+- **The appearance layer exists in C# and is unreachable from data (census 2026-09-10).** Three measurements,
+  all from this repository's source. (1) Across the seven kinds' allowed-attribute whitelists the only visual
+  knobs are `Height`, `ButtonWidth`, `FieldWidth`, `Tab` and `Hidden` — no `Tone`, no `Style`, no `Variant`,
+  no color, no font, no padding anywhere in the manifest vocabulary, so a page author cannot express "this
+  banner is a warning" without writing code. (2) `UiTheme` is a token bag of **colors and one font**: no
+  geometry tokens (padding, spacing, gap, radius), and the seven widget files hold 275 numeric-literal
+  tokens (`grep -rhno` over the files — a token count, not a per-constant audit), so density is not
+  adjustable at any granularity. (3) The semantic style layer that does exist is code-side: `UiThemeDraw`
+  exposes 14 named outlets (`Surface`, `SectionBand`, `AccentRail`, `FocusRail`,
+  `StatusTreatment`, `RecoveryBand`, `StatusBadge`, …) and `UiStatusTone` is a six-value enum (`Neutral`,
+  `Active`, `Success`, `Warning`, `Danger`, `Disabled`). The roles are therefore already named centrally;
+  what is missing is a **binding from a manifest attribute to an existing role**, not a rule engine.
+  Evidence against building more than that today: the wired consumer never re-tints — it takes
+  `UiTheme.DarkGold` as-is (`Mod.cs:154`; both diagnostics windows hold a
+  `static readonly UiTheme WindowTheme = UiTheme.DarkGold`) and its source has zero `GUI.color`, zero
+  `new Color(` and zero `ColorDef.` hits — the measured pressure is in the atom axis, not the appearance
+  axis. The cheap shape, once a citation exists: add `Tone` to the atom schemas (closed enum, already named,
+  no new semantics) and move the geometry constants into `UiTheme` so `ButtonWidth`/`FieldWidth` stop being
+  per-kind vocabulary. The expensive shape (selectors, cascade, specificity, a parsed style file) has no
+  provenance, has no host counterpart to interoperate with, and collides with measurement order: the fit
+  audit must know the resolved font before `Measure` (`ITextMetrics`, the `Breakpoint` rule).
+- **The divergence from the game's look is total on the chrome side and honest on the internals side (census
+  2026-09-10, raised by the maintainer's question "our buttons already look different — is that style?").**
+  Yes, it is style: appearance, not behaviour. Where it lives, measured: the kernel has **zero** texture
+  references (no `Texture2D`, no `TexUI`, no `ContentFinderProxy`), every surface is a flat
+  `UiThemeDraw.Solid` → `Verse.Widgets.DrawBoxSolid` fill plus 1px solid rules, and `UiNative.Button` is
+  `VerseWidgets.ButtonInvisible` — the chrome-free hit-test. Of the game's chrome-producing helpers
+  (`ButtonText` 9 string hits, `DrawTab` 37, `DrawWindow` 6, `TexUI` present) in 1.6.4871 the kernel calls
+  none. The one inherited thing is the typeface: `UiKitFonts.ToGameFont` maps our three sizes onto
+  `GameFont.Tiny/Small/Medium`. **Two atoms still render vanilla pixels inside our chrome**:
+  `UiNative.TextField` → `VerseWidgets.TextField` and `UiNative.Slider` → `VerseWidgets.HorizontalSlider`, so
+  a text field's caret and a stepper-slider's track are the game's while their surroundings are ours.
+  Consequence for the style-layer question: because we own every state appearance — vanilla gets
+  hover/pressed/disabled free from its texture button, we draw `Selected`/`Raised`/`AccentGold` ourselves —
+  the attribute-to-role binding is worth more here than in a toolkit that inherits a host look. It is still
+  not a reason to build a resolver: a selector engine in front of these outlets would delete no drawing code
+  and only add matching.
+- **The tone vocabulary is half-wired, and one pair of tokens is a duplicate (measured 2026-09-10).** Across
+  the seven widget files the only theme tokens ever selected are `Selected`, `Raised`, `Border`,
+  `AccentGold` and `HoverPoint`; `Warning`, `Danger`, `Success`, `TextSecondary` and `TextDisabled` are picked
+  by no library widget, and the state mapping is `selected ? Selected : Raised` (dropdown, mode-row) plus
+  `isHovered ? HoverPoint : AccentGold` (chart). The semantic outlets `UiThemeDraw.StatusTreatment` and
+  `StatusBadge` are exercised **only by the consumer** (`UsNavWidget.cs:104`, `UsDiagnosticsWidgets.cs:317`),
+  using `Active`/`Neutral`/`Success`. And `UiTheme.Warning` and `UiTheme.Danger` are the same RGB
+  (`0.38, 0.14, 0.11`) under two names with no users — unproven surface inside the token bag, which this
+  library's own rule treats as debt rather than inventory: either a cited consumer shapes them apart or one
+  of the two goes. Evidence: source-level counts in both repositories; no game run.
+- **The scattering is real, and its cause is an unqueryable table, not a missing stylesheet (measured
+  2026-09-10).** Three vectors, named at the line. (1) `DropdownWidget.DrawField:127` and
+  `InputModeRowWidget.DrawOption:114` hold the same two-token mapping verbatim — `selected ? Selected :
+  Raised` plus `selected ? AccentGold : Border` — which is exactly what `UiThemeDraw.StatusTreatment`
+  already computes for `Active` and `Neutral` (its switch: `Active` ⇒ Selected + AccentGold, default ⇒
+  Raised + Border). (2) The tone-to-text mapping lives inside `StatusBadge:204-213` as a private `switch`,
+  so the two widgets re-derive `selected ? TextOnGold : TextPrimary` by hand; the tables disagree on one
+  entry deliberately (a badge's neutral text is `TextSecondary`, a field's is `TextPrimary`), which is the
+  first concrete evidence that **tone alone does not determine text colour** — prominence is a second axis,
+  and any role vocabulary must carry it or it will keep being re-invented per widget. (3) The same text
+  inset is spelled two ways: `DropdownWidget` uses a named `TextPadding` constant, `InputModeRowWidget:117`
+  hardcodes `6f` and `12f`; across the seven widget files the geometry constants run 40 × `1f` (the
+  hairline), 7 × `2f` (the rail width), 5 × `6f`, 3 × `28f`, with no token source anywhere. **Why a
+  stylesheet would not have prevented this:** a component that fills a rect imperatively needs the resolved
+  value *back*, and CSS-shaped systems do not hand it the rules — they hand it a resolved view. Unity's
+  UIElements makes that view first-class: `IResolvedStyle` appears 157 times in the metadata of
+  `UnityEngine.UIElementsModule.dll` in 1.6.4871, with `resolvedStyle` on the element (`get_resolvedStyle`)
+  and `resolvedValues` beside it, while `Specificity` appears 6 times and `StyleResolver`/`ComputedStyles`
+  not at all. That module ships in `Data/Managed` and the game never references it. So the prerequisite is a
+  queryable, complete treatment table shared by the outlets and the widgets; whether a data-side `Tone=`
+  attribute ever sits on top of it stays the separate, citation-gated question.
+- **Two different things get called "resolution", and keeping them apart is the whole argument (2026-09-10,
+  written after the maintainer asked why resolution must precede the table).** (A) *Style resolution* is the
+  computation from a rule set plus an element's place in the tree to that element's effective values —
+  matching, cascade, inheritance — and **its output is the per-element resolved-value table**. Nothing draws
+  from rules directly, so "resolution before table" is not a sequencing preference: the table simply *is* the
+  output. (B) *Pre-measure determinacy* is a separate requirement that concrete numbers exist before text is
+  measured, which is why any future style surface must settle before `Measure` (`ITextMetrics`, the
+  `Breakpoint` rule). FerriteLib has no rule set and needs no selectors, so its table key is already
+  explicit — tone plus prominence — and what it lacks is the output side of (A): turning the two switches
+  that already exist into values somebody can read. Consequence for sequencing: build the table first. A
+  data-side `Tone=` is only a new input to it, whereas shipping `Tone=` first leaves every widget copying
+  the switch again, now with an XML value in hand.
+- **Four layers, and which two we actually lack (map set down 2026-09-10; it is what dissolves "does a
+  cascade table fight the treatment table").** ① *Rule source* — who may specify an element's appearance: a
+  CSS is one kind, an explicit `tone` argument is another. ② *Adjudication* — how competing sources plus
+  live state resolve to one answer; cascade and specificity live **here and only here**. ③ *The resolved
+  value store* — the answer, kept queryable: this is the "table" this session keeps naming, and Unity's
+  `IResolvedStyle` sits in this layer too. ④ *Painting outlets* — values become pixels: `UiThemeDraw`'s 14
+  outlets, complete enough that no widget touches IMGUI outside the funnel. The library has ④, has a thin ①
+  (code arguments only), and is missing ③ outright while holding only the state-mapping fragment of ②
+  implicitly. **Why the maintainer's instinct read the gap as "we have what to draw but not how":** with ③
+  absent, adjudication parasitises ④ — `StatusTreatment` and `StatusBadge` each decide values inside a
+  switch and then throw them away — so the painting layer looks incomplete when it is in fact over-scoped.
+  Naming the layers fixes the confusion; naming ③ as the missing one fixes the code.
+- **The second rule source already exists and is blocked by a missing query, not by a missing engine
+  (measured 2026-09-10).** `IUiBindings` declares `BindReadOnly<T>` and the wired consumer uses it six times
+  (`UsDiagnosticsHost.cs:70-75`), but the interface exposes no writability read — its whole read side is
+  `Get`, `TryGet`, `GetOptions`, `Invoke` and the four `Validate*` methods. No widget can ask whether its
+  value is writable, which is why `UiStatusTone.Disabled` has **zero producers**: its only two appearances in
+  the assembly are inside `UiThemeDraw`'s own switches. Consequence for the cascade question, stated as the
+  trigger rather than a preference: the first time two sources address the same property of one element will
+  be a read-only element whose data side says `Tone="danger"`, and that is settled by one written precedence
+  rule (state beats author). Cascade machinery becomes a requirement only once competing sources outnumber
+  what a written rule can carry; today the count is one.
+- **What a third consumer could do today, measured rather than assumed (2026-09-10; the §5
+  invited-vs-unsupported call was ruled invited the same day, and this census is written for what that
+  ruling now owes).** Appearance is already customisable at **window** granularity with zero
+  library change: `UiWindowHost.Theme` is an abstract property, `UiTheme` exposes **20 settable colours plus
+  one settable font**, and `DarkGold` hands out a fresh instance per call so two mods re-tinting "the
+  default" cannot repaint each other. A third mod could therefore ship a wholly different palette today, and
+  could register its own kinds through the public registry and draw as it likes — ladder rung 1. What it
+  could not do is assign a role per element from data (`Tone=`) or adjust density at all (no geometry
+  tokens). Note also that `DefaultFont` is geometry-bearing — it feeds text measurement — so that knob moves
+  layout with it and is covered by `ITextMetrics` and the fit audit; it is not a cosmetic setting. Finally,
+  the binding constraints on a third consumer are not version numbers: they are the single-carrier invariant
+  (only this mod ships the DLL, and `FerriteLibVersion.Require`'s collision report is the only detector) and
+  the invitation itself, which turns the pre-stable debt list in §3/§4 into a schedule rather than an
+  option. A third wired consumer does not get blocked by the API freeze — it is the event the freeze waits for.
+- **What a cascading style capability actually requires here, decomposed 2026-09-10.** The §5 INVITED
+  ruling turns the breaking parts into pre-stable debt rather than options, so the work separates into five
+  pieces, and the surveyed systems say the first three are the whole useful part. (1) *The resolved-value
+  store* — one table keyed by `(role, prominence[, writability])` returning fill/border/text, immutable per
+  element and session-scoped: session-scoped because the promotion gate forbids new process-wide mutable
+  statics, immutable because `Measure` must see the same font the draw will use. (2) *The token shape fix*
+  already filed in §4 — per-surface `(fill, border)` pairs, which is also what makes the game's own look
+  representable at all — plus geometry tokens, since a role that cannot vary spacing has bought very little.
+  (3) *Role vocabulary on the atoms* — `Tone` and `Emphasis` as attributes, which is why the leaf atoms are a
+  prerequisite: a role has nothing to attach to while the manifest offers no text or button. (4) *Scope
+  carriers* — page- and container-level style with a **written** precedence chain, state > element >
+  container > page > theme > default. This is the only piece where "cascade" earns its keep and the only one
+  needing inheritance, and inheritance stays limited to font and emphasis because arbitrary inheritance is
+  what makes a resolved value unauditable. (5) *The writability read* on `IUiBindings`, which finally
+  produces `Disabled`. Explicit non-goals, each with its reason: no selector matching and no specificity
+  arithmetic, because positional precedence covers the real cases and stays auditable; no `@media`, because
+  the cited narrower mechanism is the shipped `Breakpoint`; no separate stylesheet file, because the game has
+  no style layer to interoperate with, so a new file kind buys a loader, a path contract and a second
+  validation entry point and nothing else; no runtime style mutation, because live state is already resolved
+  per frame in the draw and that is what keeps it harness-drivable. Role names take the §5 deprecation clause
+  like any other attribute: redirect for at least one minor, removal only at a minor boundary.
+- **The carrier rationale is not in question, and it is not what the §5 ruling was about (restated
+  2026-09-10).** This mod exists as a prerequisite that ships the library to other consumers — that is its
+  identity, not a cost to justify, and nothing about a style layer changes it. What the invited/unsupported
+  call was actually about is narrower and remains the reason the ordering above matters: whether strangers may
+  compile against the surface, which decides when the freeze clock starts and therefore how cheap each
+  breaking piece still is. Ruled invited on 2026-09-10, so the pre-stable list is now a debt schedule.
+- **What a ".css file" actually is, and where each of its jobs already happens here (mapping set down
+  2026-09-10, after the maintainer asked what our counterpart to the CSS part is and how it would be used).**
+  A stylesheet file carries five separable jobs, and this library already performs four of them somewhere
+  else: the *value source* (`:root` custom properties) is `UiTheme`, injected per window through the abstract
+  `UiWindowHost.Theme` and carried down the tree by `UiWidgetContext`; the *rules* (`selector { prop: value }`)
+  are the hardcoded switches inside the painting outlets — `StatusTreatment`'s tone switch and `StatusBadge`'s
+  text switch — which is the same mechanism with an enum as the selector and nothing reachable from outside;
+  *pseudo-classes* (`:hover`, `:disabled`) are live session state read in the draw (`selected ? … : …`,
+  `isHovered ? …`); *media queries* are the shipped `Breakpoint`, deliberately narrower. Only one job is
+  genuinely absent: the *author's class attribute* (`class="danger"`), which is exactly what the planned
+  `Tone`/`Emphasis` pair is — and it is a manifest **attribute**, not a document. Consequence for usage:
+  nothing scans a styles directory, there is no second loader, and the payload file set is unchanged, so gate
+  5 and the packaging probe stay as they are. If a rule-set document is ever wanted, the shape that keeps
+  those properties is a `<Styles>` section inside the existing manifest, matching on kind and role names only
+  with no descendant selectors, and it is deferred not because it is hard but because the number of competing
+  sources it would have to arbitrate between is one.
+- **Failure granularity, and what co-locating style in the manifest really costs (read from the shell and the
+  guard, 2026-09-10, answering the maintainer's "写错了整个炸了").** Four buckets, not one wall. (1) A widget
+  throwing in Draw or Measure is tripped **per element id** by `UiSessionGuard` and paints a `RecoveryBand`
+  in that element's rect while the rest of the page continues. (2) A creation-time contract failure — unknown
+  element name, unknown attribute, missing required attribute, a narrow-state attribute with no governing
+  `Breakpoint` — takes the **page** down, not the window: `UiWindowHost.DoWindowContents` wraps `CreateHost()`
+  and `DrawFrame()` in one try, keeps the exception, and trips `UiWindowNotice.PageUnavailable` on the
+  **next** frame — deliberately, because the throwing pass already claimed layout state, and the code comment
+  forbids "improving" that into a synchronous retry. (3) An unmet version contract shows
+  `UiWindowNotice.Prerequisite` from `Require`'s readable report. (4) A duplicate carrier is
+  `FerriteLibVersion.Require`'s collision report. **So the accurate cost of putting style in the manifest is
+  not "it blows up" — it is that style errors land in bucket 2 (page-fatal) instead of bucket 1
+  (element-contained), because creation-time validation is page-scoped by design. **Ruled by the maintainer
+  on 2026-09-10: appearance must never take the page down — the same way a broken stylesheet leaves a web
+  document still rendering, only badly dressed. So stage 3 fails closed on structure, because a mis-named
+  element means the page means something else, and soft on appearance values: an unknown `Tone` falls back to
+  the default treatment. Fail-soft must not mean silent — the web's own weakness here is that a dropped
+  declaration fails invisibly and is found by a user rather than by its author — so the fallback is logged,
+  reported through the fit audit's channel, and exercised in a harness lane.
+- **The web analogy corrected: we are not HTML and CSS merged, we are HTML with no author CSS at all
+  (2026-09-10).** The manifest carries structure, identity (`Id`, `Kind`, `Tab`, `Hidden`), binding references
+  and three geometry attributes (`Height`, `ButtonWidth`, `FieldWidth`); style is in no file — it lives in
+  `UiThemeDraw` and the two switches, with the values in a C# bag. In web terms `UiThemeDraw` is the **UA
+  stylesheet** and the author layer simply does not exist. Which is why the maintainer's ordering intuition is
+  both right and useful: the browser runs HTML parse, CSSOM, **style recalc**, layout, paint, and the planned
+  resolve-before-`Measure` pass is exactly the style-recalc slot, existing for the same reason the browser
+  puts it there — rules need a tree to attach to, and layout needs resolved numbers. What co-location buys
+  here is one loader, one validation entry, an unchanged closed payload file set, and atomicity, since a page
+  cannot ship apart from its own role assignments. What it costs is sharing across pages — two pages wanting
+  one look copy the attributes, which moves today's duplication from C# into XML — and the fact that every
+  appearance knob added to the schema is permanent vocabulary.
+- **The requirement, stated as a boundary rather than a feature (maintainer Q&A, 2026-09-10).** "XML 就能
+  调用组件、确定布局、改变外观；其他作者用 C# 注册自己的组件." Read as a rule: **the use surface must not
+  require a compiler; the extension surface may.** Measured against it, layout already complies and
+  appearance does not — the manifest's entire visual vocabulary is `Height`, `ButtonWidth`, `FieldWidth`,
+  `Tab`, `Hidden` — so the gap is not "we lack CSS", it is a hole in this library's own stated boundary, and
+  that is why closing it needs no provenance citation: the boundary is the justification. Confirmed scope is
+  all three classes, not one: a colour scheme selectable per window and per region (the NGS ice-blue case),
+  density (row height, padding, font size), and role tags per element. Precedence is nearest-wins — element
+  > region > window > library default — because the sources are nested in the tree, so no matching modes and
+  no specificity arithmetic are required; the engine CSS exists for is exactly the thing our shape lacks the
+  need for. **Inheritance is asymmetric by design: scheme and density inherit, roles do not.** A region
+  tagged danger would make every control inside it read as dangerous and destroy the information the tag
+  exists to carry, and that is the argument any future request to make `Tone` inherit must answer.
+  Cross-page sharing was declined, with a real substitute: reuse rides the extension surface (a registered
+  kind), not a shared style document.
+- **The privacy gate measures accounts, not display names (ruled and implemented 2026-09-10).** `gh api
+  user` reports login `Coahuilite`, id `19252128`, name `Fe`, email `null` — so the `Fe` sitting on the
+  PR #1 web-merge commit is that account's own GitHub-published display name, which is precisely what
+  GitHub's merge button stamps as author, and the committer `GitHub <noreply@github.com>` is platform
+  boilerplate. One human, one account, one noreply address: the earlier "three identities, rewrite the
+  history" reading was a gate bug, not a leak. The email address is the leak vector, so `privacy-audit.ps1`
+  now fails on any non-noreply author or committer address and on more than one distinct noreply account,
+  while reporting display-name variance rather than treating it as fatal. Positive control: a real mailbox
+  → foreign 1; two accounts → 2; one name across two accounts → 2; this repository → account 1, names 2,
+  `PRIVACY AUDIT CLEAN` across 76 revisions. Consequences: no rewrite, no force-push, `v0.3.0-rc1` is
+  unblocked on this axis, and the §5 instruction to amend and force-push is superseded by this record.
 - **The library ships 7 widget kinds; 3 are reachable from outside, 4 have no consumer at all.** US's two
-  Schema=2 manifests reference exactly one library kind, `chrome/banner`, out of 17 kinds total (16
-  consumer `us/*` + 1 here). Two more library kinds are used, but *not* through a manifest:
-  `UsFilterBarWidget` instantiates `DropdownWidget` and `UsAttenuationEditorWidget` instantiates
-  `LineChartWidget` directly as composition parts. `section/header`, `state/empty`, `input/mode-row` and
-  `input/stepper-slider` are registered here and appear nowhere in US's `Source/**` (grep, zero hits) -
-  `input/mode-row` most pointedly, because US ships its own `us/mode-row`. Consequence for the freeze and
-  for the invited-vs-unsupported call: "validated against one consumer" is narrower than it sounds. Those
-  four kinds are unvalidated in a running game, not merely unused - and a third party compiling against
-  them would be the first real test of them. Evidence: source-level grep across both repos; no new game
-  run.
+  Schema=2 manifests reference exactly one library kind, `chrome/banner`. Two more library kinds are used, but
+  *not* through a manifest: `UsFilterBarWidget` instantiates `DropdownWidget` and
+  `UsAttenuationEditorWidget` instantiates `LineChartWidget` directly as composition parts.
+  `section/header`, `state/empty`, `input/mode-row` and `input/stepper-slider` are registered here and appear
+  nowhere in the consumer's source — `input/mode-row` most pointedly, because the consumer ships its own.
+  Consequence for the freeze and for the invited-vs-unsupported call: "validated against one consumer" is
+  narrower than it sounds; those four kinds are unvalidated in a running game, not merely unused, and a third
+  party compiling against them would be the first real test of them. Evidence: source-level counts; no game run.
 - **`UiThemeDraw.Label` is the single text outlet as of 2026-09-07; it was not before.** The two bypasses
   (`UiLayoutEngine`'s container `Title`/`TitleKey` band and `StepperSliderWidget`'s label and `−`/`+`
   glyphs) were deleted by round-1 item A, so `UiFitAudit.Check` now sees those strings and
@@ -439,9 +983,17 @@ an edge case can be judged without re-running the audit that produced them.
   measure it without depending on a consumer tree, which is the vacuous-guard shape already recorded
   twice in the neutrality lane.
 - **Why exemptions carry rent.** An allowlist without a named closing item drifts back into permanent
-  undocumented self-implementation; the live specimen is US's diagnostics panel — 704 lines of
-  hand-rolled immediate UI borrowing only the theme vocabulary. Written ruling + capability gap + TODO
-  reference turns each bypass into debt with a due date instead of a precedent.
+  undocumented self-implementation; the live specimen is US's diagnostics panel — 703 lines of
+  hand-rolled immediate UI borrowing only the theme vocabulary, pinned to a revision so that count cannot
+  rot silently (`Coahuilite/UniversalSqueaker@09366f8:Source/UniversalSqueaker/Diagnostics/SqueakDiagnosticsPanel.cs`).
+  Written ruling + capability gap + TODO reference turns each bypass into debt with a due date instead
+  of a precedent. **The due date is now dated by the consumer, not by us:** US
+  opened the migration of this panel onto `UiWindowHost` + `UiHost` in its own buffer on 2026-09-09
+  (§1, "devpanel"), stating that the shell surface it measured is sufficient and it asks FL for nothing
+  — so it is not a round and takes no number, and the round-4 slot stays unused. Two things follow when
+  it lands: US's gate 14 whitelist goes 2 → 1 (re-derive from its `scripts/ui-boundary-audit.ps1`), and
+  this bullet must be re-derived, because its specimen will no longer exist. If the migration instead
+  turns up a shell-level defect, that is the event that opens FL round 4.
 - **Promotion-gate provenance, by item.** P1 (hover primitive), P2 (window shell), P3 (hover-claim
   machine) each cite consumer code that was forced to hand-roll them — that is the provenance test
   passing. The P2 ruling that US's 60–75 % / 800×600 clamp is consumer policy (size arrives as a
@@ -572,8 +1124,11 @@ edited or truncated in this repo cannot turn any gate here red**; only a US gate
 when the sibling tree is present. Anything that repeats "byte-identical to the consumer's copy" as a
 property of this repo's gates is wrong in the same way.
 
-The harness is 13 test files carrying 63 named assertions. (The older wording here was "13 lanes",
-which counted files and read like an assertion count - prefer the explicit numbers.) Three assertion
+The harness is 14 test files carrying 84 named lanes and 293 assertion results per run (counted 2026-09-10;
+all three figures move within a day of work — re-derive with `ls tools/FerriteLib.UiKit.Tests/*Tests.cs |
+wc -l`, `grep -c 'Run("' tools/FerriteLib.UiKit.Tests/*Tests.cs`, and `grep -c '^  ok:'` on a release run).
+The earlier wording here — "13 lanes", "63 named assertions" — conflated files with assertions and rotted
+twice, which is the reason the commands are written next to the numbers now. Three assertion
 groups are worth naming because they are the reason this repo can be trusted across a boundary:
 
 - Version contract lane (11 assertions): range accept/reject, the pre-1.0 bump rule, inverted range as
@@ -612,17 +1167,16 @@ colour token currently feeds layout — it is a future-regression guard, not pre
   mutable singleton, which is harmless with one consumer and cross-talk with two.
 - **A count without its predicate is not a measurement.** A `find -not -path '*/obj/*'` never matches on
   this platform (paths are printed with backslashes), so any count taken that way silently includes
-  MSBuild's generated `AssemblyInfo`/`AssemblyAttributes` files. Count with `git ls-files` + `wc -l`
-  instead: generated output is untracked, so it cannot leak in. Derived at `12dacb4`: library 35 files /
-  5,381 lines (Kernel top level 27 / 4,180, `Kernel/Widgets/` 7 / 1,198, `Properties/AssemblyInfo.cs`
-  1 / 3), harness 13 files / 4,152 lines / 63 named assertions, stub sources 4 files / 672 lines in 4
-  assemblies. **These move within hours, not days** - two landed while this bullet was being written.
-  Treat them as a snapshot of a command, never as a fact to quote.
+  MSBuild's generated `AssemblyInfo`/`AssemblyAttributes` files. Count with `git ls-files` + `wc -l` /
+  `grep -c` instead: generated output is untracked, so it cannot leak in. **Every file and line figure this
+  ledger once carried has been replaced by its command**, because two of them rotted while their own bullet
+  was warning about rot; if you find a bare number here again, treat it as a stale claim until the command
+  beside it is run.
 - **The consumer's banned-substring list is six names, enforced by a C# invariant test — not by any
   `scripts/*.ps1` gate.** `UiSourceInvariantTests` forbids `UiInteract`, `Palette`, `SurfaceFrame`,
-  `UiText`, `UiValueStore`, `UiPanel`
-  (`../UniversalSqueaker/tools/UniversalSqueakerUiLogicTests/UiSourceInvariantTests.cs:153`, as of
-  2026-09-08). Two traps live here. First, a cross-repo re-check that greps the consumer's `scripts/`
+  `UiText`, `UiValueStore`, `UiPanel`, at
+  `Coahuilite/UniversalSqueaker@09366f8:tools/UniversalSqueakerUiLogicTests/UiSourceInvariantTests.cs:153`.
+  Two traps live here. First, a cross-repo re-check that greps the consumer's `scripts/`
   finds "no scan at all" and concludes the rule is a phantom — the gate is a test project, so the check
   must target `tools/`. Second, `UiPanel` used to be prose-only (five names scanned, six claimed); after
   FL→US round 2 reported it, US added it to the list rather than deleting it from the rule, so the scan
@@ -631,3 +1185,29 @@ colour token currently feeds layout — it is a future-regression guard, not pre
   code lands; during this tidy the tree moved `958ac7d → 4dd97bf → 632a9a3 → a05fddf → 12dacb4` in about
   thirty minutes, retiring a "measured at <sha>" claim twice. Prefer a re-derivable command and a date
   over an anchor nobody re-checks.
+- **A report-only item with no delivery channel is not queued, it is lost.** The reclassification of the
+  round-3 package from 0.4.0 to 0.3.0 was recorded here and in the buffer annex with the instruction that
+  US's docs "should re-point when that repo is next open". US then rewrote its own `TODO.md` and
+  `HANDOFF.md` on 2026-09-09, and its three "0.4.0 package" lines plus its summary of FL's round-3 state
+  ("REVIEWED, pending scheduling") survived that rewrite unchanged. A sibling session does not read our
+  buffer, and a buffer rewrite is precisely the moment when stale cross-repo status is *not* consulted.
+  **Resolved 2026-09-10, and the resolution is the rule**: the maintainer authorised this session to
+  inspect and then edit the sibling's docs directly, and the four stale claims landed as US `2951934`
+  (its `TODO.md:8,9,46,60`, one durable line in its `MEMORY.md`, its local buffer's FL-state summary and
+  pointer index). So an outstanding ledger item goes to the user *with an offer to apply it*: `AGENTS.md`
+  Boundaries make the sibling read-only by default, only an authorization turns a report into a fix, and
+  the report alone was never the delivery.
+- **A ref pair rots like a SHA anchor.** "`0.3.x` and `main` both at `19cfdcc`" was true for hours. Say
+  the predicate instead and let it be re-checked: `git diff --name-only main 0.3.x` returning only `.md`
+  paths is what "the tested bytes and the shipped bytes are one tree" means.
+- **A green pre-push privacy scan says nothing about the identity a remote merge button will stamp.**
+  The 2026-09-07 scan passed at the pushed tip; the 2026-09-09 PR #1 merge added one commit whose
+  author is the clicker's display name (`Fe <…@users.noreply…>`), GitHub itself as committer, and the
+  `-FullHistory` identity vector went red through no edit of ours. The scan must be re-run after
+  remote-side history events, not only before pushes — the same rule it already states for commits,
+  extended to merge buttons, tags' absence and any other hand that writes to the graph. **The fix planned
+  here — amend the merge commit's author and force-push both branches — was overtaken on 2026-09-10:
+  `gh api user` shows `Fe` is this account's own GitHub-published display name, so the vector was a gate bug
+  rather than a leak, and the gate now measures accounts instead of name strings (see the privacy-gate
+  record in this file). The lesson about re-running after remote-side history events stands; the
+  history-rewrite advice does not.**
