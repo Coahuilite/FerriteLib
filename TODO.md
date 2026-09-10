@@ -59,12 +59,10 @@ not design work.
       2026-09-09 ff'd `0.3.x` to the PR #1 merge; `0.3.x` has carried docs-only commits since, so the
       check is a predicate and not a SHA pair:
       `git diff --name-only main 0.3.x` must return `.md` files only, and that is what "the tested bytes
-      and the shipped bytes are one tree" means. Procedure: `verify-local.ps1 -PackDev`, place
-      `dist/dev/FerriteLib/` plus US's migrated build into your own `Mods/` by hand (never a
-      script, never a link — Boundaries), then check: factor labels hug their translated names at
-      both extremes of the mood card, no degenerate slider interval survives US's threshold
-      deletion, language switch re-measures an Auto column, and the narrow→wide flip is smooth
-      while dragging the window. Record findings against §3's shipped shape here.
+      and the shipped bytes are one tree" means. **The procedure and the seven live checks are a form, not
+      more prose: `docs/in-game-walkthrough.md`.** Fill one row per check there and write the outcome into
+      this section — a blank row is not a pass, and "no error" is not one either (§1's duplicate-carrier
+      check has three valid outcomes and the point is to learn which one the game picks).
 
 The blocking risk is cleared. What remains is two branches from the split plus three new ones the
 round-1 surface introduced; every one of the five only changes code if it surprises us.
@@ -183,10 +181,15 @@ Each item is expected to delete a workaround, not add a layer.
       two routes into it.
 - [ ] **Decide what to do with the four widget kinds nobody consumes.** `section/header`, `state/empty`,
       `input/mode-row` and `input/stepper-slider` are registered unconditionally by
-      `KernelCoreWidgetRegistrar` and have zero references in the consumer's `Source/**` (grep, 2026-09-04).
-      Before any freeze or public invitation, either give them a real consumer, delete them, or say in the
-      page text that they are unproven. Right now the honest statement of this library's validated surface
-      is "3 of 7 kinds", not 7.
+      `KernelCoreWidgetRegistrar`, with zero references in the wired consumer's source — re-derive against
+      that project's published tree at a pinned revision (`Coahuilite/UniversalSqueaker@09366f8`, or
+      `gh api` on it), because the count in the next sentence is five days old. Before any
+      freeze they are given a real consumer, deleted, or declared unproven in the page text; the honest
+      statement of this library's validated surface is "3 of 7 kinds", not 7. **The criterion now exists**
+      (`AGENTS.md` "What earns a kind", plus the per-kind re-derivation item below), so this item is no
+      longer a shrug: each of the four either passes the ownership test and stays, or fails it and becomes a
+      container, an attribute, or a recipe.
+
 - [ ] **Make the licence-parity guard two-sided, or stop calling it ours.** Gate 6 is credited, in prose
       that has since circulated between both repos, with comparing `LICENSE` against the consumer's copy.
       It does not - only US's gate 10 does
@@ -229,14 +232,15 @@ Each item is expected to delete a workaround, not add a layer.
       takes a drawing delegate. Whether Verse honours it is an IL-level question, and it is the only known
       fact that could move the "no non-IMGUI backend" non-goal; answer it before anyone builds a case on the
       current wording, which rests on a compositing-order claim this repo has never measured.
-- [ ] **The 0.4.0 sweep, as one breaking window (tier list, 2026-09-10).** Internalise the
-      internalize-candidate types (`KernelCoreWidgetRegistrar`, `UiLayoutEngine`, and the six kind classes
-      nobody names) and, first, add the stable container of `const string` kind identifiers they need in
-      place of `SomeWidget.Kind`; bundle it with the per-surface theme restructure, the element identity
-      layer and the announce operation, because pre-1.0 each of those is its own minor bump and paying them
-      separately means three breaking releases where the debt has one natural home. `MEMORY.md` records the
-      count that makes this a decision and not a preference: 20 of 40 public types are blocked from stable by
-      exactly these debts.
+- [ ] **The 0.4.0 sweep, as one breaking window (tier list, 2026-09-10).** Four parts, and they belong in
+      one minor because pre-1.0 each would otherwise be its own breaking release — `MEMORY.md` records the
+      count that makes this arithmetic rather than taste: 20 of 40 public types are blocked from stable by
+      exactly these debts. (a) Per-surface theme tokens (§4). (b) Element identity. (c) Announce. (d) The
+      internalise sweep: `KernelCoreWidgetRegistrar`, `UiLayoutEngine` and the six kind classes the
+      internalize-candidate tier names, which needs the stable container of `const string` kind identifiers
+      first so a manifest author never has to write `SomeWidget.Kind`. Fold into (d) the decision below about
+      kinds that do not earn registration: the cheapest way to shrink the frozen vocabulary is to stop
+      registering things that are really a container plus attributes.
 - [ ] **`UiHost.MeasureAndArrange` / `UiHost.Draw(snapshot)` have no cited use.** The harness exercises the
       two-phase split (caching and revalidation lanes), but neither the wired consumer nor `UiWindowHost`
       names it — the shell drives `DrawFrame`. So either a consumer supplies the need the split was built for
@@ -247,6 +251,36 @@ Each item is expected to delete a workaround, not add a layer.
       and wrong for a name we are retiring: the ruling is accept-and-redirect for at least one minor, warning
       in a lane that proves the warning fires, then refuse at the minor boundary. Needs a declared
       deprecated-attribute table (per kind, with the redirect target) and a harness lane driving both ends.
+- [ ] **Re-derive the kind vocabulary against `AGENTS.md`'s "What earns a kind" (rule added 2026-09-10).**
+      Two of the seven registered kinds look like they fail their own test: `section/header` is a labelled
+      band (a container with a title and a tone), and `chrome/banner` is a painted strip with text — neither
+      owns interaction state, a content-driven measure, or a hit rule. `state/empty` is the borderline case
+      worth keeping, because its `Measure` wraps a sentence through `ITextMetrics`, which is precisely a
+      measure contract a manifest cannot express. Decide per kind: keep, demote to container attributes, or
+      replace with a recipe that returns element specs (recipes are C# surface, so they get tier entries;
+      they are never widget instances, because composing by type is the bypass the metric counts). This
+      item is the four-unconsumed-kinds decision rewritten with a criterion instead of a shrug.
+- [ ] **The carrier's own diagnostic surface — built as a dev-mode window, never as a mod-settings page
+      (evaluated 2026-09-10; reasoning in `MEMORY.md` Charter).** What it must contain: the version contract
+      and `Require` verdict, the duplicate-carrier report, and one cell per **atomic** kind with a
+      worst-case string in both scripts, so the unconsumed kinds get real-glyph evidence without waiting for
+      a consumer's page. The constraint that decides the shape: this library owns zero translation keys and
+      gate 5 refuses `1.6/Languages/` by name, so the page carries literal English developer copy — the same
+      stance `UiSessionGuard` already takes in its log line — which also means it is a developer surface by
+      construction and must never grow a player-facing role.
+- [ ] **Second section of that window: the registered-kind census.** Print every scope and kind that loaded
+      assemblies registered, each with its allowed-attribute schema and its declared label set, capped and
+      totalled the way `UiFitAudit.MaxReports` does it. This is the half that finds work: a foreign kind with
+      an empty schema or a label set nobody declared is a hand-rolled bypass announcing itself. Two hard
+      rules with it: **metadata only — never instantiate a consumer's kind inside the carrier's window**, or
+      we run their code under our recovery banner and inherit their failures; and printing their scope string
+      at runtime is not a neutrality breach, since the scan governs this repository's source, not observed
+      data on screen.
+- [ ] **Write the demo rule before the window exists: rendering a kind here is not consumption.** Promotion
+      evidence stays "a page in another repository that a player used and whose needs forced the shape"; the
+      diagnostic window is a lane that proves a kind renders, measures and recovers under real metrics and
+      proves nothing about whether it should exist. Without this line the window turns the honest coverage
+      statement in `MEMORY.md` ("3 of 7 kinds validated") into a number that means nothing.
 
 ## 4. Deferred by decision, with the upgrade path written down
 

@@ -57,5 +57,6 @@ pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory   # 三向量隐私
 ## 文档索引
 
 - 协议 / 不变量：`AGENTS.md` · 已核事实：`MEMORY.md` · 行动面：`TODO.md`
+- 哪些类型承诺不破坏：`docs/api-tiers.md` · 只有你能跑的实机走查清单：`docs/in-game-walkthrough.md`
 - 发布流程与 rc 方案：`.github/workflows/release.yml` 头注释（tag 方言即契约：`vBASE-rcN` 试版，
   裸 `vBASE` 必须落在最后一个 rc 的同一提交上）

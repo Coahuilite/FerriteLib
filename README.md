@@ -65,5 +65,7 @@ pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory   # three-vector pr
 ```
 
 - Protocol / invariants: `AGENTS.md` · durable facts: `MEMORY.md` · action surface: `TODO.md`
+- Which types we will not break: `docs/api-tiers.md` · the in-game checks only you can run:
+  `docs/in-game-walkthrough.md`
 - Release flow and rc scheme: `.github/workflows/release.yml` header comments (the tag dialect is the
   contract: `vBASE-rcN` trials, bare `vBASE` on the last rc's commit)

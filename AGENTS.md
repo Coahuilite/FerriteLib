@@ -99,6 +99,14 @@ Consumer ladder when the library lacks something:
 Promotion gate — all four or it stays consumer-side: provenance cited; neutral, and no consumer's
 numbers as library defaults; no new process-wide mutable statics; a harness-drivable lane exists.
 
+**What earns a kind.** Registering a widget kind is not shipping a convenience, it is freezing vocabulary:
+every kind brings an attribute schema, a declared label set, a tier entry and eventually a deprecation debt.
+A kind is earned by owning what a manifest cannot express — per-element interaction state, a measure
+contract over its own content, or a hit/geometry rule. Something that only arranges children and paints
+chrome is a container plus attributes, and a composite worth handing to two consumers is a recipe that
+returns element specs — never a registered kind, and never a widget instance, because composing by type is
+the bypass the tree-membership metric counts.
+
 Unproven surface is debt, not inventory: zero-citation kinds and session axes get deleted or reshaped to
 a cited consumer's proven form, never kept "for symmetry".
 
@@ -119,21 +127,15 @@ pwsh -NoProfile -File scripts/pack-steam.ps1  -Version v0.3.0-rc2    # + Worksho
 `-PackDev` stages `dist/dev/FerriteLib/` and stops there: nothing under `scripts/` writes outside the
 repository, and installing a folder into a game `Mods/` directory is the developer's own step (Boundaries).
 
-Three channels, one staging engine. `stage-package.ps1` decides what a package *is* — the five allowed
-files, the content probe, the licence copy, `version.txt`, and the closed-set assertion that stops a
-stray `.pdb` or repository-only file riding along. It also **measures** the payload's build configuration
-and refuses a channel whose bytes do not match its name (`dev` requires a Dev-configured assembly,
-`github`/`steam` a Release-configured one), so `version.txt`'s `build=` line is derived from the DLL and
-never supplied by the caller. `pack-dev` / `pack-release` / `pack-steam` decide
-identity and nothing else: dev tolerates a dirty tree and says so in its label, github requires the tag
-shape and the build axis, steam additionally requires a clean tree. Only the GitHub channel archives —
-a dev rehearsal and a Workshop upload are folders — which also confines the archive-timestamp problem
-to the one artifact whose digest must be public. Dev writes no NuGet package; `-Nupkg` asks for one,
-since a consumer may want the payload as a package instead of a folder.
-
+Three channels (`pack-dev` / `pack-release` / `pack-steam`), one staging engine (`stage-package.ps1`). The
+engine owns what a package *is* — the closed file set, the content probe, the licence copy, `version.txt`,
+and a **measured** build configuration, so a channel label that does not match the payload's bytes is
+refused rather than trusted. The packers own identity only: dev tolerates a dirty tree and says so, github
+requires the tag shape and the build axis, steam additionally a clean tree, and only github archives.
 `About/PublishedFileId.txt` is gitignored and the stager copies `About.xml` as a file rather than the
-`About` directory, so no dev or GitHub artifact can carry Workshop identity; the upload step creates it
-inside `dist/steam/FerriteLib/About/` locally.
+directory, so no rehearsal or GitHub artifact can carry a Workshop identity. The measurements behind this
+split live in `MEMORY.md` ("Three channels, one staging engine", "A release asset must be built after the
+gates run", "Only the GitHub channel archives").
 
 A consumer integrates through the published GitHub Release asset; a same-level sibling folder with
 `Private=false` is one developer's lockstep arrangement, not a contract and not a layout a clone can

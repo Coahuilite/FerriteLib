@@ -309,6 +309,58 @@
   stability promise is a hand-maintained three-tier list (stable / public-unstable / internal) enforced
   socially plus by architecture-guard tests, with no binary-compatibility tool — the shape §5's proposal
   copies, chosen because a tool heavier than the surface is a promise nobody keeps.
+- **"Headless core, own persistence layer, decoupled" — what the author's phrase maps onto in code, and
+  what it means for us.** The author told the maintainer (2026-09-10, oral relay) that Qz-UILib gave up the
+  web-style implementation but kept a self-written headless core and a persistence layer, decoupled. Read
+  against the repository, the sentence separates into two claims of different strength. The headless half is
+  exactly what the code shows: `ui.scene`'s node/layout/runtime/input hold geometry, dirty marks, signals and
+  interaction state and issue no GL; the frame ends in `ScenePaintEngine` producing an immutable paint plan
+  from per-node cached fragments, replayed through a `UiRenderBackend` port, and its ban list forbids the
+  paint engine from importing the deleted `ui.dom`/`ui.paint`/`ui.layout`/`ui.component`/`ui.control`
+  namespaces. So "decoupled" means *one interface plus one replayer between what the UI is and how pixels
+  appear* — and the thing they deleted was the browser-semantics layer, not the retained tree, which survived
+  and got stricter. The "persistence" half is ambiguous and worth asking him about directly: in the code the
+  persistent structure is the retained node tree with typed property slots, the signal store, and
+  `SceneKeyedListReconciler` (reuse nodes by key, longest-increasing-subsequence over old indices to find
+  zero-move items) — that is persistence of interaction state across frames. A separate `club.heiqi.config`
+  family (~86 classes, `ConfigUI`, schema, field renderers) is the layer that persists settings to storage.
+  If he meant the second one, it is a different seam than ours and we have no equivalent problem: this
+  library writes nothing anywhere, by series rule.
+  **Consequence for FerriteLib, and it is a refusal:** the shape validates our funnel design rather than
+  asking us to copy it. We are already headless where it costs nothing — measurement goes through
+  `ITextMetrics` and the harness runs because the engine never touches a real font — but our paint side is
+  coupled to Verse on purpose, and the coupling is named and gated by five files (`KernelContainmentTests`).
+  Adding a `UiRenderBackend` port would buy an abstraction with one implementation and a non-goal behind it,
+  which is exactly the speculative surface this library's protocol exists to refuse. What we owe instead is
+  keeping the host-free seams host-free: nothing outside the five funnel files learns that IMGUI exists.
+- **The carrier's own diagnostic surface, evaluated 2026-09-10 (maintainer proposal: a settings page that
+  shows the version contract and every atomic component, not the composites).** Three things it uniquely
+  buys, none of which any lane can substitute: it is the only rendering evidence that exists when no consumer
+  is installed; it is the only way to push the unconsumed kinds through real glyph metrics without waiting on
+  somebody's page; and it turns `Require`'s verdict and the duplicate-carrier report from a log line into
+  something a player can be pointed at. One thing it collides with, and the collision is the interesting
+  part: this library owns **zero translation keys** (`AGENTS.md` identity), gate 5 refuses a `1.6/Languages/`
+  directory by name, and `IUiTranslation` is injected precisely so the library never has to say a sentence
+  alone. A page the library owns therefore has no legitimate source for its own text.
+  **The resolution that keeps both intact is a dev-mode diagnostic window with literal English copy, not a
+  mod-settings page.** Literal developer copy is already the library's stance in one place —
+  `UiSessionGuard` logs an English line and that is accepted — so the page is English by construction and
+  stays that way, no folder appears under `1.6/`, gate 5 and the payload identity are untouched, and the
+  mod-settings list is not the right host anyway: it is the game's IMGUI layout, not ours, so it demos the
+  worst geometry in the worst place while telling every player that a no-content carrier has opinions.
+  **And the demo rule, which is the part that has to be written down before the code exists: rendering a kind
+  in our own diagnostic window is not consumption.** Consumption is a page in another repository that a
+  player uses and whose needs forced a shape; that is the only evidence the promotion gate accepts, and the
+  diagnostic window is a *lane* — it proves a kind renders, measures and recovers under the real font, and it
+  proves nothing about whether the kind should exist. Without this line the page becomes a self-citation
+  machine, and the honest count in `MEMORY.md` ("3 of 7 kinds validated") would quietly read "7 of 7" while
+  meaning nothing of the sort. The consumer-registry tab (a second section listing every scope and kind
+  registered by loaded assemblies, with each kind's allowed attributes and label set) is the more valuable
+  half and follows the same rule: **report metadata only, never instantiate a foreign kind inside the
+  carrier's own window**, because that runs consumer code under our recovery banner and attributes its
+  failures to us. Printing a consumer's scope or kind string at runtime is not a neutrality violation — the
+  scan forbids product vocabulary in this repository's source, not observed data on screen — and the cap
+  should follow `UiFitAudit.MaxReports`: bounded listing with a reported total, never an unbounded tree.
 
 ## What was verified, and how
 
@@ -742,8 +794,11 @@ edited or truncated in this repo cannot turn any gate here red**; only a US gate
 when the sibling tree is present. Anything that repeats "byte-identical to the consumer's copy" as a
 property of this repo's gates is wrong in the same way.
 
-The harness is 13 test files carrying 63 named assertions. (The older wording here was "13 lanes",
-which counted files and read like an assertion count - prefer the explicit numbers.) Three assertion
+The harness is 14 test files carrying 84 named lanes and 293 assertion results per run (counted 2026-09-10;
+all three figures move within a day of work — re-derive with `ls tools/FerriteLib.UiKit.Tests/*Tests.cs |
+wc -l`, `grep -c 'Run("' tools/FerriteLib.UiKit.Tests/*Tests.cs`, and `grep -c '^  ok:'` on a release run).
+The earlier wording here — "13 lanes", "63 named assertions" — conflated files with assertions and rotted
+twice, which is the reason the commands are written next to the numbers now. Three assertion
 groups are worth naming because they are the reason this repo can be trusted across a boundary:
 
 - Version contract lane (11 assertions): range accept/reject, the pre-1.0 bump rule, inverted range as
@@ -782,12 +837,11 @@ colour token currently feeds layout — it is a future-regression guard, not pre
   mutable singleton, which is harmless with one consumer and cross-talk with two.
 - **A count without its predicate is not a measurement.** A `find -not -path '*/obj/*'` never matches on
   this platform (paths are printed with backslashes), so any count taken that way silently includes
-  MSBuild's generated `AssemblyInfo`/`AssemblyAttributes` files. Count with `git ls-files` + `wc -l`
-  instead: generated output is untracked, so it cannot leak in. Derived at `12dacb4`: library 35 files /
-  5,381 lines (Kernel top level 27 / 4,180, `Kernel/Widgets/` 7 / 1,198, `Properties/AssemblyInfo.cs`
-  1 / 3), harness 13 files / 4,152 lines / 63 named assertions, stub sources 4 files / 672 lines in 4
-  assemblies. **These move within hours, not days** - two landed while this bullet was being written.
-  Treat them as a snapshot of a command, never as a fact to quote.
+  MSBuild's generated `AssemblyInfo`/`AssemblyAttributes` files. Count with `git ls-files` + `wc -l` /
+  `grep -c` instead: generated output is untracked, so it cannot leak in. **Every file and line figure this
+  ledger once carried has been replaced by its command**, because two of them rotted while their own bullet
+  was warning about rot; if you find a bare number here again, treat it as a stale claim until the command
+  beside it is run.
 - **The consumer's banned-substring list is six names, enforced by a C# invariant test — not by any
   `scripts/*.ps1` gate.** `UiSourceInvariantTests` forbids `UiInteract`, `Palette`, `SurfaceFrame`,
   `UiText`, `UiValueStore`, `UiPanel`, at
