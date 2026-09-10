@@ -793,6 +793,22 @@
   call was actually about is narrower and remains the reason the ordering above matters: whether strangers may
   compile against the surface, which decides when the freeze clock starts and therefore how cheap each
   breaking piece still is. Ruled invited on 2026-09-10, so the pre-stable list is now a debt schedule.
+- **What a ".css file" actually is, and where each of its jobs already happens here (mapping set down
+  2026-09-10, after the maintainer asked what our counterpart to the CSS part is and how it would be used).**
+  A stylesheet file carries five separable jobs, and this library already performs four of them somewhere
+  else: the *value source* (`:root` custom properties) is `UiTheme`, injected per window through the abstract
+  `UiWindowHost.Theme` and carried down the tree by `UiWidgetContext`; the *rules* (`selector { prop: value }`)
+  are the hardcoded switches inside the painting outlets — `StatusTreatment`'s tone switch and `StatusBadge`'s
+  text switch — which is the same mechanism with an enum as the selector and nothing reachable from outside;
+  *pseudo-classes* (`:hover`, `:disabled`) are live session state read in the draw (`selected ? … : …`,
+  `isHovered ? …`); *media queries* are the shipped `Breakpoint`, deliberately narrower. Only one job is
+  genuinely absent: the *author's class attribute* (`class="danger"`), which is exactly what the planned
+  `Tone`/`Emphasis` pair is — and it is a manifest **attribute**, not a document. Consequence for usage:
+  nothing scans a styles directory, there is no second loader, and the payload file set is unchanged, so gate
+  5 and the packaging probe stay as they are. If a rule-set document is ever wanted, the shape that keeps
+  those properties is a `<Styles>` section inside the existing manifest, matching on kind and role names only
+  with no descendant selectors, and it is deferred not because it is hard but because the number of competing
+  sources it would have to arbitrate between is one.
 - **The library ships 7 widget kinds; 3 are reachable from outside, 4 have no consumer at all.** US's two
   Schema=2 manifests reference exactly one library kind, `chrome/banner`. Two more library kinds are used, but
   *not* through a manifest: `UsFilterBarWidget` instantiates `DropdownWidget` and
