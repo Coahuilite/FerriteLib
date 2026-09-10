@@ -216,17 +216,15 @@ Each item is expected to delete a workaround, not add a layer.
       a Host" claim the lane exists to hold. Cheapest fix: add `UiPopup` and mutate-test it the same way
       `UiWindowHost` was. Real fix, later: derive the page-model set from the types instead of a list
       nobody remembers to update.
-- [ ] Clean up `UiLayoutManifest.ParseFile`: it has no production caller. Either wire a real
-      load-from-disk path (which is the only thing that would make XML authoring worth its cost) or
-      delete it and the `Schema="2"` version slot with it. **The intent is written straight here because
-      this item's own wording had drifted it:** the requirement on XML is that it declares page layout and
-      composes the kinds the library already provides. Hot-adding a widget kind from data was never asked
-      for — the founding spec declined even that harder variant — so the fork is not "how do we hot-reload
-      components" but "who hands the library the manifest string". Today that is the consumer (US embeds it
-      as an assembly resource: `MEMORY.md` Charter), which is coherent and needs nothing from us. A disk
-      path would buy exactly one thing — editing layout without recompiling the consumer — and would then
-      owe an answer on where the file lives, when it is re-read, and what a parse failure shows a player.
-      Deleting the dead entry costs nothing and stops implying a capability nobody owns.
+- [ ] Wire `UiLayoutManifest.ParseFile` — the fork is settled by the style-document ruling (2026-09-10):
+      a standalone style document with its own loader makes "XML authoring without recompiling" a
+      library promise, so deleting the disk entry would strand the promise's structural half. The three
+      questions the old wording owed are answered by the same ruling's shape: where the file lives is
+      the consumer's call (nothing scans a directory — the consumer hands the path, as with any file it
+      owns); when it is re-read is at host creation only (no runtime mutation); and a parse failure is
+      appearance-class — the page renders with defaults, the fallback logged through the fit audit's
+      channel and exercised in a harness lane. Scope note: this item is the manifest loader the ruling
+      settles; the style document's own loader is the stage-3 sweep's, with the same policy.
 - [ ] **`Verse.Window`'s custom-drawing seam is unexamined.** The reference read recorded
       `Window(IWindowDrawing customWindowDrawing = null)` (`MEMORY.md`), i.e. the game's own window manager
       takes a drawing delegate. Whether Verse honours it is an IL-level question, and it is the only known
@@ -329,9 +327,14 @@ Each item is expected to delete a workaround, not add a layer.
       density inherit, roles do not, because a region marked danger makes everything inside it read as
       dangerous. Stage 4 shrinks accordingly — the region level is in scope now, the page level waits for a
       cited need; stage 5 (the `IUiBindings` writability read) ships with whichever change first needs a
-      `Disabled` producer. Cross-page sharing is explicitly **not** built: reuse rides the registry, not a
-      shared style document. Nor are the other non-goals: no selectors, no specificity, no `@media`, no
-      separate style file, no runtime mutation.
+      `Disabled` producer. Cross-page sharing was explicitly **not** built: reuse rides the registry, not
+      a shared style document. Nor are the other non-goals: no selectors, no specificity, no `@media`,
+      no runtime mutation. **Amended 2026-09-10, maintainer ruling: the page-level rule source is a
+      standalone style document with its own loader** (`MEMORY.md`, "The style surface is a standalone
+      document"), superseding "no separate style file"; the embedded `<Styles>` section remains legal
+      as the second text origin feeding the same document type, so there is still one parser and one
+      validation entry point. Document shape owes: the document type in `docs/api-tiers.md`, the
+      page-level precedence slot (which is what stage 4 was waiting for), and resolve-before-`Measure`.
       Validation policy for stage 3, per the failure ladder in `MEMORY.md` and the maintainer's ruling:
       structure stays fail-closed (page-fatal, bucket 2), appearance values go fail-soft — an unknown `Tone`
       falls back to the default treatment — and fail-soft must not mean silent: the fallback is logged,
