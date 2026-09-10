@@ -730,6 +730,28 @@
   that already exist into values somebody can read. Consequence for sequencing: build the table first. A
   data-side `Tone=` is only a new input to it, whereas shipping `Tone=` first leaves every widget copying
   the switch again, now with an XML value in hand.
+- **Four layers, and which two we actually lack (map set down 2026-09-10; it is what dissolves "does a
+  cascade table fight the treatment table").** ① *Rule source* — who may specify an element's appearance: a
+  CSS is one kind, an explicit `tone` argument is another. ② *Adjudication* — how competing sources plus
+  live state resolve to one answer; cascade and specificity live **here and only here**. ③ *The resolved
+  value store* — the answer, kept queryable: this is the "table" this session keeps naming, and Unity's
+  `IResolvedStyle` sits in this layer too. ④ *Painting outlets* — values become pixels: `UiThemeDraw`'s 14
+  outlets, complete enough that no widget touches IMGUI outside the funnel. The library has ④, has a thin ①
+  (code arguments only), and is missing ③ outright while holding only the state-mapping fragment of ②
+  implicitly. **Why the maintainer's instinct read the gap as "we have what to draw but not how":** with ③
+  absent, adjudication parasitises ④ — `StatusTreatment` and `StatusBadge` each decide values inside a
+  switch and then throw them away — so the painting layer looks incomplete when it is in fact over-scoped.
+  Naming the layers fixes the confusion; naming ③ as the missing one fixes the code.
+- **The second rule source already exists and is blocked by a missing query, not by a missing engine
+  (measured 2026-09-10).** `IUiBindings` declares `BindReadOnly<T>` and the wired consumer uses it six times
+  (`UsDiagnosticsHost.cs:70-75`), but the interface exposes no writability read — its whole read side is
+  `Get`, `TryGet`, `GetOptions`, `Invoke` and the four `Validate*` methods. No widget can ask whether its
+  value is writable, which is why `UiStatusTone.Disabled` has **zero producers**: its only two appearances in
+  the assembly are inside `UiThemeDraw`'s own switches. Consequence for the cascade question, stated as the
+  trigger rather than a preference: the first time two sources address the same property of one element will
+  be a read-only element whose data side says `Tone="danger"`, and that is settled by one written precedence
+  rule (state beats author). Cascade machinery becomes a requirement only once competing sources outnumber
+  what a written rule can carry; today the count is one.
 - **The library ships 7 widget kinds; 3 are reachable from outside, 4 have no consumer at all.** US's two
   Schema=2 manifests reference exactly one library kind, `chrome/banner`. Two more library kinds are used, but
   *not* through a manifest: `UsFilterBarWidget` instantiates `DropdownWidget` and

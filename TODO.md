@@ -309,6 +309,11 @@ Each item is expected to delete a workaround, not add a layer.
       wired consumer pins `[0.3.0, 0.4.0)`. The prominence flag exists because the badge's neutral text is
       `TextSecondary` while a field's is `TextPrimary` — do not resolve that by adding tone values, which
       would widen a public enum for a library-internal distinction.
+      Input shape: the table's key is `(tone, prominence)` today and gains writability the moment a
+      read-side query exists on `IUiBindings` — `BindReadOnly` has six consumer citations and no read path,
+      which is why `UiStatusTone.Disabled` has zero producers (`MEMORY.md`). Do not add the writability read
+      in the same change as the table: the table is deduplication, the read is a public API addition and
+      therefore 0.4.0 material.
 - [ ] **The carrier's own diagnostic surface — shipped as a page *spec* a consumer mounts, not as a settings
       page and not as a carrier-owned window (evaluated 2026-09-10; reasoning in `MEMORY.md` Charter).** The
       proposal was a mod-settings page listing the version contract and the atomic kinds; what killed that
