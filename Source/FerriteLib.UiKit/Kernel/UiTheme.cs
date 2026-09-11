@@ -206,14 +206,30 @@ public sealed class UiTheme
 
     /// <summary>
     /// Alarm surface. It is the one treatment behind both <c>UiStatusTone.Warning</c> and
-    /// <c>UiStatusTone.Danger</c>: the bag carried those as two names for one RGB with no user in
-    /// either repository, and a token nobody shapes apart is debt, so one name went. A citation that
-    /// needs them distinguishable adds the second surface and the second table row.
+    /// <c>UiStatusTone.Danger</c>: the bag carried those as two names for one RGB, a token nobody shapes
+    /// apart is debt, and the 0.4 window collapsed them. <b>The census that justified the collapse
+    /// measured this repository only</b> -- a consumer did compile against the name, so
+    /// <see cref="Warning"/> survives as a redirect for one minor rather than disappearing. A citation
+    /// that needs the two distinguishable adds the second surface and the second table row.
     /// </summary>
     public UiSurfaceStyle DangerSurface
     {
         get => new(Danger, DangerBorder ?? Danger);
         set { Danger = value.Fill; DangerBorder = value.Border; }
+    }
+
+    /// <summary>
+    /// The alarm fill under its pre-0.4 name: a consumer compiled against it
+    /// (<c>Coahuilite/UniversalSqueaker</c>, <c>UI/Kernel/UsKernelDraw.cs</c> -- one name for the fill and
+    /// the other for the border, which is why deleting one broke a build instead of a pixel). The two
+    /// names always held one RGB, so this is a redirect and not a second token: reading or assigning here
+    /// reads or assigns <see cref="Danger"/>. Retires at the next minor boundary, once the consumer has
+    /// moved.
+    /// </summary>
+    public Color Warning
+    {
+        get => Danger;
+        set => Danger = value;
     }
 
     // Typography. DefaultFont is geometry-bearing (it feeds text measurement); the colour tokens
