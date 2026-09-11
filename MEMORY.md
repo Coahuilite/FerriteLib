@@ -562,7 +562,11 @@
 - **net472 reference-assembly traps** hit while writing this repo's own code, all compile-verified:
   `string.IsNullOrEmpty` carries no `[NotNullWhen(false)]` (CS8602 on the ternary that returns it);
   `string.Split(char, StringSplitOptions)` is advertised but throws `MissingMethodException` at
-  runtime; `string.Contains(string, StringComparison)` likewise does not exist at runtime. Two more
+  runtime; `string.Contains(string, StringComparison)` likewise does not exist at runtime. **How the first one hides
+   from a search (measured 2026-09-11):** `text.Split(',')` binds to `Split(char, StringSplitOptions)`
+   through that overload's default argument, so a grep for the enum name finds only the call sites that pass
+   it explicitly and misses the one-argument form entirely; search `.Split(` and read the argument, or better
+   let a lane run the path -- the harness caught this one while two independent greps did not. Two more
   found writing the containment lane, same class and same asymmetry (compile green, runtime red):
   **`Path.GetRelativePath(string, string)`** and **`string.TrimStart()`** with no arguments. The scan
   now walks leading whitespace by hand and computes the relative path itself. The rule that generalises
