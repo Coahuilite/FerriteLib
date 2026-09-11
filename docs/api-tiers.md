@@ -165,6 +165,12 @@ consequence is paid in the open rather than discovered by a stranger.
   argument: pass the context (`UiNative.Button(rect, ctx)`), which is what every library widget now does.
   The window shell's own chrome button is the one library call site left raw, because the chrome draws
   outside the tree.
+  **Recorded boundary and its recovery condition:** content layers are in the stack and ordered by paint,
+  but two content layers do not arbitrate each other yet - only popup-over-content does, because IMGUI
+  already serialises content input by draw order and a rect lookup cannot tell a real pointer from an
+  injected one. Recover it the moment a consumer needs topmost-content dispatch inside an `Overlay`: the
+  data is already here, so the work is a consumption rule (which layer wins on the pointer, and what the
+  loser does), not a new structure.
 - `UiStyleFallbackReport` — one appearance fallback: an authored `Tone`/`Emphasis` value outside the
   vocabulary, carrying the element path, the kind, the attribute, the authored text and the value it
   resolved to. Produced by the atom vocabulary, and since batch B by `UiHost` too — one report per dropped
