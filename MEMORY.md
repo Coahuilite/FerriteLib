@@ -1124,6 +1124,21 @@ an edge case can be judged without re-running the audit that produced them.
   consumer's gate should report against `tools/dependency-reality.ps1` rule (c); this repo cannot
   measure it without depending on a consumer tree, which is the vacuous-guard shape already recorded
   twice in the neutrality lane.
+- **The exemption is now counted, and the two halves share the pattern set — not the allowlists
+  (2026-09-12).** `\bGenMapUI\.` joined the shared pattern set on both halves after the maintainer
+  ratified that the consumer's in-world pawn marker stays (a fixed-purpose part, not a redesign
+  candidate). The consumer's file carries the matching entry with date, reason and recovery condition;
+  **this repo carries none, because the measured count here is zero** — `GenMapUI` appears in
+  `Source/**` nowhere, and the only two matches are the prose declaring map-layer rendering a permanent
+  non-goal (`AGENTS.md`, this file). An entry that matches nothing would be a hole opened in advance.
+  Wording precision: the halves are identical at the **term** level, not in regex shape — rule (c) here
+  is owner-level (`Mouse.` any member, `Text.`, `Widgets.*`, optional `UnityEngine.`/`Verse.` prefix)
+  while the consumer's is a member-level enumeration. And the shared object is the pattern set alone:
+  **allowlists are ratified per side**; syncing entries would launder one side's exemption into the
+  other side's boundary. Proven by three mutations in the isolated tree: removing the term from the
+  lane (red), removing it from rule (c) (`-SelfTest` exits 1, `expected exactly 2 planted backend call
+  sites, got 1`), and planting a real `GenMapUI.DrawText` in `Source/**` (production scan red) — i.e.
+  zero here is a measurement, not a blind spot.
 - **Why exemptions carry rent.** An allowlist without a named closing item drifts back into permanent
   undocumented self-implementation; the live specimen is US's diagnostics panel — 703 lines of
   hand-rolled immediate UI borrowing only the theme vocabulary, pinned to a revision so that count cannot
