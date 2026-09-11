@@ -46,10 +46,15 @@ function Invoke-Check {
     $previousEap = $ErrorActionPreference
     $ErrorActionPreference = 'Stop'
     $failed = $false
-    try { & $Action *> $tempLog } catch { $failed = $true } finally { $ErrorActionPreference = $previousEap }
+    $failureMessage = $null
+    try { & $Action *> $tempLog } catch { $failed = $true; $failureMessage = $_.Exception.Message } finally { $ErrorActionPreference = $previousEap }
     $code = $LASTEXITCODE
     if ($failed -or $code -ne 0) {
         Write-Host 'FAIL'
+        # A gate that enforces a contract without saying which one turns every red into a scavenger
+        # hunt: the throw message used to be swallowed by this catch and never reached the console
+        # (found by the independent verifier, 2026-09-11).
+        if (-not [string]::IsNullOrWhiteSpace($failureMessage)) { Write-Host "    $failureMessage" }
         if (Test-Path -LiteralPath $tempLog) {
             Get-Content -LiteralPath $tempLog -Tail 12 | ForEach-Object { Write-Host "    $_" }
         }
