@@ -33,12 +33,14 @@ internal static class KernelContainmentTests
     /// </para>
     /// <para>
     /// <c>GenMapUI</c> is in the owner set because this lane and the rule (c) scan a consumer runs over
-    /// its own tree (<c>tools/dependency-reality.ps1</c>) are two halves of one metric: the owner set is
-    /// shared vocabulary, so a term ratified on either half is added to both or the halves stop
-    /// describing one boundary. In this tree the term can only ever be a violation - world-space
-    /// rendering is a permanent non-goal here, so the library has no legitimate call to the in-world
-    /// labeling surface and no allowance is filed for it - while a consumer that keeps an in-world
-    /// marker declares it in its own allowlist, counted and then exempted rather than invisible.
+    /// its own tree (<c>tools/dependency-reality.ps1</c>) are two halves of one metric, and the pattern
+    /// set is the one thing they share: a term ratified on either half is added to both, or the halves
+    /// stop describing one boundary. The allowlists are not shared - each side rules on its own
+    /// exemptions, so a file sanctioned in one tree means nothing in the other. In this tree the term can
+    /// only ever be a violation: world-space rendering is a permanent non-goal here, so the library has
+    /// no legitimate call to the in-world labeling surface and no allowance is filed for it. A consumer
+    /// that keeps an in-world marker declares it in its own allowlist, counted and then exempted rather
+    /// than invisible.
     /// </para>
     /// </summary>
     private static readonly Regex BackendAccess = new Regex(

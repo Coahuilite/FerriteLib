@@ -15,11 +15,13 @@
 # tools/FerriteLib.UiKit.Tests/KernelContainmentTests.cs), applied to a consumer tree: raw backend calls
 # are not forbidden, but they are declared, counted and named, or they are a failure.
 #
-# The two halves are one metric, so the owner set below is shared vocabulary: a term ratified on either
-# half - the library's lane or a consumer's own audit - is added to both, or the halves stop describing
-# one boundary. `GenMapUI` is the term this rule carries for world-space labeling: the library never
-# draws it (map-layer rendering is a permanent non-goal, so it is a violation in this tree with no
-# allowance filed), while a consumer that keeps an in-world marker declares it in its ui-chrome
+# The two halves of this metric share exactly one thing: the pattern set below. A term ratified on either
+# half - this rule, or the library's own containment lane - is added to both, or the halves stop
+# describing one boundary. The allowlists are NOT shared: each side rules on its own exemptions, so a file
+# sanctioned in one tree means nothing in the other, and syncing the entries would launder one side's
+# ruling into the other's boundary. `GenMapUI` is the term this rule carries for world-space labeling:
+# the library never draws it (map-layer rendering is a permanent non-goal there, so no allowance is filed
+# on that side), while a consumer that keeps an in-world marker declares it in its own ui-chrome
 # allowlist - counted, then exempted, never invisible.
 #
 # Usage:
