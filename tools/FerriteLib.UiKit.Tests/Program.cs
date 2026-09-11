@@ -93,5 +93,8 @@ internal static class Program
 
         Console.WriteLine("Kernel role attributes (Tone/Emphasis, fallback recording, density)...");
         failures += KernelRoleAttributeTests.RunAll();
+
+        Console.WriteLine("Kernel style documents (two origins, precedence chain, fail-soft recording)...");
+        failures += KernelStyleDocumentTests.RunAll();
     }
 }
