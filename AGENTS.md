@@ -126,7 +126,7 @@ is a maintainer-side number, never a measurement a clone can reproduce.
 ## Build and verification
 
 ```powershell
-pwsh -NoProfile -File scripts/verify-local.ps1                       # 8 gates
+pwsh -NoProfile -File scripts/verify-local.ps1                       # 9 gates
 pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev              # + staged dev folder (placement is manual)
 pwsh -NoProfile -File scripts/pack-release.ps1 -Version v0.3.0-rc2   # + GitHub asset (what CI runs)
 pwsh -NoProfile -File scripts/pack-steam.ps1  -Version v0.3.0-rc2    # + Workshop upload folder
