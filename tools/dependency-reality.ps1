@@ -71,7 +71,12 @@ $PageModelTypes = @(
 # (UiNative.Button(rect, ctx)) is the migration the contract asks for and must NOT fire.
 $BackendPatterns = @(
     '(?<![A-Za-z0-9_.])(UnityEngine\.|Verse\.)?(GUI|GUIUtility|GenMapUI|Mouse|Text|VerseWidgets|Widgets|Event)\s*\.\s*[A-Za-z_][A-Za-z0-9_]*',
-    '(?<![A-Za-z0-9_.])UiNative\s*\.\s*Button\s*\((?:[^,()]|\([^()]*\))*\)'
+    # Reach, measured 2026-09-12: catches a bare variable, an inline construction, one nested call, a cast,
+    # a qualified name and a comma inside the argument's own parentheses; refuses every two-argument form.
+    # It does NOT reach an argument that nests parenthesised calls two or more deep - a text pattern cannot
+    # recurse - and this scan is line by line, so a call split across lines escapes it too. The library's
+    # half runs the same term over whole-file code and carries the same note.
+    '(?<![A-Za-z0-9_])UiNative\s*\.\s*Button\s*\((?:[^,()]|\([^()]*\))*\)'
 )
 
 function Find-BackendCalls {

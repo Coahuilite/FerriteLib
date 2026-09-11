@@ -112,10 +112,22 @@ internal static class KernelContainmentTests
     /// <summary>
     /// The context-free hit overload, called by name: <c>UiNative.Button(&lt;one argument&gt;)</c>. One
     /// argument is the whole point - the two-argument form passes the context and is the migration the
-    /// contract asks for, so a matcher that also reddened it would fail the answer it recommends. The
-    /// argument may be a simple expression or an inline construction with its own parentheses
-    /// (<c>new Rect(0f, 0f, 1f, 1f)</c>); a top-level comma is what separates the two overloads, so the
-    /// pattern accepts nesting and refuses a second argument.
+    /// contract asks for, so a matcher that also reddened it would fail the answer it recommends. A
+    /// top-level comma is what separates the two overloads; commas nested inside the argument's own
+    /// parentheses (<c>new Rect(0f, 0f, 1f, 1f)</c>, <c>Make("a,b")</c>) are part of the one argument.
+    /// <para>
+    /// <b>Precision, measured rather than assumed (2026-09-12).</b> A corpus of call shapes was run
+    /// against this exact pattern. Caught: a bare variable, an inline construction, one nested call
+    /// (<c>UiNative.Button(Resolve(rect))</c>), a cast (<c>(Rect)boxed</c>), a double cast
+    /// (<c>(Rect)(value)</c>), a ternary, spaced <c>UiNative . Button ( r )</c>, a comma inside a string
+    /// literal, a call split across lines (the whole-file scan below), and a namespace-qualified name
+    /// (<c>Kernel.UiNative.Button(rect)</c>). Refused on purpose: any two-argument form, including
+    /// <c>UiNative.Button(rect, null)</c>. <b>Not caught, and this is the boundary:</b> an argument whose
+    /// own expression nests parenthesised calls two or more deep, e.g.
+    /// <c>UiNative.Button(F(Rect.MinMaxRect(0f, 0f, 1f, 1f)))</c> - a text pattern cannot recurse, so it
+    /// reaches one level of argument nesting and no further. The positive control carries that corpus, so
+    /// widening the reach is an edit to the control and the pattern together rather than a claim.
+    /// </para>
     /// <para>
     /// The shared pattern set with the rule (c) scan a consumer runs
     /// (<c>tools/dependency-reality.ps1</c>) carries this same term, so both halves count one shape; the
@@ -125,7 +137,7 @@ internal static class KernelContainmentTests
     /// </para>
     /// </summary>
     private static readonly Regex ContextFreeHit = new Regex(
-        @"(?<![A-Za-z0-9_.])UiNative\s*\.\s*Button\s*\((?:[^,()]|\([^()]*\))*\)",
+        @"(?<![A-Za-z0-9_])UiNative\s*\.\s*Button\s*\((?:[^,()]|\([^()]*\))*\)",
         RegexOptions.CultureInvariant);
 
     /// <summary>
@@ -412,9 +424,28 @@ internal static class KernelContainmentTests
                 Path.Combine(tree, "PlantedSplitHit.cs"),
                 "class PlantedSplitHit { void Hit(Rect r) { if (UiNative.Button(\n    r\n)) { } } }");
 
+            // The namespace-qualified name is the same call: a qualifier's dot is not part of an identifier.
+            File.WriteAllText(
+                Path.Combine(tree, "PlantedQualifiedHit.cs"),
+                "class PlantedQualifiedHit { void Hit(Rect r) { if (Kernel.UiNative.Button(r)) { } } }");
+
+            // The documented boundary, pinned as a control rather than trusted to prose: two levels of
+            // argument nesting are out of a text pattern's reach. Widening the pattern means editing this
+            // control and the precision note on the pattern together.
+            File.WriteAllText(
+                Path.Combine(tree, "PlantedDeepNesting.cs"),
+                "class PlantedDeepNesting { void Hit() { UiNative.Button(F(Rect.MinMaxRect(0f, 0f, 1f, 1f))); } }");
+
             List<string> contextFree = ScanContextFree(tree, tree, allowedFiles: false);
             Expect(contextFree, "PlantedRawHit.cs", "UiNative.Button(r)");
             Expect(contextFree, "PlantedInlineRect.cs", "UiNative.Button(new Rect(0f, 0f, 1f, 1f))");
+            Expect(contextFree, "PlantedQualifiedHit.cs", "UiNative.Button(r)");
+            if (contextFree.Exists(v => v.IndexOf("PlantedDeepNesting.cs", StringComparison.Ordinal) >= 0))
+            {
+                throw new Exception(
+                    "The context-free pattern now reaches two levels of argument nesting, but the precision "
+                    + "note on the pattern still says one level. Update the note and this control together.");
+            }
             if (!contextFree.Exists(v => v.IndexOf("PlantedSplitHit.cs", StringComparison.Ordinal) >= 0))
             {
                 throw new Exception("A call split across lines was not reported; the context-free scan is line-bound.");
