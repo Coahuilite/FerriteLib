@@ -31,9 +31,18 @@ internal static class KernelContainmentTests
     /// <c>Kernel.Widgets</c> namespace; it counts only behind <c>Verse.</c>, where it is the real
     /// <c>Verse.Widgets</c> class.
     /// </para>
+    /// <para>
+    /// <c>GenMapUI</c> is in the owner set because this lane and the rule (c) scan a consumer runs over
+    /// its own tree (<c>tools/dependency-reality.ps1</c>) are two halves of one metric: the owner set is
+    /// shared vocabulary, so a term ratified on either half is added to both or the halves stop
+    /// describing one boundary. In this tree the term can only ever be a violation - world-space
+    /// rendering is a permanent non-goal here, so the library has no legitimate call to the in-world
+    /// labeling surface and no allowance is filed for it - while a consumer that keeps an in-world
+    /// marker declares it in its own allowlist, counted and then exempted rather than invisible.
+    /// </para>
     /// </summary>
     private static readonly Regex BackendAccess = new Regex(
-        @"(?<![A-Za-z0-9_.])(?<qual>UnityEngine\s*\.\s*|Verse\s*\.\s*)?(?<owner>GUI|GUIUtility|Mouse|Text|VerseWidgets|Widgets|Event)\s*\.\s*(?<member>[A-Za-z_][A-Za-z0-9_]*)",
+        @"(?<![A-Za-z0-9_.])(?<qual>UnityEngine\s*\.\s*|Verse\s*\.\s*)?(?<owner>GUI|GUIUtility|GenMapUI|Mouse|Text|VerseWidgets|Widgets|Event)\s*\.\s*(?<member>[A-Za-z_][A-Za-z0-9_]*)",
         RegexOptions.CultureInvariant);
 
     /// <summary>
@@ -151,10 +160,17 @@ internal static class KernelContainmentTests
                 Path.Combine(tree, "PlantedAlias.cs"),
                 "class PlantedAlias { void Read() { bool b = Mouse.IsOver(default); } }");
 
+            // The shared in-world term: this half of the metric must count it too, or the two halves
+            // would disagree about what the boundary is.
+            File.WriteAllText(
+                Path.Combine(tree, "PlantedWorldLabel.cs"),
+                "class PlantedWorldLabel { void Mark() { GenMapUI.DrawPawnLabel(default, \"x\", default); } }");
+
             List<string> violations = ScanWithRoot(tree, tree);
             Expect(violations, "PlantedWidget.cs", "VerseWidgets.Label");
             Expect(violations, "UiNative.cs", "GUI.Box");
             Expect(violations, "PlantedAlias.cs", "Mouse.IsOver");
+            Expect(violations, "PlantedWorldLabel.cs", "GenMapUI.DrawPawnLabel");
 
             // Comment-only contact must not fire: the funnel files document the very calls they own,
             // and a gate that counted <see cref> text would be worked around by deleting the docs.

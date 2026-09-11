@@ -15,6 +15,13 @@
 # tools/FerriteLib.UiKit.Tests/KernelContainmentTests.cs), applied to a consumer tree: raw backend calls
 # are not forbidden, but they are declared, counted and named, or they are a failure.
 #
+# The two halves are one metric, so the owner set below is shared vocabulary: a term ratified on either
+# half - the library's lane or a consumer's own audit - is added to both, or the halves stop describing
+# one boundary. `GenMapUI` is the term this rule carries for world-space labeling: the library never
+# draws it (map-layer rendering is a permanent non-goal, so it is a violation in this tree with no
+# allowance filed), while a consumer that keeps an in-world marker declares it in its ui-chrome
+# allowlist - counted, then exempted, never invisible.
+#
 # Usage:
 #   pwsh -NoProfile -File tools/dependency-reality.ps1 -Assembly <path-to-mod.dll> `
 #        [-SourceRoot <dir>] [-Allowlist <file>] [-SelfTest]
@@ -54,7 +61,7 @@ $PageModelTypes = @(
 )
 
 # The game's immediate-mode surface, as qualified member accesses.
-$BackendPattern = '(?<![A-Za-z0-9_.])(UnityEngine\.|Verse\.)?(GUI|GUIUtility|Mouse|Text|VerseWidgets|Widgets|Event)\s*\.\s*[A-Za-z_][A-Za-z0-9_]*'
+$BackendPattern = '(?<![A-Za-z0-9_.])(UnityEngine\.|Verse\.)?(GUI|GUIUtility|GenMapUI|Mouse|Text|VerseWidgets|Widgets|Event)\s*\.\s*[A-Za-z_][A-Za-z0-9_]*'
 
 function Find-BackendCalls {
     param([string]$Root)
@@ -162,16 +169,24 @@ if ($SelfTest) {
             'class Planted { void M() { bool b = Verse.Mouse.IsOver(default); } }',
             '// Mouse.IsOver in a comment must not count'
         )
+        Set-Content -LiteralPath (Join-Path $sandbox 'PlantedWorldLabel.cs') -Encoding UTF8 -Value @(
+            'class PlantedWorldLabel { void M() { GenMapUI.DrawPawnLabel(default, "x", default); } }',
+            '// GenMapUI.DrawPawnLabel in a comment must not count'
+        )
         $planted = @(Find-BackendCalls -Root $sandbox)
-        if ($planted.Count -ne 1) {
-            Write-Error "SELFTEST: expected exactly 1 planted backend call site, got $($planted.Count). The source scan is not trustworthy." -ErrorAction Continue
+        if ($planted.Count -ne 2) {
+            Write-Error "SELFTEST: expected exactly 2 planted backend call sites, got $($planted.Count). The source scan is not trustworthy." -ErrorAction Continue
             exit 1
         }
         if (-not $planted[0].EndsWith(':1')) {
             Write-Error "SELFTEST: planted site was not reported on line 1: $($planted[0])" -ErrorAction Continue
             exit 1
         }
-        Write-Host "selftest ok: the source scan finds a planted call and ignores a comment"
+        if (-not ($planted | Where-Object { $_.EndsWith('PlantedWorldLabel.cs:1') })) {
+            Write-Error "SELFTEST: the shared in-world term (GenMapUI) did not fire on its planted site; the two halves of the metric would disagree about the boundary." -ErrorAction Continue
+            exit 1
+        }
+        Write-Host "selftest ok: the source scan finds both planted calls (including the shared in-world term) and ignores comments"
     }
     finally {
         Remove-Item -LiteralPath $sandbox -Recurse -Force -ErrorAction SilentlyContinue
