@@ -1276,6 +1276,18 @@ colour token currently feeds layout — it is a future-regression guard, not pre
 
 ## Enduring corrections
 
+- **The `Warning`/`Danger` collapse rested on a census that read the wire as empty (correction, 2026-09-11).**
+  The 2026-09-10 census said the two names had no users, and the 0.4 window deleted `UiTheme.Warning` on that
+  basis. It measured **this** repository's source and inferred the consumer from it, and the inference was
+  wrong: `Coahuilite/UniversalSqueaker` `Source/UniversalSqueaker/UI/Kernel/UsKernelDraw.cs:27` takes
+  `theme.Warning` as the fill while the same expression takes `theme.Danger` as the border -- so removing the
+  name broke a consumer's build at compile time rather than a pixel at runtime (found by the independent
+  verifier while pairing a 0.4 carrier with the consumer tree, then confirmed here by compiling that tree
+  against the 0.4 payload: with the name absent it fails, with the name restored it builds clean). The name
+  is back as a redirect onto `Danger` -- the two always held one RGB -- and retires at the next minor
+  boundary, once the consumer has moved. **Rule reinforced:** a census of this repository is evidence about
+  *this* repository; "no users anywhere" is a cross-repo claim and is only as good as its citation.
+
 - A library **can** assert its own neutrality. The note in the US harness claiming otherwise was written
   before the blocklist self-exemption was pinned to a single path with a positive control.
 - `01-product-and-architecture-decisions-zh.md:208` (US repo) says the kernel's fallback text uses
