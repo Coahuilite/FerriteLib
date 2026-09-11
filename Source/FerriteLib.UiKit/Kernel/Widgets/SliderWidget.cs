@@ -20,9 +20,6 @@ public sealed class SliderWidget : IUiWidget
 {
     public const string Kind = "input/slider";
 
-    private const float DefaultHeight = 28f;
-    private const float LabelPad = 4f;
-    private const float Gap = 6f;
 
     private UiElementSpec spec = UiElementSpec.Empty;
 
@@ -34,7 +31,7 @@ public sealed class SliderWidget : IUiWidget
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new SliderWidget(),
-            AtomVocabulary.Schema("Bind", "Min", "Max", "Label", "LabelKey", "Height"),
+            AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "Min", "Max", "Label", "LabelKey", "Height"),
             new[] { "Label", "LabelKey" });
     }
 
@@ -57,7 +54,7 @@ public sealed class SliderWidget : IUiWidget
 
     public float Measure(UiWidgetContext ctx)
     {
-        return AtomVocabulary.ReadHeight(spec, DefaultHeight);
+        return AtomVocabulary.ReadHeight(spec, ctx.Theme.Geometry.RowHeight);
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)
@@ -70,20 +67,9 @@ public sealed class SliderWidget : IUiWidget
         float current = ctx.Bindings.TryGet(bindKey, out float bound) ? bound : min;
 
         Rect track = rect;
-        string label = AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
-        if (label.Length > 0)
-        {
-            float labelWidth = LabelBandWidth(label, ctx);
-            UiThemeDraw.Label(
-                new Rect(rect.x, rect.y, labelWidth, rect.height),
-                label,
-                ctx.Theme,
-                ctx.Theme.TextPrimary,
-                ctx.Theme.DefaultFont,
-                TextAnchor.MiddleLeft);
-            float trackX = rect.x + labelWidth + Gap;
-            track = new Rect(trackX, rect.y, Math.Max(1f, rect.xMax - trackX), rect.height);
-        }
+        ResolveLabelBand(rect, ctx, out track);
+        UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, AtomVocabulary.WritableOf(ctx, bindKey));
+        DrawLabel(rect, ctx, style);
 
         // The binding's value is clamped into the declared window before the native control sees it:
         // a host value outside [Min, Max] would otherwise arrive as the control's starting point and
@@ -97,12 +83,38 @@ public sealed class SliderWidget : IUiWidget
     }
 
     /// <summary>
-    /// The label band, measured from the same glyph model the engine's <c>Width="Auto"</c> seam uses.
-    /// It is the atom's own geometry rule and not a constant because a constant is exactly what round
-    /// 3 removed: the label column has to follow the string a player actually reads.
+    /// The label band: the string's own glyph advance plus the theme's spacing, measured with the font
+    /// the label is drawn in, so draw and measure can never resolve two sizes. The track keeps what the
+    /// band leaves — a constant column is exactly what round 3 removed.
     /// </summary>
-    private static float LabelBandWidth(string label, UiWidgetContext ctx)
+    private void ResolveLabelBand(Rect rect, UiWidgetContext ctx, out Rect track)
     {
-        return Math.Max(1f, ctx.Metrics.MeasureWidth(label, ctx.Theme.DefaultFont) + LabelPad);
+        track = rect;
+        string label = AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
+        if (label.Length == 0) return;
+
+        float trackX = rect.x + BandWidth(label, ctx) + ctx.Theme.Geometry.Gap;
+        track = new Rect(trackX, rect.y, Math.Max(1f, rect.xMax - trackX), rect.height);
+    }
+
+    /// <summary>Paints the measured label band in the role's text colour, before the track is drawn.</summary>
+    private void DrawLabel(Rect rect, UiWidgetContext ctx, UiResolvedStyle style)
+    {
+        string label = AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
+        if (label.Length == 0) return;
+
+        UiThemeDraw.Label(
+            new Rect(rect.x, rect.y, BandWidth(label, ctx), rect.height),
+            label,
+            ctx.Theme,
+            style.Text,
+            AtomVocabulary.TextFont(ctx),
+            TextAnchor.MiddleLeft);
+    }
+
+    /// <summary>One label width, shared by the measure and the paint so the band cannot disagree with itself.</summary>
+    private static float BandWidth(string label, UiWidgetContext ctx)
+    {
+        return Math.Max(1f, ctx.Metrics.MeasureWidth(label, AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing);
     }
 }

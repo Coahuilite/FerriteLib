@@ -12,7 +12,9 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <see cref="WrappedTextWidget.MeasureBand"/> and this kind only feeds it its own font, its own
 /// leading and its own floor. The kind string, the attribute schema, the label set and the painted
 /// result are unchanged, which is what lets an existing manifest keep loading against the same
-/// vocabulary while the duplicated arithmetic disappears.
+/// vocabulary while the duplicated arithmetic disappears. Its leading follows the theme's density
+/// (the band floor is its own); its type size stays the one this kind is named for, so a density font
+/// change deliberately does not move this band — that pin is the composite's look, not an oversight.
 /// </para>
 /// </summary>
 public sealed class ChromeBannerWidget : IUiWidget
@@ -20,7 +22,6 @@ public sealed class ChromeBannerWidget : IUiWidget
     public const string Kind = "chrome/banner";
 
     private const float DefaultHeight = 22f;
-    private const float VerticalPadding = 6f;
 
     /// <summary>
     /// This kind's own type size. Measure and Draw read the one name, so the band the layout reserves
@@ -61,7 +62,7 @@ public sealed class ChromeBannerWidget : IUiWidget
         // The atom's band at this kind's font and leading, floored by this kind's own default band.
         return Math.Max(
             ReadHeight(),
-            WrappedTextWidget.MeasureBand(ctx, ResolveText(ctx), BandFont, VerticalPadding));
+            WrappedTextWidget.MeasureBand(ctx, ResolveText(ctx), BandFont, ctx.Theme.Geometry.Padding));
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)

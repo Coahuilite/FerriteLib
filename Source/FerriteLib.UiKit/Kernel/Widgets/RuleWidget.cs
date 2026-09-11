@@ -19,8 +19,6 @@ public sealed class RuleWidget : IUiWidget
 {
     public const string Kind = "chrome/rule";
 
-    private const float DefaultThickness = 1f;
-
     private UiElementSpec spec = UiElementSpec.Empty;
 
     string IUiWidget.Kind => Kind;
@@ -31,7 +29,7 @@ public sealed class RuleWidget : IUiWidget
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new RuleWidget(),
-            AtomVocabulary.Schema("Thickness", "Inset", "Height"));
+            AtomVocabulary.Schema(AtomRoles.Tone, "Thickness", "Inset", "Height"));
         // Deliberately no label set: a rule carries no text, so Width="Auto" has nothing honest to
         // measure here and falls back to the unsized distribution. Registering a label set for it
         // would make the Auto seam report a width this kind never draws.
@@ -49,7 +47,7 @@ public sealed class RuleWidget : IUiWidget
 
     public float Measure(UiWidgetContext ctx)
     {
-        return ReadThickness();
+        return ReadThickness(ctx);
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)
@@ -58,18 +56,28 @@ public sealed class RuleWidget : IUiWidget
 
         // A hairline band is legal input (the default band is one pixel tall), so this guard is the
         // degenerate one and not the "too small to bother" one the text atoms use.
-        float thickness = Math.Min(ReadThickness(), rect.height);
+        float thickness = Math.Min(ReadThickness(ctx), rect.height);
         float inset = Math.Max(0f, AtomVocabulary.ReadFloat(spec, "Inset", 0f));
         float width = rect.width - inset * 2f;
         if (width <= 0f) return;
 
+        // The untoned rule paints the chrome hairline token; an authored Tone opts it into that
+        // treatment's edge colour instead — which is why Tone="Neutral" is visibly different from no
+        // tone on this one kind, and why that difference is written down rather than smoothed over.
+        // Emphasis is not in this kind's schema at all: it is a text-colour axis, a rule paints no
+        // text, and an attribute that cannot move a pixel is the silent no-op creation-time validation
+        // exists to refuse.
+        Color color = AtomVocabulary.Read(spec, AtomVocabulary.ToneAttribute).Trim().Length > 0
+            ? AtomVocabulary.ResolveRole(spec, ctx, writable: null).Border
+            : ctx.Theme.Divider;
+
         UiThemeDraw.Solid(
             new Rect(rect.x + inset, rect.y + (rect.height - thickness) * 0.5f, width, thickness),
-            ctx.Theme.Divider);
+            color);
     }
 
-    private float ReadThickness()
+    private float ReadThickness(UiWidgetContext ctx)
     {
-        return Math.Max(1f, AtomVocabulary.ReadFloat(spec, "Thickness", DefaultThickness));
+        return Math.Max(1f, AtomVocabulary.ReadFloat(spec, "Thickness", ctx.Theme.Geometry.Hairline));
     }
 }

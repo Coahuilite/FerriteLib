@@ -24,9 +24,6 @@ public sealed class ButtonWidget : IUiWidget
 {
     public const string Kind = "input/button";
 
-    private const float DefaultHeight = 28f;
-    private const float TextPadding = 6f;
-
     private UiElementSpec spec = UiElementSpec.Empty;
 
     string IUiWidget.Kind => Kind;
@@ -37,7 +34,7 @@ public sealed class ButtonWidget : IUiWidget
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new ButtonWidget(),
-            AtomVocabulary.Schema("ActionBind", "Text", "TextKey", "Height"),
+            AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "ActionBind", "Text", "TextKey", "Height"),
             new[] { "Text", "TextKey" });
     }
 
@@ -61,7 +58,7 @@ public sealed class ButtonWidget : IUiWidget
 
     public float Measure(UiWidgetContext ctx)
     {
-        return AtomVocabulary.ReadHeight(spec, DefaultHeight);
+        return AtomVocabulary.ReadHeight(spec, ctx.Theme.Geometry.RowHeight);
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)
@@ -73,7 +70,13 @@ public sealed class ButtonWidget : IUiWidget
         // funnel seam, so a lane can drive the whole three-state ladder without a live event.
         bool armed = UiNative.IsMouseDownOver(rect);
         bool hovered = !armed && UiNative.IsMouseOver(rect);
-        Paint(rect, armed, hovered, ctx);
+
+        // No writability question here, deliberately: this atom's binding is a command, and the data
+        // side's writability read answers "not writable" for anything that is not a value binding — so
+        // asking would paint every bound button disabled. Command presence is a creation-time contract
+        // instead (a missing ActionBind fails the host).
+        UiResolvedStyle idle = AtomVocabulary.ResolveRole(spec, ctx, writable: null);
+        Paint(rect, armed, hovered, idle, ctx);
 
         if (UiNative.Button(rect))
         {
@@ -82,37 +85,31 @@ public sealed class ButtonWidget : IUiWidget
     }
 
     /// <summary>
-    /// The element's own three looks. Idle, hover and armed go through the theme's status-treatment
-    /// outlet where a tone exists for the state (<c>Neutral</c>, <c>Active</c>), so this atom inherits
-    /// the library's one tone table instead of keeping a fourth copy of it; hover has no tone and
-    /// reads the theme's <see cref="UiTheme.Hover"/> token directly.
+    /// The element's own three looks. The idle row is the authored role's answer, so a toned button is
+    /// a table query and not a fourth copy of the mapping; hover keeps the hover plane with the role's
+    /// text, and armed takes the active treatment outright because live state beats the author. All
+    /// three paint through the one surface outlet at the theme's hairline.
     /// </summary>
-    private void Paint(Rect rect, bool armed, bool hovered, UiWidgetContext ctx)
+    private void Paint(Rect rect, bool armed, bool hovered, UiResolvedStyle idle, UiWidgetContext ctx)
     {
         UiTheme theme = ctx.Theme;
-        Color color;
+        UiResolvedStyle shown = idle;
         if (armed)
         {
-            UiThemeDraw.StatusTreatment(rect, theme, UiStatusTone.Active);
-            color = theme.TextOnGold;
+            shown = theme.Styles.Resolve(UiStatusTone.Active);
         }
         else if (hovered)
         {
-            UiThemeDraw.Surface(rect, theme, theme.Hover, theme.BorderStrong);
-            color = theme.TextPrimary;
-        }
-        else
-        {
-            UiThemeDraw.StatusTreatment(rect, theme, UiStatusTone.Neutral);
-            color = theme.TextPrimary;
+            shown = new UiResolvedStyle(theme.HoverSurface.Fill, theme.HoverSurface.Border, idle.Text);
         }
 
+        UiThemeDraw.Surface(rect, shown.Surface, theme.Geometry.Hairline);
         UiThemeDraw.Label(
-            new Rect(rect.x + TextPadding, rect.y, Math.Max(1f, rect.width - TextPadding * 2f), rect.height),
+            new Rect(rect.x + theme.Geometry.Padding, rect.y, Math.Max(1f, rect.width - theme.Geometry.Padding * 2f), rect.height),
             AtomVocabulary.ResolveText(spec, ctx, "Text", "TextKey"),
             theme,
-            color,
-            theme.DefaultFont,
+            shown.Text,
+            AtomVocabulary.TextFont(ctx),
             TextAnchor.MiddleCenter,
             singleLine: true);
     }

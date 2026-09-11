@@ -13,13 +13,14 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// justification is a wrapped string whose height follows the wrap).
 /// </para>
 /// <para>
-/// Two decisions are deliberately not attributes. There is no font attribute: the theme's
-/// <see cref="UiTheme.DefaultFont"/> is what the engine's <c>Width="Auto"</c> seam measures a declared
-/// label set with, so a per-element font would make the Auto width and the drawn text disagree. And
-/// there is no single-line switch: wrapping is what this atom is, and a label that must not wrap is a
-/// different element. A declared <c>Height</c> still wins outright — the layout pass resolves it before
-/// Measure on every widget — which is the author's explicit override of this contract, not a second
-/// contract.
+/// Its appearance is data: <c>Tone</c> and <c>Emphasis</c> resolve through the theme's one table, and
+/// this leaf paints the text colour that answer names. The font is not an attribute on purpose — the
+/// theme's resolved font is what the engine's <c>Width="Auto"</c> seam measures a declared label set
+/// with, so a per-element font would make the Auto width and the drawn text disagree; it is also why
+/// density reaches this atom's text and band without any new vocabulary. There is no single-line switch
+/// either: wrapping is what this atom is, and a label that must not wrap is a different element. A
+/// declared <c>Height</c> still wins outright — the layout pass resolves it before Measure on every
+/// widget — which is the author's explicit override of this contract, not a second contract.
 /// </para>
 /// </summary>
 public sealed class WrappedTextWidget : IUiWidget
@@ -42,7 +43,7 @@ public sealed class WrappedTextWidget : IUiWidget
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new WrappedTextWidget(),
-            AtomVocabulary.Schema("Bind", "Text", "TextKey", "Height"),
+            AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "Text", "TextKey", "Height"),
             new[] { "Text", "TextKey" });
     }
 
@@ -61,7 +62,10 @@ public sealed class WrappedTextWidget : IUiWidget
 
     public float Measure(UiWidgetContext ctx)
     {
-        float band = MeasureBand(ctx, ResolveText(ctx), ctx.Theme.DefaultFont, VerticalPadding * 2f);
+        // The font and the leading come from the theme, so density moves this band: a kind that pinned
+        // its own size would keep measuring the old one while the rest of the page moved.
+        float band = MeasureBand(
+            ctx, ResolveText(ctx), AtomVocabulary.TextFont(ctx), ctx.Theme.Geometry.Padding * 2f);
         return band > 0f ? band : EmptyBandHeight;
     }
 
@@ -91,20 +95,34 @@ public sealed class WrappedTextWidget : IUiWidget
     {
         if (rect.width <= 1f || rect.height <= 1f) return;
 
+        // Resolved before the empty-string return: an authored role typo is recorded on the pass that
+        // draws this element, whether or not it has text to paint.
+        UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, Writable(ctx));
+
         string text = ResolveText(ctx);
         if (text.Length == 0) return;
 
         // Upper-left anchored and inset by the same padding Measure added, so the rect handed to the
         // single text outlet is the rect the wrapped height was computed for. The fit audit then
         // reports a real defect only, never this atom's own padding.
-        float pad = Math.Min(VerticalPadding, Math.Max(0f, (rect.height - 1f) * 0.5f));
+        float pad = Math.Min(ctx.Theme.Geometry.Padding, Math.Max(0f, (rect.height - 1f) * 0.5f));
         UiThemeDraw.Label(
             new Rect(rect.x, rect.y + pad, rect.width, Math.Max(1f, rect.height - pad * 2f)),
             text,
             ctx.Theme,
-            ctx.Theme.TextPrimary,
-            ctx.Theme.DefaultFont,
+            style.Text,
+            AtomVocabulary.TextFont(ctx),
             TextAnchor.UpperLeft);
+    }
+
+    /// <summary>
+    /// The data side's writability when this leaf reads a bound string, else "not known". A read-only
+    /// binding is state, and state beats the authored role: the text paints disabled whatever tone was
+    /// written. An unbound leaf has no data side to ask, so it resolves by role alone.
+    /// </summary>
+    private bool? Writable(UiWidgetContext ctx)
+    {
+        return AtomVocabulary.WritableOf(ctx, AtomVocabulary.Read(spec, "Bind"));
     }
 
     private string ResolveText(UiWidgetContext ctx)

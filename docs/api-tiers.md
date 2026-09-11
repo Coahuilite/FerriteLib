@@ -72,9 +72,13 @@ consequence is paid in the open rather than discovered by a stranger.
 - `UiPopup` — one popup per session by design today; the owned hit stack generalises exactly that.
 - `UiSessionGuard` — the recovery wrapper; the recovery key is an arranged path today.
 - `UiTheme` — per-surface (fill, border) pairs and a density bundle landed (`BaseSurface` through
-  `DangerSurface`, `Geometry`, `LayoutRevision`, `Styles`); the open debt is how far the new knobs reach
-  (two widgets read the density tokens so far) and the table key gaining writability when the bindings
-  read side exists.
+  `DangerSurface`, `Geometry`, `LayoutRevision`, `Styles`); the table's third key slot now carries the
+  bindings' read side (`IUiBindings.IsWritable`, landed with the disabled treatment's first producer),
+  and the density tokens reach every core widget that used to hold its own numbers — the dropdown, the
+  mode row, the two text composites and the five leaf atoms — while `chrome/banner` and `state/empty`
+  keep their own type size by design, so a density font change moves the atoms and not those bands. The
+  open debt is the region/page carriers the scheme and density classes still wait for, and the type size
+  those two pinned composites would need before density can reach them.
 - `UiThemeDraw` — the single text and panel outlet; per-surface tokens change what it takes to draw.
 - `UiFitAudit` — the audit surface; entry attribution follows the identity layer.
 - `UiLayoutManifest` — the `Schema="2"` slot and the uncalled `ParseFile` are an open fork, and either
@@ -112,6 +116,12 @@ consequence is paid in the open rather than discovered by a stranger.
   node's own claim record. The surface this slice deliberately did not retype — `UiNative`'s hot-control id,
   the popup owner key, and `ScrollPositions` / `SetScrollTarget` / `Trip` — keeps its string signature and
   fills the key from the identity-derived unique string.
+
+- `UiStyleFallbackReport` — one appearance fallback: an authored `Tone`/`Emphasis` value outside the
+  vocabulary, carrying the element path, the kind, the attribute, the authored text and the value it
+  resolved to. Produced by the atom vocabulary and delivered through `UiFitAudit`'s appearance half
+  (`AttachStyleFallback`, `StyleFallbackCount`, `LastStyleFallbackDiagnostic`), which stays live even
+  when the text half is off, because fail-soft must not mean silent.
 
 ## Internalize-candidate
 

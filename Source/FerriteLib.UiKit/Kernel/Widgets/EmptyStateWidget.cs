@@ -9,7 +9,8 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Rebuilt over the <c>text/wrapped</c> atom (0.4.x leaf set): the wrapped-height rule is the atom's
 /// <see cref="WrappedTextWidget.MeasureBand"/>, and this kind contributes only its own font, its own
 /// leading and its own floor. The kind string, the attribute schema, the label set and the painted
-/// result stay as they were.
+/// result stay as they were. Its leading follows the theme's density and its type size stays the one
+/// this kind is named for — the same pinned-font boundary the banner carries.
 /// </para>
 /// </summary>
 public sealed class EmptyStateWidget : IUiWidget
@@ -17,7 +18,6 @@ public sealed class EmptyStateWidget : IUiWidget
     public const string Kind = "state/empty";
 
     private const float DefaultHeight = 48f;
-    private const float VerticalPadding = 12f;
 
     /// <summary>This kind's own type size, read by both Measure and Draw so they cannot drift apart.</summary>
     private const UiFont BandFont = UiFont.Small;
@@ -51,7 +51,7 @@ public sealed class EmptyStateWidget : IUiWidget
         // The atom's band at this kind's font and leading, floored by this kind's own default band.
         return Math.Max(
             ReadHeight(),
-            WrappedTextWidget.MeasureBand(ctx, ResolveText(ctx), BandFont, VerticalPadding));
+            WrappedTextWidget.MeasureBand(ctx, ResolveText(ctx), BandFont, ctx.Theme.Geometry.Padding * 2f));
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)

@@ -17,9 +17,6 @@ public sealed class NumberFieldWidget : IUiWidget
 {
     public const string Kind = "input/number-field";
 
-    private const float DefaultHeight = 28f;
-    private const float LabelPad = 4f;
-    private const float Gap = 6f;
     private const string DefaultFormat = "0.##";
 
     private UiElementSpec spec = UiElementSpec.Empty;
@@ -32,7 +29,7 @@ public sealed class NumberFieldWidget : IUiWidget
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new NumberFieldWidget(),
-            AtomVocabulary.Schema("Bind", "Min", "Max", "Format", "Live", "Label", "LabelKey", "Height"),
+            AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "Min", "Max", "Format", "Live", "Label", "LabelKey", "Height"),
             new[] { "Label", "LabelKey" });
     }
 
@@ -55,7 +52,7 @@ public sealed class NumberFieldWidget : IUiWidget
 
     public float Measure(UiWidgetContext ctx)
     {
-        return AtomVocabulary.ReadHeight(spec, DefaultHeight);
+        return AtomVocabulary.ReadHeight(spec, ctx.Theme.Geometry.RowHeight);
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)
@@ -71,20 +68,9 @@ public sealed class NumberFieldWidget : IUiWidget
         float current = ctx.Bindings.TryGet(bindKey, out float bound) ? bound : min;
 
         Rect field = rect;
-        string label = AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
-        if (label.Length > 0)
-        {
-            float labelWidth = LabelBandWidth(label, ctx);
-            UiThemeDraw.Label(
-                new Rect(rect.x, rect.y, labelWidth, rect.height),
-                label,
-                ctx.Theme,
-                ctx.Theme.TextPrimary,
-                ctx.Theme.DefaultFont,
-                TextAnchor.MiddleLeft);
-            float fieldX = rect.x + labelWidth + Gap;
-            field = new Rect(fieldX, rect.y, Math.Max(1f, rect.xMax - fieldX), rect.height);
-        }
+        ResolveLabelBand(rect, ctx, out field);
+        UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, AtomVocabulary.WritableOf(ctx, bindKey));
+        DrawLabel(rect, ctx, style);
 
         UiNative.NumberField(field, bindKey, ctx.Session, current, min, max, format, out bool committed);
         if (!committed) return;
@@ -100,9 +86,38 @@ public sealed class NumberFieldWidget : IUiWidget
         }
     }
 
-    /// <summary>Label band measured from the glyph model, the same geometry rule the slider atom owns.</summary>
-    private static float LabelBandWidth(string label, UiWidgetContext ctx)
+    /// <summary>
+    /// The label band: the string's own glyph advance plus the theme's spacing, measured with the font
+    /// the label is drawn in. Same geometry rule the slider atom owns; the field keeps what it leaves.
+    /// </summary>
+    private void ResolveLabelBand(Rect rect, UiWidgetContext ctx, out Rect field)
     {
-        return Math.Max(1f, ctx.Metrics.MeasureWidth(label, ctx.Theme.DefaultFont) + LabelPad);
+        field = rect;
+        string label = AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
+        if (label.Length == 0) return;
+
+        float fieldX = rect.x + BandWidth(label, ctx) + ctx.Theme.Geometry.Gap;
+        field = new Rect(fieldX, rect.y, Math.Max(1f, rect.xMax - fieldX), rect.height);
+    }
+
+    /// <summary>Paints the measured label band in the role's text colour, before the field is drawn.</summary>
+    private void DrawLabel(Rect rect, UiWidgetContext ctx, UiResolvedStyle style)
+    {
+        string label = AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
+        if (label.Length == 0) return;
+
+        UiThemeDraw.Label(
+            new Rect(rect.x, rect.y, BandWidth(label, ctx), rect.height),
+            label,
+            ctx.Theme,
+            style.Text,
+            AtomVocabulary.TextFont(ctx),
+            TextAnchor.MiddleLeft);
+    }
+
+    /// <summary>One label width, shared by the measure and the paint so the band cannot disagree with itself.</summary>
+    private static float BandWidth(string label, UiWidgetContext ctx)
+    {
+        return Math.Max(1f, ctx.Metrics.MeasureWidth(label, AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing);
     }
 }
