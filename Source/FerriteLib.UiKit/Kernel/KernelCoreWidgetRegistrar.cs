@@ -17,5 +17,6 @@ public static class KernelCoreWidgetRegistrar
         Widgets.WrappedTextWidget.Register();
         Widgets.ButtonWidget.Register();
         Widgets.RuleWidget.Register();
+        Widgets.SliderWidget.Register();
     }
 }

@@ -102,6 +102,7 @@ consequence is paid in the open rather than discovered by a stranger.
 - `ButtonWidget` — kind string only (`input/button`); the command binding and the three interaction
   appearances are reached from the manifest.
 - `RuleWidget` — kind string only (`chrome/rule`).
+- `SliderWidget` — kind string only (`input/slider`).
 
 Removing them needs a place for the kind names: a stable container of `const string` kind identifiers, so
 `["Kind"] = "core/state/empty"` stays writable without a type reference. That is a 0.4.x item, and until it
