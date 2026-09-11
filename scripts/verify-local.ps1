@@ -23,6 +23,9 @@ $ErrorActionPreference = "Stop"
 #   7   About.xml identity (packageId, modVersion present and parsable as a Version)
 #   8   net472 trap scan: no call site uses a member the reference assembly advertises but the
 #       net472 runtime lacks (compiles green, fails at runtime -- see the script's own header)
+#   9   the consumer half of the boundary metric is armed and tree-sensitive: rule (c) of
+#       tools/dependency-reality.ps1 fires on a planted bare call outside its allowlist, refuses the
+#       migrated two-argument form, and passes once that file is allowlisted (self-test + fixture)
 # -PackDev: after all checks pass, stage the dev folder (a directory, not an archive). Placing it
 #   in a game Mods directory is the developer's own step - no script here writes outside the repository.
 #   -PackZip also writes the dev zip; -PackNupkg also writes the consumer reference package. Both are
@@ -196,6 +199,72 @@ Invoke-Check 'net472 trap scan (compiles green, fails at runtime)' `
         # only form that finds it: a seven-gate-green tree shipped exactly this failure until a lane ran
         # it (2026-09-11).
         & pwsh -NoProfile -File (Join-Path $root 'scripts\net472-trap-scan.ps1') -Path $root
+    }
+
+Invoke-Check 'rule (c) consumer half is armed and tree-sensitive (dependency-reality)' `
+    'pwsh -NoProfile -File tools/dependency-reality.ps1 -SelfTest' `
+    {
+        # Why this gate exists: rule (c) - the half a consumer runs over its own tree - was reachable
+        # only by a human remembering to invoke -SelfTest, so its pattern set could rot while every other
+        # gate stayed green. It is NOT run over this repository's Source/: bare "Widgets." is the game's
+        # class in a consumer tree but this library's own Kernel.Widgets namespace here, so the same
+        # pattern flags 12 innocent registration lines (measured 2026-09-12) and a green run would have
+        # meant allowlisting a namespace. The library's tree is measured by the containment lane (gate 1)
+        # with per-file symbol precision; this gate proves the consumer half still works where it is meant
+        # to work.
+        $tool = Join-Path $root 'tools\dependency-reality.ps1'
+
+        # (1) The pattern set is armed: every planted shape fires, the migrated two-argument form and the
+        # lowercase-local decoy do not.
+        # Captured rather than redirected to the gate's own log: Invoke-Check already holds that file
+        # open for the whole block, and opening it twice is a sharing violation, not a test failure.
+        $selfTest = & pwsh -NoProfile -File $tool -SelfTest *>&1 | Out-String
+        if ($LASTEXITCODE -ne 0) {
+            throw "dependency-reality -SelfTest failed (exit $LASTEXITCODE): the shared pattern set is not armed. $selfTest"
+        }
+
+        # (2) The scan is tree-sensitive, and the allowlist actually decides. The fixture lives in TEMP
+        # and is removed in the finally, so the repository keeps no fixture and nothing here is written
+        # into a game Mods directory.
+        $sandbox = Join-Path ([System.IO.Path]::GetTempPath()) ("fl-rulec-" + [guid]::NewGuid().ToString('N'))
+        $sourceRoot = Join-Path $sandbox 'Source'
+        $allowlist = Join-Path $sandbox 'ui-chrome-allowlist.txt'
+        try {
+            New-Item -ItemType Directory -Path $sourceRoot -Force | Out-Null
+            Set-Content -LiteralPath (Join-Path $sourceRoot 'Planted.cs') -Encoding UTF8 -Value @(
+                'class Planted { void Hit(Rect r) { if (UiNative.Button(r)) { } } }'
+            )
+            Set-Content -LiteralPath (Join-Path $sourceRoot 'Migrated.cs') -Encoding UTF8 -Value @(
+                'class Migrated { void Hit(Rect r, UiWidgetContext ctx) { if (UiNative.Button(r, ctx)) { } } }'
+            )
+            Set-Content -LiteralPath (Join-Path $sourceRoot 'Locals.cs') -Encoding UTF8 -Value @(
+                'class Locals { int M(string text) { return text.Length; } }'
+            )
+            Set-Content -LiteralPath $allowlist -Encoding UTF8 -Value @('# ui-chrome allowlist (fixture)')
+
+            $verdict = & pwsh -NoProfile -File $tool -SourceRoot $sourceRoot -Allowlist $allowlist *>&1 | Out-String
+            if ($LASTEXITCODE -ne 1) {
+                throw "rule (c) exited $LASTEXITCODE over a tree holding a bare UiNative.Button(rect); it must be 1. A gate wired to a tool that cannot go red is not wired."
+            }
+            if ($verdict.IndexOf('Planted.cs', [System.StringComparison]::Ordinal) -lt 0) {
+                throw "rule (c) failed the fixture without naming the offending file: $verdict"
+            }
+            if ($verdict.IndexOf('Migrated.cs', [System.StringComparison]::Ordinal) -ge 0) {
+                throw "rule (c) named the migrated two-argument call as a breach; the pattern would punish the contract's own answer. $verdict"
+            }
+            if ($verdict.IndexOf('Locals.cs', [System.StringComparison]::Ordinal) -ge 0) {
+                throw "rule (c) named a lowercase local (text.Length) as backend contact; the scan is case-insensitive. $verdict"
+            }
+
+            Add-Content -LiteralPath $allowlist -Encoding UTF8 -Value 'Planted.cs'
+            $verdict = & pwsh -NoProfile -File $tool -SourceRoot $sourceRoot -Allowlist $allowlist *>&1 | Out-String
+            if ($LASTEXITCODE -ne 0) {
+                throw "rule (c) still failed after its one boundary file was allowlisted (exit $LASTEXITCODE): $verdict"
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $sandbox -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 
 if ($PackDev) {

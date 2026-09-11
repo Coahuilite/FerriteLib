@@ -26,6 +26,15 @@
 # on that side), while a consumer that keeps an in-world marker declares it in its own ui-chrome
 # allowlist - counted, then exempted, never invisible.
 #
+# Who consumes this half, and where. Gate 9 of scripts/verify-local.ps1 runs `-SelfTest` and a fixture
+# control (a planted bare call outside the allowlist must fail the tool, the same tree with that file
+# allowlisted must pass), so this scan cannot rot silently while every other gate stays green. What gate 9
+# deliberately does NOT do is run rule (c) over the library's own Source/: bare `Widgets.` is the
+# game's class in a consumer tree but this library's own `Kernel.Widgets` namespace here, so the same
+# pattern flags 12 innocent registration lines (measured 2026-09-12) - running it there would mean
+# allowlisting a namespace, which is laundering, not measuring. The library's tree is covered by the
+# containment lane, with per-file symbol precision, inside gate 1.
+#
 # Usage:
 #   pwsh -NoProfile -File tools/dependency-reality.ps1 -Assembly <path-to-mod.dll> `
 #        [-SourceRoot <dir>] [-Allowlist <file>] [-SelfTest]
@@ -98,7 +107,12 @@ function Find-BackendCalls {
             $probe = $line.TrimStart()
             if ($probe.StartsWith('//')) { continue }
             foreach ($pattern in $BackendPatterns) {
-                if ($probe -match $pattern) {
+                # -cmatch, not -match: PowerShell's -match is case-insensitive, so a local named `text`
+                # turned `text.Length` into a "Text." hit (measured 2026-09-12: 5 innocent files in the
+                # library's own tree). The library's half uses a .NET regex, which is case-sensitive, so
+                # an identical pattern text had two different meanings. This is the one place the shared
+                # vocabulary's semantics are decided; the self-test pins both directions.
+                if ($probe -cmatch $pattern) {
                     $found.Add(("{0}:{1}" -f $file.FullName, ($i + 1)))
                     break
                 }
@@ -201,6 +215,11 @@ if ($SelfTest) {
         Set-Content -LiteralPath (Join-Path $sandbox 'PlantedMigratedHit.cs') -Encoding UTF8 -Value @(
             'class PlantedMigratedHit { void M(Rect r, UiWidgetContext ctx) { if (UiNative.Button(r, ctx)) { } } }'
         )
+        # Case, and the reason it is a control: a local named text/mouse/event is not backend contact, and
+        # case-insensitive matching counted it as one until this self-test existed.
+        Set-Content -LiteralPath (Join-Path $sandbox 'PlantedLocals.cs') -Encoding UTF8 -Value @(
+            'class PlantedLocals { int M(string text, int mouseX) { return text.Length + mouseX; } }'
+        )
         $planted = @(Find-BackendCalls -Root $sandbox)
         if ($planted.Count -ne 3) {
             Write-Error "SELFTEST: expected exactly 3 planted boundary call sites, got $($planted.Count). The source scan is not trustworthy." -ErrorAction Continue
@@ -220,6 +239,10 @@ if ($SelfTest) {
         }
         if ($planted | Where-Object { $_.EndsWith('PlantedMigratedHit.cs:1') }) {
             Write-Error "SELFTEST: the two-argument form (UiNative.Button(rect, ctx)) was reported; that is the migration the contract asks for, not a breach." -ErrorAction Continue
+            exit 1
+        }
+        if ($planted | Where-Object { $_.EndsWith('PlantedLocals.cs:1') }) {
+            Write-Error "SELFTEST: a local named text/mouse was reported as backend contact; the scan must be case-sensitive, like the library half's .NET regex." -ErrorAction Continue
             exit 1
         }
         Write-Host "selftest ok: the source scan finds every planted shape (raw backend, the shared in-world term, the context-free hit overload), ignores comments and refuses the migrated two-argument form"
