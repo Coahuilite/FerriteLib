@@ -69,11 +69,17 @@ public sealed class NumberFieldWidget : IUiWidget
 
         Rect field = rect;
         ResolveLabelBand(rect, ctx, out field);
-        UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, AtomVocabulary.WritableOf(ctx, bindKey));
+        bool? writable = AtomVocabulary.WritableOf(ctx, bindKey);
+        UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, writable);
         DrawLabel(rect, ctx, style);
 
         UiNative.NumberField(field, bindKey, ctx.Session, current, min, max, format, out bool committed);
         if (!committed) return;
+
+        // A read-only binding stops here: the buffer keeps what was typed, nothing is written, and the
+        // field never reaches the Set a read-only binding would refuse. The field still draws and the
+        // page still runs — the recovery band is not the fallback for this.
+        if (writable == false) return;
 
         // Live=false defers the write while the control holds focus: an editor that writes every
         // keystroke cannot be typed into, so the deferred form is the one the consumer asked for.

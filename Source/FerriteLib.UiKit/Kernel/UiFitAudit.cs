@@ -105,6 +105,14 @@ public readonly struct UiStyleFallbackReport
 /// Disabled by default: every measurement costs a real text-generation pass, so the host enables it
 /// only while diagnosing. Once <see cref="MaxReports"/> distinct findings are collected the audit goes
 /// quiet on its own, which bounds both the log and the per-frame cost of a pathological page.
+/// <para>
+/// The appearance half — an authored role value outside the vocabulary — lives on this same surface and
+/// carries the same lifecycle deliberately: it is bounded by <see cref="MaxReports"/>, forgotten by
+/// <see cref="Reset"/>, and has its sink and last diagnostic dropped by <see cref="Detach"/>, so a host
+/// that opens windows for hours accumulates nothing across them. It is not gated by
+/// <see cref="Enabled"/> (resolving a name costs one comparison, and fail-soft must not mean silent) and
+/// it is not a monotonic global: enable, reset and detach are the whole of its life.
+/// </para>
 /// </summary>
 public static class UiFitAudit
 {
@@ -177,6 +185,7 @@ public static class UiFitAudit
         metrics = null;
         sink = null;
         styleSink = null;
+        lastStyleFallback = null;
         currentPath = string.Empty;
     }
 
@@ -185,6 +194,7 @@ public static class UiFitAudit
     {
         Reported.Clear();
         StyleFallbacks.Clear();
+        lastStyleFallback = null;
         currentPath = string.Empty;
     }
 

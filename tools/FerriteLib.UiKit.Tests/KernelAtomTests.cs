@@ -319,7 +319,8 @@ internal static class KernelAtomTests
         }
 
         IList colors = RecordedBoxColors();
-        Check(colors.Count == 1 && HasColor(colors, theme.Divider), "the rule paints the divider token and nothing else");
+        Check(colors.Count == 1 && HasColor(colors, theme.Styles.Resolve(UiStatusTone.Neutral).Border),
+            "the rule paints the neutral treatment's edge: an unwritten tone, an explicit Neutral and a fallback are one pixel");
 
         // One pixel is a legal band, so the degenerate guard is the zero-size one.
         ClearRecordedBoxes();

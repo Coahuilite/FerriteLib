@@ -31,6 +31,7 @@ internal static class KernelRoleAttributeTests
         Run("Unknown role values fall back and are recorded", VerifyUnknownRoleFallsBack);
         Run("Roles change appearance without moving layout", VerifyAppearanceNotLayout);
         Run("Writability beats the authored role", VerifyWritabilityBeatsAuthor);
+        Run("Read-only value atoms neither write nor throw", VerifyReadOnlyAtomsDoNotWrite);
         Run("Density font and geometry reach the atoms", VerifyDensityReachesAtoms);
         ResetSeams();
         UiFitAudit.Detach();
@@ -185,6 +186,21 @@ internal static class KernelRoleAttributeTests
                 Check(records[2].ElementPath.IndexOf("probe", StringComparison.Ordinal) >= 0,
                     "the record names the element path an author can search for (got '" + records[2].ElementPath + "')");
             }
+
+            // Lifecycle: the appearance half is host/session state with the same life as the text half —
+            // bounded, forgottable, detachable — never a monotonic global.
+            UiFitAudit.Reset();
+            Check(UiFitAudit.StyleFallbackCount == 0 && UiFitAudit.LastStyleFallbackDiagnostic == null,
+                "Reset forgets the appearance findings and the last diagnostic with them");
+            int sinkCalls = records.Count;
+            ClearBoxes();
+            button.Draw(new Rect(0f, 0f, 120f, 28f), ctx);
+            Check(UiFitAudit.StyleFallbackCount == 1, "a later pass records again, so the half stays live");
+            Check(records.Count == sinkCalls + 1, "and the sink fires again after the reset");
+
+            UiFitAudit.Detach();
+            Check(UiFitAudit.LastStyleFallbackDiagnostic == null,
+                "Detach drops the sink and the diagnostic a disposed host would otherwise leave armed");
         }
         finally
         {
@@ -262,18 +278,27 @@ internal static class KernelRoleAttributeTests
         leaf.Draw(new Rect(0f, 0f, 200f, 40f), ctx);
         Check(SameColor(LastLabelColor(before), theme.TextOnDanger), "text/wrapped writes the role's text colour");
 
+        // The rule's three coordinates must be one pixel: fail-soft renders what "no declaration" renders,
+        // never a promotion to the neutral treatment the author did not ask for.
         RuleWidget rule = new();
         rule.Configure(new UiElementSpec("sep", RuleWidget.Kind, Attributes(("Thickness", "2"))));
-        ClearBoxes();
-        rule.Draw(new Rect(0f, 0f, 100f, 9f), ctx);
-        Check(RecordedBoxColors().Count == 1 && SameColor((Color)RecordedBoxColors()[0]!, theme.Divider),
-            "an untoned rule paints the chrome hairline token");
+        Color untold = Painted(rule, ctx);
+
+        rule.Configure(new UiElementSpec("sep", RuleWidget.Kind, Attributes(("Thickness", "2"), ("Tone", "Neutral"))));
+        Color explicitNeutral = Painted(rule, ctx);
+
+        rule.Configure(new UiElementSpec("sep", RuleWidget.Kind, Attributes(("Thickness", "2"), ("Tone", "puce"))));
+        Color fellBack = Painted(rule, ctx);
+
+        Check(SameColor(untold, explicitNeutral) && SameColor(explicitNeutral, fellBack),
+            "an unwritten tone, an explicit Neutral and an unknown value's fallback paint one pixel");
+        Check(SameColor(untold, theme.Styles.Resolve(UiStatusTone.Neutral).Border),
+            "and that pixel is the neutral treatment's edge");
 
         rule.Configure(new UiElementSpec("sep", RuleWidget.Kind, Attributes(("Thickness", "2"), ("Tone", "Danger"))));
-        ClearBoxes();
-        rule.Draw(new Rect(0f, 0f, 100f, 9f), ctx);
-        Check(RecordedBoxColors().Count == 1 && SameColor((Color)RecordedBoxColors()[0]!, theme.Danger),
-            "a toned rule opts into that treatment's edge colour");
+        Color dangerRule = Painted(rule, ctx);
+        Check(SameColor(dangerRule, theme.Danger), "a toned rule opts into that treatment's edge colour");
+        Check(!SameColor(dangerRule, untold), "and a real tone is still visibly a declaration");
 
         SliderWidget slider = new();
         slider.Configure(new UiElementSpec("v", SliderWidget.Kind, Attributes(("Bind", "v"), ("Label", "Vol"), ("Tone", "Danger"))));
@@ -430,6 +455,123 @@ internal static class KernelRoleAttributeTests
             "and a role adds nothing to that band (1 line of 16 plus 2 x 10)");
     }
 
+    // --- read-only value atoms: painted disabled and unable to act ---------------------------------
+
+    /// <summary>
+    /// "Looks disabled" and "cannot act" are one statement. A read-only binding's control still draws
+    /// (a disabled look must not be a hole), but a drag or a committed edit must neither reach the
+    /// binding nor throw into the tree's recovery band.
+    /// <para>
+    /// The value change is produced through the funnel's override seam because that is the only way the
+    /// harness can produce one: the stub's slider echoes its input, so without the seam a lane would
+    /// pass vacuously — it would never reach the write it exists to catch. The input state around it is
+    /// the real one (pointer down and dragging over the control).
+    /// </para>
+    /// </summary>
+    private static void VerifyReadOnlyAtomsDoNotWrite()
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+        using UiSession session = new();
+        UiTheme theme = UiTheme.DarkGold;
+
+        float published = 0.5f;
+        float editable = 0.5f;
+        var bindings = new UiBindings();
+        bindings.BindReadOnly("published", () => published);
+        bindings.BindValue("editable", () => editable, written => editable = written);
+        UiWidgetContext ctx = Context(session, theme, bindings, 200f);
+
+        try
+        {
+            UiNative.DebugMousePositionEnabled = true;
+            UiNative.DebugMousePosition = new Vector2(80f, 14f);
+            UiNative.DebugMouseDown = true;
+            UiNative.DebugMouseDrag = true;
+            UiNative.SliderOverride = (rect, current, min, max) => 0.9f;
+
+            SliderWidget readOnly = new();
+            readOnly.Configure(new UiElementSpec("published", SliderWidget.Kind,
+                Attributes(("Bind", "published"), ("Min", "0"), ("Max", "1"), ("Tone", "Danger"))));
+            Exception? thrown = null;
+            try
+            {
+                readOnly.Draw(new Rect(0f, 0f, 200f, 28f), ctx);
+            }
+            catch (Exception ex)
+            {
+                thrown = ex;
+            }
+
+            Check(thrown == null, "a read-only slider under a drag does not throw"
+                + (thrown == null ? "" : " (threw " + thrown.GetType().Name + ")"));
+            CheckClose(0.5f, published, "and the value the data side refuses is never written");
+
+            // The positive control: the same drive on a writable binding commits, so the guard is not a
+            // blanket skip that would pass by doing nothing.
+            SliderWidget writable = new();
+            writable.Configure(new UiElementSpec("editable", SliderWidget.Kind,
+                Attributes(("Bind", "editable"), ("Min", "0"), ("Max", "1"))));
+            writable.Draw(new Rect(0f, 0f, 200f, 28f), ctx);
+            CheckClose(0.9f, editable, "the same drag on a writable binding commits");
+
+            UiNative.TextFieldOverride = (rect, text) => "0.7";
+
+            NumberFieldWidget readOnlyField = new();
+            readOnlyField.Configure(new UiElementSpec("published", NumberFieldWidget.Kind,
+                Attributes(("Bind", "published"), ("Min", "0"), ("Max", "10"))));
+            thrown = null;
+            try
+            {
+                readOnlyField.Draw(new Rect(0f, 0f, 120f, 28f), Context(session, theme, bindings, 120f));
+            }
+            catch (Exception ex)
+            {
+                thrown = ex;
+            }
+
+            Check(thrown == null, "a read-only number field does not throw"
+                + (thrown == null ? "" : " (threw " + thrown.GetType().Name + ")"));
+            CheckClose(0.5f, published, "and its committed edit never reaches the binding");
+
+            NumberFieldWidget writableField = new();
+            writableField.Configure(new UiElementSpec("editable", NumberFieldWidget.Kind,
+                Attributes(("Bind", "editable"), ("Min", "0"), ("Max", "10"))));
+            writableField.Draw(new Rect(0f, 0f, 120f, 28f), Context(session, theme, bindings, 120f));
+            CheckClose(0.7f, editable, "the same edit on a writable binding commits");
+        }
+        finally
+        {
+            ResetSeams();
+        }
+
+        // The end-to-end half: the tree's own pass must not need the recovery band for this.
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+        string xml =
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Widget Id=\"published\" Kind=\"input/slider\" Bind=\"published\" Min=\"0\" Max=\"1\" Tone=\"Danger\" />"
+            + "</UiPage>";
+        using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), bindings, theme, new WrappingMetrics(), new StubTranslation());
+        try
+        {
+            UiNative.DebugMousePositionEnabled = true;
+            UiNative.DebugMousePosition = new Vector2(80f, 14f);
+            UiNative.DebugMouseDown = true;
+            UiNative.DebugMouseDrag = true;
+            UiNative.SliderOverride = (rect, current, min, max) => 0.9f;
+            host.DrawFrame(new Rect(0f, 0f, 200f, 60f));
+        }
+        finally
+        {
+            ResetSeams();
+        }
+
+        Check(host.Session.TrippedComponentIds.Count == 0,
+            "the recovery band is never the fallback: the page's pass tripped nothing");
+        CheckClose(0.5f, published, "and the page's pass wrote nothing either");
+    }
+
     // --- harness --------------------------------------------------------------------------------
 
     private static UiLayoutSnapshot Arrange(string xml, IUiBindings bindings, UiTheme theme)
@@ -476,6 +618,21 @@ internal static class KernelRoleAttributeTests
     private static UiWidgetContext Context(UiSession session, UiTheme theme, IUiBindings bindings, float viewWidth)
     {
         return new UiWidgetContext(Scope, session, new WrappingMetrics(), theme, new StubTranslation(), bindings, viewWidth, "root");
+    }
+
+    /// <summary>Draws one rule and returns the single colour it painted.</summary>
+    private static Color Painted(RuleWidget rule, UiWidgetContext ctx)
+    {
+        ClearBoxes();
+        rule.Draw(new Rect(0f, 0f, 100f, 9f), ctx);
+        IList colors = RecordedBoxColors();
+        if (colors.Count != 1)
+        {
+            Check(false, "expected one painted solid, recorded " + colors.Count);
+            return default;
+        }
+
+        return (Color)colors[0]!;
     }
 
     private static void CheckPainted(Color fill, Color border, string name)

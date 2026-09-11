@@ -68,7 +68,8 @@ public sealed class SliderWidget : IUiWidget
 
         Rect track = rect;
         ResolveLabelBand(rect, ctx, out track);
-        UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, AtomVocabulary.WritableOf(ctx, bindKey));
+        bool? writable = AtomVocabulary.WritableOf(ctx, bindKey);
+        UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, writable);
         DrawLabel(rect, ctx, style);
 
         // The binding's value is clamped into the declared window before the native control sees it:
@@ -76,7 +77,10 @@ public sealed class SliderWidget : IUiWidget
         // be written back only on the next change.
         float value = UiNative.Slider(
             track, bindKey, ctx.Session, UiNative.ClampValue(current, min, max), min, max, out bool changed);
-        if (changed)
+        // "Painted disabled" and "cannot act" are one statement: the control still draws (a disabled
+        // look must not be a hole in the page), the drag is simply never committed, and the binding
+        // never sees the Set it would refuse. The recovery band is not the fallback for this.
+        if (changed && writable != false)
         {
             ctx.Bindings.Set(bindKey, value);
         }
