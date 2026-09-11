@@ -87,5 +87,8 @@ internal static class Program
 
         Console.WriteLine("Kernel element identity (stable identity + per-element state)...");
         failures += KernelIdentityTests.RunAll();
+
+        Console.WriteLine("Kernel writability (read-only bindings drive the disabled treatment)...");
+        failures += KernelWritabilityTests.RunAll();
     }
 }
