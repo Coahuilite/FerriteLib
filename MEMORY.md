@@ -566,7 +566,15 @@
    from a search (measured 2026-09-11):** `text.Split(',')` binds to `Split(char, StringSplitOptions)`
    through that overload's default argument, so a grep for the enum name finds only the call sites that pass
    it explicitly and misses the one-argument form entirely; search `.Split(` and read the argument, or better
-   let a lane run the path -- the harness caught this one while two independent greps did not. Two more
+   let a lane run the path -- the harness caught this one while two independent greps did not.
+   **The measured shape list is longer than the four this repo had recorded (probe, 2026-09-11):**
+   `Split(char)`, `Split(char, StringSplitOptions)`, `Contains(char)`, `Contains(string, StringComparison)`,
+   `StartsWith(char)`, `EndsWith(char)`, `Replace(string, string, StringComparison)`, `string.Join(char, string[])`,
+   argument-less `TrimStart()`/`TrimEnd()` and `Path.GetRelativePath(string, string)`. Arrays are present and
+   safe, so the rule of thumb is the *argument shape*: `Split(new[]{','})` is fine, `Split(',')` is not.
+   One of them is worse than the rest because it does not even raise the expected type: `EndsWith(char)`
+   throws **MethodAccessException**, so a guard that filters by exception type would miss it. The fix for the
+   class is a static scan of argument shapes with positive and negative controls, not an exception-type filter. Two more
   found writing the containment lane, same class and same asymmetry (compile green, runtime red):
   **`Path.GetRelativePath(string, string)`** and **`string.TrimStart()`** with no arguments. The scan
   now walks leading whitespace by hand and computes the relative path itself. The rule that generalises
