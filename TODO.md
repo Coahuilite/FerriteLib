@@ -169,6 +169,12 @@ Each item is expected to delete a workaround, not add a layer.
       conversions are gone. What is left is `YieldsToCoveringPopup` (`UiNative.cs:259`, still called at
       `:115`) and the previous-frame `OpenPopupRect` reasoning, which still model one popup rather than a
       stack of overlapping surfaces.
+      **Trigger evidence added 2026-09-11 (lib-atoms, task-3 report, quoted):** popup yield is not in the
+      atoms -- `input/button`, like the existing `input/mode-row` and `input/stepper-slider`, calls
+      `UiNative.Button` directly, so a consumer that puts a button under an open popup can rediscover the
+      2026-09-04 click-theft class. The atom lane deliberately neither copied a second yield rule nor
+      widened `UiNative`'s public surface. Closing condition for this item: once the hit stack lands, every
+      element's yield behaviour must come from the stack, and no element may keep a private yield branch.
 - [x] **Fit-audit blind spots closed by round-1 item A (2026-09-07, this branch).** Both bypasses went:
       the engine's private `DrawLabel` and `StepperSliderWidget`'s copy now call `UiThemeDraw.Label`, so
       `UiFitAudit.Check` sees container titles and stepper glyphs, and `Label` can honestly be called the
@@ -272,6 +278,11 @@ Each item is expected to delete a workaround, not add a layer.
       instead, so retiring a reachable name would push authors into C#. `section/header` is the exception, and
       the reason written down for it is that it duplicates the container's `Title` band, not that it is
       composite.
+      **Progress 2026-09-11 -- the atom half landed.** The five kinds exist (`bab3c07`..`2ce61ce`) and the
+      kind strings are now a contract: `text/wrapped`, `input/button`, `chrome/rule`, `input/slider`,
+      `input/number-field` (justifications and the one debt verdict: `MEMORY.md`). What remains of this
+      item is the second half -- re-express `chrome/banner` and `state/empty` over `text/wrapped` while
+      keeping their names -- and it is scheduled as its own slice, not folded into the atoms' commit.
 - [ ] **Bind the existing role vocabulary into the manifest; do not build a stylesheet.** The census is in
       `MEMORY.md`: the manifest's only visual knobs today are `Height`, `ButtonWidth`, `FieldWidth`, `Tab`
       and `Hidden`, while the roles already exist centrally as `UiStatusTone` (six values) behind

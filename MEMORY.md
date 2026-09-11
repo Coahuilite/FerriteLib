@@ -209,6 +209,34 @@
   or an applied incompatibility notice (and its limits are stated in "Gates and what each actually
   proves" — parity against a consumer's copy is consumer-side).
 
+- **The payload gate now measures the build's own output path, and a fresh tree bootstraps itself (2026-09-11).**
+  Both holes were found by an independent verifier on this repository's own gate suite, not by a failing
+  build. Gate 4 asserted only that `1.6/Assemblies/FerriteLib.UiKit.dll` exists, so moving the csproj's
+  `<OutputPath>` elsewhere stayed green while consumers bound to a stale, gitignored DLL; it now asks
+  MSBuild for the evaluated `TargetPath` and compares that with the path consumers bind to (mutation:
+  moved output = gate 4 red with the throw message printed; restored = 7/7). A `git archive` extraction
+  also died at gate 1 with MSB3644 because every lane runs `--no-restore`, so the bootstrap restore is
+  now one visible `[setup]` step before the lanes (fresh tree, single command = 7/7 in 9.1 s, reproduced
+  independently by the verifier). `Invoke-Check` used to swallow a failed gate's thrown message and leave
+  only a retry hint that could not address the contract it broke; the message is printed now. Commits
+  `d0632ca`, `5399aa7`.
+
+- **The leaf vocabulary exists as of 2026-09-11: five kinds, one of them carried as debt.**
+  `text/wrapped`, `input/button`, `chrome/rule`, `input/slider` and `input/number-field` (commits
+  `bab3c07`..`2ce61ce`), each justified against `AGENTS.md`'s "What earns a kind": a measure contract
+  over its own content (wrapped text), per-element interaction state plus a hit rule (button, number
+  field), label-band geometry plus a value contract (slider), and a geometry rule with a negative hit
+  rule (rule). Two verdicts are worth carrying. `chrome/rule` is the weakest: it qualifies on the
+  geometry clause alone, has no label set and no binding, and its closing condition is written down --
+  if a container ever gains a `Divider="Top|Bottom"` attribute, the kind must be deleted. And
+  `input/slider` is kept because the bare slider and the stepper composite are two different things
+  whose coexistence is itself the proof that neither expresses the other. The kind strings are the
+  contract, not the type names: a manifest names a kind, and the type's visibility is a separate
+  question the 0.4.x internalise sweep answers. Known gap, filed rather than hidden: popup yield is not
+  in the atoms -- `UiNative.YieldsToCoveringPopup` remains the dropdown trigger's private path, so a
+  button under an open popup can rediscover the 2026-09-04 click-theft class; the closing item is
+  `TODO.md` section 3's owned hit stack, and no atom may grow a second, private yield rule meanwhile.
+
 ## Charter — what this library is for
 
 - **The founding spec, transcribed.** `Coahuilite/UniversalSqueaker@09366f8:docs/ui-shared-library-design-zh.md`
