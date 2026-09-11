@@ -43,6 +43,7 @@ internal static class KernelStyleScopeTests
         Run("Every dropped style value is visible in its own frame", VerifyDropsAreVisible);
         Run("A correct document is silent and an unknown scope name is not", VerifySilentWhenCorrect);
         Run("Scheme and Density are vocabulary on containers and widgets", VerifyScopeVocabulary);
+        Run("Two style sources at once is reported, not silent", VerifyTwoSourcesAreVisible);
         Reset();
         return failures;
     }
@@ -220,6 +221,60 @@ internal static class KernelStyleScopeTests
                     "the unknown scheme name is reported in the frame that resolved it (got " + records.Count + ")");
                 Check(snapshot.RectById.ContainsKey("inside"),
                     "and the page keeps rendering on the values it would have had without it");
+            }
+        }
+        finally
+        {
+            UiFitAudit.Detach();
+            UiFitAudit.Reset();
+        }
+    }
+
+    // --- one source at a time, and both at once ----------------------------------------------------
+
+    private static void VerifyTwoSourcesAreVisible()
+    {
+        PrepareRegistry();
+        var records = new List<UiStyleFallbackReport>();
+        UiFitAudit.AttachStyleFallback(records.Add);
+        UiFitAudit.Reset();
+        try
+        {
+            // The manifest carries a <Styles> section AND the caller hands in a document. One of the two is
+            // necessarily the source; silently picking one is the failure mode this library refuses, so the
+            // displaced section is reported through the appearance channel instead of vanishing.
+            UiStyleDocument handedIn = UiStyleDocument.Parse(
+                "<Styles Schema=\"1\">"
+                + "<Density Name=\"compact\"><Metric Token=\"RowHeight\" Value=\"20\"/></Density>"
+                + "</Styles>");
+            UiTheme theme = UiTheme.DarkGold;
+            using (UiHost host = new(Scope, ProbeManifest(IceAndCompactSection), new UiBindings(), theme, new StubMetrics(), new StubTranslation(), handedIn))
+            {
+                Check(records.Count == 1,
+                    "the displaced manifest section is one report (got " + records.Count + ")");
+                Check(UiFitAudit.LastStyleFallbackDiagnostic != null
+                        && UiFitAudit.LastStyleFallbackDiagnostic.IndexOf("<Styles>", StringComparison.Ordinal) >= 0
+                        && UiFitAudit.LastStyleFallbackDiagnostic.IndexOf("ignored", StringComparison.Ordinal) >= 0,
+                    "and it names both sources rather than only a count: " + (UiFitAudit.LastStyleFallbackDiagnostic ?? "(none)"));
+                Check(ReferenceEquals(host.StyleResolver.Document, handedIn),
+                    "the handed-in document is the one in force");
+            }
+
+            // Either source on its own is silent: the report is about the collision, not about one origin
+            // being second class.
+            UiFitAudit.Reset();
+            records.Clear();
+
+            UiTheme embedded = UiTheme.DarkGold;
+            using (UiHost host = new(Scope, ProbeManifest(IceAndCompactSection), new UiBindings(), embedded, new StubMetrics(), new StubTranslation()))
+            {
+                Check(records.Count == 0, "a manifest <Styles> section on its own says nothing");
+            }
+
+            UiTheme standalone = UiTheme.DarkGold;
+            using (UiHost host = new(Scope, ProbeManifest(""), new UiBindings(), standalone, new StubMetrics(), new StubTranslation(), handedIn))
+            {
+                Check(records.Count == 0, "a handed-in document on its own says nothing");
             }
         }
         finally

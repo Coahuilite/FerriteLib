@@ -51,6 +51,21 @@ public sealed class UiHost : IDisposable
         // attributes are resolved per element, against the theme below.
         UiStyleDocument styleDocument = document ?? manifest.Styles;
 
+        // Two sources at once would mean one of them is ignored, and a library that quietly picks one is
+        // exactly the silent fallback this one refuses. The document handed in wins - the caller named it
+        // explicitly, and it is the appearance-authoring origin - while the manifest's own section, when it
+        // carried anything at all, is reported as displaced through the same appearance channel. Nothing
+        // here throws: which of two style sources was read is appearance-class, like every other drop.
+        if (document != null && (!manifest.Styles.IsEmpty || manifest.Styles.Issues.Count > 0))
+        {
+            UiFitAudit.ReportStyleFallback(
+                source + "#styles",
+                "Styles",
+                "Document",
+                "the manifest's own <Styles> section (a second style source)",
+                "the document handed to the host; the section is ignored");
+        }
+
         // resolve-before-Measure: the page level lands on the injected theme before the first arrange, and
         // because applying a token moves the theme's own layout revision - the clock the band cache already
         // compares - the very first frame follows the document. No second clock is introduced anywhere.

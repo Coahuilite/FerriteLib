@@ -65,7 +65,10 @@ consequence is paid in the open rather than discovered by a stranger.
   than a second one — and every drop the parser and the resolver recorded is published on `UiFitAudit`'s
   appearance channel, so a dropped style value is the host's to surface and not something a consumer has to
   remember to ask for. `StyleResolver` is never null; a page with no document still needs one to report an
-  element naming a scheme nobody declared.
+  element naming a scheme nobody declared. Two sources at once — a handed-in document and a manifest
+  section that carried something — is the same rule applied to the choice itself: the document wins and the
+  displaced section is reported, because quietly picking one of two authored sources is the silent fallback
+  this library refuses.
 - `UiSession` — session state; focus traversal and per-key invalidation land here when they are built.
 - `UiValueState` — per-element state bag; its key is the path string the identity layer replaces.
 - `UiElementSpec` — the spec a widget reads; additions are breaking pre-1.0 by definition.
