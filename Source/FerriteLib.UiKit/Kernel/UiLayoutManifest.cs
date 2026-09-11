@@ -196,6 +196,18 @@ public sealed class UiLayoutManifest
         string elementName = reader.Name;
         int elementLine = lineInfo.LineNumber;
         string id = reader.GetAttribute("Id") ?? reader.GetAttribute("id") ?? "";
+
+        // An Id names one element and is one identity segment (0.4.0 identity layer): the '/' that joins
+        // identity keys is the tree's structure, so an Id carrying one could spell a deeper path and
+        // hand two different elements the same key. Refused here, at creation time, beside the
+        // duplicate-Id rule this parser already owns; a real child element is how a tree adds a level.
+        if (id.IndexOf('/') >= 0)
+        {
+            throw ParseError(lineInfo,
+                $"Element Id '{id}' contains the path separator '/'; an Id names one element, so give it "
+                + "a name without '/'.");
+        }
+
         string kind = elementName;
 
         if (string.Equals(elementName, "Widget", StringComparison.Ordinal))

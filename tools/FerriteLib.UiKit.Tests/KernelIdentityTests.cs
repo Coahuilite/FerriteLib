@@ -21,6 +21,7 @@ internal static class KernelIdentityTests
 {
     private const string Scope = "identity-test";
     private const string ProbeKind = "test/identity-probe";
+    private const string SlashlessKind = "identityprobe";
     private const string ThrowingKind = "test/identity-throws";
     private static readonly Rect Viewport = new(0f, 0f, 300f, 200f);
 
@@ -31,7 +32,12 @@ internal static class KernelIdentityTests
         failures = 0;
         ResetProbe();
         UiWidgetRegistry.Clear();
-        UiWidgetRegistry.Register(Scope, ProbeKind, () => new IdentityProbeWidget(),
+        UiWidgetRegistry.Register(Scope, ProbeKind, () => new IdentityProbeWidget(ProbeKind),
+            new[] { "Id", "Kind", "Text", "Dragging", "Cursor", "Hidden", "Tab" });
+        // A kind without a separator, used where a lane grades the sibling-collision rule itself: with a
+        // namespaced kind, the Id that spells its generated segment would carry '/' and the separator
+        // rule would refuse it first, so that lane would grade nothing.
+        UiWidgetRegistry.Register(Scope, SlashlessKind, () => new IdentityProbeWidget(SlashlessKind),
             new[] { "Id", "Kind", "Text", "Dragging", "Cursor", "Hidden", "Tab" });
         UiWidgetRegistry.Register(Scope, ThrowingKind, () => new ThrowingProbeWidget(),
             new[] { "Id", "Kind", "Text" });
@@ -43,6 +49,7 @@ internal static class KernelIdentityTests
             Run("identity survives a re-arrange and a Hidden sibling", VerifyIdentitySurvivesHideAndReArrange);
             Run("a Tab switch does not renumber the visible sibling", VerifyTabSwitchDoesNotRenumber);
             Run("a declared Id may not spell a sibling's generated segment", VerifyDeclaredIdMayNotSpellAGeneratedSegment);
+            Run("a declared Id may not forge a deeper path with '/'", VerifyDeclaredIdMayNotForgeADeeperPath);
             Run("per-element state does not cross between unnamed siblings", VerifyStateIsIsolatedBetweenSiblings);
             Run("a throwing sibling does not move the next element's state slot", VerifyThrowerDoesNotLeakTheScope);
             Run("hover claims carry the element that made them", VerifyHoverClaimCarriesItsElement);
@@ -214,20 +221,21 @@ internal static class KernelIdentityTests
     /// </summary>
     private static void VerifyDeclaredIdMayNotSpellAGeneratedSegment()
     {
-        string generated = ProbeKind + "[0]";
+        // Slash-free on purpose: see the registration note above.
+        string generated = SlashlessKind + "[0]";
 
         ExpectRefusal(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Row Id=\"row\">"
-            + "<Widget Kind=\"" + ProbeKind + "\" Text=\"A\" Cursor=\"1\" />"
-            + "<Widget Id=\"" + generated + "\" Kind=\"" + ProbeKind + "\" Text=\"B\" Cursor=\"2\" />"
+            + "<Widget Kind=\"" + SlashlessKind + "\" Text=\"A\" Cursor=\"1\" />"
+            + "<Widget Id=\"" + generated + "\" Kind=\"" + SlashlessKind + "\" Text=\"B\" Cursor=\"2\" />"
             + "</Row></UiPage>",
             generated,
             "a child Id spelling a sibling's generated segment");
 
         ExpectRefusal(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Widget Kind=\"" + ProbeKind + "\" Text=\"A\" Cursor=\"1\" />"
-            + "<Widget Id=\"" + generated + "\" Kind=\"" + ProbeKind + "\" Text=\"B\" Cursor=\"2\" />"
+            + "<Widget Kind=\"" + SlashlessKind + "\" Text=\"A\" Cursor=\"1\" />"
+            + "<Widget Id=\"" + generated + "\" Kind=\"" + SlashlessKind + "\" Text=\"B\" Cursor=\"2\" />"
             + "</UiPage>",
             generated,
             "a root Id spelling a sibling's generated segment");
@@ -238,7 +246,38 @@ internal static class KernelIdentityTests
         // manifests ends in "[<digits>]").
         UiLayoutManifest.Parse(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Row Id=\"row\">"
-            + "<Widget Id=\"" + generated + "\" Kind=\"" + ProbeKind + "\" Text=\"B\" Cursor=\"2\" />"
+            + "<Widget Id=\"" + generated + "\" Kind=\"" + SlashlessKind + "\" Text=\"B\" Cursor=\"2\" />"
+            + "</Row></UiPage>");
+    }
+
+    /// <summary>
+    /// The forgery shape a flat key admits when an Id carries the path separator: a name spelled like
+    /// the path of some other element's descendant. Refused at creation time, because a key two
+    /// elements share is exactly the alias the identity layer removes - and it surfaces far from the
+    /// manifest, as one control quietly holding another control's state.
+    /// </summary>
+    private static void VerifyDeclaredIdMayNotForgeADeeperPath()
+    {
+        ExpectRefusal(
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\"><Widget Kind=\"" + ProbeKind + "\" Text=\"A\" Cursor=\"1\" /></Row>"
+            + "<Widget Id=\"row/" + ProbeKind + "\" Kind=\"" + ProbeKind + "\" Text=\"B\" Cursor=\"2\" />"
+            + "</UiPage>",
+            "row/" + ProbeKind,
+            "a root Id containing the path separator");
+
+        ExpectRefusal(
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Row Id=\"row\">"
+            + "<Widget Id=\"a/b\" Kind=\"" + ProbeKind + "\" Text=\"B\" Cursor=\"2\" />"
+            + "</Row></UiPage>",
+            "a/b",
+            "a child Id containing the path separator");
+
+        // The rule is about the separator, not about unusual names - which is why no existing manifest
+        // is affected: a name that merely looks like a path with another character in it stays legal.
+        UiLayoutManifest.Parse(
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Row Id=\"row\">"
+            + "<Widget Id=\"row-2\" Kind=\"" + ProbeKind + "\" Text=\"B\" Cursor=\"2\" />"
             + "</Row></UiPage>");
     }
 
@@ -500,6 +539,8 @@ internal static class KernelIdentityTests
     {
         internal const string HelpKey = "identity-test/help";
 
+        private readonly string kind;
+
         internal static readonly List<Observation> Seen = new();
         internal static readonly List<string> MissedOwnSlot = new();
         internal static string ClaimingTag = "";
@@ -508,7 +549,12 @@ internal static class KernelIdentityTests
         private bool dragging;
         private int cursor;
 
-        public string Kind => ProbeKind;
+        internal IdentityProbeWidget(string kind)
+        {
+            this.kind = kind;
+        }
+
+        public string Kind => kind;
 
         public void Configure(UiElementSpec spec)
         {

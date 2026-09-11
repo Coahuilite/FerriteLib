@@ -18,10 +18,15 @@ namespace FerriteLib.UiKit.Kernel;
 /// than a string regenerated at each call site.
 /// </para>
 /// <para>
-/// Grammar note: an identity is unique unless a declared <c>Id</c> literally spells a sibling's
-/// generated <c>Kind[index]</c> segment (one sibling <c>Id="x[0]"</c> beside an unnamed child of kind
-/// <c>x</c>). Nothing in the creation-time contract forbids that today; if it ever shows up, the
-/// generated form is the one that has to change, because no author writes it by hand.
+/// Grammar, enforced at creation time by <c>UiLayoutManifest</c>. A key is unique only if every
+/// segment is one path element, so two shapes are refused: a declared <c>Id</c> containing the
+/// <c>'/'</c> separator (it would spell a deeper path), and a declared <c>Id</c> that spells an
+/// unnamed sibling's generated <c>Kind[declaredIndex]</c> segment (the two siblings would share one
+/// key). What stays open by construction is a <c>Kind</c> that itself contains <c>'/'</c>: kinds are
+/// namespaced vocabulary (<c>input/stepper-slider</c>) and cannot be refused, so a generated segment
+/// still carries a separator and a deliberately crafted Id chain can still meet it. Closing that
+/// needs identity to stop being a flat string, which is the node-object step; it is written down here
+/// rather than left implicit.
 /// </para>
 /// </summary>
 public readonly struct UiNodeId : IEquatable<UiNodeId>
