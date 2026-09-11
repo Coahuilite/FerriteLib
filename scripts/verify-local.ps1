@@ -60,6 +60,25 @@ function Invoke-Check {
     Write-Host 'OK'
 }
 
+# A fresh clone has no obj/ tree, and every lane below runs --no-restore on purpose (a cross-repo gate
+# must never silently re-resolve a stale graph). So the bootstrap restore happens exactly once, here,
+# measurably, instead of being smuggled into gate 1 where a missing restore surfaced as MSB3644
+# (measured 2026-09-11 by the independent verifier on a git-archive extraction).
+if (-not $NoRestore) {
+    Write-Host -NoNewline '[setup] restore the harness project graph (fresh-tree bootstrap) ... '
+    dotnet restore $testsProject *> $tempLog
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host 'FAIL'
+        if (Test-Path -LiteralPath $tempLog) {
+            Get-Content -LiteralPath $tempLog -Tail 12 | ForEach-Object { Write-Host "    $_" }
+        }
+        Write-Host '  retry: dotnet restore tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj'
+        Remove-Item -LiteralPath $tempLog -Force -ErrorAction SilentlyContinue
+        exit 1
+    }
+    Write-Host 'OK'
+}
+
 Invoke-Check 'FerriteLib.UiKit harness (kernel + version + neutrality + boundary)' `
     'dotnet run --no-restore --project tools/FerriteLib.UiKit.Tests -c Release' `
     { dotnet run --no-restore --project $testsProject -c Release }
@@ -78,8 +97,23 @@ Invoke-Check 'mod payload present at the path consumers bind to' `
         # Consumer mods reference 1.6/Assemblies/FerriteLib.UiKit.dll by this exact relative shape.
         # If the output path moves, every consumer's compile-time reference and the runtime binding
         # break together, so the layout is a contract and not an implementation detail.
-        if (-not (Test-Path -LiteralPath (Join-Path $assembliesDir 'FerriteLib.UiKit.dll') -PathType Leaf)) {
-            throw "Missing payload: $assembliesDir\FerriteLib.UiKit.dll"
+        $payload = Join-Path $assembliesDir 'FerriteLib.UiKit.dll'
+        if (-not (Test-Path -LiteralPath $payload -PathType Leaf)) {
+            throw "Missing payload: $payload"
+        }
+
+        # Existence alone is not the claim. A stale DLL left in this gitignored folder kept the gate
+        # green while consumers bound to bytes this tree never built (measured 2026-09-11 by the
+        # independent verifier: moving <OutputPath> elsewhere reddened nothing). So ask MSBuild where
+        # it will actually write, and compare that evaluated path with the one consumers bind to.
+        $target = (& dotnet msbuild $projectFile -getProperty:TargetPath -p:Configuration=Release -nologo | Select-Object -Last 1)
+        if ([string]::IsNullOrWhiteSpace($target)) {
+            throw 'Could not read TargetPath from the project.'
+        }
+        $expected = [System.IO.Path]::GetFullPath($payload)
+        $actual = [System.IO.Path]::GetFullPath($target.Trim())
+        if ($actual -ne $expected) {
+            throw "Build output does not land where consumers bind: TargetPath=$actual expected=$expected"
         }
     }
 
