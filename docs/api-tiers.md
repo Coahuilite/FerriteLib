@@ -97,6 +97,8 @@ consequence is paid in the open rather than discovered by a stranger.
 - `InputModeRowWidget` — kind string only, and the consumer ships its own `us/mode-row` anyway.
 - `SectionHeaderWidget` — kind string only.
 - `StepperSliderWidget` — kind string only.
+- `WrappedTextWidget` — kind string only (`text/wrapped`); the measure contract over its own wrapped
+  content replaces the copy inside `chrome/banner` and `state/empty` when those are rebuilt over it.
 
 Removing them needs a place for the kind names: a stable container of `const string` kind identifiers, so
 `["Kind"] = "core/state/empty"` stays writable without a type reference. That is a 0.4.x item, and until it

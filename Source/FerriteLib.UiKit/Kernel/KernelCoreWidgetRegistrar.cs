@@ -12,5 +12,8 @@ public static class KernelCoreWidgetRegistrar
         Widgets.SectionHeaderWidget.Register();
         Widgets.LineChartWidget.Register();
         Widgets.EmptyStateWidget.Register();
+        // Leaf atoms: the vocabulary a manifest reaches for when it needs one of the things a
+        // consumer would otherwise hand-roll inside its own kind.
+        Widgets.WrappedTextWidget.Register();
     }
 }
