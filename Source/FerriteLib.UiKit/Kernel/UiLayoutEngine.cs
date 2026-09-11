@@ -462,9 +462,17 @@ public sealed class UiLayoutEngine
     }
 
     /// <summary>
-    /// Session key for one scroll container: its declared id when it has one (a consumer reads
-    /// <see cref="UiSession.ScrollPositions"/> by that id), otherwise the element's identity, which is
-    /// unique where the old path fallback aliased two unnamed Scroll siblings.
+    /// Key for one scroll container in the snapshot's string-keyed geometry maps
+    /// (<see cref="UiLayoutSnapshot.Viewports"/> and <see cref="UiLayoutSnapshot.ScrollContents"/>): the
+    /// declared <c>Id</c> when the element has one, otherwise its display path, which is unique where the
+    /// old path fallback aliased two unnamed Scroll siblings.
+    /// <para>
+    /// It is not the key of the session's scroll state. <see cref="UiSession.ScrollPositions"/>,
+    /// <see cref="UiSession.GetScrollPosition"/> and <see cref="UiSession.SetScrollPosition"/> are keyed by
+    /// the container's node (0.4.0 node step 2), so a caller holding the declared <c>Id</c> bridges
+    /// through <see cref="UiSession.GetNodeByElementId(string)"/> - which answers for a declared <c>Id</c>
+    /// and nothing else - and then reads or writes that node.
+    /// </para>
     /// </summary>
     private static string ScrollKey(PlacedEntry entry)
     {

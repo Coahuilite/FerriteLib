@@ -217,3 +217,23 @@ consequence is paid in the open rather than discovered by a stranger.
 Removing them needs a place for the kind names: a stable container of `const string` kind identifiers, so
 `["Kind"] = "core/state/empty"` stays writable without a type reference. That is a 0.4.x item, and until it
 lands these classes stay public.
+
+## Breaking changes inside the open 0.4 window
+
+This minor is not released yet, which is why a shape change here is still cheap — but "cheap to change" is
+not "free to discover by compiling". A consumer that re-pins to 0.4 is owed the call that no longer binds
+and the call that replaces it, in the same place the promise lives. One entry per breaking change, written
+by the commit that made it.
+
+- **Session scroll state is keyed by a node, not by a string id.** `UiSession.GetScrollPosition` and
+  `SetScrollPosition` take a `UiNode`, `ScrollPositions` is an `IReadOnlyDictionary<UiNode, Vector2>`,
+  and no string overload was kept: a shim would be the second key space the node step exists to remove. The
+  recovery surface moved in the same step — `TrippedComponentIds` became `TrippedNodes`, and
+  `IsTripped`/`Trip`/`TryGetTripLog` take a node.
+  **Migration:** a caller holding the scroll container's declared `Id` bridges with
+  `UiSession.GetNodeByElementId(string)` — a lookup from the one string a page owns to the node identity
+  everything else keys on, not a second key space — and then reads or writes the position on that node.
+  Unchanged on purpose: `UiLayoutSnapshot.Viewports`/`ScrollContents` stay string-keyed because they are
+  diagnostic geometry keyed by scroll container id/display path rather than session state, and
+  `UiLayoutSnapshot.RectById` with `SetScrollTarget(string)` keep the declared-`Id` strings the engine
+  resolves to nodes internally.
