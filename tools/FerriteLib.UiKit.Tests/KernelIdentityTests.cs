@@ -41,6 +41,7 @@ internal static class KernelIdentityTests
             Run("two unnamed same-kind siblings never share an arranged key", VerifyArrangedKeysAreUnique);
             Run("unnamed siblings get distinct identities, stable between Measure and Draw", VerifyIdentitiesAreDistinctAndStable);
             Run("identity survives a re-arrange and a Hidden sibling", VerifyIdentitySurvivesHideAndReArrange);
+            Run("a Tab switch does not renumber the visible sibling", VerifyTabSwitchDoesNotRenumber);
             Run("per-element state does not cross between unnamed siblings", VerifyStateIsIsolatedBetweenSiblings);
             Run("a throwing sibling does not move the next element's state slot", VerifyThrowerDoesNotLeakTheScope);
             Run("hover claims carry the element that made them", VerifyHoverClaimCarriesItsElement);
@@ -163,6 +164,44 @@ internal static class KernelIdentityTests
             {
                 throw new Exception("hiding the preceding sibling renumbered B: " + before + " -> " + withHiddenA);
             }
+        }
+    }
+
+    /// <summary>
+    /// A workspace Tab switch hides one sibling and shows the other. The visible one must keep the
+    /// identity it has in a page with no Tab attributes at all: the ordinal is the declared index, so
+    /// filtering by visibility can never renumber it, and the hidden sibling keeps its state slot.
+    /// </summary>
+    private static void VerifyTabSwitchDoesNotRenumber()
+    {
+        ResetProbe();
+        string tab = "TabB";
+        var bindings = new UiBindings();
+        bindings.BindValue(UiBindings.ActiveTabKey, () => tab, value => tab = value);
+
+        using UiHost host = Host(TabSiblingPage(), bindings);
+        host.DrawFrame(Viewport);
+
+        UiNodeId b = IdentityOf("B", "draw");
+        if (!string.Equals(b.Key, "row/" + ProbeKind + "[1]", StringComparison.Ordinal))
+        {
+            throw new Exception("the Tab-gated second sibling did not keep its declared ordinal: " + b.Key);
+        }
+
+        tab = "TabA";
+        ResetProbe();
+        host.Session.BumpContentRevision();
+        host.DrawFrame(Viewport);
+
+        UiNodeId a = IdentityOf("A", "draw");
+        if (!string.Equals(a.Key, "row/" + ProbeKind + "[0]", StringComparison.Ordinal))
+        {
+            throw new Exception("a Tab switch renumbered the visible sibling: " + a.Key);
+        }
+
+        if (!host.Session.GetValueStates(b).ContainsKey("probe"))
+        {
+            throw new Exception("the Tab-hidden sibling lost its state slot");
         }
     }
 
@@ -293,12 +332,12 @@ internal static class KernelIdentityTests
 
     // --- fixture -------------------------------------------------------------------------------
 
-    private static UiHost Host(string xml)
+    private static UiHost Host(string xml, IUiBindings? bindings = null)
     {
         return new UiHost(
             Scope,
             UiLayoutManifest.Parse(xml),
-            new UiBindings(),
+            bindings ?? new UiBindings(),
             UiTheme.DarkGold,
             new FixedMetrics(),
             new FixedTranslation());
@@ -320,6 +359,16 @@ internal static class KernelIdentityTests
             + "<Row Id=\"row\" Gap=\"4\">"
             + "<Widget Kind=\"" + ProbeKind + "\" Text=\"A\" Hidden=\"true\" Cursor=\"1\" />"
             + "<Widget Kind=\"" + ProbeKind + "\" Text=\"B\" Cursor=\"2\" />"
+            + "</Row>"
+            + "</UiPage>";
+    }
+
+    private static string TabSiblingPage()
+    {
+        return "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\" Gap=\"4\">"
+            + "<Widget Kind=\"" + ProbeKind + "\" Text=\"A\" Tab=\"TabA\" Cursor=\"1\" />"
+            + "<Widget Kind=\"" + ProbeKind + "\" Text=\"B\" Tab=\"TabB\" Cursor=\"2\" />"
             + "</Row>"
             + "</UiPage>";
     }
