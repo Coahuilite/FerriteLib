@@ -2,6 +2,16 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+// Harness stub, and part of the de-facto published shape: a consumer's kernel-host lane builds these
+// projects in place and copies them out of bin/stubs/<name>/ (AGENTS.md, "Build and verification").
+//
+// 2026-09-11: Widgets.Label stopped being a no-op. It now appends three records - LabelRects,
+// LabelTexts and LabelColors (the colour the outlet had applied through GUI.color). Purely additive:
+// no existing member changed shape, nothing was removed, and the lists are only read by this repo's
+// own lanes through reflection. They exist because "which colour did this outlet write" is otherwise
+// unobservable in the harness, and that is exactly what the resolved-style lane's one-table
+// assertions have to check (KernelResolvedStyleTests, the four text outlets).
+
 namespace Verse;
 
 /// <summary>Executable stub for the Verse IMGUI types the UiKit test paths touch at runtime.</summary>
