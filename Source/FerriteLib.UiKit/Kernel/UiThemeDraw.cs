@@ -152,11 +152,16 @@ public static class UiThemeDraw
         AccentRail(rect, theme, focused, width);
     }
 
+    /// <param name="writable">
+    /// False when the element's data side says its value cannot be written: the treatment is then the
+    /// disabled one whatever tone was authored, because state beats author — the one written precedence
+    /// rule for style. Null means the caller did not ask, and the tone decides alone.
+    /// </param>
     /// <summary>Paints a compact rectangular status treatment without owning interaction.</summary>
-    public static void StatusTreatment(Rect rect, UiTheme theme, UiStatusTone tone = UiStatusTone.Neutral)
+    public static void StatusTreatment(Rect rect, UiTheme theme, UiStatusTone tone = UiStatusTone.Neutral, bool? writable = null)
     {
         if (rect.width <= 0f || rect.height <= 0f) return;
-        Surface(rect, theme.Styles.Resolve(tone).Surface, theme.Geometry.Hairline);
+        Surface(rect, theme.Styles.Resolve(tone, UiEmphasis.Normal, writable).Surface, theme.Geometry.Hairline);
     }
 
     /// <summary>
@@ -179,12 +184,16 @@ public static class UiThemeDraw
             singleLine: true);
     }
 
+    /// <param name="writable">
+    /// False paints the badge as disabled whatever tone was authored, the same state-beats-author rule
+    /// <see cref="StatusTreatment"/> documents.
+    /// </param>
     /// <summary>Paints a status treatment and centers its short, reusable badge label.</summary>
-    public static void StatusBadge(Rect rect, string text, UiTheme theme, UiStatusTone tone = UiStatusTone.Neutral, UiFont? font = null)
+    public static void StatusBadge(Rect rect, string text, UiTheme theme, UiStatusTone tone = UiStatusTone.Neutral, UiFont? font = null, bool? writable = null)
     {
         // A badge is compact surface text, which is the emphasis whose neutral label is secondary; the
         // plane and the text come from one query, so a badge and a field can no longer disagree.
-        UiResolvedStyle style = theme.Styles.Resolve(tone, UiEmphasis.Muted);
+        UiResolvedStyle style = theme.Styles.Resolve(tone, UiEmphasis.Muted, writable);
         Surface(rect, style.Surface, theme.Geometry.Hairline);
         Label(rect, text, theme, style.Text, font ?? UiFont.Tiny, TextAnchor.MiddleCenter, singleLine: true);
     }

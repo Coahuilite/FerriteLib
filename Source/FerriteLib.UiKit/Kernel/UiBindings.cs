@@ -195,6 +195,17 @@ public sealed class UiBindings : IUiBindings
         descriptor.SetBoxed(value);
     }
 
+    /// <summary>
+    /// The read side of <see cref="Set{T}"/>: a bind registered through <see cref="BindReadOnly{T}"/>
+    /// answers false, a key nobody bound answers false (the conservative answer for "may this write?"),
+    /// and a null key throws like the rest of the surface.
+    /// </summary>
+    public bool IsWritable(string elementId)
+    {
+        if (elementId == null) throw new ArgumentNullException(nameof(elementId));
+        return values.TryGetValue(elementId, out ValueDescriptor? descriptor) && descriptor!.CanWrite;
+    }
+
     public IReadOnlyList<T> GetOptions<T>(string elementId)
     {
         if (!options.TryGetValue(elementId, out OptionsDescriptor? descriptor))

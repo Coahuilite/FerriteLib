@@ -63,8 +63,9 @@ consequence is paid in the open rather than discovered by a stranger.
 - `UiValueState` — per-element state bag; its key is the path string the identity layer replaces.
 - `UiElementSpec` — the spec a widget reads; additions are breaking pre-1.0 by definition.
 - `UiWidgetContext` — what a widget is handed per pass; may carry a node instead of a path.
-- `IUiBindings` — get and set today; announce is the third operation the roadmap asks for, and an interface
-  member is a breaking addition for every implementer.
+- `IUiBindings` — get, set and the writability read (`IsWritable`, landed with the disabled treatment's
+  first producer); announce is the next operation the roadmap asks for, and an interface member is a
+  breaking addition for every implementer.
 - `UiBindings` — the reference implementation, same reason.
 - `UiNative` — the backend funnel's public face (26 members today); hit-stack and focus work will move
   members across its boundary.
