@@ -18,7 +18,13 @@ public sealed class UiHost : IDisposable
     private readonly IUiTranslation translation;
     private readonly UiLayoutEngine engine;
     private readonly UiSession session;
+    private readonly UiStyleResolver styleResolver;
     private int lastLayoutRevision;
+
+    // How far the two issue records have been published on the fit audit's appearance channel. Each one
+    // only ever moves forward, so an issue is reported exactly once however many frames follow it.
+    private int publishedDocumentIssues;
+    private int publishedResolutionIssues;
 
     public UiHost(
         string source,
@@ -26,7 +32,8 @@ public sealed class UiHost : IDisposable
         IUiBindings bindings,
         UiTheme theme,
         ITextMetrics metrics,
-        IUiTranslation translation)
+        IUiTranslation translation,
+        UiStyleDocument? document = null)
     {
         this.source = source ?? throw new ArgumentNullException(nameof(source));
         this.manifest = manifest ?? throw new ArgumentNullException(nameof(manifest));
@@ -38,8 +45,25 @@ public sealed class UiHost : IDisposable
         UiWidgetRegistry.InitializeCore();
         ValidateManifest();
 
-        engine = new UiLayoutEngine(source);
+        // The style document enters here, and the host owns it: a caller hands in a standalone document
+        // (the appearance-authoring origin) or, when it hands in none, the manifest's own <Styles>
+        // section is the document. Nothing else about the page changes - an element's Scheme/Density
+        // attributes are resolved per element, against the theme below.
+        UiStyleDocument styleDocument = document ?? manifest.Styles;
+
+        // resolve-before-Measure: the page level lands on the injected theme before the first arrange, and
+        // because applying a token moves the theme's own layout revision - the clock the band cache already
+        // compares - the very first frame follows the document. No second clock is introduced anywhere.
+        styleResolver = new UiStyleResolver(theme, styleDocument);
+        styleResolver.ApplyTo(theme);
+
+        engine = new UiLayoutEngine(source, styleResolver);
         session = new UiSession();
+
+        // A document that went wrong must not go quiet, and the consumer must not have to remember to ask:
+        // every drop the parser or the resolver recorded is published on the fit audit's appearance
+        // channel (UiFitAudit.AttachStyleFallback) here and after each arrangement.
+        PublishStyleIssues();
 
         // The runtime half of the dependency-reality rule: building a tree is what makes this mod a
         // live consumer rather than a declared one, and Require reports who has done it.
@@ -53,6 +77,14 @@ public sealed class UiHost : IDisposable
     public string Source => source;
 
     public UiLayoutManifest Manifest => manifest;
+
+    /// <summary>
+    /// The document resolver this host built: the document it resolved (the one handed to the constructor,
+    /// otherwise the manifest's own <c>&lt;Styles&gt;</c> section) plus the drops it recorded while
+    /// resolving. Never null - a page with no document still needs one to report that an element named a
+    /// scheme nobody declared, which is an appearance fallback like any other.
+    /// </summary>
+    public UiStyleResolver StyleResolver => styleResolver;
 
     public UiWidgetContext CreateContext(float viewWidth, string elementPath = "root")
     {
@@ -74,7 +106,14 @@ public sealed class UiHost : IDisposable
         }
 
         UiWidgetContext ctx = CreateContext(available.x);
-        return engine.ArrangeRoots(ctx, available, manifest.Roots);
+        UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, available, manifest.Roots);
+
+        // A region scope is resolved the first time the engine meets it, and that resolution can drop a
+        // name (a scheme or density nobody declared). Publishing here - on the same frame, right after the
+        // arrange that discovered it - is what keeps such a drop from waiting a frame to be visible. On a
+        // cached arrangement there is nothing new to publish and the call costs two integer comparisons.
+        PublishStyleIssues();
+        return snapshot;
     }
 
     public void Draw(Rect viewport, UiLayoutSnapshot snapshot)
@@ -160,6 +199,38 @@ public sealed class UiHost : IDisposable
         Close();
     }
 
+    /// <summary>
+    /// Publishes every style drop this page has recorded so far, parser-side and resolver-side, each as one
+    /// <see cref="UiStyleFallbackReport"/> on <see cref="UiFitAudit"/>'s appearance channel. The host owns
+    /// visibility deliberately: a consumer that never attaches a sink still moves the audit's count and last
+    /// diagnostic, so "fail-soft must not mean silent" holds without a consumer remembering anything.
+    /// </summary>
+    private void PublishStyleIssues()
+    {
+        IReadOnlyList<UiStyleIssue> parseIssues = styleResolver.Document.Issues;
+        for (; publishedDocumentIssues < parseIssues.Count; publishedDocumentIssues++)
+        {
+            PublishStyleIssue(parseIssues[publishedDocumentIssues]);
+        }
+
+        IReadOnlyList<UiStyleIssue> resolutionIssues = styleResolver.Issues;
+        for (; publishedResolutionIssues < resolutionIssues.Count; publishedResolutionIssues++)
+        {
+            PublishStyleIssue(resolutionIssues[publishedResolutionIssues]);
+        }
+    }
+
+    /// <summary>
+    /// One dropped declaration in the audit's own shape: which style origin it came from, which element of
+    /// the vocabulary carried it, what the author wrote and what the page fell back to. The authored text is
+    /// the drop's own message, because a style drop is already a sentence about itself by the time it gets
+    /// here, and the record's whole job is to keep an author from having to guess.
+    /// </summary>
+    private void PublishStyleIssue(UiStyleIssue issue)
+    {
+        UiFitAudit.ReportStyleFallback(source + "#styles", "Styles", "Declaration", issue.ToString(), "defaults");
+    }
+
     private void ValidateManifest()
     {
         foreach (UiElementSpec root in manifest.Roots)
@@ -173,15 +244,20 @@ public sealed class UiHost : IDisposable
     // on widgets too. Before round 3 this was a live defect: ResolveColumnWidths already read
     // Width on any child, yet no core kind's schema listed it — a manifest could not size a
     // stepper-slider column at all (US->FL round 3, N1's library-side specimen).
+    // Scheme and Density are the scope vocabulary: they are allowed on every kind - a widget narrows its
+    // own scope, a container is a region its subtree inherits - because the engine reads them for every
+    // child of the tree and the style chain, not the kind, is what carries them. Before batch B neither
+    // name existed, so an author could not reach the document's schemes at all.
     private static readonly HashSet<string> CommonWidgetAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Id", "Kind", "Hidden", "Tab", "Width", "MinWidth", "MaxWidth", "NarrowHidden"
+        "Id", "Kind", "Hidden", "Tab", "Width", "MinWidth", "MaxWidth", "NarrowHidden", "Scheme", "Density"
     };
 
     private static readonly HashSet<string> ContainerAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
         "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Width", "Fill",
-        "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden"
+        "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden",
+        "Scheme", "Density"
     };
 
     private void ValidateElement(UiElementSpec spec, string path, bool parentNarrowCapable)

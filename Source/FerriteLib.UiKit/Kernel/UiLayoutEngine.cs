@@ -33,6 +33,14 @@ public sealed class UiLayoutEngine
 
         /// <summary>The element's node: identity, state and dirty flag, owned by the session.</summary>
         internal UiNode Node = null!;
+
+        /// <summary>
+        /// The style chain this entry resolved in, recorded during arrange so the draw pass re-applies the
+        /// same scope instead of rebuilding it: measure and draw must hand the widget one theme, and the
+        /// chain is what that theme is derived from.
+        /// </summary>
+        internal IReadOnlyList<UiStyleDeclaration>? StyleChain;
+
         internal IUiWidget? Widget;
         internal bool IsContainer;
         internal string ContainerKind = "";
@@ -62,6 +70,10 @@ public sealed class UiLayoutEngine
 
     private readonly string scope;
 
+    // The document resolver is the engine's answer to "what does this scope look like": null means the
+    // tree has no style document at all, in which case every element draws with the injected theme.
+    private readonly UiStyleResolver? styleResolver;
+
     // Widget instances are keyed by element identity, not by path text: two unnamed same-kind siblings
     // used to collide here, so the second one drew with the first one's spec.
     private readonly Dictionary<UiNodeId, IUiWidget> widgetInstances = new();
@@ -73,9 +85,15 @@ public sealed class UiLayoutEngine
     private int cachedTranslationRevision = int.MinValue;
     private List<PlacedEntry> lastEntries = new();
 
-    public UiLayoutEngine(string scope)
+    /// <summary>
+    /// The engine a <see cref="UiHost"/> builds: <paramref name="styleResolver"/> turns the chain each
+    /// element declares into the theme that element draws with. Null keeps the pre-document behaviour,
+    /// where the injected theme is the only theme.
+    /// </summary>
+    public UiLayoutEngine(string scope, UiStyleResolver? styleResolver = null)
     {
         this.scope = scope ?? throw new ArgumentNullException(nameof(scope));
+        this.styleResolver = styleResolver;
     }
 
     public UiLayoutSnapshot ArrangeRoots(UiWidgetContext ctx, Vector2 available, IReadOnlyList<UiElementSpec> roots)
@@ -177,7 +195,7 @@ public sealed class UiLayoutEngine
         DrawEntries(lastEntries, 0, lastEntries.Count, ctx, new Vector2(viewport.x, viewport.y), null, Vector2.zero);
     }
 
-    private static void DrawEntries(
+    private void DrawEntries(
         List<PlacedEntry> entries,
         int start,
         int end,
@@ -191,9 +209,16 @@ public sealed class UiLayoutEngine
         {
             PlacedEntry entry = entries[index];
             Rect drawRect = ToDrawRect(entry.Rect, viewportPosition, nativeOrigin);
-            UiWidgetContext entryCtx = entry.MeasureWidth > 0f
-                ? ctx.WithViewWidth(entry.MeasureWidth).WithWindowOrigin(windowOrigin).WithNode(entry.Node)
-                : ctx.WithWindowOrigin(windowOrigin).WithNode(entry.Node);
+
+            // The element's arranged entry carries the scope it was measured in, so the draw pass
+            // re-applies exactly that scope: the same chain resolves through the same resolver cache to
+            // the same theme instance the Measure half used. The chain is set before the theme because
+            // the theme is what the chain resolves to, and the page level (an empty chain) keeps the
+            // injected theme rather than a clone of it.
+            UiWidgetContext entryCtx = ctx.WithStyleChain(entry.StyleChain);
+            entryCtx = entryCtx.WithTheme(ScopeTheme(entryCtx));
+            entryCtx = entry.MeasureWidth > 0f ? entryCtx.WithViewWidth(entry.MeasureWidth) : entryCtx;
+            entryCtx = entryCtx.WithWindowOrigin(windowOrigin).WithNode(entry.Node);
 
             if (IsScopedContainer(entry.ContainerKind))
             {
@@ -255,7 +280,7 @@ public sealed class UiLayoutEngine
         }
     }
 
-    private static void DrawScopedContainer(
+    private void DrawScopedContainer(
         PlacedEntry entry,
         Rect outRect,
         UiWidgetContext ctx,
@@ -369,8 +394,60 @@ public sealed class UiLayoutEngine
         return entry.Spec.Id.Length > 0 ? entry.Spec.Id : entry.Id.Path;
     }
 
+    /// <summary>
+    /// The element's own style scope: its declaration becomes the nearest link of the chain, and the theme
+    /// the element sees becomes the one that chain resolves to. Both halves of a pass go through here -
+    /// Measure directly, Draw through the chain each arranged entry recorded - so a widget never measures
+    /// with one theme and draws with another.
+    /// </summary>
+    private UiWidgetContext ElementScope(UiWidgetContext ctx, UiElementSpec spec)
+    {
+        UiWidgetContext scoped = ctx.WithStyleDeclaration(DeclarationOf(spec));
+        return scoped.WithTheme(ScopeTheme(scoped));
+    }
+
+    /// <summary>
+    /// The theme one chain resolves to. An empty chain is the page level: there the answer is the injected
+    /// theme itself, which already carries the document's page-level defaults because the host applies them
+    /// before the first arrangement - asking the resolver for a clone would print a different instance for
+    /// the same values. A declared scope resolves through the resolver, which builds each effective
+    /// (scheme, density) pair once and hands out that same instance on every later frame.
+    /// </summary>
+    private UiTheme ScopeTheme(UiWidgetContext ctx)
+    {
+        IReadOnlyList<UiStyleDeclaration>? chain = ctx.StyleChain;
+        if (styleResolver == null || chain == null || chain.Count == 0) return ctx.Theme;
+        return styleResolver.ThemeFor(chain);
+    }
+
+    /// <summary>
+    /// The declaration one element contributes to the chain: its own <c>Scheme</c> and <c>Density</c>
+    /// attributes and nothing else. Those are the two axes that inherit, which is exactly what a chain
+    /// carries; <c>Tone</c> and <c>Emphasis</c> stay on the element's own spec, because a role that
+    /// inherited would destroy the information the tag exists to carry.
+    /// </summary>
+    private static UiStyleDeclaration DeclarationOf(UiElementSpec spec)
+    {
+        return new UiStyleDeclaration(ReadScopeName(spec, "Scheme"), ReadScopeName(spec, "Density"));
+    }
+
+    /// <summary>A trimmed attribute value, or null when the element did not declare it (or declared nothing).</summary>
+    private static string? ReadScopeName(UiElementSpec spec, string attribute)
+    {
+        if (!spec.TryGetAttribute(attribute, out string raw)) return null;
+        if (raw == null) return null;
+        string value = raw.Trim();
+        return value.Length == 0 ? null : value;
+    }
+
     private MeasuredBox MeasureElement(UiWidgetContext ctx, UiElementSpec spec, float width, float availableHeight, UiNode node)
     {
+        // The element's own style scope comes first: its declaration joins the chain and the theme below
+        // every branch resolves against the chain, so a widget measures - and later draws - with the theme
+        // its own scope resolved to. Containers are scoped the same way, which is what lets a region's
+        // font reach the label widths measured inside it.
+        ctx = ElementScope(ctx, spec);
+
         string containerKind = GetContainerKind(spec);
         if (containerKind.Length == 0)
         {
@@ -399,6 +476,7 @@ public sealed class UiLayoutEngine
                 Spec = spec,
                 Id = node.Id,
                 Node = node,
+                StyleChain = ctx.StyleChain,
                 Widget = widget,
                 IsContainer = false,
                 MeasureWidth = width,
@@ -636,6 +714,7 @@ public sealed class UiLayoutEngine
             Spec = spec,
             Id = node.Id,
             Node = node,
+            StyleChain = ctx.StyleChain,
             IsContainer = true,
             ContainerKind = kind,
             MeasureWidth = width,
@@ -686,6 +765,7 @@ public sealed class UiLayoutEngine
             Spec = spec,
             Id = node.Id,
             Node = node,
+            StyleChain = ctx.StyleChain,
             IsContainer = true,
             ContainerKind = kind,
             MeasureWidth = width,
@@ -769,6 +849,7 @@ public sealed class UiLayoutEngine
             Spec = spec,
             Id = node.Id,
             Node = node,
+            StyleChain = ctx.StyleChain,
             IsContainer = true,
             ContainerKind = kind,
             MeasureWidth = width,
@@ -816,6 +897,7 @@ public sealed class UiLayoutEngine
             Spec = spec,
             Id = node.Id,
             Node = node,
+            StyleChain = ctx.StyleChain,
             IsContainer = true,
             ContainerKind = kind,
             MeasureWidth = width,
@@ -871,6 +953,7 @@ public sealed class UiLayoutEngine
             Spec = spec,
             Id = node.Id,
             Node = node,
+            StyleChain = ctx.StyleChain,
             IsContainer = true,
             ContainerKind = kind,
             MeasureWidth = width,
@@ -948,6 +1031,7 @@ public sealed class UiLayoutEngine
                 Spec = entry.Spec,
                 Id = entry.Id,
                 Node = entry.Node,
+                StyleChain = entry.StyleChain,
                 Widget = entry.Widget,
                 IsContainer = entry.IsContainer,
                 ContainerKind = entry.ContainerKind,

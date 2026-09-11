@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
@@ -62,6 +63,21 @@ public sealed class UiWidgetContext
     public UiNode? Node { get; }
 
     /// <summary>
+    /// The nearest-first style declaration chain this element sits in: the element's own declaration at
+    /// index 0, then its containers outward. The engine builds it as it descends (0.4.x batch B), because
+    /// a <see cref="UiNode"/> carries no parent link yet - the chain is that link for style purposes, and
+    /// migrating it onto the node is a later step, not a different shape. Only the two inheriting axes
+    /// (scheme and density) travel here; a role never inherits, so <c>Tone</c>/<c>Emphasis</c> stay on the
+    /// element's own spec.
+    /// <para>
+    /// Null means "nothing was declared on this path", which is the page level. A link is appended only
+    /// for an element that declares something, so an element that styles nothing reuses its parent's
+    /// list: one pass over a tree of unstyled elements allocates no chain at all.
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<UiStyleDeclaration>? StyleChain { get; }
+
+    /// <summary>
     /// Offset from the widget's draw rect to the Host's final usable window space. The layout
     /// engine sets this while drawing inside scrolled/grouped containers so popups (drawn after
     /// the content pass, outside any IMGUI group or scroll matrix) share one coordinate space
@@ -80,7 +96,8 @@ public sealed class UiWidgetContext
         string elementPath,
         Vector2 windowOrigin = default,
         UiNodeId elementId = default,
-        UiNode? node = null)
+        UiNode? node = null,
+        IReadOnlyList<UiStyleDeclaration>? styleChain = null)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Session = session ?? throw new ArgumentNullException(nameof(session));
@@ -93,12 +110,13 @@ public sealed class UiWidgetContext
         WindowOrigin = windowOrigin;
         ElementId = node?.Id ?? elementId;
         Node = node;
+        StyleChain = styleChain;
     }
 
     public UiWidgetContext ForChild(string childId)
     {
         string path = ElementPath.Length == 0 ? childId : ElementPath + "/" + childId;
-        return new UiWidgetContext(Source, Session, Metrics, Theme, Translation, Bindings, ViewWidth, path, WindowOrigin, ElementId, Node);
+        return new UiWidgetContext(Source, Session, Metrics, Theme, Translation, Bindings, ViewWidth, path, WindowOrigin, ElementId, Node, StyleChain);
     }
 
     /// <summary>
@@ -112,7 +130,7 @@ public sealed class UiWidgetContext
         if (node == null) throw new ArgumentNullException(nameof(node));
         return new UiWidgetContext(
             Source, Session, Metrics, Theme, Translation, Bindings, ViewWidth,
-            node.Path, WindowOrigin, node.Id, node);
+            node.Path, WindowOrigin, node.Id, node, StyleChain);
     }
 
     /// <summary>
@@ -121,13 +139,65 @@ public sealed class UiWidgetContext
     /// </summary>
     public UiWidgetContext WithViewWidth(float viewWidth)
     {
-        return new UiWidgetContext(Source, Session, Metrics, Theme, Translation, Bindings, viewWidth, ElementPath, WindowOrigin, ElementId, Node);
+        return new UiWidgetContext(Source, Session, Metrics, Theme, Translation, Bindings, viewWidth, ElementPath, WindowOrigin, ElementId, Node, StyleChain);
     }
 
     /// <summary>Returns a context whose draw rects are offset into Host window space by <paramref name="windowOrigin"/>.</summary>
     public UiWidgetContext WithWindowOrigin(Vector2 windowOrigin)
     {
-        return new UiWidgetContext(Source, Session, Metrics, Theme, Translation, Bindings, ViewWidth, ElementPath, windowOrigin, ElementId, Node);
+        return new UiWidgetContext(Source, Session, Metrics, Theme, Translation, Bindings, ViewWidth, ElementPath, windowOrigin, ElementId, Node, StyleChain);
+    }
+
+    /// <summary>
+    /// Returns a context that draws with <paramref name="theme"/>. The layout engine sets it per element,
+    /// so a widget measures and draws against the theme its own style scope resolved to - a region's
+    /// scheme/density bag, or the injected theme at the page level. A context that already carries that
+    /// theme comes back unchanged, which is the common case for an element inheriting its parent's scope.
+    /// </summary>
+    public UiWidgetContext WithTheme(UiTheme theme)
+    {
+        if (theme == null) throw new ArgumentNullException(nameof(theme));
+        if (ReferenceEquals(theme, Theme)) return this;
+        return new UiWidgetContext(
+            Source, Session, Metrics, theme, Translation, Bindings, ViewWidth,
+            ElementPath, WindowOrigin, ElementId, Node, StyleChain);
+    }
+
+    /// <summary>
+    /// Returns a context scoped to one element's own declaration: the declaration becomes the nearest link
+    /// of <see cref="StyleChain"/> and everything already on the chain stays behind it, so nearest wins.
+    /// A declaration that names neither scheme nor density returns this context unchanged - an element
+    /// that styles nothing appends no list and allocates no context.
+    /// </summary>
+    public UiWidgetContext WithStyleDeclaration(UiStyleDeclaration declaration)
+    {
+        if (declaration.Scheme == null && declaration.Density == null) return this;
+
+        int inherited = StyleChain?.Count ?? 0;
+        var chain = new UiStyleDeclaration[inherited + 1];
+        chain[0] = declaration;
+        for (int i = 0; i < inherited; i++)
+        {
+            chain[i + 1] = StyleChain![i];
+        }
+
+        return new UiWidgetContext(
+            Source, Session, Metrics, Theme, Translation, Bindings, ViewWidth,
+            ElementPath, WindowOrigin, ElementId, Node, chain);
+    }
+
+    /// <summary>
+    /// Returns a context carrying exactly <paramref name="chain"/>, or this context when it already has
+    /// it. The layout engine records each arranged element's chain during Measure and re-applies it in
+    /// Draw, so both halves of a pass resolve one scope and hand the widget one theme - the agreement the
+    /// resolved-value store exists to keep.
+    /// </summary>
+    public UiWidgetContext WithStyleChain(IReadOnlyList<UiStyleDeclaration>? chain)
+    {
+        if (ReferenceEquals(chain, StyleChain)) return this;
+        return new UiWidgetContext(
+            Source, Session, Metrics, Theme, Translation, Bindings, ViewWidth,
+            ElementPath, WindowOrigin, ElementId, Node, chain);
     }
 
     /// <summary>Converts a draw-local rect (as passed to <c>IUiWidget.Draw</c>) into Host window space.</summary>

@@ -58,11 +58,23 @@ consequence is paid in the open rather than discovered by a stranger.
 
 ## Public-unstable
 
-- `UiHost` — per-window engine entry; identity and the manifest load-path fork both reach into it.
+- `UiHost` — per-window engine entry; identity and the manifest load-path fork both reach into it. The
+  style document enters here too (`UiStyleDocument? document` on the constructor, the manifest's own
+  `<Styles>` section when none is handed in): the page level is applied to the injected theme inside the
+  constructor — the resolve-before-Measure slot, riding the theme's existing `LayoutRevision` clock rather
+  than a second one — and every drop the parser and the resolver recorded is published on `UiFitAudit`'s
+  appearance channel, so a dropped style value is the host's to surface and not something a consumer has to
+  remember to ask for. `StyleResolver` is never null; a page with no document still needs one to report an
+  element naming a scheme nobody declared.
 - `UiSession` — session state; focus traversal and per-key invalidation land here when they are built.
 - `UiValueState` — per-element state bag; its key is the path string the identity layer replaces.
 - `UiElementSpec` — the spec a widget reads; additions are breaking pre-1.0 by definition.
-- `UiWidgetContext` — what a widget is handed per pass; may carry a node instead of a path.
+- `UiWidgetContext` — what a widget is handed per pass; may carry a node instead of a path, and since
+  batch B a nearest-first `StyleChain` — the scheme/density declarations from the element outward, the
+  element's own declaration at index 0, roles deliberately absent because they never inherit. The engine
+  builds it while descending and appends a link only for an element that declares something, so an element
+  that styles nothing reuses its parent's list; `WithTheme`, `WithStyleDeclaration` and `WithStyleChain`
+  are the hand-offs, and a widget is handed the same theme instance in Measure and in Draw.
 - `IUiBindings` — get, set and the writability read (`IsWritable`, landed with the disabled treatment's
   first producer); announce is the next operation the roadmap asks for, and an interface member is a
   breaking addition for every implementer.
@@ -77,8 +89,10 @@ consequence is paid in the open rather than discovered by a stranger.
   and the density tokens reach every core widget that used to hold its own numbers — the dropdown, the
   mode row, the two text composites and the five leaf atoms — while `chrome/banner` and `state/empty`
   keep their own type size by design, so a density font change moves the atoms and not those bands. The
-  open debt is the region/page carriers the scheme and density classes still wait for, and the type size
-  those two pinned composites would need before density can reach them.
+  region/page carriers the scheme and density classes waited for landed in batch B (`Scheme`/`Density` as
+  engine vocabulary on every kind, plus the per-element style chain the engine carries and resolves), so
+  what is left of that debt is the type size those two pinned composites would need before density can
+  reach them.
 - `UiThemeDraw` — the single text and panel outlet; per-surface tokens change what it takes to draw.
 - `UiFitAudit` — the audit surface; entry attribution follows the identity layer.
 - `UiLayoutManifest` — the `Schema="2"` slot and the uncalled `ParseFile` are an open fork, and either
@@ -130,9 +144,10 @@ consequence is paid in the open rather than discovered by a stranger.
 
 - `UiStyleFallbackReport` — one appearance fallback: an authored `Tone`/`Emphasis` value outside the
   vocabulary, carrying the element path, the kind, the attribute, the authored text and the value it
-  resolved to. Produced by the atom vocabulary and delivered through `UiFitAudit`'s appearance half
-  (`AttachStyleFallback`, `StyleFallbackCount`, `LastStyleFallbackDiagnostic`), which stays live even
-  when the text half is off, because fail-soft must not mean silent.
+  resolved to. Produced by the atom vocabulary, and since batch B by `UiHost` too — one report per dropped
+  style-document declaration, attributed to the page's style origin — and delivered through `UiFitAudit`'s
+  appearance half (`AttachStyleFallback`, `StyleFallbackCount`, `LastStyleFallbackDiagnostic`), which stays
+  live even when the text half is off, because fail-soft must not mean silent.
 
 - `UiStyleDocument` — the parsed style document (named schemes, named densities, page-level defaults) from
   either text origin: the standalone `<Styles>` file and the manifest's `<Styles>` section share one parser
@@ -140,9 +155,13 @@ consequence is paid in the open rather than discovered by a stranger.
   is not well-formed, because then the manifest itself does not parse (co-location's real cost).
 - `UiStyleResolver` — the written precedence chain `state > element > container > page > theme > default`
   and the region themes built once per effective scheme/density pair. Scheme and density inherit; roles do
-  not, and that asymmetry is the design rather than a gap.
+  not, and that asymmetry is the design rather than a gap. The engine resolves each element's chain through
+  `ThemeFor` and reuses the cached instance in Measure and Draw, while an empty chain is the page level and
+  answers with the injected theme itself; `UiHost.StyleResolver` is the live instance for a page, and its
+  `Issues` are the resolution-time half of the same record the document keeps.
 - `UiStyleDeclaration` — one node's own style attributes as the resolver reads them (scheme, density, tone,
-  emphasis), handed in nearest first along the tree.
+  emphasis), handed in nearest first along the tree; the engine's chain carries the two that inherit and
+  leaves the roles on the element's own spec.
 - `UiStyleIssue` — one appearance value a document dropped, so that fail-soft is never silent.
 
 ## Internalize-candidate

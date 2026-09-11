@@ -96,5 +96,8 @@ internal static class Program
 
         Console.WriteLine("Kernel style documents (two origins, precedence chain, fail-soft recording)...");
         failures += KernelStyleDocumentTests.RunAll();
+
+        Console.WriteLine("Kernel style scopes (region theme in the live tree, page level, drop visibility)...");
+        failures += KernelStyleScopeTests.RunAll();
     }
 }
