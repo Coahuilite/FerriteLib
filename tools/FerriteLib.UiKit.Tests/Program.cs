@@ -78,5 +78,8 @@ internal static class Program
 
         Console.WriteLine("FerriteLib neutrality (no product vocabulary anywhere)...");
         failures += FerriteLibNeutralityTests.RunAll();
+
+        Console.WriteLine("Kernel leaf atoms (wrapped text / button / rule / slider / number field)...");
+        failures += KernelAtomTests.RunAll();
     }
 }
