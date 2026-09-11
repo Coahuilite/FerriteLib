@@ -1219,6 +1219,13 @@ Paths and roles only; any line/file count here would be false within a day (see 
   ledger now says so rather than keeping them as mutation proof. The criterion for a new gate is not "the
   console shows FAIL" but **"plant the defect and the process exits non-zero"**, and the same scan belongs
   on the older lanes, which nobody has audited for this shape yet.
+  **That audit happened the next day and the family has no second instance:** all 21 lanes were probed
+  through their own failure channel and every one exited non-zero with its marker printed, every lane is
+  registered in `Program.cs` (so F-E's shape is empty too), and the control run went back to zero. The
+  audit's own first attempt was invalid and the verifier said so: a bare `return` made the rest of the lane
+  unreachable, `TreatWarningsAsErrors` turned that into CS0162, and all 21 lanes "exited non-zero" while
+  compiling nothing -- a green that only holds if nobody reads the marker. Its stated limit is honest: this
+  proves the failure channel and the process exit, not that each lane fails on a real defect.
 - **A correction the lead owes the record (2026-09-11).** While reviewing the scroll-target work the lead
   asked for "clear the request when the id does not resolve". That preference was wrong: the contract test
   at `KernelContractTests.cs:297-303` already required an unresolvable target to **stay pending**, because a
