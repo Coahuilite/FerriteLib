@@ -1167,7 +1167,7 @@ Paths and roles only; any line/file count here would be false within a day (see 
 - `tools/dependency-reality.ps1` - the D-1 reference checker FL owns the rule text for: AssemblyRef,
   page-model MemberRef contact, and declared-chrome allowlisting over a consumer tree, with `-SelfTest`
   proving the source scan can fire.
-- `scripts/verify-local.ps1` (7 gates, `-PackDev` adds packaging) and `scripts/pack-dev.ps1`. The three
+- `scripts/verify-local.ps1` (8 gates, `-PackDev` adds packaging) and `scripts/pack-dev.ps1`. The three
   source-text gates and the version axes all run *inside* gate 1; the gate count is not the check count.
 - `About/About.xml`, `LoadFolders.xml`, `LICENSE`, `1.6/Assemblies/` (the DLL and PDB are gitignored; only
   `.gitkeep` is tracked, so a fresh clone has no payload until it builds).

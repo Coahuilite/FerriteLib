@@ -21,6 +21,8 @@ $ErrorActionPreference = "Stop"
 #   5   payload is content-free: no Defs, Patches, Languages, Sounds or Textures under 1.6
 #   6   LICENSE present and full MPL-2.0, with no applied incompatibility notice
 #   7   About.xml identity (packageId, modVersion present and parsable as a Version)
+#   8   net472 trap scan: no call site uses a member the reference assembly advertises but the
+#       net472 runtime lacks (compiles green, fails at runtime -- see the script's own header)
 # -PackDev: after all checks pass, stage the dev folder (a directory, not an archive). Placing it
 #   in a game Mods directory is the developer's own step - no script here writes outside the repository.
 #   -PackZip also writes the dev zip; -PackNupkg also writes the consumer reference package. Both are
@@ -182,6 +184,18 @@ Invoke-Check 'About.xml identity is present and well-formed' `
         }
         # The contract axis is asserted against this value inside gate 1, where FerriteLibVersion.Api
         # is actually readable. Here we only prove the release axis is well-formed on its own.
+    }
+
+Invoke-Check 'net472 trap scan (compiles green, fails at runtime)' `
+    'pwsh -NoProfile -File scripts/net472-trap-scan.ps1' `
+    {
+        # The harness compiles against a reference assembly and executes on net472, so a member the
+        # reference advertises can still be missing at runtime -- and the call site need not name the
+        # enum that gives it away (`text.Split(',')` binds to `Split(char, StringSplitOptions)` through
+        # a default argument). The scan reads the argument shape instead of the enum name, which is the
+        # only form that finds it: a seven-gate-green tree shipped exactly this failure until a lane ran
+        # it (2026-09-11).
+        & pwsh -NoProfile -File (Join-Path $root 'scripts\net472-trap-scan.ps1') -Path $root
     }
 
 if ($PackDev) {
