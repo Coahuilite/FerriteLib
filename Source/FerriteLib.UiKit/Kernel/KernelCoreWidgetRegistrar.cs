@@ -16,5 +16,6 @@ public static class KernelCoreWidgetRegistrar
         // consumer would otherwise hand-roll inside its own kind.
         Widgets.WrappedTextWidget.Register();
         Widgets.ButtonWidget.Register();
+        Widgets.RuleWidget.Register();
     }
 }
