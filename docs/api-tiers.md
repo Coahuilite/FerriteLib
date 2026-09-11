@@ -70,7 +70,10 @@ consequence is paid in the open rather than discovered by a stranger.
   members across its boundary.
 - `UiPopup` — one popup per session by design today; the owned hit stack generalises exactly that.
 - `UiSessionGuard` — the recovery wrapper; the recovery key is an arranged path today.
-- `UiTheme` — one global `Border` today, which cannot express the game's per-surface fill/border pairing.
+- `UiTheme` — per-surface (fill, border) pairs and a density bundle landed (`BaseSurface` through
+  `DangerSurface`, `Geometry`, `LayoutRevision`, `Styles`); the open debt is how far the new knobs reach
+  (two widgets read the density tokens so far) and the table key gaining writability when the bindings
+  read side exists.
 - `UiThemeDraw` — the single text and panel outlet; per-surface tokens change what it takes to draw.
 - `UiFitAudit` — the audit surface; entry attribution follows the identity layer.
 - `UiLayoutManifest` — the `Schema="2"` slot and the uncalled `ParseFile` are an open fork, and either
