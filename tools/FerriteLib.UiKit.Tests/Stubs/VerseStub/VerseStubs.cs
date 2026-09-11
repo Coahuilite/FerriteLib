@@ -281,12 +281,21 @@ public static class Widgets
     // Krafs ref assembly, so these are only accessible through reflection at runtime.
     public static readonly List<Rect> DrawBoxSolidRects = new();
     public static readonly List<Color> DrawBoxSolidColors = new();
+    // Label calls are recorded together with the colour the outlet had applied through GUI.color.
+    // The text colour a site resolves is otherwise invisible to the harness, and "which colour did
+    // this site write" is exactly what a one-table assertion has to observe.
+    public static readonly List<Rect> LabelRects = new();
+    public static readonly List<string> LabelTexts = new();
+    public static readonly List<Color> LabelColors = new();
     public static int ScrollViewDepth;
     public static int BeginScrollViewCalls;
     public static int EndScrollViewCalls;
 
     public static void Label(Rect rect, string text)
     {
+        LabelRects.Add(rect);
+        LabelTexts.Add(text ?? "");
+        LabelColors.Add(GUI.color);
     }
 
     public static void DrawBoxSolid(Rect rect, Color color)

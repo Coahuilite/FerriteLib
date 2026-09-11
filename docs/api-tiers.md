@@ -97,6 +97,18 @@ consequence is paid in the open rather than discovered by a stranger.
 - `UiStyleTable` — the resolved-value store reached through `UiTheme.Styles`; one per theme instance, never
   shared, and the single place the painting outlets and the widgets get their values from.
 
+- `UiNodeId` — the element identity the 0.4.0 identity layer adds: unique per structural path inside one
+  tree (`Id`, or `Kind[declaredIndex]` when the element has none), the same value in Measure and in Draw,
+  and unchanged across a re-arrange of the same tree. It is the key of `UiSession`'s per-element value state,
+  which is why `UiSession.GetOrCreateValueState(string)`, `UiSession.ActiveElement`,
+  `UiWidgetContext.ElementId` and `UiSession.HoverClaimElement` now resolve against the element being
+  arranged or drawn instead of aliasing two unnamed same-kind siblings onto one bare path string.
+  **Debt and recovery condition:** `HoverClaimElement` and the ambient `ActiveElement` it reads exist only
+  until the node object hands a widget its identity directly; that member is then deleted or replaced by the
+  node's own claim record. The surface this slice deliberately did not retype — `UiNative`'s hot-control id,
+  the popup owner key, and `ScrollPositions` / `SetScrollTarget` / `Trip` — keeps its string signature and
+  fills the key from the identity-derived unique string.
+
 ## Internalize-candidate
 
 - `KernelCoreWidgetRegistrar` — called from inside the assembly by the registry itself; no consumer names it.

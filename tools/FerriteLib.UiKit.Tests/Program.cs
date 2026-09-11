@@ -84,5 +84,8 @@ internal static class Program
 
         Console.WriteLine("Kernel resolved style table (tone x emphasis, one funnel)...");
         failures += KernelResolvedStyleTests.RunAll();
+
+        Console.WriteLine("Kernel element identity (stable identity + per-element state)...");
+        failures += KernelIdentityTests.RunAll();
     }
 }

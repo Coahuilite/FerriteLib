@@ -34,6 +34,7 @@ internal static class KernelResolvedStyleTests
         Run("Per-surface pairs: one plane can override the shared edge", VerifySurfacePairs);
         Run("Density tokens move geometry and clamp instead of throwing", VerifyDensityTokens);
         Run("The resolved font is the font the fitting audit measured with", VerifyResolvedFontIsMeasured);
+        Run("Text sites write the colour the table hands out", VerifyTextSitesFollowTheTable);
         Run("A layout-token change re-arranges; a re-tint reuses the bands", VerifyLayoutRevisionInvalidatesBands);
         ResetPointerSeams();
         return failures;
@@ -285,6 +286,47 @@ internal static class KernelResolvedStyleTests
         }
     }
 
+    /// <summary>
+    /// The text half of the same table, observed through the stub's Label recorder: a label carries the
+    /// colour the outlet applied through GUI.color, so "which colour did this site write" is checkable.
+    /// Every expectation is a colour that no hand-picked default coincides with, and the neutral pair
+    /// separates the two meanings the second axis exists for: a badge's compact text is secondary, a
+    /// field's value is primary.
+    /// </summary>
+    private static void VerifyTextSitesFollowTheTable()
+    {
+        var onGold = new Color(0.91f, 0.12f, 0.13f, 1f);
+        var primary = new Color(0.21f, 0.22f, 0.23f, 1f);
+        var secondary = new Color(0.31f, 0.32f, 0.33f, 1f);
+
+        UiTheme theme = UiTheme.DarkGold;
+        theme.TextOnGold = onGold;
+        theme.TextPrimary = primary;
+        theme.TextSecondary = secondary;
+
+        DrawStatusBadge(theme, UiStatusTone.Active);
+        CheckLastLabel(onGold, "StatusBadge(Active) writes the table's Active text colour");
+        DrawStatusBadge(theme, UiStatusTone.Neutral);
+        CheckLastLabel(secondary, "StatusBadge(Neutral) writes the Muted text colour (the measured coordinate)");
+        DrawStatusBadge(theme, UiStatusTone.Danger);
+        CheckLastLabel(theme.TextOnDanger, "StatusBadge(Danger) writes the alarm text colour");
+
+        DrawDropdown(theme, "B");
+        CheckLastLabel(onGold, "DropdownWidget field (selected) writes the Active text colour");
+        DrawDropdown(theme, "");
+        CheckLastLabel(primary, "DropdownWidget field (unselected) writes the Normal text colour");
+
+        DrawModeRow(theme, "A");
+        CheckLastLabel(onGold, "InputModeRowWidget option (selected) writes the Active text colour");
+        DrawModeRow(theme, "");
+        CheckLastLabel(primary, "InputModeRowWidget option (unselected) writes the Normal text colour");
+
+        DrawPopupRow(theme, "B");
+        CheckLastLabel(onGold, "UiPopup option row (selected) writes the Active text colour");
+        DrawPopupRow(theme, "");
+        CheckLastLabel(primary, "UiPopup option row (unselected) writes the Normal text colour");
+    }
+
     private static void VerifyLayoutRevisionInvalidatesBands()
     {
         UiWidgetRegistry.Clear();
@@ -322,10 +364,10 @@ internal static class KernelResolvedStyleTests
         UiThemeDraw.StatusTreatment(new Rect(0f, 0f, 80f, 20f), theme, tone);
     }
 
-    private static void DrawStatusBadge(UiTheme theme)
+    private static void DrawStatusBadge(UiTheme theme, UiStatusTone tone = UiStatusTone.Active)
     {
         ClearRecordedBoxes();
-        UiThemeDraw.StatusBadge(new Rect(0f, 0f, 80f, 20f), "badge", theme, UiStatusTone.Active);
+        UiThemeDraw.StatusBadge(new Rect(0f, 0f, 80f, 20f), "badge", theme, tone);
     }
 
     private static void DrawDropdown(UiTheme theme, string currentValue)
@@ -422,6 +464,22 @@ internal static class KernelResolvedStyleTests
         }
     }
 
+    /// <summary>The colour of the most recent label call, or a recorded failure when none happened.</summary>
+    private static void CheckLastLabel(Color expected, string name)
+    {
+        IList colors = RecordedLabelColors();
+        if (colors.Count == 0)
+        {
+            failures++;
+            Console.Error.WriteLine("  FAIL: " + name + " (no label was recorded)");
+            return;
+        }
+
+        Color actual = (Color)colors[colors.Count - 1];
+        Check(SameColor(actual, expected),
+            name + " (expected " + Describe(expected) + ", got " + Describe(actual) + ")");
+    }
+
     private static bool SameStyle(UiResolvedStyle left, UiResolvedStyle right)
     {
         return SameColor(left.Fill, right.Fill)
@@ -470,6 +528,14 @@ internal static class KernelResolvedStyleTests
         FieldInfo? colors = typeof(Verse.Widgets).GetField(
             "DrawBoxSolidColors", BindingFlags.Public | BindingFlags.Static);
         if (colors == null) throw new Exception("Verse stub is missing DrawBoxSolidColors");
+        return (IList)colors.GetValue(null)!;
+    }
+
+    private static IList RecordedLabelColors()
+    {
+        FieldInfo? colors = typeof(Verse.Widgets).GetField(
+            "LabelColors", BindingFlags.Public | BindingFlags.Static);
+        if (colors == null) throw new Exception("Verse stub is missing LabelColors");
         return (IList)colors.GetValue(null)!;
     }
 
