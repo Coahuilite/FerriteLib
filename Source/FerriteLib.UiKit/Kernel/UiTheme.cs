@@ -219,12 +219,13 @@ public sealed class UiTheme
     }
 
     /// <summary>
-    /// The alarm fill under its pre-0.4 name: a consumer compiled against it
-    /// (<c>Coahuilite/UniversalSqueaker</c>, <c>UI/Kernel/UsKernelDraw.cs</c> -- one name for the fill and
-    /// the other for the border, which is why deleting one broke a build instead of a pixel). The two
-    /// names always held one RGB, so this is a redirect and not a second token: reading or assigning here
-    /// reads or assigns <see cref="Danger"/>. Retires at the next minor boundary, once the consumer has
-    /// moved.
+    /// The alarm fill under its pre-0.4 name. A consumer compiled against that name while the 0.4 window
+    /// collapsed it into <see cref="Danger"/> -- one name for a fill and the other for a border inside one
+    /// expression -- so deleting it broke a build instead of a pixel. The citation is transcribed in this
+    /// repository's own ledger, which is where cross-repo evidence belongs; nothing here names the
+    /// consumer, because the neutrality invariant forbids product vocabulary in the payload. The two names
+    /// always held one RGB, so this is a redirect and not a second token: reading or assigning here reads
+    /// or assigns <see cref="Danger"/>. Retires at the next minor boundary, once the consumer has moved.
     /// </summary>
     public Color Warning
     {

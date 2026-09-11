@@ -73,8 +73,17 @@ internal static class KernelResolvedStyleTests
             SameStyle(theme.Styles.Resolve(UiStatusTone.Active, UiEmphasis.Normal), theme.Styles.Resolve(UiStatusTone.Active, UiEmphasis.Muted)),
             "a saturated tone paints the same text under either emphasis (the axis carries one measured difference, not a scale)");
 
-        Check(typeof(UiTheme).GetProperty("Warning") == null,
-            "the duplicate Warning token is gone: Warning and Danger are two tone names over one surface");
+        // The 0.4 window first collapsed the two names and then put one back as a redirect, once a
+        // consumer's build proved it was used. So the property exists -- and it is a view onto Danger,
+        // which is the claim that matters: a redirect is a name, not a second token.
+        Check(typeof(UiTheme).GetProperty("Warning") != null,
+            "the pre-0.4 alarm name survives as a redirect for one minor");
+        UiTheme redirectProbe = UiTheme.DarkGold;
+        redirectProbe.Warning = new Color(0.11f, 0.22f, 0.33f, 1f);
+        Check(redirectProbe.Danger == redirectProbe.Warning,
+            "assigning the pre-0.4 name assigns the alarm surface it redirects to");
+        Check(SameStyle(redirectProbe.Styles.Resolve(UiStatusTone.Warning), redirectProbe.Styles.Resolve(UiStatusTone.Danger)),
+            "both tone names resolve to one surface: the redirect is a name, not a second token");
 
         UiTheme other = UiTheme.DarkGold;
         Check(!ReferenceEquals(theme.Styles, other.Styles), "two themes never share one resolved-value store");
