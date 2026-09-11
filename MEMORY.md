@@ -267,6 +267,12 @@
   gate or lane refers to must be tracked, and the check is `git archive <sha>` plus a run, never the working
   tree. Gate 8 itself is verified both ways -- 8/8 on a clean tree, and red with `file:line` and the matched
   shape when `Split(',')` is planted.
+  Gate 8 runs the scan with three exit codes -- 0 clean, 2 a hit, 3 not scanned (empty scope, or a
+  directory with no git metadata) -- and the third one exists because the first version reported a clean
+  `HITS=0` over zero files: `git rev-parse` fails with 128 rather than throwing, and a native git failure
+  does not raise in PowerShell. A scan that finds nothing is a failure, not a pass. The net472 measurement
+  probe deliberately calls every trap shape inside try/catch, so it must never be committed into the repo
+  tree -- gate 8 correctly flags it there, which is the gate working, not a false positive.
   (2) Two unpushed commits were amended in flight (`a81182e`->`169cf62`, `085ebd1`->`7afa1df`), both
   reported by their author; that mapping is part of this session's record.
   **Two traps worth keeping.** A mutation check that restores a file with `Copy-Item` keeps the old mtime,
