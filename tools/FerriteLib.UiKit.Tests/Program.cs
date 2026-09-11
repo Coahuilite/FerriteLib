@@ -81,5 +81,8 @@ internal static class Program
 
         Console.WriteLine("Kernel leaf atoms (wrapped text / button / rule / slider / number field)...");
         failures += KernelAtomTests.RunAll();
+
+        Console.WriteLine("Kernel resolved style table (tone x emphasis, one funnel)...");
+        failures += KernelResolvedStyleTests.RunAll();
     }
 }

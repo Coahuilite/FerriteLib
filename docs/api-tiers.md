@@ -87,6 +87,16 @@ consequence is paid in the open rather than discovered by a stranger.
 - `UiOverflowReport` — the fit audit's overflow record, consumed by the wired consumer's own audit sink; its
   fields follow the audit's entry attribution, which the identity layer changes.
 
+- `UiSurfaceStyle` — a surface's (fill, border) pair; what the per-surface restructure replaces the single
+  global border with, and what `UiTheme.BaseSurface` through `UiTheme.DangerSurface` hand back.
+- `UiGeometry` — the density bundle (padding / spacing / gap / row height / hairline) read from
+  `UiTheme.Geometry`; the numbers widgets used to hard-code, in one knob.
+- `UiEmphasis` — the second axis of a treatment key (`Normal` form-control text, `Muted` badge text); it
+  carries the one measured difference between those two coordinates, not a general emphasis scale.
+- `UiResolvedStyle` — one immutable answer (fill, border, text plus its pair view) handed out by the table.
+- `UiStyleTable` — the resolved-value store reached through `UiTheme.Styles`; one per theme instance, never
+  shared, and the single place the painting outlets and the widgets get their values from.
+
 ## Internalize-candidate
 
 - `KernelCoreWidgetRegistrar` — called from inside the assembly by the registry itself; no consumer names it.
