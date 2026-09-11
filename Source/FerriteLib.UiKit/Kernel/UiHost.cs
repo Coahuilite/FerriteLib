@@ -18,6 +18,7 @@ public sealed class UiHost : IDisposable
     private readonly IUiTranslation translation;
     private readonly UiLayoutEngine engine;
     private readonly UiSession session;
+    private int lastLayoutRevision;
 
     public UiHost(
         string source,
@@ -60,6 +61,18 @@ public sealed class UiHost : IDisposable
 
     public UiLayoutSnapshot MeasureAndArrange(Vector2 available)
     {
+        // The band cache compares the available size and the content/definition/translation revisions,
+        // and it cannot see the theme. A density or font-size change would therefore keep the previous
+        // geometry while the draw resolves the new font - exactly the measure/draw disagreement a
+        // resolved-value store exists to prevent. The theme reports its own layout-bearing revision, and
+        // the host turns a change into the one cache clock the engine already understands rather than
+        // inventing a second one.
+        if (lastLayoutRevision != theme.LayoutRevision)
+        {
+            lastLayoutRevision = theme.LayoutRevision;
+            session.BumpContentRevision();
+        }
+
         UiWidgetContext ctx = CreateContext(available.x);
         return engine.ArrangeRoots(ctx, available, manifest.Roots);
     }
