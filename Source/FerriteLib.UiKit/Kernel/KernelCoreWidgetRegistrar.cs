@@ -15,5 +15,6 @@ public static class KernelCoreWidgetRegistrar
         // Leaf atoms: the vocabulary a manifest reaches for when it needs one of the things a
         // consumer would otherwise hand-roll inside its own kind.
         Widgets.WrappedTextWidget.Register();
+        Widgets.ButtonWidget.Register();
     }
 }
