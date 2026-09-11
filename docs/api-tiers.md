@@ -164,7 +164,8 @@ consequence is paid in the open rather than discovered by a stranger.
   forbids); it therefore keeps the pre-stack behaviour and is **not** covered by the stack. Migration is one
   argument: pass the context (`UiNative.Button(rect, ctx)`), which is what every library widget now does.
   The window shell's own chrome button is the one library call site left raw, because the chrome draws
-  outside the tree.
+  outside the tree; that count is measured rather than asserted - the containment lane allowlists this
+  call site by name and fails if a second raw call site appears or if this sentence stops saying so.
   **Recorded boundary and its recovery condition:** content layers are in the stack and ordered by paint,
   but two content layers do not arbitrate each other yet - only popup-over-content does, because IMGUI
   already serialises content input by draw order and a rect lookup cannot tell a real pointer from an
