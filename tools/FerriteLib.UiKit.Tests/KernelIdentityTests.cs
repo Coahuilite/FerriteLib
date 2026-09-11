@@ -53,6 +53,9 @@ internal static class KernelIdentityTests
             Run("per-element state does not cross between unnamed siblings", VerifyStateIsIsolatedBetweenSiblings);
             Run("a throwing sibling does not move the next element's state slot", VerifyThrowerDoesNotLeakTheScope);
             Run("hover claims carry the element that made them", VerifyHoverClaimCarriesItsElement);
+            Run("a node owns its element's state and survives a re-arrange", VerifyNodeOwnsItsState);
+            Run("a namespaced kind no longer shares identity or state", VerifySeparatorKindDoesNotAliasState);
+            Run("a node marked dirty forces the next arrange to re-measure", VerifyDirtyNodeForcesReArrange);
         }
         finally
         {
@@ -133,10 +136,15 @@ internal static class KernelIdentityTests
                 + ", drawn " + drawnA + "/" + drawnB);
         }
 
-        if (measuredA.Key.Length == 0 || !string.Equals(measuredA.Key, PathOf("A", "draw"), StringComparison.Ordinal))
+        if (string.Equals(measuredA.Key, measuredB.Key, StringComparison.Ordinal))
         {
-            throw new Exception("the element's path is not its identity: key='" + measuredA.Key
-                + "', ctx.ElementPath='" + PathOf("A", "draw") + "'");
+            throw new Exception("two unnamed same-kind siblings share one canonical key: " + measuredA.Key);
+        }
+
+        if (measuredA.Path.Length == 0 || !string.Equals(measuredA.Path, PathOf("A", "draw"), StringComparison.Ordinal))
+        {
+            throw new Exception("the context path is not the identity's display path: '" + measuredA.Path
+                + "' vs '" + PathOf("A", "draw") + "'");
         }
     }
 
@@ -191,9 +199,9 @@ internal static class KernelIdentityTests
         host.DrawFrame(Viewport);
 
         UiNodeId b = IdentityOf("B", "draw");
-        if (!string.Equals(b.Key, "row/" + ProbeKind + "[1]", StringComparison.Ordinal))
+        if (!string.Equals(b.Path, "row/" + ProbeKind + "[1]", StringComparison.Ordinal))
         {
-            throw new Exception("the Tab-gated second sibling did not keep its declared ordinal: " + b.Key);
+            throw new Exception("the Tab-gated second sibling did not keep its declared ordinal: " + b.Path);
         }
 
         tab = "TabA";
@@ -202,9 +210,9 @@ internal static class KernelIdentityTests
         host.DrawFrame(Viewport);
 
         UiNodeId a = IdentityOf("A", "draw");
-        if (!string.Equals(a.Key, "row/" + ProbeKind + "[0]", StringComparison.Ordinal))
+        if (!string.Equals(a.Path, "row/" + ProbeKind + "[0]", StringComparison.Ordinal))
         {
-            throw new Exception("a Tab switch renumbered the visible sibling: " + a.Key);
+            throw new Exception("a Tab switch renumbered the visible sibling: " + a.Path);
         }
 
         if (!host.Session.GetValueStates(b).ContainsKey("probe"))
@@ -425,6 +433,173 @@ internal static class KernelIdentityTests
         }
     }
 
+    /// <summary>
+    /// The node step's first claim: the element's state is the node's state, that node is the session's
+    /// node for the identity, and a re-arrange hands the same node back instead of replacing it - which
+    /// is what lets state survive a frame with no string key in between.
+    /// </summary>
+    private static void VerifyNodeOwnsItsState()
+    {
+        ResetProbe();
+        using UiHost host = Host(TwoSiblingPage());
+        host.DrawFrame(Viewport);
+
+        UiNodeId idA = IdentityOf("A", "draw");
+        UiNode? first = NodeOf("A", "draw");
+        if (first == null)
+        {
+            throw new Exception("the probe drew without a node");
+        }
+
+        if (!ReferenceEquals(first, host.Session.GetNode(idA)))
+        {
+            throw new Exception("the session's node for the identity is not the node the widget was handed");
+        }
+
+        if (!ReferenceEquals(first.State, host.Session.GetOrCreateValueState(idA)))
+        {
+            throw new Exception("the element's own state is not the node's state");
+        }
+
+        if (!ReferenceEquals(first.ValueStates["probe"], host.Session.GetOrCreateValueState(idA, "probe")))
+        {
+            throw new Exception("a named slot is not the node's slot");
+        }
+
+        host.DrawFrame(Viewport);
+        if (!ReferenceEquals(first, NodeOf("A", "draw")))
+        {
+            throw new Exception("a re-arrange replaced the node instead of reusing it");
+        }
+
+        if (!first.ValueStates.TryGetValue("probe", out UiValueState? state) || state.EditText != "A")
+        {
+            throw new Exception("the element's state did not survive the pass");
+        }
+    }
+
+    /// <summary>
+    /// The shape the flat key could not survive: a namespaced kind inside a generated segment makes two
+    /// different elements print the same display path (the unnamed first sibling generates
+    /// <c>test/identity-probe[0]</c>, and the second one is literally named that under an
+    /// <c>Id="test"</c> row). Identity is structural now, so the two must keep separate nodes and state.
+    /// </summary>
+    private static void VerifySeparatorKindDoesNotAliasState()
+    {
+        ResetProbe();
+        using UiHost host = Host(SeparatorKindPage());
+        host.DrawFrame(Viewport);
+
+        UiNodeId a = IdentityOf("A", "draw");
+        UiNodeId b = IdentityOf("B", "draw");
+        UiNode? nodeA = NodeOf("A", "draw");
+        UiNode? nodeB = NodeOf("B", "draw");
+        if (nodeA == null || nodeB == null)
+        {
+            throw new Exception("a sibling drew without a node");
+        }
+
+        if (a == b || string.Equals(a.Key, b.Key, StringComparison.Ordinal))
+        {
+            throw new Exception("two elements still share one identity key: " + a.Key);
+        }
+
+        if (ReferenceEquals(nodeA, nodeB)
+            || !ReferenceEquals(nodeA, host.Session.GetNode(a))
+            || !ReferenceEquals(nodeB, host.Session.GetNode(b)))
+        {
+            throw new Exception("the session did not keep the two nodes apart");
+        }
+
+        IReadOnlyDictionary<string, UiValueState> slotsA = host.Session.GetValueStates(a);
+        IReadOnlyDictionary<string, UiValueState> slotsB = host.Session.GetValueStates(b);
+        if (!slotsA.TryGetValue("probe", out UiValueState? stateA) || !slotsB.TryGetValue("probe", out UiValueState? stateB))
+        {
+            throw new Exception("a sibling did not own its own 'probe' slot");
+        }
+
+        if (ReferenceEquals(stateA, stateB) || stateA!.EditText != "A" || stateB!.EditText != "B"
+            || stateA.Cursor != 1 || stateB.Cursor != 2)
+        {
+            throw new Exception("state crossed between the two elements: A='" + stateA.EditText
+                + "', B='" + stateB.EditText + "'");
+        }
+
+        // Residual, asserted on purpose: the display path is still ambiguous for this shape - the fit
+        // audit and the recovery band can print the same text for two elements - while identity and
+        // state no longer depend on it. A step that narrows the residual updates this assertion too.
+        if (!string.Equals(a.Path, b.Path, StringComparison.Ordinal))
+        {
+            throw new Exception("the display path is no longer ambiguous; narrow the documented residual and "
+                + "update this assertion: '" + a.Path + "' vs '" + b.Path + "'");
+        }
+
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(Viewport.width, Viewport.height));
+        int printed = 0;
+        foreach (string key in snapshot.VisibleIds)
+        {
+            if (string.Equals(key, a.Path, StringComparison.Ordinal))
+            {
+                printed++;
+            }
+        }
+
+        if (printed != 2)
+        {
+            throw new Exception("expected the shared display path to be printed twice, got " + printed);
+        }
+    }
+
+    /// <summary>
+    /// The dirty flag is the per-element invalidation signal the roadmap asks for: an unchanged pass
+    /// reuses the arranged snapshot, and one node asking for a re-measure is enough to force the next
+    /// arrange even though size, content revision, definition and language all stand still.
+    /// </summary>
+    private static void VerifyDirtyNodeForcesReArrange()
+    {
+        ResetProbe();
+        using UiHost host = Host(TwoSiblingPage());
+        host.DrawFrame(Viewport);
+        if (CountObservations("A", "measure") != 1)
+        {
+            throw new Exception("expected one Measure on the first arrange, got " + CountObservations("A", "measure"));
+        }
+
+        host.DrawFrame(Viewport);
+        if (CountObservations("A", "measure") != 1)
+        {
+            throw new Exception("an unchanged pass re-measured the tree; the snapshot cache stopped working");
+        }
+
+        UiNode? node = NodeOf("A", "draw");
+        if (node == null)
+        {
+            throw new Exception("the probe drew without a node");
+        }
+
+        if (node.IsDirty)
+        {
+            throw new Exception("a node is still dirty after a successful arrange");
+        }
+
+        node.MarkDirty();
+        if (!node.IsDirty)
+        {
+            throw new Exception("MarkDirty did not set the flag");
+        }
+
+        host.DrawFrame(Viewport);
+        if (CountObservations("A", "measure") != 2)
+        {
+            throw new Exception("a dirty node did not force a re-arrange");
+        }
+
+        if (node.IsDirty)
+        {
+            throw new Exception("the arrange did not clear the dirty flag");
+        }
+    }
+
     // --- fixture -------------------------------------------------------------------------------
 
     private static UiHost Host(string xml, IUiBindings? bindings = null)
@@ -468,6 +643,21 @@ internal static class KernelIdentityTests
             + "</UiPage>";
     }
 
+    /// <summary>
+    /// The shape the flat key could not survive: a namespaced kind inside a generated segment makes two
+    /// different elements print the same display path (the unnamed first sibling generates
+    /// <c>test/identity-probe[0]</c>, and the second one is literally named that under an
+    /// <c>Id="test"</c> row). Identity is structural now, so the two must keep separate nodes and state.
+    /// </summary>
+    private static string SeparatorKindPage()
+    {
+        return "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\">"
+            + "<Widget Kind=\"" + ProbeKind + "\" Text=\"A\" Cursor=\"1\" />"
+            + "<Row Id=\"test\"><Widget Id=\"identity-probe[0]\" Kind=\"" + ProbeKind + "\" Text=\"B\" Cursor=\"2\" /></Row>"
+            + "</Row></UiPage>";
+    }
+
     private static string ThrowerPage()
     {
         return "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
@@ -490,6 +680,35 @@ internal static class KernelIdentityTests
         }
 
         throw new Exception("no " + phase + " observation for '" + tag + "'");
+    }
+
+    private static UiNode? NodeOf(string tag, string phase)
+    {
+        foreach (Observation observation in IdentityProbeWidget.Seen)
+        {
+            if (string.Equals(observation.Tag, tag, StringComparison.Ordinal)
+                && string.Equals(observation.Phase, phase, StringComparison.Ordinal))
+            {
+                return observation.Node;
+            }
+        }
+
+        throw new Exception("no " + phase + " observation for '" + tag + "'");
+    }
+
+    private static int CountObservations(string tag, string phase)
+    {
+        int count = 0;
+        foreach (Observation observation in IdentityProbeWidget.Seen)
+        {
+            if (string.Equals(observation.Tag, tag, StringComparison.Ordinal)
+                && string.Equals(observation.Phase, phase, StringComparison.Ordinal))
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     private static string PathOf(string tag, string phase)
@@ -521,13 +740,15 @@ internal static class KernelIdentityTests
         internal readonly string Phase;
         internal readonly UiNodeId Id;
         internal readonly string Path;
+        internal readonly UiNode? Node;
 
-        internal Observation(string tag, string phase, UiNodeId id, string path)
+        internal Observation(string tag, string phase, UiNodeId id, string path, UiNode? node)
         {
             Tag = tag;
             Phase = phase;
             Id = id;
             Path = path;
+            Node = node;
         }
     }
 
@@ -572,13 +793,13 @@ internal static class KernelIdentityTests
 
         public float Measure(UiWidgetContext ctx)
         {
-            Seen.Add(new Observation(tag, "measure", ctx.ElementId, ctx.ElementPath));
+            Seen.Add(new Observation(tag, "measure", ctx.ElementId, ctx.ElementPath, ctx.Node));
             return 14f;
         }
 
         public void Draw(Rect rect, UiWidgetContext ctx)
         {
-            Seen.Add(new Observation(tag, "draw", ctx.ElementId, ctx.ElementPath));
+            Seen.Add(new Observation(tag, "draw", ctx.ElementId, ctx.ElementPath, ctx.Node));
 
             UiValueState state = ctx.Session.GetOrCreateValueState("probe");
             state.EditText = tag;
@@ -593,6 +814,11 @@ internal static class KernelIdentityTests
             if (ctx.Session.ActiveElement != ctx.ElementId)
             {
                 MissedOwnSlot.Add(tag);
+            }
+
+            if (ctx.Node == null || ctx.Node.Id != ctx.ElementId || !ReferenceEquals(ctx.Session.ActiveNode, ctx.Node))
+            {
+                MissedOwnSlot.Add(tag + " (context node)");
             }
 
             if (string.Equals(tag, ClaimingTag, StringComparison.Ordinal))

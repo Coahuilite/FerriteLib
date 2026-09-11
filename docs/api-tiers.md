@@ -105,17 +105,28 @@ consequence is paid in the open rather than discovered by a stranger.
 - `UiStyleTable` — the resolved-value store reached through `UiTheme.Styles`; one per theme instance, never
   shared, and the single place the painting outlets and the widgets get their values from.
 
-- `UiNodeId` — the element identity the 0.4.0 identity layer adds: unique per structural path inside one
-  tree (`Id`, or `Kind[declaredIndex]` when the element has none), the same value in Measure and in Draw,
-  and unchanged across a re-arrange of the same tree. It is the key of `UiSession`'s per-element value state,
-  which is why `UiSession.GetOrCreateValueState(string)`, `UiSession.ActiveElement`,
-  `UiWidgetContext.ElementId` and `UiSession.HoverClaimElement` now resolve against the element being
-  arranged or drawn instead of aliasing two unnamed same-kind siblings onto one bare path string.
-  **Debt and recovery condition:** `HoverClaimElement` and the ambient `ActiveElement` it reads exist only
-  until the node object hands a widget its identity directly; that member is then deleted or replaced by the
-  node's own claim record. The surface this slice deliberately did not retype — `UiNative`'s hot-control id,
-  the popup owner key, and `ScrollPositions` / `SetScrollTarget` / `Trip` — keeps its string signature and
-  fills the key from the identity-derived unique string.
+- `UiNodeId` — the element identity the 0.4.0 identity layer adds, and the key of `UiSession`'s node
+  table: unique per element inside one tree, the same value in Measure and in Draw, unchanged across a
+  re-arrange (`Id`, or `Kind[declaredIndex]` when the element has none). Since the node step it carries two
+  strings, and the difference is the point: `Key` is the canonical identity — segments joined by a separator
+  no XML text can hold, which the creation-time guards are what make injective — while `Path` is the display
+  path every diagnostic has always printed.
+  **Debt and residual aliases, stated rather than hidden:** the display path can still name two elements
+  alike when a `Kind` itself contains `/` (`input/stepper-slider`), so `VisibleIds`, the fit audit, the
+  recovery band and the string-keyed state surfaces — `UiSession.Trip`/`TrippedComponentIds`,
+  `ScrollPositions`, `SetScrollTarget` with `UiLayoutSnapshot.RectById` — can still print or key on one
+  text. Identity and per-element state no longer depend on it: `GetNode`, `GetValueStates`,
+  `ActiveElement`, `ActiveNode` and `HoverClaimElement` are identity-keyed. `UiNative`'s hot-control id
+  and the popup owner key stay string-keyed for the same reason; both are named as the owned-hit-stack
+  step's business.
+  **Recovery condition:** when widgets receive nodes for their own sub-controls and the hit stack lands, the
+  string-keyed surfaces above move to node identity and this paragraph shrinks accordingly.
+- `UiNode` — one arranged element's identity carrier, and the object the node step adds: it owns the
+  element's `State` (plus its named slots), its `Kind`, its declared `Ordinal` and the `IsDirty` flag whose
+  writer is `MarkDirty`; `UiSession` caches it by `UiNodeId` for the host's lifetime, so a re-arrange
+  reuses the node and its state survives a frame. `UiWidgetContext.Node` (with `WithNode`, which replaces
+  the 0.4.0-window `WithElement(UiNodeId)`) is the per-pass hand-off. Public-unstable: the next step grows
+  parent/child links and geometry onto it — today the arranged rect still lives on the engine's entry.
 
 - `UiStyleFallbackReport` — one appearance fallback: an authored `Tone`/`Emphasis` value outside the
   vocabulary, carrying the element path, the kind, the attribute, the authored text and the value it

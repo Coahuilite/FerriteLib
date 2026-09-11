@@ -26,9 +26,13 @@ public sealed class UiLayoutEngine
         /// <summary>
         /// This element's stable identity, built once during arrange and reused by the draw pass, so
         /// Measure and Draw agree about which element they are on (0.4.0 identity layer). Its
-        /// <see cref="UiNodeId.Key"/> is also the entry's arranged path for diagnostics.
+        /// <see cref="UiNodeId.Path"/> is the entry's arranged display path; the identity itself is
+        /// <see cref="UiNodeId.Key"/>, which is what the session keys nodes and state by.
         /// </summary>
         internal UiNodeId Id;
+
+        /// <summary>The element's node: identity, state and dirty flag, owned by the session.</summary>
+        internal UiNode Node = null!;
         internal IUiWidget? Widget;
         internal bool IsContainer;
         internal string ContainerKind = "";
@@ -82,7 +86,10 @@ public sealed class UiLayoutEngine
         float width = Normalize(available.x, 1f);
         float height = Normalize(available.y, 1f);
 
+        // A dirty node is the per-element invalidation signal: a widget that marked its own node dirty
+        // asks for a re-measure even when size, content revision, definition and language all stand still.
         if (cachedSnapshot != null
+            && !ctx.Session.HasDirtyNodes
             && Math.Abs(cachedAvailable.x - width) < 0.01f
             && Math.Abs(cachedAvailable.y - height) < 0.01f
             && cachedContentRevision == ctx.Session.ContentRevision
@@ -100,12 +107,13 @@ public sealed class UiLayoutEngine
             UiElementSpec root = roots[i];
             if (IsHidden(root, ctx, narrow: false)) continue;
 
+            UiNode rootNode = ctx.Session.GetOrCreateNode(UiNodeId.Root(root, i), root.Kind, i);
             MeasuredBox child = MeasureElement(
                 ctx,
                 root,
                 width,
                 Math.Max(0f, height - y),
-                UiNodeId.Root(root, i));
+                rootNode);
             child = OffsetBox(child, 0f, y);
             box.Entries.AddRange(child.Entries);
             y += child.Height;
@@ -126,7 +134,7 @@ public sealed class UiLayoutEngine
                 rects[entry.Spec.Id] = entry.Rect;
             }
 
-            visible.Add(entry.Id.Key);
+            visible.Add(entry.Id.Path);
 
             if (string.Equals(entry.ContainerKind, "Scroll", StringComparison.Ordinal))
             {
@@ -150,6 +158,12 @@ public sealed class UiLayoutEngine
             viewports,
             scrollContents,
             cachedDefinitionRevision);
+
+        // The arrange succeeded, so every node's Measure has been delivered and the flags mean
+        // "recompute me on the next pass" again. A widget that marks its node dirty during Draw lands
+        // here on the following pass; one that marks it during Measure is cleared because that measure
+        // just happened.
+        ctx.Session.ClearDirtyNodes();
 
         ClampScrollPositions(ctx.Session, cachedSnapshot);
         return cachedSnapshot;
@@ -178,8 +192,8 @@ public sealed class UiLayoutEngine
             PlacedEntry entry = entries[index];
             Rect drawRect = ToDrawRect(entry.Rect, viewportPosition, nativeOrigin);
             UiWidgetContext entryCtx = entry.MeasureWidth > 0f
-                ? ctx.WithViewWidth(entry.MeasureWidth).WithWindowOrigin(windowOrigin).WithElement(entry.Id)
-                : ctx.WithWindowOrigin(windowOrigin).WithElement(entry.Id);
+                ? ctx.WithViewWidth(entry.MeasureWidth).WithWindowOrigin(windowOrigin).WithNode(entry.Node)
+                : ctx.WithWindowOrigin(windowOrigin).WithNode(entry.Node);
 
             if (IsScopedContainer(entry.ContainerKind))
             {
@@ -199,7 +213,7 @@ public sealed class UiLayoutEngine
             {
                 // Announce the owning element so the text-fit audit can attribute a finding by path
                 // without every widget threading its own identity through the drawing helpers.
-                UiFitAudit.BeginElement(entry.Id.Key);
+                UiFitAudit.BeginElement(entry.Id.Path);
                 try
                 {
                     if (entry.IsContainer)
@@ -220,14 +234,14 @@ public sealed class UiLayoutEngine
                         // tidy: the guard swallows a throwing widget and keeps drawing, so an exception
                         // path that did not restore the previous element would send every later widget's
                         // keys into the failed element's namespace.
-                        UiNodeId previous = ctx.Session.EnterElement(entry.Id);
+                        UiNode previous = ctx.Session.EnterNode(entry.Node);
                         try
                         {
-                            UiSessionGuard.DrawWidget(entry.Widget, drawRect, entryCtx, entry.Id.Key);
+                            UiSessionGuard.DrawWidget(entry.Widget, drawRect, entryCtx, entry.Id.Path);
                         }
                         finally
                         {
-                            ctx.Session.ExitElement(previous);
+                            ctx.Session.ExitNode(previous);
                         }
                     }
                 }
@@ -352,38 +366,39 @@ public sealed class UiLayoutEngine
     /// </summary>
     private static string ScrollKey(PlacedEntry entry)
     {
-        return entry.Spec.Id.Length > 0 ? entry.Spec.Id : entry.Id.Key;
+        return entry.Spec.Id.Length > 0 ? entry.Spec.Id : entry.Id.Path;
     }
 
-    private MeasuredBox MeasureElement(UiWidgetContext ctx, UiElementSpec spec, float width, float availableHeight, UiNodeId id)
+    private MeasuredBox MeasureElement(UiWidgetContext ctx, UiElementSpec spec, float width, float availableHeight, UiNode node)
     {
         string containerKind = GetContainerKind(spec);
         if (containerKind.Length == 0)
         {
-            IUiWidget widget = GetOrCreateWidget(spec, id);
+            IUiWidget widget = GetOrCreateWidget(spec, node.Id);
             // Measure must see the widget's arranged width, not the page width, so width-dependent
             // widgets (e.g. stacked narrow Mood rows) agree with the Draw pass, which already uses
             // entry.MeasureWidth via WithViewWidth. The element is bound to this context too, so a
             // widget's Measure and Draw report the same identity for the same element.
-            UiWidgetContext measureCtx = ctx.WithViewWidth(width).WithElement(id);
+            UiWidgetContext measureCtx = ctx.WithViewWidth(width).WithNode(node);
 
             // The same element scope the draw pass enters, and the same try/finally: the guard recovers
             // a throwing Measure, so the scope must not leak into the sibling measured next.
-            UiNodeId previous = ctx.Session.EnterElement(id);
+            UiNode previous = ctx.Session.EnterNode(node);
             float height;
             try
             {
-                height = ResolveHeight(spec, widget, measureCtx, width, id);
+                height = ResolveHeight(spec, widget, measureCtx, width, node.Id);
             }
             finally
             {
-                ctx.Session.ExitElement(previous);
+                ctx.Session.ExitNode(previous);
             }
 
             var leaf = new PlacedEntry
             {
                 Spec = spec,
-                Id = id,
+                Id = node.Id,
+                Node = node,
                 Widget = widget,
                 IsContainer = false,
                 MeasureWidth = width,
@@ -395,10 +410,10 @@ public sealed class UiLayoutEngine
             return box;
         }
 
-        return MeasureContainer(ctx, spec, width, availableHeight, id);
+        return MeasureContainer(ctx, spec, width, availableHeight, node);
     }
 
-    private MeasuredBox MeasureContainer(UiWidgetContext ctx, UiElementSpec spec, float width, float availableHeight, UiNodeId id)
+    private MeasuredBox MeasureContainer(UiWidgetContext ctx, UiElementSpec spec, float width, float availableHeight, UiNode node)
     {
         string declaredKind = GetContainerKind(spec);
         Padding padding = ParsePadding(spec);
@@ -416,27 +431,27 @@ public sealed class UiLayoutEngine
 
         if (string.Equals(kind, "Row", StringComparison.Ordinal))
         {
-            return MeasureRow(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, id, narrow);
+            return MeasureRow(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, node, narrow);
         }
 
         if (string.Equals(kind, "Wrap", StringComparison.Ordinal))
         {
-            return MeasureWrap(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, id, narrow);
+            return MeasureWrap(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, node, narrow);
         }
 
         if (string.Equals(kind, "Overlay", StringComparison.Ordinal))
         {
-            return MeasureOverlay(ctx, spec, declaredKind, width, padding, titleHeight, innerWidth, innerY, availableHeight, id, narrow);
+            return MeasureOverlay(ctx, spec, declaredKind, width, padding, titleHeight, innerWidth, innerY, availableHeight, node, narrow);
         }
 
         if (string.Equals(kind, "Scroll", StringComparison.Ordinal))
         {
-            return MeasureScroll(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, id, narrow);
+            return MeasureScroll(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, node, narrow);
         }
 
         // Stack, Column, Section, Surface and Clip are vertical stacks. Clip additionally becomes
         // a structural group during Draw.
-        return MeasureStack(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, id, narrow);
+        return MeasureStack(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, node, narrow);
     }
 
     /// <summary>
@@ -454,6 +469,15 @@ public sealed class UiLayoutEngine
             Spec = spec;
             DeclaredIndex = declaredIndex;
         }
+    }
+
+    /// <summary>
+    /// The node for one child, created on first use. Identity is the parent's identity plus the child's
+    /// declared ordinal, so the same element keeps the same node - and its state - across passes.
+    /// </summary>
+    private static UiNode ChildNode(UiWidgetContext ctx, UiNode parent, UiElementSpec spec, int declaredIndex)
+    {
+        return ctx.Session.GetOrCreateNode(parent.Id.Child(spec, declaredIndex), spec.Kind, declaredIndex);
     }
 
     private static List<ChildSlot> VisibleChildren(UiElementSpec spec, UiWidgetContext ctx, bool narrow)
@@ -526,7 +550,7 @@ public sealed class UiLayoutEngine
         float innerWidth,
         float innerY,
         float availableHeight,
-        UiNodeId id,
+        UiNode node,
         bool narrow)
     {
         List<ChildSlot> visible = VisibleChildren(spec, ctx, narrow);
@@ -561,8 +585,8 @@ public sealed class UiLayoutEngine
                 continue;
             }
 
-            UiNodeId childId = id.Child(visible[i].Spec, visible[i].DeclaredIndex);
-            float flow = MeasureElement(ctx, visible[i].Spec, childWidths[i], availableInner, childId).Height;
+            UiNode childNode = ChildNode(ctx, node, visible[i].Spec, visible[i].DeclaredIndex);
+            float flow = MeasureElement(ctx, visible[i].Spec, childWidths[i], availableInner, childNode).Height;
             flowHeights[i] = flow;
             nonFillTotal += flow;
         }
@@ -579,7 +603,7 @@ public sealed class UiLayoutEngine
             if (!first) y += gap;
 
             ChildSlot child = visible[i];
-            UiNodeId childId = id.Child(child.Spec, child.DeclaredIndex);
+            UiNode childNode = ChildNode(ctx, node, child.Spec, child.DeclaredIndex);
             float childAvailable;
             if (IsFlexibleFill(child.Spec))
             {
@@ -596,7 +620,7 @@ public sealed class UiLayoutEngine
                 childAvailable = Math.Max(0f, availableInner - (y - innerY) - reservedAfter);
             }
 
-            MeasuredBox childBox = MeasureElement(ctx, child.Spec, childWidths[i], childAvailable, childId);
+            MeasuredBox childBox = MeasureElement(ctx, child.Spec, childWidths[i], childAvailable, childNode);
             childBox = OffsetBox(childBox, padding.Left, y);
             box.Entries.AddRange(childBox.Entries);
             y += childBox.Height;
@@ -610,7 +634,8 @@ public sealed class UiLayoutEngine
         var containerEntry = new PlacedEntry
         {
             Spec = spec,
-            Id = id,
+            Id = node.Id,
+            Node = node,
             IsContainer = true,
             ContainerKind = kind,
             MeasureWidth = width,
@@ -632,7 +657,7 @@ public sealed class UiLayoutEngine
         float innerWidth,
         float innerY,
         float availableHeight,
-        UiNodeId id,
+        UiNode node,
         bool narrow)
     {
         List<ChildSlot> visible = VisibleChildren(spec, ctx, narrow);
@@ -644,8 +669,8 @@ public sealed class UiLayoutEngine
 
         for (int i = 0; i < visible.Count; i++)
         {
-            UiNodeId childId = id.Child(visible[i].Spec, visible[i].DeclaredIndex);
-            MeasuredBox childBox = MeasureElement(ctx, visible[i].Spec, widths[i], availableHeight, childId);
+            UiNode childNode = ChildNode(ctx, node, visible[i].Spec, visible[i].DeclaredIndex);
+            MeasuredBox childBox = MeasureElement(ctx, visible[i].Spec, widths[i], availableHeight, childNode);
             childBox = OffsetBox(childBox, x, innerY);
             box.Entries.AddRange(childBox.Entries);
             maxHeight = Math.Max(maxHeight, childBox.Height);
@@ -659,7 +684,8 @@ public sealed class UiLayoutEngine
         var containerEntry = new PlacedEntry
         {
             Spec = spec,
-            Id = id,
+            Id = node.Id,
+            Node = node,
             IsContainer = true,
             ContainerKind = kind,
             MeasureWidth = width,
@@ -681,7 +707,7 @@ public sealed class UiLayoutEngine
         float innerWidth,
         float innerY,
         float availableHeight,
-        UiNodeId id,
+        UiNode node,
         bool narrow)
     {
         var box = new MeasuredBox { Width = width, Height = 0f };
@@ -706,7 +732,7 @@ public sealed class UiLayoutEngine
             if (IsHidden(child, ctx, narrow)) continue;
 
             float childWidth = cols > 0 ? cellWidth : ResolveWrapWidth(child, innerWidth, ctx);
-            UiNodeId childId = id.Child(child, i);
+            UiNode childNode = ChildNode(ctx, node, child, i);
 
             bool lineFull = cols > 0 ? placedInLine >= cols : x + childWidth > padding.Left + innerWidth;
             if (!firstInLine && lineFull)
@@ -723,7 +749,7 @@ public sealed class UiLayoutEngine
                 child,
                 childWidth,
                 Math.Max(0f, availableHeight - (y - innerY)),
-                childId);
+                childNode);
             childBox = OffsetBox(childBox, x, y);
             box.Entries.AddRange(childBox.Entries);
 
@@ -741,7 +767,8 @@ public sealed class UiLayoutEngine
         var containerEntry = new PlacedEntry
         {
             Spec = spec,
-            Id = id,
+            Id = node.Id,
+            Node = node,
             IsContainer = true,
             ContainerKind = kind,
             MeasureWidth = width,
@@ -762,7 +789,7 @@ public sealed class UiLayoutEngine
         float innerWidth,
         float innerY,
         float availableHeight,
-        UiNodeId id,
+        UiNode node,
         bool narrow)
     {
         var box = new MeasuredBox { Width = width, Height = 0f };
@@ -773,8 +800,8 @@ public sealed class UiLayoutEngine
             UiElementSpec child = spec.Children[i];
             if (IsHidden(child, ctx, narrow)) continue;
 
-            UiNodeId childId = id.Child(child, i);
-            MeasuredBox childBox = MeasureElement(ctx, child, innerWidth, availableHeight, childId);
+            UiNode childNode = ChildNode(ctx, node, child, i);
+            MeasuredBox childBox = MeasureElement(ctx, child, innerWidth, availableHeight, childNode);
             childBox = OffsetBox(childBox, padding.Left, innerY);
             box.Entries.AddRange(childBox.Entries);
             maxHeight = Math.Max(maxHeight, childBox.Height);
@@ -787,7 +814,8 @@ public sealed class UiLayoutEngine
         var containerEntry = new PlacedEntry
         {
             Spec = spec,
-            Id = id,
+            Id = node.Id,
+            Node = node,
             IsContainer = true,
             ContainerKind = kind,
             MeasureWidth = width,
@@ -809,12 +837,12 @@ public sealed class UiLayoutEngine
         float innerWidth,
         float innerY,
         float availableHeight,
-        UiNodeId id,
+        UiNode node,
         bool narrow)
     {
         var entries = new List<PlacedEntry>();
         float naturalContentHeight = MeasureScrollContent(
-            ctx, spec, innerWidth, padding, gap, innerY, availableHeight, id, entries, narrow);
+            ctx, spec, innerWidth, padding, gap, innerY, availableHeight, node, entries, narrow);
 
         float naturalHeight = padding.Top + titleHeight + naturalContentHeight + padding.Bottom;
         float viewportHeight = ResolveContainerHeight(spec, naturalHeight, availableHeight);
@@ -832,7 +860,7 @@ public sealed class UiLayoutEngine
             float reservedInnerWidth = Math.Max(1f, contentWidth - padding.Left - padding.Right);
             entries.Clear();
             float reflowedContentHeight = MeasureScrollContent(
-                ctx, spec, reservedInnerWidth, padding, gap, innerY, availableHeight, id, entries,
+                ctx, spec, reservedInnerWidth, padding, gap, innerY, availableHeight, node, entries,
                 IsNarrow(spec, reservedInnerWidth));
             naturalHeight = padding.Top + titleHeight + reflowedContentHeight + padding.Bottom;
         }
@@ -841,7 +869,8 @@ public sealed class UiLayoutEngine
         var containerEntry = new PlacedEntry
         {
             Spec = spec,
-            Id = id,
+            Id = node.Id,
+            Node = node,
             IsContainer = true,
             ContainerKind = kind,
             MeasureWidth = width,
@@ -867,7 +896,7 @@ public sealed class UiLayoutEngine
         float gap,
         float innerY,
         float availableHeight,
-        UiNodeId id,
+        UiNode node,
         List<PlacedEntry> entries,
         bool narrow)
     {
@@ -880,13 +909,13 @@ public sealed class UiLayoutEngine
             if (IsHidden(child, ctx, narrow)) continue;
 
             if (!first) y += gap;
-            UiNodeId childId = id.Child(child, i);
+            UiNode childNode = ChildNode(ctx, node, child, i);
             MeasuredBox childBox = MeasureElement(
                 ctx,
                 child,
                 ResolveStackChildWidth(child, contentInnerWidth, ctx),
                 Math.Max(0f, availableHeight - (y - innerY)),
-                childId);
+                childNode);
             childBox = OffsetBox(childBox, padding.Left, y);
             entries.AddRange(childBox.Entries);
             y += childBox.Height;
@@ -918,6 +947,7 @@ public sealed class UiLayoutEngine
             {
                 Spec = entry.Spec,
                 Id = entry.Id,
+                Node = entry.Node,
                 Widget = entry.Widget,
                 IsContainer = entry.IsContainer,
                 ContainerKind = entry.ContainerKind,

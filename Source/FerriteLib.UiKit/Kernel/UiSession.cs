@@ -16,10 +16,12 @@ public sealed class UiSession : IDisposable
 
     private readonly Dictionary<string, Vector2> scrollPositions = new(StringComparer.Ordinal);
 
-    // Per-element state, keyed by the element's identity and then by the widget's own state name.
-    // The identity is the primary key: it is what makes two unnamed same-kind siblings separate, which
-    // the bare path string this replaces could not express (0.4.0 identity layer).
-    private readonly Dictionary<UiNodeId, Dictionary<string, UiValueState>> valueStates = new();
+    // Every arranged element's node, keyed by identity, plus the "no element" node a host-level caller
+    // resolves into. The nodes own their element's state, and the table is the session's, so disposing
+    // the session drops nodes and state together (0.4.0 identity layer, node step 1).
+    private readonly Dictionary<UiNodeId, UiNode> nodes = new();
+    private readonly HashSet<UiNode> dirtyNodes = new();
+    private readonly UiNode unscopedNode;
 
     private readonly HashSet<string> trippedComponentIds = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> trippedLogs = new(StringComparer.Ordinal);
@@ -34,9 +36,21 @@ public sealed class UiSession : IDisposable
     private UiNodeId hoverClaimElement;
     private string hoverHeld = "";
     private UiNodeId hoverHeldElement;
-    private UiNodeId activeElement;
+    private UiNode activeNode;
     private int hoverClaimStamp;
     private int hoverGraceLeft;
+
+    /// <summary>
+    /// Creates one session and its session-level node: the identity an element-less caller (a host-level
+    /// call, a popup pass) resolves into, which keeps <see cref="GetOrCreateValueState(string)"/> total
+    /// outside a tree exactly as it was before the node step.
+    /// </summary>
+    public UiSession()
+    {
+        unscopedNode = new UiNode(this, UiNodeId.None, "", -1);
+        nodes.Add(UiNodeId.None, unscopedNode);
+        activeNode = unscopedNode;
+    }
 
     /// <summary>True until <see cref="Dispose"/> is called.</summary>
     public bool IsActive { get; private set; } = true;
@@ -78,11 +92,18 @@ public sealed class UiSession : IDisposable
 
     /// <summary>
     /// The element whose Measure/Draw is running, or <see cref="UiNodeId.None"/> between elements.
-    /// The engine enters an element's identity around its own widget calls, and
+    /// The engine enters an element's node around its own widget calls, and
     /// <see cref="GetOrCreateValueState(string)"/> resolves against it: that is how a widget written
     /// against the old bare-string key gets a per-element state namespace without changing a line.
     /// </summary>
-    public UiNodeId ActiveElement => activeElement;
+    public UiNodeId ActiveElement => activeNode.Id;
+
+    /// <summary>
+    /// The node whose Measure/Draw is running - the session-level node between elements. This is the
+    /// object a widget reads its own state from and marks dirty; the engine enters it in a
+    /// <c>finally</c> around every element's Measure and Draw.
+    /// </summary>
+    public UiNode ActiveNode => activeNode;
 
     /// <summary>Session-scoped scroll positions keyed by scroll container id.</summary>
     public IReadOnlyDictionary<string, Vector2> ScrollPositions => scrollPositions;
@@ -231,7 +252,7 @@ public sealed class UiSession : IDisposable
     {
         if (stateKey == null) throw new ArgumentNullException(nameof(stateKey));
         EnsureActive();
-        return GetOrCreateValueState(activeElement, stateKey);
+        return activeNode.GetOrCreateState(stateKey);
     }
 
     /// <summary>The element's own value state, i.e. the slot it owns without naming a sub-key.</summary>
@@ -249,19 +270,7 @@ public sealed class UiSession : IDisposable
     {
         if (stateKey == null) throw new ArgumentNullException(nameof(stateKey));
         EnsureActive();
-        if (!valueStates.TryGetValue(element, out Dictionary<string, UiValueState>? slots))
-        {
-            slots = new Dictionary<string, UiValueState>(StringComparer.Ordinal);
-            valueStates.Add(element, slots);
-        }
-
-        if (!slots.TryGetValue(stateKey, out UiValueState? state))
-        {
-            state = new UiValueState();
-            slots.Add(stateKey, state);
-        }
-
-        return state;
+        return GetOrCreateNode(element, "", -1).GetOrCreateState(stateKey);
     }
 
     /// <summary>
@@ -271,28 +280,77 @@ public sealed class UiSession : IDisposable
     /// </summary>
     public IReadOnlyDictionary<string, UiValueState> GetValueStates(UiNodeId element)
     {
-        return valueStates.TryGetValue(element, out Dictionary<string, UiValueState>? slots)
-            ? slots
-            : NoValueStates;
+        return nodes.TryGetValue(element, out UiNode? node) ? node.ValueStates : NoValueStates;
     }
 
     /// <summary>
-    /// Enters <paramref name="element"/> for the duration of its own Measure/Draw and returns the
-    /// previous active element, so the engine can hand it back to <see cref="ExitElement"/> in a
-    /// <c>finally</c>. Nesting is a stack discipline: the engine draws one element at a time.
+    /// The node an identity names, or null when this session has never arranged such an element.
+    /// Read-only: nodes are created by the engine during arrange.
     /// </summary>
-    internal UiNodeId EnterElement(UiNodeId element)
+    public UiNode? GetNode(UiNodeId element)
+    {
+        return nodes.TryGetValue(element, out UiNode? node) ? node : null;
+    }
+
+    /// <summary>
+    /// The node an element's identity names, created on first use. The engine calls this for every
+    /// arranged entry, so a re-arrange reuses the node - and therefore its state - instead of replacing
+    /// it, which is what makes identity survive a frame.
+    /// </summary>
+    internal UiNode GetOrCreateNode(UiNodeId element, string kind, int ordinal)
     {
         EnsureActive();
-        UiNodeId previous = activeElement;
-        activeElement = element;
+        if (nodes.TryGetValue(element, out UiNode? node))
+        {
+            return node;
+        }
+
+        node = new UiNode(this, element, kind, ordinal);
+        nodes.Add(element, node);
+        dirtyNodes.Add(node);
+        return node;
+    }
+
+    /// <summary>True when at least one live node still owes a Measure.</summary>
+    internal bool HasDirtyNodes => dirtyNodes.Count > 0;
+
+    /// <summary>
+    /// Clears every dirty flag. The engine calls this once a whole arrange has succeeded, which is what
+    /// makes <see cref="UiNode.MarkDirty"/> mean "recompute me on the next pass".
+    /// </summary>
+    internal void ClearDirtyNodes()
+    {
+        foreach (UiNode node in dirtyNodes)
+        {
+            node.ClearDirtyFlag();
+        }
+
+        dirtyNodes.Clear();
+    }
+
+    /// <summary>Records that a node asked for a re-measure. Called by <see cref="UiNode.MarkDirty"/>.</summary>
+    internal void NodeMarkedDirty(UiNode node)
+    {
+        dirtyNodes.Add(node);
+    }
+
+    /// <summary>
+    /// Enters <paramref name="node"/> for the duration of its own Measure/Draw and returns the previous
+    /// active node, so the engine can hand it back to <see cref="ExitNode"/> in a <c>finally</c>.
+    /// Nesting is a stack discipline: the engine draws one element at a time.
+    /// </summary>
+    internal UiNode EnterNode(UiNode node)
+    {
+        EnsureActive();
+        UiNode previous = activeNode;
+        activeNode = node ?? throw new ArgumentNullException(nameof(node));
         return previous;
     }
 
-    /// <summary>Restores the element returned by <see cref="EnterElement"/>.</summary>
-    internal void ExitElement(UiNodeId previous)
+    /// <summary>Restores the node returned by <see cref="EnterNode"/>.</summary>
+    internal void ExitNode(UiNode previous)
     {
-        activeElement = previous;
+        activeNode = previous;
     }
 
     public Vector2 GetScrollPosition(string elementId)
@@ -352,7 +410,7 @@ public sealed class UiSession : IDisposable
         if (elementId == null) throw new ArgumentNullException(nameof(elementId));
         EnsureActive();
         hoverClaim = elementId;
-        hoverClaimElement = activeElement;
+        hoverClaimElement = activeNode.Id;
         hoverClaimStamp = Frame;
     }
 
@@ -432,8 +490,9 @@ public sealed class UiSession : IDisposable
         }
 
         scrollPositions.Clear();
-        valueStates.Clear();
-        activeElement = default;
+        nodes.Clear();
+        dirtyNodes.Clear();
+        activeNode = unscopedNode;
         hoverClaim = "";
         hoverClaimElement = default;
         hoverHeld = "";
