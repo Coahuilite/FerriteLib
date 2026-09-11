@@ -25,6 +25,13 @@ public sealed class UiSession : IDisposable
     private readonly HashSet<UiNode> dirtyNodes = new();
     private readonly UiNode unscopedNode;
 
+    // The owned hit stack: the last complete draw pass's paint order (bottom-to-top) plus the list the pass
+    // in progress is building. Dispatch reads the published list, which is why a popup drawn after content
+    // in pass N still wins the click in pass N+1 while no element has to know that popups exist.
+    private readonly List<UiHitLayer> hitLayers = new();
+    private readonly List<UiHitLayer> dispatchLayers = new();
+    private Vector2 currentWindowOrigin;
+
     // Recovery slots are keyed by the node that tripped, so two elements that print the same display
     // path cannot share one fallback slot (0.4.0 node step 2).
     private readonly HashSet<UiNode> trippedNodes = new();
@@ -33,7 +40,6 @@ public sealed class UiSession : IDisposable
     private readonly List<Action> popupDrawActions = new();
     private string? openPopupId;
     private Rect? openPopupAnchor;
-    private Rect? openPopupRect;
     private Rect hostViewport;
     private string? scrollTargetElementId;
     private string hoverClaim = "";
@@ -128,11 +134,76 @@ public sealed class UiSession : IDisposable
     public Rect? OpenPopupAnchor => openPopupAnchor;
 
     /// <summary>
-    /// Window-space rect the open popup actually covered when it was last drawn. The popup pass runs
-    /// after content, so this is the previous frame's rect — which is exactly the frame boundary a
-    /// click on a popup row arrives in. Null between opening and the first draw.
+    /// The owned hit stack in paint order, bottom-to-top, as built by the draw pass that is running or just
+    /// finished: content layers as their elements draw, then the popup layer. Popups are the entries with
+    /// <see cref="UiHitLayer.IsPopup"/>, and a diagnostic or a lane reads this instead of a single
+    /// "covered rect".
     /// </summary>
-    public Rect? OpenPopupRect => openPopupRect;
+    public IReadOnlyList<UiHitLayer> HitLayers => hitLayers;
+
+    /// <summary>
+    /// The window-space origin of the element being drawn. The funnel lifts a draw-local pointer by it,
+    /// which is how a primitive compares its pointer with the window-space hit layers.
+    /// </summary>
+    internal Vector2 CurrentWindowOrigin => currentWindowOrigin;
+
+    internal void SetCurrentWindowOrigin(Vector2 origin)
+    {
+        currentWindowOrigin = origin;
+    }
+
+    /// <summary>
+    /// Opens a hit pass: the pass that just finished becomes the stack input dispatch reads and a fresh one
+    /// starts. Dispatch therefore sees a complete paint order - popups included - while the pass in
+    /// progress is still being drawn.
+    /// </summary>
+    internal void BeginHitPass()
+    {
+        EnsureActive();
+        dispatchLayers.Clear();
+        dispatchLayers.AddRange(hitLayers);
+        hitLayers.Clear();
+    }
+
+    /// <summary>
+    /// Appends one layer to the pass in progress. Content layers are appended as their elements draw, so the
+    /// stack ends up in paint order; a popup appends after content and is therefore above it.
+    /// </summary>
+    internal void PushHitLayer(UiNode element, Rect windowRect, bool isPopup)
+    {
+        if (element == null) return;
+        hitLayers.Add(new UiHitLayer(element, windowRect, isPopup));
+    }
+
+    /// <summary>
+    /// Topmost-first dispatch: true when <paramref name="windowPoint"/> falls inside a popup layer that
+    /// belongs to another element, so the caller must not take the click. The topmost covering popup wins,
+    /// and one belonging to the caller (its own trigger's popup) keeps the click here, which is what
+    /// preserves toggle-to-close.
+    /// <para>
+    /// Content layers are recorded in the stack in paint order but do not arbitrate one another yet: IMGUI
+    /// already serialises content input by draw order, and a rect lookup cannot tell a real pointer from an
+    /// injected one. The overlay decision that matters today - and the one the old per-element yield branch
+    /// got wrong for every primitive outside its funnel - is popup-over-content.
+    /// </para>
+    /// </summary>
+    public bool IsPointerOverHigherLayer(UiNode element, Vector2 windowPoint)
+    {
+        for (int i = dispatchLayers.Count - 1; i >= 0; i--)
+        {
+            UiHitLayer layer = dispatchLayers[i];
+            if (!layer.IsPopup) continue;
+            if (!Contains(layer.Rect, windowPoint)) continue;
+            return !ReferenceEquals(layer.Element, element);
+        }
+
+        return false;
+    }
+
+    private static bool Contains(Rect rect, Vector2 point)
+    {
+        return point.x >= rect.x && point.x <= rect.xMax && point.y >= rect.y && point.y <= rect.yMax;
+    }
 
     /// <summary>Host viewport in window space, published once per frame before any content draws.</summary>
     public Rect HostViewport => hostViewport;
@@ -184,39 +255,27 @@ public sealed class UiSession : IDisposable
         EnsureActive();
         openPopupId = ownerId;
         openPopupAnchor = anchor;
-        // A freshly opened popup has no drawn rect yet; the popup pass records it this frame.
-        openPopupRect = null;
     }
 
-    /// <summary>Closes the session-owned popup, if any.</summary>
+    /// <summary>
+    /// Closes the session-owned popup, if any. Its hit layers go with it: a popup that is gone must not keep
+    /// blocking clicks on what it used to cover, not even for the pass that closed it.
+    /// </summary>
     public void ClosePopup()
     {
         EnsureActive();
         openPopupId = null;
         openPopupAnchor = null;
-        openPopupRect = null;
+        DropPopupLayers(hitLayers);
+        DropPopupLayers(dispatchLayers);
     }
 
-    /// <summary>Records the window-space rect of the popup the session is drawing this frame.</summary>
-    public void SetPopupRect(Rect rect)
+    private static void DropPopupLayers(List<UiHitLayer> layers)
     {
-        EnsureActive();
-        openPopupRect = rect;
-    }
-
-    /// <summary>
-    /// True when <paramref name="point"/> (Host window space) falls inside the popup the session last
-    /// drew. Content that lies under the popup must use this to give up the click: the popup is drawn
-    /// after content, so it can only ever be the topmost thing the player sees.
-    /// </summary>
-    public bool IsPointOverPopup(Vector2 point)
-    {
-        if (!openPopupRect.HasValue) return false;
-        Rect rect = openPopupRect.Value;
-
-        // Written out instead of calling Rect.Contains: the harness's UnityEngine stub has no such
-        // member, and a throw here would be swallowed by the draw guard and silently disable the rule.
-        return point.x >= rect.x && point.x <= rect.xMax && point.y >= rect.y && point.y <= rect.yMax;
+        for (int i = layers.Count - 1; i >= 0; i--)
+        {
+            if (layers[i].IsPopup) layers.RemoveAt(i);
+        }
     }
 
     /// <summary>Publishes the frame's Host viewport so popups can clamp themselves into it.</summary>
@@ -588,7 +647,9 @@ public sealed class UiSession : IDisposable
         popupDrawActions.Clear();
         openPopupId = null;
         openPopupAnchor = null;
-        openPopupRect = null;
+        hitLayers.Clear();
+        dispatchLayers.Clear();
+        currentWindowOrigin = default;
         scrollTargetElementId = null;
     }
 

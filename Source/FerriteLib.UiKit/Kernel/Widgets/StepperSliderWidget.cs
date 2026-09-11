@@ -118,13 +118,13 @@ public sealed class StepperSliderWidget : IUiWidget
             ctx.Bindings.Set(elementId, ctx.Session.GetOrCreateValueState(elementId).FloatValue);
         }
 
-        if (UiNative.Button(minusRect))
+        if (UiNative.Button(minusRect, ctx))
         {
             float next = UiNative.ClampValue(current - step, min, max);
             ctx.Bindings.Set(elementId, next);
         }
 
-        if (UiNative.Button(plusRect))
+        if (UiNative.Button(plusRect, ctx))
         {
             float next = UiNative.ClampValue(current + step, min, max);
             ctx.Bindings.Set(elementId, next);

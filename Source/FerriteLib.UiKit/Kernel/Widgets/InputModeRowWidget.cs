@@ -91,7 +91,7 @@ public sealed class InputModeRowWidget : IUiWidget
             bool selected = string.Equals(options[i].Value, current, StringComparison.Ordinal);
             DrawOption(optionRect, options[i], selected, ctx.Theme);
 
-            if (UiNative.Button(optionRect))
+            if (UiNative.Button(optionRect, ctx))
             {
                 ctx.Bindings.Set(bindKey, options[i].Value);
             }

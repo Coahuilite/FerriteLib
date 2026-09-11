@@ -78,7 +78,7 @@ public sealed class ButtonWidget : IUiWidget
         UiResolvedStyle idle = AtomVocabulary.ResolveRole(spec, ctx, writable: null);
         Paint(rect, armed, hovered, idle, ctx);
 
-        if (UiNative.Button(rect))
+        if (UiNative.Button(rect, ctx))
         {
             ctx.Bindings.Invoke(ReadActionKey());
         }

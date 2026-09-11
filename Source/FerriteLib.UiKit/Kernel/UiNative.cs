@@ -75,10 +75,31 @@ public static class UiNative
         if (GUIUtility.hotControl == controlId) GUIUtility.hotControl = 0;
     }
 
+    /// <summary>
+    /// The raw invisible button, without hit-stack arbitration. A caller that holds a context must use
+    /// <see cref="Button(Rect, UiWidgetContext)"/>. This overload has no session, and a static primitive
+    /// cannot reach one without a process-wide mutable static - which the promotion gate forbids - so it
+    /// keeps the pre-stack behaviour: a covering popup does not stop it. <c>docs/api-tiers.md</c> states
+    /// that contract and the one-line migration for consumers.
+    /// </summary>
     public static bool Button(Rect rect)
     {
         if (ButtonOverride != null) return ButtonOverride(rect);
         return VerseWidgets.ButtonInvisible(rect);
+    }
+
+    /// <summary>
+    /// The invisible button with topmost-first dispatch: when the pointer sits inside a hit layer that
+    /// belongs to another element - a popup above this content, an overlapping neighbour painted later -
+    /// this element does not take the click. Every library widget and every consumer control that holds a
+    /// context belongs here: one rule, and no per-element yield branch anywhere.
+    /// </summary>
+    public static bool Button(Rect rect, UiWidgetContext ctx)
+    {
+        if (ctx == null) throw new ArgumentNullException(nameof(ctx));
+        UiNode element = ctx.Node ?? ctx.Session.ActiveNode;
+        if (ctx.Session.IsPointerOverHigherLayer(element, PointerPositionIn(ctx))) return false;
+        return Button(rect);
     }
 
     /// <summary>
@@ -110,10 +131,10 @@ public static class UiNative
         if (session == null) throw new ArgumentNullException(nameof(session));
         if (string.IsNullOrEmpty(elementId)) throw new ArgumentException("Dropdown element id is required.", nameof(elementId));
 
-        // A popup drawn over this trigger must win the click. The popup pass runs after content, so
-        // without this a pointer inside both rects would toggle this trigger first and silently drop
-        // the selection the popup row was about to make.
-        bool yields = YieldsToCoveringPopup(session, elementId, PointerPositionIn(ctx));
+        // The hit stack decides: a popup drawn over this trigger is a layer above it, so the trigger must
+        // not take the click - unless the popup is its own, which the same layer comparison handles.
+        bool covered = ctx != null && session.IsPointerOverHigherLayer(
+            ctx.Node ?? session.ActiveNode, PointerPositionIn(ctx));
         if (Trace != null && session.OpenPopupId != null)
         {
             Vector2 local = PointerPosition();
@@ -123,12 +144,11 @@ public static class UiNative
                 + " event=" + (Event.current != null ? Event.current.type.ToString() : "none")
                 + " pointerLocal=" + Describe(local)
                 + " pointerWindow=" + Describe(window)
-                + " rect=" + (session.OpenPopupRect.HasValue ? Describe(session.OpenPopupRect.Value) : "null")
-                + " yields=" + (yields ? "true" : "false"));
+                + " yields=" + (covered ? "true" : "false"));
         }
 
-        if (yields) return false;
-        if (!Button(rect)) return false;
+        if (covered) return false;
+        if (ctx != null ? !Button(rect, ctx) : !Button(rect)) return false;
 
         if (session.IsPopupOpen(elementId))
         {
@@ -258,23 +278,9 @@ public static class UiNative
     }
 
     /// <summary>
-    /// True when another element's popup currently covers the pointer. The owning element itself is
-    /// excluded so its trigger keeps normal toggle-to-close behaviour. The pointer arrives in the
-    /// caller's draw space (inside scroll/group scopes it is NOT window space), so it is converted
-    /// with the same origin the trigger's own anchor used; comparing the raw event position against
-    /// the window-space popup rect is the 2026-09-04 bug that let covered triggers steal every click.
-    /// </summary>
-    private static bool YieldsToCoveringPopup(UiSession session, string elementId, Vector2 pointerWindow)
-    {
-        string? owner = session.OpenPopupId;
-        if (owner == null || string.Equals(owner, elementId, StringComparison.Ordinal)) return false;
-        return session.IsPointOverPopup(pointerWindow);
-    }
-
-    /// <summary>
     /// The event pointer translated into Host window space through the caller's own origin, so it is
-    /// comparable with the published popup rect. Callers without a context (already window-space)
-    /// keep the raw position.
+    /// comparable with the hit stack's window-space rects. Callers without a context (already window
+    /// space) keep the raw position.
     /// </summary>
     private static Vector2 PointerPositionIn(UiWidgetContext? ctx)
     {

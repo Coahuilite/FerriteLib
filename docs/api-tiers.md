@@ -135,10 +135,12 @@ consequence is paid in the open rather than discovered by a stranger.
   never a display-path key) while the engine resolves it to a node, writes that node's scroll position and
   consumes the request once. Still open, because the display path is what a human reads and existing
   consumers assert on: `VisibleIds`, the fit audit and the recovery band can still print one text for two
-  elements whose `Kind` contains `/` (`input/stepper-slider`); `UiNative`'s hot-control id and the popup
-  owner key stay string-keyed and belong to the owned-hit-stack step. Identity and per-element state never
-  depend on the display path: `GetNode`, `GetNodeByElementId`, `GetValueStates`, `ActiveElement`,
-  `ActiveNode`, `TrippedNodes`, `ScrollPositions` and `HoverClaimElement` are all node- or
+  elements whose `Kind` contains `/` (`input/stepper-slider`); `UiNative`'s hot-control id stays
+  string-keyed. The popup owner key is no longer a yield input: since the owned hit stack, cover decisions
+  are layer comparisons, and the popup's own state (`OpenPopupId`/`OpenPopupAnchor`/`IsPopupOpen`/
+  `ClosePopup`) only says whether a popup is open. Identity and per-element state never depend on the
+  display path: `GetNode`, `GetNodeByElementId`, `GetValueStates`, `ActiveElement`, `ActiveNode`,
+  `TrippedNodes`, `ScrollPositions`, `HitLayers` and `HoverClaimElement` are all node- or
   identity-keyed.
 - `UiNode` — one arranged element's identity carrier: it owns the element's `State` (plus its named slots,
   reachable with `GetOrCreateState`), its `Kind`, its declared `ElementId` and `Ordinal`, the `IsDirty`
@@ -151,6 +153,18 @@ consequence is paid in the open rather than discovered by a stranger.
   path-only `WithElement` before it) mints a sub-node under the element so a widget's own controls get their
   own identity and state. Public-unstable: the hit stack and focus are the next steps that read this tree.
 
+- `UiHitLayer` — one entry of the owned hit stack: the element whose paint covers a window-space rect,
+  and whether the layer is a popup. `UiSession.HitLayers` is the stack in paint order (bottom-to-top) and
+  `UiSession.IsPointerOverHigherLayer` is the one dispatch rule: the topmost layer containing the pointer
+  decides, and a layer belonging to the caller keeps the click. This replaces the single-popup yield branch
+  (`UiNative.YieldsToCoveringPopup`, `UiSession.OpenPopupRect`, `SetPopupRect`, `IsPointOverPopup` -
+  all removed in the same 0.4.0 window), so every primitive answers the same question the same way.
+  **Contract for the context-free overload:** `UiNative.Button(Rect)` has no session and no draw origin, and
+  a static primitive cannot reach a session without a process-wide mutable static (which the promotion gate
+  forbids); it therefore keeps the pre-stack behaviour and is **not** covered by the stack. Migration is one
+  argument: pass the context (`UiNative.Button(rect, ctx)`), which is what every library widget now does.
+  The window shell's own chrome button is the one library call site left raw, because the chrome draws
+  outside the tree.
 - `UiStyleFallbackReport` — one appearance fallback: an authored `Tone`/`Emphasis` value outside the
   vocabulary, carrying the element path, the kind, the attribute, the authored text and the value it
   resolved to. Produced by the atom vocabulary, and since batch B by `UiHost` too — one report per dropped

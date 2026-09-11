@@ -202,12 +202,13 @@ internal static class KernelPopupTests
                 throw new Exception("first dropdown did not open");
             }
 
-            if (!host.Session.OpenPopupRect.HasValue)
+            Rect? popupLayer = PopupLayer(host.Session);
+            if (!popupLayer.HasValue)
             {
-                throw new Exception("popup pass did not publish its rect, so nothing can yield to it");
+                throw new Exception("popup pass pushed no hit layer, so nothing can yield to it");
             }
 
-            Rect popup = host.Session.OpenPopupRect.Value;
+            Rect popup = popupLayer.Value;
             if (!Over(popup, click))
             {
                 throw new Exception("test premise broken: the click " + click + " is not inside the popup " + popup);
@@ -308,9 +309,9 @@ internal static class KernelPopupTests
                 throw new Exception("real-event pump did not open the first dropdown; trace: " + string.Join(" | ", trace));
             }
 
-            if (!host.Session.OpenPopupRect.HasValue)
+            if (!PopupLayer(host.Session).HasValue)
             {
-                throw new Exception("popup rect was not published under the real-event pump");
+                throw new Exception("popup layer was not pushed under the real-event pump");
             }
 
             Pump(host, EventType.Layout, optionClick);
@@ -339,6 +340,21 @@ internal static class KernelPopupTests
             Event.current = null;
             GUIUtility.hotControl = 0;
         }
+    }
+
+    /// <summary>
+    /// The topmost popup layer of the session's hit stack, or null when none is pushed. This is the
+    /// diagnostic read of the stack (the lane's former "published popup rect"); input dispatch itself only
+    /// ever asks <see cref="UiSession.IsPointerOverHigherLayer"/>.
+    /// </summary>
+    private static Rect? PopupLayer(UiSession session)
+    {
+        for (int i = session.HitLayers.Count - 1; i >= 0; i--)
+        {
+            if (session.HitLayers[i].IsPopup) return session.HitLayers[i].Rect;
+        }
+
+        return null;
     }
 
     private static void Pump(UiHost host, EventType type, Vector2 point)
@@ -410,12 +426,13 @@ internal static class KernelPopupTests
             // because a draw-space point at (0,0) maps to the origin in window space.
             Pump(host, EventType.Repaint, new Vector2(0f, 0f));
 
-            if (!host.Session.IsPopupOpen("first") || !host.Session.OpenPopupRect.HasValue)
+            Rect? scrolledPopup = PopupLayer(host.Session);
+            if (!host.Session.IsPopupOpen("first") || !scrolledPopup.HasValue)
             {
-                throw new Exception("scrolled container did not open/publish the popup; trace: " + string.Join(" | ", trace));
+                throw new Exception("scrolled container did not open/push the popup; trace: " + string.Join(" | ", trace));
             }
 
-            Rect popup = host.Session.OpenPopupRect.Value;
+            Rect popup = scrolledPopup.Value;
 
             // The pumped pointer is window space; the stub group model presents it to the content
             // pass in container-local space and to the popup pass in window space, exactly like the
@@ -487,10 +504,10 @@ internal static class KernelPopupTests
 
             host.DrawFrame(new Rect(0f, 0f, 300f, 100f));
 
-            Rect popup = host.Session.OpenPopupRect ?? new Rect(0f, 0f, 0f, 0f);
+            Rect popup = PopupLayer(host.Session) ?? new Rect(0f, 0f, 0f, 0f);
             if (popup.height <= 0f)
             {
-                throw new Exception("popup rect was not published");
+                throw new Exception("popup layer was not pushed");
             }
 
             if (popup.yMax > 100f + 0.01f || popup.y < 0f)

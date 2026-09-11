@@ -24,6 +24,7 @@ internal static class KernelIdentityTests
     private const string ProbeKind = "test/identity-probe";
     private const string SlashlessKind = "identityprobe";
     private const string ThrowingKind = "test/identity-throws";
+    private const string ClickKind = "test/click-probe";
     private static readonly Rect Viewport = new(0f, 0f, 300f, 200f);
 
     private static int failures;
@@ -42,6 +43,8 @@ internal static class KernelIdentityTests
             new[] { "Id", "Kind", "Text", "Dragging", "Cursor", "Hidden", "Tab" });
         UiWidgetRegistry.Register(Scope, ThrowingKind, () => new ThrowingProbeWidget(),
             new[] { "Id", "Kind", "Text" });
+        UiWidgetRegistry.Register(Scope, ClickKind, () => new ClickProbeWidget(),
+            new[] { "Id", "Kind", "Height", "ActionBind" });
 
         try
         {
@@ -61,6 +64,7 @@ internal static class KernelIdentityTests
             Run("a widget's sub-node keeps its own identity and state", VerifySubNodeIdentityAndState);
             Run("recovery slots are node-keyed where display paths collide", VerifyRecoverySlotsAreNodeKeyed);
             Run("scroll state and scroll targets are node-keyed", VerifyScrollStateIsNodeKeyed);
+            Run("a covering popup layer wins the click, and gives it back when it closes", VerifyCoveredClickYieldsToTheStack);
         }
         finally
         {
@@ -837,6 +841,81 @@ internal static class KernelIdentityTests
         }
     }
 
+    /// <summary>
+    /// The owned hit stack, one positive and one negative: a click that lands inside a popup layer must not
+    /// reach the element it covers, and the very same click must land once the popup is gone. Both halves
+    /// matter - a stack that answered "blocked" to everything would pass the first half alone.
+    /// </summary>
+    private static void VerifyCoveredClickYieldsToTheStack()
+    {
+        ResetProbe();
+        ClickProbeWidget.Fires = 0;
+        var bindings = new UiBindings();
+        string choice = "x";
+        bindings.BindValue("dd", () => choice, value => choice = value);
+        bindings.BindOptions("Options", () => new List<string> { "x", "y" });
+        bindings.BindAction<int>("under-clicked", value => ClickProbeWidget.Fires++);
+
+        using UiHost host = Host(ClickPage(), bindings);
+        Vector2 onTrigger = new(150f, 14f);
+        Vector2 underThePopup = new(150f, 70f);
+
+        try
+        {
+            UiNative.DebugMousePositionEnabled = true;
+            UiNative.ButtonOverride = rect => Over(rect, UiNative.DebugMousePosition);
+
+            Pump(host, onTrigger);
+            if (!host.Session.IsPopupOpen("dd"))
+            {
+                throw new Exception("the dropdown did not open on its trigger");
+            }
+
+            Pump(host, underThePopup);
+            if (ClickProbeWidget.Fires != 0)
+            {
+                throw new Exception("the element under the popup took the click");
+            }
+
+            if (!string.Equals(choice, "y", StringComparison.Ordinal))
+            {
+                throw new Exception("the popup row did not take the click that was its own");
+            }
+
+            Pump(host, underThePopup);
+            if (ClickProbeWidget.Fires != 1)
+            {
+                throw new Exception("with the popup gone the same click did not land (fires=" + ClickProbeWidget.Fires + ")");
+            }
+        }
+        finally
+        {
+            UiNative.DebugMousePositionEnabled = false;
+            UiNative.ButtonOverride = null;
+        }
+    }
+
+    private static void Pump(UiHost host, Vector2 point)
+    {
+        UiNative.DebugMousePosition = point;
+        UiNative.DebugMouseDown = true;
+        host.DrawFrame(new Rect(0f, 0f, 300f, 200f));
+        UiNative.DebugMouseDown = false;
+    }
+
+    private static bool Over(Rect rect, Vector2 point)
+    {
+        return point.x >= rect.x && point.x <= rect.xMax && point.y >= rect.y && point.y <= rect.yMax;
+    }
+
+    private static string ClickPage()
+    {
+        return "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Stack Id=\"root\">"
+            + "<Widget Id=\"dd\" Kind=\"input/dropdown\" OptionsBind=\"Options\" Height=\"28\" />"
+            + "<Widget Id=\"under\" Kind=\"" + ClickKind + "\" ActionBind=\"under-clicked\" Height=\"120\" />"
+            + "</Stack></UiPage>";
+    }
+
     // --- fixture -------------------------------------------------------------------------------
 
     private static UiHost Host(string xml, IUiBindings? bindings = null)
@@ -1119,6 +1198,43 @@ internal static class KernelIdentityTests
             if (string.Equals(tag, ClaimingTag, StringComparison.Ordinal))
             {
                 ctx.Session.ClaimHover(HelpKey);
+            }
+        }
+    }
+
+    /// <summary>A leaf that takes clicks through the context overload and counts what landed on it.</summary>
+    private sealed class ClickProbeWidget : IUiWidget
+    {
+        internal static int Fires;
+
+        private UiElementSpec spec = UiElementSpec.Empty;
+
+        public string Kind => ClickKind;
+
+        public void Configure(UiElementSpec spec)
+        {
+            this.spec = spec;
+        }
+
+        public void Validate(IUiBindings bindings, string elementPath)
+        {
+            if (spec.TryGetAttribute("ActionBind", out string action) && action.Length > 0)
+            {
+                bindings.ValidateAction<int>(action, elementPath);
+            }
+        }
+
+        public float Measure(UiWidgetContext ctx)
+        {
+            return 40f;
+        }
+
+        public void Draw(Rect rect, UiWidgetContext ctx)
+        {
+            if (UiNative.Button(rect, ctx) && spec.TryGetAttribute("ActionBind", out string action) && action.Length > 0)
+            {
+                // The binding's handler counts the click; incrementing here too would count every click twice.
+                ctx.Bindings.Invoke(action, 1);
             }
         }
     }

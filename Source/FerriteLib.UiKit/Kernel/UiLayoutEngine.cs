@@ -247,6 +247,9 @@ public sealed class UiLayoutEngine
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
         if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
 
+        // One hit pass per draw: the previous pass's complete paint order becomes the stack input dispatch
+        // reads, and this pass builds the next one as its elements draw.
+        ctx.Session.BeginHitPass();
         DrawEntries(lastEntries, 0, lastEntries.Count, ctx, new Vector2(viewport.x, viewport.y), null, Vector2.zero);
     }
 
@@ -274,6 +277,19 @@ public sealed class UiLayoutEngine
             entryCtx = entryCtx.WithTheme(ScopeTheme(entryCtx));
             entryCtx = entry.MeasureWidth > 0f ? entryCtx.WithViewWidth(entry.MeasureWidth) : entryCtx;
             entryCtx = entryCtx.WithWindowOrigin(windowOrigin).WithNode(entry.Node);
+
+            // The element's content layer, in window space (draw rect plus the context's offset), and the
+            // origin the funnel lifts a draw-local pointer by. Only widgets are hit surfaces: a container
+            // layer would otherwise cover its own children.
+            Vector2 entryOrigin = entryCtx.WindowOrigin;
+            ctx.Session.SetCurrentWindowOrigin(entryOrigin);
+            if (entry.Widget != null)
+            {
+                ctx.Session.PushHitLayer(
+                    entry.Node,
+                    new Rect(drawRect.x + entryOrigin.x, drawRect.y + entryOrigin.y, drawRect.width, drawRect.height),
+                    isPopup: false);
+            }
 
             if (IsScopedContainer(entry.ContainerKind))
             {
