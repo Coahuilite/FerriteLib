@@ -280,6 +280,29 @@
   pass `--no-incremental`. And `tools/.../Stubs/**` is a de-facto published surface: the verse stub's
   `Label` gained three additive recording lists so the text-colour routes became observable, which the
   wired consumer sees when it re-pins to 0.4.
+- **The 0.4 node step is a real compile break for the wired consumer, and this repo's own comment described
+  that break backwards (2026-09-12).** `bd4d1b5` (node step 2) node-keyed session state with no string
+  shim — `GetScrollPosition`/`SetScrollPosition` take a `UiNode`, `ScrollPositions` is
+  `IReadOnlyDictionary<UiNode, Vector2>`, and the recovery surface moved with it (`TrippedComponentIds`
+  became `TrippedNodes`; `IsTripped`/`Trip`/`TryGetTripLog` take a node). The wired consumer is blocked
+  by exactly that, in committed code:
+  `Coahuilite/UniversalSqueaker@4f7a9e2b8877802fda6d4b20c562e4e1194600bb:Source/UniversalSqueaker/UI/UsKernelSettingsHost.cs:108`
+  — `session.SetScrollPosition(ContentScrollId, Vector2.zero);`, where `ContentScrollId` is
+  `private const string ContentScrollId = "content-scroll";` (`:118`) — and in its harness at
+  `…:tools/UniversalSqueakerKernelHostTests/Program.cs:461` —
+  `host.Session.SetScrollPosition("content-scroll", Vector2.zero);`, with the read side at
+  `…:1336`, `Vector2 content = host.Session.GetScrollPosition("content-scroll");`. What it proved: a string
+  where 0.4 wants a node is a compile break in a tree a player runs, not a shape preference, and the
+  migration's bridge already exists — `UiSession.GetNodeByElementId`, "the bridge a caller uses to move from
+  the one string a page owns to the node identity everything else keys on; it is a lookup, not a second key
+  space". The cited revision is the consumer's committed HEAD, so the break re-derives from their tree
+  alone; their in-flight migration is not what this line rests on.
+  **The comment was the other half of the failure.** `UiLayoutEngine.ScrollKey`'s doc comment told a reader
+  that a consumer reads `ScrollPositions` by that key while the property had already been node-keyed: the
+  library shipped prose pointing at the call that no longer compiles — the same family as a lane nobody
+  registered, where every gate is green and the evidence is invisible. Corrected in `cbfe680` together with
+  `docs/api-tiers.md`'s "Breaking changes inside the open 0.4 window" section, which is now where a moved key
+  space, the call that no longer binds and its bridge are recorded before a consumer finds them by compiling.
 
 ## Charter — what this library is for
 
