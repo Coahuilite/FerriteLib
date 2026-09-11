@@ -33,12 +33,24 @@
     pwsh -NoProfile -File scripts/net472-trap-scan.ps1                 # scan this repo's tree at HEAD
     pwsh -NoProfile -File scripts/net472-trap-scan.ps1 -Sha <ref>      # scan another revision
     pwsh -NoProfile -File scripts/net472-trap-scan.ps1 -Path <dir>     # scan any directory (positive control)
-  Exit code: 0 = clean, 2 = hit(s).
+  Exit codes:
+    0 = scanned and clean.
+    2 = scanned and hit(s) found.
+    3 = NOT SCANNED: nothing was scanned, so this is not a clean result. Used when the directory holds no
+        .cs file, when repository mode has no git work tree (a source archive or a copied tree - pass
+        -Path <dir> instead), when the git work tree is not this script's root (refusing to scan another
+        repository's files), when the root is not a FerriteLib checkout, or when a revision yields fewer
+        than -MinimumRepoFiles .cs files. A silent empty scan is worse than no gate: a native git failure
+        does NOT throw in PowerShell, so an absent .git used to produce "HITS=0" over zero files
+        (measured 2026-09-11, the same day gate 8 was wired). Every one of those paths now fails loudly.
 #>
 param(
     [string]$Sha = 'HEAD',
     [string]$Path,
-    [string]$RepoRoot = (Split-Path -Parent $PSScriptRoot)
+    [string]$RepoRoot = (Split-Path -Parent $PSScriptRoot),
+    # A real FerriteLib revision holds 60-75 .cs files under Source/ and tools/; anything far below that
+    # is an empty or foreign scan, not a clean tree.
+    [int]$MinimumRepoFiles = 10
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -126,19 +138,56 @@ function Scan-Text([string]$name, [string[]]$lines) {
 
 if ($Path) {
     if (-not (Test-Path -LiteralPath $Path)) { throw "no such path: $Path" }
+    $scanned = 0
     foreach ($file in (Get-ChildItem -LiteralPath $Path -Recurse -File -Filter '*.cs')) {
         if ($file.FullName -match '\\obj\\|\\bin\\') { continue }
+        $scanned++
         Scan-Text ($file.FullName.Substring($Path.Length).TrimStart('\', '/')) (Get-Content -LiteralPath $file.FullName)
     }
-    Write-Output ("scan scope: {0}" -f $Path)
+    if ($scanned -eq 0) {
+        Write-Output ("NOT SCANNED: no .cs file under '{0}' (obj/ and bin/ are skipped). This is not a clean tree." -f $Path)
+        exit 3
+    }
+    Write-Output ("scan scope: {0} ({1} .cs files)" -f $Path, $scanned)
 }
 else {
+    # No truncating pipeline around the native call: 'Select-Object -First 1' kills the upstream command
+    # and leaves $LASTEXITCODE unset, which StrictMode then reports as an error (measured while writing
+    # this guard).
+    $toplevelRaw = & git -C $RepoRoot rev-parse --show-toplevel 2>$null
+    $gitExit = $LASTEXITCODE
+    $toplevel = if ($null -eq $toplevelRaw) { '' } else { (@($toplevelRaw) | Where-Object { $_.Trim().Length -gt 0 } | Select-Object -First 1) }
+    if ($gitExit -ne 0 -or [string]::IsNullOrWhiteSpace($toplevel)) {
+        Write-Output ("NOT SCANNED: no git work tree at '{0}'; repository mode needs git metadata." -f $RepoRoot)
+        Write-Output "             A source archive or a copied tree has no .git - scan it with -Path <dir> instead."
+        exit 3
+    }
+
+    $toplevelFull = [System.IO.Path]::GetFullPath($toplevel.Trim()).TrimEnd('\', '/')
+    $repoFull = [System.IO.Path]::GetFullPath($RepoRoot).TrimEnd('\', '/')
+    if (-not [string]::Equals($toplevelFull, $repoFull, [StringComparison]::OrdinalIgnoreCase)) {
+        Write-Output ("NOT SCANNED: the git work tree is '{0}', not the script's root '{1}'; refusing to scan" -f $toplevelFull, $repoFull)
+        Write-Output "             a different repository's files. Use -Path <dir> to scan a tree directly."
+        exit 3
+    }
+
+    if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot 'Source\FerriteLib.UiKit')) -or
+        -not (Test-Path -LiteralPath (Join-Path $RepoRoot 'About\About.xml'))) {
+        Write-Output ("NOT SCANNED: '{0}' does not look like a FerriteLib checkout (Source/FerriteLib.UiKit and About/About.xml are missing)." -f $RepoRoot)
+        exit 3
+    }
+
     $full = (& git -C $RepoRoot rev-parse $Sha).Trim()
-    $files = & git -C $RepoRoot ls-tree -r --name-only $full -- Source tools | Where-Object { $_ -like '*.cs' }
+    $files = @(& git -C $RepoRoot ls-tree -r --name-only $full -- Source tools | Where-Object { $_ -like '*.cs' })
+    if ($files.Count -lt $MinimumRepoFiles) {
+        Write-Output ("NOT SCANNED: revision {0} yielded only {1} .cs file(s) under Source/ and tools/; that is an empty scan, not a clean tree." -f $full, $files.Count)
+        exit 3
+    }
+
     foreach ($rel in $files) {
         Scan-Text $rel (& git -C $RepoRoot show ($full + ':' + $rel))
     }
-    Write-Output ("scan scope: {0} ({1} .cs files)" -f $full, ($files | Measure-Object).Count)
+    Write-Output ("scan scope: {0} ({1} .cs files)" -f $full, $files.Count)
 }
 
 foreach ($hit in $hits) { Write-Output $hit }
