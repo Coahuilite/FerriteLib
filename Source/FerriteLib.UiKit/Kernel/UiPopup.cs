@@ -18,7 +18,6 @@ public static class UiPopup
     /// <summary>Height of one option row; popup geometry and the fitting audit share this constant.</summary>
     public const float OptionHeight = 24f;
 
-    private const float TextPadding = 6f;
 
     /// <summary>
     /// Popup rect in Host window space: below the anchor when it fits, above it when it does not, and
@@ -82,16 +81,16 @@ public static class UiPopup
         {
             Rect rowRect = new(popupRect.x, popupRect.y + i * OptionHeight, popupRect.width, OptionHeight);
             bool selected = string.Equals(options[i].Value, current, StringComparison.Ordinal);
-            UiThemeDraw.Surface(
-                rowRect,
-                ctx.Theme,
-                selected ? ctx.Theme.Selected : ctx.Theme.Raised,
-                selected ? ctx.Theme.AccentGold : ctx.Theme.Border);
+            // The same table the trigger field and the status outlets read: this row used to re-derive
+            // the mapping verbatim, which is the fourth copy the one-table rule exists to delete.
+            UiResolvedStyle style = ctx.Theme.Styles.Resolve(selected ? UiStatusTone.Active : UiStatusTone.Neutral);
+            float padding = ctx.Theme.Geometry.Padding;
+            UiThemeDraw.Surface(rowRect, style.Surface, ctx.Theme.Geometry.Hairline);
             UiThemeDraw.Label(
-                new Rect(rowRect.x + TextPadding, rowRect.y, rowRect.width - TextPadding * 2f, rowRect.height),
+                new Rect(rowRect.x + padding, rowRect.y, rowRect.width - padding * 2f, rowRect.height),
                 options[i].Key,
                 ctx.Theme,
-                selected ? ctx.Theme.TextOnGold : ctx.Theme.TextPrimary,
+                style.Text,
                 UiFont.Small,
                 TextAnchor.MiddleLeft,
                 singleLine: true);

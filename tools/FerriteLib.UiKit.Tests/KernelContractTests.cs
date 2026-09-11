@@ -535,7 +535,6 @@ internal static class KernelContractTests
         altered.Raised = new Color(0f, 0f, 1f, 1f);
         altered.Hover = new Color(1f, 1f, 0f, 1f);
         altered.Selected = new Color(0f, 1f, 1f, 1f);
-        altered.Warning = new Color(1f, 0f, 1f, 1f);
         altered.Success = new Color(0.5f, 0.5f, 0.5f, 1f);
         altered.Danger = new Color(0.2f, 0.9f, 0.1f, 1f);
         altered.WorkspacePlane = new Color(0.9f, 0.1f, 0.1f, 1f);
@@ -597,6 +596,7 @@ internal static class KernelContractTests
         {
             "UiTheme.cs",
             "UiThemeDraw.cs",
+            "UiResolvedStyle.cs",
             "UiFitAudit.cs",
             "UiKitFonts.cs",
             "UiFont.cs",

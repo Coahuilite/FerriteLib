@@ -19,7 +19,7 @@ public static class UiThemeDraw
     /// </param>
     public static void Label(Rect rect, string text, UiTheme theme, Color? color = null, UiFont? font = null, TextAnchor anchor = TextAnchor.MiddleLeft, bool singleLine = false)
     {
-        UiFont resolvedFont = font ?? theme.DefaultFont;
+        UiFont resolvedFont = font ?? theme.Styles.Font;
         // Every kernel label funnels through this method, which is what makes the fitting audit cheap:
         // one hook covers the whole page, and widgets never have to remember to check themselves.
         UiFitAudit.Check(rect, text, resolvedFont, singleLine);
@@ -42,19 +42,24 @@ public static class UiThemeDraw
         }
     }
 
-    public static void Surface(Rect rect, UiTheme theme, Color fill, Color? border = null)
+    /// <summary>
+    /// Paints one surface treatment: the fill plus its hairline edge. This is the pair-shaped entry a
+    /// table answer feeds, so a caller never spells a fill and a border separately — which is how the
+    /// same two tokens used to end up re-derived per widget.
+    /// </summary>
+    public static void Surface(Rect rect, UiSurfaceStyle style, float hairline = 1f)
     {
         if (rect.width <= 0f || rect.height <= 0f) return;
 
+        float edge = Math.Max(1f, hairline);
         Color oldColor = GUI.color;
         try
         {
-            Solid(rect, fill);
-            Color borderColor = border ?? theme.Border;
-            Solid(new Rect(rect.x, rect.y, rect.width, 1f), borderColor);
-            Solid(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), borderColor);
-            Solid(new Rect(rect.x, rect.y, 1f, rect.height), borderColor);
-            Solid(new Rect(rect.xMax - 1f, rect.y, 1f, rect.height), borderColor);
+            Solid(rect, style.Fill);
+            Solid(new Rect(rect.x, rect.y, rect.width, edge), style.Border);
+            Solid(new Rect(rect.x, rect.yMax - edge, rect.width, edge), style.Border);
+            Solid(new Rect(rect.x, rect.y, edge, rect.height), style.Border);
+            Solid(new Rect(rect.xMax - edge, rect.y, edge, rect.height), style.Border);
         }
         finally
         {
@@ -62,14 +67,20 @@ public static class UiThemeDraw
         }
     }
 
+    /// <summary>Paints an explicit fill with an explicit edge colour, or the theme's shared border.</summary>
+    public static void Surface(Rect rect, UiTheme theme, Color fill, Color? border = null)
+    {
+        Surface(rect, new UiSurfaceStyle(fill, border ?? theme.Border), theme.Geometry.Hairline);
+    }
+
     public static void Panel(Rect rect, UiTheme theme)
     {
-        Surface(rect, theme, theme.Panel, theme.Border);
+        Surface(rect, theme.PanelSurface, theme.Geometry.Hairline);
     }
 
     public static void Base(Rect rect, UiTheme theme)
     {
-        Surface(rect, theme, theme.Base, theme.Border);
+        Surface(rect, theme.BaseSurface, theme.Geometry.Hairline);
     }
 
     /// <summary>Paints the uninterrupted workspace plane behind a multi-column layout.</summary>
@@ -93,15 +104,16 @@ public static class UiThemeDraw
         Workspace(rect, theme);
     }
 
-    /// <summary>Paints a flat section band and its one-pixel lower rule.</summary>
+    /// <summary>Paints a flat section band and its lower rule, both at the theme's density.</summary>
     public static void SectionBand(Rect rect, UiTheme theme, Color? fill = null, Color? rule = null)
     {
         if (rect.width <= 0f || rect.height <= 0f) return;
         Color oldColor = GUI.color;
         try
         {
+            float edge = Math.Max(1f, theme.Geometry.Hairline);
             Solid(rect, fill ?? theme.SectionBand);
-            Solid(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), rule ?? theme.Divider);
+            Solid(new Rect(rect.x, rect.yMax - edge, rect.width, edge), rule ?? theme.Divider);
         }
         finally
         {
@@ -144,41 +156,11 @@ public static class UiThemeDraw
     public static void StatusTreatment(Rect rect, UiTheme theme, UiStatusTone tone = UiStatusTone.Neutral)
     {
         if (rect.width <= 0f || rect.height <= 0f) return;
-
-        Color fill;
-        Color border;
-        switch (tone)
-        {
-            case UiStatusTone.Active:
-                fill = theme.Selected;
-                border = theme.AccentGold;
-                break;
-            case UiStatusTone.Success:
-                fill = theme.Success;
-                border = theme.BorderStrong;
-                break;
-            case UiStatusTone.Warning:
-                fill = theme.Warning;
-                border = theme.Danger;
-                break;
-            case UiStatusTone.Danger:
-                fill = theme.Danger;
-                border = theme.Danger;
-                break;
-            case UiStatusTone.Disabled:
-                fill = theme.Base;
-                border = theme.Divider;
-                break;
-            default:
-                fill = theme.Raised;
-                border = theme.Border;
-                break;
-        }
-        Surface(rect, theme, fill, border);
+        Surface(rect, theme.Styles.Resolve(tone).Surface, theme.Geometry.Hairline);
     }
 
     /// <summary>
-    /// The stable paint of an element the tree recovered after it threw: a warning-toned band carrying
+    /// The stable paint of an element the tree recovered after it threw: an alarm-toned band carrying
     /// the layout path it was supposed to occupy. Deliberately generic — the library owns no product
     /// vocabulary and no translation keys, so it reports the slot's identity rather than a sentence
     /// nobody declared. The diagnostic text lives in the session, not here.
@@ -187,7 +169,7 @@ public static class UiThemeDraw
     {
         if (rect.width <= 1f || rect.height <= 1f) return;
 
-        Surface(rect, theme, theme.Warning, theme.Border);
+        Surface(rect, theme, theme.Danger, theme.Border);
         Label(
             new Rect(rect.x + 6f, rect.y, Math.Max(1f, rect.width - 12f), rect.height),
             elementPath ?? "",
@@ -200,17 +182,11 @@ public static class UiThemeDraw
     /// <summary>Paints a status treatment and centers its short, reusable badge label.</summary>
     public static void StatusBadge(Rect rect, string text, UiTheme theme, UiStatusTone tone = UiStatusTone.Neutral, UiFont? font = null)
     {
-        StatusTreatment(rect, theme, tone);
-        Color textColor = tone switch
-        {
-            UiStatusTone.Active => theme.TextOnGold,
-            UiStatusTone.Success => theme.TextOnGold,
-            UiStatusTone.Warning => theme.TextOnDanger,
-            UiStatusTone.Danger => theme.TextOnDanger,
-            UiStatusTone.Disabled => theme.TextDisabled,
-            _ => theme.TextSecondary
-        };
-        Label(rect, text, theme, textColor, font ?? UiFont.Tiny, TextAnchor.MiddleCenter, singleLine: true);
+        // A badge is compact surface text, which is the emphasis whose neutral label is secondary; the
+        // plane and the text come from one query, so a badge and a field can no longer disagree.
+        UiResolvedStyle style = theme.Styles.Resolve(tone, UiEmphasis.Muted);
+        Surface(rect, style.Surface, theme.Geometry.Hairline);
+        Label(rect, text, theme, style.Text, font ?? UiFont.Tiny, TextAnchor.MiddleCenter, singleLine: true);
     }
 
     /// <summary>
@@ -228,7 +204,10 @@ public static class UiThemeDraw
     }
 }
 
-/// <summary>Generic visual states understood by <see cref="UiThemeDraw.StatusTreatment"/>.</summary>
+/// <summary>
+/// Generic visual states understood by <see cref="UiThemeDraw.StatusTreatment"/>. What each one paints
+/// is the <see cref="UiStyleTable"/>'s answer, not a switch here.
+/// </summary>
 public enum UiStatusTone
 {
     Neutral,

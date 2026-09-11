@@ -8,15 +8,12 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>
 /// Greenfield mode-row selector. Reads a string value binding (keyed by <c>Bind</c>, falling back
 /// to the element Id) and writes the selected mode string through the same binding. Layout is
-/// responsive: wide uses one row, medium uses two columns, narrow stacks vertically.
+/// responsive: wide uses one row, medium uses two columns, narrow stacks vertically, and the cell
+/// metrics come from the theme's <see cref="UiGeometry"/> so density is one knob for the whole tree.
 /// </summary>
 public sealed class InputModeRowWidget : IUiWidget
 {
     public const string Kind = "input/mode-row";
-
-    private const float DefaultHeight = 28f;
-    private const float Gap = 6f;
-    private const float Padding = 4f;
 
     private UiElementSpec spec = UiElementSpec.Empty;
 
@@ -61,10 +58,11 @@ public sealed class InputModeRowWidget : IUiWidget
 
     public float Measure(UiWidgetContext ctx)
     {
+        UiGeometry geometry = ctx.Theme.Geometry;
         int columns = ColumnsFor(ctx.ViewWidth);
         int rows = (Options.Count + columns - 1) / columns;
-        float rowHeight = ReadFloat("Height", DefaultHeight);
-        return Math.Max(1f, rows * rowHeight + Math.Max(0, rows - 1) * Gap + Padding * 2f);
+        float rowHeight = ReadFloat("Height", geometry.RowHeight);
+        return Math.Max(1f, rows * rowHeight + Math.Max(0, rows - 1) * geometry.Gap + geometry.Spacing * 2f);
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)
@@ -76,18 +74,19 @@ public sealed class InputModeRowWidget : IUiWidget
 
         string bindKey = ReadBindKey();
         ctx.Bindings.TryGet(bindKey, out string current);
+        UiGeometry geometry = ctx.Theme.Geometry;
         int columns = ColumnsFor(rect.width);
         int rows = (options.Count + columns - 1) / columns;
-        float rowHeight = ReadFloat("Height", DefaultHeight);
-        float innerWidth = Math.Max(1f, rect.width - Padding * 2f);
-        float columnWidth = (innerWidth - (columns - 1) * Gap) / columns;
+        float rowHeight = ReadFloat("Height", geometry.RowHeight);
+        float innerWidth = Math.Max(1f, rect.width - geometry.Spacing * 2f);
+        float columnWidth = (innerWidth - (columns - 1) * geometry.Gap) / columns;
 
         for (int i = 0; i < options.Count; i++)
         {
             int row = i / columns;
             int col = i % columns;
-            float x = rect.x + Padding + col * (columnWidth + Gap);
-            float y = rect.y + Padding + row * (rowHeight + Gap);
+            float x = rect.x + geometry.Spacing + col * (columnWidth + geometry.Gap);
+            float y = rect.y + geometry.Spacing + row * (rowHeight + geometry.Gap);
             var optionRect = new Rect(x, y, columnWidth, rowHeight);
             bool selected = string.Equals(options[i].Value, current, StringComparison.Ordinal);
             DrawOption(optionRect, options[i], selected, ctx.Theme);
@@ -111,12 +110,16 @@ public sealed class InputModeRowWidget : IUiWidget
 
     private void DrawOption(Rect rect, Option option, bool selected, UiTheme theme)
     {
-        UiThemeDraw.Surface(rect, theme, selected ? theme.Selected : theme.Raised, selected ? theme.AccentGold : theme.Border);
+        // One table query for the plane and the text, and the text inset spelled once in the theme
+        // instead of as a bare 6f/12f here and a named constant in the dropdown.
+        UiResolvedStyle style = theme.Styles.Resolve(selected ? UiStatusTone.Active : UiStatusTone.Neutral);
+        float padding = theme.Geometry.Padding;
+        UiThemeDraw.Surface(rect, style.Surface, theme.Geometry.Hairline);
         UiThemeDraw.Label(
-            new Rect(rect.x + 6f, rect.y, rect.width - 12f, rect.height),
+            new Rect(rect.x + padding, rect.y, rect.width - padding * 2f, rect.height),
             option.Title,
             theme,
-            selected ? theme.TextOnGold : theme.TextPrimary,
+            style.Text,
             UiFont.Small,
             TextAnchor.MiddleLeft);
     }
