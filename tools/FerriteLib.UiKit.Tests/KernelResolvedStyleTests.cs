@@ -80,7 +80,7 @@ internal static class KernelResolvedStyleTests
             "the pre-0.4 alarm name survives as a redirect for one minor");
         UiTheme redirectProbe = UiTheme.DarkGold;
         redirectProbe.Warning = new Color(0.11f, 0.22f, 0.33f, 1f);
-        Check(redirectProbe.Danger == redirectProbe.Warning,
+        Check(SameColor(redirectProbe.Danger, redirectProbe.Warning),
             "assigning the pre-0.4 name assigns the alarm surface it redirects to");
         Check(SameStyle(redirectProbe.Styles.Resolve(UiStatusTone.Warning), redirectProbe.Styles.Resolve(UiStatusTone.Danger)),
             "both tone names resolve to one surface: the redirect is a name, not a second token");
