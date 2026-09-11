@@ -7,6 +7,13 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Greenfield chrome banner: a theme-aware text band whose height follows the text it was given. A
 /// manifest <c>Height</c> attribute still wins outright (the layout pass consults it before Measure), so
 /// when one is present this widget's own calculation is only the fallback.
+/// <para>
+/// Rebuilt over the <c>text/wrapped</c> atom (0.4.x leaf set): the wrapped-height rule lives in
+/// <see cref="WrappedTextWidget.MeasureBand"/> and this kind only feeds it its own font, its own
+/// leading and its own floor. The kind string, the attribute schema, the label set and the painted
+/// result are unchanged, which is what lets an existing manifest keep loading against the same
+/// vocabulary while the duplicated arithmetic disappears.
+/// </para>
 /// </summary>
 public sealed class ChromeBannerWidget : IUiWidget
 {
@@ -14,6 +21,13 @@ public sealed class ChromeBannerWidget : IUiWidget
 
     private const float DefaultHeight = 22f;
     private const float VerticalPadding = 6f;
+
+    /// <summary>
+    /// This kind's own type size. Measure and Draw read the one name, so the band the layout reserves
+    /// and the band that is painted cannot drift apart — which is the risk the deleted copy of the
+    /// wrapped-height rule used to carry.
+    /// </summary>
+    private const UiFont BandFont = UiFont.Tiny;
 
     private UiElementSpec spec = UiElementSpec.Empty;
 
@@ -44,7 +58,10 @@ public sealed class ChromeBannerWidget : IUiWidget
 
     public float Measure(UiWidgetContext ctx)
     {
-        return BandFor(ctx, ResolveText(ctx));
+        // The atom's band at this kind's font and leading, floored by this kind's own default band.
+        return Math.Max(
+            ReadHeight(),
+            WrappedTextWidget.MeasureBand(ctx, ResolveText(ctx), BandFont, VerticalPadding));
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)
@@ -54,7 +71,7 @@ public sealed class ChromeBannerWidget : IUiWidget
         string text = ResolveText(ctx);
         if (text.Length == 0) return;
 
-        UiThemeDraw.Label(rect, text, ctx.Theme, ctx.Theme.TextSecondary, UiFont.Tiny, TextAnchor.MiddleLeft);
+        UiThemeDraw.Label(rect, text, ctx.Theme, ctx.Theme.TextSecondary, BandFont, TextAnchor.MiddleLeft);
     }
 
     /// <summary>
@@ -77,15 +94,6 @@ public sealed class ChromeBannerWidget : IUiWidget
         }
 
         return spec.TryGetAttribute("Text", out string literal) ? literal : "";
-    }
-
-    private float BandFor(UiWidgetContext ctx, string text)
-    {
-        float minimum = ReadHeight();
-        if (text.Length == 0) return minimum;
-
-        float lines = Math.Max(1f, ctx.Metrics.MeasureText(text, UiFont.Tiny, Math.Max(1f, ctx.ViewWidth)));
-        return Math.Max(minimum, lines + VerticalPadding);
     }
 
     private float ReadHeight()

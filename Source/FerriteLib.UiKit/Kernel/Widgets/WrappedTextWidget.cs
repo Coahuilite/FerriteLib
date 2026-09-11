@@ -61,11 +61,30 @@ public sealed class WrappedTextWidget : IUiWidget
 
     public float Measure(UiWidgetContext ctx)
     {
-        string text = ResolveText(ctx);
-        if (text.Length == 0) return EmptyBandHeight;
+        float band = MeasureBand(ctx, ResolveText(ctx), ctx.Theme.DefaultFont, VerticalPadding * 2f);
+        return band > 0f ? band : EmptyBandHeight;
+    }
 
-        float wrapped = ctx.Metrics.MeasureText(text, ctx.Theme.DefaultFont, Math.Max(1f, ctx.ViewWidth));
-        return Math.Max(1f, wrapped) + VerticalPadding * 2f;
+    /// <summary>
+    /// The atom's band contract, and the only copy of it: the height a string needs when wrapped at
+    /// the width this context arranged, plus the caller's own vertical leading. The atom measures
+    /// through this function, and so do the composites rebuilt over the atom — <c>chrome/banner</c>
+    /// and <c>state/empty</c>, the two the roadmap called "a missing leaf atom named twice". Their
+    /// font and their leading are parameters here rather than this kind's constants for exactly that
+    /// reason: once this seam exists, a second copy of "wrap the string, reserve the height" is the
+    /// defect, not a style choice.
+    /// <para>
+    /// Returns 0 for an empty string on purpose. The floor belongs to the caller's named band — this
+    /// atom's own, the banner's 22 or the empty state's 48 — so a caller that wants a floor applies
+    /// its own instead of inheriting one from here.
+    /// </para>
+    /// </summary>
+    internal static float MeasureBand(UiWidgetContext ctx, string text, UiFont font, float verticalLead)
+    {
+        if (string.IsNullOrEmpty(text)) return 0f;
+
+        float wrapped = ctx.Metrics.MeasureText(text, font, Math.Max(1f, ctx.ViewWidth));
+        return Math.Max(1f, wrapped) + verticalLead;
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)

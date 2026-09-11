@@ -3,13 +3,24 @@ using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
-/// <summary>Greenfield empty state placeholder.</summary>
+/// <summary>
+/// Greenfield empty state placeholder.
+/// <para>
+/// Rebuilt over the <c>text/wrapped</c> atom (0.4.x leaf set): the wrapped-height rule is the atom's
+/// <see cref="WrappedTextWidget.MeasureBand"/>, and this kind contributes only its own font, its own
+/// leading and its own floor. The kind string, the attribute schema, the label set and the painted
+/// result stay as they were.
+/// </para>
+/// </summary>
 public sealed class EmptyStateWidget : IUiWidget
 {
     public const string Kind = "state/empty";
 
     private const float DefaultHeight = 48f;
     private const float VerticalPadding = 12f;
+
+    /// <summary>This kind's own type size, read by both Measure and Draw so they cannot drift apart.</summary>
+    private const UiFont BandFont = UiFont.Small;
 
     private UiElementSpec spec = UiElementSpec.Empty;
 
@@ -37,14 +48,17 @@ public sealed class EmptyStateWidget : IUiWidget
 
     public float Measure(UiWidgetContext ctx)
     {
-        return BandFor(ctx, ResolveText(ctx));
+        // The atom's band at this kind's font and leading, floored by this kind's own default band.
+        return Math.Max(
+            ReadHeight(),
+            WrappedTextWidget.MeasureBand(ctx, ResolveText(ctx), BandFont, VerticalPadding));
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)
     {
         if (rect.width <= 1f || rect.height <= 1f) return;
 
-        UiThemeDraw.Label(rect, ResolveText(ctx), ctx.Theme, ctx.Theme.TextSecondary, UiFont.Small, TextAnchor.MiddleCenter);
+        UiThemeDraw.Label(rect, ResolveText(ctx), ctx.Theme, ctx.Theme.TextSecondary, BandFont, TextAnchor.MiddleCenter);
     }
 
     /// <summary>Shared by Measure and Draw so the allocated band always matches the drawn string.</summary>
@@ -56,19 +70,6 @@ public sealed class EmptyStateWidget : IUiWidget
         }
 
         return spec.TryGetAttribute("Text", out string literal) ? literal : "";
-    }
-
-    /// <summary>
-    /// Empty-state copy is a sentence, not a word: it gets the height its wrapped lines need, with the
-    /// declared or default height as the floor.
-    /// </summary>
-    private float BandFor(UiWidgetContext ctx, string text)
-    {
-        float minimum = ReadHeight();
-        if (text.Length == 0) return minimum;
-
-        float lines = Math.Max(1f, ctx.Metrics.MeasureText(text, UiFont.Small, Math.Max(1f, ctx.ViewWidth)));
-        return Math.Max(minimum, lines + VerticalPadding);
     }
 
     private float ReadHeight()
