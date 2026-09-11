@@ -8,8 +8,10 @@
 #   (a) assembly-reference  the checked DLL's AssemblyRef table must name FerriteLib.UiKit
 #   (b) page-model contact  at least one MemberRef must target a page-model type, i.e. the mod actually
 #                           drives the declarative layer rather than only borrowing the theme helpers
-#   (c) chrome allowlist    every SOURCE file that calls the game's immediate-mode surface must appear
-#                           in the mod's declared ui-chrome allowlist (needs -SourceRoot + -Allowlist)
+#   (c) chrome allowlist    every SOURCE file that calls the game's immediate-mode surface, or the
+#                           library's context-free hit overload (UiNative.Button with one argument),
+#                           must appear in the mod's declared ui-chrome allowlist (needs -SourceRoot
+#                           + -Allowlist)
 #
 # Rule (c) is the same measurement as the library's own containment gate (see
 # tools/FerriteLib.UiKit.Tests/KernelContainmentTests.cs), applied to a consumer tree: raw backend calls
@@ -62,8 +64,15 @@ $PageModelTypes = @(
     'UiPopup'
 )
 
-# The game's immediate-mode surface, as qualified member accesses.
-$BackendPattern = '(?<![A-Za-z0-9_.])(UnityEngine\.|Verse\.)?(GUI|GUIUtility|GenMapUI|Mouse|Text|VerseWidgets|Widgets|Event)\s*\.\s*[A-Za-z_][A-Za-z0-9_]*'
+# The shared pattern set: two families, one boundary. The first is raw contact with the game's
+# immediate-mode surface, as qualified member accesses. The second is the context-free hit overload
+# named by its owner - UiNative.Button with a single argument - the one library call that bypasses the
+# owned hit stack, so a call site that keeps it is declared or it is a failure. The two-argument form
+# (UiNative.Button(rect, ctx)) is the migration the contract asks for and must NOT fire.
+$BackendPatterns = @(
+    '(?<![A-Za-z0-9_.])(UnityEngine\.|Verse\.)?(GUI|GUIUtility|GenMapUI|Mouse|Text|VerseWidgets|Widgets|Event)\s*\.\s*[A-Za-z_][A-Za-z0-9_]*',
+    '(?<![A-Za-z0-9_.])UiNative\s*\.\s*Button\s*\((?:[^,()]|\([^()]*\))*\)'
+)
 
 function Find-BackendCalls {
     param([string]$Root)
@@ -83,8 +92,11 @@ function Find-BackendCalls {
             $line = $lines[$i]
             $probe = $line.TrimStart()
             if ($probe.StartsWith('//')) { continue }
-            if ($probe -match $BackendPattern) {
-                $found.Add(("{0}:{1}" -f $file.FullName, ($i + 1)))
+            foreach ($pattern in $BackendPatterns) {
+                if ($probe -match $pattern) {
+                    $found.Add(("{0}:{1}" -f $file.FullName, ($i + 1)))
+                    break
+                }
             }
         }
     }
@@ -175,9 +187,18 @@ if ($SelfTest) {
             'class PlantedWorldLabel { void M() { GenMapUI.DrawPawnLabel(default, "x", default); } }',
             '// GenMapUI.DrawPawnLabel in a comment must not count'
         )
+        Set-Content -LiteralPath (Join-Path $sandbox 'PlantedRawHit.cs') -Encoding UTF8 -Value @(
+            'class PlantedRawHit { void M(Rect r) { if (UiNative.Button(r)) { } } }',
+            '// UiNative.Button(r) in a comment must not count'
+        )
+        # The migration the contract asks for: the two-argument form must NOT be a hit, or the pattern
+        # would redden the answer it recommends.
+        Set-Content -LiteralPath (Join-Path $sandbox 'PlantedMigratedHit.cs') -Encoding UTF8 -Value @(
+            'class PlantedMigratedHit { void M(Rect r, UiWidgetContext ctx) { if (UiNative.Button(r, ctx)) { } } }'
+        )
         $planted = @(Find-BackendCalls -Root $sandbox)
-        if ($planted.Count -ne 2) {
-            Write-Error "SELFTEST: expected exactly 2 planted backend call sites, got $($planted.Count). The source scan is not trustworthy." -ErrorAction Continue
+        if ($planted.Count -ne 3) {
+            Write-Error "SELFTEST: expected exactly 3 planted boundary call sites, got $($planted.Count). The source scan is not trustworthy." -ErrorAction Continue
             exit 1
         }
         if (-not $planted[0].EndsWith(':1')) {
@@ -188,7 +209,15 @@ if ($SelfTest) {
             Write-Error "SELFTEST: the shared in-world term (GenMapUI) did not fire on its planted site; the two halves of the metric would disagree about the boundary." -ErrorAction Continue
             exit 1
         }
-        Write-Host "selftest ok: the source scan finds both planted calls (including the shared in-world term) and ignores comments"
+        if (-not ($planted | Where-Object { $_.EndsWith('PlantedRawHit.cs:1') })) {
+            Write-Error "SELFTEST: the context-free hit overload (UiNative.Button with one argument) did not fire on its planted site." -ErrorAction Continue
+            exit 1
+        }
+        if ($planted | Where-Object { $_.EndsWith('PlantedMigratedHit.cs:1') }) {
+            Write-Error "SELFTEST: the two-argument form (UiNative.Button(rect, ctx)) was reported; that is the migration the contract asks for, not a breach." -ErrorAction Continue
+            exit 1
+        }
+        Write-Host "selftest ok: the source scan finds every planted shape (raw backend, the shared in-world term, the context-free hit overload), ignores comments and refuses the migrated two-argument form"
     }
     finally {
         Remove-Item -LiteralPath $sandbox -Recurse -Force -ErrorAction SilentlyContinue
@@ -247,10 +276,10 @@ if (-not [string]::IsNullOrWhiteSpace($SourceRoot)) {
     }
 
     if ($offending.Count -gt 0) {
-        $failures.Add("(c) undeclared raw backend call sites (" + $offending.Count + " file(s)): " + ($offending -join '; ') + ' — register them in the ui-chrome allowlist with a written ruling, or funnel them through the library')
+        $failures.Add("(c) undeclared boundary call sites (" + $offending.Count + " file(s)): " + ($offending -join '; ') + ' — register them in the ui-chrome allowlist with a written ruling (date, reason, what retires it), or funnel them through the library: raw backend contact goes through the seams, and the context-free hit overload takes the context instead')
     }
     else {
-        Write-Host ("raw backend call sites: " + $sites.Count + ", all inside the declared allowlist")
+        Write-Host ("boundary call sites: " + $sites.Count + ", all inside the declared allowlist")
     }
 }
 
