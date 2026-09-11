@@ -109,8 +109,8 @@ consequence is paid in the open rather than discovered by a stranger.
   table: unique per element inside one tree, the same value in Measure and in Draw, unchanged across a
   re-arrange (`Id`, or `Kind[declaredIndex]` when the element has none). Since the node step it carries two
   strings, and the difference is the point: `Key` is the canonical identity — segments joined by a separator
-  no XML text can hold, which the creation-time guards are what make injective — while `Path` is the display
-  path every diagnostic has always printed.
+  no XML text can hold; the creation-time guards are load-bearing for that injectivity, not a legacy rule the
+  node step supersedes — while `Path` is the display path every diagnostic has always printed.
   **Debt and residual aliases, stated rather than hidden:** the display path can still name two elements
   alike when a `Kind` itself contains `/` (`input/stepper-slider`), so `VisibleIds`, the fit audit, the
   recovery band and the string-keyed state surfaces — `UiSession.Trip`/`TrippedComponentIds`,
