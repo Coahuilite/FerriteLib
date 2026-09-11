@@ -1212,6 +1212,20 @@ Paths and roles only; any line/file count here would be false within a day (see 
 
 ## How verification is described here
 
+- **A lane that prints a failure without counting it is not a gate (found 2026-09-11).** The identity lane's
+  own runner logged each failure and never incremented the failure count, so from the day it landed it could
+  print red and still exit 0. Every mutation check run against it before that date was therefore evidence
+  that the assertion *fired*, not that the suite *failed* -- those claims are regression guards, and the
+  ledger now says so rather than keeping them as mutation proof. The criterion for a new gate is not "the
+  console shows FAIL" but **"plant the defect and the process exits non-zero"**, and the same scan belongs
+  on the older lanes, which nobody has audited for this shape yet.
+- **A correction the lead owes the record (2026-09-11).** While reviewing the scroll-target work the lead
+  asked for "clear the request when the id does not resolve". That preference was wrong: the contract test
+  at `KernelContractTests.cs:297-303` already required an unresolvable target to **stay pending**, because a
+  target can legitimately sit in a tab that is not arranged yet -- clearing it would silently kill the
+  cross-tab jump the request exists for. The implementer kept the existing semantics and said why, which is
+  the behaviour this ledger wants from a lane that finds its instructions disagreeing with the code.
+
 - A PASS is recorded with its scope and its evidence class. The classes in this repo are, weakest to
   strongest: reference-assembly read, stub harness, compile-time, and in-game observation - and only the
   last is written as "proven in a running game".
