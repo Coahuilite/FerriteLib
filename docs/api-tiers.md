@@ -103,6 +103,7 @@ consequence is paid in the open rather than discovered by a stranger.
   appearances are reached from the manifest.
 - `RuleWidget` — kind string only (`chrome/rule`).
 - `SliderWidget` — kind string only (`input/slider`).
+- `NumberFieldWidget` — kind string only (`input/number-field`).
 
 Removing them needs a place for the kind names: a stable container of `const string` kind identifiers, so
 `["Kind"] = "core/state/empty"` stays writable without a type reference. That is a 0.4.x item, and until it

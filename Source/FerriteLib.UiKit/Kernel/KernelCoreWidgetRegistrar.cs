@@ -18,5 +18,6 @@ public static class KernelCoreWidgetRegistrar
         Widgets.ButtonWidget.Register();
         Widgets.RuleWidget.Register();
         Widgets.SliderWidget.Register();
+        Widgets.NumberFieldWidget.Register();
     }
 }
