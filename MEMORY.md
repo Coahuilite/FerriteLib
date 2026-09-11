@@ -237,6 +237,31 @@
   button under an open popup can rediscover the 2026-09-04 click-theft class; the closing item is
   `TODO.md` section 3's owned hit stack, and no atom may grow a second, private yield rule meanwhile.
 
+- **The 0.4.x batch exists on the branch and is archived: style table, identity layer, leaf atoms (2026-09-11).**
+  `origin/0.4.x` = `1ececed` carries all of it; `v0.3.0-rc1` remains the only published release. Landed in
+  the order this ledger's own sequence asked for: the resolved-value store plus the per-surface token shape
+  (`UiStyleTable` keyed by tone/emphasis[/writability], per-surface fill+border pairs, geometry tokens, and
+  `LayoutRevision` so a density or font change re-arranges instead of reusing stale bands -- with the
+  duplicated two-token mapping deleted from all four outlets: `StatusTreatment`, `StatusBadge`,
+  `DropdownWidget`, `InputModeRowWidget` and `UiPopup`); the element identity layer (`UiNodeId`, per-element
+  state keys, an ambient element scope set and restored in try/finally so a throwing sibling cannot move
+  the next element's slot, plus `HoverClaimElement`/`ActiveElement` as its observation surface); the five
+  leaf kinds; and `chrome/banner`/`state/empty` re-expressed over the text atom's band contract while
+  keeping their names.
+  **Two artifacts are recorded rather than hidden.** (1) Three commits -- `7110b0c`, `f516651`, `dfba792` --
+  are red at the commit level: their public types reached `docs/api-tiers.md` one commit later because
+  parallel lanes raced on that shared file. The tip was verified green in an isolated extraction before the
+  push, and rewriting the batch was refused on purpose: it would invalidate the verifier's per-sha evidence
+  and interrupt a lane still writing, while this branch's contract is the tip. The discipline that follows:
+  a public type and its tier line go in the same commit, and the tier lane is re-run after any rewrite.
+  (2) Two unpushed commits were amended in flight (`a81182e`->`169cf62`, `085ebd1`->`7afa1df`), both
+  reported by their author; that mapping is part of this session's record.
+  **Two traps worth keeping.** A mutation check that restores a file with `Copy-Item` keeps the old mtime,
+  MSBuild then skips the recompile, and the "green after restore" is the old binary -- touch the file or
+  pass `--no-incremental`. And `tools/.../Stubs/**` is a de-facto published surface: the verse stub's
+  `Label` gained three additive recording lists so the text-colour routes became observable, which the
+  wired consumer sees when it re-pins to 0.4.
+
 ## Charter — what this library is for
 
 - **The founding spec, transcribed.** `Coahuilite/UniversalSqueaker@09366f8:docs/ui-shared-library-design-zh.md`

@@ -158,6 +158,13 @@ Each item is expected to delete a workaround, not add a layer.
       node object owning identity, state and dirty flags. Removes the path-aliasing hazard where two
       unnamed same-kind siblings share a path (`UiLayoutEngine` falls back to `Kind` when `Id` is empty,
       and `UiLayoutManifest` only enforces uniqueness for ids that are present).
+      **Progress 2026-09-11 -- first step landed** (`dfba792`, archived on `0.4.x`): stable element identity
+      (`UiNodeId`, declared index rather than visible index so Tab/Hidden toggles do not renumber), per-element
+      state keys, an ambient element scope restored in `finally`, and the two observation members
+      (`ActiveElement`, `HoverClaimElement`) with their retirement condition recorded in `api-tiers.md`. The
+      real node object -- identity plus state plus dirty flags in one type -- is the next step, together with
+      the string-keyed remnants this one deliberately left (`UiNative.GetControlId`, the popup owner key,
+      `SetScrollTarget`); the owned hit stack depends on the node step.
 - [ ] **A third operation on bindings: announce.** `IUiBindings` has get and set but no notification, so
       invalidation is a single global `ContentRevision` counter and its call sites are policed by
       reading source files and asserting on substrings. Give every key a revision, then delete
