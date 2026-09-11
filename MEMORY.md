@@ -260,6 +260,13 @@
   gate; a late registration hides the evidence entirely. Same root cause, same rule: a public type, its tier
   line and its lane registration go in one commit, checked with `git show <sha>:<file> | grep`, never by
   trusting the working tree.
+  The same class bit the lead's own gate 8 wiring the next day: `verify-local.ps1` called
+  `scripts/net472-trap-scan.ps1` while the file was still untracked, so every clean extraction reddened on a
+  gate whose target did not exist -- and an untracked script is invisible to a `git status` reading, a build
+  and a local run alike. Two instances in two days make it a rule rather than an anecdote: anything a script,
+  gate or lane refers to must be tracked, and the check is `git archive <sha>` plus a run, never the working
+  tree. Gate 8 itself is verified both ways -- 8/8 on a clean tree, and red with `file:line` and the matched
+  shape when `Split(',')` is planted.
   (2) Two unpushed commits were amended in flight (`a81182e`->`169cf62`, `085ebd1`->`7afa1df`), both
   reported by their author; that mapping is part of this session's record.
   **Two traps worth keeping.** A mutation check that restores a file with `Copy-Item` keeps the old mtime,
