@@ -90,5 +90,8 @@ internal static class Program
 
         Console.WriteLine("Kernel writability (read-only bindings drive the disabled treatment)...");
         failures += KernelWritabilityTests.RunAll();
+
+        Console.WriteLine("Kernel role attributes (Tone/Emphasis, fallback recording, density)...");
+        failures += KernelRoleAttributeTests.RunAll();
     }
 }
