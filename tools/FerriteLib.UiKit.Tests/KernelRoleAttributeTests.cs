@@ -567,7 +567,7 @@ internal static class KernelRoleAttributeTests
             ResetSeams();
         }
 
-        Check(host.Session.TrippedComponentIds.Count == 0,
+        Check(host.Session.TrippedNodes.Count == 0,
             "the recovery band is never the fallback: the page's pass tripped nothing");
         CheckClose(0.5f, published, "and the page's pass wrote nothing either");
     }

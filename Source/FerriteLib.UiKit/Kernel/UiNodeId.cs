@@ -41,6 +41,13 @@ public readonly struct UiNodeId : IEquatable<UiNodeId>
     /// </summary>
     internal const char KeySeparator = '\u001F';
 
+    /// <summary>
+    /// Marker that opens a sub-node segment. U+001E is likewise illegal in XML, so no element segment -
+    /// whose text comes from XML - can start with it, which keeps a widget's own sub-nodes out of the
+    /// element namespace.
+    /// </summary>
+    internal const char SubNodeMarker = '\u001E';
+
     /// <summary>The display separator: the character this library has always joined paths with.</summary>
     public const char PathSeparator = '/';
 
@@ -78,9 +85,42 @@ public readonly struct UiNodeId : IEquatable<UiNodeId>
     internal UiNodeId Child(UiElementSpec spec, int declaredIndex)
     {
         string segment = Segment(spec, declaredIndex);
-        string childKey = Key.Length == 0 ? segment : Key + KeySeparator + segment;
-        string childPath = Path.Length == 0 ? segment : Path + PathSeparator + segment;
-        return new UiNodeId(childKey, childPath);
+        return new UiNodeId(AppendKey(segment), AppendPath(segment));
+    }
+
+    /// <summary>
+    /// Identity of a node a widget minted for one of its own sub-controls
+    /// (<see cref="UiWidgetContext.Child"/>). This is the only identity a code-supplied name can create,
+    /// and the name is validated: non-empty, and free of the two marker characters this encoding uses.
+    /// The segment opens with <see cref="SubNodeMarker"/>, which no XML text can carry, so a sub-node can
+    /// never collide with an element segment - the element namespace and the sub-node namespace stay apart
+    /// however a widget names its controls.
+    /// </summary>
+    internal UiNodeId SubNode(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            throw new ArgumentException("A sub-node needs a non-empty name.", nameof(name));
+        }
+
+        if (name.IndexOf(KeySeparator) >= 0 || name.IndexOf(SubNodeMarker) >= 0)
+        {
+            throw new ArgumentException(
+                "A sub-node name may not contain the identity encoding's marker characters.", nameof(name));
+        }
+
+        string segment = SubNodeMarker + name;
+        return new UiNodeId(AppendKey(segment), AppendPath("@" + name));
+    }
+
+    private string AppendKey(string segment)
+    {
+        return Key.Length == 0 ? segment : Key + KeySeparator + segment;
+    }
+
+    private string AppendPath(string segment)
+    {
+        return Path.Length == 0 ? segment : Path + PathSeparator + segment;
     }
 
     private static string Segment(UiElementSpec spec, int declaredIndex)

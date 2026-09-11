@@ -14,7 +14,9 @@ public sealed class UiSession : IDisposable
     private static readonly IReadOnlyDictionary<string, UiValueState> NoValueStates =
         new Dictionary<string, UiValueState>(StringComparer.Ordinal);
 
-    private readonly Dictionary<string, Vector2> scrollPositions = new(StringComparer.Ordinal);
+    // Scroll state is keyed by the scroll container's node, not by a display path: two scroll elements
+    // whose display paths collide still hold two scroll positions (0.4.0 node step 2).
+    private readonly Dictionary<UiNode, Vector2> scrollPositions = new();
 
     // Every arranged element's node, keyed by identity, plus the "no element" node a host-level caller
     // resolves into. The nodes own their element's state, and the table is the session's, so disposing
@@ -23,8 +25,10 @@ public sealed class UiSession : IDisposable
     private readonly HashSet<UiNode> dirtyNodes = new();
     private readonly UiNode unscopedNode;
 
-    private readonly HashSet<string> trippedComponentIds = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, string> trippedLogs = new(StringComparer.Ordinal);
+    // Recovery slots are keyed by the node that tripped, so two elements that print the same display
+    // path cannot share one fallback slot (0.4.0 node step 2).
+    private readonly HashSet<UiNode> trippedNodes = new();
+    private readonly Dictionary<UiNode, string> trippedLogs = new();
     private int? ownedHotControl;
     private readonly List<Action> popupDrawActions = new();
     private string? openPopupId;
@@ -105,11 +109,14 @@ public sealed class UiSession : IDisposable
     /// </summary>
     public UiNode ActiveNode => activeNode;
 
-    /// <summary>Session-scoped scroll positions keyed by scroll container id.</summary>
-    public IReadOnlyDictionary<string, Vector2> ScrollPositions => scrollPositions;
+    /// <summary>Session-scoped scroll positions, keyed by the scroll container's node.</summary>
+    public IReadOnlyDictionary<UiNode, Vector2> ScrollPositions => scrollPositions;
 
-    /// <summary>Component ids currently tripped into session fallback.</summary>
-    public IReadOnlyCollection<string> TrippedComponentIds => trippedComponentIds;
+    /// <summary>
+    /// Nodes currently tripped into session fallback. Keyed by node, so the display path a diagnostic
+    /// prints plays no part in which element owns a recovery slot.
+    /// </summary>
+    public IReadOnlyCollection<UiNode> TrippedNodes => trippedNodes;
 
     /// <summary>Session-scoped popup draw callbacks. Not process-global.</summary>
     public IReadOnlyList<Action> PopupDrawActions => popupDrawActions;
@@ -134,9 +141,16 @@ public sealed class UiSession : IDisposable
     public string? ScrollTargetElementId => scrollTargetElementId;
 
     /// <summary>
-    /// Requests the host to scroll the target element into view. The request stays pending until the
-    /// host can resolve it against an arranged snapshot (which may be a later frame, e.g. after a tab
-    /// switch makes the element visible).
+    /// Requests the engine to scroll the element with this declared <c>Id</c> into view. The request is
+    /// consumer vocabulary - a declared Id, which the manifest keeps globally unique - and the engine
+    /// resolves it to a node once per arrange, writes that scroll container's node-keyed position and
+    /// clears the request, so one request moves the view exactly once.
+    /// <para>
+    /// An Id that no arranged element carries leaves the request pending rather than clearing it: the
+    /// documented case is a target that becomes visible on a later frame (a Tab switch), and the existing
+    /// lane in <c>KernelContractTests</c> pins exactly that. There is no third behaviour - a request is
+    /// either consumed by a successful resolution or still pending.
+    /// </para>
     /// </summary>
     public void SetScrollTarget(string elementId)
     {
@@ -285,7 +299,7 @@ public sealed class UiSession : IDisposable
 
     /// <summary>
     /// The node an identity names, or null when this session has never arranged such an element.
-    /// Read-only: nodes are created by the engine during arrange.
+    /// Read-only: element nodes are created by the engine during arrange.
     /// </summary>
     public UiNode? GetNode(UiNodeId element)
     {
@@ -293,11 +307,69 @@ public sealed class UiSession : IDisposable
     }
 
     /// <summary>
+    /// The node of the element a declared <c>Id</c> names, or null when no arranged element carries it.
+    /// This is the bridge a caller uses to move from the one string a page owns to the node identity
+    /// everything else keys on; it is a lookup, not a second key space.
+    /// </summary>
+    public UiNode? GetNodeByElementId(string elementId)
+    {
+        if (string.IsNullOrEmpty(elementId)) return null;
+        foreach (UiNode node in nodes.Values)
+        {
+            if (string.Equals(node.ElementId, elementId, StringComparison.Ordinal))
+            {
+                return node;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The node a widget minted for one of its own sub-controls, created on first use under
+    /// <paramref name="parent"/> and re-linked on every call. The node - and therefore its state - is
+    /// created once per identity and reused, which is what lets a control inside a widget outlive a
+    /// widget instance, and it carries no arranged geometry: sub-controls are the widget's own business,
+    /// not tree elements.
+    /// </summary>
+    internal UiNode GetOrCreateSubNode(UiNode parent, string name)
+    {
+        EnsureActive();
+        if (parent == null) throw new ArgumentNullException(nameof(parent));
+
+        UiNodeId id = parent.Id.SubNode(name);
+        if (!nodes.TryGetValue(id, out UiNode? node))
+        {
+            node = new UiNode(this, id, "", -1, needsMeasure: false);
+            nodes.Add(id, node);
+        }
+
+        parent.AddChild(node);
+        return node;
+    }
+
+    /// <summary>
+    /// Opens a fresh arrange: every node forgets its children and its geometry, and the arrange that
+    /// follows publishes them again for the elements it visits. That is what makes "not arranged in this
+    /// tree" a state a caller can read (<see cref="UiNode.IsArranged"/>) instead of a stale rect, and it
+    /// keeps a Tab-hidden element's node and state alive while its rect is gone.
+    /// </summary>
+    internal void BeginArrange()
+    {
+        EnsureActive();
+        foreach (UiNode node in nodes.Values)
+        {
+            node.ClearChildren();
+            node.ClearGeometry();
+        }
+    }
+
+    /// <summary>
     /// The node an element's identity names, created on first use. The engine calls this for every
     /// arranged entry, so a re-arrange reuses the node - and therefore its state - instead of replacing
     /// it, which is what makes identity survive a frame.
     /// </summary>
-    internal UiNode GetOrCreateNode(UiNodeId element, string kind, int ordinal)
+    internal UiNode GetOrCreateNode(UiNodeId element, string kind, int ordinal, string elementId = "")
     {
         EnsureActive();
         if (nodes.TryGetValue(element, out UiNode? node))
@@ -305,7 +377,7 @@ public sealed class UiSession : IDisposable
             return node;
         }
 
-        node = new UiNode(this, element, kind, ordinal);
+        node = new UiNode(this, element, kind, ordinal, needsMeasure: true, elementId: elementId);
         nodes.Add(element, node);
         dirtyNodes.Add(node);
         return node;
@@ -353,18 +425,18 @@ public sealed class UiSession : IDisposable
         activeNode = previous;
     }
 
-    public Vector2 GetScrollPosition(string elementId)
+    /// <summary>The scroll position one scroll container's node holds; zero when it holds none.</summary>
+    public Vector2 GetScrollPosition(UiNode node)
     {
-        return elementId != null && scrollPositions.TryGetValue(elementId, out Vector2 pos)
-            ? pos
-            : Vector2.zero;
+        return node != null && scrollPositions.TryGetValue(node, out Vector2 pos) ? pos : Vector2.zero;
     }
 
-    public void SetScrollPosition(string elementId, Vector2 position)
+    /// <summary>Writes one scroll container's position, keyed by its node.</summary>
+    public void SetScrollPosition(UiNode node, Vector2 position)
     {
-        if (elementId == null) throw new ArgumentNullException(nameof(elementId));
+        if (node == null) throw new ArgumentNullException(nameof(node));
         EnsureActive();
-        scrollPositions[elementId] = position;
+        scrollPositions[node] = position;
     }
 
     /// <summary>
@@ -414,24 +486,36 @@ public sealed class UiSession : IDisposable
         hoverClaimStamp = Frame;
     }
 
-    public bool IsTripped(string elementId)
+    /// <summary>True when this node's element is in session fallback.</summary>
+    public bool IsTripped(UiNode node)
     {
-        return elementId != null && trippedComponentIds.Contains(elementId);
+        return node != null && trippedNodes.Contains(node);
     }
 
-    public void Trip(string elementId, string diagnostic)
+    /// <summary>
+    /// Records one node's fallback and its diagnostic. The first trip of a node keeps its log; a retry
+    /// does not replace it, which is what makes the guard log once per session slot.
+    /// </summary>
+    public void Trip(UiNode node, string diagnostic)
     {
-        if (string.IsNullOrEmpty(elementId)) return;
+        if (node == null) return;
         EnsureActive();
-        if (trippedComponentIds.Add(elementId))
+        if (trippedNodes.Add(node))
         {
-            trippedLogs[elementId] = diagnostic;
+            trippedLogs[node] = diagnostic;
         }
     }
 
-    public bool TryGetTripLog(string elementId, out string diagnostic)
+    /// <summary>The diagnostic the first trip of this node recorded, if it ever tripped.</summary>
+    public bool TryGetTripLog(UiNode node, out string diagnostic)
     {
-        return trippedLogs.TryGetValue(elementId, out diagnostic!);
+        if (node == null)
+        {
+            diagnostic = null!;
+            return false;
+        }
+
+        return trippedLogs.TryGetValue(node, out diagnostic!);
     }
     /// <summary>Registers one session-owned popup draw callback for the current Host frame.</summary>
     public void RegisterPopupDraw(Action draw)
@@ -492,6 +576,7 @@ public sealed class UiSession : IDisposable
         scrollPositions.Clear();
         nodes.Clear();
         dirtyNodes.Clear();
+        trippedNodes.Clear();
         activeNode = unscopedNode;
         hoverClaim = "";
         hoverClaimElement = default;
@@ -499,7 +584,6 @@ public sealed class UiSession : IDisposable
         hoverHeldElement = default;
         hoverClaimStamp = 0;
         hoverGraceLeft = 0;
-        trippedComponentIds.Clear();
         trippedLogs.Clear();
         popupDrawActions.Clear();
         openPopupId = null;

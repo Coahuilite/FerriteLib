@@ -68,7 +68,12 @@ internal static class KernelPopupTests
 
         // Content is 100 + 28 + 100 = 228 tall; viewport is 200, so the scroll offset clamps to 28.
         // Vertical overflow reserves the 16px scrollbar width, leaving a 284px trigger.
-        host.Session.SetScrollPosition("scroll", new Vector2(0f, 20f));
+        // The scroll element's node exists once the page has been arranged, so the offset is written
+        // against that node before the frame under test runs.
+        host.MeasureAndArrange(new Vector2(300f, 300f));
+        UiNode scrollNode = host.Session.GetNodeByElementId("scroll")
+            ?? throw new Exception("the arranged scroll element has no node");
+        host.Session.SetScrollPosition(scrollNode, new Vector2(0f, 20f));
 
         // The Host viewport starts at (20, 30). The trigger draws at content-local
         // (0, 100, 284, 28), so its window-space rect is (20, 30 + 100 - 20, 284, 28).
@@ -386,7 +391,13 @@ internal static class KernelPopupTests
         bindings.BindOptions("Options", () => new List<string> { "x", "y" });
 
         using UiHost host = new(Scope, manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
-        host.Session.SetScrollPosition("scroll", new Vector2(0f, 40f));
+
+        // Warm arrange: the node the scroll offset belongs to exists only after the page has been
+        // arranged once.
+        host.MeasureAndArrange(new Vector2(300f, 300f));
+        UiNode scrollNode = host.Session.GetNodeByElementId("scroll")
+            ?? throw new Exception("the arranged scroll element has no node");
+        host.Session.SetScrollPosition(scrollNode, new Vector2(0f, 40f));
 
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(300f, 300f));
         host.Session.OpenPopup("first", snapshot.RectById["first"]);

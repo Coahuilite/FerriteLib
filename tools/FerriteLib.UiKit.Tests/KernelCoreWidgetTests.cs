@@ -297,7 +297,7 @@ internal static class KernelCoreWidgetTests
             "the keyed banner resolves through the same translation path before the band is measured");
 
         host.DrawFrame(new Rect(0f, 0f, 300f, 400f));
-        Check(host.Session.TrippedComponentIds.Count == 0, "both composites draw their whole path without a trip");
+        Check(host.Session.TrippedNodes.Count == 0, "both composites draw their whole path without a trip");
     }
 
     private static void CheckSchema(string kind, string[] expected)

@@ -113,10 +113,27 @@ public sealed class UiWidgetContext
         StyleChain = styleChain;
     }
 
-    public UiWidgetContext ForChild(string childId)
+    /// <summary>
+    /// Returns a context for a sub-control this widget owns, minted as a node under the element's node:
+    /// <c>ctx.Child("left")</c> keeps its own identity - and therefore its own state - across passes, and
+    /// its display path reads <c>&lt;element&gt;/@left</c>. The sub-node carries no arranged geometry; it
+    /// exists so a widget's self-drawn controls stop sharing one element-wide state bag and so their state
+    /// survives the widget instance. It inherits the element's style chain (a sub-control is drawn inside
+    /// the element, so scheme and density cascade to it unchanged), and it replaces the earlier path-only
+    /// <c>ForChild</c>, which could not mint identity (0.4.0 node step 2).
+    /// </summary>
+    public UiWidgetContext Child(string name)
     {
-        string path = ElementPath.Length == 0 ? childId : ElementPath + "/" + childId;
-        return new UiWidgetContext(Source, Session, Metrics, Theme, Translation, Bindings, ViewWidth, path, WindowOrigin, ElementId, Node, StyleChain);
+        if (Node == null)
+        {
+            throw new InvalidOperationException(
+                "A context without an element node cannot mint a sub-node; the engine binds Node per arranged entry.");
+        }
+
+        UiNode child = Session.GetOrCreateSubNode(Node, name);
+        return new UiWidgetContext(
+            Source, Session, Metrics, Theme, Translation, Bindings, ViewWidth,
+            child.Path, WindowOrigin, child.Id, child, StyleChain);
     }
 
     /// <summary>

@@ -281,7 +281,9 @@ internal static class KernelContractTests
         host.Session.SetScrollTarget("target");
         host.DrawFrame(new Rect(0f, 0f, 200f, 200f));
 
-        Vector2 pos = host.Session.GetScrollPosition("scroll");
+        UiNode? scrollNode = host.Session.GetNodeByElementId("scroll");
+        if (scrollNode == null) throw new Exception("No node for the scroll element.");
+        Vector2 pos = host.Session.GetScrollPosition(scrollNode);
         if (Math.Abs(pos.y - 40f) > 0.01f)
         {
             throw new Exception("Scroll target did not position the scroll (" + pos.y + ", expected 40)");
@@ -720,9 +722,9 @@ internal static class KernelContractTests
         }
 
         bool trippedBoom = false;
-        foreach (string id in host.Session.TrippedComponentIds)
+        foreach (UiNode node in host.Session.TrippedNodes)
         {
-            if (id.IndexOf("boom", StringComparison.Ordinal) >= 0) trippedBoom = true;
+            if (node.Path.IndexOf("boom", StringComparison.Ordinal) >= 0) trippedBoom = true;
         }
 
         if (!trippedBoom)
@@ -736,9 +738,9 @@ internal static class KernelContractTests
         }
 
         bool diagnosticCarried = false;
-        foreach (string id in host.Session.TrippedComponentIds)
+        foreach (UiNode node in host.Session.TrippedNodes)
         {
-            if (host.Session.TryGetTripLog(id, out string logged)
+            if (host.Session.TryGetTripLog(node, out string logged)
                 && logged.IndexOf("planted widget failure", StringComparison.Ordinal) >= 0)
             {
                 diagnosticCarried = true;

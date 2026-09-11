@@ -190,10 +190,12 @@ internal static class KernelLayoutTests
         UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, new Vector2(200f, 600f), Parse(xml).Roots);
 
         ResetScrollCounters();
-        ctx.Session.SetScrollPosition("scroll", new Vector2(0f, 3f));
+        UiNode scrollNode = ctx.Session.GetNodeByElementId("scroll")
+            ?? throw new Exception("the arranged scroll element has no node");
+        ctx.Session.SetScrollPosition(scrollNode, new Vector2(0f, 3f));
         engine.Draw(ctx, snapshot, new Rect(0f, 0f, 200f, 200f));
 
-        Vector2 stored = ctx.Session.GetScrollPosition("scroll");
+        Vector2 stored = ctx.Session.GetScrollPosition(scrollNode);
         Check(Near(stored.y, 3f), "Scroll draw preserves the session scroll position");
         Check(ReadStaticInt(typeof(Verse.Widgets), "ScrollViewDepth") == 0,
             "Scroll draw leaves no open scroll view");
@@ -209,15 +211,21 @@ internal static class KernelLayoutTests
         string xml = ScrollXml();
         UiLayoutEngine engine = new(Scope);
         UiWidgetContext ctx = CreateContext();
-        ctx.Session.SetScrollPosition("scroll", new Vector2(0f, 1000f));
+
+        // The scroll position belongs to the scroll element's node, which exists once that element has
+        // been arranged; the clamp under test then runs on the arrange that follows.
+        engine.ArrangeRoots(ctx, new Vector2(200f, 600f), Parse(xml).Roots);
+        UiNode scrollNode = ctx.Session.GetNodeByElementId("scroll")
+            ?? throw new Exception("the arranged scroll element has no node");
+        ctx.Session.SetScrollPosition(scrollNode, new Vector2(0f, 1000f));
 
         UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, new Vector2(200f, 600f), Parse(xml).Roots);
-        Vector2 pos = ctx.Session.GetScrollPosition("scroll");
+        Vector2 pos = ctx.Session.GetScrollPosition(scrollNode);
         Check(Near(pos.y, 10f), "Scroll position clamps to contentHeight - viewportHeight (60-50)");
 
-        ctx.Session.SetScrollPosition("scroll", new Vector2(0f, -5f));
+        ctx.Session.SetScrollPosition(scrollNode, new Vector2(0f, -5f));
         snapshot = engine.ArrangeRoots(ctx, new Vector2(210f, 600f), Parse(xml).Roots);
-        pos = ctx.Session.GetScrollPosition("scroll");
+        pos = ctx.Session.GetScrollPosition(scrollNode);
         Check(Near(pos.x, 0f) && Near(pos.y, 0f), "Negative scroll clamps to zero");
     }
 
@@ -585,7 +593,7 @@ internal static class KernelLayoutTests
         Check(ReadStaticInt(typeof(GUI), "GroupDepth") == 0, "Clip group depth restored after the child failure");
         Check(ReadStaticInt(typeof(GUI), "BeginGroupCalls") == ReadStaticInt(typeof(GUI), "EndGroupCalls"),
             "Clip Begin/EndGroup balanced after the child failure");
-        Check(ctx.Session.TrippedComponentIds.Count > 0, "and the recovery is recorded in the session");
+        Check(ctx.Session.TrippedNodes.Count > 0, "and the recovery is recorded in the session");
     }
 
     private static string ScrollXml()

@@ -114,9 +114,14 @@ public sealed class UiLayoutEngine
             && cachedDefinitionRevision == DefinitionRevision(ctx)
             && cachedTranslationRevision == ctx.Translation.TranslationRevision)
         {
-            ClampScrollPositions(ctx.Session, cachedSnapshot);
+            ClampScrollPositions(ctx.Session, lastEntries);
+            ApplyScrollTarget(ctx);
             return cachedSnapshot;
         }
+
+        // A fresh arrange: every node forgets its children and geometry, and the entries below publish
+        // them again for the elements this pass visits.
+        ctx.Session.BeginArrange();
 
         var box = new MeasuredBox { Width = width, Height = 0f };
         float y = 0f;
@@ -125,7 +130,7 @@ public sealed class UiLayoutEngine
             UiElementSpec root = roots[i];
             if (IsHidden(root, ctx, narrow: false)) continue;
 
-            UiNode rootNode = ctx.Session.GetOrCreateNode(UiNodeId.Root(root, i), root.Kind, i);
+            UiNode rootNode = ctx.Session.GetOrCreateNode(UiNodeId.Root(root, i), root.Kind, i, root.Id);
             MeasuredBox child = MeasureElement(
                 ctx,
                 root,
@@ -153,6 +158,11 @@ public sealed class UiLayoutEngine
             }
 
             visible.Add(entry.Id.Path);
+
+            // Geometry lands on the node: the snapshot stays the public view, the node is what the next
+            // steps (hit stack, scroll targeting) read.
+            entry.Node.Rect = entry.Rect;
+            entry.Node.ContentRect = entry.ContentRect;
 
             if (string.Equals(entry.ContainerKind, "Scroll", StringComparison.Ordinal))
             {
@@ -183,8 +193,53 @@ public sealed class UiLayoutEngine
         // just happened.
         ctx.Session.ClearDirtyNodes();
 
-        ClampScrollPositions(ctx.Session, cachedSnapshot);
+        ClampScrollPositions(ctx.Session, lastEntries);
+        ApplyScrollTarget(ctx);
         return cachedSnapshot;
+    }
+
+    /// <summary>
+    /// Consumes a pending scroll-target request exactly once: the element whose declared Id the request
+    /// names is looked up by node, its containing scroll container's node-keyed position is written, and
+    /// the request is cleared. A request naming an Id no arranged element carries stays pending - the
+    /// documented Tab-switch case, where the target becomes visible on a later frame - so there is no
+    /// third behaviour between "consumed" and "still pending".
+    /// </summary>
+    private void ApplyScrollTarget(UiWidgetContext ctx)
+    {
+        string? targetId = ctx.Session.ScrollTargetElementId;
+        if (string.IsNullOrEmpty(targetId)) return;
+
+        PlacedEntry? target = null;
+        foreach (PlacedEntry entry in lastEntries)
+        {
+            if (entry.Spec.Id.Length > 0 && string.Equals(entry.Spec.Id, targetId, StringComparison.Ordinal))
+            {
+                target = entry;
+                break;
+            }
+        }
+
+        if (target == null) return;
+
+        Rect targetRect = target.Rect;
+        foreach (PlacedEntry entry in lastEntries)
+        {
+            if (!string.Equals(entry.ContainerKind, "Scroll", StringComparison.Ordinal)) continue;
+
+            Rect viewport = entry.Rect;
+            Rect content = entry.ContentRect
+                ?? new Rect(0f, 0f, Math.Max(1f, viewport.width), Math.Max(1f, viewport.height));
+            float contentLocalY = targetRect.y - viewport.y;
+            if (contentLocalY < -1f || contentLocalY > content.height + 1f) continue;
+
+            float maxY = Math.Max(0f, content.height - viewport.height);
+            float clampedY = ClampFloat(contentLocalY, 0f, maxY);
+            Vector2 current = ctx.Session.GetScrollPosition(entry.Node);
+            ctx.Session.SetScrollPosition(entry.Node, new Vector2(current.x, clampedY));
+            ctx.Session.ClearScrollTarget();
+            return;
+        }
     }
 
     public void Draw(UiWidgetContext ctx, UiLayoutSnapshot snapshot, Rect viewport)
@@ -262,7 +317,7 @@ public sealed class UiLayoutEngine
                         UiNode previous = ctx.Session.EnterNode(entry.Node);
                         try
                         {
-                            UiSessionGuard.DrawWidget(entry.Widget, drawRect, entryCtx, entry.Id.Path);
+                            UiSessionGuard.DrawWidget(entry.Widget, drawRect, entryCtx, entry.Node);
                         }
                         finally
                         {
@@ -295,8 +350,7 @@ public sealed class UiLayoutEngine
 
         if (string.Equals(kind, "Scroll", StringComparison.Ordinal))
         {
-            string key = ScrollKey(entry);
-            Vector2 scrollPosition = ctx.Session.GetScrollPosition(key);
+            Vector2 scrollPosition = ctx.Session.GetScrollPosition(entry.Node);
             Rect contentRect = entry.ContentRect ?? new Rect(0f, 0f, Math.Max(1f, outRect.width), Math.Max(1f, outRect.height));
             scrollPosition = ClampScroll(scrollPosition, contentRect, outRect);
 
@@ -316,7 +370,7 @@ public sealed class UiLayoutEngine
             }
             finally
             {
-                ctx.Session.SetScrollPosition(key, scrollPosition);
+                ctx.Session.SetScrollPosition(entry.Node, scrollPosition);
                 VerseWidgets.EndScrollView();
             }
 
@@ -358,14 +412,21 @@ public sealed class UiLayoutEngine
             rect.height);
     }
 
-    private static void ClampScrollPositions(UiSession session, UiLayoutSnapshot snapshot)
+    /// <summary>
+    /// Re-clamps every scroll container's node-keyed position against the geometry this arrange produced.
+    /// It reads the entries rather than the snapshot's string-keyed viewports on purpose: the snapshot
+    /// keeps its declared-id view for consumers, while the state itself belongs to the node.
+    /// </summary>
+    private static void ClampScrollPositions(UiSession session, List<PlacedEntry> entries)
     {
-        foreach (KeyValuePair<string, Rect> pair in snapshot.ScrollContents)
+        foreach (PlacedEntry entry in entries)
         {
-            string key = pair.Key;
-            if (!snapshot.Viewports.TryGetValue(key, out Rect viewport)) continue;
+            if (!string.Equals(entry.ContainerKind, "Scroll", StringComparison.Ordinal)) continue;
+            if (!entry.ContentRect.HasValue) continue;
 
-            session.SetScrollPosition(key, ClampScroll(session.GetScrollPosition(key), pair.Value, viewport));
+            session.SetScrollPosition(
+                entry.Node,
+                ClampScroll(session.GetScrollPosition(entry.Node), entry.ContentRect.Value, entry.Rect));
         }
     }
 
@@ -464,7 +525,7 @@ public sealed class UiLayoutEngine
             float height;
             try
             {
-                height = ResolveHeight(spec, widget, measureCtx, width, node.Id);
+                height = ResolveHeight(spec, widget, measureCtx, width, node);
             }
             finally
             {
@@ -555,7 +616,10 @@ public sealed class UiLayoutEngine
     /// </summary>
     private static UiNode ChildNode(UiWidgetContext ctx, UiNode parent, UiElementSpec spec, int declaredIndex)
     {
-        return ctx.Session.GetOrCreateNode(parent.Id.Child(spec, declaredIndex), spec.Kind, declaredIndex);
+        UiNode child = ctx.Session.GetOrCreateNode(
+            parent.Id.Child(spec, declaredIndex), spec.Kind, declaredIndex, spec.Id);
+        parent.AddChild(child);
+        return child;
     }
 
     private static List<ChildSlot> VisibleChildren(UiElementSpec spec, UiWidgetContext ctx, bool narrow)
@@ -1201,14 +1265,14 @@ public sealed class UiLayoutEngine
             && int.TryParse(raw.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
     }
 
-    private static float ResolveHeight(UiElementSpec spec, IUiWidget widget, UiWidgetContext ctx, float width, UiNodeId id)
+    private static float ResolveHeight(UiElementSpec spec, IUiWidget widget, UiWidgetContext ctx, float width, UiNode node)
     {
         if (spec.TryGetAttribute("Height", out string raw))
         {
             string value = raw.Trim();
             if (value.Length == 0 || string.Equals(value, "Auto", StringComparison.OrdinalIgnoreCase))
             {
-                return MeasuredHeight(widget, ctx, id);
+                return MeasuredHeight(widget, ctx, node);
             }
 
             if (float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float fixedHeight))
@@ -1220,7 +1284,7 @@ public sealed class UiLayoutEngine
                 $"Widget id=\"{spec.Id}\" (Kind=\"{spec.Kind}\") has invalid Height '{raw}'; expected a number or Auto.");
         }
 
-        return MeasuredHeight(widget, ctx, id);
+        return MeasuredHeight(widget, ctx, node);
     }
 
     /// <summary>
@@ -1229,13 +1293,13 @@ public sealed class UiLayoutEngine
     /// with it, and the tree — not the control — owns whether the page survives that. The fallback keeps
     /// the element's slot instead of collapsing it, so a trip cannot reshuffle the rest of the page.
     /// </summary>
-    private static float MeasuredHeight(IUiWidget widget, UiWidgetContext ctx, UiNodeId id)
+    private static float MeasuredHeight(IUiWidget widget, UiWidgetContext ctx, UiNode node)
     {
         // The guard is here rather than in each widget because a measurement that dies takes the whole
         // arrange pass with it, and the tree — not the control — owns whether the page survives that.
         // The fallback keeps the element's slot instead of collapsing it, so a trip cannot reshuffle
         // the rest of the page.
-        return Math.Max(0f, UiSessionGuard.MeasureWidget(widget, ctx, id.Key, RecoveryBandHeight));
+        return Math.Max(0f, UiSessionGuard.MeasureWidget(widget, ctx, node, RecoveryBandHeight));
     }
 
     private static float ResolveContainerHeight(UiElementSpec spec, float naturalHeight, float availableHeight)

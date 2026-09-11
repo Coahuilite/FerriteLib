@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using FerriteLib.UiKit.Kernel;
 using UnityEngine;
 
@@ -33,7 +34,7 @@ internal static class KernelIdentityTests
         ResetProbe();
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.Register(Scope, ProbeKind, () => new IdentityProbeWidget(ProbeKind),
-            new[] { "Id", "Kind", "Text", "Dragging", "Cursor", "Hidden", "Tab" });
+            new[] { "Id", "Kind", "Text", "Dragging", "Cursor", "Hidden", "Tab", "Height" });
         // A kind without a separator, used where a lane grades the sibling-collision rule itself: with a
         // namespaced kind, the Id that spells its generated segment would carry '/' and the separator
         // rule would refuse it first, so that lane would grade nothing.
@@ -56,6 +57,10 @@ internal static class KernelIdentityTests
             Run("a node owns its element's state and survives a re-arrange", VerifyNodeOwnsItsState);
             Run("a namespaced kind no longer shares identity or state", VerifySeparatorKindDoesNotAliasState);
             Run("a node marked dirty forces the next arrange to re-measure", VerifyDirtyNodeForcesReArrange);
+            Run("nodes carry the arranged tree and its geometry", VerifyNodeHierarchyAndGeometry);
+            Run("a widget's sub-node keeps its own identity and state", VerifySubNodeIdentityAndState);
+            Run("recovery slots are node-keyed where display paths collide", VerifyRecoverySlotsAreNodeKeyed);
+            Run("scroll state and scroll targets are node-keyed", VerifyScrollStateIsNodeKeyed);
         }
         finally
         {
@@ -67,6 +72,11 @@ internal static class KernelIdentityTests
         return failures;
     }
 
+    /// <summary>
+    /// Runs one assertion and counts its failure. Counting is done here rather than by summing the return
+    /// value at each call site: a lane that prints FAIL and still returns zero failures is the silent hole
+    /// this harness exists to close, and it was one until the node step's run caught it.
+    /// </summary>
     private static int Run(string name, Action action)
     {
         try
@@ -77,6 +87,7 @@ internal static class KernelIdentityTests
         }
         catch (Exception ex)
         {
+            failures++;
             Console.Error.WriteLine("  FAIL: " + name + " :: " + ex.Message);
             return 1;
         }
@@ -600,6 +611,232 @@ internal static class KernelIdentityTests
         }
     }
 
+    /// <summary>
+    /// The tree and its geometry live on nodes now: a parent lists its arranged children in declared
+    /// order, every arranged node carries the rect the snapshot reports, and a node that was not arranged
+    /// this pass keeps its identity and state while losing its geometry.
+    /// </summary>
+    private static void VerifyNodeHierarchyAndGeometry()
+    {
+        ResetProbe();
+        using UiHost host = Host(TwoSiblingPage());
+        host.DrawFrame(Viewport);
+
+        UiNode? row = host.Session.GetNodeByElementId("row");
+        UiNode? a = NodeOf("A", "draw");
+        UiNode? b = NodeOf("B", "draw");
+        if (row == null || a == null || b == null)
+        {
+            throw new Exception("an arranged element has no node");
+        }
+
+        if (!ReferenceEquals(a.Parent, row) || !ReferenceEquals(b.Parent, row))
+        {
+            throw new Exception("the siblings are not linked to their container's node");
+        }
+
+        if (row.Children.Count != 2 || !ReferenceEquals(row.Children[0], a) || !ReferenceEquals(row.Children[1], b))
+        {
+            throw new Exception("the container node does not list its children in declared order");
+        }
+
+        if (!a.IsArranged || !a.Rect.HasValue || !b.Rect.HasValue)
+        {
+            throw new Exception("arranged geometry was not published to the nodes");
+        }
+
+        if (Math.Abs(b.Rect.Value.x - (a.Rect.Value.x + a.Rect.Value.width + 4f)) > 0.01f)
+        {
+            throw new Exception("the node rects do not match the arranged row geometry (b.x=" + b.Rect.Value.x + ")");
+        }
+
+        // A child that is not arranged this pass leaves its parent's list and keeps no geometry.
+        ResetProbe();
+        using (UiHost hidden = Host(HiddenSiblingPage()))
+        {
+            hidden.DrawFrame(Viewport);
+            UiNode? hiddenRow = hidden.Session.GetNodeByElementId("row");
+            if (hiddenRow == null || hiddenRow.Children.Count != 1)
+            {
+                throw new Exception("a hidden child stayed in its parent's children list");
+            }
+
+            UiNode only = hiddenRow.Children[0];
+            if (!ReferenceEquals(only, NodeOf("B", "draw")) || !only.IsArranged)
+            {
+                throw new Exception("the remaining child is not the arranged visible sibling");
+            }
+        }
+    }
+
+    /// <summary>
+    /// A widget's sub-control gets its own node: distinct identity, its own state, a display path under the
+    /// element, and the same node object on the next pass.
+    /// </summary>
+    private static void VerifySubNodeIdentityAndState()
+    {
+        ResetProbe();
+        using UiHost host = Host(TwoSiblingPage());
+        host.DrawFrame(Viewport);
+
+        UiNode? leftA = SubOf("A", "draw");
+        UiNode? leftB = SubOf("B", "draw");
+        UiNode? elementA = NodeOf("A", "draw");
+        if (leftA == null || leftB == null || elementA == null)
+        {
+            throw new Exception("the probe minted no sub-node");
+        }
+
+        if (ReferenceEquals(leftA, leftB) || leftA.Id == leftB.Id)
+        {
+            throw new Exception("two sub-controls share one node identity");
+        }
+
+        if (leftA.Id == elementA.Id)
+        {
+            throw new Exception("a sub-node reused its element's identity");
+        }
+
+        if (!ReferenceEquals(leftA.Parent, elementA) || !elementA.Children.Contains(leftA))
+        {
+            throw new Exception("the sub-node is not linked under the element's node");
+        }
+
+        if (!leftA.Path.EndsWith("/@left", StringComparison.Ordinal))
+        {
+            throw new Exception("the sub-node's display path does not name it: " + leftA.Path);
+        }
+
+        if (!leftA.ValueStates.TryGetValue("buffer", out UiValueState? bufferA) || bufferA.EditText != "A"
+            || !leftB.ValueStates.TryGetValue("buffer", out UiValueState? bufferB) || bufferB.EditText != "B")
+        {
+            throw new Exception("sub-node state crossed between the two elements");
+        }
+
+        host.DrawFrame(Viewport);
+        if (!ReferenceEquals(leftA, SubOf("A", "draw")))
+        {
+            throw new Exception("a re-arrange replaced the sub-node instead of reusing it");
+        }
+    }
+
+    /// <summary>
+    /// The tripwire, updated rather than removed by the node step: the display path still names two
+    /// different elements alike - <c>VisibleIds</c> prints it twice - while the recovery slot, which this
+    /// step moved to the node, is two slots. A step that narrows the display path must update this
+    /// assertion and the api-tiers residual line.
+    /// </summary>
+    private static void VerifyRecoverySlotsAreNodeKeyed()
+    {
+        ResetProbe();
+        using UiHost host = Host(ThrowingSeparatorPage());
+        host.DrawFrame(Viewport);
+
+        if (host.Session.TrippedNodes.Count != 2)
+        {
+            throw new Exception("expected two tripped nodes, got " + host.Session.TrippedNodes.Count);
+        }
+
+        var tripped = new List<UiNode>(host.Session.TrippedNodes);
+        if (ReferenceEquals(tripped[0], tripped[1]) || tripped[0].Id == tripped[1].Id)
+        {
+            throw new Exception("two tripped elements share one recovery slot");
+        }
+
+        if (!host.Session.TryGetTripLog(tripped[0], out _) || !host.Session.TryGetTripLog(tripped[1], out _))
+        {
+            throw new Exception("a tripped node has no diagnostic of its own");
+        }
+
+        if (!string.Equals(tripped[0].Path, tripped[1].Path, StringComparison.Ordinal))
+        {
+            throw new Exception("the display-path collision this tripwire pins is gone; update the tripwire and the "
+                + "api-tiers residual line: '" + tripped[0].Path + "' vs '" + tripped[1].Path + "'");
+        }
+
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(Viewport.width, Viewport.height));
+        int printed = 0;
+        foreach (string key in snapshot.VisibleIds)
+        {
+            if (string.Equals(key, tripped[0].Path, StringComparison.Ordinal))
+            {
+                printed++;
+            }
+        }
+
+        if (printed != 2)
+        {
+            throw new Exception("expected the shared display path to be printed twice, got " + printed);
+        }
+    }
+
+    /// <summary>
+    /// Scroll state belongs to the scroll container's node, and a scroll-target request is consumer
+    /// vocabulary that the engine resolves to a node: consumed exactly once, and left pending while no
+    /// arranged element carries its Id.
+    /// </summary>
+    private static void VerifyScrollStateIsNodeKeyed()
+    {
+        ResetProbe();
+        using UiHost host = Host(ScrollSiblingPage());
+        host.DrawFrame(Viewport);
+
+        UiNode? scrollA = NodeOf("A", "draw")?.Parent;
+        UiNode? scrollB = NodeOf("B", "draw")?.Parent;
+        if (scrollA == null || scrollB == null || ReferenceEquals(scrollA, scrollB))
+        {
+            throw new Exception("the two unnamed Scroll siblings did not get their own nodes");
+        }
+
+        host.Session.SetScrollPosition(scrollA, new Vector2(0f, 5f));
+        if (Math.Abs(host.Session.GetScrollPosition(scrollB).y) > 0.01f)
+        {
+            throw new Exception("scroll state crossed between two sibling scroll containers");
+        }
+
+        if (Math.Abs(host.Session.GetScrollPosition(scrollA).y - 5f) > 0.01f)
+        {
+            throw new Exception("the scroll container's own position was lost");
+        }
+
+        // A scroll-target request: consumer vocabulary in, node state out, consumed exactly once.
+        ResetProbe();
+        using (UiHost target = Host(TargetPage()))
+        {
+            target.Session.SetScrollTarget("target");
+            target.MeasureAndArrange(new Vector2(300f, 200f));
+            UiNode? scroll = target.Session.GetNodeByElementId("scroll");
+            if (scroll == null)
+            {
+                throw new Exception("the scroll element has no node");
+            }
+
+            if (target.Session.ScrollTargetElementId != null)
+            {
+                throw new Exception("the resolved request was not consumed");
+            }
+
+            if (target.Session.GetScrollPosition(scroll).y <= 0f)
+            {
+                throw new Exception("the target did not move its scroll container");
+            }
+
+            target.Session.SetScrollPosition(scroll, new Vector2(0f, 7f));
+            target.MeasureAndArrange(new Vector2(300f, 200f));
+            if (Math.Abs(target.Session.GetScrollPosition(scroll).y - 7f) > 0.01f)
+            {
+                throw new Exception("a consumed request applied a second time");
+            }
+
+            target.Session.SetScrollTarget("missing-id");
+            target.MeasureAndArrange(new Vector2(300f, 200f));
+            if (target.Session.ScrollTargetElementId == null)
+            {
+                throw new Exception("an unresolvable target was dropped instead of staying pending");
+            }
+        }
+    }
+
     // --- fixture -------------------------------------------------------------------------------
 
     private static UiHost Host(string xml, IUiBindings? bindings = null)
@@ -658,6 +895,33 @@ internal static class KernelIdentityTests
             + "</Row></UiPage>";
     }
 
+    private static string ThrowingSeparatorPage()
+    {
+        // The forgery shape SeparatorKindPage pins, with widgets that trip: the unnamed first sibling
+        // generates test/identity-throws[0], and the second one declares an Id spelling that display path.
+        return "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Row Id=\"row\">"
+            + "<Widget Kind=\"" + ThrowingKind + "\" Text=\"A\" />"
+            + "<Row Id=\"test\"><Widget Id=\"identity-throws[0]\" Kind=\"" + ThrowingKind + "\" Text=\"B\" /></Row>"
+            + "</Row></UiPage>";
+    }
+
+    private static string ScrollSiblingPage()
+    {
+        return "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Row Id=\"row\">"
+            + "<Scroll Height=\"50\"><Widget Kind=\"" + ProbeKind + "\" Text=\"A\" Cursor=\"1\" /></Scroll>"
+            + "<Scroll Height=\"50\"><Widget Kind=\"" + ProbeKind + "\" Text=\"B\" Cursor=\"2\" /></Scroll>"
+            + "</Row></UiPage>";
+    }
+
+    private static string TargetPage()
+    {
+        return "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Scroll Id=\"scroll\" Height=\"50\">"
+            + "<Column Id=\"col\">"
+            + "<Widget Kind=\"" + ProbeKind + "\" Text=\"A\" Cursor=\"1\" Height=\"300\" />"
+            + "<Widget Id=\"target\" Kind=\"" + ProbeKind + "\" Text=\"B\" Cursor=\"2\" Height=\"30\" />"
+            + "</Column></Scroll></UiPage>";
+    }
+
     private static string ThrowerPage()
     {
         return "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
@@ -711,6 +975,20 @@ internal static class KernelIdentityTests
         return count;
     }
 
+    private static UiNode? SubOf(string tag, string phase)
+    {
+        foreach (Observation observation in IdentityProbeWidget.Seen)
+        {
+            if (string.Equals(observation.Tag, tag, StringComparison.Ordinal)
+                && string.Equals(observation.Phase, phase, StringComparison.Ordinal))
+            {
+                return observation.Sub;
+            }
+        }
+
+        throw new Exception("no " + phase + " observation for '" + tag + "'");
+    }
+
     private static string PathOf(string tag, string phase)
     {
         foreach (Observation observation in IdentityProbeWidget.Seen)
@@ -741,14 +1019,16 @@ internal static class KernelIdentityTests
         internal readonly UiNodeId Id;
         internal readonly string Path;
         internal readonly UiNode? Node;
+        internal readonly UiNode? Sub;
 
-        internal Observation(string tag, string phase, UiNodeId id, string path, UiNode? node)
+        internal Observation(string tag, string phase, UiNodeId id, string path, UiNode? node, UiNode? sub)
         {
             Tag = tag;
             Phase = phase;
             Id = id;
             Path = path;
             Node = node;
+            Sub = sub;
         }
     }
 
@@ -769,6 +1049,7 @@ internal static class KernelIdentityTests
         private string tag = "";
         private bool dragging;
         private int cursor;
+        private float height = 14f;
 
         internal IdentityProbeWidget(string kind)
         {
@@ -785,6 +1066,11 @@ internal static class KernelIdentityTests
             cursor = spec.TryGetAttribute("Cursor", out string raw) && int.TryParse(raw.Trim(), out int parsed)
                 ? parsed
                 : 0;
+            height = spec.TryGetAttribute("Height", out string rawHeight)
+                && float.TryParse(rawHeight.Trim(), System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out float declared)
+                ? declared
+                : 14f;
         }
 
         public void Validate(IUiBindings bindings, string elementPath)
@@ -793,13 +1079,22 @@ internal static class KernelIdentityTests
 
         public float Measure(UiWidgetContext ctx)
         {
-            Seen.Add(new Observation(tag, "measure", ctx.ElementId, ctx.ElementPath, ctx.Node));
-            return 14f;
+            Seen.Add(new Observation(tag, "measure", ctx.ElementId, ctx.ElementPath, ctx.Node, null));
+            return height;
         }
 
         public void Draw(Rect rect, UiWidgetContext ctx)
         {
-            Seen.Add(new Observation(tag, "draw", ctx.ElementId, ctx.ElementPath, ctx.Node));
+            // A sub-control this widget owns: minted as a node under the element's node, with its own
+            // state, so it can be graded for identity and isolation like any element.
+            UiWidgetContext left = ctx.Child("left");
+            UiNode? sub = left.Node;
+            if (sub != null)
+            {
+                sub.GetOrCreateState("buffer").EditText = tag;
+            }
+
+            Seen.Add(new Observation(tag, "draw", ctx.ElementId, ctx.ElementPath, ctx.Node, sub));
 
             UiValueState state = ctx.Session.GetOrCreateValueState("probe");
             state.EditText = tag;

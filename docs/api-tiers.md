@@ -128,22 +128,28 @@ consequence is paid in the open rather than discovered by a stranger.
   strings, and the difference is the point: `Key` is the canonical identity — segments joined by a separator
   no XML text can hold; the creation-time guards are load-bearing for that injectivity, not a legacy rule the
   node step supersedes — while `Path` is the display path every diagnostic has always printed.
-  **Debt and residual aliases, stated rather than hidden:** the display path can still name two elements
-  alike when a `Kind` itself contains `/` (`input/stepper-slider`), so `VisibleIds`, the fit audit, the
-  recovery band and the string-keyed state surfaces — `UiSession.Trip`/`TrippedComponentIds`,
-  `ScrollPositions`, `SetScrollTarget` with `UiLayoutSnapshot.RectById` — can still print or key on one
-  text. Identity and per-element state no longer depend on it: `GetNode`, `GetValueStates`,
-  `ActiveElement`, `ActiveNode` and `HoverClaimElement` are identity-keyed. `UiNative`'s hot-control id
-  and the popup owner key stay string-keyed for the same reason; both are named as the owned-hit-stack
-  step's business.
-  **Recovery condition:** when widgets receive nodes for their own sub-controls and the hit stack lands, the
-  string-keyed surfaces above move to node identity and this paragraph shrinks accordingly.
-- `UiNode` — one arranged element's identity carrier, and the object the node step adds: it owns the
-  element's `State` (plus its named slots), its `Kind`, its declared `Ordinal` and the `IsDirty` flag whose
-  writer is `MarkDirty`; `UiSession` caches it by `UiNodeId` for the host's lifetime, so a re-arrange
-  reuses the node and its state survives a frame. `UiWidgetContext.Node` (with `WithNode`, which replaces
-  the 0.4.0-window `WithElement(UiNodeId)`) is the per-pass hand-off. Public-unstable: the next step grows
-  parent/child links and geometry onto it — today the arranged rect still lives on the engine's entry.
+  **Debt and residual aliases, stated rather than hidden.** Closed by the node step: recovery slots
+  (`UiSession.Trip`/`IsTripped`/`TryGetTripLog`/`TrippedNodes`, and the engine's guard calls now take a
+  node), `ScrollPositions` with `Get/SetScrollPosition`, and scroll targeting — `SetScrollTarget(string)`
+  plus `UiLayoutSnapshot.RectById` stays consumer vocabulary (a declared Id is globally unique, so it was
+  never a display-path key) while the engine resolves it to a node, writes that node's scroll position and
+  consumes the request once. Still open, because the display path is what a human reads and existing
+  consumers assert on: `VisibleIds`, the fit audit and the recovery band can still print one text for two
+  elements whose `Kind` contains `/` (`input/stepper-slider`); `UiNative`'s hot-control id and the popup
+  owner key stay string-keyed and belong to the owned-hit-stack step. Identity and per-element state never
+  depend on the display path: `GetNode`, `GetNodeByElementId`, `GetValueStates`, `ActiveElement`,
+  `ActiveNode`, `TrippedNodes`, `ScrollPositions` and `HoverClaimElement` are all node- or
+  identity-keyed.
+- `UiNode` — one arranged element's identity carrier: it owns the element's `State` (plus its named slots,
+  reachable with `GetOrCreateState`), its `Kind`, its declared `ElementId` and `Ordinal`, the `IsDirty`
+  flag whose writer is `MarkDirty`, and - since the node step's second half - the tree and the geometry:
+  `Parent`, `Children` (arranged elements plus minted sub-nodes, in declared order), `Rect`,
+  `ContentRect` and `IsArranged`. `UiSession` caches it by `UiNodeId` for the host's lifetime, so a
+  re-arrange reuses the node and its state survives a frame, and `BeginArrange` clears children and geometry
+  so "not arranged this pass" is readable instead of a stale rect. `UiWidgetContext.Node`/`WithNode` is the
+  per-pass hand-off, and `UiWidgetContext.Child(name)` (which replaces the 0.4.0-window `ForChild`, and the
+  path-only `WithElement` before it) mints a sub-node under the element so a widget's own controls get their
+  own identity and state. Public-unstable: the hit stack and focus are the next steps that read this tree.
 
 - `UiStyleFallbackReport` — one appearance fallback: an authored `Tone`/`Emphasis` value outside the
   vocabulary, carrying the element path, the kind, the attribute, the authored text and the value it

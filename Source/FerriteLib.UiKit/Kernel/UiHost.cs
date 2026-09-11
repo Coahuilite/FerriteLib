@@ -165,42 +165,15 @@ public sealed class UiHost : IDisposable
         BeginFrame();
         try
         {
+            // The engine consumes a pending scroll-target request at the end of its own arrange, by node
+            // (task-18): resolution belongs where the entries and the nodes are, so the host does not
+            // re-derive it from string-keyed snapshot views.
             UiLayoutSnapshot snapshot = MeasureAndArrange(new Vector2(viewport.width, viewport.height));
-            ApplyScrollTarget(snapshot);
             Draw(viewport, snapshot);
         }
         finally
         {
             EndFrame();
-        }
-    }
-
-    /// <summary>
-    /// Resolves a session scroll-target request (set by a widget after a scroll-to action) against
-    /// the arranged snapshot. Applies to the scroll container that contains the target element and
-    /// keeps the request pending until it can be resolved (e.g. the target section becomes visible
-    /// after a tab switch on the following frame).
-    /// </summary>
-    private void ApplyScrollTarget(UiLayoutSnapshot snapshot)
-    {
-        string? targetId = session.ScrollTargetElementId;
-        if (targetId == null || targetId.Length == 0) return;
-        if (!snapshot.RectById.TryGetValue(targetId, out Rect targetRect)) return;
-
-        foreach (KeyValuePair<string, Rect> pair in snapshot.Viewports)
-        {
-            string scrollKey = pair.Key;
-            if (!snapshot.ScrollContents.TryGetValue(scrollKey, out Rect content)) continue;
-
-            Rect viewport = pair.Value;
-            float contentLocalY = targetRect.y - viewport.y;
-            if (contentLocalY < -1f || contentLocalY > content.height + 1f) continue;
-
-            float maxY = Math.Max(0f, content.height - viewport.height);
-            float clampedY = Mathf.Clamp(contentLocalY, 0f, maxY);
-            session.SetScrollPosition(scrollKey, new Vector2(session.GetScrollPosition(scrollKey).x, clampedY));
-            session.ClearScrollTarget();
-            return;
         }
     }
 

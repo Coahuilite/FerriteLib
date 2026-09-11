@@ -103,9 +103,11 @@ internal static class KernelSessionTests
 
         Check(fallback == 42f, "MeasureOrFallback returns fallback height");
         Check(messages.Count == 1, "first failure logs once");
-        Check(session1.IsTripped("slider"), "failure marks the session slot tripped");
+        // The guard keys a recovery slot on the node whose pass is running; called outside a tree that is
+        // the session's own node, and the diagnostic still carries the consumer's element id.
+        Check(session1.IsTripped(session1.ActiveNode), "failure marks the session slot tripped");
 
-        Check(session1.TryGetTripLog("slider", out string diagnostic)
+        Check(session1.TryGetTripLog(session1.ActiveNode, out string diagnostic)
             && diagnostic.Contains("slider")
             && diagnostic.Contains("input/stepper-slider")
             && diagnostic.Contains("root/slider")

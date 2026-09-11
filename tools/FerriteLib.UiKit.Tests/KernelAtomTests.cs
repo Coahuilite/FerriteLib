@@ -142,7 +142,7 @@ internal static class KernelAtomTests
         // The one pass that proves all five Draw paths execute inside a real tree without a trip.
         EnablePointer(new Vector2(-100000f, -100000f));
         host.DrawFrame(new Rect(0f, 0f, 400f, 620f));
-        Check(host.Session.TrippedComponentIds.Count == 0,
+        Check(host.Session.TrippedNodes.Count == 0,
             "every atom drew in one frame without tripping the recovery guard");
         Check(fired == 0, "no seam fired a command during a pass with the pointer far away");
         ResetSeams();
