@@ -33,6 +33,9 @@ public sealed class UiLayoutManifest
     private const int MaxDepth = 16;
     private const int MaxNodeCount = 512;
 
+    /// <summary>Longest <c>&lt;Styles&gt;</c> section accepted, in characters. The style parser has its own bounds.</summary>
+    private const int MaxStylesChars = 32768;
+
     private static readonly HashSet<string> SupportedElementNames = new(StringComparer.Ordinal)
     {
         "UiPage", "Stack", "Row", "Column", "Wrap", "Overlay", "Section", "Surface", "Scroll", "Clip", "Widget"
@@ -44,11 +47,19 @@ public sealed class UiLayoutManifest
 
     public IReadOnlyList<UiElementSpec> Roots { get; }
 
-    private UiLayoutManifest(string source, string schemaVersion, IReadOnlyList<UiElementSpec> roots)
+    /// <summary>
+    /// The optional <c>&lt;Styles&gt;</c> section, parsed by <see cref="UiStyleDocument.Parse"/> - the same
+    /// parser and the same vocabulary the standalone style file uses, which is what keeps the two text
+    /// origins from drifting. A manifest without the section carries the empty document.
+    /// </summary>
+    public UiStyleDocument Styles { get; }
+
+    private UiLayoutManifest(string source, string schemaVersion, IReadOnlyList<UiElementSpec> roots, UiStyleDocument styles)
     {
         Source = source;
         SchemaVersion = schemaVersion;
         Roots = roots;
+        Styles = styles;
     }
 
     public static UiLayoutManifest Parse(string xml)
@@ -128,7 +139,7 @@ public sealed class UiLayoutManifest
 
             if (reader.IsEmptyElement)
             {
-                return new UiLayoutManifest(source, schema, Array.Empty<UiElementSpec>());
+                return new UiLayoutManifest(source, schema, Array.Empty<UiElementSpec>(), UiStyleDocument.Empty);
             }
 
             break;
@@ -141,6 +152,8 @@ public sealed class UiLayoutManifest
 
         var roots = new List<UiElementSpec>();
         var ids = new HashSet<string>(StringComparer.Ordinal);
+        UiStyleDocument styles = UiStyleDocument.Empty;
+        bool stylesSeen = false;
 
         while (reader.Read())
         {
@@ -160,10 +173,22 @@ public sealed class UiLayoutManifest
                             $"Unexpected nested element <{reader.Name}> at depth {reader.Depth}; expected a root-level element.");
                     }
 
+                    if (string.Equals(reader.Name, "Styles", StringComparison.Ordinal))
+                    {
+                        if (stylesSeen)
+                        {
+                            throw ParseError(lineInfo, "Duplicate <Styles> section; one manifest may carry one.");
+                        }
+
+                        stylesSeen = true;
+                        styles = ReadStylesSection(reader, lineInfo);
+                        break;
+                    }
+
                     if (!SupportedElementNames.Contains(reader.Name))
                     {
                         throw ParseError(lineInfo,
-                            $"Unsupported element <{reader.Name}>; expected one of: Stack, Row, Column, Wrap, Overlay, Section, Surface, Scroll, Clip, Widget.");
+                            $"Unsupported element <{reader.Name}>; expected one of: Stack, Row, Column, Wrap, Overlay, Section, Surface, Scroll, Clip, Widget, Styles.");
                     }
 
                     UiElementSpec root = ReadElement(reader, lineInfo, ref nodeCount, ids);
@@ -174,7 +199,7 @@ public sealed class UiLayoutManifest
                     if (string.Equals(reader.Name, "UiPage", StringComparison.Ordinal))
                     {
                         ValidateIdentitySegments(roots, pageLine);
-                        return new UiLayoutManifest(source, schema, roots);
+                        return new UiLayoutManifest(source, schema, roots, styles);
                     }
 
                     throw ParseError(lineInfo, $"Unexpected end element </{reader.Name}>.");
@@ -189,6 +214,30 @@ public sealed class UiLayoutManifest
         }
 
         throw new FormatException("UI layout XML ended before the <UiPage> element was closed.");
+    }
+
+    /// <summary>
+    /// Captures the <c>&lt;Styles&gt;</c> subtree and hands it to the one style parser. The manifest owns
+    /// only the capture: the section's vocabulary, its validation and its failures belong to
+    /// <see cref="UiStyleDocument"/>. A malformed section is not appearance-class here, because the section
+    /// is part of this XML text - a manifest that cannot be read is the existing page-level failure.
+    /// </summary>
+    private static UiStyleDocument ReadStylesSection(XmlReader reader, IXmlLineInfo lineInfo)
+    {
+        string xml;
+        using (XmlReader subtree = reader.ReadSubtree())
+        {
+            subtree.MoveToContent();
+            xml = subtree.ReadOuterXml();
+        }
+
+        if (xml.Length > MaxStylesChars)
+        {
+            throw ParseError(lineInfo,
+                $"The <Styles> section exceeds the maximum of {MaxStylesChars} characters.");
+        }
+
+        return UiStyleDocument.Parse(xml);
     }
 
     private static UiElementSpec ReadElement(XmlReader reader, IXmlLineInfo lineInfo, ref int nodeCount, HashSet<string> ids)

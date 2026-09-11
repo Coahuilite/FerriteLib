@@ -123,6 +123,17 @@ consequence is paid in the open rather than discovered by a stranger.
   (`AttachStyleFallback`, `StyleFallbackCount`, `LastStyleFallbackDiagnostic`), which stays live even
   when the text half is off, because fail-soft must not mean silent.
 
+- `UiStyleDocument` — the parsed style document (named schemes, named densities, page-level defaults) from
+  either text origin: the standalone `<Styles>` file and the manifest's `<Styles>` section share one parser
+  and one vocabulary. All of its failures are appearance-class; the one page-level case is a section that
+  is not well-formed, because then the manifest itself does not parse (co-location's real cost).
+- `UiStyleResolver` — the written precedence chain `state > element > container > page > theme > default`
+  and the region themes built once per effective scheme/density pair. Scheme and density inherit; roles do
+  not, and that asymmetry is the design rather than a gap.
+- `UiStyleDeclaration` — one node's own style attributes as the resolver reads them (scheme, density, tone,
+  emphasis), handed in nearest first along the tree.
+- `UiStyleIssue` — one appearance value a document dropped, so that fail-soft is never silent.
+
 ## Internalize-candidate
 
 - `KernelCoreWidgetRegistrar` — called from inside the assembly by the registry itself; no consumer names it.

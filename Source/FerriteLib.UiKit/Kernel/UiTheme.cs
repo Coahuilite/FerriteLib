@@ -258,6 +258,48 @@ public sealed class UiTheme
     public UiStyleTable Styles { get; }
 
     /// <summary>
+    /// A copy of this bag with the same token values and its own resolved-value store. A region style
+    /// builds one so two regions can differ while the injected theme stays exactly what the consumer
+    /// handed in. It copies values, not identity: the copy shares no mutable state with the original
+    /// (each has its own <see cref="Styles"/>), and moving a token on either one afterwards moves only
+    /// that one.
+    /// </summary>
+    public UiTheme Clone()
+    {
+        return new UiTheme
+        {
+            Base = Base,
+            Panel = Panel,
+            Raised = Raised,
+            Hover = Hover,
+            Selected = Selected,
+            Success = Success,
+            Danger = Danger,
+            WorkspacePlane = WorkspacePlane,
+            SectionBand = SectionBand,
+            TextPrimary = TextPrimary,
+            TextSecondary = TextSecondary,
+            TextOnGold = TextOnGold,
+            TextOnDanger = TextOnDanger,
+            TextDisabled = TextDisabled,
+            AccentGold = AccentGold,
+            HoverPoint = HoverPoint,
+            Border = Border,
+            BorderStrong = BorderStrong,
+            Divider = Divider,
+            BaseBorder = BaseBorder,
+            PanelBorder = PanelBorder,
+            RaisedBorder = RaisedBorder,
+            HoverBorder = HoverBorder,
+            SelectedBorder = SelectedBorder,
+            SuccessBorder = SuccessBorder,
+            DangerBorder = DangerBorder,
+            DefaultFont = defaultFont,
+            Geometry = geometry
+        };
+    }
+
+    /// <summary>
     /// The shipped default palette, handed out as a fresh instance on every call. It is a template,
     /// not a shared singleton: two consumer mods re-tinting "the default" must never repaint each
     /// other. A caller that wants one theme for a whole window keeps the returned instance.
