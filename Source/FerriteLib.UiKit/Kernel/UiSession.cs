@@ -11,8 +11,16 @@ namespace FerriteLib.UiKit.Kernel;
 /// </summary>
 public sealed class UiSession : IDisposable
 {
+    private static readonly IReadOnlyDictionary<string, UiValueState> NoValueStates =
+        new Dictionary<string, UiValueState>(StringComparer.Ordinal);
+
     private readonly Dictionary<string, Vector2> scrollPositions = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, UiValueState> valueStates = new(StringComparer.Ordinal);
+
+    // Per-element state, keyed by the element's identity and then by the widget's own state name.
+    // The identity is the primary key: it is what makes two unnamed same-kind siblings separate, which
+    // the bare path string this replaces could not express (0.4.0 identity layer).
+    private readonly Dictionary<UiNodeId, Dictionary<string, UiValueState>> valueStates = new();
+
     private readonly HashSet<string> trippedComponentIds = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> trippedLogs = new(StringComparer.Ordinal);
     private int? ownedHotControl;
@@ -23,7 +31,10 @@ public sealed class UiSession : IDisposable
     private Rect hostViewport;
     private string? scrollTargetElementId;
     private string hoverClaim = "";
+    private UiNodeId hoverClaimElement;
     private string hoverHeld = "";
+    private UiNodeId hoverHeldElement;
+    private UiNodeId activeElement;
     private int hoverClaimStamp;
     private int hoverGraceLeft;
 
@@ -55,8 +66,23 @@ public sealed class UiSession : IDisposable
     /// </summary>
     public string? HoverClaim => hoverClaim.Length > 0 ? hoverClaim : null;
 
-    /// <summary>Session-scoped value/control state keyed by stable element id.</summary>
-    public IReadOnlyDictionary<string, UiValueState> ValueStates => valueStates;
+    /// <summary>
+    /// The element that made the claim <see cref="HoverClaim"/> is presenting, or null when nothing is
+    /// claimed. The claim string stays the consumer's vocabulary (a section key it compares against),
+    /// so two unnamed siblings claiming the same string are still indistinguishable through
+    /// <see cref="HoverClaim"/> - this is the axis that tells them apart, and the grace machine carries
+    /// it together with the string so a held claim is attributed to the element that made it.
+    /// <see cref="UiNodeId.None"/> means the claim was made outside any element (a host-level caller).
+    /// </summary>
+    public UiNodeId? HoverClaimElement => hoverClaim.Length > 0 ? hoverClaimElement : null;
+
+    /// <summary>
+    /// The element whose Measure/Draw is running, or <see cref="UiNodeId.None"/> between elements.
+    /// The engine enters an element's identity around its own widget calls, and
+    /// <see cref="GetOrCreateValueState(string)"/> resolves against it: that is how a widget written
+    /// against the old bare-string key gets a per-element state namespace without changing a line.
+    /// </summary>
+    public UiNodeId ActiveElement => activeElement;
 
     /// <summary>Session-scoped scroll positions keyed by scroll container id.</summary>
     public IReadOnlyDictionary<string, Vector2> ScrollPositions => scrollPositions;
@@ -187,17 +213,86 @@ public sealed class UiSession : IDisposable
         ContentRevision++;
     }
 
-    public UiValueState GetOrCreateValueState(string elementId)
+    /// <summary>
+    /// The value state for <paramref name="stateKey"/> inside the element currently being arranged or
+    /// drawn (<see cref="ActiveElement"/>). This is what the backend funnels and every existing widget
+    /// call; resolving it against the element is what keeps two unnamed same-kind siblings from sharing
+    /// one slot the way the bare key did.
+    /// <para>
+    /// That element scope lasts for one element's Measure or Draw inside one arrange/draw traversal and
+    /// is restored in a <c>finally</c>, so it is never observable between passes. Called outside such a
+    /// traversal - a host-level call, a popup pass, a harness driving a widget by hand - the overload
+    /// resolves against <see cref="UiNodeId.None"/> rather than throwing: that is the session-level
+    /// namespace, which is what an element-less caller had before the identity layer and what keeps the
+    /// old call shape working for code that never was inside a tree.
+    /// </para>
+    /// </summary>
+    public UiValueState GetOrCreateValueState(string stateKey)
     {
-        if (elementId == null) throw new ArgumentNullException(nameof(elementId));
+        if (stateKey == null) throw new ArgumentNullException(nameof(stateKey));
         EnsureActive();
-        if (!valueStates.TryGetValue(elementId, out UiValueState? state))
+        return GetOrCreateValueState(activeElement, stateKey);
+    }
+
+    /// <summary>The element's own value state, i.e. the slot it owns without naming a sub-key.</summary>
+    public UiValueState GetOrCreateValueState(UiNodeId element)
+    {
+        return GetOrCreateValueState(element, "");
+    }
+
+    /// <summary>
+    /// The value state for one named slot of one element. A composite that drives several stateful
+    /// controls inside a single element (the consumer's interval row drives a slider and a number field)
+    /// keeps them apart by name; two elements never share a slot whatever names they use.
+    /// </summary>
+    public UiValueState GetOrCreateValueState(UiNodeId element, string stateKey)
+    {
+        if (stateKey == null) throw new ArgumentNullException(nameof(stateKey));
+        EnsureActive();
+        if (!valueStates.TryGetValue(element, out Dictionary<string, UiValueState>? slots))
+        {
+            slots = new Dictionary<string, UiValueState>(StringComparer.Ordinal);
+            valueStates.Add(element, slots);
+        }
+
+        if (!slots.TryGetValue(stateKey, out UiValueState? state))
         {
             state = new UiValueState();
-            valueStates.Add(elementId, state);
+            slots.Add(stateKey, state);
         }
 
         return state;
+    }
+
+    /// <summary>
+    /// The state slots one element owns, keyed by the widget's state names, or an empty map when the
+    /// element holds none. The read is by identity because that is the primary key; the old flat
+    /// property could not name both dimensions.
+    /// </summary>
+    public IReadOnlyDictionary<string, UiValueState> GetValueStates(UiNodeId element)
+    {
+        return valueStates.TryGetValue(element, out Dictionary<string, UiValueState>? slots)
+            ? slots
+            : NoValueStates;
+    }
+
+    /// <summary>
+    /// Enters <paramref name="element"/> for the duration of its own Measure/Draw and returns the
+    /// previous active element, so the engine can hand it back to <see cref="ExitElement"/> in a
+    /// <c>finally</c>. Nesting is a stack discipline: the engine draws one element at a time.
+    /// </summary>
+    internal UiNodeId EnterElement(UiNodeId element)
+    {
+        EnsureActive();
+        UiNodeId previous = activeElement;
+        activeElement = element;
+        return previous;
+    }
+
+    /// <summary>Restores the element returned by <see cref="EnterElement"/>.</summary>
+    internal void ExitElement(UiNodeId previous)
+    {
+        activeElement = previous;
     }
 
     public Vector2 GetScrollPosition(string elementId)
@@ -229,17 +324,21 @@ public sealed class UiSession : IDisposable
         if (claimedLastFrame)
         {
             hoverHeld = hoverClaim;
+            hoverHeldElement = hoverClaimElement;
             hoverGraceLeft = HoverGraceFrames;
             hoverClaim = "";
+            hoverClaimElement = default;
         }
         else if (hoverGraceLeft > 0)
         {
             hoverClaim = hoverHeld;
+            hoverClaimElement = hoverHeldElement;
             hoverGraceLeft--;
         }
         else
         {
             hoverClaim = "";
+            hoverClaimElement = default;
         }
     }
 
@@ -253,6 +352,7 @@ public sealed class UiSession : IDisposable
         if (elementId == null) throw new ArgumentNullException(nameof(elementId));
         EnsureActive();
         hoverClaim = elementId;
+        hoverClaimElement = activeElement;
         hoverClaimStamp = Frame;
     }
 
@@ -333,8 +433,11 @@ public sealed class UiSession : IDisposable
 
         scrollPositions.Clear();
         valueStates.Clear();
+        activeElement = default;
         hoverClaim = "";
+        hoverClaimElement = default;
         hoverHeld = "";
+        hoverHeldElement = default;
         hoverClaimStamp = 0;
         hoverGraceLeft = 0;
         trippedComponentIds.Clear();

@@ -1,0 +1,103 @@
+using System;
+using System.Globalization;
+
+namespace FerriteLib.UiKit.Kernel;
+
+/// <summary>
+/// Stable identity of one element inside one arranged tree (0.4.0 identity layer). The key is the
+/// element's structural path: a declared <c>Id</c> when it has one, otherwise <c>Kind[declaredIndex]</c>
+/// - the child's position among its parent's declared children, not among the children that happen to
+/// be visible, so hiding a sibling or switching a <c>Tab</c> does not renumber the others. Two unnamed
+/// siblings of the same kind therefore receive different identities, which is exactly the alias a bare
+/// path string could not express: <c>UiLayoutEngine</c> used to fall back to the kind alone, so the two
+/// shared one widget instance, one session state slot, one recovery slot and one scroll key.
+/// <para>
+/// The identity is built once per element during arrange and stored on the placed entry, so the same
+/// element reports the same value in Measure, in Draw and on later passes over an unchanged tree. That
+/// stability is what lets per-element state survive a frame, and it is why this type is a value rather
+/// than a string regenerated at each call site.
+/// </para>
+/// <para>
+/// Grammar note: an identity is unique unless a declared <c>Id</c> literally spells a sibling's
+/// generated <c>Kind[index]</c> segment (one sibling <c>Id="x[0]"</c> beside an unnamed child of kind
+/// <c>x</c>). Nothing in the creation-time contract forbids that today; if it ever shows up, the
+/// generated form is the one that has to change, because no author writes it by hand.
+/// </para>
+/// </summary>
+public readonly struct UiNodeId : IEquatable<UiNodeId>
+{
+    /// <summary>
+    /// The session-level identity: "no element". A caller outside any element's Measure/Draw (a host
+    /// level call, a popup pass) resolves its state here, and it never equals a real element's identity.
+    /// </summary>
+    public static readonly UiNodeId None = default;
+
+    private readonly string? key;
+
+    private UiNodeId(string key)
+    {
+        this.key = key;
+    }
+
+    /// <summary>
+    /// Canonical key: unique inside one tree and stable across its passes. Empty for <see cref="None"/>.
+    /// </summary>
+    public string Key => key ?? "";
+
+    /// <summary>True when this identity is <see cref="None"/>, i.e. no element is being arranged or drawn.</summary>
+    public bool IsNone => Key.Length == 0;
+
+    /// <summary>Identity of the manifest root declared at <paramref name="declaredIndex"/>.</summary>
+    internal static UiNodeId Root(UiElementSpec spec, int declaredIndex)
+    {
+        return new UiNodeId(Segment(spec, declaredIndex));
+    }
+
+    /// <summary>Identity of the child declared at <paramref name="declaredIndex"/>.</summary>
+    internal UiNodeId Child(UiElementSpec spec, int declaredIndex)
+    {
+        string segment = Segment(spec, declaredIndex);
+        return new UiNodeId(Key.Length == 0 ? segment : Key + "/" + segment);
+    }
+
+    /// <summary>
+    /// One identity segment. A declared <c>Id</c> wins; without one the segment is the kind plus the
+    /// child's declared ordinal, because the kind alone is shared by every unnamed sibling.
+    /// </summary>
+    private static string Segment(UiElementSpec spec, int declaredIndex)
+    {
+        if (spec == null) throw new ArgumentNullException(nameof(spec));
+        if (spec.Id.Length > 0) return spec.Id;
+        return spec.Kind + "[" + declaredIndex.ToString(CultureInfo.InvariantCulture) + "]";
+    }
+
+    public bool Equals(UiNodeId other)
+    {
+        return string.Equals(Key, other.Key, StringComparison.Ordinal);
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return obj is UiNodeId other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        return StringComparer.Ordinal.GetHashCode(Key);
+    }
+
+    public override string ToString()
+    {
+        return Key;
+    }
+
+    public static bool operator ==(UiNodeId left, UiNodeId right)
+    {
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(UiNodeId left, UiNodeId right)
+    {
+        return !left.Equals(right);
+    }
+}

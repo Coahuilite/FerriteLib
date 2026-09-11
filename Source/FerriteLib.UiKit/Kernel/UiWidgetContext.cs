@@ -38,6 +38,19 @@ public sealed class UiWidgetContext
 
     public float ViewWidth { get; }
 
+    /// <summary>
+    /// The element this context belongs to. The layout engine sets it per arranged entry, so a widget
+    /// measures and draws with its own identity (the same value in both halves of a pass), and the
+    /// session resolves per-element state against it. <see cref="UiNodeId.None"/> for a context a
+    /// caller built by hand, which is the historical "no element" behaviour.
+    /// </summary>
+    public UiNodeId ElementId { get; }
+
+    /// <summary>
+    /// This element's arranged path. The engine sets it per entry (0.4.0 identity layer) instead of
+    /// handing every element the host's page-root path; for a hand-built context it is whatever the
+    /// caller named.
+    /// </summary>
     public string ElementPath { get; }
 
     /// <summary>
@@ -57,7 +70,8 @@ public sealed class UiWidgetContext
         IUiBindings bindings,
         float viewWidth,
         string elementPath,
-        Vector2 windowOrigin = default)
+        Vector2 windowOrigin = default,
+        UiNodeId elementId = default)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Session = session ?? throw new ArgumentNullException(nameof(session));
@@ -68,12 +82,25 @@ public sealed class UiWidgetContext
         ViewWidth = viewWidth;
         ElementPath = elementPath ?? "";
         WindowOrigin = windowOrigin;
+        ElementId = elementId;
     }
 
     public UiWidgetContext ForChild(string childId)
     {
         string path = ElementPath.Length == 0 ? childId : ElementPath + "/" + childId;
-        return new UiWidgetContext(Source, Session, Metrics, Theme, Translation, Bindings, ViewWidth, path, WindowOrigin);
+        return new UiWidgetContext(Source, Session, Metrics, Theme, Translation, Bindings, ViewWidth, path, WindowOrigin, ElementId);
+    }
+
+    /// <summary>
+    /// Returns a context bound to <paramref name="element"/>. The element's key is also the context's
+    /// path, so diagnostics, the fit audit and the recovery band all name the element the pass is on
+    /// instead of the page root. <see cref="UiNodeId.None"/> leaves both as they are.
+    /// </summary>
+    public UiWidgetContext WithElement(UiNodeId element)
+    {
+        return new UiWidgetContext(
+            Source, Session, Metrics, Theme, Translation, Bindings, ViewWidth,
+            element.IsNone ? ElementPath : element.Key, WindowOrigin, element);
     }
 
     /// <summary>
@@ -82,13 +109,13 @@ public sealed class UiWidgetContext
     /// </summary>
     public UiWidgetContext WithViewWidth(float viewWidth)
     {
-        return new UiWidgetContext(Source, Session, Metrics, Theme, Translation, Bindings, viewWidth, ElementPath, WindowOrigin);
+        return new UiWidgetContext(Source, Session, Metrics, Theme, Translation, Bindings, viewWidth, ElementPath, WindowOrigin, ElementId);
     }
 
     /// <summary>Returns a context whose draw rects are offset into Host window space by <paramref name="windowOrigin"/>.</summary>
     public UiWidgetContext WithWindowOrigin(Vector2 windowOrigin)
     {
-        return new UiWidgetContext(Source, Session, Metrics, Theme, Translation, Bindings, ViewWidth, ElementPath, windowOrigin);
+        return new UiWidgetContext(Source, Session, Metrics, Theme, Translation, Bindings, ViewWidth, ElementPath, windowOrigin, ElementId);
     }
 
     /// <summary>Converts a draw-local rect (as passed to <c>IUiWidget.Draw</c>) into Host window space.</summary>
