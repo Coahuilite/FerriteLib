@@ -23,6 +23,9 @@ internal static class KernelStyleScopeTests
     private const string Scope = "style-scope";
     private const string ProbeKind = "style/probe";
 
+    /// <summary>17 ideographs: wide enough that a font change is a different measured band, not a rounding.</summary>
+    private const string LongCjk = "这是一段用于验证换行高度的文本内容";
+
     private static readonly Color IcePanel = new(0f, 0f, 1f, 1f);
 
     private static int failures;
@@ -39,6 +42,7 @@ internal static class KernelStyleScopeTests
         failures = 0;
         Run("A region scopes its subtree to the region's own theme", VerifyRegionScope);
         Run("One scope keeps one theme instance across frames", VerifyScopeInstanceIsStable);
+        Run("A region theme expires on the baseline layout clock", VerifyScopeFollowsLayoutClock);
         Run("The document's page level is in force before the first arrange", VerifyResolveBeforeMeasure);
         Run("Every dropped style value is visible in its own frame", VerifyDropsAreVisible);
         Run("A correct document is silent and an unknown scope name is not", VerifySilentWhenCorrect);
@@ -104,6 +108,58 @@ internal static class KernelStyleScopeTests
             "and Measure and Draw of one element are handed that same instance");
         Check(secondMeasure != null && ReferenceEquals(secondMeasure, secondDraw),
             "on the second frame too");
+    }
+
+    // --- the cache expires on the layout clock, and only on it -------------------------------------
+
+    private static void VerifyScopeFollowsLayoutClock()
+    {
+        PrepareRegistry();
+        UiTheme theme = UiTheme.DarkGold;
+        using UiHost host = new(Scope, ClockManifest(), new UiBindings(), theme, new FontMetrics(), new StubTranslation());
+
+        // Frame 1: the scope is built from the baseline as it stands.
+        UiLayoutSnapshot first = Frame(host, 320f, 240f);
+        UiTheme? firstScope = LastTheme(MeasuredPaths, MeasuredThemes, "/inside");
+        float firstBand = first.RectById["note"].height;
+
+        // The control: the layout clock has not moved, so a scope is still one instance and its atom still
+        // measures the same band. The expiry rule must not turn reuse into a per-frame rebuild.
+        UiLayoutSnapshot second = Frame(host, 320f, 260f);
+        UiTheme? secondScope = LastTheme(MeasuredPaths, MeasuredThemes, "/inside");
+        Check(firstScope != null && ReferenceEquals(firstScope, secondScope),
+            "while the layout clock stands still one scope keeps one instance across frames");
+        CheckClose(firstBand, second.RectById["note"].height,
+            "and the atom inside it keeps the band it measured");
+
+        // The clock moves: a layout-bearing token on the injected theme. Every band measured against the
+        // old value is stale, so a cached scope that kept measuring with it would disagree with the page
+        // around it - that is the defect this read exists to close.
+        theme.DefaultFont = UiFont.Medium;
+
+        UiLayoutSnapshot third = Frame(host, 320f, 280f);
+        UiTheme? thirdScope = LastTheme(MeasuredPaths, MeasuredThemes, "/inside");
+        Check(thirdScope != null && !ReferenceEquals(firstScope, thirdScope),
+            "a baseline layout-clock move drops the cached scope instead of handing the stale instance back");
+        Check(thirdScope != null && thirdScope.DefaultFont == UiFont.Medium,
+            "the rebuilt scope carries the value the move introduced");
+        Check(third.RectById["note"].height > firstBand + 0.01f,
+            "and the real atom inside the region measures a taller band with it: "
+            + third.RectById["note"].height + " vs " + firstBand);
+
+        // The page level is the injected bag itself, and it moved in that same frame. A region lagging
+        // behind it is exactly the inconsistency the clock read removes.
+        UiTheme? pageLevel = LastTheme(MeasuredPaths, MeasuredThemes, "/outside");
+        Check(pageLevel != null && ReferenceEquals(pageLevel, theme) && pageLevel.DefaultFont == UiFont.Medium,
+            "the page level moved in that same frame, which the region used to lag behind");
+
+        // The new epoch is stable the same way the old one was.
+        UiLayoutSnapshot fourth = Frame(host, 320f, 300f);
+        UiTheme? fourthScope = LastTheme(MeasuredPaths, MeasuredThemes, "/inside");
+        Check(thirdScope != null && ReferenceEquals(thirdScope, fourthScope),
+            "and the rebuilt scope is reused from then on");
+        CheckClose(third.RectById["note"].height, fourth.RectById["note"].height,
+            "with the band it was rebuilt under");
     }
 
     // --- the page level, before the first arrange --------------------------------------------------
@@ -383,6 +439,25 @@ internal static class KernelStyleScopeTests
             + "</UiPage>");
     }
 
+    /// <summary>
+    /// A region holding both the probe element and a real text atom, plus a probe at the page level: the
+    /// atom is what turns "the region's font moved" into a measured band instead of an identity claim.
+    /// </summary>
+    private static UiLayoutManifest ClockManifest()
+    {
+        return UiLayoutManifest.Parse(
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + IceAndCompactSection
+            + "<Stack Id=\"root\">"
+            + "<Section Id=\"region\" Scheme=\"ice\" Density=\"compact\">"
+            + "<Widget Id=\"inside\" Kind=\"" + ProbeKind + "\"/>"
+            + "<Widget Id=\"note\" Kind=\"text/wrapped\" Text=\"" + LongCjk + "\"/>"
+            + "</Section>"
+            + "<Widget Id=\"outside\" Kind=\"" + ProbeKind + "\"/>"
+            + "</Stack>"
+            + "</UiPage>");
+    }
+
     // --- the probe ---------------------------------------------------------------------------------
 
     /// <summary>
@@ -431,6 +506,18 @@ internal static class KernelStyleScopeTests
         MeasuredThemes.Clear();
         DrawnPaths.Clear();
         DrawnThemes.Clear();
+    }
+
+    /// <summary>
+    /// One frame: measure, then draw, with the probe's records cleared first so the lane reads this frame's
+    /// observations rather than an earlier frame's.
+    /// </summary>
+    private static UiLayoutSnapshot Frame(UiHost host, float width, float height)
+    {
+        ResetProbe();
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(width, height));
+        host.DrawFrame(new Rect(0f, 0f, width, height));
+        return snapshot;
     }
 
     /// <summary>The last recorded theme whose element path ends with <paramref name="suffix"/>.</summary>
@@ -526,5 +613,29 @@ internal static class KernelStyleScopeTests
         public string Translate(string key) => key;
 
         public int TranslationRevision => 0;
+    }
+
+    /// <summary>
+    /// A ruler whose wrapped band follows the font: the same deterministic model the other lanes use, so
+    /// "the region rebuilt its theme with the new font" is observable as a taller arranged band.
+    /// </summary>
+    private sealed class FontMetrics : ITextMetrics
+    {
+        public float MeasureText(string text, UiFont font, float width)
+        {
+            if (string.IsNullOrEmpty(text)) return 0f;
+            float advance = StubTextWidth.Of(text, font);
+            int lines = Math.Max(1, (int)Math.Ceiling(advance / Math.Max(1f, width)));
+            return lines * Em(font);
+        }
+
+        public float MeasureWidth(string text, UiFont font) => StubTextWidth.Of(text, font);
+
+        private static float Em(UiFont font) => font switch
+        {
+            UiFont.Tiny => 12f,
+            UiFont.Medium => 18f,
+            _ => 16f
+        };
     }
 }

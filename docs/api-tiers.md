@@ -161,7 +161,10 @@ consequence is paid in the open rather than discovered by a stranger.
   not, and that asymmetry is the design rather than a gap. The engine resolves each element's chain through
   `ThemeFor` and reuses the cached instance in Measure and Draw, while an empty chain is the page level and
   answers with the injected theme itself; `UiHost.StyleResolver` is the live instance for a page, and its
-  `Issues` are the resolution-time half of the same record the document keeps.
+  `Issues` are the resolution-time half of the same record the document keeps. The cache is bound to the
+  injected theme's own `UiTheme.LayoutRevision` — the revision the engine's band cache already compares —
+  so a layout-bearing token moving drops the cached clones and the next scope lookup rebuilds them, while a
+  colour-only re-tint leaves the instances alone, exactly as it leaves the band cache alone.
 - `UiStyleDeclaration` — one node's own style attributes as the resolver reads them (scheme, density, tone,
   emphasis), handed in nearest first along the tree; the engine's chain carries the two that inherit and
   leaves the roles on the element's own spec.

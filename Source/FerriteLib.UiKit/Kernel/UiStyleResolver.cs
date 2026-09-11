@@ -29,6 +29,14 @@ namespace FerriteLib.UiKit.Kernel;
 /// values only, its own resolved-value store - and it is never mutated afterwards.
 /// </para>
 /// <para>
+/// That reuse expires on the injected theme's own <see cref="UiTheme.LayoutRevision"/>: a layout-bearing
+/// token (the default font, the density bundle) moving means every band measured against the old value is
+/// stale, so the cached clones are dropped and rebuilt lazily on the next lookup. This is not a second
+/// clock - it is the revision the engine's band cache already compares, read here so both caches expire
+/// together. Colour tokens deliberately do not move that revision, which is also why a cached scope keeps
+/// the palette it was built with: the same boundary the band cache draws, drawn once.
+/// </para>
+/// <para>
 /// Resolution-time drops (a scope naming a scheme nobody declared, a scope budget overrun) are recorded
 /// in <see cref="Issues"/> next to the document's own parse-time issues; the page keeps rendering with
 /// the values it would have had without the document.
@@ -46,10 +54,15 @@ public sealed class UiStyleResolver
     private readonly Dictionary<string, UiTheme> regionThemes = new(StringComparer.Ordinal);
     private readonly List<UiStyleIssue> issues = new();
 
+    // The baseline's layout revision as this resolver last saw it. Deliberately not a clock of its own: it
+    // is a read head over the revision the engine's band cache compares, so a move expires both caches.
+    private int observedBaselineRevision;
+
     public UiStyleResolver(UiTheme baseline, UiStyleDocument document)
     {
         this.baseline = baseline ?? throw new ArgumentNullException(nameof(baseline));
         this.document = document ?? throw new ArgumentNullException(nameof(document));
+        observedBaselineRevision = this.baseline.LayoutRevision;
     }
 
     /// <summary>The consumer-injected theme every scope starts from.</summary>
@@ -83,11 +96,23 @@ public sealed class UiStyleResolver
 
     /// <summary>
     /// The theme a scope draws with, built once per effective (scheme, density) pair and reused - the same
-    /// instance on every later frame. Unknown names fall back to the nearest declared ancestor's values
-    /// (or the baseline) and are recorded.
+    /// instance on every later frame, until the baseline's layout revision moves and the cached instances
+    /// are dropped. Unknown names fall back to the nearest declared ancestor's values (or the baseline)
+    /// and are recorded.
     /// </summary>
     public UiTheme ThemeFor(IReadOnlyList<UiStyleDeclaration>? nearestFirst)
     {
+        // A cached scope is only as good as the baseline it was cloned from. Watch the layout clock the
+        // injected theme already carries: when it moves, this cache is stale for exactly the reason the
+        // engine's band cache is, and the next lookup rebuilds lazily. Colours never move that clock, so a
+        // re-tint alone keeps the instances a region has been using.
+        int baselineRevision = baseline.LayoutRevision;
+        if (baselineRevision != observedBaselineRevision)
+        {
+            observedBaselineRevision = baselineRevision;
+            regionThemes.Clear();
+        }
+
         string? scheme = ResolveScheme(nearestFirst);
         string? density = ResolveDensity(nearestFirst);
         string key = (scheme ?? "") + "\u0001" + (density ?? "");
