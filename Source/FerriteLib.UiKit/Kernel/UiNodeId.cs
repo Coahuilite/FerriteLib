@@ -67,8 +67,19 @@ public readonly struct UiNodeId : IEquatable<UiNodeId>
     private static string Segment(UiElementSpec spec, int declaredIndex)
     {
         if (spec == null) throw new ArgumentNullException(nameof(spec));
-        if (spec.Id.Length > 0) return spec.Id;
-        return spec.Kind + "[" + declaredIndex.ToString(CultureInfo.InvariantCulture) + "]";
+        return spec.Id.Length > 0 ? spec.Id : GeneratedSegment(spec.Kind, declaredIndex);
+    }
+
+    /// <summary>
+    /// The identity segment an element without a declared <c>Id</c> contributes: its kind plus its
+    /// declared ordinal. One source of truth for this grammar, because the manifest parser has to
+    /// refuse a declared <c>Id</c> that spells one of these (see
+    /// <c>UiLayoutManifest.ValidateIdentitySegments</c>) and two copies of the format would drift.
+    /// </summary>
+    internal static string GeneratedSegment(string kind, int declaredIndex)
+    {
+        if (kind == null) throw new ArgumentNullException(nameof(kind));
+        return kind + "[" + declaredIndex.ToString(CultureInfo.InvariantCulture) + "]";
     }
 
     public bool Equals(UiNodeId other)

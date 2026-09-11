@@ -42,6 +42,7 @@ internal static class KernelIdentityTests
             Run("unnamed siblings get distinct identities, stable between Measure and Draw", VerifyIdentitiesAreDistinctAndStable);
             Run("identity survives a re-arrange and a Hidden sibling", VerifyIdentitySurvivesHideAndReArrange);
             Run("a Tab switch does not renumber the visible sibling", VerifyTabSwitchDoesNotRenumber);
+            Run("a declared Id may not spell a sibling's generated segment", VerifyDeclaredIdMayNotSpellAGeneratedSegment);
             Run("per-element state does not cross between unnamed siblings", VerifyStateIsIsolatedBetweenSiblings);
             Run("a throwing sibling does not move the next element's state slot", VerifyThrowerDoesNotLeakTheScope);
             Run("hover claims carry the element that made them", VerifyHoverClaimCarriesItsElement);
@@ -203,6 +204,61 @@ internal static class KernelIdentityTests
         {
             throw new Exception("the Tab-hidden sibling lost its state slot");
         }
+    }
+
+    /// <summary>
+    /// The identity grammar's one hole, closed where the rest of the creation-time contract lives: an
+    /// unnamed sibling contributes an identity segment of <c>Kind[declaredIndex]</c>, so a declared Id
+    /// written as exactly that would give two siblings one key. The refusal is a collision check, not a
+    /// ban on the spelling - which is what keeps it off every manifest that never writes such an Id.
+    /// </summary>
+    private static void VerifyDeclaredIdMayNotSpellAGeneratedSegment()
+    {
+        string generated = ProbeKind + "[0]";
+
+        ExpectRefusal(
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Row Id=\"row\">"
+            + "<Widget Kind=\"" + ProbeKind + "\" Text=\"A\" Cursor=\"1\" />"
+            + "<Widget Id=\"" + generated + "\" Kind=\"" + ProbeKind + "\" Text=\"B\" Cursor=\"2\" />"
+            + "</Row></UiPage>",
+            generated,
+            "a child Id spelling a sibling's generated segment");
+
+        ExpectRefusal(
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Widget Kind=\"" + ProbeKind + "\" Text=\"A\" Cursor=\"1\" />"
+            + "<Widget Id=\"" + generated + "\" Kind=\"" + ProbeKind + "\" Text=\"B\" Cursor=\"2\" />"
+            + "</UiPage>",
+            generated,
+            "a root Id spelling a sibling's generated segment");
+
+        // The same Id shape with no unnamed sibling beside it stays legal: an Id that merely looks like
+        // the generated form collides with nothing, and that is why existing manifests are unaffected
+        // (measured: no Id in this repository, its harness or the wired consumer's two Schema=2
+        // manifests ends in "[<digits>]").
+        UiLayoutManifest.Parse(
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Row Id=\"row\">"
+            + "<Widget Id=\"" + generated + "\" Kind=\"" + ProbeKind + "\" Text=\"B\" Cursor=\"2\" />"
+            + "</Row></UiPage>");
+    }
+
+    private static void ExpectRefusal(string xml, string named, string what)
+    {
+        try
+        {
+            UiLayoutManifest.Parse(xml);
+        }
+        catch (FormatException ex)
+        {
+            if (ex.Message.IndexOf(named, StringComparison.Ordinal) < 0)
+            {
+                throw new Exception("the refusal of " + what + " does not name '" + named + "': " + ex.Message);
+            }
+
+            return;
+        }
+
+        throw new Exception(what + " was accepted; the two siblings would share one identity key");
     }
 
     private static void VerifyStateIsIsolatedBetweenSiblings()

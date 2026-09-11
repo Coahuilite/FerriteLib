@@ -88,6 +88,7 @@ public sealed class UiLayoutManifest
         IXmlLineInfo lineInfo = reader as IXmlLineInfo ?? NullLineInfo.Instance;
 
         int nodeCount = 0;
+        int pageLine = 0;
         string source = "";
         string schema = "";
 
@@ -108,6 +109,7 @@ public sealed class UiLayoutManifest
 
             schema = reader.GetAttribute("Schema") ?? "";
             source = reader.GetAttribute("Source") ?? "";
+            pageLine = lineInfo.LineNumber;
 
             if (schema.Length == 0)
             {
@@ -171,6 +173,7 @@ public sealed class UiLayoutManifest
                 case XmlNodeType.EndElement:
                     if (string.Equals(reader.Name, "UiPage", StringComparison.Ordinal))
                     {
+                        ValidateIdentitySegments(roots, pageLine);
                         return new UiLayoutManifest(source, schema, roots);
                     }
 
@@ -267,6 +270,7 @@ public sealed class UiLayoutManifest
                         throw ParseError(lineInfo, $"Unexpected end element </{reader.Name}> inside <{elementName} id=\"{id}\">.");
                     }
 
+                    ValidateIdentitySegments(children, elementLine);
                     return new UiElementSpec(id, kind, attributes, children);
 
                 case XmlNodeType.Text:
@@ -279,6 +283,39 @@ public sealed class UiLayoutManifest
         }
 
         throw new FormatException($"UI layout XML ended inside <{elementName} id=\"{id}\" Kind=\"{kind}\">.");
+    }
+
+    /// <summary>
+    /// A declared <c>Id</c> may not spell an unnamed sibling's generated identity segment (0.4.0
+    /// identity layer). Identity keys are structural paths, and an element without an <c>Id</c>
+    /// contributes <c>Kind[declaredIndex]</c>; an Id written as exactly that would give two siblings
+    /// one key, which is the alias the identity layer exists to remove. Refused here, at creation
+    /// time, next to the duplicate-Id rule it is the sibling of: a silently shared identity surfaces
+    /// far from the manifest that caused it, as a control that keeps another control's state.
+    /// </summary>
+    private static void ValidateIdentitySegments(IReadOnlyList<UiElementSpec> siblings, int line)
+    {
+        HashSet<string>? generated = null;
+        for (int i = 0; i < siblings.Count; i++)
+        {
+            UiElementSpec sibling = siblings[i];
+            if (sibling.Id.Length > 0) continue;
+            generated ??= new HashSet<string>(StringComparer.Ordinal);
+            generated.Add(UiNodeId.GeneratedSegment(sibling.Kind, i));
+        }
+
+        if (generated == null) return;
+
+        for (int i = 0; i < siblings.Count; i++)
+        {
+            UiElementSpec sibling = siblings[i];
+            if (sibling.Id.Length == 0 || !generated.Contains(sibling.Id)) continue;
+            throw new FormatException(
+                $"Invalid UI layout XML at line {line}: element Id '{sibling.Id}' is also the generated "
+                + "identity segment of an unnamed sibling of the same parent (an unnamed element's identity "
+                + "is its Kind plus its declared index). Two siblings would share one identity key; give "
+                + "either sibling a distinct Id.");
+        }
     }
 
     private static int BumpNode(int count, IXmlLineInfo lineInfo)
