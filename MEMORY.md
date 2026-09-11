@@ -254,6 +254,12 @@
   push, and rewriting the batch was refused on purpose: it would invalidate the verifier's per-sha evidence
   and interrupt a lane still writing, while this branch's contract is the tip. The discipline that follows:
   a public type and its tier line go in the same commit, and the tier lane is re-run after any rewrite.
+  The race has a second and worse harm, found by the verifier on the same batch: `dfba792` committed a
+  491-line identity lane while `Program.cs` did not register it until `7afa1df`, so at that commit the lane
+  was dead code -- the file existed, no assertion ran, and every gate was green. A late tier line reddens a
+  gate; a late registration hides the evidence entirely. Same root cause, same rule: a public type, its tier
+  line and its lane registration go in one commit, checked with `git show <sha>:<file> | grep`, never by
+  trusting the working tree.
   (2) Two unpushed commits were amended in flight (`a81182e`->`169cf62`, `085ebd1`->`7afa1df`), both
   reported by their author; that mapping is part of this session's record.
   **Two traps worth keeping.** A mutation check that restores a file with `Copy-Item` keeps the old mtime,
