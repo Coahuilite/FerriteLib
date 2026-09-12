@@ -7,8 +7,8 @@ using FerriteLib.UiKit.Kernel;
 namespace FerriteLib.UiKit.Tests;
 
 /// <summary>
-/// The rule a page-drawing lane owes its own coverage claim: after a frame, no element may be sitting in
-/// recovery.
+/// The rule a page-drawing lane owes its own coverage claim: no element of its session may ever have been
+/// replaced by a recovery band, at any point in that session's life.
 /// <para>
 /// Why this is a guard rather than a convention (measured 2026-09-12). A consumer's page called
 /// <c>rect.ContractedBy(8f)</c>, a member the harness's Verse stub did not declare, so the call threw
@@ -23,11 +23,21 @@ namespace FerriteLib.UiKit.Tests;
 /// A lane that trips on purpose passes <c>deliberateTrips: true</c> and keeps its own assertions about the
 /// recovery - the switch exists so the choice is visible in the call, never an omission.
 /// </para>
+/// <para>
+/// <b>This is a property of the whole session, not of one frame.</b> <c>UiSession.TrippedNodes</c> is
+/// cleared by <c>UiSession.Dispose</c> and never by <c>BeginFrame</c>, so a recovery that happened in frame
+/// 3 is still reported by a check taken after frame 9 - and that is the intended strength, not a stale
+/// entry: the claim is "this session never silently recovered", which is strictly stronger than a
+/// per-frame sweep, because a sweep would let frame 3's silent recovery be forgotten by frame 4. A lane
+/// that deliberately trips early and draws healthy frames afterwards declares it in the call with
+/// <c>deliberateTrips: true</c>; nobody may relax this by clearing the session's record mid-lane.
+/// </para>
 /// </summary>
 internal static class KernelTripGuard
 {
     /// <summary>
-    /// Fails the calling lane when any element ended the frame in recovery.
+    /// Fails the calling lane when any element of the session has been replaced by a recovery band at any
+    /// point in its life (session-level: a later healthy frame does not forget an earlier recovery).
     /// <paramref name="deliberateTrips"/> is the explicit switch for the lanes that test recovery itself.
     /// </summary>
     internal static void ExpectNoTrips(UiSession session, string lane, bool deliberateTrips = false)
@@ -55,10 +65,12 @@ internal static class KernelTripGuard
     {
         var text = new StringBuilder();
         text.Append(lane).Append(": ").Append(session.TrippedNodes.Count)
-            .Append(" element(s) ended the frame in recovery, so the page was not fully drawn. ")
-            .Append("A trip means the element was replaced by its recovery band; in a harness that usually "
-                + "means the runtime stub is missing a game member the product called, so the product path "
-                + "under test never ran. If the trip is deliberate, pass deliberateTrips: true.");
+            .Append(" element(s) in this session were replaced by a recovery band, so a page drawn here ")
+            .Append("was not fully drawn. A trip means the element was replaced by its recovery band; in a ")
+            .Append("harness that usually means the runtime stub is missing a game member the product ")
+            .Append("called, so the product path under test never ran. The record is session-level and a ")
+            .Append("later healthy frame does not clear it; if the trip is deliberate, pass ")
+            .Append("deliberateTrips: true.");
 
         foreach (UiNode node in session.TrippedNodes)
         {

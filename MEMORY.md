@@ -1218,7 +1218,22 @@ Paths and roles only; any line/file count here would be false within a day (see 
 - `tools/dependency-reality.ps1` - the D-1 reference checker FL owns the rule text for: AssemblyRef,
   page-model MemberRef contact, and declared-chrome allowlisting over a consumer tree, with `-SelfTest`
   proving the source scan can fire.
-- `scripts/verify-local.ps1` (9 gates, `-PackDev` adds packaging) and `scripts/pack-dev.ps1`. Gate 9 was
+- `scripts/stub-coverage-scan.ps1` - the reference-driven door for the class above (gate 8's second half,
+  added with the `Mathf.Clamp(int, int, int)` instance). It reads the MemberRef tables of the payload and
+  of the harness assembly and requires every member they take from a stub-replaced game assembly
+  (`Assembly-CSharp`, `UnityEngine.CoreModule`, `UnityEngine.IMGUIModule`,
+  `UnityEngine.TextRenderingModule` - a rule list, deliberately not read off the stub) to be declared by the
+  stub or listed in `scripts/stub-coverage-exemptions.txt` with a reason. The table is exact both ways: an
+  unlisted unresolved member fails, a listed member that resolves again fails as STALE, a reasonless entry
+  fails; it is empty today, which is the measured state (payload 57 references, harness 37, unresolved 0).
+  `-SelfTest` adds three fixture controls: a stub set missing one whole assembly must fail and name a
+  member, an empty stub directory and a tree with no target must exit 3 (not scanned) instead of reporting
+  a clean zero. Fixture 1 failed on its first run - the replaced-assembly list had been derived from the
+  stub, so removing a whole stub assembly removed its references from scope - which is why that list is a
+  rule now.
+- `scripts/verify-local.ps1` (9 gates, `-PackDev` adds packaging) and `scripts/pack-dev.ps1`. Gate 8 has two
+  halves since 2026-09-12 - the net472 source-shape scan and the stub-coverage scan above, the second with
+  its own `-SelfTest` - so the gate count is unchanged while the trap surface is not. Gate 9 was
   added 2026-09-12: it runs `dependency-reality.ps1 -SelfTest` and a TEMP fixture tree, so the boundary
   tool's pattern set and its allowance are proven to be able to go red on every full run instead of only
   when a human remembers to call `-SelfTest`. The three
@@ -1304,6 +1319,36 @@ Paths and roles only; any line/file count here would be false within a day (see 
   hole class is wider than this member: any stub gap dissolves the consumer code under it while the
   surrounding assertions keep passing, so a new game member reaches the stub the moment a lane needs it -
   and the trip guard is what makes that need visible.
+- **The same class twice in one day, and the door that stops waiting for a lane's luck (measured
+  2026-09-12).** The guard found the second instance within hours: a consumer's timing card called
+  `Mathf.Clamp(int, int, int)` while this stub carried only `Clamp(float, float, float)` - and `Max(int, int)`
+  without its `Min(int, int)` pair - so that card became a recovery band, the page drew one card short, and
+  the lane asserting `IsActive` had been green over it; in the game the same code draws. Both integer
+  overloads are now declared and mirror the float forms (minimum branch first, Unity's own order for both,
+  so a consumer cannot clamp differently by switching between int and float), and the lane asserts the
+  semantics rather than "it did not throw". The hole class no longer depends on a lane reaching it:
+  `scripts/stub-coverage-scan.ps1` (gate 8's second half) reads the payload's and the harness assembly's
+  MemberRef tables against the stub surface, with a written exemption table that is exact both ways.
+  **Mutation provenance** (every run with the touch / `--no-incremental` discipline, green after each
+  revert): M1 delete `Verse.GenUI` -> `KernelStubCoverageTests` fails naming the `TypeLoadException` and the
+  guard reports the recovery band; M2 make `ContractedBy` return its input -> four semantics assertions red;
+  M3 make the guard vacuous -> the planted-throw positive control red; M4 delete `Mathf.Clamp(int, int,
+  int)` -> the lane reds and the scan names
+  `UnityEngine.CoreModule!UnityEngine.Mathf::Clamp(Int32,Int32,Int32)`; M5 leave one stale exemption in the
+  table -> the scan reds as STALE; M6 declare the same name with a different signature
+  (`Clamp(long, long, long)`) -> the scan still reds, so it matches signatures and not names. **M6 failed
+  the first time, and the reason is a rule**: that run changed the stub *source* and ran the scan without
+  rebuilding, so the scan read the old stub DLL and reported OK - the scan's inputs are built assemblies.
+- **The trip guard is session-level by design, and its wording now says so (maintainer ruling 2026-09-12).**
+  `UiSession.TrippedNodes` is cleared by `UiSession.Dispose` (`UiSession.cs:638`) and never by `BeginFrame`
+  (`:288-291`), so a recovery in frame 3 is still reported by a check taken after frame 9. The guard's docs
+  and failure text said "ended the frame in recovery", which reads as a per-frame sweep and invites the
+  wrong bug report when a later healthy frame still trips; they now say "in this session were replaced by a
+  recovery band" and the doc states the property and why it is stronger this way. Clearing in `BeginFrame`
+  was considered and **refused**: it would let frame 3's silent recovery be forgotten by frame 4, which
+  weakens the guard. A lane that deliberately trips and then draws healthy frames declares
+  `deliberateTrips: true`; none of FL's own lanes needs that switch (checked: the three guarded call sites
+  are healthy draws, and the one lane that plants a trip *expects* the guard to fail).
 - **A correction the lead owes the record (2026-09-11).** While reviewing the scroll-target work the lead
   asked for "clear the request when the id does not resolve". That preference was wrong: the contract test
   at `KernelContractTests.cs:297-303` already required an unresolvable target to **stay pending**, because a

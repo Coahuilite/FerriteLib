@@ -21,8 +21,10 @@ $ErrorActionPreference = "Stop"
 #   5   payload is content-free: no Defs, Patches, Languages, Sounds or Textures under 1.6
 #   6   LICENSE present and full MPL-2.0, with no applied incompatibility notice
 #   7   About.xml identity (packageId, modVersion present and parsable as a Version)
-#   8   net472 trap scan: no call site uses a member the reference assembly advertises but the
-#       net472 runtime lacks (compiles green, fails at runtime -- see the script's own header)
+#   8   runtime-resolvability trap scans: no call site uses a member the reference assembly advertises
+#       but the net472 runtime lacks, and no member the payload or the harness takes from a stub-replaced
+#       game assembly is missing from the harness stub (both compile green and both die at run time; the
+#       stub half is reference-driven with a written exemption table -- see each script's own header)
 #   9   the consumer half of the boundary metric is armed and tree-sensitive: rule (c) of
 #       tools/dependency-reality.ps1 fires on a planted bare call outside its allowlist, refuses the
 #       migrated two-argument form, and passes once that file is allowlisted (self-test + fixture)
@@ -189,8 +191,8 @@ Invoke-Check 'About.xml identity is present and well-formed' `
         # is actually readable. Here we only prove the release axis is well-formed on its own.
     }
 
-Invoke-Check 'net472 trap scan (compiles green, fails at runtime)' `
-    'pwsh -NoProfile -File scripts/net472-trap-scan.ps1' `
+Invoke-Check 'runtime-resolvability traps: net472 surface + harness stub surface' `
+    'pwsh -NoProfile -File scripts/net472-trap-scan.ps1 ; pwsh -NoProfile -File scripts/stub-coverage-scan.ps1 -SelfTest' `
     {
         # The harness compiles against a reference assembly and executes on net472, so a member the
         # reference advertises can still be missing at runtime -- and the call site need not name the
@@ -199,6 +201,18 @@ Invoke-Check 'net472 trap scan (compiles green, fails at runtime)' `
         # only form that finds it: a seven-gate-green tree shipped exactly this failure until a lane ran
         # it (2026-09-11).
         & pwsh -NoProfile -File (Join-Path $root 'scripts\net472-trap-scan.ps1') -Path $root
+
+        # Same family, the other surface. The harness compiles against the game's reference assemblies
+        # and executes on the stubs, so a member only the reference declares compiles green and dies at
+        # run time inside the harness - quietly, because the session guard swaps the element for its
+        # recovery band and the frame survives, which leaves a lane that asserts a live session green
+        # while the path under test never ran (measured 2026-09-12: Verse.GenUI.ContractedBy, then
+        # Mathf.Clamp(int, int, int)). The scan is reference-driven: every member the payload and the
+        # harness take from a stub-replaced game assembly must be declared by the stub or be named in
+        # scripts/stub-coverage-exemptions.txt with a reason. -SelfTest adds three fixture controls, so
+        # the scan cannot fail open on a stub set missing a whole assembly, an empty stub directory, or a
+        # tree with no payload and no harness build.
+        & pwsh -NoProfile -File (Join-Path $root 'scripts\stub-coverage-scan.ps1') -Path $root -SelfTest
     }
 
 Invoke-Check 'rule (c) consumer half is armed and tree-sensitive (dependency-reality)' `

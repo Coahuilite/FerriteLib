@@ -111,6 +111,11 @@ public static class Mathf
 
     public static float Min(float a, float b) => a < b ? a : b;
 
+    // The integer half of the pair above. Measured 2026-09-12: a consumer called Mathf.Clamp(int, int, int)
+    // and this stub carried only the float forms, so the call died with MissingMethodException inside the
+    // harness only - the page's timing card was replaced by its recovery band and never drew.
+    public static int Min(int a, int b) => a < b ? a : b;
+
     public static float Max(float a, float b) => a > b ? a : b;
 
     public static int Max(int a, int b) => a > b ? a : b;
@@ -120,6 +125,16 @@ public static class Mathf
     public static int RoundToInt(float value) => (int)System.Math.Round(value);
 
     public static float Clamp(float value, float min, float max)
+    {
+        if (value < min) return min;
+        if (value > max) return max;
+        return value;
+    }
+
+    // Same order as the float overload (minimum first), which is Unity's own order for both and the only
+    // order a consumer can rely on: if the two variants disagreed, code that switches between int and
+    // float would clamp differently for the same numbers.
+    public static int Clamp(int value, int min, int max)
     {
         if (value < min) return min;
         if (value > max) return max;

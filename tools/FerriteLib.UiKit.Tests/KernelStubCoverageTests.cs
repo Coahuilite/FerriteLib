@@ -33,6 +33,7 @@ internal static class KernelStubCoverageTests
     {
         failures = 0;
         Run("The stub's Rect insets behave the way the game's do", VerifyStubSemantics);
+        Run("The stub carries the integer overloads a consumer calls", VerifyIntegerOverloads);
         Run("A page calling a game inset draws instead of recovering", VerifyConsumerShapedCallDraws);
         Run("The trip guard fires on a planted trip (positive control)", VerifyGuardFiresOnAPlantedTrip);
         Run("The guard's deliberate switch is explicit and works", VerifyDeliberateSwitch);
@@ -72,6 +73,24 @@ internal static class KernelStubCoverageTests
 
         CheckClose(-90f, new Rect(0f, 0f, 100f, 50f).ContractedBy(95f).width,
             "an inset past the extent goes negative rather than being clamped");
+    }
+
+    /// <summary>
+    /// The second measured hole of the same class (2026-09-12): <c>Mathf.Clamp(int, int, int)</c> and
+    /// <c>Mathf.Min(int, int)</c> existed only in their float forms, so the consumer's timing card died
+    /// with <c>MissingMethodException</c> inside the harness and never drew. These assertions are the
+    /// semantics a caller relies on, not "it did not throw" - and the last one pins the two variants to
+    /// the same order, because a stub whose int and float clamps disagreed would be its own trap.
+    /// </summary>
+    private static void VerifyIntegerOverloads()
+    {
+        Check(Mathf.Clamp(5, 0, 10) == 5, "an in-range integer passes through Clamp untouched");
+        Check(Mathf.Clamp(-3, 0, 10) == 0, "a value below the minimum is raised to it");
+        Check(Mathf.Clamp(42, 0, 10) == 10, "a value above the maximum is lowered to it");
+        Check(Mathf.Min(3, 7) == 3, "the integer Min returns the smaller argument");
+        Check(Mathf.Min(7, 3) == 3, "and the same value when the arguments are swapped");
+        Check(Mathf.Clamp(5, 10, 0) == (int)Mathf.Clamp(5f, 10f, 0f),
+            "the integer and float Clamp agree when the minimum is above the maximum");
     }
 
     /// <summary>
@@ -132,7 +151,7 @@ internal static class KernelStubCoverageTests
                 "and names the lane that is failing");
         }
 
-        Check(fired, "the guard fails the lane when an element ended the frame in recovery");
+        Check(fired, "the guard fails the lane when an element of the session sits in recovery");
     }
 
     private static void VerifyDeliberateSwitch()
