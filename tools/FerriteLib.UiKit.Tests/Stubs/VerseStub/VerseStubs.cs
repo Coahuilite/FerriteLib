@@ -5,6 +5,13 @@ using UnityEngine;
 // Harness stub, and part of the de-facto published shape: a consumer's kernel-host lane builds these
 // projects in place and copies them out of bin/stubs/<name>/ (AGENTS.md, "Build and verification").
 //
+// 2026-09-12: GenUI gained the Rect insets a consumer reaches for. The lesson is the reason this header
+// carries it: a stub missing one game member does not fail loudly - the call throws TypeLoadException at
+// JIT time, the session guard swaps that element for a recovery band, and a lane that only asserts
+// "the session is still alive" keeps passing while the product code under test never runs. Coverage in
+// the harness is "the element drew", never "the frame survived" (KernelStubCoverageTests is that rule
+// with a positive control, and KernelTripGuard is the assertion lanes call).
+//
 // 2026-09-11: Widgets.Label stopped being a no-op. It now appends three records - LabelRects,
 // LabelTexts and LabelColors (the colour the outlet had applied through GUI.color). Purely additive:
 // no existing member changed shape, nothing was removed, and the lists are only read by this repo's
@@ -396,6 +403,49 @@ public static class Widgets
         if (ScrollViewDepth > 0) ScrollViewDepth--;
         EndScrollViewCalls++;
         UnityEngine.GUI.EndGroup();
+    }
+}
+
+/// <summary>
+/// The game's Rect insets, because a consumer's page code reaches for them.
+/// <para>
+/// This type exists because of a measured hole, not for completeness (2026-09-12). A consumer drawing
+/// <c>rect.ContractedBy(8f)</c> called into <c>Verse.GenUI</c>, which this stub did not declare, so the
+/// call threw <c>TypeLoadException</c> at JIT time inside the harness; the session guard replaced that
+/// element with a recovery band and the consumer's lane - which asserted only that the session was still
+/// alive - stayed green for as long as the hole existed. In the game the same code draws, so nothing
+/// failed until somebody read a trip log. The member belongs to the game, so the stub is where it goes:
+/// a stub that lacks it makes the harness stop drawing the very code it claims to cover, and every later
+/// consumer pays the same tax.
+/// </para>
+/// <para>
+/// Semantics copied from the game's own <c>Verse/GenUI.cs</c> (read 2026-09-12 through the local RimWorld
+/// source index; <c>ContractedBy</c> at lines 578-586, <c>ExpandedBy</c> at 573-576): a plain four-side
+/// inset with no clamping, so a margin larger than half the extent produces a negative width or height,
+/// and a negative margin expands. The per-axis overload and <c>ExpandedBy</c> are that class's immediate
+/// neighbours and are included because they sit one lookup away from the same failure. What is *not*
+/// claimed: that these are the only members a consumer might need - the class is much larger, and the
+/// next missing one is found the same way, by a lane that asserts the element drew.
+/// </para>
+/// </summary>
+public static class GenUI
+{
+    /// <summary>Insets all four sides by <paramref name="margin"/>; no clamping, so a negative value expands.</summary>
+    public static Rect ContractedBy(this Rect rect, float margin)
+    {
+        return new Rect(rect.x + margin, rect.y + margin, rect.width - margin * 2f, rect.height - margin * 2f);
+    }
+
+    /// <summary>Per-axis inset: x and width by <paramref name="marginX"/>, y and height by <paramref name="marginY"/>.</summary>
+    public static Rect ContractedBy(this Rect rect, float marginX, float marginY)
+    {
+        return new Rect(rect.x + marginX, rect.y + marginY, rect.width - marginX * 2f, rect.height - marginY * 2f);
+    }
+
+    /// <summary>The game's mirror image: negative margins on the inset are growth here.</summary>
+    public static Rect ExpandedBy(this Rect rect, float marginX, float marginY)
+    {
+        return new Rect(rect.x - marginX, rect.y - marginY, rect.width + marginX * 2f, rect.height + marginY * 2f);
     }
 }
 

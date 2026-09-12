@@ -99,5 +99,8 @@ internal static class Program
 
         Console.WriteLine("Kernel style scopes (region theme in the live tree, page level, drop visibility)...");
         failures += KernelStyleScopeTests.RunAll();
+
+        Console.WriteLine("Kernel stub coverage (game members the harness must carry, trip guard)...");
+        failures += KernelStubCoverageTests.RunAll();
     }
 }

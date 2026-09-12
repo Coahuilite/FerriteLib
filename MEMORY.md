@@ -1287,6 +1287,23 @@ Paths and roles only; any line/file count here would be false within a day (see 
   unreachable, `TreatWarningsAsErrors` turned that into CS0162, and all 21 lanes "exited non-zero" while
   compiling nothing -- a green that only holds if nobody reads the marker. Its stated limit is honest: this
   proves the failure channel and the process exit, not that each lane fails on a real defect.
+- **A session that is alive is not a page that drew (measured 2026-09-12, found by the consumer's own
+  report).** A consumer's page called `rect.ContractedBy(8f)`, a member of the game's `Verse.GenUI` that
+  this repo's Verse stub did not declare. The call threw `TypeLoadException` at JIT time **inside the
+  harness only**: the session guard did its job (that element became a recovery band, the frame survived),
+  and the consumer's lane asserted nothing more than `Session.IsActive`, so it stayed green while the
+  element under test never ran. In the game the same code draws, which is why nothing else noticed - the one
+  trace was a trip log. Two rules came out of it, and both are now enforced here rather than remembered:
+  (1) the stub is the game API's test double, so a missing member is the stub's defect, not the consumer's
+  constraint - `Verse/GenUI.cs` was read from the game's own source (single-margin and per-axis
+  `ContractedBy`, `ExpandedBy`; four-sided inset, no clamping, negative margin expands) and the stub now
+  carries those three; (2) **a lane that draws a page asserts the page drew, not that the frame lived**:
+  `KernelTripGuard.ExpectNoTrips` fails a lane when any element ended a frame in recovery, the lanes that
+  trip on purpose pass `deliberateTrips: true` so the choice is visible in the call, and
+  `KernelStubCoverageTests` carries the consumer-shaped call plus a planted-throw positive control. The
+  hole class is wider than this member: any stub gap dissolves the consumer code under it while the
+  surrounding assertions keep passing, so a new game member reaches the stub the moment a lane needs it -
+  and the trip guard is what makes that need visible.
 - **A correction the lead owes the record (2026-09-11).** While reviewing the scroll-target work the lead
   asked for "clear the request when the id does not resolve". That preference was wrong: the contract test
   at `KernelContractTests.cs:297-303` already required an unresolvable target to **stay pending**, because a

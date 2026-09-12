@@ -58,6 +58,11 @@ internal static class KernelWindowHostTests
         Check(window.Notices.Count == 0, "a healthy page draws no notice");
         Check(window.HostCreations == 1, "the shell builds its host once and reuses it across passes");
         Check(window.SessionAlive, "the owned session is alive after two clean passes");
+
+        // Alive is not drawn: the shell's page must also have ended both frames without recovering an
+        // element. The 2026-09-12 stub hole left exactly this shape of lane green while the page never ran,
+        // because liveness survives a page whose elements were all replaced by recovery bands.
+        window.ExpectPageDrew("window shell healthy pass");
     }
 
     /// <summary>
@@ -389,6 +394,19 @@ internal static class KernelWindowHostTests
         public Vector2? FixedCloseSize;
 
         public bool SessionAlive => observedSession != null && observedSession.IsActive;
+
+        /// <summary>
+        /// The page session the shell built, or null when no pass reached that far. The lane uses it to
+        /// assert what "alive" cannot say: that the page's elements actually drew.
+        /// </summary>
+        public UiSession? ObservedSession => observedSession;
+
+        /// <summary>Fails when the last pass recovered any element; see <see cref="KernelTripGuard"/>.</summary>
+        public void ExpectPageDrew(string lane)
+        {
+            if (observedSession == null) throw new InvalidOperationException("no page session was built by the pass");
+            KernelTripGuard.ExpectNoTrips(observedSession, lane);
+        }
 
         /// <summary>The affordance size the shell computes; the lane reads it the way the shell does.</summary>
         public Vector2 CloseSize => CloseButtonSize;

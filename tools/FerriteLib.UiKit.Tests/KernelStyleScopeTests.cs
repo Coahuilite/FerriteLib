@@ -517,6 +517,11 @@ internal static class KernelStyleScopeTests
         ResetProbe();
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(width, height));
         host.DrawFrame(new Rect(0f, 0f, width, height));
+
+        // A frame that recovered an element is not a frame this lane may call healthy: the theme and band
+        // assertions below would still pass while the element under test was replaced by its recovery band
+        // (the 2026-09-12 stub hole). None of these lanes trips on purpose, so no switch is passed.
+        KernelTripGuard.ExpectNoTrips(host.Session, "style-scope frame");
         return snapshot;
     }
 
