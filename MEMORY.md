@@ -1250,6 +1250,26 @@ Paths and roles only; any line/file count here would be false within a day (see 
 - Three symbols people keep assuming live here are **not** from this repo: `SessionRevisionBumper` (a US
   private class), `PreClose` (Verse), `GetManifestResourceStream` (BCL, called in US). Searching this tree
   for them returns nothing, by design.
+- **A consumer's string is not a layout constant** (`a306cae`, 2026-09-12): the window shell used to size its
+  close affordance from a fixed `110x30` constant, so a consumer whose close text was longer (US's
+  diagnostics panel: `关闭（或连按两次 Esc）`) ran out of the box - that was the first real in-game
+  fit-audit finding. `UiWindowHost.CloseButtonSize` is now
+  `max(110, Metrics.MeasureWidth(CloseText, CloseFont) + 20)` over a `protected virtual ITextMetrics Metrics`
+  (the same ruler the fit audit uses); 110 survives only as the lower bound. Fixed here rather than per
+  consumer because three consumer windows ship through this shell: the constant made the library's geometry
+  the place consumer text gets clipped.
+- **An overflow record may carry exactly two non-content discriminators** (`UiOverflowReport.RectWidth` and
+  the new `TextLength`, `a306cae`). Because a record must not carry UI text, those two are the only pair that
+  can tell two candidates apart - the real-game finding needed `text_len` to separate a 24-character key
+  literal from a 13-character CJK value.
+- **Chrome and notices now draw inside element scopes** (`<windowType>/chrome`, `<windowType>/notice`,
+  `a306cae`), so `(unscoped)` is no longer the identity a chrome finding carries. Trade-off recorded in the
+  code: the identity is the window *type*, because the shell has neither an id nor a manifest while drawing
+  chrome, so two instances of one window class share the path; findings dedupe by path+text, which merges
+  rather than misattributes.
+- **A missing translation key is drawn as the key, on purpose.** `IUiTranslation` now states the policy and
+  its cost (visible but misleading), and names the owner of the check: only the host sees both its keys and
+  the loaded language data, so the dev-only self-check belongs there, not here.
 
 ## How verification is described here
 
