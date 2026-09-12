@@ -36,6 +36,7 @@ internal static class KernelStubCoverageTests
         Run("The stub carries the integer overloads a consumer calls", VerifyIntegerOverloads);
         Run("The stub's language and constant members behave the way the game's do", VerifyLanguageAndConstants);
         Run("The stub's pure game helpers behave the way the game's do", VerifyPureHelpers);
+        Run("The stub's math helpers behave the way the game's do", VerifyMathHelpers);
         Run("A page calling a game inset draws instead of recovering", VerifyConsumerShapedCallDraws);
         Run("The trip guard fires on a planted trip (positive control)", VerifyGuardFiresOnAPlantedTrip);
         Run("The guard's deliberate switch is explicit and works", VerifyDeliberateSwitch);
@@ -75,6 +76,49 @@ internal static class KernelStubCoverageTests
 
         CheckClose(-90f, new Rect(0f, 0f, 100f, 50f).ContractedBy(95f).width,
             "an inset past the extent goes negative rather than being clamped");
+    }
+
+    /// <summary>
+    /// The math family (2026-09-12, task-101), and the loud way it arrived: a consumer's circle drawing
+    /// called Mathf.Sqrt, the trip guard named the member and the call path, and this lane now calls every
+    /// member of the family so the reference-driven gate watches it. Each assertion is the member's own
+    /// rule - the BCL counterpart, or the published formula for Repeat/PingPong/SmoothStep - including the
+    /// two edge rules a caller could otherwise assume wrong: Round is the BCL's banker's rounding (2.5 goes
+    /// to 2), and the infinities are float's own.
+    /// </summary>
+    private static void VerifyMathHelpers()
+    {
+        CheckClose(3f, Mathf.Sqrt(9f), "Sqrt is the square root");
+        Check(Mathf.Abs(-3) == 3 && Mathf.Abs(3) == 3, "integer Abs drops the sign and keeps the magnitude");
+
+        CheckClose(1f, Mathf.Floor(1.7f), "Floor rounds down");
+        CheckClose(2f, Mathf.Ceil(1.2f), "Ceil rounds up");
+        CheckClose(2f, Mathf.Round(2.5f), "Round is the BCL's banker's rounding, so 2.5 goes to 2");
+        Check(Mathf.FloorToInt(1.9f) == 1, "FloorToInt truncates toward negative infinity");
+
+        CheckClose(0f, Mathf.Sin(0f), "Sin(0)");
+        CheckClose(1f, Mathf.Cos(0f), "Cos(0)");
+        CheckClose(0f, Mathf.Tan(0f), "Tan(0)");
+        CheckClose(0f, Mathf.Asin(0f), "Asin(0)");
+        CheckClose(0f, Mathf.Acos(1f), "Acos(1)");
+        CheckClose(0f, Mathf.Atan(0f), "Atan(0)");
+        CheckClose(0f, Mathf.Atan2(0f, 1f), "Atan2 of the positive x axis");
+
+        CheckClose(8f, Mathf.Pow(2f, 3f), "Pow raises to a power");
+        CheckClose(1f, Mathf.Exp(0f), "Exp(0) is one");
+        CheckClose(0f, Mathf.Log(1f), "Log(1) is zero");
+        CheckClose(3f, Mathf.Log(8f, 2f), "and Log with a base is the inverse of Pow");
+        CheckClose(2f, Mathf.Log10(100f), "Log10 of a power of ten");
+
+        CheckClose(1f, Mathf.Repeat(7f, 3f), "Repeat loops the value into the range");
+        CheckClose(1f, Mathf.PingPong(7f, 3f), "PingPong reflects it at the length");
+        CheckClose(20f, Mathf.LerpUnclamped(0f, 10f, 2f), "LerpUnclamped does not clamp its t");
+        CheckClose(5f, Mathf.SmoothStep(0f, 10f, 0.5f), "SmoothStep is the Hermite curve, symmetric at its midpoint");
+
+        Check(float.IsPositiveInfinity(Mathf.Infinity) && float.IsNegativeInfinity(Mathf.NegativeInfinity),
+            "the infinities are the float ones, not a large number");
+        CheckClose(0.0174533f, Mathf.Deg2Rad, "Deg2Rad is the PI identity");
+        CheckClose(57.29578f, Mathf.Rad2Deg, "and Rad2Deg is its inverse");
     }
 
     /// <summary>

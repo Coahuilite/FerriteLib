@@ -243,6 +243,88 @@ public static class Mathf
     public static float Lerp(float a, float b, float t) => a + (b - a) * t;
 
     public static float InverseLerp(float a, float b, float value) => a == b ? 0f : (value - a) / (b - a);
+
+    // ----------------------------------------------------------------------------------------------------
+    // The pure math family (2026-09-12, task-101). Every one of these is its BCL counterpart or its own
+    // published definition, so the double carries the exact rule instead of a plausible number: Sqrt, the
+    // integer Abs, the rounding functions and FloorToInt, the six trigonometry functions, Pow/Exp/Log/Log10,
+    // and the four that are defined by their own formulas (Repeat, PingPong, LerpUnclamped, SmoothStep).
+    // The gap became visible the loud way: a consumer's circle drawing called Mathf.Sqrt, the trip guard
+    // named the member and the call path, and a lane that calls a member now puts it under the
+    // reference-driven gate permanently.
+    //
+    // Deliberately NOT carried, under the same rule that keeps the vector comparison operators out: a member
+    // whose rule cannot be verified must fail loudly rather than guess. That covers Sign (its zero case is
+    // not the BCL's), MoveTowards / LerpAngle / MoveTowardsAngle / DeltaAngle (all defined through Sign),
+    // Approximately (an epsilon nobody can read), SmoothDamp* (an iterative state machine), the array
+    // Min/Max overloads (their empty-array answer is not published here), Epsilon, and the engine internals
+    // (Perlin noise, gamma and colour-temperature conversions, the numeric-formatting helpers).
+    public static float Sqrt(float value) => (float)System.Math.Sqrt(value);
+
+    public static int Abs(int value) => System.Math.Abs(value);
+
+    public static float Floor(float value) => (float)System.Math.Floor(value);
+
+    public static float Ceil(float value) => (float)System.Math.Ceiling(value);
+
+    // System.Math.Round is banker's rounding and so is Unity's; the lane pins 2.5 -> 2 so the rule is
+    // recorded rather than assumed.
+    public static float Round(float value) => (float)System.Math.Round(value);
+
+    public static int FloorToInt(float value) => (int)System.Math.Floor(value);
+
+    public static float Sin(float value) => (float)System.Math.Sin(value);
+
+    public static float Cos(float value) => (float)System.Math.Cos(value);
+
+    public static float Tan(float value) => (float)System.Math.Tan(value);
+
+    public static float Asin(float value) => (float)System.Math.Asin(value);
+
+    public static float Acos(float value) => (float)System.Math.Acos(value);
+
+    public static float Atan(float value) => (float)System.Math.Atan(value);
+
+    public static float Atan2(float y, float x) => (float)System.Math.Atan2(y, x);
+
+    public static float Pow(float f, float p) => (float)System.Math.Pow(f, p);
+
+    public static float Exp(float power) => (float)System.Math.Exp(power);
+
+    public static float Log(float f) => (float)System.Math.Log(f);
+
+    public static float Log(float f, float p) => (float)System.Math.Log(f, p);
+
+    public static float Log10(float f) => (float)System.Math.Log10(f);
+
+    // Repeat is Unity's own definition: t - floor(t / length) * length. PingPong composes it, which is why
+    // the two arrive together - one without the other would be half a rule.
+    public static float Repeat(float t, float length) => t - Floor(t / length) * length;
+
+    public static float PingPong(float t, float length)
+    {
+        float repeated = Repeat(t, length * 2f);
+        return length - (float)System.Math.Abs(repeated - length);
+    }
+
+    public static float LerpUnclamped(float a, float b, float t) => a + (b - a) * t;
+
+    // Unity's smooth step: clamp t, then the Hermite curve 3t^2 - 2t^3.
+    public static float SmoothStep(float from, float to, float t)
+    {
+        float clamped = Clamp01(t);
+        clamped = -2f * clamped * clamped * clamped + 3f * clamped * clamped;
+        return to * clamped + from * (1f - clamped);
+    }
+
+    public static float Infinity => float.PositiveInfinity;
+
+    public static float NegativeInfinity => float.NegativeInfinity;
+
+    // Both are arithmetic identities over PI, so they need no external source.
+    public static float Deg2Rad => PI * 2f / 360f;
+
+    public static float Rad2Deg => 360f / (PI * 2f);
 }
 
 /// <summary>

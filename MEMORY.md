@@ -1355,6 +1355,24 @@ Paths and roles only; any line/file count here would be false within a day (see 
   the declared SURFACE, not the bytes: a rebuild changes the module id without changing what is declared, so
   a byte comparison would redden every clean build. `-SelfTest` now carries four fixture controls (the
   fourth: one copy at a stub path that is not the stubbed API).
+- **The math family, and the door that made its gap loud (task-101, measured 2026-09-12).** A consumer's
+  circle drawing called `Mathf.Sqrt`, which this stub did not declare. The trip guard named the member and
+  the call path instead of swapping the element for a recovery band, and the consumer shipped a different
+  spelling the same day. The ruling that follows is worth more than the members: **the trip guard and the
+  reference-driven stub-coverage gate together turn "the stub is missing a member" from a silent hole into a
+  loud, attributable one** - the guard catches it on the first lane that drives the page, and the gate keeps
+  it caught for every member a lane calls, naming the assembly, the type, the signature and the file to
+  declare it in. `Mathf` now carries the pure family whose rule is either the BCL counterpart or the
+  published formula: `Sqrt`; `Abs(int)`; `Floor`/`Ceil`/`Round`/`FloorToInt` (the lane pins banker's
+  rounding at 2.5); the six trigonometry functions; `Pow`/`Exp`/`Log`/`Log10`;
+  `Repeat`/`PingPong`/`LerpUnclamped`/`SmoothStep`; the two infinities; and `Deg2Rad`/`Rad2Deg`. Measured
+  after the batch: stub types 50 (members were added to an existing type), payload 57 references, harness 94
+  (was 72), 151 in total, unresolved 0, exemptions 0. Deliberately still missing, under the same rule that
+  keeps the vector comparison operators out: `Sign` (its zero case is not the BCL's),
+  `MoveTowards`/`LerpAngle`/`DeltaAngle` (all defined through `Sign`), `Approximately` (an unreadable
+  epsilon), `SmoothDamp*` (a state machine), the array `Min`/`Max` overloads, `Epsilon`, and the engine
+  internals. M11 removes `Mathf.Sqrt` and both the lane (`MissingMethodException`) and the gate
+  (`MISSING UnityEngine.CoreModule!UnityEngine.Mathf::Sqrt(Single)`) redden; green after the revert.
 - **The pure-helper batch (task-97, measured 2026-09-12).** Eight members a consumer's filters and labels
   call, whose bodies were read from the game's own source rather than remembered: `GenText.NullOrEmpty` and
   `GenText.SanitizeFilename` (Source/Verse/GenText.cs:326-334, platform invalid set plus a fixed tail, runs
