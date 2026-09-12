@@ -1339,6 +1339,28 @@ Paths and roles only; any line/file count here would be false within a day (see 
   (`Clamp(long, long, long)`) -> the scan still reds, so it matches signatures and not names. **M6 failed
   the first time, and the reason is a rule**: that run changed the stub *source* and ran the scan without
   rebuilding, so the scan read the old stub DLL and reported OK - the scan's inputs are built assemblies.
+- **The double's language/constant batch (task-95, measured 2026-09-12).** Of the 188 members a consumer's
+  built payload takes from the four stub-replaced game assemblies and this stub did not declare, the ones
+  that carry no game logic are now declared, because every consumer hits them and none of them needed a
+  judgement about game behaviour: `Rect.zero`; the arithmetic operators on `Vector2` and the whole
+  `Vector3` type (`x/y/z` fields, `zero`/`one`, `+ - * /`, `magnitude`, `sqrMagnitude`, `Distance`,
+  `Lerp`); `Color.black` and the named constants; `UnityEngine.Object.op_Equality/op_Inequality`;
+  `Time.frameCount` and `realtimeSinceStartup`; `Verse.UI.screenWidth/screenHeight` (declared as the two
+  public static FIELDS the reference assembly carries, not as properties - verified against 1.6.4871).
+  Every one is exercised by `KernelStubCoverageTests`, which is what puts it under the reference-driven
+  gate permanently: the scan now reads 57 payload references and 59 harness references (was 37), 0
+  unresolved, 116 in total. Mutation M7 (remove `Color.black`, rebuild) reds the lane with
+  `MissingMethodException` and makes the scan name
+  `UnityEngine.CoreModule!UnityEngine.Color::get_black()`; green after the revert.
+  **Two deliberate refusals belong to this batch.** The comparison operators on vectors and colours are
+  NOT carried: in the game they compare through an epsilon, a stripped reference assembly cannot show that
+  rule, and a guessed epsilon would silently change which branch a lane takes - a hole that throws is
+  better than a double that lies quietly. And `UnityEngine.Object`'s destroyed-object/fake-null behaviour
+  cannot be modelled by a managed double at all, so the operator is reference identity plus the null cases
+  and its doc-comment says exactly that. The game-object and rendering-backend members (Pawn/Scribe/Sound/
+  Def/Mod, Camera, Transform, `Widgets.Label`, `GenMapUI.DrawText`) stay OUT of the stub on purpose and
+  belong in a consumer's exemption table with reasons: two of them are containment-whitelist surface, and
+  growing the double to cover them would blur a boundary the product measures.
 - **The trip guard is session-level by design, and its wording now says so (maintainer ruling 2026-09-12).**
   `UiSession.TrippedNodes` is cleared by `UiSession.Dispose` (`UiSession.cs:638`) and never by `BeginFrame`
   (`:288-291`), so a recovery in frame 3 is still reported by a check taken after frame 9. The guard's docs

@@ -478,6 +478,19 @@ public static class Log
     }
 }
 
+/// <summary>
+/// The UI-scale surface a consumer's window clamp reads. The reference assembly declares these as two
+/// public static int FIELDS (verified against 1.6.4871), not as properties, so the double matches that
+/// shape and a lane can pin a viewport the way the game pins it at startup. Before this type existed,
+/// every read of it died in the harness only (task-95, the language/constant batch).
+/// </summary>
+public static class UI
+{
+    public static int screenWidth = 1920;
+
+    public static int screenHeight = 1080;
+}
+
 public sealed class LoadedLanguage
 {
     public string folderName = "";

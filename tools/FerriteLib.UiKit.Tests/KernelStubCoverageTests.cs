@@ -34,6 +34,7 @@ internal static class KernelStubCoverageTests
         failures = 0;
         Run("The stub's Rect insets behave the way the game's do", VerifyStubSemantics);
         Run("The stub carries the integer overloads a consumer calls", VerifyIntegerOverloads);
+        Run("The stub's language and constant members behave the way the game's do", VerifyLanguageAndConstants);
         Run("A page calling a game inset draws instead of recovering", VerifyConsumerShapedCallDraws);
         Run("The trip guard fires on a planted trip (positive control)", VerifyGuardFiresOnAPlantedTrip);
         Run("The guard's deliberate switch is explicit and works", VerifyDeliberateSwitch);
@@ -73,6 +74,68 @@ internal static class KernelStubCoverageTests
 
         CheckClose(-90f, new Rect(0f, 0f, 100f, 50f).ContractedBy(95f).width,
             "an inset past the extent goes negative rather than being clamped");
+    }
+
+    /// <summary>
+    /// The language/constant batch (2026-09-12): the members a consumer reads that carry no game logic at
+    /// all - the zero constants, component-wise vector arithmetic, the magnitudes, the named colours, the
+    /// object identity operators, the engine clock and the UI surface size. Each was a harness-only death
+    /// while the double did not declare it, and each is asserted here rather than trusted: a double that
+    /// returns a plausible-looking wrong number is worse than one that throws. Asserting them also makes
+    /// this lane reference them, which is what puts them under the reference-driven gate permanently.
+    /// </summary>
+    private static void VerifyLanguageAndConstants()
+    {
+        Rect empty = Rect.zero;
+        Check(empty.x == 0f && empty.y == 0f && empty.width == 0f && empty.height == 0f,
+            "Rect.zero is an empty rect at the origin");
+
+        Vector2 sum = new Vector2(1f, 2f) + new Vector2(3f, 4f);
+        Check(sum.x == 4f && sum.y == 6f, "Vector2 addition is component-wise");
+        Vector2 difference = new Vector2(3f, 4f) - new Vector2(1f, 2f);
+        Check(difference.x == 2f && difference.y == 2f, "Vector2 subtraction is component-wise");
+        Vector2 scaled = new Vector2(1f, 2f) * 2f;
+        Check(scaled.x == 2f && scaled.y == 4f, "Vector2 scales by a scalar");
+
+        Vector3 point = new Vector3(1f, 2f, 2f);
+        Check(point.x == 1f && point.y == 2f && point.z == 2f, "Vector3 carries the game's three fields");
+        Check(point.sqrMagnitude == 9f, "Vector3.sqrMagnitude is the squared length");
+        Check(point.magnitude == 3f, "and magnitude is its square root");
+        Vector3 moved = point - new Vector3(1f, 1f, 1f);
+        Check(moved.x == 0f && moved.y == 1f && moved.z == 1f, "Vector3 subtraction is component-wise");
+        Check(Vector3.Distance(new Vector3(0f, 0f, 0f), new Vector3(0f, 0f, 2f)) == 2f,
+            "Vector3.Distance measures between two points");
+
+        Color black = Color.black;
+        Check(black.r == 0f && black.g == 0f && black.b == 0f && black.a == 1f, "Color.black is opaque black");
+        Color grey = Color.grey;
+        Check(grey.r == 0.5f && grey.g == 0.5f && grey.b == 0.5f && grey.a == 1f, "the grey aliases agree");
+        Check(Color.yellow.g > 0.9f && Color.yellow.g < 0.93f,
+            "the named yellow is the game's numeric yellow, not pure yellow");
+
+        UnityEngine.Object first = new();
+        UnityEngine.Object second = new();
+        UnityEngine.Object same = first;
+        Check(first == same, "the object operator reports identity for the same reference");
+        Check(first != second, "and inequality for two different objects");
+        Check(!(first == null) && !(null == first), "a live object is neither null nor null-equal");
+        Check((UnityEngine.Object?)null == null,
+            "and two nulls compare equal, which is the branch a consumer's null guard takes");
+
+        Check(Time.frameCount == 0 && Time.realtimeSinceStartup == 0f,
+            "the engine clock answers zero rather than a ticking value the game would not produce here");
+
+        int width = Verse.UI.screenWidth;
+        Check(width > 0 && Verse.UI.screenHeight > 0, "the UI surface has a size a consumer can clamp against");
+        try
+        {
+            Verse.UI.screenWidth = 1024;
+            Check(Verse.UI.screenWidth == 1024, "and a lane can pin that size the way the game's fields allow");
+        }
+        finally
+        {
+            Verse.UI.screenWidth = width;
+        }
     }
 
     /// <summary>
