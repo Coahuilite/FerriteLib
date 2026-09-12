@@ -37,6 +37,7 @@ internal static class KernelStubCoverageTests
         Run("The stub's language and constant members behave the way the game's do", VerifyLanguageAndConstants);
         Run("The stub's pure game helpers behave the way the game's do", VerifyPureHelpers);
         Run("The stub's math helpers behave the way the game's do", VerifyMathHelpers);
+        Run("The stub's value types answer the accessors and arithmetic a consumer reads", VerifyValueFamilies);
         Run("A page calling a game inset draws instead of recovering", VerifyConsumerShapedCallDraws);
         Run("The trip guard fires on a planted trip (positive control)", VerifyGuardFiresOnAPlantedTrip);
         Run("The guard's deliberate switch is explicit and works", VerifyDeliberateSwitch);
@@ -76,6 +77,63 @@ internal static class KernelStubCoverageTests
 
         CheckClose(-90f, new Rect(0f, 0f, 100f, 50f).ContractedBy(95f).width,
             "an inset past the extent goes negative rather than being clamped");
+    }
+
+    /// <summary>
+    /// The value-type family sweep (2026-09-12, task-105): Rect's accessors, Vector2/Vector3's component
+    /// arithmetic and constants, and Color's component-wise arithmetic. Every rule is the arithmetic its
+    /// name states, which is why they can be carried while the guards (normalized, angles, equality) stay
+    /// out. The sweep also recorded what is deliberately missing, with reasons, on each type's comment.
+    /// </summary>
+    private static void VerifyValueFamilies()
+    {
+        Rect rect = new Rect(10f, 20f, 100f, 50f);
+        CheckClose(10f, rect.xMin, "Rect.xMin is the origin edge");
+        CheckClose(20f, rect.yMin, "and yMin too");
+
+        CheckClose(10f, rect.min.x, "min starts at the origin");
+        CheckClose(70f, rect.max.y, "and max ends at the far corner");
+        CheckClose(100f, rect.size.x, "size is the extent");
+        CheckClose(60f, rect.center.x, "and center is the middle");
+        CheckClose(45f, rect.center.y, "on both axes");
+
+        Vector2 a = new Vector2(3f, 4f);
+        CheckClose(25f, a.sqrMagnitude, "Vector2.sqrMagnitude is the squared length");
+        CheckClose(5f, a.magnitude, "and magnitude is its root");
+        CheckClose(11f, Vector2.Dot(new Vector2(1f, 2f), new Vector2(3f, 4f)), "Dot is the component sum of products");
+        CheckClose(25f, Vector2.SqrMagnitude(a), "the static form agrees with the property");
+        Check(Vector2.up.y == 1f && Vector2.down.y == -1f && Vector2.left.x == -1f && Vector2.right.x == 1f,
+            "the four direction constants point where their names say");
+        Check(float.IsPositiveInfinity(Vector2.positiveInfinity.x), "and the infinity constants are float infinities");
+        Vector2 mid = Vector2.LerpUnclamped(Vector2.zero, new Vector2(10f, 20f), 0.5f);
+        CheckClose(5f, mid.x, "LerpUnclamped halves");
+        CheckClose(10f, mid.y, "per component");
+        Vector2 clamped = Vector2.Min(new Vector2(1f, 5f), new Vector2(3f, 2f));
+        CheckClose(1f, clamped.x, "Min takes the smaller component");
+        CheckClose(2f, clamped.y, "on each axis");
+        CheckClose(6f, (new Vector2(2f, 3f) * new Vector2(3f, 2f)).x, "vector multiplication is component-wise");
+        CheckClose(1.5f, (new Vector2(3f, 4f) / new Vector2(2f, 2f)).x, "and division too");
+
+        Vector3 c = Vector3.Cross(new Vector3(1f, 0f, 0f), new Vector3(0f, 1f, 0f));
+        CheckClose(1f, c.z, "Cross of x and y is z");
+        CheckClose(32f, Vector3.Dot(new Vector3(1f, 2f, 3f), new Vector3(4f, 5f, 6f)), "Vector3.Dot sums the products");
+        CheckClose(9f, Vector3.SqrMagnitude(new Vector3(1f, 2f, 2f)), "and the squared length is the static one");
+        CheckClose(3f, Vector3.Magnitude(new Vector3(1f, 2f, 2f)), "with Magnitude its root");
+        Check(Vector3.forward.z == 1f && Vector3.back.z == -1f && Vector3.up.y == 1f,
+            "the Vector3 direction constants are the game's axes");
+        CheckClose(2f, Vector3.Scale(new Vector3(1f, 2f, 3f), new Vector3(2f, 1f, 1f)).x, "Scale multiplies per axis");
+
+        Color sum = new Color(0.1f, 0.2f, 0.3f, 0.4f) + new Color(0.1f, 0.1f, 0.1f, 0.1f);
+        CheckClose(0.2f, sum.r, "Color addition adds every channel");
+        CheckClose(0.5f, sum.a, "alpha included");
+        CheckClose(0.2f, (new Color(0.1f, 0.1f, 0.1f, 1f) * 2f).r, "a scalar scales the colour");
+        Color halfway = Color.Lerp(new Color(0f, 0f, 0f, 1f), new Color(1f, 0f, 0f, 1f), 0.5f);
+        CheckClose(0.5f, halfway.r, "Color.Lerp is the midpoint at half");
+        CheckClose(1f, Color.Lerp(new Color(0f, 0f, 0f, 1f), new Color(1f, 0f, 0f, 1f), 2f).r,
+            "and it clamps its t, unlike LerpUnclamped");
+        CheckClose(2f, Color.LerpUnclamped(new Color(0f, 0f, 0f, 1f), new Color(1f, 0f, 0f, 1f), 2f).r,
+            "which does not");
+
     }
 
     /// <summary>

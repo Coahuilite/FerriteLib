@@ -1355,6 +1355,26 @@ Paths and roles only; any line/file count here would be false within a day (see 
   the declared SURFACE, not the bytes: a rebuild changes the module id without changing what is declared, so
   a byte comparison would redden every clean build. `-SelfTest` now carries four fixture controls (the
   fourth: one copy at a stub path that is not the stubbed API).
+- **The value-type sweep (task-105, measured 2026-09-12).** The third member of the same family arrived the
+  loud way again - a consumer lane called `Rect.center`, the compile-time reference has it, the carrier stub
+  did not, and the failure named the member - so the fix became a sweep instead of one more member. The four
+  value types were compared against the reference assembly, and what could be verified is carried: Rect's
+  `xMin`/`yMin`/`xMax`/`yMax`/`min`/`max`/`size`/`center`; Vector2's and Vector3's direction and infinity
+  constants, magnitudes, `Dot`/`Cross`/`Min`/`Max`/`Scale`/`LerpUnclamped` and the component-wise operators;
+  Color's component-wise `+ - * /` and `Lerp`/`LerpUnclamped`. Each rule is the arithmetic its name states,
+  and every one is called and asserted by `KernelStubCoverageTests`, so the reference-driven gate owns them:
+  182 references (57 payload + 125 harness, was 94), stub types 50, unresolved 0, exemptions 0. **The not-carry
+  list is written on each type's comment, with reasons**: the epsilon guards (`normalized`/`Normalize`/
+  `ClampMagnitude`, the angle functions, every equality operator), the indexers, `Vector2`/`Vector3` implicit
+  conversions (they widen every overload set), `SmoothDamp*`, Rect's `Contains`/`Overlaps` (their
+  edge-inclusive rules are not readable) and its behaviour helpers, Color's luminance/sRGB/HSV members, and
+  the engine-internal ones. **The compiler corrected the sweep twice, and both corrections are rules:**
+  `Rect.left`/`top`/`right`/`bottom` are `[Obsolete]` aliases in the reference (carrying them would add
+  surface no lane can exercise without a warning, so the stub keeps the current names), and
+  `Color.RGBMultiplied`/`AlphaMultiplied` are carried by the reference but **not public** - the first sweep
+  listed members without checking visibility, which is exactly how unproven surface gets added. M13 removes
+  `Rect.center` and both the lane and the gate redden (`MISSING UnityEngine.CoreModule!UnityEngine.Rect::
+  get_center()`); green after the revert.
 - **The math family, and the door that made its gap loud (task-101, measured 2026-09-12).** A consumer's
   circle drawing called `Mathf.Sqrt`, which this stub did not declare. The trip guard named the member and
   the call path instead of swapping the element for a recovery band, and the consumer shipped a different

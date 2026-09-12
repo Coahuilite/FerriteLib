@@ -16,6 +16,47 @@ public struct Vector2
 
     public static Vector2 one => new(1f, 1f);
 
+    public static Vector2 up => new(0f, 1f);
+
+    public static Vector2 down => new(0f, -1f);
+
+    public static Vector2 left => new(-1f, 0f);
+
+    public static Vector2 right => new(1f, 0f);
+
+    public static Vector2 positiveInfinity => new(float.PositiveInfinity, float.PositiveInfinity);
+
+    public static Vector2 negativeInfinity => new(float.NegativeInfinity, float.NegativeInfinity);
+
+    public float sqrMagnitude => x * x + y * y;
+
+    public float magnitude => (float)System.Math.Sqrt(sqrMagnitude);
+
+    // Definition-based value arithmetic. NOT carried: normalized/Normalize/ClampMagnitude (all defined
+    // through a magnitude-under-epsilon guard the stripped reference cannot show, and the zero-vector answer
+    // is exactly where a guess would show), Angle/SignedAngle (the same guarded acos form), the indexer
+    // (component order is documented, not readable here), the implicit Vector2<->Vector3 conversions (they
+    // widen every overload set a consumer calls, and nothing references them), the equality operators (the
+    // epsilon question) and SmoothDamp* (a state machine).
+    public static float Dot(Vector2 a, Vector2 b) => a.x * b.x + a.y * b.y;
+
+    public static float SqrMagnitude(Vector2 a) => a.sqrMagnitude;
+
+    public static Vector2 LerpUnclamped(Vector2 a, Vector2 b, float t)
+    {
+        return new Vector2(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+    }
+
+    public static Vector2 Min(Vector2 a, Vector2 b) => new(System.Math.Min(a.x, b.x), System.Math.Min(a.y, b.y));
+
+    public static Vector2 Max(Vector2 a, Vector2 b) => new(System.Math.Max(a.x, b.x), System.Math.Max(a.y, b.y));
+
+    public static Vector2 Scale(Vector2 a, Vector2 b) => new(a.x * b.x, a.y * b.y);
+
+    public static Vector2 operator *(Vector2 a, Vector2 b) => new(a.x * b.x, a.y * b.y);
+
+    public static Vector2 operator /(Vector2 a, Vector2 b) => new(a.x / b.x, a.y / b.y);
+
     public static float Distance(Vector2 a, Vector2 b)
     {
         float dx = a.x - b.x;
@@ -69,6 +110,53 @@ public struct Vector3
     public static Vector3 zero => new(0f, 0f, 0f);
 
     public static Vector3 one => new(1f, 1f, 1f);
+
+    public static Vector3 up => new(0f, 1f, 0f);
+
+    public static Vector3 down => new(0f, -1f, 0f);
+
+    public static Vector3 left => new(-1f, 0f, 0f);
+
+    public static Vector3 right => new(1f, 0f, 0f);
+
+    public static Vector3 forward => new(0f, 0f, 1f);
+
+    public static Vector3 back => new(0f, 0f, -1f);
+
+    public static Vector3 positiveInfinity => new(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+
+    public static Vector3 negativeInfinity => new(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+
+    // Same exclusions as Vector2 (normalized, Angle/SignedAngle, indexer, implicit conversions, equality
+    // operators, SmoothDamp*), and here also Project/Reflect/Slerp/RotateTowards, whose rules are guarded
+    // or iterative. What is carried is the arithmetic defined by its own name.
+    public static float Dot(Vector3 a, Vector3 b) => a.x * b.x + a.y * b.y + a.z * b.z;
+
+    public static float SqrMagnitude(Vector3 a) => a.sqrMagnitude;
+
+    public static float Magnitude(Vector3 a) => a.magnitude;
+
+    public static Vector3 Cross(Vector3 a, Vector3 b)
+    {
+        return new Vector3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+    }
+
+    public static Vector3 Min(Vector3 a, Vector3 b)
+    {
+        return new Vector3(System.Math.Min(a.x, b.x), System.Math.Min(a.y, b.y), System.Math.Min(a.z, b.z));
+    }
+
+    public static Vector3 Max(Vector3 a, Vector3 b)
+    {
+        return new Vector3(System.Math.Max(a.x, b.x), System.Math.Max(a.y, b.y), System.Math.Max(a.z, b.z));
+    }
+
+    public static Vector3 Scale(Vector3 a, Vector3 b) => new(a.x * b.x, a.y * b.y, a.z * b.z);
+
+    public static Vector3 LerpUnclamped(Vector3 a, Vector3 b, float t)
+    {
+        return new Vector3(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t);
+    }
 
     public float sqrMagnitude => x * x + y * y + z * z;
 
@@ -148,6 +236,26 @@ public struct Rect
     public float yMax => _y + _height;
 
     public Vector2 position => new(_x, _y);
+
+    // The rest of the value family (task-105): pure reads of the four stored numbers, so each rule is the
+    // arithmetic it names and nothing else. NOT carried from Rect, with reasons: Contains/Overlaps (their
+    // edge-inclusive rules are not in the stripped reference, and a wrong boundary silently changes a hit
+    // test), the equality operators (the epsilon question), the four OBSOLETE aliases (the reference marks
+    // left/top/right/bottom [Obsolete] in favour of xMin/yMin/xMax/yMax, and the stub carries the current
+    // names so a consumer calling an alias gets the same compiler warning here as in the game, which is why
+    // no lane can exercise them), and MinMaxRect/OrderMinMax/NormalizedToPoint/
+    // PointToNormalized/Set (behaviour over authored numbers, referenced by nothing).
+    public float xMin => _x;
+
+    public float yMin => _y;
+
+    public Vector2 min => new(_x, _y);
+
+    public Vector2 max => new(_x + _width, _y + _height);
+
+    public Vector2 size => new(_width, _height);
+
+    public Vector2 center => new(_x + _width * 0.5f, _y + _height * 0.5f);
 }
 
 public struct Color
@@ -198,6 +306,40 @@ public struct Color
     public static Color gray => new(0.5f, 0.5f, 0.5f, 1f);
 
     public static Color grey => new(0.5f, 0.5f, 0.5f, 1f);
+
+    // Component-wise colour arithmetic, defined by its own name. NOT carried: grayscale and
+    // maxColorComponent (their exact reduction is not in the stripped reference), linear/gamma (the sRGB
+    // conversion), the HSV pair (long documented formulas would be a from-memory port), the Vector4
+    // implicit conversions (Vector4 is not stubbed at all), the equality operators (the epsilon
+    // question) and RGBMultiplied/AlphaMultiplied (the reference carries them but they are not public
+    // there, so they are not surface a consumer can call).
+    // question).
+    public static Color operator +(Color a, Color b) => new(a.r + b.r, a.g + b.g, a.b + b.b, a.a + b.a);
+
+    public static Color operator -(Color a, Color b) => new(a.r - b.r, a.g - b.g, a.b - b.b, a.a - b.a);
+
+    public static Color operator *(Color a, Color b) => new(a.r * b.r, a.g * b.g, a.b * b.b, a.a * b.a);
+
+    public static Color operator *(Color a, float s) => new(a.r * s, a.g * s, a.b * s, a.a * s);
+
+    public static Color operator *(float s, Color a) => a * s;
+
+    public static Color operator /(Color a, float s) => new(a.r / s, a.g / s, a.b / s, a.a / s);
+
+    public static Color Lerp(Color a, Color b, float t)
+    {
+        float clamped = Mathf.Clamp01(t);
+        return new Color(
+            a.r + (b.r - a.r) * clamped,
+            a.g + (b.g - a.g) * clamped,
+            a.b + (b.b - a.b) * clamped,
+            a.a + (b.a - a.a) * clamped);
+    }
+
+    public static Color LerpUnclamped(Color a, Color b, float t)
+    {
+        return new Color(a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t, a.a + (b.a - a.a) * t);
+    }
 }
 
 public static class Mathf
