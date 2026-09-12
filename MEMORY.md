@@ -1339,6 +1339,46 @@ Paths and roles only; any line/file count here would be false within a day (see 
   (`Clamp(long, long, long)`) -> the scan still reds, so it matches signatures and not names. **M6 failed
   the first time, and the reason is a rule**: that run changed the stub *source* and ran the scan without
   rebuilding, so the scan read the old stub DLL and reported OK - the scan's inputs are built assemblies.
+- **The stub scan was merging copies, and a partial rebuild turned that into a false green (measured
+  2026-09-12, reported by the author of the consumer-side task).** Each stub project references the ones
+  below it, so `bin/stubs` also holds copy-local duplicates - `verse/`, `unityengine-imgui/` and
+  `unityengine-textrendering/` each carry their own `UnityEngine.CoreModule.dll` - and the scan merged every
+  same-named file it found. Delete a member, rebuild ONE stub project, and the deleted member survived in a
+  stale copy: the scanner committed at `f629e1a` printed `OK: every member ... is declared by the stub` on
+  exactly that tree (M8), while the harness was free to load bytes that no longer matched the stub source.
+  The scan now indexes the canonical file of each assembly - the OutputPath of the project that builds it, a
+  rule list, not a walk - and compares every other copy, including the four files beside the harness
+  executable that the runtime actually loads, against that canonical surface: missing members, extra members
+  and a file at a stub path that declares a different assembly are all reported. After the fix the same M8
+  tree exits 2 with `MISSING UnityEngine.CoreModule!UnityEngine.Color::get_black()` and four `DIVERGED`
+  copies naming `extra UnityEngine.Color::get_black()`, and a full rebuild is green again. The comparison is
+  the declared SURFACE, not the bytes: a rebuild changes the module id without changing what is declared, so
+  a byte comparison would redden every clean build. `-SelfTest` now carries four fixture controls (the
+  fourth: one copy at a stub path that is not the stubbed API).
+- **The pure-helper batch (task-97, measured 2026-09-12).** Eight members a consumer's filters and labels
+  call, whose bodies were read from the game's own source rather than remembered: `GenText.NullOrEmpty` and
+  `GenText.SanitizeFilename` (Source/Verse/GenText.cs:326-334, platform invalid set plus a fixed tail, runs
+  collapsed, trailing dots trimmed), `GenCollection.Any<T>(List<T>, Predicate<T>)` and its `Count`
+  (GenCollection.cs:1032 and :1224), `TaggedString`'s three concatenations (TaggedString.cs:130-145),
+  `FloatRange.One` (FloatRange.cs:15) and `Translator.TryTranslate` (Translator.cs:27-45). One deliberate
+  deviation is documented in the double: the game's no-active-language branch logs an error and reports
+  SUCCESS with the key echoed, while the double's language data is its resolver, so found means the resolver
+  produced text - mirroring the quirk would make every lookup in a harness read as found. Measured after the
+  batch: stub types 50, payload 57 references, harness 72 (was 59), 129 in total, unresolved 0, exemptions 0.
+  M9 removes `GenCollection.Any` and both the lane (`MissingMethodException`) and the scan
+  (`MISSING Assembly-CSharp!Verse.GenCollection::Any(...)^1`) redden; green after the revert.
+- **A member whose semantics cannot be verified stays missing, and that is the ruling (maintainer ruling
+  2026-09-12).** The double does not carry the comparison operators on vectors or colours. In the game they
+  compare through an epsilon; a reference assembly ships stripped method bodies, so that rule cannot be read
+  from the artifact this repo gates on, and a guessed epsilon would silently change which branch a lane
+  takes. A missing member fails loudly (the trip guard when a lane drives it, then the reference-driven
+  scan); a guessed one lies quietly, and for a comparison the lie is worse than the throw. The evidence path
+  when a consumer genuinely needs it: the installed game's own `UnityEngine.CoreModule.dll` carries the real
+  implementation, so the epsilon can be read out of it and pinned by a lane - until then, not carried.
+- **Every stub member a lane calls is taken over by the gate (the other half of the same ruling).** A member
+  added to the double is not left as a declaration: `KernelStubCoverageTests` calls it and asserts its
+  semantics, which forces the harness to reference it, which is what puts it under the reference-driven scan
+  permanently. Adding coverage is therefore a two-part act - declare it, then be seen using it.
 - **The double's language/constant batch (task-95, measured 2026-09-12).** Of the 188 members a consumer's
   built payload takes from the four stub-replaced game assemblies and this stub did not declare, the ones
   that carry no game logic are now declared, because every consumer hits them and none of them needed a

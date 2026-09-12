@@ -35,6 +35,7 @@ internal static class KernelStubCoverageTests
         Run("The stub's Rect insets behave the way the game's do", VerifyStubSemantics);
         Run("The stub carries the integer overloads a consumer calls", VerifyIntegerOverloads);
         Run("The stub's language and constant members behave the way the game's do", VerifyLanguageAndConstants);
+        Run("The stub's pure game helpers behave the way the game's do", VerifyPureHelpers);
         Run("A page calling a game inset draws instead of recovering", VerifyConsumerShapedCallDraws);
         Run("The trip guard fires on a planted trip (positive control)", VerifyGuardFiresOnAPlantedTrip);
         Run("The guard's deliberate switch is explicit and works", VerifyDeliberateSwitch);
@@ -74,6 +75,73 @@ internal static class KernelStubCoverageTests
 
         CheckClose(-90f, new Rect(0f, 0f, 100f, 50f).ContractedBy(95f).width,
             "an inset past the extent goes negative rather than being clamped");
+    }
+
+    /// <summary>
+    /// The pure-helper batch (2026-09-12, task-97): members whose bodies were read from the game's own
+    /// source and that depend on nothing but their arguments - the two GenText string predicates, the two
+    /// GenCollection list helpers, TaggedString concatenation, FloatRange.One, and Translator's lookup
+    /// contract. Each is asserted rather than trusted, and asserting them here is also what makes this lane
+    /// reference them, which is what puts them under the reference-driven gate permanently.
+    /// </summary>
+    private static void VerifyPureHelpers()
+    {
+        Check(((string?)null).NullOrEmpty(), "GenText.NullOrEmpty accepts a null receiver");
+        Check("".NullOrEmpty(), "and an empty string");
+        Check(!"x".NullOrEmpty(), "and calls a real string non-empty");
+
+        // Characters from the fixed tail, not from the platform's set: the assertion must not depend on the
+        // platform the harness runs on, while the platform set is exactly what the double inherits from the
+        // game rather than inventing.
+        Check(GenText.SanitizeFilename("a?b*c|d") == "a_b_c_d",
+            "SanitizeFilename collapses runs of invalid characters into one underscore");
+        Check(GenText.SanitizeFilename("name...") == "name", "and trims trailing dots the way the game does");
+        Check(GenText.SanitizeFilename("clean-name") == "clean-name", "and leaves a clean name alone");
+
+        List<int> numbers = new() { 1, 2, 3, 4 };
+        Check(numbers.Any(n => n > 3), "GenCollection.Any finds a matching element");
+        Check(!numbers.Any(n => n > 4), "and reports none when nothing matches");
+        Check(numbers.Count(n => n % 2 == 0) == 2, "GenCollection.Count counts the matches");
+        Check(numbers.Count(n => n > 4) == 0, "and counts zero when nothing matches");
+
+        TaggedString left = new("left");
+        TaggedString right = new("right");
+        Check((left + right).RawText == "leftright", "TaggedString concatenation joins the raw texts");
+        Check(("prefix" + left).RawText == "prefixleft", "and accepts a string on the left");
+        Check((left + "suffix").RawText == "leftsuffix", "and on the right");
+
+        Check(FloatRange.One.min == 1f && FloatRange.One.max == 1f, "FloatRange.One is a range of exactly one");
+
+        string key = "neutral.test.key";
+        bool found = key.TryTranslate(out TaggedString missing);
+        Check(!found && missing.RawText == key, "a key the language data does not hold is not found and echoes itself");
+
+        bool empty = "".TryTranslate(out TaggedString emptyResult);
+        Check(!empty && emptyResult.RawText == "", "an empty key is not found either");
+
+        // The stub's language-data hook is a stub-only member, so this lane cannot name it - the harness
+        // compiles against the game's reference assembly - and reaches it the way this repo reads its other
+        // stub-only recorders: through reflection. What is asserted is still the product-facing contract,
+        // namely what TryTranslate answers for a key the data does and does not hold.
+        System.Reflection.FieldInfo? resolver = typeof(Translator).GetField(
+            "Resolve",
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+        Check(resolver != null, "the stub's language-data hook is reachable for a lane to drive");
+        if (resolver != null)
+        {
+            object? previous = resolver.GetValue(null);
+            try
+            {
+                resolver.SetValue(null, (Func<string, string>)(candidate => candidate == key ? "resolved text" : candidate));
+                bool resolved = key.TryTranslate(out TaggedString text);
+                Check(resolved && text.RawText == "resolved text",
+                    "and a key the language data holds is found, carrying its text");
+            }
+            finally
+            {
+                resolver.SetValue(null, previous);
+            }
+        }
     }
 
     /// <summary>

@@ -40,7 +40,8 @@
   Exit codes:
     0 = scanned, and every referenced member resolves or is exempted with a reason.
     2 = scanned, and at least one reference does not: unresolved member(s), stale exemption(s), an
-        exemption without a reason, or a self-test fixture that did not behave.
+        exemption without a reason, a copy of a stub assembly that does not match its canonical file, or
+        a self-test fixture that did not behave.
     3 = NOT SCANNED: the inputs were unusable (no payload, no harness build, no stub assembly, no xref at
         all, no exemption table, no metadata reader). Never reported as clean.
 #>
@@ -150,29 +151,46 @@ function Open-Reader([string]$file) {
 if (-not (Test-Path -LiteralPath $StubsDir -PathType Container)) {
     Stop-NotScanned ('the stub directory does not exist: ' + $StubsDir + ' (build the harness first: dotnet build tools/FerriteLib.UiKit.Tests)')
 }
-$stubFiles = @(Get-ChildItem -Path $StubsDir -Recurse -Filter '*.dll' -ErrorAction SilentlyContinue | Sort-Object FullName)
-if ($stubFiles.Count -eq 0) {
-    Stop-NotScanned ('no stub assembly under ' + $StubsDir + ': an absent stub surface cannot be read as covered')
+
+# The CANONICAL file of each stub assembly - the OutputPath of the project that builds it - and the rule
+# that every other copy must carry the same surface.
+#
+# Why a path map rather than a recursive file walk (measured 2026-09-12, reported by the author of the
+# consumer-side task): each stub project references the ones below it, so bin/stubs also holds copy-local
+# duplicates - verse/, unityengine-imgui/ and unityengine-textrendering/ each carry their own
+# UnityEngine.CoreModule.dll. The first version of this scan MERGED every same-named file it found, so a
+# partial rebuild (one project rebuilt after a member was deleted) left the deleted member alive in a stale
+# copy: the scan stayed GREEN while the canonical stub no longer declared it, and the harness was free to
+# load the stale bytes. Indexing the canonical file only is the fix; comparing every other copy against it
+# is what makes a partial rebuild loud instead of merely unmourned.
+$CanonicalStubFiles = [ordered]@{
+    'Assembly-CSharp'                 = 'verse/Assembly-CSharp.dll'
+    'UnityEngine.CoreModule'          = 'unityengine/UnityEngine.CoreModule.dll'
+    'UnityEngine.IMGUIModule'         = 'unityengine-imgui/UnityEngine.IMGUIModule.dll'
+    'UnityEngine.TextRenderingModule' = 'unityengine-textrendering/UnityEngine.TextRenderingModule.dll'
 }
 
-# The assemblies this harness replaces with a stub (FerriteLib.UiKit.Tests.csproj builds exactly these
-# four into bin/stubs and copies them beside the test assembly). This list is the RULE, deliberately not
-# derived from what the stub happens to declare: deriving it - caught by self-test fixture 1 on its first
-# run, 2026-09-12 - made a stub set missing one whole assembly read as nothing to check instead of
-# everything missing, which is the silent-green shape this tool exists for.
-$ReplacedAssemblies = @(
-    'Assembly-CSharp',                   # Stubs/VerseStub
-    'UnityEngine.CoreModule',            # Stubs/UnityEngineStub
-    'UnityEngine.IMGUIModule',           # Stubs/UnityEngineImGuiStub
-    'UnityEngine.TextRenderingModule'    # Stubs/UnityEngineTextRenderingModuleStub
-)
+# The assemblies this harness replaces with a stub. This list is the RULE, deliberately not derived from
+# what the stub happens to declare: deriving it - caught by self-test fixture 1 on its first run,
+# 2026-09-12 - made a stub set missing one whole assembly read as nothing to check instead of everything
+# missing, which is the silent-green shape this tool exists for.
+$ReplacedAssemblies = @($CanonicalStubFiles.Keys)
 
-$stubAssemblies = New-Object System.Collections.Generic.List[string]
-$stubTypes = @{}
-foreach ($file in $stubFiles) {
-    $reader = Open-Reader $file.FullName
+function Find-HarnessAssembly {
+    foreach ($configuration in @('Release', 'Dev')) {
+        foreach ($extension in @('.exe', '.dll')) {
+            $candidate = Join-Path $root ('tools/FerriteLib.UiKit.Tests/bin/' + $configuration + '/net472/FerriteLib.UiKit.Tests' + $extension)
+            if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+        }
+    }
+    return $null
+}
+
+function Read-StubSurface([string]$file) {
+    # One assembly file -> @{ Name; Types }, Types being type name -> declared method/field key sets.
+    $reader = Open-Reader $file
     $assemblyName = $reader.Md.GetString($reader.Md.GetAssemblyDefinition().Name)
-    if (-not $stubAssemblies.Contains($assemblyName)) { [void]$stubAssemblies.Add($assemblyName) }
+    $types = @{}
     foreach ($handle in $reader.Md.TypeDefinitions) {
         $typeName = [FlStubCoverageProvider]::TypeName($reader.Md, $handle)
         $definition = $reader.Md.GetTypeDefinition($handle)
@@ -186,28 +204,106 @@ foreach ($file in $stubFiles) {
             $field = $reader.Md.GetFieldDefinition($fieldHandle)
             [void]$fields.Add([FlStubCoverageProvider]::FieldKey($reader.Md.GetString($field.Name), $field.DecodeSignature($provider, $null)))
         }
-        $key = $assemblyName + '!' + $typeName
-        if (-not $stubTypes.ContainsKey($key)) {
-            $stubTypes[$key] = @{ Methods = $methods; Fields = $fields }
-        } else {
-            foreach ($one in $methods) { [void]$stubTypes[$key].Methods.Add($one) }
-            foreach ($one in $fields) { [void]$stubTypes[$key].Fields.Add($one) }
-        }
+        $types[$typeName] = @{ Methods = $methods; Fields = $fields }
     }
     $reader.Pe.Dispose()
     $reader.Stream.Dispose()
+    return @{ Name = $assemblyName; Types = $types }
+}
+
+function Compare-StubSurface($canonical, $copy) {
+    # Readable differences between two surfaces of the same assembly, canonical-relative. The comparison is
+    # the declared surface, not the bytes: rebuilding a stub project changes its module id without changing
+    # what it declares, so a byte comparison would redden every clean build and teach nobody anything.
+    $problems = New-Object System.Collections.Generic.List[string]
+    foreach ($typeName in $canonical.Types.Keys) {
+        if (-not $copy.Types.ContainsKey($typeName)) { [void]$problems.Add('missing type ' + $typeName); continue }
+        foreach ($one in $canonical.Types[$typeName].Methods) { if (-not $copy.Types[$typeName].Methods.Contains($one)) { [void]$problems.Add('missing ' + $typeName + '::' + $one) } }
+        foreach ($one in $canonical.Types[$typeName].Fields) { if (-not $copy.Types[$typeName].Fields.Contains($one)) { [void]$problems.Add('missing ' + $typeName + '::' + $one) } }
+    }
+    foreach ($typeName in $copy.Types.Keys) {
+        if (-not $canonical.Types.ContainsKey($typeName)) { [void]$problems.Add('extra type ' + $typeName); continue }
+        foreach ($one in $copy.Types[$typeName].Methods) { if (-not $canonical.Types[$typeName].Methods.Contains($one)) { [void]$problems.Add('extra ' + $typeName + '::' + $one) } }
+        foreach ($one in $copy.Types[$typeName].Fields) { if (-not $canonical.Types[$typeName].Fields.Contains($one)) { [void]$problems.Add('extra ' + $typeName + '::' + $one) } }
+    }
+    return $problems
+}
+
+$stubAssemblies = New-Object System.Collections.Generic.List[string]
+$stubTypes = @{}
+$canonicalPaths = @{}
+$canonicalSurfaces = @{}
+foreach ($assemblyName in $ReplacedAssemblies) {
+    $file = Join-Path $StubsDir $CanonicalStubFiles[$assemblyName]
+    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { continue }
+    $surface = Read-StubSurface $file
+    if ($surface.Name -ne $assemblyName) {
+        Stop-NotScanned ('the canonical file for ' + $assemblyName + ' at ' + $file + ' declares assembly ' + $surface.Name + ': the stub layout is not the one this scan reads (see the path map in this script)')
+    }
+    $canonicalPaths[$assemblyName] = $file
+    $canonicalSurfaces[$assemblyName] = $surface
+    [void]$stubAssemblies.Add($assemblyName)
+    foreach ($typeName in $surface.Types.Keys) {
+        $key = $assemblyName + '!' + $typeName
+        if (-not $stubTypes.ContainsKey($key)) {
+            $stubTypes[$key] = @{ Methods = $surface.Types[$typeName].Methods; Fields = $surface.Types[$typeName].Fields }
+        } else {
+            foreach ($one in $surface.Types[$typeName].Methods) { [void]$stubTypes[$key].Methods.Add($one) }
+            foreach ($one in $surface.Types[$typeName].Fields) { [void]$stubTypes[$key].Fields.Add($one) }
+        }
+    }
+}
+if ($stubAssemblies.Count -eq 0) {
+    Stop-NotScanned ('none of the four canonical stub files exists under ' + $StubsDir + ' (expected verse/Assembly-CSharp.dll, unityengine/UnityEngine.CoreModule.dll, unityengine-imgui/UnityEngine.IMGUIModule.dll, unityengine-textrendering/UnityEngine.TextRenderingModule.dll): an absent stub surface cannot be read as covered')
+}
+
+# The copy-local duplicates above, and the four files beside the harness executable that the runtime
+# actually loads, must declare the canonical surface: nothing missing (a partial rebuild would let the
+# harness load bytes that no longer match the stub source) and nothing extra (that stale copy is exactly
+# how a deleted member used to survive this scan).
+$copyDivergence = New-Object System.Collections.Generic.List[string]
+$copiesChecked = 0
+$copyDirs = New-Object System.Collections.Generic.List[string]
+[void]$copyDirs.Add($StubsDir)
+$harnessAssembly = Find-HarnessAssembly
+if ($harnessAssembly) {
+    $harnessDir = Split-Path -Parent $harnessAssembly
+    if (-not $copyDirs.Contains($harnessDir)) { [void]$copyDirs.Add($harnessDir) }
+}
+foreach ($dir in $copyDirs) {
+    foreach ($file in @(Get-ChildItem -Path $dir -Recurse -Filter '*.dll' -ErrorAction SilentlyContinue | Sort-Object FullName)) {
+        $isCanonical = $false
+        foreach ($path in $canonicalPaths.Values) { if ($path -eq $file.FullName) { $isCanonical = $true; break } }
+        if ($isCanonical) { continue }
+        try { $surface = Read-StubSurface $file.FullName } catch {
+            foreach ($canonicalName in $CanonicalStubFiles.Values) {
+                if ((Split-Path -Leaf $canonicalName) -eq $file.Name) {
+                    [void]$copyDivergence.Add($file.FullName + ' cannot be read as a managed assembly (' + $_.Exception.Message + '), yet it carries the file name of a canonical stub')
+                }
+            }
+            continue
+        }
+        # The file name at a stub path promises an assembly: a copy that declares a different one means the
+        # bytes a runtime resolves from that path are not the stubbed API at all.
+        $promisedAssembly = $null
+        foreach ($pair in $canonicalPaths.GetEnumerator()) {
+            if ((Split-Path -Leaf $pair.Value) -eq $file.Name) { $promisedAssembly = $pair.Key; break }
+        }
+        if ($promisedAssembly -and $surface.Name -ne $promisedAssembly) {
+            [void]$copyDivergence.Add($file.FullName + ' carries the file name of ' + $promisedAssembly + ' but declares assembly ' + $surface.Name + ', so the bytes a runtime resolves from that path are not the stubbed API')
+            continue
+        }
+        if (-not $canonicalSurfaces.ContainsKey($surface.Name)) { continue }
+        $copiesChecked++
+        $differences = @(Compare-StubSurface $canonicalSurfaces[$surface.Name] $surface)
+        if ($differences.Count -gt 0) {
+            $sample = (@($differences | Select-Object -First 5)) -join '; '
+            [void]$copyDivergence.Add($file.FullName + ' declares ' + $surface.Name + ' but differs from the canonical ' + $canonicalPaths[$surface.Name] + ' in ' + $differences.Count + ' place(s): ' + $sample)
+        }
+    }
 }
 
 # ------------------------------------------------------------------------- the targets (what must resolve)
-function Find-HarnessAssembly {
-    foreach ($configuration in @('Release', 'Dev')) {
-        foreach ($extension in @('.exe', '.dll')) {
-            $candidate = Join-Path $root ('tools/FerriteLib.UiKit.Tests/bin/' + $configuration + '/net472/FerriteLib.UiKit.Tests' + $extension)
-            if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
-        }
-    }
-    return $null
-}
 
 $targets = New-Object System.Collections.Generic.List[string]
 $payload = Join-Path $root '1.6/Assemblies/FerriteLib.UiKit.dll'
@@ -340,7 +436,9 @@ foreach ($key in ($exempt.Keys | Sort-Object)) {
 }
 
 # ------------------------------------------------------------------------------------------ the report
-Write-Host ('[stub-coverage] stub assemblies: ' + $stubAssemblies.Count + ' (' + ($stubAssemblies -join ', ') + '), indexed types: ' + $stubTypes.Count)
+$canonicalRelative = @($canonicalPaths.Values | ForEach-Object { $_.Replace($StubsDir, '').TrimStart([System.IO.Path]::DirectorySeparatorChar, '/') })
+Write-Host ('[stub-coverage] canonical stub files: ' + $stubAssemblies.Count + '/' + $ReplacedAssemblies.Count + ' (' + ($canonicalRelative -join ', ') + '), indexed types: ' + $stubTypes.Count)
+Write-Host ('[stub-coverage] copies compared against the canonical surface: ' + $copiesChecked + ' (copy-local duplicates and the files beside the harness executable)')
 $unstubbed = @($ReplacedAssemblies | Where-Object { -not $stubAssemblies.Contains($_) })
 if ($unstubbed.Count -gt 0) {
     Write-Host ('[stub-coverage] and with no stub at all, so every reference to them is unresolved: ' + ($unstubbed -join ', '))
@@ -370,6 +468,12 @@ if ($unreasoned.Count -gt 0) {
     foreach ($key in $unreasoned) { Write-Host ('[stub-coverage]   NO-REASON ' + $key) }
     Write-Host '[stub-coverage] Every exemption must say why the member may stay out of the stub; write it after the | separator.'
 }
+if ($copyDivergence.Count -gt 0) {
+    $failed = $true
+    Write-Host ('[stub-coverage] FAIL: ' + $copyDivergence.Count + ' copy of a stub assembly does not match the canonical file:')
+    foreach ($one in $copyDivergence) { Write-Host ('[stub-coverage]   DIVERGED ' + $one) }
+    Write-Host '[stub-coverage] A copy that differs is what a partial rebuild leaves behind: one stub project was rebuilt and the others still hold the previous surface, so this scan cannot tell which bytes the harness will load. Rebuild all four together (dotnet build tools/FerriteLib.UiKit.Tests -c Release) or delete bin/stubs and build again. Never edit a copy by hand.'
+}
 if (-not $failed -and -not $SelfTest) {
     Write-Host ('[stub-coverage] OK: every member the scanned assemblies take from a stub-replaced game assembly is declared by the stub (' + $totalReferences + ' reference(s), ' + $exempt.Count + ' exemption(s)).')
 }
@@ -382,8 +486,12 @@ if ($SelfTest) {
         # Fixture 1: the stub set without Assembly-CSharp. The scan must not only fail, it must name a
         # Verse member: this is the sensitivity control (the tree decides the verdict, not the script).
         $noVerse = Join-Path $fixtureRoot 'stubs-without-assembly-csharp'
-        New-Item -ItemType Directory -Path $noVerse | Out-Null
-        Get-ChildItem -Path $StubsDir -Recurse -Filter '*.dll' | Where-Object { $_.Name -ne 'Assembly-CSharp.dll' } | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $noVerse $_.Name) -Force }
+        foreach ($assemblyName in $ReplacedAssemblies) {
+            if ($assemblyName -eq 'Assembly-CSharp') { continue }
+            $destination = Join-Path $noVerse $CanonicalStubFiles[$assemblyName]
+            New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+            Copy-Item -LiteralPath (Join-Path $StubsDir $CanonicalStubFiles[$assemblyName]) -Destination $destination -Force
+        }
         $output1 = (& pwsh -NoProfile -File $PSCommandPath -Path $root -StubsDir $noVerse -Exemptions $Exemptions 2>&1 | Out-String)
         $code1 = $LASTEXITCODE
         $names = ($output1 -match 'MISSING Assembly-CSharp!')
@@ -419,8 +527,36 @@ if ($SelfTest) {
             $failed = $true
         }
 
+        # Fixture 4: the canonical set plus one copy-local duplicate built from other sources. That is the
+        # shape a partial rebuild leaves behind, and the shape this scan used to MERGE into a green: the
+        # copy must be reported, never averaged in.
+        $divergent = Join-Path $fixtureRoot 'stubs-with-divergent-copy'
+        foreach ($assemblyName in $ReplacedAssemblies) {
+            $destination = Join-Path $divergent $CanonicalStubFiles[$assemblyName]
+            New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+            Copy-Item -LiteralPath (Join-Path $StubsDir $CanonicalStubFiles[$assemblyName]) -Destination $destination -Force
+        }
+        # The decoy is another real stub assembly copied under this one's file name: no compiler needed, and
+        # it is the exact shape of the mistake this rule exists for (bytes at a stub path that are not the
+        # stubbed API). A same-assembly copy with a different SURFACE is the partial-rebuild shape, and that
+        # one is covered by the mutation control this script's history records instead of by a fixture, since
+        # a second build of the same assembly cannot be produced inside a fixture without a compiler.
+        $decoy = Join-Path $divergent 'unityengine-imgui/UnityEngine.CoreModule.dll'
+        Copy-Item -LiteralPath (Join-Path $StubsDir 'unityengine-imgui/UnityEngine.IMGUIModule.dll') -Destination $decoy -Force
+        if (Test-Path -LiteralPath $decoy -PathType Leaf) {
+            $output4 = (& pwsh -NoProfile -File $PSCommandPath -Path $root -StubsDir $divergent -Exemptions $Exemptions 2>&1 | Out-String)
+            $code4 = $LASTEXITCODE
+            $reported = ($output4 -match 'DIVERGED')
+            if ($code4 -eq 2 -and $reported) {
+                Write-Host '[stub-coverage] self-test fixture 4 (one copy at a stub path is not the stubbed API): exit 2 and names the diverged copy - wrong bytes under a stub file name are reported, never merged into a green.'
+            } else {
+                Write-Host ('[stub-coverage] SELF-TEST FAILED: fixture 4 exited ' + $code4 + ' (expected 2) and reported-a-divergence=' + $reported)
+                $failed = $true
+            }
+        }
+
         if (-not $failed) {
-            Write-Host '[stub-coverage] OK: the scan is armed and tree-sensitive (3 fixture controls).'
+            Write-Host '[stub-coverage] OK: the scan is armed and tree-sensitive (4 fixture controls).'
         }
     } finally {
         Remove-Item -LiteralPath $fixtureRoot -Recurse -Force -ErrorAction SilentlyContinue

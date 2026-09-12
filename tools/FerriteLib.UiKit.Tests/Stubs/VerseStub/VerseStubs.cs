@@ -48,6 +48,9 @@ public struct FloatRange
     public float min;
     public float max;
 
+    // The game's own definition, read from Source/Verse/FloatRange.cs:15 - a range of exactly one.
+    public static FloatRange One => new FloatRange(1f, 1f);
+
     public FloatRange(float min, float max)
     {
         this.min = min;
@@ -79,6 +82,24 @@ public struct TaggedString
     public static implicit operator TaggedString(string str)
     {
         return new TaggedString(str);
+    }
+
+    // Concatenation, verbatim from Source/Verse/TaggedString.cs:130-145: the raw texts join and the result
+    // is a new tagged string. The game keeps both directions and the string operands, so the double does,
+    // and a lane can tell the three apart because the raw text is observable.
+    public static TaggedString operator +(TaggedString t1, TaggedString t2)
+    {
+        return new TaggedString(t1.rawText + t2.rawText);
+    }
+
+    public static TaggedString operator +(string t1, TaggedString t2)
+    {
+        return new TaggedString(t1 + t2.rawText);
+    }
+
+    public static TaggedString operator +(TaggedString t1, string t2)
+    {
+        return new TaggedString(t1.rawText + t2);
     }
 
     public override string ToString()
@@ -123,10 +144,93 @@ public readonly struct NamedArgument
 /// key lookups behave like the real language database, so production widgets can be measured against
 /// the exact strings a player would see.
 /// </summary>
+/// <summary>
+/// The two string predicates a consumer reaches for constantly. Both bodies are the game's own, read from
+/// Source/Verse/GenText.cs (NullOrEmpty is an extension there too, and SanitizeFilename composes the
+/// platform's invalid set with a fixed tail before collapsing runs and trimming trailing dots). The double
+/// calls the same BCL member for the platform set, so it inherits the same platform dependence rather than
+/// inventing one.
+/// </summary>
+public static class GenText
+{
+    public static bool NullOrEmpty(this string str)
+    {
+        return string.IsNullOrEmpty(str);
+    }
+
+    public static string SanitizeFilename(string str)
+    {
+        // The game writes ToArray() there because that file already imports System.Linq; ToCharArray is the
+        // same char sequence without dragging a using directive in for one call.
+        return string.Join("_", str.Split(GetInvalidFilenameCharacters().ToCharArray(), StringSplitOptions.RemoveEmptyEntries)).TrimEnd('.');
+    }
+
+    private static string GetInvalidFilenameCharacters()
+    {
+        return new string(System.IO.Path.GetInvalidFileNameChars()) + "/\\{}<>:*|!@#$%^&*?";
+    }
+}
+
+/// <summary>
+/// The two list helpers a consumer's filters call. Bodies read from Source/Verse/GenCollection.cs:1032 and
+/// :1224 - <c>Any</c> is <c>FindIndex != -1</c> and <c>Count</c> walks the list - so both can be carried
+/// exactly; they depend on nothing but their arguments.
+/// </summary>
+public static class GenCollection
+{
+    public static bool Any<T>(this List<T> list, Predicate<T> predicate)
+    {
+        return list.FindIndex(predicate) != -1;
+    }
+
+    public static int Count<T>(this List<T> list, Predicate<T> predicate)
+    {
+        int num = 0;
+        for (int i = 0; i < list.Count; i++)
+        {
+            if (predicate(list[i]))
+            {
+                num++;
+            }
+        }
+        return num;
+    }
+}
+
 public static class Translator
 {
     /// <summary>Optional resolver: key to displayed text. Null keeps the pass-through behaviour.</summary>
     public static Func<string, string>? Resolve;
+
+    /// <summary>
+    /// The game's lookup contract (Source/Verse/Translator.cs:27-45): an empty key is not found and echoes
+    /// itself; a found key returns the language's text. The double's language data IS
+    /// <see cref="Resolve" />, so found means the resolver produced text. Two deviations are deliberate and
+    /// named here: the game logs an error and reports SUCCESS when no language is active (mirroring that
+    /// would make every lookup in a harness read as found), and the double never logs.
+    /// </summary>
+    public static bool TryTranslate(this string key, out TaggedString result)
+    {
+        if (key.NullOrEmpty())
+        {
+            result = key;
+            return false;
+        }
+
+        Func<string, string>? resolver = Resolve;
+        if (resolver != null)
+        {
+            string? text = resolver(key);
+            if (text != null)
+            {
+                result = new TaggedString(text);
+                return true;
+            }
+        }
+
+        result = new TaggedString(key);
+        return false;
+    }
 
     public static TaggedString Translate(this string key)
     {
