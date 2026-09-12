@@ -34,6 +34,7 @@ public readonly struct UiOverflowReport
         Needed = needed;
         Available = available;
         RectWidth = rectWidth;
+        TextLength = (text ?? "").Length;
     }
 
     public string ElementPath { get; }
@@ -54,6 +55,21 @@ public readonly struct UiOverflowReport
     /// too narrow. Diagnostic only — the shipped usdiag record does not carry it.
     /// </summary>
     public float RectWidth { get; }
+
+    /// <summary>
+    /// Length of the overflowing text in UTF-16 code units, and the second of the two non-content
+    /// discriminators this record carries (the other is <see cref="RectWidth"/>).
+    /// <para>
+    /// <b>Why a length instead of the text.</b> A finding outside any element scope is attributed to
+    /// <c>"(unscoped)"</c>, and a caller that must not put UI text into a log — the prudent default for
+    /// a record another mod's diagnostic pipeline may ship — is then left unable to say which of several
+    /// on-screen strings produced it. Length plus rect width is enough to pin that down in practice: a
+    /// twenty-four unit literal, a thirteen unit translation and a twenty-six unit literal are three
+    /// different findings, and the width axis only fires for labels their owner declared single-line.
+    /// Neither field is content, so adding them does not change what a record may safely carry.
+    /// </para>
+    /// </summary>
+    public int TextLength { get; }
 }
 
 /// <summary>
@@ -198,7 +214,13 @@ public static class UiFitAudit
         currentPath = string.Empty;
     }
 
-    /// <summary>Marks the element whose draw pass is about to run. Called by the layout pass only.</summary>
+    /// <summary>
+    /// Marks the element whose draw pass is about to run. The layout pass calls it per arranged entry, and
+    /// the window shell calls it for the text it draws outside the page tree — its chrome and the notice
+    /// band, under <c>&lt;windowType&gt;/chrome</c> and <c>&lt;windowType&gt;/notice</c> — because those
+    /// labels have no element identity of their own and an <c>"(unscoped)"</c> finding cannot say which of
+    /// two open windows produced it.
+    /// </summary>
     public static void BeginElement(string elementPath)
     {
         if (!Enabled) return;

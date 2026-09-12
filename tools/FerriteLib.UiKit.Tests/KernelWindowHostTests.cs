@@ -33,6 +33,8 @@ internal static class KernelWindowHostTests
             VerifyUnmetPrerequisiteBlocksHostCreation();
             VerifyWidgetFailureIsRecoveredBelowTheShell();
             VerifyCloseAffordanceClosesTheWindow();
+            VerifyCloseAffordanceSizesToItsText();
+            VerifyShellTextIsScopedNotUnscoped();
             VerifyPreCloseDisposesTheOwnedHost();
             VerifyWindowSizeComesOnlyFromTheProvider();
             VerifyZeroMarginLeavesTheContentInsetToTheShell();
@@ -154,6 +156,116 @@ internal static class KernelWindowHostTests
             "and it is right-aligned inside the shell's padding");
     }
 
+    /// <summary>
+    /// The shell's close label is the consumer's string, so its box follows the text instead of a constant:
+    /// a consumer whose wording or translation grows must not be clipped by the shell's own geometry. The
+    /// samples are neutral on purpose — a long ASCII label and a CJK label, nothing from any consumer — and
+    /// the same <see cref="ITextMetrics"/> ruler the fit audit uses is the one the shell measures with.
+    /// </summary>
+    private static void VerifyCloseAffordanceSizesToItsText()
+    {
+        const string LongAscii = "close the window and return to the previous screen";
+        const string Cjk = "关闭窗口并返回上一个界面";
+
+        var ruler = new StubMetrics();
+
+        var ascii = new TestWindow(LaneScope()) { CloseLabel = LongAscii, Ruler = ruler };
+        Check(ascii.CloseSize.x >= ruler.MeasureWidth(LongAscii, UiFont.Tiny),
+            "a long ASCII label fits inside the affordance the shell sized for it");
+        Check(ascii.CloseSize.x > 110f,
+            "which is wider than the constant this shell used to ship (got " + ascii.CloseSize.x + ")");
+
+        var cjk = new TestWindow(LaneScope()) { CloseLabel = Cjk, Ruler = ruler };
+        Check(cjk.CloseSize.x >= ruler.MeasureWidth(Cjk, UiFont.Tiny),
+            "a CJK label gets a box measured by the same ruler, not a Latin-length estimate");
+        Check(cjk.CloseSize.x > 110f, "and that label is wider than the old constant too");
+
+        var brief = new TestWindow(LaneScope()) { CloseLabel = "close", Ruler = ruler };
+        Check(brief.CloseSize.x == 110f && brief.CloseSize.y == 30f,
+            "a short label keeps the shipped 110 x 30 look");
+
+        const float Fixed = 40f;
+        var pinned = new TestWindow(LaneScope()) { CloseLabel = LongAscii, Ruler = ruler, FixedCloseSize = new Vector2(Fixed, 20f) };
+        Check(pinned.CloseSize.x == Fixed,
+            "a consumer override still replaces the whole computation");
+
+        // End to end: the rect the label is handed is the sized one, and the audit that watches that label
+        // finds nothing to report — the two halves of the same ruler, so they cannot disagree.
+        var reports = new List<UiOverflowReport>();
+        UiFitAudit.Attach(ruler, reports.Add);
+        UiFitAudit.Reset();
+        UiFitAudit.Enabled = true;
+
+        var drawn = new TestWindow(LaneScope()) { CloseLabel = LongAscii, Ruler = ruler };
+        drawn.windowRect = new Rect(0f, 0f, 900f, 700f);
+        UiNative.ButtonOverride = rect =>
+        {
+            drawn.CloseRects.Add(rect);
+            return false;
+        };
+        drawn.WindowOnGUI();
+
+        Check(drawn.CloseRects.Count == 1 && drawn.CloseRects[0].width >= ruler.MeasureWidth(LongAscii, UiFont.Tiny),
+            "the drawn affordance is at least as wide as the measured label");
+        Check(reports.Count == 0,
+            "and the fit audit reports no finding for it (got " + reports.Count + ")");
+
+        ResetSeams();
+        UiFitAudit.Detach();
+    }
+
+    /// <summary>
+    /// The shell's own text carries its own identity. Two windows can be on screen at once, so an
+    /// "(unscoped)" finding about chrome or a notice cannot say which window produced it; the shell is what
+    /// knows, and this holds that it says so for both bands it draws.
+    /// </summary>
+    private static void VerifyShellTextIsScopedNotUnscoped()
+    {
+        string longTitle = new string('t', 60);
+        string longNotice = new string('n', 60);
+
+        var reports = new List<UiOverflowReport>();
+        UiFitAudit.Attach(new StubMetrics(), reports.Add);
+        UiFitAudit.Reset();
+        UiFitAudit.Enabled = true;
+
+        var window = new TestWindow(LaneScope()) { TitleText = longTitle, NoticeText = longNotice };
+        window.windowRect = new Rect(0f, 0f, 200f, 600f);
+        window.WindowOnGUI();
+
+        Check(ScopedReports(reports, "/chrome").Count >= 1,
+            "a chrome finding names the window and the band it came from");
+        Check(!reports.Exists(r => r.ElementPath == "(unscoped)"),
+            "and nothing the shell drew is left unattributed");
+
+        UiFitAudit.Reset();
+        var blocked = new TestWindow(LaneScope()) { Prerequisite = false, NoticeText = longNotice };
+        blocked.windowRect = new Rect(0f, 0f, 200f, 600f);
+        blocked.WindowOnGUI();
+
+        Check(ScopedReports(reports, "/notice").Count >= 1,
+            "a notice finding is attributed to the shell's notice band");
+        Check(!reports.Exists(r => r.ElementPath == "(unscoped)"),
+            "with no unscoped leftover from the notice pass either");
+
+        ResetSeams();
+        UiFitAudit.Detach();
+    }
+
+    private static List<UiOverflowReport> ScopedReports(List<UiOverflowReport> reports, string suffix)
+    {
+        var scoped = new List<UiOverflowReport>();
+        foreach (UiOverflowReport report in reports)
+        {
+            if (report.ElementPath.EndsWith(suffix, StringComparison.Ordinal))
+            {
+                scoped.Add(report);
+            }
+        }
+
+        return scoped;
+    }
+
     private static void VerifyPreCloseDisposesTheOwnedHost()
     {
         var window = new TestWindow(LaneScope());
@@ -270,18 +382,32 @@ internal static class KernelWindowHostTests
         public Rect ContentRect;
         public string FailureText = "";
 
+        public string CloseLabel = "close";
+        public string TitleText = "title";
+        public string NoticeText = "";
+        public ITextMetrics Ruler = new StubMetrics();
+        public Vector2? FixedCloseSize;
+
         public bool SessionAlive => observedSession != null && observedSession.IsActive;
+
+        /// <summary>The affordance size the shell computes; the lane reads it the way the shell does.</summary>
+        public Vector2 CloseSize => CloseButtonSize;
 
         public bool LastFailureMentionsPlantedError
             => FailureText.IndexOf("planted window host failure", StringComparison.Ordinal) >= 0;
 
         protected override UiTheme Theme => UiTheme.DarkGold;
 
-        protected override string Title => "title";
+        /// <summary>The same ruler the lane hands the fit audit, so the shell and the audit cannot disagree.</summary>
+        protected override ITextMetrics Metrics => Ruler;
+
+        protected override Vector2 CloseButtonSize => FixedCloseSize ?? base.CloseButtonSize;
+
+        protected override string Title => TitleText;
 
         protected override string Subtitle => "subtitle";
 
-        protected override string CloseText => "close";
+        protected override string CloseText => CloseLabel;
 
         protected override bool PrerequisiteVerified => Prerequisite;
 
@@ -308,6 +434,9 @@ internal static class KernelWindowHostTests
         {
             Notices.Add(notice);
             FailureText = LastFailure?.Message ?? "";
+            // The notice body is consumer text, but the shell is what calls it — that is the case this
+            // lane needs: an empty body is silent, a long one is a finding the shell must attribute.
+            UiThemeDraw.Label(rect, NoticeText, Theme, singleLine: true);
         }
 
         protected override void BeforeDraw(Rect contentRect)
@@ -336,7 +465,10 @@ internal static class KernelWindowHostTests
     {
         public float MeasureText(string text, UiFont font, float width) => 16f;
 
-        public float MeasureWidth(string text, UiFont font) => text.Length * 7f;
+        // The shared half-width model, not a per-character constant: the chrome's label can be CJK, and a
+        // ruler that counted characters would size a wide-glyph label exactly like a narrow one — which is
+        // the mistake this lane exists to catch.
+        public float MeasureWidth(string text, UiFont font) => StubTextWidth.Of(text, font);
     }
 
     private sealed class StubTranslation : IUiTranslation

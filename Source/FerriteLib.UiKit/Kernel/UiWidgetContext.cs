@@ -4,7 +4,28 @@ using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
 
-/// <summary>Host-provided translation seam. RimWorld keys are resolved by the host adapter.</summary>
+/// <summary>
+/// Host-provided translation seam. RimWorld keys are resolved by the host adapter.
+/// <para>
+/// <b>A missing key is drawn as the key, and that is a policy rather than a gap.</b> The library owns no
+/// strings and cannot know which keys a consumer declared, so when a key resolves to nothing its only
+/// choice is between a blank label and the key the consumer asked for. It draws the key: a visible,
+/// slightly wrong word is diagnosable from a screenshot, while a blank rectangle has no author to blame.
+/// A host that prefers a placeholder, an empty string or a log entry is free to resolve unknown keys that
+/// way — this seam is the host's, and nothing in the library inspects the answer. The cost of the policy
+/// is real and should be written down rather than discovered: a missing key reads as a foreign-language
+/// word, not as a defect, and the library's own lanes cannot see a consumer's language files.
+/// </para>
+/// <para>
+/// <b>Where the check belongs, if a host wants one (dev-only).</b> Only the host knows both the keys it
+/// passes in and the language data that is actually loaded, so the self-check is the host's: at window
+/// creation, or once after the mod's start-up, resolve each key the chrome uses, compare the result with
+/// the key itself, and log the ones that came back equal — once per session, behind the development
+/// build's logging switch. Running it in a release build is how a diagnostic turns into noise; skipping
+/// it entirely is how a missing key reaches players as a foreign word, which is the failure this
+/// paragraph exists to make a decision instead of an accident.
+/// </para>
+/// </summary>
 public interface IUiTranslation
 {
     string Translate(string key);

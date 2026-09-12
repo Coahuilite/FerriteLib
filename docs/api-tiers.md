@@ -44,7 +44,13 @@ consequence is paid in the open rather than discovered by a stranger.
   font size.
 - `UiFont` — the font vocabulary every other seam names.
 - `UiKitFonts` — the one `UiFont` to `GameFont` mapping in the series.
-- `IUiTranslation` — the translation seam; the library owns no strings, and this is how it says so.
+- `IUiTranslation` — the translation seam; the library owns no strings, and this is how it says so. A
+  missing key is drawn as the key on purpose: the library's choice is between a blank label and the key the
+  consumer asked for, and it draws the key, because a visible wrong-ish word is diagnosable from a
+  screenshot while a blank rectangle has no author to blame. The cost is written down with the policy — the
+  library cannot see a consumer's language files, so the dev-only check ("resolve the keys my chrome uses,
+  log the ones that come back equal to the key") is the host's to run, and a host that prefers a
+  placeholder or an empty string is free to answer that way.
 - `IUiWidget` — the custom-kind interface; sixteen consumer kinds implement it, which is the only proven
   extension point the library has.
 - `UiWidgetRegistry` — kind registration carrying the per-kind attribute schema and label set; consumers
@@ -103,14 +109,24 @@ consequence is paid in the open rather than discovered by a stranger.
 - `UiLayoutSnapshot` — the measure-then-draw halves are exercised only by the harness; no wired consumer or
   the shell names them (`UiWindowHost` drives `DrawFrame`), so they either earn a cited use or go internal.
 - `UiWindowHost` — the largest freeze surface this library has ever shipped, landed before a second consumer
-  existed; provisional in a way a theme token is not.
+  existed; provisional in a way a theme token is not. The close affordance is sized from its own label by
+  default (`CloseButtonSize` = `max(110, measured label + padding)`, measured through the `Metrics`
+  seam a host also hands the fit audit) rather than from the fixed 110x30 box it used to ship, because the
+  label is the consumer's string and a library must not clip the wording it was handed; overriding the
+  property still replaces the computation. The shell's own text is attributed in the audit as
+  `<windowType>/chrome` and `<windowType>/notice` — the concrete type is the only identity the shell has
+  before it holds a manifest — so two windows on screen at once no longer produce indistinguishable
+  `(unscoped)` findings.
 - `UiWindowNotice` — the shell's notice vocabulary, same reason.
 - `LineChartWidget` — named by the consumer's own composition, so it cannot go internal yet; that use is
   also the specimen behind the tree-membership metric, and the debt list would rather it be a kind string.
 - `UiChartPointChange` — the typed drag result of `chart/line`, consumed by the attenuation editor today; it
   travels with that widget's shape, which the metric wants expressed as a kind plus bindings instead.
 - `UiOverflowReport` — the fit audit's overflow record, consumed by the wired consumer's own audit sink; its
-  fields follow the audit's entry attribution, which the identity layer changes.
+  fields follow the audit's entry attribution, which the identity layer changes. It carries two
+  **non-content discriminators** — `TextLength` and `RectWidth` (`RectWidth` was already there) — so a
+  finding outside any element scope is still decidable by a caller whose record may not carry UI text:
+  length separates the candidates, the rect width says which box the label was drawn into.
 
 - `UiSurfaceStyle` — a surface's (fill, border) pair; what the per-surface restructure replaces the single
   global border with, and what `UiTheme.BaseSurface` through `UiTheme.DangerSurface` hand back.
