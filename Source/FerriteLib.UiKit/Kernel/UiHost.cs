@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Verse;
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -25,6 +26,12 @@ public sealed class UiHost : IDisposable
     // only ever moves forward, so an issue is reported exactly once however many frames follow it.
     private int publishedDocumentIssues;
     private int publishedResolutionIssues;
+
+    // Test seam: lets FerriteLib.UiKit.Tests capture the dropped-style warning without a real game log,
+    // the same shape UiSessionGuard.LogWarningOverride already uses for recovery warnings.
+    internal static Action<string>? StyleWarningOverride;
+
+    private bool warnedDroppedStyleDocument;
 
     public UiHost(
         string source,
@@ -196,6 +203,7 @@ public sealed class UiHost : IDisposable
     private void PublishStyleIssues()
     {
         IReadOnlyList<UiStyleIssue> parseIssues = styleResolver.Document.Issues;
+        WarnIfStyleDocumentWasDropped(parseIssues);
         for (; publishedDocumentIssues < parseIssues.Count; publishedDocumentIssues++)
         {
             PublishStyleIssue(parseIssues[publishedDocumentIssues]);
@@ -205,6 +213,33 @@ public sealed class UiHost : IDisposable
         for (; publishedResolutionIssues < resolutionIssues.Count; publishedResolutionIssues++)
         {
             PublishStyleIssue(resolutionIssues[publishedResolutionIssues]);
+        }
+    }
+
+    /// <summary>
+    /// A whole style document that was refused - a missing or wrong <c>Schema</c>, a foreign root, invalid
+    /// XML - leaves the page drawing normally on defaults, so without a warning "I authored a density" and
+    /// "my density never applied" look exactly alike on screen. That is the silent behaviour change this
+    /// method exists to end: one Warning-level line per host, naming the section and the parser's own reason.
+    /// A partly-bad document is not this case (its readable rest still applies) and keeps the audit channel.
+    /// </summary>
+    private void WarnIfStyleDocumentWasDropped(IReadOnlyList<UiStyleIssue> parseIssues)
+    {
+        if (warnedDroppedStyleDocument) return;
+        if (parseIssues.Count == 0) return;
+        if (!styleResolver.Document.IsEmpty) return;
+
+        warnedDroppedStyleDocument = true;
+        string warning = "[FerriteLib.UiKit] the <Styles> section was dropped and none of its styles took "
+            + "effect (source '" + source + "'): " + parseIssues[0];
+
+        if (StyleWarningOverride != null)
+        {
+            StyleWarningOverride(warning);
+        }
+        else
+        {
+            Log.Warning(warning);
         }
     }
 

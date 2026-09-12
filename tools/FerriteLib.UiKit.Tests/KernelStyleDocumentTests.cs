@@ -29,6 +29,7 @@ internal static class KernelStyleDocumentTests
         Run("Inheritance is asymmetric: scheme/density inherit, roles do not", VerifyInheritanceAsymmetry);
         Run("A document is resolved before Measure and layout follows it", VerifyResolveBeforeMeasure);
         Run("Appearance failures fall back softly and loudly", VerifyFailSoftAndLoud);
+        Run("A dropped <Styles> section is loud, not silent", VerifyDroppedStylesSectionIsLoud);
         Run("Both file entries load what they promise", VerifyFileOrigins);
         Run("Clone copies values and never shares a store", VerifyCloneContract);
         ResetAudit();
@@ -212,6 +213,68 @@ internal static class KernelStyleDocumentTests
             "and that scope theme is its own bag, not the host's");
 
         UiFitAudit.Detach();
+    }
+
+    /// <summary>
+    /// The failure this lane exists for: a <c>&lt;Styles&gt;</c> section whose <c>Schema</c> is missing is
+    /// refused as a whole, so every value it carried - a density above all - silently does not apply while
+    /// the page draws on defaults. "Seen" is what gets asserted: one Warning-level line naming the section
+    /// and the parser's reason, with a correct document staying silent as the counter-example.
+    /// </summary>
+    private static void VerifyDroppedStylesSectionIsLoud()
+    {
+        var warnings = new List<string>();
+        UiHost.StyleWarningOverride = warnings.Add;
+        try
+        {
+            UiLayoutManifest dropped = UiLayoutManifest.Parse(
+                "<UiPage Schema=\"2\" Source=\"dropped-styles\">"
+                + "<Styles><Density Name=\"compact\"><Metric Token=\"RowHeight\" Value=\"20\"/></Density></Styles>"
+                + "<Widget Id=\"banner\" Kind=\"chrome/banner\" Text=\"x\" Height=\"30\"/>"
+                + "</UiPage>");
+
+            Check(dropped.Styles.IsEmpty,
+                "the section without Schema is still refused as a whole (schema semantics unchanged)");
+
+            using (UiHost host = new("dropped-styles", dropped, new UiBindings(), UiTheme.DarkGold,
+                new ModelMetrics(), new FixedTranslation()))
+            {
+                host.MeasureAndArrange(new Vector2(240f, 200f));
+            }
+
+            Check(warnings.Count > 0, "a dropped <Styles> section produces a warning instead of silence");
+
+            bool namesSection = false;
+            bool namesReason = false;
+            foreach (string warning in warnings)
+            {
+                if (warning.IndexOf("Styles", StringComparison.Ordinal) >= 0) namesSection = true;
+                if (warning.IndexOf("Schema", StringComparison.Ordinal) >= 0) namesReason = true;
+            }
+
+            Check(namesSection, "the warning names the section the author has to look at");
+            Check(namesReason, "and the reason the parser gave for dropping it");
+
+            // Counter-example: the same content with its Schema emits nothing (fail-soft must not be noisy).
+            warnings.Clear();
+            UiLayoutManifest good = UiLayoutManifest.Parse(
+                "<UiPage Schema=\"2\" Source=\"good-styles\">"
+                + "<Styles Schema=\"1\"><Density Name=\"compact\"><Metric Token=\"RowHeight\" Value=\"20\"/></Density></Styles>"
+                + "<Widget Id=\"banner\" Kind=\"chrome/banner\" Text=\"x\" Height=\"30\"/>"
+                + "</UiPage>");
+
+            using (UiHost host = new("good-styles", good, new UiBindings(), UiTheme.DarkGold,
+                new ModelMetrics(), new FixedTranslation()))
+            {
+                host.MeasureAndArrange(new Vector2(240f, 200f));
+            }
+
+            Check(warnings.Count == 0, "a document that parses stays silent");
+        }
+        finally
+        {
+            UiHost.StyleWarningOverride = null;
+        }
     }
 
     private static void VerifyFailSoftAndLoud()
