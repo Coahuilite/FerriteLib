@@ -217,8 +217,9 @@ internal static class KernelSmokeTests
         UiHost host2 = new("test", manifest, bindings2, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
 
         if (ReferenceEquals(host1.Session, host2.Session)) throw new Exception("Hosts share a session");
-        host1.Session.SetScrollPosition("scroll", new Vector2(1f, 2f));
-        if (host2.Session.ScrollPositions.ContainsKey("scroll")) throw new Exception("Session state leaked across hosts");
+        // Scroll state is keyed by node now; any node in host1's session proves the isolation claim.
+        host1.Session.SetScrollPosition(host1.Session.ActiveNode, new Vector2(1f, 2f));
+        if (host2.Session.ScrollPositions.Count != 0) throw new Exception("Session state leaked across hosts");
 
         host1.Close();
         if (host1.Session.IsActive) throw new Exception("Closed host session still active");

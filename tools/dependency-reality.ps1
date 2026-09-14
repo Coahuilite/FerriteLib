@@ -8,12 +8,32 @@
 #   (a) assembly-reference  the checked DLL's AssemblyRef table must name FerriteLib.UiKit
 #   (b) page-model contact  at least one MemberRef must target a page-model type, i.e. the mod actually
 #                           drives the declarative layer rather than only borrowing the theme helpers
-#   (c) chrome allowlist    every SOURCE file that calls the game's immediate-mode surface must appear
-#                           in the mod's declared ui-chrome allowlist (needs -SourceRoot + -Allowlist)
+#   (c) chrome allowlist    every SOURCE file that calls the game's immediate-mode surface, or the
+#                           library's context-free hit overload (UiNative.Button with one argument),
+#                           must appear in the mod's declared ui-chrome allowlist (needs -SourceRoot
+#                           + -Allowlist)
 #
 # Rule (c) is the same measurement as the library's own containment gate (see
 # tools/FerriteLib.UiKit.Tests/KernelContainmentTests.cs), applied to a consumer tree: raw backend calls
 # are not forbidden, but they are declared, counted and named, or they are a failure.
+#
+# The two halves of this metric share exactly one thing: the pattern set below. A term ratified on either
+# half - this rule, or the library's own containment lane - is added to both, or the halves stop
+# describing one boundary. The allowlists are NOT shared: each side rules on its own exemptions, so a file
+# sanctioned in one tree means nothing in the other, and syncing the entries would launder one side's
+# ruling into the other's boundary. `GenMapUI` is the term this rule carries for world-space labeling:
+# the library never draws it (map-layer rendering is a permanent non-goal there, so no allowance is filed
+# on that side), while a consumer that keeps an in-world marker declares it in its own ui-chrome
+# allowlist - counted, then exempted, never invisible.
+#
+# Who consumes this half, and where. Gate 9 of scripts/verify-local.ps1 runs `-SelfTest` and a fixture
+# control (a planted bare call outside the allowlist must fail the tool, the same tree with that file
+# allowlisted must pass), so this scan cannot rot silently while every other gate stays green. What gate 9
+# deliberately does NOT do is run rule (c) over the library's own Source/: bare `Widgets.` is the
+# game's class in a consumer tree but this library's own `Kernel.Widgets` namespace here, so the same
+# pattern flags 12 innocent registration lines (measured 2026-09-12) - running it there would mean
+# allowlisting a namespace, which is laundering, not measuring. The library's tree is covered by the
+# containment lane, with per-file symbol precision, inside gate 1.
 #
 # Usage:
 #   pwsh -NoProfile -File tools/dependency-reality.ps1 -Assembly <path-to-mod.dll> `
@@ -53,8 +73,20 @@ $PageModelTypes = @(
     'UiPopup'
 )
 
-# The game's immediate-mode surface, as qualified member accesses.
-$BackendPattern = '(?<![A-Za-z0-9_.])(UnityEngine\.|Verse\.)?(GUI|GUIUtility|Mouse|Text|VerseWidgets|Widgets|Event)\s*\.\s*[A-Za-z_][A-Za-z0-9_]*'
+# The shared pattern set: two families, one boundary. The first is raw contact with the game's
+# immediate-mode surface, as qualified member accesses. The second is the context-free hit overload
+# named by its owner - UiNative.Button with a single argument - the one library call that bypasses the
+# owned hit stack, so a call site that keeps it is declared or it is a failure. The two-argument form
+# (UiNative.Button(rect, ctx)) is the migration the contract asks for and must NOT fire.
+$BackendPatterns = @(
+    '(?<![A-Za-z0-9_.])(UnityEngine\.|Verse\.)?(GUI|GUIUtility|GenMapUI|Mouse|Text|VerseWidgets|Widgets|Event)\s*\.\s*[A-Za-z_][A-Za-z0-9_]*',
+    # Reach, measured 2026-09-12: catches a bare variable, an inline construction, one nested call, a cast,
+    # a qualified name and a comma inside the argument's own parentheses; refuses every two-argument form.
+    # It does NOT reach an argument that nests parenthesised calls two or more deep - a text pattern cannot
+    # recurse - and this scan is line by line, so a call split across lines escapes it too. The library's
+    # half runs the same term over whole-file code and carries the same note.
+    '(?<![A-Za-z0-9_])UiNative\s*\.\s*Button\s*\((?:[^,()]|\([^()]*\))*\)'
+)
 
 function Find-BackendCalls {
     param([string]$Root)
@@ -74,8 +106,16 @@ function Find-BackendCalls {
             $line = $lines[$i]
             $probe = $line.TrimStart()
             if ($probe.StartsWith('//')) { continue }
-            if ($probe -match $BackendPattern) {
-                $found.Add(("{0}:{1}" -f $file.FullName, ($i + 1)))
+            foreach ($pattern in $BackendPatterns) {
+                # -cmatch, not -match: PowerShell's -match is case-insensitive, so a local named `text`
+                # turned `text.Length` into a "Text." hit (measured 2026-09-12: 5 innocent files in the
+                # library's own tree). The library's half uses a .NET regex, which is case-sensitive, so
+                # an identical pattern text had two different meanings. This is the one place the shared
+                # vocabulary's semantics are decided; the self-test pins both directions.
+                if ($probe -cmatch $pattern) {
+                    $found.Add(("{0}:{1}" -f $file.FullName, ($i + 1)))
+                    break
+                }
             }
         }
     }
@@ -162,16 +202,50 @@ if ($SelfTest) {
             'class Planted { void M() { bool b = Verse.Mouse.IsOver(default); } }',
             '// Mouse.IsOver in a comment must not count'
         )
+        Set-Content -LiteralPath (Join-Path $sandbox 'PlantedWorldLabel.cs') -Encoding UTF8 -Value @(
+            'class PlantedWorldLabel { void M() { GenMapUI.DrawPawnLabel(default, "x", default); } }',
+            '// GenMapUI.DrawPawnLabel in a comment must not count'
+        )
+        Set-Content -LiteralPath (Join-Path $sandbox 'PlantedRawHit.cs') -Encoding UTF8 -Value @(
+            'class PlantedRawHit { void M(Rect r) { if (UiNative.Button(r)) { } } }',
+            '// UiNative.Button(r) in a comment must not count'
+        )
+        # The migration the contract asks for: the two-argument form must NOT be a hit, or the pattern
+        # would redden the answer it recommends.
+        Set-Content -LiteralPath (Join-Path $sandbox 'PlantedMigratedHit.cs') -Encoding UTF8 -Value @(
+            'class PlantedMigratedHit { void M(Rect r, UiWidgetContext ctx) { if (UiNative.Button(r, ctx)) { } } }'
+        )
+        # Case, and the reason it is a control: a local named text/mouse/event is not backend contact, and
+        # case-insensitive matching counted it as one until this self-test existed.
+        Set-Content -LiteralPath (Join-Path $sandbox 'PlantedLocals.cs') -Encoding UTF8 -Value @(
+            'class PlantedLocals { int M(string text, int mouseX) { return text.Length + mouseX; } }'
+        )
         $planted = @(Find-BackendCalls -Root $sandbox)
-        if ($planted.Count -ne 1) {
-            Write-Error "SELFTEST: expected exactly 1 planted backend call site, got $($planted.Count). The source scan is not trustworthy." -ErrorAction Continue
+        if ($planted.Count -ne 3) {
+            Write-Error "SELFTEST: expected exactly 3 planted boundary call sites, got $($planted.Count). The source scan is not trustworthy." -ErrorAction Continue
             exit 1
         }
         if (-not $planted[0].EndsWith(':1')) {
             Write-Error "SELFTEST: planted site was not reported on line 1: $($planted[0])" -ErrorAction Continue
             exit 1
         }
-        Write-Host "selftest ok: the source scan finds a planted call and ignores a comment"
+        if (-not ($planted | Where-Object { $_.EndsWith('PlantedWorldLabel.cs:1') })) {
+            Write-Error "SELFTEST: the shared in-world term (GenMapUI) did not fire on its planted site; the two halves of the metric would disagree about the boundary." -ErrorAction Continue
+            exit 1
+        }
+        if (-not ($planted | Where-Object { $_.EndsWith('PlantedRawHit.cs:1') })) {
+            Write-Error "SELFTEST: the context-free hit overload (UiNative.Button with one argument) did not fire on its planted site." -ErrorAction Continue
+            exit 1
+        }
+        if ($planted | Where-Object { $_.EndsWith('PlantedMigratedHit.cs:1') }) {
+            Write-Error "SELFTEST: the two-argument form (UiNative.Button(rect, ctx)) was reported; that is the migration the contract asks for, not a breach." -ErrorAction Continue
+            exit 1
+        }
+        if ($planted | Where-Object { $_.EndsWith('PlantedLocals.cs:1') }) {
+            Write-Error "SELFTEST: a local named text/mouse was reported as backend contact; the scan must be case-sensitive, like the library half's .NET regex." -ErrorAction Continue
+            exit 1
+        }
+        Write-Host "selftest ok: the source scan finds every planted shape (raw backend, the shared in-world term, the context-free hit overload), ignores comments and refuses the migrated two-argument form"
     }
     finally {
         Remove-Item -LiteralPath $sandbox -Recurse -Force -ErrorAction SilentlyContinue
@@ -230,10 +304,10 @@ if (-not [string]::IsNullOrWhiteSpace($SourceRoot)) {
     }
 
     if ($offending.Count -gt 0) {
-        $failures.Add("(c) undeclared raw backend call sites (" + $offending.Count + " file(s)): " + ($offending -join '; ') + ' — register them in the ui-chrome allowlist with a written ruling, or funnel them through the library')
+        $failures.Add("(c) undeclared boundary call sites (" + $offending.Count + " file(s)): " + ($offending -join '; ') + ' — register them in the ui-chrome allowlist with a written ruling (date, reason, what retires it), or funnel them through the library: raw backend contact goes through the seams, and the context-free hit overload takes the context instead')
     }
     else {
-        Write-Host ("raw backend call sites: " + $sites.Count + ", all inside the declared allowlist")
+        Write-Host ("boundary call sites: " + $sites.Count + ", all inside the declared allowlist")
     }
 }
 

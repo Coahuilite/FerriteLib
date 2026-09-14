@@ -25,6 +25,21 @@ public interface IUiBindings
 
     void Set<T>(string elementId, T value);
 
+    /// <summary>
+    /// Answers whether the value bound to <paramref name="elementId"/> may be written back through
+    /// <see cref="Set{T}"/>. A read-only binding is a value its owner publishes but does not accept
+    /// changes for, and without this query a widget cannot tell such an element from a writable one: it
+    /// draws the same control and only finds out by throwing, or by silently doing nothing while the
+    /// player clicks it.
+    /// <para>
+    /// A key with no value binding answers false. The question is "may this control write?", so anything
+    /// that cannot be shown writable answers no — the conservative direction, and the one that keeps an
+    /// unresolved element from presenting itself as usable. A null key is a caller error and throws, as
+    /// the rest of the surface does.
+    /// </para>
+    /// </summary>
+    bool IsWritable(string elementId);
+
     IReadOnlyList<T> GetOptions<T>(string elementId);
 
     void Invoke<T>(string actionId, T payload);

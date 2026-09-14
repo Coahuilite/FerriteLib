@@ -158,6 +158,13 @@ Each item is expected to delete a workaround, not add a layer.
       node object owning identity, state and dirty flags. Removes the path-aliasing hazard where two
       unnamed same-kind siblings share a path (`UiLayoutEngine` falls back to `Kind` when `Id` is empty,
       and `UiLayoutManifest` only enforces uniqueness for ids that are present).
+      **Progress 2026-09-11 -- first step landed** (`dfba792`, archived on `0.4.x`): stable element identity
+      (`UiNodeId`, declared index rather than visible index so Tab/Hidden toggles do not renumber), per-element
+      state keys, an ambient element scope restored in `finally`, and the two observation members
+      (`ActiveElement`, `HoverClaimElement`) with their retirement condition recorded in `api-tiers.md`. The
+      real node object -- identity plus state plus dirty flags in one type -- is the next step, together with
+      the string-keyed remnants this one deliberately left (`UiNative.GetControlId`, the popup owner key,
+      `SetScrollTarget`); the owned hit stack depends on the node step.
 - [ ] **A third operation on bindings: announce.** `IUiBindings` has get and set but no notification, so
       invalidation is a single global `ContentRevision` counter and its call sites are policed by
       reading source files and asserting on substrings. Give every key a revision, then delete
@@ -169,6 +176,12 @@ Each item is expected to delete a workaround, not add a layer.
       conversions are gone. What is left is `YieldsToCoveringPopup` (`UiNative.cs:259`, still called at
       `:115`) and the previous-frame `OpenPopupRect` reasoning, which still model one popup rather than a
       stack of overlapping surfaces.
+      **Trigger evidence added 2026-09-11 (lib-atoms, task-3 report, quoted):** popup yield is not in the
+      atoms -- `input/button`, like the existing `input/mode-row` and `input/stepper-slider`, calls
+      `UiNative.Button` directly, so a consumer that puts a button under an open popup can rediscover the
+      2026-09-04 click-theft class. The atom lane deliberately neither copied a second yield rule nor
+      widened `UiNative`'s public surface. Closing condition for this item: once the hit stack lands, every
+      element's yield behaviour must come from the stack, and no element may keep a private yield branch.
 - [x] **Fit-audit blind spots closed by round-1 item A (2026-09-07, this branch).** Both bypasses went:
       the engine's private `DrawLabel` and `StepperSliderWidget`'s copy now call `UiThemeDraw.Label`, so
       `UiFitAudit.Check` sees container titles and stepper glyphs, and `Label` can honestly be called the
@@ -216,17 +229,15 @@ Each item is expected to delete a workaround, not add a layer.
       a Host" claim the lane exists to hold. Cheapest fix: add `UiPopup` and mutate-test it the same way
       `UiWindowHost` was. Real fix, later: derive the page-model set from the types instead of a list
       nobody remembers to update.
-- [ ] Clean up `UiLayoutManifest.ParseFile`: it has no production caller. Either wire a real
-      load-from-disk path (which is the only thing that would make XML authoring worth its cost) or
-      delete it and the `Schema="2"` version slot with it. **The intent is written straight here because
-      this item's own wording had drifted it:** the requirement on XML is that it declares page layout and
-      composes the kinds the library already provides. Hot-adding a widget kind from data was never asked
-      for — the founding spec declined even that harder variant — so the fork is not "how do we hot-reload
-      components" but "who hands the library the manifest string". Today that is the consumer (US embeds it
-      as an assembly resource: `MEMORY.md` Charter), which is coherent and needs nothing from us. A disk
-      path would buy exactly one thing — editing layout without recompiling the consumer — and would then
-      owe an answer on where the file lives, when it is re-read, and what a parse failure shows a player.
-      Deleting the dead entry costs nothing and stops implying a capability nobody owns.
+- [ ] Wire `UiLayoutManifest.ParseFile` — the fork is settled by the style-document ruling (2026-09-10):
+      a standalone style document with its own loader makes "XML authoring without recompiling" a
+      library promise, so deleting the disk entry would strand the promise's structural half. The three
+      questions the old wording owed are answered by the same ruling's shape: where the file lives is
+      the consumer's call (nothing scans a directory — the consumer hands the path, as with any file it
+      owns); when it is re-read is at host creation only (no runtime mutation); and a parse failure is
+      appearance-class — the page renders with defaults, the fallback logged through the fit audit's
+      channel and exercised in a harness lane. Scope note: this item is the manifest loader the ruling
+      settles; the style document's own loader is the stage-3 sweep's, with the same policy.
 - [ ] **`Verse.Window`'s custom-drawing seam is unexamined.** The reference read recorded
       `Window(IWindowDrawing customWindowDrawing = null)` (`MEMORY.md`), i.e. the game's own window manager
       takes a drawing delegate. Whether Verse honours it is an IL-level question, and it is the only known
@@ -274,6 +285,11 @@ Each item is expected to delete a workaround, not add a layer.
       instead, so retiring a reachable name would push authors into C#. `section/header` is the exception, and
       the reason written down for it is that it duplicates the container's `Title` band, not that it is
       composite.
+      **Progress 2026-09-11 -- the atom half landed.** The five kinds exist (`bab3c07`..`2ce61ce`) and the
+      kind strings are now a contract: `text/wrapped`, `input/button`, `chrome/rule`, `input/slider`,
+      `input/number-field` (justifications and the one debt verdict: `MEMORY.md`). What remains of this
+      item is the second half -- re-express `chrome/banner` and `state/empty` over `text/wrapped` while
+      keeping their names -- and it is scheduled as its own slice, not folded into the atoms' commit.
 - [ ] **Bind the existing role vocabulary into the manifest; do not build a stylesheet.** The census is in
       `MEMORY.md`: the manifest's only visual knobs today are `Height`, `ButtonWidth`, `FieldWidth`, `Tab`
       and `Hidden`, while the roles already exist centrally as `UiStatusTone` (six values) behind
@@ -329,9 +345,14 @@ Each item is expected to delete a workaround, not add a layer.
       density inherit, roles do not, because a region marked danger makes everything inside it read as
       dangerous. Stage 4 shrinks accordingly — the region level is in scope now, the page level waits for a
       cited need; stage 5 (the `IUiBindings` writability read) ships with whichever change first needs a
-      `Disabled` producer. Cross-page sharing is explicitly **not** built: reuse rides the registry, not a
-      shared style document. Nor are the other non-goals: no selectors, no specificity, no `@media`, no
-      separate style file, no runtime mutation.
+      `Disabled` producer. Cross-page sharing was explicitly **not** built: reuse rides the registry, not
+      a shared style document. Nor are the other non-goals: no selectors, no specificity, no `@media`,
+      no runtime mutation. **Amended 2026-09-10, maintainer ruling: the page-level rule source is a
+      standalone style document with its own loader** (`MEMORY.md`, "The style surface is a standalone
+      document"), superseding "no separate style file"; the embedded `<Styles>` section remains legal
+      as the second text origin feeding the same document type, so there is still one parser and one
+      validation entry point. Document shape owes: the document type in `docs/api-tiers.md`, the
+      page-level precedence slot (which is what stage 4 was waiting for), and resolve-before-`Measure`.
       Validation policy for stage 3, per the failure ladder in `MEMORY.md` and the maintainer's ruling:
       structure stays fail-closed (page-fatal, bucket 2), appearance values go fail-soft — an unknown `Tone`
       falls back to the default treatment — and fail-soft must not mean silent: the fallback is logged,
@@ -368,6 +389,8 @@ Each item is expected to delete a workaround, not add a layer.
       while never instantiating it. What no lane can do is show real glyph advance, so this green says nothing
       to the coverage count in `MEMORY.md` — `AGENTS.md` "Our own demo is not consumption" is the rule that
       keeps the two claims apart.
+
+- [ ] **The 0.5.0 vocabulary expansion is now scheduled against a real consumer migration (maintainer directive 2026-09-14; the cross-repo board lives in the consumer workspace at `modding_documents/team-mode/task-decomposition-us-fl-board-zh.md`).** US's 0.5.x main goal is dissolving its **18 consumer-owned `us/*` kinds** into manifest subtrees. Three capabilities stand in the way and each is a vocabulary question, not a convenience: a **checkbox** (the consumer needs a two-level parent/child row pair), a **repeater / list template** (checklist, preset list, race layer, xenotype layer and the help catalog all render data-driven row sets, and the engine has no per-item template today), and a **tree kind** (`us/scope-tree` walks action -> mood -> factor). Per `AGENTS.md` "What earns a kind" the provenance already exists - the consumer was forced to hand-roll all three - but the shape must be decided before anything is registered, the kind must not be one only our own harness drives, and nothing starts before the second wired consumer has moved (TODO §2). **Scope note (maintainer, same day): the `ParseFile` wiring is a 0.5.x item, not 0.4.x** - the consumer's 0.4.x window was cut back to a single feature port and takes no source changes. The requirement it must satisfy is now stated precisely: a layout or style file edit must be visible **after reopening the window**, with no game restart and no recompile, while **adding or changing widget kinds is explicitly excluded from hot reload** (kinds are compiled). That is this library's own use/extend boundary with the use half moving from an assembly-embedded copy to a file on disk; the embedded copy remains the fallback, and `UiHost` already takes both entry points (`UiLayoutManifest` plus the optional `UiStyleDocument`) at construction, so no runtime tree mutation is required.
 
 ## 4. Deferred by decision, with the upgrade path written down
 
@@ -456,15 +479,16 @@ identity is created locally at upload time.
       and the amend-and-force-push instruction this item used to carry is superseded. Standing rule
       unchanged: re-run `-FullHistory` after any commit lands, because a clean tree says nothing about
       history — that is how this was caught at all.
-- [ ] **Release sequencing for the style sweep (reasoned 2026-09-10; `MEMORY.md`).** Cut `v0.3.0-rc1` from
-      the current tip — all three axes already read 0.3.0, the tree is clean, and both `verify-local` and the
-      full-history privacy scan are green — so that US's `[0.3.0, 0.4.0)` pin points at something
-      installable. Then open `0.4.x` for the leaf atoms plus the three style classes (per-surface scheme,
-      density, role tags) and the `UiTheme` restructure, bumping all three axes in one commit and
-      re-classifying every new public type in `docs/api-tiers.md`. US's re-pin to `[0.4.0, 0.5.0)` is a
-      cross-repo write: report it in a round, never edit it from this repository. The order is load-bearing,
-      not cosmetic — a second consumer wiring against 0.3.x before the restructure freezes the exact shape we
-      already know must break.
+- [~] **Release sequencing for the style sweep — first half done 2026-09-10.** `v0.3.0-rc1` is cut from
+      `main` at `6a92331` and published by CI with the prerelease flag correct, one asset, and
+      `/releases/latest` still 404 as the rc window requires; a local pack at the tag commit matched the
+      platform's digest byte-for-byte, which is the first real exercise of §5's cross-machine check rather
+      than a rehearsal. Second half is open: the `0.4.x` line now carries all three axes at 0.4.0 and holds
+      the leaf atoms plus the three style classes (per-surface scheme, density, role tags) and the `UiTheme`
+      restructure, and every new public type needs its `docs/api-tiers.md` classification in the same
+      commit. US's re-pin to `[0.4.0, 0.5.0)` is a cross-repo write — report it in a round, never edit it
+      here — and until that lands the sibling checkout has to stay on a 0.3-axis branch, because `Require`
+      will correctly refuse the pair.
 - [x] **Repository name ruled by the maintainer 2026-09-07: `FerriteLib`, PascalCase** — matching the
       series convention (`SqueakyRatkin`, `UniversalSqueaker`, both measured live on GitHub). The earlier
       "lowercase or a Linux runner breaks" argument is void on evidence: GitHub resolves owner/repo

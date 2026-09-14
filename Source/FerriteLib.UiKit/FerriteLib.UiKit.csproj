@@ -12,7 +12,7 @@
          the contract axis (FerriteLibVersion.Api) and the release axis (About.xml <modVersion>).
          FerriteLibVersionTests locks all three, because a published package whose label contradicts
          the DLL inside it is invisible to the two gates that only read the other two axes. -->
-    <VersionPrefix>0.3.0</VersionPrefix>
+    <VersionPrefix>0.4.0</VersionPrefix>
     <VersionSuffix>dev</VersionSuffix>
     <AssemblyVersion>$(VersionPrefix).0</AssemblyVersion>
     <FileVersion>$(VersionPrefix).0</FileVersion>

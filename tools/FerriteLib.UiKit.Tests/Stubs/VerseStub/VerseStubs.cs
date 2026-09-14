@@ -2,6 +2,23 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+// Harness stub, and part of the de-facto published shape: a consumer's kernel-host lane builds these
+// projects in place and copies them out of bin/stubs/<name>/ (AGENTS.md, "Build and verification").
+//
+// 2026-09-12: GenUI gained the Rect insets a consumer reaches for. The lesson is the reason this header
+// carries it: a stub missing one game member does not fail loudly - the call throws TypeLoadException at
+// JIT time, the session guard swaps that element for a recovery band, and a lane that only asserts
+// "the session is still alive" keeps passing while the product code under test never runs. Coverage in
+// the harness is "the element drew", never "the frame survived" (KernelStubCoverageTests is that rule
+// with a positive control, and KernelTripGuard is the assertion lanes call).
+//
+// 2026-09-11: Widgets.Label stopped being a no-op. It now appends three records - LabelRects,
+// LabelTexts and LabelColors (the colour the outlet had applied through GUI.color). Purely additive:
+// no existing member changed shape, nothing was removed, and the lists are only read by this repo's
+// own lanes through reflection. They exist because "which colour did this outlet write" is otherwise
+// unobservable in the harness, and that is exactly what the resolved-style lane's one-table
+// assertions have to check (KernelResolvedStyleTests, the four text outlets).
+
 namespace Verse;
 
 /// <summary>Executable stub for the Verse IMGUI types the UiKit test paths touch at runtime.</summary>
@@ -30,6 +47,9 @@ public struct FloatRange
 {
     public float min;
     public float max;
+
+    // The game's own definition, read from Source/Verse/FloatRange.cs:15 - a range of exactly one.
+    public static FloatRange One => new FloatRange(1f, 1f);
 
     public FloatRange(float min, float max)
     {
@@ -62,6 +82,24 @@ public struct TaggedString
     public static implicit operator TaggedString(string str)
     {
         return new TaggedString(str);
+    }
+
+    // Concatenation, verbatim from Source/Verse/TaggedString.cs:130-145: the raw texts join and the result
+    // is a new tagged string. The game keeps both directions and the string operands, so the double does,
+    // and a lane can tell the three apart because the raw text is observable.
+    public static TaggedString operator +(TaggedString t1, TaggedString t2)
+    {
+        return new TaggedString(t1.rawText + t2.rawText);
+    }
+
+    public static TaggedString operator +(string t1, TaggedString t2)
+    {
+        return new TaggedString(t1 + t2.rawText);
+    }
+
+    public static TaggedString operator +(TaggedString t1, string t2)
+    {
+        return new TaggedString(t1.rawText + t2);
     }
 
     public override string ToString()
@@ -106,10 +144,93 @@ public readonly struct NamedArgument
 /// key lookups behave like the real language database, so production widgets can be measured against
 /// the exact strings a player would see.
 /// </summary>
+/// <summary>
+/// The two string predicates a consumer reaches for constantly. Both bodies are the game's own, read from
+/// Source/Verse/GenText.cs (NullOrEmpty is an extension there too, and SanitizeFilename composes the
+/// platform's invalid set with a fixed tail before collapsing runs and trimming trailing dots). The double
+/// calls the same BCL member for the platform set, so it inherits the same platform dependence rather than
+/// inventing one.
+/// </summary>
+public static class GenText
+{
+    public static bool NullOrEmpty(this string str)
+    {
+        return string.IsNullOrEmpty(str);
+    }
+
+    public static string SanitizeFilename(string str)
+    {
+        // The game writes ToArray() there because that file already imports System.Linq; ToCharArray is the
+        // same char sequence without dragging a using directive in for one call.
+        return string.Join("_", str.Split(GetInvalidFilenameCharacters().ToCharArray(), StringSplitOptions.RemoveEmptyEntries)).TrimEnd('.');
+    }
+
+    private static string GetInvalidFilenameCharacters()
+    {
+        return new string(System.IO.Path.GetInvalidFileNameChars()) + "/\\{}<>:*|!@#$%^&*?";
+    }
+}
+
+/// <summary>
+/// The two list helpers a consumer's filters call. Bodies read from Source/Verse/GenCollection.cs:1032 and
+/// :1224 - <c>Any</c> is <c>FindIndex != -1</c> and <c>Count</c> walks the list - so both can be carried
+/// exactly; they depend on nothing but their arguments.
+/// </summary>
+public static class GenCollection
+{
+    public static bool Any<T>(this List<T> list, Predicate<T> predicate)
+    {
+        return list.FindIndex(predicate) != -1;
+    }
+
+    public static int Count<T>(this List<T> list, Predicate<T> predicate)
+    {
+        int num = 0;
+        for (int i = 0; i < list.Count; i++)
+        {
+            if (predicate(list[i]))
+            {
+                num++;
+            }
+        }
+        return num;
+    }
+}
+
 public static class Translator
 {
     /// <summary>Optional resolver: key to displayed text. Null keeps the pass-through behaviour.</summary>
     public static Func<string, string>? Resolve;
+
+    /// <summary>
+    /// The game's lookup contract (Source/Verse/Translator.cs:27-45): an empty key is not found and echoes
+    /// itself; a found key returns the language's text. The double's language data IS
+    /// <see cref="Resolve" />, so found means the resolver produced text. Two deviations are deliberate and
+    /// named here: the game logs an error and reports SUCCESS when no language is active (mirroring that
+    /// would make every lookup in a harness read as found), and the double never logs.
+    /// </summary>
+    public static bool TryTranslate(this string key, out TaggedString result)
+    {
+        if (key.NullOrEmpty())
+        {
+            result = key;
+            return false;
+        }
+
+        Func<string, string>? resolver = Resolve;
+        if (resolver != null)
+        {
+            string? text = resolver(key);
+            if (text != null)
+            {
+                result = new TaggedString(text);
+                return true;
+            }
+        }
+
+        result = new TaggedString(key);
+        return false;
+    }
 
     public static TaggedString Translate(this string key)
     {
@@ -281,12 +402,21 @@ public static class Widgets
     // Krafs ref assembly, so these are only accessible through reflection at runtime.
     public static readonly List<Rect> DrawBoxSolidRects = new();
     public static readonly List<Color> DrawBoxSolidColors = new();
+    // Label calls are recorded together with the colour the outlet had applied through GUI.color.
+    // The text colour a site resolves is otherwise invisible to the harness, and "which colour did
+    // this site write" is exactly what a one-table assertion has to observe.
+    public static readonly List<Rect> LabelRects = new();
+    public static readonly List<string> LabelTexts = new();
+    public static readonly List<Color> LabelColors = new();
     public static int ScrollViewDepth;
     public static int BeginScrollViewCalls;
     public static int EndScrollViewCalls;
 
     public static void Label(Rect rect, string text)
     {
+        LabelRects.Add(rect);
+        LabelTexts.Add(text ?? "");
+        LabelColors.Add(GUI.color);
     }
 
     public static void DrawBoxSolid(Rect rect, Color color)
@@ -380,6 +510,49 @@ public static class Widgets
     }
 }
 
+/// <summary>
+/// The game's Rect insets, because a consumer's page code reaches for them.
+/// <para>
+/// This type exists because of a measured hole, not for completeness (2026-09-12). A consumer drawing
+/// <c>rect.ContractedBy(8f)</c> called into <c>Verse.GenUI</c>, which this stub did not declare, so the
+/// call threw <c>TypeLoadException</c> at JIT time inside the harness; the session guard replaced that
+/// element with a recovery band and the consumer's lane - which asserted only that the session was still
+/// alive - stayed green for as long as the hole existed. In the game the same code draws, so nothing
+/// failed until somebody read a trip log. The member belongs to the game, so the stub is where it goes:
+/// a stub that lacks it makes the harness stop drawing the very code it claims to cover, and every later
+/// consumer pays the same tax.
+/// </para>
+/// <para>
+/// Semantics copied from the game's own <c>Verse/GenUI.cs</c> (read 2026-09-12 through the local RimWorld
+/// source index; <c>ContractedBy</c> at lines 578-586, <c>ExpandedBy</c> at 573-576): a plain four-side
+/// inset with no clamping, so a margin larger than half the extent produces a negative width or height,
+/// and a negative margin expands. The per-axis overload and <c>ExpandedBy</c> are that class's immediate
+/// neighbours and are included because they sit one lookup away from the same failure. What is *not*
+/// claimed: that these are the only members a consumer might need - the class is much larger, and the
+/// next missing one is found the same way, by a lane that asserts the element drew.
+/// </para>
+/// </summary>
+public static class GenUI
+{
+    /// <summary>Insets all four sides by <paramref name="margin"/>; no clamping, so a negative value expands.</summary>
+    public static Rect ContractedBy(this Rect rect, float margin)
+    {
+        return new Rect(rect.x + margin, rect.y + margin, rect.width - margin * 2f, rect.height - margin * 2f);
+    }
+
+    /// <summary>Per-axis inset: x and width by <paramref name="marginX"/>, y and height by <paramref name="marginY"/>.</summary>
+    public static Rect ContractedBy(this Rect rect, float marginX, float marginY)
+    {
+        return new Rect(rect.x + marginX, rect.y + marginY, rect.width - marginX * 2f, rect.height - marginY * 2f);
+    }
+
+    /// <summary>The game's mirror image: negative margins on the inset are growth here.</summary>
+    public static Rect ExpandedBy(this Rect rect, float marginX, float marginY)
+    {
+        return new Rect(rect.x - marginX, rect.y - marginY, rect.width + marginX * 2f, rect.height + marginY * 2f);
+    }
+}
+
 public static class Mouse
 {
     public static bool IsOver(Rect rect)
@@ -407,6 +580,19 @@ public static class Log
     public static void Message(string message)
     {
     }
+}
+
+/// <summary>
+/// The UI-scale surface a consumer's window clamp reads. The reference assembly declares these as two
+/// public static int FIELDS (verified against 1.6.4871), not as properties, so the double matches that
+/// shape and a lane can pin a viewport the way the game pins it at startup. Before this type existed,
+/// every read of it died in the harness only (task-95, the language/constant batch).
+/// </summary>
+public static class UI
+{
+    public static int screenWidth = 1920;
+
+    public static int screenHeight = 1080;
 }
 
 public sealed class LoadedLanguage

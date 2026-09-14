@@ -7,18 +7,17 @@ namespace FerriteLib.UiKit.Kernel;
 /// <summary>
 /// The single geometry-and-input primitive for dropdown-shaped popups. Every surface that opens a
 /// session popup over content must draw its option list through <see cref="DrawOptionList"/>: it is
-/// the only place that publishes the covered rect (<see cref="UiSession.SetPopupRect"/>), which is
-/// what lets <see cref="UiNative"/> make covered triggers yield, and the only place that applies the
-/// viewport clamp/flip rule (<see cref="RectFor"/>). A second copy of either rule is exactly how the
-/// consumer-side composite dropdowns shipped without them and let a covered trigger steal the click
-/// an option row was about to make.
+/// the only place that pushes a popup layer into the owned hit stack
+/// (<see cref="UiSession.PushHitLayer"/>), which is what makes anything under the popup yield the click,
+/// and the only place that applies the viewport clamp/flip rule (<see cref="RectFor"/>). A second copy
+/// of either rule is exactly how the consumer-side composite dropdowns shipped without them and let a
+/// covered trigger steal the click an option row was about to make.
 /// </summary>
 public static class UiPopup
 {
     /// <summary>Height of one option row; popup geometry and the fitting audit share this constant.</summary>
     public const float OptionHeight = 24f;
 
-    private const float TextPadding = 6f;
 
     /// <summary>
     /// Popup rect in Host window space: below the anchor when it fits, above it when it does not, and
@@ -69,9 +68,10 @@ public static class UiPopup
         if (options == null) throw new ArgumentNullException(nameof(options));
         if (onSelected == null) throw new ArgumentNullException(nameof(onSelected));
 
-        // Published for the *next* frame's content pass: a click on a popup row is delivered in a
-        // later frame than the one that drew the row, and only the triggers below can yield to it.
-        ctx.Session.SetPopupRect(popupRect);
+        // Push the popup as a hit layer: the stack is what makes a covered element yield, uniformly for
+        // every primitive, and the layer carries the owning element so the owner's own trigger keeps its
+        // toggle-to-close behaviour.
+        ctx.Session.PushHitLayer(ctx.Node ?? ctx.Session.ActiveNode, popupRect, isPopup: true);
         if (UiNative.Trace != null)
         {
             UiNative.Trace("publish id=" + elementId + " rect=" + UiNative.Describe(popupRect));
@@ -82,16 +82,16 @@ public static class UiPopup
         {
             Rect rowRect = new(popupRect.x, popupRect.y + i * OptionHeight, popupRect.width, OptionHeight);
             bool selected = string.Equals(options[i].Value, current, StringComparison.Ordinal);
-            UiThemeDraw.Surface(
-                rowRect,
-                ctx.Theme,
-                selected ? ctx.Theme.Selected : ctx.Theme.Raised,
-                selected ? ctx.Theme.AccentGold : ctx.Theme.Border);
+            // The same table the trigger field and the status outlets read: this row used to re-derive
+            // the mapping verbatim, which is the fourth copy the one-table rule exists to delete.
+            UiResolvedStyle style = ctx.Theme.Styles.Resolve(selected ? UiStatusTone.Active : UiStatusTone.Neutral);
+            float padding = ctx.Theme.Geometry.Padding;
+            UiThemeDraw.Surface(rowRect, style.Surface, ctx.Theme.Geometry.Hairline);
             UiThemeDraw.Label(
-                new Rect(rowRect.x + TextPadding, rowRect.y, rowRect.width - TextPadding * 2f, rowRect.height),
+                new Rect(rowRect.x + padding, rowRect.y, rowRect.width - padding * 2f, rowRect.height),
                 options[i].Key,
                 ctx.Theme,
-                selected ? ctx.Theme.TextOnGold : ctx.Theme.TextPrimary,
+                style.Text,
                 UiFont.Small,
                 TextAnchor.MiddleLeft,
                 singleLine: true);

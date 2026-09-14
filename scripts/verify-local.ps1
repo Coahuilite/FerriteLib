@@ -21,6 +21,13 @@ $ErrorActionPreference = "Stop"
 #   5   payload is content-free: no Defs, Patches, Languages, Sounds or Textures under 1.6
 #   6   LICENSE present and full MPL-2.0, with no applied incompatibility notice
 #   7   About.xml identity (packageId, modVersion present and parsable as a Version)
+#   8   runtime-resolvability trap scans: no call site uses a member the reference assembly advertises
+#       but the net472 runtime lacks, and no member the payload or the harness takes from a stub-replaced
+#       game assembly is missing from the harness stub (both compile green and both die at run time; the
+#       stub half is reference-driven with a written exemption table -- see each script's own header)
+#   9   the consumer half of the boundary metric is armed and tree-sensitive: rule (c) of
+#       tools/dependency-reality.ps1 fires on a planted bare call outside its allowlist, refuses the
+#       migrated two-argument form, and passes once that file is allowlisted (self-test + fixture)
 # -PackDev: after all checks pass, stage the dev folder (a directory, not an archive). Placing it
 #   in a game Mods directory is the developer's own step - no script here writes outside the repository.
 #   -PackZip also writes the dev zip; -PackNupkg also writes the consumer reference package. Both are
@@ -46,14 +53,38 @@ function Invoke-Check {
     $previousEap = $ErrorActionPreference
     $ErrorActionPreference = 'Stop'
     $failed = $false
-    try { & $Action *> $tempLog } catch { $failed = $true } finally { $ErrorActionPreference = $previousEap }
+    $failureMessage = $null
+    try { & $Action *> $tempLog } catch { $failed = $true; $failureMessage = $_.Exception.Message } finally { $ErrorActionPreference = $previousEap }
     $code = $LASTEXITCODE
     if ($failed -or $code -ne 0) {
         Write-Host 'FAIL'
+        # A gate that enforces a contract without saying which one turns every red into a scavenger
+        # hunt: the throw message used to be swallowed by this catch and never reached the console
+        # (found by the independent verifier, 2026-09-11).
+        if (-not [string]::IsNullOrWhiteSpace($failureMessage)) { Write-Host "    $failureMessage" }
         if (Test-Path -LiteralPath $tempLog) {
             Get-Content -LiteralPath $tempLog -Tail 12 | ForEach-Object { Write-Host "    $_" }
         }
         Write-Host "  retry: $Retry"
+        Remove-Item -LiteralPath $tempLog -Force -ErrorAction SilentlyContinue
+        exit 1
+    }
+    Write-Host 'OK'
+}
+
+# A fresh clone has no obj/ tree, and every lane below runs --no-restore on purpose (a cross-repo gate
+# must never silently re-resolve a stale graph). So the bootstrap restore happens exactly once, here,
+# measurably, instead of being smuggled into gate 1 where a missing restore surfaced as MSB3644
+# (measured 2026-09-11 by the independent verifier on a git-archive extraction).
+if (-not $NoRestore) {
+    Write-Host -NoNewline '[setup] restore the harness project graph (fresh-tree bootstrap) ... '
+    dotnet restore $testsProject *> $tempLog
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host 'FAIL'
+        if (Test-Path -LiteralPath $tempLog) {
+            Get-Content -LiteralPath $tempLog -Tail 12 | ForEach-Object { Write-Host "    $_" }
+        }
+        Write-Host '  retry: dotnet restore tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj'
         Remove-Item -LiteralPath $tempLog -Force -ErrorAction SilentlyContinue
         exit 1
     }
@@ -78,8 +109,23 @@ Invoke-Check 'mod payload present at the path consumers bind to' `
         # Consumer mods reference 1.6/Assemblies/FerriteLib.UiKit.dll by this exact relative shape.
         # If the output path moves, every consumer's compile-time reference and the runtime binding
         # break together, so the layout is a contract and not an implementation detail.
-        if (-not (Test-Path -LiteralPath (Join-Path $assembliesDir 'FerriteLib.UiKit.dll') -PathType Leaf)) {
-            throw "Missing payload: $assembliesDir\FerriteLib.UiKit.dll"
+        $payload = Join-Path $assembliesDir 'FerriteLib.UiKit.dll'
+        if (-not (Test-Path -LiteralPath $payload -PathType Leaf)) {
+            throw "Missing payload: $payload"
+        }
+
+        # Existence alone is not the claim. A stale DLL left in this gitignored folder kept the gate
+        # green while consumers bound to bytes this tree never built (measured 2026-09-11 by the
+        # independent verifier: moving <OutputPath> elsewhere reddened nothing). So ask MSBuild where
+        # it will actually write, and compare that evaluated path with the one consumers bind to.
+        $target = (& dotnet msbuild $projectFile -getProperty:TargetPath -p:Configuration=Release -nologo | Select-Object -Last 1)
+        if ([string]::IsNullOrWhiteSpace($target)) {
+            throw 'Could not read TargetPath from the project.'
+        }
+        $expected = [System.IO.Path]::GetFullPath($payload)
+        $actual = [System.IO.Path]::GetFullPath($target.Trim())
+        if ($actual -ne $expected) {
+            throw "Build output does not land where consumers bind: TargetPath=$actual expected=$expected"
         }
     }
 
@@ -143,6 +189,96 @@ Invoke-Check 'About.xml identity is present and well-formed' `
         }
         # The contract axis is asserted against this value inside gate 1, where FerriteLibVersion.Api
         # is actually readable. Here we only prove the release axis is well-formed on its own.
+    }
+
+Invoke-Check 'runtime-resolvability traps: net472 surface + harness stub surface' `
+    'pwsh -NoProfile -File scripts/net472-trap-scan.ps1 ; pwsh -NoProfile -File scripts/stub-coverage-scan.ps1 -SelfTest' `
+    {
+        # The harness compiles against a reference assembly and executes on net472, so a member the
+        # reference advertises can still be missing at runtime -- and the call site need not name the
+        # enum that gives it away (`text.Split(',')` binds to `Split(char, StringSplitOptions)` through
+        # a default argument). The scan reads the argument shape instead of the enum name, which is the
+        # only form that finds it: a seven-gate-green tree shipped exactly this failure until a lane ran
+        # it (2026-09-11).
+        & pwsh -NoProfile -File (Join-Path $root 'scripts\net472-trap-scan.ps1') -Path $root
+
+        # Same family, the other surface. The harness compiles against the game's reference assemblies
+        # and executes on the stubs, so a member only the reference declares compiles green and dies at
+        # run time inside the harness - quietly, because the session guard swaps the element for its
+        # recovery band and the frame survives, which leaves a lane that asserts a live session green
+        # while the path under test never ran (measured 2026-09-12: Verse.GenUI.ContractedBy, then
+        # Mathf.Clamp(int, int, int)). The scan is reference-driven: every member the payload and the
+        # harness take from a stub-replaced game assembly must be declared by the stub or be named in
+        # scripts/stub-coverage-exemptions.txt with a reason. -SelfTest adds three fixture controls, so
+        # the scan cannot fail open on a stub set missing a whole assembly, an empty stub directory, or a
+        # tree with no payload and no harness build.
+        & pwsh -NoProfile -File (Join-Path $root 'scripts\stub-coverage-scan.ps1') -Path $root -SelfTest
+    }
+
+Invoke-Check 'rule (c) consumer half is armed and tree-sensitive (dependency-reality)' `
+    'pwsh -NoProfile -File tools/dependency-reality.ps1 -SelfTest' `
+    {
+        # Why this gate exists: rule (c) - the half a consumer runs over its own tree - was reachable
+        # only by a human remembering to invoke -SelfTest, so its pattern set could rot while every other
+        # gate stayed green. It is NOT run over this repository's Source/: bare "Widgets." is the game's
+        # class in a consumer tree but this library's own Kernel.Widgets namespace here, so the same
+        # pattern flags 12 innocent registration lines (measured 2026-09-12) and a green run would have
+        # meant allowlisting a namespace. The library's tree is measured by the containment lane (gate 1)
+        # with per-file symbol precision; this gate proves the consumer half still works where it is meant
+        # to work.
+        $tool = Join-Path $root 'tools\dependency-reality.ps1'
+
+        # (1) The pattern set is armed: every planted shape fires, the migrated two-argument form and the
+        # lowercase-local decoy do not.
+        # Captured rather than redirected to the gate's own log: Invoke-Check already holds that file
+        # open for the whole block, and opening it twice is a sharing violation, not a test failure.
+        $selfTest = & pwsh -NoProfile -File $tool -SelfTest *>&1 | Out-String
+        if ($LASTEXITCODE -ne 0) {
+            throw "dependency-reality -SelfTest failed (exit $LASTEXITCODE): the shared pattern set is not armed. $selfTest"
+        }
+
+        # (2) The scan is tree-sensitive, and the allowlist actually decides. The fixture lives in TEMP
+        # and is removed in the finally, so the repository keeps no fixture and nothing here is written
+        # into a game Mods directory.
+        $sandbox = Join-Path ([System.IO.Path]::GetTempPath()) ("fl-rulec-" + [guid]::NewGuid().ToString('N'))
+        $sourceRoot = Join-Path $sandbox 'Source'
+        $allowlist = Join-Path $sandbox 'ui-chrome-allowlist.txt'
+        try {
+            New-Item -ItemType Directory -Path $sourceRoot -Force | Out-Null
+            Set-Content -LiteralPath (Join-Path $sourceRoot 'Planted.cs') -Encoding UTF8 -Value @(
+                'class Planted { void Hit(Rect r) { if (UiNative.Button(r)) { } } }'
+            )
+            Set-Content -LiteralPath (Join-Path $sourceRoot 'Migrated.cs') -Encoding UTF8 -Value @(
+                'class Migrated { void Hit(Rect r, UiWidgetContext ctx) { if (UiNative.Button(r, ctx)) { } } }'
+            )
+            Set-Content -LiteralPath (Join-Path $sourceRoot 'Locals.cs') -Encoding UTF8 -Value @(
+                'class Locals { int M(string text) { return text.Length; } }'
+            )
+            Set-Content -LiteralPath $allowlist -Encoding UTF8 -Value @('# ui-chrome allowlist (fixture)')
+
+            $verdict = & pwsh -NoProfile -File $tool -SourceRoot $sourceRoot -Allowlist $allowlist *>&1 | Out-String
+            if ($LASTEXITCODE -ne 1) {
+                throw "rule (c) exited $LASTEXITCODE over a tree holding a bare UiNative.Button(rect); it must be 1. A gate wired to a tool that cannot go red is not wired."
+            }
+            if ($verdict.IndexOf('Planted.cs', [System.StringComparison]::Ordinal) -lt 0) {
+                throw "rule (c) failed the fixture without naming the offending file: $verdict"
+            }
+            if ($verdict.IndexOf('Migrated.cs', [System.StringComparison]::Ordinal) -ge 0) {
+                throw "rule (c) named the migrated two-argument call as a breach; the pattern would punish the contract's own answer. $verdict"
+            }
+            if ($verdict.IndexOf('Locals.cs', [System.StringComparison]::Ordinal) -ge 0) {
+                throw "rule (c) named a lowercase local (text.Length) as backend contact; the scan is case-insensitive. $verdict"
+            }
+
+            Add-Content -LiteralPath $allowlist -Encoding UTF8 -Value 'Planted.cs'
+            $verdict = & pwsh -NoProfile -File $tool -SourceRoot $sourceRoot -Allowlist $allowlist *>&1 | Out-String
+            if ($LASTEXITCODE -ne 0) {
+                throw "rule (c) still failed after its one boundary file was allowlisted (exit $LASTEXITCODE): $verdict"
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $sandbox -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 
 if ($PackDev) {

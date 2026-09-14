@@ -281,7 +281,9 @@ internal static class KernelContractTests
         host.Session.SetScrollTarget("target");
         host.DrawFrame(new Rect(0f, 0f, 200f, 200f));
 
-        Vector2 pos = host.Session.GetScrollPosition("scroll");
+        UiNode? scrollNode = host.Session.GetNodeByElementId("scroll");
+        if (scrollNode == null) throw new Exception("No node for the scroll element.");
+        Vector2 pos = host.Session.GetScrollPosition(scrollNode);
         if (Math.Abs(pos.y - 40f) > 0.01f)
         {
             throw new Exception("Scroll target did not position the scroll (" + pos.y + ", expected 40)");
@@ -535,7 +537,6 @@ internal static class KernelContractTests
         altered.Raised = new Color(0f, 0f, 1f, 1f);
         altered.Hover = new Color(1f, 1f, 0f, 1f);
         altered.Selected = new Color(0f, 1f, 1f, 1f);
-        altered.Warning = new Color(1f, 0f, 1f, 1f);
         altered.Success = new Color(0.5f, 0.5f, 0.5f, 1f);
         altered.Danger = new Color(0.2f, 0.9f, 0.1f, 1f);
         altered.WorkspacePlane = new Color(0.9f, 0.1f, 0.1f, 1f);
@@ -597,6 +598,7 @@ internal static class KernelContractTests
         {
             "UiTheme.cs",
             "UiThemeDraw.cs",
+            "UiResolvedStyle.cs",
             "UiFitAudit.cs",
             "UiKitFonts.cs",
             "UiFont.cs",
@@ -720,9 +722,9 @@ internal static class KernelContractTests
         }
 
         bool trippedBoom = false;
-        foreach (string id in host.Session.TrippedComponentIds)
+        foreach (UiNode node in host.Session.TrippedNodes)
         {
-            if (id.IndexOf("boom", StringComparison.Ordinal) >= 0) trippedBoom = true;
+            if (node.Path.IndexOf("boom", StringComparison.Ordinal) >= 0) trippedBoom = true;
         }
 
         if (!trippedBoom)
@@ -736,9 +738,9 @@ internal static class KernelContractTests
         }
 
         bool diagnosticCarried = false;
-        foreach (string id in host.Session.TrippedComponentIds)
+        foreach (UiNode node in host.Session.TrippedNodes)
         {
-            if (host.Session.TryGetTripLog(id, out string logged)
+            if (host.Session.TryGetTripLog(node, out string logged)
                 && logged.IndexOf("planted widget failure", StringComparison.Ordinal) >= 0)
             {
                 diagnosticCarried = true;

@@ -1,0 +1,14 @@
+# Stub-coverage exemptions - members a scanned assembly references but the harness stub does not declare.
+# Read by scripts/stub-coverage-scan.ps1, which gate 8 runs.
+#
+# Format, one entry per line:
+#   <assembly>!<Type>::<member(parameter types)> | why this member may stay out of the stub
+# An entry key is exactly what the scan prints as MISSING. The reason after the | is not decoration: an
+# entry without one fails the gate, and so does an entry that is no longer unresolved (STALE) - the table
+# is exact in both directions, so it cannot pad itself and can only shrink.
+#
+# It is EMPTY on purpose. Measured 2026-09-12, after the Verse.GenUI hole was closed: the payload
+# (1.6/Assemblies/FerriteLib.UiKit.dll) takes 57 members from the stub surface and the harness assembly 34,
+# and every one of them is declared by the stub. An exemption here is a written admission that a member
+# this repository calls is NOT covered by the test double, so it needs a reason a reader can check -
+# for example that the call is unreachable in the harness because only the game dispatches it.

@@ -24,19 +24,14 @@ public static class UiSessionGuard
     internal static Action<string>? LogWarningOverride;
 
     /// <summary>
-    /// Draws one widget, recovering into the standard band if it throws.
+    /// Draws one widget, recovering into the standard band if it throws. The engine passes the element's
+    /// node, so the recovery slot is the element - not a display path, which two elements can share.
     /// </summary>
-    /// <param name="elementPath">
-    /// The engine's arranged path for this element. It is a parameter rather than read from
-    /// <paramref name="ctx"/> because the draw pass reuses the host context with only width and origin
-    /// adjusted — <c>ctx.ElementPath</c> is the page root for every element, so keying on it would
-    /// collapse every recovery into one session slot and paint every band with the word "root".
-    /// </param>
-    public static void DrawWidget(IUiWidget widget, Rect rect, UiWidgetContext ctx, string elementPath)
+    public static void DrawWidget(IUiWidget widget, Rect rect, UiWidgetContext ctx, UiNode node)
     {
         if (widget == null) throw new ArgumentNullException(nameof(widget));
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
-        if (string.IsNullOrEmpty(elementPath)) throw new ArgumentException("Element path is required.", nameof(elementPath));
+        if (node == null) throw new ArgumentNullException(nameof(node));
 
         GameFont previousFont = Text.Font;
         Color previousColor = GUI.color;
@@ -46,22 +41,22 @@ public static class UiSessionGuard
         }
         catch (Exception ex)
         {
-            Record(ctx.Session, elementPath, widget.Kind, elementPath, ex);
+            Record(ctx.Session, node, node.Path, widget.Kind, node.Path, ex);
             Text.Font = previousFont;
             GUI.color = previousColor;
-            UiThemeDraw.RecoveryBand(rect, ctx.Theme, elementPath);
+            UiThemeDraw.RecoveryBand(rect, ctx.Theme, node.Path);
         }
     }
 
     /// <summary>
     /// Measures one widget, recovering to <paramref name="fallbackHeight"/>. Allocation-free twin of
-    /// <see cref="DrawWidget"/>; see it for why it takes the widget, and for why the path is a parameter.
+    /// <see cref="DrawWidget"/>; see it for why it takes the widget and the node.
     /// </summary>
-    public static float MeasureWidget(IUiWidget widget, UiWidgetContext ctx, string elementPath, float fallbackHeight)
+    public static float MeasureWidget(IUiWidget widget, UiWidgetContext ctx, UiNode node, float fallbackHeight)
     {
         if (widget == null) throw new ArgumentNullException(nameof(widget));
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
-        if (string.IsNullOrEmpty(elementPath)) throw new ArgumentException("Element path is required.", nameof(elementPath));
+        if (node == null) throw new ArgumentNullException(nameof(node));
 
         GameFont previousFont = Text.Font;
         Color previousColor = GUI.color;
@@ -71,7 +66,7 @@ public static class UiSessionGuard
         }
         catch (Exception ex)
         {
-            Record(ctx.Session, elementPath, widget.Kind, elementPath, ex);
+            Record(ctx.Session, node, node.Path, widget.Kind, node.Path, ex);
             Text.Font = previousFont;
             GUI.color = previousColor;
             return fallbackHeight;
@@ -79,7 +74,10 @@ public static class UiSessionGuard
     }
 
     /// <summary>
-    /// Guard for a consumer's own control, where the fallback paint is the consumer's design.
+    /// Guard for a consumer's own control, where the fallback paint is the consumer's design. The
+    /// recovery slot is the node whose Draw is running (<see cref="UiSession.ActiveNode"/>, which the
+    /// engine entered around this control); <paramref name="elementId"/> stays the label a diagnostic
+    /// prints, because that is the consumer's own vocabulary.
     /// </summary>
     public static void DrawOrFallback(
         UiSession session,
@@ -102,7 +100,7 @@ public static class UiSessionGuard
         }
         catch (Exception ex)
         {
-            Record(session, elementId, kind, elementPath, ex);
+            Record(session, session.ActiveNode, elementId, kind, elementPath, ex);
             Text.Font = previousFont;
             GUI.color = previousColor;
             fallback?.Invoke(rect);
@@ -130,18 +128,23 @@ public static class UiSessionGuard
         }
         catch (Exception ex)
         {
-            Record(session, elementId, kind, elementPath, ex);
+            Record(session, session.ActiveNode, elementId, kind, elementPath, ex);
             Text.Font = previousFont;
             GUI.color = previousColor;
             return fallbackHeight;
         }
     }
 
-    private static void Record(UiSession session, string elementId, string kind, string elementPath, Exception ex)
+    /// <summary>
+    /// Records one recovery against the node that owns it. <paramref name="label"/> is the name the
+    /// diagnostic prints - the engine passes the element's display path, a consumer passes its own id -
+    /// while <paramref name="key"/> is what decides which slot is occupied.
+    /// </summary>
+    private static void Record(UiSession session, UiNode key, string label, string kind, string elementPath, Exception ex)
     {
-        bool first = !session.IsTripped(elementId);
-        string diagnostic = BuildDiagnostic(elementId, kind, elementPath, ex);
-        session.Trip(elementId, diagnostic);
+        bool first = !session.IsTripped(key);
+        string diagnostic = BuildDiagnostic(label, kind, elementPath, ex);
+        session.Trip(key, diagnostic);
         if (first)
         {
             LogWarning(diagnostic);

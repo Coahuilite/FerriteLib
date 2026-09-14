@@ -8,16 +8,16 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>
 /// Greenfield dropdown/select control. The current value is a typed string binding keyed by
 /// <c>Bind</c> (falling back to the element Id); options come from a typed
-/// <c>BindOptions&lt;string&gt;</c> binding or static OptionN/Values attributes. Popup state lives
-/// in <see cref="UiSession"/> and is drawn by <see cref="UiHost"/> after content.
+/// <c>BindOptions&lt;string&gt;</c> binding or static OptionN/Values attributes. The field's plane and
+/// its text come from the theme's <see cref="UiStyleTable"/>; its height and text inset from the
+/// theme's <see cref="UiGeometry"/>. Popup state lives in <see cref="UiSession"/> and is drawn by
+/// <see cref="UiHost"/> after content.
 /// </summary>
 public sealed class DropdownWidget : IUiWidget
 {
     public const string Kind = "input/dropdown";
 
-    private const float DefaultHeight = 28f;
     private const float LabelWidth = 80f;
-    private const float TextPadding = 6f;
 
     private UiElementSpec spec = UiElementSpec.Empty;
 
@@ -63,7 +63,7 @@ public sealed class DropdownWidget : IUiWidget
 
     public float Measure(UiWidgetContext ctx)
     {
-        return ReadHeight();
+        return ReadHeight(ctx.Theme.Geometry.RowHeight);
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)
@@ -124,12 +124,16 @@ public sealed class DropdownWidget : IUiWidget
 
     private static void DrawField(Rect rect, string display, bool selected, UiTheme theme)
     {
-        UiThemeDraw.Surface(rect, theme, selected ? theme.Selected : theme.Raised, selected ? theme.AccentGold : theme.Border);
+        // The mapping is a table query, not a second copy of it: this method used to re-derive the
+        // three tokens the status outlet already computes, which is how the two drifted apart.
+        UiResolvedStyle style = theme.Styles.Resolve(selected ? UiStatusTone.Active : UiStatusTone.Neutral);
+        float padding = theme.Geometry.Padding;
+        UiThemeDraw.Surface(rect, style.Surface, theme.Geometry.Hairline);
         UiThemeDraw.Label(
-            new Rect(rect.x + TextPadding, rect.y, rect.width - TextPadding * 2f, rect.height),
+            new Rect(rect.x + padding, rect.y, rect.width - padding * 2f, rect.height),
             display,
             theme,
-            selected ? theme.TextOnGold : theme.TextPrimary,
+            style.Text,
             UiFont.Small,
             TextAnchor.MiddleLeft,
             singleLine: true);
@@ -204,7 +208,7 @@ public sealed class DropdownWidget : IUiWidget
         return spec.TryGetAttribute("Label", out string label) ? label : "";
     }
 
-    private float ReadHeight()
+    private float ReadHeight(float fallback)
     {
         if (spec.TryGetAttribute("Height", out string raw)
             && float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out float height)
@@ -213,7 +217,7 @@ public sealed class DropdownWidget : IUiWidget
             return height;
         }
 
-        return DefaultHeight;
+        return fallback;
     }
 
     private readonly struct Option

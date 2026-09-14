@@ -30,6 +30,7 @@ internal static class KernelTextAuditTests
         Run("Single-line label reports width need against the rect", VerifyWidthFinding);
         Run("Repeated frames deduplicate", VerifyDeduplication);
         Run("Element scope attributes the finding", VerifyElementScope);
+        Run("An unscoped finding carries length and rect width", VerifyUnscopedDiscriminators);
         Run("Wrapped text taller than its band reports height", VerifyHeightFinding);
         Run("Paragraph given room for its lines is never reported", VerifyWrappedParagraphIsSilent);
         Run("Fitting text reports nothing", VerifyFittingTextIsSilent);
@@ -106,6 +107,41 @@ internal static class KernelTextAuditTests
             "Finding carries the element path the layout pass announced");
         Check(reports.Count == 2 && reports[1].ElementPath == "(unscoped)",
             "EndElement clears the scope so stray text is not misattributed");
+        Stop();
+    }
+
+    /// <summary>
+    /// A finding outside any element scope cannot say where it came from — two windows can be on screen at
+    /// once — and the caller that logs it may not be allowed to put UI text into the record. The two
+    /// non-content discriminators are what makes that branch decidable anyway: the length separates the
+    /// candidates and the rect width says which box it was drawn into. This lane holds both, and holds that
+    /// they are the values of the string and rect that actually overflowed rather than incidental numbers.
+    /// </summary>
+    private static void VerifyUnscopedDiscriminators()
+    {
+        List<UiOverflowReport> reports = Start();
+
+        // Two labels of different lengths in the same rect: one field must separate them.
+        string longLabel = "a close affordance label that does not fit";
+        Draw(new Rect(0f, 0f, 12f, TinyBand), longLabel, UiFont.Tiny, singleLine: true);
+        Draw(new Rect(0f, 0f, 12f, TinyBand), "short", UiFont.Tiny, singleLine: true);
+
+        Check(reports.Count == 2, "Both unscoped findings are reported (got " + reports.Count + ")");
+        if (reports.Count != 2)
+        {
+            Stop();
+            return;
+        }
+
+        Check(reports[0].ElementPath == "(unscoped)" && reports[1].ElementPath == "(unscoped)",
+            "Neither finding claims an element it cannot know");
+        Check(reports[0].TextLength == longLabel.Length && reports[0].TextLength != reports[1].TextLength,
+            "text_len separates the two candidates without carrying either string ("
+            + reports[0].TextLength + " vs " + reports[1].TextLength + ")");
+        Check(Near(12f, reports[0].RectWidth) && Near(12f, reports[1].RectWidth),
+            "rect_width names the box the label was actually drawn into");
+        Check(reports[0].Axis == UiOverflowAxis.Width,
+            "and the width axis is the one a declared-single-line label reports");
         Stop();
     }
 

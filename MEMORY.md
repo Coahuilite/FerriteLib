@@ -3,10 +3,12 @@
 ## Current durable state
 
 - Repository split out of the Universal Squeaker tree on 2026-09-03. FerriteLib is a prerequisite mod,
-  `coahuilite.ferritelib`, display name FerriteLib; its release axis `<modVersion>` is **0.3.0 in the
-  tree** (round 1 moved all three axes, `0daf06e` — re-derive, never quote). **Published 2026-09-07 in
-  the rc-only window:** GitHub repo `Coahuilite/FerriteLib` (public), sole release `v0.2.0-rc1`,
-  its platform digest matched a local pack byte-for-byte; `/releases/latest` 404s, which is the correct
+  `coahuilite.ferritelib`, display name FerriteLib. The three version axes are re-derived from the tree and
+  never quoted from this file (`grep -n 'Api = new Version' Source/FerriteLib.UiKit/Kernel/FerriteLibVersion.cs`,
+  `<modVersion>` in `About/About.xml`, `<VersionPrefix>` in the csproj) — and note that `main` and `0.4.x`
+  now differ on all three, the released line against the open sweep. **Published in the rc-only window:**
+  GitHub repo `Coahuilite/FerriteLib` (public); releases `v0.2.0-rc1` and, cut 2026-09-10, `v0.3.0-rc1` from
+  merge commit `6a92331` on `main`; `/releases/latest` still 404s, which is the correct
   state while only rc iterations exist. A bare `v0.2.0` was tagged the same day and **withdrawn the same
   day by maintainer ruling** - cutting the stable tag was outside the push authorization: the rc scheme
   exists precisely so "the trial is over" stays a deliberate decision (see `TODO.md` §5). Workshop still
@@ -206,6 +208,101 @@
   duty is met by `pack-dev.ps1` copying `LICENSE` into the package; gate 6 rejects a truncated paste
   or an applied incompatibility notice (and its limits are stated in "Gates and what each actually
   proves" — parity against a consumer's copy is consumer-side).
+
+- **The payload gate now measures the build's own output path, and a fresh tree bootstraps itself (2026-09-11).**
+  Both holes were found by an independent verifier on this repository's own gate suite, not by a failing
+  build. Gate 4 asserted only that `1.6/Assemblies/FerriteLib.UiKit.dll` exists, so moving the csproj's
+  `<OutputPath>` elsewhere stayed green while consumers bound to a stale, gitignored DLL; it now asks
+  MSBuild for the evaluated `TargetPath` and compares that with the path consumers bind to (mutation:
+  moved output = gate 4 red with the throw message printed; restored = 7/7). A `git archive` extraction
+  also died at gate 1 with MSB3644 because every lane runs `--no-restore`, so the bootstrap restore is
+  now one visible `[setup]` step before the lanes (fresh tree, single command = 7/7 in 9.1 s, reproduced
+  independently by the verifier). `Invoke-Check` used to swallow a failed gate's thrown message and leave
+  only a retry hint that could not address the contract it broke; the message is printed now. Commits
+  `d0632ca`, `5399aa7`.
+
+- **The leaf vocabulary exists as of 2026-09-11: five kinds, one of them carried as debt.**
+  `text/wrapped`, `input/button`, `chrome/rule`, `input/slider` and `input/number-field` (commits
+  `bab3c07`..`2ce61ce`), each justified against `AGENTS.md`'s "What earns a kind": a measure contract
+  over its own content (wrapped text), per-element interaction state plus a hit rule (button, number
+  field), label-band geometry plus a value contract (slider), and a geometry rule with a negative hit
+  rule (rule). Two verdicts are worth carrying. `chrome/rule` is the weakest: it qualifies on the
+  geometry clause alone, has no label set and no binding, and its closing condition is written down --
+  if a container ever gains a `Divider="Top|Bottom"` attribute, the kind must be deleted. And
+  `input/slider` is kept because the bare slider and the stepper composite are two different things
+  whose coexistence is itself the proof that neither expresses the other. The kind strings are the
+  contract, not the type names: a manifest names a kind, and the type's visibility is a separate
+  question the 0.4.x internalise sweep answers. Known gap, filed rather than hidden: popup yield is not
+  in the atoms -- `UiNative.YieldsToCoveringPopup` remains the dropdown trigger's private path, so a
+  button under an open popup can rediscover the 2026-09-04 click-theft class; the closing item is
+  `TODO.md` section 3's owned hit stack, and no atom may grow a second, private yield rule meanwhile.
+
+- **The 0.4.x batch exists on the branch and is archived: style table, identity layer, leaf atoms (2026-09-11).**
+  `origin/0.4.x` = `1ececed` carries all of it; `v0.3.0-rc1` remains the only published release. Landed in
+  the order this ledger's own sequence asked for: the resolved-value store plus the per-surface token shape
+  (`UiStyleTable` keyed by tone/emphasis[/writability], per-surface fill+border pairs, geometry tokens, and
+  `LayoutRevision` so a density or font change re-arranges instead of reusing stale bands -- with the
+  duplicated two-token mapping deleted from all four outlets: `StatusTreatment`, `StatusBadge`,
+  `DropdownWidget`, `InputModeRowWidget` and `UiPopup`); the element identity layer (`UiNodeId`, per-element
+  state keys, an ambient element scope set and restored in try/finally so a throwing sibling cannot move
+  the next element's slot, plus `HoverClaimElement`/`ActiveElement` as its observation surface); the five
+  leaf kinds; and `chrome/banner`/`state/empty` re-expressed over the text atom's band contract while
+  keeping their names.
+  **Two artifacts are recorded rather than hidden.** (1) Three commits -- `7110b0c`, `f516651`, `dfba792` --
+  are red at the commit level: their public types reached `docs/api-tiers.md` one commit later because
+  parallel lanes raced on that shared file. The tip was verified green in an isolated extraction before the
+  push, and rewriting the batch was refused on purpose: it would invalidate the verifier's per-sha evidence
+  and interrupt a lane still writing, while this branch's contract is the tip. The discipline that follows:
+  a public type and its tier line go in the same commit, and the tier lane is re-run after any rewrite.
+  The race has a second and worse harm, found by the verifier on the same batch: `dfba792` committed a
+  491-line identity lane while `Program.cs` did not register it until `7afa1df`, so at that commit the lane
+  was dead code -- the file existed, no assertion ran, and every gate was green. A late tier line reddens a
+  gate; a late registration hides the evidence entirely. Same root cause, same rule: a public type, its tier
+  line and its lane registration go in one commit, checked with `git show <sha>:<file> | grep`, never by
+  trusting the working tree.
+  The same class bit the lead's own gate 8 wiring the next day: `verify-local.ps1` called
+  `scripts/net472-trap-scan.ps1` while the file was still untracked, so every clean extraction reddened on a
+  gate whose target did not exist -- and an untracked script is invisible to a `git status` reading, a build
+  and a local run alike. Two instances in two days make it a rule rather than an anecdote: anything a script,
+  gate or lane refers to must be tracked, and the check is `git archive <sha>` plus a run, never the working
+  tree. Gate 8 itself is verified both ways -- 8/8 on a clean tree, and red with `file:line` and the matched
+  shape when `Split(',')` is planted.
+  Gate 8 runs the scan with three exit codes -- 0 clean, 2 a hit, 3 not scanned (empty scope, or a
+  directory with no git metadata) -- and the third one exists because the first version reported a clean
+  `HITS=0` over zero files: `git rev-parse` fails with 128 rather than throwing, and a native git failure
+  does not raise in PowerShell. A scan that finds nothing is a failure, not a pass. The net472 measurement
+  probe deliberately calls every trap shape inside try/catch, so it must never be committed into the repo
+  tree -- gate 8 correctly flags it there, which is the gate working, not a false positive.
+  (2) Two unpushed commits were amended in flight (`a81182e`->`169cf62`, `085ebd1`->`7afa1df`), both
+  reported by their author; that mapping is part of this session's record.
+  **Two traps worth keeping.** A mutation check that restores a file with `Copy-Item` keeps the old mtime,
+  MSBuild then skips the recompile, and the "green after restore" is the old binary -- touch the file or
+  pass `--no-incremental`. And `tools/.../Stubs/**` is a de-facto published surface: the verse stub's
+  `Label` gained three additive recording lists so the text-colour routes became observable, which the
+  wired consumer sees when it re-pins to 0.4.
+- **The 0.4 node step is a real compile break for the wired consumer, and this repo's own comment described
+  that break backwards (2026-09-12).** `bd4d1b5` (node step 2) node-keyed session state with no string
+  shim — `GetScrollPosition`/`SetScrollPosition` take a `UiNode`, `ScrollPositions` is
+  `IReadOnlyDictionary<UiNode, Vector2>`, and the recovery surface moved with it (`TrippedComponentIds`
+  became `TrippedNodes`; `IsTripped`/`Trip`/`TryGetTripLog` take a node). The wired consumer is blocked
+  by exactly that, in committed code:
+  `Coahuilite/UniversalSqueaker@4f7a9e2b8877802fda6d4b20c562e4e1194600bb:Source/UniversalSqueaker/UI/UsKernelSettingsHost.cs:108`
+  — `session.SetScrollPosition(ContentScrollId, Vector2.zero);`, where `ContentScrollId` is
+  `private const string ContentScrollId = "content-scroll";` (`:118`) — and in its harness at
+  `…:tools/UniversalSqueakerKernelHostTests/Program.cs:461` —
+  `host.Session.SetScrollPosition("content-scroll", Vector2.zero);`, with the read side at
+  `…:1336`, `Vector2 content = host.Session.GetScrollPosition("content-scroll");`. What it proved: a string
+  where 0.4 wants a node is a compile break in a tree a player runs, not a shape preference, and the
+  migration's bridge already exists — `UiSession.GetNodeByElementId`, "the bridge a caller uses to move from
+  the one string a page owns to the node identity everything else keys on; it is a lookup, not a second key
+  space". The cited revision is the consumer's committed HEAD, so the break re-derives from their tree
+  alone; their in-flight migration is not what this line rests on.
+  **The comment was the other half of the failure.** `UiLayoutEngine.ScrollKey`'s doc comment told a reader
+  that a consumer reads `ScrollPositions` by that key while the property had already been node-keyed: the
+  library shipped prose pointing at the call that no longer compiles — the same family as a lane nobody
+  registered, where every gate is green and the evidence is invisible. Corrected in `cbfe680` together with
+  `docs/api-tiers.md`'s "Breaking changes inside the open 0.4 window" section, which is now where a moved key
+  space, the call that no longer binds and its bridge are recorded before a consumer finds them by compiling.
 
 ## Charter — what this library is for
 
@@ -456,6 +553,25 @@
   second consumer wire against 0.3.x and then break `UiTheme`** — 0.4.0 is the last minor where the
   per-surface restructure is cheap, and because the API freeze is gated on the second wired consumer, the
   style sweep has to land before NGS or anyone else builds against the shell.
+- **v0.3.0-rc1 is cut, and the deterministic-archive claim is proven across machines (2026-09-10).**
+  Sequence: `0.3.x` merged into `main` at `6a92331` — the release workflow demands the tag commit be in
+  `main`'s history ("Merge to main, then tag"), so a release cannot come from a feature-branch tip — then a
+  lightweight tag `v0.3.0-rc1` (matching `v0.2.0-rc1`'s type) was pushed and CI ran the same three steps the
+  local rehearsal does, finishing green including its own post-publish platform check. Local
+  `verify-release.ps1 -Tag v0.3.0-rc1`: published, `prerelease = True` matching the tag dialect, single
+  asset `FerriteLib-v0.3.0-rc1.zip` at 50166 bytes, no stable release so `/releases/latest` 404s, every `v*`
+  tag has a release. **The cross-machine proof:** a local `dotnet build -c Release -p:VersionSuffix=`
+  followed by `pack-release.ps1` at the tag commit produced `sha256 1609552d…`, byte-identical to the
+  platform's server-computed `assets[].digest` — the first time §5's "CI zip SHA-256 matches a local pack of
+  the same commit" check has run against a real published asset instead of a rehearsal. An earlier rehearsal
+  at the pre-merge tip produced a different size, which is the commit label doing its job rather than drift.
+- **A consumer's CI follows the default branch, not the dev line (measured in US's `ci.yml:37-40`,
+  2026-09-10).** Its carrier checkout passes `repository: Coahuilite/FerriteLib` with **no `ref:`**, so it
+  builds whatever `main` holds. Consequence for the newly opened `0.4.x`: bumping all three axes there
+  cannot break US's CI, because `main` still carries the 0.3 contract — but a machine whose sibling
+  `../ferritelib` checkout sits on `0.4.x` will make US fail `Require` with a readable report until US
+  re-pins to `[0.4.0, 0.5.0)`. That re-pin is a cross-repo write: report it in a round, never edit it from
+  this repository.
 - **uGUI / UIElements assemblies do ship** (`UnityEngine.UI.dll`, `UnityEngine.UIModule.dll`,
   `Unity.TextMeshPro.dll`, `UnityEngine.UIElementsModule.dll`), so they are referenceable by a mod. The
   constraint that actually matters is compositing, not availability: IMGUI draws above every Canvas.
@@ -482,7 +598,19 @@
 - **net472 reference-assembly traps** hit while writing this repo's own code, all compile-verified:
   `string.IsNullOrEmpty` carries no `[NotNullWhen(false)]` (CS8602 on the ternary that returns it);
   `string.Split(char, StringSplitOptions)` is advertised but throws `MissingMethodException` at
-  runtime; `string.Contains(string, StringComparison)` likewise does not exist at runtime. Two more
+  runtime; `string.Contains(string, StringComparison)` likewise does not exist at runtime. **How the first one hides
+   from a search (measured 2026-09-11):** `text.Split(',')` binds to `Split(char, StringSplitOptions)`
+   through that overload's default argument, so a grep for the enum name finds only the call sites that pass
+   it explicitly and misses the one-argument form entirely; search `.Split(` and read the argument, or better
+   let a lane run the path -- the harness caught this one while two independent greps did not.
+   **The measured shape list is longer than the four this repo had recorded (probe, 2026-09-11):**
+   `Split(char)`, `Split(char, StringSplitOptions)`, `Contains(char)`, `Contains(string, StringComparison)`,
+   `StartsWith(char)`, `EndsWith(char)`, `Replace(string, string, StringComparison)`, `string.Join(char, string[])`,
+   argument-less `TrimStart()`/`TrimEnd()` and `Path.GetRelativePath(string, string)`. Arrays are present and
+   safe, so the rule of thumb is the *argument shape*: `Split(new[]{','})` is fine, `Split(',')` is not.
+   One of them is worse than the rest because it does not even raise the expected type: `EndsWith(char)`
+   throws **MethodAccessException**, so a guard that filters by exception type would miss it. The fix for the
+   class is a static scan of argument shapes with positive and negative controls, not an exception-type filter. Two more
   found writing the containment lane, same class and same asymmetry (compile green, runtime red):
   **`Path.GetRelativePath(string, string)`** and **`string.TrimStart()`** with no arguments. The scan
   now walks leading whitespace by hand and computes the relative path itself. The rule that generalises
@@ -868,6 +996,20 @@
   exists to carry, and that is the argument any future request to make `Tone` inherit must answer.
   Cross-page sharing was declined, with a real substitute: reuse rides the extension surface (a registered
   kind), not a shared style document.
+- **The style surface is a standalone document with its own loader, not an embedded manifest section — maintainer ruling 2026-09-10, superseding the same day's "no separate style file" non-goal.** The ruling's grounds: an embedded `<Styles>` section keeps structure and appearance tangled in one file, leaves cross-page sharing as copy-paste (the co-location cost that entry itself already recorded), and the "second resolver with no host counterpart" objection was written for an interop-shaped plan rather than for what this assembly is. The chrome is already 100% self-owned — zero texture references, `UiNative.Button` is `ButtonInvisible`, every fill through `UiThemeDraw` — so there is no host style layer to fight, and "the game has no style layer" flips from objection to enabler: the only contract the document must honour is this library's own, exactly as the layout manifest already does. What survives of the old ruling on purpose: no selector matching and no specificity (matching stays kind and role names, nearest-wins); no `@media` (`Breakpoint` is the cited narrower mechanism); no runtime mutation (parsed once at host creation, live state still resolves per frame); nothing scans a styles directory (the consumer hands the path, as with any file it owns); and the failure ladder is already ruled — a malformed or unknown-value style document is appearance-class, so the page renders with defaults, the fallback is logged through the fit audit's channel and exercised in a harness lane. The design move that keeps the old costs out: **one parser, one `<Style>` vocabulary, two text origins** — the standalone document and a manifest `<Styles>` section both feed the same document type, so there is still exactly one validation entry point, not two. New debts the document shape owes: a public document type classified in `docs/api-tiers.md` in the same commit; the precedence-chain slot (the document enters as the page/window-level source — the cited need stage 4 was waiting for); and resolve-before-`Measure` (the document resolves into the value store before the first arrange, in the style-recalc slot). Name collisions checked: `Region`, `Scheme`, `Density` hit nothing in the assembly (measured this session).
+- **Provenance correction on the ruling above (maintainer, 2026-09-10): "IMGUI as the drawing
+  backend" is a survey finding, not the maintainer's intuition, and the earlier session that recorded
+  the style entries failed to note which half of the chrome facts were already on the ledger.** The
+  measured half was here all along: zero texture references, `UiNative.Button` = `ButtonInvisible`,
+  every fill through `UiThemeDraw` (`MEMORY.md`, "The divergence from the game's look is total on the
+  chrome side"). What was missing was the connective claim it supports — that the kernel's chrome is
+  100% self-owned chrome over the game's fonts, so a style document has no host stylesheet to
+  interoperate with — and that line exists too ("Our look is self-owned chrome", census 2026-09-10).
+  The session that proposed the embedded-`<Styles>` compromise then cited the self-ownership as if it
+  were fresh evidence and mis-attributed the backend choice to intuition; the maintainer's correction
+  is that the backend choice itself was derived from the same survey, and it is this file's job to
+  carry attribution, not just conclusions. Lesson filed with it: when a ruling's grounds restate an
+  existing ledger line, cite the line — do not re-derive it in the ruling and drop the original.
 - **The privacy gate measures accounts, not display names (ruled and implemented 2026-09-10).** `gh api
   user` reports login `Coahuilite`, id `19252128`, name `Fe`, email `null` — so the `Fe` sitting on the
   PR #1 web-merge commit is that account's own GitHub-published display name, which is precisely what
@@ -982,6 +1124,21 @@ an edge case can be judged without re-running the audit that produced them.
   consumer's gate should report against `tools/dependency-reality.ps1` rule (c); this repo cannot
   measure it without depending on a consumer tree, which is the vacuous-guard shape already recorded
   twice in the neutrality lane.
+- **The exemption is now counted, and the two halves share the pattern set — not the allowlists
+  (2026-09-12).** `\bGenMapUI\.` joined the shared pattern set on both halves after the maintainer
+  ratified that the consumer's in-world pawn marker stays (a fixed-purpose part, not a redesign
+  candidate). The consumer's file carries the matching entry with date, reason and recovery condition;
+  **this repo carries none, because the measured count here is zero** — `GenMapUI` appears in
+  `Source/**` nowhere, and the only two matches are the prose declaring map-layer rendering a permanent
+  non-goal (`AGENTS.md`, this file). An entry that matches nothing would be a hole opened in advance.
+  Wording precision: the halves are identical at the **term** level, not in regex shape — rule (c) here
+  is owner-level (`Mouse.` any member, `Text.`, `Widgets.*`, optional `UnityEngine.`/`Verse.` prefix)
+  while the consumer's is a member-level enumeration. And the shared object is the pattern set alone:
+  **allowlists are ratified per side**; syncing entries would launder one side's exemption into the
+  other side's boundary. Proven by three mutations in the isolated tree: removing the term from the
+  lane (red), removing it from rule (c) (`-SelfTest` exits 1, `expected exactly 2 planted backend call
+  sites, got 1`), and planting a real `GenMapUI.DrawText` in `Source/**` (production scan red) — i.e.
+  zero here is a measurement, not a blind spot.
 - **Why exemptions carry rent.** An allowlist without a named closing item drifts back into permanent
   undocumented self-implementation; the live specimen is US's diagnostics panel — 703 lines of
   hand-rolled immediate UI borrowing only the theme vocabulary, pinned to a revision so that count cannot
@@ -1061,7 +1218,25 @@ Paths and roles only; any line/file count here would be false within a day (see 
 - `tools/dependency-reality.ps1` - the D-1 reference checker FL owns the rule text for: AssemblyRef,
   page-model MemberRef contact, and declared-chrome allowlisting over a consumer tree, with `-SelfTest`
   proving the source scan can fire.
-- `scripts/verify-local.ps1` (7 gates, `-PackDev` adds packaging) and `scripts/pack-dev.ps1`. The three
+- `scripts/stub-coverage-scan.ps1` - the reference-driven door for the class above (gate 8's second half,
+  added with the `Mathf.Clamp(int, int, int)` instance). It reads the MemberRef tables of the payload and
+  of the harness assembly and requires every member they take from a stub-replaced game assembly
+  (`Assembly-CSharp`, `UnityEngine.CoreModule`, `UnityEngine.IMGUIModule`,
+  `UnityEngine.TextRenderingModule` - a rule list, deliberately not read off the stub) to be declared by the
+  stub or listed in `scripts/stub-coverage-exemptions.txt` with a reason. The table is exact both ways: an
+  unlisted unresolved member fails, a listed member that resolves again fails as STALE, a reasonless entry
+  fails; it is empty today, which is the measured state (payload 57 references, harness 37, unresolved 0).
+  `-SelfTest` adds three fixture controls: a stub set missing one whole assembly must fail and name a
+  member, an empty stub directory and a tree with no target must exit 3 (not scanned) instead of reporting
+  a clean zero. Fixture 1 failed on its first run - the replaced-assembly list had been derived from the
+  stub, so removing a whole stub assembly removed its references from scope - which is why that list is a
+  rule now.
+- `scripts/verify-local.ps1` (9 gates, `-PackDev` adds packaging) and `scripts/pack-dev.ps1`. Gate 8 has two
+  halves since 2026-09-12 - the net472 source-shape scan and the stub-coverage scan above, the second with
+  its own `-SelfTest` - so the gate count is unchanged while the trap surface is not. Gate 9 was
+  added 2026-09-12: it runs `dependency-reality.ps1 -SelfTest` and a TEMP fixture tree, so the boundary
+  tool's pattern set and its allowance are proven to be able to go red on every full run instead of only
+  when a human remembers to call `-SelfTest`. The three
   source-text gates and the version axes all run *inside* gate 1; the gate count is not the check count.
 - `About/About.xml`, `LoadFolders.xml`, `LICENSE`, `1.6/Assemblies/` (the DLL and PDB are gitignored; only
   `.gitkeep` is tracked, so a fresh clone has no payload until it builds).
@@ -1090,8 +1265,196 @@ Paths and roles only; any line/file count here would be false within a day (see 
 - Three symbols people keep assuming live here are **not** from this repo: `SessionRevisionBumper` (a US
   private class), `PreClose` (Verse), `GetManifestResourceStream` (BCL, called in US). Searching this tree
   for them returns nothing, by design.
+- **A consumer's string is not a layout constant** (`a306cae`, 2026-09-12): the window shell used to size its
+  close affordance from a fixed `110x30` constant, so a consumer whose close text was longer (US's
+  diagnostics panel: `关闭（或连按两次 Esc）`) ran out of the box - that was the first real in-game
+  fit-audit finding. `UiWindowHost.CloseButtonSize` is now
+  `max(110, Metrics.MeasureWidth(CloseText, CloseFont) + 20)` over a `protected virtual ITextMetrics Metrics`
+  (the same ruler the fit audit uses); 110 survives only as the lower bound. Fixed here rather than per
+  consumer because three consumer windows ship through this shell: the constant made the library's geometry
+  the place consumer text gets clipped.
+- **An overflow record may carry exactly two non-content discriminators** (`UiOverflowReport.RectWidth` and
+  the new `TextLength`, `a306cae`). Because a record must not carry UI text, those two are the only pair that
+  can tell two candidates apart - the real-game finding needed `text_len` to separate a 24-character key
+  literal from a 13-character CJK value.
+- **Chrome and notices now draw inside element scopes** (`<windowType>/chrome`, `<windowType>/notice`,
+  `a306cae`), so `(unscoped)` is no longer the identity a chrome finding carries. Trade-off recorded in the
+  code: the identity is the window *type*, because the shell has neither an id nor a manifest while drawing
+  chrome, so two instances of one window class share the path; findings dedupe by path+text, which merges
+  rather than misattributes.
+- **A missing translation key is drawn as the key, on purpose.** `IUiTranslation` now states the policy and
+  its cost (visible but misleading), and names the owner of the check: only the host sees both its keys and
+  the loaded language data, so the dev-only self-check belongs there, not here.
 
 ## How verification is described here
+
+- **A lane that prints a failure without counting it is not a gate (found 2026-09-11).** The identity lane's
+  own runner logged each failure and never incremented the failure count, so from the day it landed it could
+  print red and still exit 0. Every mutation check run against it before that date was therefore evidence
+  that the assertion *fired*, not that the suite *failed* -- those claims are regression guards, and the
+  ledger now says so rather than keeping them as mutation proof. The criterion for a new gate is not "the
+  console shows FAIL" but **"plant the defect and the process exits non-zero"**, and the same scan belongs
+  on the older lanes, which nobody has audited for this shape yet.
+  **That audit happened the next day and the family has no second instance:** all 21 lanes were probed
+  through their own failure channel and every one exited non-zero with its marker printed, every lane is
+  registered in `Program.cs` (so F-E's shape is empty too), and the control run went back to zero. The
+  audit's own first attempt was invalid and the verifier said so: a bare `return` made the rest of the lane
+  unreachable, `TreatWarningsAsErrors` turned that into CS0162, and all 21 lanes "exited non-zero" while
+  compiling nothing -- a green that only holds if nobody reads the marker. Its stated limit is honest: this
+  proves the failure channel and the process exit, not that each lane fails on a real defect.
+- **A session that is alive is not a page that drew (measured 2026-09-12, found by the consumer's own
+  report).** A consumer's page called `rect.ContractedBy(8f)`, a member of the game's `Verse.GenUI` that
+  this repo's Verse stub did not declare. The call threw `TypeLoadException` at JIT time **inside the
+  harness only**: the session guard did its job (that element became a recovery band, the frame survived),
+  and the consumer's lane asserted nothing more than `Session.IsActive`, so it stayed green while the
+  element under test never ran. In the game the same code draws, which is why nothing else noticed - the one
+  trace was a trip log. Two rules came out of it, and both are now enforced here rather than remembered:
+  (1) the stub is the game API's test double, so a missing member is the stub's defect, not the consumer's
+  constraint - `Verse/GenUI.cs` was read from the game's own source (single-margin and per-axis
+  `ContractedBy`, `ExpandedBy`; four-sided inset, no clamping, negative margin expands) and the stub now
+  carries those three; (2) **a lane that draws a page asserts the page drew, not that the frame lived**:
+  `KernelTripGuard.ExpectNoTrips` fails a lane when any element ended a frame in recovery, the lanes that
+  trip on purpose pass `deliberateTrips: true` so the choice is visible in the call, and
+  `KernelStubCoverageTests` carries the consumer-shaped call plus a planted-throw positive control. The
+  hole class is wider than this member: any stub gap dissolves the consumer code under it while the
+  surrounding assertions keep passing, so a new game member reaches the stub the moment a lane needs it -
+  and the trip guard is what makes that need visible.
+- **The same class twice in one day, and the door that stops waiting for a lane's luck (measured
+  2026-09-12).** The guard found the second instance within hours: a consumer's timing card called
+  `Mathf.Clamp(int, int, int)` while this stub carried only `Clamp(float, float, float)` - and `Max(int, int)`
+  without its `Min(int, int)` pair - so that card became a recovery band, the page drew one card short, and
+  the lane asserting `IsActive` had been green over it; in the game the same code draws. Both integer
+  overloads are now declared and mirror the float forms (minimum branch first, Unity's own order for both,
+  so a consumer cannot clamp differently by switching between int and float), and the lane asserts the
+  semantics rather than "it did not throw". The hole class no longer depends on a lane reaching it:
+  `scripts/stub-coverage-scan.ps1` (gate 8's second half) reads the payload's and the harness assembly's
+  MemberRef tables against the stub surface, with a written exemption table that is exact both ways.
+  **Mutation provenance** (every run with the touch / `--no-incremental` discipline, green after each
+  revert): M1 delete `Verse.GenUI` -> `KernelStubCoverageTests` fails naming the `TypeLoadException` and the
+  guard reports the recovery band; M2 make `ContractedBy` return its input -> four semantics assertions red;
+  M3 make the guard vacuous -> the planted-throw positive control red; M4 delete `Mathf.Clamp(int, int,
+  int)` -> the lane reds and the scan names
+  `UnityEngine.CoreModule!UnityEngine.Mathf::Clamp(Int32,Int32,Int32)`; M5 leave one stale exemption in the
+  table -> the scan reds as STALE; M6 declare the same name with a different signature
+  (`Clamp(long, long, long)`) -> the scan still reds, so it matches signatures and not names. **M6 failed
+  the first time, and the reason is a rule**: that run changed the stub *source* and ran the scan without
+  rebuilding, so the scan read the old stub DLL and reported OK - the scan's inputs are built assemblies.
+- **The stub scan was merging copies, and a partial rebuild turned that into a false green (measured
+  2026-09-12, reported by the author of the consumer-side task).** Each stub project references the ones
+  below it, so `bin/stubs` also holds copy-local duplicates - `verse/`, `unityengine-imgui/` and
+  `unityengine-textrendering/` each carry their own `UnityEngine.CoreModule.dll` - and the scan merged every
+  same-named file it found. Delete a member, rebuild ONE stub project, and the deleted member survived in a
+  stale copy: the scanner committed at `f629e1a` printed `OK: every member ... is declared by the stub` on
+  exactly that tree (M8), while the harness was free to load bytes that no longer matched the stub source.
+  The scan now indexes the canonical file of each assembly - the OutputPath of the project that builds it, a
+  rule list, not a walk - and compares every other copy, including the four files beside the harness
+  executable that the runtime actually loads, against that canonical surface: missing members, extra members
+  and a file at a stub path that declares a different assembly are all reported. After the fix the same M8
+  tree exits 2 with `MISSING UnityEngine.CoreModule!UnityEngine.Color::get_black()` and four `DIVERGED`
+  copies naming `extra UnityEngine.Color::get_black()`, and a full rebuild is green again. The comparison is
+  the declared SURFACE, not the bytes: a rebuild changes the module id without changing what is declared, so
+  a byte comparison would redden every clean build. `-SelfTest` now carries four fixture controls (the
+  fourth: one copy at a stub path that is not the stubbed API).
+- **The value-type sweep (task-105, measured 2026-09-12).** The third member of the same family arrived the
+  loud way again - a consumer lane called `Rect.center`, the compile-time reference has it, the carrier stub
+  did not, and the failure named the member - so the fix became a sweep instead of one more member. The four
+  value types were compared against the reference assembly, and what could be verified is carried: Rect's
+  `xMin`/`yMin`/`xMax`/`yMax`/`min`/`max`/`size`/`center`; Vector2's and Vector3's direction and infinity
+  constants, magnitudes, `Dot`/`Cross`/`Min`/`Max`/`Scale`/`LerpUnclamped` and the component-wise operators;
+  Color's component-wise `+ - * /` and `Lerp`/`LerpUnclamped`. Each rule is the arithmetic its name states,
+  and every one is called and asserted by `KernelStubCoverageTests`, so the reference-driven gate owns them:
+  182 references (57 payload + 125 harness, was 94), stub types 50, unresolved 0, exemptions 0. **The not-carry
+  list is written on each type's comment, with reasons**: the epsilon guards (`normalized`/`Normalize`/
+  `ClampMagnitude`, the angle functions, every equality operator), the indexers, `Vector2`/`Vector3` implicit
+  conversions (they widen every overload set), `SmoothDamp*`, Rect's `Contains`/`Overlaps` (their
+  edge-inclusive rules are not readable) and its behaviour helpers, Color's luminance/sRGB/HSV members, and
+  the engine-internal ones. **The compiler corrected the sweep twice, and both corrections are rules:**
+  `Rect.left`/`top`/`right`/`bottom` are `[Obsolete]` aliases in the reference (carrying them would add
+  surface no lane can exercise without a warning, so the stub keeps the current names), and
+  `Color.RGBMultiplied`/`AlphaMultiplied` are carried by the reference but **not public** - the first sweep
+  listed members without checking visibility, which is exactly how unproven surface gets added. M13 removes
+  `Rect.center` and both the lane and the gate redden (`MISSING UnityEngine.CoreModule!UnityEngine.Rect::
+  get_center()`); green after the revert.
+- **The math family, and the door that made its gap loud (task-101, measured 2026-09-12).** A consumer's
+  circle drawing called `Mathf.Sqrt`, which this stub did not declare. The trip guard named the member and
+  the call path instead of swapping the element for a recovery band, and the consumer shipped a different
+  spelling the same day. The ruling that follows is worth more than the members: **the trip guard and the
+  reference-driven stub-coverage gate together turn "the stub is missing a member" from a silent hole into a
+  loud, attributable one** - the guard catches it on the first lane that drives the page, and the gate keeps
+  it caught for every member a lane calls, naming the assembly, the type, the signature and the file to
+  declare it in. `Mathf` now carries the pure family whose rule is either the BCL counterpart or the
+  published formula: `Sqrt`; `Abs(int)`; `Floor`/`Ceil`/`Round`/`FloorToInt` (the lane pins banker's
+  rounding at 2.5); the six trigonometry functions; `Pow`/`Exp`/`Log`/`Log10`;
+  `Repeat`/`PingPong`/`LerpUnclamped`/`SmoothStep`; the two infinities; and `Deg2Rad`/`Rad2Deg`. Measured
+  after the batch: stub types 50 (members were added to an existing type), payload 57 references, harness 94
+  (was 72), 151 in total, unresolved 0, exemptions 0. Deliberately still missing, under the same rule that
+  keeps the vector comparison operators out: `Sign` (its zero case is not the BCL's),
+  `MoveTowards`/`LerpAngle`/`DeltaAngle` (all defined through `Sign`), `Approximately` (an unreadable
+  epsilon), `SmoothDamp*` (a state machine), the array `Min`/`Max` overloads, `Epsilon`, and the engine
+  internals. M11 removes `Mathf.Sqrt` and both the lane (`MissingMethodException`) and the gate
+  (`MISSING UnityEngine.CoreModule!UnityEngine.Mathf::Sqrt(Single)`) redden; green after the revert.
+- **The pure-helper batch (task-97, measured 2026-09-12).** Eight members a consumer's filters and labels
+  call, whose bodies were read from the game's own source rather than remembered: `GenText.NullOrEmpty` and
+  `GenText.SanitizeFilename` (Source/Verse/GenText.cs:326-334, platform invalid set plus a fixed tail, runs
+  collapsed, trailing dots trimmed), `GenCollection.Any<T>(List<T>, Predicate<T>)` and its `Count`
+  (GenCollection.cs:1032 and :1224), `TaggedString`'s three concatenations (TaggedString.cs:130-145),
+  `FloatRange.One` (FloatRange.cs:15) and `Translator.TryTranslate` (Translator.cs:27-45). One deliberate
+  deviation is documented in the double: the game's no-active-language branch logs an error and reports
+  SUCCESS with the key echoed, while the double's language data is its resolver, so found means the resolver
+  produced text - mirroring the quirk would make every lookup in a harness read as found. Measured after the
+  batch: stub types 50, payload 57 references, harness 72 (was 59), 129 in total, unresolved 0, exemptions 0.
+  M9 removes `GenCollection.Any` and both the lane (`MissingMethodException`) and the scan
+  (`MISSING Assembly-CSharp!Verse.GenCollection::Any(...)^1`) redden; green after the revert.
+- **A member whose semantics cannot be verified stays missing, and that is the ruling (maintainer ruling
+  2026-09-12).** The double does not carry the comparison operators on vectors or colours. In the game they
+  compare through an epsilon; a reference assembly ships stripped method bodies, so that rule cannot be read
+  from the artifact this repo gates on, and a guessed epsilon would silently change which branch a lane
+  takes. A missing member fails loudly (the trip guard when a lane drives it, then the reference-driven
+  scan); a guessed one lies quietly, and for a comparison the lie is worse than the throw. The evidence path
+  when a consumer genuinely needs it: the installed game's own `UnityEngine.CoreModule.dll` carries the real
+  implementation, so the epsilon can be read out of it and pinned by a lane - until then, not carried.
+- **Every stub member a lane calls is taken over by the gate (the other half of the same ruling).** A member
+  added to the double is not left as a declaration: `KernelStubCoverageTests` calls it and asserts its
+  semantics, which forces the harness to reference it, which is what puts it under the reference-driven scan
+  permanently. Adding coverage is therefore a two-part act - declare it, then be seen using it.
+- **The double's language/constant batch (task-95, measured 2026-09-12).** Of the 188 members a consumer's
+  built payload takes from the four stub-replaced game assemblies and this stub did not declare, the ones
+  that carry no game logic are now declared, because every consumer hits them and none of them needed a
+  judgement about game behaviour: `Rect.zero`; the arithmetic operators on `Vector2` and the whole
+  `Vector3` type (`x/y/z` fields, `zero`/`one`, `+ - * /`, `magnitude`, `sqrMagnitude`, `Distance`,
+  `Lerp`); `Color.black` and the named constants; `UnityEngine.Object.op_Equality/op_Inequality`;
+  `Time.frameCount` and `realtimeSinceStartup`; `Verse.UI.screenWidth/screenHeight` (declared as the two
+  public static FIELDS the reference assembly carries, not as properties - verified against 1.6.4871).
+  Every one is exercised by `KernelStubCoverageTests`, which is what puts it under the reference-driven
+  gate permanently: the scan now reads 57 payload references and 59 harness references (was 37), 0
+  unresolved, 116 in total. Mutation M7 (remove `Color.black`, rebuild) reds the lane with
+  `MissingMethodException` and makes the scan name
+  `UnityEngine.CoreModule!UnityEngine.Color::get_black()`; green after the revert.
+  **Two deliberate refusals belong to this batch.** The comparison operators on vectors and colours are
+  NOT carried: in the game they compare through an epsilon, a stripped reference assembly cannot show that
+  rule, and a guessed epsilon would silently change which branch a lane takes - a hole that throws is
+  better than a double that lies quietly. And `UnityEngine.Object`'s destroyed-object/fake-null behaviour
+  cannot be modelled by a managed double at all, so the operator is reference identity plus the null cases
+  and its doc-comment says exactly that. The game-object and rendering-backend members (Pawn/Scribe/Sound/
+  Def/Mod, Camera, Transform, `Widgets.Label`, `GenMapUI.DrawText`) stay OUT of the stub on purpose and
+  belong in a consumer's exemption table with reasons: two of them are containment-whitelist surface, and
+  growing the double to cover them would blur a boundary the product measures.
+- **The trip guard is session-level by design, and its wording now says so (maintainer ruling 2026-09-12).**
+  `UiSession.TrippedNodes` is cleared by `UiSession.Dispose` (`UiSession.cs:638`) and never by `BeginFrame`
+  (`:288-291`), so a recovery in frame 3 is still reported by a check taken after frame 9. The guard's docs
+  and failure text said "ended the frame in recovery", which reads as a per-frame sweep and invites the
+  wrong bug report when a later healthy frame still trips; they now say "in this session were replaced by a
+  recovery band" and the doc states the property and why it is stronger this way. Clearing in `BeginFrame`
+  was considered and **refused**: it would let frame 3's silent recovery be forgotten by frame 4, which
+  weakens the guard. A lane that deliberately trips and then draws healthy frames declares
+  `deliberateTrips: true`; none of FL's own lanes needs that switch (checked: the three guarded call sites
+  are healthy draws, and the one lane that plants a trip *expects* the guard to fail).
+- **A correction the lead owes the record (2026-09-11).** While reviewing the scroll-target work the lead
+  asked for "clear the request when the id does not resolve". That preference was wrong: the contract test
+  at `KernelContractTests.cs:297-303` already required an unresolvable target to **stay pending**, because a
+  target can legitimately sit in a tab that is not arranged yet -- clearing it would silently kill the
+  cross-tab jump the request exists for. The implementer kept the existing semantics and said why, which is
+  the behaviour this ledger wants from a lane that finds its instructions disagreeing with the code.
 
 - A PASS is recorded with its scope and its evidence class. The classes in this repo are, weakest to
   strongest: reference-assembly read, stub harness, compile-time, and in-game observation - and only the
@@ -1157,6 +1520,18 @@ colour token currently feeds layout — it is a future-regression guard, not pre
 
 ## Enduring corrections
 
+- **The `Warning`/`Danger` collapse rested on a census that read the wire as empty (correction, 2026-09-11).**
+  The 2026-09-10 census said the two names had no users, and the 0.4 window deleted `UiTheme.Warning` on that
+  basis. It measured **this** repository's source and inferred the consumer from it, and the inference was
+  wrong: `Coahuilite/UniversalSqueaker` `Source/UniversalSqueaker/UI/Kernel/UsKernelDraw.cs:27` takes
+  `theme.Warning` as the fill while the same expression takes `theme.Danger` as the border -- so removing the
+  name broke a consumer's build at compile time rather than a pixel at runtime (found by the independent
+  verifier while pairing a 0.4 carrier with the consumer tree, then confirmed here by compiling that tree
+  against the 0.4 payload: with the name absent it fails, with the name restored it builds clean). The name
+  is back as a redirect onto `Danger` -- the two always held one RGB -- and retires at the next minor
+  boundary, once the consumer has moved. **Rule reinforced:** a census of this repository is evidence about
+  *this* repository; "no users anywhere" is a cross-repo claim and is only as good as its citation.
+
 - A library **can** assert its own neutrality. The note in the US harness claiming otherwise was written
   before the blocklist self-exemption was pinned to a single path with a positive control.
 - `01-product-and-architecture-decisions-zh.md:208` (US repo) says the kernel's fallback text uses
@@ -1211,3 +1586,4 @@ colour token currently feeds layout — it is a future-regression guard, not pre
   rather than a leak, and the gate now measures accounts instead of name strings (see the privacy-gate
   record in this file). The lesson about re-running after remote-side history events stands; the
   history-rewrite advice does not.**
+- **File-driven invocation is the requirement; kind hot-reload is not (maintainer ruling 2026-09-14, carried across from the consumer's scope narrowing).** The consumer's 0.4.x window was cut back to a single feature port and takes no source changes, so wiring `ParseFile` is a **0.5.x** item. The requirement it must satisfy is now stated precisely: a layout or style file edit must be visible **after reopening the window**, with no game restart and no recompile, while **adding or changing widget kinds is explicitly excluded** (kinds are compiled). That is this library's own use/extend boundary with the use half moving from a copy embedded in the consumer's assembly to a file on disk; the embedded copy stays as the fallback. `UiHost` already takes both entry points at construction (`UiLayoutManifest` plus the optional `UiStyleDocument`), so no runtime tree mutation is needed - parse once at host creation, keep the previous page on failure, warn loudly. `TODO.md` §3 carries the wire-up.

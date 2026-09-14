@@ -78,5 +78,29 @@ internal static class Program
 
         Console.WriteLine("FerriteLib neutrality (no product vocabulary anywhere)...");
         failures += FerriteLibNeutralityTests.RunAll();
+
+        Console.WriteLine("Kernel leaf atoms (wrapped text / button / rule / slider / number field)...");
+        failures += KernelAtomTests.RunAll();
+
+        Console.WriteLine("Kernel resolved style table (tone x emphasis, one funnel)...");
+        failures += KernelResolvedStyleTests.RunAll();
+
+        Console.WriteLine("Kernel element identity (stable identity + per-element state)...");
+        failures += KernelIdentityTests.RunAll();
+
+        Console.WriteLine("Kernel writability (read-only bindings drive the disabled treatment)...");
+        failures += KernelWritabilityTests.RunAll();
+
+        Console.WriteLine("Kernel role attributes (Tone/Emphasis, fallback recording, density)...");
+        failures += KernelRoleAttributeTests.RunAll();
+
+        Console.WriteLine("Kernel style documents (two origins, precedence chain, fail-soft recording)...");
+        failures += KernelStyleDocumentTests.RunAll();
+
+        Console.WriteLine("Kernel style scopes (region theme in the live tree, page level, drop visibility)...");
+        failures += KernelStyleScopeTests.RunAll();
+
+        Console.WriteLine("Kernel stub coverage (game members the harness must carry, trip guard)...");
+        failures += KernelStubCoverageTests.RunAll();
     }
 }

@@ -43,9 +43,13 @@ public static class FerriteLibVersion
     /// failure shape reached a maintainer machine: an additive type (UiPopup) shipped without an Api
     /// bump, the old installed carrier passed Require, and the desync exploded inside UiHost.Draw.
     /// The 0.2.0 → 0.3.0 move is the US→FL round-1 set: P1, P2, P3, P4, P5 and P6 plus items A–E all
-    /// touched this surface, and they ship as one bump rather than one per item.
+    /// touched this surface, and they ship as one bump rather than one per item. The 0.3.0 → 0.4.0 move
+    /// is the style and atom sweep: the leaf atoms, the per-surface theme restructure, the geometry
+    /// tokens, and the scheme/density/role attributes on the atom schemas — all of it public surface, so
+    /// it is one minor, and it is the last minor in which breaking <c>UiTheme</c>'s shape is cheap,
+    /// because a second wired consumer is what starts the freeze.
     /// </summary>
-    public static readonly Version Api = new Version(0, 3, 0);
+    public static readonly Version Api = new Version(0, 4, 0);
 
     /// <summary>Human-readable identity for logs.</summary>
     public static string Describe()

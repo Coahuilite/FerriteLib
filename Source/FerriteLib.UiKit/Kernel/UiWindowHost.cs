@@ -49,8 +49,16 @@ public abstract class UiWindowHost : Window
     private bool noticeDueNextFrame;
     private Exception? lastFailure;
 
+    // Identity the shell's own text is attributed to in the fit audit, built once because the concrete
+    // type is already known here and a per-frame string would be a per-frame allocation.
+    private readonly string chromeScope;
+    private readonly string noticeScope;
+
     protected UiWindowHost()
     {
+        chromeScope = GetType().Name + "/chrome";
+        noticeScope = GetType().Name + "/notice";
+
         // The shell paints its own background, accent rule and close affordance, so the game's
         // equivalents must be off: two backgrounds or two close buttons is the defect this type
         // exists to prevent, not a style preference. Modality (forcePause, absorbInputAroundWindow,
@@ -129,8 +137,53 @@ public abstract class UiWindowHost : Window
     /// <summary>Accent rule painted along the top edge.</summary>
     protected virtual float AccentBarHeight => 3f;
 
-    /// <summary>Size of the close affordance.</summary>
-    protected virtual Vector2 CloseButtonSize => new Vector2(110f, 30f);
+    /// <summary>
+    /// The text ruler the chrome measures with. It is the same <see cref="ITextMetrics"/> seam a host
+    /// hands the fit audit (<see cref="UiFitAudit.Attach"/>), and it has to be the same *model* the audit
+    /// counts with: the shell now sizes its close affordance from a measurement, so two rulers would mean
+    /// the audit reporting a width the shell had just made enough room for. Defaults to the production
+    /// seam; a harness or a consumer with its own ruler overrides it and hands the same instance to both.
+    /// </summary>
+    protected virtual ITextMetrics Metrics => VerseFerriteTextMetrics.Instance;
+
+    /// <summary>Narrowest the close affordance may be: the shipped width for a short label.</summary>
+    private const float CloseButtonMinWidth = 110f;
+
+    /// <summary>Height of the close affordance. Text moves the width only; the band is fixed.</summary>
+    private const float CloseButtonHeight = 30f;
+
+    /// <summary>Breathing room left around the close label, per side.</summary>
+    private const float CloseButtonPadding = 10f;
+
+    /// <summary>
+    /// Size of the close affordance, derived from the label it has to hold: at least
+    /// <see cref="CloseButtonMinWidth"/> wide, otherwise the measured label plus
+    /// <see cref="CloseButtonPadding"/> on each side.
+    /// <para>
+    /// A fixed box was this shell's shipped shape and it is the wrong default <b>for a library</b>:
+    /// <see cref="CloseText"/> is the consumer's string, so any consumer whose wording or translation
+    /// grows past the constant gets its own label clipped by the shell's geometry — and the finding lands
+    /// on the chrome, not on the consumer who wrote the text. Sizing to the text is what makes that class
+    /// of defect impossible once, in the shell, instead of once per consumer; the floor keeps the shipped
+    /// look unchanged for the short labels it was designed around. The measurement runs through
+    /// <see cref="Metrics"/>, one unwrapped extent per frame, which is the same order of cost the audit
+    /// pays per label while it is enabled.
+    /// </para>
+    /// <para>
+    /// Overriding this property replaces the computation entirely — that is the escape hatch for a
+    /// consumer with its own chrome geometry, and it is the only supported way to keep a fixed size.
+    /// </para>
+    /// </summary>
+    protected virtual Vector2 CloseButtonSize
+    {
+        get
+        {
+            float measured = Metrics.MeasureWidth(CloseText, CloseFont);
+            return new Vector2(
+                Math.Max(CloseButtonMinWidth, measured + CloseButtonPadding * 2f),
+                CloseButtonHeight);
+        }
+    }
 
     /// <summary>Font size of the title line.</summary>
     protected virtual UiFont TitleFont => UiFont.Medium;
@@ -157,13 +210,13 @@ public abstract class UiWindowHost : Window
 
         if (pageUnavailable)
         {
-            DrawNotice(content, UiWindowNotice.PageUnavailable);
+            DrawNoticeScoped(content, UiWindowNotice.PageUnavailable);
             return;
         }
 
         if (!PrerequisiteVerified)
         {
-            DrawNotice(content, UiWindowNotice.Prerequisite);
+            DrawNoticeScoped(content, UiWindowNotice.Prerequisite);
             return;
         }
 
@@ -175,7 +228,7 @@ public abstract class UiWindowHost : Window
         {
             noticeDueNextFrame = false;
             pageUnavailable = true;
-            DrawNotice(content, UiWindowNotice.PageUnavailable);
+            DrawNoticeScoped(content, UiWindowNotice.PageUnavailable);
             return;
         }
 
@@ -211,7 +264,52 @@ public abstract class UiWindowHost : Window
             Math.Max(1f, inRect.height - TitleBarHeight - SidePadding));
     }
 
+    /// <summary>
+    /// The shell's own text is drawn inside a named scope, so a fit finding about it is addressable.
+    /// <para>
+    /// It exists because of what an unscoped finding costs: two windows can be on screen at once, and a
+    /// report that only says <c>"(unscoped)"</c> cannot say which window or which band produced it — the
+    /// ambiguity that made a real-machine investigation attribute a 128px finding to the wrong window.
+    /// The chrome is drawn before the page and outside every element scope, so it is exactly the text this
+    /// scope has to name; the notice is the consumer's own drawing but the shell is what calls it, so the
+    /// shell is what can say whose notice it is.
+    /// </para>
+    /// <para>
+    /// Trade-off, recorded rather than hidden: the identity is the concrete window TYPE, not a manifest
+    /// element path, because the shell has no id and no manifest yet when it paints chrome. Two instances
+    /// of one window class therefore share a chrome path; findings are keyed by path and text, so a
+    /// second instance's identical finding is deduplicated rather than misattributed. The <c>/chrome</c>
+    /// and <c>/notice</c> suffixes keep the two bands apart.
+    /// </para>
+    /// </summary>
     private void DrawChrome(Rect rect)
+    {
+        UiFitAudit.BeginElement(chromeScope);
+        try
+        {
+            DrawChromeCore(rect);
+        }
+        finally
+        {
+            UiFitAudit.EndElement();
+        }
+    }
+
+    /// <summary>Draws the notice inside the shell's notice scope; see <see cref="DrawChrome"/>.</summary>
+    private void DrawNoticeScoped(Rect content, UiWindowNotice notice)
+    {
+        UiFitAudit.BeginElement(noticeScope);
+        try
+        {
+            DrawNotice(content, notice);
+        }
+        finally
+        {
+            UiFitAudit.EndElement();
+        }
+    }
+
+    private void DrawChromeCore(Rect rect)
     {
         UiTheme theme = Theme;
         UiThemeDraw.Workspace(rect, theme);

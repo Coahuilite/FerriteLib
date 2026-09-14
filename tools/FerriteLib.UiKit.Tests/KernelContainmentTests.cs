@@ -18,6 +18,16 @@ namespace FerriteLib.UiKit.Tests;
 /// into a scratch copy: a scan that finds nothing because a path moved is the failure class this
 /// repository has already been burned by twice (see <c>MEMORY.md</c>, "Neutrality lane").
 /// </para>
+/// <para>
+/// A second family is measured beside it: <see cref="UiNative.Button(Rect)"/>, the context-free hit
+/// overload. It is not backend contact - it is the library's own seam - but it is the one call that
+/// bypasses the owned hit stack, so a call site that keeps it is the same kind of boundary breach as a
+/// raw <c>GUI.</c> call and is counted by the same allowlist discipline. Every library widget passes
+/// the context instead (<see cref="UiNative.Button(Rect, UiWidgetContext)"/>); the exception, its
+/// contract and its recovery condition are in <c>docs/api-tiers.md</c>, and this lane pins that
+/// contract to the measured call sites so the document cannot promise something the tree stopped
+/// doing.
+/// </para>
 /// </summary>
 internal static class KernelContainmentTests
 {
@@ -31,9 +41,20 @@ internal static class KernelContainmentTests
     /// <c>Kernel.Widgets</c> namespace; it counts only behind <c>Verse.</c>, where it is the real
     /// <c>Verse.Widgets</c> class.
     /// </para>
+    /// <para>
+    /// <c>GenMapUI</c> is in the owner set because this lane and the rule (c) scan a consumer runs over
+    /// its own tree (<c>tools/dependency-reality.ps1</c>) are two halves of one metric, and the pattern
+    /// set is the one thing they share: a term ratified on either half is added to both, or the halves
+    /// stop describing one boundary. The allowlists are not shared - each side rules on its own
+    /// exemptions, so a file sanctioned in one tree means nothing in the other. In this tree the term can
+    /// only ever be a violation: world-space rendering is a permanent non-goal here, so the library has
+    /// no legitimate call to the in-world labeling surface and no allowance is filed for it. A consumer
+    /// that keeps an in-world marker declares it in its own allowlist, counted and then exempted rather
+    /// than invisible.
+    /// </para>
     /// </summary>
     private static readonly Regex BackendAccess = new Regex(
-        @"(?<![A-Za-z0-9_.])(?<qual>UnityEngine\s*\.\s*|Verse\s*\.\s*)?(?<owner>GUI|GUIUtility|Mouse|Text|VerseWidgets|Widgets|Event)\s*\.\s*(?<member>[A-Za-z_][A-Za-z0-9_]*)",
+        @"(?<![A-Za-z0-9_.])(?<qual>UnityEngine\s*\.\s*|Verse\s*\.\s*)?(?<owner>GUI|GUIUtility|GenMapUI|Mouse|Text|VerseWidgets|Widgets|Event)\s*\.\s*(?<member>[A-Za-z_][A-Za-z0-9_]*)",
         RegexOptions.CultureInvariant);
 
     /// <summary>
@@ -55,11 +76,16 @@ internal static class KernelContainmentTests
             "VerseWidgets.TextField",
         },
         // The drawing outlet: everything that paints or writes a string goes through here.
+        // Text.WordWrap is granted beside Anchor and Font because here it is the same kind of state, not
+        // a second backend: the outlet's own singleLine parameter has to turn the wrap off for the draw,
+        // or the parameter is only an audit axis and an over-wide single-line label still wraps out of
+        // its row (the in-game author-credit popup row). Recorded 2026-09-15; retire with singleLine.
         ["UiThemeDraw.cs"] = new[]
         {
             "GUI.color",
             "Text.Anchor",
             "Text.Font",
+            "Text.WordWrap",
             "VerseWidgets.DrawBoxSolid",
             "VerseWidgets.Label",
         },
@@ -88,12 +114,71 @@ internal static class KernelContainmentTests
         },
     };
 
+    /// <summary>
+    /// The context-free hit overload, called by name: <c>UiNative.Button(&lt;one argument&gt;)</c>. One
+    /// argument is the whole point - the two-argument form passes the context and is the migration the
+    /// contract asks for, so a matcher that also reddened it would fail the answer it recommends. A
+    /// top-level comma is what separates the two overloads; commas nested inside the argument's own
+    /// parentheses (<c>new Rect(0f, 0f, 1f, 1f)</c>, <c>Make("a,b")</c>) are part of the one argument.
+    /// <para>
+    /// <b>Precision, measured rather than assumed (2026-09-12).</b> A corpus of call shapes was run
+    /// against this exact pattern. Caught: a bare variable, an inline construction, one nested call
+    /// (<c>UiNative.Button(Resolve(rect))</c>), a cast (<c>(Rect)boxed</c>), a double cast
+    /// (<c>(Rect)(value)</c>), a ternary, spaced <c>UiNative . Button ( r )</c>, a comma inside a string
+    /// literal, a call split across lines (the whole-file scan below), and a namespace-qualified name
+    /// (<c>Kernel.UiNative.Button(rect)</c>). Refused on purpose: any two-argument form, including
+    /// <c>UiNative.Button(rect, null)</c>. <b>Not caught, and this is the boundary:</b> an argument whose
+    /// own expression nests parenthesised calls two or more deep, e.g.
+    /// <c>UiNative.Button(F(Rect.MinMaxRect(0f, 0f, 1f, 1f)))</c> - a text pattern cannot recurse, so it
+    /// reaches one level of argument nesting and no further. The positive control carries that corpus, so
+    /// widening the reach is an edit to the control and the pattern together rather than a claim.
+    /// </para>
+    /// <para>
+    /// The shared pattern set with the rule (c) scan a consumer runs
+    /// (<c>tools/dependency-reality.ps1</c>) carries this same term, so both halves count one shape; the
+    /// allowlists stay each side's own ruling. This matcher reads whole-file code with whole-line comments
+    /// blanked, so a call split across lines is still seen; the rule (c) scan works line by line and
+    /// documents that narrower reach.
+    /// </para>
+    /// </summary>
+    private static readonly Regex ContextFreeHit = new Regex(
+        @"(?<![A-Za-z0-9_])UiNative\s*\.\s*Button\s*\((?:[^,()]|\([^()]*\))*\)",
+        RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// The exception in <c>docs/api-tiers.md</c>, in the document's own words. The sentence is a promise
+    /// about this tree ("the one library call site left raw"), and a promise no gate reads is a comment:
+    /// <see cref="VerifyDocContractMatchesTheMetric"/> fails when the sentence disappears, so rewording it
+    /// is a deliberate two-place edit rather than a silent drift.
+    /// </summary>
+    private const string DocumentedRawCallClaim = "the one library call site left raw";
+
+    /// <summary>
+    /// Files allowed to call the context-free hit overload by name. Each entry is one documented
+    /// exception, and the value is its ruling: what the file is for, when the exception was recorded and
+    /// what retires it. An entry that stops firing is reported by
+    /// <see cref="VerifyContextFreeHitAllowanceIsLoadBearing"/>, because a hole kept open for a call site
+    /// that no longer exists is how a boundary becomes a formality.
+    /// </summary>
+    private static readonly Dictionary<string, string> ContextFreeHitAllowed = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        // docs/api-tiers.md, "Contract for the context-free overload": the window shell's own chrome
+        // button. The chrome draws outside the page tree, so there is no context to hand the overload and
+        // no hit layer to arbitrate against - this is the one library call site the contract names.
+        // Recorded 2026-09-12. Retire it when the close affordance becomes a tree element (a page or a
+        // registered kind), or when the overload itself is removed at a minor boundary.
+        ["UiWindowHost.cs"] = "chrome close affordance draws outside the tree; no context and no layer to arbitrate (recorded 2026-09-12)",
+    };
+
     public static int RunAll()
     {
         int failures = 0;
         failures += Run("Backend contact stays inside the funnel files", VerifySourceIsContained);
         failures += Run("Containment scan fires on a planted violation", VerifyGateIsNotVacuous);
         failures += Run("Funnel allowlist has no dead entries", VerifyAllowlistIsStillLoadBearing);
+        failures += Run("The context-free hit overload stays inside its allowance", VerifyContextFreeHitIsContained);
+        failures += Run("Context-free hit allowance has no dead entries", VerifyContextFreeHitAllowanceIsLoadBearing);
+        failures += Run("The documented contract matches the measured call sites", VerifyDocContractMatchesTheMetric);
         return failures;
     }
 
@@ -124,6 +209,155 @@ internal static class KernelContainmentTests
     }
 
     /// <summary>
+    /// The second family: a named call to the context-free hit overload outside its allowance. The scope
+    /// is the same tree the backend scan reads, so one file cannot be contained by one half and loose in
+    /// the other.
+    /// </summary>
+    private static void VerifyContextFreeHitIsContained()
+    {
+        string tree = SourceTree();
+        List<string> violations = ScanContextFree(tree, tree, allowedFiles: false);
+        if (violations.Count > 0)
+        {
+            throw new Exception(
+                violations.Count + " context-free hit call(s) outside the allowance:\n    "
+                + string.Join("\n    ", violations));
+        }
+    }
+
+    /// <summary>
+    /// Every allowance must still be used. The same rule the funnel allowlist is held to, for the same
+    /// reason: an exception nobody uses is a hole kept open, and it is what lets a boundary become a
+    /// formality one commit at a time.
+    /// </summary>
+    private static void VerifyContextFreeHitAllowanceIsLoadBearing()
+    {
+        string root = SourceTree();
+        foreach (KeyValuePair<string, string> entry in ContextFreeHitAllowed)
+        {
+            string path = Path.Combine(root, "Kernel", entry.Key);
+            if (!File.Exists(path))
+            {
+                throw new Exception("The context-free hit allowance names a file that is gone: " + entry.Key);
+            }
+
+            if (CollectContextFreeHits(File.ReadAllLines(path)).Count == 0)
+            {
+                throw new Exception(
+                    entry.Key + " no longer calls the context-free overload; drop the allowance (its stated reason: "
+                    + entry.Value + ") instead of keeping an unused hole in the boundary.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// The document's promise, measured. <c>docs/api-tiers.md</c> names the exception ("the one library
+    /// call site left raw", the window shell's chrome button) and the migration, but before this check no
+    /// gate read either: the contract could keep promising one raw call site after the tree had five, or
+    /// after somebody reworded it into a different claim. Both directions fail here, so the sentence and
+    /// the call sites are one fact written in two places.
+    /// </summary>
+    private static void VerifyDocContractMatchesTheMetric()
+    {
+        string doc = Path.Combine(RepoRoot(), "docs", "api-tiers.md");
+        if (!File.Exists(doc))
+        {
+            throw new Exception("The tier document is missing, so the exception this metric measures has no home: " + doc);
+        }
+
+        string flattened = Flatten(File.ReadAllText(doc));
+        if (flattened.IndexOf("UiNative.Button(Rect)", StringComparison.Ordinal) < 0)
+        {
+            throw new Exception(
+                "docs/api-tiers.md no longer states the context-free overload contract (UiNative.Button(Rect)); "
+                + "the metric and the promise have come apart.");
+        }
+
+        if (flattened.IndexOf(DocumentedRawCallClaim, StringComparison.Ordinal) < 0)
+        {
+            throw new Exception(
+                "docs/api-tiers.md no longer promises \"" + DocumentedRawCallClaim + "\". That sentence is the "
+                + "exception this metric measures, so reword it only together with this check.");
+        }
+
+        string tree = SourceTree();
+        int measured = ScanContextFree(tree, tree, allowedFiles: true).Count;
+        if (measured != 1)
+        {
+            throw new Exception(
+                "docs/api-tiers.md promises exactly one raw call site (the window shell's chrome button); the "
+                + "tree has " + measured + ". Either the call site moved or the contract did.");
+        }
+    }
+
+    /// <summary>
+    /// Whole-line comments blanked, newlines kept: a call split across lines is still one call, and the
+    /// comment convention stays what the backend scan uses (a trailing comment after code counts as its
+    /// code line, because the code is what binds).
+    /// </summary>
+    private static List<string> CollectContextFreeHits(string[] lines)
+    {
+        var code = new System.Text.StringBuilder();
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i];
+            int first = 0;
+            while (first < line.Length && char.IsWhiteSpace(line[first])) first++;
+            bool wholeLineComment = first + 1 < line.Length && line[first] == '/' && line[first + 1] == '/';
+            if (!wholeLineComment) code.Append(line);
+            code.Append('\n');
+        }
+
+        var calls = new List<string>();
+        foreach (Match match in ContextFreeHit.Matches(code.ToString()))
+        {
+            calls.Add(match.Value);
+        }
+
+        return calls;
+    }
+
+    /// <summary>
+    /// Call sites of the context-free overload under <paramref name="tree"/>, either outside the allowance
+    /// (<paramref name="allowedFiles"/> false) or inside it (true), with paths relative to
+    /// <paramref name="root"/> so the positive control can drive the real scanner over a scratch copy.
+    /// </summary>
+    private static List<string> ScanContextFree(string root, string tree, bool allowedFiles)
+    {
+        var found = new List<string>();
+        foreach (string file in Directory.GetFiles(tree, "*.cs", SearchOption.AllDirectories))
+        {
+            if (IsGenerated(file)) continue;
+            if (ContextFreeHitAllowed.ContainsKey(Path.GetFileName(file)) != allowedFiles) continue;
+
+            foreach (string call in CollectContextFreeHits(File.ReadAllLines(file)))
+            {
+                found.Add(Relative(root, file) + ": " + call);
+            }
+        }
+
+        found.Sort(StringComparer.Ordinal);
+        return found;
+    }
+
+    /// <summary>
+    /// The tree both scans read. It is not the repository root: the harness itself contains this lane's
+    /// planted samples and the pattern text, so a scanner pointed at the root would report its own
+    /// positive control as a violation - which is exactly what the first version did.
+    /// </summary>
+    private static string SourceTree()
+    {
+        return Path.Combine(RepoRoot(), "Source", "FerriteLib.UiKit");
+    }
+
+    /// <summary>Whitespace collapsed, so a sentence keeps its meaning across a reflow of the document.</summary>
+    private static string Flatten(string text)
+    {
+        string[] words = text.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(" ", words);
+    }
+
+    /// <summary>
     /// Positive control. Three shapes have to fail: contact in a file nobody allowed, an unlisted
     /// symbol inside a file that is allowed, and the fully-qualified alias form. A gate that only
     /// caught the first would let the funnel files absorb the whole backend one member at a time.
@@ -151,10 +385,17 @@ internal static class KernelContainmentTests
                 Path.Combine(tree, "PlantedAlias.cs"),
                 "class PlantedAlias { void Read() { bool b = Mouse.IsOver(default); } }");
 
+            // The shared in-world term: this half of the metric must count it too, or the two halves
+            // would disagree about what the boundary is.
+            File.WriteAllText(
+                Path.Combine(tree, "PlantedWorldLabel.cs"),
+                "class PlantedWorldLabel { void Mark() { GenMapUI.DrawPawnLabel(default, \"x\", default); } }");
+
             List<string> violations = ScanWithRoot(tree, tree);
             Expect(violations, "PlantedWidget.cs", "VerseWidgets.Label");
             Expect(violations, "UiNative.cs", "GUI.Box");
             Expect(violations, "PlantedAlias.cs", "Mouse.IsOver");
+            Expect(violations, "PlantedWorldLabel.cs", "GenMapUI.DrawPawnLabel");
 
             // Comment-only contact must not fire: the funnel files document the very calls they own,
             // and a gate that counted <see cref> text would be worked around by deleting the docs.
@@ -164,6 +405,72 @@ internal static class KernelContainmentTests
             if (ScanWithRoot(tree, tree).Exists(v => v.IndexOf("PlantedComment.cs", StringComparison.Ordinal) >= 0))
             {
                 throw new Exception("Comment text was reported as backend contact; the scan is not comment-aware.");
+            }
+
+            // The context-free hit overload, called by name: the same boundary, the other half of it.
+            File.WriteAllText(
+                Path.Combine(tree, "PlantedRawHit.cs"),
+                "class PlantedRawHit { void Hit(Rect r) { if (UiNative.Button(r)) { } } }");
+
+            // The same defect with the rect built inline, so the matcher's reach past its own parentheses
+            // is tested rather than assumed.
+            File.WriteAllText(
+                Path.Combine(tree, "PlantedInlineRect.cs"),
+                "class PlantedInlineRect { void Hit() { if (UiNative.Button(new Rect(0f, 0f, 1f, 1f))) { } } }");
+
+            // The migration the contract asks for must NOT fire: a matcher that reddens the two-argument
+            // form would fail the answer it recommends, and the next reader would widen the allowance.
+            File.WriteAllText(
+                Path.Combine(tree, "PlantedMigratedHit.cs"),
+                "class PlantedMigratedHit { void Hit(Rect r, UiWidgetContext ctx) { if (UiNative.Button(r, ctx)) { } } }");
+
+            // A call split across lines is still one call.
+            File.WriteAllText(
+                Path.Combine(tree, "PlantedSplitHit.cs"),
+                "class PlantedSplitHit { void Hit(Rect r) { if (UiNative.Button(\n    r\n)) { } } }");
+
+            // The namespace-qualified name is the same call: a qualifier's dot is not part of an identifier.
+            File.WriteAllText(
+                Path.Combine(tree, "PlantedQualifiedHit.cs"),
+                "class PlantedQualifiedHit { void Hit(Rect r) { if (Kernel.UiNative.Button(r)) { } } }");
+
+            // The documented boundary, pinned as a control rather than trusted to prose: two levels of
+            // argument nesting are out of a text pattern's reach. Widening the pattern means editing this
+            // control and the precision note on the pattern together.
+            File.WriteAllText(
+                Path.Combine(tree, "PlantedDeepNesting.cs"),
+                "class PlantedDeepNesting { void Hit() { UiNative.Button(F(Rect.MinMaxRect(0f, 0f, 1f, 1f))); } }");
+
+            List<string> contextFree = ScanContextFree(tree, tree, allowedFiles: false);
+            Expect(contextFree, "PlantedRawHit.cs", "UiNative.Button(r)");
+            Expect(contextFree, "PlantedInlineRect.cs", "UiNative.Button(new Rect(0f, 0f, 1f, 1f))");
+            Expect(contextFree, "PlantedQualifiedHit.cs", "UiNative.Button(r)");
+            if (contextFree.Exists(v => v.IndexOf("PlantedDeepNesting.cs", StringComparison.Ordinal) >= 0))
+            {
+                throw new Exception(
+                    "The context-free pattern now reaches two levels of argument nesting, but the precision "
+                    + "note on the pattern still says one level. Update the note and this control together.");
+            }
+            if (!contextFree.Exists(v => v.IndexOf("PlantedSplitHit.cs", StringComparison.Ordinal) >= 0))
+            {
+                throw new Exception("A call split across lines was not reported; the context-free scan is line-bound.");
+            }
+
+            if (contextFree.Exists(v => v.IndexOf("PlantedMigratedHit.cs", StringComparison.Ordinal) >= 0))
+            {
+                throw new Exception(
+                    "The migrated two-argument form was reported as a context-free call; the pattern would "
+                    + "redden the very answer the contract asks for.");
+            }
+
+            // An allowlisted name is exempt by file, not by shape: the entry it does not have is what the
+            // funnel discipline is for, and this proves the allowance is consulted rather than assumed.
+            File.WriteAllText(
+                Path.Combine(tree, "UiWindowHost.cs"),
+                "class PlantedShell { void Hit(Rect r) { if (UiNative.Button(r)) { } } }");
+            if (ScanContextFree(tree, tree, allowedFiles: false).Exists(v => v.IndexOf("UiWindowHost.cs", StringComparison.Ordinal) >= 0))
+            {
+                throw new Exception("The allowlisted file was reported anyway; the context-free allowance is not consulted.");
             }
         }
         finally

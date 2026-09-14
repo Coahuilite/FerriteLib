@@ -59,7 +59,7 @@ provisional, and `CONTRIBUTING.md` is written when the freeze lands.
 ## Local verification and build
 
 ```powershell
-pwsh -NoProfile -File scripts/verify-local.ps1            # the gate suite (harness + builds + payload + content-free + licence + identity)
+pwsh -NoProfile -File scripts/verify-local.ps1            # the gate suite (harness + builds + payload + content-free + licence + identity + net472 trap scan)
 pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev   # + staged dev folder dist/dev/FerriteLib (no archive; you place it)
 pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory   # three-vector privacy gate, run before any push
 ```

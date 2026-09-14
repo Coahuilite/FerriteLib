@@ -33,6 +33,9 @@ public sealed class UiLayoutManifest
     private const int MaxDepth = 16;
     private const int MaxNodeCount = 512;
 
+    /// <summary>Longest <c>&lt;Styles&gt;</c> section accepted, in characters. The style parser has its own bounds.</summary>
+    private const int MaxStylesChars = 32768;
+
     private static readonly HashSet<string> SupportedElementNames = new(StringComparer.Ordinal)
     {
         "UiPage", "Stack", "Row", "Column", "Wrap", "Overlay", "Section", "Surface", "Scroll", "Clip", "Widget"
@@ -44,11 +47,19 @@ public sealed class UiLayoutManifest
 
     public IReadOnlyList<UiElementSpec> Roots { get; }
 
-    private UiLayoutManifest(string source, string schemaVersion, IReadOnlyList<UiElementSpec> roots)
+    /// <summary>
+    /// The optional <c>&lt;Styles&gt;</c> section, parsed by <see cref="UiStyleDocument.Parse"/> - the same
+    /// parser and the same vocabulary the standalone style file uses, which is what keeps the two text
+    /// origins from drifting. A manifest without the section carries the empty document.
+    /// </summary>
+    public UiStyleDocument Styles { get; }
+
+    private UiLayoutManifest(string source, string schemaVersion, IReadOnlyList<UiElementSpec> roots, UiStyleDocument styles)
     {
         Source = source;
         SchemaVersion = schemaVersion;
         Roots = roots;
+        Styles = styles;
     }
 
     public static UiLayoutManifest Parse(string xml)
@@ -88,6 +99,7 @@ public sealed class UiLayoutManifest
         IXmlLineInfo lineInfo = reader as IXmlLineInfo ?? NullLineInfo.Instance;
 
         int nodeCount = 0;
+        int pageLine = 0;
         string source = "";
         string schema = "";
 
@@ -108,6 +120,7 @@ public sealed class UiLayoutManifest
 
             schema = reader.GetAttribute("Schema") ?? "";
             source = reader.GetAttribute("Source") ?? "";
+            pageLine = lineInfo.LineNumber;
 
             if (schema.Length == 0)
             {
@@ -126,7 +139,7 @@ public sealed class UiLayoutManifest
 
             if (reader.IsEmptyElement)
             {
-                return new UiLayoutManifest(source, schema, Array.Empty<UiElementSpec>());
+                return new UiLayoutManifest(source, schema, Array.Empty<UiElementSpec>(), UiStyleDocument.Empty);
             }
 
             break;
@@ -139,6 +152,8 @@ public sealed class UiLayoutManifest
 
         var roots = new List<UiElementSpec>();
         var ids = new HashSet<string>(StringComparer.Ordinal);
+        UiStyleDocument styles = UiStyleDocument.Empty;
+        bool stylesSeen = false;
 
         while (reader.Read())
         {
@@ -158,10 +173,22 @@ public sealed class UiLayoutManifest
                             $"Unexpected nested element <{reader.Name}> at depth {reader.Depth}; expected a root-level element.");
                     }
 
+                    if (string.Equals(reader.Name, "Styles", StringComparison.Ordinal))
+                    {
+                        if (stylesSeen)
+                        {
+                            throw ParseError(lineInfo, "Duplicate <Styles> section; one manifest may carry one.");
+                        }
+
+                        stylesSeen = true;
+                        styles = ReadStylesSection(reader, lineInfo);
+                        break;
+                    }
+
                     if (!SupportedElementNames.Contains(reader.Name))
                     {
                         throw ParseError(lineInfo,
-                            $"Unsupported element <{reader.Name}>; expected one of: Stack, Row, Column, Wrap, Overlay, Section, Surface, Scroll, Clip, Widget.");
+                            $"Unsupported element <{reader.Name}>; expected one of: Stack, Row, Column, Wrap, Overlay, Section, Surface, Scroll, Clip, Widget, Styles.");
                     }
 
                     UiElementSpec root = ReadElement(reader, lineInfo, ref nodeCount, ids);
@@ -171,7 +198,8 @@ public sealed class UiLayoutManifest
                 case XmlNodeType.EndElement:
                     if (string.Equals(reader.Name, "UiPage", StringComparison.Ordinal))
                     {
-                        return new UiLayoutManifest(source, schema, roots);
+                        ValidateIdentitySegments(roots, pageLine);
+                        return new UiLayoutManifest(source, schema, roots, styles);
                     }
 
                     throw ParseError(lineInfo, $"Unexpected end element </{reader.Name}>.");
@@ -188,11 +216,47 @@ public sealed class UiLayoutManifest
         throw new FormatException("UI layout XML ended before the <UiPage> element was closed.");
     }
 
+    /// <summary>
+    /// Captures the <c>&lt;Styles&gt;</c> subtree and hands it to the one style parser. The manifest owns
+    /// only the capture: the section's vocabulary, its validation and its failures belong to
+    /// <see cref="UiStyleDocument"/>. A malformed section is not appearance-class here, because the section
+    /// is part of this XML text - a manifest that cannot be read is the existing page-level failure.
+    /// </summary>
+    private static UiStyleDocument ReadStylesSection(XmlReader reader, IXmlLineInfo lineInfo)
+    {
+        string xml;
+        using (XmlReader subtree = reader.ReadSubtree())
+        {
+            subtree.MoveToContent();
+            xml = subtree.ReadOuterXml();
+        }
+
+        if (xml.Length > MaxStylesChars)
+        {
+            throw ParseError(lineInfo,
+                $"The <Styles> section exceeds the maximum of {MaxStylesChars} characters.");
+        }
+
+        return UiStyleDocument.Parse(xml);
+    }
+
     private static UiElementSpec ReadElement(XmlReader reader, IXmlLineInfo lineInfo, ref int nodeCount, HashSet<string> ids)
     {
         string elementName = reader.Name;
         int elementLine = lineInfo.LineNumber;
         string id = reader.GetAttribute("Id") ?? reader.GetAttribute("id") ?? "";
+
+        // An Id names one element and is one identity segment (0.4.0 identity layer): the '/' that joins
+        // identity keys is the tree's structure, so an Id carrying one could spell a deeper path and
+        // hand two different elements the same key. Refused here, at creation time, beside the
+        // duplicate-Id rule this parser already owns; a real child element is how a tree adds a level.
+        if (id.IndexOf('/') >= 0)
+        {
+            throw ParseError(lineInfo,
+                $"Element Id '{id}' contains the path separator '/'; an Id names one element, so give it "
+                + "a name without '/'.");
+        }
+
         string kind = elementName;
 
         if (string.Equals(elementName, "Widget", StringComparison.Ordinal))
@@ -267,6 +331,7 @@ public sealed class UiLayoutManifest
                         throw ParseError(lineInfo, $"Unexpected end element </{reader.Name}> inside <{elementName} id=\"{id}\">.");
                     }
 
+                    ValidateIdentitySegments(children, elementLine);
                     return new UiElementSpec(id, kind, attributes, children);
 
                 case XmlNodeType.Text:
@@ -279,6 +344,39 @@ public sealed class UiLayoutManifest
         }
 
         throw new FormatException($"UI layout XML ended inside <{elementName} id=\"{id}\" Kind=\"{kind}\">.");
+    }
+
+    /// <summary>
+    /// A declared <c>Id</c> may not spell an unnamed sibling's generated identity segment (0.4.0
+    /// identity layer). Identity keys are structural paths, and an element without an <c>Id</c>
+    /// contributes <c>Kind[declaredIndex]</c>; an Id written as exactly that would give two siblings
+    /// one key, which is the alias the identity layer exists to remove. Refused here, at creation
+    /// time, next to the duplicate-Id rule it is the sibling of: a silently shared identity surfaces
+    /// far from the manifest that caused it, as a control that keeps another control's state.
+    /// </summary>
+    private static void ValidateIdentitySegments(IReadOnlyList<UiElementSpec> siblings, int line)
+    {
+        HashSet<string>? generated = null;
+        for (int i = 0; i < siblings.Count; i++)
+        {
+            UiElementSpec sibling = siblings[i];
+            if (sibling.Id.Length > 0) continue;
+            generated ??= new HashSet<string>(StringComparer.Ordinal);
+            generated.Add(UiNodeId.GeneratedSegment(sibling.Kind, i));
+        }
+
+        if (generated == null) return;
+
+        for (int i = 0; i < siblings.Count; i++)
+        {
+            UiElementSpec sibling = siblings[i];
+            if (sibling.Id.Length == 0 || !generated.Contains(sibling.Id)) continue;
+            throw new FormatException(
+                $"Invalid UI layout XML at line {line}: element Id '{sibling.Id}' is also the generated "
+                + "identity segment of an unnamed sibling of the same parent (an unnamed element's identity "
+                + "is its Kind plus its declared index). Two siblings would share one identity key; give "
+                + "either sibling a distinct Id.");
+        }
     }
 
     private static int BumpNode(int count, IXmlLineInfo lineInfo)
