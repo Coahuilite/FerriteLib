@@ -27,13 +27,13 @@
        UnityEngine.CoreModule / Assembly-CSharp 桩程序集。它们不参与本项目的编译引用，因此
        不写成 ProjectReference，而是在主构建后显式构建并复制到输出目录。 -->
   <Target Name="BuildAndCopyUiKitRuntimeStubs" AfterTargets="Build">
-    <Exec Command="dotnet build &quot;Stubs\UnityEngineStub\UnityEngineStub.csproj&quot; -c $(Configuration) --nologo -v quiet"
+    <Exec Command="dotnet build &quot;Stubs\UnityEngineStub\UnityEngineStub.csproj&quot; -c $(Configuration) --nologo -v quiet -m:1"
           WorkingDirectory="$(MSBuildProjectDirectory)" />
-    <Exec Command="dotnet build &quot;Stubs\UnityEngineImGuiStub\UnityEngineImGuiStub.csproj&quot; -c $(Configuration) --nologo -v quiet"
+    <Exec Command="dotnet build &quot;Stubs\UnityEngineImGuiStub\UnityEngineImGuiStub.csproj&quot; -c $(Configuration) --nologo -v quiet -m:1"
           WorkingDirectory="$(MSBuildProjectDirectory)" />
-    <Exec Command="dotnet build &quot;Stubs\UnityEngineTextRenderingModuleStub\UnityEngineTextRenderingModuleStub.csproj&quot; -c $(Configuration) --nologo -v quiet"
+    <Exec Command="dotnet build &quot;Stubs\UnityEngineTextRenderingModuleStub\UnityEngineTextRenderingModuleStub.csproj&quot; -c $(Configuration) --nologo -v quiet -m:1"
           WorkingDirectory="$(MSBuildProjectDirectory)" />
-    <Exec Command="dotnet build &quot;Stubs\VerseStub\VerseStub.csproj&quot; -c $(Configuration) --nologo -v quiet"
+    <Exec Command="dotnet build &quot;Stubs\VerseStub\VerseStub.csproj&quot; -c $(Configuration) --nologo -v quiet -m:1"
           WorkingDirectory="$(MSBuildProjectDirectory)" />
     <ItemGroup>
       <UiKitRuntimeStub Include="$(MSBuildProjectDirectory)\bin\stubs\unityengine\UnityEngine.CoreModule.dll" />

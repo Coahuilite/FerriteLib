@@ -76,11 +76,16 @@ internal static class KernelContainmentTests
             "VerseWidgets.TextField",
         },
         // The drawing outlet: everything that paints or writes a string goes through here.
+        // Text.WordWrap is granted beside Anchor and Font because here it is the same kind of state, not
+        // a second backend: the outlet's own singleLine parameter has to turn the wrap off for the draw,
+        // or the parameter is only an audit axis and an over-wide single-line label still wraps out of
+        // its row (the in-game author-credit popup row). Recorded 2026-09-15; retire with singleLine.
         ["UiThemeDraw.cs"] = new[]
         {
             "GUI.color",
             "Text.Anchor",
             "Text.Font",
+            "Text.WordWrap",
             "VerseWidgets.DrawBoxSolid",
             "VerseWidgets.Label",
         },

@@ -14,8 +14,10 @@ namespace FerriteLib.UiKit.Kernel;
 public static class UiThemeDraw
 {
     /// <param name="singleLine">
-    /// True for labels that must stay on one line (badges, dropdown display text). The fitting audit then
-    /// checks width instead of height, because for those labels wrapping is not an available answer.
+    /// True for labels that must stay on one line (badges, dropdown display text). It is a rendering
+    /// promise, not only an audit axis: the wrap state is turned off around the draw, so an over-wide
+    /// single-line label is clipped horizontally instead of wrapping out of its row. The fitting audit
+    /// then checks width instead of height, because for those labels wrapping is not an available answer.
     /// </param>
     public static void Label(Rect rect, string text, UiTheme theme, Color? color = null, UiFont? font = null, TextAnchor anchor = TextAnchor.MiddleLeft, bool singleLine = false)
     {
@@ -27,15 +29,22 @@ public static class UiThemeDraw
         Color oldColor = GUI.color;
         TextAnchor oldAnchor = Text.Anchor;
         GameFont oldFont = Text.Font;
+        bool oldWrap = Text.WordWrap;
         try
         {
             Text.Font = UiKitFonts.ToGameFont(resolvedFont);
             Text.Anchor = anchor;
+            // Verse's label renderer wraps by default, so a declared single-line label used to wrap
+            // anyway and paint out of its own row while the width axis reported the same finding (the
+            // in-game author-credit popup row): a wrapping row is what the declaration exists to refuse.
+            // The save/restore is the same process-global dance the font and anchor get above.
+            if (singleLine) Text.WordWrap = false;
             GUI.color = color ?? theme.TextPrimary;
             VerseWidgets.Label(rect, text);
         }
         finally
         {
+            Text.WordWrap = oldWrap;
             Text.Font = oldFont;
             Text.Anchor = oldAnchor;
             GUI.color = oldColor;
