@@ -494,8 +494,8 @@ identity is created locally at upload time.
       still 404 as the rc window requires, and `main` = tag = `b60f7fd`. The cut moved no version axis: the
       0.4.0 sweep (leaf atoms, the three style classes, the `UiTheme` restructure) was already on `0.4.x`
       before the merge, so `Api` / `<modVersion>` / `<VersionPrefix>` are 0.4.0 on `main` and the consumer's
-      `[0.4.0, 0.5.0)` pin is satisfied - no re-pin is pending. Every ref in this repo is pushed: `0.4.x`
-      trails `main` only by the merge and all of its commits are reachable from `main`. The remaining sweep
+      `[0.4.0, 0.5.0)` pin is satisfied - no re-pin is pending. Every ref in this repo is pushed: `0.4.x` now carries the rc1 record commit (`5971cfd`) and is
+      one docs commit ahead of `main`, which itself stays at the tag. The remaining sweep
       work in the item above is unchanged and still owned here.
 
 - [x] **Repository name ruled by the maintainer 2026-09-07: `FerriteLib`, PascalCase** — matching the
