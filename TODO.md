@@ -489,6 +489,15 @@ identity is created locally at upload time.
       commit. US's re-pin to `[0.4.0, 0.5.0)` is a cross-repo write — report it in a round, never edit it
       here — and until that lands the sibling checkout has to stay on a 0.3-axis branch, because `Require`
       will correctly refuse the pair.
+- [x] **`v0.4.0-rc1` cut and published 2026-09-14 - the 0.4 axis now has a real rc in the field.** CI
+      published it as a prerelease with one asset, `FerriteLib-v0.4.0-rc1.zip` (68,777 B), `/releases/latest`
+      still 404 as the rc window requires, and `main` = tag = `b60f7fd`. The cut moved no version axis: the
+      0.4.0 sweep (leaf atoms, the three style classes, the `UiTheme` restructure) was already on `0.4.x`
+      before the merge, so `Api` / `<modVersion>` / `<VersionPrefix>` are 0.4.0 on `main` and the consumer's
+      `[0.4.0, 0.5.0)` pin is satisfied - no re-pin is pending. Every ref in this repo is pushed: `0.4.x`
+      trails `main` only by the merge and all of its commits are reachable from `main`. The remaining sweep
+      work in the item above is unchanged and still owned here.
+
 - [x] **Repository name ruled by the maintainer 2026-09-07: `FerriteLib`, PascalCase** — matching the
       series convention (`SqueakyRatkin`, `UniversalSqueaker`, both measured live on GitHub). The earlier
       "lowercase or a Linux runner breaks" argument is void on evidence: GitHub resolves owner/repo

@@ -304,6 +304,14 @@
   `docs/api-tiers.md`'s "Breaking changes inside the open 0.4 window" section, which is now where a moved key
   space, the call that no longer binds and its bridge are recorded before a consumer finds them by compiling.
 
+- **`v0.4.0-rc1` is cut (2026-09-14).** Released through this repo's own release CI as a prerelease: asset
+  `FerriteLib-v0.4.0-rc1.zip` (68,777 B), six-point reconciliation green, `/releases/latest` still 404s, which
+  is the correct state while only rc iterations exist. `main` and the tag agree; no public-surface change
+  accompanied the cut, so `Api` stays 0.4.0 and no consumer pin moves. The payload must be built as a Release
+  build with the project's `dev` suffix overridden (`-p:VersionSuffix=`), or the stager refuses the bytes as a
+  dev build - the same class of refusal that caught the consumer's carrier, where a build outside its git
+  checkout came out with no commit suffix at all.
+
 ## Charter — what this library is for
 
 - **The founding spec, transcribed.** `Coahuilite/UniversalSqueaker@09366f8:docs/ui-shared-library-design-zh.md`
