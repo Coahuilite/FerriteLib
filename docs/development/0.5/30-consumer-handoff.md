@@ -55,6 +55,8 @@ FerriteLibVersion.Require(new Version(0, 5, 0), new Version(0, 6, 0), "your.pack
 - **实机行为未由本仓证明。** 激活/层级/输入穿透/模态共存等组合行为是 IL 级事实推导 + 自动化断言，
   必须由消费者团队在真实游戏里验收（清单见 `../../in-game-walkthrough.md` 与 [40-verification.md](40-verification.md)）。
 
+- **重载会重置文档可设置的主题令牌。** 热重载提交前会把注入 `UiTheme` 的、可由样式文档设置的令牌恢复为 host 构造时的值，否则被删除的覆盖会继续生效。**后果**：若消费者在 host 构造之后重新调过这些令牌之一，下一次重载提交会丢掉这次调整。要保留就请在重载后重新应用，或把该调整放进样式文档。此行为由 P4 的独立验证实测（`docs/development/0.5/verification/p4-adversarial.md`），尚未决定是否在 0.5 内修正。
+
 ## 5. 交接节奏
 
 | 阶段 | 交付物 | 消费者可开始做什么 |
