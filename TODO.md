@@ -5,14 +5,17 @@
 Branch `0.5.x`, contract axis 0.5.0. Scope, packages, ownership and status: `docs/development/0.5/`.
 This section is a pointer only; the round's live status has one home and it is that directory.
 
-- [ ] Window instances — generic shell + keyed identity + focus/active-target + pause policy (P1).
-- [ ] Bindings — per-key notification, batch commit, invalidation classes, command executability,
-      conditional visibility (P2).
-- [ ] Collections and common controls — keyed repeater, checkbox, progress, hierarchy tree (P3).
-- [ ] Documents — file sources, dependency tracking, candidate validation, atomic batch commit,
-      last-known-good, manual reload (P4).
-- [ ] Diagnostics — per-host/session subscriptions and attributed, bounded events (P5).
-- [ ] Delivery — neutral fixture, dev package, consumer handoff, in-game checklist (P6).
+- [x] Window instances — generic shell + keyed identity + focus/active-target + pause policy (P1+P1h).
+- [x] Bindings — per-key notification, batch commit, invalidation classes, command executability,
+      conditional visibility (P2+P2b+P2c).
+- [x] Collections and common controls — keyed repeater with a template table, checkbox, progress, tree (P3).
+- [x] Documents — file sources, dependency tracking, candidate validation, atomic batch commit,
+      last-known-good, manual reload (P4+P4b+P4c).
+- [x] Diagnostics — per-host/session subscriptions, attributed bounded events, and the shell/page routing
+      seams that make them reachable (P5 + task-13 + task-14).
+- [ ] Delivery — dev package `0.5.0-dev` at `ef133b3` and the consumer handoff are done; what remains is
+      external: in-game acceptance (A1-A11) and a real consumer compiling against `[0.5.0,0.6.0)`. Both are
+      other teams' steps and neither may be recorded as done from here.
 - Supersessions this round registers (detail in `docs/development/0.5/00-baseline.md` §2): confirmed
   public capabilities no longer wait for a consumer to hand-roll them first; hot reload now targets the
   open window, not the reopened one; and the 0.4 node/hit-stack state is restated accurately.
@@ -529,165 +532,3 @@ identity is created locally at upload time.
       HintPath actually resolves). Creating `Coahuilite/FerriteLib` also squat-proofs the variants:
       GitHub forbids a second case-variant under one owner, so every misspelling redirects here.
       Availability measured 2026-09-07: both variants free under the owner, zero global name collisions
-      (`Ferrite*` hits are unrelated projects), the `FerriteLib` user/org handle is free, and NuGet
-      `FerriteLib` / `FerriteLib.UiKit` are both unclaimed (404) — relevant only if §4's feed ever turns on.
-- [x] **Repository created and pushed 2026-09-07 (maintainer authorization this session).**
-      `gh repo create Coahuilite/FerriteLib --public` → SSH remote → `git push -u origin main` at
-      `bdbeae0`. The token's missing `workflow` scope never bit: the push went over SSH, and both
-      workflow files landed and ran (measured: `contents/.github/workflows` lists ci.yml + release.yml).
-      Rehearsal executed in the rc dialect: `v0.2.0-rc1` tagged on the tip, Actions Release run green,
-      **the platform's server-computed digest `sha256:e8a54be6…` equals a local `pack-release.ps1` run
-      of the same commit byte-for-byte** — the digest-determinism fix from this morning is what made
-      that check meaningful; it would have failed on timing before it. CI on main green on the first run.
-      **Overstep corrected the same day:** the bare `v0.2.0` was also tagged and released in that flow,
-      and the maintainer ruled it premature - the push authorization covered the repo and the rc trial,
-      not ending the trial. Release and tag withdrawn (`gh release delete --cleanup-tag`); the page is
-      back to rc-only, `/releases/latest` 404s as the scheme intends. Consequence encoded by the gate,
-      not by trust: the tip has moved past rc1's commit since, so the eventual stable is `v0.2.0-rc2` at
-      the then-tip plus the bare tag on that same commit - a bare `v0.2.0` on today's tip would be
-      rejected by `release.yml`'s final-state anchor. Cutting a stable release is a maintainer decision,
-      never a pipeline step.
-- [x] **`About/About.xml <url>` filled 2026-09-07** with `https://github.com/Coahuilite/FerriteLib` —
-      the naming ruling made the url a pure function of a decided value. It is the only pointer a player
-      or modder gets inside the game. No Workshop id exists yet, and no `<steamAppId>` goes in before any
-      Workshop upload. If the repository is ever renamed, this line and the two pack scripts' source
-      pointers move together.
-- [ ] **US side: the link itself** - **cross-repo write, needs maintainer authorization.** The mechanism is
-      one derived line in US's release body plus one pin, and it must be derived from a single source so the
-      two cannot drift:
-      `PrerequisiteApiMin` / `PrerequisiteApiMax` in
-      `Coahuilite/UniversalSqueaker@09366f8:Source/UniversalSqueaker/Mod.cs:27-28` (both re-derived
-      2026-09-09: `0.3.0` / `0.4.0`) is the truth for which lib range US was compiled against, so the link must
-      be **resolved from that range, not string-built from the floor**: the floor is only the minimum, so if
-      lib has since shipped a later patch inside the window, linking to the floor's tag sends players to an
-      older carrier than the one US was tested against. US's `release.yml` should list lib's releases and
-      take the highest whose base version
-      satisfies `>= min` and `< max`, and then fail the release if (a) no release satisfies the range, (b) the
-      chosen release is a prerelease while US is being released as stable, or (c) a lib payload exists in US's
-      own stage directory. (c) already exists as `stage-package.ps1:41-45` and US gate 9; both stay valid
-      under this decision unchanged. Pin the resolved tag into the release body, so the pairing is a published
-      fact rather than something a reader has to recompute. Status 2026-09-07 (US feedback round): US's CI
-      carrier checkout is deliberately **unpinned** - it tracks this repo's default branch so lib breakage
-      surfaces early in US's CI (measured: its gate 13 death on DLL-only staging caught a real staging bug);
-      that makes the release-body link the only pinned half, and US's `release.yml` does not carry it yet
-      (grep: no tag link, no digest line). The item stays open until US lands it.
-      After US's first release, run `scripts/verify-release.ps1` from this repo against it
-      (`-Repo Coahuilite/universalsqueaker -AssetPrefix UniversalSqueaker`): the checks are generic
-      (prerelease-flag-vs-tag, draft, single asset, digest, latest-pointer, dangling tags) and US has
-      the same rc exposure once its own trials start.
-- [x] **Cross-repo hash anchor applied 2026-09-07.** US executed its targeted blob rewrite and reported
-      the commit-map mapping `0fe60b0 -> 6c7053a`; `MEMORY.md:8` now cites the new hash with the old one
-      recorded as its pre-rewrite name. Verified independently from this repo: `6c7053a` is reachable from
-      US `main` and carries the identical message; `0fe60b0` resolves only as a dangling local object.
-      US's one-time guide was deleted pre-push (their ruling; survivors folded into US `MEMORY.md`), so
-      the method pointer is `modding_documents/privacy-debt-vector-triage-zh.md`, which is maintainer-local
-      and present in no clone.
-- [x] **US's CI dependency chain — settled by US's own session, superseding this sketch.** What was
-      written here (`path: ../ferritelib`) is impossible: `actions/checkout` resolves `path` inside
-      `GITHUB_WORKSPACE` and throws on anything outside (US verified against the action's own
-      `input-helper.ts`). US landed the working variant — carrier checkout to the `ci-ferritelib/`
-      subdir, build there, run-step copy to the sibling path the HintPath expects (path math verified
-      in US `MEMORY.md`). Follow-through closed by re-derivation 2026-09-09: US's two workflows now read
-      `repository: Coahuilite/FerriteLib` (`ci.yml:40`, `release.yml:36`), so the case alignment this bullet
-      asked for is done — the case-insensitive-resolution note survives only as archaeology. No FL action;
-      **cross-repo write, report, do not edit.**
-- [ ] **The four widget kinds nobody consumes** (`section/header`, `state/empty`, `input/mode-row`,
-      `input/stepper-slider`) become public on the day this repo is public. See §3 for the decision; it is
-      cheaper to make before the first release than after somebody compiles against them.
-- [ ] **The one thing this decision actually changes: publishing makes the library referenceable by
-      strangers.** With lockstep releases and one consumer, a breaking change is genuinely fine - our own
-      mismatch path already degrades to a readable `Require` error rather than a crash. What is not
-      reversible is that a Workshop page with a stable packageId turns `FerriteLib.UiKit` into something
-      any modder can compile against, and from their first build our breaking edits become their breakage.
-      That is the real one-way door, and it is independent of our own discipline.
-      Decide before the upload, in one line on the page: is third-party use **invited** (then `§3` and the
-      per-surface theme restructure in `§4` should land first, because they are breaking by their own
-      admission and will stop being cheap afterwards), or **unsupported** (then we may keep breaking it
-      for as long as US is the only consumer, and say so plainly). Both are fine; discovering the choice
-      after someone builds on us is the only bad outcome.
-      Round 1 enlarged the door without changing its nature: `UiWindowHost` is the largest new freeze
-      surface the library has ever shipped, and it landed **before** the second wired consumer exists —
-      which is exactly the pressure the freeze rule waits for, so the shell is provisional in a way that
-      a theme token is not. If the call is "invited", the shell is the item most likely to need reshaping
-      once a second consumer pressures it; say so on the page rather than implying the chrome API is done.
-- [~] `About.xml` description rewritten 2026-09-07 (bilingual, answers "what is this doing in my mod
-      list", says not to uninstall while a consumer is present). **Preview image still missing** - it is
-      a Workshop-page asset and the Workshop step is undecided; nothing player-facing is published
-      without it.
-- [x] **README landed with the push 2026-09-07**: `README.md` + `README.zh-CN.md`, bilingual interlinked,
-      scoped to what is true (two layers, no content, one DLL, verify commands, which mods need it), no
-      counts. `CONTRIBUTING.md` deliberately **not** written - its existence is the item below's output,
-      and the README states the currently-true stance (bug reports welcome, PRs not promised while the
-      surface is provisional).
-- [x] **Third-party use: ruled INVITED on 2026-09-10** (maintainer), which settles the item that had been
-      open since the Workshop decision — "a stable packageId plus a browsable repository is what a modder
-      compiles against whether or not anyone invited them" was the correct read, and the ruling accepts it
-      instead of tolerating it. Consequences, all now derived rather than optional: §3's identity layer,
-      announce, hit stack and focus traversal plus §4's per-surface theme restructure are **pre-stable
-      debt**, because every one of them is breaking by its own admission and the cheap moment to pay is
-      before anything compiles against the current shape; a `CONTRIBUTING.md` is owed as the second half of
-      the offer (`MEMORY.md` Charter: the nearest precedent, Lightweave, advertises itself as a shared
-      dependency in About.xml while its README says primitives may break freely — invitation without
-      contract is the failure mode this repo now has to refuse); and `README.md`'s "PRs are not promised
-      while the surface is provisional" line stays true only while it is paired with a written list of what
-      the provisional surface will not do.
-- [x] **Published-contract proposal — approved by the maintainer on 2026-09-10 ("草案我们先用；真实需求总比
-      虚空打靶强")**, with the deprecation clause strengthened: an attribute under retirement keeps working,
-      **redirected** to its replacement, for at least one minor, and full removal happens only at a minor
-      boundary. Status of each part:
-  1. **DONE** — `docs/api-tiers.md` (40 exported types: 12 stable, 20 public-unstable, 8
-     internalize-candidate) with `FerriteLibApiTierTests` enforcing classification, staleness, the pinned
-     stable list and a planted-name control. Mutation-proven by renaming a stable entry: four red lanes with
-     exact names, green on restore.
-  2. **Half-approved, both halves open.** The `.props` release asset (compile reference without shipping a
-     runnable DLL) is the step to take; the metadata-only `.Ref` package waits until a stranger needs it.
-     **Briefing owed to the maintainer, on his request and not yet delivered:** explain concretely what a
-     `.props` file is versus a `.Ref` package, why one is a build-script include and the other is a
-     non-executable metadata assembly, and which promise each one buys. Do not let the next session assume
-     he already knows; he asked to be told after the decision, not before it.
-  3. **Decided, wording owed.** The one-sentence promise goes into both READMEs now, and into the release
-     body when `v0.3.0-rc1` is cut — the last one is the cutter's step, not a script change to land blind,
-     because `release.yml`'s body is what a player reads.
-  4. **Ruled, not implemented** — tracked in §3 as the deprecation channel item; the current creation
-     contract refuses unknown attributes outright, so there is today no mechanism to accept-and-redirect.
-      What this deliberately still excludes is a NuGet feed, any back-compat shim layer, and multi-version
-      support.
-
-## 6. Documentation hygiene: what this audit found, and the rule that keeps it from coming back
-
-Every item below was produced by reading code and both repos' scripts, not by reading a document. Four
-claims that were circulating in prose turned out not to hold; all four are corrected in `MEMORY.md`, and
-these are the follow-throughs.
-
-- [x] `About/About.xml`'s header comment stale claims fixed 2026-09-07: "License stays undecided" now
-      names MPL-2.0, "local NuGet feed" now describes the actual sibling-`HintPath` + `<Private>False`
-      scheme, and the comment records the repository-name ruling next to the display-name confirmation.
-      The comment ships inside the mod package, so it is a durable text a reader will meet.
-- [x] Gate 6's licence claim corrected in `MEMORY.md`: it is the sixth gate, and it asserts local text
-      structure only. The cross-repo parity half belongs to the consumer, so `MEMORY.md` must keep naming
-      it that way.
-- [x] Consumer banned-substring list corrected to five names; the phantom `UiPanel` still sits in the
-      consumer's own `MEMORY.md:81` prose and will travel back into this repo from there unless fixed at
-      source. Worth a one-line correction over the fence next time that repo is open (its docs, not its
-      code). RESOLVED at source 2026-09-08: US added `UiPanel` to the scan
-      (`UiSourceInvariantTests.cs:153`) rather than deleting it from the rule; the list is now six and
-      the prose is accurate. Re-derived, not re-trusted — the earlier "re-verified" claim was itself
-      wrong in the other direction, for the same reason this bullet exists.
-- [ ] **Standing rule, once this repo has a Workshop page:** a gate's *capability* is whatever its script
-      does, and the only way to keep prose honest is to name the file and line range when claiming one.
-      "Gate 6 rejects divergence from a consumer's copy" survived one full revision cycle because it read
-      like a confident summary of a check nobody re-opened. The same class of error is what `MEMORY.md`'s
-      neutrality lane records twice, in the other direction.
-- [ ] Open question worth one line of policy: is a one-directional series guard acceptable at all, given
-      that the neutrality scan was moved *into* this repo precisely because a consumer-side check passed
-      vacuously after the split? The actionable version is §3's two-sided-guard item.
-- [ ] **Queued documentation work (2026-09-10), not to be written in this pass:** `docs/design-charter.md`
-      carrying the tier-by-tier comparison of a retained layer's irreducible core against this library's
-      actual standing, one external source per row. The substance already exists as prose in `MEMORY.md`
-      "Charter"; the file exists so a stranger can be shown *why* the number is five rather than being told.
-      Write it together with the API-tier list if §5's contract proposal is approved, so one document answers
-      purpose and promise and the two are never maintained apart.
-
-**Method note for whoever picks this up.** Derive every number with `git ls-files` + `wc -l` / `grep -c`,
-and every gate claim from a read of the named range. A figure or capability repeated from prose inherits
-whatever error the last author measured into it - which is how all four defects above survived a day.

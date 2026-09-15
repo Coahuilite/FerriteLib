@@ -18,7 +18,20 @@ pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev
 | 包 | 内容 revision | 对应源码提交 | 含包 | 位置 |
 | --- | --- | --- | --- | --- |
 | 第一个开发包 0.5.0-dev | `0.5.0-dev` | 见 `dist/dev/FerriteLib/version.txt` 的 `commit=` 行（构建时树必须干净；带 `-dirty` 表示构建时存在未提交改动，则该包不对应任何提交） | P1 + P1h + P2 + P2b + P4 + P4b | `dist/dev/FerriteLib/` |
-| 第二个开发包 | 待生成 | 待生成 | 加 P3 + P5 | `dist/dev/FerriteLib/` |
+| **第二个开发包（当前交付版本）** | `0.5.0-dev` | `ef133b3067da9ce6e52f20c59f7c3863b26920b8`（`ef133b30 67da`） | P1+P1h+P2+P2b+P2c+P3+P4+P4b+P4c+P5+task-13+task-14（全部包） | `dist/dev/FerriteLib/` |
+
+**当前交付版本（干净树构建，`commit=` 与 `HEAD` 逐字符相等）**：
+
+| 项 | 值 |
+| --- | --- |
+| 标签 | `0.5.0-dev` |
+| 源码提交 | `ef133b3067da9ce6e52f20c59f7c3863b26920b8` |
+| 位置 | `dist/dev/FerriteLib/`（5 个文件：`About/About.xml`、`1.6/Assemblies/FerriteLib.UiKit.dll`、`LoadFolders.xml`、`LICENSE`、`version.txt`） |
+| 构建 | `pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev`（10 门禁全绿后才 staging） |
+| `version.txt` | `FerriteLib 0.5.0-dev` / `build=dev` / `commit=ef133b3067da` / `source https://github.com/Coahuilite/FerriteLib` |
+
+**这是 Dev 配置字节，不是发布字节**：stager 从程序集读 `AssemblyConfigurationAttribute` 并拒绝通道不匹配的字节；
+消费者若要与发布资产对齐，请按同一提交自行构建 Release，或以之后授权的 release 通道产物为准。
 
 **交付用的开发包**（干净树构建；`commit=` 与 `git rev-parse HEAD` 逐字符相等）：
 

@@ -345,6 +345,21 @@
   not at merge time. The rewritten range is `99acc5f..8098ca0`; the pre-rewrite commit `766b6cd` is dangling locally
   and its content is byte-identical (`git diff --stat 766b6cd 8098ca0` is empty).
 
+- **The 0.5.x round delivered its library-side surface on 2026-09-15 and stopped at the boundary it cannot cross.**
+  Branch `0.5.x`, tip `ef133b3`, contract axis 0.5.0. Eleven packages plus two cross-package seams landed in isolated git
+  worktrees and were merged serially: window instances and focus (P1/P1h), per-key notification, invalidation classes,
+  command executability and conditional visibility (P2/P2b/P2c), keyed repeater with a template table plus checkbox,
+  progress and tree (P3), file-backed documents with atomic batches and last-known-good (P4/P4b/P4c), and per-host
+  diagnostics isolation (P5). Every package carries both a mutation proof and a regression lane; the seven independent
+  verification rounds are `docs/development/0.5/verification/`, and the round's own record is
+  `docs/development/0.5/`. **What is not delivered, and must not be read into the above: no real consumer compiled
+  against this surface, and nothing was observed in a game.** Those two are the only things that could raise the
+  validated-surface count, and they belong to other teams; the in-game steps are written out item by item in
+  `40-verification.md` §3 so a human can execute them. Two decisions worth carrying: the page-level default rule is a
+  **third** failure bucket (version-fatal with last-known-good, not structure fail-closed) and it behaves differently on
+  first load than on reload - recorded openly rather than smoothed; and the environment overrides git's commit identity,
+  which the privacy gate caught once (see the entry on that above).
+
 ## Charter — what this library is for
 
 - **The founding spec, transcribed.** `Coahuilite/UniversalSqueaker@09366f8:docs/ui-shared-library-design-zh.md`
