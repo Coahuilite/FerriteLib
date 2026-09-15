@@ -20,18 +20,21 @@ pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev
 | 第一个开发包 0.5.0-dev | `0.5.0-dev` | 见 `dist/dev/FerriteLib/version.txt` 的 `commit=` 行（构建时树必须干净；带 `-dirty` 表示构建时存在未提交改动，则该包不对应任何提交） | P1 + P1h + P2 + P2b + P4 + P4b | `dist/dev/FerriteLib/` |
 | 第二个开发包 | 待生成 | 待生成 | 加 P3 + P5 | `dist/dev/FerriteLib/` |
 
-第一个开发包的实测 `version.txt`（构建于 `0ee55b6`，当时工作树因未提交的文档改动而带 `-dirty`，因此**不作为交付版本**，
-只作流程记录）：
+**交付用的开发包**（干净树构建；`commit=` 与 `git rev-parse HEAD` 逐字符相等）：
 
-```
-FerriteLib 0.5.0-dev
-build=dev
-commit=0ee55b665c39-dirty
-source https://github.com/Coahuilite/FerriteLib
-```
+| 项 | 值 |
+| --- | --- |
+| 标签 | `0.5.0-dev` |
+| 源码提交 | `de5a56536afcb7fac7bfd9e0518380bc61491e77`（`de5a56536afc`） |
+| 位置 | `dist/dev/FerriteLib/`（目录，5 个文件：`About/About.xml`、`1.6/Assemblies/FerriteLib.UiKit.dll`、`LoadFolders.xml`、`LICENSE`、`version.txt`） |
+| 含包 | P1 + P1h + P2 + P2b + P4 + P4b |
+| 构建命令 | `pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev`（门禁全绿后才 staging） |
+| `version.txt` | `FerriteLib 0.5.0-dev` / `build=dev` / `commit=de5a56536afc` / `source https://github.com/Coahuilite/FerriteLib` |
 
-**交付用的开发包必须由干净树构建**：先提交全部改动，再运行 `-PackDev`，使 `commit=` 与 `git rev-parse HEAD` 完全相等。
-本目录的注册行在该包生成后回填。
+流程记录（**不是交付版本**）：第一次 staging 得到 `commit=0ee55b665c39-dirty`，原因是构建时工作树里还有未提交的文档改动；
+这正是 dev 通道"脏树必须自曝"的行为，保留在此说明为什么不能拿它当交付包。
+
+**交付用的开发包必须由干净树构建**：先提交全部改动，再运行 `-PackDev`
 
 填写规则：`commit=` 必须与 `git rev-parse` 一致；同时记录 `version.txt` 的完整内容摘要，
 不得只写"最新"。如果工作树是 dirty 的，dev 标签会带 `-dirty`，必须照实登记。
