@@ -32,6 +32,12 @@ public sealed class UiHost : IDisposable
     // reload can keep the appearance it already had.
     private UiStyleDocument? attachedStyleDocument;
 
+    // A layout commit's destructive half, held until the whole change batch has staged successfully. The
+    // tree, resolver, engine and theme are swapped first; the removed/kind-changed element state and the
+    // held interaction capture are only destroyed by SealDocumentCommit, which the service calls after every
+    // host in the batch committed. A rolled-back batch therefore loses nothing the user had not committed.
+    private UiLayoutManifest? pendingPrune;
+
     // The theme's tokens as the consumer handed them in, captured before the first document is applied.
     // Applying a document is a mutation of the injected theme, so committing the next version has to start
     // from the pre-document values: without this, a declaration the new document no longer carries would
@@ -448,28 +454,50 @@ public sealed class UiHost : IDisposable
     }
 
     /// <summary>
-    /// Commits a validated layout candidate: swaps the roots and rebuilds the style resolver and the engine
-    /// over the effective document, cleans up the state of elements that are gone or whose kind changed, and
-    /// releases a held hot control. The session - and therefore the scroll positions, drafts, selection and
-    /// expansion of every identity that survives - is not touched: state preservation here is a property of
-    /// not replacing the session, not of copying anything out of it.
+    /// Stages a validated layout candidate: swaps the roots and rebuilds the style resolver and the engine
+    /// over the effective document. The session - and therefore the scroll positions, drafts, selection and
+    /// expansion of every identity that survives - is not touched here: state preservation is a property of
+    /// not replacing the session, and the destructive half (pruning what the new tree no longer carries)
+    /// waits for <see cref="SealDocumentCommit"/> so a batch that later rolls back loses nothing.
     /// </summary>
     internal void CommitLayoutCandidate(UiLayoutManifest candidate)
     {
         UiLayoutManifest previous = manifest;
         manifest = candidate;
-        RebuildTree(previous);
+        pendingPrune = previous;
+        RebuildTree();
     }
 
     /// <summary>
-    /// Commits a style-document candidate. Whether the document is structurally valid was decided by the
+    /// Stages a style-document candidate. Whether the document is structurally valid was decided by the
     /// service (a whole-document refusal never reaches here); declaration-level drops inside it stay soft and
-    /// are published by the rebuilt resolver.
+    /// are published by the rebuilt resolver. A style change removes no element, so there is nothing to prune.
     /// </summary>
     internal void CommitStyleCandidate(UiStyleDocument candidate)
     {
         attachedStyleDocument = candidate ?? throw new ArgumentNullException(nameof(candidate));
-        RebuildTree(previous: null);
+        pendingPrune = null;
+        RebuildTree();
+    }
+
+    /// <summary>
+    /// The destructive half of a document commit, run only once the whole change batch has staged
+    /// successfully: elements the new tree no longer carries lose their state, and a held interaction capture
+    /// is released. Keeping it out of the staging step is what makes a rolled-back batch a real rollback -
+    /// before this, a batch that failed on a later host had already cleared an earlier host's draft.
+    /// </summary>
+    internal void SealDocumentCommit()
+    {
+        UiLayoutManifest? previous = pendingPrune;
+        pendingPrune = null;
+        if (SessionDisposed) return;
+
+        if (previous != null)
+        {
+            PruneDetachedState(previous, manifest);
+        }
+
+        ReleaseHotControlForReload();
     }
 
     /// <summary>
@@ -554,6 +582,9 @@ public sealed class UiHost : IDisposable
     /// <summary>Puts a host back on the tree, document and theme state a commit was about to replace.</summary>
     internal void RestoreDocumentRollback(DocumentRollback rollback)
     {
+        // The capture always precedes a stage, so any pending prune belongs to the commit being undone and
+        // must not survive it: sealing a rolled-back batch would destroy state the rollback just preserved.
+        pendingPrune = null;
         manifest = rollback.Manifest;
         attachedStyleDocument = rollback.AttachedStyle;
         styleResolver = rollback.StyleResolver;
@@ -564,13 +595,30 @@ public sealed class UiHost : IDisposable
         CopyThemeTokens(theme, rollback.Theme);
     }
 
-    /// <summary>Records the service this host's documents come from; called by the service's Attach.</summary>
+    /// <summary>
+    /// Records the service this host's documents come from; called by the service's Attach. A host binds to
+    /// one service, so re-binding releases the previous one: leaving the old service holding a host that no
+    /// longer answers to it would leak the dependency until the cap refuses later attaches. The reference
+    /// check matters - the calling service has just registered the host, and detaching from itself would
+    /// remove the dependency it is in the middle of creating.
+    /// </summary>
     internal void AttachDocumentService(UiDocumentService service)
     {
-        documentService = service ?? throw new ArgumentNullException(nameof(service));
+        if (service == null) throw new ArgumentNullException(nameof(service));
+        UiDocumentService? previous = documentService;
+        documentService = service;
+        if (!ReferenceEquals(previous, service))
+        {
+            previous?.Detach(this);
+        }
     }
 
-    private void RebuildTree(UiLayoutManifest? previous)
+    /// <summary>
+    /// The non-destructive half of a commit: re-resolve the page level, rebuild the engine over the new
+    /// effective document and republish the appearance issues. It deliberately destroys no interaction
+    /// state - <see cref="SealDocumentCommit"/> owns that, one whole batch later.
+    /// </summary>
+    private void RebuildTree()
     {
         // Start from the pre-document tokens and then apply the new page level: a colour the new document no
         // longer declares has to actually stop applying, or "remove the override and reload" silently keeps
@@ -588,12 +636,6 @@ public sealed class UiHost : IDisposable
         publishedResolutionIssues = 0;
         warnedDroppedStyleDocument = false;
 
-        if (previous != null)
-        {
-            PruneDetachedState(previous, manifest);
-        }
-
-        ReleaseHotControlForReload();
         PublishStyleIssues();
     }
 
