@@ -59,7 +59,7 @@ pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev
 3. [20-api-and-xml.md](20-api-and-xml.md)：API/XML 说明与示例。
 4. `1.6/Assemblies/FerriteLib.UiKit.dll` 与 `tools/.../Stubs/`（后者是事实上的已发布面，
    重命名或移动会让消费者 harness 断裂而本仓门禁全绿）。
-**关于标签与本记录的关系（照实说明）**：包由干净树 `ef133b3` 构建；其后提交的是**文档**（本目录与 `MEMORY.md`/`TODO.md`），
+**关于标签与本记录的关系（照实说明）**：早前一段文字曾称两版「逐字节相同」，那只对源码成立，对程序集未经验证；已按上表改写。包由干净树构建；其后提交的是**文档**（本目录与 `MEMORY.md`/`TODO.md`），
 不改变任何源码或载荷字节。因此在 `ae68a0e` 上重新执行同一命令会得到同样内容的 DLL，而 `version.txt` 会写明 `ae68a0e`；
 两个标签指向同一份载荷，差别只在文档。需要与消费者对齐时，请以 `version.txt` 的 `commit=` 为准并说明该差异。
 ### 构建历史（同一载荷、不同标签）
@@ -68,4 +68,4 @@ pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev
 | --- | --- | --- |
 | `0ee55b6` | `0.5.0-dev` / `0ee55b665c39-dirty` | 当时工作树有未提交文档改动；dev 通道自曝 `-dirty`，**不作为交付** |
 | `ef133b30 67da` | `0.5.0-dev` | P1+P2+P4+P5+P3 全包的首个干净构建 |
-| `7ac991c71a1a` | `0.5.0-dev` | **交付版本**：加上 F6（死 lane 守卫拒绝重复注册，仅测试文件）与文档修正；`Source/` 与上一版逐字节相同 |
+| `7ac991c71a1a` | `0.5.0-dev` | 在 `ef133b3` 之上加 F6（死 lane 守卫拒绝重复注册，仅测试文件）与文档修正。**身份说明**：`git diff ef133b3 7ac991c -- Source/` 为空，即源码文件未变；但**没有**对两次构建出的程序集做过逐字节比较，因此本文件不对 DLL 的字节同一性下任何断言 |

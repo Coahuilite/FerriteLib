@@ -92,8 +92,12 @@ FerriteLibVersion.Require(new Version(0, 5, 0), new Version(0, 6, 0), "your.pack
 | 第二个开发包 | 加上 P3+P5 | 集合与公共控件迁移、多窗诊断接入 |
 | 最终 | `40-verification.md` 的证据表 + 实机清单 | 真实页面验收与反馈回交 |
 
-消费者发现的缺口：**在消费者树内先组合实现**，把 `owner/repo@sha:path:line` 证据回交本仓，
-由本团队评估是否晋升为公共能力；**跨仓修改由所属团队完成**，本团队不代改消费者。
+消费者发现的缺口按两条不同的通道处理（区分见 `AGENTS.md` 的生态协议与 `00-baseline.md` §2.4）：
+
+- **缺的是某条专用 kind / 专用词汇** -> 先在你的树里用注册的自持 kind 组合实现，并把 `owner/repo@sha:path:line` 证据回交本仓，
+  由本团队按晋升门评估是否晋升；**跨仓修改由所属团队完成**，本团队不代改消费者。
+- **缺的是页面模型本就无法表达的通用能力**（窗口实例、失效、集合协调、文档重载、诊断隔离这一类）-> 直接向本团队提出，
+  不需要你先写一份复制品；本轮就是这么做的。
 ## 6. 当前可用面（第一个开发包）
 
 | 能力 | 状态 | 消费者现在能做什么 |
@@ -105,7 +109,6 @@ FerriteLibVersion.Require(new Version(0, 5, 0), new Version(0, 6, 0), "your.pack
 | keyed repeater（`<Templates>` + `<Repeat>`）、`input/checkbox`、`display/progress`、`container/tree` | 已实现 + 自动化验证（P3：5 处突变） | 数据驱动行集交给 `<Repeat Items=… Template=…>`；item key 用业务稳定键 |
 | 多 host/session 诊断隔离 + reload/fit/recovery 事件 | 已实现 + 自动化验证（P5：7 处突变；未订阅路径实测 0 分配） | 每个 host 打开 `UiHost.Diagnostics` 订阅自己的事件 |
 | 通用页壳的诊断入口 | 已实现 + 自动化验证（task-14：2 处突变） | `pageWindow.PageHost.Diagnostics` —— 纯 XML 页面也能订阅自己的事件 |
-| 多 host/session 诊断隔离 | **尚不可用**（P5 开发中） | 暂用现有 `UiFitAudit` |
 
 **接口冻结程度**：以上均为 `0.5.0` 窗口内的**公共面**，其中 P1/P2 新增类型目前按 `public-unstable` 登记
 （见 `docs/api-tiers.md`）。区间 `[0.5.0,0.6.0)` 承诺的是"签名在区间内不删不改"，不是"形状已定稿"。
