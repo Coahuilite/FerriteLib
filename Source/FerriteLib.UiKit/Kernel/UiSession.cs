@@ -81,7 +81,17 @@ public sealed class UiSession : IDisposable
     /// </summary>
     public int Frame { get; private set; }
 
-    /// <summary>Monotonic revision bumped when dynamic content changes. Used for layout cache keys.</summary>
+    /// <summary>
+    /// The engine's arrangement-cache clock: monotonic, moved by things the band cache cannot see for
+    /// itself - a layout-bearing theme token, or a <see cref="UiInvalidation.Measure"/> /
+    /// <see cref="UiInvalidation.Structure"/> announcement the engine committed at a frame boundary.
+    /// <para>
+    /// It is deliberately <b>not</b> the library's invalidation API. A consumer announces a model change
+    /// per key through <see cref="IUiBindings.NotifyChanged"/>, and a <see cref="UiInvalidation.Paint"/>
+    /// announcement leaves this clock alone on purpose: a fixed-size readout must not re-arrange the page.
+    /// There is exactly one such clock; do not add a second.
+    /// </para>
+    /// </summary>
     public int ContentRevision { get; private set; }
 
     /// <summary>
@@ -301,6 +311,11 @@ public sealed class UiSession : IDisposable
         popupDrawActions.Clear();
     }
 
+    /// <summary>
+    /// Moves the arrangement-cache clock one step. The host commits a layout-bearing theme change with it,
+    /// and the engine commits a batch of <see cref="UiInvalidation.Measure"/> /
+    /// <see cref="UiInvalidation.Structure"/> announcements with it - once per batch, not once per key.
+    /// </summary>
     public void BumpContentRevision()
     {
         EnsureActive();
@@ -366,9 +381,19 @@ public sealed class UiSession : IDisposable
     }
 
     /// <summary>
-    /// The node of the element a declared <c>Id</c> names, or null when no arranged element carries it.
-    /// This is the bridge a caller uses to move from the one string a page owns to the node identity
-    /// everything else keys on; it is a lookup, not a second key space.
+    /// The node of the element a declared <c>Id</c> names, or null when this session holds no such
+    /// identity. This is the bridge a caller uses to move from the one string a page owns to the node
+    /// identity everything else keys on; it is a lookup, not a second key space.
+    /// <para>
+    /// The answer is about the identity, not about the current arrangement, and the difference is
+    /// load-bearing. A declared element hidden by <c>Visible</c>/<c>VisibleKey</c>/<c>Tab</c> is not
+    /// arranged but still exists in the definition and keeps its node and state, so this finds it - that
+    /// is what keeps a hidden element's draft or scroll position reachable. A null answer means the
+    /// identity is <b>gone from the session</b>: the current definition no longer declares it and
+    /// <see cref="PruneNodesExcept"/> released it. The earlier wording said "no arranged element carries
+    /// it", which was false for exactly the hidden case and read as false for the removed case until the
+    /// prune existed.
+    /// </para>
     /// </summary>
     public UiNode? GetNodeByElementId(string elementId)
     {
@@ -408,6 +433,98 @@ public sealed class UiSession : IDisposable
     }
 
     /// <summary>
+    /// Drops every node whose identity the current definition no longer declares - the release half of a
+    /// structural change. Without it a reload that removes an element (or changes its kind under what used
+    /// to be a stable Id) leaves the old <see cref="UiNode"/> in this table with a stale
+    /// <see cref="UiNode.Kind"/> and orphaned state: this table owns node lifetime, so this is the only
+    /// place that can end it.
+    /// <para>
+    /// A declared but hidden element keeps its node on purpose - it is skipped by the arrange, but its
+    /// identity is still part of the definition and its state must survive the hide. Only an identity the
+    /// definition no longer contains is released, and everything the node owned goes with it: its
+    /// sub-nodes, its state slots, its scroll position, its dirty and recovery records and any hit layer
+    /// it still occupies, so nothing points at an identity that is gone.
+    /// </para>
+    /// <para>
+    /// <paramref name="declared"/> is the identity set of the definition being arranged (every declared
+    /// element, visible or not), which the engine walks from the roots. The cost is one pass over this
+    /// table per successful arrange, next to a layout pass that already touches every element.
+    /// </para>
+    /// </summary>
+    /// <returns>How many nodes were released.</returns>
+    internal int PruneNodesExcept(HashSet<UiNodeId> declared)
+    {
+        EnsureActive();
+        if (declared == null) throw new ArgumentNullException(nameof(declared));
+
+        var doomed = new List<UiNode>();
+        foreach (UiNode node in nodes.Values)
+        {
+            if (ReferenceEquals(node, unscopedNode)) continue;
+
+            if (!IsSubNode(node.Id))
+            {
+                // An element identity (an arranged element, or a node a caller created state for). It goes
+                // when the definition does not declare it - a hidden element is still declared, so this is
+                // "removed", not "not arranged".
+                if (!declared.Contains(node.Id)) doomed.Add(node);
+                continue;
+            }
+
+            // A widget's sub-node goes with the element that owns it: an element identity the definition
+            // no longer declares, or an owner that an earlier prune already released.
+            if (!OwnerSurvives(node, declared)) doomed.Add(node);
+        }
+
+        if (doomed.Count == 0) return 0;
+
+        var released = new HashSet<UiNode>();
+        foreach (UiNode node in doomed)
+        {
+            released.Add(node);
+            nodes.Remove(node.Id);
+            dirtyNodes.Remove(node);
+            trippedNodes.Remove(node);
+            trippedLogs.Remove(node);
+            scrollPositions.Remove(node);
+            if (ReferenceEquals(activeNode, node)) activeNode = unscopedNode;
+        }
+
+        DropLayersOf(released, hitLayers);
+        DropLayersOf(released, dispatchLayers);
+        return released.Count;
+    }
+
+    /// <summary>True when the identity was minted by <see cref="UiNodeId.SubNode"/> for a widget's own control.</summary>
+    private static bool IsSubNode(UiNodeId id)
+    {
+        return id.Key.IndexOf(UiNodeId.SubNodeMarker) >= 0;
+    }
+
+    /// <summary>
+    /// True when a sub-node's owning element is still part of the definition: the walk climbs past any
+    /// intermediate sub-nodes to the first element identity, and that one has to be declared.
+    /// </summary>
+    private static bool OwnerSurvives(UiNode node, HashSet<UiNodeId> declared)
+    {
+        for (UiNode? cursor = node.Parent; cursor != null; cursor = cursor.Parent)
+        {
+            if (IsSubNode(cursor.Id)) continue;
+            return declared.Contains(cursor.Id);
+        }
+
+        return false;
+    }
+
+    private static void DropLayersOf(HashSet<UiNode> released, List<UiHitLayer> layers)
+    {
+        for (int i = layers.Count - 1; i >= 0; i--)
+        {
+            if (released.Contains(layers[i].Element)) layers.RemoveAt(i);
+        }
+    }
+
+    /// <summary>
     /// Opens a fresh arrange: every node forgets its children and its geometry, and the arrange that
     /// follows publishes them again for the elements it visits. That is what makes "not arranged in this
     /// tree" a state a caller can read (<see cref="UiNode.IsArranged"/>) instead of a stale rect, and it
@@ -428,6 +545,20 @@ public sealed class UiSession : IDisposable
     /// arranged entry, so a re-arrange reuses the node - and therefore its state - instead of replacing
     /// it, which is what makes identity survive a frame.
     /// </summary>
+    /// <summary>
+    /// The node an arranged element owns: identity-only reuse, plus the definition-owned facts refreshed.
+    /// A reload can keep an identity and change the kind under it, and the node has to move with it - a
+    /// node that still reported the old kind is the stale diagnostic the document service cannot fix
+    /// because it does not own this table.
+    /// </summary>
+    internal UiNode GetOrCreateElementNode(UiNodeId element, UiElementSpec spec, int ordinal)
+    {
+        if (spec == null) throw new ArgumentNullException(nameof(spec));
+        UiNode node = GetOrCreateNode(element, spec.Kind, ordinal, spec.Id);
+        node.RefreshIdentity(spec.Kind, ordinal, spec.Id);
+        return node;
+    }
+
     internal UiNode GetOrCreateNode(UiNodeId element, string kind, int ordinal, string elementId = "")
     {
         EnsureActive();

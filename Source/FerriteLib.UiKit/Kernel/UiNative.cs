@@ -98,8 +98,32 @@ public static class UiNative
     {
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
         UiNode element = ctx.Node ?? ctx.Session.ActiveNode;
+
+        // A disabled element does not capture the pointer at all - no hot control, no consumed event, no
+        // click for whatever is underneath to miss. The check is here rather than in the widget for the
+        // same reason the yield check is: one rule for every kind, including kinds this library has never
+        // seen, instead of a per-widget branch each of them can forget.
+        if (IsInputDisabled(element)) return false;
+
         if (ctx.Session.IsPointerOverHigherLayer(element, PointerPositionIn(ctx))) return false;
         return Button(rect);
+    }
+
+    /// <summary>
+    /// True when the element being drawn is disabled and must not take input. The engine publishes the
+    /// disabled state on the element's node once per draw (<see cref="UiNode.IsDisabled"/>), and the walk
+    /// up the parent chain is what makes a widget's own sub-node answer like the element that owns it:
+    /// <see cref="UiWidgetContext.Child"/> mints a sub-node under the element, so the two are one control
+    /// for input purposes.
+    /// </summary>
+    private static bool IsInputDisabled(UiNode? node)
+    {
+        for (UiNode? cursor = node; cursor != null; cursor = cursor.Parent)
+        {
+            if (cursor.IsDisabled) return true;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -130,6 +154,12 @@ public static class UiNative
     {
         if (session == null) throw new ArgumentNullException(nameof(session));
         if (string.IsNullOrEmpty(elementId)) throw new ArgumentException("Dropdown element id is required.", nameof(elementId));
+
+        // A disabled trigger neither opens nor closes its popup: the dropdown is one of the pointer
+        // captures this guard exists for, and the context-carrying entry points answer it before any of
+        // the routing below runs. Checked against the element being drawn, so it holds for a trigger that
+        // is drawn by hand through the session overload as well.
+        if (IsInputDisabled(ctx?.Node ?? session.ActiveNode)) return false;
 
         // The hit stack decides: a popup drawn over this trigger is a layer above it, so the trigger must
         // not take the click - unless the popup is its own, which the same layer comparison handles.

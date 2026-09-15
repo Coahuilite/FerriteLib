@@ -6,6 +6,12 @@ namespace FerriteLib.UiKit.Kernel;
 /// <summary>
 /// Explicit typed binding registry. Every binding is registered with a concrete <c>T</c>; all
 /// widget access is generic, so type mismatches surface at Host creation time rather than Draw.
+/// <para>
+/// This is also the notification side: every key carries a monotonic revision and an invalidation class,
+/// and <see cref="NotifyChanged"/> is the one entry point a consumer calls when its authoritative model
+/// moved. The registry never polls, diffs or wraps the model - it records that a key was announced, and
+/// the engine folds the announcements into one commit at the next arrangement boundary.
+/// </para>
 /// </summary>
 public sealed class UiBindings : IUiBindings
 {
@@ -96,12 +102,16 @@ public sealed class UiBindings : IUiBindings
 
     private sealed class CommandDescriptor
     {
-        public CommandDescriptor(Action action)
+        public CommandDescriptor(Action action, Func<bool>? canExecute)
         {
             Action = action ?? throw new ArgumentNullException(nameof(action));
+            CanExecute = canExecute;
         }
 
         public Action Action { get; }
+
+        /// <summary>Null means "no predicate": a registered command runs whenever it is invoked.</summary>
+        public Func<bool>? CanExecute { get; }
     }
 
     private readonly Dictionary<string, ValueDescriptor> values = new(StringComparer.Ordinal);
@@ -109,22 +119,31 @@ public sealed class UiBindings : IUiBindings
     private readonly Dictionary<string, ActionDescriptor> actions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CommandDescriptor> commands = new(StringComparer.Ordinal);
 
-    public void BindValue<T>(string elementId, Func<T> get, Action<T> set)
+    // The notification side. declaredInvalidation is what each key says an announcement of it means;
+    // a key with no entry answers UiInvalidation.Everything. revisions is the monotonic per-key counter
+    // NotifyChanged moves, read through GetRevision.
+    private readonly Dictionary<string, UiInvalidation> declaredInvalidation = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> revisions = new(StringComparer.Ordinal);
+
+    public void BindValue<T>(
+        string elementId, Func<T> get, Action<T> set, UiInvalidation invalidates = UiInvalidation.Everything)
     {
         if (elementId == null) throw new ArgumentNullException(nameof(elementId));
         if (get == null) throw new ArgumentNullException(nameof(get));
         if (set == null) throw new ArgumentNullException(nameof(set));
-        AddValue(elementId, new ValueDescriptor<T>(get, set));
+        AddValue(elementId, new ValueDescriptor<T>(get, set), invalidates);
     }
 
-    public void BindReadOnly<T>(string elementId, Func<T> get)
+    public void BindReadOnly<T>(
+        string elementId, Func<T> get, UiInvalidation invalidates = UiInvalidation.Everything)
     {
         if (elementId == null) throw new ArgumentNullException(nameof(elementId));
         if (get == null) throw new ArgumentNullException(nameof(get));
-        AddValue(elementId, new ValueDescriptor<T>(get, null));
+        AddValue(elementId, new ValueDescriptor<T>(get, null), invalidates);
     }
 
-    public void BindOptions<T>(string elementId, Func<IReadOnlyList<T>> get)
+    public void BindOptions<T>(
+        string elementId, Func<IReadOnlyList<T>> get, UiInvalidation invalidates = UiInvalidation.Everything)
     {
         if (elementId == null) throw new ArgumentNullException(nameof(elementId));
         if (get == null) throw new ArgumentNullException(nameof(get));
@@ -134,9 +153,11 @@ public sealed class UiBindings : IUiBindings
         }
 
         options.Add(elementId, new OptionsDescriptor<T>(get));
+        DeclareInvalidation(elementId, invalidates);
     }
 
-    public void BindAction<T>(string actionId, Action<T> action)
+    public void BindAction<T>(
+        string actionId, Action<T> action, UiInvalidation invalidates = UiInvalidation.Everything)
     {
         if (actionId == null) throw new ArgumentNullException(nameof(actionId));
         if (action == null) throw new ArgumentNullException(nameof(action));
@@ -146,9 +167,14 @@ public sealed class UiBindings : IUiBindings
         }
 
         actions.Add(actionId, new ActionDescriptor<T>(action));
+        DeclareInvalidation(actionId, invalidates);
     }
 
-    public void BindCommand(string actionId, Action action)
+    public void BindCommand(
+        string actionId,
+        Action action,
+        Func<bool>? canExecute = null,
+        UiInvalidation invalidates = UiInvalidation.Paint)
     {
         if (actionId == null) throw new ArgumentNullException(nameof(actionId));
         if (action == null) throw new ArgumentNullException(nameof(action));
@@ -157,7 +183,8 @@ public sealed class UiBindings : IUiBindings
             throw new InvalidOperationException($"Duplicate command binding '{actionId}'.");
         }
 
-        commands.Add(actionId, new CommandDescriptor(action));
+        commands.Add(actionId, new CommandDescriptor(action, canExecute));
+        DeclareInvalidation(actionId, invalidates);
     }
 
     public T Get<T>(string elementId)
@@ -182,6 +209,24 @@ public sealed class UiBindings : IUiBindings
         EnsureType<T>(descriptor!.ValueType, elementId, "value");
         value = (T)descriptor.GetBoxed()!;
         return true;
+    }
+
+    /// <summary>
+    /// The probe <see cref="IUiBindings.TryGetBool"/> documents: a missing key and a key bound to another
+    /// type are both "not resolved", because the caller here is a per-frame visibility query rather than
+    /// a caller that knows what it bound.
+    /// </summary>
+    public bool TryGetBool(string key, out bool value)
+    {
+        if (key == null) throw new ArgumentNullException(nameof(key));
+        if (values.TryGetValue(key, out ValueDescriptor? descriptor) && descriptor!.ValueType == typeof(bool))
+        {
+            value = (bool)descriptor.GetBoxed()!;
+            return true;
+        }
+
+        value = false;
+        return false;
     }
 
     public void Set<T>(string elementId, T value)
@@ -238,6 +283,11 @@ public sealed class UiBindings : IUiBindings
         descriptor.InvokeBoxed(payload);
     }
 
+    /// <summary>
+    /// Runs the command only when it may run. The disabled answer is the owner's declaration, so it is a
+    /// no-op here and not an exception - but it is enforced on the execution path, which is what keeps a
+    /// control that forgot to ask from firing a command its owner has taken away.
+    /// </summary>
     public void Invoke(string actionId)
     {
         if (!commands.TryGetValue(actionId, out CommandDescriptor? descriptor))
@@ -245,7 +295,59 @@ public sealed class UiBindings : IUiBindings
             throw new KeyNotFoundException($"No command binding registered for '{actionId}'.");
         }
 
+        if (!CanRun(descriptor!)) return;
         descriptor!.Action();
+    }
+
+    /// <summary>
+    /// The veto the disabled decision consults. A registered command with no predicate is executable; one
+    /// with a predicate follows it; a key with no command binding answers true so an action-bound or
+    /// value-bound element is never mistaken for a disabled command.
+    /// </summary>
+    public bool CanExecute(string actionId)
+    {
+        if (actionId == null) throw new ArgumentNullException(nameof(actionId));
+        return !commands.TryGetValue(actionId, out CommandDescriptor? descriptor) || CanRun(descriptor!);
+    }
+
+    private static bool CanRun(CommandDescriptor descriptor)
+    {
+        return descriptor.CanExecute == null || descriptor.CanExecute();
+    }
+
+    public int GetRevision(string key)
+    {
+        if (key == null) throw new ArgumentNullException(nameof(key));
+        return revisions.TryGetValue(key, out int revision) ? revision : 0;
+    }
+
+    public UiInvalidation GetInvalidation(string key)
+    {
+        if (key == null) throw new ArgumentNullException(nameof(key));
+        return declaredInvalidation.TryGetValue(key, out UiInvalidation invalidates)
+            ? invalidates
+            : UiInvalidation.Everything;
+    }
+
+    /// <summary>
+    /// Moves each named key's revision. Repeating a key before the engine's next commit only moves the
+    /// counter further - the commit compares a revision once and marks the declaring node at most once -
+    /// so a consumer that announces generously cannot multiply work.
+    /// </summary>
+    public void NotifyChanged(params string[] keys)
+    {
+        if (keys == null) throw new ArgumentNullException(nameof(keys));
+        for (int i = 0; i < keys.Length; i++)
+        {
+            string key = keys[i];
+            if (string.IsNullOrEmpty(key))
+            {
+                throw new ArgumentException(
+                    "NotifyChanged needs a binding key per entry; entry " + i + " is null or empty.", nameof(keys));
+            }
+
+            revisions[key] = (revisions.TryGetValue(key, out int revision) ? revision : 0) + 1;
+        }
     }
 
     public void ValidateValue<T>(string elementId, string elementPath)
@@ -294,7 +396,7 @@ public sealed class UiBindings : IUiBindings
         }
     }
 
-    private void AddValue(string elementId, ValueDescriptor descriptor)
+    private void AddValue(string elementId, ValueDescriptor descriptor, UiInvalidation invalidates)
     {
         if (values.ContainsKey(elementId))
         {
@@ -302,6 +404,12 @@ public sealed class UiBindings : IUiBindings
         }
 
         values.Add(elementId, descriptor);
+        DeclareInvalidation(elementId, invalidates);
+    }
+
+    private void DeclareInvalidation(string key, UiInvalidation invalidates)
+    {
+        declaredInvalidation[key] = invalidates;
     }
 
     private bool TryGetValueDescriptor(string elementId, out ValueDescriptor? descriptor)

@@ -75,7 +75,11 @@ consequence is paid in the open rather than discovered by a stranger.
   section that carried something — is the same rule applied to the choice itself: the document wins and the
   displaced section is reported, because quietly picking one of two authored sources is the silent fallback
   this library refuses.
-- `UiSession` — session state; focus traversal and per-key invalidation land here when they are built.
+- `UiSession` — session state. `ContentRevision`/`BumpContentRevision` are the engine's
+  arrangement-cache clock (a layout-bearing theme token move, or one committed Measure/Structure batch),
+  deliberately not the library's invalidation API: the consumer path is `IUiBindings.NotifyChanged` plus
+  per-key revisions, and a Paint-class announcement leaves this clock alone. Focus traversal still lands
+  here when it is built.
 - `UiValueState` — per-element state bag; its key is the path string the identity layer replaces.
 - `UiElementSpec` — the spec a widget reads; additions are breaking pre-1.0 by definition.
 - `UiWidgetContext` — what a widget is handed per pass; may carry a node instead of a path, and since
@@ -85,9 +89,17 @@ consequence is paid in the open rather than discovered by a stranger.
   that styles nothing reuses its parent's list; `WithTheme`, `WithStyleDeclaration` and `WithStyleChain`
   are the hand-offs, and a widget is handed the same theme instance in Measure and in Draw.
 - `IUiBindings` — get, set and the writability read (`IsWritable`, landed with the disabled treatment's
-  first producer); announce is the next operation the roadmap asks for, and an interface member is a
-  breaking addition for every implementer.
-- `UiBindings` — the reference implementation, same reason.
+  first producer). Announce has landed as the third operation: `NotifyChanged(key...)` says the
+  authoritative model moved, `GetRevision(key)` is the per-key revision that replaces one global counter,
+  `GetInvalidation(key)` is the class the binding declared, `CanExecute(actionId)` is the command-state
+  veto the disabled path consults, `TryGetBool(key, out bool)` is the non-throwing probe the `VisibleKey`
+  query needs, and the `Bind*` registrations take an optional `UiInvalidation` (command registration also
+  takes the executability predicate). Every one is a breaking addition for every implementer, which is why
+  they land once in this window.
+- `UiBindings` — the reference implementation, same reason: it carries the per-key revisions and declared
+  invalidation classes, moves a revision only on `NotifyChanged` (never on `Set`), refuses to run a
+  command whose predicate answers false, and answers `TryGetBool` without throwing for a key bound to
+  another type.
 - `UiNative` — the backend funnel's public face (26 members today); hit-stack and focus work will move
   members across its boundary.
 - `UiPopup` — one popup per session by design today; the owned hit stack generalises exactly that.
@@ -212,6 +224,11 @@ consequence is paid in the open rather than discovered by a stranger.
   emphasis), handed in nearest first along the tree; the engine's chain carries the two that inherit and
   leaves the roles on the element's own spec.
 - `UiStyleIssue` — one appearance value a document dropped, so that fail-soft is never silent.
+- `UiInvalidation` — the class a binding declares for its own announcements: `Paint` reuses the arranged
+  snapshot and lets the next paint read the value, `Measure` re-measures the elements that declared the
+  key, `Structure` adds the container that owns the element's slot. Combinable, and an undeclared binding
+  answers `Everything`. Public-unstable for the same reason `IUiBindings` is: the class set may grow when
+  collection reconciliation has to name what a keyed insert or removal invalidates.
 
 ## Internalize-candidate
 
@@ -279,6 +296,33 @@ What the 0.5 window is for (working packages, ownership and status: `docs/develo
   rather than implied. C# kind changes stay outside hot reload on purpose.
 - **Diagnostics.** One shared diagnostic slot becomes per-host/per-session subscriptions with bounded,
   attributed events (reload / fit / recovery), released when the host closes.
+
+### Landed breaking changes (0.5)
+
+- **Bindings announce per key.** `IUiBindings` gains `NotifyChanged(params string[])`,
+  `GetRevision(string)`, `GetInvalidation(string)`, `CanExecute(string)` and
+  `TryGetBool(string, out bool)`; `BindValue`/`BindReadOnly`/`BindOptions`/`BindAction` gain an
+  optional `UiInvalidation invalidates` parameter, and `BindCommand` gains optional `canExecute` and
+  `invalidates` parameters. An interface addition is breaking for every implementer; the reference
+  implementation is `UiBindings`, and `UiInvalidation` is a new public type.
+  **Migration:** declare what a key moves where you register it (`Paint` for a fixed-size readout,
+  `Measure`/`Structure` for text, spacing or structure), then call `bindings.NotifyChanged(key)` when
+  the authoritative model behind that key changes. `Set` deliberately does not announce - only the owner
+  of the model can say the model moved.
+- **A disabled command does not run and does not take input.** `BindCommand(key, action, canExecute)` is
+  the enablement path: `Invoke` no-ops when the predicate answers false, the engine publishes the state on
+  the element's node, and the funnel's context-carrying interactive entry points (`UiNative.Button(rect,
+  ctx)`, `UiNative.DropdownButton`) refuse the pointer for that element. The disabled look keeps coming
+  from the one writability funnel (`UiResolvedStyle.Resolve(..., writable: false)` →
+  `UiStatusTone.Disabled`), so there is still exactly one disabled treatment.
+- **`Visible`/`VisibleKey` join the engine-wide vocabulary.** `Visible="true|false"` is static and
+  defaults true; `VisibleKey="key"` reads a bool value binding through `TryGetBool`; `Hidden` keeps its
+  meaning as the legacy static form. An unresolvable `VisibleKey` is not fatal - the element stays visible
+  and one deduplicated appearance fallback is recorded - so a page whose model key is missing or not yet
+  bound still exists.
+- **`UiSession.ContentRevision`/`BumpContentRevision` are demoted to the arrangement-cache clock.** No
+  signature changed; what changed is the contract. A consumer must not use them as its refresh channel
+  (that is `NotifyChanged`), and a Paint-class announcement must not move the clock.
 
 Everything here is provisional until the second wired consumer compiles against it (`AGENTS.md`
 invariants): the tier list, not the shape, is what this file promises.
