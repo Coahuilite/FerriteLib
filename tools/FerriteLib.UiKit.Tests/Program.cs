@@ -130,6 +130,12 @@ internal static class Program
         Console.WriteLine("Kernel neutral fixture page (data-driven rows + the new controls, library fixture only)...");
         failures += KernelFixturePageTests.RunAll();
 
+        // --- T2 automatic reload scheduling (owner: reload) - one contiguous block; ---- //
+        // --- mvvm and catalog add their own blocks and the Lead resolves the merge. ----- //
+        Console.WriteLine("Kernel reload scheduling (quiet period, bounded retry, pause independence, deferral)...");
+        failures += KernelReloadSchedulingTests.RunAll();
+        // ------------------------------------------------------------------------------- //
+
         // ---- T1 MVVM / page lifecycle lanes (owner: mvvm) - begin -----------------------------
         Console.WriteLine("Kernel notification adapter (explicit mapping, bounded batch, unsubscribe, thread refusal)...");
         failures += KernelNotifyAdapterTests.RunAll();

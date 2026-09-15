@@ -429,7 +429,7 @@ internal static class KernelDiagnosticsTests
         File.WriteAllText(pathA, pageA);
         File.WriteAllText(pathB, pageB);
 
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         Check(service.Add(new UiDocumentSource("a", UiDocumentKind.Layout, pathA), pageA), "document a registers");
         Check(service.Add(new UiDocumentSource("b", UiDocumentKind.Layout, pathB), pageB), "document b registers");
 
@@ -443,7 +443,7 @@ internal static class KernelDiagnosticsTests
 
         File.WriteAllText(pathA, Page("diag-rel-a", "a-added", "diag/overflow"));
         service.Signal("a");
-        service.Pump();
+        Settle(service);
 
         Check(subA.CountOf(UiDiagnosticKind.Reload) == 1,
             "the affected host received the accepted report (got " + subA.CountOf(UiDiagnosticKind.Reload) + ")");
@@ -458,7 +458,7 @@ internal static class KernelDiagnosticsTests
 
         File.WriteAllText(pathA, "<UiPage Schema=\"2\" Source=\"diag-rel-a\"><Column Id=\"root\"></UiPage>");
         service.Signal("a");
-        service.Pump();
+        Settle(service);
 
         subA.TryGetLatest(UiDiagnosticKind.Reload, out UiDiagnosticEvent parseRefusal);
         Check(parseRefusal.Code == "reload.rejected" && parseRefusal.Report != null && parseRefusal.Report.Rejected,
@@ -469,7 +469,7 @@ internal static class KernelDiagnosticsTests
         File.WriteAllText(pathA,
             "<UiPage Schema=\"2\" Source=\"diag-rel-a\"><Column Id=\"root\" Bogus=\"1\"></Column></UiPage>");
         service.Signal("a");
-        service.Pump();
+        Settle(service);
 
         subA.TryGetLatest(UiDiagnosticKind.Reload, out UiDiagnosticEvent elementRefusal);
         Check(elementRefusal.Code == "reload.rejected" && elementRefusal.Element.Length > 0,
@@ -817,6 +817,47 @@ internal static class KernelDiagnosticsTests
         public string Translate(string key) => key;
 
         public int TranslationRevision => 0;
+    }
+
+    /// <summary>
+    /// The lane's clock. Automatic reload scheduling is debounced by the policy's quiet period and the
+    /// harness's <c>Time.realtimeSinceStartup</c> stub is a constant zero, so a watcher signal only reaches
+    /// the host once the lane advances this clock explicitly. Nothing else advances to make time pass.
+    /// </summary>
+    private sealed class LaneClock : IUiTimeSource
+    {
+        public double Now;
+
+        public double NowSeconds => Now;
+
+        public void Advance(double seconds)
+        {
+            Now += seconds;
+        }
+    }
+
+    /// <summary>
+    /// Past every window in <see cref="UiReloadPolicy.Default"/>: the 0.25s quiet period and the 2.0s
+    /// deferral ceiling. Nothing here holds a capture, so the quiet window is what actually elapses.
+    /// </summary>
+    private const double SettleSeconds = 3.0;
+
+    private static readonly LaneClock Clock = new LaneClock();
+
+    private static UiDocumentService NewService(bool? autoWatch = null)
+    {
+        return new UiDocumentService(autoWatch, UiReloadPolicy.Default, Clock);
+    }
+
+    /// <summary>
+    /// Observe, advance, commit: the first pump opens the quiet window for the signals the lane posted, the
+    /// clock then passes every scheduling window, and the second pump reads and commits them.
+    /// </summary>
+    private static void Settle(UiDocumentService service)
+    {
+        service.Pump();
+        Clock.Advance(SettleSeconds);
+        service.Pump();
     }
 
     private static UiHost NewHost(string source, string xml)

@@ -69,6 +69,11 @@ public sealed class UiDocumentService : IDisposable
     private bool overflowed;
     private bool disposed;
 
+    // The scheduler's per-document state: which signals the main thread has observed, when, how many retries
+    // a transient read failure has used, and whether a ready commit is deferred for the user's own input.
+    // The watcher thread only ever touches the pending set; this table is the main thread's.
+    private readonly Dictionary<string, Schedule> schedules = new(StringComparer.Ordinal);
+
     // Re-arm attempts are made on the frame path, so they are throttled: a document whose directory did
     // not exist yet must get another chance, without stat-ing every registered path once per frame.
     private int reArmCountdown;
@@ -118,9 +123,41 @@ public sealed class UiDocumentService : IDisposable
 
     /// <summary>
     /// What the scheduler is holding right now. A value, so reading it cannot change what it reports.
+    /// <para>
+    /// The four numbers are the whole diagnostic: <see cref="UiReloadSchedulerState.Pending"/> work that has
+    /// not been read yet, <see cref="UiReloadSchedulerState.Deferred"/> work held back because an attached
+    /// host is interacting, <see cref="UiReloadSchedulerState.Retrying"/> work waiting out a transient read
+    /// failure, and the age of the oldest held signal. Reading it is the observation the timing contract is
+    /// asserted with, instead of source-text assertions.
+    /// </para>
     /// </summary>
-    public UiReloadSchedulerState SchedulerState =>
-        throw new NotImplementedException("T2: UiDocumentService.SchedulerState");
+    public UiReloadSchedulerState SchedulerState
+    {
+        get
+        {
+            if (disposed) return new UiReloadSchedulerState(0, 0, 0, 0);
+
+            double now = NowSeconds();
+            lock (gate)
+            {
+                int pendingCount = 0;
+                int deferredCount = 0;
+                int retryingCount = 0;
+                double oldest = 0;
+                foreach (Schedule schedule in schedules.Values)
+                {
+                    if (schedule.Attempted) retryingCount++;
+                    else if (schedule.Deferred) deferredCount++;
+                    else pendingCount++;
+
+                    double waited = now - schedule.FirstObservedSeconds;
+                    if (waited > oldest) oldest = waited;
+                }
+
+                return new UiReloadSchedulerState(pendingCount, deferredCount, retryingCount, oldest < 0 ? 0 : oldest);
+            }
+        }
+    }
 
     /// <summary>
     /// Whether automatic watching is on unless a caller says otherwise: true for an <c>FER_DEV</c> build,
@@ -198,6 +235,7 @@ public sealed class UiDocumentService : IDisposable
         lock (gate)
         {
             pending.Remove(documentId);
+            schedules.Remove(documentId);
         }
 
         for (int i = dependencies.Count - 1; i >= 0; i--)
@@ -225,6 +263,12 @@ public sealed class UiDocumentService : IDisposable
     /// any thread: it touches one locked set, never Verse, never Unity, never a business object. It returns
     /// false for an unknown id or after <see cref="Dispose"/>, so a late watcher callback cannot resurrect
     /// a disposed service. Repeated signals for one document coalesce into a single pending entry.
+    /// <para>
+    /// <b>This is the watcher channel and it is debounced.</b> A signal means "the bytes may be in motion",
+    /// not "reload now": the quiet period waits for the writes to stop before anything is read, and a later
+    /// signal restarts that window (trailing edge). A consumer that wants the file read on this call uses
+    /// <see cref="Reload"/>/<see cref="ReloadAll"/> instead - the manual channel, which is immediate.
+    /// </para>
     /// </summary>
     public bool Signal(string documentId)
     {
@@ -237,54 +281,95 @@ public sealed class UiDocumentService : IDisposable
         }
     }
 
-    /// <summary>True when a signal is waiting for a pump (a watcher callback landed since the last one).</summary>
+    /// <summary>
+    /// True when a signal is waiting to be read - either it has not been observed by a pump yet, or a pump
+    /// observed it and its quiet period (or retry interval, or interaction deferral) is still open.
+    /// </summary>
     public bool HasPending
     {
         get
         {
             lock (gate)
             {
-                return pending.Count > 0 || overflowed;
+                return pending.Count > 0 || overflowed || schedules.Count > 0;
             }
         }
     }
 
     /// <summary>
-    /// The main-thread commit boundary: reads every document a signal named, validates each batch in full,
-    /// and commits the batches that pass. Called by an attached host at its own frame start, so the GUI
-    /// pass that is about to run already sees the new tree and the pass that just finished was never
-    /// mutated under itself. Safe to call from a consumer as well; it is idempotent when nothing is pending.
-    /// Returns true when at least one batch committed. Never throws once disposed - a frame path must not
-    /// introduce an exception into a GUI pass.
+    /// The main-thread scheduling boundary: takes the watcher's signals, waits out each document's quiet
+    /// period, and reads, validates and commits the batches that are due. Called by an attached host at its
+    /// own frame start, so the GUI pass that is about to run already sees the new tree and the pass that just
+    /// finished was never mutated under itself. The guarantee is per host, not global: this service is one
+    /// object shared by every attached host, so a commit driven by the host that pumps first is visible to a
+    /// sibling window that has not drawn yet in the same event pass.
+    /// <para>
+    /// Every timing decision is made against <see cref="TimeSource"/>, never against a frame counter: this
+    /// method has no notion of "how many frames have passed". A signal that arrived since the last call
+    /// starts (or restarts) that document's quiet window; a document whose window has elapsed is read once
+    /// per <see cref="Pump"/>, and a transient read failure is retried no more than
+    /// <see cref="UiReloadPolicy.MaxRetryAttempts"/> times before it is reported.
+    /// </para>
+    /// <para>
+    /// <b>Nothing open, nothing read.</b> With no attached host this method observes signals and returns
+    /// without reading or parsing anything: there is no timer in this service, so a registered document whose
+    /// window is closed is not rebuilt behind the user's back. The next <see cref="Attach"/> resolves the
+    /// newest valid content on the explicit path.
+    /// </para>
+    /// <para>
+    /// Safe to call from a consumer as well; it is idempotent when nothing is due. Returns true when at least
+    /// one batch committed. Never throws once disposed - a frame path must not introduce an exception into a
+    /// GUI pass.
+    /// </para>
     /// </summary>
     public bool Pump()
     {
         if (disposed) return false;
         if (autoWatch) AttemptReArm();
 
-        List<string> batch;
-        lock (gate)
+        if (dependencies.Count == 0)
         {
-            if (overflowed)
-            {
-                // A watcher buffer overflow means notifications were lost. Re-check every watched document
-                // rather than pretending nothing moved; the harmless cost is a re-read of unchanged files.
-                overflowed = false;
-                foreach (DocumentState watched in documents.Values)
-                {
-                    if (watched.Watcher != null) pending.Add(watched.Source.Id);
-                }
-            }
-
-            batch = new List<string>(pending);
-            pending.Clear();
+            ObserveSignals(NowSeconds());
+            return false;
         }
 
+        double now = NowSeconds();
+        ObserveSignals(now);
+
+        List<string> due = CollectDue(now);
         bool committed = false;
-        for (int i = 0; i < batch.Count; i++)
+        for (int i = 0; i < due.Count; i++)
         {
-            UiReloadReport? report = ReloadCore(batch[i]);
-            if (report != null && report.Accepted) committed = true;
+            string documentId = due[i];
+            if (!documents.ContainsKey(documentId))
+            {
+                ForgetSchedule(documentId);
+                continue;
+            }
+
+            // The user's own interaction defers a ready commit, but the ceiling is absolute: a held drag can
+            // never keep an edited file out of its window forever.
+            if (IsInteractionDeferring(documentId, now))
+            {
+                MarkDeferred(documentId);
+                continue;
+            }
+
+            ClearDeferred(documentId);
+
+            // A transient read failure is not reported on its own while attempts remain: the previous valid
+            // version stays in force and the same bytes are retried at RetrySeconds. Only the exhausted
+            // attempt - or a failure that cannot become valid by waiting, like malformed XML - is reported.
+            bool holdTransient = RetriesFor(documentId) < policy.MaxRetryAttempts;
+            UiReloadReport? report = ReloadCore(documentId, deferTransientFailure: holdTransient);
+            if (report == null)
+            {
+                ScheduleRetry(documentId, now + policy.RetrySeconds);
+                continue;
+            }
+
+            ForgetSchedule(documentId);
+            if (report.Accepted) committed = true;
         }
 
         return committed;
@@ -292,8 +377,10 @@ public sealed class UiDocumentService : IDisposable
 
     /// <summary>
     /// Manual reload of one document: the entry point that works with watching off and that recovers a
-    /// dropped notification. Same candidate/validate/commit path as <see cref="Pump"/>, and a signal that
-    /// was already pending for this document is consumed by it. Returns null for an unknown id.
+    /// dropped notification. It is the manual channel, so it is <b>immediate</b>: it bypasses the quiet
+    /// period and the interaction deferral, consumes any signal pending for this document, and runs the
+    /// identical candidate/validate/commit path a scheduled <see cref="Pump"/> runs (same parser, same
+    /// per-host pre-check, same atomic batch and rollback). Returns null for an unknown id.
     /// </summary>
     public UiReloadReport? Reload(string documentId)
     {
@@ -303,12 +390,16 @@ public sealed class UiDocumentService : IDisposable
         lock (gate)
         {
             pending.Remove(documentId);
+            schedules.Remove(documentId);
         }
 
         return ReloadCore(documentId);
     }
 
-    /// <summary>Manual reload of every registered document, in registration order.</summary>
+    /// <summary>
+    /// Manual reload of every registered document, in registration order. Like <see cref="Reload"/> this is
+    /// the immediate manual channel: no quiet period, no deferral, the same validation and commit path.
+    /// </summary>
     public IReadOnlyList<UiReloadReport> ReloadAll()
     {
         EnsureAlive();
@@ -320,6 +411,7 @@ public sealed class UiDocumentService : IDisposable
             lock (gate)
             {
                 pending.Remove(ids[i]);
+                schedules.Remove(ids[i]);
             }
 
             UiReloadReport? report = ReloadCore(ids[i]);
@@ -352,6 +444,13 @@ public sealed class UiDocumentService : IDisposable
         DocumentState? layout = layoutId == null ? null : RequireDocument(layoutId);
         DocumentState? style = styleId == null ? null : RequireDocument(styleId);
         if ((layoutId != null && layout == null) || (styleId != null && style == null)) return false;
+
+        // A signal that arrived while nothing was attached is resolved here, on the explicit attach path:
+        // the new host must start on the newest valid content, not on whatever was read when the source was
+        // registered. Attach is the manual channel's timing - immediate - not the watcher channel's quiet
+        // period, and the resolved version is the same candidate/validate/commit path a reload uses.
+        ResolveScheduledNow(layoutId);
+        ResolveScheduledNow(styleId);
 
         Detach(host);
         if (dependencies.Count >= MaxDependencies) return false;
@@ -454,6 +553,7 @@ public sealed class UiDocumentService : IDisposable
         {
             disposed = true;
             pending.Clear();
+            schedules.Clear();
         }
 
         foreach (DocumentState state in documents.Values)
@@ -469,9 +569,203 @@ public sealed class UiDocumentService : IDisposable
         }
     }
 
+    // --- scheduling (T2) ------------------------------------------------------------------------
+
+    /// <summary>
+    /// Moves whatever the watcher posted into the scheduler's per-document table. The timestamp is taken
+    /// here, on the main thread, and never in <see cref="Signal"/>: the watcher callback runs on a
+    /// <see cref="FileSystemWatcher"/> thread that must touch no Verse/Unity type, and
+    /// <see cref="IUiTimeSource"/> is a Verse/Unity-backed clock in production.
+    /// <para>
+    /// Consequence, stated as a contract rather than left implicit: the quiet window opens when the pump
+    /// first observes a signal, so the effective delay is
+    /// <c>[QuietSeconds, QuietSeconds + one pump interval]</c>. A signal observed while its document is
+    /// already scheduled restarts the window (trailing-edge debounce) and restarts its retry cycle, because
+    /// the bytes on disk changed again.
+    /// </para>
+    /// </summary>
+    private void ObserveSignals(double now)
+    {
+        List<string> observed;
+        lock (gate)
+        {
+            if (overflowed)
+            {
+                // A watcher buffer overflow means notifications were lost. Re-check every watched document
+                // rather than pretending nothing moved; the harmless cost is a re-read of unchanged files.
+                overflowed = false;
+                foreach (DocumentState watched in documents.Values)
+                {
+                    if (watched.Watcher != null) pending.Add(watched.Source.Id);
+                }
+            }
+
+            if (pending.Count == 0) return;
+
+            observed = new List<string>(pending);
+            pending.Clear();
+        }
+
+        for (int i = 0; i < observed.Count; i++)
+        {
+            string documentId = observed[i];
+            if (!documents.ContainsKey(documentId)) continue;
+
+            lock (gate)
+            {
+                if (schedules.TryGetValue(documentId, out Schedule? schedule))
+                {
+                    schedule.LastObservedSeconds = now;
+                    schedule.Attempted = false;
+                    schedule.Retries = 0;
+                    schedule.NextAttemptSeconds = 0;
+                    schedule.Deferred = false;
+                }
+                else
+                {
+                    schedules.Add(documentId, new Schedule(now));
+                }
+            }
+        }
+    }
+
+    /// <summary>Documents whose quiet window has elapsed, or whose retry interval has elapsed, as of <paramref name="now"/>.</summary>
+    private List<string> CollectDue(double now)
+    {
+        var due = new List<string>();
+        lock (gate)
+        {
+            foreach (KeyValuePair<string, Schedule> entry in schedules)
+            {
+                Schedule schedule = entry.Value;
+                if (schedule.Attempted)
+                {
+                    if (now >= schedule.NextAttemptSeconds) due.Add(entry.Key);
+                }
+                else if (now - schedule.LastObservedSeconds >= policy.QuietSeconds)
+                {
+                    due.Add(entry.Key);
+                }
+            }
+        }
+
+        return due;
+    }
+
+    /// <summary>
+    /// Whether a ready document must wait because an attached host that depends on it is interacting. Only
+    /// hosts the batch can affect count, and the deferral expires at
+    /// <see cref="UiReloadPolicy.MaxDeferSeconds"/> past the moment the document became ready - a held
+    /// capture delays a commit, it never cancels one.
+    /// </summary>
+    private bool IsInteractionDeferring(string documentId, double now)
+    {
+        double readyAt;
+        lock (gate)
+        {
+            if (!schedules.TryGetValue(documentId, out Schedule? schedule)) return false;
+
+            // A retry is already time-bounded by RetrySeconds and is not made shorter or longer by the
+            // user's input; only a ready commit is deferred.
+            if (schedule.Attempted) return false;
+            readyAt = schedule.LastObservedSeconds + policy.QuietSeconds;
+        }
+
+        if (now - readyAt >= policy.MaxDeferSeconds) return false;
+
+        for (int i = 0; i < dependencies.Count; i++)
+        {
+            Dependency dependency = dependencies[i];
+            if (dependency.Host.SessionDisposed) continue;
+            if (!string.Equals(dependency.LayoutId, documentId, StringComparison.Ordinal)
+                && !string.Equals(dependency.StyleId, documentId, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (dependency.Host.IsInteracting) return true;
+        }
+
+        return false;
+    }
+
+    private int RetriesFor(string documentId)
+    {
+        lock (gate)
+        {
+            return schedules.TryGetValue(documentId, out Schedule? schedule)
+                ? schedule.Retries
+                : policy.MaxRetryAttempts;
+        }
+    }
+
+    private void ScheduleRetry(string documentId, double nextAttemptSeconds)
+    {
+        lock (gate)
+        {
+            if (!schedules.TryGetValue(documentId, out Schedule? schedule)) return;
+            schedule.Attempted = true;
+            schedule.Retries++;
+            schedule.NextAttemptSeconds = nextAttemptSeconds;
+            schedule.Deferred = false;
+        }
+    }
+
+    private void MarkDeferred(string documentId)
+    {
+        lock (gate)
+        {
+            if (schedules.TryGetValue(documentId, out Schedule? schedule)) schedule.Deferred = true;
+        }
+    }
+
+    private void ClearDeferred(string documentId)
+    {
+        lock (gate)
+        {
+            if (schedules.TryGetValue(documentId, out Schedule? schedule)) schedule.Deferred = false;
+        }
+    }
+
+    private void ForgetSchedule(string documentId)
+    {
+        lock (gate)
+        {
+            schedules.Remove(documentId);
+        }
+    }
+
+    /// <summary>
+    /// Resolves a document that a watcher signalled while nothing depended on it. It is the explicit-entry-
+    /// point timing - no quiet period, no deferral - and the same candidate/validate/commit path a reload
+    /// uses, so a document whose file was fixed before the window opened arrives as the fixed version.
+    /// </summary>
+    private void ResolveScheduledNow(string? documentId)
+    {
+        if (documentId == null) return;
+
+        bool scheduled;
+        lock (gate)
+        {
+            scheduled = schedules.Remove(documentId);
+            pending.Remove(documentId);
+        }
+
+        if (scheduled && documents.ContainsKey(documentId))
+        {
+            ReloadCore(documentId);
+        }
+    }
+
+    /// <summary>The one place the clock is read; a frame path asks time here and nowhere else.</summary>
+    private double NowSeconds()
+    {
+        return timeSource.NowSeconds;
+    }
+
     // --- candidate / commit ---------------------------------------------------------------------
 
-    private UiReloadReport? ReloadCore(string documentId)
+    private UiReloadReport? ReloadCore(string documentId, bool deferTransientFailure = false)
     {
         if (!documents.TryGetValue(documentId, out DocumentState? state)) return null;
 
@@ -490,6 +784,11 @@ public sealed class UiDocumentService : IDisposable
         Candidate candidate = ReadCandidate(state);
         if (candidate.Failure.Length > 0)
         {
+            // The scheduler holds a transient read failure for a bounded retry: returning null publishes
+            // nothing, accepts nothing and leaves the previous valid version in force. A failure that cannot
+            // become valid by waiting (malformed XML, an oversized file) is reported on the first attempt.
+            if (deferTransientFailure && candidate.Retryable) return null;
+
             bool duplicate = string.Equals(candidate.Version, state.LastFailedVersion, StringComparison.Ordinal);
             state.LastFailedVersion = candidate.Version;
             var failure = new UiReloadReport(
@@ -720,7 +1019,8 @@ public sealed class UiDocumentService : IDisposable
         {
             return Candidate.Refused(
                 "missing:" + HashText(state.Source.Path),
-                "the file '" + state.Source.Path + "' does not exist; the last valid version is kept");
+                "the file '" + state.Source.Path + "' does not exist; the last valid version is kept",
+                retryable: true);
         }
 
         return ReadEmbedded(state, "");
@@ -746,7 +1046,10 @@ public sealed class UiDocumentService : IDisposable
         }
         catch (Exception ex) when (IsIoFailure(ex))
         {
-            return Candidate.Refused(HashText("read:" + ex.Message), "the file could not be read: " + ex.Message);
+            return Candidate.Refused(
+                HashText("read:" + ex.Message),
+                "the file could not be read: " + ex.Message,
+                retryable: true);
         }
 
         if (bytes.Length > MaxDocumentBytes)
@@ -1057,6 +1360,38 @@ public sealed class UiDocumentService : IDisposable
         }
     }
 
+    /// <summary>
+    /// One document's scheduling state, created when the main thread first observes a signal for it and
+    /// removed when its attempt completes (accepted, skipped or reported). It holds no tree and no candidate
+    /// - only the clock reading, the retry budget and the deferral flag the diagnostics report.
+    /// </summary>
+    private sealed class Schedule
+    {
+        internal Schedule(double observedAt)
+        {
+            FirstObservedSeconds = observedAt;
+            LastObservedSeconds = observedAt;
+        }
+
+        /// <summary>When the signal was first observed, so the diagnostics can report how long work has waited.</summary>
+        internal double FirstObservedSeconds { get; }
+
+        /// <summary>When the most recent signal was observed; the quiet deadline is this plus QuietSeconds.</summary>
+        internal double LastObservedSeconds { get; set; }
+
+        /// <summary>Retries used by the current signal cycle; bounded by MaxRetryAttempts.</summary>
+        internal int Retries { get; set; }
+
+        /// <summary>True while waiting out RetrySeconds after a transient read failure.</summary>
+        internal bool Attempted { get; set; }
+
+        /// <summary>Earliest second at which the next retry may run; only meaningful while Attempted.</summary>
+        internal double NextAttemptSeconds { get; set; }
+
+        /// <summary>True while a ready commit is held for the user's own interaction.</summary>
+        internal bool Deferred { get; set; }
+    }
+
     private sealed class Dependency
     {
         internal Dependency(UiHost host, string? layoutId, string? styleId)
@@ -1089,12 +1424,14 @@ public sealed class UiDocumentService : IDisposable
 
     private readonly struct Candidate
     {
-        private Candidate(string version, UiLayoutManifest? layout, UiStyleDocument? style, string failure)
+        private Candidate(
+            string version, UiLayoutManifest? layout, UiStyleDocument? style, string failure, bool retryable)
         {
             Version = version;
             Layout = layout;
             Style = style;
             Failure = failure;
+            Retryable = retryable;
         }
 
         internal string Version { get; }
@@ -1105,19 +1442,33 @@ public sealed class UiDocumentService : IDisposable
 
         internal string Failure { get; }
 
+        /// <summary>
+        /// True for the failure shapes that waiting can fix - a sharing violation while an editor replaces
+        /// the file, or a file that is momentarily absent mid-save. A parse failure, an oversized file or a
+        /// bad embedded fallback is false: retrying it would only delay the report.
+        /// <para>The default <c>Candidate</c> (no external file at all) is not a refusal, so its false value
+        /// is never consulted.</para>
+        /// </summary>
+        internal bool Retryable { get; }
+
         internal static Candidate LayoutVersion(string version, UiLayoutManifest layout)
         {
-            return new Candidate(version, layout, null, "");
+            return new Candidate(version, layout, null, "", retryable: false);
         }
 
         internal static Candidate StyleVersion(string version, UiStyleDocument style)
         {
-            return new Candidate(version, null, style, "");
+            return new Candidate(version, null, style, "", retryable: false);
         }
 
         internal static Candidate Refused(string version, string failure)
         {
-            return new Candidate(version, null, null, failure);
+            return new Candidate(version, null, null, failure, retryable: false);
+        }
+
+        internal static Candidate Refused(string version, string failure, bool retryable)
+        {
+            return new Candidate(version, null, null, failure, retryable);
         }
     }
 }

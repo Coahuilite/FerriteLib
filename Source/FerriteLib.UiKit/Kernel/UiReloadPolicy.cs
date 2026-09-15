@@ -41,6 +41,19 @@ public sealed class UiReloadPolicy
     /// <summary>
     /// How long a changed file must stay untouched before its candidate is read. A save arrives as several
     /// events, and this is what turns them into one commit instead of three partial reads.
+    /// <para>
+    /// <b>The window is a trailing edge.</b> A later signal restarts it: signals at 0.0s and 0.2s with a
+    /// 0.25s window produce one read after 0.45s, not one read after 0.25s. That is what makes an editor's
+    /// multi-write save coalesce instead of being read half-written.
+    /// </para>
+    /// <para>
+    /// <b>The effective delay is this value plus at most one host frame.</b> The watcher thread posts a
+    /// signal and reads no clock, so the window does not open at the instant the file changed: it opens when
+    /// the main-thread pump first observes the signal. On a hosted window that is one
+    /// <see cref="UiHost.BeginFrame"/> after the watch event, so the observed delay is
+    /// <c>[QuietSeconds, QuietSeconds + frame interval]</c>. This is a bound on coalescing, never a
+    /// guarantee of latency.
+    /// </para>
     /// </summary>
     public double QuietSeconds { get; }
 

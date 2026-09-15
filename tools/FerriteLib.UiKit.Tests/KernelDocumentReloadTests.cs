@@ -90,7 +90,7 @@ internal static class KernelDocumentReloadTests
         File.WriteAllText(pathA, pageA);
         File.WriteAllText(pathB, pageB);
 
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         Check(service.Add(new UiDocumentSource("a", UiDocumentKind.Layout, pathA), pageA), "the first layout source registers");
         Check(service.Add(new UiDocumentSource("b", UiDocumentKind.Layout, pathB), pageB), "the second layout source registers");
 
@@ -113,7 +113,7 @@ internal static class KernelDocumentReloadTests
         File.WriteAllText(pathA, pageA2);
 
         Check(service.Signal("a"), "a watcher-shaped signal is accepted");
-        Check(service.Pump(), "the pump commits the changed document");
+        Check(Settle(service), "the pump commits the changed document");
         Check(!ReferenceEquals(hostA.Manifest, aBefore) && HasElement(hostA.Manifest, "added"),
             "the affected host now carries the new tree");
         Check(ReferenceEquals(hostB.Manifest, bBefore), "the unrelated host's manifest object was never touched");
@@ -133,7 +133,7 @@ internal static class KernelDocumentReloadTests
         string good = KeepPage("scope-lkg");
         File.WriteAllText(path, good);
 
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         service.Add(new UiDocumentSource("l", UiDocumentKind.Layout, path), good);
         using var host = NewHost("scope-lkg", UiLayoutManifest.Parse(good), new UiBindings());
         service.Attach(host, "l");
@@ -142,7 +142,7 @@ internal static class KernelDocumentReloadTests
 
         File.WriteAllText(path, "<UiPage Schema=\"2\" Source=\"scope-lkg\"><Column Id=\"root\">");
         service.Signal("l");
-        service.Pump();
+        Settle(service);
 
         UiReloadReport? refused = FindReport(service, "l");
         Check(refused != null && refused.Rejected, "a malformed candidate is refused");
@@ -161,7 +161,7 @@ internal static class KernelDocumentReloadTests
         const string good = "<Styles Schema=\"1\"><Scheme Name=\"ice\"><Color Token=\"Panel\" Value=\"#0000ff\"/></Scheme></Styles>";
         File.WriteAllText(path, good);
 
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         service.Add(new UiDocumentSource("s", UiDocumentKind.Style, path), good);
         using var host = NewHost("scope-style", UiLayoutManifest.Parse(KeepPage("scope-style")), new UiBindings());
         service.Attach(host, null, "s");
@@ -169,7 +169,7 @@ internal static class KernelDocumentReloadTests
 
         File.WriteAllText(path, "<NotAStyleDocument/>");
         service.Signal("s");
-        service.Pump();
+        Settle(service);
 
         UiReloadReport? refused = FindReport(service, "s");
         Check(refused != null && refused.Rejected, "a structurally broken style file is refused as a version");
@@ -186,7 +186,7 @@ internal static class KernelDocumentReloadTests
         string missing = Path.Combine(dir, "not-written-yet.xml");
         string fallback = KeepPage("scope-embed");
 
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         Check(service.Add(new UiDocumentSource("e", UiDocumentKind.Layout, missing), fallback),
             "a source with no file on disk still registers");
         using var host = NewHost("scope-embed", UiLayoutManifest.Parse(fallback), new UiBindings());
@@ -218,7 +218,7 @@ internal static class KernelDocumentReloadTests
         File.WriteAllText(sharedPath, shared);
         File.WriteAllText(otherPath, other);
 
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         service.Add(new UiDocumentSource("shared", UiDocumentKind.Layout, sharedPath), shared);
         service.Add(new UiDocumentSource("other", UiDocumentKind.Layout, otherPath), other);
 
@@ -266,7 +266,7 @@ internal static class KernelDocumentReloadTests
 
         service.Signal("shared");
         service.Signal("other");
-        service.Pump();
+        Settle(service);
 
         UiReloadReport? sharedReport = FindReport(service, "shared");
         Check(sharedReport != null && sharedReport.Rejected,
@@ -299,7 +299,7 @@ internal static class KernelDocumentReloadTests
         string good = KeepPage("scope-manual");
         File.WriteAllText(path, good);
 
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         service.Add(new UiDocumentSource("m", UiDocumentKind.Layout, path), good);
         using var host = NewHost("scope-manual", UiLayoutManifest.Parse(good), new UiBindings());
         service.Attach(host, "m");
@@ -307,7 +307,7 @@ internal static class KernelDocumentReloadTests
 
         File.WriteAllText(path, "<UiPage Schema=\"2\" Source=\"scope-manual\"><Column>");
         service.Signal("m");
-        service.Pump();
+        Settle(service);
         Check(FindReport(service, "m")?.Rejected == true, "the broken file is refused");
 
         string fixedPage = Page("scope-manual",
@@ -333,7 +333,7 @@ internal static class KernelDocumentReloadTests
         string v1 = ScrollPage("scope-state", "");
         File.WriteAllText(path, v1);
 
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         service.Add(new UiDocumentSource("st", UiDocumentKind.Layout, path), v1);
         using var host = NewHost("scope-state", UiLayoutManifest.Parse(v1), new UiBindings());
         service.Attach(host, "st");
@@ -353,7 +353,7 @@ internal static class KernelDocumentReloadTests
         string v2 = ScrollPage("scope-state", "<Widget Id=\"added\" Kind=\"chrome/banner\" Text=\"added\"/>");
         File.WriteAllText(path, v2);
         service.Signal("st");
-        service.Pump();
+        Settle(service);
         Check(service.LastReport?.Accepted == true, "the compatible reload commits");
         Draw(host);
 
@@ -373,7 +373,7 @@ internal static class KernelDocumentReloadTests
         string v3 = ScrollPage("scope-state", "", keepElement: "<Widget Id=\"keep\" Kind=\"chrome/rule\"/>");
         File.WriteAllText(path, v3);
         service.Signal("st");
-        service.Pump();
+        Settle(service);
         Draw(host);
         UiNode? rekinded = host.Session.GetNodeByElementId("keep");
         Check(rekinded != null && ReferenceEquals(rekinded, keep),
@@ -389,7 +389,7 @@ internal static class KernelDocumentReloadTests
         string v4 = ScrollPage("scope-state", "", keepElement: "");
         File.WriteAllText(path, v4);
         service.Signal("st");
-        service.Pump();
+        Settle(service);
         Draw(host);
         Check(!HasElement(host.Manifest, "keep"), "the element is gone from the new tree");
         Check(rekinded.State.EditText.Length == 0 && rekinded.State.Cursor == 0
@@ -403,7 +403,7 @@ internal static class KernelDocumentReloadTests
             "<Column Id=\"root\"><Widget Id=\"added\" Kind=\"chrome/banner\" Text=\"added\"/></Column>");
         File.WriteAllText(path, v5);
         service.Signal("st");
-        service.Pump();
+        Settle(service);
         Draw(host);
         Vector2 droppedScroll = host.Session.GetScrollPosition(scroll!);
         Check(Math.Abs(droppedScroll.x) < 0.001f && Math.Abs(droppedScroll.y) < 0.001f,
@@ -430,7 +430,7 @@ internal static class KernelDocumentReloadTests
             throw new InvalidOperationException("a reload must not replay a command");
         });
 
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         service.Add(new UiDocumentSource("se", UiDocumentKind.Layout, path), v1);
         using var host = NewHost("scope-side", UiLayoutManifest.Parse(v1), bindings);
         service.Attach(host, "se");
@@ -439,7 +439,7 @@ internal static class KernelDocumentReloadTests
         string v2 = ModelPage().Replace("Text=\"field\"", "Text=\"field-2\"");
         File.WriteAllText(path, v2);
         service.Signal("se");
-        service.Pump();
+        Settle(service);
         Check(service.LastReport?.Accepted == true, "the reload committed");
         Check(model.Draft == "original", "a reload leaves the business model exactly as it was");
         Check(model.Writes == 0, "a reload never calls a value setter");
@@ -455,7 +455,7 @@ internal static class KernelDocumentReloadTests
         string v1 = KeepPage("scope-hot");
         File.WriteAllText(path, v1);
 
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         service.Add(new UiDocumentSource("h", UiDocumentKind.Layout, path), v1);
         using var host = NewHost("scope-hot", UiLayoutManifest.Parse(v1), new UiBindings());
         service.Attach(host, "h");
@@ -473,7 +473,7 @@ internal static class KernelDocumentReloadTests
             + "</Column>");
         File.WriteAllText(path, v2);
         service.Signal("h");
-        service.Pump();
+        Settle(service);
 
         Check(host.Session.OwnedHotControl == null, "a reload releases the hot control instead of leaving it held");
         Check(keep.State.EditText == "mid-edit", "and keeps the compatible draft");
@@ -486,7 +486,7 @@ internal static class KernelDocumentReloadTests
         string v1 = KeepPage("scope-coalesce");
         File.WriteAllText(path, v1);
 
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         service.Add(new UiDocumentSource("c", UiDocumentKind.Layout, path), v1);
         using var host = NewHost("scope-coalesce", UiLayoutManifest.Parse(v1), new UiBindings());
         service.Attach(host, "c");
@@ -505,7 +505,7 @@ internal static class KernelDocumentReloadTests
         }
 
         Check(service.HasPending, "pending work is visible before the pump");
-        Check(service.Pump(), "five notifications for one save commit once");
+        Check(Settle(service), "five notifications for one save commit once");
         Check(service.Reports.Count == reportsBefore + 1, "and produce exactly one report");
         Check(HasElement(host.Manifest, "added"), "the committed tree is the new one");
 
@@ -522,7 +522,7 @@ internal static class KernelDocumentReloadTests
         string path = Path.Combine(dir, "page.xml");
         File.WriteAllText(path, KeepPage("scope-dedup"));
 
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         service.Add(new UiDocumentSource("d", UiDocumentKind.Layout, path), KeepPage("scope-dedup"));
         using var host = NewHost("scope-dedup", UiLayoutManifest.Parse(KeepPage("scope-dedup")), new UiBindings());
         service.Attach(host, "d");
@@ -531,7 +531,7 @@ internal static class KernelDocumentReloadTests
         int before = service.Reports.Count;
         File.WriteAllText(path, "<UiPage Schema=\"2\" Source=\"scope-dedup\">");
         service.Signal("d");
-        service.Pump();
+        Settle(service);
         UiReloadReport? first = service.LastReport;
         Check(first != null && first.Rejected && !first.Duplicate, "the first failure of a version is reported");
         Check(service.Reports.Count == before + 1, "and recorded once");
@@ -542,7 +542,7 @@ internal static class KernelDocumentReloadTests
 
         File.WriteAllText(path, "<UiPage Schema=\"2\" Source=\"scope-dedup\"><Row>");
         service.Signal("d");
-        service.Pump();
+        Settle(service);
         Check(service.Reports.Count == before + 2, "a different broken version is a new failure");
 
         string fixedPage = Page("scope-dedup",
@@ -569,7 +569,7 @@ internal static class KernelDocumentReloadTests
         string v1 = KeepPage("scope-watch");
         File.WriteAllText(path, v1);
 
-        using (var toggled = new UiDocumentService(autoWatch: false))
+        using (var toggled = NewService(false))
         {
             Check(!toggled.AutoWatch, "the constructor override turns watching off");
             toggled.Add(new UiDocumentSource("w", UiDocumentKind.Layout, path), v1);
@@ -580,14 +580,14 @@ internal static class KernelDocumentReloadTests
             Check(!toggled.IsWatching("w"), "turning AutoWatch off disarms it again");
         }
 
-        using var byDefault = new UiDocumentService();
+        using var byDefault = NewService();
         Check(byDefault.AutoWatch == UiDocumentService.DefaultAutoWatch, "an unconfigured service follows the build default");
 
         string dir2 = NewDir(sandbox, "watch-live");
         string live = Path.Combine(dir2, "live.xml");
         File.WriteAllText(live, v1);
 
-        using var service = new UiDocumentService(autoWatch: true);
+        using var service = NewService(true);
         service.Add(new UiDocumentSource("live", UiDocumentKind.Layout, live), v1);
         using var host = NewHost("scope-watch", UiLayoutManifest.Parse(v1), new UiBindings());
         service.Attach(host, "live");
@@ -606,7 +606,7 @@ internal static class KernelDocumentReloadTests
         bool committed = false;
         for (int attempt = 0; attempt < 200 && !committed; attempt++)
         {
-            committed = service.Pump();
+            committed = Settle(service);
             if (!committed)
             {
                 System.Threading.Thread.Sleep(25);
@@ -630,7 +630,7 @@ internal static class KernelDocumentReloadTests
         string v1 = KeepPage("scope-rearm");
 
         string pathA = Path.Combine(sandbox, "rearm-a", "page.xml");
-        using (var viaSetter = new UiDocumentService(autoWatch: true))
+        using (var viaSetter = NewService(true))
         {
             Check(viaSetter.Add(new UiDocumentSource("a", UiDocumentKind.Layout, pathA), v1),
                 "a source under a directory that does not exist yet still registers");
@@ -641,7 +641,7 @@ internal static class KernelDocumentReloadTests
         }
 
         string pathB = Path.Combine(sandbox, "rearm-b", "page.xml");
-        using (var viaPump = new UiDocumentService(autoWatch: true))
+        using (var viaPump = NewService(true))
         {
             viaPump.Add(new UiDocumentSource("b", UiDocumentKind.Layout, pathB), v1);
             Check(!viaPump.IsWatching("b"), "the second source starts unwatched for the same reason");
@@ -651,7 +651,7 @@ internal static class KernelDocumentReloadTests
         }
 
         string pathC = Path.Combine(sandbox, "rearm-c", "page.xml");
-        using (var viaReload = new UiDocumentService(autoWatch: true))
+        using (var viaReload = NewService(true))
         {
             viaReload.Add(new UiDocumentSource("c", UiDocumentKind.Layout, pathC), v1);
             Check(!viaReload.IsWatching("c"), "the third source starts unwatched too");
@@ -677,7 +677,7 @@ internal static class KernelDocumentReloadTests
         string v1 = PageSchemeStyle("ice", "#0000ff");
         File.WriteAllText(path, v1);
 
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         service.Add(new UiDocumentSource("shared-style", UiDocumentKind.Style, path), v1);
         UiTheme themeA = UiTheme.DarkGold.Clone();
         UiTheme themeB = UiTheme.DarkGold.Clone();
@@ -766,7 +766,7 @@ internal static class KernelDocumentReloadTests
         File.WriteAllText(path, v1);
 
         UiTheme theme = UiTheme.DarkGold.Clone();
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         service.Add(new UiDocumentSource("tint", UiDocumentKind.Layout, path), v1);
         using var host = NewHost("scope-retint", UiLayoutManifest.Parse(v1), new UiBindings(), theme);
         service.Attach(host, "tint");
@@ -780,7 +780,7 @@ internal static class KernelDocumentReloadTests
             + "<Widget Id=\"added\" Kind=\"chrome/banner\" Text=\"added\"/>"
             + "</Column>"));
         service.Signal("tint");
-        service.Pump();
+        Settle(service);
 
         Check(service.LastReport?.Accepted == true, "the layout reload committed");
         Check(SameColor(theme.Base, tint),
@@ -790,7 +790,7 @@ internal static class KernelDocumentReloadTests
         string styleV1 = PageSchemeStyle("ice", "#0000ff");
         File.WriteAllText(stylePath, styleV1);
 
-        using var styleService = new UiDocumentService(autoWatch: false);
+        using var styleService = NewService(false);
         styleService.Add(new UiDocumentSource("tint-style", UiDocumentKind.Style, stylePath), styleV1);
         UiTheme themed = UiTheme.DarkGold.Clone();
         Color panelBaseline = themed.Panel;
@@ -803,7 +803,7 @@ internal static class KernelDocumentReloadTests
         File.WriteAllText(stylePath,
             "<Styles Schema=\"1\"><Scheme Name=\"ice\"><Color Token=\"Panel\" Value=\"#00ff00\"/></Scheme></Styles>");
         styleService.Signal("tint-style");
-        styleService.Pump();
+        Settle(styleService);
         Check(styleService.LastReport?.Accepted == true, "the style reload committed");
         Check(SameColor(themed.Panel, panelBaseline),
             "and a page level the new document no longer declares is undone");
@@ -836,7 +836,7 @@ internal static class KernelDocumentReloadTests
         string v1 = ScrollPage("scope-rollback", "");
         File.WriteAllText(path, v1);
 
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         service.Add(new UiDocumentSource("rb", UiDocumentKind.Layout, path), v1);
         using var hostA = NewHost("host-a", UiLayoutManifest.Parse(v1), new UiBindings());
         using var hostB = NewHost("host-b", UiLayoutManifest.Parse(v1), new UiBindings());
@@ -902,7 +902,7 @@ internal static class KernelDocumentReloadTests
             "<Column Id=\"root\"><Widget Id=\"embedded\" Kind=\"chrome/banner\" Text=\"embedded\"/></Column>");
         File.WriteAllText(path, external);
 
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         service.Add(new UiDocumentSource("m", UiDocumentKind.Layout, path), embedded);
         using var host = NewHost("scope-missing", UiLayoutManifest.Parse(embedded), new UiBindings());
         service.Attach(host, "m");
@@ -957,7 +957,7 @@ internal static class KernelDocumentReloadTests
         const string invalid = "<Styles Schema=\"1\" Scheme=\"undefined\"/>";
         File.WriteAllText(path, invalid);
 
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         service.Add(new UiDocumentSource("s5", UiDocumentKind.Style, path), "<Styles Schema=\"1\"/>");
         using var host = NewHost("style-first", UiLayoutManifest.Parse(KeepPage("style-first")), new UiBindings());
         UiStyleDocument hostDocument = host.StyleResolver.Document;
@@ -980,7 +980,7 @@ internal static class KernelDocumentReloadTests
         string validPath = Path.Combine(dir, "valid.xml");
         File.WriteAllText(validPath, valid);
         UiTheme theme = UiTheme.DarkGold.Clone();
-        using var validService = new UiDocumentService(autoWatch: false);
+        using var validService = NewService(false);
         validService.Add(new UiDocumentSource("s5v", UiDocumentKind.Style, validPath), valid);
         using var validHost = NewHost(
             "style-first-valid", UiLayoutManifest.Parse(KeepPage("style-first-valid")), new UiBindings(), theme);
@@ -1002,8 +1002,8 @@ internal static class KernelDocumentReloadTests
         string v1 = KeepPage("scope-rebind");
         File.WriteAllText(path, v1);
 
-        using var first = new UiDocumentService(autoWatch: false);
-        using var second = new UiDocumentService(autoWatch: false);
+        using var first = NewService(false);
+        using var second = NewService(false);
         first.Add(new UiDocumentSource("one", UiDocumentKind.Layout, path), v1);
         second.Add(new UiDocumentSource("two", UiDocumentKind.Layout, path), v1);
         using var host = NewHost("scope-rebind", UiLayoutManifest.Parse(v1), new UiBindings());
@@ -1040,7 +1040,7 @@ internal static class KernelDocumentReloadTests
         string good = KeepPage("scope-oversized");
         File.WriteAllText(path, good);
 
-        using var service = new UiDocumentService(autoWatch: false);
+        using var service = NewService(false);
         service.Add(new UiDocumentSource("big", UiDocumentKind.Layout, path), good);
         using var host = NewHost("scope-oversized", UiLayoutManifest.Parse(good), new UiBindings());
         service.Attach(host, "big");
@@ -1093,12 +1093,12 @@ internal static class KernelDocumentReloadTests
         Check(preamble.Length == 3 && marked[0] == 0xEF && marked[1] == 0xBB && marked[2] == 0xBF,
             "the fixture really carries a UTF-8 byte-order mark");
 
-        using var plainService = new UiDocumentService(autoWatch: false);
+        using var plainService = NewService(false);
         plainService.Add(new UiDocumentSource("plain", UiDocumentKind.Layout, plainPath), xml);
         using var plainHost = NewHost("scope-bom-plain", UiLayoutManifest.Parse(xml), new UiBindings());
         plainService.Attach(plainHost, "plain");
 
-        using var bomService = new UiDocumentService(autoWatch: false);
+        using var bomService = NewService(false);
         bomService.Add(new UiDocumentSource("bom", UiDocumentKind.Layout, bomPath), xml);
         using var bomHost = NewHost("scope-bom-marked", UiLayoutManifest.Parse(xml), new UiBindings());
         bomService.Attach(bomHost, "bom");
@@ -1142,7 +1142,7 @@ internal static class KernelDocumentReloadTests
         string path = Path.Combine(dir, "shared.xml");
         File.WriteAllText(path, v1);
 
-        using (var service = new UiDocumentService(autoWatch: false))
+        using (var service = NewService(false))
         {
             service.Add(new UiDocumentSource("sd", UiDocumentKind.Layout, path), v1);
             var vanishing = NewHost("stage-dispose-a", UiLayoutManifest.Parse(v1), new UiBindings());
@@ -1185,7 +1185,7 @@ internal static class KernelDocumentReloadTests
         string path2 = Path.Combine(dir2, "shared.xml");
         File.WriteAllText(path2, v1);
 
-        using (var service = new UiDocumentService(autoWatch: false))
+        using (var service = NewService(false))
         {
             service.Add(new UiDocumentSource("sdr", UiDocumentKind.Layout, path2), v1);
             var vanishing = NewHost("stage-dispose-c", UiLayoutManifest.Parse(v1), new UiBindings());
@@ -1408,6 +1408,54 @@ internal static class KernelDocumentReloadTests
         public int Writes;
 
         public int Commands;
+    }
+
+    /// <summary>
+    /// The lane's clock. Automatic reload scheduling is debounced by the policy's quiet period, and the
+    /// harness's <c>Time.realtimeSinceStartup</c> stub is a constant zero, so a lane that wants a watcher
+    /// signal to commit has to advance time explicitly. Nothing else is advanced to make time pass - no
+    /// frame count, no host count, no pump count; <see cref="Settle"/> only moves this clock and pumps.
+    /// </summary>
+    private sealed class LaneClock : IUiTimeSource
+    {
+        public double Now;
+
+        public double NowSeconds => Now;
+
+        public void Advance(double seconds)
+        {
+            Now += seconds;
+        }
+    }
+
+    /// <summary>
+    /// Past every window in <see cref="UiReloadPolicy.Default"/>: the 0.25s quiet period, the 0.5s retry
+    /// interval, and the 2.0s deferral ceiling. A lane that holds an interaction capture therefore still
+    /// reaches the commit - the ceiling is what forces it - and a lane with no interaction simply passes the
+    /// quiet window.
+    /// </summary>
+    private const double SettleSeconds = 3.0;
+
+    private static readonly LaneClock Clock = new LaneClock();
+
+    private static UiDocumentService NewService(bool? autoWatch = null)
+    {
+        return new UiDocumentService(autoWatch, UiReloadPolicy.Default, Clock);
+    }
+
+    /// <summary>
+    /// The observe/advance/commit shape of an automatic reload. The first pump observes the signals the lane
+    /// posted - that is when the quiet window opens, because the watcher thread reads no clock - the clock
+    /// then advances past every scheduling window, and the second pump reads and commits. A single
+    /// <c>Pump</c> after <c>Signal</c> is deliberately NOT a commit: that debounce is this round's contract,
+    /// and the assertions below are unchanged from the 0.5 lane - only the timing that reaches them is now
+    /// explicit. Returns true when either pump committed.
+    /// </summary>
+    private static bool Settle(UiDocumentService service)
+    {
+        bool committed = service.Pump();
+        Clock.Advance(SettleSeconds);
+        return service.Pump() || committed;
     }
 
     private static string NewDir(string sandbox, string name)

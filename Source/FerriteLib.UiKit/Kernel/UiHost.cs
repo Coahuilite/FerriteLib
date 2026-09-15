@@ -406,6 +406,28 @@ public sealed class UiHost : IDisposable
     internal bool SessionDisposed => !session.IsActive;
 
     /// <summary>
+    /// True while this host's session owns the IMGUI hot control - the library's own observable model of
+    /// "the user is dragging or editing right now", which is the signal
+    /// <see cref="UiDocumentService"/> defers a ready commit for.
+    /// <para>
+    /// The signal is the session's own capture (<see cref="UiSession.CaptureHotControl"/>), because that is
+    /// the one piece of interaction state the library owns end to end: <c>UiNative</c> grants the native hot
+    /// control and the session records the ownership, so a drag reports true for every frame the pointer is
+    /// held (the chart's point drag captures on pointer-down and releases on pointer-up).
+    /// </para>
+    /// <para>
+    /// <b>What it does not cover.</b> It is deliberately not a general "the user is busy" answer. A control
+    /// that is merely focused - a text field after a click, a keyboard-navigated control, an OS-level IME
+    /// composition in progress - holds no library-owned hot control and reports false here. There is no
+    /// per-element walk in this property either: a drag that never captured through the session is
+    /// invisible. A consumer that needs one of those shapes deferred must close its own capture; the
+    /// deferral ceiling is what keeps the missed cases bounded rather than a promise that this property is
+    /// a complete activity monitor.
+    /// </para>
+    /// </summary>
+    internal bool IsInteracting => session.IsActive && session.OwnedHotControl.HasValue;
+
+    /// <summary>
     /// Attributes one document-service report to this host. The service calls it for every host a reload
     /// batch affected, so a report reaches exactly the windows that read the document and never a window
     /// that reads a different one. A host with no subscription returns on the null check, and nothing here

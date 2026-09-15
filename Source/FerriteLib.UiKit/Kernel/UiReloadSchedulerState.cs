@@ -20,7 +20,12 @@ public readonly struct UiReloadSchedulerState
     /// <summary>Signals accepted and waiting for their quiet period to elapse.</summary>
     public int Pending { get; }
 
-    /// <summary>Signals whose quiet period has elapsed but whose commit is deferred for the user's input.</summary>
+    /// <summary>
+    /// Signals whose quiet period has elapsed but whose commit is deferred for the user's input. This count
+    /// is the visible reason a scheduler is holding work back: an attached host reports it is dragging or
+    /// editing (<c>UiHost.IsInteracting</c>), and the deferral lasts no longer than
+    /// <see cref="UiReloadPolicy.MaxDeferSeconds"/> past the moment the signal became ready.
+    /// </summary>
     public int Deferred { get; }
 
     /// <summary>Signals being retried after a transient read failure.</summary>
