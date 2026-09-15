@@ -40,6 +40,7 @@ internal static class KernelRepeatTests
     private static readonly List<string> Keys = new();
     private static readonly Dictionary<string, bool> Done = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, float> Pct = new(StringComparer.Ordinal);
+    private static readonly Dictionary<string, string> Caption = new(StringComparer.Ordinal);
     private static readonly HashSet<string> BoundKeys = new(StringComparer.Ordinal);
     private static int pageLevelDone;
     private static bool showRows = true;
@@ -61,6 +62,10 @@ internal static class KernelRepeatTests
         Run("The parser refuses a dangling template, a duplicate name, children, a nested repeat and a reserved Id", VerifyManifestStructureIsRefused);
         Run("The engine's template vocabulary cannot drift from the host's", VerifyTemplateVocabularyCannotDrift);
         Run("The Repeat declaration itself is contract-checked at creation", VerifyRepeatDeclarationContract);
+        Run("An item-local key nobody bound draws the kind's default and reports once", VerifyAbsentItemLocalKeysAreFailSoft);
+        Run("A mistyped item-local value draws the kind's default and reports once", VerifyMistypedItemLocalValuesAreFailSoft);
+        Run("An item-local value that arrives a frame later is read without a recovery trip", VerifyLateItemLocalValueIsReadLater);
+        Run("An existing atom keeps its own throwing-read contract", VerifyAtomsKeepTheirOwnContract);
         return failures;
     }
 
@@ -360,6 +365,96 @@ internal static class KernelRepeatTests
             "and an Items key bound to another type is refused at creation too");
     }
 
+    // --- the item-local binding contract ----------------------------------------------------------
+
+    /// <summary>
+    /// The chosen contract, pinned from both sides: an item-local key that is absent or bound to another type
+    /// draws the kind's declared default and records one deduplicated report, while an existing atom keeps its
+    /// own documented behaviour (a throwing read reaches one recovery slot). Code, comments and
+    /// <c>docs/development/0.5/20-api-and-xml.md</c> 7.4 say exactly this and nothing else.
+    /// </summary>
+    private static void VerifyAbsentItemLocalKeysAreFailSoft()
+    {
+        UiFitAudit.Reset();
+        using UiHost host = NewHost(new[] { "a" }, ItemBindingMode.NewKindsAbsent);
+        Draw(host);
+
+        UiNode flag = Require(host, "flag#a");
+        UiNode bar = Require(host, "bar#a");
+        Check(!host.Session.IsTripped(flag) && !host.Session.IsTripped(bar),
+            "a key nobody bound draws the kind's declared default instead of replacing the slot with a recovery band");
+        Check(!host.Session.IsTripped(Require(host, "caption#a")),
+            "while the atom whose key is bound keeps drawing normally in the same row");
+
+        int reports = UiFitAudit.StyleFallbackCount;
+        Check(reports == 2, "one report per unresolved element, and none for the bound one: " + reports);
+        Draw(host);
+        Draw(host);
+        Check(UiFitAudit.StyleFallbackCount == reports, "and repeated frames add no more: the report is deduplicated");
+    }
+
+    private static void VerifyMistypedItemLocalValuesAreFailSoft()
+    {
+        UiFitAudit.Reset();
+        using UiHost host = NewHost(new[] { "a" }, ItemBindingMode.NewKindsMistyped);
+        Draw(host);
+
+        UiNode flag = Require(host, "flag#a");
+        UiNode bar = Require(host, "bar#a");
+        Check(!host.Session.IsTripped(flag),
+            "a value of another type is answered with the declared default, not the recovery band");
+        Check(!host.Session.IsTripped(bar), "for the progress read too");
+        Check(UiFitAudit.StyleFallbackCount >= 2,
+            "and each unresolved read is recorded once through the bounded channel: " + UiFitAudit.StyleFallbackCount);
+        Check(
+            UiFitAudit.LastStyleFallbackDiagnostic is string diagnostic && diagnostic.Contains("items.a."),
+            "the report names the key it could not resolve: " + UiFitAudit.LastStyleFallbackDiagnostic);
+    }
+
+    private static void VerifyLateItemLocalValueIsReadLater()
+    {
+        UiFitAudit.Reset();
+        UiBindings bindings = MakeBindings(new[] { "a" }, ItemBindingMode.NewKindsAbsent);
+        using var host = new UiHost(
+            Scope, UiLayoutManifest.Parse(PageXml), bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+
+        Draw(host);
+        Check(!host.Session.IsTripped(Require(host, "flag#a")),
+            "the first frame draws the default without a recovery trip");
+
+        BindItemValues(bindings, "a");
+        Done["a"] = true;
+        Draw(host);
+        Check(!host.Session.IsTripped(Require(host, "flag#a")),
+            "and the frame that brings the value stays out of recovery too");
+
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(240f, 400f));
+        Rect flag = snapshot.RectById["flag#a"];
+        var centre = new Vector2(flag.x + flag.width * 0.5f, flag.y + flag.height * 0.5f);
+        Pump(host, EventType.MouseDown, centre);
+        Pump(host, EventType.MouseUp, centre);
+        Check(!Done["a"], "the value the page bound one frame later is read and written like any other");
+    }
+
+    private static void VerifyAtomsKeepTheirOwnContract()
+    {
+        UiFitAudit.Reset();
+        using UiHost host = NewHost(new[] { "a" }, ItemBindingMode.CaptionMistyped);
+        Draw(host);
+
+        UiNode caption = Require(host, "caption#a");
+        Check(host.Session.IsTripped(caption),
+            "an existing atom's throwing read still reaches one recovery slot - its own contract, unchanged");
+        Check(
+            host.Session.TryGetTripLog(caption, out string log) && log.Length > 0,
+            "with the slot's diagnostic recorded: " + log);
+        Check(
+            Require(host, "flag#a") != null && !host.Session.IsTripped(Require(host, "flag#a")),
+            "and the page keeps drawing around the tripped slot: the row's other controls are intact");
+        Draw(host);
+        Check(host.Session.IsTripped(caption), "the trip stays once per slot rather than once per frame");
+    }
+
     // --- page and model -------------------------------------------------------------------------
 
     private const string PageXml =
@@ -368,6 +463,7 @@ internal static class KernelRepeatTests
         + "<Row Id=\"row\" Gap=\"2\" Padding=\"2\">"
         + "<Widget Id=\"flag\" Kind=\"input/checkbox\" Bind=\"done\" Label=\"Done\" />"
         + "<Widget Id=\"bar\" Kind=\"display/progress\" Bind=\"pct\" Height=\"8\" />"
+        + "<Widget Id=\"caption\" Kind=\"text/wrapped\" Bind=\"caption\" />"
         + "<Widget Id=\"probe\" Kind=\"" + ChildProbeKind + "\" Height=\"4\" />"
         + "</Row>"
         + "</Templates>"
@@ -376,12 +472,12 @@ internal static class KernelRepeatTests
         + "</Column>"
         + "</UiPage>";
 
-    private static UiHost NewHost(IReadOnlyList<string> keys)
+    private static UiHost NewHost(IReadOnlyList<string> keys, ItemBindingMode mode = ItemBindingMode.Correct)
     {
         return new UiHost(
             Scope,
             UiLayoutManifest.Parse(PageXml),
-            MakeBindings(keys),
+            MakeBindings(keys, mode),
             UiTheme.DarkGold,
             new StubMetrics(),
             new StubTranslation());
@@ -392,12 +488,33 @@ internal static class KernelRepeatTests
     /// here knows an element's identity, a rectangle or an input rule - which is the round's success
     /// criterion stated as code rather than as prose.
     /// </summary>
-    private static UiBindings MakeBindings(IReadOnlyList<string> keys)
+    /// <summary>
+    /// Which of a row's item-local bindings the page registers, so the contract lanes can isolate one state at
+    /// a time: the new kinds' absent and mistyped cases, the value that arrives later, and the existing atom's
+    /// own throwing-read case.
+    /// </summary>
+    private enum ItemBindingMode
+    {
+        /// <summary>Every key the template declares is bound with the type it declares.</summary>
+        Correct,
+
+        /// <summary>The new kinds' keys are not bound at all; the atom's key is.</summary>
+        NewKindsAbsent,
+
+        /// <summary>The new kinds' keys are bound to another type; the atom's key is correct.</summary>
+        NewKindsMistyped,
+
+        /// <summary>The existing atom's key is bound to another type, so its own read contract is observable.</summary>
+        CaptionMistyped,
+    }
+
+    private static UiBindings MakeBindings(IReadOnlyList<string> keys, ItemBindingMode mode = ItemBindingMode.Correct)
     {
         Keys.Clear();
         Keys.AddRange(keys);
         Done.Clear();
         Pct.Clear();
+        Caption.Clear();
         BoundKeys.Clear();
         pageLevelDone = 0;
         showRows = true;
@@ -410,24 +527,64 @@ internal static class KernelRepeatTests
         bindings.BindReadOnly<float>("pct", () => 0f, UiInvalidation.Paint);
         bindings.BindReadOnly<bool>("not-a-list", () => true, UiInvalidation.Paint);
         bindings.BindReadOnly<bool>("show-rows", () => showRows, UiInvalidation.Structure);
-        BindItemKeys(bindings);
+        BindItemKeys(bindings, mode);
         return bindings;
     }
 
-    private static void BindItemKeys(IUiBindings bindings)
+    private static void BindItemKeys(IUiBindings bindings, ItemBindingMode mode = ItemBindingMode.Correct)
     {
         for (int i = 0; i < Keys.Count; i++)
         {
             string key = Keys[i];
             if (!BoundKeys.Add(key)) continue;
 
-            string captured = key;
-            Done[captured] = false;
-            Pct[captured] = 0f;
-            bindings.BindValue<bool>(
-                "items." + captured + ".done", () => Done[captured], value => Done[captured] = value, UiInvalidation.Paint);
-            bindings.BindReadOnly<float>("items." + captured + ".pct", () => Pct[captured], UiInvalidation.Paint);
+            Caption[key] = "Caption " + key;
+            BindItemKey(bindings, key, mode);
         }
+    }
+
+    /// <summary>
+    /// One item key's bindings. The atom's key is bound in every mode but <see cref="ItemBindingMode.CaptionAbsent"/>,
+    /// because a tripped sibling would drown the signal the contract lanes are looking for.
+    /// </summary>
+    private static void BindItemKey(IUiBindings bindings, string key, ItemBindingMode mode)
+    {
+        string captured = key;
+        Done[captured] = false;
+        Pct[captured] = 0f;
+
+        if (mode == ItemBindingMode.CaptionMistyped)
+        {
+            bindings.BindReadOnly<bool>("items." + captured + ".caption", () => true);
+        }
+        else
+        {
+            bindings.BindReadOnly<string>("items." + captured + ".caption", () => Caption[captured]);
+        }
+
+        switch (mode)
+        {
+            case ItemBindingMode.Correct:
+            case ItemBindingMode.CaptionMistyped:
+                BindItemValues(bindings, captured);
+                break;
+            case ItemBindingMode.NewKindsMistyped:
+                // Deliberately the wrong types: a bool key bound to a string, a float key bound to a bool.
+                bindings.BindReadOnly<string>("items." + captured + ".done", () => "not-a-bool");
+                bindings.BindReadOnly<bool>("items." + captured + ".pct", () => true);
+                break;
+            case ItemBindingMode.NewKindsAbsent:
+                break;
+        }
+    }
+
+    /// <summary>The two new-kind value bindings for one item key, bound with their declared types.</summary>
+    private static void BindItemValues(IUiBindings bindings, string key)
+    {
+        string captured = key;
+        bindings.BindValue<bool>(
+            "items." + captured + ".done", () => Done[captured], value => Done[captured] = value, UiInvalidation.Paint);
+        bindings.BindReadOnly<float>("items." + captured + ".pct", () => Pct[captured], UiInvalidation.Paint);
     }
 
     private static string? CreationFailure(string xml)

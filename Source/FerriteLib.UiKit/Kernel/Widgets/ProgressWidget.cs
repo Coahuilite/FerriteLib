@@ -122,15 +122,13 @@ internal sealed class ProgressWidget : IUiWidget
     }
 
     /// <summary>
-    /// The proportion read. An unbound or mistyped key paints the empty track and is recorded once, the
-    /// same fail-soft answer <c>VisibleKey</c> gets - a progress row whose item-local key is not bound yet
-    /// must not take the page down.
+    /// The proportion read, under the same contract as the checkbox: an absent key and a key bound to another
+    /// type both paint the empty track and are recorded once (<see cref="AtomVocabulary.ReadOr{T}"/>), so an
+    /// item-local value that is not there yet cannot take the page down.
     /// </summary>
     private float ReadValue(UiWidgetContext ctx, string key)
     {
-        if (ctx.Bindings.TryGet<float>(key, out float value)) return value;
-        UiFitAudit.ReportStyleFallback(ctx.ElementPath, Kind, "Bind", key, "0");
-        return 0f;
+        return AtomVocabulary.ReadOr(ctx, Kind, key, 0f, "0");
     }
 
     private string ReadBindKey()
