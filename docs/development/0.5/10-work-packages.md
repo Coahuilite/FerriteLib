@@ -64,3 +64,29 @@ P1..P5 ── P6 (独立验证 → 开发包 → 文档)
 | P6 | 进行中（Lead + `verifier`） | 基线已复跑绿 |
 
 状态只在 Lead 合并后更新（单一状态源原则）；各包分支内部进度写在提交信息与任务回交里。
+## 5. 提交纪律（本轮实测教训）
+
+**本环境的 agent 运行时会覆盖 git 的 author/committer 身份。** 主检出与每个 worktree 的 `user.name`/`user.email` 都是
+正确的单账号 noreply 值，但子 agent 提交后落到的是 `<agent> <agent@local>`——环境变量优先级高于 config。
+`scripts/privacy-audit.ps1` 会以 `identity: non-noreply author/committer address(es)` 判失败。
+
+因此：**每一次提交都必须把四个身份变量放在同一个 pwsh 命令里**：
+
+```powershell
+$env:GIT_AUTHOR_NAME='Coahuilite'
+$env:GIT_AUTHOR_EMAIL='19252128+Coahuilite@users.noreply.github.com'
+$env:GIT_COMMITTER_NAME='Coahuilite'
+$env:GIT_COMMITTER_EMAIL='19252128+Coahuilite@users.noreply.github.com'
+git commit -m "message"
+```
+
+`git -c user.name=...` **不够**（config 低于环境）。提交后以
+`git log --format='%h | %an <%ae> | %cn <%ce>'` 自查。
+
+配套两条流程规则：
+
+1. 隐私审计必须**作为 push 的前置条件**，不能用 `;` 与 push 串在同一条命令里——本轮第一次 push 就是这样把
+   一个非 noreply 身份送上了远端，随后只能改写并 force-push（仅 `0.5.x`，无 tag/无 release/无消费者，代价只是记录）。
+2. 审计扫描 `--all` refs，因此**未推送的队友分支上的坏身份同样会让整个仓库审计失败**，必须在 push 前修掉，
+   不能留到 merge 时。改写范围 `99acc5f..8098ca0`，改写前内容与改写后逐字节相同
+   （`git diff --stat 766b6cd 8098ca0` 为空）。

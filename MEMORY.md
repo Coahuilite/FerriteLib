@@ -330,6 +330,21 @@
   (`UiHitLayer` + `UiSession.IsPointerOverHigherLayer`) with full z-ordered dispatch still owed, and "0.5 is
   about dissolving 18 consumer kinds" is not this round's goal.
 
+- **The acting environment overrides git's author/committer identity, and the privacy gate is what catches it
+  (2026-09-15, measured during the 0.5.x round).** A teammate agent's commits landed as `name <name@local>`, not as
+  the repository's single noreply account, even though `git config user.name`/`user.email` were correct in the main
+  checkout *and* in every worktree: the runtime exports the identity into the commit process, and environment beats
+  config. `scripts/privacy-audit.ps1` reported `identity: non-noreply author/committer address(es)` and exit 1.
+  Three consequences, all now practice rather than advice: (1) every commit made by a non-Lead agent must set
+  `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_NAME`/`GIT_COMMITTER_EMAIL` **in the same shell invocation** as
+  the `git commit` - `git -c user.name=` does not win; (2) the audit must gate the push, not run beside it (the first
+  push of this round went out because the audit and the push were chained with `;` instead of conditionally, and the
+  branch had to be rewritten and force-pushed minutes later - 0.5.x only, no tag, no release, no consumer, so the
+  rewrite cost nothing but the record); (3) the gate itself is the detector and it scans `--all` refs, so a bad
+  identity on an unwritten teammate branch fails the audit for the whole repository and must be fixed before any push,
+  not at merge time. The rewritten range is `99acc5f..8098ca0`; the pre-rewrite commit `766b6cd` is dangling locally
+  and its content is byte-identical (`git diff --stat 766b6cd 8098ca0` is empty).
+
 ## Charter — what this library is for
 
 - **The founding spec, transcribed.** `Coahuilite/UniversalSqueaker@09366f8:docs/ui-shared-library-design-zh.md`
