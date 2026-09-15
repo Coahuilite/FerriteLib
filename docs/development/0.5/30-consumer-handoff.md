@@ -12,7 +12,7 @@
 | 发布通道 | 消费者经已发布的 GitHub Release 资产集成；同目录兄弟文件夹的 `Private=false` 是开发便利，不是契约 |
 | 单 DLL carrier | 只有本 Mod 交付 `FerriteLib.UiKit.dll`；消费者不得自带副本 |
 
-游戏无法表达前置版本区间（`ModRequirement` 只解析 packageId/displayName），
+游戏无法表达前置版本区间（`ModRequirement` 只解析 `packageId`/`alternativePackageIds`/`displayName`），
 所以**每个消费者必须在自己构造函数里断言区间**：
 
 ```csharp

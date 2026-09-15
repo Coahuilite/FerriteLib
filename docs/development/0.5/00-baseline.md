@@ -27,8 +27,16 @@
 - **hit stack 是"有第一层，不是没有"**：`UiHitLayer`（元素 + Host 空间矩形 + 是否弹层）存在，
   `UiSession.BeginHitPass/PushHitLayer/IsPointerOverHigherLayer` 已能把"最上层不接收点击"这条规则集中表达；
   `UiPopup.RectFor` 是唯一的弹层矩形规则。
-- **仍然欠的**：内容层之间不互相裁决，`UiNative.YieldsToCoveringPopup` 仍是下拉触发器的私有分支；
-  完整 z 序调度（topmost-first dispatch + 元素级 yield 全部来自栈）是本轮 **P2/P3** 的目标。
+- **元素级 yield 已经来自栈，不是私有分支**（本文件初版在此重复了台账里的过时说法，2026-09-15 由独立审计纠正）：
+  `YieldsToCoveringPopup` 在 `99acc5f` 的 `Source` 下 **0 命中**，它已随 0.4.0 的 hit stack 一起被删除；
+  `UiNative.Button(rect, ctx)`（`UiNative.cs:97-103`）与下拉触发器（`:129-137`）都通过
+  `UiSession.IsPointerOverHigherLayer` 判层，五个 leaf atom 全部走两参数形式
+  （`ButtonWidget.cs:81`、`InputModeRowWidget.cs:94`、`StepperSliderWidget.cs:121,127`），
+  唯一保留的裸调用是壳自身的关闭按钮（`UiWindowHost.cs:368`，画在树外、已在 containment 白名单登记）。
+- **仍然欠的边界（本轮不做）**：内容层与内容层之间不互相裁决——只有"弹层盖内容"这一条规则，
+  因为 IMGUI 已按绘制顺序串行化内容输入。它**不属于 P1–P5 任何包**；恢复条件写在
+  `docs/api-tiers.md` 的 `UiHitLayer` 条目（"the moment a consumer needs topmost-content dispatch"）。
+  本轮把这条边界写清而不是留着一条与包不对应的待办。
 - 证据：`Source/FerriteLib.UiKit/Kernel/UiHitLayer.cs`、`UiNode.cs`、`UiNodeId.cs`、`UiSession.cs`；
   退役条件写在 `docs/api-tiers.md` 的 `UiHitLayer` 条目。
 

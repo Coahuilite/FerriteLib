@@ -50,7 +50,7 @@ pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev
 | A1 | 同型双窗、同 key 重开、不同上下文 | 正确共存或激活，命令目标不串线 | 待实机 |
 | A2 | 双窗 + 原版确认窗，鼠标/键盘/Cancel/Accept | 原版模态有效，无穿透、连关、误操作 | 待实机 |
 | A3 | 双窗同时打开，面板外地图选取/相机、面板内点击/滚动/拖动、分辨率变化 | 面板外正常操作地图；面板内不穿透；重叠区域只由前方目标处理 | 待实机 |
-| A3b | 内务草稿 → 点外务 → 点地图 → 回内务 | 草稿/选择/滚动保留；键盘只到当前目标；返回不误提交 | 待实机 |
+| A3b | 面板 A 草稿 → 点面板 B → 点地图 → 回面板 A | 草稿/选择/滚动保留；键盘只到当前目标；返回不误提交 | 待实机 |
 | A4 | 后台任务改变进度/资源/资格 | 相关窗口自动更新；固定尺寸读数不引起持续整页测量 | 待实机 |
 | A5 | 列表插入/排序/删除，删除正在编辑或持有弹层的行 | 状态跟随 key；捕获与订阅释放；重复操作数量不增长 | 待实机 |
 | A6 | 保存布局与共享样式 | 局部更新正确，共享更新一致；自动与手动路径均可用 | 待实机 |
@@ -67,3 +67,24 @@ pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev
 - 实机验收（A1–A11）：**阻塞于真实游戏会话**，本团队环境无游戏操作能力。
 - 消费者接入（真实页面）：**阻塞于消费者团队排期**；库侧交付接口、开发包与迁移步骤。
 - 两者都完成后才能把任何条目记为"已实机验证"。
+
+## 5. 独立审计发现与处置（wave A，`c69ab9b` → 处置于本提交）
+
+独立审计（`docs/development/0.5/verification/wave-A-audit.md`）在基线与 W0 文档上做了两件事：
+在干净提取（`git archive` 到临时目录，**不是工作树**）上复跑门禁与 harness
+（`c53bd37` 与 `99acc5f` 均 exit 0、867 ok / 0 FAIL / ALL PASS），以及核对 W0 文档的每一条"已实现"陈述。
+
+| 编号 | 发现 | 处置 |
+| --- | --- | --- |
+| F1 | `00-baseline.md` §2.1 仍称 `UiNative.YieldsToCoveringPopup` 是下拉触发器的私有分支——该符号在 `99acc5f` 的 `Source` 下 0 命中，0.4.0 的 hit stack 已删除它；`MEMORY.md` 与 `TODO.md` 同处亦有同一条过时说法 | 已按源码改写三处：元素级 yield 由 `UiSession.IsPointerOverHigherLayer` 集中裁决，五个 atom 均走两参数入口，唯一裸调用是壳的关闭按钮（已登记）。**这是本轮最严重的一条——W0 的"纠正过时说法"自己重复了一条过时说法** |
+| F2 | `00-baseline.md` 把"完整 z 序调度"记成 P2/P3 的目标，但没有任何包拥有它 | 改为明确的**本轮不做**边界（内容层互不裁决），恢复条件仍在 `docs/api-tiers.md` 的 `UiHitLayer` 条目 |
+| F3 | `api-tiers.md` 与 `MEMORY.md` 称 `ParseFile` "zero callers/no caller"——harness lane 直接调用它 | 三处改为 "no production caller"，与 `MEMORY.md` 既有的准确说法一致 |
+| F4 | `40-verification.md` 的 A3b 行使用了第二消费者的窗口名称 | 改为中立的"面板 A / 面板 B" |
+| F5 | `30-consumer-handoff.md` 的 `ModRequirement` 字段表漏 `alternativePackageIds` | 已补全 |
+| F6 | `api-tiers.md` 仍在讲一个已经关闭（`v0.4.0-rc1` 已切）的"0.4.x window" | 改为"0.4 线未完成、在 0.5 窗口继续" |
+
+**未能复核**（照实登记）：真实游戏 `Assembly-CSharp.dll` 的哈希与 IL 控制流（只核了固定版本引用程序集里符号存在）；
+GitHub release 状态（本环境 `api.github.com` 不可达）；任何消费者在 0.5 上编译——三项均为"尚待外部验证"。
+
+审计工具链自身的一条纪律也被确认：`git grep`/`git show` 于**已提交的 sha**上取证，
+而不是读工作树——`MEMORY.md` 已记录过一次"lane 文件存在但从未注册"的同类事故。

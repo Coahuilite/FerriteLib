@@ -10,8 +10,9 @@ assembly. Three tiers, one home for the promise:
 - **Public-unstable** — usable today, and expected to change shape. Compile against the version you tested
   against; expect to recompile at a minor bump. This is not a warning label, it is the honest status of a
   surface that has been forced by one consumer and never by two.
-- **Internalize-candidate** — public today and needed by nobody outside the assembly. The 0.4.x window
-  removes them from the surface; until then a consumer that names one is on its own.
+- **Internalize-candidate** — public today and needed by nobody outside the assembly. A minor window removes
+  them from the surface; the 0.4 line shipped without finishing that sweep, so it continues in the open 0.5
+  window. Until then a consumer that names one is on its own.
 
 Enforcement is a harness lane (`tools/FerriteLib.UiKit.Tests/FerriteLibApiTierTests.cs`): every public type
 in the payload must be listed here exactly once, no entry may name a type that no longer exists, and the
@@ -19,8 +20,8 @@ stable list is additionally pinned inside the test, so promoting or demoting a t
 edits. `UiWidgetRegistry.Clear` is the precedent for what an unlisted change does: it went internal in 0.3.0
 (item D) and no lane here would have noticed.
 
-**Why the stable tier is thin, and that is the point.** Three known debts each block a specific group of
-types from stability, and they are the reason a 0.4.x exists rather than a 0.3.5:
+**Why the stable tier is thin, and that is the point.** Known debts each block a specific group of types
+from stability; they are why the 0.4 line existed and they are what the open 0.5 window is paying down:
 
 | Debt (see `TODO.md`) | Blocks from stable |
 |---|---|
@@ -104,8 +105,9 @@ consequence is paid in the open rather than discovered by a stranger.
   reach them.
 - `UiThemeDraw` — the single text and panel outlet; per-surface tokens change what it takes to draw.
 - `UiFitAudit` — the audit surface; entry attribution follows the identity layer.
-- `UiLayoutManifest` — the `Schema="2"` slot and the uncalled `ParseFile` are an open fork, and either
-  branch changes this type.
+- `UiLayoutManifest` — the `Schema="2"` slot and `ParseFile` are an open fork — the method has **no
+  production caller** (the harness calls it directly; that is not a use), and the 0.5 document service is
+  the branch that decides it. Either branch changes this type.
 - `UiLayoutSnapshot` — the measure-then-draw halves are exercised only by the harness; no wired consumer or
   the shell names them (`UiWindowHost` drives `DrawFrame`), so they either earn a cited use or go internal.
 - `UiWindowHost` — the largest freeze surface this library has ever shipped, landed before a second consumer
@@ -273,7 +275,8 @@ What the 0.5 window is for (working packages, ownership and status: `docs/develo
 - **Collections and common controls.** The engine has no per-item template; a keyed repeater with a local
   item binding scope, node reuse and removal cleanup lands here, together with the checkbox, a basic
   progress bar and a hierarchy-only tree surface.
-- **Documents.** `UiLayoutManifest.ParseFile`/`UiStyleDocument.ParseFile` exist and have no caller. A
+- **Documents.** `UiLayoutManifest.ParseFile`/`UiStyleDocument.ParseFile` exist and have no production
+  caller (harness lanes call them; no shipped path does). A
   bounded document service with dependency tracking, candidate validation, atomic batch commit and
   last-known-good fallback lands here, which is what makes "edit the XML and the open window updates" true
   rather than implied. C# kind changes stay outside hot reload on purpose.
