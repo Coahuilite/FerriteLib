@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
@@ -13,6 +14,11 @@ public sealed class UiSession : IDisposable
 {
     private static readonly IReadOnlyDictionary<string, UiValueState> NoValueStates =
         new Dictionary<string, UiValueState>(StringComparer.Ordinal);
+
+    // Identity is per session, not per node: a diagnostic subscription is keyed by it, and the whole point
+    // of that key is that it survives as a number after the session itself is gone. A counter is bounded
+    // state (an int wraps in 2^31 sessions), never a table of live objects.
+    private static int nextIdentity;
 
     // Scroll state is keyed by the scroll container's node, not by a display path: two scroll elements
     // whose display paths collide still hold two scroll positions (0.4.0 node step 2).
@@ -57,10 +63,19 @@ public sealed class UiSession : IDisposable
     /// </summary>
     public UiSession()
     {
+        Identity = Interlocked.Increment(ref nextIdentity);
         unscopedNode = new UiNode(this, UiNodeId.None, "", -1);
         nodes.Add(UiNodeId.None, unscopedNode);
         activeNode = unscopedNode;
     }
+
+    /// <summary>
+    /// Process-unique session identity, stable from construction and never reused. A diagnostic
+    /// subscription and every event it buffers are keyed by this number rather than by a session
+    /// reference, which is what lets a buffered event outlive nothing at all: the session object can be
+    /// collected while the record of what it reported stays readable.
+    /// </summary>
+    public int Identity { get; }
 
     /// <summary>True until <see cref="Dispose"/> is called.</summary>
     public bool IsActive { get; private set; } = true;
@@ -755,6 +770,12 @@ public sealed class UiSession : IDisposable
     {
         if (!IsActive) return;
         IsActive = false;
+
+        // The session is the subscription's owner: disposing it releases the subscription, its bounded
+        // buffers and its registry entry, and never a sibling session's. This is the torn-down-window
+        // half of the isolation contract.
+        UiDiagnosticHub.ReleaseSession(this);
+
         if (ownedHotControl.HasValue)
         {
             // Dispose is the close path: release only this session's capture, then clear the

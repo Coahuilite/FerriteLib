@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using UnityEngine;
 using Verse;
 
@@ -47,6 +48,20 @@ public sealed class UiHost : IDisposable
     // only ever moves forward, so an issue is reported exactly once however many frames follow it.
     private int publishedDocumentIssues;
     private int publishedResolutionIssues;
+
+    // Per-host diagnostics are opt-in: null until the consumer asks for them, which is what keeps the
+    // unsubscribed path a null check. Created through UiDiagnosticHub.Subscribe and released by Close.
+    private UiDiagnosticSubscription? diagnostics;
+
+    // Phase-timing accumulators. Timing is sampled, never logged per frame: a window of
+    // TimingSampleFrames frames closes into one aggregate event. They are plain numbers on the host, so a
+    // host whose subscription has timing off pays one boolean test per phase and nothing else.
+    private int arrangeTimingSamples;
+    private double arrangeTimingTotal;
+    private double arrangeTimingMax;
+    private int drawTimingSamples;
+    private double drawTimingTotal;
+    private double drawTimingMax;
 
     // Test seam: lets FerriteLib.UiKit.Tests capture the dropped-style warning without a real game log,
     // the same shape UiSessionGuard.LogWarningOverride already uses for recovery warnings.
@@ -124,6 +139,31 @@ public sealed class UiHost : IDisposable
     public UiLayoutManifest Manifest => manifest;
 
     /// <summary>
+    /// Opts this host in to per-host diagnostics and returns its bounded subscription. It is created on
+    /// first access, so a host that never asks pays nothing: without it the fit audit, the recovery guard
+    /// and the reload hook all take their pre-existing no-subscriber path. The subscription is released by
+    /// <see cref="Close"/> and therefore by <see cref="Dispose"/> as well; the session that owns it
+    /// releases it a second time, idempotently.
+    /// </summary>
+    public UiDiagnosticSubscription Diagnostics =>
+        diagnostics ?? UiDiagnosticHub.Subscribe(this, UiDiagnosticHub.DefaultBudget);
+
+    /// <summary>The subscription this host already holds, or null. The hub reads it to stay idempotent.</summary>
+    internal UiDiagnosticSubscription? CurrentDiagnostics => diagnostics;
+
+    /// <summary>Binds a subscription the hub created; one host owns at most one.</summary>
+    internal void AttachDiagnostics(UiDiagnosticSubscription subscription)
+    {
+        diagnostics = subscription ?? throw new ArgumentNullException(nameof(subscription));
+    }
+
+    /// <summary>
+    /// The measurement model this host built. Opting in hands it to the fit audit, because the audit needs
+    /// a ruler and the shell, the page and the audit must all measure with the same one.
+    /// </summary>
+    internal ITextMetrics TextMetrics => metrics;
+
+    /// <summary>
     /// The document resolver this host built: the document it resolved (the one handed to the constructor,
     /// otherwise the manifest's own <c>&lt;Styles&gt;</c> section) plus the drops it recorded while
     /// resolving. Never null - a page with no document still needs one to report that an element named a
@@ -138,42 +178,103 @@ public sealed class UiHost : IDisposable
 
     public UiLayoutSnapshot MeasureAndArrange(Vector2 available)
     {
-        // The band cache compares the available size and the content/definition/translation revisions,
-        // and it cannot see the theme. A density or font-size change would therefore keep the previous
-        // geometry while the draw resolves the new font - exactly the measure/draw disagreement a
-        // resolved-value store exists to prevent. The theme reports its own layout-bearing revision, and
-        // the host turns a change into the one cache clock the engine already understands rather than
-        // inventing a second one.
-        if (lastLayoutRevision != theme.LayoutRevision)
+        // The arrange runs inside this host's diagnostic scope: an appearance fallback the engine records
+        // while resolving a region is attributed to the host that is arranging, not to whichever host drew
+        // last. Null still opens the scope, so an unsubscribed host never inherits another host's routing.
+        UiDiagnosticSubscription? subscription = diagnostics;
+        bool timing = subscription != null && subscription.TimingEnabled;
+        long started = timing ? Stopwatch.GetTimestamp() : 0L;
+        UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription);
+        try
         {
-            lastLayoutRevision = theme.LayoutRevision;
-            session.BumpContentRevision();
+            // The band cache compares the available size and the content/definition/translation revisions,
+            // and it cannot see the theme. A density or font-size change would therefore keep the previous
+            // geometry while the draw resolves the new font - exactly the measure/draw disagreement a
+            // resolved-value store exists to prevent. The theme reports its own layout-bearing revision, and
+            // the host turns a change into the one cache clock the engine already understands rather than
+            // inventing a second one.
+            if (lastLayoutRevision != theme.LayoutRevision)
+            {
+                lastLayoutRevision = theme.LayoutRevision;
+                session.BumpContentRevision();
+            }
+
+            UiWidgetContext ctx = CreateContext(available.x);
+            UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, available, manifest.Roots);
+
+            // A region scope is resolved the first time the engine meets it, and that resolution can drop a
+            // name (a scheme or density nobody declared). Publishing here - on the same frame, right after the
+            // arrange that discovered it - is what keeps such a drop from waiting a frame to be visible. On a
+            // cached arrangement there is nothing new to publish and the call costs two integer comparisons.
+            PublishStyleIssues();
+            return snapshot;
         }
-
-        UiWidgetContext ctx = CreateContext(available.x);
-        UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, available, manifest.Roots);
-
-        // A region scope is resolved the first time the engine meets it, and that resolution can drop a
-        // name (a scheme or density nobody declared). Publishing here - on the same frame, right after the
-        // arrange that discovered it - is what keeps such a drop from waiting a frame to be visible. On a
-        // cached arrangement there is nothing new to publish and the call costs two integer comparisons.
-        PublishStyleIssues();
-        return snapshot;
+        finally
+        {
+            scope.Dispose();
+            if (timing)
+            {
+                SampleTiming("arrange", started, ref arrangeTimingSamples, ref arrangeTimingTotal, ref arrangeTimingMax);
+            }
+        }
     }
 
     public void Draw(Rect viewport, UiLayoutSnapshot snapshot)
     {
-        // Popups are drawn after content and must clamp themselves into the frame's usable window
-        // space; publish it here, the one place that knows both the viewport and the session.
-        session.SetHostViewport(viewport);
-        UiWidgetContext ctx = CreateContext(viewport.width);
-        engine.Draw(ctx, snapshot, viewport);
-
-        // Session-owned popups draw after normal content in the same OnGUI pass.
-        foreach (Action popupDraw in session.PopupDrawActions)
+        // The draw runs inside this host's diagnostic scope: a fit-audit finding comes out of a static text
+        // outlet with no session argument, and the scope is what says which host's text it was. Popups draw
+        // inside the same scope, so their findings are attributed here too.
+        UiDiagnosticSubscription? subscription = diagnostics;
+        bool timing = subscription != null && subscription.TimingEnabled;
+        long started = timing ? Stopwatch.GetTimestamp() : 0L;
+        UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription);
+        try
         {
-            popupDraw();
+            // Popups are drawn after content and must clamp themselves into the frame's usable window
+            // space; publish it here, the one place that knows both the viewport and the session.
+            session.SetHostViewport(viewport);
+            UiWidgetContext ctx = CreateContext(viewport.width);
+            engine.Draw(ctx, snapshot, viewport);
+
+            // Session-owned popups draw after normal content in the same OnGUI pass.
+            foreach (Action popupDraw in session.PopupDrawActions)
+            {
+                popupDraw();
+            }
         }
+        finally
+        {
+            scope.Dispose();
+            if (timing)
+            {
+                SampleTiming("draw", started, ref drawTimingSamples, ref drawTimingTotal, ref drawTimingMax);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Folds one measured phase into its sampling window and publishes the aggregate when the window
+    /// closes, so a subscription gets a rate rather than a line per frame. A subscription with timing off
+    /// returns on the boolean test; an unsubscribed host never reaches here at all.
+    /// </summary>
+    private void SampleTiming(string name, long startTimestamp, ref int samples, ref double total, ref double max)
+    {
+        UiDiagnosticSubscription? subscription = diagnostics;
+        if (subscription == null || !subscription.TimingEnabled) return;
+
+        double milliseconds = (Stopwatch.GetTimestamp() - startTimestamp) * 1000.0 / Stopwatch.Frequency;
+        samples++;
+        total += milliseconds;
+        if (milliseconds > max) max = milliseconds;
+
+        int window = subscription.TimingSampleFrames;
+        if (window < 1) window = 1;
+        if (samples < window) return;
+
+        subscription.PublishTiming(name, samples, total, max);
+        samples = 0;
+        total = 0d;
+        max = 0d;
     }
 
     /// <summary>
@@ -222,6 +323,12 @@ public sealed class UiHost : IDisposable
         UiDocumentService? service = documentService;
         documentService = null;
         service?.Detach(this);
+
+        // The host's own diagnostic subscription goes with the host, before the session the hub keyed it
+        // by is disposed: a torn-down window leaves no buffer, no registry entry and no ambient reference.
+        diagnostics?.Dispose();
+        diagnostics = null;
+
         session.Dispose();
     }
 
@@ -297,6 +404,19 @@ public sealed class UiHost : IDisposable
 
     /// <summary>True once this host's session has been disposed by <see cref="Close"/>.</summary>
     internal bool SessionDisposed => !session.IsActive;
+
+    /// <summary>
+    /// Attributes one document-service report to this host. The service calls it for every host a reload
+    /// batch affected, so a report reaches exactly the windows that read the document and never a window
+    /// that reads a different one. A host with no subscription returns on the null check, and nothing here
+    /// may throw into a reload path - the caller isolates the call for that reason.
+    /// </summary>
+    internal void PublishReloadReport(UiReloadReport? report)
+    {
+        UiDiagnosticSubscription? subscription = diagnostics;
+        if (subscription == null || !subscription.IsActive || report == null) return;
+        subscription.PublishReload(report);
+    }
 
     /// <summary>
     /// Validates a candidate layout in full - the same creation-time contract the constructor runs,
