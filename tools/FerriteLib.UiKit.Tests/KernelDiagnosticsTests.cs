@@ -47,6 +47,7 @@ internal static class KernelDiagnosticsTests
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
         UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "diag/overflow", () => new OverflowWidget());
+        UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "diag/stable", () => new StableOverflowWidget());
         UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "diag/throwing", () => new ThrowingWidget());
 
         try
@@ -55,6 +56,7 @@ internal static class KernelDiagnosticsTests
             Run("A recovery trip is attributed to its own session and to no other", VerifyRecoveryAttribution);
             Run("Disposing one host releases only its own subscription", VerifyDisposalReleasesOnlyItsOwn);
             Run("A noisy subscriber exhausts only its own budget", VerifyNoisySubscriberKeepsItsOwnBudget);
+            Run("Dedup is per subscriber: a repeat is suppressed, another host's copy is not", VerifyDedupIsPerSubscriber);
             Run("The unsubscribed diagnostic path allocates nothing per frame", VerifyUnsubscribedPathAllocatesNothing);
             Run("A live subscription owns the fit finding and bypasses the shared slot", VerifySubscriptionReplacesTheSharedSlot);
             Run("Reload events wrap the service's report and reach only affected hosts", () => VerifyReloadEvents(sandbox));
@@ -217,6 +219,42 @@ internal static class KernelDiagnosticsTests
         Check(quietSub.Dropped == 0, "and was not charged for the noisy subscriber's overflow");
         Check(quietSub.Published == 1, "one accepted event, not one per suppressed or dropped sibling event");
         Check(noisySub.Count == 4, "drawing the quiet host did not disturb the noisy ring");
+    }
+
+    // --- dedup is per subscriber -------------------------------------------------------------------
+
+    /// <summary>
+    /// The budget lane above uses a widget whose text changes every draw, so it can only prove the ring is
+    /// bounded. This lane uses one whose finding is identical every frame, which is the shape dedup exists
+    /// for: five draws are one record plus four suppressed repeats - and the second host drawing the same
+    /// element into the same rect is its own record rather than a duplicate of the first host's, which is
+    /// exactly what a process-wide dedup set (the pre-P5 shape) would get wrong.
+    /// </summary>
+    private static void VerifyDedupIsPerSubscriber()
+    {
+        UiFitAudit.Enabled = true;
+        using var hostA = NewHost("diag-dedup-a", Page("diag-dedup-a", "d-keep", "diag/stable"));
+        using var hostB = NewHost("diag-dedup-b", Page("diag-dedup-b", "d-keep", "diag/stable"));
+        UiDiagnosticSubscription subA = hostA.Diagnostics;
+        UiDiagnosticSubscription subB = hostB.Diagnostics;
+
+        for (int i = 0; i < 5; i++)
+        {
+            Draw(hostA);
+        }
+
+        Check(subA.CountOf(UiDiagnosticKind.Fit) == 1,
+            "five identical findings produce one record (got " + subA.CountOf(UiDiagnosticKind.Fit) + ")");
+        Check(subA.Suppressed == 4, "and the four repeats are counted as suppressed (got " + subA.Suppressed + ")");
+        Check(subA.Count == 1, "the ring holds the record once, not once per frame");
+
+        Draw(hostB);
+
+        Check(subB.CountOf(UiDiagnosticKind.Fit) == 1,
+            "the other host's identical finding is its own record, not a duplicate of A's (got "
+            + subB.CountOf(UiDiagnosticKind.Fit) + ")");
+        Check(subB.Suppressed == 0, "and it was not suppressed by a sibling's earlier copy");
+        Check(subA.CountOf(UiDiagnosticKind.Fit) == 1, "B's arrival did not disturb A's record");
     }
 
     // --- (d) the unsubscribed path is allocation-free ----------------------------------------------
@@ -579,6 +617,34 @@ internal static class KernelDiagnosticsTests
             UiThemeDraw.Label(
                 new Rect(rect.x, rect.y, 4f, 4f),
                 "diag overflow text " + draws.ToString(),
+                ctx.Theme,
+                null,
+                UiFont.Medium,
+                TextAnchor.MiddleLeft,
+                singleLine: true);
+        }
+    }
+
+    /// <summary>Draws the same overflowing label every pass, so a repeat is a genuine duplicate.</summary>
+    private sealed class StableOverflowWidget : IUiWidget
+    {
+        public string Kind => "diag/stable";
+
+        public void Configure(UiElementSpec spec)
+        {
+        }
+
+        public void Validate(IUiBindings bindings, string elementPath)
+        {
+        }
+
+        public float Measure(UiWidgetContext ctx) => 20f;
+
+        public void Draw(Rect rect, UiWidgetContext ctx)
+        {
+            UiThemeDraw.Label(
+                new Rect(rect.x, rect.y, 4f, 4f),
+                "stable overflowing text",
                 ctx.Theme,
                 null,
                 UiFont.Medium,
