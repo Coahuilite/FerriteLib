@@ -478,6 +478,9 @@ public sealed class UiDocumentService : IDisposable
 
         if (state.GoodVersion.Length > 0 && string.Equals(candidate.Version, state.GoodVersion, StringComparison.Ordinal))
         {
+            // The bytes are back in force, which resolves any failure that was standing: the next refusal of
+            // this content is a new event again, not the tail of the previous one.
+            state.ClearFailedVersion();
             var skipped = new UiReloadReport(
                 state.Source.Id, state.Source.Kind, state.Source.Path, candidate.Version,
                 accepted: false, skipped: true, duplicate: false, "",
@@ -588,12 +591,18 @@ public sealed class UiDocumentService : IDisposable
 
         // The whole batch staged, so its destructive half can run. Doing it here - after the last host
         // committed - is what makes a rolled-back batch a real rollback rather than a tree-only one.
+        // A host disposed between its stage and this pass (a consumer can only do that from the commit
+        // seam, because nothing else runs in between) keeps its staged tree but has no session left:
+        // UiHost.SealDocumentCommit returns without touching it, and its dependency was released by its own
+        // Close. The accepted report's HostsCommitted describes the batch's commit, so it still counts that
+        // host; the service's DependencyCount is the axis that says how many hosts remain attached.
         for (int i = 0; i < applied.Count; i++)
         {
             applied[i].Host.SealDocumentCommit();
         }
 
         state.Accept(candidate);
+        state.ClearFailedVersion();
         var accepted = new UiReloadReport(
             state.Source.Id, state.Source.Kind, state.Source.Path, candidate.Version,
             accepted: true, skipped: false, duplicate: false, "",
@@ -1000,8 +1009,18 @@ public sealed class UiDocumentService : IDisposable
 
         internal UiStyleDocument? GoodStyle { get; private set; }
 
-        /// <summary>Version already reported as a failure, so the same breakage is reported once.</summary>
+        /// <summary>
+        /// Version already reported as a failure, so a continuing breakage is reported once. Cleared when a
+        /// version is accepted or found already current: deduplication is about one uninterrupted failure,
+        /// not about suppressing every later recurrence of the same bytes.
+        /// </summary>
         internal string LastFailedVersion { get; set; } = "";
+
+        /// <summary>The failure state resolved; the next refusal is a new event again.</summary>
+        internal void ClearFailedVersion()
+        {
+            LastFailedVersion = "";
+        }
 
         internal FileSystemWatcher? Watcher { get; set; }
 
