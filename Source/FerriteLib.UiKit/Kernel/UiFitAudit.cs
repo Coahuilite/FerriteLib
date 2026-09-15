@@ -179,8 +179,19 @@ public static class UiFitAudit
     /// <summary>Binds the measuring implementation and the reporting callback. Does not enable the audit.</summary>
     public static void Attach(ITextMetrics textMetrics, Action<UiOverflowReport> reportSink)
     {
-        metrics = textMetrics ?? throw new ArgumentNullException(nameof(textMetrics));
+        AttachMetrics(textMetrics);
         sink = reportSink ?? throw new ArgumentNullException(nameof(reportSink));
+    }
+
+    /// <summary>
+    /// Binds only the measuring implementation. This is the ruler half of <see cref="Attach"/>, split out
+    /// because a diagnostic subscription needs a measurement model without claiming the process-wide sink:
+    /// the subscription routes finished findings to its own subscriber, so the legacy callback stays
+    /// untouched and an existing consumer of <see cref="Attach"/> is not displaced by somebody opting in.
+    /// </summary>
+    internal static void AttachMetrics(ITextMetrics textMetrics)
+    {
+        metrics = textMetrics ?? throw new ArgumentNullException(nameof(textMetrics));
     }
 
     /// <summary>
@@ -248,8 +259,15 @@ public static class UiFitAudit
     {
         if (!Enabled) return;
 
+        // One shared slot used to hold every host's findings, and its saturation bound was the reason a
+        // noisy page could silence a quiet one. With a subscription live the finding goes to that
+        // subscriber's own bounded buffer, and the process-wide ledger - with its saturation check, its
+        // dedup set and its callback - is deliberately not consulted at all.
+        UiDiagnosticSubscription? subscription = UiDiagnosticHub.ActiveSubscription;
+        if (subscription == null && Saturated) return;
+
         ITextMetrics? textMetrics = metrics;
-        if (textMetrics == null || Saturated) return;
+        if (textMetrics == null) return;
         if (string.IsNullOrEmpty(text) || rect.width <= 1f || rect.height <= 1f) return;
 
         if (singleLine)
@@ -257,7 +275,7 @@ public static class UiFitAudit
             float neededWidth = textMetrics.MeasureWidth(text, font);
             if (neededWidth > rect.width + Tolerance)
             {
-                Report(rect, text, font, UiOverflowAxis.Width, neededWidth, rect.width);
+                Report(rect, text, font, UiOverflowAxis.Width, neededWidth, rect.width, subscription);
             }
 
             return;
@@ -266,7 +284,7 @@ public static class UiFitAudit
         float neededHeight = textMetrics.MeasureText(text, font, rect.width);
         if (neededHeight > rect.height + Tolerance)
         {
-            Report(rect, text, font, UiOverflowAxis.Height, neededHeight, rect.height);
+            Report(rect, text, font, UiOverflowAxis.Height, neededHeight, rect.height, subscription);
         }
     }
 
@@ -276,19 +294,22 @@ public static class UiFitAudit
         UiFont font,
         UiOverflowAxis axis,
         float needed,
-        float available)
+        float available,
+        UiDiagnosticSubscription? subscription)
     {
         string key = currentPath + "|" + (int)axis + "|" + (int)font + "|" + Shorten(text);
+        string path = currentPath.Length == 0 ? "(unscoped)" : currentPath;
+
+        if (subscription != null)
+        {
+            subscription.PublishOverflow(
+                new UiOverflowReport(path, text, font, axis, needed, available, rect.width), key);
+            return;
+        }
+
         if (!Reported.Add(key)) return;
 
-        sink?.Invoke(new UiOverflowReport(
-            currentPath.Length == 0 ? "(unscoped)" : currentPath,
-            text,
-            font,
-            axis,
-            needed,
-            available,
-            rect.width));
+        sink?.Invoke(new UiOverflowReport(path, text, font, axis, needed, available, rect.width));
     }
 
     private static string Shorten(string text)
@@ -315,6 +336,16 @@ public static class UiFitAudit
         lastStyleFallback = report.Diagnostic;
 
         string key = report.ElementPath + "|" + report.Kind + "|" + report.Attribute + "|" + report.Authored;
+
+        // Same routing rule as the text half: a live subscription owns the finding, and the process-wide
+        // cap and dedup set stay out of it so one host's appearance noise cannot spend another's budget.
+        UiDiagnosticSubscription? subscription = UiDiagnosticHub.ActiveSubscription;
+        if (subscription != null)
+        {
+            subscription.PublishStyleFallback(report, key);
+            return;
+        }
+
         if (StyleFallbacks.Count >= MaxReports) return;
         if (!StyleFallbacks.Add(key)) return;
 

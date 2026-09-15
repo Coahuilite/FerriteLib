@@ -24,8 +24,18 @@ namespace FerriteLib.UiKit.Kernel;
 /// </summary>
 internal static class UiHostLedger
 {
+    /// <summary>
+    /// How many distinct sources this ledger retains. A process-wide record has to be bounded like every
+    /// other one in the library: a long session can build page trees from unbounded distinct sources (a
+    /// reload path that mints a source per file), and an append-only list is exactly the unbounded cache
+    /// the diagnostic surface is not allowed to add. The bound is high enough that no real tree can reach
+    /// it, and what it refuses is counted rather than silently dropped.
+    /// </summary>
+    internal const int MaxSources = 512;
+
     private static readonly object Gate = new object();
     private static readonly List<string> Sources = new List<string>();
+    private static int dropped;
 
     /// <summary>Records one manifest source. Called from <see cref="UiHost"/>'s constructor.</summary>
     internal static void Record(string source)
@@ -35,7 +45,37 @@ internal static class UiHostLedger
         lock (Gate)
         {
             if (Sources.Contains(source)) return;
+            if (Sources.Count >= MaxSources)
+            {
+                dropped++;
+                return;
+            }
+
             Sources.Add(source);
+        }
+    }
+
+    /// <summary>Distinct sources retained. Never above <see cref="MaxSources"/>; the lane asserts it.</summary>
+    internal static int SourceCount
+    {
+        get
+        {
+            lock (Gate)
+            {
+                return Sources.Count;
+            }
+        }
+    }
+
+    /// <summary>Sources the bound refused, so a truncated record says so instead of looking complete.</summary>
+    internal static int DroppedCount
+    {
+        get
+        {
+            lock (Gate)
+            {
+                return dropped;
+            }
         }
     }
 
@@ -58,6 +98,12 @@ internal static class UiHostLedger
             }
 
             report.Append(']');
+            if (dropped > 0)
+            {
+                report.Append(" (+").Append(dropped).Append(" more source(s) refused by the ")
+                    .Append(MaxSources).Append("-entry bound)");
+            }
+
             return report.ToString();
         }
     }

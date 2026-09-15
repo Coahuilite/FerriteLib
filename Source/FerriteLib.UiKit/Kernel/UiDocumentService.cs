@@ -343,11 +343,13 @@ public sealed class UiDocumentService : IDisposable
             }
             else
             {
-                AddReport(new UiReloadReport(
+                var attachFailure = new UiReloadReport(
                     layout.Source.Id, layout.Source.Kind, layout.Source.Path, layout.GoodVersion,
                     accepted: false, skipped: false, duplicate: false,
                     element, "the initial version could not be applied to host '" + host.Source + "': " + reason,
-                    1, 0));
+                    1, 0);
+                AddReport(attachFailure);
+                PublishToHost(host, attachFailure);
             }
         }
 
@@ -449,16 +451,19 @@ public sealed class UiDocumentService : IDisposable
                 accepted: false, skipped: false, duplicate, "", candidate.Failure,
                 affected.Count, 0);
             if (!duplicate) AddReport(failure);
+            PublishToHosts(affected, failure);
             return failure;
         }
 
         if (state.GoodVersion.Length > 0 && string.Equals(candidate.Version, state.GoodVersion, StringComparison.Ordinal))
         {
-            return new UiReloadReport(
+            var skipped = new UiReloadReport(
                 state.Source.Id, state.Source.Kind, state.Source.Path, candidate.Version,
                 accepted: false, skipped: true, duplicate: false, "",
                 "the bytes are unchanged since the last accepted version",
                 affected.Count, 0);
+            PublishToHosts(affected, skipped);
+            return skipped;
         }
 
         // Validate the whole batch before committing any of it. A layout candidate is checked against the
@@ -512,7 +517,9 @@ public sealed class UiDocumentService : IDisposable
 
         if (failureReason.Length > 0)
         {
-            return RefuseBatch(state, candidate, failureElement, failureReason, affected.Count);
+            UiReloadReport refused = RefuseBatch(state, candidate, failureElement, failureReason, affected.Count);
+            PublishToHosts(affected, refused);
+            return refused;
         }
 
         // Every affected host accepted the candidate, so commit them. A commit cannot fail after validation
@@ -560,8 +567,10 @@ public sealed class UiDocumentService : IDisposable
                 applied[i].Host.RestoreDocumentRollback(applied[i].Rollback);
             }
 
-            return RefuseBatch(
+            UiReloadReport rolledBack = RefuseBatch(
                 state, candidate, "", commitFailure + "; the whole batch was rolled back", affected.Count);
+            PublishToHosts(affected, rolledBack);
+            return rolledBack;
         }
 
         state.Accept(candidate);
@@ -573,7 +582,41 @@ public sealed class UiDocumentService : IDisposable
                 : "committed to every affected host",
             affected.Count, committed);
         AddReport(accepted);
+        PublishToHosts(affected, accepted);
         return accepted;
+    }
+
+    /// <summary>
+    /// Attributes one reload report to every host the batch affected, on each host's own diagnostic
+    /// subscription. This is where a document-scoped report becomes a per-window record: the service knows
+    /// the affected dependency list before it reads the candidate, so even a parse failure - which never
+    /// reaches a host's validation - still names the windows it touched.
+    /// <para>
+    /// Additive and inert by construction: a host with no subscription returns on a null check, and a
+    /// diagnostic must never break a hot reload, so a throwing subscriber is isolated here instead of
+    /// aborting a batch.
+    /// </para>
+    /// </summary>
+    private static void PublishToHosts(List<Dependency> hosts, UiReloadReport report)
+    {
+        for (int i = 0; i < hosts.Count; i++)
+        {
+            PublishToHost(hosts[i].Host, report);
+        }
+    }
+
+    /// <summary>One host's half of <see cref="PublishToHosts"/>, isolated so a subscriber cannot throw into a reload.</summary>
+    private static void PublishToHost(UiHost host, UiReloadReport report)
+    {
+        try
+        {
+            host.PublishReloadReport(report);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // A diagnostic failure is not a reload failure. The subscription is the only thing that could
+            // throw here, and letting it abort a batch would make the diagnostic surface a hazard.
+        }
     }
 
     /// <summary>The planted prepare-phase refusal for one host, or "" when the seam is off or silent.</summary>

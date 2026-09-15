@@ -284,6 +284,24 @@ consequence is paid in the open rather than discovered by a stranger.
   answers `Everything`. Public-unstable for the same reason `IUiBindings` is: the class set may grow when
   collection reconciliation has to name what a keyed insert or removal invalidates.
 
+- `UiDiagnosticHub` — the per-host / per-session routing that replaces the one shared diagnostic slot:
+  `Subscribe(UiHost, budget)`, `ForSession`, `Release` and `SubscriptionCount`, over a registry capped at
+  `MaxSubscriptions` that holds subscriptions rather than hosts or sessions. `UiHost.Diagnostics` is the
+  opt-in door, and a host that never opens it pays a struct scope push/pop and a null check. Public-unstable
+  because the channel set and the sampling policy are this round's shape, not a promise.
+- `UiDiagnosticSubscription` — one subscriber's bounded ring (`Budget`, clamped to `MaxBudget`,
+  `DefaultBudget` when unnamed) with a dropped-count marker, a dedup table bounded by that same ring, and
+  per-subscription `Count`/`Dropped`/`Suppressed`/`Published`. `Dispose` releases it, and so does
+  disposing the owning host or session; it carries the host's identity string and the session id, never the
+  objects.
+- `UiDiagnosticEvent` — one attributed record: `Kind` plus a stable `Code`, `Host`, `SessionId`,
+  `Node`/`ElementPath`, and the original record for the channel that produced it (`Report` for reload,
+  `Overflow`/`Fallback` for the fit audit's two halves, `Timing` for a sampled aggregate). No field names a
+  host, session or node type.
+- `UiDiagnosticKind` — the channel vocabulary (`Reload`, `Fit`, `Recovery`, `Timing`).
+- `UiDiagnosticTiming` — one sampling window's aggregate (name, samples, total, max, average), which is what
+  makes timing a rate rather than a per-frame line.
+
 ## Internalize-candidate
 
 - `KernelCoreWidgetRegistrar` — called from inside the assembly by the registry itself; no consumer names it.
