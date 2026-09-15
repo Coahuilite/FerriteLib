@@ -102,7 +102,9 @@ FerriteLibVersion.Require(new Version(0, 5, 0), new Version(0, 6, 0), "your.pack
 | 通用 XML 页壳（无需 C# Window 子类） | 已实现 + 自动化验证 | 普通页面用 `UiPageWindow` 直接承载 |
 | 按 key 通知 + 失效分类 + 命令可执行态 + 条件显隐 | 已实现 + 自动化验证（6 处突变） | 模型变更调 `NotifyChanged`；禁用交给 `canExecute`；显隐用 `Visible`/`VisibleKey` |
 | 外部布局/样式文件 + 自动/手动热重载 + LKG | 已实现 + 自动化验证（P4 三处 + P4b 四处突变） | 把 XML 交给 `UiDocumentService`；开发模式自动监听 |
-| keyed repeater、checkbox、进度条、树 | **尚不可用**（P3 开发中） | 暂用现有 atom/自持 kind 组合 |
+| keyed repeater（`<Templates>` + `<Repeat>`）、`input/checkbox`、`display/progress`、`container/tree` | 已实现 + 自动化验证（P3：5 处突变） | 数据驱动行集交给 `<Repeat Items=… Template=…>`；item key 用业务稳定键 |
+| 多 host/session 诊断隔离 + reload/fit/recovery 事件 | 已实现 + 自动化验证（P5：7 处突变；未订阅路径实测 0 分配） | 每个 host 打开 `UiHost.Diagnostics` 订阅自己的事件 |
+| 通用页壳的诊断入口 | 已实现 + 自动化验证（task-14：2 处突变） | `pageWindow.PageHost.Diagnostics` —— 纯 XML 页面也能订阅自己的事件 |
 | 多 host/session 诊断隔离 | **尚不可用**（P5 开发中） | 暂用现有 `UiFitAudit` |
 
 **接口冻结程度**：以上均为 `0.5.0` 窗口内的**公共面**，其中 P1/P2 新增类型目前按 `public-unstable` 登记
