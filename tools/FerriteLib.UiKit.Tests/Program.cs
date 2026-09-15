@@ -130,6 +130,11 @@ internal static class Program
         Console.WriteLine("Kernel neutral fixture page (data-driven rows + the new controls, library fixture only)...");
         failures += KernelFixturePageTests.RunAll();
 
+        // --- T3 widget catalogue (owner: catalog) - one contiguous block, merge-conflict anchor ---
+        Console.WriteLine("Kernel widget catalogue (read-only description, scope-preserving identity, no factories)...");
+        failures += KernelWidgetCatalogTests.RunAll();
+        // --- end T3 widget catalogue ---
+
         Console.WriteLine("Kernel lane registration (every lane file is invoked from Program.cs)...");
         failures += KernelLaneRegistrationTests.RunAll();
     }

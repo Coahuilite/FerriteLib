@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -32,10 +33,13 @@ public readonly struct UiWidgetDescriptor
     {
         Scope = scope ?? throw new ArgumentNullException(nameof(scope));
         Kind = kind ?? throw new ArgumentNullException(nameof(kind));
-        AllowedAttributes = allowedAttributes ?? Array.Empty<string>();
-        LabelAttributes = labelAttributes ?? Array.Empty<string>();
+
+        // Declared-ness is read from the arguments, not from the copies: a declared-but-empty collection and a
+        // missing one are different claims, and the copies below turn both into non-null empty collections.
         HasAttributeSchema = allowedAttributes != null;
         HasLabelSet = labelAttributes != null;
+        AllowedAttributes = Copy(allowedAttributes);
+        LabelAttributes = Copy(labelAttributes);
     }
 
     /// <summary>The scope the kind was declared in - a registration scope, not necessarily the packageId.</summary>
@@ -55,6 +59,31 @@ public readonly struct UiWidgetDescriptor
 
     /// <summary>True when the kind declared which attributes carry its label; false means "not Auto-measurable".</summary>
     public bool HasLabelSet { get; }
+
+    /// <summary>
+    /// A private, ordinal-sorted, read-only copy of one declared collection, and the reason the type's own
+    /// promise holds: a caller that keeps a list it passed in and mutates it cannot move this descriptor, and a
+    /// caller that reads <see cref="AllowedAttributes"/> cannot move the registry, because what it receives is
+    /// this copy and not the registry's set. Sorting is part of the description: a HashSet enumerates in
+    /// insertion order, and a catalogue that rendered that order would be describing the registration sequence
+    /// rather than the kind.
+    /// </summary>
+    private static IReadOnlyCollection<string> Copy(IReadOnlyCollection<string>? source)
+    {
+        if (source == null || source.Count == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        var copy = new List<string>(source.Count);
+        foreach (string value in source)
+        {
+            copy.Add(value ?? "");
+        }
+
+        copy.Sort(StringComparer.Ordinal);
+        return new ReadOnlyCollection<string>(copy);
+    }
 
     /// <summary>Diagnostic rendering; never parsed back.</summary>
     public override string ToString()
