@@ -393,6 +393,19 @@
   independently re-derived; and the external acceptance this library has never had - a game session and a real consumer compiling
   against it - is still outstanding. `docs/development/0.5/40-verification.md` §7 carries all of it, including the defect table.
 
+- **The review round is closed (2026-09-16, tip `a4a7dd8`), and what it cost is worth recording.** After the seven review defects
+  were fixed, two more rounds of independent probing found a second shape of the window-close defect and then **refuted its own
+  must-fix classification**: a second, independently built probe could not reach the interleave through the product path
+  (`WindowStack.TryRemove` runs its hooks adjacently with no re-entrancy), so it is a latent sharp edge with unproven reachability
+  rather than a release blocker - and it is now hardened anyway, with the neutrality argument written down. The same round also
+  downgraded R7: a *real* second read planted behind its lane left the guard GREEN, so the honest claim is "the historical
+  double-read shape is guarded", not "the race is fixed"; the guard is now a comment-stripped scan with controls in both
+  directions and its own boundary stated. Six of the seven new-defect probes pass; the seventh found the latent edge. The delivery
+  candidate is `0.5.0-dev` at `d6b3f6e` (package rebuilt after the last fix), and the external acceptance this library has never
+  had - a game session and a real consumer compiling against it - is still the only thing that can change the verdict. Two
+  process lessons: an independent probe that exercises the public API end to end is worth more than another per-package lane,
+  and an independent verifier that corrects its own over-strong finding is doing the job properly.
+
 ## Charter — what this library is for
 
 - **The founding spec, transcribed.** `Coahuilite/UniversalSqueaker@09366f8:docs/ui-shared-library-design-zh.md`
