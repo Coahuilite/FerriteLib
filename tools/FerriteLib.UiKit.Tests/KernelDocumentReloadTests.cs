@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using FerriteLib.UiKit.Kernel;
 using UnityEngine;
 
@@ -58,6 +59,9 @@ internal static class KernelDocumentReloadTests
             Run("A transiently missing file keeps the last known good instead of the embedded text", () => VerifyTransientlyMissingFileKeepsLastKnownGood(sandbox));
             Run("First style attach runs the same validate-and-apply rule as a reload", () => VerifyFirstStyleAttachValidatesLikeReload(sandbox));
             Run("Rebinding a host to another service releases the old dependency", () => VerifyRebindingReleasesTheOldService(sandbox));
+            Run("An oversized document is refused and keeps the last known good", () => VerifyOversizedDocumentKeepsLastKnownGood(sandbox));
+            Run("A BOM-prefixed document parses exactly like its BOM-less equivalent", () => VerifyBomInputParsesLikePlain(sandbox));
+            Run("A host disposed between stage and seal leaves no leak, no crash and no half-commit", () => VerifyDisposedHostBetweenStageAndSeal(sandbox));
             Run("The document path reads one snapshot and stays backend-free", VerifySourceWiring);
         }
         finally
@@ -878,6 +882,15 @@ internal static class KernelDocumentReloadTests
     /// The other P1: the embedded text is the FIRST-load source. Once an external version is in force, a
     /// deleted file (or an editor moving it aside mid-save) must be a failure that keeps that version, not a
     /// silent step backwards to the embedded copy.
+    /// <para>
+    /// Dedup contract, pinned here and stated in <c>20-api-and-xml.md</c>: deduplication is per refusing
+    /// version and lasts only as long as the failure does. A continuing absence (the same version refused
+    /// again with no successful validation in between) is <c>Duplicate=true</c> and does not touch the ring;
+    /// a new absence after a successful recovery is a new event again, because the version was accepted or
+    /// found current in between and the recorded failure was cleared. Consumers that count events read the
+    /// returned/published report either way; consumers that read <c>Reports</c>/<c>LastReport</c> see
+    /// distinct failure episodes, not one entry that outlives the incident.
+    /// </para>
     /// </summary>
     private static void VerifyTransientlyMissingFileKeepsLastKnownGood(string sandbox)
     {
@@ -895,6 +908,7 @@ internal static class KernelDocumentReloadTests
         service.Attach(host, "m");
         Check(HasElement(host.Manifest, "external"), "the external file is the version in force");
 
+        int ringBefore = service.Reports.Count;
         File.Delete(path);
         UiReloadReport? missing = service.Reload("m");
         Check(missing != null && missing.Rejected, "a transiently missing file is a failure, not a silent fallback");
@@ -902,12 +916,26 @@ internal static class KernelDocumentReloadTests
             "and the report says the file is gone");
         Check(HasElement(host.Manifest, "external") && !HasElement(host.Manifest, "embedded"),
             "the last valid external version is kept");
+        Check(service.Reports.Count == ringBefore + 1 && ReferenceEquals(service.LastReport, missing),
+            "the first absence is the current report in the ring");
 
         UiReloadReport? again = service.Reload("m");
-        Check(again != null && again.Duplicate, "the same missing version is reported once");
+        Check(again != null && again.Duplicate && service.Reports.Count == ringBefore + 1,
+            "a continuing absence is deduplicated rather than counted again");
 
         File.WriteAllText(path, external);
         Check(service.Reload("m")?.Skipped == true, "the file returning with the same bytes is already in force");
+
+        // The sharp edge, pinned: the same file disappearing again after a successful recovery is a NEW
+        // event. The recorded failure version is cleared when a version is accepted or found current, so the
+        // ring and LastReport move again instead of hiding the second disappearance.
+        File.Delete(path);
+        UiReloadReport? second = service.Reload("m");
+        Check(second != null && second.Rejected && !second.Duplicate,
+            "a re-break after a successful recovery is reported as a new failure");
+        Check(service.Reports.Count == ringBefore + 2 && ReferenceEquals(service.LastReport, second),
+            "and it updates the ring and LastReport");
+
         string changed = Page("scope-missing",
             "<Column Id=\"root\"><Widget Id=\"changed\" Kind=\"chrome/banner\" Text=\"changed\"/></Column>");
         File.WriteAllText(path, changed);
@@ -998,40 +1026,377 @@ internal static class KernelDocumentReloadTests
         Check(first.DependencyCount == 0, "and closing it releases that one");
     }
 
+    // --- the size bound is decided by the snapshot (P4 R7) ----------------------------------------
+
+    /// <summary>
+    /// The size bound is one of the things the single snapshot decides, and it is pinnable behaviourally:
+    /// a document past <see cref="UiDocumentService.MaxDocumentBytes"/> is refused before it is parsed, the
+    /// version in force is untouched, and the file's return is handled normally.
+    /// </summary>
+    private static void VerifyOversizedDocumentKeepsLastKnownGood(string sandbox)
+    {
+        string dir = NewDir(sandbox, "oversized");
+        string path = Path.Combine(dir, "page.xml");
+        string good = KeepPage("scope-oversized");
+        File.WriteAllText(path, good);
+
+        using var service = new UiDocumentService(autoWatch: false);
+        service.Add(new UiDocumentSource("big", UiDocumentKind.Layout, path), good);
+        using var host = NewHost("scope-oversized", UiLayoutManifest.Parse(good), new UiBindings());
+        service.Attach(host, "big");
+        Draw(host);
+        UiLayoutManifest before = host.Manifest;
+
+        // Well-formed XML padded past the bound with a comment the parser would ignore anyway: the bound is
+        // what refuses it, and it refuses before any parse happens.
+        string oversized = Page("scope-oversized",
+            "<Column Id=\"root\"><!--" + new string('x', UiDocumentService.MaxDocumentBytes + 1024) + "-->"
+            + "<Widget Id=\"big\" Kind=\"chrome/banner\" Text=\"big\"/></Column>");
+        File.WriteAllText(path, oversized);
+        Check(new FileInfo(path).Length > UiDocumentService.MaxDocumentBytes,
+            "the fixture really is larger than the bound");
+
+        UiReloadReport? refused = service.Reload("big");
+        Check(refused != null && refused.Rejected, "an oversized document is refused");
+        Check(refused != null && refused.Reason.IndexOf("bound", StringComparison.Ordinal) >= 0,
+            "and the report names the size bound rather than a parse failure");
+        Check(ReferenceEquals(host.Manifest, before) && HasElement(host.Manifest, "keep"),
+            "the last known good is kept");
+        Check(Visible(Arrange(host), "root/keep"), "and still draws");
+
+        File.WriteAllText(path, good);
+        Check(service.Reload("big")?.Skipped == true,
+            "the original file returning is the version already in force");
+    }
+
+    // --- the decode is the snapshot's, and it is BOM-aware (P4 R7) --------------------------------
+
+    /// <summary>
+    /// The other behaviour the snapshot decides: how the bytes decode. A UTF-8 byte-order mark must not reach
+    /// the XML parser (it would not be legal before the root element), so a BOM-prefixed file must parse to
+    /// exactly the tree its BOM-less equivalent does, while the content identity stays byte-based.
+    /// </summary>
+    private static void VerifyBomInputParsesLikePlain(string sandbox)
+    {
+        string dir = NewDir(sandbox, "bom");
+        string plainPath = Path.Combine(dir, "plain.xml");
+        string bomPath = Path.Combine(dir, "bom.xml");
+        string xml = KeepPage("scope-bom");
+        File.WriteAllText(plainPath, xml);
+
+        byte[] preamble = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true).GetPreamble();
+        byte[] body = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(xml);
+        var marked = new byte[preamble.Length + body.Length];
+        Array.Copy(preamble, 0, marked, 0, preamble.Length);
+        Array.Copy(body, 0, marked, preamble.Length, body.Length);
+        File.WriteAllBytes(bomPath, marked);
+        Check(preamble.Length == 3 && marked[0] == 0xEF && marked[1] == 0xBB && marked[2] == 0xBF,
+            "the fixture really carries a UTF-8 byte-order mark");
+
+        using var plainService = new UiDocumentService(autoWatch: false);
+        plainService.Add(new UiDocumentSource("plain", UiDocumentKind.Layout, plainPath), xml);
+        using var plainHost = NewHost("scope-bom-plain", UiLayoutManifest.Parse(xml), new UiBindings());
+        plainService.Attach(plainHost, "plain");
+
+        using var bomService = new UiDocumentService(autoWatch: false);
+        bomService.Add(new UiDocumentSource("bom", UiDocumentKind.Layout, bomPath), xml);
+        using var bomHost = NewHost("scope-bom-marked", UiLayoutManifest.Parse(xml), new UiBindings());
+        bomService.Attach(bomHost, "bom");
+
+        Check(plainHost.Manifest.Roots.Count == bomHost.Manifest.Roots.Count
+            && string.Equals(plainHost.Manifest.Roots[0].Id, bomHost.Manifest.Roots[0].Id, StringComparison.Ordinal)
+            && string.Equals(plainHost.Manifest.Source, bomHost.Manifest.Source, StringComparison.Ordinal),
+            "a BOM-prefixed document parses to the same tree as its BOM-less equivalent");
+        Check(Visible(Arrange(plainHost), "root/keep") && Visible(Arrange(bomHost), "root/keep"),
+            "and both arrange the same element");
+
+        UiReloadReport? plainReload = plainService.Reload("plain");
+        UiReloadReport? bomReload = bomService.Reload("bom");
+        Check(plainReload != null && plainReload.Skipped && bomReload != null && bomReload.Skipped,
+            "both files are the version in force for their service");
+        Check(plainReload != null && bomReload != null
+            && !string.Equals(plainReload.Version, bomReload.Version, StringComparison.Ordinal),
+            "and the BOM is a different content identity even though the parsed tree is the same");
+    }
+
+    // --- a host that vanishes between stage and seal ----------------------------------------------
+
+    /// <summary>
+    /// The stage/dispose/seal ordering, which the addendum probed: a batch stages host A, host B's turn runs
+    /// consumer code that disposes A, and the seal pass then runs over both. The surviving host must be on
+    /// the new tree, nothing may throw, the disposed host's dependency must be released by its own Close, and
+    /// the accepted report describes the batch's commit (it counts both hosts; the service's DependencyCount
+    /// is the axis that says how many remain). The rollback ordering is covered too: the vanish, then the
+    /// other host's commit fails, so the rollback restores a live host while the disposed one is skipped.
+    /// </summary>
+    private static void VerifyDisposedHostBetweenStageAndSeal(string sandbox)
+    {
+        string v1 = KeepPage("scope-stage-dispose");
+        string v2 = Page("scope-stage-dispose",
+            "<Column Id=\"root\">"
+            + "<Widget Id=\"keep\" Kind=\"chrome/banner\" Text=\"keep\"/>"
+            + "<Widget Id=\"added\" Kind=\"chrome/banner\" Text=\"added\"/>"
+            + "</Column>");
+
+        string dir = NewDir(sandbox, "stage-dispose");
+        string path = Path.Combine(dir, "shared.xml");
+        File.WriteAllText(path, v1);
+
+        using (var service = new UiDocumentService(autoWatch: false))
+        {
+            service.Add(new UiDocumentSource("sd", UiDocumentKind.Layout, path), v1);
+            var vanishing = NewHost("stage-dispose-a", UiLayoutManifest.Parse(v1), new UiBindings());
+            using var survivor = NewHost("stage-dispose-b", UiLayoutManifest.Parse(v1), new UiBindings());
+            service.Attach(vanishing, "sd");
+            service.Attach(survivor, "sd");
+            Check(service.DependencyCount == 2, "both hosts hold the dependency before the batch");
+            File.WriteAllText(path, v2);
+
+            // The commit seam is the only point where the batch yields control between staging one host and
+            // the seal pass, so it is where this ordering can be reproduced.
+            service.DocumentCommitFaultOverride = host =>
+            {
+                if (ReferenceEquals(host, survivor))
+                {
+                    vanishing.Dispose();
+                }
+
+                return "";
+            };
+
+            UiReloadReport? report = service.Reload("sd");
+            service.DocumentCommitFaultOverride = null;
+
+            Check(report != null && report.Accepted, "the batch completes instead of crashing on the vanished host");
+            Check(report != null && report.HostsAffected == 2 && report.HostsCommitted == 2,
+                "the report describes the batch's commit, so it still counts both hosts");
+            Check(!vanishing.Session.IsActive, "the vanished host's session is down");
+            Check(survivor.Session.IsActive && HasElement(survivor.Manifest, "added"),
+                "and the surviving host is on the new tree");
+            Check(service.DependencyCount == 1,
+                "the vanished host was released by its own close, so the service leaks nothing");
+            Check(ReferenceEquals(service.LastReport, report), "and the accepted report is the current one");
+
+            survivor.Dispose();
+            Check(service.DependencyCount == 0, "closing the survivor leaves the service clean");
+        }
+
+        string dir2 = NewDir(sandbox, "stage-dispose-rollback");
+        string path2 = Path.Combine(dir2, "shared.xml");
+        File.WriteAllText(path2, v1);
+
+        using (var service = new UiDocumentService(autoWatch: false))
+        {
+            service.Add(new UiDocumentSource("sdr", UiDocumentKind.Layout, path2), v1);
+            var vanishing = NewHost("stage-dispose-c", UiLayoutManifest.Parse(v1), new UiBindings());
+            using var failing = NewHost("stage-dispose-d", UiLayoutManifest.Parse(v1), new UiBindings());
+            service.Attach(vanishing, "sdr");
+            service.Attach(failing, "sdr");
+            File.WriteAllText(path2, v2);
+
+            service.DocumentCommitFaultOverride = host =>
+            {
+                if (ReferenceEquals(host, failing))
+                {
+                    vanishing.Dispose();
+                    return "planted commit failure after the vanish";
+                }
+
+                return "";
+            };
+
+            UiReloadReport? rolledBack = service.Reload("sdr");
+            service.DocumentCommitFaultOverride = null;
+
+            Check(rolledBack != null && rolledBack.Rejected, "the batch is refused when the surviving host fails");
+            Check(failing.Session.IsActive && HasElement(failing.Manifest, "keep"),
+                "the surviving host is restored to the old tree without touching the disposed one");
+            Check(service.DependencyCount == 1, "and the service tracks only the host that remains");
+        }
+    }
+
     // --- wiring ----------------------------------------------------------------------------------
 
     /// <summary>
-    /// The single-read shape P4 R7 asks for: the service reads the bytes once and parses that same snapshot,
-    /// so the size bound, the version identity and the tree all describe one file state. A
-    /// <c>ParseFile</c> call in this file means an independent second read - the TOCTOU this guard exists to
-    /// catch - so its absence is asserted rather than its presence. The document path must also stay
-    /// backend-free so the watcher thread has nothing game-facing to touch, and the predicate is shown to go
-    /// red on a planted double read so a scan that stopped finding anything cannot pass quietly.
+    /// The single-read shape P4 R7 asks for: the service reads one file snapshot and parses that same
+    /// snapshot, so the size bound, the version identity and the tree all describe one file state.
+    /// <para>
+    /// <b>What this guard is, exactly.</b> It is a lexical guard over the comment-stripped service source:
+    /// it counts the file-reading entry points it knows about and requires exactly one snapshot read
+    /// (<c>File.ReadAllBytes</c>) plus its one in-memory reader, and no other read shape - not
+    /// <c>ParseFile</c>, not <c>ReadAllText</c>/<c>ReadAllLines</c>/<c>ReadLines</c>, not
+    /// <c>OpenRead</c>/<c>OpenText</c>/<c>Open</c>, not a path-backed <c>FileStream</c>, not even a
+    /// re-appearing <c>File.Exists</c> probe. Comments are stripped first, so naming a read in prose neither
+    /// reddens the lane nor hides a real one.
+    /// </para>
+    /// <para>
+    /// <b>What it cannot do.</b> It cannot prove at run time that the parse and the version came from one
+    /// read. The TOCTOU it guards against is an ordering between a read and a parse with no yield point and
+    /// no seam to interleave, so no behavioural lane can pin it from outside: this repository has no read
+    /// hook, and adding one to make the race testable would be test scaffolding in the product. What the lane
+    /// can pin behaviourally - and does, in the lanes below - is what a snapshot decides: the size bound and
+    /// the decoded content. The guard is a regression guard against reintroducing a second read, not proof of
+    /// atomicity.
+    /// </para>
     /// </summary>
     private static void VerifySourceWiring()
     {
         string kernel = Path.Combine(RepoRoot(), "Source", "FerriteLib.UiKit", "Kernel");
         string service = File.ReadAllText(Path.Combine(kernel, "UiDocumentService.cs"));
 
-        Check(HasSingleReadPipeline(service),
-            "the document path reads one snapshot and parses it, with no second file read");
+        Check(IsSingleReadService(service),
+            "the document path reads one snapshot and no other file-reading entry point");
         Check(service.IndexOf("using Verse", StringComparison.Ordinal) < 0
             && service.IndexOf("UnityEngine", StringComparison.Ordinal) < 0,
             "the document service carries no backend contact, so its watcher thread cannot touch the game");
-        const string doubleRead =
-            "var bytes = File.ReadAllBytes(path);"
-            + "var layout = UiLayoutManifest.ParseFile(path);"
-            + "var style = UiStyleDocument.ParseFile(path);";
-        Check(!HasSingleReadPipeline(doubleRead),
-            "planted control: a snapshot followed by ParseFile is reported as a double read");
+
+        // The false negative the addendum measured: a second real read in a different shape.
+        const string plantedSecondRead =
+            "static void Read(string path) {\n"
+            + "  byte[] first = File.ReadAllBytes(path);\n"
+            + "  var a = UiLayoutManifest.Parse(Decode(first));\n"
+            + "  var b = UiLayoutManifest.Parse(Decode(File.ReadAllBytes(path)));\n"
+            + "}\n"
+            + "static string Decode(byte[] bytes) { var s = new MemoryStream(bytes); var r = new StreamReader(s); return r.ReadToEnd(); }\n";
+        Check(!IsSingleReadService(plantedSecondRead),
+            "planted control: a Parse(ReadAllBytes) second read reddens the guard");
+
+        // The false positive the addendum measured: a comment mentioning the old shape.
+        const string commentedRead =
+            "// UiLayoutManifest.ParseFile(path); File.ReadAllBytes(path); File.ReadAllText(path);\n"
+            + "static void Read(string path) {\n"
+            + "  byte[] first = File.ReadAllBytes(path);\n"
+            + "  var a = UiLayoutManifest.Parse(Decode(first));\n"
+            + "  var b = UiStyleDocument.Parse(Decode(first));\n"
+            + "}\n"
+            + "static string Decode(byte[] bytes) { var s = new MemoryStream(bytes); var r = new StreamReader(s); return r.ReadToEnd(); }\n";
+        Check(IsSingleReadService(commentedRead),
+            "planted control: a read named only in a comment does not count");
+        Check(CountOccurrences(StripComments(commentedRead), "File.ReadAllBytes(") == 1,
+            "and comment stripping leaves exactly the one real read");
+
+        // Another read shape, to show the guard is not ParseFile-shaped.
+        Check(!IsSingleReadService("var a = File.ReadAllBytes(p); var b = File.ReadAllText(p);"),
+            "planted control: a ReadAllText second read reddens the guard too");
     }
 
-    private static bool HasSingleReadPipeline(string text)
+    /// <summary>
+    /// The read shapes the service must not contain beyond its one snapshot. Enumerated rather than inferred:
+    /// a lexical guard that cannot name its own boundary is a gate you can walk under by typing a different
+    /// API, and this list is the boundary it does cover.
+    /// </summary>
+    private static readonly string[] ForbiddenReadShapes =
     {
-        return text.IndexOf("File.ReadAllBytes(", StringComparison.Ordinal) >= 0
-            && text.IndexOf("UiLayoutManifest.Parse(", StringComparison.Ordinal) >= 0
-            && text.IndexOf("UiStyleDocument.Parse(", StringComparison.Ordinal) >= 0
-            && text.IndexOf("ParseFile(", StringComparison.Ordinal) < 0;
+        "File.ReadAllText(",
+        "File.ReadAllLines(",
+        "File.ReadLines(",
+        "File.OpenRead(",
+        "File.OpenText(",
+        "File.Open(",
+        "new FileStream(",
+        "ParseFile(",
+        "File.Exists("
+    };
+
+    /// <summary>
+    /// True when the comment-stripped source holds exactly one snapshot read (<c>File.ReadAllBytes</c>) and
+    /// its single in-memory reader, and none of <see cref="ForbiddenReadShapes"/>.
+    /// </summary>
+    private static bool IsSingleReadService(string source)
+    {
+        string code = StripComments(source);
+        if (CountOccurrences(code, "File.ReadAllBytes(") != 1) return false;
+        if (CountOccurrences(code, "new StreamReader(") != 1) return false;
+        for (int i = 0; i < ForbiddenReadShapes.Length; i++)
+        {
+            if (code.IndexOf(ForbiddenReadShapes[i], StringComparison.Ordinal) >= 0) return false;
+        }
+
+        return true;
+    }
+
+    private static int CountOccurrences(string text, string token)
+    {
+        int count = 0;
+        int index = 0;
+        while ((index = text.IndexOf(token, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += token.Length;
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// Removes line and block comments, outside string and character literals, so a read call named only in
+    /// prose is not counted as one. A state machine rather than a regex: a regex cannot tell a comment from a
+    /// literal, and this file's own source carries both.
+    /// </summary>
+    private static string StripComments(string text)
+    {
+        var builder = new StringBuilder(text.Length);
+        bool inLine = false;
+        bool inBlock = false;
+        bool inString = false;
+        bool inVerbatim = false;
+        bool inChar = false;
+
+        for (int i = 0; i < text.Length; i++)
+        {
+            char current = text[i];
+            char next = i + 1 < text.Length ? text[i + 1] : '\0';
+
+            if (inLine)
+            {
+                if (current == '\n') { inLine = false; builder.Append(current); }
+                continue;
+            }
+
+            if (inBlock)
+            {
+                if (current == '*' && next == '/') { inBlock = false; i++; }
+                else if (current == '\n') { builder.Append(current); }
+                continue;
+            }
+
+            if (inString)
+            {
+                builder.Append(current);
+                if (current == '\\' && next != '\0') { builder.Append(next); i++; }
+                else if (current == '"') { inString = false; }
+                continue;
+            }
+
+            if (inVerbatim)
+            {
+                builder.Append(current);
+                if (current == '"')
+                {
+                    if (next == '"') { builder.Append(next); i++; }
+                    else { inVerbatim = false; }
+                }
+
+                continue;
+            }
+
+            if (inChar)
+            {
+                builder.Append(current);
+                if (current == '\\' && next != '\0') { builder.Append(next); i++; }
+                else if (current == '\'') { inChar = false; }
+                continue;
+            }
+
+            if (current == '/' && next == '/') { inLine = true; i++; continue; }
+            if (current == '/' && next == '*') { inBlock = true; i++; continue; }
+            if (current == '@' && next == '"') { inVerbatim = true; builder.Append(current); builder.Append(next); i++; continue; }
+            if (current == '"') { inString = true; builder.Append(current); continue; }
+            if (current == '\'') { inChar = true; builder.Append(current); continue; }
+            builder.Append(current);
+        }
+
+        return builder.ToString();
     }
 
     // --- fixture ---------------------------------------------------------------------------------

@@ -207,7 +207,13 @@ public sealed class UiDocumentService : IDisposable {
 
 - 一个批次先验证**全部**受影响 host（layout 走创建期契约，style 走 `TryPrepareStyleCandidate`），
   任一失败则整批保留原有效版本；提交期失败会把已提交的 host 回滚。
-- 首次无外部文件时用内嵌回退；后续失败保留 last-known-good；失败按版本去重报告。
+- 首次无外部文件时用内嵌回退；**已有有效版本时**文件暂时消失（删除、编辑器保存中移走）算失败而非回退：
+  保留 last-known-good、报告该次失败，文件恢复后正常重读。
+- 一次快照读取同时决定大小上限、内容版本与解析内容：超过 `MaxDocumentBytes` 的候选在解析前被拒绝并保留
+  last-known-good；UTF-8 BOM 前缀与无 BOM 的同一文件解析出同一棵树，但两者内容版本不同（版本按字节）。
+- 失败按版本去重，**去重只在失败持续期间有效**：同一拒绝版本在没有成功校验的情况下重复出现记为
+  `Duplicate=true`，仍会返回并推送给订阅者，但不写入 `Reports`/`LastReport`；一次成功接受或“已是当前版本”
+  的跳过会清除该记录，此后的再次失败是新事件，会进入 `Reports` 与 `LastReport`。
 - 工作线程只投递信号（BCL only）；提交发生在主线程帧边界，当前 GUI pass 不换树。
 - 稳定 Id/key 保留滚动/选择/展开/草稿；删除或换 kind 清理旧状态；拖拽/编辑中重载会释放 hot control 并保留草稿。
 - **不在范围**：运行中的 C# kind 增删改。
