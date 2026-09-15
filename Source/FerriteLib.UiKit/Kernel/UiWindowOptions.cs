@@ -28,8 +28,18 @@ public sealed class UiWindowOptions
     /// <summary>
     /// True (default) sets the window's <c>onlyOneOfTypeAllowed</c> to false, so a sibling of the same C#
     /// type is not removed by the vanilla add path; the catalog's key is the only dedup rule. False is
-    /// the vanilla exact-type rule, and the catalog records the evicted sibling through
+    /// the vanilla rule, and the catalog records the evicted sibling through
     /// <see cref="Verse.Window.PostClose"/> rather than pretending it did not happen.
+    /// <para>
+    /// <b>The sharp edge, stated where the switch is.</b> The eviction is by <b>exact</b> C# type - the
+    /// game publishes <c>TryRemove(Type)</c> and <c>TryRemoveAssignableFromType(Type)</c> as separate
+    /// operations, and the add path uses the former - so two window <i>kinds</i> that share one window
+    /// class still evict each other when this is false. A generic shell is exactly that case:
+    /// <see cref="UiPageWindow"/> is one class serving every kind, so a kind that sets this false closes
+    /// other kinds' panels too. Keep it true, or give the kind its own shell type. This repeats
+    /// <c>docs/development/0.5/30-consumer-handoff.md</c> §4 ("same-type multi-open needs an explicit
+    /// choice"); the two must not drift.
+    /// </para>
     /// </summary>
     public bool AllowMultipleInstances { get; set; } = true;
 
@@ -76,6 +86,14 @@ public sealed class UiWindowOptions
     /// window comes back at. Null leaves the rect the game set. Distinct from
     /// <see cref="InitialSize"/>: that one is the game's first-placement provider, this one a size the
     /// consumer restores on every open.
+    /// <para>
+    /// <b>Provisional semantics, recorded as such.</b> No consumer asked for this and nothing measures it
+    /// beyond its own unit assertion in the catalog lane, which makes it the weakest P1 claim of the 0.5
+    /// window round; that is the classification
+    /// <c>docs/development/0.5/30-consumer-handoff.md</c> §4 carries for consumers. Verify it on a real
+    /// window before treating it as a usable default, and expect the shape to change if a consumer's
+    /// actual reopen behaviour disagrees with "the resting size is re-applied on every open".
+    /// </para>
     /// </summary>
     public Vector2? NormalSize { get; set; }
 

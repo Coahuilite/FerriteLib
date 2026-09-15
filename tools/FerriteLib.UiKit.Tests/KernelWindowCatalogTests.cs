@@ -41,6 +41,7 @@ internal static class KernelWindowCatalogTests
             VerifySameKindDifferentContextsCoexist();
             VerifySameKeyReopenActivatesTheExistingInstance();
             VerifyAllowMultipleInstancesFalseUsesTheVanillaExactTypeRule();
+            VerifyVanillaRuleIsExactTypeNotAssignableFrom();
             VerifyCloseDisposesTheSessionAndDropsTheInstance();
             VerifyRefusedCloseIsPreserved();
             VerifyOptionsReachTheWindowAndUnsetLeavesTheGameValue();
@@ -157,7 +158,15 @@ internal static class KernelWindowCatalogTests
         Check(harness.Catalog.Open(beta), "opening the other context creates an instance");
         Check(harness.Catalog.ActiveKey == beta, "and that instance becomes the active target");
 
-        Check(!harness.Catalog.Open(alpha), "reopening an open key activates instead of creating");
+        // The duplicate-open contract is asserted on the state BEFORE the reopen, so it is reachable even
+        // when a broken implementation throws from inside Open() instead of returning: the key already
+        // resolves to the instance, and the reopen must neither add a third nor route the target away.
+        Check(harness.Catalog.TryGet(alpha, out UiWindowHost beforeReopen) && ReferenceEquals(beforeReopen, opened),
+            "the key already resolves to the open instance before the reopen");
+
+        bool reopened = TryOpen(
+            harness.Catalog, alpha, "reopening an open key activates the existing instance", out bool created);
+        Check(reopened && !created, "reopening an open key activates instead of creating");
         Check(harness.Catalog.Instances.Count == 2, "reopening created no third instance");
         Check(harness.Catalog.TryGet(alpha, out UiWindowHost again) && ReferenceEquals(opened, again),
             "the instance that was already open is the one activated");
@@ -188,6 +197,41 @@ internal static class KernelWindowCatalogTests
         Check(harness.Catalog.Instances.Count == 1 && harness.Catalog.TryGet(second, out _),
             "the catalog recorded the eviction through PostClose instead of keeping a ghost instance");
         Check(harness.Stack.Count == 1, "and the stack holds only the survivor");
+    }
+
+    /// <summary>
+    /// The other half of the vanilla rule: the add path evicts by EXACT C# type, never assignable-from.
+    /// <para>
+    /// The harness otherwise only ever opens one window class, so without this assertion switching the
+    /// double's rule to <c>IsAssignableFrom</c> would redden nothing - the gap the P1 adversarial pass
+    /// recorded. Both orders are checked because "assignable" is directional: a derived window added after
+    /// its base and a base added after its derived window are two different mutation shapes, and one
+    /// assertion cannot see both. Both windows carry <c>onlyOneOfTypeAllowed</c> (the option is false), so
+    /// the flag cannot hide the distinction the way it would under the default.
+    /// </para>
+    /// </summary>
+    private static void VerifyVanillaRuleIsExactTypeNotAssignableFrom()
+    {
+        var baseFirst = new Harness();
+        baseFirst.RegisterTypedFamily("c", "typed", new UiWindowOptions { AllowMultipleInstances = false });
+        var baseKey = new UiWindowKey("c", "typed", "base");
+        var derivedKey = new UiWindowKey("c", "typed", "derived");
+
+        Check(baseFirst.Catalog.Open(baseKey), "the base-class window opens");
+        Check(baseFirst.Catalog.Open(derivedKey), "a derived-class window of the same kind opens beside it");
+        Check(baseFirst.Catalog.TryGet(baseKey, out _),
+            "the base window survives a derived sibling: the vanilla rule is exact type, not assignable-from");
+        Check(baseFirst.Catalog.Instances.Count == 2 && baseFirst.Stack.Count == 2,
+            "and both classes coexist in the catalog and in the vanilla stack");
+
+        var derivedFirst = new Harness();
+        derivedFirst.RegisterTypedFamily("c", "typed", new UiWindowOptions { AllowMultipleInstances = false });
+        Check(derivedFirst.Catalog.Open(derivedKey), "the derived-class window opens first here");
+        Check(derivedFirst.Catalog.Open(baseKey), "then the base-class window of the same kind");
+        Check(derivedFirst.Catalog.TryGet(derivedKey, out _),
+            "the derived window survives a base sibling: assignable-from the other way is not the rule either");
+        Check(derivedFirst.Catalog.Instances.Count == 2 && derivedFirst.Stack.Count == 2,
+            "and both classes coexist in this order too");
     }
 
     private static void VerifyCloseDisposesTheSessionAndDropsTheInstance()
@@ -647,6 +691,32 @@ internal static class KernelWindowCatalogTests
         return field.GetValue(stack);
     }
 
+    /// <summary>
+    /// Reopens a key and turns a thrown break into a NAMED failure.
+    /// <para>
+    /// <b>Why this exists (P1 adversarial pass).</b> Disabling the keyed dedup in
+    /// <c>UiWindowCatalog.Open</c> makes the identity map's own duplicate-key guard throw before any
+    /// assertion in this lane can report, so that regression used to produce an
+    /// <c>UNHANDLED: ArgumentException</c> and a dead run instead of naming the contract it broke. A lane
+    /// whose job is to name a broken contract has to name it whether the break returns or throws, so the
+    /// call is wrapped here: the throw becomes a named FAIL and the caller's own assertion still runs.
+    /// </para>
+    /// </summary>
+    private static bool TryOpen(UiWindowCatalog catalog, UiWindowKey key, string lane, out bool created)
+    {
+        created = false;
+        try
+        {
+            created = catalog.Open(key);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Check(false, lane + ": Open threw " + ex.GetType().Name + " :: " + ex.Message);
+            return false;
+        }
+    }
+
     private static void CheckThrows(string what, Action action)
     {
         try
@@ -717,6 +787,22 @@ internal static class KernelWindowCatalogTests
                     new LaneMetrics()));
         }
 
+        /// <summary>
+        /// Registers a kind whose factory returns a base-class shell for one context and a derived-class
+        /// shell for another, which is the only way this lane can tell exact-type removal from
+        /// assignable-from removal.
+        /// </summary>
+        internal void RegisterTypedFamily(string consumer, string kind, UiWindowOptions? options)
+        {
+            Catalog.Register(
+                consumer,
+                kind,
+                options,
+                key => string.Equals(key.ContextKey, "derived", StringComparison.Ordinal)
+                    ? (UiWindowHost)new LaneShellDerived()
+                    : new LaneShellBase());
+        }
+
         internal void Place(UiWindowKey key, Rect rect)
         {
             if (!Catalog.TryGet(key, out UiWindowHost host))
@@ -734,6 +820,35 @@ internal static class KernelWindowCatalogTests
         public override void DoWindowContents(Rect inRect)
         {
         }
+    }
+
+    /// <summary>
+    /// A base shell class and a derived one, so the lane can tell "exact C# type" from "assignable-from".
+    /// <c>UiPageWindow</c> is sealed and one shared class is exactly the blind spot the adversarial pass
+    /// found, so the two-class family has to live here.
+    /// </summary>
+    private class LaneShellBase : UiWindowHost
+    {
+        protected override UiTheme Theme => UiTheme.DarkGold;
+
+        protected override UiHost CreateHost()
+        {
+            return new UiHost(
+                "window-catalog-lane",
+                Page(),
+                new UiBindings(),
+                UiTheme.DarkGold,
+                new LaneMetrics(),
+                new LaneTranslation());
+        }
+
+        protected override void DrawNotice(Rect rect, UiWindowNotice notice)
+        {
+        }
+    }
+
+    private sealed class LaneShellDerived : LaneShellBase
+    {
     }
 
     private sealed class LaneMetrics : ITextMetrics
