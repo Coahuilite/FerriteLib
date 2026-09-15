@@ -46,6 +46,8 @@ internal static class KernelWindowCatalogTests
             VerifyRefusedCloseIsPreserved();
             VerifyOptionsReachTheWindowAndUnsetLeavesTheGameValue();
             VerifyActiveTargetIsExactlyOneAndFollowsClicks();
+            VerifyPointerSpaceIsConsistentAcrossOffsetWindows();
+            VerifyClosingAWindowHandsOverTheActiveTarget();
             VerifyOpenOnlyAndManualPoliciesDoNotFollowClicks();
             VerifyDeactivationKeepsSessionAndReleasesCapture();
             VerifyGenericShellNeedsNoWindowSubclass();
@@ -393,13 +395,109 @@ internal static class KernelWindowCatalogTests
         Check(harness.Stack.Windows.Count == 2 && ReferenceEquals(harness.Stack.Windows[0], first),
             "and it does not reorder the vanilla stack, so it is not a bring-to-front");
 
-        Event inSecond = PumpMouseDown(second, new Vector2(450f, 50f));
+        // Content-local, like every point this helper takes: the offset window's own origin is added by
+        // the shell, so the same local point that selects one window cannot select the other.
+        Event inSecond = PumpMouseDown(second, new Vector2(50f, 50f));
         Check(harness.Catalog.ActiveKey == beta, "a click inside the other window moves the target back");
         Check(EventWasUsed(inSecond), "and that activating click is consumed too");
 
         Event outside = PumpMouseDown(first, new Vector2(1000f, 1000f));
         Check(harness.Catalog.ActiveKey == null, "a click outside every instance clears the target");
         Check(!EventWasUsed(outside), "and is left to the game, because no window was selected by it");
+    }
+
+    /// <summary>
+    /// The pointer arrives content-local while the catalog compares screen rects, so the shell must
+    /// translate before resolving. Two windows with different origins prove it from both directions: a
+    /// local click inside the OFFSET window used to resolve to whichever window covered that local
+    /// coordinate on screen.
+    /// </summary>
+    private static void VerifyPointerSpaceIsConsistentAcrossOffsetWindows()
+    {
+        var harness = new Harness();
+        harness.Register("c", "page");
+        var alpha = new UiWindowKey("c", "page", "alpha");
+        var beta = new UiWindowKey("c", "page", "beta");
+        harness.Catalog.Open(alpha);
+        harness.Place(alpha, new Rect(0f, 0f, 300f, 200f));
+        harness.Catalog.Open(beta);
+        harness.Place(beta, new Rect(400f, 0f, 300f, 200f));
+        harness.Catalog.TryGet(alpha, out UiWindowHost first);
+        harness.Catalog.TryGet(beta, out UiWindowHost second);
+        Check(harness.Catalog.ActiveKey == beta, "the offset window starts as the target");
+
+        PumpMouseDown(second, new Vector2(50f, 50f));
+        Check(harness.Catalog.ActiveKey == beta,
+            "a local click inside the offset window keeps its own target");
+
+        PumpMouseDown(first, new Vector2(50f, 50f));
+        Check(harness.Catalog.ActiveKey == alpha, "a local click inside the origin window selects it");
+
+        PumpMouseDown(second, new Vector2(250f, 150f));
+        Check(harness.Catalog.ActiveKey == beta,
+            "and near the far corner of the offset window still lands there");
+
+        PumpMouseDown(second, new Vector2(2000f, 2000f));
+        Check(harness.Catalog.ActiveKey == null,
+            "a local point outside every window clears the target");
+    }
+
+    /// <summary>
+    /// Closing a window hands the active target over instead of dropping it. The external review's R3
+    /// reproduced "close the active window, one window remains, active=null": the pre-close hook cleared
+    /// the target, which made the survivor branch in the post-close hook unreachable. All four shapes are
+    /// pinned here - close active, close inactive, close last, refused close.
+    /// </summary>
+    private static void VerifyClosingAWindowHandsOverTheActiveTarget()
+    {
+        var alpha = new UiWindowKey("c", "page", "alpha");
+        var beta = new UiWindowKey("c", "page", "beta");
+
+        // (1) Closing the ACTIVE window hands the target to the survivor.
+        var closeActive = new Harness();
+        closeActive.Register("c", "page");
+        closeActive.Catalog.Open(alpha);
+        closeActive.Catalog.Open(beta);
+        Check(closeActive.Catalog.ActiveKey == beta, "the second window is the active target");
+        Check(closeActive.Catalog.Close(beta), "closing the active window goes through the stack");
+        Check(closeActive.Catalog.Instances.Count == 1, "one window remains open");
+        Check(closeActive.Catalog.ActiveKey == alpha,
+            "and it is the active target: a close never leaves windows open with no target");
+        closeActive.Catalog.TryGet(alpha, out UiWindowHost survivor);
+        Check(survivor.IsActiveTarget, "the survivor itself reports it as the target");
+
+        // (2) Closing a NON-active window leaves the target exactly where it was.
+        var closeInactive = new Harness();
+        closeInactive.Register("c", "page");
+        closeInactive.Catalog.Open(alpha);
+        closeInactive.Catalog.Open(beta);
+        Check(closeInactive.Catalog.Close(alpha), "closing the inactive window goes through");
+        Check(closeInactive.Catalog.ActiveKey == beta, "the active target does not move");
+        Check(closeInactive.Catalog.Instances.Count == 1, "and the survivor is the window that was active");
+
+        // (3) Closing the LAST window leaves an empty catalog with no target, which is the honest answer.
+        var closeLast = new Harness();
+        closeLast.Register("c", "page");
+        closeLast.Catalog.Open(alpha);
+        Check(closeLast.Catalog.Close(alpha), "closing the last window goes through");
+        Check(closeLast.Catalog.Instances.Count == 0 && closeLast.Catalog.ActiveKey == null,
+            "an empty catalog reports no active target");
+
+        // (4) A refused close keeps both the window and the target, in both roles.
+        bool allow = false;
+        var refused = new Harness();
+        refused.Register("c", "page", new UiWindowOptions { CanClose = _ => allow });
+        refused.Catalog.Open(alpha);
+        refused.Catalog.Open(beta);
+        Check(!refused.Catalog.Close(beta), "a refused close reports false");
+        Check(refused.Catalog.ActiveKey == beta && refused.Catalog.Instances.Count == 2,
+            "and the refused window keeps the target");
+        Check(!refused.Catalog.Close(alpha), "a refused close of the inactive window reports false too");
+        Check(refused.Catalog.ActiveKey == beta, "and the target is still where it was");
+
+        allow = true;
+        Check(refused.Catalog.Close(beta), "allowing the close lets it through");
+        Check(refused.Catalog.ActiveKey == alpha, "and the target hands over to the survivor");
     }
 
     /// <summary>The other two policies pin the rule from both sides, so "follows clicks" is a choice and not an accident.</summary>
@@ -871,6 +969,12 @@ internal static class KernelWindowCatalogTests
 
     /// <summary>
     /// One pointer-down pass over one window, through the member the game calls.
+    /// <para>
+    /// <b><paramref name="point"/> is content-local</b> - the space the game's event pointer is in while the
+    /// window draws inside its group (Verse.Window hands <c>DoWindowContents</c> a zeroed group rect), which
+    /// is why the shell, not the lane, adds the window origin. A lane that passed screen coordinates here
+    /// would be testing a convention the game does not have.
+    /// </para>
     /// <para>
     /// Compiled against the real UnityEngine surface, which has no public <c>Event</c> constructor, so the
     /// instance comes from the static factory and the fields a lane needs are overwritten - the same idiom

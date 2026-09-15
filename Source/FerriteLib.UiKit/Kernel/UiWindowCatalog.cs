@@ -301,19 +301,38 @@ public sealed class UiWindowCatalog
     {
     }
 
+    // The window whose close was already observed to be the active target: recorded at PreClose and
+    // consumed at PostClose. A reference rather than a flag, so a close that never reaches PostClose
+    // cannot make a later close believe it was the active one.
+    private UiWindowHost? closingActiveWindow;
+
     /// <summary>
     /// A window is closing: it stops being the active target first, so no input or capture reaches a
-    /// window that is on its way out.
+    /// window that is on its way out. Whether that leaves the catalog targetless is remembered here and
+    /// answered once the window is actually out of the identity map, in <see cref="NotifyPostClose"/>:
+    /// at this moment the closing window is still in the map, so a survivor chosen here would be the
+    /// window being closed.
     /// </summary>
     internal void NotifyPreClose(UiWindowHost window)
     {
-        if (ReferenceEquals(active, window))
+        closingActiveWindow = ReferenceEquals(active, window) ? window : null;
+        if (closingActiveWindow != null)
         {
             SetActive(null);
         }
     }
 
-    /// <summary>A window is out of the stack: drop every reference the catalog held to it.</summary>
+    /// <summary>
+    /// A window is out of the stack: drop every reference the catalog held to it and, when it was the
+    /// active target, hand the target to a survivor.
+    /// <para>
+    /// <b>The reviewed defect lived here.</b> This branch used to be keyed on "the target is still the
+    /// closing window", which the pre-close hook had just made false by clearing the target, so closing
+    /// the active window while siblings stayed open left the catalog reporting no active target at all
+    /// (the external probe's <c>active=null remaining=1</c>). The close's own record decides now, and a
+    /// close that was refused never reaches either hook, so a veto cannot clear the target.
+    /// </para>
+    /// </summary>
     internal void NotifyPostClose(UiWindowHost window)
     {
         if (window.Key is UiWindowKey key)
@@ -324,54 +343,66 @@ public sealed class UiWindowCatalog
         openOrder.Remove(window);
         activationOrder.Remove(window);
 
-        if (ReferenceEquals(active, window))
+        bool closingWasActive = ReferenceEquals(closingActiveWindow, window) || ReferenceEquals(active, window);
+        if (ReferenceEquals(closingActiveWindow, window))
         {
-            // The target moves to the most recently activated survivor, or to nothing when this was the
-            // last window. A closing window never leaves a dangling active target behind.
-            UiWindowHost? next = activationOrder.Count > 0 ? activationOrder[activationOrder.Count - 1] : null;
-            SetActive(next);
+            closingActiveWindow = null;
         }
 
-        window.SetActiveTarget(false);
+        if (closingWasActive)
+        {
+            SetActive(SelectSurvivor());
+        }
+        else
+        {
+            window.SetActiveTarget(false);
+        }
+    }
+
+    /// <summary>
+    /// The target a closed window hands over to: the most recently activated survivor, which is the
+    /// catalog's own front-most record, or null when the closing window was the last one. An explicit
+    /// policy rather than "whatever is left", so the rule is readable and testable.
+    /// </summary>
+    private UiWindowHost? SelectSurvivor()
+    {
+        return activationOrder.Count > 0 ? activationOrder[activationOrder.Count - 1] : null;
     }
 
     /// <summary>
     /// A pointer-down happened somewhere on screen. Under <see cref="UiFocusPolicy.FollowClicks"/> the
-    /// target becomes the instance whose rect contains the pointer - resolved against every open
-    /// instance, so it does not matter which window's pass reports it - and a click outside every
-    /// instance clears the target.
+    /// target becomes the instance whose screen <c>windowRect</c> contains the point - resolved against
+    /// every open instance, so it does not matter which window's pass reports it - and a click outside
+    /// every instance clears the target.
     /// <para>
-    /// <paramref name="reportingRect"/> is the rect the game handed the reporting window during this pass,
-    /// which is authoritative for that one instance; every other instance is resolved against its last
-    /// known <c>windowRect</c>. Overlapping windows are then resolved by most-recently-activated order
-    /// rather than by IMGUI draw order. <b>Known boundary, not a silent assumption:</b> the stubs cannot
-    /// model real stacking, so overlap is heuristic outside the non-overlapping case and the in-game
-    /// checklist carries that scenario.
+    /// <b>One coordinate space, by contract.</b> <paramref name="windowSpacePosition"/> is in the space
+    /// the instances' <c>windowRect</c> values live in; the caller
+    /// (<see cref="UiWindowHost.ResolvePointerDown"/>) translates the content-local pointer into it. The
+    /// previous shape compared the reporting window's zero-based content rect with the raw pointer while
+    /// checking every <i>other</i> window against its screen rect: a click inside a second, offset window
+    /// resolved to whichever window covered the local coordinate on screen.
+    /// </para>
+    /// <para>
+    /// <b>Known boundary, not a silent assumption:</b> overlapping windows are resolved by
+    /// most-recently-activated order rather than by the vanilla stack's actual order, and a window's
+    /// <c>windowRect</c> is the value its own pass is using rather than a live query. Neither can be
+    /// settled from the harness, so the in-game checklist carries the overlap scenario.
     /// </para>
     /// </summary>
-    internal void NotifyPointerDown(Vector2 position, UiWindowHost reporting, Rect reportingRect)
+    internal void NotifyPointerDown(Vector2 windowSpacePosition)
     {
         if (focusPolicy != UiFocusPolicy.FollowClicks)
         {
             return;
         }
 
-        UiWindowHost? target = Contains(reportingRect, position) ? reporting : null;
-        if (target == null)
+        UiWindowHost? target = null;
+        for (int i = activationOrder.Count - 1; i >= 0; i--)
         {
-            for (int i = activationOrder.Count - 1; i >= 0; i--)
+            if (Contains(activationOrder[i].windowRect, windowSpacePosition))
             {
-                UiWindowHost candidate = activationOrder[i];
-                if (ReferenceEquals(candidate, reporting))
-                {
-                    continue;
-                }
-
-                if (Contains(candidate.windowRect, position))
-                {
-                    target = candidate;
-                    break;
-                }
+                target = activationOrder[i];
+                break;
             }
         }
 
