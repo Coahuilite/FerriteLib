@@ -456,6 +456,13 @@ public abstract class UiWindowHost : Window
     /// <summary>
     /// Announces the page host is going away and then disposes it: the one place teardown happens, so a close
     /// and a failed pass cannot drift apart in what they tell the consumer.
+    /// <para>
+    /// <b>Disposal is not conditional on the handler behaving.</b> <see cref="HostDetached"/> is contracted
+    /// not to throw, and if it does the exception must not defeat the teardown: the host is disposed in a
+    /// <c>finally</c>, so the session dies either way. The throw is recorded as this window's failure rather
+    /// than escaping into the game's window-stack code, and the pass's own failure wins if there already is
+    /// one - a page that threw is reported as the page that threw, not as its teardown handler.
+    /// </para>
     /// </summary>
     private void ReleaseHost()
     {
@@ -466,8 +473,18 @@ public abstract class UiWindowHost : Window
             return;
         }
 
-        HostDetached?.Invoke(released);
-        released.Dispose();
+        try
+        {
+            HostDetached?.Invoke(released);
+        }
+        catch (Exception detachError)
+        {
+            if (lastFailure == null) lastFailure = detachError;
+        }
+        finally
+        {
+            released.Dispose();
+        }
     }
 
     public override void PreClose()

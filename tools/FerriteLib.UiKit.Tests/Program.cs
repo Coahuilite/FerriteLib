@@ -130,6 +130,14 @@ internal static class Program
         Console.WriteLine("Kernel neutral fixture page (data-driven rows + the new controls, library fixture only)...");
         failures += KernelFixturePageTests.RunAll();
 
+        // ---- T1 MVVM / page lifecycle lanes (owner: mvvm) - begin -----------------------------
+        Console.WriteLine("Kernel notification adapter (explicit mapping, bounded batch, unsubscribe, thread refusal)...");
+        failures += KernelNotifyAdapterTests.RunAll();
+
+        Console.WriteLine("Kernel page lifecycle (attach/detach order, reload invariance, the page-level door)...");
+        failures += KernelPageLifecycleTests.RunAll();
+        // ---- T1 MVVM / page lifecycle lanes (owner: mvvm) - end -------------------------------
+
         // --- T3 widget catalogue (owner: catalog) - one contiguous block, merge-conflict anchor ---
         Console.WriteLine("Kernel widget catalogue (read-only description, scope-preserving identity, no factories)...");
         failures += KernelWidgetCatalogTests.RunAll();

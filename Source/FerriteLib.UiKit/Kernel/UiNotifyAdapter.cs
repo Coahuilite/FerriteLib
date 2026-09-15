@@ -27,6 +27,20 @@ namespace FerriteLib.UiKit.Kernel;
 /// coalescing optimisation with a ceiling, not a promise that exactly one announcement will ever be made.
 /// </para>
 /// <para>
+/// <b>A leaked inner scope cannot strand the set.</b> Batch scopes nest, and only the outermost open scope
+/// commits. Ending a scope closes it and every scope opened after it, so a consumer that drops an inner
+/// handle still delivers when the outer one ends: the pending set is written because the outermost scope is
+/// gone, not because every handle was released. A leaked <em>outermost</em> scope is the one case the ceiling
+/// resolves, which is exactly why the ceiling exists.
+/// </para>
+/// <para>
+/// <b>What "the batch is never ended" does to a pending key, stated rather than implied.</b> A key queued
+/// inside an open batch is delivered when the outermost scope ends or when the pending set reaches
+/// <see cref="MaxPendingKeys"/>. It is not delivered by <see cref="Flush"/> while any scope is open, and an
+/// outermost scope that is neither ended nor pushed to the ceiling leaves the key pending - bounded, visible
+/// through <see cref="PendingKeyCount"/>, and released by the ceiling rather than declared impossible.
+/// </para>
+/// <para>
 /// <b>Threads.</b> This first version delivers on the main thread only. A notification raised from any other
 /// thread is refused before it can touch a game object, counted in
 /// <see cref="OffThreadNotificationCount"/> and surfaced through <see cref="NotificationRejected"/>; it is
@@ -109,7 +123,8 @@ public sealed class UiNotifyAdapter : IDisposable
             return MapAll(bindingKeys);
         }
 
-        propertyKeys[propertyName] = Copy(bindingKeys);
+        // Validated before the assignment, so a refused mapping never replaces the one already in force.
+        propertyKeys[propertyName] = Copy(bindingKeys, nameof(bindingKeys));
         return this;
     }
 
@@ -120,13 +135,15 @@ public sealed class UiNotifyAdapter : IDisposable
     public UiNotifyAdapter MapAll(params string[] bindingKeys)
     {
         EnsureAlive();
-        allKeys = Copy(bindingKeys);
+        allKeys = Copy(bindingKeys, nameof(bindingKeys));
         return this;
     }
 
     /// <summary>
     /// Subscribes to one source and returns the handle that unsubscribes it. Attaching the same source twice is
-    /// idempotent: one subscription, two handles that each release it once.
+    /// idempotent: one subscription, two handles, and exactly one of them releases it. The handle is bound to
+    /// the subscription it was handed out for, so a stale handle from an earlier attach cannot release a
+    /// subscription that replaced it.
     /// </summary>
     public IDisposable Attach(INotifyPropertyChanged source)
     {
@@ -140,13 +157,13 @@ public sealed class UiNotifyAdapter : IDisposable
             source.PropertyChanged += handler;
         }
 
-        return new SourceSubscription(this, source);
+        return new SourceSubscription(this, source, handler);
     }
 
     /// <summary>
-    /// Unsubscribes one source. False when it was not attached. Unlike the rest of the surface this does not
-    /// throw after <see cref="Dispose"/>: a subscription handle that is released twice, or released after the
-    /// page closed, must be harmless.
+    /// Unsubscribes one source, whichever subscription is currently attached. False when it was not attached.
+    /// Unlike the rest of the surface this does not throw after <see cref="Dispose"/>: a subscription handle
+    /// that is released twice, or released after the page closed, must be harmless.
     /// </summary>
     public bool Detach(INotifyPropertyChanged source)
     {
@@ -158,26 +175,51 @@ public sealed class UiNotifyAdapter : IDisposable
             return false;
         }
 
+        Remove(source, handler);
+        return true;
+    }
+
+    /// <summary>
+    /// Releases one specific subscription, refusing when the source now carries a different one: a handle that
+    /// outlived the subscription it was handed out for must not release the subscription that replaced it.
+    /// </summary>
+    private bool Release(INotifyPropertyChanged source, PropertyChangedEventHandler handler)
+    {
+        if (disposed) return false;
+        if (!handlers.TryGetValue(source, out PropertyChangedEventHandler? current)) return false;
+        if (!ReferenceEquals(current, handler)) return false;
+
+        Remove(source, current);
+        return true;
+    }
+
+    private void Remove(INotifyPropertyChanged source, PropertyChangedEventHandler handler)
+    {
         handlers.Remove(source);
         source.PropertyChanged -= handler;
-        return true;
     }
 
     /// <summary>
     /// Opens a batch: announcements merge into one flush when the outermost batch closes, so a VM that raises
     /// twenty notifications while recomputing announces once. Nesting is allowed; only the outermost scope
-    /// flushes. The pending set is still bounded inside a batch - reaching <see cref="MaxPendingKeys"/>
-    /// flushes early rather than growing.
+    /// flushes, and ending a scope also closes the scopes nested inside it - so an inner handle that is never
+    /// released cannot strand the pending set. The set is still bounded inside a batch: reaching
+    /// <see cref="MaxPendingKeys"/> flushes early rather than growing.
     /// </summary>
     public IDisposable BeginBatch()
     {
         EnsureAlive();
         batchDepth++;
-        return new BatchScope(this);
+        return new BatchScope(this, batchDepth);
     }
 
-    /// <summary>Writes every pending key to the bindings now. A no-op while a batch is open, and outside a batch
-    /// a notification is already announced as it arrives.</summary>
+    /// <summary>
+    /// Writes every pending key to the bindings now. Inside a batch this is deliberately a no-op: the batch's
+    /// outermost scope is the commit point, and a flush that punched through it would make the coalescing
+    /// window's width depend on which notifications happened to call this. Outside a batch a notification
+    /// commits as it arrives, so the set is already empty when this runs; the member stays public because the
+    /// contract names it, and it is the explicit door a future queue-without-commit path would use.
+    /// </summary>
     public void Flush()
     {
         EnsureAlive();
@@ -189,6 +231,12 @@ public sealed class UiNotifyAdapter : IDisposable
         ForceFlush();
     }
 
+    /// <summary>
+    /// Unsubscribes every attached source and drops the pending set. It never disposes a source - the
+    /// consumer owns its model - and it is idempotent. After this only <see cref="Detach"/> is callable:
+    /// every other member throws, while a subscription handle or batch scope that outlives the adapter stays
+    /// harmless rather than throwing out of a <c>using</c> block.
+    /// </summary>
     public void Dispose()
     {
         if (disposed)
@@ -244,6 +292,15 @@ public sealed class UiNotifyAdapter : IDisposable
         {
             Queue(keys[i]);
         }
+
+        // Outside every batch, one notification is one write however many keys its mapping carries: the
+        // loop above only queues, and the commit happens here. Flushing per key inside the loop would turn
+        // one property whose mapping names three keys into three separate announcements, which is the
+        // opposite of what the mapping is for.
+        if (batchDepth == 0)
+        {
+            ForceFlush();
+        }
     }
 
     private string[] Resolve(string propertyName)
@@ -269,14 +326,9 @@ public sealed class UiNotifyAdapter : IDisposable
         }
 
         // The ceiling is the contract, so it wins over the batch: a burst that outruns the cap announces what
-        // it holds instead of growing without limit.
+        // it holds instead of growing without limit. Whether an under-cap set is written now is decided by the
+        // caller, because a batch's outer scope - not each key - is the commit point.
         if (pendingKeys.Count >= MaxPendingKeys)
-        {
-            ForceFlush();
-            return;
-        }
-
-        if (batchDepth == 0)
         {
             ForceFlush();
         }
@@ -296,25 +348,42 @@ public sealed class UiNotifyAdapter : IDisposable
         Bindings.NotifyChanged(keys);
     }
 
-    private void EndBatch()
+    private void EndBatch(int level)
     {
         // Tolerant on purpose: the scope may be disposed after the adapter was disposed, and a handle that
-        // outlives its owner must not throw out of a using block.
-        if (disposed || batchDepth == 0)
+        // outlives its owner must not throw out of a using block. A scope whose level is above the current
+        // depth was already closed by an enclosing scope, so releasing it again is a no-op rather than a
+        // resurrection of the depth it used to hold.
+        if (disposed || level > batchDepth)
         {
             return;
         }
 
-        batchDepth--;
+        // Ending a scope closes it and every scope opened after it. That is the whole fix for a dropped
+        // inner handle: the outermost scope is still the commit point, so its end writes the keys instead of
+        // them staying pending because one nested handle was never released.
+        batchDepth = level - 1;
         if (batchDepth == 0)
         {
             ForceFlush();
         }
     }
 
-    private static string[] Copy(string[]? keys)
+    /// <summary>
+    /// Clones a mapping's key list, refusing anything the binding surface could never deliver. A null list
+    /// (a literal <c>null</c> passed for the <c>params</c> array) and a null or empty entry are all caller
+    /// errors: a key that can never be announced is a configuration mistake, not an empty mapping, and the
+    /// binding surface's own <c>NotifyChanged</c> refuses the same shape. The clone means a caller's later
+    /// mutation of its array cannot reach into a mapping already in force.
+    /// </summary>
+    private static string[] Copy(string[]? keys, string parameterName)
     {
-        if (keys == null || keys.Length == 0)
+        if (keys == null)
+        {
+            throw new ArgumentNullException(parameterName, "A mapped binding key list cannot be null.");
+        }
+
+        if (keys.Length == 0)
         {
             return Array.Empty<string>();
         }
@@ -322,7 +391,14 @@ public sealed class UiNotifyAdapter : IDisposable
         var copy = new string[keys.Length];
         for (int i = 0; i < keys.Length; i++)
         {
-            copy[i] = keys[i] ?? throw new ArgumentException("A mapped binding key cannot be null.", nameof(keys));
+            string? key = keys[i];
+            if (string.IsNullOrEmpty(key))
+            {
+                throw new ArgumentException(
+                    "A mapped binding key must be non-null and non-empty; entry " + i + " is not.", parameterName);
+            }
+
+            copy[i] = key;
         }
 
         return copy;
@@ -336,41 +412,51 @@ public sealed class UiNotifyAdapter : IDisposable
         }
     }
 
-    /// <summary>The handle one <see cref="Attach"/> call handed out; releasing it twice is harmless.</summary>
+    /// <summary>
+    /// The handle one <see cref="Attach"/> call handed out. Releasing it twice is harmless, and it carries the
+    /// handler that was current when it was created so the release cannot land on a later subscription.
+    /// </summary>
     private sealed class SourceSubscription : IDisposable
     {
         private UiNotifyAdapter? owner;
         private readonly INotifyPropertyChanged source;
+        private readonly PropertyChangedEventHandler handler;
 
-        internal SourceSubscription(UiNotifyAdapter owner, INotifyPropertyChanged source)
+        internal SourceSubscription(UiNotifyAdapter owner, INotifyPropertyChanged source, PropertyChangedEventHandler handler)
         {
             this.owner = owner;
             this.source = source;
+            this.handler = handler;
         }
 
         public void Dispose()
         {
             UiNotifyAdapter? current = owner;
             owner = null;
-            current?.Detach(source);
+            current?.Release(source, handler);
         }
     }
 
-    /// <summary>One nesting level of a batch scope.</summary>
+    /// <summary>
+    /// One nesting level of a batch scope. It carries the depth it was opened at, because ending it has to
+    /// close every scope that was opened after it - see <see cref="EndBatch"/>.
+    /// </summary>
     private sealed class BatchScope : IDisposable
     {
         private UiNotifyAdapter? owner;
+        private readonly int level;
 
-        internal BatchScope(UiNotifyAdapter owner)
+        internal BatchScope(UiNotifyAdapter owner, int level)
         {
             this.owner = owner;
+            this.level = level;
         }
 
         public void Dispose()
         {
             UiNotifyAdapter? current = owner;
             owner = null;
-            current?.EndBatch();
+            current?.EndBatch(level);
         }
     }
 }
