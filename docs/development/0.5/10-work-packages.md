@@ -59,8 +59,8 @@ P1..P5 ── P6 (独立验证 → 开发包 → 文档)
 | P1 | **已合并**（`2b37d3d` → merge） | keyed 实例/焦点/通用 XML 页壳；91 断言；**7 处突变证明**（含同型多开与 vanilla 精确类型规则）；stub 增补已披露 |
 | P2 | **已合并**（`369400f` → merge `0ee55b6`） | 按 key 通知/失效分类/命令态/条件显隐 + P2b 节点剪枝；6 处突变转红 + 1 处诚实负结果；3 个新 lane |
 | P4 | **已合并**（`bd2e04c` → `85faab0`；P4b `079aa5e` → `6e0781a`） | 文档服务 + 原子热重载 + LKG；lane 103 断言；P4 三处突变 + P4b 四处突变均转红；AutoWatch 重武装与 style 批次跨 host 原子性已补 |
-| P3 | **进行中**（`collections`） | 依赖已清（P2/P4 合并），分支 `feat/0.5-collections` |
-| P5 | **进行中**（`diagnostics`） | 依赖已清（P1/P2/P4 合并），分支 `feat/0.5-diagnostics` |
+| P3 | **进行中**（`collections`） | 依赖已清（P2/P4 合并），分支 `feat/0.5-collections`；repeater 采用容器形态（item 行为声明身份，复用现有 prune 生命周期） |
+| P5 | **已合并**（`a09d6e6` → merge `def7465`） | 每 host/session 订阅 + 归属事件（reload/fit/recovery/计时）；7 处突变转红、未订阅路径实测 0 分配；P4 文件上的 6 处发布钩子为经授权的加法改动 |
 | P6 | 进行中（Lead + `verifier`） | wave-A 审计已合并（`8d4bdb0`）并处置 6 条发现（`8098ca0`）；P4 逆验证已合并并派生 task-8；死 lane 守卫已入库（`b6b621d`）；P1 逆验证待做 |
 
 状态只在 Lead 合并后更新（单一状态源原则）；各包分支内部进度写在提交信息与任务回交里。
@@ -97,5 +97,8 @@ git commit -m "message"
 | --- | --- | --- |
 | task-8 P4b | P4 逆验证：AutoWatch 无法重新武装（must-fix）、style 批次未跨 host 预校验（must-fix）、主题基线重置（待裁定文档化或修正） | **已完成并合并**（`079aa5e` → `6e0781a`）；三项全部修复，主题基线为「门控修复 + 明确残余」 |
 | task-9 P2b | P4 逆验证：被删除元素的 node 未从 session 表移除、`GetNodeByElementId` 的无 `IsArranged` 过滤与自身注释矛盾 | **已完成并合并进 P2**；选择保留「按身份而非按排布」的契约并改注释，未加 `IsArranged` 过滤（过滤会隐藏隐藏元素的草稿） |
-| task-10 P1 hardening | P1 逆验证：stub 只用一个窗口类，`AllowMultipleInstances` 的「精确类型 vs 可赋值」半边未钉；M1 去重突变靠未捕获异常变红而非命名断言 | 已派发（`windowing`） |
+| task-10 P1 hardening | P1 逆验证：stub 只用一个窗口类，`AllowMultipleInstances` 的「精确类型 vs 可赋值」半边未钉；M1 去重突变靠未捕获异常变红而非命名断言 | **已完成并合并**（`eca4675` → `4a50f58`） |
+| task-11 P2c | P2 逆验证：禁用守卫没覆盖 `UiNative.Slider/NumberField/TextField`（产品缺口）；每节点 `MarkDirty` 机制不可观测 | 已派发（`core`） |
+| task-12 P4c | P4b 逆验证：style 预校验分支可被整体掏空而 suite 全绿；基线门控残余 | **已完成并合并**（`8b6508f` → `9714b0a`）；裁定保留页面级拒绝并在 §6 记录代价 |
+| task-13 | P5 自陈：壳的 chrome/notice fit 发现走的是进程级旧通道，未归属到 host 订阅 | 已派发（`windowing`） |
 | 死 lane 守卫 | P6 自查：仓库被"lane 存在但从未注册"伤过两次且无门禁 | 已入库并突变证明（\`b6b621d\`） |
