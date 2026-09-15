@@ -67,6 +67,25 @@ public sealed class UiDocumentService : IDisposable
     private bool overflowed;
     private bool disposed;
 
+    // Re-arm attempts are made on the frame path, so they are throttled: a document whose directory did
+    // not exist yet must get another chance, without stat-ing every registered path once per frame.
+    private int reArmCountdown;
+
+    /// <summary>
+    /// Test seam, instance-level (never process-wide): the harness forces one host's document prepare or
+    /// commit to fail. A prepare-phase fault exercises the style half of the all-or-nothing rule, which a
+    /// valid style document cannot fail on its own; a commit-phase fault exercises the batch rollback,
+    /// which a production commit cannot reach once every host validated. Null in production.
+    /// </summary>
+    internal Func<UiHost, string, string>? DocumentFaultOverride;
+
+    internal const string PreparePhase = "prepare";
+
+    internal const string CommitPhase = "commit";
+
+    /// <summary>Pumps between re-arm attempts on the frame path.</summary>
+    private const int ReArmPumpInterval = 30;
+
     /// <summary>
     /// Creates the service. <paramref name="autoWatch"/> overrides the build's default: automatic watching
     /// is on by default in <c>FER_DEV</c> builds and off in release builds, and a consumer may switch it
@@ -95,13 +114,11 @@ public sealed class UiDocumentService : IDisposable
         set
         {
             EnsureAlive();
-            if (autoWatch == value) return;
+            // Deliberately not an early return on an unchanged value: re-setting AutoWatch to true is the
+            // documented re-arm after a directory that did not exist yet, so the same value must still do
+            // the work. RefreshWatchers arms only the documents that hold no watcher.
             autoWatch = value;
-            foreach (DocumentState state in documents.Values)
-            {
-                if (value) Watch(state);
-                else Unwatch(state);
-            }
+            RefreshWatchers();
         }
     }
 
@@ -218,6 +235,7 @@ public sealed class UiDocumentService : IDisposable
     public bool Pump()
     {
         if (disposed) return false;
+        if (autoWatch) AttemptReArm();
 
         List<string> batch;
         lock (gate)
@@ -256,6 +274,7 @@ public sealed class UiDocumentService : IDisposable
     {
         EnsureAlive();
         if (documentId == null) return null;
+        RefreshWatchers();
         lock (gate)
         {
             pending.Remove(documentId);
@@ -268,6 +287,7 @@ public sealed class UiDocumentService : IDisposable
     public IReadOnlyList<UiReloadReport> ReloadAll()
     {
         EnsureAlive();
+        RefreshWatchers();
         var results = new List<UiReloadReport>();
         var ids = new List<string>(documents.Keys);
         for (int i = 0; i < ids.Count; i++)
@@ -441,18 +461,28 @@ public sealed class UiDocumentService : IDisposable
                 affected.Count, 0);
         }
 
-        // Validate the whole batch before committing any of it. A candidate is host-specific because the
-        // creation-time contract is checked against the host's own bindings, so "it parsed" is not "every
-        // affected window can draw it".
+        // Validate the whole batch before committing any of it. A layout candidate is checked against the
+        // host's own creation-time contract, because "it parsed" is not "every affected window can draw
+        // it"; a style candidate is pre-flighted by applying it over a throwaway theme clone, because a
+        // valid style document has no per-host element contract to fail on and the batch rule still has to
+        // hold for it. Every affected dependency goes through this loop, whatever kind it names.
         string failureElement = "";
         string failureReason = "";
         for (int i = 0; i < affected.Count && failureReason.Length == 0; i++)
         {
             Dependency dependency = affected[i];
-                if (string.Equals(dependency.LayoutId, documentId, StringComparison.Ordinal))
+            if (string.Equals(dependency.LayoutId, documentId, StringComparison.Ordinal))
             {
+                // The planted fault sits inside the dependency's own kind branch on purpose: a host can only
+                // refuse through the pre-check its kind uses, so a lane that removes a branch removes the
+                // refusal with it and cannot pass by accident.
+                string planted = PlantedPrepareFailure(dependency.Host);
                 UiLayoutManifest? layout = candidate.Layout;
-                if (layout == null)
+                if (planted.Length > 0)
+                {
+                    failureReason = "host '" + dependency.Host.Source + "': " + planted;
+                }
+                else if (layout == null)
                 {
                     failureReason = "the candidate carried no layout document";
                 }
@@ -461,34 +491,77 @@ public sealed class UiDocumentService : IDisposable
                     failureReason = "host '" + dependency.Host.Source + "': " + failureReason;
                 }
             }
+            else
+            {
+                string planted = PlantedPrepareFailure(dependency.Host);
+                UiStyleDocument? style = candidate.Style;
+                if (planted.Length > 0)
+                {
+                    failureReason = "host '" + dependency.Host.Source + "': " + planted;
+                }
+                else if (style == null)
+                {
+                    failureReason = "the candidate carried no style document";
+                }
+                else if (!dependency.Host.TryPrepareStyleCandidate(style, out failureElement, out failureReason))
+                {
+                    failureReason = "host '" + dependency.Host.Source + "': " + failureReason;
+                }
+            }
         }
 
         if (failureReason.Length > 0)
         {
-            bool duplicate = string.Equals(candidate.Version, state.LastFailedVersion, StringComparison.Ordinal);
-            state.LastFailedVersion = candidate.Version;
-            var refused = new UiReloadReport(
-                state.Source.Id, state.Source.Kind, state.Source.Path, candidate.Version,
-                accepted: false, skipped: false, duplicate, failureElement, failureReason,
-                affected.Count, 0);
-            if (!duplicate) AddReport(refused);
-            return refused;
+            return RefuseBatch(state, candidate, failureElement, failureReason, affected.Count);
         }
 
+        // Every affected host accepted the candidate, so commit them. A commit cannot fail after validation
+        // today, but it is not trusted either: each host is captured before it is committed, and a failure
+        // anywhere rolls the already-committed hosts back. That is what keeps "no half-updated batch" true
+        // for style documents and for any host that can fail at commit time later.
+        var applied = new List<AppliedCommit>();
         int committed = 0;
-        for (int i = 0; i < affected.Count; i++)
+        string commitFailure = "";
+        for (int i = 0; i < affected.Count && commitFailure.Length == 0; i++)
         {
             Dependency dependency = affected[i];
-            if (string.Equals(dependency.LayoutId, documentId, StringComparison.Ordinal))
+            applied.Add(new AppliedCommit(dependency.Host, dependency.Host.CaptureDocumentRollback()));
+            try
             {
-                dependency.Host.CommitLayoutCandidate(candidate.Layout!);
+                string planted = DocumentFaultOverride?.Invoke(dependency.Host, CommitPhase) ?? "";
+                if (planted.Length > 0)
+                {
+                    commitFailure = "host '" + dependency.Host.Source + "': " + planted;
+                    break;
+                }
+
+                if (string.Equals(dependency.LayoutId, documentId, StringComparison.Ordinal))
+                {
+                    dependency.Host.CommitLayoutCandidate(candidate.Layout!);
+                }
+                else if (candidate.Style != null)
+                {
+                    dependency.Host.CommitStyleCandidate(candidate.Style);
+                }
+
+                committed++;
             }
-            else if (candidate.Style != null)
+            catch (Exception ex) when (ex is not OutOfMemoryException)
             {
-                dependency.Host.CommitStyleCandidate(candidate.Style);
+                commitFailure = "host '" + dependency.Host.Source + "': the commit threw "
+                    + ex.GetType().Name + ": " + ex.Message;
+            }
+        }
+
+        if (commitFailure.Length > 0)
+        {
+            for (int i = applied.Count - 1; i >= 0; i--)
+            {
+                applied[i].Host.RestoreDocumentRollback(applied[i].Rollback);
             }
 
-            committed++;
+            return RefuseBatch(
+                state, candidate, "", commitFailure + "; the whole batch was rolled back", affected.Count);
         }
 
         state.Accept(candidate);
@@ -501,6 +574,29 @@ public sealed class UiDocumentService : IDisposable
             affected.Count, committed);
         AddReport(accepted);
         return accepted;
+    }
+
+    /// <summary>The planted prepare-phase refusal for one host, or "" when the seam is off or silent.</summary>
+    private string PlantedPrepareFailure(UiHost host)
+    {
+        return DocumentFaultOverride?.Invoke(host, PreparePhase) ?? "";
+    }
+
+    /// <summary>
+    /// Records one refused batch and returns its report - the shared tail of the validation refusal and the
+    /// commit-and-rollback refusal. Failures stay deduplicated per refusing version on both paths.
+    /// </summary>
+    private UiReloadReport RefuseBatch(
+        DocumentState state, Candidate candidate, string element, string reason, int affectedCount)
+    {
+        bool duplicate = string.Equals(candidate.Version, state.LastFailedVersion, StringComparison.Ordinal);
+        state.LastFailedVersion = candidate.Version;
+        var refused = new UiReloadReport(
+            state.Source.Id, state.Source.Kind, state.Source.Path, candidate.Version,
+            accepted: false, skipped: false, duplicate, element, reason,
+            affectedCount, 0);
+        if (!duplicate) AddReport(refused);
+        return refused;
     }
 
     private void ReadFirstVersion(DocumentState state)
@@ -701,6 +797,56 @@ public sealed class UiDocumentService : IDisposable
         state.Watcher = watcher;
     }
 
+    /// <summary>
+    /// Arms a watcher for every registered document that holds none, or disarms every one when watching is
+    /// off. Already-armed documents cost one null check, which is what makes this safe on the explicit
+    /// re-arm path, the manual reload path and the throttled pump path.
+    /// </summary>
+    private void RefreshWatchers()
+    {
+        foreach (DocumentState state in documents.Values)
+        {
+            if (autoWatch)
+            {
+                if (state.Watcher == null) Watch(state);
+            }
+            else
+            {
+                Unwatch(state);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The throttled pump-path re-arm. A document whose directory did not exist when it was registered gets
+    /// another chance automatically - the dev hot-reload path must not silently do nothing on a first run -
+    /// while the frame path does not stat every registered path once per frame. Bounded by the document
+    /// table; the manual reload and the AutoWatch setter re-arm without waiting for the throttle.
+    /// </summary>
+    private void AttemptReArm()
+    {
+        bool missing = false;
+        foreach (DocumentState state in documents.Values)
+        {
+            if (state.Watcher == null)
+            {
+                missing = true;
+                break;
+            }
+        }
+
+        if (!missing) return;
+
+        if (reArmCountdown > 0)
+        {
+            reArmCountdown--;
+            return;
+        }
+
+        reArmCountdown = ReArmPumpInterval;
+        RefreshWatchers();
+    }
+
     private static void Unwatch(DocumentState state)
     {
         FileSystemWatcher? watcher = state.Watcher;
@@ -801,6 +947,20 @@ public sealed class UiDocumentService : IDisposable
         internal string? LayoutId { get; set; }
 
         internal string? StyleId { get; set; }
+    }
+
+    /// <summary>One host's pre-commit state, kept only for the duration of a batch commit.</summary>
+    private readonly struct AppliedCommit
+    {
+        internal AppliedCommit(UiHost host, UiHost.DocumentRollback rollback)
+        {
+            Host = host;
+            Rollback = rollback;
+        }
+
+        internal UiHost Host { get; }
+
+        internal UiHost.DocumentRollback Rollback { get; }
     }
 
     private readonly struct Candidate

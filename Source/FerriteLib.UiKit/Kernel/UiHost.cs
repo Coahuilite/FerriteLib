@@ -358,6 +358,68 @@ public sealed class UiHost : IDisposable
         RebuildTree(previous: null);
     }
 
+    /// <summary>
+    /// Pre-flights a style-document candidate the same way a layout one is pre-flighted: it resolves and
+    /// applies the document over a throwaway clone of this host's theme, which is the exact path a commit
+    /// runs, without mutating the host or the theme it holds. It exists so a style batch is validated
+    /// against every affected host before anything commits, instead of the batch being trusted because a
+    /// style document has no creation-time element contract.
+    /// </summary>
+    internal bool TryPrepareStyleCandidate(UiStyleDocument candidate, out string element, out string reason)
+    {
+        element = "";
+        reason = "";
+        if (candidate == null)
+        {
+            reason = "the candidate is null";
+            return false;
+        }
+
+        try
+        {
+            UiTheme probe = theme.Clone();
+            new UiStyleResolver(probe, candidate).ApplyTo(probe);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            reason = ex.Message;
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Captures the state a document commit replaces, so the service can put it back if a later host in
+    /// the same batch refuses the candidate. The theme is captured by value: the page level is applied to
+    /// the injected theme in place, so undoing a commit has to undo that too.
+    /// </summary>
+    internal DocumentRollback CaptureDocumentRollback()
+    {
+        return new DocumentRollback(
+            manifest,
+            attachedStyleDocument,
+            styleResolver,
+            engine,
+            theme.Clone(),
+            publishedDocumentIssues,
+            publishedResolutionIssues,
+            warnedDroppedStyleDocument);
+    }
+
+    /// <summary>Puts a host back on the tree, document and theme state a commit was about to replace.</summary>
+    internal void RestoreDocumentRollback(DocumentRollback rollback)
+    {
+        manifest = rollback.Manifest;
+        attachedStyleDocument = rollback.AttachedStyle;
+        styleResolver = rollback.StyleResolver;
+        engine = rollback.Engine;
+        publishedDocumentIssues = rollback.PublishedDocumentIssues;
+        publishedResolutionIssues = rollback.PublishedResolutionIssues;
+        warnedDroppedStyleDocument = rollback.WarnedDroppedStyleDocument;
+        CopyThemeTokens(theme, rollback.Theme);
+    }
+
     /// <summary>Records the service this host's documents come from; called by the service's Attach.</summary>
     internal void AttachDocumentService(UiDocumentService service)
     {
@@ -391,36 +453,103 @@ public sealed class UiHost : IDisposable
         PublishStyleIssues();
     }
 
+    /// <summary>
+    /// Undoes the page-level application of the document currently in force, so the incoming document is
+    /// resolved against the consumer's own theme rather than on top of its predecessor's values.
+    /// <para>
+    /// The gate is the whole point: a document that declares neither a page scheme nor a page density
+    /// applied nothing, and restoring in that case would only discard a tint the consumer applied to the
+    /// theme it handed in. A reload is not an excuse to reset state a document never owned.
+    /// </para>
+    /// <para>
+    /// The residual, stated rather than implied: a token that the outgoing document's page scheme or
+    /// density <b>did</b> set is restored anyway, because the document is the authority for the values it
+    /// declares - a consumer that wants to own such a token must not have the document declare it. That is
+    /// the boundary of this gate, not an oversight.
+    /// </para>
+    /// </summary>
     private void RestoreStyleBaseline()
     {
-        theme.Base = styleBaseline.Base;
-        theme.Panel = styleBaseline.Panel;
-        theme.Raised = styleBaseline.Raised;
-        theme.Hover = styleBaseline.Hover;
-        theme.Selected = styleBaseline.Selected;
-        theme.Success = styleBaseline.Success;
-        theme.Danger = styleBaseline.Danger;
-        theme.WorkspacePlane = styleBaseline.WorkspacePlane;
-        theme.SectionBand = styleBaseline.SectionBand;
-        theme.TextPrimary = styleBaseline.TextPrimary;
-        theme.TextSecondary = styleBaseline.TextSecondary;
-        theme.TextOnGold = styleBaseline.TextOnGold;
-        theme.TextOnDanger = styleBaseline.TextOnDanger;
-        theme.TextDisabled = styleBaseline.TextDisabled;
-        theme.AccentGold = styleBaseline.AccentGold;
-        theme.HoverPoint = styleBaseline.HoverPoint;
-        theme.Border = styleBaseline.Border;
-        theme.BorderStrong = styleBaseline.BorderStrong;
-        theme.Divider = styleBaseline.Divider;
-        theme.BaseBorder = styleBaseline.BaseBorder;
-        theme.PanelBorder = styleBaseline.PanelBorder;
-        theme.RaisedBorder = styleBaseline.RaisedBorder;
-        theme.HoverBorder = styleBaseline.HoverBorder;
-        theme.SelectedBorder = styleBaseline.SelectedBorder;
-        theme.SuccessBorder = styleBaseline.SuccessBorder;
-        theme.DangerBorder = styleBaseline.DangerBorder;
-        theme.DefaultFont = styleBaseline.DefaultFont;
-        theme.Geometry = styleBaseline.Geometry;
+        UiStyleDocument applied = styleResolver.Document;
+        if (applied.DefaultScheme == null && applied.DefaultDensity == null) return;
+        CopyThemeTokens(theme, styleBaseline);
+    }
+
+    /// <summary>Copies every document-settable token from <paramref name="source"/> onto <paramref name="target"/>.</summary>
+    private static void CopyThemeTokens(UiTheme target, UiTheme source)
+    {
+        target.Base = source.Base;
+        target.Panel = source.Panel;
+        target.Raised = source.Raised;
+        target.Hover = source.Hover;
+        target.Selected = source.Selected;
+        target.Success = source.Success;
+        target.Danger = source.Danger;
+        target.WorkspacePlane = source.WorkspacePlane;
+        target.SectionBand = source.SectionBand;
+        target.TextPrimary = source.TextPrimary;
+        target.TextSecondary = source.TextSecondary;
+        target.TextOnGold = source.TextOnGold;
+        target.TextOnDanger = source.TextOnDanger;
+        target.TextDisabled = source.TextDisabled;
+        target.AccentGold = source.AccentGold;
+        target.HoverPoint = source.HoverPoint;
+        target.Border = source.Border;
+        target.BorderStrong = source.BorderStrong;
+        target.Divider = source.Divider;
+        target.BaseBorder = source.BaseBorder;
+        target.PanelBorder = source.PanelBorder;
+        target.RaisedBorder = source.RaisedBorder;
+        target.HoverBorder = source.HoverBorder;
+        target.SelectedBorder = source.SelectedBorder;
+        target.SuccessBorder = source.SuccessBorder;
+        target.DangerBorder = source.DangerBorder;
+        target.DefaultFont = source.DefaultFont;
+        target.Geometry = source.Geometry;
+    }
+
+    /// <summary>
+    /// Everything a document commit changes, captured before the commit so the service can roll a batch
+    /// back when a later host in the same batch refuses. Deliberately internal and nested: it is the
+    /// service's transaction token, not a consumer surface.
+    /// </summary>
+    internal readonly struct DocumentRollback
+    {
+        internal DocumentRollback(
+            UiLayoutManifest manifest,
+            UiStyleDocument? attachedStyle,
+            UiStyleResolver styleResolver,
+            UiLayoutEngine engine,
+            UiTheme theme,
+            int publishedDocumentIssues,
+            int publishedResolutionIssues,
+            bool warnedDroppedStyleDocument)
+        {
+            Manifest = manifest;
+            AttachedStyle = attachedStyle;
+            StyleResolver = styleResolver;
+            Engine = engine;
+            Theme = theme;
+            PublishedDocumentIssues = publishedDocumentIssues;
+            PublishedResolutionIssues = publishedResolutionIssues;
+            WarnedDroppedStyleDocument = warnedDroppedStyleDocument;
+        }
+
+        internal UiLayoutManifest Manifest { get; }
+
+        internal UiStyleDocument? AttachedStyle { get; }
+
+        internal UiStyleResolver StyleResolver { get; }
+
+        internal UiLayoutEngine Engine { get; }
+
+        internal UiTheme Theme { get; }
+
+        internal int PublishedDocumentIssues { get; }
+
+        internal int PublishedResolutionIssues { get; }
+
+        internal bool WarnedDroppedStyleDocument { get; }
     }
 
     /// <summary>
