@@ -210,6 +210,40 @@ public abstract class UiWindowHost : Window
     public UiSession? Session => host?.Session;
 
     /// <summary>
+    /// Raised once, on the draw thread, immediately after this window built its page host and before that
+    /// host draws its first frame. It is the reliable public attach path a consumer needs in order to stop
+    /// polling for a host that does not exist yet: a host is built lazily inside the guarded pass, so
+    /// <see cref="Session"/> is null for every frame before the first one, and a consumer that read it early
+    /// had no way to tell "not yet" from "failed" without guessing at the frame count.
+    /// <para>
+    /// <b>What the handler may do.</b> Opt the host into diagnostics, attach a reload-report sink, register
+    /// this page's document dependency - the same things it could do after the first draw, only sooner. What
+    /// it must not do is throw: the handler runs inside this window's guarded pass, so an exception here is
+    /// treated exactly like an exception from the page and the window enters its failure notice. That is
+    /// deliberate - a silent swallow would make a consumer's broken lifecycle code indistinguishable from a
+    /// page that never loaded.
+    /// </para>
+    /// <para>
+    /// <b>Who owns what.</b> The window owns this host and disposes it; the consumer owns the manifest, the
+    /// bindings, the theme, the model and the view model, and this library never disposes any of them. A
+    /// borrowed Model or VM is borrowed for exactly as long as the subscription the consumer made here.
+    /// </para>
+    /// </summary>
+    public event Action<UiHost>? HostAttached;
+
+    /// <summary>
+    /// Raised immediately before this window disposes the page host it owns - on close, and when a failed
+    /// pass tears the host down. The host is still alive when the handler runs, so a consumer releases its
+    /// subscriptions here (unsubscribe a notification adapter, detach the document dependency) rather than
+    /// leaving a dead page wired into a live model.
+    /// <para>
+    /// The same "cannot throw" contract as <see cref="HostAttached"/> applies, and the same ownership split:
+    /// this releases the page's connection, never the consumer's objects.
+    /// </para>
+    /// </summary>
+    public event Action<UiHost>? HostDetached;
+
+    /// <summary>
     /// The key this window is addressed by, or null when no catalog attached it. A window created
     /// outside a catalog keeps the null and behaves exactly as the shell always did.
     /// </summary>
@@ -349,15 +383,23 @@ public abstract class UiWindowHost : Window
 
         try
         {
-            host ??= CreateHost();
+            if (host == null)
+            {
+                UiHost created = CreateHost();
+                host = created;
+                // Before the first draw of that host, which is the whole point of the door: a subscription
+                // made here sees the first frame, and a consumer never has to poll for a host that does not
+                // exist yet.
+                HostAttached?.Invoke(created);
+            }
+
             host.DrawFrame(content);
         }
         catch (Exception ex)
         {
             noticeDueNextFrame = true;
             lastFailure = ex;
-            host?.Dispose();
-            host = null;
+            ReleaseHost();
             OnDrawFailure(ex);
         }
     }
@@ -411,6 +453,23 @@ public abstract class UiWindowHost : Window
         return true;
     }
 
+    /// <summary>
+    /// Announces the page host is going away and then disposes it: the one place teardown happens, so a close
+    /// and a failed pass cannot drift apart in what they tell the consumer.
+    /// </summary>
+    private void ReleaseHost()
+    {
+        UiHost? released = host;
+        host = null;
+        if (released == null)
+        {
+            return;
+        }
+
+        HostDetached?.Invoke(released);
+        released.Dispose();
+    }
+
     public override void PreClose()
     {
         // The target is dropped before the page goes away, so no input or capture reaches a closing
@@ -418,8 +477,7 @@ public abstract class UiWindowHost : Window
         catalog?.NotifyPreClose(this);
 
         // Closing disposes the session with the host, so reopening gets a clean retry.
-        host?.Dispose();
-        host = null;
+        ReleaseHost();
         base.PreClose();
     }
 

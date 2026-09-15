@@ -64,6 +64,8 @@ public sealed class UiDocumentService : IDisposable
     private readonly HashSet<string> pending = new(StringComparer.Ordinal);
     private readonly List<UiReloadReport> reports = new();
     private bool autoWatch;
+    private readonly UiReloadPolicy policy;
+    private readonly IUiTimeSource timeSource;
     private bool overflowed;
     private bool disposed;
 
@@ -92,10 +94,33 @@ public sealed class UiDocumentService : IDisposable
     /// either way at any time through <see cref="AutoWatch"/>. Construction itself starts no thread and
     /// reads no file; <see cref="Add"/> does the first read.
     /// </summary>
-    public UiDocumentService(bool? autoWatch = null)
+    public UiDocumentService(
+        bool? autoWatch = null,
+        UiReloadPolicy? policy = null,
+        IUiTimeSource? timeSource = null)
     {
         this.autoWatch = autoWatch ?? DefaultAutoWatch;
+        this.policy = policy ?? UiReloadPolicy.Default;
+        this.timeSource = timeSource ?? VerseFerriteTimeSource.Instance;
     }
+
+    /// <summary>
+    /// When a signalled file is read and committed: the quiet period that merges a save burst, the bounded
+    /// retry after a transient read failure, and the upper bound on deferring to the user's own input.
+    /// </summary>
+    public UiReloadPolicy Policy => policy;
+
+    /// <summary>
+    /// The clock those timings are measured against. Injectable so a lane can drive an hour of editing in a
+    /// microsecond; the production source is real time, never the simulation clock.
+    /// </summary>
+    public IUiTimeSource TimeSource => timeSource;
+
+    /// <summary>
+    /// What the scheduler is holding right now. A value, so reading it cannot change what it reports.
+    /// </summary>
+    public UiReloadSchedulerState SchedulerState =>
+        throw new NotImplementedException("T2: UiDocumentService.SchedulerState");
 
     /// <summary>
     /// Whether automatic watching is on unless a caller says otherwise: true for an <c>FER_DEV</c> build,

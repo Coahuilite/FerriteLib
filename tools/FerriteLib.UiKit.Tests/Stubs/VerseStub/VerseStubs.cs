@@ -867,3 +867,13 @@ public class WindowStack
         }
     }
 }
+
+/// <summary>
+/// The game's own thread answer, stubbed as "yes" because the harness host is single-threaded: the payload
+/// delegates to this property rather than re-deriving the comparison, so a lane that needs the other answer
+/// injects <c>IUiMainThread</c> instead of pretending the process moved threads.
+/// </summary>
+public static class UnityData
+{
+    public static bool IsInMainThread => true;
+}

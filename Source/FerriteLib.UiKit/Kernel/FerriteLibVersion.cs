@@ -47,9 +47,16 @@ public static class FerriteLibVersion
     /// is the style and atom sweep: the leaf atoms, the per-surface theme restructure, the geometry
     /// tokens, and the scheme/density/role attributes on the atom schemas — all of it public surface, so
     /// it is one minor, and it is the last minor in which breaking <c>UiTheme</c>'s shape is cheap,
-    /// because a second wired consumer is what starts the freeze.
+    /// because a second wired consumer is what starts the freeze. The 0.4.0 → 0.5.0 move is the window
+    /// round: instance identity, per-key binding notification, collection reconciliation, document hot
+    /// reload and per-host diagnostics, all in one minor. The 0.5.0 → 0.6.0 move is the MVVM and reload
+    /// round: the page lifecycle doors a consumer needs to stop polling for a host, the optional
+    /// <c>INotifyPropertyChanged</c> adapter, the reload scheduler's testable time seam and the read-only
+    /// widget descriptor snapshot. If the 0.5.0 line's handoff has not been consumed by anyone yet, the
+    /// 0.6.0 number is still the honest one: the rule below is unconditional for additions, and a consumer
+    /// that pinned <c>[0.5.0,0.6.0)</c> keeps compiling against the 0.5.0 carrier it tested.
     /// </summary>
-    public static readonly Version Api = new Version(0, 5, 0);
+    public static readonly Version Api = new Version(0, 6, 0);
 
     /// <summary>Human-readable identity for logs.</summary>
     public static string Describe()

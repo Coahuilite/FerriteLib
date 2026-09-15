@@ -335,6 +335,42 @@ consequence is paid in the open rather than discovered by a stranger.
   consumer's shape. The key is the only identity the kind uses — a blank or duplicated one is refused rather
   than replaced by a position.
 
+### Added in the open 0.6 window
+
+- `IUiMainThread` — the "may I touch the game's objects from here" seam. One member, answering only that
+  question, because the alternative is a process-wide notion of "main" a test cannot answer either way.
+- `VerseFerriteMainThread` — the production answer, delegated to `Verse.UnityData.IsInMainThread` rather
+  than re-derived: a second thread comparison inside this library could disagree with the game's own, and
+  every other subsystem that checks its thread checks that property.
+- `UiNotifyAdapter` — the optional `INotifyPropertyChanged` bridge. Explicit mapping only (one property to
+  many binding keys, plus the empty-name "the whole object moved" convention), a bounded pending set, a
+  nesting batch scope, and deterministic unsubscribe. Public-unstable because the mapping vocabulary is this
+  round's shape: a second consumer may want attributes, or a mapping declared on the binding instead of on the
+  adapter.
+  **Boundary, stated as a boundary:** it delivers on the main thread only. An off-thread notification is
+  refused, counted and surfaced, never queued for later. There is no base class to inherit and no container to
+  configure - a plain C# object that implements the BCL interface is a view model here.
+- `IUiTimeSource` — the reload scheduler's clock. The seam exists because frame counts, host counts and pump
+  counts are not time: a paused game pumps many frames per second and a minimised one pumps few, so a
+  scheduler built on them coalesces differently on every machine.
+- `VerseFerriteTimeSource` — real time, deliberately not the simulation clock, so a paused game still
+  notices a saved file.
+- `UiReloadPolicy` — when a signalled file may be read and committed: the quiet period that merges a save
+  burst, the retry interval and bound after a transient read failure, and the ceiling on deferring to the
+  user's own input. It says nothing about *whether* files are watched - that stays
+  `UiDocumentService.AutoWatch` and its build-configuration default.
+- `UiReloadSchedulerState` — a value snapshot of what the scheduler is holding (pending, deferred,
+  retrying, oldest wait). Public so a diagnostic readout and a lane can both observe the timing contract
+  rather than assert it against source text.
+- `UiWidgetDescriptor` — one registered kind as the registry can describe it without being asked for an
+  instance: the scope it was declared in, the kind, and the declared attribute and label sets. Identity is the
+  pair, because a kind name is not unique across scopes. `HasAttributeSchema`/`HasLabelSet` keep
+  "not declared" from being rendered as "no attributes allowed".
+- `UiWidgetCatalog` — the read-only description surface: `Snapshot()`, `TryGet`, `Scopes()`. It never
+  calls a factory (a catalogue that resolved kinds in order to list them would run every registered consumer's
+  constructor on open), never hands back a writable registry, and returns a fresh deterministic copy each
+  call, so listing stays safe while other mods are still registering.
+
 ## Internalize-candidate
 
 - `KernelCoreWidgetRegistrar` — called from inside the assembly by the registry itself; no consumer names it.
@@ -445,6 +481,26 @@ What the 0.5 window is for (working packages, ownership and status: `docs/develo
   stable keys through an `IReadOnlyList<string>` value binding, declares one binding per item under
   `<Items>.<key>.…`, announces that items key with `UiInvalidation.Structure`, and never writes a rectangle,
   a node identity or an input rule for a row.
+
+## Breaking changes inside the open 0.6 window
+
+`FerriteLibVersion.Api` moved 0.5.0 → 0.6.0 for this round. The rule is unconditional for additions
+(`FerriteLibVersion.Api`'s own summary: while the major is 0, ANY change to the compiled surface, addition
+or break, bumps the minor), so a purely additive round is still a minor. The competing reading - "0.5.0 was
+never released, so its window is still open" - is the precedent the 0.4.0 → 0.3.0 refile used, and it does not
+apply here: the 0.5.0 dev package and its `[0.5.0,0.6.0)` handoff were delivered, so the number has a
+goalpost a consumer may already have pinned. Re-pinning a consumer is a one-line change in its constructor;
+silently growing the surface under a number somebody tested is the failure this rule exists to prevent.
+
+- **Additive only, and source-compatible.** Every new type is listed above, and the two changed public
+  signatures are both optional-parameter additions: `UiDocumentService`'s constructor gains
+  `UiReloadPolicy? policy` and `IUiTimeSource? timeSource` after the existing `bool? autoWatch`, and
+  `UiPageWindow`-`UiWindowHost` gains the `HostAttached`/`HostDetached` events plus `UiHost`'s
+  lifecycle wiring. Existing call sites keep compiling and keep their behaviour; no member was removed, moved
+  or renamed in this round.
+  **Migration:** none required to keep working. To use the round: subscribe `HostAttached` instead of
+  polling `PageHost`/`Session`, hand a `UiReloadPolicy` and an `IUiTimeSource` to the document
+  service, and list kinds through `UiWidgetCatalog` (which keeps scope, unlike `KnownKinds`).
 
 Everything here is provisional until the second wired consumer compiles against it (`AGENTS.md`
 invariants): the tier list, not the shape, is what this file promises.
