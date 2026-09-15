@@ -48,11 +48,14 @@ internal static class KernelDiagnosticsTests
         UiWidgetRegistry.InitializeCore();
         UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "diag/overflow", () => new OverflowWidget());
         UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "diag/stable", () => new StableOverflowWidget());
+        UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "diag/ruler", () => new RulerProbeWidget());
         UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "diag/throwing", () => new ThrowingWidget());
 
         try
         {
             Run("Two coexisting hosts receive only their own attributed fit findings", VerifyTwoHostsAreIsolated);
+            Run("Two hosts with distinct rulers each measure with their own ruler", VerifyRulersArePerHost);
+            Run("Subscribing a host does not replace the legacy channel's ruler", VerifySubscriptionDoesNotOwnTheLegacyRuler);
             Run("A recovery trip is attributed to its own session and to no other", VerifyRecoveryAttribution);
             Run("Disposing one host releases only its own subscription", VerifyDisposalReleasesOnlyItsOwn);
             Run("A noisy subscriber exhausts only its own budget", VerifyNoisySubscriberKeepsItsOwnBudget);
@@ -116,6 +119,89 @@ internal static class KernelDiagnosticsTests
         Check(eventA.Code == "fit.overflow" && eventA.Overflow.HasValue && eventA.Overflow.Value.Axis == UiOverflowAxis.Width,
             "the event carries the audit's own overflow record and its axis");
         Check(eventA.Sequence == 1 && eventB.Sequence == 1, "each subscription numbers its own arrivals from one");
+    }
+
+    // --- the ruler travels with the host, not with the process --------------------------------------
+
+    /// <summary>
+    /// R4 (external review): the subscription used to write the subscribing host's <see cref="ITextMetrics"/>
+    /// into the one static slot <c>UiFitAudit.Check</c> reads, so merely subscribing host B changed what host
+    /// A's unchanged text was measured against - the review probe's "A before=0, A after B's subscription=1"
+    /// on the real <c>DrawFrame</c> path. This lane is the harness half of that probe, and it deliberately
+    /// uses two DISTINCT ruler instances: the common case (two hosts sharing one Verse metrics instance)
+    /// hides the defect entirely, so a lane that reused one ruler would pass for the wrong reason.
+    /// </summary>
+    private static void VerifyRulersArePerHost()
+    {
+        UiFitAudit.Enabled = true;
+        using var hostA = NewHost("diag-ruler-a", Page("diag-ruler-a", "text", "diag/ruler"), new SmallRuler());
+        using var hostB = NewHost("diag-ruler-b", Page("diag-ruler-b", "text", "diag/ruler"), new LargeRuler());
+        UiDiagnosticSubscription subA = hostA.Diagnostics;
+
+        Draw(hostA);
+        Check(subA.CountOf(UiDiagnosticKind.Fit) == 0,
+            "A's own ruler says its text fits (got " + subA.CountOf(UiDiagnosticKind.Fit) + ")");
+
+        UiDiagnosticSubscription subB = hostB.Diagnostics;
+
+        Draw(hostA);
+        Check(subA.CountOf(UiDiagnosticKind.Fit) == 0,
+            "subscribing B with a different ruler did not change A's verdict (got "
+            + subA.CountOf(UiDiagnosticKind.Fit) + ")");
+
+        Draw(hostB);
+        Check(subB.CountOf(UiDiagnosticKind.Fit) == 1,
+            "B reports the overflow under its own ruler (got " + subB.CountOf(UiDiagnosticKind.Fit)
+            + ", published " + subB.Published + ", suppressed " + subB.Suppressed + ")");
+
+        for (int i = 0; i < 3; i++)
+        {
+            Draw(hostA);
+            Draw(hostB);
+        }
+
+        Check(subA.CountOf(UiDiagnosticKind.Fit) == 0,
+            "interleaved A/B draws leave A at zero (got " + subA.CountOf(UiDiagnosticKind.Fit) + ")");
+        Check(subB.Suppressed == 3,
+            "B kept measuring every one of its four draws under its own ruler (got " + subB.Suppressed + " repeats)");
+
+        hostB.Dispose();
+        Draw(hostA);
+        Check(subA.CountOf(UiDiagnosticKind.Fit) == 0,
+            "closing B left A's measurement unchanged (got " + subA.CountOf(UiDiagnosticKind.Fit) + ")");
+    }
+
+    /// <summary>
+    /// The half the review probe hit directly: an unsubscribed host measures through the legacy channel's
+    /// static ruler, so subscribing a DIFFERENT host must not replace that ruler. Before the fix,
+    /// <c>Subscribe</c> wrote the new host's ruler into the static slot and the unsubscribed host's next draw
+    /// reported an overflow its own ruler never saw.
+    /// </summary>
+    private static void VerifySubscriptionDoesNotOwnTheLegacyRuler()
+    {
+        var legacy = new List<UiOverflowReport>();
+        UiFitAudit.Attach(new SmallRuler(), legacy.Add);
+        UiFitAudit.Reset();
+        UiFitAudit.Enabled = true;
+
+        using var hostA = NewHost("diag-legacy-ruler", Page("diag-legacy-ruler", "text", "diag/ruler"), new SmallRuler());
+        Draw(hostA);
+        Check(legacy.Count == 0, "the legacy channel measures with the ruler it was handed (got " + legacy.Count + ")");
+
+        using var hostB = NewHost("diag-sub-ruler", Page("diag-sub-ruler", "text", "diag/ruler"), new LargeRuler());
+        UiDiagnosticSubscription subB = hostB.Diagnostics;
+        Check(legacy.Count == 0,
+            "subscribing a host with a different ruler changed nothing on the legacy channel (got " + legacy.Count + ")");
+
+        Draw(hostA);
+        Check(legacy.Count == 0,
+            "the unsubscribed host still measures with the legacy ruler (got " + legacy.Count + ")");
+
+        Draw(hostB);
+        Check(subB.CountOf(UiDiagnosticKind.Fit) == 1,
+            "the subscribed host measures with its own ruler (got " + subB.CountOf(UiDiagnosticKind.Fit)
+            + ", published " + subB.Published + ")");
+        Check(legacy.Count == 0, "and its finding is not written to the legacy channel");
     }
 
     // --- recovery attribution ---------------------------------------------------------------------
@@ -275,7 +361,7 @@ internal static class KernelDiagnosticsTests
 
         for (int i = 0; i < 500; i++)
         {
-            UiDiagnosticHub.EnterHost(null).Dispose();
+            UiDiagnosticHub.EnterHost(null, null).Dispose();
             UiFitAudit.Check(probe, "warmup", UiFont.Tiny, true);
         }
 
@@ -290,7 +376,7 @@ internal static class KernelDiagnosticsTests
         before = domain.MonitoringTotalAllocatedMemorySize;
         for (int i = 0; i < 20000; i++)
         {
-            UiDiagnosticHub.EnterHost(null).Dispose();
+            UiDiagnosticHub.EnterHost(null, null).Dispose();
             UiFitAudit.Check(probe, "unsubscribed", UiFont.Tiny, true);
         }
 
@@ -625,6 +711,55 @@ internal static class KernelDiagnosticsTests
         }
     }
 
+    /// <summary>
+    /// Draws one label into a FIXED 100x16 band, so the only thing that decides whether it fits is the
+    /// ruler: the small ruler measures "hello" at 40 units (fits) and the large one at 1000 (overflows).
+    /// A kind that sized its own band from its own ruler (text/wrapped) would have nothing left to report,
+    /// which is why the ruler lanes use this probe instead.
+    /// </summary>
+    private sealed class RulerProbeWidget : IUiWidget
+    {
+        public string Kind => "diag/ruler";
+
+        public void Configure(UiElementSpec spec)
+        {
+        }
+
+        public void Validate(IUiBindings bindings, string elementPath)
+        {
+        }
+
+        public float Measure(UiWidgetContext ctx) => 16f;
+
+        public void Draw(Rect rect, UiWidgetContext ctx)
+        {
+            UiThemeDraw.Label(
+                new Rect(rect.x, rect.y, 100f, 16f),
+                "hello",
+                ctx.Theme,
+                null,
+                UiFont.Medium,
+                TextAnchor.MiddleLeft,
+                singleLine: true);
+        }
+    }
+
+    /// <summary>The probe's normal ruler: a short label measures 40 units wide and 20 tall.</summary>
+    private sealed class SmallRuler : ITextMetrics
+    {
+        public float MeasureText(string text, UiFont font, float width) => 20f;
+
+        public float MeasureWidth(string text, UiFont font) => text.Length * 8f;
+    }
+
+    /// <summary>A deliberately different ruler: everything measures far past any arranged band.</summary>
+    private sealed class LargeRuler : ITextMetrics
+    {
+        public float MeasureText(string text, UiFont font, float width) => 1000f;
+
+        public float MeasureWidth(string text, UiFont font) => 1000f;
+    }
+
     /// <summary>Draws the same overflowing label every pass, so a repeat is a genuine duplicate.</summary>
     private sealed class StableOverflowWidget : IUiWidget
     {
@@ -698,6 +833,12 @@ internal static class KernelDiagnosticsTests
     private static void Draw(UiHost host)
     {
         host.DrawFrame(new Rect(0f, 0f, 400f, 300f));
+    }
+
+    private static UiHost NewHost(string source, string xml, ITextMetrics metrics)
+    {
+        return new UiHost(
+            source, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.DarkGold.Clone(), metrics, new FixedTranslation());
     }
 
     private static string Page(string source, string widgetId, string kind)

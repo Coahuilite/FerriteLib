@@ -123,7 +123,11 @@ consequence is paid in the open rather than discovered by a stranger.
   what is left of that debt is the type size those two pinned composites would need before density can
   reach them.
 - `UiThemeDraw` — the single text and panel outlet; per-surface tokens change what it takes to draw.
-- `UiFitAudit` — the audit surface; entry attribution follows the identity layer.
+- `UiFitAudit` — the audit surface; entry attribution follows the identity layer. The ruler moved with
+  the routing: a subscribed host is measured with the `ITextMetrics` its own diagnostic scope carries, and
+  the process-wide slot bound by `Attach` serves only the legacy (unsubscribed) channel. That split is a
+  fix, not a nuance — while subscribing wrote the slot, a second host with a different measurement adapter
+  silently changed the first host's overflow verdict without ever drawing.
 - `UiLayoutManifest` — the `Schema="2"` slot and `ParseFile` are an open fork — the method has **no
   production caller** (the harness calls it directly; that is not a use), and the 0.5 document service is
   the branch that decides it. Either branch changes this type.
@@ -304,8 +308,11 @@ consequence is paid in the open rather than discovered by a stranger.
 - `UiDiagnosticHub` — the per-host / per-session routing that replaces the one shared diagnostic slot:
   `Subscribe(UiHost, budget)`, `ForSession`, `Release` and `SubscriptionCount`, over a registry capped at
   `MaxSubscriptions` that holds subscriptions rather than hosts or sessions. `UiHost.Diagnostics` is the
-  opt-in door, and a host that never opens it pays a struct scope push/pop and a null check. Public-unstable
-  because the channel set and the sampling policy are this round's shape, not a promise.
+  opt-in door, and a host that never opens it pays a struct scope push/pop and a null check. Subscribing
+  binds no process-wide ruler: the host's `ITextMetrics` travels in the same ambient scope as its
+  subscription, so two hosts using different measurement adapters cannot change each other's overflow
+  verdict. Public-unstable because the channel set and the sampling policy are this round's shape, not a
+  promise.
 - `UiDiagnosticSubscription` — one subscriber's bounded ring (`Budget`, clamped to `MaxBudget`,
   `DefaultBudget` when unnamed) with a dropped-count marker, a dedup table bounded by that same ring, and
   per-subscription `Count`/`Dropped`/`Suppressed`/`Published`. `Dispose` releases it, and so does

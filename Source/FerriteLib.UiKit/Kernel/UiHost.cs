@@ -158,12 +158,6 @@ public sealed class UiHost : IDisposable
     }
 
     /// <summary>
-    /// The measurement model this host built. Opting in hands it to the fit audit, because the audit needs
-    /// a ruler and the shell, the page and the audit must all measure with the same one.
-    /// </summary>
-    internal ITextMetrics TextMetrics => metrics;
-
-    /// <summary>
     /// The document resolver this host built: the document it resolved (the one handed to the constructor,
     /// otherwise the manifest's own <c>&lt;Styles&gt;</c> section) plus the drops it recorded while
     /// resolving. Never null - a page with no document still needs one to report that an element named a
@@ -184,7 +178,7 @@ public sealed class UiHost : IDisposable
         UiDiagnosticSubscription? subscription = diagnostics;
         bool timing = subscription != null && subscription.TimingEnabled;
         long started = timing ? Stopwatch.GetTimestamp() : 0L;
-        UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription);
+        UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription, metrics);
         try
         {
             // The band cache compares the available size and the content/definition/translation revisions,
@@ -227,7 +221,7 @@ public sealed class UiHost : IDisposable
         UiDiagnosticSubscription? subscription = diagnostics;
         bool timing = subscription != null && subscription.TimingEnabled;
         long started = timing ? Stopwatch.GetTimestamp() : 0L;
-        UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription);
+        UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription, metrics);
         try
         {
             // Popups are drawn after content and must clamp themselves into the frame's usable window
