@@ -1,5 +1,30 @@
 # TODO
 
+## 0.6.x round — open (2026-09-16)
+
+Branch `0.6.x` (forked from the frozen `0.5.x` tip `354d90a`), contract axis **0.6.0**. Scope, packages,
+ownership, the frozen public API and status: `docs/development/0.6/`. This section is a pointer only; the
+round's live status has one home and it is that directory.
+
+Product: lightweight MVVM (page lifecycle + an optional explicit `INotifyPropertyChanged` → binding-key
+adapter), automatic hot-reload scheduling with a testable time seam, a read-only widget description snapshot
+that keeps scope — and an **independent demo mod** `ferritelib_uikit_demo` that consumes only public API
+(vanilla ModSettings entry, three tabs, core samples, consumer directory by scope, two windows sharing one
+model) and is explicitly **not** a second real consumer.
+
+- [x] T0 — fork, version ruling (0.5.0 → 0.6.0), frozen API contract, nine new public types + tier entries,
+      compiling skeletons with package-named markers, ten gates green at `02a6aea`.
+- [ ] T1 — page lifecycle (`HostAttached`/`HostDetached`) and the MVVM notification adapter.
+- [ ] T2 — reload scheduling: quiet period, bounded retry, bounded deferral, pause independence, the vanilla
+      commit-point evidence.
+- [ ] T3 — `UiWidgetCatalog`/`UiWidgetDescriptor`: scope-preserving identity, isolation, zero factory calls.
+- [ ] T4 — the demo mod, its package, and proof it carries no FL DLL.
+- [ ] T5 — independent adversarial verification, the external compile probe, package checks, the in-game
+      checklist, and the delivery record.
+
+Carried over unchanged and **not** closed by this round: `0.5.x`'s in-game acceptance (A1–A11) and a real
+consumer compiling against `[0.5.0,0.6.0)`. Both are other actors' steps.
+
 ## 0.5.x round — open (2026-09-15)
 
 Branch `0.5.x`, contract axis 0.5.0. Scope, packages, ownership and status: `docs/development/0.5/`.
@@ -14,7 +39,7 @@ This section is a pointer only; the round's live status has one home and it is t
 - [x] Diagnostics — per-host/session subscriptions, attributed bounded events, and the shell/page routing
       seams that make them reachable (P5 + task-13 + task-14).
 - [~] Delivery — external review of `0117c01` returned Request changes with 7 reproduced defects; all fixed and the reviewer's
-      own probe re-run green (tip `0622679`, package rebuilt). What remains is
+      own probe re-run green (tip `354d90a`, package rebuilt at `d6b3f6e`). What remains is
       external: in-game acceptance (A1-A11) and a real consumer compiling against `[0.5.0,0.6.0)`. Both are
       other teams' steps and neither may be recorded as done from here.
 - Supersessions this round registers (detail in `docs/development/0.5/00-baseline.md` §2): confirmed
