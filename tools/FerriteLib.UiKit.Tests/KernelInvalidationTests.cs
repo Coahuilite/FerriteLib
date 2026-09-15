@@ -46,6 +46,7 @@ internal static class KernelInvalidationTests
         Run("A key no arranged element declares invalidates nothing", VerifyUndeclaredKeyTargetsNothing);
         Run("A batch of announcements is one commit", VerifyBatchCommit);
         Run("A notification raised inside a draw pass commits at the next boundary", VerifyDrawPassNotificationIsDeferred);
+        Run("A node marked dirty re-runs the arrange without moving the clock", VerifyDirtyFlagForcesReArrange);
         return failures;
     }
 
@@ -239,6 +240,47 @@ internal static class KernelInvalidationTests
         Check(Count("k") == measured + 1, "the commit lands on the next arrangement boundary");
         Check(Near(DrawnHeightOf("k"), 50f), "carrying the value the model moved to");
         Check(host.Session.ContentRevision == clock + 1, "and the arrangement clock moves exactly once for it");
+    }
+
+    /// <summary>
+    /// The dirty-flag half of the arrangement cache, held to the claim the a2 result left open: the
+    /// per-key commit sets the node flag and the clock together, so removing only the marking changes
+    /// nothing - which is a statement about the commit, not about the flag. This drives the flag alone:
+    /// one node marked by hand, no announcement, and the content revision asserted equal before and after,
+    /// so the re-arrange can only have come from the dirty set. `KernelIdentityTests` already pins that a
+    /// dirty node re-measures; what is added here is the clock standing still, plus the flag being cleared
+    /// by the arrange that answered it. Removing the dirty check from the arrangement cache reddens both.
+    /// </summary>
+    private static void VerifyDirtyFlagForcesReArrange()
+    {
+        float height = 10f;
+        var bindings = new UiBindings();
+        bindings.BindReadOnly("k", () => height, UiInvalidation.Paint);
+
+        using UiHost host = Host(Page("k"), bindings);
+        host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot cached = host.MeasureAndArrange(new Vector2(200f, 200f));
+        Check(
+            ReferenceEquals(cached, host.MeasureAndArrange(new Vector2(200f, 200f))),
+            "an idle page keeps reusing its arranged snapshot");
+
+        UiNode node = host.Session.GetNodeByElementId("k")
+            ?? throw new Exception("the readout was not arranged");
+        int clock = host.Session.ContentRevision;
+        int measured = Count("k");
+
+        node.MarkDirty();
+        Check(node.IsDirty, "MarkDirty raises the node's own flag");
+
+        UiLayoutSnapshot after = host.MeasureAndArrange(new Vector2(200f, 200f));
+        Check(
+            !ReferenceEquals(cached, after),
+            "one dirty node re-runs the arrange with the content revision unchanged");
+        Check(
+            host.Session.ContentRevision == clock,
+            "and the arrangement clock is not what did it: this is the flag's own path");
+        Check(!node.IsDirty, "the arrange clears the flag it answered");
+        Check(Count("k") == measured + 1, "and the element was measured again");
     }
 
     // --- helpers -------------------------------------------------------------------------------
