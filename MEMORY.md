@@ -360,6 +360,23 @@
   first load than on reload - recorded openly rather than smoothed; and the environment overrides git's commit identity,
   which the privacy gate caught once (see the entry on that above).
 
+- **An external independent review of the 0.5.x delivery candidate came back Request changes (2026-09-15, tip `0117c01`), and it was right.**
+  Its own net472 public-API probe reproduced seven library-side defects, and the Lead re-ran that probe and reproduced every line
+  before acting: a rolled-back hot-reload batch restores the document tree but not the interaction state it already pruned (an
+  uncommitted draft is lost while the code calls it a rollback); a transiently missing file falls back to the embedded version even
+  when a valid external version is in force; closing the currently active window leaves the catalog with no active target while a
+  window is still open; a second host's diagnostic subscription writes its `TextMetrics` into the static slot the fit audit reads, so
+  merely subscribing B changes A's overflow verdict; first style attach bypasses the candidate validation the reload path applies;
+  re-attaching a host to a second document service leaves the first service holding it; and the content hash and the parsed tree come
+  from two independent reads. The lesson is the one this file keeps re-learning in a new costume: **a green gate suite is a statement
+  about the lanes that exist, and seven packages each verified in isolation can still compose into defects no lane crossed.** The
+  per-package adversarial passes could not have found R1/R2/R5/R6/R7 (they are cross-step semantics inside one package) or R3/R4
+  (they are cross-package state). What made this findable was an outside probe that exercises the public API end to end and does not
+  share the authors' assumptions. The round is therefore **not** deliverable at `0117c01`: fixes are in flight (tasks 15-18) and the
+  product claim stays "library-side surface landed" until they are merged and independently re-verified. Reproduced probe output and
+  the finding table live in `docs/development/0.5/40-verification.md` §7; the probe itself is gitignored under `dist/review-0117c01/`
+  and must never become the only regression guard - every fix owes a harness lane.
+
 ## Charter — what this library is for
 
 - **The founding spec, transcribed.** `Coahuilite/UniversalSqueaker@09366f8:docs/ui-shared-library-design-zh.md`
