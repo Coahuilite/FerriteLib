@@ -106,3 +106,93 @@ bindings.BindCommand("apply", () => model.Apply(), canExecute: () => model.CanAp
 
 - 中立夹具页 / 规格：`tools/FerriteLib.UiKit.Tests`（**库内示例，不是消费证据**）。
 - 消费者侧示例：由消费者团队在自身仓库落地；本仓只提供 `30-consumer-handoff.md` 的接入步骤。
+
+## 7. P3 落地形态：keyed repeater 与三个公共控件（已实现，证据类 1/2）
+
+> 本节由落地提交追加，形态与实现同源。命名与语义均以本节为准；§1 的示例仍是设计草案。
+> 代码位置：`Source/FerriteLib.UiKit/Kernel/Widgets/{CheckboxWidget,ProgressWidget,TreeWidget,RepeatTemplateWidget,UiTreeRow}.cs`、
+> `Kernel/UiLayoutEngine.cs`、`Kernel/UiLayoutManifest.cs`；lane：`tools/FerriteLib.UiKit.Tests/KernelRepeatTests.cs`、
+> `KernelControlKindTests.cs`、`KernelFixturePageTests.cs`。
+
+### 7.1 XML 形态
+
+```xml
+<UiPage Schema="2" Source="example/page">
+  <Templates>
+    <!-- 模板：一次声明，按 item key 物化；每个模板元素必须有 Id（模板内部 Id 不得含 '#'） -->
+    <Row Id="entry" Gap="6" Padding="2">
+      <Widget Id="done"    Kind="input/checkbox"   Bind="done"    LabelKey="example.entry.done" />
+      <Widget Id="caption" Kind="text/wrapped"     Bind="caption" />
+      <Widget Id="amount"  Kind="display/progress" Bind="amount"  Max="1" Height="8" />
+    </Row>
+  </Templates>
+
+  <Column Id="body" Gap="6" Padding="6">
+    <Widget Id="total"   Kind="display/progress" Bind="total"   Max="1" Height="10" />
+    <Repeat Id="entries" Items="entries" Template="entry" Gap="2" />
+    <Widget Id="outline" Kind="container/tree"  Bind="outline" ActionBind="focus" RowHeight="18" />
+  </Column>
+</UiPage>
+```
+
+- `<Templates>`（可选，最多一个，depth 1）：每个直接子元素是一份模板，其 `Id` 即模板名；模板元素**不在**
+  `Roots` 里，因此 Host 的创建期遍历看不到它们。模板子树内不得再出现 `<Repeat>`（不做二层协调）。
+- `<Repeat>`（无子元素）：`Items` 命名一个 **`IReadOnlyList<string>` 值绑定**（模型按显示顺序投影出的稳定业务 key），
+  `Template` 命名一份模板；`Padding`/`Gap`/`Height` 与容器同义。`Items` 未绑定、类型不符、`Template` 悬空、
+  `Repeat` 带子元素或属性越界，都是**创建期拒绝**（`UiContractException`/`FormatException`），不是空列表。
+- 行身份 = `<declaredId>#<itemKey>`，行内绑定 key = `<Items>.<itemKey>.<declaredKey>`（`Bind`/`ActionBind`/
+  `OptionsBind`/`VisibleKey` 四项被作用域化；`Tab` 保持页面级，因为 tab 不是某一行的答案）。
+- item key 契约：空白、重复、含保留字符（`/`、`#`、身份编码的两个标记字符）的 key **拒绝该行** —— 不产生元素、
+  不产生节点、不产生状态，经有界通道（`UiFitAudit`，按 路径|kind|属性|值 去重）记录一条；**不做静默协调**。
+  同 key 重排复用同一节点与状态；删除 key 由 session 既有 `PruneNodesExcept` 释放该行的节点、状态槽、子节点与命中层。
+  **隐藏不等于移除**：`Visible`/`VisibleKey`/`Tab` 隐藏的 `<Repeat>` 会保留上一次物化的行身份与状态（隐藏元素保留节点这条 P2 规则同样适用于行），
+  只有定义/绑定不再提供的 key 才被释放；重新可见时复用同一节点。
+- `input/checkbox`：`Bind`（bool 值绑定，必填）+ 可选 `ActionBind`（命令，声明后该元素进入 P2 的禁用漏斗）+
+  `Label`/`LabelKey`/`Height` + `Tone`/`Emphasis`。
+- `display/progress`：`Bind`（**float**，必填）+ 可选 `Max`（正数，默认 1）+ `Height` + `Tone`（无文本，故无 `Emphasis`）。
+  值按 `value/Max` 取 [0,1] 并夹紧；不取输入。
+- `container/tree`：`Bind`（**`IReadOnlyList<UiTreeRow>`**，必填）+ 可选 `ActionBind`（`BindAction<string>`，
+  命中时以该行 key 为载荷）+ 可选 `RowHeight`（正数，默认 density 行高）+ `Tone`/`Emphasis`。
+
+### 7.2 每个新 kind 对 "What earns a kind" 的论证（`AGENTS.md`）
+
+| kind | 拥有的、manifest 无法表达的东西 | 不拥有/不复制 |
+| --- | --- | --- |
+| `input/checkbox` | 每元素交互态（hover/armed 三态）与自己的命中规则；两态回写（写读到的反值）；盒内几何 | 禁用外观不是私有分支：可写性走 `IsWritable`→resolved table，命令态读回引擎发布的 `UiNode.IsDisabled`，两者都落到**唯一**的 Disabled 行；输入仍走 `UiNative.Button(rect, ctx)` 这一个漏斗 |
+| `display/progress` | 值契约（float、`Max`、夹紧）与自身内容的测量契约（固定 band ⇒ 值变化是 `Paint` 类）+ 填充几何 | 不取输入（与 `chrome/rule` 同为"负规则"）；不新增第二套失效路径 |
+| `container/tree` | 每行 band 测量（`RowHeight`/density）、层级缩进几何、逐行命中规则 | 只表达层级：不排序、不调度、不评估任务图；行集合与展开态都归模型，库按 `UiTreeRow.Key` 读取，从不按下标保存状态 |
+| `Repeat`（元素，非绘制控件） | 集合协调本身：按业务 key 物化行、复用节点/状态、删除释放；item 局部绑定作用域 | 不是第二种身份方案：行身份由既有 `UiNodeId` 组合、节点表与 prune 生命周期承载；不是第二个刷新通道（`Items` 作为声明 key 进入 P2 的按 key 通知） |
+
+### 7.3 失效分类（与 P2 组合，不新增路径）
+
+- `Items` 绑定应按 `UiInvalidation.Structure` 注册：插入/删除/重排都改变行集合，需要重新排列。
+- 每行每个字段按语义注册：checkbox 的 bool 与其后的命令、progress 的 float 都是 `Paint`（固定 band，值不改几何）；
+  行内文本标注 `Measure`。
+- 引擎把 `Items` 与每个已排列行元素的 `Bind`/`ActionBind`/`OptionsBind`/`VisibleKey`（作用域化后的 key）
+  记入声明的 key→node 表，因此 `NotifyChanged` 只标记声明它的元素，Paint 类公告不移动排列时钟。
+
+### 7.4 模板结构校验的边界（写清，不留给读者推断）
+
+- **覆盖**：模板元素必须是已注册 kind 或容器；属性必须落在该 kind 的 schema（+ 全元素通用名）或容器词表内；
+  未知 kind / 未知属性以 `UiContractException` 在**创建期**拒绝，消息含模板名与模板内路径
+  （`Template 'row' is invalid at '<Templates>/row/flag': ...`）。这一层校验在 `UiLayoutEngine` 构造时执行，
+  两个词表与 `UiHost` 私有词表的相等性由 lane 反射钉住（防止复制漂移）。
+- **不覆盖**：`UiHost` 对页面元素执行的数值/窄态语法（`Width`/`Padding`/`Gap`/`Height`/`Breakpoint`/…）不在此层重复验证，
+  原因是被校验的子树带着 item 作用域、且 `UiHost` 的词表是私有的。后果与"程序化构造的 spec"一致：模板内写坏的数值按
+  引擎既有的"未声明/退化"路径处理，而不是创建期拒绝。这是**已知缺口**，不是"已覆盖"。
+- 模板内元素的 `Validate`（绑定存在性）**不在创建期执行**：其 key 是 item 作用域的，创建期无法存在。缺失的 item 局部 key
+  是 fail-soft：新控件（checkbox/progress/tree）用 `TryGet` 读，取默认值并记录一条去重报告后照常绘制；既有 atom
+  （如 `text/wrapped`）保持自身契约（`Get` 抛出→由树的 recovery 记录一次恢复带，页面继续绘制）。
+- 热重载：模板表随文件内容标识一起变化，重载候选的解析/预检路径与页面一致；模板结构错误在 commit 阶段抛出时由文档服务
+  回滚整批并保留 last-known-good（`UiDocumentService` 既有规则），不是半批更新。
+
+### 7.5 中立夹具页（库内示例，**不是**消费证据）
+
+`tools/FerriteLib.UiKit.Tests/KernelFixturePageTests.cs` 是本轮的形态证据：一个数据驱动行集 + 三个新公共控件，
+页面半边只有一份 XML 与键绑定，没有手写矩形、没有手动刷新、没有手写集合身份、没有手写输入规则。
+
+- 该 lane 钉住的事实：行 band 高 = density 行高；行内控件点击写回的是该行自己的 key；模型变化（值）下一帧即被读取，
+  而结构变化必须经由**一次** `NotifyChanged`；Paint 类公告复用同一排列快照；树按层级缩进并以被点击行的 key 回报。
+- **证据等级**：这是本仓自己的库内示例（证据类 1/2），`AGENTS.md` "Our own demo is not consumption" 适用：
+  它证明这些 kind 在桩度量下能画、能测、能恢复，**不**抬高"已验证公共面"计数，也**不是**晋升门的 provenance。
+

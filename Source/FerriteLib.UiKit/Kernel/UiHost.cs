@@ -102,7 +102,7 @@ public sealed class UiHost : IDisposable
         styleResolver = new UiStyleResolver(theme, styleDocument);
         styleResolver.ApplyTo(theme);
 
-        engine = new UiLayoutEngine(source, styleResolver);
+        engine = new UiLayoutEngine(source, styleResolver, manifest.Templates);
         session = new UiSession();
 
         // A document that went wrong must not go quiet, and the consumer must not have to remember to ask:
@@ -438,7 +438,7 @@ public sealed class UiHost : IDisposable
         // A fresh engine has no cached arrangement, so the next ArrangeRoots measures the new tree. This is
         // the invalidation the reload needs and it is strictly local: no second revision counter is
         // introduced anywhere - the engine instance itself is the invalidated thing.
-        engine = new UiLayoutEngine(source, styleResolver);
+        engine = new UiLayoutEngine(source, styleResolver, manifest.Templates);
 
         publishedDocumentIssues = 0;
         publishedResolutionIssues = 0;

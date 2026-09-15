@@ -19,5 +19,12 @@ public static class KernelCoreWidgetRegistrar
         Widgets.RuleWidget.Register();
         Widgets.SliderWidget.Register();
         Widgets.NumberFieldWidget.Register();
+        // 0.5 common controls and the collection element. The three controls are ordinary kinds; Repeat is
+        // a container the engine materializes, registered here because its declaration (attribute schema,
+        // Items/Template contract) still needs the creation-time owner every element has.
+        Widgets.CheckboxWidget.Register();
+        Widgets.ProgressWidget.Register();
+        Widgets.TreeWidget.Register();
+        Widgets.RepeatTemplateWidget.Register();
     }
 }
