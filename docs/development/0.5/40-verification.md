@@ -237,3 +237,24 @@ P4c 把**页面级**默认值（`DefaultScheme`/`DefaultDensity` 指向本文件
 - 不变量：tier 74 = 74（未分级 0、悬空 0）；lane 注册 **32 = 32**（无未注册、无幽灵）；三轴 0.5.0；无冲突标记；隐私与中立性干净。
 - **该轮未关闭的部分**：R1–R7 的「植入旧缺陷、确认仓内 lane 变红」逐条扫查、七个新缺陷探针、以及 review 附带风险的登记核对，属于 verifier 报告的追加部分；在其落库前，本文件只把「门禁 + 探针 + 不变量」记为已复验。
 
+### 7.4 R1–R7 仓内护栏存在性核对（Lead，@ 最终 tip）
+
+独立复验的追加部分（逐条植入旧缺陷、确认仓内 lane 变红）**未完成并已如实登记**：verifier 报告了门禁/探针/不变量三项后停止，
+两次唤醒均未产出追加报告。为避免把「已修复」写成「已逐条复验」，Lead 在最终 tip 上核对了另一半——**每个缺陷的仓内护栏确实存在且已注册**：
+
+| 缺陷 | 仓内 lane（文件内 RunAll 调用） |
+| --- | --- |
+| R1 | `KernelDocumentReloadTests`: A rolled-back batch restores the old document AND the interaction state it held |
+| R2 | `KernelDocumentReloadTests`: A transiently missing file keeps the last known good instead of the embedded text |
+| R5 | `KernelDocumentReloadTests`: First style attach runs the same validate-and-apply rule as a reload |
+| R6 | `KernelDocumentReloadTests`: Rebinding a host to another service releases the old dependency |
+| R7 | `KernelDocumentReloadTests`: The document path reads one snapshot and stays backend-free |
+| R3 | `KernelWindowCatalogTests`: VerifyClosingAWindowHandsOverTheActiveTarget |
+| R3 附带 | `KernelWindowCatalogTests`: VerifyPointerSpaceIsConsistentAcrossOffsetWindows |
+| R4 | `KernelDiagnosticsTests`: Two hosts with distinct rulers each measure with their own ruler |
+| 契约 | `KernelRepeatTests`: item-local 缺键 / 错类型两条 lane（+ wrapped atom 缺键） |
+| stub | `KernelWindowCatalogTests`: the double rests on the game's own defaults |
+
+每个修复的**突变证据由各自作者提供**（范围 3–5 FAIL 不等，已记入 §7.1），但**没有**经过本轮独立复核；
+因此本文件把 R1–R7 记为「已修复合入 + 仓内护栏存在 + 作者突变证据」+「独立逐条复验未完成」。
+
