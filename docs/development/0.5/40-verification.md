@@ -189,7 +189,7 @@ P4c 把**页面级**默认值（`DefaultScheme`/`DefaultDensity` 指向本文件
 | R1 | P1 | 批次失败回滚只恢复旧文档树，不恢复已被清掉的交互状态（用户未提交草稿丢失） | `ROLLBACK rejected=True restoredRoot=one draft=''`（原草稿 `uncommitted-draft`） | 修复中（task-15） |
 | R2 | P1 | 已有有效外部版本时，文件暂时缺失仍切回内嵌旧版 | `MISSING before=external-valid` → `accepted=True after=embedded` | 修复中（task-15） |
 | R3 | P2 | 关闭活动窗口后剩余窗口没有恢复为活动目标 | `WINDOW after close active=null remaining=1` | 修复中（task-16） |
-| R4 | P2 | 第二个 host 的诊断订阅覆盖第一个 host 的测量尺（溢出判断互相污染） | `METRICS A before=0` → 仅订阅 B 后 `A after=1` | 修复中（task-17） |
+| R4 | P2 | 第二个 host 的诊断订阅覆盖第一个 host 的测量尺（溢出判断互相污染） | `METRICS A before=0` → 仅订阅 B 后 `A after=1` | **已修复合入**：诊断作用域携带本 host 测量尺；外部探针复跑为 `A after B subscription=0`；harness lane 先红后绿 + 突变证明 |
 | R5 | P2 | 首次样式应用绕过候选校验：同一文件首次加载与重载语义不同 | `initial attached=True reports=0` → 仅改空白后 `reload rejected=True` | 修复中（task-15）；此前 §4 第 10 条把它登记为待关闭，review 判定不能只当已知限制 |
 | R6 | P2 | 换绑文档服务后关闭 host，旧服务仍持有该 host（依赖泄漏） | `REATTACH after close firstDeps=1 secondDeps=0` | 修复中（task-15） |
 | R7 | P2 | 内容哈希与解析来自两次独立读取（TOCTOU：记录的版本与实际解析的树可能不同） | 控制流确认；未做并发保存压力复现 | 修复中（task-15） |
