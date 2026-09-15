@@ -136,3 +136,43 @@ P2/P4/P5/P6 are covered by the fix lanes themselves and are green at the tip; **
 remain named gaps** at this commit. Nothing here is asserted beyond what the cited lane text or the two sweeps
 show.
 
+
+## 9. The seven probes, run (follow-up) - one DEFECT found in R3
+
+Scratch probe lanes in a unique extraction (3 temporary lane files + one scratch `Program.cs`, all restored
+byte-exact by SHA256; `--no-incremental` build exit 0; post-restore `verify-local` exit 0, 9/9 gates).
+
+| probe | verdict | raw evidence |
+| --- | --- | --- |
+| P1 R1: host disposed between stage and seal | EXERCISED-AND-PASSES | `disposedMidBatch=True outcome=no-throw accepted=True hostA.disposed=True hostB.added=True` |
+| P2 R2: recovery when the file returns | EXERCISED-AND-PASSES | `missing.rejected=True keptV1=True back.accepted=True host.hasV2=True` (observation below) |
+| P3 R3: the survivor itself closing / two closes in one frame | **DEFECT-FOUND** | `shapeA activeAfterClose=beta remainingAfterClose=1 activeAfterSecondClose=null remainingEnd=0` ; `shapeB activeAfterTwoCloses=null remaining=2` |
+| P4 R4: legacy ruler for an UNSUBSCRIBED host | EXERCISED-AND-PASSES | `legacyControlCount=1 legacyUnsubscribedFirstDraw=0 legacyAfterSubscribe=0 subB.fit=1 unsubscribedRuleHeld=True` |
+| P5 R5: first-attach refusal leaving no style source | EXERCISED-AND-PASSES | `attached=True reportsOnRefusal=1 keptOwnDocument=True depsAfterRefusal=1 recovered.accepted=True panelBlue=True` |
+| P6 R6: attaching the same service twice | EXERCISED-AND-PASSES | `first=True secondSame=True badId=False depsAfterBad=1 deps=1 reloadOne.hosts=1` |
+| P7 R7: size bound + BOM | EXERCISED-AND-PASSES | `atBoundLength=1048576 parsedAtBound=True overLength=1048577 over.rejected=True over.reason=the file is 1048577 bytes, above the 1048576-byte bound` |
+
+`CANNOT-EXERCISE`: none.
+
+### MUST-FIX: R3 pre-close target hand-off is a single slot
+
+`UiWindowCatalog.NotifyPreClose` records the closing holder in one field
+(`closingActiveWindow = ReferenceEquals(active, window) ? window : null`) that is unconditionally overwritten
+by the next pre-close in the same frame. With two closes in one frame (alpha active, beta non-active, gamma
+open): `PreClose(alpha)` records alpha, `PreClose(beta)` erases the record, `PostClose(alpha)` takes the false
+branch and leaves **active=null while beta and gamma are still open** - exactly the invariant the R3 lane
+states ("a close never leaves windows open with no target"). A second shape: `SelectSurvivor` can hand the
+target to a survivor that has already been pre-closed but is still in `activationOrder`, even though the
+PreClose contract says a window on its way out must receive no input or capture.
+
+**Classification: must-fix-in-0.5** (or an explicitly recorded remaining item if the round closes first).
+The fix surface is one concept: track the *set* of pre-closed windows (or skip windows with a pending close
+in `SelectSurvivor`) instead of one slot. Reproduced deterministically through the catalog's own hooks; not a
+scratch-harness limitation. The existing R3 lane passes because it only exercises the single-close shape.
+
+### Observation (not counted a defect)
+
+R2: after a successful recovery, a second disappearance is still refused but is **deduped against the first
+missing version** (`state.LastFailedVersion` is keyed on `"missing:" + path` alone), so it never enters the
+report ring. That is a reporting nuance worth a sentence in the R2 record, not a correctness failure.
+
