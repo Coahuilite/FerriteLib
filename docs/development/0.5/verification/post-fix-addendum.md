@@ -176,3 +176,41 @@ R2: after a successful recovery, a second disappearance is still refused but is 
 missing version** (`state.LastFailedVersion` is keyed on `"missing:" + path` alone), so it never enters the
 report ring. That is a reporting nuance worth a sentence in the R2 record, not a correctness failure.
 
+
+## 10. Correction: second probe run and the R3 reachability disagreement
+
+A second, independently built probe harness (scratch lane only, no Source edit; `Program.cs` restored
+byte-identical; `--no-incremental` build 0/0; `verify-local` exit 0) ran the same seven probes and reached a
+**different R3 verdict**. Its raw totals: 1588 ok / 5 FAIL, all five in the scratch lane.
+
+| probe | second run |
+| --- | --- |
+| P1 R1 dispose between stage and seal | EXERCISED-AND-PASSES (15 ok / 0 fail) - `pendingPrune` non-null after stage and null after seal; a disposed mid-batch host leaks nothing; the captured hot control 4242 is released |
+| P2 R2 recovery | EXERCISED-AND-PASSES; 4 FAILs are the stricter expectation: `LastFailedVersion` is never reset on accept/skip, so a re-failure of a seen version is `Duplicate=True` and not appended to `Reports`/`LastReport` (still returned by `Reload` and still published) - matches the documented "once per refusing version" |
+| P3 R3 | reachable close path PASSES (gamma -> beta -> alpha); the out-of-order hook interleave is **CANNOT-EXERCISE** |
+| P4 R4 unsubscribed legacy ruler | EXERCISED-AND-PASSES (6/0), including a draw nested inside another host's live subscription |
+| P5 R5 first-attach refusal | EXERCISED-AND-PASSES (10/0) - non-null style source kept, draws, fixed file applies |
+| P6 R6 same-service double attach | EXERCISED-AND-PASSES (19/0) |
+| P7 R7 size bound + BOM | EXERCISED-AND-PASSES (12/0) - UTF-8 and UTF-16LE BOMs decoded, exactly-bound accepted, 1048577-byte refused with the bound message |
+
+### R3: reachability decides the classification
+
+The first run drove two PreCloses in one frame through the catalog hooks directly and saw the single
+`closingActiveWindow` slot overwritten (`active=null` with windows still open). The second run checked whether
+that sequence is reachable in production and argues it is not: `WindowStack.TryRemove` runs
+`OnCloseRequest -> PreClose -> windows.Remove -> PostClose` adjacently, `List.Remove` uses reference equality,
+and no user code (and no re-entrant path) runs between them, so a second `PreClose` cannot clobber the field
+before the first `PostClose`. The catalog's own `CloseAll` likewise completes one `TryRemove` before starting
+the next.
+
+**Corrected classification: latent sharp edge, NOT a confirmed must-fix.** The failure requires an
+out-of-order or re-entrant hook sequence that neither probe could reach through the production path; the
+must-fix statement in section 9 is withdrawn as *confirmed*. What remains true and worth recording: the
+pre-close record is a single slot, so any future path that pre-closes two windows before either post-closes
+would strand the target; making it a set (or skipping pending-close windows in `SelectSurvivor`) is cheap
+insurance. **Classify as must-document / optional hardening, not release-blocking.**
+
+The R2 ledger observation is confirmed by both runs and classed by both as non-defect (documented "once per
+refusing version"): a re-break after a successful recovery is refused and published but reports as
+`Duplicate=True` and does not update `LastReport`. Worth one sentence in the R2 record.
+
