@@ -339,6 +339,14 @@ internal static class KernelWindowCatalogTests
             "and the activating click is marked used before the page draws, so it cannot also operate a control");
         Check(first.IsActiveTarget && !second.IsActiveTarget, "the target moved and is still exactly one");
 
+        // The activation combination, stated so it cannot drift: the game's own focus setter is called,
+        // and nothing here reorders the stack. That is the whole difference between "set focus" and
+        // "bring to front" - whether the game's routing agrees is the in-game checklist's job.
+        Check(ReferenceEquals(FocusedWindow(harness.Stack), first),
+            "activation uses the game's own focus setter rather than a private notion of focus");
+        Check(harness.Stack.Windows.Count == 2 && ReferenceEquals(harness.Stack.Windows[0], first),
+            "and it does not reorder the vanilla stack, so it is not a bring-to-front");
+
         Event inSecond = PumpMouseDown(second, new Vector2(450f, 50f));
         Check(harness.Catalog.ActiveKey == beta, "a click inside the other window moves the target back");
         Check(EventWasUsed(inSecond), "and that activating click is consumed too");
@@ -619,6 +627,24 @@ internal static class KernelWindowCatalogTests
 
         object? value = property.GetValue(raised);
         return value is bool used && used;
+    }
+
+    /// <summary>
+    /// The stack double's own focus slot, which mirrors the real type's private <c>focusedWindow</c>.
+    /// Read by reflection for the same reason as <see cref="EventWasUsed"/>: the game reference assembly
+    /// does not advertise it, and a missing member throws instead of quietly reporting "not focused".
+    /// </summary>
+    private static object? FocusedWindow(WindowStack stack)
+    {
+        FieldInfo? field = typeof(WindowStack).GetField("focusedWindow");
+        if (field == null)
+        {
+            throw new Exception(
+                "the harness WindowStack double no longer exposes 'focusedWindow', so the "
+                + "'activation uses the vanilla focus setter' assertion would pass vacuously.");
+        }
+
+        return field.GetValue(stack);
     }
 
     private static void CheckThrows(string what, Action action)
