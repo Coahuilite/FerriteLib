@@ -22,6 +22,9 @@ status source. The round's live status stays in `10-work-packages.md` and `40-ve
 | [plan-P2-bindings.md](plan-P2-bindings.md) | falsification plan for P2 (bindings announce / invalidation / commands / visibility) |
 | [plan-P4-documents.md](plan-P4-documents.md) | falsification plan for P4 (document sources / hot reload) |
 | [plan-P5-diagnostics.md](plan-P5-diagnostics.md) | falsification plan for P5 (per-host diagnostics) |
+| [turnkey-mutations.md](turnkey-mutations.md) | the helper + copy-pasteable mutation recipes per claim (P4's are measured) |
+| [p4-adversarial.md](p4-adversarial.md) | P4 adversarial pass at `85faab0`: mutation counts, gap probes, invariant verdicts |
+| [p1-adversarial.md](p1-adversarial.md) | P1 adversarial pass at `688cb5d`: stub faithfulness, 7-mutation battery, gap classifications, invariants |
 
 ## How wave B falsifies a claim
 
