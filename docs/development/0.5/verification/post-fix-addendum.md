@@ -214,3 +214,64 @@ The R2 ledger observation is confirmed by both runs and classed by both as non-d
 refusing version"): a re-break after a successful recovery is refused and published but reports as
 `Duplicate=True` and does not update `LastReport`. Worth one sentence in the R2 record.
 
+
+## 11. Post-hardening verification at a0d2c89: both P3 shapes closed, both new assertions mutation-proven
+
+The round hardened the R3 edge at `2a0379a` ("fix(kernel): keep the active target across interleaved
+closes", merged as `a0d2c89`) after the section 10 correction: the single slot became
+`HashSet<UiWindowHost> closingWindows` plus the subset `activeClosingWindows` that held the target when it
+was pre-closed, and `SelectSurvivor` now walks `activationOrder` from the front and skips any candidate
+whose close is pending.
+
+Verified at tip `a0d2c89` in a clean extraction (`git archive a0d2c89` into a fresh temp tree;
+`dotnet restore` exit 0):
+
+- `pwsh -NoProfile -File scripts/verify-local.ps1` -> `VERIFY_EXIT=0`, all nine gates OK.
+- `dotnet build tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj -c Release --no-incremental --no-restore`
+  then `dotnet run --no-build --no-restore --project tools/FerriteLib.UiKit.Tests -c Release` -> exit 0,
+  `1544` `ok:` lines, `0` `FAIL:`, `ALL PASS`.
+- The exact P3 driver from sections 9-10 (direct `PreClose()` on two windows, then direct `PostClose()` on
+  both, with no `WindowStack.TryRemove`) now passes as a scratch method appended to the temp copy of
+  `KernelWindowCatalogTests.cs`: shape A raw `active=p3 remaining=1` (was `active=null remaining=1`),
+  shape B raw `active=p3 gammaActive=False` (was `active=gamma`); harness exit 0, `ALL PASS`, scratch file
+  restored byte-identical. [product behaviour: mutation-proven below; this direct driver: scratch-only, not
+  committed.]
+
+Planted-failure controls in the same extraction. The anchor count is asserted case-sensitively before each
+edit; the product file hash `B5476F1C78A05D8F04EB830F58393C14537FD0471E27F90E0D696F21C84556E7` is
+identical before and after both runs, the post-restore harness is `ALL PASS`, and the post-restore full
+gate is again `VERIFY_EXIT=0`.
+
+| mutation | anchor | result | reading |
+| --- | --- | --- | --- |
+| M1 `activeClosingWindows.Clear()` on every pre-close | `closingWindows.Add(window);` in `NotifyPreClose` | build 0, harness exit 1, 2 FAIL, both in the new lane's one-frame shape, no other lane red | the two-closes-in-one-frame assertions are mutation-proven |
+| M2 `closingWindows.Clear()` before the hand-over decision | `bool closingWasActive = activeClosingWindows.Remove(window)` | build 0, harness exit 1, 1 FAIL, `pending close: the surviving OPEN window takes the target`, no other lane red | the pending-close-survivor assertion is mutation-proven |
+
+That both mutations leave every pre-existing lane green is the measured half of the neutrality claim: on the
+adjacent single-close path the set holds one window when `SelectSurvivor` runs, so the skip cannot exclude
+anything the old code would have chosen.
+
+**Correction to section 10's reachability wording.** "no user code (and no re-entrant path) runs between them"
+is too strong. What is adjacent is the library's own sequence; the interval between `NotifyPreClose` and
+`NotifyPostClose` sits inside `UiWindowHost.PreClose`/`PostClose`, which are public overrides of the
+vanilla hooks this library documents itself as sitting on (`docs/api-tiers.md:151`, `:269`), and instances
+come from the consumer's own `Func<UiWindowKey, UiWindowHost>` factory (`UiWindowCatalog.Register`,
+`:115-119`). A consumer override that closes a sibling after `base.PreClose()` therefore is a re-entrant
+path, and `Instances`/`TryGet`/`ActiveWindow` hand the instance out, so driving the hooks directly (what
+both probes do) needs no special access. The accurate claim is "not reachable by library-only control flow",
+not "not reachable at all" - and with the hardening merged the distinction no longer decides a release
+question.
+
+**Residual precondition (inspection only, NOT measured).** Both sets are cleaned only in `NotifyPostClose`
+(`:350`, `:360`). A `PreClose` that never reaches its `PostClose` - an exception thrown out of the hook
+after `NotifyPreClose`, or a caller driving the hooks directly - leaves a stale entry that
+`SelectSurvivor` then skips (`:380-389`), so a later active close can hand the target to a different
+survivor, or to none, while the stale window is still in the stack. Not a regression (the pre-hardening code
+was equally wrong there, in the other direction) and it needs the same aborted-close precondition as before;
+worth one sentence in code or in the round record, not a fix in this round.
+
+Neither the fix nor the lane touches the public surface: `2a0379a` adds only private fields and changes
+internal methods, so no `docs/api-tiers.md` entry was due, and the lane is invoked from the existing
+`KernelWindowCatalogTests.RunAll()` (registered at `tools/FerriteLib.UiKit.Tests/Program.cs:68`), so the
+lane-registration invariant is untouched.
+
