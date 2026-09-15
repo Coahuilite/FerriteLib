@@ -57,10 +57,10 @@ P1..P5 ── P6 (独立验证 → 开发包 → 文档)
 | --- | --- | --- |
 | W0 | **已完成** | `99acc5f`：本目录 + `0.5.x` 分支（已推送）+ 三轴 0.5.0；基线门禁全绿 |
 | P1 | **已合并**（`2b37d3d` → merge） | keyed 实例/焦点/通用 XML 页壳；91 断言；**7 处突变证明**（含同型多开与 vanilla 精确类型规则）；stub 增补已披露 |
-| P2 | 进行中（`core`） | 独立 worktree，分支 `feat/0.5-core`；关键路径 |
-| P4 | **已合并**（`bd2e04c` → merge `85faab0`） | 文档服务 + 原子热重载 + LKG；13 lane / 68 断言；3 处突变均转红 |
-| P3 | 阻塞于 P2/P4（task-6） | 依赖未清 |
-| P5 | 阻塞于 P1/P2/P4（task-7） | 依赖未清 |
+| P2 | **已合并**（`369400f` → merge `0ee55b6`） | 按 key 通知/失效分类/命令态/条件显隐 + P2b 节点剪枝；6 处突变转红 + 1 处诚实负结果；3 个新 lane |
+| P4 | **已合并**（`bd2e04c` → `85faab0`；P4b `079aa5e` → `6e0781a`） | 文档服务 + 原子热重载 + LKG；lane 103 断言；P4 三处突变 + P4b 四处突变均转红；AutoWatch 重武装与 style 批次跨 host 原子性已补 |
+| P3 | **进行中**（`collections`） | 依赖已清（P2/P4 合并），分支 `feat/0.5-collections` |
+| P5 | **进行中**（`diagnostics`） | 依赖已清（P1/P2/P4 合并），分支 `feat/0.5-diagnostics` |
 | P6 | 进行中（Lead + `verifier`） | wave-A 审计已合并（`8d4bdb0`）并处置 6 条发现（`8098ca0`）；P4 逆验证已合并并派生 task-8；死 lane 守卫已入库（`b6b621d`）；P1 逆验证待做 |
 
 状态只在 Lead 合并后更新（单一状态源原则）；各包分支内部进度写在提交信息与任务回交里。
@@ -95,6 +95,7 @@ git commit -m "message"
 
 | 任务 | 来源 | 状态 |
 | --- | --- | --- |
-| task-8 P4b | P4 逆验证：AutoWatch 无法重新武装（must-fix）、style 批次未跨 host 预校验（must-fix）、主题基线重置（待裁定文档化或修正） | 已派发（\`documents\`） |
-| task-9 P2b | P4 逆验证：被删除元素的 node 未从 session 表移除、\`GetNodeByElementId\` 的无 \`IsArranged\` 过滤与自身注释矛盾 | 阻塞于 task-2 |
+| task-8 P4b | P4 逆验证：AutoWatch 无法重新武装（must-fix）、style 批次未跨 host 预校验（must-fix）、主题基线重置（待裁定文档化或修正） | **已完成并合并**（`079aa5e` → `6e0781a`）；三项全部修复，主题基线为「门控修复 + 明确残余」 |
+| task-9 P2b | P4 逆验证：被删除元素的 node 未从 session 表移除、`GetNodeByElementId` 的无 `IsArranged` 过滤与自身注释矛盾 | **已完成并合并进 P2**；选择保留「按身份而非按排布」的契约并改注释，未加 `IsArranged` 过滤（过滤会隐藏隐藏元素的草稿） |
+| task-10 P1 hardening | P1 逆验证：stub 只用一个窗口类，`AllowMultipleInstances` 的「精确类型 vs 可赋值」半边未钉；M1 去重突变靠未捕获异常变红而非命名断言 | 已派发（`windowing`） |
 | 死 lane 守卫 | P6 自查：仓库被"lane 存在但从未注册"伤过两次且无门禁 | 已入库并突变证明（\`b6b621d\`） |

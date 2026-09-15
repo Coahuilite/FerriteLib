@@ -70,3 +70,17 @@ FerriteLibVersion.Require(new Version(0, 5, 0), new Version(0, 6, 0), "your.pack
 
 消费者发现的缺口：**在消费者树内先组合实现**，把 `owner/repo@sha:path:line` 证据回交本仓，
 由本团队评估是否晋升为公共能力；**跨仓修改由所属团队完成**，本团队不代改消费者。
+## 6. 当前可用面（第一个开发包）
+
+| 能力 | 状态 | 消费者现在能做什么 |
+| --- | --- | --- |
+| keyed 窗口实例 + 活动目标 + 暂停/相机策略 | 已实现 + 自动化验证（7 处突变） | 每个 kind 按 `UiWindowKey` 打开；同 key 重开即激活；同型多开需显式允许 |
+| 通用 XML 页壳（无需 C# Window 子类） | 已实现 + 自动化验证 | 普通页面用 `UiPageWindow` 直接承载 |
+| 按 key 通知 + 失效分类 + 命令可执行态 + 条件显隐 | 已实现 + 自动化验证（6 处突变） | 模型变更调 `NotifyChanged`；禁用交给 `canExecute`；显隐用 `Visible`/`VisibleKey` |
+| 外部布局/样式文件 + 自动/手动热重载 + LKG | 已实现 + 自动化验证（P4 三处 + P4b 四处突变） | 把 XML 交给 `UiDocumentService`；开发模式自动监听 |
+| keyed repeater、checkbox、进度条、树 | **尚不可用**（P3 开发中） | 暂用现有 atom/自持 kind 组合 |
+| 多 host/session 诊断隔离 | **尚不可用**（P5 开发中） | 暂用现有 `UiFitAudit` |
+
+**接口冻结程度**：以上均为 `0.5.0` 窗口内的**公共面**，其中 P1/P2 新增类型目前按 `public-unstable` 登记
+（见 `docs/api-tiers.md`）。区间 `[0.5.0,0.6.0)` 承诺的是"签名在区间内不删不改"，不是"形状已定稿"。
+消费者开始接入是安全的；把“已接入”写进验收结论要等**消费者自己的树**真的编译并运行。

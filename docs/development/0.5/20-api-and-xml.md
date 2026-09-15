@@ -106,3 +106,108 @@ bindings.BindCommand("apply", () => model.Apply(), canExecute: () => model.CanAp
 
 - 中立夹具页 / 规格：`tools/FerriteLib.UiKit.Tests`（**库内示例，不是消费证据**）。
 - 消费者侧示例：由消费者团队在自身仓库落地；本仓只提供 `30-consumer-handoff.md` 的接入步骤。
+
+## 3.1 已落地接口（第一个开发包：P1 + P2 + P4）
+
+以下签名取自当前 `0.5.x` 树，是**已实现并自动化验证**的部分。P3（集合与控件）与 P5（诊断隔离）仍在开发，见 §3。
+
+### 窗口（P1）
+
+```csharp
+// identity
+public readonly struct UiWindowKey { string Consumer; string WindowKind; string ContextKey; }
+
+// per-window policy; a null option means "leave the game's own behaviour alone"
+public sealed class UiWindowOptions {
+    bool AllowMultipleInstances = true;   // false => the vanilla exact-C#-type rule applies
+    bool? ForcePause, PreventCameraMotion, AbsorbInputAroundWindow;
+    bool? Draggable, Resizeable, CloseOnAccept, CloseOnCancel, CloseOnClickedOutside;
+    bool SetFocusOnActivate = true;
+}
+
+public enum UiFocusPolicy { ... }          // how an activated target is focused
+
+public sealed class UiWindowCatalog {
+    UiFocusPolicy FocusPolicy { get; }
+    IReadOnlyList<UiWindowHost> Instances { get; }
+    UiWindowHost? ActiveWindow { get; }
+    void Register(...);                    // kind -> factory + options
+    bool Open(UiWindowKey key);            // same key reopens = activates the existing instance
+    bool Close(UiWindowKey key);
+    int  CloseAll();
+    bool TryGet(UiWindowKey key, out UiWindowHost host);
+    bool IsActive(UiWindowKey key);
+    void Activate(UiWindowKey key);
+}
+
+// a concrete shell for an ordinary XML page: no bespoke C# Window subclass needed
+public sealed class UiPageWindow : UiWindowHost { ... }
+```
+
+```xml
+<Window Id="main" Title="Your title" CloseText="Close">
+  <Scroll Id="body"><Checkbox Id="flag" Label="Ammo"/></Scroll>
+</Window>
+```
+
+### 绑定、失效与命令态（P2）
+
+```csharp
+// every binding declares what its change invalidates
+void BindValue<T>(string id, Func<T> get, Action<T> set, UiInvalidation invalidates = UiInvalidation.Everything);
+void BindReadOnly<T>(string id, Func<T> get, UiInvalidation invalidates = ...);
+void BindCommand(string actionId, Action action, Func<bool> canExecute, UiInvalidation invalidates = ...);
+
+[Flags] public enum UiInvalidation { Paint, Measure, Structure, Everything }
+
+void NotifyChanged(params string[] keys);   // coalesced to one commit per frame boundary
+long GetRevision(string key);
+UiInvalidation GetInvalidation(string key);
+bool CanExecute(string actionId);
+bool TryGetBool(string key, out bool value);
+```
+
+Rules a page author relies on:
+
+- **Paint** reuses the arrangement (a fixed-size readout does not re-measure the page).
+  **Measure**/**Structure** mark the declaring nodes and move the single arrangement clock.
+- A disabled command is not executed, does not capture the pointer/hot control, and takes the disabled
+  treatment from the one writability funnel. There is no per-widget disabled branch to copy.
+
+条件显隐（XML）：
+
+```xml
+<Text Id="note" Visible="false" ... />        <!-- static -->
+<Text Id="note" VisibleKey="hasWarning" ... /> <!-- dynamic: bool binding key -->
+```
+
+- 不可解析的 `VisibleKey` **不**让页面创建失败：元素保持可见，并记录一条去重的 fail-soft 报告。
+- `Hidden` 仍按原样工作，是旧的静态形式，不废弃、不重载。
+- 显隐不改变未命名兄弟的声明序号（稳定身份），隐藏元素保留其节点与状态。
+
+### 文档与热重载（P4）
+
+```csharp
+public enum UiDocumentKind { Layout, Style }
+public readonly struct UiDocumentSource { string Id; UiDocumentKind Kind; string Path; }
+public sealed class UiReloadReport { DocumentId, Kind, Path, Version, Accepted, Skipped, Duplicate,
+                                     Rejected, Element, Reason, HostsAffected, HostsCommitted }
+
+public sealed class UiDocumentService : IDisposable {
+    static bool DefaultAutoWatch { get; }          // ON in dev builds, OFF in release unless configured
+    bool Add(UiDocumentSource source, string embeddedFallbackXml = "");
+    bool Attach(UiHost host, string? layoutId, string? styleId = null);
+    void Detach(UiHost host);
+    bool Pump();                                   // main-thread commit boundary (called from UiHost.BeginFrame)
+    UiReloadReport? Reload(string documentId);      // manual entry point, always available
+    IReadOnlyList<UiReloadReport> ReloadAll();
+    bool Signal(string documentId);
+}
+```
+
+- 一个批次先验证**全部**受影响 host（layout 走创建期契约，style 走 `TryPrepareStyleCandidate`），
+  任一失败则整批保留原有效版本；提交期失败会把已提交的 host 回滚。
+- 首次无外部文件时用内嵌回退；后续失败保留 last-known-good；失败按版本去重报告。
+- 工作线程只投递信号（BCL only）；提交发生在主线程帧边界，当前 GUI pass 不换树。
+- 稳定 Id/key 保留滚动/选择/展开/草稿；删除或换 kind 清理旧状态；拖拽/编辑中重载会释放 hot control 并保留草稿。
+- **不在范围**：运行中的 C# kind 增删改。
