@@ -175,6 +175,15 @@ internal static class KernelWindowCatalogTests
         Check(harness.Catalog.TryGet(alpha, out UiWindowHost again) && ReferenceEquals(opened, again),
             "the instance that was already open is the one activated");
         Check(harness.Catalog.ActiveKey == alpha, "and it is the active target again");
+        // Guarded read, not a crash: if the reopen had replaced the instance (or the sibling had been
+        // evicted) this session is disposed and reading it would take the runner down instead of naming
+        // the break - the shape the task-10 review asked lanes to report rather than throw.
+        Check(session.IsActive, "the page session survived the reopen");
+        if (!session.IsActive)
+        {
+            return;
+        }
+
         Check(ReferenceEquals(opened.Session, session), "its page session is unchanged");
         Check(session.GetOrCreateValueState("draft").EditText == "typed"
             && Math.Abs(session.GetOrCreateValueState("draft").FloatValue - 7f) < 0.001f,
@@ -186,6 +195,15 @@ internal static class KernelWindowCatalogTests
     /// The option that decides the vanilla exact-type rule must actually reach it: with multiple
     /// instances disallowed, the sibling is evicted by the game's own path and the catalog records the
     /// eviction instead of holding a ghost.
+    /// <para>
+    /// <b>What this pins, and what it cannot.</b> Since the double now rests on the game's own
+    /// <c>onlyOneOfTypeAllowed = true</c>, this lane pins the <i>behaviour</i> of the false option and no
+    /// longer distinguishes "the library wrote true" from "the field already rested true": both evict, so
+    /// a regression that stopped writing this direction would still pass here. That is stated rather than
+    /// papered over. The other direction is fully pinned - with the default option the library must write
+    /// false, and <see cref="VerifySameKindDifferentContextsCoexist"/> reddens if it does not - so the
+    /// write itself is load-bearing and tested where it matters.
+    /// </para>
     /// </summary>
     private static void VerifyAllowMultipleInstancesFalseUsesTheVanillaExactTypeRule()
     {
@@ -293,11 +311,15 @@ internal static class KernelWindowCatalogTests
     {
         var explicitOptions = new UiWindowOptions
         {
+            // Every value here is the OPPOSITE of the game's own resting value, which is what makes the
+            // write observable: a field that already rested on the requested value could pass the
+            // assertion below even if the library never wrote it. The resting values are pinned by the
+            // double assertion under this block, so the two halves cannot drift apart.
             ForcePause = true,
             PreventCameraMotion = false,
             AbsorbInputAroundWindow = true,
-            Draggable = false,
-            Resizeable = false,
+            Draggable = true,
+            Resizeable = true,
             CloseOnAccept = false,
             CloseOnCancel = false,
             CloseOnClickedOutside = true,
@@ -317,25 +339,43 @@ internal static class KernelWindowCatalogTests
         Check(explicitHost.forcePause
             && !explicitHost.preventCameraMotion
             && explicitHost.absorbInputAroundWindow
-            && !explicitHost.draggable
-            && !explicitHost.resizeable
+            && explicitHost.draggable
+            && explicitHost.resizeable
             && !explicitHost.closeOnAccept
             && !explicitHost.closeOnCancel
             && explicitHost.closeOnClickedOutside,
             "every explicit option reaches the vanilla window field");
 
-        // The baseline is a freshly constructed window, so this asserts what the library did NOT write
-        // rather than a number the library chose.
+        // The double is a model of the game, so its resting values are pinned against the game's own
+        // source (Verse/Window.cs, read through the local source index) rather than against itself. Five
+        // of them had drifted; a drift reddens the first assertion here.
         var vanilla = new BaselineWindow();
-        Check(plainHost.forcePause == vanilla.forcePause
-            && plainHost.preventCameraMotion == vanilla.preventCameraMotion
-            && plainHost.absorbInputAroundWindow == vanilla.absorbInputAroundWindow
-            && plainHost.draggable == vanilla.draggable
-            && plainHost.resizeable == vanilla.resizeable
-            && plainHost.closeOnAccept == vanilla.closeOnAccept
-            && plainHost.closeOnCancel == vanilla.closeOnCancel
-            && plainHost.closeOnClickedOutside == vanilla.closeOnClickedOutside,
-            "an unset option leaves the game's own value untouched, so the library chose no product default");
+        Check(vanilla.onlyOneOfTypeAllowed
+            && !vanilla.resizeable
+            && !vanilla.draggable
+            && !vanilla.doCloseX
+            && !vanilla.doCloseButton,
+            "the double rests on the game's own defaults: onlyOneOfTypeAllowed true, the other four false");
+        Check(vanilla.preventCameraMotion
+            && vanilla.doWindowBackground
+            && vanilla.focusWhenOpened
+            && vanilla.drawShadow
+            && vanilla.closeOnAccept
+            && vanilla.closeOnCancel
+            && !vanilla.forcePause
+            && !vanilla.absorbInputAroundWindow
+            && !vanilla.closeOnClickedOutside,
+            "and the defaults that already matched the game's source are stated rather than assumed");
+
+        Check(!plainHost.forcePause
+            && plainHost.preventCameraMotion
+            && !plainHost.absorbInputAroundWindow
+            && !plainHost.draggable
+            && !plainHost.resizeable
+            && plainHost.closeOnAccept
+            && plainHost.closeOnCancel
+            && !plainHost.closeOnClickedOutside,
+            "an unset option leaves the field on the game's own resting value, so the library chose no product default");
         Check(!harness.Catalog.AnyForcesPause == !plainHost.forcePause || explicitHost.forcePause,
             "the catalog's pause view is the any-true rule over its own instances");
         Check(plainHost.onlyOneOfTypeAllowed == false,
