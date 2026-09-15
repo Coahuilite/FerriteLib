@@ -66,8 +66,10 @@ FerriteLibVersion.Require(new Version(0, 5, 0), new Version(0, 6, 0), "your.pack
 - **自持 kind 里的裸 IMGUI 拖拽不受 `canExecute` 约束。** 漏斗的禁用守卫在 `UiNative` 的带 ctx 入口上；一个手写拖拽（如库内 `chart/line` 的做法）不走漏斗，因此禁用态不会阻止它的拖拽。公共拖拽型控件应走库入口。
 - **`UiSession.ContentRevision` 是排布缓存时钟，不是失效 API。** 消费者用它做失效判断会失去按 key 的定向能力；请用 `NotifyChanged` + `UiInvalidation`。
 
-- **一个无法解析的"页面级"默认值会让整份样式文档被拒。** 候选样式文档的 `DefaultScheme`/`DefaultDensity` 必须在该文档自身声明过
+- **一个无法解析的「页面级」默认值，在【重载】时会拒绝整份候选版本。** 候选样式文档的 `DefaultScheme`/`DefaultDensity` 必须在该文档自身声明过
   （`SchemeNames`/`DensityNames`）；否则该**版本被拒绝**，last-known-good 继续生效，失败按版本去重报告。
+  **首次加载不走这条规则**（实测）：结构合法但页面级名字无法解析的样式文件在首次加载时会被**直接采纳**，页面级名字静默不生效，
+  文档其余部分照常生效。同一个文件因此在「首次加载」与「重载」下语义不同——这不是笔误，是本轮已登记的剩余关闭项。
   这是本库失败阶梯的一处**刻意收窄**：逐元素的未知 `Tone`/`Emphasis` 仍然是 fail-soft（回退到默认表现并记录），
   但页面级默认值的作用域是**整页**，fail-soft 会让页面以"作者没有写过的外观"提交成功。
   **代价要写清**：该文档里其余合法的 scheme/density 在该版本里**也不会生效**，改对拼写后一起生效。
