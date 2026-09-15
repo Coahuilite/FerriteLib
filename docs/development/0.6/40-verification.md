@@ -104,7 +104,26 @@ were checked independently of the demo's own `pack.ps1`; the ten-row in-game ope
    cause at creation (`TODO.md`, 0.6 section); the XML vocabulary traps a real integrator hit
    (`20-api-and-xml.md` §5).
 
-## 4. Regression of the previous round
+## 4. Final integrated pass
+
+The independent verifier's last pass (`verification/t5c-final-integrated.md`, bound to `e246aa4`) found
+**nothing**. It reproduced the ten gates and `1853 ok / 0 FAIL` across 36 lanes with no lane skipped;
+`privacy-audit.ps1` CLEAN; `grep NotImplementedException Source/` empty; the dev package and the demo
+package re-checked file by file with matching hashes; and it reconciled the package's
+`commit=f3595a1b28f1` label against a tip that is documentation-commits ahead
+(`git diff --name-status f3595a1 e246aa4` = the package document alone).
+
+**The one hole it had found is closed and named.** Re-planting its own attack (re-announcing
+`HostAttached` from `UiWindowHost.SetActiveTarget`) now produces three **named** failures —
+`ACTIVATION-NO-SECOND-ANNOUNCEMENT`, "drawing the reactivated window announces nothing more", "the
+announcement count is still exactly one after two full activation cycles" — where the same attack left the
+whole harness green at `84537fc` before T1b.
+
+It also reported two non-defects so they cannot be mistaken for findings: `privacy-audit.ps1` false-FAILs
+when run outside a git work-tree (it cannot find the account), and `dist/dev/` still holds a previous
+round's gitignored `FerriteLib-0.4.0-dev.zip` beside this round's staged folder.
+
+## 5. Regression of the previous round
 
 R1 (rolled-back batch keeps the draft) and R7 (single-read document pipeline) were re-planted at the merged
 tip by the verifier and by the Lead's own T5a-1 pass: R1 reddens 4 assertions, R7 reddens its single-read

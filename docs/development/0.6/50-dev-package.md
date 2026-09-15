@@ -31,10 +31,12 @@ version.txt                                      103   0FD93D51920F254C45BB0D7DF
 About/About.xml                                 2198   1EBA1798C5124AF8DA1EEE83F727A128E92B74F2EF379D9E0B4481CABA293E99
 ```
 
-**One honest note about the revision.** This document was added in the commit *after* `f3595a1`, so the
-branch tip is one documentation commit ahead of the tree the payload was built from. The delivered artefact
-is the staged folder above, and the DLL inside it embeds `f3595a1` in its informational version — which is
-never a compatibility value. Nothing in the payload depends on this file.
+**One honest note about the revision.** The commits after `f3595a1` are documentation-only — this file and
+the verifier's `verification/t5c-final-integrated.md` — so the branch tip is a few documentation commits
+ahead of the tree the payload was built from. The delivered artefact is the staged folder above, and the DLL
+inside it embeds `f3595a1` in its informational version, which is never a compatibility value. Nothing in
+the payload depends on those files; the verifier confirmed the difference is
+`git diff --name-status f3595a1 <tip>` = documentation additions only.
 
 ## 3. The demo mod
 
