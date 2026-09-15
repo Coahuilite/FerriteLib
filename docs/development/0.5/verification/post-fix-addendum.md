@@ -67,3 +67,30 @@ R1's destructive half and R7's guard are planted and measured above. **No new de
 items remain unverified by me at this commit — the R2-R6 old-defect plantings and the seven adversarial
 probes — both named rather than omitted. R7's guard is a source-shape check and should be recorded that
 way.
+
+## 6. R1-R6 plantings (delegated verifier, controlled disposable tree)
+
+Raw counts and FAIL lines from the delegated sweep, baseline 1515 ok / 0 fail, every mutation byte-restored
+and re-verified with a forced `--no-incremental` rebuild.
+
+| R | lane | planted old defect | raw | FAIL lines |
+| --- | --- | --- | --- | --- |
+| R1 (rollback half) | `VerifyRolledBackBatchKeepsInteractionState` | `SealDocumentCommit();` called inside `UiHost.CommitLayoutCandidate` (destructive half at stage time) | `1512 ok / 3 fail` | "and its uncommitted draft survived the rollback" · "and its named state slots" · "and its scroll position" |
+| R2 | `VerifyTransientlyMissingFileKeepsLastKnownGood` | deleted the `GoodVersion.Length > 0 -> Candidate.Refused("missing:...")` block | `1510 / 5` | "a transiently missing file is a failure, not a silent fallback" · "the report says the file is gone" · "the last valid external version is kept" · "the same missing version is reported once" · "the file returning with the same bytes is already in force" |
+| R3 | `VerifyClosingAWindowHandsOverTheActiveTarget` | reverted the condition to `ReferenceEquals(active, window)` | `1512 / 3` | "and it is the active target: a close never leaves windows open with no target" · "the survivor itself reports it as the target" · "and the target hands over to the survivor" |
+| R4 | `VerifyRulersArePerHost` + `VerifySubscriptionDoesNotOwnTheLegacyRuler` | 3-file revert of the host-ruler routing | `1510 / 5` | "subscribing B with a different ruler did not change A verdict (got 1)" · "interleaved A/B draws leave A at zero (got 1)" · "closing B left A measurement unchanged (got 1)" · "the unsubscribed host still measures with the legacy ruler (got 1)" · "and its finding is not written to the legacy channel" |
+| R5 | `VerifyFirstStyleAttachValidatesLikeReload` | `TryPrepareStyleCandidate` if/else replaced by the old `CommitStyleCandidate` | `1513 / 2` | "the first application is reported when its page level cannot resolve" · "and the host keeps the document it already had" |
+| R6 | `VerifyRebindingReleasesTheOldService` | `AttachDocumentService` back to the plain assignment with no previous `Detach` | `1511 / 4` | "rebinding releases the dependency the first service held" · "and leaves the old one clean" · "re-attaching to the same service keeps exactly one dependency" · "and closing it releases that one" |
+
+**R7, second independent falsification (stronger than my comment-only one).** The delegated sweep planted a
+*real* second read — `...Parse(Decode(File.ReadAllBytes(path)))` at both parse sites, with size and version
+still taken from the first `bytes` — and the lane stayed **GREEN** (`1515 ok / 0 fail ALL PASS`). So the
+guard is lexical in both directions: a comment can redden it (measured above) and a genuine TOCTOU
+reintroduction can pass it. No behavioural lane pins R7 either: there is no `MaxDocumentBytes`/oversized
+test and no mid-attempt file mutation anywhere under `tools/`. The correct record is **"the historical
+`ParseFile` double-read shape is guarded; single-read/TOCTOU semantics are not behaviourally pinned"** —
+which is exactly the owner's "not reproducible, structural guard" caveat, now measured.
+
+R1 is therefore fully covered (my seal-half planting plus this rollback-half planting), and R2-R6 each have a
+measured red lane. The only remaining gap is section 3: the seven new-defect probes.
+
