@@ -18,17 +18,17 @@ pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev
 | 包 | 内容 revision | 对应源码提交 | 含包 | 位置 |
 | --- | --- | --- | --- | --- |
 | 第一个开发包 0.5.0-dev | `0.5.0-dev` | 见 `dist/dev/FerriteLib/version.txt` 的 `commit=` 行（构建时树必须干净；带 `-dirty` 表示构建时存在未提交改动，则该包不对应任何提交） | P1 + P1h + P2 + P2b + P4 + P4b | `dist/dev/FerriteLib/` |
-| **交付候选（当前）** | `0.5.0-dev` | `14b29ae85ae11476bbae78f625706ae0bb69d7b8`（`14b29ae85ae1`） | P1+P1h+P2+P2b+P2c+P3+P4+P4b+P4c+P5+task-13+task-14（全部包） | `dist/dev/FerriteLib/` |
+| **交付候选（当前）** | `0.5.0-dev` | `d6b3f6ec791c61c95a72525800ca614ac9b6f135`（`d6b3f6ec791c`） | P1+P1h+P2+P2b+P2c+P3+P4+P4b+P4c+P5+task-13+task-14（全部包） | `dist/dev/FerriteLib/` |
 
 **当前交付版本（干净树构建，`commit=` 与 `HEAD` 逐字符相等）**：
 
 | 项 | 值 |
 | --- | --- |
 | 标签 | `0.5.0-dev` |
-| 源码提交 | `14b29ae85ae11476bbae78f625706ae0bb69d7b8` |
+| 源码提交 | `d6b3f6ec791c61c95a72525800ca614ac9b6f135` |
 | 位置 | `dist/dev/FerriteLib/`（5 个文件：`About/About.xml`、`1.6/Assemblies/FerriteLib.UiKit.dll`、`LoadFolders.xml`、`LICENSE`、`version.txt`） |
 | 构建 | `pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev`（10 门禁全绿后才 staging） |
-| `version.txt` | `FerriteLib 0.5.0-dev` / `build=dev` / `commit=14b29ae85ae1` / `source https://github.com/Coahuilite/FerriteLib` |
+| `version.txt` | `FerriteLib 0.5.0-dev` / `build=dev` / `commit=d6b3f6ec791c` / `source https://github.com/Coahuilite/FerriteLib` |
 
 **这是 Dev 配置字节，不是发布字节**：stager 从程序集读 `AssemblyConfigurationAttribute` 并拒绝通道不匹配的字节；
 消费者若要与发布资产对齐，请按同一提交自行构建 Release，或以之后授权的 release 通道产物为准。
@@ -73,3 +73,6 @@ pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev
 
 **注意**：`7ac991c` 之前的包都带有外部 review 已复现的 R1–R7 缺陷（回滚丢草稿、缺失文件回退内嵌、关闭活动窗口丢活动目标、诊断尺互相污染、首次样式未校验、换绑依赖泄漏、哈希/解析两次读）。
 任何在 `14b29ae` 之前构建的包都不应再用于消费者试接或实机验收。
+| `d6b3f6ec791c` | `0.5.0-dev` | **当前交付候选**：R1–R7 修复 + 独立复验（门禁/探针/不变量 + R1–R6 植入红 + 七个探针）+ R3 潜在尖角加固 + R7 护栏收紧与行为 lane + R2 去重范围修正 |
+
+**`7ac991c` 及更早的包都带有外部 review 已复现的缺陷，不得再用于试接或实机验收。**

@@ -296,3 +296,23 @@ P4c 把**页面级**默认值（`DefaultScheme`/`DefaultDensity` 指向本文件
 **R2 的尖角（两个探针一致确认，非缺陷）**：`LastFailedVersion` 在 accept/skip 后不会重置，因此「恢复成功之后的再次损坏」仍会返回 Rejected 并发布给订阅者，但 `Duplicate=True` 且不更新 `LastReport`/`Reports`——与文档承诺的「按失败版本去重报告一次」一致，值得在 R2 记录里补一句。
 
 **R2 的观察（非缺陷）**：恢复成功后第二次缺失仍被拒，但因 `LastFailedVersion` 只按 `missing:`+path 去重，它不会进入报告环；已交 `documents` 裁定并 pin。
+### 7.5 后续修复（task-21 / task-22）与最终剩余项
+
+**task-22（R3 潜在尖角）**：交接链 lane（2 窗 / 3 窗 / 同帧两次关闭 / pending-close survivor，每一步对**所有**窗口断言恰好一个 `IsActiveTarget`）；
+尖角在代码与 lane 注释中写明**可达性未证明**；加固取「pending-close 集合 + `SelectSurvivor` 跳过 pending-close」并给出**行为中性论证**（可 reachable 路径上集合恒为单元素）。
+两半各自有突变证明其载荷（H-A 只红同帧两条、H-B 只红 pending-close 一条），单次关闭/交接链/拒绝关闭三条 lane 保持绿。
+
+**task-21（R7 与 R2）**：R7 的源码护栏改为**去注释的状态机扫描**，要求恰好一次 `ReadAllBytes` 快照且命中枚举的禁止读集；两个方向都有对照（真实第二次读会红、注释里的读不会红），
+并明确写出它**不能**证明 TOCTOU 原子性（无 yield point、无读钩子）。新增行为 lane：超限拒绝并保留 LKG、UTF-8 BOM 与无 BOM 解析同树（版本仍按字节）、
+stage 与 seal 之间释放 host（两种顺序都不崩、不泄漏、不半提交）。R2 去重改为**只在失败持续期间有效**（accept/skip 清除失败版本记录），消费者可见，已在 20-api-and-xml §6 写明。
+
+**最终剩余项（本轮不再动）**：
+
+1. 实机 A1–A11；真实消费者编译——两项外部验收，仍然是零。
+2. R7 的 TOCTOU 语义**没有**行为固定（无钩子）；现有是回归护栏，已自陈边界。
+3. 窗口重叠按目录自持 activationOrder 而非原版栈序、`windowRect` 取本 pass 值——实机项（A3）。
+4. 两个 catalog 同时工作仍无组合 lane。
+5. 诊断覆盖缺口（构造期样式丢弃 / 首帧 chrome / 终态 notice 走旧通道）。
+6. R3 尖角可达性未证明（已加固 + 已记录）。
+7. 未订阅路径分配 lane 主体仍是合成循环、未断言主体执行；交错帧归属 lane 仍缺。
+8. window lane 在 `ApplyOptions` 默认方向被写坏时会抛 NRE 而非命名失败（与 task-10 同类，宜按同样做法硬化）。
