@@ -59,3 +59,6 @@ pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev
 3. [20-api-and-xml.md](20-api-and-xml.md)：API/XML 说明与示例。
 4. `1.6/Assemblies/FerriteLib.UiKit.dll` 与 `tools/.../Stubs/`（后者是事实上的已发布面，
    重命名或移动会让消费者 harness 断裂而本仓门禁全绿）。
+**关于标签与本记录的关系（照实说明）**：包由干净树 `ef133b3` 构建；其后提交的是**文档**（本目录与 `MEMORY.md`/`TODO.md`），
+不改变任何源码或载荷字节。因此在 `ae68a0e` 上重新执行同一命令会得到同样内容的 DLL，而 `version.txt` 会写明 `ae68a0e`；
+两个标签指向同一份载荷，差别只在文档。需要与消费者对齐时，请以 `version.txt` 的 `commit=` 为准并说明该差异。
