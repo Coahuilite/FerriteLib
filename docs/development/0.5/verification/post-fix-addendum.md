@@ -94,3 +94,45 @@ which is exactly the owner's "not reproducible, structural guard" caveat, now me
 R1 is therefore fully covered (my seal-half planting plus this rollback-half planting), and R2-R6 each have a
 measured red lane. The only remaining gap is section 3: the seven new-defect probes.
 
+
+## 7. Follow-up: second independent R1-R7 sweep (corroboration)
+
+A second, independently set-up disposable tree reproduced all seven reds with the same lanes: R1
+`VerifyRolledBackBatchKeepsInteractionState` 3 FAIL (`SealDocumentCommit()` inserted before `RebuildTree()`);
+R2 `VerifyTransientlyMissingFileKeepsLastKnownGood` 5 FAIL (`GoodVersion.Length > 0` inverted); R3
+`VerifyClosingAWindowHandsOverTheActiveTarget` 3 FAIL (`closingWasActive` reduced to `ReferenceEquals(active, window)`);
+R4 `VerifyRulersArePerHost` + `VerifySubscriptionDoesNotOwnTheLegacyRuler` 11 FAIL across the diagnostics lanes
+(`textMetrics = UiDiagnosticHub.ActiveMetrics;` reverted to `metrics`); R5 `VerifyFirstStyleAttachValidatesLikeReload`
+2 FAIL (attach pre-check bypassed); R6 `VerifyRebindingReleasesTheOldService` 4 FAIL (`previous?.Detach(this);`
+dropped); R7 `VerifySourceWiring` 1 FAIL (`Parse(Decode(bytes))` -> `ParseFile(path)`). Every run: one unique
+anchor, byte snapshot, SHA256-verified restore, then `dotnet build ... --no-incremental` exit 0 and a green
+harness `ALL PASS`. Two independent sweeps now agree on the lane for every R.
+
+**R7 verbatim (both sweeps).** `HasSingleReadPipeline(text)` is `File.ReadAllText(UiDocumentService.cs)` plus four
+`IndexOf` clauses (three positive substrings, `ParseFile(` absent). It never executes the service, does not strip
+comments/strings/dead code, and only ever looks at that one file. So the predicate is satisfiable by text that
+executes nothing, and blind to a second read performed outside that file or in a shape that keeps the four
+substrings. Together with the two falsifications already recorded (comment-only reddens it; a real second read
+keeps it green), the honest record is: *the historical double-read shape is guarded; the TOCTOU fix is not
+behaviourally pinned.*
+
+**Process finding (not a tip defect).** One sweep's first extraction lived at a shared temp path another process
+reused; `UiDocumentService.cs` there had been reverted to `ParseFile(path)` after extraction, giving a spurious
+red. Re-extracting the same tip into a unique directory is green. Independent verifiers must use unique temp paths.
+
+## 8. The seven new-defect probes
+
+| probe | disposition | evidence / reason |
+| --- | --- | --- |
+| P1 R1: host disposed between stage and seal | **UNVERIFIED** | no lane reaches a disposed-host-between-phases shape; the delegated probe had not returned |
+| P2 R2: recovery when the file returns | **EXERCISED-AND-PASSES** | lane R2 asserts "the file returning with the same bytes is already in force" and "and a changed file commits normally after recovery" |
+| P3 R3: the survivor itself closing | **UNVERIFIED** | no lane closes the survivor during hand-off; the delegated probe had not returned |
+| P4 R4: legacy ruler for an UNSUBSCRIBED host | **EXERCISED-AND-PASSES** | lane `VerifySubscriptionDoesNotOwnTheLegacyRuler` asserts "the legacy channel measures with the ruler it was handed"; the R4 mutation's FAIL list includes "the unsubscribed host still measures with the legacy ruler". **A stale comment**: the reviewer's report claims `UiWindowCatalog.cs:268` ... note: the two-catalogs claim lives in `api-tiers.md:268`. |
+| P5 R5: first-attach refusal leaves no style source | **EXERCISED-AND-PASSES** | lane R5 asserts "and the host keeps the document it already had" - a refusal leaves the host with its existing source, not none |
+| P6 R6: attaching the same service twice | **EXERCISED-AND-PASSES** | lane R6 asserts "re-attaching to the same service keeps exactly one dependency" and "and closing it releases that one" |
+| P7 R7: size bound + BOM | **UNVERIFIED** | a search of `tools/` finds no test touching `MaxDocumentBytes`/oversized and none that feeds a BOM-prefixed file; the delegated probe had not returned |
+
+P2/P4/P5/P6 are covered by the fix lanes themselves and are green at the tip; **P1, P3 and P7 have no lane and
+remain named gaps** at this commit. Nothing here is asserted beyond what the cited lane text or the two sweeps
+show.
+
