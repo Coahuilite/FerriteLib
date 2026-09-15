@@ -51,6 +51,9 @@ internal static class KernelDocumentReloadTests
             Run("Repeated notifications coalesce and an unchanged version is skipped", () => VerifyCoalescingAndDedup(sandbox));
             Run("Failures are reported once per refusing version", () => VerifyFailureDedup(sandbox));
             Run("Automatic watching is configurable and a real file write reaches the host", () => VerifyWatching(sandbox));
+            Run("A watcher whose directory appeared later is re-armed on every entry point", () => VerifyWatchReArm(sandbox));
+            Run("A shared style batch is pre-checked across hosts and rolled back, never half-updated", () => VerifyStyleBatchAtomicity(sandbox));
+            Run("A consumer re-tint survives a reload; a page level the document drops is undone", () => VerifyConsumerRetintAcrossReload(sandbox));
             Run("The two file entry points are wired and the document path stays backend-free", VerifySourceWiring);
         }
         finally
@@ -594,6 +597,182 @@ internal static class KernelDocumentReloadTests
         Check(HasElement(host.Manifest, "added"), "and the host draws the edited tree");
     }
 
+    // --- re-arm after a directory that did not exist yet -----------------------------------------
+
+    /// <summary>
+    /// The adversarial probe this lane answers: a registered file whose parent directory does not exist yet
+    /// used to be a permanent silent no-op, because the setter early-returned on an unchanged value and the
+    /// watch attempt returned when the directory was missing. A first run whose <c>Layouts/</c> folder is
+    /// created later must pick the watcher up on every entry point.
+    /// </summary>
+    private static void VerifyWatchReArm(string sandbox)
+    {
+        string v1 = KeepPage("scope-rearm");
+
+        string pathA = Path.Combine(sandbox, "rearm-a", "page.xml");
+        using (var viaSetter = new UiDocumentService(autoWatch: true))
+        {
+            Check(viaSetter.Add(new UiDocumentSource("a", UiDocumentKind.Layout, pathA), v1),
+                "a source under a directory that does not exist yet still registers");
+            Check(!viaSetter.IsWatching("a"), "and stays unwatched while the directory is missing");
+            Directory.CreateDirectory(Path.Combine(sandbox, "rearm-a"));
+            viaSetter.AutoWatch = true;
+            Check(viaSetter.IsWatching("a"), "setting AutoWatch to its current value re-arms once the directory exists");
+        }
+
+        string pathB = Path.Combine(sandbox, "rearm-b", "page.xml");
+        using (var viaPump = new UiDocumentService(autoWatch: true))
+        {
+            viaPump.Add(new UiDocumentSource("b", UiDocumentKind.Layout, pathB), v1);
+            Check(!viaPump.IsWatching("b"), "the second source starts unwatched for the same reason");
+            Directory.CreateDirectory(Path.Combine(sandbox, "rearm-b"));
+            viaPump.Pump();
+            Check(viaPump.IsWatching("b"), "the frame-boundary pump re-attempts the arming without the caller touching AutoWatch");
+        }
+
+        string pathC = Path.Combine(sandbox, "rearm-c", "page.xml");
+        using (var viaReload = new UiDocumentService(autoWatch: true))
+        {
+            viaReload.Add(new UiDocumentSource("c", UiDocumentKind.Layout, pathC), v1);
+            Check(!viaReload.IsWatching("c"), "the third source starts unwatched too");
+            Directory.CreateDirectory(Path.Combine(sandbox, "rearm-c"));
+            viaReload.Reload("c");
+            Check(viaReload.IsWatching("c"), "the manual reload path re-attempts the arming as well");
+        }
+    }
+
+    // --- style batches ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// A shared style document with two hosts is a batch like any other. The adversarial pass found that
+    /// only layout dependencies were pre-checked, so this lane pins both halves: a host that fails the
+    /// pre-check keeps the whole batch old, and a host that fails at commit time rolls the already-committed
+    /// host back. The fault seam is what makes those two paths reachable - a valid style document has no
+    /// per-host contract to fail on, and a production commit cannot fail after validation.
+    /// </summary>
+    private static void VerifyStyleBatchAtomicity(string sandbox)
+    {
+        string dir = NewDir(sandbox, "style-batch");
+        string path = Path.Combine(dir, "theme.xml");
+        string v1 = PageSchemeStyle("ice", "#0000ff");
+        File.WriteAllText(path, v1);
+
+        using var service = new UiDocumentService(autoWatch: false);
+        service.Add(new UiDocumentSource("shared-style", UiDocumentKind.Style, path), v1);
+        UiTheme themeA = UiTheme.DarkGold.Clone();
+        UiTheme themeB = UiTheme.DarkGold.Clone();
+        using var hostA = NewHost("style-a", UiLayoutManifest.Parse(KeepPage("style-a")), new UiBindings(), themeA);
+        using var hostB = NewHost("style-b", UiLayoutManifest.Parse(KeepPage("style-b")), new UiBindings(), themeB);
+        service.Attach(hostA, null, "shared-style");
+        service.Attach(hostB, null, "shared-style");
+
+        UiStyleDocument beforeA = hostA.StyleResolver.Document;
+        UiStyleDocument beforeB = hostB.StyleResolver.Document;
+        Check(SameColor(themeA.Panel, new Color(0f, 0f, 1f, 1f)),
+            "the first style document's page level reached host A");
+        Check(SameColor(themeB.Panel, new Color(0f, 0f, 1f, 1f)),
+            "and reached host B");
+
+        File.WriteAllText(path, PageSchemeStyle("ice", "#00ff00"));
+
+        service.DocumentFaultOverride = (host, phase) =>
+            string.Equals(phase, UiDocumentService.PreparePhase, StringComparison.Ordinal)
+                && string.Equals(host.Source, "style-b", StringComparison.Ordinal)
+                ? "planted style prepare failure"
+                : "";
+        UiReloadReport? preCheckRefusal = service.Reload("shared-style");
+        service.DocumentFaultOverride = null;
+        Check(preCheckRefusal != null && preCheckRefusal.Rejected && preCheckRefusal.HostsCommitted == 0,
+            "a style batch is refused when one affected host fails its pre-check");
+        Check(preCheckRefusal != null && preCheckRefusal.Reason.IndexOf("style-b", StringComparison.Ordinal) >= 0,
+            "and the refusal names the host that failed the pre-check");
+        Check(ReferenceEquals(hostA.StyleResolver.Document, beforeA)
+            && ReferenceEquals(hostB.StyleResolver.Document, beforeB),
+            "a pre-check failure leaves both hosts of the style batch on the old document");
+
+        service.DocumentFaultOverride = (host, phase) =>
+            string.Equals(phase, UiDocumentService.CommitPhase, StringComparison.Ordinal)
+                && string.Equals(host.Source, "style-b", StringComparison.Ordinal)
+                ? "planted style commit failure"
+                : "";
+        UiReloadReport? commitRefusal = service.Reload("shared-style");
+        service.DocumentFaultOverride = null;
+        Check(commitRefusal != null && commitRefusal.Rejected && commitRefusal.HostsCommitted == 0,
+            "a style batch whose later commit fails is refused rather than half-applied");
+        Check(commitRefusal != null && commitRefusal.Reason.IndexOf("rolled back", StringComparison.Ordinal) >= 0,
+            "and the refusal says the batch was rolled back");
+        Check(ReferenceEquals(hostA.StyleResolver.Document, beforeA)
+            && ReferenceEquals(hostB.StyleResolver.Document, beforeB),
+            "the already-committed host is rolled back to the old document");
+
+        UiReloadReport? accepted = service.Reload("shared-style");
+        Check(accepted != null && accepted.Accepted && accepted.HostsCommitted == 2,
+            "once no host fails, the same style batch commits to both");
+        Check(!ReferenceEquals(hostA.StyleResolver.Document, beforeA)
+            && !ReferenceEquals(hostB.StyleResolver.Document, beforeB)
+            && SameColor(themeA.Panel, new Color(0f, 1f, 0f, 1f))
+            && SameColor(themeB.Panel, new Color(0f, 1f, 0f, 1f)),
+            "and both hosts resolve the new page level together");
+    }
+
+    // --- the theme baseline ----------------------------------------------------------------------
+
+    /// <summary>
+    /// The adversarial probe that found <c>RestoreStyleBaseline</c> dropping a post-construction re-tint.
+    /// The fix is a gate, not a promise: a document that applies no page level is not undone, so a re-tint
+    /// on the theme the consumer handed in survives; a document that does apply one is still undone when
+    /// the next version stops declaring it.
+    /// </summary>
+    private static void VerifyConsumerRetintAcrossReload(string sandbox)
+    {
+        string dir = NewDir(sandbox, "retint");
+        string path = Path.Combine(dir, "page.xml");
+        string v1 = KeepPage("scope-retint");
+        File.WriteAllText(path, v1);
+
+        UiTheme theme = UiTheme.DarkGold.Clone();
+        using var service = new UiDocumentService(autoWatch: false);
+        service.Add(new UiDocumentSource("tint", UiDocumentKind.Layout, path), v1);
+        using var host = NewHost("scope-retint", UiLayoutManifest.Parse(v1), new UiBindings(), theme);
+        service.Attach(host, "tint");
+
+        Color tint = new Color(0.5f, 0.1f, 0.1f, 1f);
+        theme.Base = tint;
+
+        File.WriteAllText(path, Page("scope-retint",
+            "<Column Id=\"root\">"
+            + "<Widget Id=\"keep\" Kind=\"chrome/banner\" Text=\"keep\"/>"
+            + "<Widget Id=\"added\" Kind=\"chrome/banner\" Text=\"added\"/>"
+            + "</Column>"));
+        service.Signal("tint");
+        service.Pump();
+
+        Check(service.LastReport?.Accepted == true, "the layout reload committed");
+        Check(SameColor(theme.Base, tint),
+            "a consumer re-tint survives a reload whose document applies no page level");
+
+        string stylePath = Path.Combine(dir, "theme.xml");
+        string styleV1 = PageSchemeStyle("ice", "#0000ff");
+        File.WriteAllText(stylePath, styleV1);
+
+        using var styleService = new UiDocumentService(autoWatch: false);
+        styleService.Add(new UiDocumentSource("tint-style", UiDocumentKind.Style, stylePath), styleV1);
+        UiTheme themed = UiTheme.DarkGold.Clone();
+        Color panelBaseline = themed.Panel;
+        using var styled = NewHost("scope-retint-style", UiLayoutManifest.Parse(KeepPage("scope-retint-style")), new UiBindings(), themed);
+        styleService.Attach(styled, null, "tint-style");
+        Check(SameColor(themed.Panel, new Color(0f, 0f, 1f, 1f)),
+            "a page-level document is applied on the first commit");
+
+        File.WriteAllText(stylePath,
+            "<Styles Schema=\"1\"><Scheme Name=\"ice\"><Color Token=\"Panel\" Value=\"#00ff00\"/></Scheme></Styles>");
+        styleService.Signal("tint-style");
+        styleService.Pump();
+        Check(styleService.LastReport?.Accepted == true, "the style reload committed");
+        Check(SameColor(themed.Panel, panelBaseline),
+            "and a page level the new document no longer declares is undone");
+    }
+
     // --- wiring ----------------------------------------------------------------------------------
 
     /// <summary>
@@ -645,6 +824,12 @@ internal static class KernelDocumentReloadTests
         return new UiHost(source, manifest, bindings, UiTheme.DarkGold, new FixedMetrics(), new FixedTranslation());
     }
 
+    /// <summary>A host built on a theme the lane holds, so a page-level application is observable.</summary>
+    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindings bindings, UiTheme theme)
+    {
+        return new UiHost(source, manifest, bindings, theme, new FixedMetrics(), new FixedTranslation());
+    }
+
     private static void Draw(UiHost host)
     {
         host.DrawFrame(new Rect(0f, 0f, 400f, 300f));
@@ -658,6 +843,16 @@ internal static class KernelDocumentReloadTests
     private static string Page(string source, string body)
     {
         return "<UiPage Schema=\"2\" Source=\"" + source + "\">" + body + "</UiPage>";
+    }
+
+    /// <summary>A style document whose page level names <paramref name="schemeName"/> and sets Panel.</summary>
+    private static string PageSchemeStyle(string schemeName, string panelValue)
+    {
+        return "<Styles Schema=\"1\" Scheme=\"" + schemeName + "\">"
+            + "<Scheme Name=\"" + schemeName + "\">"
+            + "<Color Token=\"Panel\" Value=\"" + panelValue + "\"/>"
+            + "</Scheme>"
+            + "</Styles>";
     }
 
     private static string KeepPage(string source)
@@ -705,6 +900,14 @@ internal static class KernelDocumentReloadTests
         }
 
         return false;
+    }
+
+    private static bool SameColor(Color left, Color right)
+    {
+        return Math.Abs(left.r - right.r) < 0.001f
+            && Math.Abs(left.g - right.g) < 0.001f
+            && Math.Abs(left.b - right.b) < 0.001f
+            && Math.Abs(left.a - right.a) < 0.001f;
     }
 
     private static bool ContainsName(IReadOnlyCollection<string> names, string name)
