@@ -377,6 +377,22 @@
   the finding table live in `docs/development/0.5/40-verification.md` §7; the probe itself is gitignored under `dist/review-0117c01/`
   and must never become the only regression guard - every fix owes a harness lane.
 
+- **The external review's seven findings are fixed, and the external probe now reads fixed (2026-09-16, tip `0622679`).**
+  R1 (a rolled-back batch kept the old document but lost the draft it had already pruned) is now a two-phase commit - a
+  non-destructive stage followed by a seal that runs only after the whole batch staged - so a failed batch keeps the document
+  AND the interaction state. R2 makes the embedded text the first-load source only, with a missing file keeping the last known
+  good. R3 records who held the active target before a close and hands it to a survivor. R4 gives a diagnostic scope its own
+  host ruler instead of one static slot. R5 runs the same candidate validation on first style attach as on reload. R6 releases
+  the previous service's dependency on rebinding. R7 reads one snapshot for size, version and parse. The reviewer's own probe,
+  re-run by the Lead and again by the independent verifier on a clean extraction, prints every line in its fixed shape; the gate
+  suite is green on the final tip with 1515 harness checks. Two more defects came out of the fixes themselves and were closed: an
+  item-local binding that was absent or wrong-typed landed on the recovery band instead of the fail-soft default plus one report,
+  and the harness's window double rested on field defaults that the game does not have. **The honest residue:** the independent
+  verifier delivered the gate, probe and invariant half of the post-fix round and then stopped twice without the promised per-fix
+  mutation sweep, so R1-R7 are "fixed, with an in-repo guard per finding and the author's mutation evidence" rather than
+  independently re-derived; and the external acceptance this library has never had - a game session and a real consumer compiling
+  against it - is still outstanding. `docs/development/0.5/40-verification.md` §7 carries all of it, including the defect table.
+
 ## Charter — what this library is for
 
 - **The founding spec, transcribed.** `Coahuilite/UniversalSqueaker@09366f8:docs/ui-shared-library-design-zh.md`

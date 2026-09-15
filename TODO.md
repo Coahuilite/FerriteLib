@@ -13,7 +13,8 @@ This section is a pointer only; the round's live status has one home and it is t
       last-known-good, manual reload (P4+P4b+P4c).
 - [x] Diagnostics — per-host/session subscriptions, attributed bounded events, and the shell/page routing
       seams that make them reachable (P5 + task-13 + task-14).
-- [ ] Delivery — dev package `0.5.0-dev` at `ef133b3` and the consumer handoff are done; what remains is
+- [~] Delivery — external review of `0117c01` returned Request changes with 7 reproduced defects; all fixed and the reviewer's
+      own probe re-run green (tip `0622679`, package rebuilt). What remains is
       external: in-game acceptance (A1-A11) and a real consumer compiling against `[0.5.0,0.6.0)`. Both are
       other teams' steps and neither may be recorded as done from here.
 - Supersessions this round registers (detail in `docs/development/0.5/00-baseline.md` §2): confirmed
@@ -529,6 +530,3 @@ identity is created locally at upload time.
       `path: ci-ferritelib` that no repo-name case affects, and both runners are windows-latest anyway.
       Machine identity stays lowercase where it is load-bearing: packageId `coahuilite.ferritelib`
       (save-data reference, immutable) and the local sibling directory `ferritelib` (what the csproj
-      HintPath actually resolves). Creating `Coahuilite/FerriteLib` also squat-proofs the variants:
-      GitHub forbids a second case-variant under one owner, so every misspelling redirects here.
-      Availability measured 2026-09-07: both variants free under the owner, zero global name collisions
