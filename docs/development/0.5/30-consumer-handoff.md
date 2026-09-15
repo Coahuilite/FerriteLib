@@ -60,6 +60,12 @@ FerriteLibVersion.Require(new Version(0, 5, 0), new Version(0, 6, 0), "your.pack
 - **同型多开需要显式选择。** `UiWindowOptions.AllowMultipleInstances = false` 走的是原版规则：`WindowStack.Add` 按**精确 C# 类型**（配合既有窗口的 `onlyOneOfTypeAllowed`）驱逐同型窗口。因此两个不同 window-kind 若共用同一个 `Window` 派生类，会互相关闭；要同型共存必须显式允许，或者让每个 kind 有自己的壳类型。`UiPageWindow` 作为通用壳时请特别注意这一点（它建议每个 kind 用不同的实例 key，而不是不同的 C# 类型）。
 - **`UiWindowOptions.NormalSize` 是暂定语义。** 它是"在 `PreOpen` 时重新施加的静止尺寸"，目前**没有消费者证据**，是本轮最弱的一条 P1 声明；把它当成可用的默认值之前请先在自己的窗口上验证。
 
+- **失效类别在"注册绑定"时声明，不能按元素覆盖。** `BindValue/BindReadOnly/BindOptions/BindAction/BindCommand` 上的 `UiInvalidation` 属于**该 key**，同一 key 的所有元素共用同一个类别，不声明即 `Everything`。一个页面若同一个 key 需要两种类别，请拆成两个 key。
+- **`Paint` ≠ 元素级重测。** 排布缓存是整页的：`Paint` 复用已排布快照（不重排），`Measure`/`Structure` 触发整页重排。按 key 的是**通知的定向**，不是元素级增量测量。
+- **在元素存在之前发出的通知不会补发。** `NotifyChanged` 对一个尚未排布过的 key 只记录、不生效；该元素首次排布时会直接读当前模型值，所以不会丢更新，但语义是"元素存在后再通知"。
+- **自持 kind 里的裸 IMGUI 拖拽不受 `canExecute` 约束。** 漏斗的禁用守卫在 `UiNative` 的带 ctx 入口上；一个手写拖拽（如库内 `chart/line` 的做法）不走漏斗，因此禁用态不会阻止它的拖拽。公共拖拽型控件应走库入口。
+- **`UiSession.ContentRevision` 是排布缓存时钟，不是失效 API。** 消费者用它做失效判断会失去按 key 的定向能力；请用 `NotifyChanged` + `UiInvalidation`。
+
 ## 5. 交接节奏
 
 | 阶段 | 交付物 | 消费者可开始做什么 |

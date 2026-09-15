@@ -33,7 +33,7 @@ pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev
 | W0 | —— | 基线在 `c53bd37` 与 `99acc5f` 的**干净提取**上各复跑一次：门禁 exit 0、harness 867 ok / 0 FAIL / ALL PASS | —— | 完成（独立复跑） |
 | P1 | `KernelWindowCatalogTests`（91→108 断言） | 合并后门禁 exit 0；harness 1050 ok / 0 FAIL | **7 处**：M1 去重、M2/M6 `AllowMultipleInstances` 与原版精确类型规则、M3 失活释放捕获、M4 激活点击被消费、M5 chrome 身份带 key、M7 调原版焦点设置 —— 独立复跑全部转红、无一留绿 | 已合并 |
 | P1h（task-10） | 同上（+9 断言） | 门禁 exit 0；harness 1081 ok | 2 处 stub 突变（精确类型 vs 可赋值，双向）+ M1 由 UNHANDLED 变为 3 条命名 FAIL | 已合并 |
-| P2 | `KernelInvalidationTests` + `KernelCommandStateTests` + `KernelVisibilityTests` | 门禁 exit 0；harness ALL PASS | **6 处转红**（a1 忽略声明类别 3、a3 去掉按 key 失效 13、b1 去掉可执行守卫 3、b2 去掉漏斗禁用守卫 1、c1 隐藏后重编号 4、c2 过度剪枝 6）+ **1 处诚实的负结果**：只删每节点 `MarkDirty` 而保留时钟 → 全绿（已写进代码注释） | 已合并 |
+| P2 | `KernelInvalidationTests` + `KernelCommandStateTests` + `KernelVisibilityTests` | 门禁 exit 0；harness ALL PASS | **6 处转红**（a1 忽略声明类别 3、a3 去掉按 key 失效 13、b1 去掉可执行守卫 3、b2 去掉漏斗禁用守卫 1、c1 隐藏后重编号 4、**c2 过度剪枝 7**——作者报 6，独立复跑为 7，多出的一条是 Tab-隐藏兄弟断言）+ **1 处诚实的负结果**：只删每节点 `MarkDirty` 而保留时钟 → 全绿（已写进代码注释） | 已合并 |
 | P2b（task-9） | 同上 | 门禁 exit 0 | 含在 P2 的 c2 突变内（过度剪枝 6 转红） | 已合并 |
 | P4 | `KernelDocumentReloadTests`（81 断言） | 门禁 exit 0；harness 948 ok | **3 处**：批次原子性 6、状态清理 5、重复版本跳过 2 | 已合并 |
 | P4b（task-8） | 同上（103 断言） | 门禁 exit 0；harness 1072 ok | **4 处**：AutoWatch 旧行为 3、style 预校验分支移除 7、回滚移除 1、无条件基线恢复 1 | 已合并 |

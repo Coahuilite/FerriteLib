@@ -279,10 +279,13 @@ consequence is paid in the open rather than discovered by a stranger.
   committed/skipped/duplicate axes; failures are recorded once per refusing version.
 
 - `UiInvalidation` — the class a binding declares for its own announcements: `Paint` reuses the arranged
-  snapshot and lets the next paint read the value, `Measure` re-measures the elements that declared the
-  key, `Structure` adds the container that owns the element's slot. Combinable, and an undeclared binding
-  answers `Everything`. Public-unstable for the same reason `IUiBindings` is: the class set may grow when
-  collection reconciliation has to name what a keyed insert or removal invalidates.
+  snapshot and lets the next paint read the value; `Measure` re-arranges the page (the arrangement cache is
+  page-wide, so this is **not** an element-level re-measure — what is per-key is the targeting of the
+  announcement); `Structure` additionally covers the container that owns the element's slot. Combinable, and
+  an undeclared binding answers `Everything`. The class is declared at binding **registration**, so every
+  element sharing one key shares one class and there is no per-element override — a page that needs two
+  classes for one key must use two keys. Public-unstable for the same reason `IUiBindings` is: the class set
+  may grow when collection reconciliation has to name what a keyed insert or removal invalidates.
 
 ## Internalize-candidate
 
