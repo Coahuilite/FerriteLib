@@ -26,6 +26,7 @@ internal static class KernelLaneRegistrationTests
         int failures = 0;
         failures += Run("Every lane file that declares RunAll is invoked from Program.cs", VerifyEveryDeclaredLaneIsRegistered);
         failures += Run("Every Program.cs RunAll registration names a lane that exists", VerifyNoRegistrationIsStale);
+        failures += Run("No lane is invoked more than once from Program.cs", VerifyNoDuplicateRegistration);
         failures += Run("The comparison fires on a planted unregistered lane and ignores a renamed file", VerifyComparisonIsNotVacuous);
         return failures;
     }
@@ -78,11 +79,22 @@ internal static class KernelLaneRegistrationTests
         }
     }
 
+    private static void VerifyNoDuplicateRegistration()
+    {
+        LaneScan scan = Scan(RepoRoot());
+        if (scan.DuplicateRegistrations.Count > 0)
+        {
+            throw new Exception(scan.DuplicateRegistrations.Count + " lane(s) are invoked more than once from Program.cs: "
+                + string.Join(", ", scan.DuplicateRegistrations)
+                + " - the registry must invoke each lane exactly once; an accidental duplicate also hides a drifting copy.");
+        }
+    }
+
     /// <summary>
     /// Positive control. A parser that silently reads nothing reports a clean repository, which is the
     /// failure this lane exists to catch, so the control plants the exact shape it must reject: one lane
     /// file that is not registered, one registered lane whose class name differs from its file name (must
-    /// NOT be reported), and one registration with no lane file at all.
+    /// NOT be reported), one registration with no lane file at all, and one lane invoked twice.
     /// </summary>
     private static void VerifyComparisonIsNotVacuous()
     {
@@ -93,6 +105,7 @@ internal static class KernelLaneRegistrationTests
             Directory.CreateDirectory(directory);
             File.WriteAllText(Path.Combine(directory, ProgramFileName),
                 "class Program { static int failures; static void RunAll() {"
+                + " failures += GoodLaneTests.RunAll();"
                 + " failures += GoodLaneTests.RunAll();"
                 + " failures += RenamedFileLane.RunAll();"
                 + " failures += GhostLane.RunAll(); } }");
@@ -113,6 +126,12 @@ internal static class KernelLaneRegistrationTests
                 throw new Exception("a registration with no lane file was not isolated; reported ["
                     + string.Join(", ", scan.StaleRegistrations) + "] - exactly GhostLane must be reported.");
             }
+
+            if (scan.DuplicateRegistrations.Count != 1 || scan.DuplicateRegistrations[0] != "GoodLaneTests")
+            {
+                throw new Exception("a duplicated registration was not isolated; reported ["
+                    + string.Join(", ", scan.DuplicateRegistrations) + "] - exactly GoodLaneTests must be reported.");
+            }
         }
         finally
         {
@@ -130,6 +149,8 @@ internal static class KernelLaneRegistrationTests
     private sealed class LaneScan
     {
         public readonly List<string> RegisteredNames = new List<string>();
+        public readonly List<string> RegisteredOccurrences = new List<string>();
+        public readonly List<string> DuplicateRegistrations = new List<string>();
         public readonly List<string> DeclaredLaneClasses = new List<string>();
         public readonly List<string> DeclaredTestsLaneClasses = new List<string>();
         public readonly List<string> Unregistered = new List<string>();
@@ -151,7 +172,11 @@ internal static class KernelLaneRegistrationTests
         }
 
         LaneScan scan = new LaneScan();
-        scan.RegisteredNames.AddRange(RegisteredNames(StripComments(File.ReadAllText(programPath))));
+        foreach (string name in RegisteredNames(StripComments(File.ReadAllText(programPath))))
+        {
+            scan.RegisteredOccurrences.Add(name);
+            if (!scan.RegisteredNames.Contains(name)) scan.RegisteredNames.Add(name);
+        }
 
         foreach (string file in Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories))
         {
@@ -176,6 +201,20 @@ internal static class KernelLaneRegistrationTests
             if (!scan.DeclaredLaneClasses.Contains(name)) scan.StaleRegistrations.Add(name);
         }
 
+        // The reader deduped on the way in, which is exactly why a duplicate was invisible to every check
+        // here: the registry means to invoke each lane once, and a second call runs the suite twice (or
+        // hides a drifted copy).
+        foreach (string name in scan.RegisteredNames)
+        {
+            int occurrences = 0;
+            for (int i = 0; i < scan.RegisteredOccurrences.Count; i++)
+            {
+                if (string.Equals(scan.RegisteredOccurrences[i], name, StringComparison.Ordinal)) occurrences++;
+            }
+
+            if (occurrences > 1) scan.DuplicateRegistrations.Add(name);
+        }
+
         return scan;
     }
 
@@ -190,14 +229,17 @@ internal static class KernelLaneRegistrationTests
         return Regex.Replace(Regex.Replace(text, @"/\*.*?\*/", " ", RegexOptions.Singleline), @"//[^\r\n]*", " ");
     }
 
-    /// <summary>Program.cs is the only registration surface; the call shape is what the reader keys on.</summary>
+    /// <summary>
+    /// Program.cs is the only registration surface; the call shape is what the reader keys on. Every
+    /// occurrence is returned in file order - the caller dedupes for the set logic and counts the
+    /// occurrences separately, because a duplicate is exactly what must not be deduped away.
+    /// </summary>
     private static List<string> RegisteredNames(string programText)
     {
         List<string> names = new List<string>();
         foreach (Match match in Regex.Matches(programText, @"\b([A-Za-z_][A-Za-z0-9_]*)\.RunAll\s*\(\s*\)"))
         {
-            string name = match.Groups[1].Value;
-            if (!names.Contains(name)) names.Add(name);
+            names.Add(match.Groups[1].Value);
         }
 
         return names;
