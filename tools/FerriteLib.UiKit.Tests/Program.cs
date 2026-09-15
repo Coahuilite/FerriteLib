@@ -121,6 +121,15 @@ internal static class Program
         Console.WriteLine("Kernel diagnostics (per-host subscriptions, attribution, budgets, reload/fit/recovery)...");
         failures += KernelDiagnosticsTests.RunAll();
 
+        Console.WriteLine("Kernel keyed repeater (item scope, key reuse, removal cleanup, template contract)...");
+        failures += KernelRepeatTests.RunAll();
+
+        Console.WriteLine("Kernel common controls (checkbox / progress / tree contracts)...");
+        failures += KernelControlKindTests.RunAll();
+
+        Console.WriteLine("Kernel neutral fixture page (data-driven rows + the new controls, library fixture only)...");
+        failures += KernelFixturePageTests.RunAll();
+
         Console.WriteLine("Kernel lane registration (every lane file is invoked from Program.cs)...");
         failures += KernelLaneRegistrationTests.RunAll();
     }

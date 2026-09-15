@@ -68,11 +68,54 @@ public sealed class UiLayoutEngine
     // Matches Verse.GenUI.ScrollBarWidth (16f), the convention the US pages already follow.
     private const float ScrollbarWidth = 16f;
 
+    // Attribute names of the collection element. They are manifest vocabulary the engine reads, like the
+    // Bind/ActionBind names above, not source text.
+    private const string RepeatItemsAttribute = "Items";
+    private const string RepeatTemplateAttribute = "Template";
+
     private readonly string scope;
 
     // The document resolver is the engine's answer to "what does this scope look like": null means the
     // tree has no style document at all, in which case every element draws with the injected theme.
     private readonly UiStyleResolver? styleResolver;
+
+    // The definition's template table (the manifest's <Templates> section), handed in by the host. A Repeat
+    // element materializes a named template once per item key; an engine built without the table refuses the
+    // row set with one bounded report instead of drawing a silently empty band.
+    private readonly IReadOnlyDictionary<string, UiElementSpec> templates;
+
+    // One entry per arranged Repeat element: the row keys the current items binding produced, in order, plus
+    // the derived per-item subtree each key instantiates. Keyed by the repeat's node identity and pruned
+    // with the node, so a removed <Repeat> leaves nothing behind - the same object lifetime rule the
+    // session's own tables follow. A reorder reuses both the keys and the derived specs, which is what makes
+    // reordering reuse nodes and state instead of rebuilding them.
+    private readonly Dictionary<UiNodeId, RepeatState> repeatStates = new();
+
+    // The repeats materialized by the arrange currently running. It is what lets the declared identity set
+    // contain exactly the rows the current items binding produced: that set is what the session's
+    // PruneNodesExcept reaps against, so a removed item's node - and its state, its sub-nodes and its hit
+    // layers - is released rather than merely zeroed.
+    private readonly List<MaterializedRepeat> materializedRepeats = new();
+
+    // The template subtree is deliberately outside the Host's creation-time walk, because its binding keys
+    // are item-scoped and cannot exist as page bindings. Its attribute vocabulary therefore has to be
+    // enforced here, and these two sets are UiHost's own lists, copied because UiHost's are private.
+    // KernelRepeatTests reflects the private originals and fails when the copies drift, so the duplication
+    // cannot rot silently - which is the reason it is duplication rather than a hole.
+    private static readonly HashSet<string> TemplateContainerAttributes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Width", "Fill",
+        "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden",
+        "Scheme", "Density", "Visible", "VisibleKey"
+    };
+
+    private static readonly HashSet<string> EngineWideWidgetAttributes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Id", "Kind", "Hidden", "Tab", "Width", "MinWidth", "MaxWidth", "NarrowHidden", "Scheme", "Density",
+        "Visible", "VisibleKey"
+    };
+
+    private static readonly string[] NoSchema = Array.Empty<string>();
 
     // Widget instances are keyed by element identity, not by path text: two unnamed same-kind siblings
     // used to collide here, so the second one drew with the first one's spec.
@@ -108,10 +151,18 @@ public sealed class UiLayoutEngine
     /// element declares into the theme that element draws with. Null keeps the pre-document behaviour,
     /// where the injected theme is the only theme.
     /// </summary>
-    public UiLayoutEngine(string scope, UiStyleResolver? styleResolver = null)
+    public UiLayoutEngine(
+        string scope,
+        UiStyleResolver? styleResolver = null,
+        IReadOnlyDictionary<string, UiElementSpec>? templates = null)
     {
         this.scope = scope ?? throw new ArgumentNullException(nameof(scope));
         this.styleResolver = styleResolver;
+        this.templates = templates ?? new Dictionary<string, UiElementSpec>(StringComparer.Ordinal);
+        if (this.templates.Count > 0)
+        {
+            ValidateTemplates();
+        }
     }
 
     public UiLayoutSnapshot ArrangeRoots(UiWidgetContext ctx, Vector2 available, IReadOnlyList<UiElementSpec> roots)
@@ -147,6 +198,7 @@ public sealed class UiLayoutEngine
         // declared by any arranged element stops being polled instead of invalidating a page forever.
         ctx.Session.BeginArrange();
         keyNodes.Clear();
+        materializedRepeats.Clear();
 
         var box = new MeasuredBox { Width = width, Height = 0f };
         float y = 0f;
@@ -232,11 +284,27 @@ public sealed class UiLayoutEngine
         // identity still exists and their state has to survive the hide.
         var declaredIdentities = new HashSet<UiNodeId>();
         CollectDeclaredIdentities(roots, declaredIdentities);
+
+        // A row set's identities are data-driven, so the definition walk above cannot know them: this
+        // arrange's materialization is the definition for this purpose. A key the items binding no longer
+        // supplies instantiates nothing this pass, is therefore declared by nobody, and the session's prune
+        // releases its node - with its state, its sub-nodes and its hit layers - through the one lifetime
+        // path every other element already uses. That is why "removal cleans the item's state" needs no
+        // second cleanup rule.
+        CollectRepeatItemIdentities(declaredIdentities);
+
+        // A declared-but-hidden collection keeps what it last materialized: P2's rule for a hidden element is
+        // that its identity survives the hide and only a removed one is released, and that rule has to hold
+        // for rows too or a Tab switch would silently discard every row's state the page still declares.
+        CollectHiddenRepeatIdentities(roots, declaredIdentities);
+
         if (ctx.Session.PruneNodesExcept(declaredIdentities) > 0)
         {
             // A widget instance keyed by an identity that no longer exists is the same leak one level up.
             PruneWidgetInstances(ctx.Session);
         }
+
+        PruneRepeatStates(ctx.Session);
 
         ClampScrollPositions(ctx.Session, lastEntries);
         ApplyScrollTarget(ctx);
@@ -375,6 +443,12 @@ public sealed class UiLayoutEngine
         }
 
         RecordKey(ReadAttribute(spec, VisibleKeyAttribute), owner, bindings);
+
+        // A collection element declares the binding its row set comes from. Without it an announcement on
+        // that key would reach no node, and an insert, removal or reorder would leave the arranged rows as
+        // stale as a page that announced nothing - the exact refresh the keyed repeater exists to remove.
+        // Every other element answers "" here, so this costs one lookup on each.
+        RecordKey(ReadAttribute(spec, RepeatItemsAttribute), owner, bindings);
     }
 
     private void RecordKey(string key, UiNode owner, IUiBindings bindings)
@@ -805,6 +879,11 @@ public sealed class UiLayoutEngine
         if (string.Equals(kind, "Scroll", StringComparison.Ordinal))
         {
             return MeasureScroll(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, node, narrow);
+        }
+
+        if (string.Equals(kind, "Repeat", StringComparison.Ordinal))
+        {
+            return MeasureRepeat(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, node);
         }
 
         // Stack, Column, Section, Surface and Clip are vertical stacks. Clip additionally becomes
@@ -1334,6 +1413,501 @@ public sealed class UiLayoutEngine
         return Math.Max(0f, y - innerY);
     }
 
+    // --- the keyed repeater (P3) -----------------------------------------------------------------
+
+    /// <summary>One materialized row: the consumer's key, its position in the binding, and its subtree.</summary>
+    private sealed class ItemRow
+    {
+        internal string Key = "";
+        internal int Index;
+        internal UiElementSpec Spec = UiElementSpec.Empty;
+    }
+
+    /// <summary>
+    /// One Repeat element's materialized row set: the keys the items binding supplied and the derived
+    /// per-item subtree each key instantiates. Both are keyed by the item's business key, never by position,
+    /// which is what makes a reorder reuse nodes and state and an insertion touch only the new key.
+    /// </summary>
+    private sealed class RepeatState
+    {
+        internal string ItemsKey = "";
+        internal string TemplateName = "";
+        internal readonly List<ItemRow> Rows = new();
+        internal readonly Dictionary<string, UiElementSpec> DerivedByKey = new(StringComparer.Ordinal);
+    }
+
+    /// <summary>One arranged Repeat element and the row set it produced in this arrange.</summary>
+    private readonly struct MaterializedRepeat
+    {
+        internal readonly UiNodeId Node;
+        internal readonly RepeatState State;
+
+        internal MaterializedRepeat(UiNodeId node, RepeatState state)
+        {
+            Node = node;
+            State = state;
+        }
+    }
+
+    private RepeatState GetOrCreateRepeatState(UiNode node)
+    {
+        if (!repeatStates.TryGetValue(node.Id, out RepeatState? state))
+        {
+            state = new RepeatState();
+            repeatStates.Add(node.Id, state);
+        }
+
+        return state;
+    }
+
+    /// <summary>
+    /// Arranges the collection element: one row per accepted item key, each row the named template
+    /// instantiated in that item's binding scope, stacked the way a vertical container stacks its children
+    /// (the element's <c>Padding</c>, <c>Gap</c>, <c>Title</c> and <c>Height</c> mean what they mean on every
+    /// other container).
+    /// <para>
+    /// Nothing here is a second reconciliation algorithm: identity is the item key composed into the
+    /// ordinary element identity by <see cref="BuildItemSpec"/>, reuse is the session's node table keyed by
+    /// that identity, and release is the same <c>PruneNodesExcept</c> pass the definition walk feeds.
+    /// </para>
+    /// </summary>
+    private MeasuredBox MeasureRepeat(
+        UiWidgetContext ctx,
+        UiElementSpec spec,
+        string kind,
+        float width,
+        Padding padding,
+        float gap,
+        float titleHeight,
+        float innerWidth,
+        float innerY,
+        float availableHeight,
+        UiNode node)
+    {
+        RepeatState state = GetOrCreateRepeatState(node);
+        string itemsKey = ReadAttribute(spec, RepeatItemsAttribute);
+        string templateName = ReadAttribute(spec, RepeatTemplateAttribute);
+
+        if (!string.Equals(state.ItemsKey, itemsKey, StringComparison.Ordinal)
+            || !string.Equals(state.TemplateName, templateName, StringComparison.Ordinal))
+        {
+            // The declaration under this identity changed. A reload rebuilds the engine, so this is the
+            // programmatic-spec path; either way the derived subtrees belong to the old scope and are dropped
+            // rather than reused under a scope they were not built for.
+            state.Rows.Clear();
+            state.DerivedByKey.Clear();
+            state.ItemsKey = itemsKey;
+            state.TemplateName = templateName;
+        }
+
+        state.Rows.Clear();
+        MaterializeRows(ctx, node, state, itemsKey, templateName);
+
+        var box = new MeasuredBox { Width = width, Height = 0f };
+        float y = innerY;
+        bool first = true;
+
+        for (int r = 0; r < state.Rows.Count; r++)
+        {
+            ItemRow row = state.Rows[r];
+            if (!first) y += gap;
+
+            UiNode rowNode = ChildNode(ctx, node, row.Spec, row.Index);
+            MeasuredBox rowBox = MeasureElement(
+                ctx,
+                row.Spec,
+                ResolveStackChildWidth(row.Spec, innerWidth, ctx),
+                Math.Max(0f, availableHeight - (y - innerY)),
+                rowNode);
+            rowBox = OffsetBox(rowBox, padding.Left, y);
+            box.Entries.AddRange(rowBox.Entries);
+            y += rowBox.Height;
+            first = false;
+        }
+
+        float naturalHeight = padding.Top + titleHeight + Math.Max(0f, y - innerY) + padding.Bottom;
+        float height = ResolveContainerHeight(spec, naturalHeight, availableHeight);
+        box.Height = height;
+
+        var containerEntry = new PlacedEntry
+        {
+            Spec = spec,
+            Id = node.Id,
+            Node = node,
+            StyleChain = ctx.StyleChain,
+            IsContainer = true,
+            ContainerKind = kind,
+            MeasureWidth = width,
+            Rect = new Rect(0f, 0f, width, height)
+        };
+        box.Entries.Insert(0, containerEntry);
+        containerEntry.SubtreeCount = box.Entries.Count;
+
+        materializedRepeats.Add(new MaterializedRepeat(node.Id, state));
+        return box;
+    }
+
+    /// <summary>
+    /// Reads the row set the items binding currently supplies and materializes one identity per accepted
+    /// key. A row the key contract refuses is not rendered at all: it contributes no element, no node and no
+    /// state, and the refusal is reported once per distinct key.
+    /// </summary>
+    private void MaterializeRows(
+        UiWidgetContext ctx, UiNode node, RepeatState state, string itemsKey, string templateName)
+    {
+        if (itemsKey.Length == 0 || templateName.Length == 0)
+        {
+            ReportRepeat(
+                ctx,
+                node,
+                RepeatItemsAttribute,
+                "(blank)",
+                itemsKey.Length == 0
+                    ? "no rows (no item-key binding is declared)"
+                    : "no rows (no template name is declared)");
+            return;
+        }
+
+        if (!templates.TryGetValue(templateName, out UiElementSpec template))
+        {
+            ReportRepeat(
+                ctx,
+                node,
+                RepeatTemplateAttribute,
+                templateName,
+                "no rows (no template of that name in the definition)");
+            return;
+        }
+
+        IReadOnlyList<string> keys = ReadItemKeys(ctx, node, itemsKey);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        for (int i = 0; i < keys.Count; i++)
+        {
+            string key = keys[i] == null ? "" : keys[i].Trim();
+            if (!AcceptItemKey(ctx, node, key, seen)) continue;
+
+            if (!state.DerivedByKey.TryGetValue(key, out UiElementSpec derived))
+            {
+                derived = BuildItemSpec(template, itemsKey, key, i);
+                state.DerivedByKey.Add(key, derived);
+            }
+
+            state.Rows.Add(new ItemRow { Key = key, Index = i, Spec = derived });
+        }
+
+        // A key the binding no longer supplies keeps no derived subtree: the session's prune releases its
+        // nodes, and this table must not hold the shape of rows that no longer exist.
+        if (state.DerivedByKey.Count > state.Rows.Count)
+        {
+            state.DerivedByKey.Clear();
+            for (int i = 0; i < state.Rows.Count; i++)
+            {
+                state.DerivedByKey.Add(state.Rows[i].Key, state.Rows[i].Spec);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The ordered item keys the binding currently supplies. The element's own declaration contract already
+    /// validated that binding at creation; the guard here is for a programmatically built spec, where a
+    /// mistyped key must be one bounded report rather than an exception out of arrange.
+    /// </summary>
+    private IReadOnlyList<string> ReadItemKeys(UiWidgetContext ctx, UiNode node, string itemsKey)
+    {
+        try
+        {
+            if (ctx.Bindings.TryGet<IReadOnlyList<string>>(itemsKey, out IReadOnlyList<string> keys) && keys != null)
+            {
+                return keys;
+            }
+
+            ReportRepeat(ctx, node, RepeatItemsAttribute, itemsKey, "not bound as an ordered item-key list");
+        }
+        catch (InvalidOperationException ex)
+        {
+            ReportRepeat(ctx, node, RepeatItemsAttribute, itemsKey, "bound to another type (" + ex.GetType().Name + ")");
+        }
+
+        return Array.Empty<string>();
+    }
+
+    /// <summary>
+    /// The row-identity contract, applied to the data the binding supplied. A blank key, a key carrying a
+    /// reserved identity character, or a key a sibling row already used is refused: the row produces no
+    /// element, no node and no state, and one deduplicated report names the repeat element and the key.
+    /// Refusing the row is the whole answer - reconciling two model rows onto one identity would silently
+    /// show one row's state under another, which is the defect this element exists to prevent.
+    /// </summary>
+    private static bool AcceptItemKey(UiWidgetContext ctx, UiNode node, string key, HashSet<string> seen)
+    {
+        if (key.Length == 0)
+        {
+            ReportRepeat(ctx, node, RepeatItemsAttribute, "(blank)", "no row (a stable business key is required)");
+            return false;
+        }
+
+        if (key.IndexOf('/') >= 0
+            || key.IndexOf(UiLayoutManifest.ItemKeySeparator) >= 0
+            || key.IndexOf(UiNodeId.KeySeparator) >= 0
+            || key.IndexOf(UiNodeId.SubNodeMarker) >= 0)
+        {
+            ReportRepeat(ctx, node, RepeatItemsAttribute, key, "no row (the key carries a reserved identity character)");
+            return false;
+        }
+
+        if (!seen.Add(key))
+        {
+            ReportRepeat(ctx, node, RepeatItemsAttribute, key, "no row (the key already names a row in this set)");
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// One item's subtree: the named template with every element's declared identity and binding keys moved
+    /// into that item's scope. The result is cached per (repeat, item key), so a reorder reuses the very same
+    /// spec objects - and therefore the same identities, widget instances and state.
+    /// <para>
+    /// The composed identity is <c>&lt;declaredId&gt;#&lt;itemKey&gt;</c>: the declared Id stays readable in
+    /// diagnostics, and the item key is what makes two rows of one template distinct. An element the author
+    /// left unnamed contributes its generated segment, exactly as the session's identity grammar composes it,
+    /// so an unnamed template element still gets a per-row identity instead of colliding with its namesake in
+    /// the next row.
+    /// </para>
+    /// </summary>
+    private static UiElementSpec BuildItemSpec(UiElementSpec template, string itemsKey, string itemKey, int declaredIndex)
+    {
+        string segment = template.Id.Length > 0
+            ? template.Id
+            : UiNodeId.GeneratedSegment(template.Kind, declaredIndex);
+        string id = segment + UiLayoutManifest.ItemKeySeparator + itemKey;
+
+        var attributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, string> pair in template.Attributes)
+        {
+            attributes[pair.Key] = QualifyItemBinding(pair.Key, pair.Value, itemsKey, itemKey);
+        }
+
+        attributes["Id"] = id;
+
+        var children = new UiElementSpec[template.Children.Count];
+        for (int i = 0; i < children.Length; i++)
+        {
+            children[i] = BuildItemSpec(template.Children[i], itemsKey, itemKey, i);
+        }
+
+        return new UiElementSpec(id, template.Kind, attributes, children);
+    }
+
+    /// <summary>
+    /// One declared binding key moved into the item's scope: <c>done</c> becomes
+    /// <c>&lt;itemsKey&gt;.&lt;itemKey&gt;.done</c>. Only the four binding attributes are scoped; <c>Tab</c>
+    /// is deliberately not, because a tab is a page-level answer and not an item's, and every other attribute
+    /// is layout or appearance with nothing to resolve against bindings.
+    /// </summary>
+    private static string QualifyItemBinding(string attribute, string value, string itemsKey, string itemKey)
+    {
+        if (!string.Equals(attribute, BindAttribute, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(attribute, ActionBindAttribute, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(attribute, OptionsBindAttribute, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(attribute, VisibleKeyAttribute, StringComparison.OrdinalIgnoreCase))
+        {
+            return value;
+        }
+
+        string declared = (value ?? "").Trim();
+        return declared.Length == 0 ? value ?? "" : itemsKey + "." + itemKey + "." + declared;
+    }
+
+    /// <summary>
+    /// The item identity set this arrange materialized, added to the declared set the session's prune uses.
+    /// It mirrors the definition walk: every element of an instantiated row is declared, hidden or not - a
+    /// hidden row element keeps its node and its state - while a key the binding no longer supplies declares
+    /// nothing, so its subtree is released by the one lifetime path every other node follows.
+    /// </summary>
+    private void CollectRepeatItemIdentities(HashSet<UiNodeId> into)
+    {
+        for (int r = 0; r < materializedRepeats.Count; r++)
+        {
+            MaterializedRepeat repeat = materializedRepeats[r];
+            List<ItemRow> rows = repeat.State.Rows;
+            for (int i = 0; i < rows.Count; i++)
+            {
+                UiNodeId id = repeat.Node.Child(rows[i].Spec, rows[i].Index);
+                into.Add(id);
+                CollectChildIdentities(rows[i].Spec, id, into);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The last materialization of every Repeat element the definition still declares but this arrange did not
+    /// visit (a <c>Visible</c>/<c>VisibleKey</c>/<c>Tab</c>-hidden one). Without it the prune would reap the
+    /// rows of an element that is merely hidden, and a Tab switch would throw away scroll, selection, drafts
+    /// and expansion the definition never removed - the one lifetime distinction P2 wrote down for elements.
+    /// A key the binding dropped while the element was hidden stays until the next arrange that visits it, so
+    /// the extra retention is bounded by the last row set the consumer actually supplied.
+    /// </summary>
+    private void CollectHiddenRepeatIdentities(IReadOnlyList<UiElementSpec> roots, HashSet<UiNodeId> into)
+    {
+        for (int i = 0; i < roots.Count; i++)
+        {
+            UiNodeId id = UiNodeId.Root(roots[i], i);
+            CollectHiddenRepeatIdentities(roots[i], id, into);
+        }
+    }
+
+    private void CollectHiddenRepeatIdentities(UiElementSpec spec, UiNodeId id, HashSet<UiNodeId> into)
+    {
+        if (string.Equals(spec.Kind, "Repeat", StringComparison.Ordinal)
+            && !IsMaterializedThisPass(id)
+            && repeatStates.TryGetValue(id, out RepeatState? state))
+        {
+            List<ItemRow> rows = state!.Rows;
+            for (int r = 0; r < rows.Count; r++)
+            {
+                UiNodeId rowId = id.Child(rows[r].Spec, rows[r].Index);
+                into.Add(rowId);
+                CollectChildIdentities(rows[r].Spec, rowId, into);
+            }
+        }
+
+        for (int i = 0; i < spec.Children.Count; i++)
+        {
+            UiElementSpec child = spec.Children[i];
+            CollectHiddenRepeatIdentities(child, id.Child(child, i), into);
+        }
+    }
+
+    private bool IsMaterializedThisPass(UiNodeId id)
+    {
+        for (int i = 0; i < materializedRepeats.Count; i++)
+        {
+            if (materializedRepeats[i].Node == id) return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Drops the materialization of a Repeat element whose identity the session no longer holds.</summary>
+    private void PruneRepeatStates(UiSession session)
+    {
+        List<UiNodeId>? gone = null;
+        foreach (UiNodeId id in repeatStates.Keys)
+        {
+            if (session.GetNode(id) == null)
+            {
+                (gone ??= new List<UiNodeId>()).Add(id);
+            }
+        }
+
+        if (gone == null) return;
+        for (int i = 0; i < gone.Count; i++)
+        {
+            repeatStates.Remove(gone[i]);
+        }
+    }
+
+    private static void ReportRepeat(
+        UiWidgetContext ctx, UiNode node, string attribute, string authored, string resolved)
+    {
+        UiFitAudit.ReportStyleFallback(node.Path, "Repeat", attribute, authored, resolved);
+    }
+
+    // --- the template contract (P3) -------------------------------------------------------------
+
+    /// <summary>
+    /// The structural contract of the definition's templates, checked once when the engine is built - which
+    /// is Host creation, and each document commit that rebuilds the engine. The template subtree is outside
+    /// the Host's own walk on purpose (its binding keys are item-scoped and provably cannot exist as page
+    /// bindings), so its kinds and attribute vocabulary are enforced here, with the template name and the
+    /// element path in the refusal.
+    /// <para>
+    /// What this covers: an unknown widget kind, an attribute outside the kind's registered schema (plus the
+    /// engine-wide names every element accepts), and an attribute outside the container vocabulary for a
+    /// container. What it deliberately does not re-implement: UiHost's numeric and narrow-state grammar, which
+    /// needs the parent chain and the Bindings the Host holds. A malformed number inside a template therefore
+    /// degrades the way a programmatically built spec degrades instead of failing creation, and that boundary
+    /// is written in <c>docs/development/0.5/20-api-and-xml.md</c> rather than implied here.
+    /// </para>
+    /// </summary>
+    private void ValidateTemplates()
+    {
+        foreach (KeyValuePair<string, UiElementSpec> entry in templates)
+        {
+            ValidateTemplateElement(entry.Value, entry.Key, "<Templates>/" + entry.Key);
+        }
+    }
+
+    private void ValidateTemplateElement(UiElementSpec spec, string templateName, string path)
+    {
+        if (IsContainerElementName(spec.Kind))
+        {
+            RejectUnknownTemplateAttributes(spec, templateName, path, TemplateContainerAttributes, engineWide: false);
+        }
+        else
+        {
+            try
+            {
+                UiWidgetRegistry.Resolve(scope, spec.Kind);
+            }
+            catch (UiUnknownWidgetKindException ex)
+            {
+                throw TemplateContract(templateName, path, spec, ex.Message);
+            }
+
+            RejectUnknownTemplateAttributes(
+                spec,
+                templateName,
+                path,
+                UiWidgetRegistry.GetAttributeSchema(scope, spec.Kind) ?? NoSchema,
+                engineWide: true);
+        }
+
+        for (int i = 0; i < spec.Children.Count; i++)
+        {
+            UiElementSpec child = spec.Children[i];
+            ValidateTemplateElement(child, templateName, path + "/" + (child.Id.Length > 0 ? child.Id : child.Kind));
+        }
+    }
+
+    private void RejectUnknownTemplateAttributes(
+        UiElementSpec spec, string templateName, string path, IReadOnlyCollection<string> allowed, bool engineWide)
+    {
+        foreach (KeyValuePair<string, string> pair in spec.Attributes)
+        {
+            if (ContainsAttribute(allowed, pair.Key)) continue;
+            if (engineWide && EngineWideWidgetAttributes.Contains(pair.Key)) continue;
+
+            throw TemplateContract(
+                templateName,
+                path,
+                spec,
+                "Unknown attribute '" + pair.Key + "' on " + spec.Kind + " is not part of the creation-time contract.");
+        }
+    }
+
+    private static bool ContainsAttribute(IReadOnlyCollection<string> allowed, string name)
+    {
+        foreach (string candidate in allowed)
+        {
+            if (string.Equals(candidate, name, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+
+        return false;
+    }
+
+    private UiContractException TemplateContract(string templateName, string path, UiElementSpec spec, string message)
+    {
+        return new UiContractException(
+            "Template '" + templateName + "' is invalid at '" + path + "': " + message,
+            scope,
+            spec.Id,
+            spec.Kind,
+            path);
+    }
+
     private IUiWidget GetOrCreateWidget(UiElementSpec spec, UiNodeId id)
     {
         if (widgetInstances.TryGetValue(id, out IUiWidget? widget))
@@ -1387,6 +1961,13 @@ public sealed class UiLayoutEngine
 
     private static string GetContainerKind(UiElementSpec spec)
     {
+        // The collection element is claimed here, before any widget path can see it: its rows are tree
+        // elements materialized from a template, so it must never be handled as a drawn leaf.
+        if (string.Equals(spec.Kind, "Repeat", StringComparison.Ordinal))
+        {
+            return "Repeat";
+        }
+
         if (string.Equals(spec.Kind, "Stack", StringComparison.Ordinal)
             || string.Equals(spec.Kind, "Column", StringComparison.Ordinal)
             || string.Equals(spec.Kind, "Section", StringComparison.Ordinal)
@@ -1416,6 +1997,26 @@ public sealed class UiLayoutEngine
         return string.Equals(kind, "Scroll", StringComparison.Ordinal)
             || string.Equals(kind, "Clip", StringComparison.Ordinal)
             || string.Equals(kind, "Overlay", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// True when the element name is one the engine arranges as a container rather than drawing through a
+    /// widget. The list is the engine's counterpart of <c>UiHost.IsContainerKind</c>, which decides how the
+    /// Host validates the same element; the two must agree, and <c>Repeat</c> is the one name they agree on
+    /// differently by design (the Host validates it as a widget so its declaration has a contract owner, the
+    /// engine arranges it as a container so its rows exist in the tree).
+    /// </summary>
+    private static bool IsContainerElementName(string kind)
+    {
+        return string.Equals(kind, "Stack", StringComparison.Ordinal)
+            || string.Equals(kind, "Row", StringComparison.Ordinal)
+            || string.Equals(kind, "Column", StringComparison.Ordinal)
+            || string.Equals(kind, "Wrap", StringComparison.Ordinal)
+            || string.Equals(kind, "Overlay", StringComparison.Ordinal)
+            || string.Equals(kind, "Section", StringComparison.Ordinal)
+            || string.Equals(kind, "Surface", StringComparison.Ordinal)
+            || string.Equals(kind, "Scroll", StringComparison.Ordinal)
+            || string.Equals(kind, "Clip", StringComparison.Ordinal);
     }
 
     /// <summary>Numeric Width on a child; Auto and malformed values are not fixed.</summary>

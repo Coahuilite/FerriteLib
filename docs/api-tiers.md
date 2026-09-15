@@ -311,6 +311,12 @@ consequence is paid in the open rather than discovered by a stranger.
 - `UiDiagnosticKind` — the channel vocabulary (`Reload`, `Fit`, `Recovery`, `Timing`).
 - `UiDiagnosticTiming` — one sampling window's aggregate (name, samples, total, max, average), which is what
   makes timing a rate rather than a per-frame line.
+- `UiTreeRow` — one row of a `container/tree` row set: the consumer's stable business key, the level it is
+  presented at, its label (literal or translation key) and the model's expansion answer. A data carrier, not a
+  control: the kind owns the band geometry and the hit rule, the consumer owns the ordering and the answer.
+  Public-unstable because the collection vocabulary is new in 0.5 and this type's fields follow the first real
+  consumer's shape. The key is the only identity the kind uses — a blank or duplicated one is refused rather
+  than replaced by a position.
 
 ## Internalize-candidate
 
@@ -406,6 +412,22 @@ What the 0.5 window is for (working packages, ownership and status: `docs/develo
 - **`UiSession.ContentRevision`/`BumpContentRevision` are demoted to the arrangement-cache clock.** No
   signature changed; what changed is the contract. A consumer must not use them as its refresh channel
   (that is `NotifyChanged`), and a Paint-class announcement must not move the clock.
+- **Collections: `<Templates>`/`<Repeat>`, item-local binding scope, and three common kinds.** A layout may
+  now carry one `<Templates>` section whose named subtrees a `<Repeat Items="..." Template="..."/>`
+  materializes once per consumer-supplied item key. Each row's identity is `<declaredId>#<itemKey>`, and each
+  binding key inside a template resolves in the item's scope as `<Items>.<itemKey>.<declaredKey>` — for
+  `Bind`, `ActionBind`, `OptionsBind` and `VisibleKey`; `Tab` stays page-level on purpose. A `Repeat`
+  that names a template nothing declares, carries children of its own, or appears inside a template is refused
+  at parse time; a row whose key is blank, duplicated or carries a reserved identity character is refused with
+  one bounded report rather than reconciled onto another row's state. New kinds: `input/checkbox`,
+  `display/progress`, `container/tree`. `UiLayoutManifest` gains `Templates`, and
+  `UiLayoutEngine`'s constructor takes the template table (a host passes `manifest.Templates`; the engine
+  enforces the table's kinds and attribute vocabulary at creation, because a template's binding keys cannot
+  exist as page bindings).
+  **Migration:** nothing existing changes meaning. A consumer that wants a row set projects its collection to
+  stable keys through an `IReadOnlyList<string>` value binding, declares one binding per item under
+  `<Items>.<key>.…`, announces that items key with `UiInvalidation.Structure`, and never writes a rectangle,
+  a node identity or an input rule for a row.
 
 Everything here is provisional until the second wired consumer compiles against it (`AGENTS.md`
 invariants): the tier list, not the shape, is what this file promises.
