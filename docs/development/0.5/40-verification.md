@@ -186,13 +186,13 @@ P4c 把**页面级**默认值（`DefaultScheme`/`DefaultDensity` 指向本文件
 
 | 编号 | 严重度 | 缺陷 | 复现证据 | 处置 |
 | --- | --- | --- | --- | --- |
-| R1 | P1 | 批次失败回滚只恢复旧文档树，不恢复已被清掉的交互状态（用户未提交草稿丢失） | `ROLLBACK rejected=True restoredRoot=one draft=''`（原草稿 `uncommitted-draft`） | 修复中（task-15） |
-| R2 | P1 | 已有有效外部版本时，文件暂时缺失仍切回内嵌旧版 | `MISSING before=external-valid` → `accepted=True after=embedded` | 修复中（task-15） |
-| R3 | P2 | 关闭活动窗口后剩余窗口没有恢复为活动目标 | `WINDOW after close active=null remaining=1` | 修复中（task-16） |
+| R1 | P1 | 批次失败回滚只恢复旧文档树，不恢复已被清掉的交互状态（用户未提交草稿丢失） | `ROLLBACK rejected=True restoredRoot=one draft=''`（原草稿 `uncommitted-draft`） | **已修复合入**：提交拆成非破坏性 stage + 整批成功后 seal（剪枝与释放捕获）；回滚清空待剪枝。探针复跑 `draft='uncommitted-draft'`；lane + 3 处突变 |
+| R2 | P1 | 已有有效外部版本时，文件暂时缺失仍切回内嵌旧版 | `MISSING before=external-valid` → `accepted=True after=embedded` | **已修复合入**：内嵌仅用于首次无可用版本；已有 LKG 时缺失=拒绝并按版本去重、文件回归后恢复。探针 `accepted=False after=external-valid`；lane + 5 处突变 |
+| R3 | P2 | 关闭活动窗口后剩余窗口没有恢复为活动目标 | `WINDOW after close active=null remaining=1` | **已修复合入**：PreClose 记录「关闭者原本是否活动」，PostClose 按策略交给 survivor；拒绝关闭不触发。探针 `active=a remaining=1`；14 条断言覆盖四种形状 + 突变 |
 | R4 | P2 | 第二个 host 的诊断订阅覆盖第一个 host 的测量尺（溢出判断互相污染） | `METRICS A before=0` → 仅订阅 B 后 `A after=1` | **已修复合入**：诊断作用域携带本 host 测量尺；外部探针复跑为 `A after B subscription=0`；harness lane 先红后绿 + 突变证明 |
-| R5 | P2 | 首次样式应用绕过候选校验：同一文件首次加载与重载语义不同 | `initial attached=True reports=0` → 仅改空白后 `reload rejected=True` | 修复中（task-15）；此前 §4 第 10 条把它登记为待关闭，review 判定不能只当已知限制 |
-| R6 | P2 | 换绑文档服务后关闭 host，旧服务仍持有该 host（依赖泄漏） | `REATTACH after close firstDeps=1 secondDeps=0` | 修复中（task-15） |
-| R7 | P2 | 内容哈希与解析来自两次独立读取（TOCTOU：记录的版本与实际解析的树可能不同） | 控制流确认；未做并发保存压力复现 | 修复中（task-15） |
+| R5 | P2 | 首次样式应用绕过候选校验：同一文件首次加载与重载语义不同 | `initial attached=True reports=0` → 仅改空白后 `reload rejected=True` | **已修复合入**：首次 attach 走与重载同一条预校验，拒绝时保留 host 自身文档并给出可归属报告。探针 `attached=True reports=1`；lane + 2 处突变 |
+| R6 | P2 | 换绑文档服务后关闭 host，旧服务仍持有该 host（依赖泄漏） | `REATTACH after close firstDeps=1 secondDeps=0` | **已修复合入**：换绑时释放旧服务依赖（同一服务重绑安全）。探针 `firstDeps=0 secondDeps=0`；lane + 4 处突变 |
+| R7 | P2 | 内容哈希与解析来自两次独立读取（TOCTOU：记录的版本与实际解析的树可能不同） | 控制流确认；未做并发保存压力复现 | **已修复合入**：单次 `ReadAllBytes` 快照同时供大小约束、版本哈希与解析（BOM 感知解码）；并发替换本身仍无 harness 钩子，证据是结构护栏 + 突变 |
 
 **已接受的额外风险（不混入上述已复现结果）**：`ResolvePointerDown` 的窗口局部坐标与 `NotifyPointerDown` 的屏幕坐标空间混用，
 且重叠用目录自持的 activationOrder 而非原版层级（需实机核对）；两个 catalog 同时工作的组合未测；
@@ -202,5 +202,5 @@ P4c 把**页面级**默认值（`DefaultScheme`/`DefaultDensity` 指向本文件
 「消费者先自建再谈晋升」已按 `AGENTS.md` 的现行范围改写为两条不同通道；诊断反馈覆盖缺口（构造期样式丢弃、首帧 chrome、终态 notice）已声明；
 `50-dev-package.md` 的「逐字节相同」已更正为「源码未变、程序集未做字节比较」。
 
-**交付结论（本节覆盖 §1 的乐观表述）**：在 R1–R7 全部修复并通过独立复验之前，本轮**不是可交付状态**；
+**交付结论（本节覆盖 §1 的乐观表述）**：R1–R7 已全部修复并合入；外部探针在本机复跑后七项输出全部转为已修复形态。**独立复验（verifier）完成前**，本轮仍按「库侧表面已落地、待独立复验」记录，不写成已交付；
 消费者可以继续按 `30-consumer-handoff.md` 接入联调，但不应把当前 tip 当作验收基线。
