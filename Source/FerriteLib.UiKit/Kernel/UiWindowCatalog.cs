@@ -301,10 +301,19 @@ public sealed class UiWindowCatalog
     {
     }
 
-    // The window whose close was already observed to be the active target: recorded at PreClose and
-    // consumed at PostClose. A reference rather than a flag, so a close that never reaches PostClose
-    // cannot make a later close believe it was the active one.
-    private UiWindowHost? closingActiveWindow;
+    // Windows whose PreClose has run and whose PostClose has not: they are on their way out of the stack,
+    // receive no input or capture, and must never be chosen as a survivor. A SET, not one slot, because
+    // the hooks can interleave: the verifier's P3 probe pre-closes two windows before either is
+    // post-closed, and a single slot let the second pre-close erase the first window's record, leaving the
+    // catalog targetless while windows stayed open. On the ordinary path - WindowStack.TryRemove runs
+    // OnCloseRequest -> PreClose -> windows.Remove -> PostClose adjacently, with no user or re-entrant code
+    // between them - the set holds exactly one window, so this changes nothing there. Reachability of the
+    // interleave through the product path is unproven; the set keeps the invariant either way.
+    private readonly HashSet<UiWindowHost> closingWindows = new HashSet<UiWindowHost>();
+
+    // The subset of the above that held the active target when it was pre-closed. Recorded per window for
+    // the same reason: a second pre-close must not erase the first window's claim to a survivor.
+    private readonly HashSet<UiWindowHost> activeClosingWindows = new HashSet<UiWindowHost>();
 
     /// <summary>
     /// A window is closing: it stops being the active target first, so no input or capture reaches a
@@ -315,9 +324,10 @@ public sealed class UiWindowCatalog
     /// </summary>
     internal void NotifyPreClose(UiWindowHost window)
     {
-        closingActiveWindow = ReferenceEquals(active, window) ? window : null;
-        if (closingActiveWindow != null)
+        closingWindows.Add(window);
+        if (ReferenceEquals(active, window))
         {
+            activeClosingWindows.Add(window);
             SetActive(null);
         }
     }
@@ -335,6 +345,10 @@ public sealed class UiWindowCatalog
     /// </summary>
     internal void NotifyPostClose(UiWindowHost window)
     {
+        // This window is no longer pending a close: it is out of the identity map below. Removing it here,
+        // before the maps, is what makes SelectSurvivor's pending-close skip see only OTHER closing windows.
+        closingWindows.Remove(window);
+
         if (window.Key is UiWindowKey key)
         {
             instances.Remove(key);
@@ -343,12 +357,7 @@ public sealed class UiWindowCatalog
         openOrder.Remove(window);
         activationOrder.Remove(window);
 
-        bool closingWasActive = ReferenceEquals(closingActiveWindow, window) || ReferenceEquals(active, window);
-        if (ReferenceEquals(closingActiveWindow, window))
-        {
-            closingActiveWindow = null;
-        }
-
+        bool closingWasActive = activeClosingWindows.Remove(window) || ReferenceEquals(active, window);
         if (closingWasActive)
         {
             SetActive(SelectSurvivor());
@@ -360,13 +369,24 @@ public sealed class UiWindowCatalog
     }
 
     /// <summary>
-    /// The target a closed window hands over to: the most recently activated survivor, which is the
-    /// catalog's own front-most record, or null when the closing window was the last one. An explicit
-    /// policy rather than "whatever is left", so the rule is readable and testable.
+    /// The target a closed window hands over to: the most recently activated survivor that is not itself on
+    /// its way out, or null when every remaining window is closing (or there is none). An explicit policy
+    /// rather than "whatever is left", so the rule is readable and testable; skipping the pending-close
+    /// windows is the half that keeps a window which already received PreClose - and therefore no input -
+    /// from being handed the active target.
     /// </summary>
     private UiWindowHost? SelectSurvivor()
     {
-        return activationOrder.Count > 0 ? activationOrder[activationOrder.Count - 1] : null;
+        for (int i = activationOrder.Count - 1; i >= 0; i--)
+        {
+            UiWindowHost candidate = activationOrder[i];
+            if (!closingWindows.Contains(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

@@ -48,6 +48,7 @@ internal static class KernelWindowCatalogTests
             VerifyActiveTargetIsExactlyOneAndFollowsClicks();
             VerifyPointerSpaceIsConsistentAcrossOffsetWindows();
             VerifyClosingAWindowHandsOverTheActiveTarget();
+            VerifyActiveTargetHandOffChain();
             VerifyOpenOnlyAndManualPoliciesDoNotFollowClicks();
             VerifyDeactivationKeepsSessionAndReleasesCapture();
             VerifyGenericShellNeedsNoWindowSubclass();
@@ -538,6 +539,135 @@ internal static class KernelWindowCatalogTests
         allow = true;
         Check(refused.Catalog.Close(beta), "allowing the close lets it through");
         Check(refused.Catalog.ActiveKey == alpha, "and the target hands over to the survivor");
+    }
+
+    /// <summary>
+    /// One step of the hand-off chain, asserted over every window the chain created - open or already
+    /// closed: exactly one of them reports the target and it is the expected one, or, when
+    /// <paramref name="expected"/> is null, none of them does. The catalog's own key must agree. Counting
+    /// the closed windows too is what catches a stale or resurrected activation flag.
+    /// </summary>
+    private static void CheckChainStep(UiWindowCatalog catalog, string step, UiWindowKey? expected, params UiWindowHost[] windows)
+    {
+        int active = 0;
+        bool expectedHolds = false;
+        foreach (UiWindowHost window in windows)
+        {
+            if (!window.IsActiveTarget)
+            {
+                continue;
+            }
+
+            active++;
+            if (expected != null && window.Key == expected)
+            {
+                expectedHolds = true;
+            }
+        }
+
+        bool flags = expected == null ? active == 0 : active == 1 && expectedHolds;
+        bool key = expected == null ? catalog.ActiveKey == null : catalog.ActiveKey == expected;
+        Check(flags && key, step + ": exactly the expected window holds the target and no other does");
+    }
+
+    /// <summary>
+    /// The hand-off chain: closing the active window hands the target on, closing the SURVIVOR hands it on
+    /// again, and closing the last window leaves the honest empty answer - with no window, open or closed,
+    /// left reporting stale activation. Two shapes are exercised beyond the single close: two closes in
+    /// one frame, and a survivor selection that must skip a window already pre-closed.
+    /// <para>
+    /// <b>Latent sharp edge, deliberately pinned here (task-22).</b> The verifier's P3 probe pre-closes two
+    /// windows before either is post-closed and finds the catalog with windows still open and no active
+    /// target: a single-slot pre-close record is erased by the second pre-close, and a survivor selection
+    /// that ignores pending-close windows can hand the target to one. <b>Reachability is unproven</b>: the
+    /// product path is an adjacent OnCloseRequest -> PreClose -> remove -> PostClose per window, with no
+    /// user or re-entrant call between the hooks, so the interleave the probe drives directly is not known
+    /// to occur in the game. This lane therefore documents the edge and, with the hardened bookkeeping,
+    /// keeps the invariant even if it ever becomes reachable.
+    /// </para>
+    /// </summary>
+    private static void VerifyActiveTargetHandOffChain()
+    {
+        var alpha = new UiWindowKey("c", "chain", "alpha");
+        var beta = new UiWindowKey("c", "chain", "beta");
+        var gamma = new UiWindowKey("c", "chain", "gamma");
+
+        // (1) Two windows: A then B, close the ACTIVE B, then close the survivor A.
+        var pair = new Harness();
+        pair.Register("c", "chain");
+        pair.Catalog.Open(alpha);
+        pair.Catalog.TryGet(alpha, out UiWindowHost first);
+        pair.Catalog.Open(beta);
+        pair.Catalog.TryGet(beta, out UiWindowHost second);
+        CheckChainStep(pair.Catalog, "chain(2): both open", beta, first, second);
+        Check(pair.Catalog.Close(beta), "chain(2): closing the active window goes through");
+        CheckChainStep(pair.Catalog, "chain(2): the survivor took the target", alpha, first, second);
+        Check(pair.Catalog.Instances.Count == 1, "chain(2): one window remains");
+        Check(pair.Catalog.Close(alpha), "chain(2): closing the survivor goes through");
+        CheckChainStep(pair.Catalog, "chain(2): the empty catalog reports nothing", null, first, second);
+
+        // (2) Three windows: close the active C (B takes it), then the active B (A takes it), then A.
+        var trio = new Harness();
+        trio.Register("c", "chain");
+        trio.Catalog.Open(alpha);
+        trio.Catalog.TryGet(alpha, out UiWindowHost a2);
+        trio.Catalog.Open(beta);
+        trio.Catalog.TryGet(beta, out UiWindowHost b2);
+        trio.Catalog.Open(gamma);
+        trio.Catalog.TryGet(gamma, out UiWindowHost c2);
+        CheckChainStep(trio.Catalog, "chain(3): the newest window holds the target", gamma, a2, b2, c2);
+        Check(trio.Catalog.Close(gamma), "chain(3): closing the active window goes through");
+        CheckChainStep(trio.Catalog, "chain(3): the middle window took the target", beta, a2, b2, c2);
+        Check(trio.Catalog.Close(beta), "chain(3): closing the new survivor goes through");
+        CheckChainStep(trio.Catalog, "chain(3): the oldest window took the target", alpha, a2, b2, c2);
+        Check(trio.Catalog.Close(alpha), "chain(3): closing the last window goes through");
+        CheckChainStep(trio.Catalog, "chain(3): the empty catalog reports nothing", null, a2, b2, c2);
+
+        // (3) Two closes in ONE frame, driven through the catalog's own hooks: alpha is the target, beta
+        // is not, gamma is open. Both windows are pre-closed before either is post-closed, which is the
+        // interleave the addendum's probe drove. The invariant must hold at every step anyway.
+        var frame = new Harness();
+        frame.Register("c", "chain");
+        frame.Catalog.Open(alpha);
+        frame.Catalog.TryGet(alpha, out UiWindowHost a3);
+        frame.Catalog.Open(beta);
+        frame.Catalog.TryGet(beta, out UiWindowHost b3);
+        frame.Catalog.Open(gamma);
+        frame.Catalog.TryGet(gamma, out UiWindowHost c3);
+        frame.Catalog.Activate(alpha);
+        CheckChainStep(frame.Catalog, "one frame: alpha is the target", alpha, a3, b3, c3);
+
+        a3.PreClose();
+        b3.PreClose();
+        Check(frame.Catalog.Close(alpha), "one frame: the first close completes");
+        CheckChainStep(frame.Catalog, "one frame: after the first close a survivor holds the target", gamma, a3, b3, c3);
+        Check(frame.Catalog.Close(beta), "one frame: the second close completes");
+        CheckChainStep(frame.Catalog, "one frame: the survivor still holds it", gamma, a3, b3, c3);
+        Check(frame.Catalog.Instances.Count == 1, "one frame: only the untouched window remains");
+        Check(frame.Catalog.Close(gamma), "one frame: closing the last window goes through");
+        CheckChainStep(frame.Catalog, "one frame: the empty catalog reports nothing", null, a3, b3, c3);
+
+        // (4) The second shape: a window already pre-closed must never be chosen as the survivor, even
+        // when it is the most recently activated entry still in the activation order.
+        var pending = new Harness();
+        pending.Register("c", "chain");
+        pending.Catalog.Open(alpha);
+        pending.Catalog.TryGet(alpha, out UiWindowHost a4);
+        pending.Catalog.Open(beta);
+        pending.Catalog.TryGet(beta, out UiWindowHost b4);
+        pending.Catalog.Open(gamma);
+        pending.Catalog.TryGet(gamma, out UiWindowHost c4);
+        CheckChainStep(pending.Catalog, "pending close: gamma holds the target when it opens", gamma, a4, b4, c4);
+
+        c4.PreClose();
+        pending.Catalog.Activate(beta);
+        CheckChainStep(pending.Catalog, "pending close: beta is the target", beta, a4, b4, c4);
+        Check(pending.Catalog.Close(beta), "pending close: closing beta goes through");
+        CheckChainStep(pending.Catalog, "pending close: the surviving OPEN window takes the target", alpha, a4, b4, c4);
+        Check(pending.Catalog.Close(gamma), "pending close: the pending window's close completes");
+        CheckChainStep(pending.Catalog, "pending close: alpha is the target again", alpha, a4, b4, c4);
+        Check(pending.Catalog.Close(alpha), "pending close: closing the last window goes through");
+        CheckChainStep(pending.Catalog, "pending close: the empty catalog reports nothing", null, a4, b4, c4);
     }
 
     /// <summary>The other two policies pin the rule from both sides, so "follows clicks" is a choice and not an accident.</summary>
