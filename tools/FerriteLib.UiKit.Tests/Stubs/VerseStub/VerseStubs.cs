@@ -842,8 +842,15 @@ public class WindowStack
 
     /// <summary>
     /// The exact-type sibling removal the vanilla <c>Add</c> performs, driven by the flag on the windows
-    /// already in the stack. Exact type, not assignable-from: that distinction is what makes a generic
-    /// shell's same-type siblings the case worth modelling.
+    /// already in the stack. Exact type, not assignable-from: the vanilla type publishes
+    /// <c>TryRemove(Type)</c> and <c>TryRemoveAssignableFromType(Type)</c> as separate operations, and the
+    /// add path is the exact-type one.
+    /// <para>
+    /// The distinction is pinned from the lane rather than only declared here:
+    /// <c>KernelWindowCatalogTests.VerifyVanillaRuleIsExactTypeNotAssignableFrom</c> opens a base-class and
+    /// a derived-class shell in both orders, so rewriting this condition as <c>IsAssignableFrom</c> in
+    /// either direction reddens a named assertion (measured: two FAILs per direction).
+    /// </para>
     /// </summary>
     private void RemoveWindowsOfType(Type type)
     {
