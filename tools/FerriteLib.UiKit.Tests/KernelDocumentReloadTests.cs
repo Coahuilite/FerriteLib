@@ -54,7 +54,11 @@ internal static class KernelDocumentReloadTests
             Run("A watcher whose directory appeared later is re-armed on every entry point", () => VerifyWatchReArm(sandbox));
             Run("A shared style batch is pre-checked across hosts and rolled back, never half-updated", () => VerifyStyleBatchAtomicity(sandbox));
             Run("A consumer re-tint survives a reload; a page level the document drops is undone", () => VerifyConsumerRetintAcrossReload(sandbox));
-            Run("The two file entry points are wired and the document path stays backend-free", VerifySourceWiring);
+            Run("A rolled-back batch restores the old document AND the interaction state it held", () => VerifyRolledBackBatchKeepsInteractionState(sandbox));
+            Run("A transiently missing file keeps the last known good instead of the embedded text", () => VerifyTransientlyMissingFileKeepsLastKnownGood(sandbox));
+            Run("First style attach runs the same validate-and-apply rule as a reload", () => VerifyFirstStyleAttachValidatesLikeReload(sandbox));
+            Run("Rebinding a host to another service releases the old dependency", () => VerifyRebindingReleasesTheOldService(sandbox));
+            Run("The document path reads one snapshot and stays backend-free", VerifySourceWiring);
         }
         finally
         {
@@ -813,32 +817,221 @@ internal static class KernelDocumentReloadTests
             "RESIDUAL (documented): a re-tint of a token the outgoing page level never declared is discarded");
     }
 
+    // --- rollback restores interaction state, not only the tree (P4 R1) -------------------------
+
+    /// <summary>
+    /// The P1 the external review reproduced: the tree rolled back, the user's uncommitted draft did not.
+    /// The fix keeps the destructive half of a commit (pruning removed/kind-changed state and releasing a
+    /// held capture) out of the staging step, so it only runs once the whole batch committed. This lane
+    /// asserts both halves - the old document AND the old draft, named slots and scroll position.
+    /// </summary>
+    private static void VerifyRolledBackBatchKeepsInteractionState(string sandbox)
+    {
+        string dir = NewDir(sandbox, "rollback-state");
+        string path = Path.Combine(dir, "shared.xml");
+        string v1 = ScrollPage("scope-rollback", "");
+        File.WriteAllText(path, v1);
+
+        using var service = new UiDocumentService(autoWatch: false);
+        service.Add(new UiDocumentSource("rb", UiDocumentKind.Layout, path), v1);
+        using var hostA = NewHost("host-a", UiLayoutManifest.Parse(v1), new UiBindings());
+        using var hostB = NewHost("host-b", UiLayoutManifest.Parse(v1), new UiBindings());
+        service.Attach(hostA, "rb");
+        service.Attach(hostB, "rb");
+        Draw(hostA);
+
+        UiNode? draft = hostA.Session.GetNodeByElementId("keep");
+        UiNode? scroll = hostA.Session.GetNodeByElementId("body");
+        Check(draft != null && scroll != null, "the arranged element and its scroll container exist");
+        draft!.State.EditText = "uncommitted-draft";
+        draft.GetOrCreateState("slot").EditText = "slot-draft";
+        hostA.Session.SetScrollPosition(scroll!, new Vector2(0f, 9f));
+        UiLayoutManifest before = hostA.Manifest;
+
+        string v2 = Page("scope-rollback",
+            "<Column Id=\"root\"><Widget Id=\"replacement\" Kind=\"chrome/banner\" Text=\"replacement\"/></Column>");
+        File.WriteAllText(path, v2);
+        service.DocumentCommitFaultOverride = host =>
+            ReferenceEquals(host, hostB) ? "planted host B commit failure" : "";
+        UiReloadReport? report = service.Reload("rb");
+        service.DocumentCommitFaultOverride = null;
+
+        Check(report != null && report.Rejected, "the batch is refused when a later host fails its commit");
+        Check(ReferenceEquals(hostA.Manifest, before) && HasElement(hostA.Manifest, "keep"),
+            "the rolled-back host is back on the old document");
+        Check(draft.State.EditText == "uncommitted-draft",
+            "and its uncommitted draft survived the rollback");
+        Check(draft.GetOrCreateState("slot").EditText == "slot-draft", "and its named state slots");
+        Vector2 scrolled = hostA.Session.GetScrollPosition(scroll!);
+        Check(Math.Abs(scrolled.y - 9f) < 0.001f, "and its scroll position");
+
+        // The same candidate, with no fault, still commits and still cleans the removed element up.
+        Check(service.Reload("rb")?.Accepted == true, "the same batch commits once no host fails");
+        Draw(hostA);
+        Check(!HasElement(hostA.Manifest, "keep"), "a committed batch still drops the removed element");
+        Check(draft.State.EditText.Length == 0, "and still cleans its state");
+    }
+
+    // --- a transiently missing file keeps the last known good (P4 R2) ---------------------------
+
+    /// <summary>
+    /// The other P1: the embedded text is the FIRST-load source. Once an external version is in force, a
+    /// deleted file (or an editor moving it aside mid-save) must be a failure that keeps that version, not a
+    /// silent step backwards to the embedded copy.
+    /// </summary>
+    private static void VerifyTransientlyMissingFileKeepsLastKnownGood(string sandbox)
+    {
+        string dir = NewDir(sandbox, "missing-lkg");
+        string path = Path.Combine(dir, "page.xml");
+        string external = Page("scope-missing",
+            "<Column Id=\"root\"><Widget Id=\"external\" Kind=\"chrome/banner\" Text=\"external\"/></Column>");
+        string embedded = Page("scope-missing",
+            "<Column Id=\"root\"><Widget Id=\"embedded\" Kind=\"chrome/banner\" Text=\"embedded\"/></Column>");
+        File.WriteAllText(path, external);
+
+        using var service = new UiDocumentService(autoWatch: false);
+        service.Add(new UiDocumentSource("m", UiDocumentKind.Layout, path), embedded);
+        using var host = NewHost("scope-missing", UiLayoutManifest.Parse(embedded), new UiBindings());
+        service.Attach(host, "m");
+        Check(HasElement(host.Manifest, "external"), "the external file is the version in force");
+
+        File.Delete(path);
+        UiReloadReport? missing = service.Reload("m");
+        Check(missing != null && missing.Rejected, "a transiently missing file is a failure, not a silent fallback");
+        Check(missing != null && missing.Reason.IndexOf("does not exist", StringComparison.Ordinal) >= 0,
+            "and the report says the file is gone");
+        Check(HasElement(host.Manifest, "external") && !HasElement(host.Manifest, "embedded"),
+            "the last valid external version is kept");
+
+        UiReloadReport? again = service.Reload("m");
+        Check(again != null && again.Duplicate, "the same missing version is reported once");
+
+        File.WriteAllText(path, external);
+        Check(service.Reload("m")?.Skipped == true, "the file returning with the same bytes is already in force");
+        string changed = Page("scope-missing",
+            "<Column Id=\"root\"><Widget Id=\"changed\" Kind=\"chrome/banner\" Text=\"changed\"/></Column>");
+        File.WriteAllText(path, changed);
+        Check(service.Reload("m")?.Accepted == true, "and a changed file commits normally after recovery");
+        Check(HasElement(host.Manifest, "changed"), "so the window follows the file again");
+    }
+
+    // --- first style attach validates like a reload (P4 R5) --------------------------------------
+
+    /// <summary>
+    /// One file, one meaning: the initial style application runs the same pre-check a reload does, so an
+    /// unresolvable page level is refused on attach too - the host keeps its own document and the refusal is
+    /// reported - and a whitespace-only edit afterwards cannot flip the same file from accepted to rejected.
+    /// </summary>
+    private static void VerifyFirstStyleAttachValidatesLikeReload(string sandbox)
+    {
+        string dir = NewDir(sandbox, "style-attach");
+        string path = Path.Combine(dir, "theme.xml");
+        const string invalid = "<Styles Schema=\"1\" Scheme=\"undefined\"/>";
+        File.WriteAllText(path, invalid);
+
+        using var service = new UiDocumentService(autoWatch: false);
+        service.Add(new UiDocumentSource("s5", UiDocumentKind.Style, path), "<Styles Schema=\"1\"/>");
+        using var host = NewHost("style-first", UiLayoutManifest.Parse(KeepPage("style-first")), new UiBindings());
+        UiStyleDocument hostDocument = host.StyleResolver.Document;
+        int reportsBefore = service.Reports.Count;
+
+        Check(service.Attach(host, null, "s5"), "the host attaches to the style document");
+        Check(service.Reports.Count == reportsBefore + 1,
+            "the first application is reported when its page level cannot resolve");
+        Check(ReferenceEquals(host.StyleResolver.Document, hostDocument),
+            "and the host keeps the document it already had");
+
+        File.WriteAllText(path, invalid + "\n");
+        UiReloadReport? reload = service.Reload("s5");
+        Check(reload != null && reload.Rejected, "the whitespace-only reload is rejected by the same rule");
+        Check(reload != null && reload.Reason.IndexOf("undefined", StringComparison.Ordinal) >= 0,
+            "and it names the unresolvable page level");
+
+        // A valid external style document still applies on first attach.
+        string valid = PageSchemeStyle("ice", "#0000ff");
+        string validPath = Path.Combine(dir, "valid.xml");
+        File.WriteAllText(validPath, valid);
+        UiTheme theme = UiTheme.DarkGold.Clone();
+        using var validService = new UiDocumentService(autoWatch: false);
+        validService.Add(new UiDocumentSource("s5v", UiDocumentKind.Style, validPath), valid);
+        using var validHost = NewHost(
+            "style-first-valid", UiLayoutManifest.Parse(KeepPage("style-first-valid")), new UiBindings(), theme);
+        Check(validService.Attach(validHost, null, "s5v"), "a valid style document still attaches");
+        Check(SameColor(theme.Panel, new Color(0f, 0f, 1f, 1f)), "and its page level is applied on first attach");
+    }
+
+    // --- rebinding releases the old service (P4 R6) ----------------------------------------------
+
+    /// <summary>
+    /// A host binds to one service. Re-binding through a second service must release the first one's
+    /// dependency, or the old service keeps a disposed host until the dependency cap blocks later attaches;
+    /// re-binding to the same service must not detach the dependency it just created.
+    /// </summary>
+    private static void VerifyRebindingReleasesTheOldService(string sandbox)
+    {
+        string dir = NewDir(sandbox, "rebind");
+        string path = Path.Combine(dir, "page.xml");
+        string v1 = KeepPage("scope-rebind");
+        File.WriteAllText(path, v1);
+
+        using var first = new UiDocumentService(autoWatch: false);
+        using var second = new UiDocumentService(autoWatch: false);
+        first.Add(new UiDocumentSource("one", UiDocumentKind.Layout, path), v1);
+        second.Add(new UiDocumentSource("two", UiDocumentKind.Layout, path), v1);
+        using var host = NewHost("scope-rebind", UiLayoutManifest.Parse(v1), new UiBindings());
+
+        Check(first.Attach(host, "one"), "the host attaches to the first service");
+        Check(first.DependencyCount == 1, "the first service holds the dependency");
+        Check(second.Attach(host, "two"), "re-attaching through the second service succeeds");
+        Check(first.DependencyCount == 0, "rebinding releases the dependency the first service held");
+        Check(second.DependencyCount == 1, "and the second service holds it");
+
+        host.Dispose();
+        Check(second.DependencyCount == 0, "closing the host releases the service it is bound to");
+        Check(first.DependencyCount == 0, "and leaves the old one clean");
+
+        using var again = NewHost("scope-rebind-2", UiLayoutManifest.Parse(v1), new UiBindings());
+        first.Attach(again, "one");
+        first.Attach(again, "one");
+        Check(first.DependencyCount == 1, "re-attaching to the same service keeps exactly one dependency");
+        again.Dispose();
+        Check(first.DependencyCount == 0, "and closing it releases that one");
+    }
+
     // --- wiring ----------------------------------------------------------------------------------
 
     /// <summary>
-    /// The production half of "ParseFile has zero callers today": both file entry points must be reached
-    /// from the service, and the document path must stay backend-free so the watcher thread has nothing
-    /// game-facing to touch. The second check is the armed half - the predicate is shown to report an
-    /// unwired source, so a scan that stopped finding anything would fail here rather than pass quietly.
+    /// The single-read shape P4 R7 asks for: the service reads the bytes once and parses that same snapshot,
+    /// so the size bound, the version identity and the tree all describe one file state. A
+    /// <c>ParseFile</c> call in this file means an independent second read - the TOCTOU this guard exists to
+    /// catch - so its absence is asserted rather than its presence. The document path must also stay
+    /// backend-free so the watcher thread has nothing game-facing to touch, and the predicate is shown to go
+    /// red on a planted double read so a scan that stopped finding anything cannot pass quietly.
     /// </summary>
     private static void VerifySourceWiring()
     {
         string kernel = Path.Combine(RepoRoot(), "Source", "FerriteLib.UiKit", "Kernel");
         string service = File.ReadAllText(Path.Combine(kernel, "UiDocumentService.cs"));
 
-        Check(HasFileEntryCalls(service),
-            "UiLayoutManifest.ParseFile and UiStyleDocument.ParseFile both have a production caller");
+        Check(HasSingleReadPipeline(service),
+            "the document path reads one snapshot and parses it, with no second file read");
         Check(service.IndexOf("using Verse", StringComparison.Ordinal) < 0
             && service.IndexOf("UnityEngine", StringComparison.Ordinal) < 0,
             "the document service carries no backend contact, so its watcher thread cannot touch the game");
-        Check(!HasFileEntryCalls("class PlantedBeacon { }"),
-            "planted control: a source with no file-load calls is reported as unwired");
+        const string doubleRead =
+            "var bytes = File.ReadAllBytes(path);"
+            + "var layout = UiLayoutManifest.ParseFile(path);"
+            + "var style = UiStyleDocument.ParseFile(path);";
+        Check(!HasSingleReadPipeline(doubleRead),
+            "planted control: a snapshot followed by ParseFile is reported as a double read");
     }
 
-    private static bool HasFileEntryCalls(string text)
+    private static bool HasSingleReadPipeline(string text)
     {
-        return text.IndexOf("UiLayoutManifest.ParseFile(", StringComparison.Ordinal) >= 0
-            && text.IndexOf("UiStyleDocument.ParseFile(", StringComparison.Ordinal) >= 0;
+        return text.IndexOf("File.ReadAllBytes(", StringComparison.Ordinal) >= 0
+            && text.IndexOf("UiLayoutManifest.Parse(", StringComparison.Ordinal) >= 0
+            && text.IndexOf("UiStyleDocument.Parse(", StringComparison.Ordinal) >= 0
+            && text.IndexOf("ParseFile(", StringComparison.Ordinal) < 0;
     }
 
     // --- fixture ---------------------------------------------------------------------------------

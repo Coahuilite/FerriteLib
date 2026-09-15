@@ -339,7 +339,10 @@ public sealed class UiDocumentService : IDisposable
         {
             if (host.TryPrepareLayoutCandidate(layout.GoodLayout, out string element, out string reason))
             {
+                // Stage, then seal: the initial application is a one-host batch, so the destructive half
+                // still only runs once the candidate has been accepted for every host it touches.
                 host.CommitLayoutCandidate(layout.GoodLayout);
+                host.SealDocumentCommit();
             }
             else
             {
@@ -353,9 +356,27 @@ public sealed class UiDocumentService : IDisposable
             }
         }
 
+        // First style application runs the same pre-check as a reload (P4 R5). One file must not mean two
+        // different things depending on whether it arrived through Attach or through a later reload, so an
+        // unresolvable page level is refused here too: the host keeps its own document and the refusal is
+        // reported instead of being silently applied.
         if (style != null && style.GoodVersion.Length > 0 && style.GoodStyle != null)
         {
-            host.CommitStyleCandidate(style.GoodStyle);
+            if (host.TryPrepareStyleCandidate(style.GoodStyle, out string element, out string reason))
+            {
+                host.CommitStyleCandidate(style.GoodStyle);
+                host.SealDocumentCommit();
+            }
+            else
+            {
+                var attachFailure = new UiReloadReport(
+                    style.Source.Id, style.Source.Kind, style.Source.Path, style.GoodVersion,
+                    accepted: false, skipped: false, duplicate: false,
+                    element, "the initial version could not be applied to host '" + host.Source + "': " + reason,
+                    1, 0);
+                AddReport(attachFailure);
+                PublishToHost(host, attachFailure);
+            }
         }
 
         return true;
@@ -516,7 +537,8 @@ public sealed class UiDocumentService : IDisposable
         // Every affected host accepted the candidate, so commit them. A commit cannot fail after validation
         // today, but it is not trusted either: each host is captured before it is committed, and a failure
         // anywhere rolls the already-committed hosts back. That is what keeps "no half-updated batch" true
-        // for style documents and for any host that can fail at commit time later.
+        // for style documents and for any host that can fail at commit time later. Staging is non-destructive;
+        // the pruning and capture release happen in one seal pass only after the whole batch staged.
         var applied = new List<AppliedCommit>();
         int committed = 0;
         string commitFailure = "";
@@ -562,6 +584,13 @@ public sealed class UiDocumentService : IDisposable
                 state, candidate, "", commitFailure + "; the whole batch was rolled back", affected.Count);
             PublishToHosts(affected, rolledBack);
             return rolledBack;
+        }
+
+        // The whole batch staged, so its destructive half can run. Doing it here - after the last host
+        // committed - is what makes a rolled-back batch a real rollback rather than a tree-only one.
+        for (int i = 0; i < applied.Count; i++)
+        {
+            applied[i].Host.SealDocumentCommit();
         }
 
         state.Accept(candidate);
@@ -646,8 +675,20 @@ public sealed class UiDocumentService : IDisposable
     {
         Candidate external = ReadExternal(state);
         // A parsed candidate carries an empty (non-null) Failure, a refused one carries a message, and only
-        // the "no external file" case is the default struct - which is what sends us to the fallback.
+        // the "no external file" case is the default struct.
         if (external.Failure != null) return external;
+
+        // The embedded text is the FIRST-load source, not a later fallback: once a version is in force, a
+        // transiently absent file - deleted, or moved aside mid-save - is a failure that keeps the last known
+        // good, and the read is retried when the file returns. Falling back to the embedded copy here would
+        // move the open window backwards, and a different element set would clear state the user is holding.
+        if (state.GoodVersion.Length > 0)
+        {
+            return Candidate.Refused(
+                "missing:" + HashText(state.Source.Path),
+                "the file '" + state.Source.Path + "' does not exist; the last valid version is kept");
+        }
+
         return ReadEmbedded(state, "");
     }
 
@@ -656,22 +697,18 @@ public sealed class UiDocumentService : IDisposable
         UiDocumentSource source = state.Source;
         string path = source.Path;
 
-        bool exists;
-        try
-        {
-            exists = File.Exists(path);
-        }
-        catch (Exception ex) when (IsIoFailure(ex))
-        {
-            return Candidate.Refused(HashText("path:" + ex.Message), "the path could not be queried: " + ex.Message);
-        }
-
-        if (!exists) return default;
-
+        // One read per attempt (P4 R7). The size bound, the content identity and the parsed document all
+        // describe the same bytes, so a file replaced mid-attempt can no longer be recorded under a version
+        // that was never parsed. Absent and unreadable stay different failures: the caller needs that to
+        // choose the embedded first-load source or to keep the last known good.
         byte[] bytes;
         try
         {
             bytes = File.ReadAllBytes(path);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return default;
         }
         catch (Exception ex) when (IsIoFailure(ex))
         {
@@ -691,7 +728,7 @@ public sealed class UiDocumentService : IDisposable
         {
             try
             {
-                return Candidate.LayoutVersion(version, UiLayoutManifest.ParseFile(path));
+                return Candidate.LayoutVersion(version, UiLayoutManifest.Parse(Decode(bytes)));
             }
             catch (Exception ex) when (IsParseFailure(ex))
             {
@@ -699,13 +736,28 @@ public sealed class UiDocumentService : IDisposable
             }
         }
 
-        UiStyleDocument style = UiStyleDocument.ParseFile(path);
+        UiStyleDocument style = UiStyleDocument.Parse(Decode(bytes));
         if (style.StructurallyInvalid)
         {
             return Candidate.Refused(version, "file '" + path + "' did not parse: " + style.Issues[0]);
         }
 
         return Candidate.StyleVersion(version, style);
+    }
+
+    /// <summary>
+    /// Decodes one snapshot the way the parsers' own file entry point does - UTF-8 with byte-order-mark
+    /// detection - so moving the read out of the parser changed no file's meaning. The version identity is
+    /// taken from the raw bytes, not from this string, so a BOM or an encoding change still reads as a
+    /// different version.
+    /// </summary>
+    private static string Decode(byte[] bytes)
+    {
+        using (var stream = new MemoryStream(bytes))
+        using (var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true))
+        {
+            return reader.ReadToEnd();
+        }
     }
 
     private static Candidate ReadEmbedded(DocumentState state, string externalFailure)
