@@ -285,8 +285,14 @@ P4c 把**页面级**默认值（`DefaultScheme`/`DefaultDensity` 指向本文件
 | P6 R6 同一服务重复 attach | 通过 | `deps=1` |
 | P7 R7 大小上界 + BOM | 通过 | `atBoundLength=1048576 parsedAtBound=True`；`overLength=1048577 over.rejected=True` |
 
-**R3 的第二形状（缺陷本身）**：`NotifyPreClose` 只用一个槽记录「关闭者原本是否活动」，同帧第二次 pre-close 会覆盖它，于是 `PostClose` 走假分支，在仍有窗口打开时把活动目标置空；
-`SelectSurvivor` 还可能把目标交给一个**已 pre-close 但仍留在 activationOrder 里**的窗口。已派发 `windowing` 修（task-22，升级为 must-fix），并要求覆盖两种形状与「同帧两次关闭」。
-原 R3 lane 只覆盖单次关闭，所以它绿过——这正是「一个 lane 通过不代表那条不变量成立」的又一例。
+**R3 的第二形状：潜在尖角，可达性未被证明（Lead 的 must-fix 升级已按第二个探针撤回）**。
+`NotifyPreClose` 只用一个槽记录「关闭者原本是否活动」，理论上同帧第二次 pre-close 会覆盖它，使 `PostClose` 在仍有窗口打开时把活动目标置空；`SelectSurvivor` 也可能把目标交给已 pre-close 但仍在 activationOrder 里的窗口。
+
+但**第二个、独立构建的探针 harness** 检查了产品路径的可达性并给出相反结论：`WindowStack.TryRemove` 的 `OnCloseRequest -> PreClose -> windows.Remove -> PostClose` 是相邻的，`List.Remove` 按引用相等，其间没有用户代码运行，也没有可重入路径能在该窗口内再开一次 PreClose；`CloseAll` 也是逐个 TryRemove 完成。两个探针都**无法通过产品路径**造出这个交错。
+
+因此准确分类是：**潜在尖角、可达性未证明 -> 记录 + 可选加固，不是发布阻断项**。原 R3 lane 只覆盖单次关闭，它通过并不证明该交错不可能——两件事都要写清。
+`windowing` 的 task-22 相应改为：交付交接链 lane（仍然有价值）、把该尖角写进代码与文档、加固只在**能证明行为中性**时才做。
+
+**R2 的尖角（两个探针一致确认，非缺陷）**：`LastFailedVersion` 在 accept/skip 后不会重置，因此「恢复成功之后的再次损坏」仍会返回 Rejected 并发布给订阅者，但 `Duplicate=True` 且不更新 `LastReport`/`Reports`——与文档承诺的「按失败版本去重报告一次」一致，值得在 R2 记录里补一句。
 
 **R2 的观察（非缺陷）**：恢复成功后第二次缺失仍被拒，但因 `LastFailedVersion` 只按 `missing:`+path 去重，它不会进入报告环；已交 `documents` 裁定并 pin。
