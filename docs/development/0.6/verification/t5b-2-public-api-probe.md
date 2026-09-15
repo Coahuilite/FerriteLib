@@ -1,9 +1,10 @@
 # T5b-2 — external public-API probe at the merged 0.6 tip
 
-Owner `probe`. Branch `feat/0.6-probe`, synced to the merged `0.6.x` tip
-`84537fc58d03e9b9a1d512cdd798bb21eaabe38b` with `git reset --hard 0.6.x` (T5b-1 is in that tip as
-`eaae287`; `git status --porcelain` empty afterwards). Same worktree-only rules as T5b-1: nothing pushed,
-tagged, released or installed into a game `Mods/` folder, and the probe project lives in gitignored
+Owner `probe`. Branch `feat/0.6-probe`. This record was written at the merged `0.6.x` tip
+`84537fc58d03e9b9a1d512cdd798bb21eaabe38b` (reached with `git reset --hard 0.6.x`; T5b-1 is in it as
+`eaae287`). It was later merged forward with `git merge 0.6.x` for the demo round, and the carrier block
+below carries the fresh staging the probe was re-run against. Same worktree-only rules as T5b-1: nothing
+pushed, tagged, released or installed into a game `Mods/` folder, and the probe project lives in gitignored
 `dist/probe-0.6/` and is never committed.
 
 Scope of this record: task-29 items (1)–(4) — the outside public-API compile/run probe over the landed 0.6
@@ -16,6 +17,13 @@ go red is the T1/T2/T3 lanes' evidence, not this probe's. Zero findings below ar
 in the shapes probed**.
 
 ## 1. Release package at the merged tip
+
+> **Update after the demo round.** The carrier was re-staged at the lead's current tip: `version.txt` records
+> `commit=0d48d25ed1cc`, and the packaged DLL's SHA-256 is
+> `F1CB344DDFA73982A79F266AB1BB838F72B7BF6DD319CB6EC09919244942A18D` (the `84537fc58d03` staging written
+> below was `AC13A8C0…`). The probe was re-run against the fresh bytes, exit 0; that run, the demo package
+> checks and the in-game checklist live in `t5b-3-demo-package-link-and-in-game-checklist.md`. The closed
+> five-file set and the absence of content directories are unchanged (dll 249344 B, same listing).
 
 Staged in this worktree with `pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev` (exit 0, all ten gates,
 clean tree, so not `-dirty`):
