@@ -62,6 +62,27 @@ public sealed class UiPageWindow : UiWindowHost
         Key = key;
     }
 
+    /// <summary>
+    /// The page engine this window hosts, or null before the first draw pass and after a failure disposed
+    /// it. The base shell builds the host lazily inside its guarded pass, so a consumer reads this after
+    /// the window has drawn at least once.
+    /// <para>
+    /// <b>Why this exists at all.</b> The inherited host property is protected and this class is sealed, so
+    /// a consumer holding the generic shell had no way to reach its own page's engine - and therefore no
+    /// way to opt the page into per-host diagnostics (<see cref="UiHost.Diagnostics"/>) or to attach a
+    /// reload report subscription. Two ordinary XML pages then collapsed into the one process-wide channel,
+    /// which is the isolation defect this shell was most exposed to precisely because it is the shape most
+    /// consumers use.
+    /// </para>
+    /// <para>
+    /// <b>Read-only and side-effect free.</b> It never creates a host and never subscribes anything:
+    /// diagnostics stay opt-in, and a page nobody subscribed to stays exactly as cheap and quiet as before.
+    /// It does not widen <see cref="UiWindowHost"/>'s protected surface, which remains the only door a
+    /// subclass has.
+    /// </para>
+    /// </summary>
+    public UiHost? PageHost => Host;
+
     protected override UiTheme Theme => theme;
 
     protected override string Title => title;

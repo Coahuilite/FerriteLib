@@ -52,6 +52,7 @@ internal static class KernelWindowCatalogTests
             VerifyGenericShellFailureNoticeIsDeferredAndTerminal();
             VerifyChromeScopeTellsTwoInstancesOfOneTypeApart();
             VerifyShellFindingsRouteToTheOwningSubscription();
+            VerifyGenericPagesRouteTheirOwnEvents();
         }
         finally
         {
@@ -722,6 +723,108 @@ internal static class KernelWindowCatalogTests
 
         Check(UiDiagnosticHub.SubscriptionCount == subscriptionsBefore,
             "closing the windows released their subscriptions");
+    }
+
+    /// <summary>
+    /// The flagship shape under per-host diagnostics: two ordinary XML pages opened as two contexts of one
+    /// generic kind, subscribed through the accessor this task adds, each receiving only its own events.
+    /// <para>
+    /// The accessor half is asserted too - null before the first pass, non-null after it, two pages owning
+    /// two different hosts - and the guard shapes are deliberate: when the accessor returns null the lane
+    /// must name that instead of throwing on it.
+    /// </para>
+    /// </summary>
+    private static void VerifyGenericPagesRouteTheirOwnEvents()
+    {
+        var legacy = new List<UiOverflowReport>();
+        var harness = new Harness();
+        int subscriptionsBefore = UiDiagnosticHub.SubscriptionCount;
+
+        UiFitAudit.Attach(new LaneMetrics(), legacy.Add);
+        UiFitAudit.Reset();
+        UiFitAudit.Enabled = true;
+        try
+        {
+            harness.Register("c", "diagpage", null, new string('t', 64));
+            var alpha = new UiWindowKey("c", "diagpage", "alpha");
+            var beta = new UiWindowKey("c", "diagpage", "beta");
+            harness.Catalog.Open(alpha);
+            harness.Catalog.Open(beta);
+            harness.Place(alpha, new Rect(0f, 0f, 220f, 200f));
+            harness.Place(beta, new Rect(300f, 0f, 220f, 200f));
+
+            if (!harness.Catalog.TryGet(alpha, out UiWindowHost alphaWindow)
+                || !harness.Catalog.TryGet(beta, out UiWindowHost betaWindow)
+                || !(alphaWindow is UiPageWindow alphaPage)
+                || !(betaWindow is UiPageWindow betaPage))
+            {
+                Check(false, "both generic pages are open");
+                return;
+            }
+
+            Check(alphaPage.PageHost == null,
+                "the page's host is null before its first draw, so the accessor creates nothing");
+            Check(UiDiagnosticHub.SubscriptionCount == subscriptionsBefore,
+                "and reading it subscribes nothing");
+
+            // The first pass is what creates each page's host.
+            alphaPage.WindowOnGUI();
+            betaPage.WindowOnGUI();
+            if (alphaPage.PageHost == null || betaPage.PageHost == null)
+            {
+                Check(false, "the generic page exposes the host it created once it has drawn");
+                return;
+            }
+
+            Check(!ReferenceEquals(alphaPage.PageHost, betaPage.PageHost),
+                "two open pages own two different hosts");
+
+            // The new door, used the way the task requires: the consumer calls host.Diagnostics on it.
+            UiDiagnosticSubscription alphaSub = alphaPage.PageHost.Diagnostics;
+            UiDiagnosticSubscription betaSub = betaPage.PageHost.Diagnostics;
+            Check(UiDiagnosticHub.SubscriptionCount == subscriptionsBefore + 2,
+                "opting in through the accessor created one subscription per page");
+            Check(string.Equals(alphaSub.Host, "c/diagpage", StringComparison.Ordinal)
+                && string.Equals(betaSub.Host, "c/diagpage", StringComparison.Ordinal),
+                "both pages report under the registration's own source identity");
+
+            // The chrome is drawn after the host now exists, so two passes route it.
+            legacy.Clear();
+            for (int pass = 0; pass < 2; pass++)
+            {
+                alphaPage.WindowOnGUI();
+                betaPage.WindowOnGUI();
+            }
+
+            if (!alphaSub.TryGetLatest(UiDiagnosticKind.Fit, out UiDiagnosticEvent alphaEvent)
+                || !betaSub.TryGetLatest(UiDiagnosticKind.Fit, out UiDiagnosticEvent betaEvent))
+            {
+                Check(false, "each subscribed generic page received its own chrome finding");
+                return;
+            }
+
+            Check(alphaEvent.ElementPath.IndexOf("[c/diagpage/alpha]", StringComparison.Ordinal) >= 0,
+                "the first page's event names its own key");
+            Check(betaEvent.ElementPath.IndexOf("[c/diagpage/beta]", StringComparison.Ordinal) >= 0,
+                "the second page's event names its own key");
+            bool isolated = alphaSub.CountOf(UiDiagnosticKind.Fit) == 1
+                && betaSub.CountOf(UiDiagnosticKind.Fit) == 1
+                && !HasEventFor(alphaSub, "[c/diagpage/beta]")
+                && !HasEventFor(betaSub, "[c/diagpage/alpha]");
+            Check(isolated, "each page received exactly its own event, with no cross-page copy");
+            Check(legacy.Count == 0,
+                "and a subscribed page's finding no longer reaches the legacy channel");
+        }
+        finally
+        {
+            harness.Catalog.CloseAll();
+            UiFitAudit.Enabled = false;
+            UiFitAudit.Reset();
+            UiFitAudit.Detach();
+        }
+
+        Check(UiDiagnosticHub.SubscriptionCount == subscriptionsBefore,
+            "closing both pages released their subscriptions");
     }
 
     /// <summary>True when any retained event of a subscription names one element-path fragment.</summary>
