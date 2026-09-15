@@ -671,7 +671,14 @@ public abstract class Window
     public bool forcePause;
     public bool preventCameraMotion = true;
     public bool doWindowBackground = true;
+    public bool onlyOneOfTypeAllowed;
     public bool absorbInputAroundWindow;
+
+    // Read from the 1.6.4871 reference assembly's field list (Verse.Window declares both). The
+    // initializers are NOT readable from a reference assembly, so these two carry the value the game's
+    // own windows behave with: no lane claims either number as the game's default, and the option lane
+    // compares an option-untouched window against a freshly constructed one instead.
+    public bool resizeable = true;
     public bool draggable = true;
     public bool drawShadow = true;
     public bool focusWhenOpened = true;
@@ -688,6 +695,17 @@ public abstract class Window
 
     public virtual void PostOpen()
     {
+    }
+
+    /// <summary>
+    /// The close-refusal hook, read from the 1.6.4871 reference assembly
+    /// (<c>public virtual bool OnCloseRequest()</c>). The game's <c>WindowStack.TryRemove</c> asks it
+    /// before removing, and a false keeps the window in the stack - which is the "a consumer's refusal
+    /// to close is preserved" half of the 0.5.x window contract.
+    /// </summary>
+    public virtual bool OnCloseRequest()
+    {
+        return true;
     }
 
     public virtual void PreClose()
@@ -718,5 +736,124 @@ public abstract class Window
             Math.Max(1f, windowRect.width - margin * 2f),
             Math.Max(1f, windowRect.height - margin * 2f));
         DoWindowContents(inRect);
+    }
+}
+
+
+/// <summary>
+/// Minimal executable slice of <c>Verse.WindowStack</c> for the 0.5.x window-instance round.
+/// <para>
+/// <b>Why the double carries the lifecycle at all.</b> The library composes the game's stack instead of
+/// building a second scheduler, so the behaviour under test IS the vanilla add/remove contract: <c>Add</c>
+/// removes same-typed windows by the <c>onlyOneOfTypeAllowed</c> flag the <i>existing</i> windows carry
+/// (which is why a generic shell that ignores it lets two panels close each other), and <c>TryRemove</c>
+/// asks <c>OnCloseRequest</c> first, so a refusal keeps the window. Without those two bodies a lane could
+/// only assert what the library did to its own map, never that the vanilla path it relies on behaves the
+/// way the plan records.
+/// </para>
+/// <para>
+/// <b>Provenance of the emulation.</b> The ordering (Add -> RemoveWindowsOfType, then
+/// PreOpen/PostOpen; TryRemove -> OnCloseRequest, then PreClose/PostClose) is read from the master plan's
+/// IL-level note for the 1.6 Assembly-CSharp build, not from a game run; the exact intra-<c>Add</c>
+/// ordering is not observable in a reference assembly, so this double is the plan's reading made
+/// executable and the lanes assert only what both readings agree on. <c>GetsInput</c>,
+/// <c>Notify_ClickedInsideWindow</c>, immediate windows and the resolution-change path are deliberately
+/// absent: nothing this repository references needs them, and a double that grows guessed behaviour is
+/// worse than one that is honestly small.
+/// </para>
+/// <para>
+/// <c>focusedWindow</c> is public here while the real field is private: the test assembly compiles
+/// against the game reference assembly, so a lane can only read it through reflection, the same shape
+/// <c>Widgets.LabelTexts</c> already uses. It exists so "activation called the vanilla focus setter" is
+/// observable rather than asserted.
+/// </para>
+/// </summary>
+public class WindowStack
+{
+    private readonly List<Window> windows = new List<Window>();
+
+    public IList<Window> Windows => windows;
+
+    public int Count => windows.Count;
+
+    public Window this[int index] => windows[index];
+
+    /// <summary>The window the game would route Accept/Cancel to; set by <see cref="Notify_ManuallySetFocus"/>.</summary>
+    public Window? focusedWindow;
+
+    public bool WindowsForcePause
+    {
+        get
+        {
+            for (int i = 0; i < windows.Count; i++)
+            {
+                if (windows[i].forcePause) return true;
+            }
+
+            return false;
+        }
+    }
+
+    public bool WindowsPreventCameraMotion
+    {
+        get
+        {
+            for (int i = 0; i < windows.Count; i++)
+            {
+                if (windows[i].preventCameraMotion) return true;
+            }
+
+            return false;
+        }
+    }
+
+    public void Add(Window window)
+    {
+        if (window == null) throw new ArgumentNullException(nameof(window));
+
+        RemoveWindowsOfType(window.GetType());
+        window.PreOpen();
+        windows.Add(window);
+        window.PostOpen();
+    }
+
+    public bool TryRemove(Window window, bool doCloseSound = true)
+    {
+        if (window == null) return false;
+        if (!windows.Contains(window)) return false;
+        if (!window.OnCloseRequest()) return false;
+
+        window.PreClose();
+        windows.Remove(window);
+        window.PostClose();
+        if (ReferenceEquals(focusedWindow, window)) focusedWindow = null;
+        return true;
+    }
+
+    public bool IsOpen(Window window)
+    {
+        return window != null && windows.Contains(window);
+    }
+
+    public void Notify_ManuallySetFocus(Window window)
+    {
+        focusedWindow = window;
+    }
+
+    /// <summary>
+    /// The exact-type sibling removal the vanilla <c>Add</c> performs, driven by the flag on the windows
+    /// already in the stack. Exact type, not assignable-from: that distinction is what makes a generic
+    /// shell's same-type siblings the case worth modelling.
+    /// </summary>
+    private void RemoveWindowsOfType(Type type)
+    {
+        for (int i = windows.Count - 1; i >= 0; i--)
+        {
+            Window existing = windows[i];
+            if (existing.onlyOneOfTypeAllowed && existing.GetType() == type)
+            {
+                TryRemove(existing);
+            }
+        }
     }
 }
