@@ -93,8 +93,10 @@ in the next one.
 
 ## T4 — the demo mod (`demo`)
 
-Scope: `ferritelib_uikit_demo` — created by this round,
-a local git repository with **no remote**, and never written by any other package.
+Scope: the sibling directory `ferritelib_uikit_demo` next to this repository — created by this round, a
+local git repository with **no remote**, and never written by any other package. (The workspace root is not
+written down here on purpose: a tracked file may not carry a machine-absolute path, which is exactly what
+`scripts/privacy-audit.ps1` vector 1 caught in this line during the round.)
 
 Owes:
 
