@@ -284,9 +284,18 @@ public sealed class UiDocumentService : IDisposable {
 - **不覆盖**：`UiHost` 对页面元素执行的数值/窄态语法（`Width`/`Padding`/`Gap`/`Height`/`Breakpoint`/…）不在此层重复验证，
   原因是被校验的子树带着 item 作用域、且 `UiHost` 的词表是私有的。后果与"程序化构造的 spec"一致：模板内写坏的数值按
   引擎既有的"未声明/退化"路径处理，而不是创建期拒绝。这是**已知缺口**，不是"已覆盖"。
-- 模板内元素的 `Validate`（绑定存在性）**不在创建期执行**：其 key 是 item 作用域的，创建期无法存在。缺失的 item 局部 key
-  是 fail-soft：新控件（checkbox/progress/tree）用 `TryGet` 读，取默认值并记录一条去重报告后照常绘制；既有 atom
-  （如 `text/wrapped`）保持自身契约（`Get` 抛出→由树的 recovery 记录一次恢复带，页面继续绘制）。
+- 模板内元素的 `Validate`（绑定存在性）**不在创建期执行**：其 key 是 item 作用域的，创建期无法存在。因此这里选定
+  **collection kinds 的 fail-soft 读取契约**——代码、注释与本条说同一件事，由 lane 双向钉住：
+  - **缺失的 key 与类型不符的 key**：`input/checkbox`、`display/progress`、`container/tree` 一律取各自声明的默认值
+    （未选中 / 0 / 无行）并**记录一条去重报告**（`UiFitAudit` 外观通道，报告键含元素路径），元素照常绘制，
+    **不进入 recovery band**。实现是 `AtomVocabulary.ReadBoolOr`（走 P2 的 `TryGetBool`，全程无异常）与
+    `AtomVocabulary.ReadOr&lt;T&gt;`（`TryGet&lt;T&gt;` 对类型不符抛 `InvalidOperationException`，该异常被**收窄**捕获后按默认值处理；
+    消费者 getter 抛出的其他异常仍走 recovery）。lane：`KernelRepeatTests` 的"缺失 / 错类型 / 延迟一帧到达"三条。
+  - **既有 atom 保持自身读路径，本轮不改**：`text/wrapped` 的绑定读取用 `TryGet` 并忽略返回值，所以**缺失 key 画空文本**
+    （不记录报告）；**类型不符的 key 会让它的读取抛出**，由树的 recovery 记录一次恢复带、把该槽位标记为 tripped，
+    页面继续围绕它绘制。这条分界同样有 lane（`KernelRepeatTests` 的 "An existing atom keeps its own throwing-read contract"），
+    不把"新控件 fail-soft、旧 atom 抛"写成没有证据的声明。若要把旧 atom 的"缺失即空且不记录"也纳入统一告警，
+    那是另一处行为变更（`WrappedTextWidget` 两行），需要单独裁定，不在本次修复内。
 - 热重载：模板表随文件内容标识一起变化，重载候选的解析/预检路径与页面一致；模板结构错误在 commit 阶段抛出时由文档服务
   回滚整批并保留 last-known-good（`UiDocumentService` 既有规则），不是半批更新。
 

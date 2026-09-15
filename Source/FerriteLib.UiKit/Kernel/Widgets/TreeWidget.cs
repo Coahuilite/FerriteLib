@@ -184,16 +184,15 @@ internal sealed class TreeWidget : IUiWidget
     /// <summary>
     /// The rows this pass may draw: the model's list, with every row it cannot identify removed. Measure
     /// and Draw both come through here, so the bands they compute are always the same set - a refusal
-    /// cannot shift the geometry of the rows that survive.
+    /// cannot shift the geometry of the rows that survive. The list itself is read under the collection
+    /// kinds' fail-soft contract (<see cref="AtomVocabulary.ReadOr{T}"/>): an absent or mistyped row source
+    /// draws no rows and records one report, rather than tripping the slot.
     /// </summary>
     private List<UiTreeRow> CollectRows(UiWidgetContext ctx, string key)
     {
         var accepted = new List<UiTreeRow>();
-        if (!ctx.Bindings.TryGet<IReadOnlyList<UiTreeRow>>(key, out IReadOnlyList<UiTreeRow> rows) || rows == null)
-        {
-            UiFitAudit.ReportStyleFallback(ctx.ElementPath, Kind, "Bind", key, "no rows");
-            return accepted;
-        }
+        IReadOnlyList<UiTreeRow> rows = AtomVocabulary.ReadOr<IReadOnlyList<UiTreeRow>>(
+            ctx, Kind, key, Array.Empty<UiTreeRow>(), "no rows");
 
         HashSet<string>? seen = null;
         for (int i = 0; i < rows.Count; i++)

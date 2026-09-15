@@ -185,15 +185,15 @@ internal sealed class CheckboxWidget : IUiWidget
     }
 
     /// <summary>
-    /// The two-state read. A key nobody bound (or one bound to another type) answers the default state and
-    /// is recorded once through the appearance channel, because the deduplicated-report rule P2 wrote for
-    /// <c>VisibleKey</c> is the same rule here: fail-soft must not mean silent.
+    /// The two-state read, and the contract that makes it safe inside a repeater template: an absent key and a
+    /// key bound to another type both answer the default state and are recorded once through the appearance
+    /// channel (<see cref="AtomVocabulary.ReadBoolOr"/>). Fail-soft must not mean silent, and a data-driven
+    /// row whose item-local value is not there yet or lost its type must keep drawing rather than replace the
+    /// slot with a recovery band.
     /// </summary>
     private bool ReadState(UiWidgetContext ctx, string key)
     {
-        if (ctx.Bindings.TryGet<bool>(key, out bool value)) return value;
-        UiFitAudit.ReportStyleFallback(ctx.ElementPath, Kind, "Bind", key, "unchecked");
-        return false;
+        return AtomVocabulary.ReadBoolOr(ctx, Kind, key, fallback: false);
     }
 
     private string ReadBindKey()

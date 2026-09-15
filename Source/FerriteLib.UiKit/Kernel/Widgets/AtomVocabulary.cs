@@ -127,6 +127,57 @@ internal static class AtomVocabulary
     }
 
     /// <summary>
+    /// A fail-soft typed read for the kinds whose key may be item-local: an absent key and a key bound to
+    /// another type both answer <paramref name="fallback"/> and are recorded once through the appearance
+    /// channel, instead of reaching the tree's recovery band. That is the contract the collection kinds
+    /// publish - a data-driven row composes its key from the consumer's item key at instantiation, so
+    /// "the value is not there yet" and "the model hands back another type" are ordinary states of a page
+    /// that is still drawing, not a reason to replace the slot.
+    /// <para>
+    /// The bool read goes through <see cref="IUiBindings.TryGetBool"/>, the query P2 added for exactly this
+    /// shape, so it needs no exception at all. The generic one has to catch, because
+    /// <see cref="IUiBindings.TryGet{T}"/> reports a type mismatch as an <see cref="InvalidOperationException"/>
+    /// and the surface has no non-throwing typed read for anything else. The catch is narrowed to that one
+    /// exception type and the fallback is recorded, so a consumer getter that throws anything else still
+    /// reaches the tree's recovery path, and one that throws this type is answered - not silently.
+    /// </para>
+    /// <para>
+    /// Scope, stated because it is a boundary and not an accident: this is the collection kinds' value
+    /// contract. The pre-existing atoms keep their own read paths (a bound string atom draws an empty label
+    /// for an unresolvable key; a read that throws reaches the recovery band once per slot), and
+    /// <c>KernelRepeatTests</c> pins that split from both sides.
+    /// </para>
+    /// </summary>
+    internal static bool ReadBoolOr(UiWidgetContext ctx, string kind, string key, bool fallback)
+    {
+        if (ctx.Bindings.TryGetBool(key, out bool value)) return value;
+        ReportUnresolved(ctx, kind, key, fallback ? "true" : "false");
+        return fallback;
+    }
+
+    /// <summary>The generic half of <see cref="ReadBoolOr(UiWidgetContext, string, string, bool)"/>.</summary>
+    internal static T ReadOr<T>(UiWidgetContext ctx, string kind, string key, T fallback, string recordedDefault)
+    {
+        try
+        {
+            if (ctx.Bindings.TryGet<T>(key, out T value)) return value;
+        }
+        catch (InvalidOperationException)
+        {
+            // TryGet<T> reports a type mismatch this way; narrowed to that type so a consumer getter that
+            // throws anything else still reaches the tree's recovery path (see the summary above).
+        }
+
+        ReportUnresolved(ctx, kind, key, recordedDefault);
+        return fallback;
+    }
+
+    private static void ReportUnresolved(UiWidgetContext ctx, string kind, string key, string resolved)
+    {
+        UiFitAudit.ReportStyleFallback(ctx.ElementPath, kind, "Bind", key, resolved);
+    }
+
+    /// <summary>
     /// The data side's writability for a value key, or null when the element carries no value binding.
     /// Null is "not known" and resolves by role alone; false is state, and state beats the author.
     /// </summary>
