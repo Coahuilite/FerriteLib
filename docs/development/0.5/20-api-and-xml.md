@@ -291,11 +291,15 @@ public sealed class UiDocumentService : IDisposable {
     **不进入 recovery band**。实现是 `AtomVocabulary.ReadBoolOr`（走 P2 的 `TryGetBool`，全程无异常）与
     `AtomVocabulary.ReadOr&lt;T&gt;`（`TryGet&lt;T&gt;` 对类型不符抛 `InvalidOperationException`，该异常被**收窄**捕获后按默认值处理；
     消费者 getter 抛出的其他异常仍走 recovery）。lane：`KernelRepeatTests` 的"缺失 / 错类型 / 延迟一帧到达"三条。
-  - **既有 atom 保持自身读路径，本轮不改**：`text/wrapped` 的绑定读取用 `TryGet` 并忽略返回值，所以**缺失 key 画空文本**
-    （不记录报告）；**类型不符的 key 会让它的读取抛出**，由树的 recovery 记录一次恢复带、把该槽位标记为 tripped，
-    页面继续围绕它绘制。这条分界同样有 lane（`KernelRepeatTests` 的 "An existing atom keeps its own throwing-read contract"），
-    不把"新控件 fail-soft、旧 atom 抛"写成没有证据的声明。若要把旧 atom 的"缺失即空且不记录"也纳入统一告警，
-    那是另一处行为变更（`WrappedTextWidget` 两行），需要单独裁定，不在本次修复内。
+  - **既有 atom 的绑定读取同样"缺失即 fail-soft 且有报告"，但保留"类型不符走 recovery"**：`text/wrapped` 的 `Bind` 键
+    **无法解析**时按该 leaf 的文档默认值绘制（空文本，且保留空字符串的那条带高，叶子不会塌陷而移动兄弟），
+    并**记录一条去重报告**——与 collection kinds 同一通道、同一拼写（`AtomVocabulary.ReportUnresolved` → `UiFitAudit`）；
+    **类型不符**时仍由 `TryGet&lt;string&gt;` 抛出，由树的 recovery 替换为一次恢复带并把槽位标记为 tripped，页面继续围绕它绘制。
+    lane：`KernelRepeatTests` 的 "An absent item-local key on an atom draws its default and reports once" 与
+    "An existing atom keeps its own throwing-read contract"，把这一分界从"声明"变成"有证据"。
+  - **本条的适用范围（避免误读）**：它只针对**运行期可能无法解析**的键——repeater 模板里的 item 局部键、尚未到达的晚绑定键。
+    **页面级** `Bind` 键在创建期就由 `WrappedTextWidget.Validate`/`ValidateValue&lt;string&gt;` 拒绝，因此
+    "清单里写错一个键会静默降级"并非本规则的含义：写错键仍然是创建期失败。
 - 热重载：模板表随文件内容标识一起变化，重载候选的解析/预检路径与页面一致；模板结构错误在 commit 阶段抛出时由文档服务
   回滚整批并保留 last-known-good（`UiDocumentService` 既有规则），不是半批更新。
 

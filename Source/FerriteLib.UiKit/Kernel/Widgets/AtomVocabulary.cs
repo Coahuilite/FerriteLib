@@ -172,7 +172,13 @@ internal static class AtomVocabulary
         return fallback;
     }
 
-    private static void ReportUnresolved(UiWidgetContext ctx, string kind, string key, string resolved)
+    /// <summary>
+    /// Records one unresolved-binding answer on the bounded appearance channel, deduplicated by element, kind,
+    /// attribute and key. It is the single place this vocabulary spells that report, so a kind that answers an
+    /// unresolvable key with a default - a collection control or the wrapped-text atom - records the same
+    /// finding in the same shape, and "fail-soft must not mean silent" is one call rather than a convention.
+    /// </summary>
+    internal static void ReportUnresolved(UiWidgetContext ctx, string kind, string key, string resolved)
     {
         UiFitAudit.ReportStyleFallback(ctx.ElementPath, kind, "Bind", key, resolved);
     }
