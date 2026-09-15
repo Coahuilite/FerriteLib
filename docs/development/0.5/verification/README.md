@@ -26,6 +26,7 @@ status source. The round's live status stays in `10-work-packages.md` and `40-ve
 | [p4-adversarial.md](p4-adversarial.md) | P4 adversarial pass at `85faab0`: mutation counts, gap probes, invariant verdicts |
 | [p1-adversarial.md](p1-adversarial.md) | P1 adversarial pass at `688cb5d`: stub faithfulness, 7-mutation battery, gap classifications, invariants |
 | [p4b-adversarial.md](p4b-adversarial.md) | P4b adversarial pass at `6e0781a`: 4 mutations confirmed, seam vacuity probe, baseline-gate residual, invariants |
+| [p2-adversarial.md](p2-adversarial.md) | P2/P2b adversarial pass at `0ee55b6`: 6/7 mutation counts confirmed, a2 redundancy judged, borrow check, gap classifications |
 
 ## How wave B falsifies a claim
 
