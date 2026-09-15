@@ -114,9 +114,14 @@ consequence is paid in the open rather than discovered by a stranger.
   seam a host also hands the fit audit) rather than from the fixed 110x30 box it used to ship, because the
   label is the consumer's string and a library must not clip the wording it was handed; overriding the
   property still replaces the computation. The shell's own text is attributed in the audit as
-  `<windowType>/chrome` and `<windowType>/notice` — the concrete type is the only identity the shell has
-  before it holds a manifest — so two windows on screen at once no longer produce indistinguishable
-  `(unscoped)` findings.
+  `<windowType>[<window-key>]/chrome` and `.../notice` for a shell a catalog attached, and as the bare
+  `<windowType>/chrome` when none did — the concrete type plus the window key is the identity, extended in
+  the 0.5.x window round because one generic page shell now serves every ordinary page, and type-only
+  identity would put two open panels on one audit path and merge two instances into one finding. Two
+  windows on screen at once therefore no longer produce indistinguishable `(unscoped)` findings either.
+  The same round adds `Key`, `IsActiveTarget`, `Session`, the
+  `PreOpen`/`PostOpen`/`OnCloseRequest`/`PreClose`/`PostClose` hooks and the protected `CanClose`
+  veto to this type; all of it is additive, and a window no catalog attached behaves exactly as before.
 - `UiWindowNotice` — the shell's notice vocabulary, same reason.
 - `LineChartWidget` — named by the consumer's own composition, so it cannot go internal yet; that use is
   also the specimen behind the tree-membership metric, and the debt list would rather it be a kind string.
@@ -212,6 +217,39 @@ consequence is paid in the open rather than discovered by a stranger.
   emphasis), handed in nearest first along the tree; the engine's chain carries the two that inherit and
   leaves the roles on the element's own spec.
 - `UiStyleIssue` — one appearance value a document dropped, so that fail-soft is never silent.
+- `UiWindowKey` — the instance identity the 0.5.x window round adds: `(consumer, window-kind,
+  context-key)` as a value type with ordinal equality over all three parts, an empty context key meaning
+  the kind's one context-free instance. It exists because the C# type cannot be the identity: the vanilla
+  add path removes same-typed windows by exact type, so a shared page shell would make every ordinary page
+  a sibling of every other one. Usable as a dictionary key and through `==`/`!=`; `ToString` is a
+  diagnostic rendering and is never parsed back.
+- `UiWindowOptions` — per-kind window policy, applied by `UiWindowCatalog` before the window enters the
+  stack. Every modality switch is a nullable `bool?` and null writes nothing: `ForcePause` and
+  `PreventCameraMotion` are any-true over all windows, so a library-chosen default there would change
+  another consumer's game — this type ships no product default for either. `AllowMultipleInstances` is
+  the one non-nullable switch and defaults to true, setting the window's `onlyOneOfTypeAllowed` false so
+  the library's key, not the C# type, is what deduplicates instances; a false is the vanilla exact-type
+  rule, exact C# type included, so two kinds sharing one window class would evict each other.
+  `InitialSize` feeds the shell's size provider, `NormalSize` is re-applied at `PreOpen`, `CanClose`
+  is the close veto and `SetFocusOnActivate` lets activation call the game's own focus setter.
+- `UiWindowCatalog` — the registry that composes `Verse.WindowStack` instead of scheduling windows
+  itself: `Register`, `Open`/`Close`/`CloseAll`, `TryGet`, `Instances`,
+  `ActiveKey`/`ActiveWindow`/`IsActive`, `Activate`, `FocusPolicy`, and an
+  `AnyForcesPause`/`AnyPreventsCameraMotion` view of its own instances (the game's aggregate is still
+  the authority, because it also counts vanilla windows). It is constructed with the stack it drives, so
+  it holds no process-wide lookup and two catalogs in one process cannot touch each other. Its lifecycle
+  sits on the vanilla hooks `PreOpen`/`PostOpen`/`OnCloseRequest`/`PreClose`/`PostClose`, and a
+  consumer's refusal to close is preserved because `Close` reports the stack's own answer instead of
+  removing the instance itself.
+- `UiPageWindow` — the concrete page shell an ordinary XML page no longer needs a C# `Window` subclass
+  for. It takes a key, the manifest, typed bindings, a theme, a translation seam and every visible word
+  (title, close label and the notice text for each `UiWindowNotice`), and it participates in a catalog by
+  key; options come from the registration rather than the constructor so a kind has one policy in one
+  place. It inherits the shell's deferred failure-notice contract unchanged.
+- `UiFocusPolicy` — when a window becomes the one active target: `FollowClicks` (default: opening,
+  reopening and a pointer-down inside a window move it, and a click outside every instance clears it),
+  `OpenOnly`, and `Manual`. It states the library's own rule only: it makes no claim about z-order,
+  and the vanilla focus call an activation may make is not a bring-to-front.
 
 ## Internalize-candidate
 

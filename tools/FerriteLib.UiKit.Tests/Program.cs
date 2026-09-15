@@ -64,6 +64,9 @@ internal static class Program
         Console.WriteLine("Kernel window shell (P2 chrome + failure contract)...");
         failures += KernelWindowHostTests.RunAll();
 
+        Console.WriteLine("Kernel window catalog (0.5 keyed instances + shell + active target + pause policy)...");
+        failures += KernelWindowCatalogTests.RunAll();
+
         Console.WriteLine("Kernel backend containment (funnel allowlist)...");
         failures += KernelContainmentTests.RunAll();
 

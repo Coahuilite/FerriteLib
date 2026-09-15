@@ -48,17 +48,17 @@ public abstract class UiWindowHost : Window
     private bool pageUnavailable;
     private bool noticeDueNextFrame;
     private Exception? lastFailure;
+    private bool activeTarget = true;
+    private UiWindowCatalog? catalog;
 
-    // Identity the shell's own text is attributed to in the fit audit, built once because the concrete
-    // type is already known here and a per-frame string would be a per-frame allocation.
-    private readonly string chromeScope;
-    private readonly string noticeScope;
+    // Identity the shell's own text is attributed to in the fit audit: built lazily and cached, because
+    // the concrete type is known here but the window key is attached by the catalog after construction,
+    // and a per-frame string would be a per-frame allocation. See BuildScope for the identity itself.
+    private string? chromeScope;
+    private string? noticeScope;
 
     protected UiWindowHost()
     {
-        chromeScope = GetType().Name + "/chrome";
-        noticeScope = GetType().Name + "/notice";
-
         // The shell paints its own background, accent rule and close affordance, so the game's
         // equivalents must be off: two backgrounds or two close buttons is the defect this type
         // exists to prevent, not a style preference. Modality (forcePause, absorbInputAroundWindow,
@@ -202,8 +202,99 @@ public abstract class UiWindowHost : Window
     /// <summary>The live page host, or null before first draw and after a failure.</summary>
     protected UiHost? Host => host;
 
+    /// <summary>
+    /// The live page session, or null before the first successful pass and after a failure. Exposed
+    /// because a window that stops being the active target keeps this session - its scroll, selection and
+    /// drafts - and "the same session is still there" is the observable form of that promise.
+    /// </summary>
+    public UiSession? Session => host?.Session;
+
+    /// <summary>
+    /// The key this window is addressed by, or null when no catalog attached it. A window created
+    /// outside a catalog keeps the null and behaves exactly as the shell always did.
+    /// </summary>
+    public UiWindowKey? Key { get; internal set; }
+
+    /// <summary>
+    /// True while this window is the catalog's one active target. A window outside a catalog is always
+    /// the active target, which is what keeps the pre-catalog shell's behaviour unchanged.
+    /// </summary>
+    public bool IsActiveTarget => activeTarget;
+
+    /// <summary>
+    /// The policy a catalog applied to this window, or null when none was applied. Readable by a consumer
+    /// subclass and by the catalog in this assembly, which is why it is not merely protected: the
+    /// catalog's own activation rule consults it.
+    /// </summary>
+    protected internal UiWindowOptions? AppliedOptions { get; private set; }
+
+    /// <summary>
+    /// Applies a registration's policy. A null switch leaves the game's own value untouched: the library
+    /// writes no product default into forcePause or preventCameraMotion. The one non-nullable switch,
+    /// <see cref="UiWindowOptions.AllowMultipleInstances"/>, reaches the vanilla add path's exact-type
+    /// rule directly, because the library's own key - not the C# type - is what deduplicates instances.
+    /// </summary>
+    internal void ApplyOptions(UiWindowOptions options)
+    {
+        if (options == null) throw new ArgumentNullException(nameof(options));
+
+        AppliedOptions = options;
+
+        // The vanilla add path removes a same-typed sibling that carries onlyOneOfTypeAllowed, so this
+        // flag is how the option reaches the game's own rule instead of the library re-implementing it.
+        onlyOneOfTypeAllowed = !options.AllowMultipleInstances;
+
+        if (options.ForcePause is bool forcePauseValue) forcePause = forcePauseValue;
+        if (options.PreventCameraMotion is bool cameraValue) preventCameraMotion = cameraValue;
+        if (options.AbsorbInputAroundWindow is bool absorbValue) absorbInputAroundWindow = absorbValue;
+        if (options.Draggable is bool draggableValue) draggable = draggableValue;
+        if (options.Resizeable is bool resizeableValue) resizeable = resizeableValue;
+        if (options.CloseOnAccept is bool acceptValue) closeOnAccept = acceptValue;
+        if (options.CloseOnCancel is bool cancelValue) closeOnCancel = cancelValue;
+        if (options.CloseOnClickedOutside is bool outsideValue) closeOnClickedOutside = outsideValue;
+    }
+
+    /// <summary>Binds this window to the catalog that owns its instance identity. One catalog per window.</summary>
+    internal void AttachToCatalog(UiWindowCatalog owner)
+    {
+        if (owner == null) throw new ArgumentNullException(nameof(owner));
+        if (catalog != null && !ReferenceEquals(catalog, owner))
+        {
+            throw new InvalidOperationException("A window cannot be attached to two window catalogs.");
+        }
+
+        catalog = owner;
+    }
+
+    /// <summary>
+    /// Moves this window in or out of the active target. Losing the target releases the page session's
+    /// IMGUI capture, which is the pointer half of "a control in a deactivated window stops receiving
+    /// input": the control that captured the pointer before the target moved cannot be dragged from a
+    /// window the user is no longer working in. <c>UiSession.ReleaseHotControl</c> only ever releases the
+    /// session's own capture, so this cannot free another window's drag.
+    /// </summary>
+    internal void SetActiveTarget(bool active)
+    {
+        if (activeTarget == active) return;
+
+        activeTarget = active;
+        if (!active)
+        {
+            UiSession? session = host?.Session;
+            if (session != null && session.IsActive)
+            {
+                int? owned = session.OwnedHotControl;
+                if (owned.HasValue)
+                {
+                    session.ReleaseHotControl(owned.Value);
+                }
+            }
+        }
+    }
+
     public sealed override void DoWindowContents(Rect inRect)
     {
+        ResolvePointerDown(inRect);
         DrawChrome(inRect);
         Rect content = ContentRect(inRect);
         BeforeDraw(content);
@@ -247,12 +338,71 @@ public abstract class UiWindowHost : Window
         }
     }
 
+    /// <summary>
+    /// A window is about to enter the stack. The normal size is restored here so a reopened window comes
+    /// back at its resting size, and the catalog is told before anything else runs so the instance is
+    /// addressable by its key from the first hook onward.
+    /// </summary>
+    public override void PreOpen()
+    {
+        Vector2? normal = AppliedOptions?.NormalSize;
+        if (normal.HasValue)
+        {
+            windowRect = new Rect(windowRect.x, windowRect.y, normal.Value.x, normal.Value.y);
+        }
+
+        catalog?.NotifyPreOpen(this);
+        base.PreOpen();
+    }
+
+    public override void PostOpen()
+    {
+        base.PostOpen();
+        catalog?.NotifyPostOpen(this);
+    }
+
+    /// <summary>
+    /// The consumer's close veto, answered through the vanilla hook. The catalog is told only after the
+    /// hook agreed to close, so a refused close never looks like a removal to the identity map.
+    /// </summary>
+    public override bool OnCloseRequest()
+    {
+        if (!CanClose())
+        {
+            return false;
+        }
+
+        bool allowed = base.OnCloseRequest();
+        if (allowed)
+        {
+            catalog?.NotifyCloseRequested(this);
+        }
+
+        return allowed;
+    }
+
+    /// <summary>The consumer's veto. True by default, which is the game's own answer.</summary>
+    protected virtual bool CanClose()
+    {
+        return true;
+    }
+
     public override void PreClose()
     {
+        // The target is dropped before the page goes away, so no input or capture reaches a closing
+        // window; the catalog then removes the instance for real at PostClose.
+        catalog?.NotifyPreClose(this);
+
         // Closing disposes the session with the host, so reopening gets a clean retry.
         host?.Dispose();
         host = null;
         base.PreClose();
+    }
+
+    public override void PostClose()
+    {
+        base.PostClose();
+        catalog?.NotifyPostClose(this);
     }
 
     private Rect ContentRect(Rect inRect)
@@ -275,16 +425,18 @@ public abstract class UiWindowHost : Window
     /// shell is what can say whose notice it is.
     /// </para>
     /// <para>
-    /// Trade-off, recorded rather than hidden: the identity is the concrete window TYPE, not a manifest
-    /// element path, because the shell has no id and no manifest yet when it paints chrome. Two instances
-    /// of one window class therefore share a chrome path; findings are keyed by path and text, so a
-    /// second instance's identical finding is deduplicated rather than misattributed. The <c>/chrome</c>
-    /// and <c>/notice</c> suffixes keep the two bands apart.
+    /// Identity, recorded rather than hidden: the concrete window TYPE plus the window key when a catalog
+    /// attached one, because the shell has no manifest element id when it paints chrome. The key was
+    /// added in the 0.5.x window round: a single generic page shell serves every ordinary page, so
+    /// type-only identity would put two open panels on the same chrome path and a finding about one would
+    /// read as a finding about the other. Findings are keyed by path and text, so with the key in the path
+    /// two instances are told apart instead of deduplicated into one. The <c>/chrome</c> and
+    /// <c>/notice</c> suffixes keep the two bands apart.
     /// </para>
     /// </summary>
     private void DrawChrome(Rect rect)
     {
-        UiFitAudit.BeginElement(chromeScope);
+        UiFitAudit.BeginElement(ChromeScope);
         try
         {
             DrawChromeCore(rect);
@@ -298,7 +450,7 @@ public abstract class UiWindowHost : Window
     /// <summary>Draws the notice inside the shell's notice scope; see <see cref="DrawChrome"/>.</summary>
     private void DrawNoticeScoped(Rect content, UiWindowNotice notice)
     {
-        UiFitAudit.BeginElement(noticeScope);
+        UiFitAudit.BeginElement(NoticeScope);
         try
         {
             DrawNotice(content, notice);
@@ -306,6 +458,54 @@ public abstract class UiWindowHost : Window
         finally
         {
             UiFitAudit.EndElement();
+        }
+    }
+
+    /// <summary>The fit-audit scope the chrome is drawn inside; see <see cref="DrawChrome"/>.</summary>
+    private string ChromeScope => chromeScope ??= BuildScope("chrome");
+
+    /// <summary>The fit-audit scope the notice is drawn inside; see <see cref="DrawChrome"/>.</summary>
+    private string NoticeScope => noticeScope ??= BuildScope("notice");
+
+    /// <summary>
+    /// The audit identity for one of the shell's own bands: the concrete type, plus the window key in
+    /// brackets when a catalog attached one. Built lazily and cached because the key is attached after
+    /// construction, so the string cannot be decided once in the constructor.
+    /// </summary>
+    private string BuildScope(string band)
+    {
+        string identity = Key is UiWindowKey key ? GetType().Name + "[" + key + "]" : GetType().Name;
+        return identity + "/" + band;
+    }
+
+    /// <summary>
+    /// The active-target half of the shell's input rule, run before anything draws. A pointer-down asks
+    /// the catalog which instance the pointer is over: the click that selects a deactivated window is
+    /// consumed here so it cannot also operate a control of that window (the first click selects, the
+    /// second operates); a click outside every instance clears the target, so a control in the window
+    /// that was selected before does not keep taking input.
+    /// <para>
+    /// <b>What the harness cannot prove.</b> Real keyboard routing after the target moves, and how this
+    /// selection click composes with the vanilla stack's own click handling, are in-game behaviour: the
+    /// stubs model the library's rule, not IMGUI's. The 0.5 verification checklist (A1/A2/A3/A3b) is
+    /// where that half is confirmed.
+    /// </para>
+    /// </summary>
+    private void ResolvePointerDown(Rect contentRect)
+    {
+        if (catalog == null || !UiNative.IsPointerDown())
+        {
+            return;
+        }
+
+        bool wasActive = activeTarget;
+        catalog.NotifyPointerDown(UiNative.PointerPosition(), this, contentRect);
+
+        if (!wasActive && activeTarget)
+        {
+            // Consumed so the activating click cannot reach the page this pass: a control drawn while the
+            // window was deactivated must not fire from the click that selected the window.
+            UiNative.ConsumePointerEvent();
         }
     }
 
