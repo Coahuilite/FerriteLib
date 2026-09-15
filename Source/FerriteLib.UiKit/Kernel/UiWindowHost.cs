@@ -318,7 +318,7 @@ public abstract class UiWindowHost : Window
 
     private void DrawShell(Rect inRect)
     {
-        ResolvePointerDown(inRect);
+        ResolvePointerDown();
         DrawChrome(inRect);
         Rect content = ContentRect(inRect);
         BeforeDraw(content);
@@ -509,13 +509,19 @@ public abstract class UiWindowHost : Window
     /// second operates); a click outside every instance clears the target, so a control in the window
     /// that was selected before does not keep taking input.
     /// <para>
+    /// <b>Coordinates.</b> <c>Event.current.mousePosition</c> is group-local inside the window's draw
+    /// group, so the pointer is translated into the space the catalog compares rects in before it is
+    /// handed over; see <see cref="ToWindowSpace"/>. Without that translation a click inside a second,
+    /// offset window resolved to whichever window covered the local coordinate on screen.
+    /// </para>
+    /// <para>
     /// <b>What the harness cannot prove.</b> Real keyboard routing after the target moves, and how this
     /// selection click composes with the vanilla stack's own click handling, are in-game behaviour: the
     /// stubs model the library's rule, not IMGUI's. The 0.5 verification checklist (A1/A2/A3/A3b) is
     /// where that half is confirmed.
     /// </para>
     /// </summary>
-    private void ResolvePointerDown(Rect contentRect)
+    private void ResolvePointerDown()
     {
         if (catalog == null || !UiNative.IsPointerDown())
         {
@@ -523,7 +529,7 @@ public abstract class UiWindowHost : Window
         }
 
         bool wasActive = activeTarget;
-        catalog.NotifyPointerDown(UiNative.PointerPosition(), this, contentRect);
+        catalog.NotifyPointerDown(ToWindowSpace(UiNative.PointerPosition()));
 
         if (!wasActive && activeTarget)
         {
@@ -531,6 +537,22 @@ public abstract class UiWindowHost : Window
             // window was deactivated must not fire from the click that selected the window.
             UiNative.ConsumePointerEvent();
         }
+    }
+
+    /// <summary>
+    /// A content-local point translated into the window space the catalog's rects live in.
+    /// <para>
+    /// <b>Why the offset is the window's own origin.</b> The game draws the page inside a group whose
+    /// rect is <c>windowRect.AtZero().ContractedBy(Margin)</c> and hands <c>DoWindowContents</c> that
+    /// rect at zero (Verse.Window.InnerWindowOnGUI), so the event pointer inside it is group-local. This
+    /// shell seals <c>Margin</c> to zero, which makes the group origin the window's own screen origin and
+    /// the conversion exact: <c>windowRect.position + local</c>. It is also why the catalog can compare
+    /// the result against every instance's screen <c>windowRect</c>.
+    /// </para>
+    /// </summary>
+    private Vector2 ToWindowSpace(Vector2 contentLocal)
+    {
+        return new Vector2(windowRect.x + contentLocal.x, windowRect.y + contentLocal.y);
     }
 
     private void DrawChromeCore(Rect rect)
