@@ -188,7 +188,7 @@ P4c 把**页面级**默认值（`DefaultScheme`/`DefaultDensity` 指向本文件
 | --- | --- | --- | --- | --- |
 | R1 | P1 | 批次失败回滚只恢复旧文档树，不恢复已被清掉的交互状态（用户未提交草稿丢失） | `ROLLBACK rejected=True restoredRoot=one draft=''`（原草稿 `uncommitted-draft`） | **已修复合入**：提交拆成非破坏性 stage + 整批成功后 seal（剪枝与释放捕获）；回滚清空待剪枝。探针复跑 `draft='uncommitted-draft'`；lane + 3 处突变 |
 | R2 | P1 | 已有有效外部版本时，文件暂时缺失仍切回内嵌旧版 | `MISSING before=external-valid` → `accepted=True after=embedded` | **已修复合入**：内嵌仅用于首次无可用版本；已有 LKG 时缺失=拒绝并按版本去重、文件回归后恢复。探针 `accepted=False after=external-valid`；lane + 5 处突变 |
-| R3 | P2 | 关闭活动窗口后剩余窗口没有恢复为活动目标 | `WINDOW after close active=null remaining=1` | **已修复合入**：PreClose 记录「关闭者原本是否活动」，PostClose 按策略交给 survivor；拒绝关闭不触发。探针 `active=a remaining=1`；14 条断言覆盖四种形状 + 突变 |
+| R3 | P2 | 关闭活动窗口后剩余窗口没有恢复为活动目标 | `WINDOW after close active=null remaining=1` | **已修复合入**：PreClose 记录「关闭者原本是否活动」，PostClose 按策略交给 survivor；拒绝关闭不触发。探针 `active=a remaining=1`；单次关闭 lane 16 条断言 + 交接链 lane（2/3 窗、同帧两次关闭、pending-close，逐窗断言恰好一个 `IsActiveTarget`）+ 突变 |
 | R4 | P2 | 第二个 host 的诊断订阅覆盖第一个 host 的测量尺（溢出判断互相污染） | `METRICS A before=0` → 仅订阅 B 后 `A after=1` | **已修复合入**：诊断作用域携带本 host 测量尺；外部探针复跑为 `A after B subscription=0`；harness lane 先红后绿 + 突变证明 |
 | R5 | P2 | 首次样式应用绕过候选校验：同一文件首次加载与重载语义不同 | `initial attached=True reports=0` → 仅改空白后 `reload rejected=True` | **已修复合入**：首次 attach 走与重载同一条预校验，拒绝时保留 host 自身文档并给出可归属报告。探针 `attached=True reports=1`；lane + 2 处突变 |
 | R6 | P2 | 换绑文档服务后关闭 host，旧服务仍持有该 host（依赖泄漏） | `REATTACH after close firstDeps=1 secondDeps=0` | **已修复合入**：换绑时释放旧服务依赖（同一服务重绑安全）。探针 `firstDeps=0 secondDeps=0`；lane + 4 处突变 |
@@ -279,20 +279,26 @@ P4c 把**页面级**默认值（`DefaultScheme`/`DefaultDensity` 指向本文件
 | --- | --- | --- |
 | P1 R1 stage 与 seal 之间释放 host | 通过 | `disposedMidBatch=True outcome=no-throw accepted=True hostB.added=True` |
 | P2 R2 文件回归 | 通过 | `back.accepted=True host.hasV2=True` |
-| **P3 R3 同帧两次关闭 / survivor 自身关闭** | **发现缺陷（must-fix）** | `activeAfterSecondClose=null remainingEnd=0`；`activeAfterTwoCloses=null remaining=2` —— 违反 R3 lane 自己写下的不变量 |
+| **P3 R3 同帧两次关闭 / survivor 自身关闭** | **尖角（可达性未证明），已加固并复验** | 加固前 `activeAfterSecondClose=null remainingEnd=0`；加固后独立复验同一驱动：`active=p3 remaining=1`。两处新断言已突变证明 |
 | P4 R4 未订阅 host 的旧通道尺 | 通过 | `legacyUnsubscribedFirstDraw=0` |
 | P5 R5 首次 attach 被拒后无样式来源 | 通过 | `keptOwnDocument=True recovered.accepted=True` |
 | P6 R6 同一服务重复 attach | 通过 | `deps=1` |
 | P7 R7 大小上界 + BOM | 通过 | `atBoundLength=1048576 parsedAtBound=True`；`overLength=1048577 over.rejected=True` |
 
-**R3 的第二形状：潜在尖角，可达性未被证明（Lead 的 must-fix 升级已按第二个探针撤回）**。
-`NotifyPreClose` 只用一个槽记录「关闭者原本是否活动」，理论上同帧第二次 pre-close 会覆盖它，使 `PostClose` 在仍有窗口打开时把活动目标置空；`SelectSurvivor` 也可能把目标交给已 pre-close 但仍在 activationOrder 里的窗口。
+**R3 的第二形状：潜在尖角，可达性未被证明 -> 已加固、已独立复验（Lead 的 must-fix 升级已按第二个探针撤回）**。
 
-但**第二个、独立构建的探针 harness** 检查了产品路径的可达性并给出相反结论：`WindowStack.TryRemove` 的 `OnCloseRequest -> PreClose -> windows.Remove -> PostClose` 是相邻的，`List.Remove` 按引用相等，其间没有用户代码运行，也没有可重入路径能在该窗口内再开一次 PreClose；`CloseAll` 也是逐个 TryRemove 完成。两个探针都**无法通过产品路径**造出这个交错。
+症状：`NotifyPreClose` 原先只用一个槽记录「关闭者原本是否活动」，同帧第二次 pre-close 会覆盖它，使 `PostClose` 在仍有窗口打开时把活动目标置空；`SelectSurvivor` 也可能把目标交给已 pre-close 但仍在 activationOrder 里的窗口。
 
-因此准确分类是：**潜在尖角、可达性未证明 -> 记录 + 可选加固，不是发布阻断项**。原 R3 lane 只覆盖单次关闭，它通过并不证明该交错不可能——两件事都要写清。
-`windowing` 的 task-22 相应改为：交付交接链 lane（仍然有价值）、把该尖角写进代码与文档、加固只在**能证明行为中性**时才做。
+**可达性**：第二个独立探针无法通过产品路径造出该交错（`WindowStack.TryRemove` 的 `OnCloseRequest -> PreClose -> windows.Remove -> PostClose` 相邻，其间无库内代码；`CloseAll` 逐个完成）。
+**准确措辞是「库内控制流不可达」，不是「不存在可重入路径」**——两个钩子位于**可被消费者覆写**的 `UiWindowHost.PreClose`/`PostClose`（`api-tiers.md:151/:269`），实例又来自消费者自己的工厂（`Register`），一个覆写里在 `base.PreClose()` 之后关闭兄弟窗口就是真实的可重入路径。
 
+**加固（task-22，已合入 `a0d2c89`）**：单槽改为 `HashSet closingWindows` + `activeClosingWindows` 子集，`SelectSurvivor` 遍历 activationOrder 时跳过 pending-close 候选；行为中性论证写在代码注释里。
+新 lane `VerifyActiveTargetHandOffChain` 覆盖两次关闭链、同帧两次关闭、pending-close survivor，并对**每个**窗口断言恰好一个 `IsActiveTarget`。
+
+**独立复验（`40194ae` @ `a0d2c89`）**：门禁 exit 0、harness 1544 ok / 0 FAIL；同一个 P3 驱动在加固后 shape A `active=p3 remaining=1`、shape B `active=p3 gammaActive=False`（加固前分别是 `null` 与 `gamma`）。
+两处新断言现已突变证明：M1（每次 pre-close 清空 `activeClosingWindows`）只红同帧两条；M2（交接前清空 `closingWindows`）只红 pending-close 一条；**两次突变都未使任何既有 lane 变红**，这就是「在可达路径上行为中性」的实测半边。
+
+**残余前置条件（仅代码审读，未测量）**：两个集合只在 `NotifyPostClose` 清理，因此一次「PreClose 之后永远没有 PostClose」的中止关闭（钩子里抛异常逃出、或有人直接调用钩子）会留下陈旧条目，`SelectSurvivor` 会跳过它，后续关闭可能把目标交给别的 survivor 或干脆没有。这不是回归（加固前在反方向同样错），也不需要新的前置条件，**登记为一句已知边界而非修复项**。
 **R2 的尖角（两个探针一致确认，非缺陷）**：`LastFailedVersion` 在 accept/skip 后不会重置，因此「恢复成功之后的再次损坏」仍会返回 Rejected 并发布给订阅者，但 `Duplicate=True` 且不更新 `LastReport`/`Reports`——与文档承诺的「按失败版本去重报告一次」一致，值得在 R2 记录里补一句。
 
 **R2 的观察（非缺陷）**：恢复成功后第二次缺失仍被拒，但因 `LastFailedVersion` 只按 `missing:`+path 去重，它不会进入报告环；已交 `documents` 裁定并 pin。
