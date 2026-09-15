@@ -105,5 +105,8 @@ internal static class Program
 
         Console.WriteLine("Kernel documents (file sources, dependencies, atomic reload, last-known-good)...");
         failures += KernelDocumentReloadTests.RunAll();
+
+        Console.WriteLine("Kernel lane registration (every lane file is invoked from Program.cs)...");
+        failures += KernelLaneRegistrationTests.RunAll();
     }
 }
