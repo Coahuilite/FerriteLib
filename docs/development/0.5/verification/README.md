@@ -30,6 +30,7 @@ status source. The round's live status stays in `10-work-packages.md` and `40-ve
 | [p4c-adversarial.md](p4c-adversarial.md) | P4c adversarial pass at `9078812`: both vacuity mutations confirmed (6/8), first-load fallback measured, adjudication judged |
 | [final-integrated.md](final-integrated.md) | Final round at `1769e37`: P3/P5 batteries, cross-package lanes, invariant gate, merge-resolution checks |
 | [post-fix-verification.md](post-fix-verification.md) | Post-fix round at `0d1f38b`: external probe, invariants, R1-R7 lane sweep and adversarial probes |
+| [post-fix-addendum.md](post-fix-addendum.md) | R1/R7 planted measurements, R7 source-text judgement, advisory records, named gaps |
 
 ## How wave B falsifies a claim
 
