@@ -28,7 +28,10 @@
 | 16 | 预算独立性用 lane 断言但**没有**植入突变（去重那半有） | P5 | 待补 | 为预算独立性补一处植入突变 |
 | 17 | 构造期样式丢弃记录发生在可订阅之前，仍走旧通道（同时有整份文档丢弃的警告） | P5 | 可接受（已写） | —— |
 | 18 | `UiHostLedger` 上界 512（实测真实计数 132） | P5 | 可接受 | —— |
-| 19 | 死 lane 守卫已入库（`b6b621d`）——此前"lane 存在但从未注册"无门禁 | P6 | 已关闭 | —— |
+| 19 | 死 lane 守卫已入库（`b6b621d`）——此前「lane 存在但从未注册」无门禁；**最终验证发现它去重已注册名，重复注册不可见（F6）** | P6 | **修复中** | 守卫同时拒绝重复注册 |
+| 20 | 未订阅路径的分配 lane 比声明窄：主体是合成两次调用循环而非 `UiHost.DrawFrame`，且未断言主体循环真的执行过（无法区分"0 分配"与"循环被省略"） | P5 | 待关闭（已收窄声明） | 让 lane 直接驱动 `DrawFrame` 并断言主体执行次数 |
+| 21 | 缺少"A,B,A,B 交替帧"的多 host 交错 lane（`plan-P5-diagnostics.md` 要求；现有 lane 是顺序共存 + 进程级去重被证伪） | P5 | 待补 | 按 plan-P5 补交错帧 lane |
+| 22 | 夹具页注释「此行以下不知道矩形」对**测试半边**不成立（测试半边确实用 Rect 驱动事件泵） | P3 | 待文档（已修） | 注释已限定为"页面半边" |
 
 ## 4.1 需要外部输入才能推进的两项
 
@@ -75,8 +78,8 @@ pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev
 | P2b（task-9） | 同上 | 门禁 exit 0 | 含在 P2 的 c2 突变内（过度剪枝 6 转红） | 已合并 |
 | P4 | `KernelDocumentReloadTests`（81 断言） | 门禁 exit 0；harness 948 ok | **3 处**：批次原子性 6、状态清理 5、重复版本跳过 2 | 已合并 |
 | P4b（task-8） | 同上（103 断言） | 门禁 exit 0；harness 1072 ok | **4 处**：AutoWatch 旧行为 3、style 预校验分支移除 7、回滚移除 1、无条件基线恢复 1 | 已合并 |
-| P3 | `KernelRepeatTests`(60) + `KernelControlKindTests`(46) + `KernelFixturePageTests`(14) | 合并后门禁 exit 0 | **5 处**：声明身份集合漏掉行（14 FAIL）、行身份改用位置（14 FAIL）、只读 checkbox 保留命中规则、引擎唯一禁用决策永不触发、隐藏集合被回收 | 已合并 |
-| P5 | `KernelDiagnosticsTests` | 合并后门禁 exit 0 | **7 处**（会话归零、释放清空全部、去重键旁路、reload 钩子丢弃、注册表单一槽位 43 FAIL、recovery kind 丢失、植入静态 host 引用）+ 未订阅路径**实测** 0 分配（对照循环 483,328 B） | 已合并 |
+| P3 | `KernelRepeatTests`(**61**) + `KernelControlKindTests`(**47**) + `KernelFixturePageTests`(**19**)（作者报 60/46/14，独立复跑修正） | 合并后门禁 exit 0；harness 1426 ok | **5 处全部转红**（作者计数被独立复跑修正）：声明身份集合漏掉行 **18** FAIL（作者报 14）、行身份改用位置 **24** FAIL（报 14）、只读 checkbox 保留命中规则 **1**、引擎唯一禁用决策永不触发 **8**、隐藏集合被回收 **2**；恢复后 SHA256 校验一致 | 已合并 |
+| P5 | `KernelDiagnosticsTests` | 合并后门禁 exit 0 | 作者报 **7 处**（会话归零、释放清空全部、去重键旁路、reload 钩子丢弃、注册表单一槽位、recovery kind 丢失、植入静态 host 引用）；独立复跑 6 处均转红。未订阅路径**实测** 0 分配（对照循环 483,328 B），但**该 lane 比其声明窄**：主体是合成的两次调用循环而非 `UiHost.DrawFrame`，且没有断言主体循环确实执行过——见 §4 第 20 条 | 已合并 |
 | P1/P5 缝合（task-13） | `KernelWindowCatalogTests`（+13 断言） | 合并后门禁 exit 0 | 2 处：作用域参数置空、整段 using 移除 | 已合并 |
 
 填写规则（**不得伪造 PASS**）：每条 PASS 必须写明 ①在哪个 revision 上跑、②跑的命令、

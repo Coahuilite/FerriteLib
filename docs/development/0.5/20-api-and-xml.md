@@ -13,7 +13,7 @@
   <Window Id="main" TitleKey="example.page.title" Width="640" Height="420" CloseOnCancel="true">
     <Scroll Id="body" Height="Fill">
       <Section Id="members" TitleKey="example.page.members">
-        <Repeat Id="member-list" Items="members" ItemKey="id" Template="member-row" />
+        <Repeat Id="member-list" Items="members" Template="member-row" />
       </Section>
       <Checkbox Id="flag-ammo" LabelKey="example.page.flag.ammo" Label="Ammo"/>
       <Button Id="apply" TextKey="example.page.apply" Command="apply"/>
@@ -299,3 +299,9 @@ public sealed class UiDocumentService : IDisposable {
   而结构变化必须经由**一次** `NotifyChanged`；Paint 类公告复用同一排列快照；树按层级缩进并以被点击行的 key 回报。
 - **证据等级**：这是本仓自己的库内示例（证据类 1/2），`AGENTS.md` "Our own demo is not consumption" 适用：
   它证明这些 kind 在桩度量下能画、能测、能恢复，**不**抬高"已验证公共面"计数，也**不是**晋升门的 provenance。
+### 7.6 修正说明（最终独立验证 F8）
+
+§1 的示例曾写 `<Repeat Items="members" ItemKey="id" Template="member-row"/>`。**`ItemKey` 不是真实属性**：
+落地形态的 `<Repeat>` 只有 `Items`（items 绑定键）与 `Template`（`<Templates>` 中的模板 Id），
+行身份由**items 绑定所提供的 item 键**决定（身份形如 `<declaredId>#<itemKey>`）。写 `ItemKey=` 会在创建期被拒绝。
+本节的示例已按真实形态修正，§1 的其余部分是设计草案，一律以 §7 为准。

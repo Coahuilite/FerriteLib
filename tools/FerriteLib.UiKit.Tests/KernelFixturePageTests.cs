@@ -36,9 +36,11 @@ internal static class KernelFixturePageTests
     private const string Scope = "fixture-page";
 
     /// <summary>
-    /// The page half: the page's structure, its template, and its bindings. Nothing below this line knows a
+    /// The page half: the page's structure, its template, and its bindings. Nothing in THIS HALF knows a
     /// rectangle, an element identity, an input rule or a refresh call - the four things the round's success
-    /// criterion names.
+    /// criterion names. (The test half further down does use rectangles and an event pump: an immediate-mode
+    /// host has to be driven frame by frame, so the lane must name geometry where the page must not. The
+    /// claim is about the page, not about the harness that scores it.)
     /// </summary>
     private const string FixturePageXml =
         "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
