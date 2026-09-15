@@ -1,8 +1,10 @@
 # T1 — notification adapter and page lifecycle: lane record
 
-Owner: `mvvm` (task-24). Branch `feat/0.6-mvvm`, implementation commit `8ff5b9f` (baseline `02a6aea`).
+Owner: `mvvm` (task-24; task-32 for the T1b activation lane). Branch `feat/0.6-mvvm`; the T1 landing is
+`8ff5b9f` (baseline `02a6aea`, merged upstream as `df243df`/`1613057`), and the T1b activation lane is
+`4c94090` at `0948540`.
 Evidence class reached: **已自动化验证** for every item below — the Release harness on the stub game surface,
-153 assertions across two lane classes (`KernelNotifyAdapterTests` 89, `KernelPageLifecycleTests` 64).
+166 assertions across two lane classes (`KernelNotifyAdapterTests` 89, `KernelPageLifecycleTests` 77).
 
 Not reached, and not claimed anywhere in this record: 已由真实消费者接入 and 已实机验证. Nothing here ran in a
 game, no second consumer compiled against the surface, and the window passes are driven through the harness's
@@ -16,7 +18,7 @@ game, no second consumer compiled against the surface, and the window passes are
 | `Source/FerriteLib.UiKit/Kernel/UiWindowHost.cs` | `ReleaseHost` disposes in a `finally` and records a throwing `HostDetached` instead of letting it escape |
 | `Source/FerriteLib.UiKit/Kernel/IUiMainThread.cs` | doc correction only (it claimed "three public entry points"; one takes it today) |
 | `tools/FerriteLib.UiKit.Tests/KernelNotifyAdapterTests.cs` | new lane, 89 assertions |
-| `tools/FerriteLib.UiKit.Tests/KernelPageLifecycleTests.cs` | new lane, 64 assertions |
+| `tools/FerriteLib.UiKit.Tests/KernelPageLifecycleTests.cs` | new lane, 77 assertions (T1 64 + the T1b activation lane 13) |
 | `tools/FerriteLib.UiKit.Tests/Program.cs` | one contiguous commented registration block for both lanes |
 
 No public signature changed. The frozen contract in `docs/development/0.6/05-api-contract.md` is implemented
@@ -153,7 +155,8 @@ the host).
 **Does not pin:** how the real window stack orders its own hooks around these events; the vanilla
 exact-type removal performed by `WindowStack.Add` (covered by `KernelWindowCatalogTests`); the case where
 `CreateHost` itself throws — there is no host to detach, and that path stays with
-`KernelWindowHostTests.VerifyFailingPassTripsTheNoticeOnTheNextPassOnly`.
+`KernelWindowHostTests.VerifyFailingPassTripsTheNoticeOnTheNextPassOnly`. The **active-target** path was on
+this list when T1 landed and is no longer: it is pinned by the T1b lane in §2a.
 
 ### (6) Invariance across reload
 
@@ -185,6 +188,15 @@ page-level regression guard that the same property holds with a view model attac
 has no shared registry to get wrong (each window owns its own `host` field), so there is no single-line
 production defect for it to catch.
 
+The independent verifier sharpened this caveat, and their measured numbers are recorded here instead of
+upgrading the claim (T5a record §3.2): planting R1's own defect — `SealDocumentCommit()` at stage time in
+`UiHost.CommitLayoutCandidate` — reddens **4** document/scheduler assertions and **zero** T1 ones; planting the
+blunter `Session.Dispose()` at the same point reddens **42** across the document, diagnostics and scheduler
+lanes, and this lane then fails only as an **unnamed lane-level `NullReferenceException`**, not at the named
+`and the uncommitted draft survived both reloads` or `a reload never invokes a command` assertions (they cite
+`:299` and `:296` in their extraction), because the lane holds the node object and never draws again. The two
+named assertions stay "future-regression guard" and no more.
+
 **Does not pin:** the two verifiers' territory — a reload arriving from a real file watcher on a real editor
 save, and the in-game ordering of the commit.
 
@@ -210,11 +222,44 @@ M6/M7 redden the delivery assertions.
 **Does not pin:** that `HostAttached`-in-the-first-draw composes with the game's real GUI event order — the
 harness drives a synthetic pass.
 
+### (5b) The active-target path does not re-announce (T1b, task-32)
+
+Lane `KernelPageLifecycleTests`:
+`Activation: re-activating a window does not announce its host again`.
+
+Added after the independent verifier's T5a record measured this shape as **NOT PINNED** (§3.1 there): they
+re-announced `HostAttached` from `UiWindowHost.SetActiveTarget(true)` while a host already existed — the shape
+a consumer that re-subscribes its view model when its window becomes the target would produce — and the whole
+harness stayed green (1840 ok / 0 FAIL), because no lane both subscribes to `HostAttached` and re-activates a
+window after its first draw.
+
+Asserts, with two real `UiPageWindow` instances opened through a `UiWindowCatalog`: the first is opened and
+drawn and its host is announced exactly once, handing out that page's own host; a second instance is opened so
+the active target moves off the first (asserted, because a window's target flag rests at true and
+`SetActiveTarget` returns early when the flag already matches); activating the first again — which is what
+really runs `SetActiveTarget(true)` with a host already built and drawn — keeps the announcement count at
+exactly one and hands out the same `UiHost`; drawing the re-activated window adds nothing; and two full
+deactivate/activate cycles leave the count at one and the announced instance unchanged.
+
+**The product behaviour is correct as it stands: only creation announces.** This lane is therefore a regression
+guard, not a fix — precisely the guard the verifier's finding asked for.
+
+**Mutation-proven.** T1b-A (the verifier's exact attack: re-announce `host` in `SetActiveTarget(true)`)
+reddens **ACTIVATION-NO-SECOND-ANNOUNCEMENT**, plus the two count assertions that restate it. T1b-B (announce a
+freshly created `CreateHost()` there) reddens both **ACTIVATION-NO-SECOND-ANNOUNCEMENT** and
+**ACTIVATION-SAME-HOST**, so the identity half is mutation-proven separately from the count half.
+
+**Does not pin:** the click path's own selection semantics (which window a click selects is
+`KernelWindowCatalogTests`' territory and, for real input routing, the in-game checklist); whether the game's
+own focus setter re-activates a window behind this library's back.
+
 ## 3. Mutation campaign
 
-Baseline: `8ff5b9f`, tree otherwise clean, Release harness `ALL PASS`. Each row: the defect planted in the
-production file, then `git checkout -- <file>` before the next row. Every row fired at least one named
-assertion; no row failed to compile.
+Baseline: `8ff5b9f` for M1–M20. T1b-A/T1b-B were run at the `0.6.x` tip `0948540` with the new activation
+lane present (and only `UiWindowHost.cs` mutated, so the lane file was never reverted). Tree otherwise clean,
+Release harness `ALL PASS` before each phase. Each row: the defect planted in the production file, then
+`git checkout -- <file>` before the next row. Every row fired at least one named assertion; no row failed to
+compile.
 
 | # | Planted defect (file) | Assertions that went red |
 | --- | --- | --- |
@@ -238,6 +283,8 @@ assertion; no row failed to compile.
 | M18 | `PageHost` answers null | *after the first draw the page host is reachable through PageHost*; *the generic page exposes the host it created* |
 | M19 | default equality instead of reference identity | *two value-equal sources are two subscriptions, not one*; *each of them was subscribed once* |
 | M20 | `Dispose` stops unsubscribing | *Dispose unsubscribes every source* (+2 knock-ons) |
+| T1b-A | re-announce `host` from `SetActiveTarget(true)` (the verifier's exact attack) | **ACTIVATION-NO-SECOND-ANNOUNCEMENT**; *drawing the reactivated window announces nothing more*; *the announcement count is still exactly one after two full activation cycles* |
+| T1b-B | announce a fresh `CreateHost()` from `SetActiveTarget(true)` | **ACTIVATION-NO-SECOND-ANNOUNCEMENT**; **ACTIVATION-SAME-HOST**; *and the host instance handed out never changed*; the two count restatements |
 
 ## 4. What this record is not
 
@@ -250,12 +297,14 @@ assertion; no row failed to compile.
 
 ## 5. Reported to the Lead
 
-1. **`scripts/privacy-audit.ps1` currently FAILS on a pre-existing, Lead-owned file.**
-   `docs/development/0.6/10-work-packages.md` line 96 carries a machine-absolute drive path naming the demo
-   mod's planned location. It landed with T0 commit `02a6aea`; vector1 reports exactly that one finding, and
-   the working-tree scan is otherwise clean. The file is outside this package's write scope and was not
-   touched, so the round's privacy gate cannot pass until the Lead removes the path there.
+1. **The privacy-gate finding raised with the T1 hand-off is closed upstream.** `docs/development/0.6/10-work-packages.md`
+   line 96 carried a machine-absolute drive path naming the demo mod's planned location (landed with T0
+   `02a6aea`). The Lead removed it at `4a9c6b9`; `scripts/privacy-audit.ps1` reports `PRIVACY AUDIT CLEAN`
+   (exit 0) at the tip this record's T1b lane sits on, so no T1a activity is needed there.
 2. **The unended-batch reading.** §2 item (2) records which reading of "still delivered even if the batch is
    never ended" was implemented (a dropped inner scope delivers at the outer end; a leaked outermost scope is
    released by the ceiling). If the Lead intended `Flush()` to force a commit inside a batch, that is a
    one-line semantic change to `Flush` and a new assertion, not a contract amendment.
+3. **T1b follow-up (task-32).** The verifier's NOT PINNED finding T5a §3.1 is closed by the lane in §2a,
+   mutation-proven with their exact attack plus a fresh-host variant. No production behaviour changed: the
+   shell already announced only on creation, and this lane is the missing regression guard.
