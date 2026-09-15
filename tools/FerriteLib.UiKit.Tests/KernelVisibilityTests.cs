@@ -215,7 +215,7 @@ internal static class KernelVisibilityTests
             keeperAfter != null,
             "GetNodeByElementId answers by identity rather than by arrangement, which is what keeps a hidden element's draft reachable");
         Check(
-            keeperAfter!.ValueStates["draft"].EditText == "typed",
+            keeperAfter != null && keeperAfter.ValueStates["draft"].EditText == "typed",
             "and its draft survives the hide");
         Check(
             ReferenceEquals(host.Session.GetNodeByElementId("other"), other)

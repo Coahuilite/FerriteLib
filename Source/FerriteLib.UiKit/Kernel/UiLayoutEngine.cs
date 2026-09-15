@@ -300,6 +300,17 @@ public sealed class UiLayoutEngine
     /// arrived during a pass and however many times one key was announced, the element is marked at most
     /// once (<see cref="UiNode.MarkDirty"/> is idempotent) and the batch produces exactly one commit.
     /// </para>
+    /// <para>
+    /// <b>What is load-bearing today, stated rather than assumed.</b> The page-wide snapshot cache cannot
+    /// tell one element from another, so the clock bump alone already forces the re-arrange a Measure or
+    /// Structure announcement needs, and the per-node flags are currently redundant with it: marking the
+    /// affected nodes is the seam element-level measure reuse will need, and removing only those calls
+    /// changes nothing observable yet (measured, 2026-09-15). What <i>is</i> observable, and what the
+    /// invalidation lane pins, is the rest of the decision: which keys are polled at all (declared keys
+    /// only - an announcement for a key no arranged element declares invalidates nothing), and the class
+    /// the key declared (Paint moves neither a node nor the clock). Do not delete the flags on the grounds
+    /// that the clock covers them; delete them with the reuse that makes them matter.
+    /// </para>
     /// </summary>
     private void CommitNotifications(UiWidgetContext ctx)
     {
@@ -1332,6 +1343,11 @@ public sealed class UiLayoutEngine
             // be, so the instance is replaced with the one the current definition names.
             if (string.Equals(widget.Kind, spec.Kind, StringComparison.Ordinal))
             {
+                // The identity is reused, but the element under it can still be a different one of the same
+                // kind: a definition that renumbers unnamed siblings hands node [1] a different spec, and an
+                // instance still configured with the old one would measure and draw the wrong element. The
+                // table's whole point is reusing the instance, so it is re-configured instead of replaced.
+                widget.Configure(spec);
                 return widget;
             }
 
