@@ -28,7 +28,7 @@
 | 16 | 预算独立性用 lane 断言但**没有**植入突变（去重那半有） | P5 | 待补 | 为预算独立性补一处植入突变 |
 | 17 | 构造期样式丢弃记录发生在可订阅之前，仍走旧通道（同时有整份文档丢弃的警告） | P5 | 可接受（已写） | —— |
 | 18 | `UiHostLedger` 上界 512（实测真实计数 132） | P5 | 可接受 | —— |
-| 19 | 死 lane 守卫已入库（`b6b621d`）——此前「lane 存在但从未注册」无门禁；**最终验证发现它去重已注册名，重复注册不可见（F6）** | P6 | **修复中** | 守卫同时拒绝重复注册 |
+| 19 | 死 lane 守卫已入库（`b6b621d`）——此前「lane 存在但从未注册」无门禁；最终验证发现它去重已注册名，重复注册不可见（F6） | P6 | **已关闭**（`b812dfc`）：守卫现在也会命名重复注册 | —— |
 | 20 | 未订阅路径的分配 lane 比声明窄：主体是合成两次调用循环而非 `UiHost.DrawFrame`，且未断言主体循环真的执行过（无法区分"0 分配"与"循环被省略"） | P5 | 待关闭（已收窄声明） | 让 lane 直接驱动 `DrawFrame` 并断言主体执行次数 |
 | 21 | **交错帧归属 lane 缺失**（不是「归属未被证明」）：`plan-P5-diagnostics.md:27-29` 明确**要求**一条 A,B,A,B 交错、各自计数的 lane。现有 lane 已证伪「共享槽位」与「进程级去重表」（多 host 共存 + M6 突变转红），缺的只是交错帧 + 共享元素路径这一种形状 | P5 | 待补（独立验证判定为记录项而非 must-fix：增量风险低） | 按 plan-P5 补交错帧 lane，应由 diagnostics 侧实现 |
 | 22 | 夹具页注释「此行以下不知道矩形」对**测试半边**不成立（测试半边确实用 Rect 驱动事件泵） | P3 | 待文档（已修） | 注释已限定为"页面半边" |
@@ -192,10 +192,9 @@ P4c 把**页面级**默认值（`DefaultScheme`/`DefaultDensity` 指向本文件
 | R4 | P2 | 第二个 host 的诊断订阅覆盖第一个 host 的测量尺（溢出判断互相污染） | `METRICS A before=0` → 仅订阅 B 后 `A after=1` | **已修复合入**：诊断作用域携带本 host 测量尺；外部探针复跑为 `A after B subscription=0`；harness lane 先红后绿 + 突变证明 |
 | R5 | P2 | 首次样式应用绕过候选校验：同一文件首次加载与重载语义不同 | `initial attached=True reports=0` → 仅改空白后 `reload rejected=True` | **已修复合入**：首次 attach 走与重载同一条预校验，拒绝时保留 host 自身文档并给出可归属报告。探针 `attached=True reports=1`；lane + 2 处突变 |
 | R6 | P2 | 换绑文档服务后关闭 host，旧服务仍持有该 host（依赖泄漏） | `REATTACH after close firstDeps=1 secondDeps=0` | **已修复合入**：换绑时释放旧服务依赖（同一服务重绑安全）。探针 `firstDeps=0 secondDeps=0`；lane + 4 处突变 |
-| R7 | P2 | 内容哈希与解析来自两次独立读取（TOCTOU：记录的版本与实际解析的树可能不同） | 控制流确认；未做并发保存压力复现 | **已修复合入**：单次 `ReadAllBytes` 快照同时供大小约束、版本哈希与解析（BOM 感知解码）；并发替换本身仍无 harness 钩子，证据是结构护栏 + 突变 |
+| R7 | P2 | 内容哈希与解析来自两次独立读取（TOCTOU：记录的版本与实际解析的树可能不同） | 控制流确认；未做并发保存压力复现 | **已修复合入，但独立复验把它的证据等级降了一档**：单次 `ReadAllBytes` 快照同时供大小约束、版本哈希与解析（BOM 感知解码）。其 lane 是**源码文本断言**——verifier 仅追加一行注释即令其变红，而若第二次读盘换成它未列举的形态（如 `ReadAllText` + `Parse`）它仍会绿。因此准确说法是「历史上那种双读形态已被守住」，**不是**「竞态已被证明消除」 |
 
-**已接受的额外风险（不混入上述已复现结果）**：`ResolvePointerDown` 的窗口局部坐标与 `NotifyPointerDown` 的屏幕坐标空间混用，
-且重叠用目录自持的 activationOrder 而非原版层级（需实机核对）；两个 catalog 同时工作的组合未测；
+**已接受的额外风险（review 提出，不混入上述已复现结果）**：**review 时** `ResolvePointerDown` 的窗口局部坐标与 `NotifyPointerDown` 的屏幕坐标空间混用——
 普通 content 的激活标志与原版键盘路由的关系未实机证明。
 
 **文档修订（已由 Lead 处理）**：`30-consumer-handoff.md` 的诊断条目自相矛盾（同时写「已实现」与「尚不可用」）已删除；
@@ -255,6 +254,9 @@ P4c 把**页面级**默认值（`DefaultScheme`/`DefaultDensity` 指向本文件
 | 契约 | `KernelRepeatTests`: item-local 缺键 / 错类型两条 lane（+ wrapped atom 缺键） |
 | stub | `KernelWindowCatalogTests`: the double rests on the game's own defaults |
 
-每个修复的**突变证据由各自作者提供**（范围 3–5 FAIL 不等，已记入 §7.1），但**没有**经过本轮独立复核；
-因此本文件把 R1–R7 记为「已修复合入 + 仓内护栏存在 + 作者突变证据」+「独立逐条复验未完成」。
+**追加部分（verifier，`aa3d240` @ `0d1f38b`）**：独立复验了 **R1 的 seal 半边**（注释掉 `SealDocumentCommit` -> 6 条命名 FAIL）与 **R7**（见上：注释级改动即变红）。
+并逐条核对了 review 附带风险的登记：指针空间已修（`UiWindowHost.cs:511-516`、`UiWindowCatalog.cs:392`）而原版栈序重叠仍属实机（`UiWindowCatalog.cs:385-389`）；两个 catalog 同时工作仍未测；
+诊断覆盖缺口已登记；窗口 double 默认值已修并 pin。
 
+**仍未由独立复验测量（verifier 自陈的具名缺口）**：R2–R6 的「植入旧缺陷」测量，以及七个新缺陷探针（R1 seal/dispose、R2 文件回归、R3 关闭 survivor、R4 未订阅旧通道尺、R5 无样式来源、R6 同服务重绑、R7 大小上界 + BOM）。
+因此 R1–R7 的准确记法是：**已修复合入 + 每项都有仓内护栏（Lead 核对）+ 作者突变证据 + 独立复验只覆盖 R1(seal) 与 R7**。
