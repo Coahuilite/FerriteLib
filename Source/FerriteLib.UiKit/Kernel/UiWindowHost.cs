@@ -310,7 +310,7 @@ public abstract class UiWindowHost : Window
     /// </summary>
     public sealed override void DoWindowContents(Rect inRect)
     {
-        using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics))
+        using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, host == null ? null : Metrics))
         {
             DrawShell(inRect);
         }

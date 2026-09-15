@@ -176,22 +176,19 @@ public static class UiFitAudit
     /// </summary>
     public static string? LastStyleFallbackDiagnostic => lastStyleFallback;
 
-    /// <summary>Binds the measuring implementation and the reporting callback. Does not enable the audit.</summary>
+    /// <summary>
+    /// Binds the measuring implementation and the reporting callback of the <b>legacy channel</b> - the
+    /// process-wide path a host that never subscribed uses. Does not enable the audit.
+    /// <para>
+    /// A host that has subscribed is measured with its own ruler, carried by its diagnostic scope, not with
+    /// this slot: two hosts with different measurement adapters used to contaminate each other's overflow
+    /// verdict through this one field, because subscribing wrote it. Nothing outside this method writes it.
+    /// </para>
+    /// </summary>
     public static void Attach(ITextMetrics textMetrics, Action<UiOverflowReport> reportSink)
     {
-        AttachMetrics(textMetrics);
-        sink = reportSink ?? throw new ArgumentNullException(nameof(reportSink));
-    }
-
-    /// <summary>
-    /// Binds only the measuring implementation. This is the ruler half of <see cref="Attach"/>, split out
-    /// because a diagnostic subscription needs a measurement model without claiming the process-wide sink:
-    /// the subscription routes finished findings to its own subscriber, so the legacy callback stays
-    /// untouched and an existing consumer of <see cref="Attach"/> is not displaced by somebody opting in.
-    /// </summary>
-    internal static void AttachMetrics(ITextMetrics textMetrics)
-    {
         metrics = textMetrics ?? throw new ArgumentNullException(nameof(textMetrics));
+        sink = reportSink ?? throw new ArgumentNullException(nameof(reportSink));
     }
 
     /// <summary>
@@ -259,14 +256,24 @@ public static class UiFitAudit
     {
         if (!Enabled) return;
 
-        // One shared slot used to hold every host's findings, and its saturation bound was the reason a
-        // noisy page could silence a quiet one. With a subscription live the finding goes to that
-        // subscriber's own bounded buffer, and the process-wide ledger - with its saturation check, its
-        // dedup set and its callback - is deliberately not consulted at all.
+        // Routing and the ruler are decided together. One shared slot used to hold every host's findings
+        // AND the one ruler every label was measured with, so subscribing a host with a different adapter
+        // changed an unrelated host's overflow verdict. With a subscription live, both the destination and
+        // the ruler come from that host's own scope, and the process-wide ledger - its saturation check,
+        // its dedup set, its callback and its ruler - is not consulted at all. An unsubscribed host keeps
+        // exactly the legacy path it had.
         UiDiagnosticSubscription? subscription = UiDiagnosticHub.ActiveSubscription;
-        if (subscription == null && Saturated) return;
+        ITextMetrics? textMetrics;
+        if (subscription != null)
+        {
+            textMetrics = UiDiagnosticHub.ActiveMetrics;
+        }
+        else
+        {
+            if (Saturated) return;
+            textMetrics = metrics;
+        }
 
-        ITextMetrics? textMetrics = metrics;
         if (textMetrics == null) return;
         if (string.IsNullOrEmpty(text) || rect.width <= 1f || rect.height <= 1f) return;
 

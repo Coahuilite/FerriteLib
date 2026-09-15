@@ -449,6 +449,12 @@ public static class UiDiagnosticHub
     // ambient static here and it never outlives the call that opened it.
     private static UiDiagnosticSubscription? active;
 
+    // The ruler of the host whose scope is open. It belongs to the same scope as the subscription above,
+    // and while a subscription is live UiFitAudit.Check measures with this one and never with the
+    // process-wide legacy ruler - which is what stops one host's ruler from deciding another host's
+    // overflow verdict.
+    private static ITextMetrics? activeMetrics;
+
     /// <summary>Live subscriptions. It drops back to zero when every host/session is disposed.</summary>
     public static int SubscriptionCount => BySession.Count;
 
@@ -489,10 +495,9 @@ public static class UiDiagnosticHub
         BySession.Add(session.Identity, subscription);
         host.AttachDiagnostics(subscription);
 
-        // Opting in is what arms the measuring half: the audit needs a ruler, and the host already holds
-        // the one model its shell and its page measure with. The legacy Attach remains the path for a
-        // consumer that wants the process-wide channel instead of a subscription.
-        UiFitAudit.AttachMetrics(host.TextMetrics);
+        // Subscribing deliberately does NOT touch UiFitAudit's process-wide ruler. That slot serves the
+        // legacy channel only; a subscribed host's ruler travels in its own draw scope instead, so
+        // subscribing host B can no longer change how host A measures.
         return subscription;
     }
 
@@ -520,11 +525,19 @@ public static class UiDiagnosticHub
         if (ReferenceEquals(active, subscription))
         {
             active = null;
+            activeMetrics = null;
         }
     }
 
     /// <summary>The subscription of the arrange/draw scope currently open, or null.</summary>
     internal static UiDiagnosticSubscription? ActiveSubscription => active;
+
+    /// <summary>
+    /// The ruler of the host whose scope is open, or null outside any scope. Only meaningful together with
+    /// <see cref="ActiveSubscription"/>: the two are set and restored as one scope, so a live subscription
+    /// always carries the ruler of the host it belongs to.
+    /// </summary>
+    internal static ITextMetrics? ActiveMetrics => activeMetrics;
 
     /// <summary>
     /// Releases the subscription of a session being disposed. This is the lifetime half of the contract:
@@ -542,20 +555,26 @@ public static class UiDiagnosticHub
         if (ReferenceEquals(active, subscription))
         {
             active = null;
+            activeMetrics = null;
         }
 
         subscription.Deactivate();
     }
 
     /// <summary>
-    /// Opens the ambient host scope for one arrange or draw. The scope is a struct so the unsubscribed
-    /// path allocates nothing; <paramref name="subscription"/> null still opens the scope, so a host with
-    /// no subscription cannot inherit the routing of whichever host is drawing around it.
+    /// Opens the ambient host scope for one arrange or draw, carrying both the host's subscription and the
+    /// ruler it measures with. The scope is a struct so the unsubscribed path allocates nothing;
+    /// <paramref name="subscription"/> null still opens the scope, so a host with no subscription cannot
+    /// inherit the routing or the ruler of whichever host is drawing around it. A null
+    /// <paramref name="textMetrics"/> with a live subscription means the host cannot be measured at all,
+    /// which is the truthful answer rather than measuring it with somebody else's ruler.
     /// </summary>
-    internal static UiDiagnosticScope EnterHost(UiDiagnosticSubscription? subscription)
+    internal static UiDiagnosticScope EnterHost(UiDiagnosticSubscription? subscription, ITextMetrics? textMetrics)
     {
-        var scope = new UiDiagnosticScope(active);
-        active = subscription != null && subscription.IsActive ? subscription : null;
+        var scope = new UiDiagnosticScope(active, activeMetrics);
+        bool live = subscription != null && subscription.IsActive;
+        active = live ? subscription : null;
+        activeMetrics = live ? textMetrics : null;
         return scope;
     }
 
@@ -578,16 +597,19 @@ public static class UiDiagnosticHub
     internal readonly struct UiDiagnosticScope : IDisposable
     {
         private readonly UiDiagnosticSubscription? previous;
+        private readonly ITextMetrics? previousMetrics;
 
-        internal UiDiagnosticScope(UiDiagnosticSubscription? previous)
+        internal UiDiagnosticScope(UiDiagnosticSubscription? previous, ITextMetrics? previousMetrics)
         {
             this.previous = previous;
+            this.previousMetrics = previousMetrics;
         }
 
-        /// <summary>Puts the ambient subscription back to what it was before the scope opened.</summary>
+        /// <summary>Puts the ambient subscription and ruler back to what they were before the scope opened.</summary>
         public void Dispose()
         {
             active = previous;
+            activeMetrics = previousMetrics;
         }
     }
 }
