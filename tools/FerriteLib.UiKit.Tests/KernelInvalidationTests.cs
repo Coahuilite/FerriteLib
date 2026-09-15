@@ -33,6 +33,8 @@ internal static class KernelInvalidationTests
     private const string ReadoutKind = "test/readout";
 
     private static readonly Dictionary<string, int> MeasureCounts = new(StringComparer.Ordinal);
+    private static readonly Dictionary<string, float> DrawnHeights = new(StringComparer.Ordinal);
+    private static bool announceInDraw;
     private static int failures;
 
     public static int RunAll()
@@ -43,6 +45,7 @@ internal static class KernelInvalidationTests
         Run("Paint reuses the arrangement, Measure re-arranges", VerifyClassification);
         Run("A key no arranged element declares invalidates nothing", VerifyUndeclaredKeyTargetsNothing);
         Run("A batch of announcements is one commit", VerifyBatchCommit);
+        Run("A notification raised inside a draw pass commits at the next boundary", VerifyDrawPassNotificationIsDeferred);
         return failures;
     }
 
@@ -202,6 +205,42 @@ internal static class KernelInvalidationTests
             "five announcements across two keys coalesce into exactly one clock step, not five");
     }
 
+    /// <summary>
+    /// The boundary half of the batch claim, raised from the place a page actually raises it: a widget
+    /// callback inside the draw pass. A commit there would mutate the tree the pass is painting, so the
+    /// announcement must be recorded and committed at the next arrangement boundary instead. The lens is
+    /// the drawn rect: the pass that announced finishes with the geometry it started with, and the value it
+    /// announced arrives one frame later.
+    /// </summary>
+    private static void VerifyDrawPassNotificationIsDeferred()
+    {
+        float height = 10f;
+        var bindings = new UiBindings();
+        bindings.BindReadOnly("k", () => height, UiInvalidation.Measure);
+
+        using UiHost host = Host(Page("k"), bindings);
+        host.MeasureAndArrange(new Vector2(200f, 200f));
+        host.MeasureAndArrange(new Vector2(200f, 200f));
+        int clock = host.Session.ContentRevision;
+        int measured = Count("k");
+
+        var viewport = new Rect(0f, 0f, 200f, 200f);
+        height = 50f;
+        announceInDraw = true;
+        host.DrawFrame(viewport);
+
+        Check(Count("k") == measured, "a notification raised inside the draw pass does not re-arrange that pass");
+        Check(Near(DrawnHeightOf("k"), 10f), "and the pass finishes with the tree it started with");
+        Check(host.Session.ContentRevision == clock, "so nothing committed mid-pass");
+
+        announceInDraw = false;
+        host.DrawFrame(viewport);
+
+        Check(Count("k") == measured + 1, "the commit lands on the next arrangement boundary");
+        Check(Near(DrawnHeightOf("k"), 50f), "carrying the value the model moved to");
+        Check(host.Session.ContentRevision == clock + 1, "and the arrangement clock moves exactly once for it");
+    }
+
     // --- helpers -------------------------------------------------------------------------------
 
     /// <summary>One row per test, carrying exactly the readouts whose keys that test binds.</summary>
@@ -225,6 +264,8 @@ internal static class KernelInvalidationTests
         UiWidgetRegistry.InitializeCore();
         UiWidgetRegistry.Register(Scope, ReadoutKind, () => new ReadoutWidget(), new[] { "Id", "Kind", "Bind" });
         MeasureCounts.Clear();
+        DrawnHeights.Clear();
+        announceInDraw = false;
         return new UiHost(
             Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
     }
@@ -260,6 +301,11 @@ internal static class KernelInvalidationTests
         }
 
         return false;
+    }
+
+    private static float DrawnHeightOf(string key)
+    {
+        return DrawnHeights.TryGetValue(key, out float height) ? height : float.NaN;
     }
 
     private static bool Near(float expected, float actual)
@@ -323,6 +369,13 @@ internal static class KernelInvalidationTests
 
         public void Draw(Rect rect, UiWidgetContext ctx)
         {
+            string key = Key();
+            DrawnHeights[key] = rect.height;
+            if (announceInDraw)
+            {
+                // The shape a real page has: the model moved and a widget notices while it paints.
+                ctx.Bindings.NotifyChanged(key);
+            }
         }
 
         private string Key()
