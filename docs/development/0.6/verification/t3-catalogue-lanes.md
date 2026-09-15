@@ -8,6 +8,15 @@ lane：`tools/FerriteLib.UiKit.Tests/KernelWidgetCatalogTests.cs`（`KernelWidge
 
 **证据等级：已实现 + 已自动化验证。** 没有任何实机或真实消费者计数；T4 的演示面板如何渲染本描述不在本文件范围。
 
+> **声明边界（declared boundary — pre-existing behaviour, NOT a defect）**
+>
+> `Register` 会在注册表锁内复制调用方传入的 schema/label 集合；`Resolve` 会在锁内调用工厂。
+> **Lead 裁决（task-26 回交时）：两者保持不变**——本轮指令明确不扩大公开契约，且要求的不变量窄于
+> "任何锁内都不得有消费者代码"，而是：**后台/列举路径不得在锁内暴露可写注册表、工厂或消费者回调**。
+> T3 的 lane 证明的正是这一条（每条 listing 路径既不枚举传入集合、也不调工厂）。
+> 因此 **T5 读者请把它作为边界记录一次现状，不要为这两条种突变、也不要要求本包修复**；
+> 若判断该边界有误，请在报告里写明不同意见和依据，而不是在该处种一个注定红的突变。
+
 ## 逐项对照
 
 | # | 要求 | lane（Run 名） | 断言要点 | 突变证明 |
@@ -19,14 +28,15 @@ lane：`tools/FerriteLib.UiKit.Tests/KernelWidgetCatalogTests.cs`（`KernelWidge
 | 5 | 列目录零工厂调用（计数工厂 + 抛异常工厂） | `Listing invokes no factory, even one that throws` | 3 轮 Snapshot/TryGet/Scopes 后计数工厂仍为 0、抛异常工厂为 0；抛异常工厂的 kind 仍被完整描述（含 schema）；随后**显式 Resolve** 证明该工厂确实会抛（前提可证） | M4（`Describe` 里 Resolve 一下）红 2 条 |
 | 6 | 未声明 schema/label 仍列出 | `A kind with no declared schema or label set still lists` | `HasAttributeSchema==false`、`HasLabelSet==false` 且集合为空；`GetAttributeSchema` 同时返回 null；只声明一半的情况各自正确；**声明了空集合**仍算声明（`true` + 空集合） | M1（跳过无 schema 的 kind）红 4 条 |
 | 7 | 晚注册：下一次 Snapshot 可见，无重启无缓存 | `A kind registered after a snapshot appears in the next one` | 旧 Snapshot 对象保持原样（是记录不是视图）；新 Snapshot 多一项且能 TryGet；scope 列表同步；第二次晚注册同样可见 | M7（进程级缓存）红 8 条 |
-| 8 | 注册表锁持有期间不跑消费者代码 | `Listing runs no consumer code while the registry lock is held` | 用调用方提供的 schema 集合（其 `GetEnumerator` 记录 `Monitor.IsEntered(Gate)`）证明：所有 listing 调用**一次都没有枚举它**，且计数工厂为 0 | M8（注册表直接保存调用方集合而不复制→listing 会枚举消费者集合）红 2 条 |
+| 8 | 列举路径在锁持有期间不跑消费者代码（声明边界见文首：注册/解析两条既有路径仍持锁） | `Listing runs no consumer code while the registry lock is held` | 用调用方提供的 schema 集合（其 `GetEnumerator` 记录 `Monitor.IsEntered(Gate)`）证明：所有 listing 调用**一次都没有枚举它**，且计数工厂为 0 | M8（注册表直接保存调用方集合而不复制→listing 会枚举消费者集合）红 2 条 |
 
 ## 本 lane 明确**不**钉住的东西
 
-- **锁边界的两处既有路径**：`Register` 在锁内用调用方传入的 schema/label 集合构造 `HashSet`（lane 输出里
-  `note:` 记录为 `lockHeld=True`），`Resolve` 在锁内调用工厂。两者都是本包不得改动的公开面既有行为；
-  本 lane 证明的是**每条 listing 路径**（Snapshot/TryGet/Scopes）完全不跑消费者代码（不枚举传入集合、不调工厂）。
-  若要连注册路径也移出锁，是一次公开面行为变更，需 Lead 裁定。
+- **锁边界的两处既有路径 = 声明边界，不是缺陷**：`Register` 在锁内用调用方传入的 schema/label 集合构造
+  `HashSet`（lane 输出里 `note:` 记录为 `lockHeld=True`），`Resolve` 在锁内调用工厂。两者都是**本包不拥有的
+  既有公开行为**，Lead 已裁定保持不变（见文首声明边界）；把注册路径也移出锁属于公开面行为变更，不在本轮授权内。
+  本 lane 证明的是**每条 listing 路径**（Snapshot/TryGet/Scopes）完全不跑消费者代码（不枚举传入集合、不调工厂），
+  这正是计划要求的那条窄不变量。
 - **并发压力**：没有多线程 Register/Snapshot 交错压测；"锁纪律"来自代码阅读与单线程可观察量，不来自竞态复现。
 - **渲染形态**：描述符是数据，能不能渲染成目录 UI 由 T4 的演示面板决定；本 lane 不画任何东西。
 - **`TryGet` 返回 false 时的 out 值**：是 `default(UiWidgetDescriptor)`（结构体默认值绕过构造，集合为 null）。
