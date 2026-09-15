@@ -663,23 +663,26 @@ public abstract class Window
 
     public WindowLayer layer;
     public string optionalTitle = "";
-    public bool doCloseX = true;
-    public bool doCloseButton = true;
+    // Field defaults are the GAME'S OWN, read from Source/Verse/Window.cs through the local source index.
+    // A reference assembly advertises the fields but not their initializers, which is exactly how this
+    // double drifted before (2026-09-15, the R-extra-3 finding): doCloseX, doCloseButton,
+    // closeOnClickedOutside, forcePause, absorbInputAroundWindow, resizeable and draggable have no
+    // initializer and rest false; closeOnAccept, closeOnCancel, preventCameraMotion, doWindowBackground,
+    // drawShadow and focusWhenOpened rest true; onlyOneOfTypeAllowed rests true. A double whose resting
+    // values disagree with the game is a harness that measures a different game, so
+    // KernelWindowCatalogTests pins the five that drifted and a drift reddens a lane.
+    public bool doCloseX;
+    public bool doCloseButton;
     public bool closeOnAccept = true;
     public bool closeOnCancel = true;
     public bool closeOnClickedOutside;
     public bool forcePause;
     public bool preventCameraMotion = true;
     public bool doWindowBackground = true;
-    public bool onlyOneOfTypeAllowed;
+    public bool onlyOneOfTypeAllowed = true;
     public bool absorbInputAroundWindow;
-
-    // Read from the 1.6.4871 reference assembly's field list (Verse.Window declares both). The
-    // initializers are NOT readable from a reference assembly, so these two carry the value the game's
-    // own windows behave with: no lane claims either number as the game's default, and the option lane
-    // compares an option-untouched window against a freshly constructed one instead.
-    public bool resizeable = true;
-    public bool draggable = true;
+    public bool resizeable;
+    public bool draggable;
     public bool drawShadow = true;
     public bool focusWhenOpened = true;
     public Rect windowRect;
