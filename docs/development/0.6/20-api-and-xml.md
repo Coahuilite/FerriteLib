@@ -141,7 +141,26 @@ if (UiWidgetCatalog.TryGet("my-mod", "details", out UiWidgetDescriptor descripto
 - A kind that declared no schema is not attribute-checked; render it as "not declared" and never as
   "no attributes allowed". The two are opposite claims.
 
-## 5. What is deliberately absent
+## 5. Vocabulary traps a real integrator hit
+
+Found by the demo mod while writing its pages against the packaged carrier — every one of these cost real
+minutes, and none is new in 0.6. They are recorded here because the manifest vocabulary reference
+(`docs/development/0.5/20-api-and-xml.md`) states the rules but not the failure shapes.
+
+1. **`Tab` is a leaf attribute.** A container rejects it (`Unknown attribute 'Tab' on Column at 'root/body/core'`),
+   so if your page uses containers the tab marker has to be repeated on every widget inside them. The failure
+   text reads like a container-vocabulary gap; it is not.
+2. **A dropdown needs `BindOptions`, not a read-only list binding.** `BindReadOnly<IReadOnlyList<T>>` compiles
+   and passes value validation, then fails at creation with `Required options binding 'x' is missing` — which
+   reads as "you never bound it" rather than "you bound it the wrong way".
+3. **Declaring an action makes that binding required.** Adding `ActionBind` to `container/tree` (or any
+   declared action) means the binding must exist; it is not an optional extra.
+4. **`Scroll`'s `Height` is a number or `Auto`, never `Fill`**, and `container/tree` takes `RowHeight`, not
+   `Height`.
+5. **`<Templates>` has one `Id` namespace for the whole manifest**, not one per page or per section.
+6. **The host's `Source` is the widget-registry scope** — see `30-consumer-handoff.md` item 8.
+
+## 6. What is deliberately absent
 
 Mandatory VM base class, DI container, code generation, reflection or deep-path binding, automatic dependency
 inference, a collection framework (the keyed repeater and per-key notification from 0.5 are the mechanism),

@@ -25,6 +25,12 @@ model) and is explicitly **not** a second real consumer.
 Carried over unchanged and **not** closed by this round: `0.5.x`'s in-game acceptance (A1–A11) and a real
 consumer compiling against `[0.5.0,0.6.0)`. Both are other actors' steps.
 
+- [ ] Follow-up, **not** this round: a dropdown bound with `BindReadOnly<IReadOnlyList<T>>` compiles and passes
+      value validation, then fails at creation with "Required options binding 'x' is missing", which names the
+      wrong cause (the binding exists; it is the wrong registration kind). Found by the demo mod 2026-09-16 and
+      recorded in `docs/development/0.6/20-api-and-xml.md` §5; the fix is a diagnostic-message change in the
+      manifest/binding validation path, so it needs its own lane rather than a drive-by edit.
+
 ## 0.5.x round — open (2026-09-15)
 
 Branch `0.5.x`, contract axis 0.5.0. Scope, packages, ownership and status: `docs/development/0.5/`.
