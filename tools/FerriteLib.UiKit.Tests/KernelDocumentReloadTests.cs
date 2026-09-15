@@ -244,6 +244,18 @@ internal static class KernelDocumentReloadTests
             + "</Column>");
         File.WriteAllText(sharedPath, sharedV2);
         File.WriteAllText(otherPath, otherV2);
+
+        // Pin the real per-host pre-check directly: the batch's refusal must come from this call, not from
+        // anything wrapped around it. Hollowing TryPrepareLayoutCandidate reddens here as well as below.
+        UiLayoutManifest sharedCandidate = UiLayoutManifest.Parse(sharedV2);
+        Check(!hostB.TryPrepareLayoutCandidate(sharedCandidate, out string directElement, out string directReason),
+            "host B's real pre-check refuses the candidate that names an unbound command");
+        Check(directElement.IndexOf("go", StringComparison.Ordinal) >= 0
+            && directReason.IndexOf("apply", StringComparison.Ordinal) >= 0,
+            "and it names the element and the binding that stopped it");
+        Check(hostA.TryPrepareLayoutCandidate(sharedCandidate, out _, out _),
+            "host A's real pre-check accepts the same candidate");
+
         service.Signal("shared");
         service.Signal("other");
         service.Pump();
@@ -644,11 +656,11 @@ internal static class KernelDocumentReloadTests
     // --- style batches ---------------------------------------------------------------------------
 
     /// <summary>
-    /// A shared style document with two hosts is a batch like any other. The adversarial pass found that
-    /// only layout dependencies were pre-checked, so this lane pins both halves: a host that fails the
-    /// pre-check keeps the whole batch old, and a host that fails at commit time rolls the already-committed
-    /// host back. The fault seam is what makes those two paths reachable - a valid style document has no
-    /// per-host contract to fail on, and a production commit cannot fail after validation.
+    /// A shared style document with two hosts is a batch like any other, and both halves are pinned against
+    /// the real code rather than a planted fault: the pre-check has no seam in front of it and refuses a
+    /// candidate whose own page level names a scheme or density the document does not declare. The commit
+    /// half still uses the instance seam, because a production commit cannot fail after every host
+    /// pre-checked the candidate.
     /// </summary>
     private static void VerifyStyleBatchAtomicity(string sandbox)
     {
@@ -673,30 +685,40 @@ internal static class KernelDocumentReloadTests
         Check(SameColor(themeB.Panel, new Color(0f, 0f, 1f, 1f)),
             "and reached host B");
 
-        File.WriteAllText(path, PageSchemeStyle("ice", "#00ff00"));
+        // The real pre-check, driven directly with candidates that really fail: a page level naming a name
+        // the document never declares can never take effect, so the version is refused instead of being
+        // applied as a silent no-op. No seam stands in front of this call.
+        const string unknownScheme =
+            "<Styles Schema=\"1\" Scheme=\"ghost\"><Scheme Name=\"ice\"><Color Token=\"Panel\" Value=\"#00ff00\"/></Scheme></Styles>";
+        const string unknownDensity =
+            "<Styles Schema=\"1\" Density=\"ghost\"><Density Name=\"compact\"><Metric Token=\"Gap\" Value=\"2\"/></Density></Styles>";
+        Check(!hostA.TryPrepareStyleCandidate(UiStyleDocument.Parse(unknownScheme), out _, out string schemeReason)
+            && schemeReason.IndexOf("ghost", StringComparison.Ordinal) >= 0,
+            "the real style pre-check refuses a page level naming a scheme the document does not declare");
+        Check(!hostA.TryPrepareStyleCandidate(UiStyleDocument.Parse(unknownDensity), out _, out string densityReason)
+            && densityReason.IndexOf("ghost", StringComparison.Ordinal) >= 0,
+            "and the same for a page-level density");
+        Check(hostA.TryPrepareStyleCandidate(UiStyleDocument.Parse(PageSchemeStyle("ice", "#00ff00")), out _, out _),
+            "while a resolvable page level passes the same pre-check");
 
-        service.DocumentFaultOverride = (host, phase) =>
-            string.Equals(phase, UiDocumentService.PreparePhase, StringComparison.Ordinal)
-                && string.Equals(host.Source, "style-b", StringComparison.Ordinal)
-                ? "planted style prepare failure"
-                : "";
+        File.WriteAllText(path, unknownScheme);
         UiReloadReport? preCheckRefusal = service.Reload("shared-style");
-        service.DocumentFaultOverride = null;
         Check(preCheckRefusal != null && preCheckRefusal.Rejected && preCheckRefusal.HostsCommitted == 0,
-            "a style batch is refused when one affected host fails its pre-check");
-        Check(preCheckRefusal != null && preCheckRefusal.Reason.IndexOf("style-b", StringComparison.Ordinal) >= 0,
-            "and the refusal names the host that failed the pre-check");
+            "a style batch whose candidate fails the real pre-check is refused before anything commits");
+        Check(preCheckRefusal != null
+            && preCheckRefusal.Reason.IndexOf("style-a", StringComparison.Ordinal) >= 0
+            && preCheckRefusal.Reason.IndexOf("ghost", StringComparison.Ordinal) >= 0,
+            "and the refusal names the host and the unresolvable page level");
         Check(ReferenceEquals(hostA.StyleResolver.Document, beforeA)
             && ReferenceEquals(hostB.StyleResolver.Document, beforeB),
-            "a pre-check failure leaves both hosts of the style batch on the old document");
+            "a real pre-check failure leaves both hosts of the style batch on the old document");
 
-        service.DocumentFaultOverride = (host, phase) =>
-            string.Equals(phase, UiDocumentService.CommitPhase, StringComparison.Ordinal)
-                && string.Equals(host.Source, "style-b", StringComparison.Ordinal)
-                ? "planted style commit failure"
-                : "";
+        // The commit half: a good candidate, with the second host's commit forced to fail.
+        File.WriteAllText(path, PageSchemeStyle("ice", "#00ff00"));
+        service.DocumentCommitFaultOverride = host =>
+            string.Equals(host.Source, "style-b", StringComparison.Ordinal) ? "planted style commit failure" : "";
         UiReloadReport? commitRefusal = service.Reload("shared-style");
-        service.DocumentFaultOverride = null;
+        service.DocumentCommitFaultOverride = null;
         Check(commitRefusal != null && commitRefusal.Rejected && commitRefusal.HostsCommitted == 0,
             "a style batch whose later commit fails is refused rather than half-applied");
         Check(commitRefusal != null && commitRefusal.Reason.IndexOf("rolled back", StringComparison.Ordinal) >= 0,
@@ -722,6 +744,11 @@ internal static class KernelDocumentReloadTests
     /// The fix is a gate, not a promise: a document that applies no page level is not undone, so a re-tint
     /// on the theme the consumer handed in survives; a document that does apply one is still undone when
     /// the next version stops declaring it.
+    /// <para>
+    /// The last check pins the documented residual so the comment cannot drift from the code: the restore is
+    /// not per-token, so a re-tint of a token the outgoing page level never declared is discarded by that
+    /// reload too. Narrowing that would be a behaviour change - and would have to update this check.
+    /// </para>
     /// </summary>
     private static void VerifyConsumerRetintAcrossReload(string sandbox)
     {
@@ -759,6 +786,7 @@ internal static class KernelDocumentReloadTests
         styleService.Add(new UiDocumentSource("tint-style", UiDocumentKind.Style, stylePath), styleV1);
         UiTheme themed = UiTheme.DarkGold.Clone();
         Color panelBaseline = themed.Panel;
+        Color baseBaseline = themed.Base;
         using var styled = NewHost("scope-retint-style", UiLayoutManifest.Parse(KeepPage("scope-retint-style")), new UiBindings(), themed);
         styleService.Attach(styled, null, "tint-style");
         Check(SameColor(themed.Panel, new Color(0f, 0f, 1f, 1f)),
@@ -771,6 +799,18 @@ internal static class KernelDocumentReloadTests
         Check(styleService.LastReport?.Accepted == true, "the style reload committed");
         Check(SameColor(themed.Panel, panelBaseline),
             "and a page level the new document no longer declares is undone");
+
+        // The documented residual, pinned. A page level is present again, a token it never declares is
+        // re-tinted, and the next reload - to a document with no page level at all - still discards the tint:
+        // the restore is not tracked per token.
+        File.WriteAllText(stylePath, PageSchemeStyle("ice", "#00ff00"));
+        Check(styleService.Reload("tint-style")?.Accepted == true, "a page level is applied again");
+        Color residualTint = new Color(0.2f, 0.4f, 0.6f, 1f);
+        themed.Base = residualTint;
+        File.WriteAllText(stylePath, "<Styles Schema=\"1\"></Styles>");
+        Check(styleService.Reload("tint-style")?.Accepted == true, "and the next reload drops the page level");
+        Check(!SameColor(themed.Base, residualTint) && SameColor(themed.Base, baseBaseline),
+            "RESIDUAL (documented): a re-tint of a token the outgoing page level never declared is discarded");
     }
 
     // --- wiring ----------------------------------------------------------------------------------

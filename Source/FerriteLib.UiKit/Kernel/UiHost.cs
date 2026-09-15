@@ -359,11 +359,17 @@ public sealed class UiHost : IDisposable
     }
 
     /// <summary>
-    /// Pre-flights a style-document candidate the same way a layout one is pre-flighted: it resolves and
-    /// applies the document over a throwaway clone of this host's theme, which is the exact path a commit
-    /// runs, without mutating the host or the theme it holds. It exists so a style batch is validated
-    /// against every affected host before anything commits, instead of the batch being trusted because a
-    /// style document has no creation-time element contract.
+    /// Pre-flights a style-document candidate the same way a layout one is pre-flighted, and it can really
+    /// refuse one: the candidate's own page level must resolve inside the candidate, and the document is
+    /// then applied over a throwaway clone of this host's theme - the exact path a commit runs - without
+    /// mutating the host or the theme it holds.
+    /// <para>
+    /// The page-level rule is the page-wide half of "structure stays fail-closed, values fall soft": an
+    /// authored <c>Scheme</c>/<c>Density</c> naming something the document does not declare can never take
+    /// effect, and silently leaving the page on its previous values is the no-op this refuses. A per-element
+    /// unknown name still falls back softly (recorded on the resolver's issues); the page-level declaration
+    /// is either applied or the candidate version is refused and the last good appearance survives.
+    /// </para>
     /// </summary>
     internal bool TryPrepareStyleCandidate(UiStyleDocument candidate, out string element, out string reason)
     {
@@ -372,6 +378,20 @@ public sealed class UiHost : IDisposable
         if (candidate == null)
         {
             reason = "the candidate is null";
+            return false;
+        }
+
+        if (candidate.DefaultScheme != null && !ContainsName(candidate.SchemeNames, candidate.DefaultScheme))
+        {
+            reason = "the page level names scheme '" + candidate.DefaultScheme
+                + "', which the document does not declare; the page level could never take effect";
+            return false;
+        }
+
+        if (candidate.DefaultDensity != null && !ContainsName(candidate.DensityNames, candidate.DefaultDensity))
+        {
+            reason = "the page level names density '" + candidate.DefaultDensity
+                + "', which the document does not declare; the page level could never take effect";
             return false;
         }
 
@@ -387,6 +407,16 @@ public sealed class UiHost : IDisposable
         }
 
         return true;
+    }
+
+    private static bool ContainsName(IReadOnlyCollection<string> names, string name)
+    {
+        foreach (string declared in names)
+        {
+            if (string.Equals(declared, name, StringComparison.Ordinal)) return true;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -462,10 +492,14 @@ public sealed class UiHost : IDisposable
     /// theme it handed in. A reload is not an excuse to reset state a document never owned.
     /// </para>
     /// <para>
-    /// The residual, stated rather than implied: a token that the outgoing document's page scheme or
-    /// density <b>did</b> set is restored anyway, because the document is the authority for the values it
-    /// declares - a consumer that wants to own such a token must not have the document declare it. That is
-    /// the boundary of this gate, not an oversight.
+    /// <b>The residual, stated exactly.</b> The restore is not tracked per token: once the outgoing document
+    /// applied <i>any</i> page-level scheme or density, the next reload restores <b>every</b>
+    /// document-settable token to the value the theme had at host construction. So a consumer that re-tints
+    /// any token in the bag - including a token the outgoing page level never declared - loses that tint on
+    /// that reload, even when the incoming document declares nothing. A per-token restore would need the
+    /// resolver to record which tokens it touched, and the name-to-property mapping exists once, privately,
+    /// in <see cref="UiStyleResolver"/>; it is not duplicated here. Consumer-visible consequence: re-apply a
+    /// re-tint after a reload, or declare the value in the document instead of tinting the theme.
     /// </para>
     /// </summary>
     private void RestoreStyleBaseline()

@@ -72,16 +72,16 @@ public sealed class UiDocumentService : IDisposable
     private int reArmCountdown;
 
     /// <summary>
-    /// Test seam, instance-level (never process-wide): the harness forces one host's document prepare or
-    /// commit to fail. A prepare-phase fault exercises the style half of the all-or-nothing rule, which a
-    /// valid style document cannot fail on its own; a commit-phase fault exercises the batch rollback,
-    /// which a production commit cannot reach once every host validated. Null in production.
+    /// Test seam, instance-level (never process-wide): the harness forces one host's document <b>commit</b>
+    /// to fail, which is the only way to reach the batch rollback - a production commit cannot fail once
+    /// every host pre-checked the candidate. Null in production.
+    /// <para>
+    /// There is deliberately no seam on the pre-check path. A planted prepare fault sat in front of the
+    /// host's real pre-check, so hollowing that pre-check out left every lane green; the pre-check branches
+    /// now contain only the real host calls, and each one has a lane that reddens when it is removed.
+    /// </para>
     /// </summary>
-    internal Func<UiHost, string, string>? DocumentFaultOverride;
-
-    internal const string PreparePhase = "prepare";
-
-    internal const string CommitPhase = "commit";
+    internal Func<UiHost, string>? DocumentCommitFaultOverride;
 
     /// <summary>Pumps between re-arm attempts on the frame path.</summary>
     private const int ReArmPumpInterval = 30;
@@ -473,16 +473,10 @@ public sealed class UiDocumentService : IDisposable
             Dependency dependency = affected[i];
             if (string.Equals(dependency.LayoutId, documentId, StringComparison.Ordinal))
             {
-                // The planted fault sits inside the dependency's own kind branch on purpose: a host can only
-                // refuse through the pre-check its kind uses, so a lane that removes a branch removes the
-                // refusal with it and cannot pass by accident.
-                string planted = PlantedPrepareFailure(dependency.Host);
+                // No seam in this branch: the only thing that can refuse a layout candidate here is the
+                // host's own creation-time contract, so hollowing that call is observable.
                 UiLayoutManifest? layout = candidate.Layout;
-                if (planted.Length > 0)
-                {
-                    failureReason = "host '" + dependency.Host.Source + "': " + planted;
-                }
-                else if (layout == null)
+                if (layout == null)
                 {
                     failureReason = "the candidate carried no layout document";
                 }
@@ -493,13 +487,10 @@ public sealed class UiDocumentService : IDisposable
             }
             else
             {
-                string planted = PlantedPrepareFailure(dependency.Host);
+                // No seam here either: a style candidate is refused for a real reason (its page level names a
+                // scheme or density the document does not declare), so the lane exercises the real call.
                 UiStyleDocument? style = candidate.Style;
-                if (planted.Length > 0)
-                {
-                    failureReason = "host '" + dependency.Host.Source + "': " + planted;
-                }
-                else if (style == null)
+                if (style == null)
                 {
                     failureReason = "the candidate carried no style document";
                 }
@@ -528,7 +519,7 @@ public sealed class UiDocumentService : IDisposable
             applied.Add(new AppliedCommit(dependency.Host, dependency.Host.CaptureDocumentRollback()));
             try
             {
-                string planted = DocumentFaultOverride?.Invoke(dependency.Host, CommitPhase) ?? "";
+                string planted = DocumentCommitFaultOverride?.Invoke(dependency.Host) ?? "";
                 if (planted.Length > 0)
                 {
                     commitFailure = "host '" + dependency.Host.Source + "': " + planted;
@@ -574,12 +565,6 @@ public sealed class UiDocumentService : IDisposable
             affected.Count, committed);
         AddReport(accepted);
         return accepted;
-    }
-
-    /// <summary>The planted prepare-phase refusal for one host, or "" when the seam is off or silent.</summary>
-    private string PlantedPrepareFailure(UiHost host)
-    {
-        return DocumentFaultOverride?.Invoke(host, PreparePhase) ?? "";
     }
 
     /// <summary>
