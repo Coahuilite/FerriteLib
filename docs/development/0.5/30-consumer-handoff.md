@@ -78,6 +78,10 @@ FerriteLibVersion.Require(new Version(0, 5, 0), new Version(0, 6, 0), "your.pack
   **恢复方式**：重载后重新施加该着色，或把该值写进文档而不是直接改主题。
   （该行为由 P4 独立验证实测并有 lane 固定；未在 0.5 内做逐令牌收窄，因为令牌到主题属性的映射目前只在 `UiStyleResolver` 内部存在一份。）
 
+- **禁用守卫管的是「交互」，不是「外观」。** `UiNative` 没有主题，所以命令绑定为不可执行状态的元素，其**禁用外观**仍由该 kind 自己绘制——与 `input/button` 的做法一致。库负责的是：不执行、不接收输入、不捕获指针/hot control、不给焦点。
+- **`UiNative` 的禁用守卫覆盖哪些入口。** `Button(rect, ctx)`、`DropdownButton`、`Slider`、`NumberField`（后两者通过 `elementId` 解析节点身份；解析不到节点时保持原有行为，即「任意 state key」用法不受影响）。
+  **`TextField(Rect, string)` 是例外**：它既没有 session 也没有 key，无法查询禁用态——这是已登记的空缺；需要禁用文本输入时请用带 session 的形式或自持 kind。
+
 ## 5. 交接节奏
 
 | 阶段 | 交付物 | 消费者可开始做什么 |

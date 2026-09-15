@@ -98,7 +98,7 @@ git commit -m "message"
 | task-8 P4b | P4 逆验证：AutoWatch 无法重新武装（must-fix）、style 批次未跨 host 预校验（must-fix）、主题基线重置（待裁定文档化或修正） | **已完成并合并**（`079aa5e` → `6e0781a`）；三项全部修复，主题基线为「门控修复 + 明确残余」 |
 | task-9 P2b | P4 逆验证：被删除元素的 node 未从 session 表移除、`GetNodeByElementId` 的无 `IsArranged` 过滤与自身注释矛盾 | **已完成并合并进 P2**；选择保留「按身份而非按排布」的契约并改注释，未加 `IsArranged` 过滤（过滤会隐藏隐藏元素的草稿） |
 | task-10 P1 hardening | P1 逆验证：stub 只用一个窗口类，`AllowMultipleInstances` 的「精确类型 vs 可赋值」半边未钉；M1 去重突变靠未捕获异常变红而非命名断言 | **已完成并合并**（`eca4675` → `4a50f58`） |
-| task-11 P2c | P2 逆验证：禁用守卫没覆盖 `UiNative.Slider/NumberField/TextField`（产品缺口）；每节点 `MarkDirty` 机制不可观测 | 已派发（`core`） |
+| task-11 P2c | P2 逆验证：禁用守卫没覆盖 `UiNative.Slider/NumberField/TextField`（产品缺口）；每节点 `MarkDirty` 在按 key 提交路径内与时钟冗余 | **已完成并合并**（`76ff07b`）；slider/field 已加守卫（`TextField(Rect,string)` 登记为无 session 的空缺）；dirty 路径用「时钟不动」的 lane 显式固定。**修正**：它并非死代码——既有 lane 就覆盖它，a2 只证明按 key 提交路径里的标记与同批时钟冗余 |
 | task-12 P4c | P4b 逆验证：style 预校验分支可被整体掏空而 suite 全绿；基线门控残余 | **已完成并合并**（`8b6508f` → `9714b0a`）；裁定保留页面级拒绝并在 §6 记录代价 |
 | task-13 | P5 自陈：壳的 chrome/notice fit 发现走的是进程级旧通道，未归属到 host 订阅 | 已派发（`windowing`） |
 | 死 lane 守卫 | P6 自查：仓库被"lane 存在但从未注册"伤过两次且无门禁 | 已入库并突变证明（\`b6b621d\`） |
