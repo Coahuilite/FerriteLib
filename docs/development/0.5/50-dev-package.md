@@ -18,17 +18,17 @@ pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev
 | 包 | 内容 revision | 对应源码提交 | 含包 | 位置 |
 | --- | --- | --- | --- | --- |
 | 第一个开发包 0.5.0-dev | `0.5.0-dev` | 见 `dist/dev/FerriteLib/version.txt` 的 `commit=` 行（构建时树必须干净；带 `-dirty` 表示构建时存在未提交改动，则该包不对应任何提交） | P1 + P1h + P2 + P2b + P4 + P4b | `dist/dev/FerriteLib/` |
-| **交付版本（当前）** | `0.5.0-dev` | `7ac991c71a1a69ee16812c5b00421e659d4759a0`（`7ac991c71a1a`） | P1+P1h+P2+P2b+P2c+P3+P4+P4b+P4c+P5+task-13+task-14（全部包） | `dist/dev/FerriteLib/` |
+| **交付候选（当前）** | `0.5.0-dev` | `14b29ae85ae11476bbae78f625706ae0bb69d7b8`（`14b29ae85ae1`） | P1+P1h+P2+P2b+P2c+P3+P4+P4b+P4c+P5+task-13+task-14（全部包） | `dist/dev/FerriteLib/` |
 
 **当前交付版本（干净树构建，`commit=` 与 `HEAD` 逐字符相等）**：
 
 | 项 | 值 |
 | --- | --- |
 | 标签 | `0.5.0-dev` |
-| 源码提交 | `7ac991c71a1a69ee16812c5b00421e659d4759a0` |
+| 源码提交 | `14b29ae85ae11476bbae78f625706ae0bb69d7b8` |
 | 位置 | `dist/dev/FerriteLib/`（5 个文件：`About/About.xml`、`1.6/Assemblies/FerriteLib.UiKit.dll`、`LoadFolders.xml`、`LICENSE`、`version.txt`） |
 | 构建 | `pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev`（10 门禁全绿后才 staging） |
-| `version.txt` | `FerriteLib 0.5.0-dev` / `build=dev` / `commit=7ac991c71a1a` / `source https://github.com/Coahuilite/FerriteLib` |
+| `version.txt` | `FerriteLib 0.5.0-dev` / `build=dev` / `commit=14b29ae85ae1` / `source https://github.com/Coahuilite/FerriteLib` |
 
 **这是 Dev 配置字节，不是发布字节**：stager 从程序集读 `AssemblyConfigurationAttribute` 并拒绝通道不匹配的字节；
 消费者若要与发布资产对齐，请按同一提交自行构建 Release，或以之后授权的 release 通道产物为准。
@@ -68,4 +68,8 @@ pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev
 | --- | --- | --- |
 | `0ee55b6` | `0.5.0-dev` / `0ee55b665c39-dirty` | 当时工作树有未提交文档改动；dev 通道自曝 `-dirty`，**不作为交付** |
 | `ef133b30 67da` | `0.5.0-dev` | P1+P2+P4+P5+P3 全包的首个干净构建 |
-| `7ac991c71a1a` | `0.5.0-dev` | 在 `ef133b3` 之上加 F6（死 lane 守卫拒绝重复注册，仅测试文件）与文档修正。**身份说明**：`git diff ef133b3 7ac991c -- Source/` 为空，即源码文件未变；但**没有**对两次构建出的程序集做过逐字节比较，因此本文件不对 DLL 的字节同一性下任何断言 |
+| `7ac991c71a1a` | `0.5.0-dev` | 历史：`ef133b3` + F6 与文档修正。**身份说明**：`git diff ef133b3 7ac991c -- Source/` 为空，即源码文件未变；但**没有**对两次构建出的程序集做过逐字节比较，因此本文件不对 DLL 的字节同一性下任何断言 |
+| `14b29ae85ae1` | `0.5.0-dev` | **当前交付候选**：外部 review 的 R1–R7 全部修复 + task-18/19/20 + R3 指针空间修复；这一版**才是**应交给消费者试接的包 |
+
+**注意**：`7ac991c` 之前的包都带有外部 review 已复现的 R1–R7 缺陷（回滚丢草稿、缺失文件回退内嵌、关闭活动窗口丢活动目标、诊断尺互相污染、首次样式未校验、换绑依赖泄漏、哈希/解析两次读）。
+任何在 `14b29ae` 之前构建的包都不应再用于消费者试接或实机验收。
