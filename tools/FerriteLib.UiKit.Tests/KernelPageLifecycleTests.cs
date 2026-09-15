@@ -5,6 +5,7 @@ using System.IO;
 
 using FerriteLib.UiKit.Kernel;
 using UnityEngine;
+using Verse;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -25,6 +26,10 @@ namespace FerriteLib.UiKit.Tests;
 /// page's first draw, and one made after that first draw still works through <c>UiPageWindow.PageHost</c>.
 /// The first half is the new guarantee of this round; the second is the previously shipped path, asserted
 /// next to it so the new door cannot be mistaken for the only way in.</item>
+/// <item>The active-target path holds the same guarantee: re-activating a window that already owns a host -
+/// the shape a consumer that re-subscribes its view model when its window becomes the target produces -
+/// announces nothing and hands out no second host. The T5a verifier measured this shape as NOT PINNED; this
+/// lane closes it. The product behaviour is correct as it stands, so the lane is a regression guard.</item>
 /// </list>
 /// Everything here is harness evidence over the stub game surface. It shows what the shell does under a
 /// driven pass; it does not show how the real window stack orders its own hooks in a running game.
@@ -47,6 +52,7 @@ internal static class KernelPageLifecycleTests
         Run("Lifecycle: closing one window leaves another window's subscription live", VerifyClosingOneKeepsTheOther);
         Run("Reload: a page with a VM attached survives layout and style reloads untouched", VerifyReloadInvariance);
         Run("Door: HostAttached sees the first draw, and PageHost works after it", VerifyTheDoorIsUsable);
+        Run("Activation: re-activating a window does not announce its host again", VerifyActivationDoesNotReannounce);
         return failures;
     }
 
@@ -364,6 +370,118 @@ internal static class KernelPageLifecycleTests
             "a subscription made after the first draw still delivers on the next draw through PageHost");
         Check(DrawCountOf(scopeTwo) >= 2, "and the page drew that pass");
         second.PreClose();
+    }
+
+    // --- (5b) the active-target path does not re-announce ---------------------------------------
+
+    /// <summary>
+    /// The activation shape the T5a verifier measured as NOT PINNED: no lane both subscribed to
+    /// <c>HostAttached</c> and re-activated a window after its first draw, so a second announcement raised
+    /// from <c>UiWindowHost.SetActiveTarget(true)</c> passed the whole harness. This lane closes that shape.
+    /// <para>
+    /// <b>The product is correct as it stands - only creation announces - so this is a regression guard,
+    /// not a fix.</b> It exists so a future activation-time re-announcement (the shape a consumer that
+    /// re-subscribes its view model when its window becomes the target would produce) fails by name instead
+    /// of silently re-subscribing.
+    /// </para>
+    /// <para>
+    /// <b>How the activation path is really reached.</b> A window's target flag rests at true and
+    /// <c>SetActiveTarget</c> returns early when the flag already matches, so the lane opens a second
+    /// instance through the catalog to move the target away, then activates the first one twice. Each of
+    /// those activations runs <c>SetActiveTarget(true)</c> with a host already built and drawn - exactly the
+    /// place the verifier planted the second announcement.
+    /// </para>
+    /// </summary>
+    private static void VerifyActivationDoesNotReannounce()
+    {
+        const string Consumer = "activation-door";
+        string kind = "page-" + Guid.NewGuid().ToString("N");
+        string otherKind = kind + "-other";
+        string scope = Consumer + "/" + kind;
+        string otherScope = Consumer + "/" + otherKind;
+        UiWidgetRegistry.InitializeCore();
+        UiWidgetRegistry.Register(scope, ProbeWidget.KindName, () => new ProbeWidget(scope));
+        UiWidgetRegistry.Register(otherScope, ProbeWidget.KindName, () => new ProbeWidget(otherScope));
+
+        var bindings = new UiBindings();
+        var stack = new WindowStack();
+        var catalog = new UiWindowCatalog(stack, UiFocusPolicy.FollowClicks);
+        var announcements = new List<UiHost>();
+
+        UiPageWindow? first = null;
+        catalog.Register(Consumer, kind, null, key =>
+        {
+            UiPageWindow created = NewPageWindow(key.Consumer, key.WindowKind, scope, bindings);
+            created.windowRect = new Rect(0f, 0f, 800f, 600f);
+            created.HostAttached += host => announcements.Add(host);
+            first = created;
+            return created;
+        });
+
+        UiPageWindow? second = null;
+        catalog.Register(Consumer, otherKind, null, key =>
+        {
+            UiPageWindow created = NewPageWindow(key.Consumer, key.WindowKind, otherScope, bindings);
+            created.windowRect = new Rect(0f, 0f, 800f, 600f);
+            second = created;
+            return created;
+        });
+
+        var firstKey = new UiWindowKey(Consumer, kind, "");
+        var secondKey = new UiWindowKey(Consumer, otherKind, "");
+        try
+        {
+            Check(catalog.Open(firstKey), "the first instance opens through the catalog");
+            first!.WindowOnGUI();
+            Check(announcements.Count == 1, "opening and drawing announces the host exactly once");
+            Check(announcements.Count == 1 && ReferenceEquals(announcements[0], first.PageHost),
+                "and that one announcement hands out the page's own host");
+
+            Check(catalog.Open(secondKey), "a second instance opens through the catalog");
+            Check(!first.IsActiveTarget && catalog.IsActive(secondKey),
+                "opening a second window moved the active target off the first");
+
+            // The attacked shape: the first window is reactivated, so SetActiveTarget(true) runs with its
+            // host already built and drawn.
+            catalog.Activate(firstKey);
+            Check(first.IsActiveTarget && !second!.IsActiveTarget,
+                "activating the first window makes it the target again");
+            Check(announcements.Count == 1,
+                "ACTIVATION-NO-SECOND-ANNOUNCEMENT: reactivating a window that already owns a host announces nothing");
+            Check(SameHostCount(announcements, first.PageHost) == announcements.Count,
+                "ACTIVATION-SAME-HOST: every announcement the window ever made hands out its one UiHost instance");
+
+            first.WindowOnGUI();
+            Check(announcements.Count == 1, "drawing the reactivated window announces nothing more");
+
+            catalog.Activate(secondKey);
+            Check(!first.IsActiveTarget, "deactivating the first window works");
+            catalog.Activate(firstKey);
+            Check(first.IsActiveTarget, "and reactivating it works a second time");
+            Check(announcements.Count == 1,
+                "the announcement count is still exactly one after two full activation cycles");
+            Check(SameHostCount(announcements, first.PageHost) == announcements.Count,
+                "and the host instance handed out never changed");
+        }
+        finally
+        {
+            catalog.CloseAll();
+            Event.current = null;
+            UiNative.ButtonOverride = null;
+            UiNative.DebugMousePositionEnabled = false;
+        }
+    }
+
+    /// <summary>How many of the announcements handed out exactly <paramref name="host"/>, by identity.</summary>
+    private static int SameHostCount(List<UiHost> announcements, UiHost? host)
+    {
+        int same = 0;
+        for (int i = 0; i < announcements.Count; i++)
+        {
+            if (ReferenceEquals(announcements[i], host)) same++;
+        }
+
+        return same;
     }
 
     // --- helpers --------------------------------------------------------------------------------
