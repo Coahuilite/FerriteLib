@@ -127,6 +127,18 @@ public sealed class UiStyleDocument
     /// <summary>Everything the document dropped, in the order it was found. Empty for a correct document.</summary>
     public IReadOnlyList<UiStyleIssue> Issues => issues;
 
+    /// <summary>
+    /// True when the document was refused as a whole - unreadable XML, a foreign root, a missing or foreign
+    /// <c>Schema</c>, or a file the loader could not read at all. The document service reads this to keep
+    /// the last valid version rather than committing an empty one.
+    /// <para>
+    /// A document that parsed and then dropped individual declarations is deliberately NOT structurally
+    /// invalid: that fail-soft path is the style policy, the readable rest still applies, and the drops are
+    /// already on <see cref="Issues"/>. Only the whole-document refusal is a version the service refuses.
+    /// </para>
+    /// </summary>
+    internal bool StructurallyInvalid { get; private set; }
+
     /// <summary>Declared scheme names, for diagnostics and authoring tools.</summary>
     public IReadOnlyCollection<string> SchemeNames => schemes.Keys;
 
@@ -166,12 +178,12 @@ public sealed class UiStyleDocument
                 "Invalid style XML at line " + ex.LineNumber.ToString(CultureInfo.InvariantCulture)
                 + ", position " + ex.LinePosition.ToString(CultureInfo.InvariantCulture) + ": " + ex.Message,
                 ex.LineNumber));
-            return new UiStyleDocument(null, null, new Dictionary<string, SchemeDefinition>(StringComparer.Ordinal), new Dictionary<string, DensityDefinition>(StringComparer.Ordinal), issues);
+            return Invalid(issues);
         }
         catch (InvalidOperationException ex)
         {
             issues.Add(new UiStyleIssue("Invalid style XML: " + ex.Message));
-            return new UiStyleDocument(null, null, new Dictionary<string, SchemeDefinition>(StringComparer.Ordinal), new Dictionary<string, DensityDefinition>(StringComparer.Ordinal), issues);
+            return Invalid(issues);
         }
 
         XmlElement? root = document.DocumentElement;
@@ -181,7 +193,7 @@ public sealed class UiStyleDocument
         if (root == null || !string.Equals(root.Name, "Styles", StringComparison.Ordinal))
         {
             issues.Add(new UiStyleIssue("The style document root must be <Styles>; found <" + (root == null ? "(none)" : root.Name) + ">."));
-            return new UiStyleDocument(null, null, emptySchemes, emptyDensities, issues);
+            return Invalid(emptySchemes, emptyDensities, issues);
         }
 
         string schema = root.GetAttribute("Schema") ?? "";
@@ -190,7 +202,7 @@ public sealed class UiStyleDocument
             issues.Add(new UiStyleIssue(schema.Length == 0
                 ? "The style document is missing the required Schema=\"1\" on <Styles>."
                 : "Unsupported <Styles> Schema '" + schema + "'; expected '1'."));
-            return new UiStyleDocument(null, null, emptySchemes, emptyDensities, issues);
+            return Invalid(emptySchemes, emptyDensities, issues);
         }
 
         var schemes = new Dictionary<string, SchemeDefinition>(StringComparer.Ordinal);
@@ -246,10 +258,35 @@ public sealed class UiStyleDocument
         {
             var issues = new List<UiStyleIssue>();
             Record(issues, "Style document '" + path + "' could not be read: " + ex.Message);
-            return new UiStyleDocument(null, null, new Dictionary<string, SchemeDefinition>(StringComparer.Ordinal), new Dictionary<string, DensityDefinition>(StringComparer.Ordinal), issues);
+            return Invalid(issues);
         }
 
         return Parse(xml);
+    }
+
+    /// <summary>
+    /// The one whole-document refusal, so every branch marks the same way and no caller has to guess which
+    /// issue text means "nothing applied" (the issue text is for a human; this flag is for the service).
+    /// </summary>
+    private static UiStyleDocument Invalid(List<UiStyleIssue> issues)
+    {
+        return new UiStyleDocument(
+            null,
+            null,
+            new Dictionary<string, SchemeDefinition>(StringComparer.Ordinal),
+            new Dictionary<string, DensityDefinition>(StringComparer.Ordinal),
+            issues)
+        {
+            StructurallyInvalid = true
+        };
+    }
+
+    private static UiStyleDocument Invalid(
+        Dictionary<string, SchemeDefinition> schemes,
+        Dictionary<string, DensityDefinition> densities,
+        List<UiStyleIssue> issues)
+    {
+        return new UiStyleDocument(null, null, schemes, densities, issues) { StructurallyInvalid = true };
     }
 
     internal bool TryGetScheme(string name, out SchemeDefinition definition)

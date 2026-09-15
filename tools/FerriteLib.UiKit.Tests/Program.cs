@@ -64,6 +64,9 @@ internal static class Program
         Console.WriteLine("Kernel window shell (P2 chrome + failure contract)...");
         failures += KernelWindowHostTests.RunAll();
 
+        Console.WriteLine("Kernel window catalog (0.5 keyed instances + shell + active target + pause policy)...");
+        failures += KernelWindowCatalogTests.RunAll();
+
         Console.WriteLine("Kernel backend containment (funnel allowlist)...");
         failures += KernelContainmentTests.RunAll();
 
@@ -111,5 +114,11 @@ internal static class Program
 
         Console.WriteLine("Kernel stub coverage (game members the harness must carry, trip guard)...");
         failures += KernelStubCoverageTests.RunAll();
+
+        Console.WriteLine("Kernel documents (file sources, dependencies, atomic reload, last-known-good)...");
+        failures += KernelDocumentReloadTests.RunAll();
+
+        Console.WriteLine("Kernel lane registration (every lane file is invoked from Program.cs)...");
+        failures += KernelLaneRegistrationTests.RunAll();
     }
 }

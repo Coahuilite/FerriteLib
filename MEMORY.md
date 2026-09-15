@@ -232,10 +232,14 @@
   `input/slider` is kept because the bare slider and the stepper composite are two different things
   whose coexistence is itself the proof that neither expresses the other. The kind strings are the
   contract, not the type names: a manifest names a kind, and the type's visibility is a separate
-  question the 0.4.x internalise sweep answers. Known gap, filed rather than hidden: popup yield is not
-  in the atoms -- `UiNative.YieldsToCoveringPopup` remains the dropdown trigger's private path, so a
-  button under an open popup can rediscover the 2026-09-04 click-theft class; the closing item is
-  `TODO.md` section 3's owned hit stack, and no atom may grow a second, private yield rule meanwhile.
+  question the 0.4.x internalise sweep answers. **Corrected 2026-09-15 by the 0.5 independent audit: the
+  "popup yield is not in the atoms" gap recorded here was already closed by the hit stack.**
+  `YieldsToCoveringPopup` has zero hits in `Source` at `99acc5f`; `UiNative.Button(rect, ctx)` and the dropdown
+  trigger both consult `UiSession.IsPointerOverHigherLayer`, and all five atoms call the two-argument form
+  (`ButtonWidget.cs:81`, `InputModeRowWidget.cs:94`, `StepperSliderWidget.cs:121,127`). The only raw call left is
+  the shell's own chrome close affordance (`UiWindowHost.cs:368`, drawn outside the tree, containment-allowlisted).
+  What remains open is the narrower boundary - content layer vs content layer - whose recovery condition is the
+  `UiHitLayer` entry in `docs/api-tiers.md`.
 
 - **The 0.4.x batch exists on the branch and is archived: style table, identity layer, leaf atoms (2026-09-11).**
   `origin/0.4.x` = `1ececed` carries all of it; `v0.3.0-rc1` remains the only published release. Landed in
@@ -326,6 +330,21 @@
   (`UiHitLayer` + `UiSession.IsPointerOverHigherLayer`) with full z-ordered dispatch still owed, and "0.5 is
   about dissolving 18 consumer kinds" is not this round's goal.
 
+- **The acting environment overrides git's author/committer identity, and the privacy gate is what catches it
+  (2026-09-15, measured during the 0.5.x round).** A teammate agent's commits landed as `name <name@local>`, not as
+  the repository's single noreply account, even though `git config user.name`/`user.email` were correct in the main
+  checkout *and* in every worktree: the runtime exports the identity into the commit process, and environment beats
+  config. `scripts/privacy-audit.ps1` reported `identity: non-noreply author/committer address(es)` and exit 1.
+  Three consequences, all now practice rather than advice: (1) every commit made by a non-Lead agent must set
+  `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_NAME`/`GIT_COMMITTER_EMAIL` **in the same shell invocation** as
+  the `git commit` - `git -c user.name=` does not win; (2) the audit must gate the push, not run beside it (the first
+  push of this round went out because the audit and the push were chained with `;` instead of conditionally, and the
+  branch had to be rewritten and force-pushed minutes later - 0.5.x only, no tag, no release, no consumer, so the
+  rewrite cost nothing but the record); (3) the gate itself is the detector and it scans `--all` refs, so a bad
+  identity on an unwritten teammate branch fails the audit for the whole repository and must be fixed before any push,
+  not at merge time. The rewritten range is `99acc5f..8098ca0`; the pre-rewrite commit `766b6cd` is dangling locally
+  and its content is byte-identical (`git diff --stat 766b6cd 8098ca0` is empty).
+
 ## Charter — what this library is for
 
 - **The founding spec, transcribed.** `Coahuilite/UniversalSqueaker@09366f8:docs/ui-shared-library-design-zh.md`
@@ -374,7 +393,8 @@
   declarative layout is real, hot update is owned by nobody. US supplies its manifest as an embedded
   assembly resource (`Coahuilite/UniversalSqueaker@09366f8:Source/UniversalSqueaker/UI/UsKernelSettingsHost.cs:29,319`),
   so a layout edit recompiles the consumer, and this library's only disk-reading entry point
-  (`UiLayoutManifest.ParseFile`) has zero callers. The spec never promised the harder half either — it
+  (`UiLayoutManifest.ParseFile`) has no production caller (the harness calls it; no shipped path does). The
+  spec never promised the harder half either — it
   explicitly declined hot-reloading a new kind — so `TODO.md` §3 now carries the fork openly: wire a real
   load path, or delete the dead entry and stop implying a capability nothing owns.
 - **Ecosystem calibration for the public ruling (surveyed 2026-09-10, external sources).** The RimWorld
@@ -1609,3 +1629,7 @@ colour token currently feeds layout — it is a future-regression guard, not pre
   record in this file). The lesson about re-running after remote-side history events stands; the
   history-rewrite advice does not.**
 - **File-driven invocation is the requirement; kind hot-reload is not (maintainer ruling 2026-09-14, carried across from the consumer's scope narrowing).** The consumer's 0.4.x window was cut back to a single feature port and takes no source changes, so wiring `ParseFile` is a **0.5.x** item. The requirement it must satisfy is now stated precisely: a layout or style file edit must be visible **after reopening the window**, with no game restart and no recompile, while **adding or changing widget kinds is explicitly excluded** (kinds are compiled). That is this library's own use/extend boundary with the use half moving from a copy embedded in the consumer's assembly to a file on disk; the embedded copy stays as the fallback. `UiHost` already takes both entry points at construction (`UiLayoutManifest` plus the optional `UiStyleDocument`), so no runtime tree mutation is needed - parse once at host creation, keep the previous page on failure, warn loudly. `TODO.md` §3 carries the wire-up.
+  **Superseded in part, 2026-09-15:** the bar recorded here — a file edit "visible after reopening the window" — is no
+  longer the 0.5 target. A save in development mode must update the windows that are already open, with manual reload
+  and a last-known-good fallback behind it; C# kind changes remain outside hot reload exactly as this entry says. The
+  stronger contract and its eight clauses are in `docs/development/0.5/00-baseline.md` §2.2.

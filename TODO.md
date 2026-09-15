@@ -190,9 +190,12 @@ Each item is expected to delete a workaround, not add a layer.
 - [ ] **Owned hit stack.** Produce a z-ordered `(rect, element)` list during arrange and dispatch input
       topmost-first. **Half done by `4dd97bf`:** `UiPopup.RectFor` is now the only popup rect rule and
       `UiPopup.DrawOptionList` the only publisher of the covered rect, so the popup-specific coordinate
-      conversions are gone. What is left is `YieldsToCoveringPopup` (`UiNative.cs:259`, still called at
-      `:115`) and the previous-frame `OpenPopupRect` reasoning, which still model one popup rather than a
-      stack of overlapping surfaces.
+      conversions are gone. **Updated 2026-09-15 (0.5 independent audit): the element-level half is done and the
+      older wording here was stale.** `YieldsToCoveringPopup` has zero hits in `Source` at `99acc5f`;
+      `UiNative.Button(rect, ctx)` and the dropdown trigger dispatch through `UiSession.IsPointerOverHigherLayer`,
+      and the atoms call the two-argument form. What is left is the content-layer-vs-content-layer boundary (a
+      `(rect, element)` list exists; arbitration between two content layers does not), out of scope for 0.5 and
+      still carrying the recovery condition recorded in `docs/api-tiers.md`.
       **Trigger evidence added 2026-09-11 (lib-atoms, task-3 report, quoted):** popup yield is not in the
       atoms -- `input/button`, like the existing `input/mode-row` and `input/stepper-slider`, calls
       `UiNative.Button` directly, so a consumer that puts a button under an open popup can rediscover the

@@ -12,14 +12,35 @@ namespace FerriteLib.UiKit.Kernel;
 public sealed class UiHost : IDisposable
 {
     private readonly string source;
-    private readonly UiLayoutManifest manifest;
     private readonly IUiBindings bindings;
     private readonly UiTheme theme;
     private readonly ITextMetrics metrics;
     private readonly IUiTranslation translation;
-    private readonly UiLayoutEngine engine;
     private readonly UiSession session;
-    private readonly UiStyleResolver styleResolver;
+
+    // The three fields a document reload swaps. They are not readonly because a host is the thing a
+    // reload commits into: the manifest, the resolver built over the effective style document, and the
+    // engine that arranges those roots. Everything else - the session, the bindings, the theme identity -
+    // is deliberately untouched, which is what keeps state and the business model out of the swap.
+    private UiLayoutManifest manifest;
+    private UiLayoutEngine engine;
+    private UiStyleResolver styleResolver;
+
+    // The standalone style document handed to the constructor (null when the manifest's own <Styles>
+    // section is the origin), so a reload can replace appearance without touching the tree and a layout
+    // reload can keep the appearance it already had.
+    private UiStyleDocument? attachedStyleDocument;
+
+    // The theme's tokens as the consumer handed them in, captured before the first document is applied.
+    // Applying a document is a mutation of the injected theme, so committing the next version has to start
+    // from the pre-document values: without this, a declaration the new document no longer carries would
+    // keep applying forever.
+    private readonly UiTheme styleBaseline;
+
+    // The service this host reads documents through, so closing the host releases its dependency instead of
+    // leaving a closed session referenced by a live service.
+    private UiDocumentService? documentService;
+
     private int lastLayoutRevision;
 
     // How far the two issue records have been published on the fit audit's appearance channel. Each one
@@ -50,13 +71,14 @@ public sealed class UiHost : IDisposable
         this.translation = translation ?? throw new ArgumentNullException(nameof(translation));
 
         UiWidgetRegistry.InitializeCore();
-        ValidateManifest();
+        ValidateManifest(manifest);
 
         // The style document enters here, and the host owns it: a caller hands in a standalone document
         // (the appearance-authoring origin) or, when it hands in none, the manifest's own <Styles>
         // section is the document. Nothing else about the page changes - an element's Scheme/Density
         // attributes are resolved per element, against the theme below.
         UiStyleDocument styleDocument = document ?? manifest.Styles;
+        attachedStyleDocument = document;
 
         // Two sources at once would mean one of them is ignored, and a library that quietly picks one is
         // exactly the silent fallback this one refuses. The document handed in wins - the caller named it
@@ -76,6 +98,7 @@ public sealed class UiHost : IDisposable
         // resolve-before-Measure: the page level lands on the injected theme before the first arrange, and
         // because applying a token moves the theme's own layout revision - the clock the band cache already
         // compares - the very first frame follows the document. No second clock is introduced anywhere.
+        styleBaseline = theme.Clone();
         styleResolver = new UiStyleResolver(theme, styleDocument);
         styleResolver.ApplyTo(theme);
 
@@ -153,8 +176,16 @@ public sealed class UiHost : IDisposable
         }
     }
 
+    /// <summary>
+    /// Starts one frame. A host that reads documents takes the service's pending change signals here,
+    /// before the session's own frame starts and therefore before this pass arranges anything: the GUI pass
+    /// that just finished was never mutated under itself, and the pass about to run already follows the new
+    /// tree. <see cref="UiDocumentService.Pump"/> is idempotent, so a consumer that also pumps explicitly
+    /// pays nothing for doing so.
+    /// </summary>
     public void BeginFrame()
     {
+        documentService?.Pump();
         session.BeginFrame();
     }
 
@@ -186,6 +217,11 @@ public sealed class UiHost : IDisposable
 
     public void Close()
     {
+        // A closed host must not stay referenced by a live document service, and the service's documents
+        // must survive the host: the dependency is released, the last valid version is not.
+        UiDocumentService? service = documentService;
+        documentService = null;
+        service?.Detach(this);
         session.Dispose();
     }
 
@@ -254,9 +290,238 @@ public sealed class UiHost : IDisposable
         UiFitAudit.ReportStyleFallback(source + "#styles", "Styles", "Declaration", issue.ToString(), "defaults");
     }
 
-    private void ValidateManifest()
+    // --- document reload (P4) -------------------------------------------------------------------
+
+    /// <summary>The style document this host would resolve against right now.</summary>
+    internal UiStyleDocument EffectiveStyleDocument => attachedStyleDocument ?? manifest.Styles;
+
+    /// <summary>True once this host's session has been disposed by <see cref="Close"/>.</summary>
+    internal bool SessionDisposed => !session.IsActive;
+
+    /// <summary>
+    /// Validates a candidate layout in full - the same creation-time contract the constructor runs,
+    /// including every widget's own Configure/Validate against this host's bindings - without changing
+    /// anything. The document service calls this for every affected host before it commits any of them,
+    /// which is what makes one change batch all-or-nothing.
+    /// </summary>
+    internal bool TryPrepareLayoutCandidate(UiLayoutManifest candidate, out string element, out string reason)
     {
-        foreach (UiElementSpec root in manifest.Roots)
+        element = "";
+        reason = "";
+        if (candidate == null)
+        {
+            reason = "the candidate is null";
+            return false;
+        }
+
+        try
+        {
+            ValidateManifest(candidate);
+        }
+        catch (UiContractException ex)
+        {
+            element = ex.ElementPath.Length > 0 ? ex.ElementPath : ex.ElementId;
+            reason = ex.Message;
+            return false;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or FormatException)
+        {
+            reason = ex.Message;
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Commits a validated layout candidate: swaps the roots and rebuilds the style resolver and the engine
+    /// over the effective document, cleans up the state of elements that are gone or whose kind changed, and
+    /// releases a held hot control. The session - and therefore the scroll positions, drafts, selection and
+    /// expansion of every identity that survives - is not touched: state preservation here is a property of
+    /// not replacing the session, not of copying anything out of it.
+    /// </summary>
+    internal void CommitLayoutCandidate(UiLayoutManifest candidate)
+    {
+        UiLayoutManifest previous = manifest;
+        manifest = candidate;
+        RebuildTree(previous);
+    }
+
+    /// <summary>
+    /// Commits a style-document candidate. Whether the document is structurally valid was decided by the
+    /// service (a whole-document refusal never reaches here); declaration-level drops inside it stay soft and
+    /// are published by the rebuilt resolver.
+    /// </summary>
+    internal void CommitStyleCandidate(UiStyleDocument candidate)
+    {
+        attachedStyleDocument = candidate ?? throw new ArgumentNullException(nameof(candidate));
+        RebuildTree(previous: null);
+    }
+
+    /// <summary>Records the service this host's documents come from; called by the service's Attach.</summary>
+    internal void AttachDocumentService(UiDocumentService service)
+    {
+        documentService = service ?? throw new ArgumentNullException(nameof(service));
+    }
+
+    private void RebuildTree(UiLayoutManifest? previous)
+    {
+        // Start from the pre-document tokens and then apply the new page level: a colour the new document no
+        // longer declares has to actually stop applying, or "remove the override and reload" silently keeps
+        // the old value and the reload is only half true.
+        RestoreStyleBaseline();
+        styleResolver = new UiStyleResolver(theme, EffectiveStyleDocument);
+        styleResolver.ApplyTo(theme);
+
+        // A fresh engine has no cached arrangement, so the next ArrangeRoots measures the new tree. This is
+        // the invalidation the reload needs and it is strictly local: no second revision counter is
+        // introduced anywhere - the engine instance itself is the invalidated thing.
+        engine = new UiLayoutEngine(source, styleResolver);
+
+        publishedDocumentIssues = 0;
+        publishedResolutionIssues = 0;
+        warnedDroppedStyleDocument = false;
+
+        if (previous != null)
+        {
+            PruneDetachedState(previous, manifest);
+        }
+
+        ReleaseHotControlForReload();
+        PublishStyleIssues();
+    }
+
+    private void RestoreStyleBaseline()
+    {
+        theme.Base = styleBaseline.Base;
+        theme.Panel = styleBaseline.Panel;
+        theme.Raised = styleBaseline.Raised;
+        theme.Hover = styleBaseline.Hover;
+        theme.Selected = styleBaseline.Selected;
+        theme.Success = styleBaseline.Success;
+        theme.Danger = styleBaseline.Danger;
+        theme.WorkspacePlane = styleBaseline.WorkspacePlane;
+        theme.SectionBand = styleBaseline.SectionBand;
+        theme.TextPrimary = styleBaseline.TextPrimary;
+        theme.TextSecondary = styleBaseline.TextSecondary;
+        theme.TextOnGold = styleBaseline.TextOnGold;
+        theme.TextOnDanger = styleBaseline.TextOnDanger;
+        theme.TextDisabled = styleBaseline.TextDisabled;
+        theme.AccentGold = styleBaseline.AccentGold;
+        theme.HoverPoint = styleBaseline.HoverPoint;
+        theme.Border = styleBaseline.Border;
+        theme.BorderStrong = styleBaseline.BorderStrong;
+        theme.Divider = styleBaseline.Divider;
+        theme.BaseBorder = styleBaseline.BaseBorder;
+        theme.PanelBorder = styleBaseline.PanelBorder;
+        theme.RaisedBorder = styleBaseline.RaisedBorder;
+        theme.HoverBorder = styleBaseline.HoverBorder;
+        theme.SelectedBorder = styleBaseline.SelectedBorder;
+        theme.SuccessBorder = styleBaseline.SuccessBorder;
+        theme.DangerBorder = styleBaseline.DangerBorder;
+        theme.DefaultFont = styleBaseline.DefaultFont;
+        theme.Geometry = styleBaseline.Geometry;
+    }
+
+    /// <summary>
+    /// A reload does not leave a global capture behind: the IMGUI hot control this session holds is
+    /// released, and whatever a drag or text edit had already typed stays where it was, in the node state
+    /// the surviving identity owns. Releasing is the "cancel the UI capture while keeping a compatible
+    /// draft" half of the contract; the draft is untouched here on purpose.
+    /// </summary>
+    private void ReleaseHotControlForReload()
+    {
+        int? held = session.OwnedHotControl;
+        if (held.HasValue)
+        {
+            session.ReleaseHotControl(held.Value);
+        }
+    }
+
+    /// <summary>
+    /// Cleans up the state of elements the new tree no longer keeps: an element whose identity is gone, or
+    /// whose kind changed under the same identity, must not hand its draft, selection or drag state to a
+    /// different control. A widget's own sub-nodes - minted under the element and absent from the element
+    /// map - go with their element. A node that survives both identity and kind keeps everything.
+    /// </summary>
+    private void PruneDetachedState(UiLayoutManifest previous, UiLayoutManifest next)
+    {
+        Dictionary<UiNodeId, string> before = ElementKinds(previous);
+        if (before.Count == 0) return;
+        Dictionary<UiNodeId, string> after = ElementKinds(next);
+
+        foreach (KeyValuePair<UiNodeId, string> entry in before)
+        {
+            bool survives = after.TryGetValue(entry.Key, out string? kind)
+                && string.Equals(kind, entry.Value, StringComparison.Ordinal);
+            if (survives) continue;
+
+            UiNode? node = session.GetNode(entry.Key);
+            if (node != null)
+            {
+                ResetDetachedState(node, after);
+            }
+        }
+    }
+
+    private void ResetDetachedState(UiNode node, Dictionary<UiNodeId, string> survivors)
+    {
+        ResetState(node.State);
+        foreach (KeyValuePair<string, UiValueState> slot in node.ValueStates)
+        {
+            ResetState(slot.Value);
+        }
+
+        // A scroll position is state too, and it is keyed by the node for exactly this reason: a removed
+        // scroll container must not leave a position behind for whatever identity claims that slot next.
+        if (session.ScrollPositions.ContainsKey(node))
+        {
+            session.SetScrollPosition(node, new Vector2(0f, 0f));
+        }
+
+        foreach (UiNode child in node.Children)
+        {
+            // An element child the new tree still carries keeps its own state; everything else under a
+            // removed or kind-changed element - sub-nodes included - is part of what has to be cleaned up.
+            if (survivors.ContainsKey(child.Id)) continue;
+            ResetDetachedState(child, survivors);
+        }
+    }
+
+    private static void ResetState(UiValueState state)
+    {
+        state.FloatValue = 0f;
+        state.EditText = "";
+        state.Dragging = false;
+        state.Focused = false;
+        state.Cursor = 0;
+    }
+
+    private static Dictionary<UiNodeId, string> ElementKinds(UiLayoutManifest value)
+    {
+        var kinds = new Dictionary<UiNodeId, string>();
+        for (int i = 0; i < value.Roots.Count; i++)
+        {
+            UiElementSpec root = value.Roots[i];
+            CollectElement(UiNodeId.Root(root, i), root, kinds);
+        }
+
+        return kinds;
+    }
+
+    private static void CollectElement(UiNodeId id, UiElementSpec spec, Dictionary<UiNodeId, string> kinds)
+    {
+        kinds[id] = spec.Kind;
+        for (int i = 0; i < spec.Children.Count; i++)
+        {
+            UiElementSpec child = spec.Children[i];
+            CollectElement(id.Child(child, i), child, kinds);
+        }
+    }
+
+    private void ValidateManifest(UiLayoutManifest candidate)
+    {
+        foreach (UiElementSpec root in candidate.Roots)
         {
             ValidateElement(root, root.Id.Length > 0 ? root.Id : root.Kind, parentNarrowCapable: false);
         }

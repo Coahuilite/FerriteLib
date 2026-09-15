@@ -10,8 +10,9 @@ assembly. Three tiers, one home for the promise:
 - **Public-unstable** — usable today, and expected to change shape. Compile against the version you tested
   against; expect to recompile at a minor bump. This is not a warning label, it is the honest status of a
   surface that has been forced by one consumer and never by two.
-- **Internalize-candidate** — public today and needed by nobody outside the assembly. The 0.4.x window
-  removes them from the surface; until then a consumer that names one is on its own.
+- **Internalize-candidate** — public today and needed by nobody outside the assembly. A minor window removes
+  them from the surface; the 0.4 line shipped without finishing that sweep, so it continues in the open 0.5
+  window. Until then a consumer that names one is on its own.
 
 Enforcement is a harness lane (`tools/FerriteLib.UiKit.Tests/FerriteLibApiTierTests.cs`): every public type
 in the payload must be listed here exactly once, no entry may name a type that no longer exists, and the
@@ -19,8 +20,8 @@ stable list is additionally pinned inside the test, so promoting or demoting a t
 edits. `UiWidgetRegistry.Clear` is the precedent for what an unlisted change does: it went internal in 0.3.0
 (item D) and no lane here would have noticed.
 
-**Why the stable tier is thin, and that is the point.** Three known debts each block a specific group of
-types from stability, and they are the reason a 0.4.x exists rather than a 0.3.5:
+**Why the stable tier is thin, and that is the point.** Known debts each block a specific group of types
+from stability; they are why the 0.4 line existed and they are what the open 0.5 window is paying down:
 
 | Debt (see `TODO.md`) | Blocks from stable |
 |---|---|
@@ -116,8 +117,9 @@ consequence is paid in the open rather than discovered by a stranger.
   reach them.
 - `UiThemeDraw` — the single text and panel outlet; per-surface tokens change what it takes to draw.
 - `UiFitAudit` — the audit surface; entry attribution follows the identity layer.
-- `UiLayoutManifest` — the `Schema="2"` slot and the uncalled `ParseFile` are an open fork, and either
-  branch changes this type.
+- `UiLayoutManifest` — the `Schema="2"` slot and `ParseFile` are an open fork — the method has **no
+  production caller** (the harness calls it directly; that is not a use), and the 0.5 document service is
+  the branch that decides it. Either branch changes this type.
 - `UiLayoutSnapshot` — the measure-then-draw halves are exercised only by the harness; no wired consumer or
   the shell names them (`UiWindowHost` drives `DrawFrame`), so they either earn a cited use or go internal.
 - `UiWindowHost` — the largest freeze surface this library has ever shipped, landed before a second consumer
@@ -126,9 +128,14 @@ consequence is paid in the open rather than discovered by a stranger.
   seam a host also hands the fit audit) rather than from the fixed 110x30 box it used to ship, because the
   label is the consumer's string and a library must not clip the wording it was handed; overriding the
   property still replaces the computation. The shell's own text is attributed in the audit as
-  `<windowType>/chrome` and `<windowType>/notice` — the concrete type is the only identity the shell has
-  before it holds a manifest — so two windows on screen at once no longer produce indistinguishable
-  `(unscoped)` findings.
+  `<windowType>[<window-key>]/chrome` and `.../notice` for a shell a catalog attached, and as the bare
+  `<windowType>/chrome` when none did — the concrete type plus the window key is the identity, extended in
+  the 0.5.x window round because one generic page shell now serves every ordinary page, and type-only
+  identity would put two open panels on one audit path and merge two instances into one finding. Two
+  windows on screen at once therefore no longer produce indistinguishable `(unscoped)` findings either.
+  The same round adds `Key`, `IsActiveTarget`, `Session`, the
+  `PreOpen`/`PostOpen`/`OnCloseRequest`/`PreClose`/`PostClose` hooks and the protected `CanClose`
+  veto to this type; all of it is additive, and a window no catalog attached behaves exactly as before.
 - `UiWindowNotice` — the shell's notice vocabulary, same reason.
 - `LineChartWidget` — named by the consumer's own composition, so it cannot go internal yet; that use is
   also the specimen behind the tree-membership metric, and the debt list would rather it be a kind string.
@@ -224,6 +231,53 @@ consequence is paid in the open rather than discovered by a stranger.
   emphasis), handed in nearest first along the tree; the engine's chain carries the two that inherit and
   leaves the roles on the element's own spec.
 - `UiStyleIssue` — one appearance value a document dropped, so that fail-soft is never silent.
+- `UiWindowKey` — the instance identity the 0.5.x window round adds: `(consumer, window-kind,
+  context-key)` as a value type with ordinal equality over all three parts, an empty context key meaning
+  the kind's one context-free instance. It exists because the C# type cannot be the identity: the vanilla
+  add path removes same-typed windows by exact type, so a shared page shell would make every ordinary page
+  a sibling of every other one. Usable as a dictionary key and through `==`/`!=`; `ToString` is a
+  diagnostic rendering and is never parsed back.
+- `UiWindowOptions` — per-kind window policy, applied by `UiWindowCatalog` before the window enters the
+  stack. Every modality switch is a nullable `bool?` and null writes nothing: `ForcePause` and
+  `PreventCameraMotion` are any-true over all windows, so a library-chosen default there would change
+  another consumer's game — this type ships no product default for either. `AllowMultipleInstances` is
+  the one non-nullable switch and defaults to true, setting the window's `onlyOneOfTypeAllowed` false so
+  the library's key, not the C# type, is what deduplicates instances; a false is the vanilla exact-type
+  rule, exact C# type included, so two kinds sharing one window class would evict each other.
+  `InitialSize` feeds the shell's size provider, `NormalSize` is re-applied at `PreOpen`, `CanClose`
+  is the close veto and `SetFocusOnActivate` lets activation call the game's own focus setter.
+- `UiWindowCatalog` — the registry that composes `Verse.WindowStack` instead of scheduling windows
+  itself: `Register`, `Open`/`Close`/`CloseAll`, `TryGet`, `Instances`,
+  `ActiveKey`/`ActiveWindow`/`IsActive`, `Activate`, `FocusPolicy`, and an
+  `AnyForcesPause`/`AnyPreventsCameraMotion` view of its own instances (the game's aggregate is still
+  the authority, because it also counts vanilla windows). It is constructed with the stack it drives, so
+  it holds no process-wide lookup and two catalogs in one process cannot touch each other. Its lifecycle
+  sits on the vanilla hooks `PreOpen`/`PostOpen`/`OnCloseRequest`/`PreClose`/`PostClose`, and a
+  consumer's refusal to close is preserved because `Close` reports the stack's own answer instead of
+  removing the instance itself.
+- `UiPageWindow` — the concrete page shell an ordinary XML page no longer needs a C# `Window` subclass
+  for. It takes a key, the manifest, typed bindings, a theme, a translation seam and every visible word
+  (title, close label and the notice text for each `UiWindowNotice`), and it participates in a catalog by
+  key; options come from the registration rather than the constructor so a kind has one policy in one
+  place. It inherits the shell's deferred failure-notice contract unchanged.
+- `UiFocusPolicy` — when a window becomes the one active target: `FollowClicks` (default: opening,
+  reopening and a pointer-down inside a window move it, and a click outside every instance clears it),
+  `OpenOnly`, and `Manual`. It states the library's own rule only: it makes no claim about z-order,
+  and the vanilla focus call an activation may make is not a bring-to-front.
+
+- `UiDocumentKind` — which of the two document vocabularies a file is read as (layout or style). Part of
+  the source identity rather than an extension guess, because the two parsers have two different failure
+  policies.
+- `UiDocumentSource` — `{ Id, Kind, Path }`: the consumer names the file, nothing scans a directory, and
+  the service is what later re-reads it.
+- `UiDocumentService` — the bounded, disposable owner of the document half: dependency tracking from host
+  to file, the watcher whose worker thread only posts a change signal, candidate parse/validation on the
+  main-thread commit boundary, atomic per-document batches across every affected host, last-known-good with
+  an embedded-fallback first load, and the manual reload that recovers a dropped signal. No static state,
+  and every collection is capped.
+- `UiReloadReport` — one reload attempt's outcome: file, element, reason, content identity, and the
+  committed/skipped/duplicate axes; failures are recorded once per refusing version.
+
 - `UiInvalidation` — the class a binding declares for its own announcements: `Paint` reuses the arranged
   snapshot and lets the next paint read the value, `Measure` re-measures the elements that declared the
   key, `Structure` adds the container that owns the element's slot. Combinable, and an undeclared binding
@@ -290,7 +344,8 @@ What the 0.5 window is for (working packages, ownership and status: `docs/develo
 - **Collections and common controls.** The engine has no per-item template; a keyed repeater with a local
   item binding scope, node reuse and removal cleanup lands here, together with the checkbox, a basic
   progress bar and a hierarchy-only tree surface.
-- **Documents.** `UiLayoutManifest.ParseFile`/`UiStyleDocument.ParseFile` exist and have no caller. A
+- **Documents.** `UiLayoutManifest.ParseFile`/`UiStyleDocument.ParseFile` exist and have no production
+  caller (harness lanes call them; no shipped path does). A
   bounded document service with dependency tracking, candidate validation, atomic batch commit and
   last-known-good fallback lands here, which is what makes "edit the XML and the open window updates" true
   rather than implied. C# kind changes stay outside hot reload on purpose.

@@ -12,7 +12,7 @@
 | 发布通道 | 消费者经已发布的 GitHub Release 资产集成；同目录兄弟文件夹的 `Private=false` 是开发便利，不是契约 |
 | 单 DLL carrier | 只有本 Mod 交付 `FerriteLib.UiKit.dll`；消费者不得自带副本 |
 
-游戏无法表达前置版本区间（`ModRequirement` 只解析 packageId/displayName），
+游戏无法表达前置版本区间（`ModRequirement` 只解析 `packageId`/`alternativePackageIds`/`displayName`），
 所以**每个消费者必须在自己构造函数里断言区间**：
 
 ```csharp
@@ -54,6 +54,8 @@ FerriteLibVersion.Require(new Version(0, 5, 0), new Version(0, 6, 0), "your.pack
 - **地图层渲染不在库内**（永久非目标）。
 - **实机行为未由本仓证明。** 激活/层级/输入穿透/模态共存等组合行为是 IL 级事实推导 + 自动化断言，
   必须由消费者团队在真实游戏里验收（清单见 `../../in-game-walkthrough.md` 与 [40-verification.md](40-verification.md)）。
+
+- **重载会重置文档可设置的主题令牌。** 热重载提交前会把注入 `UiTheme` 的、可由样式文档设置的令牌恢复为 host 构造时的值，否则被删除的覆盖会继续生效。**后果**：若消费者在 host 构造之后重新调过这些令牌之一，下一次重载提交会丢掉这次调整。要保留就请在重载后重新应用，或把该调整放进样式文档。此行为由 P4 的独立验证实测（`docs/development/0.5/verification/p4-adversarial.md`），尚未决定是否在 0.5 内修正。
 
 ## 5. 交接节奏
 
