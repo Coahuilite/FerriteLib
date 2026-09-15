@@ -667,14 +667,15 @@ public sealed class UiHost : IDisposable
     // name existed, so an author could not reach the document's schemes at all.
     private static readonly HashSet<string> CommonWidgetAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Id", "Kind", "Hidden", "Tab", "Width", "MinWidth", "MaxWidth", "NarrowHidden", "Scheme", "Density"
+        "Id", "Kind", "Hidden", "Tab", "Width", "MinWidth", "MaxWidth", "NarrowHidden", "Scheme", "Density",
+        "Visible", "VisibleKey"
     };
 
     private static readonly HashSet<string> ContainerAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
         "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Width", "Fill",
         "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden",
-        "Scheme", "Density"
+        "Scheme", "Density", "Visible", "VisibleKey"
     };
 
     private void ValidateElement(UiElementSpec spec, string path, bool parentNarrowCapable)
@@ -750,6 +751,26 @@ public sealed class UiHost : IDisposable
             {
                 throw new UiContractException(
                     $"Element id=\"{spec.Id}\" at '{path}' has invalid Width '{widthRaw}'; expected a positive number or Auto.",
+                    source, spec.Id, spec.Kind, path);
+            }
+        }
+
+        // Visible is engine-wide and static, so its value is part of the creation-time contract like
+        // Width: a malformed value would otherwise be interpreted per frame by the engine, and the one
+        // place that still knows the element, the attribute and the path is here. VisibleKey is
+        // deliberately NOT resolved against the injected bindings: a page must not fail to exist because
+        // a model key is missing or not yet bound. The engine keeps such an element visible and records
+        // one deduplicated appearance fallback instead - fail-soft, but not silent.
+        if (spec.TryGetAttribute("Visible", out string visibleRaw))
+        {
+            string visible = visibleRaw.Trim();
+            if (!string.Equals(visible, "true", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(visible, "false", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(visible, "1", StringComparison.Ordinal)
+                && !string.Equals(visible, "0", StringComparison.Ordinal))
+            {
+                throw new UiContractException(
+                    $"Element id=\"{spec.Id}\" at '{path}' has invalid Visible '{visibleRaw}'; expected true or false.",
                     source, spec.Id, spec.Kind, path);
             }
         }

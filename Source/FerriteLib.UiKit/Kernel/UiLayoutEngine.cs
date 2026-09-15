@@ -85,6 +85,24 @@ public sealed class UiLayoutEngine
     private int cachedTranslationRevision = int.MinValue;
     private List<PlacedEntry> lastEntries = new();
 
+    // Per-key notification state. keyNodes is the last arrange's map from an announced binding key to the
+    // nodes whose elements declare it; committedRevisions is the revision this engine has already folded
+    // into the arrangement. Together they are what makes an announcement target the elements that
+    // declared the key instead of the page: a key no arranged element declares is never polled, and one
+    // that is polled marks only its own nodes.
+    private readonly Dictionary<string, List<UiNode>> keyNodes = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> committedRevisions = new(StringComparer.Ordinal);
+
+    // The three attribute names below are the page vocabulary the atoms and the consumer kinds read when
+    // they resolve a binding (Bind, ActionBind, OptionsBind), plus the declared Id as the documented
+    // value-atom fallback. They are manifest vocabulary, not source text: the engine is reading what the
+    // author declared, which is the opposite of inferring an invalidation from a page's C#.
+    private const string BindAttribute = "Bind";
+    private const string ActionBindAttribute = "ActionBind";
+    private const string OptionsBindAttribute = "OptionsBind";
+    private const string VisibleKeyAttribute = "VisibleKey";
+    private const string TabAttribute = "Tab";
+
     /// <summary>
     /// The engine a <see cref="UiHost"/> builds: <paramref name="styleResolver"/> turns the chain each
     /// element declares into the theme that element draws with. Null keeps the pre-document behaviour,
@@ -104,6 +122,11 @@ public sealed class UiLayoutEngine
         float width = Normalize(available.x, 1f);
         float height = Normalize(available.y, 1f);
 
+        // The frame boundary: announcements raised during the previous pass are folded into one commit
+        // before the cache is consulted, so a Paint-class key leaves the cache alone while a
+        // Measure/Structure-class key marks its elements and moves the arrangement clock.
+        CommitNotifications(ctx);
+
         // A dirty node is the per-element invalidation signal: a widget that marked its own node dirty
         // asks for a re-measure even when size, content revision, definition and language all stand still.
         if (cachedSnapshot != null
@@ -120,17 +143,26 @@ public sealed class UiLayoutEngine
         }
 
         // A fresh arrange: every node forgets its children and geometry, and the entries below publish
-        // them again for the elements this pass visits.
+        // them again for the elements this pass visits. The key map is rebuilt with it, so a key no longer
+        // declared by any arranged element stops being polled instead of invalidating a page forever.
         ctx.Session.BeginArrange();
+        keyNodes.Clear();
 
         var box = new MeasuredBox { Width = width, Height = 0f };
         float y = 0f;
         for (int i = 0; i < roots.Count; i++)
         {
             UiElementSpec root = roots[i];
-            if (IsHidden(root, ctx, narrow: false)) continue;
+            if (IsHidden(root, ctx, narrow: false, parent: null, declaredIndex: i))
+            {
+                // A hidden root has no arranged ancestor, so its declared keys report to the session-level
+                // node - the same owner a host-level caller's state resolves into. That is what lets its
+                // VisibleKey/Tab come back and re-arrange the page when the model says so.
+                RecordDeclaredKeys(root, ctx.Session.ActiveNode, ctx.Bindings);
+                continue;
+            }
 
-            UiNode rootNode = ctx.Session.GetOrCreateNode(UiNodeId.Root(root, i), root.Kind, i, root.Id);
+            UiNode rootNode = ctx.Session.GetOrCreateElementNode(UiNodeId.Root(root, i), root, i);
             MeasuredBox child = MeasureElement(
                 ctx,
                 root,
@@ -193,6 +225,19 @@ public sealed class UiLayoutEngine
         // just happened.
         ctx.Session.ClearDirtyNodes();
 
+        // A definition that no longer declares an identity must not leave its node behind - a reload that
+        // removes an element would otherwise keep a stale node, a stale Kind and orphaned state forever.
+        // The session owns node lifetime, so the engine hands it the definition it just arranged and the
+        // session releases what is gone. Declared-but-hidden elements are in the set on purpose: their
+        // identity still exists and their state has to survive the hide.
+        var declaredIdentities = new HashSet<UiNodeId>();
+        CollectDeclaredIdentities(roots, declaredIdentities);
+        if (ctx.Session.PruneNodesExcept(declaredIdentities) > 0)
+        {
+            // A widget instance keyed by an identity that no longer exists is the same leak one level up.
+            PruneWidgetInstances(ctx.Session);
+        }
+
         ClampScrollPositions(ctx.Session, lastEntries);
         ApplyScrollTarget(ctx);
         return cachedSnapshot;
@@ -242,6 +287,146 @@ public sealed class UiLayoutEngine
         }
     }
 
+    /// <summary>
+    /// Folds every announcement the page made since the last arrange into one commit at the frame
+    /// boundary: per key, the declared invalidation class decides what moves.
+    /// <see cref="UiInvalidation.Paint"/> costs nothing here - the next paint pass reads the new value
+    /// and the arranged geometry is reused as it stands, which is what keeps a fixed-size readout from
+    /// re-measuring the page. <see cref="UiInvalidation.Measure"/> and
+    /// <see cref="UiInvalidation.Structure"/> mark the nodes that declared the key dirty, and the
+    /// arrangement clock moves once for the whole batch.
+    /// <para>
+    /// One comparison per declared key per arrange is the whole cost, so however many announcements
+    /// arrived during a pass and however many times one key was announced, the element is marked at most
+    /// once (<see cref="UiNode.MarkDirty"/> is idempotent) and the batch produces exactly one commit.
+    /// </para>
+    /// <para>
+    /// <b>What is load-bearing today, stated rather than assumed.</b> The page-wide snapshot cache cannot
+    /// tell one element from another, so the clock bump alone already forces the re-arrange a Measure or
+    /// Structure announcement needs, and the per-node flags are currently redundant with it: marking the
+    /// affected nodes is the seam element-level measure reuse will need, and removing only those calls
+    /// changes nothing observable yet (measured, 2026-09-15). What <i>is</i> observable, and what the
+    /// invalidation lane pins, is the rest of the decision: which keys are polled at all (declared keys
+    /// only - an announcement for a key no arranged element declares invalidates nothing), and the class
+    /// the key declared (Paint moves neither a node nor the clock). Do not delete the flags on the grounds
+    /// that the clock covers them; delete them with the reuse that makes them matter.
+    /// </para>
+    /// </summary>
+    private void CommitNotifications(UiWidgetContext ctx)
+    {
+        if (keyNodes.Count == 0) return;
+
+        bool arrangementMoved = false;
+        foreach (KeyValuePair<string, List<UiNode>> entry in keyNodes)
+        {
+            int current = ctx.Bindings.GetRevision(entry.Key);
+            if (!committedRevisions.TryGetValue(entry.Key, out int committed) || committed == current)
+            {
+                continue;
+            }
+
+            committedRevisions[entry.Key] = current;
+
+            UiInvalidation invalidates = ctx.Bindings.GetInvalidation(entry.Key);
+            if ((invalidates & (UiInvalidation.Measure | UiInvalidation.Structure)) == 0)
+            {
+                // Paint-class: the value is read again by the draw pass, nothing here moves.
+                continue;
+            }
+
+            arrangementMoved = true;
+            bool structural = (invalidates & UiInvalidation.Structure) != 0;
+            for (int i = 0; i < entry.Value.Count; i++)
+            {
+                UiNode node = entry.Value[i];
+                node.MarkDirty();
+                if (structural)
+                {
+                    // Structure says the element's slot may change shape - it appears, disappears or stops
+                    // occupying its old band - so the container that owns the slot reflows with it.
+                    // Measure alone is the element's own geometry.
+                    node.Parent?.MarkDirty();
+                }
+            }
+        }
+
+        if (arrangementMoved)
+        {
+            ctx.Session.BumpContentRevision();
+        }
+    }
+
+    /// <summary>
+    /// Records which announced binding keys one element declares and who owns them, so the next commit
+    /// can target nodes instead of the page. An element that is not arranged this pass is recorded
+    /// against its nearest arranged ancestor by the caller, which is how a hidden element's VisibleKey
+    /// or Tab still brings it back.
+    /// </summary>
+    private void RecordDeclaredKeys(UiElementSpec spec, UiNode owner, IUiBindings bindings)
+    {
+        RecordKey(ReadDeclaredBindKey(spec), owner, bindings);
+        RecordKey(ReadAttribute(spec, ActionBindAttribute), owner, bindings);
+        RecordKey(ReadAttribute(spec, OptionsBindAttribute), owner, bindings);
+        if (ReadAttribute(spec, TabAttribute).Length > 0)
+        {
+            // A Tab-gated element does not depend on its own tab name; it depends on the one shared
+            // active-tab binding, whatever name the author wrote.
+            RecordKey(UiBindings.ActiveTabKey, owner, bindings);
+        }
+
+        RecordKey(ReadAttribute(spec, VisibleKeyAttribute), owner, bindings);
+    }
+
+    private void RecordKey(string key, UiNode owner, IUiBindings bindings)
+    {
+        if (key.Length == 0) return;
+        if (!committedRevisions.ContainsKey(key))
+        {
+            // First sight: this arrange is already using the key's current value, so its revision is
+            // committed here and only a later announcement invalidates the element.
+            committedRevisions[key] = bindings.GetRevision(key);
+        }
+
+        if (!keyNodes.TryGetValue(key, out List<UiNode>? owners))
+        {
+            owners = new List<UiNode>();
+            keyNodes.Add(key, owners);
+        }
+
+        if (!owners.Contains(owner))
+        {
+            owners.Add(owner);
+        }
+    }
+
+    /// <summary>
+    /// The key a value atom reads for this element: the <c>Bind</c> attribute when declared, else the
+    /// element's own <c>Id</c>. That fallback is the documented atom contract, not a second key space.
+    /// </summary>
+    private static string ReadDeclaredBindKey(UiElementSpec spec)
+    {
+        string bind = ReadAttribute(spec, BindAttribute);
+        return bind.Length > 0 ? bind : spec.Id.Trim();
+    }
+
+    private static string ReadAttribute(UiElementSpec spec, string attribute)
+    {
+        return spec.TryGetAttribute(attribute, out string value) ? value.Trim() : "";
+    }
+
+    /// <summary>
+    /// The element's disabled state: the command it declares as <c>ActionBind</c> answers
+    /// <see cref="IUiBindings.CanExecute"/> false. An element that declares no command is never
+    /// disabled, so this cannot change the behaviour of a page that binds no commands. The answer is
+    /// published on the node because that is where the funnel's interactive entry points read it: one
+    /// rule for every kind instead of a per-widget branch.
+    /// </summary>
+    private static bool ResolveDisabled(UiElementSpec spec, UiWidgetContext ctx)
+    {
+        string commandKey = ReadAttribute(spec, ActionBindAttribute);
+        return commandKey.Length > 0 && !ctx.Bindings.CanExecute(commandKey);
+    }
+
     public void Draw(UiWidgetContext ctx, UiLayoutSnapshot snapshot, Rect viewport)
     {
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
@@ -277,6 +462,11 @@ public sealed class UiLayoutEngine
             entryCtx = entryCtx.WithTheme(ScopeTheme(entryCtx));
             entryCtx = entry.MeasureWidth > 0f ? entryCtx.WithViewWidth(entry.MeasureWidth) : entryCtx;
             entryCtx = entryCtx.WithWindowOrigin(windowOrigin).WithNode(entry.Node);
+
+            // Publish the element's disabled state before anything paints or hit-tests: the funnel's
+            // interactive entry points read it, so a disabled element neither executes nor captures the
+            // pointer. Resolved once per element per draw from the command the element declares.
+            entry.Node.IsDisabled = ResolveDisabled(entry.Spec, entryCtx);
 
             // The element's content layer, in window space (draw rect plus the context's offset), and the
             // origin the funnel lifts a draw-local pointer by. Only widgets are hit surfaces: a container
@@ -533,6 +723,11 @@ public sealed class UiLayoutEngine
         // font reach the label widths measured inside it.
         ctx = ElementScope(ctx, spec);
 
+        // Every arranged element declares its binding keys to the engine here, so the next announcement
+        // of any of them can target this node instead of the page. An element that is not arranged this
+        // pass is recorded against its nearest arranged ancestor by the caller instead.
+        RecordDeclaredKeys(spec, node, ctx.Bindings);
+
         string containerKind = GetContainerKind(spec);
         if (containerKind.Length == 0)
         {
@@ -638,21 +833,52 @@ public sealed class UiLayoutEngine
     /// The node for one child, created on first use. Identity is the parent's identity plus the child's
     /// declared ordinal, so the same element keeps the same node - and its state - across passes.
     /// </summary>
+    /// <summary>
+    /// Drops the widget instances whose identity the session no longer holds. A removed element's widget
+    /// would otherwise stay alive in this table holding whatever a consumer's factory closed over.
+    /// </summary>
+    private void PruneWidgetInstances(UiSession session)
+    {
+        List<UiNodeId>? gone = null;
+        foreach (UiNodeId id in widgetInstances.Keys)
+        {
+            if (session.GetNode(id) == null)
+            {
+                (gone ??= new List<UiNodeId>()).Add(id);
+            }
+        }
+
+        if (gone == null) return;
+        for (int i = 0; i < gone.Count; i++)
+        {
+            widgetInstances.Remove(gone[i]);
+        }
+    }
+
     private static UiNode ChildNode(UiWidgetContext ctx, UiNode parent, UiElementSpec spec, int declaredIndex)
     {
-        UiNode child = ctx.Session.GetOrCreateNode(
-            parent.Id.Child(spec, declaredIndex), spec.Kind, declaredIndex, spec.Id);
+        UiNode child = ctx.Session.GetOrCreateElementNode(
+            parent.Id.Child(spec, declaredIndex), spec, declaredIndex);
         parent.AddChild(child);
         return child;
     }
 
-    private static List<ChildSlot> VisibleChildren(UiElementSpec spec, UiWidgetContext ctx, bool narrow)
+    private List<ChildSlot> VisibleChildren(UiElementSpec spec, UiWidgetContext ctx, bool narrow, UiNode parent)
     {
         var visible = new List<ChildSlot>();
         for (int i = 0; i < spec.Children.Count; i++)
         {
             UiElementSpec child = spec.Children[i];
-            if (!IsHidden(child, ctx, narrow)) visible.Add(new ChildSlot(child, i));
+            if (IsHidden(child, ctx, narrow, parent, i))
+            {
+                // A hidden element owns no arranged node, so its declared keys report to the container
+                // that would hold its slot. That is what makes its VisibleKey (or Tab) able to bring it
+                // back: the container is marked dirty and the page re-arranges with the element in it.
+                RecordDeclaredKeys(child, parent, ctx.Bindings);
+                continue;
+            }
+
+            visible.Add(new ChildSlot(child, i));
         }
 
         return visible;
@@ -719,7 +945,7 @@ public sealed class UiLayoutEngine
         UiNode node,
         bool narrow)
     {
-        List<ChildSlot> visible = VisibleChildren(spec, ctx, narrow);
+        List<ChildSlot> visible = VisibleChildren(spec, ctx, narrow, node);
 
         // Per-child width: a stack child is full-width unless it declares Width="Auto", in which
         // case its slot hugs its own label text (N1). The pre-pass and the arrange pass must use
@@ -827,7 +1053,7 @@ public sealed class UiLayoutEngine
         UiNode node,
         bool narrow)
     {
-        List<ChildSlot> visible = VisibleChildren(spec, ctx, narrow);
+        List<ChildSlot> visible = VisibleChildren(spec, ctx, narrow, node);
 
         float[] widths = ResolveColumnWidths(visible, innerWidth, gap, ctx);
         var box = new MeasuredBox { Width = width, Height = 0f };
@@ -897,7 +1123,11 @@ public sealed class UiLayoutEngine
         for (int i = 0; i < spec.Children.Count; i++)
         {
             UiElementSpec child = spec.Children[i];
-            if (IsHidden(child, ctx, narrow)) continue;
+            if (IsHidden(child, ctx, narrow, node, i))
+            {
+                RecordDeclaredKeys(child, node, ctx.Bindings);
+                continue;
+            }
 
             float childWidth = cols > 0 ? cellWidth : ResolveWrapWidth(child, innerWidth, ctx);
             UiNode childNode = ChildNode(ctx, node, child, i);
@@ -967,7 +1197,11 @@ public sealed class UiLayoutEngine
         for (int i = 0; i < spec.Children.Count; i++)
         {
             UiElementSpec child = spec.Children[i];
-            if (IsHidden(child, ctx, narrow)) continue;
+            if (IsHidden(child, ctx, narrow, node, i))
+            {
+                RecordDeclaredKeys(child, node, ctx.Bindings);
+                continue;
+            }
 
             UiNode childNode = ChildNode(ctx, node, child, i);
             MeasuredBox childBox = MeasureElement(ctx, child, innerWidth, availableHeight, childNode);
@@ -1077,7 +1311,11 @@ public sealed class UiLayoutEngine
         for (int i = 0; i < spec.Children.Count; i++)
         {
             UiElementSpec child = spec.Children[i];
-            if (IsHidden(child, ctx, narrow)) continue;
+            if (IsHidden(child, ctx, narrow, node, i))
+            {
+                RecordDeclaredKeys(child, node, ctx.Bindings);
+                continue;
+            }
 
             if (!first) y += gap;
             UiNode childNode = ChildNode(ctx, node, child, i);
@@ -1100,7 +1338,20 @@ public sealed class UiLayoutEngine
     {
         if (widgetInstances.TryGetValue(id, out IUiWidget? widget))
         {
-            return widget;
+            // An identity survives a definition change; the kind under it may not. A cached instance whose
+            // kind no longer matches the spec would measure and draw the element as the kind it used to
+            // be, so the instance is replaced with the one the current definition names.
+            if (string.Equals(widget.Kind, spec.Kind, StringComparison.Ordinal))
+            {
+                // The identity is reused, but the element under it can still be a different one of the same
+                // kind: a definition that renumbers unnamed siblings hands node [1] a different spec, and an
+                // instance still configured with the old one would measure and draw the wrong element. The
+                // table's whole point is reusing the instance, so it is re-configured instead of replaced.
+                widget.Configure(spec);
+                return widget;
+            }
+
+            widgetInstances.Remove(id);
         }
 
         widget = UiWidgetRegistry.Resolve(scope, spec.Kind);
@@ -1496,12 +1747,25 @@ public sealed class UiLayoutEngine
             $"Element id=\"{spec.Id}\" (Kind=\"{spec.Kind}\") has invalid Gap '{raw}'.");
     }
 
-    private static bool IsHidden(UiElementSpec spec, UiWidgetContext ctx, bool narrow)
+    /// <summary>
+    /// The element's authored visibility, and with it the three visibility mechanisms the page
+    /// vocabulary has: the static <c>Visible</c>, the dynamic <c>VisibleKey</c>, and the legacy static
+    /// <c>Hidden</c>. An element is hidden when any of them says so; <paramref name="parent"/> and
+    /// <paramref name="declaredIndex"/> exist only to name the element in the one diagnostic
+    /// <see cref="VisibleKeyAttribute"/> can produce, and are not part of the decision.
+    /// </summary>
+    private static bool IsHidden(
+        UiElementSpec spec, UiWidgetContext ctx, bool narrow, UiNode? parent, int declaredIndex)
     {
         if (narrow
             && spec.TryGetAttribute("NarrowHidden", out string narrowRaw)
             && (string.Equals(narrowRaw.Trim(), "true", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(narrowRaw.Trim(), "1", StringComparison.Ordinal)))
+        {
+            return true;
+        }
+
+        if (!IsVisibleDeclaration(spec, ctx, parent, declaredIndex))
         {
             return true;
         }
@@ -1523,6 +1787,62 @@ public sealed class UiLayoutEngine
 
         string activeTab = ctx.Bindings.TryGet(UiBindings.ActiveTabKey, out string current) ? current : "";
         return !string.Equals(tab.Trim(), activeTab, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// <c>Visible</c> (default true) and <c>VisibleKey</c>: the static declaration first, then a bool
+    /// value binding resolved through <see cref="IUiBindings.TryGetBool"/>.
+    /// <para>
+    /// An unresolvable key is deliberately not fatal: a page must not fail to exist because a model key
+    /// is missing or not yet bound, so the element stays visible. It is not silent either - the key is
+    /// reported once through the appearance channel, which is deduplicated by element, kind, attribute
+    /// and key, so a page drawn at 60 fps records one finding rather than sixty.
+    /// </para>
+    /// </summary>
+    private static bool IsVisibleDeclaration(
+        UiElementSpec spec, UiWidgetContext ctx, UiNode? parent, int declaredIndex)
+    {
+        if (spec.TryGetAttribute("Visible", out string visibleRaw))
+        {
+            string visible = visibleRaw.Trim();
+            if (string.Equals(visible, "false", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(visible, "0", StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        string key = ReadAttribute(spec, VisibleKeyAttribute);
+        if (key.Length == 0) return true;
+        if (ctx.Bindings.TryGetBool(key, out bool boundVisible)) return boundVisible;
+
+        UiNodeId id = parent == null ? UiNodeId.Root(spec, declaredIndex) : parent.Id.Child(spec, declaredIndex);
+        UiFitAudit.ReportStyleFallback(id.Path, spec.Kind, VisibleKeyAttribute, key, "visible");
+        return true;
+    }
+
+    /// <summary>
+    /// Every element identity one definition declares, whether or not the arrange will visit it: hidden
+    /// elements are included because their identity still exists and only a removed one may be released.
+    /// </summary>
+    private static void CollectDeclaredIdentities(IReadOnlyList<UiElementSpec> roots, HashSet<UiNodeId> into)
+    {
+        for (int i = 0; i < roots.Count; i++)
+        {
+            UiNodeId id = UiNodeId.Root(roots[i], i);
+            into.Add(id);
+            CollectChildIdentities(roots[i], id, into);
+        }
+    }
+
+    private static void CollectChildIdentities(UiElementSpec spec, UiNodeId parent, HashSet<UiNodeId> into)
+    {
+        for (int i = 0; i < spec.Children.Count; i++)
+        {
+            UiNodeId id = parent.Child(spec.Children[i], i);
+            into.Add(id);
+            CollectChildIdentities(spec.Children[i], id, into);
+        }
     }
 
     private static int DefinitionRevision(UiWidgetContext ctx)

@@ -39,7 +39,9 @@ internal static class AtomVocabulary
     // vocabulary) plus the two identity names. Listed explicitly so an atom's schema reads as the
     // complete contract instead of "whatever the engine adds on the side" — the shape the six
     // pre-existing core kinds use as well.
-    private static readonly string[] EngineWideAttributes = { "Id", "Kind", "Tab", "Hidden" };
+    // Visible/VisibleKey are engine-wide like Hidden: the engine reads them for every kind, so an
+    // atom that refused them would reject a page its container accepted.
+    private static readonly string[] EngineWideAttributes = { "Id", "Kind", "Tab", "Hidden", "Visible", "VisibleKey" };
 
     /// <summary>
     /// The allowed-attribute array a core atom registers: the engine-wide names, the role names the kind

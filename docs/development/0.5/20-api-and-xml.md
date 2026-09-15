@@ -29,6 +29,15 @@
 - **每 kind 自带属性 schema**：未登记的属性在创建期被拒绝（`UiContractException`），不是运行期静默忽略。
   弃用属性走"接受并重定向一个 minor"的通道。
 - **绑定键是名字**，没有一个消费者能"顺手读到另一个窗口的选中态"：命令携带自己的上下文键。
+- **条件显隐（P2 落地）**：`Visible="true|false"` 是静态写法，引擎级（容器与 kind 都接受，默认 true）；
+  `VisibleKey="bindingKey"` 是动态写法，按 `IUiBindings.TryGetBool` 解析 bool 值绑定——键缺失或类型不符
+  **不致命**，元素保持可见，并记一条按 (元素, kind, 属性, 键) 去重的 appearance 回退（fail-soft 不静默）。
+  既有 `Hidden="true|1"` 是静态旧写法，语义不变、继续可用，新页面用 `Visible`/`VisibleKey`。
+- **失效分类由绑定声明（P2 落地）**：`BindValue`/`BindReadOnly`/`BindOptions`/`BindAction` 的
+  `invalidates` 参数取 `UiInvalidation` 的 `Paint`/`Measure`/`Structure`；`NotifyChanged(key)` 在帧边界
+  合并提交：`Paint` 只影响下一次绘制、不触发重排测量，`Measure`/`Structure` 才让声明该键的元素重测。
+  动态可执行性用 `BindCommand(key, action, canExecute)` + `IUiBindings.CanExecute`；禁用元素不执行、
+  不捕获 hot control/pointer，禁用外观走既有的 writability 漏斗（`writable: false` → `UiStatusTone.Disabled`）。
 
 ## 2. 业务作者（C#）会看到什么
 
@@ -63,6 +72,7 @@ bindings.BindCommand("apply", () => model.Apply(), canExecute: () => model.CanAp
 | P4 | `UiDocumentService` | 有界、可释放；依赖追踪；候选校验；原子批次提交；LKG 回退；开发模式自动监听可配置 |
 | P4 | `UiReloadReport` | 每个文档/窗口的接受或拒绝及原因（文件、元素、原因），失败按版本去重 |
 | P5 | `UiDiagnosticHub`、`UiDiagnosticEvent` | 每 host/session 订阅与有界事件；reload/fit/recovery + 计时 |
+| P2（落地补充） | `IUiBindings.GetRevision(key)` / `NotifyChanged(key...)` / `GetInvalidation(key)` / `CanExecute(actionId)` / `TryGetBool(key, out bool)` | 每键修订与通知；失效分类读回；命令可执行性；可见性查询要能把"键不可解析"当**答案**而不是异常（`TryGet<T>` 对类型不符是抛出的） |
 
 ## 4. 热重载合同（P4 落地时必须逐条对照）
 

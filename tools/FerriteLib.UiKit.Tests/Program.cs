@@ -94,6 +94,15 @@ internal static class Program
         Console.WriteLine("Kernel writability (read-only bindings drive the disabled treatment)...");
         failures += KernelWritabilityTests.RunAll();
 
+        Console.WriteLine("Kernel invalidation (per-key announce, class, batch commit)...");
+        failures += KernelInvalidationTests.RunAll();
+
+        Console.WriteLine("Kernel command state (canExecute, one disabled interaction)...");
+        failures += KernelCommandStateTests.RunAll();
+
+        Console.WriteLine("Kernel visibility (Visible/VisibleKey, identity, structural prune)...");
+        failures += KernelVisibilityTests.RunAll();
+
         Console.WriteLine("Kernel role attributes (Tone/Emphasis, fallback recording, density)...");
         failures += KernelRoleAttributeTests.RunAll();
 
