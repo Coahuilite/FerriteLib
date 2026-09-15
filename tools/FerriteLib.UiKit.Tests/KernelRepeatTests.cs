@@ -66,6 +66,7 @@ internal static class KernelRepeatTests
         Run("A mistyped item-local value draws the kind's default and reports once", VerifyMistypedItemLocalValuesAreFailSoft);
         Run("An item-local value that arrives a frame later is read without a recovery trip", VerifyLateItemLocalValueIsReadLater);
         Run("An existing atom keeps its own throwing-read contract", VerifyAtomsKeepTheirOwnContract);
+        Run("An absent item-local key on an atom draws its default and reports once", VerifyAbsentAtomKeyIsLoud);
         return failures;
     }
 
@@ -436,6 +437,28 @@ internal static class KernelRepeatTests
         Check(!Done["a"], "the value the page bound one frame later is read and written like any other");
     }
 
+    private static void VerifyAbsentAtomKeyIsLoud()
+    {
+        UiFitAudit.Reset();
+        using UiHost host = NewHost(new[] { "a" }, ItemBindingMode.CaptionAbsent);
+        Draw(host);
+
+        UiNode caption = Require(host, "caption#a");
+        Check(!host.Session.IsTripped(caption),
+            "an absent bound key is not an error for the atom either: it draws its documented default");
+        Check(caption.Rect.HasValue && caption.Rect.Value.height > 0f,
+            "and the band it reserves while empty still exists, so the empty leaf cannot collapse its siblings");
+
+        int reports = UiFitAudit.StyleFallbackCount;
+        Check(reports == 1, "while the emptiness is recorded once, like every other fail-soft answer: " + reports);
+        Check(
+            UiFitAudit.LastStyleFallbackDiagnostic is string diagnostic && diagnostic.Contains("items.a.caption"),
+            "and the report names the key it could not resolve: " + UiFitAudit.LastStyleFallbackDiagnostic);
+        Draw(host);
+        Draw(host);
+        Check(UiFitAudit.StyleFallbackCount == reports, "repeated frames add no more: the report is deduplicated");
+    }
+
     private static void VerifyAtomsKeepTheirOwnContract()
     {
         UiFitAudit.Reset();
@@ -506,6 +529,9 @@ internal static class KernelRepeatTests
 
         /// <summary>The existing atom's key is bound to another type, so its own read contract is observable.</summary>
         CaptionMistyped,
+
+        /// <summary>The existing atom's key is not bound at all, so its documented default is observable.</summary>
+        CaptionAbsent,
     }
 
     private static UiBindings MakeBindings(IReadOnlyList<string> keys, ItemBindingMode mode = ItemBindingMode.Correct)
@@ -557,7 +583,7 @@ internal static class KernelRepeatTests
         {
             bindings.BindReadOnly<bool>("items." + captured + ".caption", () => true);
         }
-        else
+        else if (mode != ItemBindingMode.CaptionAbsent)
         {
             bindings.BindReadOnly<string>("items." + captured + ".caption", () => Caption[captured]);
         }
@@ -566,6 +592,7 @@ internal static class KernelRepeatTests
         {
             case ItemBindingMode.Correct:
             case ItemBindingMode.CaptionMistyped:
+            case ItemBindingMode.CaptionAbsent:
                 BindItemValues(bindings, captured);
                 break;
             case ItemBindingMode.NewKindsMistyped:
