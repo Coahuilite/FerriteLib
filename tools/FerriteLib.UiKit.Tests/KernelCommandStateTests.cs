@@ -34,6 +34,7 @@ internal static class KernelCommandStateTests
 {
     private const string Scope = "command-state-lane";
     private const string ProbeKind = "test/action-probe";
+    private const string GateProbeKind = "test/gate-probe";
 
     private static int failures;
     private static float actionPayload;
@@ -46,6 +47,7 @@ internal static class KernelCommandStateTests
         Run("The disabled treatment is the one writability funnel", VerifyDisabledPlane);
         Run("A disabled element neither executes nor captures the pointer", VerifyDisabledElementTakesNoInput);
         Run("Elements with no command, and action-bound elements, are never disabled", VerifyNoCommandIsNeverDisabled);
+        Run("The disabled guard reaches the slider and the number field", VerifyDisabledSliderAndFieldTakeNoInput);
         return failures;
     }
 
@@ -223,6 +225,98 @@ internal static class KernelCommandStateTests
         Check(nobody == null, "an identity the definition does not declare has no node at all");
     }
 
+    /// <summary>
+    /// The round's "unified disabled interaction" had one hole: the funnel's context-carrying entry points
+    /// refused the pointer for a disabled element, but the slider and the number field - handed a session
+    /// and a state key rather than a context - did not. The guard resolves the node through the Id bridge,
+    /// so a command-bound slider or field refuses input exactly as a button does, while a key that names no
+    /// arranged element keeps the documented arbitrary-state-key behaviour unchanged.
+    /// </summary>
+    private static void VerifyDisabledSliderAndFieldTakeNoInput()
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+        UiWidgetRegistry.Register(
+            Scope, GateProbeKind, () => new GateProbeWidget(), new[] { "Id", "Kind", "ActionBind", "Height" });
+
+        bool enabled = false;
+        var bindings = new UiBindings();
+        bindings.BindCommand("gate", () => { }, () => enabled);
+
+        using UiHost host = Host(
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Column Id=\"column\"><Widget Id=\"track\" Kind=\"" + GateProbeKind
+            + "\" ActionBind=\"gate\" Height=\"24\" /></Column>"
+            + "</UiPage>",
+            bindings);
+
+        var viewport = new Rect(0f, 0f, 240f, 120f);
+        host.DrawFrame(viewport);
+
+        UiNode track = host.Session.GetNodeByElementId("track")
+            ?? throw new Exception("the command-bound element was not arranged");
+        Check(track.IsDisabled, "the command-bound element is published disabled while its predicate answers false");
+
+        var rect = new Rect(10f, 10f, 120f, 20f);
+        int sliderCalls = 0;
+        UiNative.SliderOverride = (r, v, min, max) =>
+        {
+            sliderCalls++;
+            return 0.9f;
+        };
+
+        float returned = UiNative.Slider(rect, "track", host.Session, 0.1f, 0f, 1f, out bool changed);
+        Check(
+            sliderCalls == 0,
+            "a disabled slider never reaches the native control, so no drag starts and nothing takes the pointer");
+        Check(!changed && Near(returned, 0.1f), "and it reports the value it was handed, unchanged");
+
+        int fieldCalls = 0;
+        UiNative.TextFieldOverride = (r, text) =>
+        {
+            fieldCalls++;
+            return "999";
+        };
+
+        string shown = UiNative.NumberField(rect, "track", host.Session, 0.25f, 0f, 1f, "0.##", out bool committed);
+        Check(fieldCalls == 0, "a disabled field never reaches the native control either");
+        Check(!committed, "and it commits nothing");
+        Check(!host.Session.GetOrCreateValueState("track").Focused, "and it never takes focus");
+        Check(shown.Length > 0, "while still handing the caller the model's value to draw");
+
+        // Contrast: with the predicate answering true the same calls reach the native seams, so the checks
+        // above are the guard's answer rather than a lane that never exercises them.
+        enabled = true;
+        host.DrawFrame(viewport);
+        Check(!track.IsDisabled, "the same element stops being disabled once its predicate allows the command");
+
+        sliderCalls = 0;
+        returned = UiNative.Slider(rect, "track", host.Session, 0.1f, 0f, 1f, out changed);
+        Check(
+            sliderCalls == 1 && changed && Near(returned, 0.9f),
+            "an enabled slider reaches the native control and reports the drag");
+
+        fieldCalls = 0;
+        UiNative.TextFieldOverride = (r, text) =>
+        {
+            fieldCalls++;
+            return "0.75";
+        };
+        UiNative.NumberField(rect, "track", host.Session, 0.25f, 0f, 1f, "0.##", out committed);
+        Check(fieldCalls == 1 && committed, "and an enabled field takes the edit and commits it");
+
+        // The documented arbitrary-state-key usage of those parameters: a key that names no arranged element
+        // has no node to consult, and must behave exactly as it did before the guard existed.
+        enabled = false;
+        host.DrawFrame(viewport);
+        sliderCalls = 0;
+        UiNative.Slider(rect, "not-an-element", host.Session, 0.1f, 0f, 1f, out changed);
+        Check(sliderCalls == 1, "a key that names no arranged element keeps the pre-guard behaviour");
+
+        UiNative.SliderOverride = null;
+        UiNative.TextFieldOverride = null;
+    }
+
     // --- helpers -------------------------------------------------------------------------------
 
     private static UiHost Host(string xml, UiBindings bindings)
@@ -344,6 +438,40 @@ internal static class KernelCommandStateTests
         {
             failures++;
             Console.Error.WriteLine("  FAIL: " + name + " threw " + ex.GetType().Name + ": " + ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// A kind whose <c>ActionBind</c> is a command: the shape whose disabled state every interactive
+    /// primitive in the funnel has to refuse. Its own Draw paints nothing on purpose - the lane drives the
+    /// slider and the field through their public entry points, which is where the guard lives.
+    /// </summary>
+    private sealed class GateProbeWidget : IUiWidget
+    {
+        private UiElementSpec spec = UiElementSpec.Empty;
+
+        string IUiWidget.Kind => GateProbeKind;
+
+        public void Configure(UiElementSpec spec)
+        {
+            this.spec = spec;
+        }
+
+        public void Validate(IUiBindings bindings, string elementPath)
+        {
+            if (spec.TryGetAttribute("ActionBind", out string declared) && declared.Trim().Length > 0)
+            {
+                bindings.ValidateCommand(declared.Trim(), elementPath);
+            }
+        }
+
+        public float Measure(UiWidgetContext ctx)
+        {
+            return 20f;
+        }
+
+        public void Draw(Rect rect, UiWidgetContext ctx)
+        {
         }
     }
 

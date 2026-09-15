@@ -127,6 +127,18 @@ public static class UiNative
     }
 
     /// <summary>
+    /// True when the element an interactive primitive was handed is disabled. The slider and the number
+    /// field take a session and a state key rather than a context, so the node is resolved through the one
+    /// bridge a page owns - the declared Id - and a key that names no arranged element answers false: that
+    /// is the documented arbitrary-state-key usage of those parameters, and it must behave exactly as it
+    /// did before this guard existed.
+    /// </summary>
+    private static bool IsElementDisabled(UiSession session, string elementId)
+    {
+        return session.GetNodeByElementId(elementId) is UiNode node && IsInputDisabled(node);
+    }
+
+    /// <summary>
     /// Draws/tests a dropdown trigger using the session-owned popup model. A click on the trigger
     /// opens the popup for <paramref name="elementId"/> anchored at <paramref name="rect"/>, or
     /// closes it when the same element already owns the open popup. The anchor is stored exactly
@@ -216,6 +228,22 @@ public static class UiNative
     {
         if (session == null) throw new ArgumentNullException(nameof(session));
         UiValueState state = session.GetOrCreateValueState(elementId);
+        if (IsElementDisabled(session, elementId))
+        {
+            // Disabled: the native control is never reached, so no drag can start and nothing can take the
+            // hot control away from what sits under the pointer - the funnel owns that rule for every kind,
+            // exactly as Button does. The state keeps the value the caller handed in, so re-enabling resumes
+            // on the model rather than on a drag that never happened.
+            state.FloatValue = ClampValue(value, min, max);
+            if (!state.Focused)
+            {
+                state.EditText = FormatValue(state.FloatValue, "0.##");
+            }
+
+            changed = false;
+            return state.FloatValue;
+        }
+
         float newValue = NativeHorizontalSlider(rect, value, min, max);
         newValue = ClampValue(newValue, min, max);
         changed = Math.Abs(newValue - value) > 0.0001f;
@@ -228,6 +256,13 @@ public static class UiNative
         return newValue;
     }
 
+    /// <summary>
+    /// The raw text field, and the one interactive primitive here that carries no element identity: there is
+    /// no session and no key to resolve, so it cannot consult the element's disabled state. A caller that
+    /// wants the unified disabled interaction for a text field reaches it through
+    /// <see cref="NumberField"/>, which carries the session and the state key. Recorded as a named gap
+    /// rather than left implicit.
+    /// </summary>
     public static string TextField(Rect rect, string text)
     {
         return NativeTextField(rect, text);
@@ -245,6 +280,17 @@ public static class UiNative
     {
         if (session == null) throw new ArgumentNullException(nameof(session));
         UiValueState state = session.GetOrCreateValueState(elementId);
+        if (IsElementDisabled(session, elementId))
+        {
+            // Disabled: the field never takes focus, never parses and never commits, and the native control
+            // is never reached - so no click is consumed and no text is edited. The buffer is reset to the
+            // model's value so a re-enabled field resumes there instead of on a dead edit.
+            state.Focused = false;
+            state.FloatValue = ClampValue(value, min, max);
+            state.EditText = FormatValue(state.FloatValue, format);
+            committed = false;
+            return state.EditText;
+        }
 
         if (!state.Focused)
         {
