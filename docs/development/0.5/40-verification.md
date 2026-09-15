@@ -204,3 +204,28 @@ P4c 把**页面级**默认值（`DefaultScheme`/`DefaultDensity` 指向本文件
 
 **交付结论（本节覆盖 §1 的乐观表述）**：R1–R7 已全部修复并合入；外部探针在本机复跑后七项输出全部转为已修复形态。**独立复验（verifier）完成前**，本轮仍按「库侧表面已落地、待独立复验」记录，不写成已交付；
 消费者可以继续按 `30-consumer-handoff.md` 接入联调，但不应把当前 tip 当作验收基线。
+### 7.1 修复的自动化证据（每个缺陷都要有仓内 lane，探针不能是唯一护栏）
+
+| 编号 | 提交 | 仓内 lane | 突变 | 外部探针复跑 |
+| --- | --- | --- | --- | --- |
+| R1 | `feat/0.5-documents` | `VerifyRolledBackBatchKeepsInteractionState`（旧文档 + 草稿 + 命名槽 + 滚动位置） | 3 FAIL | `draft='uncommitted-draft'` |
+| R2 | 同上 | `VerifyTransientlyMissingFileKeepsLastKnownGood` | 5 FAIL | `accepted=False after=external-valid` |
+| R5 | 同上 | `VerifyFirstStyleAttachValidatesLikeReload` | 2 FAIL | `attached=True reports=1` |
+| R6 | 同上 | `VerifyRebindingReleasesTheOldService` | 4 FAIL | `firstDeps=0 secondDeps=0` |
+| R7 | 同上 | 单次读取管线 lane + 植入双读对照 | 1 FAIL | （探针无此用例） |
+| R3 | `feat/0.5-windowing` | `VerifyClosingAWindowHandsOverTheActiveTarget`（四种形状 14 断言） | 3 FAIL | `active=a remaining=1` |
+| R3 附带 | 同上 | `VerifyPointerSpaceIsConsistentAcrossOffsetWindows` | 4 FAIL | ——（探针不覆盖） |
+| R4 | `feat/0.5-diagnostics` | 双尺交错 A/B lane + 旧通道尺隔离 lane | 5 FAIL | `A after B subscription=0` |
+| 契约 | `feat/0.5-collections` | item-local 缺键/错类型/迟到三 lane + wrapped atom 缺键 lane | 4 FAIL | —— |
+| stub | `feat/0.5-windowing` | double 五个默认值字面量 pin + option lane 按游戏静止值断言 | 3 FAIL | —— |
+
+### 7.2 review 附带风险与后续项的处置
+
+- **指针坐标空间混用**：已修（`ResolvePointerDown` 统一到窗口空间，`NotifyPointerDown` 只收一种空间），并有偏移窗口 lane。
+  仍属实机的部分：重叠窗口按目录自持的 activationOrder 解析，而非原版窗口栈实际顺序；`windowRect` 取的是本 pass 自己的值而非实时查询。**A3 项**。
+- **两个 catalog 同时工作**：仍无组合 lane，登记为**待补**。
+- **诊断覆盖缺口**（构造期样式丢弃 / 首帧 chrome / 终态 notice）：已在 `30-consumer-handoff.md` §4 显式声明缺失范围。
+- **窗口 double 默认值**：已按游戏源码对齐并 pin。
+- **R7 的并发替换竞态**：没有 harness 钩子，证据是结构护栏 + 源码装配 lane，**不是复现的竞态**；独立复验需判定该 lane 是否只在满足该实现时才绿。
+- **R3 附带发现（window lane 的 NRE 硬化）**：把 `ApplyOptions` 的默认方向写坏时，7 条命名 FAIL 之后还有一条 lane 因解引用 `TryGet` 结果而抛 `NullReferenceException`（与 task-10 同一类）。产品行为不受影响，但该 lane 宜按 task-10 的做法改为命名失败。登记为**待补**。
+
