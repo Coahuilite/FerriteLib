@@ -266,7 +266,14 @@ consequence is paid in the open rather than discovered by a stranger.
   for. It takes a key, the manifest, typed bindings, a theme, a translation seam and every visible word
   (title, close label and the notice text for each `UiWindowNotice`), and it participates in a catalog by
   key; options come from the registration rather than the constructor so a kind has one policy in one
-  place. It inherits the shell's deferred failure-notice contract unchanged.
+  place. It inherits the shell's deferred failure-notice contract unchanged. Its one addition to the base
+  shell is `PageHost`: the `UiHost` this page owns, or null before the first draw pass and after a failure
+  disposed it. The inherited host is protected and this class is sealed, so without that accessor a consumer
+  holding the flagship XML-only shape could not reach its own page's engine - and therefore could not opt
+  the page into per-host diagnostics (`UiHost.Diagnostics`) or attach a reload report subscription, which
+  left two ordinary XML pages sharing the one process-wide channel. The accessor is read-only and
+  side-effect free: it never creates a host and never subscribes anything, so diagnostics stay opt-in and
+  a page nobody subscribed to stays as cheap and quiet as before.
 - `UiFocusPolicy` — when a window becomes the one active target: `FollowClicks` (default: opening,
   reopening and a pointer-down inside a window move it, and a click outside every instance clears it),
   `OpenOnly`, and `Manual`. It states the library's own rule only: it makes no claim about z-order,
