@@ -57,6 +57,9 @@ FerriteLibVersion.Require(new Version(0, 5, 0), new Version(0, 6, 0), "your.pack
 
 - **重载会重置文档可设置的主题令牌。** 热重载提交前会把注入 `UiTheme` 的、可由样式文档设置的令牌恢复为 host 构造时的值，否则被删除的覆盖会继续生效。**后果**：若消费者在 host 构造之后重新调过这些令牌之一，下一次重载提交会丢掉这次调整。要保留就请在重载后重新应用，或把该调整放进样式文档。此行为由 P4 的独立验证实测（`docs/development/0.5/verification/p4-adversarial.md`），尚未决定是否在 0.5 内修正。
 
+- **同型多开需要显式选择。** `UiWindowOptions.AllowMultipleInstances = false` 走的是原版规则：`WindowStack.Add` 按**精确 C# 类型**（配合既有窗口的 `onlyOneOfTypeAllowed`）驱逐同型窗口。因此两个不同 window-kind 若共用同一个 `Window` 派生类，会互相关闭；要同型共存必须显式允许，或者让每个 kind 有自己的壳类型。`UiPageWindow` 作为通用壳时请特别注意这一点（它建议每个 kind 用不同的实例 key，而不是不同的 C# 类型）。
+- **`UiWindowOptions.NormalSize` 是暂定语义。** 它是"在 `PreOpen` 时重新施加的静止尺寸"，目前**没有消费者证据**，是本轮最弱的一条 P1 声明；把它当成可用的默认值之前请先在自己的窗口上验证。
+
 ## 5. 交接节奏
 
 | 阶段 | 交付物 | 消费者可开始做什么 |
