@@ -273,4 +273,20 @@ P4c 把**页面级**默认值（`DefaultScheme`/`DefaultDensity` 指向本文件
 且 `tools/` 下**没有任何行为 lane** 覆盖 R7（没有超限文件用例、没有中途改文件的用例）。
 准确记法：**「历史上那种 `ParseFile` 双读形态已被守住；单次读取/TOCTOU 语义没有被行为固定」**。已派发 task-21 补行为 lane 并收紧该扫描。
 
-**仍未覆盖的唯一一块**：七个新缺陷探针（R1 seal/dispose、R2 文件回归、R3 关闭 survivor、R4 未订阅旧通道尺、R5 无样式来源、R6 同服务重绑、R7 大小上界 + BOM）。
+**追加第三部分（verifier，`fbd86cf`）：七个新缺陷探针全部跑完，并发现一个 must-fix。**
+
+| 探针 | 结果 | 实测 |
+| --- | --- | --- |
+| P1 R1 stage 与 seal 之间释放 host | 通过 | `disposedMidBatch=True outcome=no-throw accepted=True hostB.added=True` |
+| P2 R2 文件回归 | 通过 | `back.accepted=True host.hasV2=True` |
+| **P3 R3 同帧两次关闭 / survivor 自身关闭** | **发现缺陷（must-fix）** | `activeAfterSecondClose=null remainingEnd=0`；`activeAfterTwoCloses=null remaining=2` —— 违反 R3 lane 自己写下的不变量 |
+| P4 R4 未订阅 host 的旧通道尺 | 通过 | `legacyUnsubscribedFirstDraw=0` |
+| P5 R5 首次 attach 被拒后无样式来源 | 通过 | `keptOwnDocument=True recovered.accepted=True` |
+| P6 R6 同一服务重复 attach | 通过 | `deps=1` |
+| P7 R7 大小上界 + BOM | 通过 | `atBoundLength=1048576 parsedAtBound=True`；`overLength=1048577 over.rejected=True` |
+
+**R3 的第二形状（缺陷本身）**：`NotifyPreClose` 只用一个槽记录「关闭者原本是否活动」，同帧第二次 pre-close 会覆盖它，于是 `PostClose` 走假分支，在仍有窗口打开时把活动目标置空；
+`SelectSurvivor` 还可能把目标交给一个**已 pre-close 但仍留在 activationOrder 里**的窗口。已派发 `windowing` 修（task-22，升级为 must-fix），并要求覆盖两种形状与「同帧两次关闭」。
+原 R3 lane 只覆盖单次关闭，所以它绿过——这正是「一个 lane 通过不代表那条不变量成立」的又一例。
+
+**R2 的观察（非缺陷）**：恢复成功后第二次缺失仍被拒，但因 `LastFailedVersion` 只按 `missing:`+path 去重，它不会进入报告环；已交 `documents` 裁定并 pin。
