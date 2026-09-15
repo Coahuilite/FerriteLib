@@ -229,3 +229,11 @@ P4c 把**页面级**默认值（`DefaultScheme`/`DefaultDensity` 指向本文件
 - **R7 的并发替换竞态**：没有 harness 钩子，证据是结构护栏 + 源码装配 lane，**不是复现的竞态**；独立复验需判定该 lane 是否只在满足该实现时才绿。
 - **R3 附带发现（window lane 的 NRE 硬化）**：把 `ApplyOptions` 的默认方向写坏时，7 条命名 FAIL 之后还有一条 lane 因解引用 `TryGet` 结果而抛 `NullReferenceException`（与 task-10 同一类）。产品行为不受影响，但该 lane 宜按 task-10 的做法改为命名失败。登记为**待补**。
 
+### 7.3 修复后的独立复验（verifier，clean extraction @ `0d1f38b`）
+
+- `pwsh -NoProfile -File scripts/verify-local.ps1` -> exit 0，`[setup]` + 9 门禁 OK。
+- harness -> exit 0，**ok=1515 fail=0 ALL PASS**（交付候选 `0d1f38b` 前为 1426；R 修复 + task-18/19/20 增加 89 条）。
+- 外部探针七行全部转为已修复形态（原始输出见 `verification/post-fix-verification.md`）。
+- 不变量：tier 74 = 74（未分级 0、悬空 0）；lane 注册 **32 = 32**（无未注册、无幽灵）；三轴 0.5.0；无冲突标记；隐私与中立性干净。
+- **该轮未关闭的部分**：R1–R7 的「植入旧缺陷、确认仓内 lane 变红」逐条扫查、七个新缺陷探针、以及 review 附带风险的登记核对，属于 verifier 报告的追加部分；在其落库前，本文件只把「门禁 + 探针 + 不变量」记为已复验。
+
