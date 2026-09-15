@@ -2,6 +2,36 @@
 
 ## Current durable state
 
+- **The 0.6 round (2026-09-16, branch `0.6.x`, forked from the frozen `0.5.x` tip `354d90a`) adds the
+  MVVM/MVVM-adjacent surface and an independent demo mod.** Contract axis moved **0.5.0 → 0.6.0** as one
+  minor, because the rule at `FerriteLibVersion.Api` is unconditional for additions while the major is 0. The
+  competing reading ("0.5.0 never released, its window is still open", the precedent behind the 0.4.0 → 0.3.0
+  refile) was rejected in writing: the 0.5.0 dev package and its `[0.5.0,0.6.0)` handoff were delivered, so
+  the number has a goalpost a consumer may already have pinned. Status, packages and the frozen contract:
+  `docs/development/0.6/`. Nine new public types: `IUiMainThread`/`VerseFerriteMainThread`,
+  `UiNotifyAdapter`, `IUiTimeSource`/`VerseFerriteTimeSource`, `UiReloadPolicy`,
+  `UiReloadSchedulerState`, `UiWidgetDescriptor`, `UiWidgetCatalog`. `UiWindowHost` gained
+  `HostAttached`/`HostDetached`; `UiDocumentService` gained `Policy`/`TimeSource`/`SchedulerState`
+  and two optional constructor parameters.
+- **Two durable facts the round measured, worth carrying.** (1) **The host's `Source` string is the
+  widget-registry scope** — `UiHost` calls `UiWidgetRegistry.Resolve(source, spec.Kind)`, and a
+  `UiPageWindow`'s source is `Consumer + "/" + WindowKind`, so a consumer must register its kinds under the
+  exact page identity it opens or its own kinds resolve through the core fallback and then throw. It cost the
+  demo mod real debugging time; it is written into `docs/development/0.6/30-consumer-handoff.md` item 8.
+  (2) **`UiDocumentService.Signal` is now the debounced watcher channel and `Reload` the immediate manual
+  one** — same validation path, different timing, and the split is laned.
+- **Evidence boundary of the 0.6 round, stated so no later session over-reads it:** everything is
+  `已实现` + `已自动化验证` (harness lanes, an external probe against the packaged DLL, package inspection).
+  **Nothing is 已由真实消费者接入 and nothing is 已实机验证** — no in-game session was run and no consumer
+  repository compiled against 0.6.0. The independent verifier re-measured, at this tip, that the R7 guard still
+  does not cover a bare `ReadAllBytes` reached through `using static System.IO.File;`, and that the T1
+  lifecycle claim is pinned for create/failed-pass/reopen/reload/activation but not for a consumer that
+  re-subscribes on some future path.
+- **`ferritelib_uikit_demo` is a separate local repository beside this one** (`master`, no remote, never
+  pushed), a RimWorld 1.6 mod that enters from vanilla `ModSettings` and uses only public API. It is a usage
+  sample and a catalogue browser; per `AGENTS.md` it is **not** consumption evidence and does not lift the
+  API freeze or earn any kind.
+
 - Repository split out of the Universal Squeaker tree on 2026-09-03. FerriteLib is a prerequisite mod,
   `coahuilite.ferritelib`, display name FerriteLib. The three version axes are re-derived from the tree and
   never quoted from this file (`grep -n 'Api = new Version' Source/FerriteLib.UiKit/Kernel/FerriteLibVersion.cs`,

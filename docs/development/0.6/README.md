@@ -14,9 +14,13 @@ has been accepted in game; every entry states which evidence class it carries.
 | `10-work-packages.md` | T0–T5, owners, write scopes, dependencies, acceptance |
 | `20-api-and-xml.md` | Consumer-facing XML and C# usage of the new surface (written as packages land) |
 | `30-consumer-handoff.md` | Version range, migration, known limits for a real consumer |
-| `40-verification.md` | Commands, results, the in-game checklist, everything unfinished |
-| `50-dev-package.md` | Where the dev packages are, their hashes and the source revision behind them |
+| `40-verification.md` | Commands, results, everything unfinished, and who owns it |
+| `50-dev-package.md` | Where the dev package is, its hash and the source revision behind it |
 | `verification/` | Per-package adversarial records, including what a lane does **not** pin |
+
+Two records outside this directory also belong to the round: the demo mod lives in its own local repository
+beside this one (`ferritelib_uikit_demo`, `README.md` there), and the coordination surface is
+`modding_documents/team-mode/ferritelib-0.6-round-coordination-zh.md`.
 
 Evidence classes used throughout, and the rule they exist for (never collapse them):
 
