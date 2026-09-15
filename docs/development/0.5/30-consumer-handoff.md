@@ -84,6 +84,12 @@ FerriteLibVersion.Require(new Version(0, 5, 0), new Version(0, 6, 0), "your.pack
 - **`UiNative` 的禁用守卫覆盖哪些入口。** `Button(rect, ctx)`、`DropdownButton`、`Slider`、`NumberField`（后两者通过 `elementId` 解析节点身份；解析不到节点时保持原有行为，即「任意 state key」用法不受影响）。
   **`TextField(Rect, string)` 是例外**：它既没有 session 也没有 key，无法查询禁用态——这是已登记的空缺；需要禁用文本输入时请用带 session 的形式或自持 kind。
 
+- **诊断订阅覆盖不全（已知且已声明）**：以下几类反馈目前仍走进程级旧通道，不会出现在某个 host 的订阅里——
+  host **构造期**的样式丢弃记录、窗口**首帧**的 chrome 发现（首帧在 `CreateHost` 之前绘制）、以及终态 `PageUnavailable` notice
+  （此时 host 已被释放、订阅已随之释放）。消费者的反馈包若依赖「所有 UI 异常都归属到某个窗口」，请把这三类单独处理。
+- **多 host 各自使用不同测量尺时**，本轮的诊断订阅曾互相污染对方的溢出判断；该缺陷由外部 review 在 `0117c01` 上复现，修复见 `40-verification.md` §7（R4）。
+  同尺（多数消费者的常见情形）不会触发。
+
 ## 5. 交接节奏
 
 | 阶段 | 交付物 | 消费者可开始做什么 |

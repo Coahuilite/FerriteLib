@@ -177,3 +177,30 @@ P4c 把**页面级**默认值（`DefaultScheme`/`DefaultDensity` 指向本文件
 
 **剩余关闭项（本轮不做，登记而不隐藏）**：让页面级存在性规则在首次加载与重载上对称（要么首次加载同样拒绝，
 要么重载改为只丢页面级并采纳其余）。当前的不对称由本节显式记录，消费者侧同样照实说明（`30-consumer-handoff.md` §4）。
+## 7. 外部独立 review（2026-09-15，对 tip 0117c01）：结论 Request changes
+
+一份外部独立 review（主审 + 3 个分审，自带 net472 公共 API 探针）对 `0117c01` 判 **Request changes**：
+「库侧尚不应按『全部完成、只剩外部验收』交付」。**Lead 在本机重新运行了该探针，逐行复现了它的全部输出**
+（`dist/review-0117c01/`，gitignored，不入库）。这是本轮最重的一次更正：§1–§6 里「已合并、门禁绿」仍然成立，
+但**「仅剩外部验收」的结论不成立**。
+
+| 编号 | 严重度 | 缺陷 | 复现证据 | 处置 |
+| --- | --- | --- | --- | --- |
+| R1 | P1 | 批次失败回滚只恢复旧文档树，不恢复已被清掉的交互状态（用户未提交草稿丢失） | `ROLLBACK rejected=True restoredRoot=one draft=''`（原草稿 `uncommitted-draft`） | 修复中（task-15） |
+| R2 | P1 | 已有有效外部版本时，文件暂时缺失仍切回内嵌旧版 | `MISSING before=external-valid` → `accepted=True after=embedded` | 修复中（task-15） |
+| R3 | P2 | 关闭活动窗口后剩余窗口没有恢复为活动目标 | `WINDOW after close active=null remaining=1` | 修复中（task-16） |
+| R4 | P2 | 第二个 host 的诊断订阅覆盖第一个 host 的测量尺（溢出判断互相污染） | `METRICS A before=0` → 仅订阅 B 后 `A after=1` | 修复中（task-17） |
+| R5 | P2 | 首次样式应用绕过候选校验：同一文件首次加载与重载语义不同 | `initial attached=True reports=0` → 仅改空白后 `reload rejected=True` | 修复中（task-15）；此前 §4 第 10 条把它登记为待关闭，review 判定不能只当已知限制 |
+| R6 | P2 | 换绑文档服务后关闭 host，旧服务仍持有该 host（依赖泄漏） | `REATTACH after close firstDeps=1 secondDeps=0` | 修复中（task-15） |
+| R7 | P2 | 内容哈希与解析来自两次独立读取（TOCTOU：记录的版本与实际解析的树可能不同） | 控制流确认；未做并发保存压力复现 | 修复中（task-15） |
+
+**已接受的额外风险（不混入上述已复现结果）**：`ResolvePointerDown` 的窗口局部坐标与 `NotifyPointerDown` 的屏幕坐标空间混用，
+且重叠用目录自持的 activationOrder 而非原版层级（需实机核对）；两个 catalog 同时工作的组合未测；
+普通 content 的激活标志与原版键盘路由的关系未实机证明。
+
+**文档修订（已由 Lead 处理）**：`30-consumer-handoff.md` 的诊断条目自相矛盾（同时写「已实现」与「尚不可用」）已删除；
+「消费者先自建再谈晋升」已按 `AGENTS.md` 的现行范围改写为两条不同通道；诊断反馈覆盖缺口（构造期样式丢弃、首帧 chrome、终态 notice）已声明；
+`50-dev-package.md` 的「逐字节相同」已更正为「源码未变、程序集未做字节比较」。
+
+**交付结论（本节覆盖 §1 的乐观表述）**：在 R1–R7 全部修复并通过独立复验之前，本轮**不是可交付状态**；
+消费者可以继续按 `30-consumer-handoff.md` 接入联调，但不应把当前 tip 当作验收基线。
