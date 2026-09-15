@@ -1,0 +1,799 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using FerriteLib.UiKit.Kernel;
+using UnityEngine;
+
+namespace FerriteLib.UiKit.Tests;
+
+/// <summary>
+/// Document lane (0.5.x, package P4): a consumer-owned file is the page's second text origin, and editing
+/// it has to reach the open window that reads it without a restart and without a recompile.
+/// <para>
+/// What the lane asserts, in the order the contract states it: a document is dependency-tracked so an edit
+/// moves only the hosts that actually read it; a candidate is fully parsed and validated before anything is
+/// committed, and the current GUI pass never swaps a tree under itself; one change batch is all-or-nothing
+/// across every host it affects while a different document's failure stays its own batch; the first load
+/// falls back to the embedded text when the file does not exist and a later bad candidate keeps the last
+/// valid version; state survives a compatible reload and is cleaned up when identity or kind goes; a reload
+/// commits no draft, replays no command and resets no model; and a held hot control is released rather than
+/// left behind.
+/// </para>
+/// <para>
+/// Everything here is harness evidence over the stub game surface. It says nothing about a real window: no
+/// lane can show that an editor's save event arrives in a running game, or that the real IMGUI hot-control
+/// release path behaves like the stub's. That half is <c>docs/development/0.5/40-verification.md</c>'s.
+/// </para>
+/// </summary>
+internal static class KernelDocumentReloadTests
+{
+    private const string Scope = "documents-lane";
+
+    private static int failures;
+
+    public static int RunAll()
+    {
+        failures = 0;
+        string sandbox = Path.Combine(Path.GetTempPath(), "ferritelib-documents-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(sandbox);
+
+        try
+        {
+            Run("An edited file updates its own host and leaves an unrelated host untouched", () => VerifyScopedUpdate(sandbox));
+            Run("A malformed candidate is refused and the previous tree still draws (last-known-good)", () => VerifyLastKnownGood(sandbox));
+            Run("A structurally broken style file keeps the previous valid document", () => VerifyStyleLastKnownGood(sandbox));
+            Run("The first load falls back to the embedded text only when no file exists", () => VerifyEmbeddedFallback(sandbox));
+            Run("A batch whose affected host refuses keeps every host on the old version", () => VerifyBatchAtomicity(sandbox));
+            Run("Manual reload recovers after the file is fixed", () => VerifyManualReloadRecovery(sandbox));
+            Run("A compatible reload keeps node state; a removed or re-kindded element is cleaned up", () => VerifyStateCarryOver(sandbox));
+            Run("A reload writes no draft, replays no command and resets no model", () => VerifyNoSideEffects(sandbox));
+            Run("A reload releases a held hot control and keeps the draft", () => VerifyHotControlReleased(sandbox));
+            Run("Repeated notifications coalesce and an unchanged version is skipped", () => VerifyCoalescingAndDedup(sandbox));
+            Run("Failures are reported once per refusing version", () => VerifyFailureDedup(sandbox));
+            Run("Automatic watching is configurable and a real file write reaches the host", () => VerifyWatching(sandbox));
+            Run("The two file entry points are wired and the document path stays backend-free", VerifySourceWiring);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(sandbox, true);
+            }
+            catch (IOException)
+            {
+            }
+        }
+
+        return failures;
+    }
+
+    // --- acceptance (a): one edit, one affected host --------------------------------------------
+
+    private static void VerifyScopedUpdate(string sandbox)
+    {
+        string dir = NewDir(sandbox, "scoped");
+        string pathA = Path.Combine(dir, "a.xml");
+        string pathB = Path.Combine(dir, "b.xml");
+        string pageA = KeepPage("scope-a");
+        string pageB = KeepPage("scope-b");
+        File.WriteAllText(pathA, pageA);
+        File.WriteAllText(pathB, pageB);
+
+        using var service = new UiDocumentService(autoWatch: false);
+        Check(service.Add(new UiDocumentSource("a", UiDocumentKind.Layout, pathA), pageA), "the first layout source registers");
+        Check(service.Add(new UiDocumentSource("b", UiDocumentKind.Layout, pathB), pageB), "the second layout source registers");
+
+        using var hostA = NewHost("scope-a", UiLayoutManifest.Parse(pageA), new UiBindings());
+        using var hostB = NewHost("scope-b", UiLayoutManifest.Parse(pageB), new UiBindings());
+        Check(service.Attach(hostA, "a"), "host A attaches to document a");
+        Check(service.Attach(hostB, "b"), "host B attaches to document b");
+        Check(service.DependencyCount == 2, "the service tracks one dependency per host");
+
+        Draw(hostA);
+        Draw(hostB);
+        UiLayoutManifest aBefore = hostA.Manifest;
+        UiLayoutManifest bBefore = hostB.Manifest;
+
+        string pageA2 = Page("scope-a",
+            "<Column Id=\"root\">"
+            + "<Widget Id=\"keep\" Kind=\"chrome/banner\" Text=\"keep\"/>"
+            + "<Widget Id=\"added\" Kind=\"chrome/banner\" Text=\"added\"/>"
+            + "</Column>");
+        File.WriteAllText(pathA, pageA2);
+
+        Check(service.Signal("a"), "a watcher-shaped signal is accepted");
+        Check(service.Pump(), "the pump commits the changed document");
+        Check(!ReferenceEquals(hostA.Manifest, aBefore) && HasElement(hostA.Manifest, "added"),
+            "the affected host now carries the new tree");
+        Check(ReferenceEquals(hostB.Manifest, bBefore), "the unrelated host's manifest object was never touched");
+
+        UiLayoutSnapshot snapshotA = Arrange(hostA);
+        UiLayoutSnapshot snapshotB = Arrange(hostB);
+        Check(Visible(snapshotA, "root/added"), "the new element reaches the arranged snapshot");
+        Check(!Visible(snapshotB, "root/added"), "the unrelated host's snapshot never grows the element");
+    }
+
+    // --- acceptance (b): last-known-good ---------------------------------------------------------
+
+    private static void VerifyLastKnownGood(string sandbox)
+    {
+        string dir = NewDir(sandbox, "lkg");
+        string path = Path.Combine(dir, "page.xml");
+        string good = KeepPage("scope-lkg");
+        File.WriteAllText(path, good);
+
+        using var service = new UiDocumentService(autoWatch: false);
+        service.Add(new UiDocumentSource("l", UiDocumentKind.Layout, path), good);
+        using var host = NewHost("scope-lkg", UiLayoutManifest.Parse(good), new UiBindings());
+        service.Attach(host, "l");
+        Draw(host);
+        UiLayoutManifest before = host.Manifest;
+
+        File.WriteAllText(path, "<UiPage Schema=\"2\" Source=\"scope-lkg\"><Column Id=\"root\">");
+        service.Signal("l");
+        service.Pump();
+
+        UiReloadReport? refused = FindReport(service, "l");
+        Check(refused != null && refused.Rejected, "a malformed candidate is refused");
+        Check(refused != null && refused.Path.Length > 0 && refused.Reason.Length > 0,
+            "the refusal names the file and the reason");
+        Check(ReferenceEquals(host.Manifest, before), "the host keeps the last valid manifest object");
+
+        UiLayoutSnapshot snapshot = Arrange(host);
+        Check(Visible(snapshot, "root/keep"), "the previous tree still draws after the refusal");
+    }
+
+    private static void VerifyStyleLastKnownGood(string sandbox)
+    {
+        string dir = NewDir(sandbox, "lkg-style");
+        string path = Path.Combine(dir, "theme.xml");
+        const string good = "<Styles Schema=\"1\"><Scheme Name=\"ice\"><Color Token=\"Panel\" Value=\"#0000ff\"/></Scheme></Styles>";
+        File.WriteAllText(path, good);
+
+        using var service = new UiDocumentService(autoWatch: false);
+        service.Add(new UiDocumentSource("s", UiDocumentKind.Style, path), good);
+        using var host = NewHost("scope-style", UiLayoutManifest.Parse(KeepPage("scope-style")), new UiBindings());
+        service.Attach(host, null, "s");
+        Check(host.StyleResolver.Document.SchemeNames.Count == 1, "the valid style document reached the host");
+
+        File.WriteAllText(path, "<NotAStyleDocument/>");
+        service.Signal("s");
+        service.Pump();
+
+        UiReloadReport? refused = FindReport(service, "s");
+        Check(refused != null && refused.Rejected, "a structurally broken style file is refused as a version");
+        Check(host.StyleResolver.Document.SchemeNames.Count == 1
+            && ContainsName(host.StyleResolver.Document.SchemeNames, "ice"),
+            "the previous valid style document is still the one the host resolves against");
+    }
+
+    // --- last-known-good, first load -------------------------------------------------------------
+
+    private static void VerifyEmbeddedFallback(string sandbox)
+    {
+        string dir = NewDir(sandbox, "embedded");
+        string missing = Path.Combine(dir, "not-written-yet.xml");
+        string fallback = KeepPage("scope-embed");
+
+        using var service = new UiDocumentService(autoWatch: false);
+        Check(service.Add(new UiDocumentSource("e", UiDocumentKind.Layout, missing), fallback),
+            "a source with no file on disk still registers");
+        using var host = NewHost("scope-embed", UiLayoutManifest.Parse(fallback), new UiBindings());
+        service.Attach(host, "e");
+        Check(HasElement(host.Manifest, "keep"), "the embedded fallback is what the page starts on");
+        Check(service.LastReport == null, "a missing file with a valid fallback is not a failure");
+
+        // The external file is the preferred origin the moment it exists.
+        string external = Page("scope-embed",
+            "<Column Id=\"root\">"
+            + "<Widget Id=\"keep\" Kind=\"chrome/banner\" Text=\"keep\"/>"
+            + "<Widget Id=\"from-file\" Kind=\"chrome/banner\" Text=\"file\"/>"
+            + "</Column>");
+        File.WriteAllText(missing, external);
+        UiReloadReport? report = service.Reload("e");
+        Check(report != null && report.Accepted, "the external file is read once it exists");
+        Check(HasElement(host.Manifest, "from-file"), "and its tree wins over the embedded fallback");
+    }
+
+    // --- acceptance (c): batch atomicity ---------------------------------------------------------
+
+    private static void VerifyBatchAtomicity(string sandbox)
+    {
+        string dir = NewDir(sandbox, "batch");
+        string sharedPath = Path.Combine(dir, "shared.xml");
+        string otherPath = Path.Combine(dir, "other.xml");
+        string shared = KeepPage("scope-shared");
+        string other = KeepPage("scope-other");
+        File.WriteAllText(sharedPath, shared);
+        File.WriteAllText(otherPath, other);
+
+        using var service = new UiDocumentService(autoWatch: false);
+        service.Add(new UiDocumentSource("shared", UiDocumentKind.Layout, sharedPath), shared);
+        service.Add(new UiDocumentSource("other", UiDocumentKind.Layout, otherPath), other);
+
+        var bindingsA = new UiBindings();
+        bindingsA.BindCommand("apply", () => { });
+        var bindingsB = new UiBindings();
+
+        using var hostA = NewHost("host-a", UiLayoutManifest.Parse(shared), bindingsA);
+        using var hostB = NewHost("host-b", UiLayoutManifest.Parse(shared), bindingsB);
+        using var hostC = NewHost("host-c", UiLayoutManifest.Parse(other), new UiBindings());
+        service.Attach(hostA, "shared");
+        service.Attach(hostB, "shared");
+        service.Attach(hostC, "other");
+        Draw(hostA);
+        Draw(hostB);
+        Draw(hostC);
+
+        UiLayoutManifest aBefore = hostA.Manifest;
+        UiLayoutManifest bBefore = hostB.Manifest;
+        UiLayoutManifest cBefore = hostC.Manifest;
+
+        string sharedV2 = Page("scope-shared",
+            "<Column Id=\"root\">"
+            + "<Widget Id=\"keep\" Kind=\"chrome/banner\" Text=\"keep\"/>"
+            + "<Widget Id=\"go\" Kind=\"input/button\" Text=\"go\" ActionBind=\"apply\"/>"
+            + "</Column>");
+        string otherV2 = Page("scope-other",
+            "<Column Id=\"root\">"
+            + "<Widget Id=\"keep\" Kind=\"chrome/banner\" Text=\"keep\"/>"
+            + "<Widget Id=\"other-added\" Kind=\"chrome/banner\" Text=\"other\"/>"
+            + "</Column>");
+        File.WriteAllText(sharedPath, sharedV2);
+        File.WriteAllText(otherPath, otherV2);
+        service.Signal("shared");
+        service.Signal("other");
+        service.Pump();
+
+        UiReloadReport? sharedReport = FindReport(service, "shared");
+        Check(sharedReport != null && sharedReport.Rejected,
+            "the shared batch is refused because one of its hosts cannot draw the candidate");
+        Check(sharedReport != null && sharedReport.Element.Length > 0,
+            "the refusal names the element the contract stopped at");
+        Check(sharedReport != null && sharedReport.Reason.IndexOf("host-b", StringComparison.Ordinal) >= 0,
+            "and names the host that refused it");
+        Check(ReferenceEquals(hostA.Manifest, aBefore), "host A - which could have drawn it - keeps the old version");
+        Check(ReferenceEquals(hostB.Manifest, bBefore), "host B keeps the old version");
+        Check(!ReferenceEquals(hostC.Manifest, cBefore) && HasElement(hostC.Manifest, "other-added"),
+            "the unrelated document's batch commits in the same pump");
+
+        // The failing half was host B's missing command binding; binding it makes the candidate valid, and
+        // the manual path - the recovery entry point - is what commits it.
+        bindingsB.BindCommand("apply", () => { });
+        UiReloadReport? recovered = service.Reload("shared");
+        Check(recovered != null && recovered.Accepted && recovered.HostsCommitted == 2,
+            "manual reload commits the same batch to both hosts once every host accepts it");
+        Check(HasElement(hostA.Manifest, "go") && HasElement(hostB.Manifest, "go"),
+            "and both hosts are on the new tree together");
+    }
+
+    // --- acceptance (d): manual recovery ---------------------------------------------------------
+
+    private static void VerifyManualReloadRecovery(string sandbox)
+    {
+        string dir = NewDir(sandbox, "manual");
+        string path = Path.Combine(dir, "page.xml");
+        string good = KeepPage("scope-manual");
+        File.WriteAllText(path, good);
+
+        using var service = new UiDocumentService(autoWatch: false);
+        service.Add(new UiDocumentSource("m", UiDocumentKind.Layout, path), good);
+        using var host = NewHost("scope-manual", UiLayoutManifest.Parse(good), new UiBindings());
+        service.Attach(host, "m");
+        Draw(host);
+
+        File.WriteAllText(path, "<UiPage Schema=\"2\" Source=\"scope-manual\"><Column>");
+        service.Signal("m");
+        service.Pump();
+        Check(FindReport(service, "m")?.Rejected == true, "the broken file is refused");
+
+        string fixedPage = Page("scope-manual",
+            "<Column Id=\"root\">"
+            + "<Widget Id=\"keep\" Kind=\"chrome/banner\" Text=\"keep\"/>"
+            + "<Widget Id=\"recovered\" Kind=\"chrome/banner\" Text=\"recovered\"/>"
+            + "</Column>");
+        File.WriteAllText(path, fixedPage);
+
+        UiReloadReport? report = service.Reload("m");
+        Check(report != null && report.Accepted && report.HostsCommitted == 1,
+            "manual reload recovers after the file is fixed");
+        Check(HasElement(host.Manifest, "recovered"), "and the host follows the fixed file");
+        Check(Visible(Arrange(host), "root/recovered"), "the recovered tree draws");
+    }
+
+    // --- state across a reload -------------------------------------------------------------------
+
+    private static void VerifyStateCarryOver(string sandbox)
+    {
+        string dir = NewDir(sandbox, "state");
+        string path = Path.Combine(dir, "page.xml");
+        string v1 = ScrollPage("scope-state", "");
+        File.WriteAllText(path, v1);
+
+        using var service = new UiDocumentService(autoWatch: false);
+        service.Add(new UiDocumentSource("st", UiDocumentKind.Layout, path), v1);
+        using var host = NewHost("scope-state", UiLayoutManifest.Parse(v1), new UiBindings());
+        service.Attach(host, "st");
+        Draw(host);
+
+        UiNode? keep = host.Session.GetNodeByElementId("keep");
+        UiNode? scroll = host.Session.GetNodeByElementId("body");
+        Check(keep != null && scroll != null, "the arrange published the nodes state hangs on");
+
+        keep!.State.EditText = "draft";
+        keep.State.Cursor = 4;
+        keep.State.Focused = true;
+        keep.State.FloatValue = 3f;
+        keep.GetOrCreateState("extra").EditText = "slot";
+        host.Session.SetScrollPosition(scroll!, new Vector2(0f, 12f));
+
+        string v2 = ScrollPage("scope-state", "<Widget Id=\"added\" Kind=\"chrome/banner\" Text=\"added\"/>");
+        File.WriteAllText(path, v2);
+        service.Signal("st");
+        service.Pump();
+        Check(service.LastReport?.Accepted == true, "the compatible reload commits");
+        Draw(host);
+
+        UiNode? keepAfter = host.Session.GetNodeByElementId("keep");
+        Check(ReferenceEquals(keep, keepAfter), "a compatible reload keeps the same node object for a stable identity");
+        Check(keepAfter!.State.EditText == "draft" && keepAfter.State.Cursor == 4
+            && keepAfter.State.Focused && Math.Abs(keepAfter.State.FloatValue - 3f) < 0.001f,
+            "the draft, cursor, focus and value state all survive");
+        Check(keepAfter.GetOrCreateState("extra").EditText == "slot", "a named state slot survives too");
+        Vector2 survived = host.Session.GetScrollPosition(scroll!);
+        Check(Math.Abs(survived.x) < 0.001f && Math.Abs(survived.y - 12f) < 0.001f, "the scroll position survives");
+
+        // Kind changed under the same identity: the node is the same one, the control is not, so the state
+        // belongs to nobody and must be dropped rather than handed to the new kind.
+        keepAfter!.State.EditText = "draft-2";
+        keepAfter.State.Cursor = 2;
+        string v3 = ScrollPage("scope-state", "", keepElement: "<Widget Id=\"keep\" Kind=\"chrome/rule\"/>");
+        File.WriteAllText(path, v3);
+        service.Signal("st");
+        service.Pump();
+        Draw(host);
+        UiNode? rekinded = host.Session.GetNodeByElementId("keep");
+        Check(rekinded != null && ReferenceEquals(rekinded, keep),
+            "the kind change keeps the node the stable identity names");
+        Check(rekinded != null && rekinded.State.EditText.Length == 0 && rekinded.State.Cursor == 0,
+            "a kind change under a stable identity cleans the old element's state");
+        Check(rekinded != null && rekinded.GetOrCreateState("extra").EditText.Length == 0,
+            "and the slots the old kind used");
+
+        // Removed: identity is gone, so the old state must not linger for a future element to inherit.
+        rekinded!.State.EditText = "draft-3";
+        rekinded.State.Cursor = 3;
+        string v4 = ScrollPage("scope-state", "", keepElement: "");
+        File.WriteAllText(path, v4);
+        service.Signal("st");
+        service.Pump();
+        Draw(host);
+        Check(!HasElement(host.Manifest, "keep"), "the element is gone from the new tree");
+        Check(rekinded.State.EditText.Length == 0 && rekinded.State.Cursor == 0
+            && !rekinded.State.Focused && !rekinded.State.Dragging
+            && Math.Abs(rekinded.State.FloatValue) < 0.001f,
+            "a removed element's state is cleaned up");
+        Check(rekinded.GetOrCreateState("extra").EditText.Length == 0, "and its named slots with it");
+
+        // A removed scroll container's position is state as well, and it is cleaned up with the node.
+        string v5 = Page("scope-state",
+            "<Column Id=\"root\"><Widget Id=\"added\" Kind=\"chrome/banner\" Text=\"added\"/></Column>");
+        File.WriteAllText(path, v5);
+        service.Signal("st");
+        service.Pump();
+        Draw(host);
+        Vector2 droppedScroll = host.Session.GetScrollPosition(scroll!);
+        Check(Math.Abs(droppedScroll.x) < 0.001f && Math.Abs(droppedScroll.y) < 0.001f,
+            "a removed scroll container's position is cleaned up too");
+    }
+
+    private static void VerifyNoSideEffects(string sandbox)
+    {
+        string dir = NewDir(sandbox, "side-effects");
+        string path = Path.Combine(dir, "page.xml");
+        string v1 = ModelPage();
+        File.WriteAllText(path, v1);
+
+        var model = new Model();
+        var bindings = new UiBindings();
+        bindings.BindValue<string>("draft", () => model.Draft, value =>
+        {
+            model.Writes++;
+            throw new InvalidOperationException("a reload must not write the model");
+        });
+        bindings.BindCommand("apply", () =>
+        {
+            model.Commands++;
+            throw new InvalidOperationException("a reload must not replay a command");
+        });
+
+        using var service = new UiDocumentService(autoWatch: false);
+        service.Add(new UiDocumentSource("se", UiDocumentKind.Layout, path), v1);
+        using var host = NewHost("scope-side", UiLayoutManifest.Parse(v1), bindings);
+        service.Attach(host, "se");
+        Draw(host);
+
+        string v2 = ModelPage().Replace("Text=\"field\"", "Text=\"field-2\"");
+        File.WriteAllText(path, v2);
+        service.Signal("se");
+        service.Pump();
+        Check(service.LastReport?.Accepted == true, "the reload committed");
+        Check(model.Draft == "original", "a reload leaves the business model exactly as it was");
+        Check(model.Writes == 0, "a reload never calls a value setter");
+        Check(model.Commands == 0, "a reload never replays a command");
+        Draw(host);
+        Check(model.Commands == 0, "and neither does the frame that follows it");
+    }
+
+    private static void VerifyHotControlReleased(string sandbox)
+    {
+        string dir = NewDir(sandbox, "hot-control");
+        string path = Path.Combine(dir, "page.xml");
+        string v1 = KeepPage("scope-hot");
+        File.WriteAllText(path, v1);
+
+        using var service = new UiDocumentService(autoWatch: false);
+        service.Add(new UiDocumentSource("h", UiDocumentKind.Layout, path), v1);
+        using var host = NewHost("scope-hot", UiLayoutManifest.Parse(v1), new UiBindings());
+        service.Attach(host, "h");
+        Draw(host);
+
+        UiNode? keep = host.Session.GetNodeByElementId("keep");
+        host.Session.CaptureHotControl(4242);
+        keep!.State.EditText = "mid-edit";
+        Check(host.Session.OwnedHotControl == 4242, "the session holds the capture an active edit would hold");
+
+        string v2 = Page("scope-hot",
+            "<Column Id=\"root\">"
+            + "<Widget Id=\"keep\" Kind=\"chrome/banner\" Text=\"keep\"/>"
+            + "<Widget Id=\"added\" Kind=\"chrome/banner\" Text=\"added\"/>"
+            + "</Column>");
+        File.WriteAllText(path, v2);
+        service.Signal("h");
+        service.Pump();
+
+        Check(host.Session.OwnedHotControl == null, "a reload releases the hot control instead of leaving it held");
+        Check(keep.State.EditText == "mid-edit", "and keeps the compatible draft");
+    }
+
+    private static void VerifyCoalescingAndDedup(string sandbox)
+    {
+        string dir = NewDir(sandbox, "coalesce");
+        string path = Path.Combine(dir, "page.xml");
+        string v1 = KeepPage("scope-coalesce");
+        File.WriteAllText(path, v1);
+
+        using var service = new UiDocumentService(autoWatch: false);
+        service.Add(new UiDocumentSource("c", UiDocumentKind.Layout, path), v1);
+        using var host = NewHost("scope-coalesce", UiLayoutManifest.Parse(v1), new UiBindings());
+        service.Attach(host, "c");
+        Draw(host);
+
+        int reportsBefore = service.Reports.Count;
+        string v2 = Page("scope-coalesce",
+            "<Column Id=\"root\">"
+            + "<Widget Id=\"keep\" Kind=\"chrome/banner\" Text=\"keep\"/>"
+            + "<Widget Id=\"added\" Kind=\"chrome/banner\" Text=\"added\"/>"
+            + "</Column>");
+        File.WriteAllText(path, v2);
+        for (int i = 0; i < 5; i++)
+        {
+            service.Signal("c");
+        }
+
+        Check(service.HasPending, "pending work is visible before the pump");
+        Check(service.Pump(), "five notifications for one save commit once");
+        Check(service.Reports.Count == reportsBefore + 1, "and produce exactly one report");
+        Check(HasElement(host.Manifest, "added"), "the committed tree is the new one");
+
+        UiReloadReport? skipped = service.Reload("c");
+        Check(skipped != null && skipped.Skipped && !skipped.Accepted,
+            "an unchanged version is skipped rather than committed again");
+        Check(service.Reports.Count == reportsBefore + 1, "a skip is not a new report");
+        Check(!service.Signal("missing"), "a signal for an unknown document is refused");
+    }
+
+    private static void VerifyFailureDedup(string sandbox)
+    {
+        string dir = NewDir(sandbox, "dedup");
+        string path = Path.Combine(dir, "page.xml");
+        File.WriteAllText(path, KeepPage("scope-dedup"));
+
+        using var service = new UiDocumentService(autoWatch: false);
+        service.Add(new UiDocumentSource("d", UiDocumentKind.Layout, path), KeepPage("scope-dedup"));
+        using var host = NewHost("scope-dedup", UiLayoutManifest.Parse(KeepPage("scope-dedup")), new UiBindings());
+        service.Attach(host, "d");
+        Draw(host);
+
+        int before = service.Reports.Count;
+        File.WriteAllText(path, "<UiPage Schema=\"2\" Source=\"scope-dedup\">");
+        service.Signal("d");
+        service.Pump();
+        UiReloadReport? first = service.LastReport;
+        Check(first != null && first.Rejected && !first.Duplicate, "the first failure of a version is reported");
+        Check(service.Reports.Count == before + 1, "and recorded once");
+
+        UiReloadReport? again = service.Reload("d");
+        Check(again != null && again.Rejected && again.Duplicate, "the same refusing version is reported as a duplicate");
+        Check(service.Reports.Count == before + 1, "a duplicate adds no report");
+
+        File.WriteAllText(path, "<UiPage Schema=\"2\" Source=\"scope-dedup\"><Row>");
+        service.Signal("d");
+        service.Pump();
+        Check(service.Reports.Count == before + 2, "a different broken version is a new failure");
+
+        string fixedPage = Page("scope-dedup",
+            "<Column Id=\"root\">"
+            + "<Widget Id=\"keep\" Kind=\"chrome/banner\" Text=\"keep\"/>"
+            + "<Widget Id=\"fixed\" Kind=\"chrome/banner\" Text=\"fixed\"/>"
+            + "</Column>");
+        File.WriteAllText(path, fixedPage);
+        Check(service.Reload("d")?.Accepted == true, "and a fixed file is accepted again");
+    }
+
+    // --- watching --------------------------------------------------------------------------------
+
+    private static void VerifyWatching(string sandbox)
+    {
+#if FER_DEV
+        Check(UiDocumentService.DefaultAutoWatch, "a dev build turns automatic watching on by default");
+#else
+        Check(!UiDocumentService.DefaultAutoWatch, "a release build leaves automatic watching off by default");
+#endif
+
+        string dir = NewDir(sandbox, "watch");
+        string path = Path.Combine(dir, "page.xml");
+        string v1 = KeepPage("scope-watch");
+        File.WriteAllText(path, v1);
+
+        using (var toggled = new UiDocumentService(autoWatch: false))
+        {
+            Check(!toggled.AutoWatch, "the constructor override turns watching off");
+            toggled.Add(new UiDocumentSource("w", UiDocumentKind.Layout, path), v1);
+            Check(!toggled.IsWatching("w"), "watching off arms no watcher");
+            toggled.AutoWatch = true;
+            Check(toggled.IsWatching("w"), "turning AutoWatch on arms a watcher for an already-registered document");
+            toggled.AutoWatch = false;
+            Check(!toggled.IsWatching("w"), "turning AutoWatch off disarms it again");
+        }
+
+        using var byDefault = new UiDocumentService();
+        Check(byDefault.AutoWatch == UiDocumentService.DefaultAutoWatch, "an unconfigured service follows the build default");
+
+        string dir2 = NewDir(sandbox, "watch-live");
+        string live = Path.Combine(dir2, "live.xml");
+        File.WriteAllText(live, v1);
+
+        using var service = new UiDocumentService(autoWatch: true);
+        service.Add(new UiDocumentSource("live", UiDocumentKind.Layout, live), v1);
+        using var host = NewHost("scope-watch", UiLayoutManifest.Parse(v1), new UiBindings());
+        service.Attach(host, "live");
+        Draw(host);
+        Check(service.IsWatching("live"), "watching on arms the real watcher");
+
+        string v2 = Page("scope-watch",
+            "<Column Id=\"root\">"
+            + "<Widget Id=\"keep\" Kind=\"chrome/banner\" Text=\"keep\"/>"
+            + "<Widget Id=\"added\" Kind=\"chrome/banner\" Text=\"added\"/>"
+            + "</Column>");
+        File.WriteAllText(live, v2);
+
+        // The watcher is asynchronous by nature; the lane waits for the signal it produces instead of
+        // assuming a latency. A dropped signal is the case Reload covers, not this one.
+        bool committed = false;
+        for (int attempt = 0; attempt < 200 && !committed; attempt++)
+        {
+            committed = service.Pump();
+            if (!committed)
+            {
+                System.Threading.Thread.Sleep(25);
+            }
+        }
+
+        Check(committed, "a real file write reaches the service through the armed watcher");
+        Check(HasElement(host.Manifest, "added"), "and the host draws the edited tree");
+    }
+
+    // --- wiring ----------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The production half of "ParseFile has zero callers today": both file entry points must be reached
+    /// from the service, and the document path must stay backend-free so the watcher thread has nothing
+    /// game-facing to touch. The second check is the armed half - the predicate is shown to report an
+    /// unwired source, so a scan that stopped finding anything would fail here rather than pass quietly.
+    /// </summary>
+    private static void VerifySourceWiring()
+    {
+        string kernel = Path.Combine(RepoRoot(), "Source", "FerriteLib.UiKit", "Kernel");
+        string service = File.ReadAllText(Path.Combine(kernel, "UiDocumentService.cs"));
+
+        Check(HasFileEntryCalls(service),
+            "UiLayoutManifest.ParseFile and UiStyleDocument.ParseFile both have a production caller");
+        Check(service.IndexOf("using Verse", StringComparison.Ordinal) < 0
+            && service.IndexOf("UnityEngine", StringComparison.Ordinal) < 0,
+            "the document service carries no backend contact, so its watcher thread cannot touch the game");
+        Check(!HasFileEntryCalls("class PlantedBeacon { }"),
+            "planted control: a source with no file-load calls is reported as unwired");
+    }
+
+    private static bool HasFileEntryCalls(string text)
+    {
+        return text.IndexOf("UiLayoutManifest.ParseFile(", StringComparison.Ordinal) >= 0
+            && text.IndexOf("UiStyleDocument.ParseFile(", StringComparison.Ordinal) >= 0;
+    }
+
+    // --- fixture ---------------------------------------------------------------------------------
+
+    private sealed class Model
+    {
+        public string Draft = "original";
+
+        public int Writes;
+
+        public int Commands;
+    }
+
+    private static string NewDir(string sandbox, string name)
+    {
+        string dir = Path.Combine(sandbox, name);
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindings bindings)
+    {
+        return new UiHost(source, manifest, bindings, UiTheme.DarkGold, new FixedMetrics(), new FixedTranslation());
+    }
+
+    private static void Draw(UiHost host)
+    {
+        host.DrawFrame(new Rect(0f, 0f, 400f, 300f));
+    }
+
+    private static UiLayoutSnapshot Arrange(UiHost host)
+    {
+        return host.MeasureAndArrange(new Vector2(400f, 300f));
+    }
+
+    private static string Page(string source, string body)
+    {
+        return "<UiPage Schema=\"2\" Source=\"" + source + "\">" + body + "</UiPage>";
+    }
+
+    private static string KeepPage(string source)
+    {
+        return Page(source, "<Column Id=\"root\"><Widget Id=\"keep\" Kind=\"chrome/banner\" Text=\"keep\"/></Column>");
+    }
+
+    private static string ScrollPage(string source, string extra, string keepElement = "<Widget Id=\"keep\" Kind=\"chrome/banner\" Text=\"keep\"/>")
+    {
+        return Page(source,
+            "<Column Id=\"root\">"
+            + "<Scroll Id=\"body\" Height=\"40\">"
+            + keepElement
+            + "<Widget Id=\"tall\" Kind=\"chrome/banner\" Text=\"tall\" Height=\"300\"/>"
+            + "</Scroll>"
+            + extra
+            + "</Column>");
+    }
+
+    private static string ModelPage()
+    {
+        return Page("scope-side",
+            "<Column Id=\"root\">"
+            + "<Widget Id=\"field\" Kind=\"chrome/banner\" Text=\"field\" Bind=\"draft\"/>"
+            + "<Widget Id=\"apply\" Kind=\"input/button\" Text=\"apply\" ActionBind=\"apply\"/>"
+            + "</Column>");
+    }
+
+    private static bool HasElement(UiLayoutManifest manifest, string id)
+    {
+        for (int i = 0; i < manifest.Roots.Count; i++)
+        {
+            if (HasElement(manifest.Roots[i], id)) return true;
+        }
+
+        return false;
+    }
+
+    private static bool HasElement(UiElementSpec spec, string id)
+    {
+        if (string.Equals(spec.Id, id, StringComparison.Ordinal)) return true;
+        for (int i = 0; i < spec.Children.Count; i++)
+        {
+            if (HasElement(spec.Children[i], id)) return true;
+        }
+
+        return false;
+    }
+
+    private static bool ContainsName(IReadOnlyCollection<string> names, string name)
+    {
+        foreach (string candidate in names)
+        {
+            if (string.Equals(candidate, name, StringComparison.Ordinal)) return true;
+        }
+
+        return false;
+    }
+
+    private static bool Visible(UiLayoutSnapshot snapshot, string path)
+    {
+        for (int i = 0; i < snapshot.VisibleIds.Count; i++)
+        {
+            if (string.Equals(snapshot.VisibleIds[i], path, StringComparison.Ordinal)) return true;
+        }
+
+        return false;
+    }
+
+    private static UiReloadReport? FindReport(UiDocumentService service, string documentId)
+    {
+        IReadOnlyList<UiReloadReport> reports = service.Reports;
+        for (int i = reports.Count - 1; i >= 0; i--)
+        {
+            if (string.Equals(reports[i].DocumentId, documentId, StringComparison.Ordinal)) return reports[i];
+        }
+
+        return null;
+    }
+
+    private static string RepoRoot()
+    {
+        string current = Directory.GetCurrentDirectory();
+        while (!string.IsNullOrEmpty(current))
+        {
+            if (Directory.Exists(Path.Combine(current, "Source", "FerriteLib.UiKit"))
+                && File.Exists(Path.Combine(current, "About", "About.xml")))
+            {
+                return current;
+            }
+
+            DirectoryInfo? parent = Directory.GetParent(current);
+            if (parent == null) break;
+            current = parent.FullName;
+        }
+
+        return Directory.GetCurrentDirectory();
+    }
+
+    private sealed class FixedMetrics : ITextMetrics
+    {
+        public float MeasureText(string text, UiFont font, float width) => 16f;
+
+        public float MeasureWidth(string text, UiFont font) => StubTextWidth.Of(text, font);
+    }
+
+    private sealed class FixedTranslation : IUiTranslation
+    {
+        public string Translate(string key) => key;
+
+        public int TranslationRevision => 0;
+    }
+
+    private static void Run(string name, Action body)
+    {
+        try
+        {
+            body();
+        }
+        catch (Exception ex)
+        {
+            failures++;
+            Console.Error.WriteLine("  FAIL: " + name + " threw " + ex.GetType().Name + ": " + ex.Message);
+        }
+    }
+
+    private static void Check(bool condition, string name)
+    {
+        if (condition)
+        {
+            Console.WriteLine("  ok: " + name);
+        }
+        else
+        {
+            failures++;
+            Console.Error.WriteLine("  FAIL: " + name);
+        }
+    }
+}

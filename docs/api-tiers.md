@@ -215,6 +215,19 @@ consequence is paid in the open rather than discovered by a stranger.
   leaves the roles on the element's own spec.
 - `UiStyleIssue` — one appearance value a document dropped, so that fail-soft is never silent.
 
+- `UiDocumentKind` — which of the two document vocabularies a file is read as (layout or style). Part of
+  the source identity rather than an extension guess, because the two parsers have two different failure
+  policies.
+- `UiDocumentSource` — `{ Id, Kind, Path }`: the consumer names the file, nothing scans a directory, and
+  the service is what later re-reads it.
+- `UiDocumentService` — the bounded, disposable owner of the document half: dependency tracking from host
+  to file, the watcher whose worker thread only posts a change signal, candidate parse/validation on the
+  main-thread commit boundary, atomic per-document batches across every affected host, last-known-good with
+  an embedded-fallback first load, and the manual reload that recovers a dropped signal. No static state,
+  and every collection is capped.
+- `UiReloadReport` — one reload attempt's outcome: file, element, reason, content identity, and the
+  committed/skipped/duplicate axes; failures are recorded once per refusing version.
+
 ## Internalize-candidate
 
 - `KernelCoreWidgetRegistrar` — called from inside the assembly by the registry itself; no consumer names it.

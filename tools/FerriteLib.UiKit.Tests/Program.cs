@@ -102,5 +102,8 @@ internal static class Program
 
         Console.WriteLine("Kernel stub coverage (game members the harness must carry, trip guard)...");
         failures += KernelStubCoverageTests.RunAll();
+
+        Console.WriteLine("Kernel documents (file sources, dependencies, atomic reload, last-known-good)...");
+        failures += KernelDocumentReloadTests.RunAll();
     }
 }
