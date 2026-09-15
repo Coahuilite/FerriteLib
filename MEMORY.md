@@ -312,6 +312,20 @@
   dev build - the same class of refusal that caught the consumer's carrier, where a build outside its git
   checkout came out with no commit suffix at all.
 
+- **The 0.5.x round is open on branch `0.5.x` (2026-09-15), and it is the first round whose driver is a
+  confirmed public product goal rather than one wired consumer's page.** Baseline `c53bd37` (`0.4.x`), contract
+  axis moved to 0.5.0 on all three axes, gate suite re-run green on the baseline before any change. The round's
+  contract, work packages, file ownership and evidence classes live in `docs/development/0.5/` and nowhere else —
+  this line only records that the round exists and where its state is. Two supersessions are registered there and in
+  `AGENTS.md`: the ecosystem gate now governs *new specialized kinds* rather than confirmed general capabilities
+  (a page model's own missing surface is implemented from the requirement instead of waiting for someone to
+  hand-roll a copy), and "reopen the window and it is current" is no longer a sufficient hot-reload target — a save
+  must update the open window, with manual reload and last-known-good behind it. Three statements that were already
+  stale before this round are corrected there rather than repeated: the node/identity layer landed in 0.4.x
+  (`UiNode`/`UiNodeId`/node-keyed session state), the hit stack exists as one popup layer
+  (`UiHitLayer` + `UiSession.IsPointerOverHigherLayer`) with full z-ordered dispatch still owed, and "0.5 is
+  about dissolving 18 consumer kinds" is not this round's goal.
+
 ## Charter — what this library is for
 
 - **The founding spec, transcribed.** `Coahuilite/UniversalSqueaker@09366f8:docs/ui-shared-library-design-zh.md`

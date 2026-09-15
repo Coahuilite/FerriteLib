@@ -49,7 +49,7 @@ public static class FerriteLibVersion
     /// it is one minor, and it is the last minor in which breaking <c>UiTheme</c>'s shape is cheap,
     /// because a second wired consumer is what starts the freeze.
     /// </summary>
-    public static readonly Version Api = new Version(0, 4, 0);
+    public static readonly Version Api = new Version(0, 5, 0);
 
     /// <summary>Human-readable identity for logs.</summary>
     public static string Describe()

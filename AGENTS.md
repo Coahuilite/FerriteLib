@@ -99,6 +99,15 @@ Consumer ladder when the library lacks something:
 Promotion gate — all four or it stays consumer-side: provenance cited; neutral, and no consumer's
 numbers as library defaults; no new process-wide mutable statics; a harness-drivable lane exists.
 
+**The gate governs *new specialized kinds*, not confirmed public capabilities** (2026-09-15, superseding
+the broader reading of the rule above). Registering a kind freezes vocabulary, which is why it waits for a
+citation. A capability a page model structurally cannot express — window-instance identity, binding
+notification, collection reconciliation, document hot reload, per-host diagnostics — is implemented from
+the confirmed requirement directly. The distinguishing question is "does the page model own a general
+surface here?", not "has somebody already hand-rolled a copy elsewhere"; a request is still not evidence
+for a *kind*, and our own demo is still not consumption. The superseded wording, the round it changed in and
+the affected decisions are recorded in `docs/development/0.5/00-baseline.md` §2.4.
+
 **What earns a kind.** Registering a widget kind is not shipping a convenience, it is freezing vocabulary:
 every kind brings an attribute schema, a declared label set, a tier entry and eventually a deprecation debt.
 A kind is earned by owning what a manifest cannot express — per-element interaction state, a measure

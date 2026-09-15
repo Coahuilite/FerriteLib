@@ -1,5 +1,22 @@
 # TODO
 
+## 0.5.x round — open (2026-09-15)
+
+Branch `0.5.x`, contract axis 0.5.0. Scope, packages, ownership and status: `docs/development/0.5/`.
+This section is a pointer only; the round's live status has one home and it is that directory.
+
+- [ ] Window instances — generic shell + keyed identity + focus/active-target + pause policy (P1).
+- [ ] Bindings — per-key notification, batch commit, invalidation classes, command executability,
+      conditional visibility (P2).
+- [ ] Collections and common controls — keyed repeater, checkbox, progress, hierarchy tree (P3).
+- [ ] Documents — file sources, dependency tracking, candidate validation, atomic batch commit,
+      last-known-good, manual reload (P4).
+- [ ] Diagnostics — per-host/session subscriptions and attributed, bounded events (P5).
+- [ ] Delivery — neutral fixture, dev package, consumer handoff, in-game checklist (P6).
+- Supersessions this round registers (detail in `docs/development/0.5/00-baseline.md` §2): confirmed
+  public capabilities no longer wait for a consumer to hand-roll them first; hot reload now targets the
+  open window, not the reopened one; and the 0.4 node/hit-stack state is restated accurately.
+
 ## 0. No open HANDOFF rounds; the round-1 release and the one remaining cross-repo report (branch `0.3.x`)
 
 - [x] **US→FL round 3 (2026-09-08) — CLOSED, implemented 2026-09-09.** Filed as "round 2", renumbered

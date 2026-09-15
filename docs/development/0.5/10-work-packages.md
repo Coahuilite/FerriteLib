@@ -1,0 +1,66 @@
+# 10 工作包、依赖图与集成顺序
+
+分支模型：`0.5.x` 是集成分支与唯一可发布线。每个工作包在**独立 git worktree + 临时功能分支**上开发
+（`feat/0.5-<pkg>`），由 Lead 串行 merge 回 `0.5.x` 并复跑门禁。同一时刻**一个文件只有一个写者**。
+
+## 1. 工作包
+
+| 包 | 内容 | 依赖 | 主要写者文件 | 完成判据（自动化） |
+| --- | --- | --- | --- | --- |
+| **W0** 合同对齐 | 基线、取代关系、工作包/所有权、接口交接顺序、开发文档骨架 | 无 | `docs/development/0.5/**`、`AGENTS.md`、`MEMORY.md`、`TODO.md` | 文档可独立阅读；门禁仍绿 |
+| **P1** 窗口壳 + keyed 实例 + 焦点 + 暂停策略 | `UiWindowKey`/`UiWindowCatalog`/`UiWindowOptions`；同型多实例；同 key 重开=激活；激活/关闭/生命周期；活动目标与键盘跟随；暂停/相机独立策略（不给产品默认值） | W0 | `Kernel/UiWindowHost.cs`、新增 `UiWindowKey/UiWindowCatalog/UiWindowOptions/UiFocusPolicy` | 新 lane：同型双实例共存、同 key 去重、关闭释放、选项独立生效 |
+| **P2** 绑定通知 + 失效分类 + 命令态 + 条件显隐 | `IUiBindings` 通知/修订；批量合并；paint/measure/structure 分类；`canExecute` → 统一禁用交互；条件显隐与受支持结构更新；删掉全局 `ContentRevision` 的源码文本式护栏 | W0 | `Kernel/IUiBindings.cs`、`UiBindings.cs`、`UiSession.cs`、`UiLayoutEngine.cs`、`UiValueState.cs` | 新 lane：按 key 通知只失效相关元素；合并批；禁用不执行；显隐改结构不改无关状态 |
+| **P3** 集合 + 公共控件 | keyed repeater（item 局部绑定作用域、节点复用、删除清理）；`input/checkbox`、`display/progress`、`container/tree`（只表达层级） | P2、P4 | `Kernel/UiLayoutEngine.cs`、`UiLayoutManifest.cs`、新增 `Widgets/*`、`AtomVocabulary.cs`、`KernelCoreWidgetRegistrar.cs` | 新 lane：排序不串状态、增删不累积、按 key 复用、删除清理；三个控件各自的交互/测量合同 |
+| **P4** 文档来源 + 热重载 | 文件来源与依赖追踪；候选解析+校验；批次原子提交；last-known-good；手动重载；开发模式自动监听可配置；工作线程只发信号；稳定 key 状态保留 | W0 | `Kernel/UiHost.cs`、`UiLayoutManifest.cs`、`UiStyleDocument.cs`、新增 `UiDocumentSource/UiDocumentService/UiReloadReport` | 新 lane：改文件→已开窗口更新（桩内）；坏文件保 LKG；批内任一失败则整批不提交；手动重载可用 |
+| **P5** 多 Host/Session 诊断隔离 | 每 host/session 诊断订阅与有界事件（reload/fit/recovery + 计时）；关闭即释放；两 host 并存不互相覆盖 | P1、P2、P4 | `Kernel/UiSession.cs`、`UiHost.cs`、`UiFitAudit.cs`、`UiHostLedger.cs`、`UiSessionGuard.cs`、新增 `UiDiagnosticHub/*` | 新 lane：两 host 并存事件归属正确；关闭一窗另一窗继续报告；额度/去重独立 |
+| **P6** 验证与交付 | 独立验证（含反向突变）；中立夹具页；开发包；文档与实机清单 | P1–P5 | `docs/development/0.5/**`、`tools/.../Kernel*.cs`（验证 lane）、`KernelContainmentTests.cs` | 门禁全绿 + 每个 PASS 标明证据类与 mutation/regression 归属 |
+
+## 2. 依赖图与集成顺序
+
+```
+W0 ──┬── P1 (窗口壳/keyed/焦点)
+     ├── P2 (通知/失效/命令态/显隐) ──┐
+     └── P4 (文档/热重载) ──────┬────┴── P3 (集合+控件)
+                                 └──────── P5 (诊断隔离)
+P1..P5 ── P6 (独立验证 → 开发包 → 文档)
+```
+
+固定合并顺序（Lead 串行执行，每步后跑 `verify-local.ps1`）：
+
+1. `W0` → `0.5.x`（含 0.5.0 三轴版本）
+2. `P1` → 3. `P2` → 4. `P4` → **第一个开发包 + 消费者交接说明**（最小可用接口尽早交付）
+5. `P3` → 6. `P5` → 7. `P6` → 第二个开发包 + 交付文档定稿
+
+## 3. 文件所有权（同一时刻单一写者）
+
+| 文件/目录 | 写者 |
+| --- | --- |
+| `docs/development/0.5/**` | Lead |
+| `AGENTS.md` / `MEMORY.md` / `TODO.md` / `docs/api-tiers.md`（最终裁决） | Lead |
+| `tools/FerriteLib.UiKit.Tests/KernelContainmentTests.cs`（后端漏斗白名单） | Lead |
+| `scripts/**` | Lead |
+| `Kernel/UiWindowHost.cs` + 新增窗口类型 | P1 |
+| `Kernel/IUiBindings.cs`/`UiBindings.cs`/`UiSession.cs`/`UiLayoutEngine.cs`/`UiValueState.cs` | P2（P3/P5 在该包 merge 后才可动同一文件） |
+| `Kernel/UiHost.cs`/`UiLayoutManifest.cs`/`UiStyleDocument.cs` + 文档服务类型 | P4 |
+| `Kernel/Widgets/**`（新增控件）、`AtomVocabulary.cs`、`KernelCoreWidgetRegistrar.cs` | P3 |
+| 诊断类型 | P5 |
+
+**共享但追加式**的三个文件（每个包都要加一行/几条）：`tools/.../Program.cs`（lane 注册）、
+`docs/api-tiers.md`（公共类型分级）、`scripts/stub-coverage-exemptions.txt`（仅在确有必要时）。
+各包在自己分支里就地改，Lead 在串行 merge 时解冲突并复跑门禁。
+约束（`MEMORY.md` 教训）：**公共类型、tier 行、lane 注册必须在同一个提交里**；
+`dfba792` 曾把 491 行 lane 提交了但没注册，门禁全绿而断言从未运行。
+
+## 4. 当前状态
+
+| 包 | 状态 | 说明 |
+| --- | --- | --- |
+| W0 | 进行中（Lead） | 本目录 + `0.5.x` 分支 + 三轴版本 |
+| P1 | 待开始 | 分配 `windowing` |
+| P2 | 待开始 | 分配 `core` |
+| P3 | 阻塞于 P2/P4 | 分配 `collections` |
+| P4 | 待开始 | 分配 `documents` |
+| P5 | 阻塞于 P1/P2/P4 | 分配 `diagnostics` |
+| P6 | 进行中（Lead + `verifier`） | 基线已复跑绿 |
+
+状态只在 Lead 合并后更新（单一状态源原则）；各包分支内部进度写在提交信息与任务回交里。

@@ -254,3 +254,31 @@ by the commit that made it.
   diagnostic geometry keyed by scroll container id/display path rather than session state, and
   `UiLayoutSnapshot.RectById` with `SetScrollTarget(string)` keep the declared-`Id` strings the engine
   resolves to nodes internally.
+
+## Breaking changes inside the open 0.5 window
+
+Same rule as the section above, one minor later: the 0.4 line was cut as `v0.4.0-rc1`, so 0.5.0 is the
+window in which the public foundation this round is built lands **once**, as one minor, rather than as a
+train of breaking releases. A consumer re-pinning to 0.5 is owed, in this file, the call that no longer
+binds and its replacement. Entries are written by the commit that makes them.
+
+What the 0.5 window is for (working packages, ownership and status: `docs/development/0.5/`):
+
+- **Window instances.** A generic XML window shell already exists (`UiWindowHost`); what it never had is
+  `consumer + window-kind + context-key` instance identity, same-key reopen-as-activate, and an explicit
+  active-target/focus rule. All three land here, and `UiWindowHost`/`UiWindowNotice` move with them.
+- **Invalidation.** `IUiBindings` has get, set and `IsWritable`, and no notification, so "the model moved"
+  is a single global `ContentRevision` counter. A per-key revision plus a batch commit lands here, and the
+  source-text assertions that currently police the counter retire with it.
+- **Collections and common controls.** The engine has no per-item template; a keyed repeater with a local
+  item binding scope, node reuse and removal cleanup lands here, together with the checkbox, a basic
+  progress bar and a hierarchy-only tree surface.
+- **Documents.** `UiLayoutManifest.ParseFile`/`UiStyleDocument.ParseFile` exist and have no caller. A
+  bounded document service with dependency tracking, candidate validation, atomic batch commit and
+  last-known-good fallback lands here, which is what makes "edit the XML and the open window updates" true
+  rather than implied. C# kind changes stay outside hot reload on purpose.
+- **Diagnostics.** One shared diagnostic slot becomes per-host/per-session subscriptions with bounded,
+  attributed events (reload / fit / recovery), released when the host closes.
+
+Everything here is provisional until the second wired consumer compiles against it (`AGENTS.md`
+invariants): the tier list, not the shape, is what this file promises.
