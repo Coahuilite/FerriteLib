@@ -292,7 +292,31 @@ public abstract class UiWindowHost : Window
         }
     }
 
+    /// <summary>
+    /// One window pass. The shell's own bands - chrome and the failure notice - are drawn outside
+    /// <see cref="UiHost.DrawFrame"/>, so the ambient attribution a host opens around its own arrange/draw
+    /// never covered them: their fit findings fell back to the process-wide channel, and with two windows
+    /// open a chrome overflow could not be routed to the window that produced it. That is the routing half
+    /// of the ambiguity the keyed chrome scope already fixes on the naming half, so the whole shell pass
+    /// runs inside the owning host's diagnostic scope.
+    /// <para>
+    /// <b>Where no host exists the scope opens with null, never with a subscription of its own.</b> The
+    /// first pass draws chrome before <see cref="CreateHost"/> has run, and a failed pass disposes the host
+    /// together with its subscription; in both cases the audit keeps its pre-existing legacy path, and the
+    /// null scope still clears the ambient subscription so a window can never inherit whichever host
+    /// happens to be drawing around it. A host nobody subscribed to stays exactly as cheap and quiet as
+    /// before: this creates no subscription and measures nothing the audit was not already measuring.
+    /// </para>
+    /// </summary>
     public sealed override void DoWindowContents(Rect inRect)
+    {
+        using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics))
+        {
+            DrawShell(inRect);
+        }
+    }
+
+    private void DrawShell(Rect inRect)
     {
         ResolvePointerDown(inRect);
         DrawChrome(inRect);

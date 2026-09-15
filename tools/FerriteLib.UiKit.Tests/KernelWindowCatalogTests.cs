@@ -51,6 +51,7 @@ internal static class KernelWindowCatalogTests
             VerifyGenericShellNeedsNoWindowSubclass();
             VerifyGenericShellFailureNoticeIsDeferredAndTerminal();
             VerifyChromeScopeTellsTwoInstancesOfOneTypeApart();
+            VerifyShellFindingsRouteToTheOwningSubscription();
         }
         finally
         {
@@ -595,6 +596,148 @@ internal static class KernelWindowCatalogTests
         }
     }
 
+    /// <summary>
+    /// The routing half of the multi-window diagnostic contract: the shell draws its chrome and its notice
+    /// outside <see cref="UiHost.DrawFrame"/>, so those findings need the owning host's diagnostic scope or
+    /// they fall back to the process-wide channel and two open windows become indistinguishable.
+    /// <para>
+    /// Two subscribed shells are drawn, and each finding must land in its own subscription with the
+    /// sibling's buffer untouched; the notice is checked the same way through a prerequisite that goes
+    /// unmet while the host is still alive. The last phase draws an unsubscribed shell to pin the other
+    /// side: no subscription is created for it, and its finding still reaches the legacy channel.
+    /// </para>
+    /// </summary>
+    private static void VerifyShellFindingsRouteToTheOwningSubscription()
+    {
+        var legacy = new List<UiOverflowReport>();
+        var harness = new Harness();
+        SubscribedShell? detached = null;
+        int subscriptionsBefore = UiDiagnosticHub.SubscriptionCount;
+
+        UiFitAudit.Attach(new LaneMetrics(), legacy.Add);
+        UiFitAudit.Reset();
+        UiFitAudit.Enabled = true;
+        try
+        {
+            harness.Catalog.Register(
+                "c",
+                "diag",
+                null,
+                key => new SubscribedShell(
+                    "diag-lane/" + key.ContextKey,
+                    string.Equals(key.ContextKey, "alpha", StringComparison.Ordinal)
+                        ? new string('a', 60)
+                        : new string('b', 60),
+                    subscribe: true));
+
+            var alpha = new UiWindowKey("c", "diag", "alpha");
+            var beta = new UiWindowKey("c", "diag", "beta");
+            harness.Catalog.Open(alpha);
+            harness.Catalog.Open(beta);
+            harness.Place(alpha, new Rect(0f, 0f, 220f, 200f));
+            harness.Place(beta, new Rect(300f, 0f, 220f, 200f));
+
+            if (!harness.Catalog.TryGet(alpha, out UiWindowHost alphaWindow)
+                || !harness.Catalog.TryGet(beta, out UiWindowHost betaWindow))
+            {
+                Check(false, "both diag windows are open");
+                return;
+            }
+
+            // Pass 1 creates each host, and its subscription with it; chrome on that pass is drawn before
+            // the host exists, which is the documented boundary ("where a host exists"). Pass 2 is the
+            // steady state the game runs in, and that is the pass that must route.
+            alphaWindow.WindowOnGUI();
+            betaWindow.WindowOnGUI();
+            alphaWindow.WindowOnGUI();
+            betaWindow.WindowOnGUI();
+
+            UiDiagnosticSubscription? alphaSub = (alphaWindow as SubscribedShell)?.Subscription;
+            UiDiagnosticSubscription? betaSub = (betaWindow as SubscribedShell)?.Subscription;
+            if (alphaSub == null || betaSub == null)
+            {
+                Check(false, "both shells subscribed the host they created");
+                return;
+            }
+
+            // Guarded reads, not a crash: when the routing is broken there is no event at all, and a
+            // default event's path is null. The lane must name that shape instead of throwing on it.
+            if (!alphaSub.TryGetLatest(UiDiagnosticKind.Fit, out UiDiagnosticEvent alphaEvent)
+                || !betaSub.TryGetLatest(UiDiagnosticKind.Fit, out UiDiagnosticEvent betaEvent))
+            {
+                Check(false, "both subscriptions received their own chrome finding instead of the legacy channel");
+                return;
+            }
+
+            Check(string.Equals(alphaEvent.Code, "fit.overflow", StringComparison.Ordinal),
+                "as a fit.overflow event on the fit channel");
+            Check(alphaEvent.ElementPath.IndexOf("[c/diag/alpha]", StringComparison.Ordinal) >= 0,
+                "attributed to the window that produced it");
+            Check(string.Equals(alphaEvent.Host, "diag-lane/alpha", StringComparison.Ordinal),
+                "and to that host's own identity");
+            Check(betaEvent.ElementPath.IndexOf("[c/diag/beta]", StringComparison.Ordinal) >= 0,
+                "attributed to the sibling, not to the first window");
+            Check(!string.Equals(alphaEvent.ElementPath, betaEvent.ElementPath, StringComparison.Ordinal),
+                "the two findings are different findings, not one shared record");
+
+            // One assertion rather than two: an empty buffer must not let the isolation half pass for the
+            // wrong reason.
+            bool isolated = alphaSub.CountOf(UiDiagnosticKind.Fit) == 1
+                && betaSub.CountOf(UiDiagnosticKind.Fit) == 1
+                && !HasEventFor(alphaSub, "[c/diag/beta]")
+                && !HasEventFor(betaSub, "[c/diag/alpha]");
+            Check(isolated, "each finding landed exactly once in its own buffer, with no cross-window copy");
+
+            // The notice half: the same shell, its host still alive, its prerequisite goes unmet.
+            ((SubscribedShell)alphaWindow).Prerequisite = false;
+            alphaWindow.WindowOnGUI();
+            Check(alphaSub.TryGetLatest(UiDiagnosticKind.Fit, out UiDiagnosticEvent noticeEvent)
+                && noticeEvent.ElementPath != null
+                && noticeEvent.ElementPath.EndsWith("/notice", StringComparison.Ordinal),
+                "the notice routes to the owning subscription and names its own band");
+            Check(string.Equals(noticeEvent.Host, "diag-lane/alpha", StringComparison.Ordinal),
+                "with the owning host's identity");
+            Check(betaSub.CountOf(UiDiagnosticKind.Fit) == 1,
+                "and the sibling's buffer is untouched by it");
+
+            // The other side of the contract: a host nobody subscribed stays cheap and quiet.
+            legacy.Clear();
+            int subscriptionsAfterWindows = UiDiagnosticHub.SubscriptionCount;
+            detached = new SubscribedShell("diag-lane/detached", new string('d', 60), subscribe: false);
+            detached.windowRect = new Rect(0f, 0f, 220f, 200f);
+            detached.WindowOnGUI();
+            detached.WindowOnGUI();
+            Check(UiDiagnosticHub.SubscriptionCount == subscriptionsAfterWindows,
+                "an unsubscribed shell creates no subscription");
+            Check(legacy.Count > 0, "and its finding still reaches the legacy channel");
+        }
+        finally
+        {
+            harness.Catalog.CloseAll();
+            detached?.PreClose();
+            UiFitAudit.Enabled = false;
+            UiFitAudit.Reset();
+            UiFitAudit.Detach();
+        }
+
+        Check(UiDiagnosticHub.SubscriptionCount == subscriptionsBefore,
+            "closing the windows released their subscriptions");
+    }
+
+    /// <summary>True when any retained event of a subscription names one element-path fragment.</summary>
+    private static bool HasEventFor(UiDiagnosticSubscription subscription, string fragment)
+    {
+        foreach (UiDiagnosticEvent retained in subscription.Snapshot())
+        {
+            if (retained.ElementPath.IndexOf(fragment, StringComparison.Ordinal) >= 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>The lane's own page: a container plus one core atom, no per-test kind registration.</summary>
     private static UiLayoutManifest Page()
     {
@@ -819,6 +962,62 @@ internal static class KernelWindowCatalogTests
     {
         public override void DoWindowContents(Rect inRect)
         {
+        }
+    }
+
+    /// <summary>
+    /// A shell that opts the host it created in to diagnostics - the shape a consumer uses, because the
+    /// shell is the only place that knows the <see cref="UiHost"/> it built - with a long title and a long
+    /// notice so both of its own bands produce a fit finding. <see cref="Prerequisite"/> is mutable so the
+    /// notice path can be driven while the host is still alive.
+    /// </summary>
+    private sealed class SubscribedShell : UiWindowHost
+    {
+        private readonly string source;
+        private readonly string title;
+        private readonly bool subscribe;
+        private readonly LaneMetrics ruler = new LaneMetrics();
+
+        internal SubscribedShell(string source, string title, bool subscribe)
+        {
+            this.source = source;
+            this.title = title;
+            this.subscribe = subscribe;
+        }
+
+        internal UiDiagnosticSubscription? Subscription { get; private set; }
+
+        internal bool Prerequisite = true;
+
+        protected override UiTheme Theme => UiTheme.DarkGold;
+
+        protected override string Title => title;
+
+        protected override bool PrerequisiteVerified => Prerequisite;
+
+        protected override ITextMetrics Metrics => ruler;
+
+        protected override UiHost CreateHost()
+        {
+            var host = new UiHost(
+                source,
+                Page(),
+                new UiBindings(),
+                UiTheme.DarkGold,
+                ruler,
+                new LaneTranslation());
+
+            if (subscribe)
+            {
+                Subscription = UiDiagnosticHub.Subscribe(host);
+            }
+
+            return host;
+        }
+
+        protected override void DrawNotice(Rect rect, UiWindowNotice notice)
+        {
+            UiThemeDraw.Label(rect, "notice:" + notice + ":" + new string('n', 60), Theme, singleLine: true);
         }
     }
 
