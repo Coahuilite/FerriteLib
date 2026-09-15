@@ -108,6 +108,10 @@ disposable extraction only):
   library assertion. The P3 per-package lane `KernelRepeatTests.cs:196-219` does cover node+sub-node+state
   release and is mutation-proven; the **cross-package** form of that one assertion remains unproven.
 
+**LANE 1 correction (delegated runner's final, corrected probe).** After fixing its sub-node probe (a `ctx.Child` sub-node is linked under the template widget's element node and only during **Draw**), the runner re-ran both lanes and the corrected **LANE 1 is fully green** with 17 raw `ok:` lines, including "(b) the sub-node the removed row's widget minted went with the row", "(b) the removed key's row node is gone from the session", "(a) every key's row node is reused across the reorder", and "(a) key a's draft, named slot and scroll followed the item key". My own re-run of the surviving copy in the scratch tree still aborts on the old probe defect (I copied an intermediate revision), so the green LANE 1 is delegated-verifier evidence with raw lines attached, not my own re-run.
+
+**ItemKey vocabulary mismatch (finding F8).** The task's "stability by item key" is implemented as the consumer's ordered business-key projection, not as an `ItemKey=` manifest attribute. `ItemKey` appears only in the section 1 design-draft example of `20-api-and-xml.md`; `RepeatTemplateWidget`'s creation schema is `Id, Kind, Items, Template, Padding, Gap, Height, Hidden, Tab, Visible, VisibleKey`, and an `ItemKey=` attribute would be refused at creation. The state follows the item key correctly (LANE 1 proves it); the attribute name in the docs is stale relative to the implementation.
+
 ## 6. Findings
 
 | id | finding | class |
@@ -119,6 +123,7 @@ disposable extraction only):
 | F5 | the allocation lane is narrower than its claim (synthetic two-call subject, no subject-liveness assertion) | **must-document** |
 | F6 | my own dead-lane guard dedupes registered names, so a duplicated `Program.cs` registration is invisible (proven: planted duplicate → 4 tier FAILs, guard lane green) | **must-fix-in-0.5** (small, verifier-owned file) |
 | F7 | the fixture lane's `:38-42` comment is false for its test half | **must-document** |
+| F8 | `ItemKey=` is documented in `20-api-and-xml.md` section 1 but does not exist in the implementation (and would be refused at creation); the implemented vocabulary is `Items` + the consumer's business-key projection | **must-document** (or must-fix if the draft example is meant to be an interface) |
 
 No correctness defect was found in P3, P5, task-13 or task-14; the delivery gate is green at the candidate.
 
