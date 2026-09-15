@@ -128,9 +128,12 @@ consequence is paid in the open rather than discovered by a stranger.
   the process-wide slot bound by `Attach` serves only the legacy (unsubscribed) channel. That split is a
   fix, not a nuance — while subscribing wrote the slot, a second host with a different measurement adapter
   silently changed the first host's overflow verdict without ever drawing.
-- `UiLayoutManifest` — the `Schema="2"` slot and `ParseFile` are an open fork — the method has **no
-  production caller** (the harness calls it directly; that is not a use), and the 0.5 document service is
-  the branch that decides it. Either branch changes this type.
+- `UiLayoutManifest` — the `Schema="2"` slot and the `ParseFile` file entry point. The fork this entry used
+  to describe is **decided as of the R7 fix**: the document service reads one snapshot (`ReadAllBytes`) and
+  parses that text, because hashing one read and parsing another let a concurrently replaced file record
+  version A while the tree came from B. `ParseFile` therefore has **no production caller** and stays as a
+  convenience for a consumer that wants the one-shot parse; it is *not* a second read path in the service, and
+  a lane asserts the single-read pipeline. In-process text entry is `Parse(string)`.
 - `UiLayoutSnapshot` — the measure-then-draw halves are exercised only by the harness; no wired consumer or
   the shell names them (`UiWindowHost` drives `DrawFrame`), so they either earn a cited use or go internal.
 - `UiWindowHost` — the largest freeze surface this library has ever shipped, landed before a second consumer
