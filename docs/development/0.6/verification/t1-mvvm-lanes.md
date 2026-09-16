@@ -1,10 +1,11 @@
 # T1 — notification adapter and page lifecycle: lane record
 
-Owner: `mvvm` (task-24; task-32 for the T1b activation lane). Branch `feat/0.6-mvvm`; the T1 landing is
-`8ff5b9f` (baseline `02a6aea`, merged upstream as `df243df`/`1613057`), and the T1b activation lane is
-`4c94090` at `0948540`.
+Owner: `mvvm` (task-24; task-32 for the T1b activation lane; task-36 for the R06 close-in-attach guard).
+Branch `feat/0.6-mvvm`; the T1 landing is `8ff5b9f` (baseline `02a6aea`, merged upstream as
+`df243df`/`1613057`), the T1b activation lane is `4c94090` at `0948540`, and the R06 guard is
+`583350d` at `a6e8885`.
 Evidence class reached: **已自动化验证** for every item below — the Release harness on the stub game surface,
-166 assertions across two lane classes (`KernelNotifyAdapterTests` 89, `KernelPageLifecycleTests` 77).
+179 assertions across two lane classes (`KernelNotifyAdapterTests` 89, `KernelPageLifecycleTests` 90).
 
 Not reached, and not claimed anywhere in this record: 已由真实消费者接入 and 已实机验证. Nothing here ran in a
 game, no second consumer compiled against the surface, and the window passes are driven through the harness's
@@ -15,10 +16,10 @@ game, no second consumer compiled against the surface, and the window passes are
 | File | Change |
 | --- | --- |
 | `Source/FerriteLib.UiKit/Kernel/UiNotifyAdapter.cs` | the adapter's behaviour completed against the frozen signature |
-| `Source/FerriteLib.UiKit/Kernel/UiWindowHost.cs` | `ReleaseHost` disposes in a `finally` and records a throwing `HostDetached` instead of letting it escape |
+| `Source/FerriteLib.UiKit/Kernel/UiWindowHost.cs` | `ReleaseHost` disposes in a `finally` and records a throwing `HostDetached` instead of letting it escape; the pass re-checks the host after the announcement (R06) |
 | `Source/FerriteLib.UiKit/Kernel/IUiMainThread.cs` | doc correction only (it claimed "three public entry points"; one takes it today) |
 | `tools/FerriteLib.UiKit.Tests/KernelNotifyAdapterTests.cs` | new lane, 89 assertions |
-| `tools/FerriteLib.UiKit.Tests/KernelPageLifecycleTests.cs` | new lane, 77 assertions (T1 64 + the T1b activation lane 13) |
+| `tools/FerriteLib.UiKit.Tests/KernelPageLifecycleTests.cs` | new lane, 90 assertions (T1 64 + the T1b activation lane 13 + the R06 close-in-attach lane 13) |
 | `tools/FerriteLib.UiKit.Tests/Program.cs` | one contiguous commented registration block for both lanes |
 
 No public signature changed. The frozen contract in `docs/development/0.6/05-api-contract.md` is implemented
@@ -156,7 +157,8 @@ the host).
 exact-type removal performed by `WindowStack.Add` (covered by `KernelWindowCatalogTests`); the case where
 `CreateHost` itself throws — there is no host to detach, and that path stays with
 `KernelWindowHostTests.VerifyFailingPassTripsTheNoticeOnTheNextPassOnly`. The **active-target** path was on
-this list when T1 landed and is no longer: it is pinned by the T1b lane in §2a.
+this list when T1 landed and is no longer: it is pinned by the T1b lane in §2a. The announcement handler that
+**closes its own window** is a different hazard from one that throws, and it is pinned by the R06 lane in §2c.
 
 ### (6) Invariance across reload
 
@@ -253,13 +255,60 @@ freshly created `CreateHost()` there) reddens both **ACTIVATION-NO-SECOND-ANNOUN
 `KernelWindowCatalogTests`' territory and, for real input routing, the in-game checklist); whether the game's
 own focus setter re-activates a window behind this library's back.
 
+### (5c) An announcement handler may close its own window (R06 risk 3, task-36)
+
+Lane `KernelPageLifecycleTests`:
+`Close in HostAttached: a handler may close its own window without a failure`.
+
+The external review's R06 sub-audit flagged this re-entrancy and could not reproduce it. Reproduced here, the
+real shape was **not** an escaping crash. The lane opens a shell through a real `UiWindowCatalog` and the
+`HostAttached` handler closes it with `catalog.Close(key)` — the vanilla `WindowStack.TryRemove` order:
+`OnCloseRequest`, `PreClose`, removal, `PostClose`. `PreClose` runs `ReleaseHost`, which detaches the
+announced host while it is still alive, disposes it and nulls the shell's `host` field. `DrawShell` then
+dereferenced that null field, and the measured pre-fix result was:
+
+- `System.NullReferenceException` (message localised) out of `host.DrawFrame(content)`, **caught by the
+  shell's own guarded pass** — so the pass called `OnDrawFailure` once and armed the deferred notice;
+- the next pass — which a real stack would never run, because the window left the stack — drew
+  `UiWindowNotice.PageUnavailable`;
+- a page whose consumer **deliberately closed it from the door** was therefore labelled unavailable, with an
+  NRE recorded as `LastFailure`.
+
+**The contract, and the fix.** A handler may close its own window, and the pass must not continue into a host
+that no longer exists. The guard is the minimal one and it is the whole fix: the pass re-reads `host` after the
+announcement and returns before `DrawFrame` when the close already released it. The **field**, not the local
+`created`, is what is re-read, because `ReleaseHost` nulls exactly that field.
+
+**No stack or session re-order is needed, and here is why.** A window closing itself from inside its own
+`DoWindowContents` pass is already the shipped path — this shell's own close affordance calls `Close()` in the
+middle of its pass — so the vanilla stack's self-removal behaviour is the game's existing contract, not
+something this guard invents. `ReleaseHost` remains the single teardown point and detaches before disposing,
+and the catalog's identity map is updated by `NotifyPreClose`/`NotifyPostClose` on that same synchronous
+path. The only library-side hole was the stale dereference.
+
+**Mutation-proven.** R06-A (the guard removed — the reviewer's unguarded shape) reddens
+**CLOSE-IN-ATTACH-NO-FAILURE** and **CLOSE-IN-ATTACH-NO-EXCEPTION**. R06-B (the guard broadened to skip every
+announced pass) reddens the lane's own positive control **CONTROL-CLOSED-ONLY-IF-ACTUALLY-CLOSED** plus six
+assertions in the other lifecycle lanes — which is why the lane carries that control: the guard may not pass by
+abandoning every announced pass.
+
+**What stays unpinned.** The in-game stack/IMGUI interaction when a window removes itself during its own pass:
+whether the real `WindowStack` iteration and the game's GUI group state behave exactly as the stub does. The
+harness also cannot say what a **second** pass over an already-removed window should do — driving one by hand
+re-creates a host, because the shell's `host` field is null again and `pageUnavailable` was never set; a real
+stack does not draw a removed window, so the lane drives the closing pass only and this record claims no second
+pass contract.
+
 ## 3. Mutation campaign
 
 Baseline: `8ff5b9f` for M1–M20. T1b-A/T1b-B were run at the `0.6.x` tip `0948540` with the new activation
-lane present (and only `UiWindowHost.cs` mutated, so the lane file was never reverted). Tree otherwise clean,
-Release harness `ALL PASS` before each phase. Each row: the defect planted in the production file, then
-`git checkout -- <file>` before the next row. Every row fired at least one named assertion; no row failed to
-compile.
+lane present (and only `UiWindowHost.cs` mutated, so the lane file was never reverted). R06-A/R06-B were run at
+`a6e8885` with the guard present but still uncommitted, so the file was restored from a byte copy rather than
+`git checkout`; the harness was then rebuilt with `--no-incremental`, because the byte restore puts the
+original mtime back and MSBuild would otherwise have re-run the **mutated** binary and reported its failures as
+the fixed tree's. Tree otherwise clean, Release harness `ALL PASS` before each phase. Each row: the defect
+planted in the production file, then the file restored before the next row. Every row fired at least one named
+assertion; no row failed to compile.
 
 | # | Planted defect (file) | Assertions that went red |
 | --- | --- | --- |
@@ -285,6 +334,8 @@ compile.
 | M20 | `Dispose` stops unsubscribing | *Dispose unsubscribes every source* (+2 knock-ons) |
 | T1b-A | re-announce `host` from `SetActiveTarget(true)` (the verifier's exact attack) | **ACTIVATION-NO-SECOND-ANNOUNCEMENT**; *drawing the reactivated window announces nothing more*; *the announcement count is still exactly one after two full activation cycles* |
 | T1b-B | announce a fresh `CreateHost()` from `SetActiveTarget(true)` | **ACTIVATION-NO-SECOND-ANNOUNCEMENT**; **ACTIVATION-SAME-HOST**; *and the host instance handed out never changed*; the two count restatements |
+| R06-A | the re-check after the announcement is removed (the reviewer's unguarded shape) | **CLOSE-IN-ATTACH-NO-FAILURE**; **CLOSE-IN-ATTACH-NO-EXCEPTION** |
+| R06-B | the re-check skips every announced pass, even a refused close | **CONTROL-CLOSED-ONLY-IF-ACTUALLY-CLOSED**; *and the same pass did draw the page*; *a subscription made in HostAttached is live for the first draw*; *the page arranged the element the draft hangs on*; *the reopened page drew as well*; *and that pass did draw the page* (+1 lane-level NRE in the reload lane) |
 
 ## 4. What this record is not
 
@@ -308,3 +359,9 @@ compile.
 3. **T1b follow-up (task-32).** The verifier's NOT PINNED finding T5a §3.1 is closed by the lane in §2a,
    mutation-proven with their exact attack plus a fresh-host variant. No production behaviour changed: the
    shell already announced only on creation, and this lane is the missing regression guard.
+4. **R06 risk 3 (task-36).** The reviewer's un-reproduced re-entrancy is reproduced and fixed. Measured pre-fix
+   shape: a `System.NullReferenceException` out of the nulled host field, caught by the shell's own guard and
+   reported as a page failure, with a deferred `PageUnavailable` for the window that was deliberately closed.
+   The fix is the re-check in §2c and nothing else — no stack or session re-order is needed, and the reasoning
+   is in that section. What stays unpinned is the in-game stack/IMGUI behaviour of a window that removes itself
+   inside its own pass.
