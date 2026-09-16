@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using FerriteLib.UiKit.Kernel;
 using UnityEngine;
@@ -78,6 +79,10 @@ internal static class KernelReloadSchedulingTests
                 () => VerifyReopenWithBrokenFileReportsOnce(sandbox));
             Run("R06-2 reopen: an unchanged file is not turned into a report",
                 () => VerifyReopenWithUnchangedFileWritesNoReport(sandbox));
+            Run("R06 risk 1: Reload from inside the host's own draw pass",
+                () => VerifyReloadInsideDrawPass(sandbox));
+            Run("R06 risk 1: ReloadAll from inside the host's own draw pass",
+                () => VerifyReloadAllInsideDrawPass(sandbox));
         }
         finally
         {
@@ -785,6 +790,199 @@ internal static class KernelReloadSchedulingTests
         Check(service.Reports.Count == baseline,
             "an unchanged file is not turned into a report by the attach freshness probe");
         Check(HasElement(host.Manifest, "keep"), "and the host is bound to the version already in force");
+    }
+
+    // --- R06 risk 1: the manual channel from inside a draw pass ------------------------------
+
+    private static bool probeKindRegistered;
+
+    private static void EnsureProbeKind()
+    {
+        if (probeKindRegistered) return;
+        UiWidgetRegistry.InitializeCore();
+        UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "sched/probe", () => new PassProbeWidget());
+        probeKindRegistered = true;
+    }
+
+    /// <summary>The probe draws in tree order and records the session's capture state at that moment.</summary>
+    private static readonly List<string> PassTrace = new();
+
+    /// <summary>One-shot trigger a probe fires from inside its own Draw, i.e. from inside the host's pass.</summary>
+    private static Action? PendingTrigger;
+
+    private sealed class PassProbeWidget : IUiWidget
+    {
+        private string label = "";
+
+        public string Kind => "sched/probe";
+
+        public void Configure(UiElementSpec spec)
+        {
+            label = spec.TryGetAttribute("Text", out string text) ? text : "";
+        }
+
+        public void Validate(IUiBindings bindings, string elementPath)
+        {
+        }
+
+        public float Measure(UiWidgetContext ctx) => 16f;
+
+        public void Draw(Rect rect, UiWidgetContext ctx)
+        {
+            PassTrace.Add(label + (ctx.Session.OwnedHotControl.HasValue ? ":hot" : ":free"));
+            Action? trigger = PendingTrigger;
+            PendingTrigger = null;
+            trigger?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// Drives <see cref="UiDocumentService.Reload"/> from inside the host's own draw pass - exactly what the
+    /// demo's manual reload button does - and records what the running pass, the session and the next pass
+    /// actually do. The lane asserts the observation, not an assumption.
+    /// </summary>
+    private static void VerifyReloadInsideDrawPass(string sandbox)
+    {
+        EnsureProbeKind();
+
+        string dir = NewDir(sandbox, "inpass");
+        string path = Path.Combine(dir, "page.xml");
+        string v1 = Page("sched-inpass",
+            "<Column Id=\"root\">"
+            + "<Widget Id=\"trigger\" Kind=\"sched/probe\" Text=\"trigger\"/>"
+            + "<Widget Id=\"tail\" Kind=\"sched/probe\" Text=\"tail\"/>"
+            + "</Column>");
+        File.WriteAllText(path, v1);
+
+        var clock = new ManualClock();
+        var policy = new UiReloadPolicy(quietSeconds: 0.25, retrySeconds: 0.5, maxRetryAttempts: 3, maxDeferSeconds: 2.0);
+        using var service = new UiDocumentService(false, policy, clock);
+        service.Add(new UiDocumentSource("ip", UiDocumentKind.Layout, path), v1);
+        using var host = NewHost("sched-inpass", UiLayoutManifest.Parse(v1), new UiBindings());
+        service.Attach(host, "ip");
+        PendingTrigger = null;
+        Draw(host);
+
+        UiNode? triggerNode = host.Session.GetNodeByElementId("trigger");
+        Check(triggerNode != null, "the probe element has a node a draft can hang on");
+        triggerNode!.State.EditText = "mid-pass-draft";
+
+        string v2 = Page("sched-inpass",
+            "<Column Id=\"root\">"
+            + "<Widget Id=\"trigger\" Kind=\"sched/probe\" Text=\"trigger\"/>"
+            + "<Widget Id=\"head\" Kind=\"sched/probe\" Text=\"head\"/>"
+            + "<Widget Id=\"added\" Kind=\"chrome/banner\" Text=\"added\"/>"
+            + "</Column>");
+        File.WriteAllText(path, v2);
+
+        host.Session.CaptureHotControl(4242);
+        PassTrace.Clear();
+        string? thrown = null;
+        PendingTrigger = () => service.Reload("ip");
+        try
+        {
+            Draw(host);
+        }
+        catch (Exception ex)
+        {
+            thrown = ex.GetType().Name + ": " + ex.Message;
+        }
+
+        Check(thrown == null, "a Reload from inside the host's own draw pass does not throw (got " + (thrown ?? "none") + ")");
+        string trace = string.Join(",", PassTrace);
+        Check(PassTrace.Count == 2 && PassTrace[0] == "trigger:hot" && PassTrace[1] == "tail:free",
+            "the running pass finishes on the pre-reload snapshot and the seal lands mid-pass: the element the new tree removes still drew, already capture-free (["
+            + trace + "])");
+        Check(!PassTrace.Contains("head:hot") && !PassTrace.Contains("head:free"),
+            "and the running pass never swaps in the new snapshot mid-pass");
+        Check(service.LastReport != null && service.LastReport.Accepted,
+            "Reload returned its synchronous accepted report from inside the pass");
+        Check(HasElement(host.Manifest, "added") && !HasElement(host.Manifest, "tail"),
+            "the commit is synchronous: the manifest is already the new tree when the pass returns");
+        Check(host.Session.IsActive, "the session survives the mid-pass commit");
+        Check(ReferenceEquals(triggerNode, host.Session.GetNodeByElementId("trigger"))
+            && triggerNode!.State.EditText == "mid-pass-draft",
+            "a surviving identity keeps its node and its draft across the mid-pass commit");
+        Check(host.Session.OwnedHotControl == null, "and the held capture was released by the mid-pass seal");
+
+        PendingTrigger = null;
+        PassTrace.Clear();
+        Draw(host);
+        trace = string.Join(",", PassTrace);
+        Check(PassTrace.Count == 2 && PassTrace[0] == "trigger:free" && PassTrace[1] == "head:free",
+            "the next pass draws the new tree only ([" + trace + "])");
+        Check(triggerNode!.State.EditText == "mid-pass-draft", "and the draft is still there on the pass after");
+    }
+
+    /// <summary>
+    /// The same observation for <see cref="UiDocumentService.ReloadAll"/>, with a layout and a style document
+    /// so the lane can see whether both halves commit inside the one pass.
+    /// </summary>
+    private static void VerifyReloadAllInsideDrawPass(string sandbox)
+    {
+        EnsureProbeKind();
+
+        string dir = NewDir(sandbox, "inpass-all");
+        string layoutPath = Path.Combine(dir, "page.xml");
+        string stylePath = Path.Combine(dir, "theme.xml");
+        string layout1 = Page("sched-inpass-all",
+            "<Column Id=\"root\">"
+            + "<Widget Id=\"trigger\" Kind=\"sched/probe\" Text=\"trigger\"/>"
+            + "<Widget Id=\"tail\" Kind=\"sched/probe\" Text=\"tail\"/>"
+            + "</Column>");
+        string style1 = PageSchemeStyle("ice", "#0000ff");
+        File.WriteAllText(layoutPath, layout1);
+        File.WriteAllText(stylePath, style1);
+
+        var clock = new ManualClock();
+        var policy = new UiReloadPolicy(quietSeconds: 0.25, retrySeconds: 0.5, maxRetryAttempts: 3, maxDeferSeconds: 2.0);
+        using var service = new UiDocumentService(false, policy, clock);
+        service.Add(new UiDocumentSource("lay", UiDocumentKind.Layout, layoutPath), layout1);
+        service.Add(new UiDocumentSource("sty", UiDocumentKind.Style, stylePath), style1);
+
+        UiTheme theme = UiTheme.DarkGold.Clone();
+        using var host = NewHost("sched-inpass-all", UiLayoutManifest.Parse(layout1), new UiBindings(), theme);
+        service.Attach(host, "lay", "sty");
+        PendingTrigger = null;
+        Draw(host);
+        Check(SameColor(theme.Panel, new Color(0f, 0f, 1f, 1f)), "the first style version applied on attach");
+
+        string layout2 = Page("sched-inpass-all",
+            "<Column Id=\"root\">"
+            + "<Widget Id=\"trigger\" Kind=\"sched/probe\" Text=\"trigger\"/>"
+            + "<Widget Id=\"head\" Kind=\"sched/probe\" Text=\"head\"/>"
+            + "<Widget Id=\"added\" Kind=\"chrome/banner\" Text=\"added\"/>"
+            + "</Column>");
+        string style2 = PageSchemeStyle("ice", "#00ff00");
+        File.WriteAllText(layoutPath, layout2);
+        File.WriteAllText(stylePath, style2);
+
+        PassTrace.Clear();
+        string? thrown = null;
+        PendingTrigger = () => { service.ReloadAll(); };
+        try
+        {
+            Draw(host);
+        }
+        catch (Exception ex)
+        {
+            thrown = ex.GetType().Name + ": " + ex.Message;
+        }
+
+        Check(thrown == null, "ReloadAll from inside the draw pass does not throw (got " + (thrown ?? "none") + ")");
+        string trace = string.Join(",", PassTrace);
+        Check(PassTrace.Count == 2 && PassTrace[0] == "trigger:free" && PassTrace[1] == "tail:free",
+            "the running pass still finishes on the pre-reload snapshot ([" + trace + "])");
+        Check(HasElement(host.Manifest, "added"), "the layout half committed synchronously");
+        Check(SameColor(theme.Panel, new Color(0f, 1f, 0f, 1f)),
+            "and the style half was applied to the theme inside the same pass");
+
+        PendingTrigger = null;
+        PassTrace.Clear();
+        Draw(host);
+        trace = string.Join(",", PassTrace);
+        Check(PassTrace.Count == 2 && PassTrace[0] == "trigger:free" && PassTrace[1] == "head:free",
+            "the next pass draws the new tree only ([" + trace + "])");
     }
 
     // --- fixture ----------------------------------------------------------------------------

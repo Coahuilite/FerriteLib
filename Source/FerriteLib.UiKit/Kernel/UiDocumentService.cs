@@ -381,6 +381,18 @@ public sealed class UiDocumentService : IDisposable
     /// period and the interaction deferral, consumes any signal pending for this document, and runs the
     /// identical candidate/validate/commit path a scheduled <see cref="Pump"/> runs (same parser, same
     /// per-host pre-check, same atomic batch and rollback). Returns null for an unknown id.
+    /// <para>
+    /// <b>It commits synchronously, so calling it from a draw pass is a mid-pass commit.</b> The report
+    /// describes a commit that has already happened by the time the call returns, which is exactly what the
+    /// manual-reload button reads. When the caller is inside its own <c>DoWindowContents</c>, the pass that is
+    /// running finishes on the snapshot it already measured and the new tree is what the next measure/draw
+    /// uses; by the time the remaining elements of that running pass draw, the destructive half has already
+    /// run - removed or kind-changed element state is reset and a held interaction capture is released - and
+    /// the new style has been applied to the theme. That is a one-pass transient, not a torn session: a
+    /// surviving identity keeps its node and its draft. The observation is pinned by
+    /// <c>KernelReloadSchedulingTests.VerifyReloadInsideDrawPass</c>, and the boundary it does not cover is
+    /// written down in <c>docs/development/0.6/verification/t2-reload-scheduling.md</c> §7.
+    /// </para>
     /// </summary>
     public UiReloadReport? Reload(string documentId)
     {
@@ -398,7 +410,10 @@ public sealed class UiDocumentService : IDisposable
 
     /// <summary>
     /// Manual reload of every registered document, in registration order. Like <see cref="Reload"/> this is
-    /// the immediate manual channel: no quiet period, no deferral, the same validation and commit path.
+    /// the immediate manual channel: no quiet period, no deferral, the same validation and commit path, and
+    /// the same synchronous mid-pass boundary - every document's commit lands inside the calling pass, and the
+    /// running pass still finishes on the snapshot it already measured
+    /// (<c>KernelReloadSchedulingTests.VerifyReloadAllInsideDrawPass</c>).
     /// </summary>
     public IReadOnlyList<UiReloadReport> ReloadAll()
     {

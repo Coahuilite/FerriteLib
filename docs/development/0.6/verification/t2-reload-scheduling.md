@@ -409,3 +409,66 @@ reddens `VerifyEmbeddedFallback`'s *"a missing file with a valid fallback is not
 
 NOT verified: that a real editor produces the watcher signal in-game and that `FileSystemWatcher` delivers it
 before the reopen. The contract is asserted against `Signal`; the in-game half stays 尚待外部团队验证.
+
+---
+
+## 7. R06 risk 1 — the manual channel from inside a draw pass (task-37)
+
+The reviewer flagged, as a RISK rather than a must-fix, that `Reload`/`ReloadAll` commit synchronously and the
+demo's manual reload button calls them from inside `DoWindowContents`, so the manifest/engine/resolver can be
+swapped mid-pass. They could not reproduce a concrete input failure and noted it is partly inherited from 0.5.
+
+**The observation (driven, not assumed).** `KernelReloadSchedulingTests.VerifyReloadInsideDrawPass` builds a
+page whose first element is a probe widget that calls `service.Reload("ip")` from inside its own `Draw`, with a
+layout document the reload replaces (the second probe element is removed, a new element added) and a held
+`UiSession` capture. `VerifyReloadAllInsideDrawPass` does the same with `ReloadAll()` over a layout and a style
+document and a theme the lane holds. The pass trace records each probe as it draws, in tree order, with the
+session's capture state:
+
+```
+Reload,    observed pass : trigger:hot, tail:free
+Reload,    next pass     : trigger:free, head:free
+ReloadAll, observed pass : trigger:free, tail:free
+```
+
+What actually happens:
+
+1. **Nothing throws.** Both calls complete inside the pass; the full harness runs green.
+2. **The running pass finishes on the pre-reload snapshot.** The engine draws the entries it arranged
+   (`lastEntries`) from the instance that is already executing, so the element the new tree removes (`tail`)
+   still draws *after* the reload committed. The new element (`head`) never appears in the running pass.
+3. **The commit is synchronous.** When the call returns, `host.Manifest` is already the new tree, the theme
+   already carries the new style, and `LastReport` is the accepted report - which is what the button reads.
+4. **The destructive half lands mid-pass.** The trace shows the trigger drawn `:hot` and the next element drawn
+   `:free`: the held capture was released by `SealDocumentCommit` while the old snapshot was still drawing.
+5. **The session stays coherent.** It is still active; a surviving identity keeps the same node and its
+   uncommitted draft; the next measure/draw uses the new tree only.
+
+**The contract that follows.** `Reload`/`ReloadAll` are synchronous mid-pass commits by design: they return the
+report of a commit that has already happened, and the pass that called them finishes on its own snapshot. The
+minimal move to the safer boundary would be to have the manual channel request the commit and run it at the next
+`BeginFrame`; that changes the frozen `UiReloadReport? Reload(id)` return contract (it could no longer return
+the report of a commit it has not performed) and therefore the demo's button. It was **not** implemented here;
+it is reported to the Lead as an option. The boundary is documented on both members' XML docs.
+
+### Lanes and mutation status (task-37)
+
+| Claim | Lane | Planted defect → red | Status |
+| --- | --- | --- | --- |
+| no throw; running pass on the pre-reload snapshot; new tree only next pass; session coherent; draft kept | `VerifyReloadInsideDrawPass` | **M-E** the seal no longer releases the capture → red *"the running pass finishes on the pre-reload snapshot and the seal lands mid-pass ... ([trigger:hot,tail:hot])"* and *"and the held capture was released by the mid-pass seal"* | **mutation-proven** |
+| the commit and its report are synchronous | `VerifyReloadInsideDrawPass` | **M-F** `Reload` returns without committing → red *"Reload returned its synchronous accepted report from inside the pass"*, *"the commit is synchronous ..."*, *"the next pass draws the new tree only"* | **mutation-proven** |
+| `ReloadAll` commits every document inside the one pass | `VerifyReloadAllInsideDrawPass` | **M-G** `ReloadAll` commits only the first document → red *"and the style half was applied to the theme inside the same pass"* | **mutation-proven** |
+| `ReloadAll`'s running pass keeps the pre-reload snapshot | `VerifyReloadAllInsideDrawPass` | no defect planted | **future-regression guard** |
+
+Red counts: M-E 5 (it also reddens the P4 hot-control lane and the T2 deferral lane), M-F 56 (the whole manual
+channel), M-G 1.
+
+### What this does NOT pin
+
+- **Real IMGUI semantics of a mid-pass capture release.** The stub's `CaptureHotControl` is a session field;
+  whether a real drag can re-capture in the same event after the release is not observable here.
+- **Appearance of the running pass.** The trace proves which elements drew and the capture state, not the
+  pixels: a remaining element can draw pre-reload geometry with the post-reload theme in that one pass.
+- **A consumer that reloads from a window's own `PreClose`/`PostClose`** (the §1.6 re-entrancy hole) stays
+  unpinned.
+- **The safe-boundary alternative** is a proposal, not a measurement; nothing here measures the deferred shape.
