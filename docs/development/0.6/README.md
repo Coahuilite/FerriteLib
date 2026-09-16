@@ -15,8 +15,13 @@ has been accepted in game; every entry states which evidence class it carries.
 | `20-api-and-xml.md` | Consumer-facing XML and C# usage of the new surface (written as packages land) |
 | `30-consumer-handoff.md` | Version range, migration, known limits for a real consumer |
 | `40-verification.md` | Commands, results, everything unfinished, and who owns it |
-| `50-dev-package.md` | Where the dev package is, its hash and the source revision behind it |
+| `50-dev-package.md` | Where the (R06-fixed) dev package is, its hash and the source revision behind it |
+| `60-review-r06.md` | Disposition of the independent review: R06-1..R06-7 and the two risk items |
 | `verification/` | Per-package adversarial records, including what a lane does **not** pin |
+
+The **permanent consumer pointer** is `docs/consumers/consume-from-0.6.0.md` (artefact to take, version
+assertion, reference setup, the registry-scope trap, what is still open) — a consumer session should be handed
+that, not this directory.
 
 Two records outside this directory also belong to the round: the demo mod lives in its own local repository
 beside this one (`ferritelib_uikit_demo`, `README.md` there), and the coordination surface is
