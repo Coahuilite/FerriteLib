@@ -30,6 +30,10 @@ namespace FerriteLib.UiKit.Tests;
 /// the shape a consumer that re-subscribes its view model when its window becomes the target produces -
 /// announces nothing and hands out no second host. The T5a verifier measured this shape as NOT PINNED; this
 /// lane closes it. The product behaviour is correct as it stands, so the lane is a regression guard.</item>
+/// <item>An announcement handler may close its own window: the close detaches and disposes the host, and the
+/// pass must not then draw the host that no longer exists. The external R06 review flagged this re-entrancy
+/// and could not reproduce it; this lane reproduces it, pins the guard and keeps a positive control that the
+/// guard does not skip a draw when the close was vetoed.</item>
 /// </list>
 /// Everything here is harness evidence over the stub game surface. It shows what the shell does under a
 /// driven pass; it does not show how the real window stack orders its own hooks in a running game.
@@ -53,6 +57,7 @@ internal static class KernelPageLifecycleTests
         Run("Reload: a page with a VM attached survives layout and style reloads untouched", VerifyReloadInvariance);
         Run("Door: HostAttached sees the first draw, and PageHost works after it", VerifyTheDoorIsUsable);
         Run("Activation: re-activating a window does not announce its host again", VerifyActivationDoesNotReannounce);
+        Run("Close in HostAttached: a handler may close its own window without a failure", VerifyCloseFromAttach);
         return failures;
     }
 
@@ -484,6 +489,129 @@ internal static class KernelPageLifecycleTests
         return same;
     }
 
+    // --- (5c) an announcement handler may close its own window ---------------------------------
+
+    /// <summary>
+    /// The R06 re-entrancy the external reviewer flagged: <c>HostAttached</c> is a public door and closing the
+    /// window is a legitimate thing for a handler to do there (a page that is opened to answer one question
+    /// and closes itself when there is nothing to show). The close runs synchronously through the vanilla
+    /// order - <c>OnCloseRequest</c>, <c>PreClose</c>, stack removal, <c>PostClose</c> - and <c>PreClose</c>
+    /// releases the host, so the pass that was about to draw it has nothing left to draw.
+    /// <para>
+    /// The lane drives the real path: the shell is opened through a <see cref="UiWindowCatalog"/> and the
+    /// handler closes it with <c>catalog.Close(key)</c>, which is <c>WindowStack.TryRemove</c>. Block (a)
+    /// asserts the fixed contract; block (b) is the positive control - a close the window's own
+    /// <c>CanClose</c> vetoes must still draw the page in the same pass, so the guard cannot pass by
+    /// abandoning every announced pass.
+    /// </para>
+    /// </summary>
+    private static void VerifyCloseFromAttach()
+    {
+        CloseFromAttachOutcome closed = RunCloseFromAttach(allowClose: true);
+        Check(closed.AttachCalls == 1, "the host is announced once before the handler closes the window");
+        Check(closed.CloseAttempts == 1 && closed.CloseAccepted,
+            "the handler's close of its own window goes through the vanilla path");
+        Check(closed.DetachCalls == 1 && closed.DetachedWithLiveSession,
+            "the close detaches the announced host while it is still alive");
+        Check(!closed.LiveHostPresent && !closed.SessionAlive,
+            "and leaves the shell with no host and a disposed session");
+        Check(closed.DrawCount == 0, "the page was never drawn: the close happened before its first frame");
+        Check(closed.Failures == 0,
+            "CLOSE-IN-ATTACH-NO-FAILURE: closing the window from its own HostAttached is not a page failure");
+        Check(closed.FailureReported == null,
+            "CLOSE-IN-ATTACH-NO-EXCEPTION: and no exception was recorded for it");
+        Check(closed.NoticeCount == 0, "the closing pass draws no failure notice");
+
+        CloseFromAttachOutcome refused = RunCloseFromAttach(allowClose: false);
+        Check(refused.CloseAttempts == 1 && !refused.CloseAccepted, "a vetoed close is refused");
+        Check(refused.AttachCalls == 1, "the host is still announced once");
+        Check(refused.LiveHostPresent && refused.SessionAlive, "and the page host survives the refusal");
+        Check(refused.DrawCount >= 1,
+            "CONTROL-CLOSED-ONLY-IF-ACTUALLY-CLOSED: a refused close still draws the page in the same pass");
+        Check(refused.Failures == 0 && refused.FailureReported == null,
+            "and a refused close is not a failure either");
+    }
+
+    /// <summary>What one close-in-attach scenario produced, read after its pass.</summary>
+    private sealed class CloseFromAttachOutcome
+    {
+        internal int AttachCalls;
+
+        internal int DetachCalls;
+
+        internal bool DetachedWithLiveSession;
+
+        internal int CloseAttempts;
+
+        internal bool CloseAccepted;
+
+        internal bool LiveHostPresent;
+
+        internal bool SessionAlive;
+
+        internal int DrawCount;
+
+        internal int Failures;
+
+        internal Exception? FailureReported;
+
+        internal int NoticeCount;
+    }
+
+    /// <summary>
+    /// One close-in-attach pass over a real catalog. <paramref name="allowClose"/> false makes the window veto
+    /// the close, which is the positive control.
+    /// </summary>
+    private static CloseFromAttachOutcome RunCloseFromAttach(bool allowClose)
+    {
+        const string Consumer = "close-in-attach";
+        string kind = "page-" + (allowClose ? "accepted-" : "refused-") + Guid.NewGuid().ToString("N");
+        string scope = Consumer + "/" + kind;
+
+        var stack = new WindowStack();
+        var catalog = new UiWindowCatalog(stack, UiFocusPolicy.FollowClicks);
+        var outcome = new CloseFromAttachOutcome();
+        ProbeShell? shell = null;
+        catalog.Register(Consumer, kind, null, key =>
+        {
+            var created = new ProbeShell(scope) { AllowClose = allowClose };
+            created.windowRect = new Rect(0f, 0f, 800f, 600f);
+            created.HostAttached += _ =>
+            {
+                outcome.CloseAttempts++;
+                outcome.CloseAccepted = catalog.Close(key);
+            };
+            shell = created;
+            return created;
+        });
+
+        var windowKey = new UiWindowKey(Consumer, kind, "");
+        try
+        {
+            catalog.Open(windowKey);
+            shell!.WindowOnGUI();
+
+            outcome.AttachCalls = shell.AttachCalls;
+            outcome.DetachCalls = shell.DetachCalls;
+            outcome.DetachedWithLiveSession = shell.DetachedWithLiveSession;
+            outcome.LiveHostPresent = shell.LiveHost != null;
+            outcome.SessionAlive = shell.Session != null && shell.Session.IsActive;
+            outcome.DrawCount = DrawCountOf(scope);
+            outcome.Failures = shell.Failures;
+            outcome.FailureReported = shell.FailureReported;
+            outcome.NoticeCount = shell.Notices.Count;
+        }
+        finally
+        {
+            catalog.CloseAll();
+            Event.current = null;
+            UiNative.ButtonOverride = null;
+            UiNative.DebugMousePositionEnabled = false;
+        }
+
+        return outcome;
+    }
+
     // --- helpers --------------------------------------------------------------------------------
 
     private static UiPageWindow NewPageWindow(string consumer, string kind, string source, IUiBindings bindings)
@@ -676,11 +804,19 @@ internal static class KernelPageLifecycleTests
 
         internal UiHost? LiveHost => Host;
 
+        /// <summary>The exception this shell recorded for its last failed pass, or null when no pass failed.</summary>
+        internal Exception? FailureReported => LastFailure;
+
+        /// <summary>The close veto this double answers with; true (the default) allows a close.</summary>
+        internal bool AllowClose = true;
+
         protected override UiTheme Theme => UiTheme.DarkGold;
 
         protected override string Title => "title";
 
         protected override string CloseText => "close";
+
+        protected override bool CanClose() => AllowClose;
 
         protected override UiHost CreateHost()
         {

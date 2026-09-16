@@ -393,6 +393,16 @@ public abstract class UiWindowHost : Window
                 HostAttached?.Invoke(created);
             }
 
+            // The announcement door is public, and closing the window is a legitimate thing for a handler to
+            // do there - a page opened to answer one question closes itself when there is nothing to show. A
+            // close runs PreClose -> ReleaseHost, which nulls this field and disposes the host, so the pass
+            // that was about to draw it has nothing left to draw. Re-read the field rather than the local
+            // created above: ReleaseHost nulls the field precisely so the close is observable here.
+            if (host == null)
+            {
+                return;
+            }
+
             host.DrawFrame(content);
         }
         catch (Exception ex)
