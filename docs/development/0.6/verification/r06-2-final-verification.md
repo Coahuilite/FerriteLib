@@ -1,8 +1,8 @@
 # R06-F — final independent verification of the R06 fixes and re-pack
 
-Owner: `verify` (shared task `task-40`). Frozen FL tip verified: **`7b62416fa623bd38869223e4639d556558c74185`**
-(`0.6.x`, clean). Status of this record: **items 1, 2, 3 (FL half) and 4 are complete; item 3 (demo half) and
-item 5 are pending the demo owner's confirmed re-commit** — see `7.
+Owner: `verify` (shared task `task-40`). Frozen tips verified: FerriteLib
+**`7b62416fa623bd38869223e4639d556558c74185`** (`0.6.x`, clean) and the demo
+**`587bf160fbf1e566475b8a80d1ee693ed3e9eca9`** (`master`, clean). **Complete: items 1-6.**
 
 The FL fixes in this tip: `eff4f57` + `6b556dd` (risk-3 close-in-attach guard), `a48e808` (R06-2
 Attach/pending), `9c7ce56` (risk-1 lane + record), `7b62416` (T5b-4 before-record).
@@ -136,13 +136,80 @@ time (checked `git rev-parse` and `git log`), so the package label names the ver
 documentation commit followed the content freeze, and none needs to be excepted. The packaged DLL is what my
 own fixture loaded (hash copied above and re-read after the copy).
 
-## 5. Demo package (item 5) — PENDING
+## 5. The demo half (items 3 and 5) — verified at `587bf160`, clean
 
-Not reported yet, deliberately. At this moment the demo repository is at `b0fb161`
-("fix(demo): close the six R06 demo defects with lanes and planted mutations") with a **dirty working tree**
-(`README.md`, `pack.ps1`, `tools/DemoProbe/Program.cs` modified) — i.e. the owner's own re-probe/re-pack is in
-progress. The Lead said the final demo sha and hash will be confirmed; until then I make no claim about the
-package, its file set, its LoadFolders resolution or its DLL hash.
+Demo repository: branch `master`, tip **`587bf160fbf1e566475b8a80d1ee693ed3e9eca9`**, working tree clean;
+read-only for me — every defect below was planted in a **scratch copy** of the repo, and that copy was clean
+again after every run. Two commits landed since `b0fb161`: `f19ca9c` (validate the package before publishing
+it; pin the new Attach contract) and `587bf16` (build without trusting the up-to-date check).
+
+### 5.1 My own defects against the six demo fixes
+
+Each row: my defect, written into one source file of the scratch copy, then the demo's probe rebuilt
+(`--no-incremental`) and run. Baseline before each row and after every restore: `DEMO PROBE PASS`.
+
+| item | my planted defect | probe result |
+| --- | --- | --- |
+| R06-3 | re-register `consumerKinds` inside `RefreshConsumerRows` (every scope change binds it again) | **FAIL** `consumer-filter-switch-repeatedly :: InvalidOperationException :: Duplicate value binding 'consumerKinds'.` (plus `catalogue-identity-is-injective` on the same exception) |
+| R06-4 | `OnModelChanged` keyed on `DataProperty` instead of `ItemsProperty` (the structural announcement ignored) | **FAIL** `dual-window-add-under-different-filters` |
+| R06-6 | `RowKey` made lossy again (`~` and `_` both collapse to `_`) | **FAIL** `catalogue-identity-is-injective` |
+| R06-7 | `RefreshCatalogue` no longer calls `DemoCatalog.Read()` | **FAIL** `late-registration-is-visible` |
+| R06-1 | tracked manifest `<li>1.6</li>` → `<li>1.60</li>` | `pack.ps1` **exit 1**: "LoadFolders.xml declares /, 1.60 but no declared folder + Assemblies/FerriteLibUiKitDemo.dll resolves the game-visible assembly in the candidate" |
+
+Every row reddened its owning lane, and the restored scratch tree was clean (`git status --porcelain` empty)
+with the probe green again.
+
+### 5.2 The new consumer-side lane is not vacuous (measured against the real pre-fix behaviour)
+
+`tools/DemoProbe/Program.cs` adds `attach-adopts-newest-content-without-pump`, asserting
+`pendingBefore && before=="old" && after=="new" && !pending`. I built the **pre-fix carrier from source**
+(`git archive a6e8885`, Release; SHA-256 `FF24197E27DCFBF4095183F27BF3B2516C8C16D720615C7617D27C0776203AD9`,
+230912 B) and pointed a scratch demo copy's `FerriteLibArtifactDir` at it:
+
+```
+pre-fix carrier : no-pump attach: before=old signalPending=True after=old pending=False
+                  FAIL attach-adopts-newest-content-without-pump        (probe exit 1)
+fixed carrier   : no-pump attach: before=old signalPending=True after=new pending=False
+                  PASS attach-adopts-newest-content-without-pump        (probe exit 0)
+```
+
+The lane cannot pass by constructing the host from the new text: it asserts the pre-state (stale `before`,
+signal pending) and it detects the real pre-fix defect.
+
+### 5.3 Attacking the artefact, not the tree (the class the demo owner fixed)
+
+The pack path stages into `dist/.staging-*`, validates, and swaps only on success.
+
+| attack | raw result |
+| --- | --- |
+| **A2** tracked manifest mutated (`<li>1.60</li>`), then `pack.ps1` | exit 1 with the reachability message; delivered-folder fingerprint **unchanged**; `dist/.staging-*` **absent** |
+| **A1** delivered artefact drifted (`LoadFolders.xml` edited inside `dist/`, tracked tree correct), then `pack.ps1` | exit 0; the delivered manifest becomes byte-identical to the tracked one (`3FD398611C5E6013B590BB1E13A5FB328F88AE9A1C6608F6AE076DD0D63D5C49`) |
+
+The "a refused pack leaves the previous artefact byte-identical" claim holds under my own attack, and a pack
+from a correct tree repairs drift. Boundary worth one line: **drift is repaired, not detected** — a delivered
+folder left stale by some other process reddens nothing until `pack.ps1` (or `verify-fixes.ps1`, which packs
+at baseline) runs. That matches what the scripts claim; it is not a claim that a stale artefact would be
+reported as such.
+
+### 5.4 Item 5 — the delivered demo package
+
+From my own scan of `dist/FerriteLibUiKitDemo/` at `587bf160`:
+
+- **8 files** (FerriteLib's package is the five-file one; the demo also ships `Languages/` and `Xml/`).
+- `LoadFolders.xml` 200 B, SHA-256 `3FD398611C5E6013B590BB1E13A5FB328F88AE9A1C6608F6AE076DD0D63D5C49`,
+  declaring `/` and `1.6`.
+- **My own reachability computation:** declared `/` → `dist/FerriteLibUiKitDemo/Assemblies/FerriteLibUiKitDemo.dll`
+  `exists=False`; declared `1.6` → `dist/FerriteLibUiKitDemo/1.6/Assemblies/FerriteLibUiKitDemo.dll`
+  `exists=True`. The demo's own `pack.ps1` prints the same lookup, the reachable path, `staged … (8 files)`,
+  and `no FerriteLib.UiKit.dll; no machine-absolute path in any publishable file`.
+- **No `FerriteLib.UiKit.dll`** anywhere in the package (0 hits) and no tracked file with that name.
+- Demo DLL 49664 B, SHA-256 `53CBF59E3BDD8602CC0E43E45A3BF01412119BEB64339B3F2FAB6FB2EC4685E7`.
+- **The package's DLL is the one its probe loaded:** the probe's build output copy
+  `tools/DemoProbe/bin/Release/net472/FerriteLibUiKitDemo.dll` has exactly that SHA-256, and its
+  `FerriteLib.UiKit.dll` copy is `2A7F9C9E…ECC0D` — the re-packed FL dev-package DLL.
+- **No drive-letter path in tracked files:** 25 tracked files scanned for `[A-Za-z]:\` and `[A-Za-z]:/`
+  → 0 hits. (A laxer first pass flagged `candidate":` inside a probe string literal; the strict scan above is
+  the reported measurement.)
 
 ## 6. What I did NOT verify
 
@@ -151,6 +218,12 @@ package, its file set, its LoadFolders resolution or its DLL hash.
   unobserved here. The reviewer's probe runs against the harness's game stubs, and so does my own probe.
 - **RISK-1's in-game safety**: the lane is a synthetic single-pass observation; the record's own
   "does not pin" list stands.
-- **The demo fixes (R06-3/4/6/7, R06-1's packaged reachability) and the demo package** — `5 and `7.
-- **Anything bound to a moved tip.** This record is bound to `7b62416` for FL. If `0.6.x` moves before the
-  demo half is done, `1, `3 and `4 must be re-run.
+- **The demo half's stub surface.** The demo probe compiles against the harness's game doubles
+  (`FerriteLibStubDir` = `tools/FerriteLib.UiKit.Tests/bin/Release/net472`), so R06-3/4/6/7 are observed
+  through `Verse`/`UnityEngine` stand-ins; `pack.ps1`'s LoadFolders resolution is a filesystem computation,
+  not an observation of a running `ModLister`, so R06-1 stays derived rather than seen in game.
+- **The pre-fix carrier is a rebuild**, not the archived pre-fix package: its assembly informational version
+  carries the a6e8885 commit, so its bytes are not the overwritten pre-fix package's bytes. The lane flip is a
+  statement about the pre-fix code, which is what it has to be.
+- **Anything bound to a moved tip.** This record is bound to `7b62416` (FL) and `587bf160` (demo). A move on
+  either invalidates the corresponding sections and needs them re-run.
