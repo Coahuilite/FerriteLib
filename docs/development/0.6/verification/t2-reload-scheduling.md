@@ -359,3 +359,53 @@ M10 shows the R1 assertion still fires on the real defect.
 5. **Direct file-read counts.** §3 limits: the "one read" and "no re-parse" claims are report-count proxies.
 6. **Cross-machine watcher behaviour.** `FileSystemWatcher` coalescing/dropping is exercised only through
    `Signal`; the `overflowed` recovery path is pre-existing and not re-laned here.
+
+---
+
+## 6. R06-2 — the reopen-refresh contract (post-review must-fix, task-34)
+
+Independent review reproduced a real defect: valid old content, the only host closed, the file changed, the
+watcher's `Signal` delivered, a new host attached **with no pump in between** — the reopen showed the OLD
+content. Root cause: `Attach` → `ResolveScheduledNow` decided whether to read from `schedules.Remove(id)` and
+then unconditionally did `pending.Remove(id)`. With no attached host nothing pumps, so a signal only ever lived
+in the pending set with an empty schedule table; the attach dropped it and applied the stale last-good version.
+
+### The contract
+
+`Attach` calls `RefreshBeforeAttach` for each named document **before** the new host is added to the
+dependency table. The outcome is *the newest valid content as of the instant of the next attach*. The watcher
+state is consumed first, whatever shape it is in (pending or scheduled), and then **one read decides every
+shape** — there is no branch that depends on which watcher state happened to be present:
+
+| Shape | What the reopen shows |
+| --- | --- |
+| (a) A signal arrived while nothing was attached | the signalled bytes are read on the explicit path (no quiet period, no deferral) through the same candidate/validate/commit path a reload uses; the reopen shows the new content even though no `Pump` ever observed the signal, and the signal does not survive to make the next frame re-read it |
+| (b) The watcher never fired (not armed / directory created late / dropped notification) | the file's own content identity is compared with the version in force: moved → refreshed through the same path; not moved → nothing applied, no report |
+| (c) The file is missing | absence is not newer content: the last valid version stays in force and the attach writes no failure report |
+| (d) The file is broken | the content moved, so the candidate is refused, reported once per refusing version, and the last valid version is what the host is bound to |
+
+(a) and (b) are one code path, not two: the version comparison answers both. The freshness read reuses the
+service's single read entry point (`ReadCandidate` → `ReadExternal`), and `ReloadCore` now takes that
+already-read candidate, so an attach that resolves a changed document still pays exactly **one** snapshot (R7's
+guard counts call sites and stays green). The cost is one candidate read+parse per named document per
+`Attach`; `Attach` is a bind operation, not a per-frame call.
+
+### Lanes and mutation status (task-34)
+
+All mutations planted in a scratch state, harness rebuilt and run, file restored (SHA-256 checked back to the
+pre-mutation hash).
+
+| Claim | Lane | Planted defect → red | Status |
+| --- | --- | --- | --- |
+| reviewer's exact shape: signal, no pump, attach | `VerifyReopenAfterSignalNoPump` | **M-A** watcher state not consumed → red *"and the signal was consumed, not thrown away"*; **M-B** no freshness read → red *"reopen shows the new content even though no Pump ever observed the signal"* | **mutation-proven** (both halves) |
+| (b) unsignalled content change | `VerifyReopenAfterUnsignalledContentChange` | **M-B** → red *"an unsignalled content change still resolves at attach (content-version freshness)"* | **mutation-proven** |
+| (b) watcher could not arm (directory late) | `VerifyReopenWhenWatcherCouldNotArm` | **M-B** → red *"the late directory's file resolves at attach even though no watcher ever armed"* | **mutation-proven** |
+| (c) missing file | `VerifyReopenWithMissingFileKeepsLastValid` | **M-C** treat a missing file as moved content → red *"and attach does not turn an absence into a report"* | **mutation-proven** |
+| (d) broken newer file | `VerifyReopenWithBrokenFileReportsOnce` | **M-D** every probe failure a silent no-op → red *"and the break is reported once at attach"* | **mutation-proven** |
+| unchanged file writes no report | `VerifyReopenWithUnchangedFileWritesNoReport` | the probe is what would over-report; no defect planted | **future-regression guard** |
+
+Red counts: M-A 2, M-B 10 (it also reddens the pre-existing `VerifyNothingOpenIsNotRebuilt`), M-C 4 (also
+reddens `VerifyEmbeddedFallback`'s *"a missing file with a valid fallback is not a failure"*), M-D 2.
+
+NOT verified: that a real editor produces the watcher signal in-game and that `FileSystemWatcher` delivers it
+before the reopen. The contract is asserted against `Signal`; the in-game half stays 尚待外部团队验证.

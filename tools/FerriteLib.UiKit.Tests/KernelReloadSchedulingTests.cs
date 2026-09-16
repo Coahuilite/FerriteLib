@@ -66,6 +66,18 @@ internal static class KernelReloadSchedulingTests
                 () => VerifyLayoutAndStyleInQuickSuccession(sandbox));
             Run("A scheduler-driven rolled-back batch keeps the old tree and R1's draft",
                 () => VerifySchedulerRollbackKeepsDraft(sandbox));
+            Run("R06-2 reopen: a signal no pump observed is consumed by Attach, not dropped",
+                () => VerifyReopenAfterSignalNoPump(sandbox));
+            Run("R06-2 reopen: a content change with no signal at all resolves by content version",
+                () => VerifyReopenAfterUnsignalledContentChange(sandbox));
+            Run("R06-2 reopen: a file whose watcher never armed still resolves at attach",
+                () => VerifyReopenWhenWatcherCouldNotArm(sandbox));
+            Run("R06-2 reopen: a missing file keeps the last valid version and writes no report",
+                () => VerifyReopenWithMissingFileKeepsLastValid(sandbox));
+            Run("R06-2 reopen: a broken newer file keeps the last valid version and is reported once",
+                () => VerifyReopenWithBrokenFileReportsOnce(sandbox));
+            Run("R06-2 reopen: an unchanged file is not turned into a report",
+                () => VerifyReopenWithUnchangedFileWritesNoReport(sandbox));
         }
         finally
         {
@@ -589,6 +601,190 @@ internal static class KernelReloadSchedulingTests
             "the rolled-back host is back on the old document");
         Check(draft.State.EditText == "uncommitted-draft",
             "and R1's draft survives the scheduler-driven rollback");
+    }
+
+    // --- R06-2: the reopen-refresh contract --------------------------------------------------
+
+    /// <summary>
+    /// The reviewer's exact shape: valid old content, the only host closed, the file changed, the watcher's
+    /// signal delivered, then a new host attached with NO pump in between. The signal must be consumed, not
+    /// dropped, so the reopen shows the new content.
+    /// </summary>
+    private static void VerifyReopenAfterSignalNoPump(string sandbox)
+    {
+        string dir = NewDir(sandbox, "reopen-signal");
+        string path = Path.Combine(dir, "page.xml");
+        string v1 = KeepPage("sched-reopen-signal");
+        File.WriteAllText(path, v1);
+
+        var clock = new ManualClock();
+        var policy = new UiReloadPolicy(quietSeconds: 0.25, retrySeconds: 0.5, maxRetryAttempts: 3, maxDeferSeconds: 2.0);
+        using var service = new UiDocumentService(false, policy, clock);
+        service.Add(new UiDocumentSource("rs", UiDocumentKind.Layout, path), v1);
+
+        var first = NewHost("sched-reopen-signal-1", UiLayoutManifest.Parse(v1), new UiBindings());
+        service.Attach(first, "rs");
+        first.Dispose();
+        Check(service.DependencyCount == 0, "the only host is closed, so nothing can pump");
+
+        string v2 = Page("sched-reopen-signal",
+            "<Column Id=\"root\">"
+            + "<Widget Id=\"keep\" Kind=\"chrome/banner\" Text=\"keep\"/>"
+            + "<Widget Id=\"added\" Kind=\"chrome/banner\" Text=\"added\"/>"
+            + "</Column>");
+        File.WriteAllText(path, v2);
+        Check(service.Signal("rs"), "the watcher posts a change signal while nothing is attached");
+        Check(service.HasPending, "and it sits in the pending set: there is no host to pump it");
+
+        using var reopened = NewHost("sched-reopen-signal-2", UiLayoutManifest.Parse(v1), new UiBindings());
+        service.Attach(reopened, "rs");
+
+        Check(HasElement(reopened.Manifest, "added"),
+            "reopen shows the new content even though no Pump ever observed the signal");
+        Check(!service.HasPending, "and the signal was consumed, not thrown away");
+        Check(service.Reports.Count == 1 && service.LastReport != null && service.LastReport.Accepted,
+            "the refresh is one accepted report (reports=" + service.Reports.Count + ")");
+    }
+
+    /// <summary>(b) No watcher fired at all: the file's own content version is what makes the reopen fresh.</summary>
+    private static void VerifyReopenAfterUnsignalledContentChange(string sandbox)
+    {
+        string dir = NewDir(sandbox, "reopen-quiet");
+        string path = Path.Combine(dir, "page.xml");
+        string v1 = KeepPage("sched-reopen-quiet");
+        File.WriteAllText(path, v1);
+
+        var clock = new ManualClock();
+        var policy = new UiReloadPolicy(quietSeconds: 0.25, retrySeconds: 0.5, maxRetryAttempts: 3, maxDeferSeconds: 2.0);
+        using var service = new UiDocumentService(false, policy, clock);
+        service.Add(new UiDocumentSource("rq", UiDocumentKind.Layout, path), v1);
+
+        var first = NewHost("sched-reopen-quiet-1", UiLayoutManifest.Parse(v1), new UiBindings());
+        service.Attach(first, "rq");
+        first.Dispose();
+
+        File.WriteAllText(path, Page("sched-reopen-quiet",
+            "<Column Id=\"root\"><Widget Id=\"added\" Kind=\"chrome/banner\" Text=\"added\"/></Column>"));
+        // Deliberately no Signal: the notification was never delivered.
+
+        using var reopened = NewHost("sched-reopen-quiet-2", UiLayoutManifest.Parse(v1), new UiBindings());
+        service.Attach(reopened, "rq");
+        Check(HasElement(reopened.Manifest, "added"),
+            "an unsignalled content change still resolves at attach (content-version freshness)");
+        Check(service.Reports.Count == 1 && service.LastReport != null && service.LastReport.Accepted,
+            "and it is one accepted report");
+    }
+
+    /// <summary>(b) The directory did not exist when the source was registered, so no watcher ever armed.</summary>
+    private static void VerifyReopenWhenWatcherCouldNotArm(string sandbox)
+    {
+        string dir = Path.Combine(sandbox, "late-dir");
+        string path = Path.Combine(dir, "page.xml");
+        string fallback = KeepPage("sched-late");
+
+        var clock = new ManualClock();
+        var policy = new UiReloadPolicy(quietSeconds: 0.25, retrySeconds: 0.5, maxRetryAttempts: 3, maxDeferSeconds: 2.0);
+        using var service = new UiDocumentService(true, policy, clock);
+        Check(service.Add(new UiDocumentSource("late", UiDocumentKind.Layout, path), fallback),
+            "a source under a directory that does not exist yet still registers");
+        Check(!service.IsWatching("late"), "and holds no watcher: the directory is missing");
+
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(path, Page("sched-late",
+            "<Column Id=\"root\"><Widget Id=\"from-file\" Kind=\"chrome/banner\" Text=\"file\"/></Column>"));
+
+        using var host = NewHost("sched-late", UiLayoutManifest.Parse(fallback), new UiBindings());
+        service.Attach(host, "late");
+        Check(HasElement(host.Manifest, "from-file"),
+            "the late directory's file resolves at attach even though no watcher ever armed");
+        Check(service.LastReport != null && service.LastReport.Accepted, "and the refresh is the accepted report");
+    }
+
+    /// <summary>(c) A missing file is not newer content: the last valid version stays in force, unreported.</summary>
+    private static void VerifyReopenWithMissingFileKeepsLastValid(string sandbox)
+    {
+        string dir = NewDir(sandbox, "reopen-missing");
+        string path = Path.Combine(dir, "page.xml");
+        string external = Page("sched-missing",
+            "<Column Id=\"root\"><Widget Id=\"external\" Kind=\"chrome/banner\" Text=\"external\"/></Column>");
+        string embedded = Page("sched-missing",
+            "<Column Id=\"root\"><Widget Id=\"embedded\" Kind=\"chrome/banner\" Text=\"embedded\"/></Column>");
+        File.WriteAllText(path, external);
+
+        var clock = new ManualClock();
+        var policy = new UiReloadPolicy(quietSeconds: 0.25, retrySeconds: 0.5, maxRetryAttempts: 3, maxDeferSeconds: 2.0);
+        using var service = new UiDocumentService(false, policy, clock);
+        service.Add(new UiDocumentSource("rm", UiDocumentKind.Layout, path), embedded);
+
+        var first = NewHost("sched-missing-1", UiLayoutManifest.Parse(external), new UiBindings());
+        service.Attach(first, "rm");
+        Check(HasElement(first.Manifest, "external"), "the first host started on the external version");
+        first.Dispose();
+
+        File.Delete(path);
+        UiReloadReport? before = service.LastReport;
+        int baseline = service.Reports.Count;
+
+        using var reopened = NewHost("sched-missing-2", UiLayoutManifest.Parse(embedded), new UiBindings());
+        service.Attach(reopened, "rm");
+        Check(HasElement(reopened.Manifest, "external") && !HasElement(reopened.Manifest, "embedded"),
+            "a missing file leaves the last valid external version in force, not the embedded fallback");
+        Check(service.Reports.Count == baseline && ReferenceEquals(service.LastReport, before),
+            "and attach does not turn an absence into a report");
+    }
+
+    /// <summary>(d) The content moved and is invalid: refused, reported once, last valid version kept.</summary>
+    private static void VerifyReopenWithBrokenFileReportsOnce(string sandbox)
+    {
+        string dir = NewDir(sandbox, "reopen-broken");
+        string path = Path.Combine(dir, "page.xml");
+        string v1 = KeepPage("sched-broken");
+        File.WriteAllText(path, v1);
+
+        var clock = new ManualClock();
+        var policy = new UiReloadPolicy(quietSeconds: 0.25, retrySeconds: 0.5, maxRetryAttempts: 3, maxDeferSeconds: 2.0);
+        using var service = new UiDocumentService(false, policy, clock);
+        service.Add(new UiDocumentSource("rb", UiDocumentKind.Layout, path), v1);
+
+        var first = NewHost("sched-broken-1", UiLayoutManifest.Parse(v1), new UiBindings());
+        service.Attach(first, "rb");
+        first.Dispose();
+
+        File.WriteAllText(path, "<UiPage Schema=\"2\" Source=\"sched-broken\"><Column Id=\"root\">");
+        int baseline = service.Reports.Count;
+
+        using var reopened = NewHost("sched-broken-2", UiLayoutManifest.Parse(v1), new UiBindings());
+        service.Attach(reopened, "rb");
+        Check(HasElement(reopened.Manifest, "keep"),
+            "a broken newer file leaves the last valid version in force");
+        Check(service.Reports.Count == baseline + 1 && service.LastReport != null && service.LastReport.Rejected,
+            "and the break is reported once at attach (reports=" + service.Reports.Count + ")");
+
+        using var third = NewHost("sched-broken-3", UiLayoutManifest.Parse(v1), new UiBindings());
+        service.Attach(third, "rb");
+        Check(service.Reports.Count == baseline + 1, "the same refusing version is not reported again");
+        Check(HasElement(third.Manifest, "keep"), "and the next reopen is still bound to the last valid version");
+    }
+
+    /// <summary>The freshness probe must not turn an unchanged file into a report or a re-parse event.</summary>
+    private static void VerifyReopenWithUnchangedFileWritesNoReport(string sandbox)
+    {
+        string dir = NewDir(sandbox, "reopen-same");
+        string path = Path.Combine(dir, "page.xml");
+        string v1 = KeepPage("sched-same");
+        File.WriteAllText(path, v1);
+
+        var clock = new ManualClock();
+        var policy = new UiReloadPolicy(quietSeconds: 0.25, retrySeconds: 0.5, maxRetryAttempts: 3, maxDeferSeconds: 2.0);
+        using var service = new UiDocumentService(false, policy, clock);
+        service.Add(new UiDocumentSource("ru", UiDocumentKind.Layout, path), v1);
+
+        int baseline = service.Reports.Count;
+        using var host = NewHost("sched-same", UiLayoutManifest.Parse(v1), new UiBindings());
+        service.Attach(host, "ru");
+        Check(service.Reports.Count == baseline,
+            "an unchanged file is not turned into a report by the attach freshness probe");
+        Check(HasElement(host.Manifest, "keep"), "and the host is bound to the version already in force");
     }
 
     // --- fixture ----------------------------------------------------------------------------

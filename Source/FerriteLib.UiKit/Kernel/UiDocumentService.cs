@@ -431,6 +431,16 @@ public sealed class UiDocumentService : IDisposable
     /// Re-attaching a host replaces its previous dependency. Returns false when the dependency bound is
     /// reached or a named document is not registered.
     /// </para>
+    /// <para>
+    /// <b>The reopen-refresh contract.</b> Before the host is bound, each named document is brought up to
+    /// "the newest valid content as of this instant" (<see cref="RefreshBeforeAttach"/>): a signal that
+    /// arrived while nothing was attached is consumed and read on the spot, a file that changed without any
+    /// signal is detected by its content version, a missing file leaves the last valid version in force, and a
+    /// broken newer file is refused and reported once while the last valid version is what the host is bound
+    /// to. A reopen therefore never shows content older than the last valid version the service holds, and it
+    /// never needs a pump to have run in between. The cost is one candidate read (and parse) per named
+    /// document per attach; <see cref="Attach"/> is a bind operation, not a per-frame call.
+    /// </para>
     /// </summary>
     public bool Attach(UiHost host, string? layoutId, string? styleId = null)
     {
@@ -445,12 +455,11 @@ public sealed class UiDocumentService : IDisposable
         DocumentState? style = styleId == null ? null : RequireDocument(styleId);
         if ((layoutId != null && layout == null) || (styleId != null && style == null)) return false;
 
-        // A signal that arrived while nothing was attached is resolved here, on the explicit attach path:
-        // the new host must start on the newest valid content, not on whatever was read when the source was
-        // registered. Attach is the manual channel's timing - immediate - not the watcher channel's quiet
-        // period, and the resolved version is the same candidate/validate/commit path a reload uses.
-        ResolveScheduledNow(layoutId);
-        ResolveScheduledNow(styleId);
+        // The newest valid content as of this instant, before the new host is added to the dependency table:
+        // a pending signal is consumed, and content that moved without a signal is detected by version. See
+        // RefreshBeforeAttach for the four shapes this defines.
+        RefreshBeforeAttach(layoutId);
+        RefreshBeforeAttach(styleId);
 
         Detach(host);
         if (dependencies.Count >= MaxDependencies) return false;
@@ -736,25 +745,79 @@ public sealed class UiDocumentService : IDisposable
     }
 
     /// <summary>
-    /// Resolves a document that a watcher signalled while nothing depended on it. It is the explicit-entry-
-    /// point timing - no quiet period, no deferral - and the same candidate/validate/commit path a reload
-    /// uses, so a document whose file was fixed before the window opened arrives as the fixed version.
+    /// Brings one document up to "the newest valid content as of this instant" before a host is bound to it.
+    /// This is the reopen-refresh contract, and these are the four shapes it defines:
+    /// <para>
+    /// The watcher state is consumed first, whatever shape it is in: a signal that arrived while nothing was
+    /// attached is still in the pending set (nothing pumped), and a signal a pump observed before the last
+    /// host left is in the schedule table. Both are cleared here, so neither survives to make the first frame
+    /// after the reopen re-read a document this attach already resolved.
+    /// </para>
+    /// <para>
+    /// Then <b>one read decides every shape</b>, and there is no branch that depends on which watcher state
+    /// happened to be present:
+    /// </para>
+    /// <para>
+    /// <b>(a) A signal arrived while nothing was attached.</b> The read finds the signalled bytes and, because
+    /// the content identity moved, applies the newest valid content on the explicit path - no quiet period, no
+    /// deferral - through the same candidate/validate/commit path a reload uses. The reopen shows it even
+    /// though no <see cref="Pump"/> ever observed the signal.
+    /// </para>
+    /// <para>
+    /// <b>(b) The watcher never fired</b> - no watcher was armed, the directory did not exist when the source
+    /// was registered, or a notification was dropped. There is no signal, but the read still compares the
+    /// file's own content identity with the version in force: if it moved, the document refreshes through the
+    /// same path; if it did not, nothing is applied and no report is written. This content-version freshness
+    /// check is what makes "newest valid content at the next attach" true without a watcher, and it is the
+    /// same check that answers (a) - the two shapes are one code path, not two.
+    /// </para>
+    /// <para>
+    /// <b>(c) The file is missing</b> (deleted, or moved aside mid-save). Absence is not newer content: the
+    /// last valid version stays in force and no failure is reported here - a consumer that wants the
+    /// disappearance as an event gets it from the watcher/pump or from <see cref="Reload"/>.
+    /// </para>
+    /// <para>
+    /// <b>(d) The file is broken.</b> The content really did move, so the candidate goes through the normal
+    /// validation: it is refused, reported once per refusing version, and the last valid version is what the
+    /// host is bound to. "Newest valid content" is a clause about validity, not about modification time.
+    /// </para>
+    /// <para>
+    /// Called before the new host is added to the dependency table, so a refresh commits to the hosts that are
+    /// already attached (none, in the reopen case) and the new host is then bound to the refreshed version.
+    /// </para>
     /// </summary>
-    private void ResolveScheduledNow(string? documentId)
+    private void RefreshBeforeAttach(string? documentId)
     {
         if (documentId == null) return;
+        if (!documents.TryGetValue(documentId, out DocumentState? state)) return;
 
-        bool scheduled;
         lock (gate)
         {
-            scheduled = schedules.Remove(documentId);
             pending.Remove(documentId);
+            schedules.Remove(documentId);
         }
 
-        if (scheduled && documents.ContainsKey(documentId))
+        // One read decides every shape. It reuses the service's single read entry point, so an attach that
+        // resolves a changed document still pays exactly one snapshot (R7), and the candidate is handed to the
+        // commit path rather than being read a second time.
+        Candidate probe = ReadCandidate(state);
+        if (probe.Failure.Length > 0)
         {
-            ReloadCore(documentId);
+            // (c) Missing or unreadable: the current valid version is the newest valid content there is.
+            if (probe.Retryable) return;
+
+            // (d) The content moved and is invalid: refuse it, report it once, keep the last valid version.
+            ReloadCore(documentId, preRead: probe);
+            return;
         }
+
+        if (state.GoodVersion.Length > 0
+            && string.Equals(probe.Version, state.GoodVersion, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        ReloadCore(documentId, preRead: probe);
     }
 
     /// <summary>The one place the clock is read; a frame path asks time here and nowhere else.</summary>
@@ -765,7 +828,7 @@ public sealed class UiDocumentService : IDisposable
 
     // --- candidate / commit ---------------------------------------------------------------------
 
-    private UiReloadReport? ReloadCore(string documentId, bool deferTransientFailure = false)
+    private UiReloadReport? ReloadCore(string documentId, bool deferTransientFailure = false, Candidate? preRead = null)
     {
         if (!documents.TryGetValue(documentId, out DocumentState? state)) return null;
 
@@ -781,7 +844,10 @@ public sealed class UiDocumentService : IDisposable
             }
         }
 
-        Candidate candidate = ReadCandidate(state);
+        // The attach freshness probe already read this candidate; reusing it keeps the service's one-read
+        // discipline (no second snapshot between the probe and the commit) and avoids re-parsing an unchanged
+        // document twice.
+        Candidate candidate = preRead ?? ReadCandidate(state);
         if (candidate.Failure.Length > 0)
         {
             // The scheduler holds a transient read failure for a bounded retry: returning null publishes
