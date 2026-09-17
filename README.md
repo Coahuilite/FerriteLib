@@ -45,8 +45,11 @@ RimWorld's `modDependencies` cannot express a version, so every consumer must as
 its own constructor — `FerriteLibVersion.Require(min, max, packageId, out report)` enumerates loaded
 carriers, reports collisions, and fails readable. Compile against the DLL from a GitHub Release asset
 of this repository (the release body quotes its SHA-256); the assembly is `net472`. The public API is
-**pre-1.0 and provisional**: a minor bump is a breaking change, and the freeze decision is gated on a
-second wired consumer.
+**pre-1.0**: treat a minor bump as a compatibility boundary and compile against the version you tested.
+**API stabilization is not gated on a second wired consumer** (maintainer ruling 2026-09-17). Establish
+an explicit, verified compatibility commitment so consumers can adopt it; use integration as validation,
+not permission to stabilize. Existing type tiers are unchanged by this ruling, and missing consumer/game
+evidence must still be reported honestly.
 
 **Third-party use is invited (maintainer ruling 2026-09-10).** Compile against the release asset, and open
 an issue when the library forced you to hand-roll something — a citation into your own working code is how

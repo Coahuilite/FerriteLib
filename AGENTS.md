@@ -71,10 +71,13 @@ assembly and no `FerriteLib.Core`; re-open only if a consumer needs the visual c
   library cannot provide — a non-goal, not a backlog item. A consumer's whitelist entry for it is
   policy-backed and is not renegotiated per PR; the boundary that remains is that anything drawn into a
   window goes through the tree.
-- **API freeze is gated on the second wired consumer**, not on features; until it builds against this
-  surface, the API is provisional. After a Workshop page carries the stable packageId, "breaking
-  changes are expected" stops being free — the invited-vs-unsupported call (`TODO.md` §5) is open and
-  is a maintainer decision, never a session's.
+- **API stabilization is not gated on a consumer count.** Define the supported contract, verify its
+  behavior, and state the compatibility commitment so consumers have a dependable surface to adopt.
+  Real-consumer integration is valuable validation, not a prerequisite for stabilizing that surface;
+  missing integration evidence must remain explicit. This does not automatically promote existing API
+  tiers or waive version, migration, or verification requirements. After a Workshop page carries the
+  stable packageId, "breaking changes are expected" stops being free — the invited-vs-unsupported call
+  (`TODO.md` §5) remains a maintainer decision, never a session's.
 
 ## Ecosystem protocol (how this library may grow)
 

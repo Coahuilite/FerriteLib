@@ -2,6 +2,20 @@
 
 ## Current durable state
 
+- **Maintainer ruling — consumer-count prerequisite removed (2026-09-17).** A second wired real
+  consumer is no longer required before API stabilization or a supported-contract freeze. The
+  previous rule created a circular dependency: the consumer could not integrate without a reasonably
+  stable API, while the library would not stabilize before integration. Establish the explicit
+  contract, verification, and compatibility commitment first; use subsequent integration to validate
+  and improve it under that commitment. Consumer/game evidence remains honestly scoped, but its
+  absence is not a consumer-count veto on stabilization. This supersedes the older freeze/scheduling
+  statements elsewhere in this ledger and dated review records. `AGENTS.md`, `docs/api-tiers.md`,
+  `TODO.md`, both READMEs, and the current 0.6 consumer-entry documents were aligned. Specialized-kind provenance, neutrality, API-tier
+  classification checks, version/migration rules, and publication permissions are unchanged.
+  **Scope of this update:** rules/documentation only; no source, API tier membership, version axis,
+  build, runtime test, consumer integration, or release was changed or claimed. The 0.7 execution
+  plan remains subject to a separate implementation approval.
+
 - **`0.6.x` is PUBLISHED (2026-09-17) at `2545346`, after a pre-first-push history rewrite.** The line had
   been local-only; `scripts/privacy-audit.ps1 -FullHistory` failed on a **historical blob** — the fork
   commit `02a6aea` carried a machine-absolute path in `docs/development/0.6/10-work-packages.md` (the
@@ -44,7 +58,7 @@
 - **`ferritelib_uikit_demo` is a separate local repository beside this one** (`master`, no remote, never
   pushed), a RimWorld 1.6 mod that enters from vanilla `ModSettings` and uses only public API. It is a usage
   sample and a catalogue browser; per `AGENTS.md` it is **not** consumption evidence and does not lift the
-  API freeze or earn any kind.
+  specialized-kind promotion gate or establish real-consumer provenance.
 
 - Repository split out of the Universal Squeaker tree on 2026-09-03. FerriteLib is a prerequisite mod,
   `coahuilite.ferritelib`, display name FerriteLib. The three version axes are re-derived from the tree and

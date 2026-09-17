@@ -65,15 +65,18 @@ call to `Reload(id)`, which is immediate and uses the same validation and commit
    demo mod hit it. A future round may let a manifest or a page declare its scope explicitly; until then,
    align the two strings deliberately.
 9. **Our own demo is not provenance.** `ferritelib_uikit_demo` uses only public API and is shipped as a
-   usage sample, but it does **not** count as the second real consumer, and it does not lift the API freeze
-   or the promotion gate for any kind.
+   usage sample, but it does **not** establish real-consumer provenance or satisfy the specialized-kind
+   promotion gate. API stabilization no longer has a consumer-count prerequisite (maintainer, 2026-09-17).
 
 ## 4. What this round still owes you (and is honest about)
 
 - **No real consumer has compiled against 0.6.0 yet**, and no in-game acceptance has been run. Nothing in this
   round's evidence reaches 已由真实消费者接入 or 已实机验证; see `40-verification.md` for the checklist.
 - The stable tier is unchanged and still thin: `IUiBindings`, `UiHost`, `UiWindowHost`, `UiTheme` and the
-  rest of the page model remain **public-unstable** until a second wired consumer compiles against them.
+  rest of the page model remain **public-unstable** under the current tier list. The maintainer removed
+  the second-wired-consumer prerequisite on 2026-09-17; stabilization now requires a documented
+  contract/verification decision, not a particular consumer count. This clarification does not promote
+  types or alter the frozen 0.6 signatures.
 - If your integration needs something this surface cannot express, that is a finding, not a workaround: the
   library's growth rule is that a real consumer being forced to hand-roll something, with the code cited, is
   what earns a new capability. Report it rather than reaching past the public surface.

@@ -80,8 +80,10 @@ Register under the exact page identity you open, or wrap the page in a window wh
 
 - **In-game acceptance is 尚待实机** — a human with a game session must walk the operator checklist
   (`docs/development/0.6/verification/t5b-3-demo-package-link-and-in-game-checklist.md` §4).
-- **No second real consumer has compiled against 0.6.0 yet.** Until one does, the page-model surface stays
-  public-unstable and the API freeze is not lifted.
+- **The recorded 0.6.0 evidence contains no second-real-consumer integration.** This is an evidence
+  limitation, not an API-stabilization prerequisite: the maintainer removed that prerequisite on
+  2026-09-17. Existing type tiers remain as listed in `docs/api-tiers.md` until explicitly changed;
+  the ruling does not itself claim new integration or promote types.
 - Known, documented limits: main-thread-only notification delivery; IME composition is not part of the input
   deferral; no cross-sibling-window atomicity for consumer hooks; listing is a snapshot, not a subscription.
 - If you are forced to hand-roll something the public surface cannot express, that is a finding, not a

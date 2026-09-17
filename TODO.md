@@ -1,5 +1,16 @@
 # TODO
 
+## Current stabilization ruling — 2026-09-17
+
+The maintainer removed the second-wired-consumer prerequisite for API stabilization to break the
+"no stable API -> no integration -> no stable API" cycle. Establish explicit supported contracts and
+verification so consumers can adopt them; do not block stabilization on the consumer count.
+`AGENTS.md` and `docs/api-tiers.md` carry the operative rule; `MEMORY.md` records the decision.
+No API tier was promoted and no implementation/version change was made by this documentation update.
+Real-consumer and in-game evidence remain separately recorded; specialized-kind provenance and
+compatibility/version requirements are unchanged. Older scheduling text below does not restore the
+removed consumer-count prerequisite.
+
 ## 0.6.x round — open (2026-09-16)
 
 Branch `0.6.x` (forked from the frozen `0.5.x` tip `354d90a`), contract axis **0.6.0**. Scope, packages,
@@ -173,6 +184,9 @@ round-1 surface introduced; every one of the five only changes code if it surpri
       page keeps drawing around it and the log line appears once per slot.
 
 ## 2. Second consumer: the withheld sibling mod
+
+This is an integration/validation follow-up, not an API-stabilization prerequisite (maintainer,
+2026-09-17). It does not authorize changes to another repository.
 
 - [ ] Before touching it: it builds against a machine-local game path, so decide whether it moves to
       the same RimRef + relative-reference scheme US and this repo use.
@@ -445,7 +459,7 @@ Each item is expected to delete a workaround, not add a layer.
       to the coverage count in `MEMORY.md` — `AGENTS.md` "Our own demo is not consumption" is the rule that
       keeps the two claims apart.
 
-- [ ] **The 0.5.0 vocabulary expansion is now scheduled against a real consumer migration (maintainer directive 2026-09-14; the cross-repo board lives in the consumer workspace at `modding_documents/team-mode/task-decomposition-us-fl-board-zh.md`).** US's 0.5.x main goal is dissolving its **18 consumer-owned `us/*` kinds** into manifest subtrees. Three capabilities stand in the way and each is a vocabulary question, not a convenience: a **checkbox** (the consumer needs a two-level parent/child row pair), a **repeater / list template** (checklist, preset list, race layer, xenotype layer and the help catalog all render data-driven row sets, and the engine has no per-item template today), and a **tree kind** (`us/scope-tree` walks action -> mood -> factor). Per `AGENTS.md` "What earns a kind" the provenance already exists - the consumer was forced to hand-roll all three - but the shape must be decided before anything is registered, the kind must not be one only our own harness drives, and nothing starts before the second wired consumer has moved (TODO §2). **Scope note (maintainer, same day): the `ParseFile` wiring is a 0.5.x item, not 0.4.x** - the consumer's 0.4.x window was cut back to a single feature port and takes no source changes. The requirement it must satisfy is now stated precisely: a layout or style file edit must be visible **after reopening the window**, with no game restart and no recompile, while **adding or changing widget kinds is explicitly excluded from hot reload** (kinds are compiled). That is this library's own use/extend boundary with the use half moving from an assembly-embedded copy to a file on disk; the embedded copy remains the fallback, and `UiHost` already takes both entry points (`UiLayoutManifest` plus the optional `UiStyleDocument`) at construction, so no runtime tree mutation is required.
+- [ ] **The 0.5.0 vocabulary expansion is now scheduled against a real consumer migration (maintainer directive 2026-09-14; the cross-repo board lives in the consumer workspace at `modding_documents/team-mode/task-decomposition-us-fl-board-zh.md`).** US's 0.5.x main goal is dissolving its **18 consumer-owned `us/*` kinds** into manifest subtrees. Three capabilities stand in the way and each is a vocabulary question, not a convenience: a **checkbox** (the consumer needs a two-level parent/child row pair), a **repeater / list template** (checklist, preset list, race layer, xenotype layer and the help catalog all render data-driven row sets, and the engine has no per-item template today), and a **tree kind** (`us/scope-tree` walks action -> mood -> factor). Per `AGENTS.md` "What earns a kind" the provenance already exists - the consumer was forced to hand-roll all three - but the shape must be decided before anything is registered, the kind must not be one only our own harness drives, and the former wait for the second wired consumer (TODO §2) is **superseded by the 2026-09-17 maintainer ruling**; specialized-kind provenance requirements remain. **Scope note (maintainer, same day): the `ParseFile` wiring is a 0.5.x item, not 0.4.x** - the consumer's 0.4.x window was cut back to a single feature port and takes no source changes. The requirement it must satisfy is now stated precisely: a layout or style file edit must be visible **after reopening the window**, with no game restart and no recompile, while **adding or changing widget kinds is explicitly excluded from hot reload** (kinds are compiled). That is this library's own use/extend boundary with the use half moving from an assembly-embedded copy to a file on disk; the embedded copy remains the fallback, and `UiHost` already takes both entry points (`UiLayoutManifest` plus the optional `UiStyleDocument`) at construction, so no runtime tree mutation is required.
 
 ## 4. Deferred by decision, with the upgrade path written down
 

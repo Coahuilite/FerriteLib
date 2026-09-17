@@ -8,8 +8,8 @@ assembly. Three tiers, one home for the promise:
   types is removed and no signature changes. Anything that would change one is either re-scoped or lands as
   a documented breaking change with a migration in its own minor.
 - **Public-unstable** — usable today, and expected to change shape. Compile against the version you tested
-  against; expect to recompile at a minor bump. This is not a warning label, it is the honest status of a
-  surface that has been forced by one consumer and never by two.
+  against; expect to recompile at a minor bump. This classification records unresolved contract or
+  verification decisions; a second consumer is not a prerequisite for stabilizing a surface.
 - **Internalize-candidate** — public today and needed by nobody outside the assembly. A minor window removes
   them from the surface; the 0.4 line shipped without finishing that sweep, so it continues in the open 0.5
   window. Until then a consumer that names one is on its own.
@@ -136,8 +136,9 @@ consequence is paid in the open rather than discovered by a stranger.
   a lane asserts the single-read pipeline. In-process text entry is `Parse(string)`.
 - `UiLayoutSnapshot` — the measure-then-draw halves are exercised only by the harness; no wired consumer or
   the shell names them (`UiWindowHost` drives `DrawFrame`), so they either earn a cited use or go internal.
-- `UiWindowHost` — the largest freeze surface this library has ever shipped, landed before a second consumer
-  existed; provisional in a way a theme token is not. The close affordance is sized from its own label by
+- `UiWindowHost` — a broad lifecycle and window-geometry surface, currently classified public-unstable;
+  its stability decision must name the supported behavior and verification, not wait for another consumer.
+  The close affordance is sized from its own label by
   default (`CloseButtonSize` = `max(110, measured label + padding)`, measured through the `Metrics`
   seam a host also hands the fit audit) rather than from the fixed 110x30 box it used to ship, because the
   label is the consumer's string and a library must not clip the wording it was handed; overriding the
@@ -344,9 +345,9 @@ consequence is paid in the open rather than discovered by a stranger.
   every other subsystem that checks its thread checks that property.
 - `UiNotifyAdapter` — the optional `INotifyPropertyChanged` bridge. Explicit mapping only (one property to
   many binding keys, plus the empty-name "the whole object moved" convention), a bounded pending set, a
-  nesting batch scope, and deterministic unsubscribe. Public-unstable because the mapping vocabulary is this
-  round's shape: a second consumer may want attributes, or a mapping declared on the binding instead of on the
-  adapter.
+  nesting batch scope, and deterministic unsubscribe. Currently public-unstable; a stability decision
+  must review this explicit mapping/lifecycle contract, not wait for another consumer or speculate about
+  adding attributes or another mapping mechanism.
   **Boundary, stated as a boundary:** it delivers on the main thread only. An off-thread notification is
   refused, counted and surfaced, never queued for later. There is no base class to inherit and no container to
   configure - a plain C# object that implements the BCL interface is a view model here.
@@ -502,5 +503,8 @@ silently growing the surface under a number somebody tested is the failure this 
   polling `PageHost`/`Session`, hand a `UiReloadPolicy` and an `IUiTimeSource` to the document
   service, and list kinds through `UiWidgetCatalog` (which keeps scope, unlike `KnownKinds`).
 
-Everything here is provisional until the second wired consumer compiles against it (`AGENTS.md`
-invariants): the tier list, not the shape, is what this file promises.
+**Maintainer ruling, 2026-09-17:** the second-wired-consumer prerequisite for API stabilization is
+removed. Establish a documented, verified compatibility commitment so another consumer can adopt it;
+do not make adoption and stabilization wait on each other. Real-consumer results remain evidence, not
+permission to stabilize. Existing tier memberships are unchanged by this ruling: promotion still
+requires an explicit contract/verification decision and the paired document/test update described above.
