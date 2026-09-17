@@ -1,0 +1,68 @@
+# Consume FerriteLib from another mod — 0.7.0
+
+**Read this first if you are wiring another project against the 0.7 line.** It replaces
+`consume-from-0.6.0.md` as the entry document (the 0.6 file stays as versioned history). Companion docs:
+`docs/api-tiers.md` (compat promise), `ordinary-settings.md` (the recommended authoring recipe),
+`docs/development/0.7/05-api-contract.md` (what 0.7.x commits to),
+`docs/development/0.5/20-api-and-xml.md` + `docs/development/0.6/20-api-and-xml.md` (the surface itself).
+
+## 1. Which artefact to take
+
+| | |
+| --- | --- |
+| Dev package folder | `dist/dev/FerriteLib/` (5 files) — staged by `scripts/verify-local.ps1 -PackDev` |
+| version.txt | `FerriteLib 0.7.0-dev / build=dev / commit=88095fb3cbed` |
+| DLL | `1.6/Assemblies/FerriteLib.UiKit.dll`, SHA-256 `271128299A9CFF2C4CB5EBDFBB9246C3F6BEC2791A5D0117B894E6F96FC8F82F` |
+
+Published integration goes through the GitHub Release asset once the maintainer cuts one; the dev folder is
+the rehearsal, not the publication. **Do not copy the DLL into your package** — `<HintPath>` +
+`<Private>false</Private>`; only `coahuilite.ferritelib` ships it. Registry-scope, stale-build and
+machine-path traps are unchanged from 0.6 (§3–4 of `consume-from-0.6.0.md` still apply verbatim).
+
+## 2. Assert the version range
+
+```csharp
+// Mod constructor, before touching any UiKit type:
+FerriteLibVersion.Require(new Version(0, 7, 0), new Version(0, 8, 0));
+```
+
+Axes: `FerriteLibVersion.Api` = `<modVersion>` = `<VersionPrefix>` = 0.7.0. Pre-1.0, a minor bump is the
+breaking signal; 0.7.x will not move a public signature or a documented behavior again without the next
+appropriate minor.
+
+## 3. What actually changed for you at 0.7.0
+
+- **Public surface: nothing.** No added/removed/renamed types, members, kinds or XML vocabulary; tiers
+  unchanged.
+- **Default theme moved**: `new UiTheme()` is now vanilla-aligned neutral surfaces with a reserved yellow
+  accent. If you liked the 0.6 look, take `UiTheme.DarkGold` as your starting instance and re-apply your
+  overrides — the property is now the frozen 0.6 palette, not an alias for the constructor. If you built a
+  custom theme on `new UiTheme()`, you inherit the new defaults for every token you did not set (deliberate).
+- **Two validations tightened**: a malformed/non-finite `Height` now throws an attributable
+  `UiContractException` at host creation and at reload-candidate validation instead of a `FormatException`
+  at arrange time; `Cols`/`NarrowCols` on a non-`Wrap` container are refused at creation (they never did
+  anything there — remove the attribute or switch to `wrap`).
+- **Three behavior fixes**: a Row child with `Width="Auto"` that cannot be label-measured now shares space
+  like an unsized child instead of collapsing to a 1-unit stub; a dropdown shows the option whose **value**
+  equals the bound value even when an earlier option's display text matched; and a dropdown whose options
+  key was registered as a value (`BindReadOnly<IReadOnlyList<T>>`) says so and names `BindOptions<T>`.
+  Migration detail for each: `docs/development/0.7/05-api-contract.md`.
+
+## 4. The recommended way to author a settings page
+
+`ordinary-settings.md` — existing atoms and containers, typed bindings, a plain C# model with one explicit
+`NotifyChanged` path, and the existing window host. The compile-checked reference is
+`tools/FerriteLib.UiKit.Tests/KernelOrdinarySettingsRecipeTests.cs`. MVVM and `UiNotifyAdapter` stay
+optional, not prerequisites.
+
+## 5. What is still open (do not over-claim)
+
+- **In-game and consumer acceptance for 0.7 is pending** — the four checks in
+  `docs/development/0.7/README.md` §External acceptance are owned by the maintainer/consumer operator and
+  include one comparable new-default/DarkGold/custom state sheet. Library evidence is automated only.
+- A custom theme built on `new UiTheme()` sees the new defaults; that is a behavior choice recorded in the
+  contract, not a bug to work around.
+- Known limits inherited from 0.6: main-thread-only notification delivery; IME composition outside the
+  input deferral; no cross-sibling-window atomicity for consumer hooks; catalogue is a snapshot.
+- If the public surface forces you to hand-roll something, report it — a cited consumer need is what earns
+  a capability; a request is not.

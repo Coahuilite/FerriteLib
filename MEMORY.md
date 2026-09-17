@@ -16,6 +16,24 @@
   build, runtime test, consumer integration, or release was changed or claimed. The 0.7 execution
   plan remains subject to a separate implementation approval.
 
+- **The 0.7.x line is implemented and automated-verified (2026-09-17, branch `0.7.x`, axes 0.7.0).**
+  Bounded subtraction-and-stabilization: five reliability fixes (Row Auto fallback to unsized; creation-time
+  `Height` validation incl. NaN/infinity, also on reload candidates; `Cols`/`NarrowCols` refused off `Wrap`;
+  dropdown value precedence in two ordered passes + a null-`ValueN` crash fix; wrong-kind options diagnostics
+  naming `BindOptions<T>`), one compile-checked public-only authoring recipe (`ordinary-settings.md` +
+  `KernelOrdinarySettingsRecipeTests.cs`), and the theme split — `new UiTheme()` is the vanilla-aligned
+  neutral/yellow default (substrate/edge/option values carried from the earlier vanilla `Verse.Widgets`
+  investigation whose build identity is NOT established; everything else derived and labeled), while
+  `UiTheme.DarkGold` is now an explicit frozen copy of the 0.6 palette, the `=> new()` coupling broken.
+  **Every A/C lane was re-run red against the reverted production file before being recorded green**
+  (tables and the C red-first pairing: `docs/development/0.7/40-verification.md`). No public signature,
+  type, kind or vocabulary moved; tiers unchanged. Gate run `-PackDev` all-green; dev package
+  `0.7.0-dev / commit=88095fb3cbed`, DLL SHA-256 `271128299A9CFF…FC8F82F`. **Scope limit:** this is all
+  `已实现 + 已自动化验证` over the stub; nothing is consumer-compiled against `[0.7.0,0.8.0)`, nothing is
+  已实机验证, and the default/DarkGold/custom visual state sheet is an open maintainer acceptance. The
+  supported 0.7 contract (`docs/development/0.7/05-api-contract.md`) was recorded before the behavior
+  changes and stands on the maintainer's 2026-09-17 ruling without waiting for a second consumer.
+
 - **`0.6.x` is PUBLISHED (2026-09-17) at `2545346`, after a pre-first-push history rewrite.** The line had
   been local-only; `scripts/privacy-audit.ps1 -FullHistory` failed on a **historical blob** — the fork
   commit `02a6aea` carried a machine-absolute path in `docs/development/0.6/10-work-packages.md` (the

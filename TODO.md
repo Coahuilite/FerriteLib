@@ -11,6 +11,14 @@ Real-consumer and in-game evidence remain separately recorded; specialized-kind 
 compatibility/version requirements are unchanged. Older scheduling text below does not restore the
 removed consumer-count prerequisite.
 
+## 0.7.x round — implemented, external acceptance open (2026-09-17)
+
+Branch `0.7.x` (forked from the published `0.6.x` at `12d0dbb` + the maintainer's ruling docs), contract
+axis **0.7.0**. Scope: A reliability ×5, B ordinary-author recipe, C vanilla-aligned default theme,
+D contract + gates. Execution status, the supported contract and the four external checks each have one
+home: `docs/development/0.7/`. This section is a pointer only. Consumer/game acceptance is owned by the
+maintainer/operator and is **not** claimed here; push/tag/release need separate authorization.
+
 ## 0.6.x round — open (2026-09-16)
 
 Branch `0.6.x` (forked from the frozen `0.5.x` tip `354d90a`), contract axis **0.6.0**. Scope, packages,
@@ -36,11 +44,10 @@ model) and is explicitly **not** a second real consumer.
 Carried over unchanged and **not** closed by this round: `0.5.x`'s in-game acceptance (A1–A11) and a real
 consumer compiling against `[0.5.0,0.6.0)`. Both are other actors' steps.
 
-- [ ] Follow-up, **not** this round: a dropdown bound with `BindReadOnly<IReadOnlyList<T>>` compiles and passes
-      value validation, then fails at creation with "Required options binding 'x' is missing", which names the
-      wrong cause (the binding exists; it is the wrong registration kind). Found by the demo mod 2026-09-16 and
-      recorded in `docs/development/0.6/20-api-and-xml.md` §5; the fix is a diagnostic-message change in the
-      manifest/binding validation path, so it needs its own lane rather than a drive-by edit.
+- [x] Follow-up — **closed on `0.7.x`** (package A, item A5, commit `88f1c77`): a dropdown bound with
+      `BindReadOnly<IReadOnlyList<T>>` now gets a creation error that names the wrong registration kind and
+      points at `BindOptions<T>`, with the key and the element path; the lane was re-run red on the 0.6
+      baseline first. (Original finding: the demo mod, 2026-09-16, `docs/development/0.6/20-api-and-xml.md` §5.)
 
 ## 0.5.x round — open (2026-09-15)
 
