@@ -20,6 +20,7 @@ internal static class KernelCoreWidgetTests
         failures += Run("Kernel core widgets measure/draw", VerifyCoreWidgetsMeasureDraw);
         failures += Run("Kernel dropdown opens session popup", VerifyDropdownOpensPopup);
         failures += Run("Dropdown exact value wins over display-text fallback (A4)", VerifyDropdownValuePrecedence);
+        failures += Run("Wrong-kind options registration is explained, not called missing (A5)", VerifyOptionsKindDiagnostic);
         failures += Run("Banner/empty-state bands are the text atom's band", VerifyCompositeBandsComeFromTheAtom);
         failures += Run("Composites draw text/font/rect through the one outlet", VerifyCompositeOutletTriple);
         failures += Run("Composite kinds keep their vocabulary and their manifests", VerifyCompositeVocabularyUnchanged);
@@ -209,6 +210,95 @@ internal static class KernelCoreWidgetTests
         FieldInfo? field = type.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Public);
         if (field == null) throw new Exception(type.Name + " has no field '" + name + "'");
         return field.GetValue(instance)!;
+    }
+
+    // A5 (0.7): the demo mod's dead end - a collection registered through BindReadOnly compiles and
+    // passes value validation, and then dropdown creation reported the options binding as simply
+    // "missing", naming the wrong cause. The registration category is now diagnosed; nothing is
+    // coerced, and a key that legitimately carries both registrations is still valid.
+
+    private static void VerifyOptionsKindDiagnostic()
+    {
+        // 1. Truly absent key: the historical message stands, with no invented category.
+        var empty = new UiBindings();
+        string missing = MessageOf(() => empty.ValidateOptions<string>("nobody", "page/dropdown"));
+        Check(missing.Contains("Required options binding 'nobody' is missing at 'page/dropdown'")
+            && !missing.Contains("BindOptions"),
+            "a key with no registration at all keeps the plain missing message");
+
+        // 2. The demo's case: a read-only collection value under the same key.
+        var readOnlyList = new UiBindings();
+        IReadOnlyList<string> items = new List<string> { "a", "b" };
+        readOnlyList.BindReadOnly("Options", () => items);
+        string wrongKind = MessageOf(() => readOnlyList.ValidateOptions<string>("Options", "page/dropdown"));
+        Check(wrongKind.Contains("'Options'") && wrongKind.Contains("page/dropdown"),
+            "the diagnosis names the key and the element path");
+        Check(wrongKind.Contains("read-only value") && wrongKind.Contains("not as options"),
+            "it says the registration category is wrong rather than calling it missing");
+        Check(wrongKind.Contains("BindOptions"),
+            "and it points at the registration that would fix it");
+
+        // 3. A writable value under the same key is diagnosed as writable, not read-only.
+        var writableList = new UiBindings();
+        List<string> mutable = new List<string> { "a" };
+        writableList.BindValue<IReadOnlyList<string>>("Options", () => mutable, v => { });
+        Check(MessageOf(() => writableList.ValidateOptions<string>("Options", "p")).Contains("writable value"),
+            "a writable collection value is named as writable");
+
+        // 4. Valid options still pass; the wrong ITEM type keeps its existing distinction.
+        var good = new UiBindings();
+        good.BindOptions("Options", () => items);
+        good.ValidateOptions<string>("Options", "page/dropdown");
+        Check(true, "a real options binding validates");
+        var wrongItem = new UiBindings();
+        wrongItem.BindOptions("Options", () => new List<int> { 1 });
+        string itemType = MessageOf(() => wrongItem.ValidateOptions<string>("Options", "p"));
+        Check(itemType.Contains("'Int32'") && itemType.Contains("'String'"),
+            "the wrong-option-item-type message is unchanged");
+
+        // 5. A key may legitimately carry BOTH a value and an options registration; neither
+        // validation may reject the other's presence.
+        var both = new UiBindings();
+        string selected = "a";
+        both.BindValue("Pick", () => selected, v => selected = v);
+        both.BindOptions("Pick", () => items);
+        both.ValidateValue<string>("Pick", "p");
+        both.ValidateOptions<string>("Pick", "p");
+        Check(true, "co-existing value and options registrations both validate");
+
+        // 6. The real creation path: the host wraps the widget's validation error, and the
+        // consumer-visible message must carry the diagnosis, not the old bare "missing".
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+        var hostBindings = new UiBindings();
+        string current = "a";
+        hostBindings.BindValue("dropdown", () => current, v => current = v);
+        hostBindings.BindReadOnly("Options", () => items);
+        string xml =
+            "<UiPage Schema=\"2\" Source=\"test\">"
+            + "<Widget Id=\"dropdown\" Kind=\"input/dropdown\" OptionsBind=\"Options\" />"
+            + "</UiPage>";
+        string creationMessage = MessageOf(() =>
+        {
+            using UiHost h = new("test", UiLayoutManifest.Parse(xml), hostBindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        });
+        Check(creationMessage.Contains("read-only value") && creationMessage.Contains("BindOptions")
+            && creationMessage.Contains("Options"),
+            "host creation surfaces the category diagnosis through the widget-validation wrapper");
+    }
+
+    private static string MessageOf(Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+
+        throw new Exception("expected the validation to throw, but it passed");
     }
 
     // --- 0.4.x leaf vocabulary: the two composites rebuilt over the text atom --------------------

@@ -364,6 +364,17 @@ public sealed class UiBindings : IUiBindings
     {
         if (!options.TryGetValue(elementId, out OptionsDescriptor? descriptor))
         {
+            // A5 (0.7): when the SAME key is registered as a value the "missing" message names the
+            // wrong cause - BindReadOnly<IReadOnlyList<T>> compiles, passes value validation, and
+            // then the dropdown creation blames an options table nobody ever claimed to write
+            // (found by the demo mod 2026-09-16). Explain the category error and name the fix.
+            // Diagnose only: no value registration is ever coerced into an options one.
+            if (values.TryGetValue(elementId, out ValueDescriptor? valueDescriptor))
+            {
+                throw new InvalidOperationException(
+                    $"Required options binding '{elementId}' is missing at '{elementPath}': the same key is registered as a {(valueDescriptor!.CanWrite ? "writable" : "read-only")} value of type '{valueDescriptor.ValueType.Name}', not as options. Register the option list with BindOptions<{valueDescriptor.ValueType.Name}>('{elementId}', ...).");
+            }
+
             throw new InvalidOperationException($"Required options binding '{elementId}' is missing at '{elementPath}'.");
         }
 
