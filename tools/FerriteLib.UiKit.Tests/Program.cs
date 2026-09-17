@@ -130,6 +130,9 @@ internal static class Program
         Console.WriteLine("Kernel neutral fixture page (data-driven rows + the new controls, library fixture only)...");
         failures += KernelFixturePageTests.RunAll();
 
+        Console.WriteLine("Kernel ordinary-settings recipe (B: public-only authoring, explicit notify, lifecycle)...");
+        failures += KernelOrdinarySettingsRecipeTests.RunAll();
+
         // --- T2 automatic reload scheduling (owner: reload) - one contiguous block; ---- //
         // --- mvvm and catalog add their own blocks and the Lead resolves the merge. ----- //
         Console.WriteLine("Kernel reload scheduling (quiet period, bounded retry, pause independence, deferral)...");

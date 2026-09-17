@@ -6,10 +6,12 @@ to read and what to take.
 
 | Document | When to read it |
 | --- | --- |
-| `consume-from-0.6.0.md` | Start here. Artefact to take, version assertion, reference setup, the registry-scope trap, what is still open. |
+| `consume-from-0.7.0.md` | Start here for the 0.7 line. Artefact to take, version assertion, what changed from 0.6 (default theme, validation), what is still open. |
+| `consume-from-0.6.0.md` | The 0.6 line's onboarding, kept as versioned history. |
 | `../development/0.6/20-api-and-xml.md` | How each capability is used (XML + C#), incl. vocabulary traps. |
 | `../api-tiers.md` | The compat promise (stable / public-unstable / internalize-candidate). |
 | `../development/0.5/20-api-and-xml.md` | The 0.5 base surface (manifest, styles, bindings, tabs, repeat, window catalog). |
+| `ordinary-settings.md` | The recommended authoring recipe for an ordinary settings page (0.7): plain model + typed bindings + explicit notification, no custom widget. |
 
 Permanent consumer-facing facts (kept current here so a later session or a consumer session does not have to
 re-derive them):
