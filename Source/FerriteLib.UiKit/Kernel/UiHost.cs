@@ -967,6 +967,28 @@ public sealed class UiHost : IDisposable
             }
         }
 
+        // A2 (0.7): Height belongs to the same creation-time contract as Width. Until now a malformed
+        // value survived validation and only exploded at arrange time as an unattributable
+        // FormatException from deep inside the engine; the layout engine's own defensive checks stay,
+        // this just refuses the value where the element, attribute and path are all still known.
+        // Zero and negative finite numbers keep their existing clamp behavior - no new positive-only
+        // rule - but NaN and infinities are refused: ResolveHeight would take Math.Max(0f, NaN) down
+        // into every downstream rect.
+        if (spec.TryGetAttribute("Height", out string heightRaw))
+        {
+            string height = heightRaw.Trim();
+            bool heightAuto = string.Equals(height, "Auto", StringComparison.OrdinalIgnoreCase);
+            bool heightNumber = float.TryParse(height, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float parsedHeight)
+                && !float.IsNaN(parsedHeight) && !float.IsInfinity(parsedHeight);
+            if (height.Length > 0 && !heightAuto && !heightNumber)
+            {
+                throw new UiContractException(
+                    $"Element id=\"{spec.Id}\" at '{path}' has invalid Height '{heightRaw}'; expected a number or Auto.",
+                    source, spec.Id, spec.Kind, path);
+            }
+        }
+
         // Visible is engine-wide and static, so its value is part of the creation-time contract like
         // Width: a malformed value would otherwise be interpreted per frame by the engine, and the one
         // place that still knows the element, the attribute and the path is here. VisibleKey is
@@ -1024,6 +1046,23 @@ public sealed class UiHost : IDisposable
             }
 
             return;
+        }
+
+        // A3 (0.7): the grammar check above made Cols/NarrowCols well-formed numbers on every
+        // container, but only the Wrap path ever reads them — on any other kind they are an inert
+        // declaration of grid intent, which is exactly the silent no-op this contract layer exists
+        // to stop. Either remove the attribute or choose Wrap if grid flow was intended.
+        if (!string.Equals(spec.Kind, "Wrap", StringComparison.Ordinal))
+        {
+            foreach (string wrapOnly in new[] { "Cols", "NarrowCols" })
+            {
+                if (spec.TryGetAttribute(wrapOnly, out _))
+                {
+                    throw new UiContractException(
+                        $"'{wrapOnly}' at '{path}' is Wrap-only vocabulary; a {spec.Kind} never reads it, so the declaration would do nothing.",
+                        source, spec.Id, spec.Kind, path);
+                }
+            }
         }
 
         ValidatePositiveNumber(spec, path, "Breakpoint");

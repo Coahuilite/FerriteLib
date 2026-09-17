@@ -43,6 +43,8 @@ internal static class KernelLayoutTests
         Run("Breakpoint flips Row to a stack without reopening (N2)", VerifyBreakpointDirectionFlip);
         Run("NarrowHidden children vanish only in the narrow state (N2)", VerifyNarrowHidden);
         Run("Wrap Cols/NarrowCols pin the column count per state (N2)", VerifyWrapColsResponsive);
+        Run("Height is validated at creation, not at arrange (A2)", VerifyHeightValidation);
+        Run("Cols/NarrowCols are Wrap-only vocabulary (A3)", VerifyColsWrapOnly);
         Run("Responsive vocabulary is rejected before it can silently no-op (N2 grammar)", VerifyResponsiveValidation);
         return failures;
     }
@@ -579,6 +581,122 @@ internal static class KernelLayoutTests
         UiLayoutSnapshot narrow = Arrange(xml, 150f, 600f).Snapshot;
         Check(Near(narrow.RectById["b"].x, 0f) && Near(narrow.RectById["b"].y, 10f), "narrow: NarrowCols=1 forces one column — the 响应式列数 acceptance row");
         Check(Near(narrow.RectById["d"].y, 30f), "narrow: all four children stack");
+    }
+
+    // A2 (0.7): Height used to be grammar-validated nowhere — a malformed string passed creation and
+    // only threw an unattributable FormatException at arrange time. The contract: everything the
+    // engine already accepts (numbers incl. zero/negative, empty, case-insensitive Auto) passes
+    // creation; malformed and non-finite values are refused there with the element path in the message.
+
+    private static void VerifyHeightValidation()
+    {
+        RegisterTestWidget(10f, null, false);
+
+        Host("<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"24\" />");
+        Host("<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\" 24.5 \" />");
+        Host("<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"Auto\" />");
+        Host("<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"auto\" />");
+        Host("<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"\" />");
+        Host("<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"0\" />");
+        Host("<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"-4\" />");
+        Check(true, "widget Height: numbers, Auto (any case), empty, zero and negative all pass creation");
+
+        Host("<Column Id=\"c\" Height=\"30\"><Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" /></Column>");
+        Host("<Column Id=\"c\" Height=\"auto\"><Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" /></Column>");
+        Check(true, "container Height accepts the same legacy forms");
+
+        Reject("<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"tall\" />", "malformed widget Height");
+        Reject("<Column Id=\"c\" Height=\"bogus\"><Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" /></Column>", "malformed container Height");
+        Reject("<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"NaN\" />", "NaN Height");
+        Reject("<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"Infinity\" />", "infinite Height");
+        Reject("<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"-Infinity\" />", "negative-infinite Height");
+        // Exponential notation parses as a finite invariant-culture number, exactly the grammar
+        // ResolveHeight itself uses (NumberStyles.Float) — creation and engine must agree on it.
+        Host("<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"1e2\" />");
+        UiLayoutSnapshot exponent = Arrange(
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"1e2\" />"
+            + "</UiPage>", 400f, 600f).Snapshot;
+        Check(Near(exponent.RectById["a"].height, 100f),
+            "exponential notation is accepted at creation and arranges to 100 like the engine reads it");
+
+        // Zero and negative keep their existing engine clamp (Math.Max(0f, fixedHeight)) — the
+        // validator refuses only what the engine could not interpret.
+        UiLayoutSnapshot zero = Arrange(
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"0\" />"
+            + "</UiPage>", 400f, 600f).Snapshot;
+        Check(Near(zero.RectById["a"].height, 0f), "zero Height still arranges to a zero slot, not an error");
+
+        // Refusing must name what and where: the path of a nested element appears in the message.
+        try
+        {
+            Host("<Column Id=\"c\"><Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"tall\" /></Column>");
+            Check(false, "nested malformed Height — but the host accepted it");
+        }
+        catch (UiContractException ex)
+        {
+            Check(ex.Message.Contains("Height 'tall'") && ex.Message.Contains("'c/a'"),
+                "the refusal names the attribute, the value and the element path");
+        }
+
+        // The same validator guards reload candidates: an invalid Height is refused before commit,
+        // so the document service's last-known-good path can keep the previous tree.
+        using (UiHost host = new(
+            Scope,
+            UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+                + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" /></UiPage>"),
+            new UiBindings(), UiTheme.DarkGold, new StubMetrics(), new StubTranslation()))
+        {
+            Check(!host.TryPrepareLayoutCandidate(
+                    Parse("<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+                        + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"tall\" /></UiPage>"),
+                    out string badElement, out string badReason)
+                && badReason.IndexOf("Height", StringComparison.Ordinal) >= 0
+                && badElement.Length > 0,
+                "an invalid reload candidate is refused by the same creation-time validator");
+            Check(host.TryPrepareLayoutCandidate(
+                    Parse("<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+                        + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"Auto\" /></UiPage>"),
+                    out _, out _),
+                "while a valid candidate passes it");
+        }
+    }
+
+    // A3 (0.7): the host checked Cols/NarrowCols grammar on every container although only the Wrap
+    // grid path reads them — an inert declaration on Row/Column/Section/... is the silent no-op the
+    // creation contract exists to stop.
+
+    private static void VerifyColsWrapOnly()
+    {
+        RegisterTestWidget(10f, null, false);
+
+        Reject("<Row Id=\"r\" Cols=\"2\"><Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" /></Row>",
+            "valid-looking Cols on a Row");
+        Reject("<Column Id=\"c\" Cols=\"3\"><Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" /></Column>",
+            "Cols on a Column");
+        Reject("<Section Id=\"s\" Breakpoint=\"200\" Cols=\"2\" NarrowCols=\"1\"><Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" /></Section>",
+            "a breakpoint plus both column attributes on a Section is still inert");
+
+        // The message is actionable: names the attribute and says the kind never reads it.
+        try
+        {
+            Host("<Stack Id=\"st\" NarrowCols=\"2\" Cols=\"2\"><Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" /></Stack>");
+            Check(false, "Cols on a Stack — but the host accepted it");
+        }
+        catch (UiContractException ex)
+        {
+            Check(ex.Message.IndexOf("'Cols'", StringComparison.Ordinal) >= 0
+                && ex.Message.IndexOf("Wrap-only", StringComparison.Ordinal) >= 0
+                && ex.Message.IndexOf("'st'", StringComparison.Ordinal) >= 0,
+                "the refusal names the attribute, the rule and the element path");
+        }
+
+        // Valid Wrap vocabulary — wide-only, and the full responsive set — still passes creation,
+        // and the engine-side wide/narrow grid is pinned by VerifyWrapColsResponsive above.
+        Host("<Wrap Id=\"w\" Cols=\"2\"><Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" /></Wrap>");
+        Host("<Wrap Id=\"w\" Breakpoint=\"200\" Cols=\"2\" NarrowCols=\"1\"><Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" /></Wrap>");
+        Check(true, "valid wide and responsive Wrap declarations are untouched");
     }
 
     private static void VerifyResponsiveValidation()
