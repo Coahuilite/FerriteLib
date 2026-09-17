@@ -39,6 +39,7 @@ internal static class KernelLayoutTests
         Run("Auto widths are capped by the budget fixed siblings leave (N1)", VerifyAutoCappedByBudget);
         Run("Stack child with Width=Auto hugs its label (N1)", VerifyStackAutoChildHugsLabel);
         Run("Core stepper-slider is Auto-measurable through its declared label set (N1+N3)", VerifyCoreKindAutoMeasurable);
+        Run("Row Auto child that cannot be measured falls back to unsized (A1)", VerifyRowAutoFallbackToFlex);
         Run("Breakpoint flips Row to a stack without reopening (N2)", VerifyBreakpointDirectionFlip);
         Run("NarrowHidden children vanish only in the narrow state (N2)", VerifyNarrowHidden);
         Run("Wrap Cols/NarrowCols pin the column count per state (N2)", VerifyWrapColsResponsive);
@@ -422,6 +423,92 @@ internal static class KernelLayoutTests
         UiLayoutSnapshot snapshot = Arrange(xml, 400f, 600f).Snapshot;
         Check(Near(snapshot.RectById["slider"].width, 32f),
             "the core stepper-slider's declared label set feeds the same Auto seam (N3's reshape is N1 proving itself)");
+    }
+
+    // A1 (0.7): the Row Auto fallback. Before the fix an unmeasurable Auto child was floored to a
+    // 1-unit stub while its flex siblings soaked up the row; the contract is that such a child is
+    // allocated like the identical child with no Width at all. These lanes compare the two forms.
+
+    private static void VerifyRowAutoFallbackToFlex()
+    {
+        RegisterLabeledTestWidget();
+
+        // 1. Unmeasurable kind (no declared label set): Auto ≡ unsized.
+        UiLayoutSnapshot unmeasurable = Arrange(
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\">"
+            + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" Height=\"10\" />"
+            + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "</Row></UiPage>", 400f, 600f).Snapshot;
+        Check(Near(unmeasurable.RectById["auto"].width, 200f)
+            && Near(unmeasurable.RectById["plain"].width, 200f),
+            "unmeasurable Auto shares the remaining space with the omitted-Width sibling, no 1-unit stub");
+
+        // 2. Registered label set but empty label: same fallback.
+        UiLayoutSnapshot emptyLabel = Arrange(
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\">"
+            + "<Widget Id=\"auto\" Kind=\"" + TestLabelKind + "\" Width=\"Auto\" Label=\"\" Height=\"10\" />"
+            + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "</Row></UiPage>", 400f, 600f).Snapshot;
+        Check(Near(emptyLabel.RectById["auto"].width, 200f),
+            "registered-but-empty label falls back the same way (measure returns zero)");
+
+        // 3. Fixed siblings are still honored; the fallback child splits only the remainder.
+        UiLayoutSnapshot withFixed = Arrange(
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\">"
+            + "<Widget Id=\"fixed\" Kind=\"" + TestWidgetKind + "\" Width=\"90\" Height=\"10\" />"
+            + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" Height=\"10\" />"
+            + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "</Row></UiPage>", 400f, 600f).Snapshot;
+        Check(Near(withFixed.RectById["fixed"].width, 90f)
+            && Near(withFixed.RectById["auto"].width, 155f)
+            && Near(withFixed.RectById["plain"].width, 155f),
+            "fixed sibling keeps 90; the two flex slots split the 310 remainder equally");
+
+        // 4. A positive MinWidth rescues the child into the Auto bucket through the declared clamp.
+        UiLayoutSnapshot floored = Arrange(
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\">"
+            + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" MinWidth=\"40\" Height=\"10\" />"
+            + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "</Row></UiPage>", 400f, 600f).Snapshot;
+        Check(Near(floored.RectById["auto"].width, 40f) && Near(floored.RectById["plain"].width, 360f),
+            "positive MinWidth Auto keeps its existing Auto behavior (40, not a flex share)");
+
+        // 5. On the fallback path the declared MaxWidth clamps the flex share like any child.
+        UiLayoutSnapshot capped = Arrange(
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\">"
+            + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" MaxWidth=\"100\" Height=\"10\" />"
+            + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "</Row></UiPage>", 400f, 600f).Snapshot;
+        Check(Near(capped.RectById["auto"].width, 100f),
+            "MaxWidth applies on the fallback path");
+
+        // 6. Positive control: a measurable Auto child still hugs its label (the fix must not
+        // demote measurable content); covered again here because the lane above mixes both kinds.
+        UiLayoutSnapshot mixed = Arrange(
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\">"
+            + "<Widget Id=\"label\" Kind=\"" + TestLabelKind + "\" Width=\"Auto\" Label=\"音量\" Height=\"10\" />"
+            + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" Height=\"10\" />"
+            + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "</Row></UiPage>", 400f, 600f).Snapshot;
+        Check(Near(mixed.RectById["label"].width, 32f)
+            && Near(mixed.RectById["auto"].width, 184f)
+            && Near(mixed.RectById["plain"].width, 184f),
+            "measurable Auto hugs 32 while the two flex slots split the remaining 368");
+
+        // 7. Stack keeps its own fallback (full width), unchanged by A1.
+        UiLayoutSnapshot stacked = Arrange(
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Column Id=\"column\">"
+            + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" Height=\"10\" />"
+            + "</Column></UiPage>", 400f, 600f).Snapshot;
+        Check(Near(stacked.RectById["auto"].width, 400f),
+            "Stack's unmeasurable-Auto fallback (full width) is preserved");
     }
 
     private static void VerifyBreakpointDirectionFlip()

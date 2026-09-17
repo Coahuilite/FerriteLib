@@ -2240,6 +2240,7 @@ public sealed class UiLayoutEngine
         float fixedSum = 0f;
         int flexCount = 0;
         var autoSlots = new List<int>();
+        var autoNaturals = new List<float>();
 
         for (int i = 0; i < children.Count; i++)
         {
@@ -2247,15 +2248,27 @@ public sealed class UiLayoutEngine
             {
                 widths[i] = fixedWidth;
                 fixedSum += fixedWidth;
+                continue;
             }
-            else if (IsAutoWidth(children[i].Spec))
+
+            // A1: an Auto child that cannot be label-measured (no declared label set, or none of the
+            // labels filled) is NOT floored to a 1-unit stub. It joins the ordinary unsized/flex
+            // distribution, exactly like the same child with no Width attribute — which is what the
+            // MeasureLabelWidth contract ("zero means not Auto-measurable") already promised. A
+            // positive MinWidth still rescues it into the Auto bucket through the declared clamp.
+            if (IsAutoWidth(children[i].Spec))
             {
-                autoSlots.Add(i);
+                float natural = ClampDeclaredWidth(
+                    children[i].Spec, MeasureLabelWidth(children[i].Spec, ctx));
+                if (natural > 0f)
+                {
+                    autoSlots.Add(i);
+                    autoNaturals.Add(natural);
+                    continue;
+                }
             }
-            else
-            {
-                flexCount++;
-            }
+
+            flexCount++;
         }
 
         float totalGap = gap * Math.Max(0, children.Count - 1);
@@ -2266,12 +2279,8 @@ public sealed class UiLayoutEngine
         // and flex siblings keep at least their historical floor.
         float autoBudget = Math.Max(0f, innerWidth - totalGap - fixedSum);
         float autoNaturalTotal = 0f;
-        var autoNaturals = new float[autoSlots.Count];
         for (int s = 0; s < autoSlots.Count; s++)
         {
-            float natural = ClampDeclaredWidth(
-                children[autoSlots[s]].Spec, MeasureLabelWidth(children[autoSlots[s]].Spec, ctx));
-            autoNaturals[s] = Math.Max(1f, natural);
             autoNaturalTotal += autoNaturals[s];
         }
 
