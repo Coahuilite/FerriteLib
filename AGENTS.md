@@ -181,3 +181,29 @@ may depend on reading it, and an un-CLOSED round keeps a pointer line in `TODO.m
   step copies, links or junctions anything into a `Mods/` directory — a link back into the repo would bind
   build output to a machine-local layout another clone cannot see, reproduce, or (without elevation)
   create. Keep artifacts under `dist/` and say where they are.
+
+## Push discipline (added 2026-09-17; each rule was paid for once, on the 0.6.x first push)
+
+Extends the boundaries above; it does not relax them.
+
+- **Run `scripts/privacy-audit.ps1 -FullHistory` before the FIRST push of a line, not only before a
+  release.** A line that has never been pushed is where a history rewrite is still cheap; afterwards it is
+  not. (The 0.6 line sat local-only for a whole round and its pre-push audit failed on a blob from the
+  *fork* commit.)
+- **The audit scans `git rev-list --all`, so the check is "no reachable ref carries a personal path", not
+  "the working tree is clean today".** Consequences seen: a path already fixed in the tree still failed
+  while history kept the blob (`4a9c6b9` fixed the file; `02a6aea` still carried it); and a **backup tag
+  created after the fix re-exposed the old history and failed the audit by itself**. Keep backups outside
+  the repository (`git bundle` on local disk), not as tags or branches.
+- **Clean history by rewriting only the unpublished range**, preserving author/committer dates and
+  messages, and verify the final tree is byte-identical to the pre-rewrite tip. Expect a cross-repo
+  cascade: the rewritten SHA is what a consumer cites and what the payload's
+  `AssemblyInformationalVersion` embeds, so the payload must be **rebuilt** and the consumer's gates
+  re-run (`scripts/stage-package.ps1` measures the build, so a stale payload is refused rather than
+  trusted). Never rewrite a range that is already public.
+- **Short-lived feature branches are deleted with their worktrees when their work lands.** Eleven stale
+  `feat/0.5-*` / `feat/0.6-*` branches plus eleven `.fl-worktrees/` entries survived earlier rounds —
+  hygiene debt, and (per the rule above) an audit liability. Confirm `git worktree list` shows only the
+  main checkout before a push.
+- **The commit identity is set once per repository and checked before writing history**, not before
+  pushing it: a stray identity in one commit forces a rewrite of everything after it.

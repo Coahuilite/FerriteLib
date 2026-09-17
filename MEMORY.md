@@ -2,6 +2,20 @@
 
 ## Current durable state
 
+- **`0.6.x` is PUBLISHED (2026-09-17) at `2545346`, after a pre-first-push history rewrite.** The line had
+  been local-only; `scripts/privacy-audit.ps1 -FullHistory` failed on a **historical blob** — the fork
+  commit `02a6aea` carried a machine-absolute path in `docs/development/0.6/10-work-packages.md` (the
+  working tree had already been fixed by `4a9c6b9`, but vector 3 scans `git rev-list --all`). Remedy: the
+  **33 commits after the published `0.5.x` tip `354d90a`** were rewritten in place at blob level
+  (author/committer dates and messages preserved; the final tree is **byte-identical** to the pre-rewrite
+  tip), and the eleven stale `feat/0.5-*` / `feat/0.6-*` branches plus their eleven `.fl-worktrees/`
+  entries were removed (a `git bundle` of all of them is kept outside the repository). Audit then CLEAN
+  over 289 revisions. **`b3283e0` survives in older evidence documents as a historical cite; the live tip
+  is `2545346`.** The payload was rebuilt so its `AssemblyInformationalVersion` matches again
+  (`0.6.0-dev+2545346...`, SHA-256 `3366D578...`). The reusable rules are now in `AGENTS.md` "Push
+  discipline" — read them before the next first push; the identity one exists because a consumer repo wrote
+  two commits with a placeholder identity and had to re-author them.
+
 - **The 0.6 round (2026-09-16, branch `0.6.x`, forked from the frozen `0.5.x` tip `354d90a`) adds the
   MVVM/MVVM-adjacent surface and an independent demo mod.** Contract axis moved **0.5.0 → 0.6.0** as one
   minor, because the rule at `FerriteLibVersion.Api` is unconditional for additions while the major is 0. The
