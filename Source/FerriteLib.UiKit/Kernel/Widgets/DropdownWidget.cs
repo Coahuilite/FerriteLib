@@ -177,8 +177,8 @@ public sealed class DropdownWidget : IUiWidget
                 continue;
             }
 
-            spec.TryGetAttribute("Value" + suffix, out string value);
-            result.Add(new Option(text, value.Length > 0 ? value : text));
+            spec.TryGetAttribute("Value" + suffix, out string? value);
+            result.Add(new Option(text, string.IsNullOrEmpty(value) ? text : value));
         }
 
         return result;
@@ -186,10 +186,22 @@ public sealed class DropdownWidget : IUiWidget
 
     private static string FindDisplayText(List<Option> options, string current)
     {
+        // A4 (0.7): two passes, value first. The old per-item "value OR text" test let an earlier
+        // option whose display text happened to equal the bound value hide a later option whose
+        // VALUE is exactly that value; the bound value is the authoritative key, so any exact
+        // value match wins outright and the text fallback only runs when no value matched.
+        // Matching stays ordinal and option order stays authoritative within each pass.
         foreach (Option option in options)
         {
-            if (string.Equals(option.Value, current, StringComparison.Ordinal)
-                || string.Equals(option.Text, current, StringComparison.Ordinal))
+            if (string.Equals(option.Value, current, StringComparison.Ordinal))
+            {
+                return option.Text;
+            }
+        }
+
+        foreach (Option option in options)
+        {
+            if (string.Equals(option.Text, current, StringComparison.Ordinal))
             {
                 return option.Text;
             }

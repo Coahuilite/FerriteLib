@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
 using UnityEngine;
@@ -17,6 +19,7 @@ internal static class KernelCoreWidgetTests
         int failures = 0;
         failures += Run("Kernel core widgets measure/draw", VerifyCoreWidgetsMeasureDraw);
         failures += Run("Kernel dropdown opens session popup", VerifyDropdownOpensPopup);
+        failures += Run("Dropdown exact value wins over display-text fallback (A4)", VerifyDropdownValuePrecedence);
         failures += Run("Banner/empty-state bands are the text atom's band", VerifyCompositeBandsComeFromTheAtom);
         failures += Run("Composites draw text/font/rect through the one outlet", VerifyCompositeOutletTriple);
         failures += Run("Composite kinds keep their vocabulary and their manifests", VerifyCompositeVocabularyUnchanged);
@@ -126,6 +129,86 @@ internal static class KernelCoreWidgetTests
         {
             UiNative.ButtonOverride = null;
         }
+    }
+
+    // A4 (0.7): FindDisplayText used to test value OR text per item, so an earlier option whose
+    // display text equalled the bound value could hide a later option whose value IS that value.
+    // The contract is two passes — exact value first, display-text fallback second — with option
+    // order authoritative inside each pass. The seam is the widget's own draw: the field's display
+    // string is what reaches the single text outlet, no reflection-resolver shortcut.
+
+    private static void VerifyDropdownValuePrecedence()
+    {
+        Check("Second" == FieldDrawnText("Option1=\"b\" Value1=\"a\" Option2=\"Second\" Value2=\"b\"", "b"),
+            "the required case: a later exact value beats an earlier text collision");
+        Check("One" == FieldDrawnText("Option1=\"One\" Value1=\"x\" Option2=\"Two\" Value2=\"y\"", "x"),
+            "value-only match still resolves");
+        Check("One" == FieldDrawnText("Option1=\"One\" Value1=\"x\" Option2=\"Two\" Value2=\"y\"", "One"),
+            "the legacy display-text fallback still runs when no value matches");
+        Check("zzz" == FieldDrawnText("Option1=\"One\" Value1=\"x\" Option2=\"Two\" Value2=\"y\"", "zzz"),
+            "no match still displays the raw value");
+        Check("First" == FieldDrawnText("Option1=\"First\" Value1=\"d\" Option2=\"Second\" Value2=\"d\"", "d"),
+            "two value matches: the first in option order wins, unchanged");
+        Check("Alpha" == FieldDrawnText("Option1=\"Alpha\" Option2=\"Beta\"", "Alpha"),
+            "static pairs without Value keep working (value defaults to the text)");
+
+        // Dynamic options (BindOptions) are value==text pairs; precedence must not shift their result.
+        Check("y" == FieldDrawnText("OptionsBind=\"Options\"", "y", options: new List<string> { "x", "y" }),
+            "an options binding still displays its exact member");
+
+        // Writeback is untouched: drawing resolves for display only; the bound value survives the pass.
+        string stored = "b";
+        FieldDrawnText("Option1=\"b\" Value1=\"a\" Option2=\"Second\" Value2=\"b\"", "b", keepValue: s => stored = s);
+        Check(stored == "b", "the draw pass committed nothing to the binding");
+    }
+
+    private static string FieldDrawnText(
+        string optionAttributes, string current, List<string>? options = null, Action<string>? keepValue = null)
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+
+        string xml =
+            "<UiPage Schema=\"2\" Source=\"test\">"
+            + "<Widget Id=\"dropdown\" Kind=\"input/dropdown\" " + optionAttributes + " />"
+            + "</UiPage>";
+
+        var bindings = new UiBindings();
+        string value = current;
+        bindings.BindValue("dropdown", () => value, v => value = v);
+        if (options != null)
+        {
+            bindings.BindOptions("Options", () => options);
+        }
+
+        using UiHost host = new("test", UiLayoutManifest.Parse(xml), bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(300f, 200f));
+
+        IList texts = (IList)Field(typeof(Verse.Widgets), "LabelTexts", null);
+        IList rects = (IList)Field(typeof(Verse.Widgets), "LabelRects", null);
+        texts.Clear();
+        rects.Clear();
+
+        host.BeginFrame();
+        host.Draw(new Rect(0f, 0f, 300f, 200f), snapshot);
+        host.EndFrame();
+
+        keepValue?.Invoke(value);
+
+        // The widget carries no Label attribute, so the field display is the page's only label call.
+        if (texts.Count != 1)
+        {
+            throw new Exception("expected exactly one drawn label, got " + texts.Count);
+        }
+
+        return (string)texts[0]!;
+    }
+
+    private static object Field(Type type, string name, object? instance)
+    {
+        FieldInfo? field = type.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Public);
+        if (field == null) throw new Exception(type.Name + " has no field '" + name + "'");
+        return field.GetValue(instance)!;
     }
 
     // --- 0.4.x leaf vocabulary: the two composites rebuilt over the text atom --------------------
