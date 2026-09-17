@@ -116,29 +116,40 @@ public sealed class UiTheme
         Styles = new UiStyleTable(this);
     }
 
-    // Surfaces: restrained near-black planes with small luminance steps.
-    public Color Base { get; set; } = new(0.065f, 0.065f, 0.063f, 1f);
-    public Color Panel { get; set; } = new(0.095f, 0.095f, 0.090f, 1f);
-    public Color Raised { get; set; } = new(0.135f, 0.135f, 0.128f, 1f);
-    public Color Hover { get; set; } = new(0.17f, 0.17f, 0.16f, 1f);
-    public Color Selected { get; set; } = new(0.17f, 0.14f, 0.08f, 1f);
-    public Color Success { get; set; } = new(0.11f, 0.24f, 0.15f, 1f);
-    public Color Danger { get; set; } = new(0.38f, 0.14f, 0.11f, 1f);
+    // C (0.7): the constructor default is the vanilla-aligned palette. Provenance, in two classes:
+    // the four substrate/edge references and the two option references below were carried from the
+    // previous investigation of vanilla <c>Verse.Widgets</c> — that investigation's service build
+    // identity was NOT established, so they are references to reproduce centrally, not a promise the
+    // target game paints exactly this. Every other value is DERIVED in the same direction (neutral
+    // surfaces, one reserved yellow); the exact vanilla button yellow is not established anywhere, so
+    // <see cref="AccentGold"/> is a stated candidate, honestly labeled. Geometry, fonts, token names
+    // and the renderer did not move in this package. The 0.6 values survive verbatim in
+    // <see cref="DarkGold"/>.
+
+    // Surfaces: the vanilla window/section substrates with the vanilla unselected/selected options.
+    public Color Base { get; set; } = new(21f / 255f, 25f / 255f, 29f / 255f, 1f);
+    public Color Panel { get; set; } = new(42f / 255f, 43f / 255f, 44f / 255f, 1f);
+    public Color Raised { get; set; } = new(0.21f, 0.21f, 0.21f, 1f);
+    public Color Hover { get; set; } = new(0.27f, 0.27f, 0.27f, 1f);
+    public Color Selected { get; set; } = new(0.32f, 0.28f, 0.21f, 1f);
+    public Color Success { get; set; } = new(0.13f, 0.30f, 0.18f, 1f);
+    public Color Danger { get; set; } = new(0.42f, 0.15f, 0.12f, 1f);
 
     // Named planes for reusable multi-column chrome primitives.
-    public Color WorkspacePlane { get; set; } = new(0.045f, 0.045f, 0.044f, 1f);
-    public Color SectionBand { get; set; } = new(0.085f, 0.085f, 0.080f, 1f);
+    public Color WorkspacePlane { get; set; } = new(0.055f, 0.066f, 0.078f, 1f);
+    public Color SectionBand { get; set; } = new(0.12f, 0.125f, 0.13f, 1f);
 
     // Text
-    public Color TextPrimary { get; set; } = new(0.88f, 0.88f, 0.84f, 1f);
-    public Color TextSecondary { get; set; } = new(0.58f, 0.58f, 0.55f, 1f);
-    public Color TextOnGold { get; set; } = new(1f, 0.84f, 0.55f, 1f);
-    public Color TextOnDanger { get; set; } = new(1f, 0.65f, 0.46f, 1f);
-    public Color TextDisabled { get; set; } = new(0.42f, 0.42f, 0.40f, 1f);
+    public Color TextPrimary { get; set; } = new(0.91f, 0.91f, 0.91f, 1f);
+    public Color TextSecondary { get; set; } = new(0.62f, 0.64f, 0.67f, 1f);
+    public Color TextOnGold { get; set; } = new(0.99f, 0.87f, 0.55f, 1f);
+    public Color TextOnDanger { get; set; } = new(0.99f, 0.72f, 0.64f, 1f);
+    public Color TextDisabled { get; set; } = new(0.45f, 0.46f, 0.48f, 1f);
 
-    // Accents: reserve gold for activity and focus states.
-    public Color AccentGold { get; set; } = new(0.82f, 0.60f, 0.22f, 1f);
-    public Color HoverPoint { get; set; } = new(0.96f, 0.80f, 0.42f, 1f);
+    // Accents: yellow stays reserved for emphasis, selection/focus and interaction feedback —
+    // the Selected plane keeps its warm-neutral fill and takes the accent as its edge (below).
+    public Color AccentGold { get; set; } = new(0.93f, 0.77f, 0.22f, 1f);
+    public Color HoverPoint { get; set; } = new(0.99f, 0.87f, 0.45f, 1f);
 
     /// <summary>
     /// The accent at a reduced alpha. Derived rather than stored: a consumer that re-tints
@@ -148,14 +159,15 @@ public sealed class UiTheme
 
     // Shared borders. These stay the defaults for every surface that does not override its edge, so a
     // consumer that re-tints the bag the old way still moves every plane it used to move.
-    public Color Border { get; set; } = new(0.21f, 0.21f, 0.20f, 1f);
-    public Color BorderStrong { get; set; } = new(0.32f, 0.32f, 0.30f, 1f);
-    public Color Divider { get; set; } = new(0.14f, 0.14f, 0.13f, 1f);
+    public Color Border { get; set; } = new(0.33f, 0.35f, 0.38f, 1f);
+    public Color BorderStrong { get; set; } = new(0.47f, 0.51f, 0.57f, 1f);
+    public Color Divider { get; set; } = new(0.20f, 0.21f, 0.23f, 1f);
 
-    // Per-surface edge overrides. Null — the default — means "use the shared token above"; a value
-    // gives exactly one surface an edge of its own, which is what the per-surface restructure is for.
-    public Color? BaseBorder { get; set; }
-    public Color? PanelBorder { get; set; }
+    // Per-surface edge overrides. Null means "use the shared token above"; a value gives exactly one
+    // surface an edge of its own, which is what the per-surface restructure is for. From 0.7 the two
+    // planes the table establishes claim their edge by default; the rest stay as shipped.
+    public Color? BaseBorder { get; set; } = new Color(97f / 255f, 108f / 255f, 122f / 255f, 1f);
+    public Color? PanelBorder { get; set; } = new Color(135f / 255f, 135f / 255f, 135f / 255f, 1f);
     public Color? RaisedBorder { get; set; }
     public Color? HoverBorder { get; set; }
     public Color? SelectedBorder { get; set; }
@@ -317,9 +329,44 @@ public sealed class UiTheme
     }
 
     /// <summary>
-    /// The shipped default palette, handed out as a fresh instance on every call. It is a template,
-    /// not a shared singleton: two consumer mods re-tinting "the default" must never repaint each
-    /// other. A caller that wants one theme for a whole window keeps the returned instance.
+    /// The complete 0.6 palette, frozen as history and handed out as a fresh independent instance on
+    /// every call — a template, never a shared singleton, exactly like the constructor default.
+    /// <para>
+    /// Until 0.7 this property was <c>=> new()</c>, i.e. one value with two names. When the constructor
+    /// default moved to the vanilla-aligned palette, the coupling had to break with it: the property
+    /// now spells every 0.6 token, so re-tinting the default can never repaint DarkGold, and a
+    /// consumer that liked the old look switches its theme source here and keeps its overrides.
+    /// The per-surface edges are reset to null on purpose — DarkGold's answer is the 0.6 answer,
+    /// shared-border-only, regardless of what new defaults claim.
+    /// </para>
     /// </summary>
-    public static UiTheme DarkGold => new();
+    public static UiTheme DarkGold => new()
+    {
+        Base = new Color(0.065f, 0.065f, 0.063f, 1f),
+        Panel = new Color(0.095f, 0.095f, 0.090f, 1f),
+        Raised = new Color(0.135f, 0.135f, 0.128f, 1f),
+        Hover = new Color(0.17f, 0.17f, 0.16f, 1f),
+        Selected = new Color(0.17f, 0.14f, 0.08f, 1f),
+        Success = new Color(0.11f, 0.24f, 0.15f, 1f),
+        Danger = new Color(0.38f, 0.14f, 0.11f, 1f),
+        WorkspacePlane = new Color(0.045f, 0.045f, 0.044f, 1f),
+        SectionBand = new Color(0.085f, 0.085f, 0.080f, 1f),
+        TextPrimary = new Color(0.88f, 0.88f, 0.84f, 1f),
+        TextSecondary = new Color(0.58f, 0.58f, 0.55f, 1f),
+        TextOnGold = new Color(1f, 0.84f, 0.55f, 1f),
+        TextOnDanger = new Color(1f, 0.65f, 0.46f, 1f),
+        TextDisabled = new Color(0.42f, 0.42f, 0.40f, 1f),
+        AccentGold = new Color(0.82f, 0.60f, 0.22f, 1f),
+        HoverPoint = new Color(0.96f, 0.80f, 0.42f, 1f),
+        Border = new Color(0.21f, 0.21f, 0.20f, 1f),
+        BorderStrong = new Color(0.32f, 0.32f, 0.30f, 1f),
+        Divider = new Color(0.14f, 0.14f, 0.13f, 1f),
+        BaseBorder = null,
+        PanelBorder = null,
+        RaisedBorder = null,
+        HoverBorder = null,
+        SelectedBorder = null,
+        SuccessBorder = null,
+        DangerBorder = null,
+    };
 }
