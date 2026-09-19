@@ -144,7 +144,28 @@ public sealed class UiTheme
     public Color TextDisabled { get; set; }
 
     public Color AccentGold { get; set; }
-    public Color HoverPoint { get; set; }
+
+    /// <summary>
+    /// The accent's hover step: every channel of <see cref="AccentGold"/> lifted <see cref="HoverLift"/> of
+    /// the remaining distance toward white, with the accent's alpha kept. Computed on every read, never
+    /// stored and never settable, because there is exactly one accent token: a consumer that re-tints
+    /// <see cref="AccentGold"/> gets the matching hover step immediately, and no second colour can be left
+    /// holding the old hue (which is what the two stored tokens used to do).
+    /// <para>
+    /// The rule is a fixed fraction rather than an adaptive lighten, so the result is predictable for an
+    /// author who re-tints the accent; no requirement has asked for the adaptive form.
+    /// </para>
+    /// </summary>
+    public Color AccentHover => new Color(
+        Lift(AccentGold.r),
+        Lift(AccentGold.g),
+        Lift(AccentGold.b),
+        AccentGold.a);
+
+    /// <summary>The fraction of the remaining distance to white the derived hover step travels.</summary>
+    private const float HoverLift = 0.3f;
+
+    private static float Lift(float channel) => channel + (1f - channel) * HoverLift;
 
     /// <summary>
     /// The accent at a reduced alpha. Derived rather than stored: a consumer that re-tints
@@ -305,7 +326,8 @@ public sealed class UiTheme
             TextOnDanger = TextOnDanger,
             TextDisabled = TextDisabled,
             AccentGold = AccentGold,
-            HoverPoint = HoverPoint,
+            // No second accent is copied: AccentHover is computed from AccentGold on every read, so
+            // copying a value would only be able to go stale.
             Border = Border,
             BorderStrong = BorderStrong,
             Divider = Divider,
@@ -348,7 +370,6 @@ public sealed class UiTheme
         TextOnDanger = new Color(0.99f, 0.72f, 0.64f, 1f),
         TextDisabled = new Color(0.45f, 0.46f, 0.48f, 1f),
         AccentGold = new Color(0.93f, 0.77f, 0.22f, 1f),
-        HoverPoint = new Color(0.99f, 0.87f, 0.45f, 1f),
         Border = new Color(0.33f, 0.35f, 0.38f, 1f),
         BorderStrong = new Color(0.47f, 0.51f, 0.57f, 1f),
         Divider = new Color(0.20f, 0.21f, 0.23f, 1f),
@@ -384,7 +405,6 @@ public sealed class UiTheme
         TextOnDanger = new Color(1f, 0.65f, 0.46f, 1f),
         TextDisabled = new Color(0.42f, 0.42f, 0.40f, 1f),
         AccentGold = new Color(0.82f, 0.60f, 0.22f, 1f),
-        HoverPoint = new Color(0.96f, 0.80f, 0.42f, 1f),
         Border = new Color(0.21f, 0.21f, 0.20f, 1f),
         BorderStrong = new Color(0.32f, 0.32f, 0.30f, 1f),
         Divider = new Color(0.14f, 0.14f, 0.13f, 1f),

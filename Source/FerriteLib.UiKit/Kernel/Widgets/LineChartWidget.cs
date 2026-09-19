@@ -24,7 +24,7 @@ public sealed class LineChartWidget : IUiWidget
     private const float DefaultHeight = 120f;
     private const float PlotPadding = 8f;
     private const float PointSize = 5f;
-    private const float HoverPointSize = 9f;
+    private const float HoveredPointSize = 9f;
     private const float HitRadius = 6f;
     private const float Epsilon = 0.0001f;
 
@@ -257,9 +257,9 @@ public sealed class LineChartWidget : IUiWidget
         {
             Vector2 pixel = ToRectPoint(points[i], plotRect);
             bool isHovered = i == hovered;
-            float size = isHovered ? HoverPointSize : PointSize;
+            float size = isHovered ? HoveredPointSize : PointSize;
             var pointRect = new Rect(pixel.x - size * 0.5f, pixel.y - size * 0.5f, size, size);
-            UiThemeDraw.Solid(pointRect, isHovered ? theme.HoverPoint : theme.AccentGold);
+            UiThemeDraw.Solid(pointRect, isHovered ? theme.AccentHover : theme.AccentGold);
         }
     }
 

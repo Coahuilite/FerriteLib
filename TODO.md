@@ -30,17 +30,17 @@ Second amendment **inside 0.7.x**: the contract axis stays `0.7.0` and the consu
 plan, one home: `docs/development/0.7/10-change-plan.md`. It closes `docs/architecture.md` §3.2/§6.3's
 **alignment** gap and half of the **relation** gap, with CP-0 as a prerequisite.
 
-- [ ] CP-0 — `ParsePadding`/`ReadGap` fall back to the theme's geometry tokens (breaking; documented migration).
-- [ ] CP-1 — placement vocabulary (`AlignX`/`OffsetX`/`AlignY`/`OffsetY`) inside a placement container;
-      carries the round-README amendment in the same commit.
-- [ ] CP-2 — cross-axis alignment in flow containers.
-- [ ] D1–D4 — the four open decisions listed in the plan.
-- [ ] CP-3 — the skin-source axis: a look definable by data, not only by C# factories.
-- [ ] CP-4 — the document boundary; `proposed`, **blocked by D5**. The "role moves into the style
-      document" half is withdrawn (`Tone` is the only appearance reference that cannot dangle).
-- [ ] CP-5 — regional scope in the style document (`For="region-id"`), not a selector language.
-- [ ] CP-6 — split the tone axes (state vs role) and make the role→surface mapping data; `proposed`, blocked by D5.
-- [ ] D5 — what `Tone` is: role vocabulary on the element (recommended), document-defined named roles, or leave as-is.
+- [x] **Batch 1 landed 2026-09-19** — CP-0, CP-1, CP-2 and CP-6①③④ implemented, two new lanes,
+      42 expectations re-pinned (all classified as the accepted break, none relaxed), gates 9/9.
+      Recorded in `MEMORY.md` and in the contract under "Batch 1".
+- [ ] **Delivery to the local consumer** — stage `dist/dev/FerriteLib/` (`-PackDev`), hand the consumer the
+      migration list in `docs/consumers/consume-from-0.7.0.md` §4b, and let it compile against
+      `[0.7.0,0.8.0)`. The four in-game checks in `docs/development/0.7/README.md` remain the
+      maintainer's/operator's; they are the only thing that can lift the harness-only evidence boundary.
+- [ ] **Batch 2 (after the live feedback)** — CP-3 (skin-source axis) → CP-6② (role→surface mapping as
+      data; blocked by CP-3) → CP-5 (regional scope), plus CP-7 (sibling-relative placement) if the feedback
+      asks for it. Additive today and cited by nothing; the live pass is what would supply the citation.
+- [x] D1–D7 — all seven Step-1/Batch-1 decisions settled; see the plan §0b for what each was settled as.
 
 ## 0.7.x round — implemented, external acceptance open (2026-09-17)
 

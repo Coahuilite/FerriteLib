@@ -59,7 +59,9 @@ consequence is paid in the open rather than discovered by a stranger.
 - `UiContractException` — creation-time contract failure, the type a consumer catches to survive its own
   manifest.
 - `UiUnknownWidgetKindException` — the same contract's kind half.
-- `UiStatusTone` — the status vocabulary shared by the audit surface and consumer copy.
+- `UiStatusTone` — the status vocabulary shared by the audit surface and consumer copy. **Batch 1
+  (0.7.x):** the authored *manifest* vocabulary shrank to four accepted values, which is a manifest change
+  only — this type stays stable and `Active`/`Disabled` remain members used internally as states.
 - `UiOverflowAxis` — the fit-audit axis vocabulary; two axes because a width overflow and a height overflow
   are different bugs.
 
@@ -122,7 +124,8 @@ consequence is paid in the open rather than discovered by a stranger.
   engine vocabulary on every kind, plus the per-element style chain the engine carries and resolves), so
   what is left of that debt is the type size those two pinned composites would need before density can
   reach them. **0.7 amendment:** two named peer factories, `Vanilla` and `DarkGold`; `new UiTheme()` is
-  an unpainted bag, not a product default.
+  an unpainted bag, not a product default. **Batch 1 amendment:** the accent is one stored colour,
+  `AccentGold`, plus the read-only derived `AccentHover`; the stored `HoverPoint` member is removed.
 - `UiThemeDraw` — the single text and panel outlet; per-surface tokens change what it takes to draw.
 - `UiFitAudit` — the audit surface; entry attribution follows the identity layer. The ruler moved with
   the routing: a subscribed host is measured with the `ITextMetrics` its own diagnostic scope carries, and

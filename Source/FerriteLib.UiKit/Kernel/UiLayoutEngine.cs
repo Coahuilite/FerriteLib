@@ -106,13 +106,15 @@ public sealed class UiLayoutEngine
     {
         "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Width", "Fill",
         "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden",
-        "Scheme", "Density", "Visible", "VisibleKey"
+        "Scheme", "Density", "Visible", "VisibleKey",
+        "AlignX", "OffsetX", "AlignY", "OffsetY"
     };
 
     private static readonly HashSet<string> EngineWideWidgetAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
         "Id", "Kind", "Hidden", "Tab", "Width", "MinWidth", "MaxWidth", "NarrowHidden", "Scheme", "Density",
-        "Visible", "VisibleKey"
+        "Visible", "VisibleKey",
+        "AlignX", "OffsetX", "AlignY", "OffsetY"
     };
 
     private static readonly string[] NoSchema = Array.Empty<string>();
@@ -848,8 +850,8 @@ public sealed class UiLayoutEngine
     private MeasuredBox MeasureContainer(UiWidgetContext ctx, UiElementSpec spec, float width, float availableHeight, UiNode node)
     {
         string declaredKind = GetContainerKind(spec);
-        Padding padding = ParsePadding(spec);
-        float gap = ReadGap(spec);
+        Padding padding = ParsePadding(spec, ctx.Theme);
+        float gap = ReadGap(spec, ctx.Theme);
         float titleHeight = HasTitle(spec) ? SectionTitleHeight : 0f;
         float innerWidth = Math.Max(1f, width - padding.Left - padding.Right);
         float innerY = padding.Top + titleHeight;
@@ -1030,10 +1032,21 @@ public sealed class UiLayoutEngine
         // case its slot hugs its own label text (N1). The pre-pass and the arrange pass must use
         // the same width or a wrap-sensitive child measures its height against a band it will not
         // be drawn in.
+        //
+        // CP-2: the cross axis of a vertical container is horizontal, so a child that names AlignX takes its
+        // own envelope as its width - a declared numeric Width, or an Auto label width - while a Stretch
+        // child keeps the flow slot this container has always handed it. That is the one place a numeric
+        // Width on a stack child becomes load-bearing, and it becomes so only when the child asks for a
+        // reference point: with no vocabulary the width is resolved exactly as before.
         var childWidths = new float[visible.Count];
+        var alignsX = new UiPlacement.Alignment[visible.Count];
         for (int i = 0; i < visible.Count; i++)
         {
-            childWidths[i] = ResolveStackChildWidth(visible[i].Spec, innerWidth, ctx);
+            alignsX[i] = UiPlacement.ParseAlign(
+                visible[i].Spec, UiPlacement.AlignXAttribute, UiPlacement.Axis.Horizontal);
+            childWidths[i] = alignsX[i].IsStretch
+                ? ResolveStackChildWidth(visible[i].Spec, innerWidth, ctx)
+                : ResolveWrapWidth(visible[i].Spec, innerWidth, ctx);
         }
 
         // Fill-aware vertical allocation. A pre-pass measures the flow height of every non-Fill
@@ -1092,7 +1105,9 @@ public sealed class UiLayoutEngine
             }
 
             MeasuredBox childBox = MeasureElement(ctx, child.Spec, childWidths[i], childAvailable, childNode);
-            childBox = OffsetBox(childBox, padding.Left, y);
+            float nudgeX = UiPlacement.ParseOffset(child.Spec, UiPlacement.OffsetXAttribute, innerWidth);
+            float childX = UiPlacement.Origin(padding.Left, innerWidth, childBox.Width, alignsX[i], nudgeX);
+            childBox = OffsetBox(childBox, childX, y);
             box.Entries.AddRange(childBox.Entries);
             y += childBox.Height;
             first = false;
@@ -1136,22 +1151,37 @@ public sealed class UiLayoutEngine
 
         float[] widths = ResolveColumnWidths(visible, innerWidth, gap, ctx);
         var box = new MeasuredBox { Width = width, Height = 0f };
-        float x = padding.Left;
-        float maxHeight = 0f;
 
+        // CP-2: the cross axis of a row is vertical, so a child may name AlignY against this row's inner
+        // height. That height is the RESOLVED container height - a fixed or filling row is taller than its
+        // content - and it is only known once every child has been measured, so the row measures its children
+        // first and places them in a second pass. With no AlignY every child lands on innerY, exactly where
+        // flow put it.
+        var childBoxes = new MeasuredBox[visible.Count];
+        float maxHeight = 0f;
         for (int i = 0; i < visible.Count; i++)
         {
             UiNode childNode = ChildNode(ctx, node, visible[i].Spec, visible[i].DeclaredIndex);
-            MeasuredBox childBox = MeasureElement(ctx, visible[i].Spec, widths[i], availableHeight, childNode);
-            childBox = OffsetBox(childBox, x, innerY);
-            box.Entries.AddRange(childBox.Entries);
-            maxHeight = Math.Max(maxHeight, childBox.Height);
-            x += widths[i] + gap;
+            childBoxes[i] = MeasureElement(ctx, visible[i].Spec, widths[i], availableHeight, childNode);
+            maxHeight = Math.Max(maxHeight, childBoxes[i].Height);
         }
 
         float naturalHeight = padding.Top + titleHeight + maxHeight + padding.Bottom;
         float height = ResolveContainerHeight(spec, naturalHeight, availableHeight);
         box.Height = height;
+
+        float innerHeight = Math.Max(0f, height - padding.Bottom - innerY);
+        float x = padding.Left;
+        for (int i = 0; i < visible.Count; i++)
+        {
+            UiElementSpec child = visible[i].Spec;
+            UiPlacement.Alignment alignY = UiPlacement.ParseAlign(
+                child, UiPlacement.AlignYAttribute, UiPlacement.Axis.Vertical);
+            float nudgeY = UiPlacement.ParseOffset(child, UiPlacement.OffsetYAttribute, innerHeight);
+            float y = UiPlacement.Origin(innerY, innerHeight, childBoxes[i].Height, alignY, nudgeY);
+            box.Entries.AddRange(OffsetBox(childBoxes[i], x, y).Entries);
+            x += widths[i] + gap;
+        }
 
         var containerEntry = new PlacedEntry
         {
@@ -1190,6 +1220,13 @@ public sealed class UiLayoutEngine
         bool firstInLine = true;
         int placedInLine = 0;
 
+        // CP-2 for a Wrap: a line of flow is horizontal, so the cross axis of a line is vertical. A line's
+        // height is only final once the line is closed, so each child is placed on the line top exactly where
+        // flow put it and the finished line is then nudged onto its AlignY reference point. A line with no
+        // AlignY computes a zero delta, so an existing Wrap keeps its arrangement untouched.
+        var line = new List<WrapLineItem>();
+        float lineTop = y;
+
         // N2's column variant: declared Cols (wide) / NarrowCols (narrow) fix a uniform grid —
         // the acceptance row the rebuild contract promised ("响应式列数") is a column COUNT, and
         // a count is only declarable if the grid can be pinned. Without either, flow-by-width
@@ -1214,13 +1251,17 @@ public sealed class UiLayoutEngine
             bool lineFull = cols > 0 ? placedInLine >= cols : x + childWidth > padding.Left + innerWidth;
             if (!firstInLine && lineFull)
             {
+                AlignWrapLine(box.Entries, line, lineTop, lineHeight);
+                line.Clear();
                 x = padding.Left;
                 y += lineHeight + gap;
+                lineTop = y;
                 lineHeight = 0f;
                 firstInLine = true;
                 placedInLine = 0;
             }
 
+            int entryStart = box.Entries.Count;
             MeasuredBox childBox = MeasureElement(
                 ctx,
                 child,
@@ -1229,12 +1270,15 @@ public sealed class UiLayoutEngine
                 childNode);
             childBox = OffsetBox(childBox, x, y);
             box.Entries.AddRange(childBox.Entries);
+            line.Add(new WrapLineItem(entryStart, childBox.Entries.Count, childBox.Height, child));
 
             x += childWidth + gap;
             lineHeight = Math.Max(lineHeight, childBox.Height);
             firstInLine = false;
             placedInLine++;
         }
+
+        AlignWrapLine(box.Entries, line, lineTop, lineHeight);
 
         float contentHeight = Math.Max(0f, y + lineHeight - innerY);
         float naturalHeight = padding.Top + titleHeight + contentHeight + padding.Bottom;
@@ -1257,6 +1301,65 @@ public sealed class UiLayoutEngine
         return box;
     }
 
+    /// <summary>
+    /// One child placed on a Wrap line: the entries it owns in the container's entry list, its own measured
+    /// height, and the spec its <c>AlignY</c>/<c>OffsetY</c> are read from.
+    /// </summary>
+    private readonly struct WrapLineItem
+    {
+        internal readonly int EntryStart;
+        internal readonly int EntryCount;
+        internal readonly float Height;
+        internal readonly UiElementSpec Spec;
+
+        internal WrapLineItem(int entryStart, int entryCount, float height, UiElementSpec spec)
+        {
+            EntryStart = entryStart;
+            EntryCount = entryCount;
+            Height = height;
+            Spec = spec;
+        }
+    }
+
+    /// <summary>
+    /// Moves one finished Wrap line's children onto their cross-axis reference points. Every child on the
+    /// line was offset to <paramref name="lineTop"/> by flow, so all this applies is the difference between
+    /// that and the resolved placement; a line whose children name no AlignY resolves to a zero delta and the
+    /// entries are left exactly as flow produced them.
+    /// </summary>
+    private static void AlignWrapLine(List<PlacedEntry> entries, List<WrapLineItem> line, float lineTop, float lineHeight)
+    {
+        for (int i = 0; i < line.Count; i++)
+        {
+            WrapLineItem item = line[i];
+            UiPlacement.Alignment alignY = UiPlacement.ParseAlign(
+                item.Spec, UiPlacement.AlignYAttribute, UiPlacement.Axis.Vertical);
+            float nudgeY = UiPlacement.ParseOffset(item.Spec, UiPlacement.OffsetYAttribute, lineHeight);
+            float delta = UiPlacement.Origin(lineTop, lineHeight, item.Height, alignY, nudgeY) - lineTop;
+            if (delta == 0f) continue;
+
+            for (int entry = item.EntryStart; entry < item.EntryStart + item.EntryCount; entry++)
+            {
+                Rect rect = entries[entry].Rect;
+                entries[entry].Rect = new Rect(rect.x, rect.y + delta, rect.width, rect.height);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The placement container (CP-1): every child resolves its own position against this container's inner
+    /// box, so this is the one place in the engine where both axes may be named and where an offset may be a
+    /// percentage of the parent's span.
+    /// <para>
+    /// The measurement width comes from the child's <c>AlignX</c>: a Stretch child keeps the whole inner
+    /// width, which is the slot this container has always handed its children, while a named edge or centre
+    /// measures the child at its own envelope (a declared width, or an Auto label width). The vertical
+    /// placement needs the container's final height, which is only known once every child has been measured
+    /// (a fixed Height or Fill makes it taller than its content), so children are measured first and offset
+    /// in a second pass. With no vocabulary at all both axes resolve to fraction zero and every child lands
+    /// exactly where flow put it.
+    /// </para>
+    /// </summary>
     private MeasuredBox MeasureOverlay(
         UiWidgetContext ctx,
         UiElementSpec spec,
@@ -1273,6 +1376,12 @@ public sealed class UiLayoutEngine
         var box = new MeasuredBox { Width = width, Height = 0f };
         float maxHeight = 0f;
 
+        var children = new List<UiElementSpec>();
+        var childBoxes = new List<MeasuredBox>();
+        var alignsX = new List<UiPlacement.Alignment>();
+        var alignsY = new List<UiPlacement.Alignment>();
+        var nudgesX = new List<float>();
+
         for (int i = 0; i < spec.Children.Count; i++)
         {
             UiElementSpec child = spec.Children[i];
@@ -1282,16 +1391,37 @@ public sealed class UiLayoutEngine
                 continue;
             }
 
+            UiPlacement.Alignment alignX = UiPlacement.ParseAlign(
+                child, UiPlacement.AlignXAttribute, UiPlacement.Axis.Horizontal);
+            float childWidth = alignX.IsStretch ? innerWidth : ResolveWrapWidth(child, innerWidth, ctx);
+
             UiNode childNode = ChildNode(ctx, node, child, i);
-            MeasuredBox childBox = MeasureElement(ctx, child, innerWidth, availableHeight, childNode);
-            childBox = OffsetBox(childBox, padding.Left, innerY);
-            box.Entries.AddRange(childBox.Entries);
+            MeasuredBox childBox = MeasureElement(ctx, child, childWidth, availableHeight, childNode);
+
+            children.Add(child);
+            childBoxes.Add(childBox);
+            alignsX.Add(alignX);
+            alignsY.Add(UiPlacement.ParseAlign(child, UiPlacement.AlignYAttribute, UiPlacement.Axis.Vertical));
+            nudgesX.Add(UiPlacement.ParseOffset(child, UiPlacement.OffsetXAttribute, innerWidth));
             maxHeight = Math.Max(maxHeight, childBox.Height);
         }
 
         float naturalHeight = padding.Top + titleHeight + maxHeight + padding.Bottom;
         float height = ResolveContainerHeight(spec, naturalHeight, availableHeight);
         box.Height = height;
+
+        // The inner box the vocabulary resolves against: the arranged rect less this container's own
+        // Padding, with the title band (when there is one) excluded from the content area, exactly where the
+        // children's flow origin already was.
+        float innerHeight = Math.Max(0f, height - padding.Bottom - innerY);
+        for (int i = 0; i < childBoxes.Count; i++)
+        {
+            MeasuredBox childBox = childBoxes[i];
+            float x = UiPlacement.Origin(padding.Left, innerWidth, childBox.Width, alignsX[i], nudgesX[i]);
+            float nudgeY = UiPlacement.ParseOffset(children[i], UiPlacement.OffsetYAttribute, innerHeight);
+            float y = UiPlacement.Origin(innerY, innerHeight, childBox.Height, alignsY[i], nudgeY);
+            box.Entries.AddRange(OffsetBox(childBox, x, y).Entries);
+        }
 
         var containerEntry = new PlacedEntry
         {
@@ -1398,13 +1528,23 @@ public sealed class UiLayoutEngine
 
             if (!first) y += gap;
             UiNode childNode = ChildNode(ctx, node, child, i);
+
+            // CP-2: a Scroll flows vertically, so its cross axis is horizontal and the same rule applies.
+            UiPlacement.Alignment alignX = UiPlacement.ParseAlign(
+                child, UiPlacement.AlignXAttribute, UiPlacement.Axis.Horizontal);
+            float childWidth = alignX.IsStretch
+                ? ResolveStackChildWidth(child, contentInnerWidth, ctx)
+                : ResolveWrapWidth(child, contentInnerWidth, ctx);
+
             MeasuredBox childBox = MeasureElement(
                 ctx,
                 child,
-                ResolveStackChildWidth(child, contentInnerWidth, ctx),
+                childWidth,
                 Math.Max(0f, availableHeight - (y - innerY)),
                 childNode);
-            childBox = OffsetBox(childBox, padding.Left, y);
+            float nudgeX = UiPlacement.ParseOffset(child, UiPlacement.OffsetXAttribute, contentInnerWidth);
+            float childX = UiPlacement.Origin(padding.Left, contentInnerWidth, childBox.Width, alignX, nudgeX);
+            childBox = OffsetBox(childBox, childX, y);
             entries.AddRange(childBox.Entries);
             y += childBox.Height;
             first = false;
@@ -1836,12 +1976,20 @@ public sealed class UiLayoutEngine
     {
         foreach (KeyValuePair<string, UiElementSpec> entry in templates)
         {
-            ValidateTemplateElement(entry.Value, entry.Key, "<Templates>/" + entry.Key);
+            // A template root is validated with no parent: the collection element owns the row slot, so the
+            // root is not a child of a placement or flow container and the placement vocabulary is refused
+            // there rather than accepted and then ignored by the row arrangement.
+            ValidateTemplateElement(entry.Value, entry.Key, "<Templates>/" + entry.Key, parent: null);
         }
     }
 
-    private void ValidateTemplateElement(UiElementSpec spec, string templateName, string path)
+    private void ValidateTemplateElement(UiElementSpec spec, string templateName, string path, UiElementSpec? parent)
     {
+        // The same creation-time refusal matrix the Host runs over the page tree, run here because a template
+        // subtree is outside that walk. Element, attribute and path are all still known, which is what makes
+        // the located error possible.
+        UiPlacement.ValidateChild(spec, path, scope, parent);
+
         if (IsContainerElementName(spec.Kind))
         {
             RejectUnknownTemplateAttributes(spec, templateName, path, TemplateContainerAttributes, engineWide: false);
@@ -1868,7 +2016,7 @@ public sealed class UiLayoutEngine
         for (int i = 0; i < spec.Children.Count; i++)
         {
             UiElementSpec child = spec.Children[i];
-            ValidateTemplateElement(child, templateName, path + "/" + (child.Id.Length > 0 ? child.Id : child.Kind));
+            ValidateTemplateElement(child, templateName, path + "/" + (child.Id.Length > 0 ? child.Id : child.Kind), spec);
         }
     }
 
@@ -2309,11 +2457,24 @@ public sealed class UiLayoutEngine
         return widths;
     }
 
-    private static Padding ParsePadding(UiElementSpec spec)
+    /// <summary>
+    /// CP-0 (0.7.x Batch 1): density reaches container spacing. An absent <c>Padding</c> falls back to the
+    /// theme's own geometry instead of zero, so a theme change moves the space BETWEEN containers and not
+    /// only the space inside a control. An explicit attribute always wins, which is what makes
+    /// <c>Padding="0"</c> the documented escape hatch back to the pre-CP-0 result.
+    /// <para>
+    /// This is called from both halves of the frame - the measure pass and the draw pass that builds a
+    /// container's title rect - with the theme each half resolved through the element's own style chain.
+    /// Both halves must read the same token or measure and draw disagree, which is the one invariant this
+    /// library exists to keep; the placement lane pins the two answers against each other.
+    /// </para>
+    /// </summary>
+    private static Padding ParsePadding(UiElementSpec spec, UiTheme theme)
     {
         if (!spec.TryGetAttribute("Padding", out string raw))
         {
-            return Padding.Zero;
+            float token = theme.Geometry.Padding;
+            return new Padding(token, token, token, token);
         }
 
         string[] parts = raw.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
@@ -2341,11 +2502,15 @@ public sealed class UiLayoutEngine
         };
     }
 
-    private static float ReadGap(UiElementSpec spec)
+    /// <summary>
+    /// The container's declared <c>Gap</c>, or the theme's geometry gap when the attribute is absent (CP-0).
+    /// An explicit <c>Gap="0"</c> keeps the pre-CP-0 result exactly, like <c>Padding="0"</c>.
+    /// </summary>
+    private static float ReadGap(UiElementSpec spec, UiTheme theme)
     {
         if (!spec.TryGetAttribute("Gap", out string raw) || raw.Trim().Length == 0)
         {
-            return 0f;
+            return theme.Geometry.Gap;
         }
 
         if (float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float gap) && gap >= 0f)
@@ -2489,7 +2654,10 @@ public sealed class UiLayoutEngine
 
         if (HasTitle(entry.Spec))
         {
-            Padding padding = ParsePadding(entry.Spec);
+            // The draw half of CP-0: the same helper the measure half called, with the theme this entry's
+            // own style chain resolved to, so a container's title rect sits on the same padding its children
+            // were arranged against.
+            Padding padding = ParsePadding(entry.Spec, ctx.Theme);
             float innerWidth = Math.Max(1f, rect.width - padding.Left - padding.Right);
             var headerRect = new Rect(rect.x + padding.Left, rect.y + padding.Top, innerWidth, SectionTitleHeight);
             // One text outlet: routing the container title through UiThemeDraw.Label is what makes it
@@ -2524,7 +2692,5 @@ public sealed class UiLayoutEngine
             Bottom = bottom;
             Left = left;
         }
-
-        internal static readonly Padding Zero = new(0f, 0f, 0f, 0f);
     }
 }

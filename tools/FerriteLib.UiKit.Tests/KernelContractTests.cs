@@ -266,7 +266,7 @@ internal static class KernelContractTests
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"test\">"
-            + "<Scroll Id=\"scroll\" Height=\"50\">"
+            + "<Scroll Id=\"scroll\" Padding=\"0\" Gap=\"0\" Height=\"50\">"
             + "<Widget Id=\"a\" Kind=\"chrome/banner\" Text=\"x\" Height=\"30\" />"
             + "<Widget Id=\"b\" Kind=\"chrome/banner\" Text=\"y\" Height=\"30\" />"
             + "<Widget Id=\"target\" Kind=\"chrome/banner\" Text=\"z\" Height=\"30\" />"
@@ -547,7 +547,8 @@ internal static class KernelContractTests
         altered.TextOnDanger = new Color(0.7f, 0.7f, 0.7f, 1f);
         altered.TextDisabled = new Color(0.1f, 0.2f, 0.3f, 1f);
         altered.AccentGold = new Color(0.4f, 0.5f, 0.6f, 1f);
-        altered.HoverPoint = new Color(0.6f, 0.5f, 0.4f, 1f);
+        // Batch 1 (CP-6④): no second accent token exists. The derived hover step moves with AccentGold by
+        // construction, so perturbing the accent is what perturbs it.
         altered.Border = new Color(0f, 0f, 0f, 0f);
         altered.BorderStrong = new Color(1f, 1f, 1f, 1f);
         altered.Divider = new Color(0.5f, 0f, 0.5f, 1f);
@@ -994,16 +995,16 @@ internal static class KernelContractTests
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + scope + "\">"
             + "<Column Id=\"page-root\" Gap=\"6\" Padding=\"12\">"
-            + "<Row Id=\"body-row\" Gap=\"12\">"
-            + "<Column Id=\"nav-column\" Width=\"176\" Fill=\"true\">"
+            + "<Row Id=\"body-row\" Padding=\"0\" Gap=\"12\">"
+            + "<Column Id=\"nav-column\" Padding=\"0\" Width=\"176\" Fill=\"true\">"
             + "<Widget Id=\"nav\" Kind=\"neutral/section\" />"
             + "</Column>"
-            + "<Scroll Id=\"content-scroll\" Fill=\"true\" Gap=\"10\">"
+            + "<Scroll Id=\"content-scroll\" Padding=\"0\" Fill=\"true\" Gap=\"10\">"
             + "<Widget Id=\"page-title\" Kind=\"neutral/section\" />"
             + "<Widget Id=\"section-a\" Kind=\"neutral/section\" Tab=\"GroupA\" />"
             + "<Widget Id=\"section-b\" Kind=\"neutral/section\" Tab=\"GroupB\" />"
             + "</Scroll>"
-            + "<Scroll Id=\"help-scroll\" Width=\"200\" Fill=\"true\">"
+            + "<Scroll Id=\"help-scroll\" Padding=\"0\" Width=\"200\" Fill=\"true\">"
             + "<Widget Id=\"help-panel\" Kind=\"neutral/section\" />"
             + "</Scroll>"
             + "</Row>"

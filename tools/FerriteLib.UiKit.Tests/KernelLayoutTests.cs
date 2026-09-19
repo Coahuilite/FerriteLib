@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -46,6 +47,9 @@ internal static class KernelLayoutTests
         Run("Height is validated at creation, not at arrange (A2)", VerifyHeightValidation);
         Run("Cols/NarrowCols are Wrap-only vocabulary (A3)", VerifyColsWrapOnly);
         Run("Responsive vocabulary is rejected before it can silently no-op (N2 grammar)", VerifyResponsiveValidation);
+        Run("Density reaches container spacing (CP-0)", VerifyDensityReachesContainers);
+        Run("Padding=\"0\"/Gap=\"0\" keeps the pre-CP-0 result exactly (CP-0 escape hatch)", VerifyDensityEscapeHatch);
+        Run("A container's padding resolves identically in the measure and draw halves (CP-0)", VerifyContainerPaddingAgreesBetweenMeasureAndDraw);
         return failures;
     }
 
@@ -103,7 +107,7 @@ internal static class KernelLayoutTests
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Wrap Id=\"wrap\" Gap=\"10\">"
+            + "<Wrap Id=\"wrap\" Padding=\"0\" Gap=\"10\">"
             + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Width=\"120\" Height=\"10\" />"
             + "<Widget Id=\"b\" Kind=\"" + TestWidgetKind + "\" Width=\"120\" Height=\"10\" />"
             + "<Widget Id=\"c\" Kind=\"" + TestWidgetKind + "\" Width=\"120\" Height=\"10\" />"
@@ -127,7 +131,7 @@ internal static class KernelLayoutTests
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Overlay Id=\"overlay\">"
+            + "<Overlay Id=\"overlay\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"back\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "<Widget Id=\"front\" Kind=\"" + TestWidgetKind + "\" Height=\"20\" />"
             + "</Overlay>"
@@ -170,7 +174,7 @@ internal static class KernelLayoutTests
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Scroll Id=\"scroll\" Height=\"80\">"
+            + "<Scroll Id=\"scroll\" Padding=\"0\" Gap=\"0\" Height=\"80\">"
             + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"30\" />"
             + "<Widget Id=\"b\" Kind=\"" + TestWidgetKind + "\" Height=\"30\" />"
             + "</Scroll></UiPage>";
@@ -238,7 +242,7 @@ internal static class KernelLayoutTests
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Stack Id=\"stack\" Gap=\"4\">"
+            + "<Stack Id=\"stack\" Padding=\"0\" Gap=\"4\">"
             + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "<Widget Id=\"b\" Kind=\"" + TestWidgetKind + "\" Height=\"20\" Hidden=\"true\" />"
             + "<Widget Id=\"c\" Kind=\"" + TestWidgetKind + "\" Height=\"30\" />"
@@ -260,7 +264,7 @@ internal static class KernelLayoutTests
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Column Id=\"column\" Gap=\"4\">"
+            + "<Column Id=\"column\" Padding=\"0\" Gap=\"4\">"
             + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"20\" />"
             + "<Scroll Id=\"fill\" Fill=\"true\" />"
             + "<Widget Id=\"b\" Kind=\"" + TestWidgetKind + "\" Height=\"30\" />"
@@ -287,7 +291,7 @@ internal static class KernelLayoutTests
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Column Id=\"column\" Gap=\"4\">"
+            + "<Column Id=\"column\" Padding=\"0\" Gap=\"4\">"
             + "<Scroll Id=\"fill-a\" Fill=\"true\" />"
             + "<Scroll Id=\"fill-b\" Fill=\"true\" />"
             + "</Column>"
@@ -312,7 +316,7 @@ internal static class KernelLayoutTests
         RegisterTestWidget(10f, null, false);
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Row Id=\"row\" Gap=\"12\">"
+            + "<Row Id=\"row\" Padding=\"0\" Gap=\"12\">"
             + "<Widget Id=\"left\" Kind=\"" + TestWidgetKind + "\" Width=\"176\" Height=\"10\" />"
             + "<Widget Id=\"middle\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "<Widget Id=\"right\" Kind=\"" + TestWidgetKind + "\" Width=\"200\" Height=\"10\" />"
@@ -348,7 +352,7 @@ internal static class KernelLayoutTests
 
         string Row(string label) =>
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Row Id=\"row\">"
+            + "<Row Id=\"row\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"cap\" Kind=\"" + TestLabelKind + "\" Width=\"Auto\" Label=\"" + label + "\" Height=\"10\" />"
             + "<Widget Id=\"rest\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "</Row></UiPage>";
@@ -367,7 +371,7 @@ internal static class KernelLayoutTests
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Row Id=\"row\">"
+            + "<Row Id=\"row\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"floor\" Kind=\"" + TestLabelKind + "\" Width=\"Auto\" Label=\"ab\" MinWidth=\"40\" Height=\"10\" />"
             + "<Widget Id=\"ceil\" Kind=\"" + TestLabelKind + "\" Width=\"Auto\" Label=\"音量\" MaxWidth=\"10\" Height=\"10\" />"
             + "<Widget Id=\"rest\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
@@ -385,7 +389,7 @@ internal static class KernelLayoutTests
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Row Id=\"row\">"
+            + "<Row Id=\"row\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"fixed\" Kind=\"" + TestWidgetKind + "\" Width=\"90\" Height=\"10\" />"
             + "<Widget Id=\"cap\" Kind=\"" + TestLabelKind + "\" Width=\"Auto\" Label=\"音量音量\" Height=\"10\" />"
             + "</Row></UiPage>";
@@ -401,7 +405,7 @@ internal static class KernelLayoutTests
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Column Id=\"column\">"
+            + "<Column Id=\"column\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"cap\" Kind=\"" + TestLabelKind + "\" Width=\"Auto\" Label=\"ab\" Height=\"10\" />"
             + "<Widget Id=\"full\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "</Column></UiPage>";
@@ -417,7 +421,7 @@ internal static class KernelLayoutTests
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Row Id=\"row\">"
+            + "<Row Id=\"row\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"slider\" Kind=\"input/stepper-slider\" Width=\"Auto\" Label=\"音量\" Height=\"28\" />"
             + "<Widget Id=\"rest\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "</Row></UiPage>";
@@ -438,7 +442,7 @@ internal static class KernelLayoutTests
         // 1. Unmeasurable kind (no declared label set): Auto ≡ unsized.
         UiLayoutSnapshot unmeasurable = Arrange(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Row Id=\"row\">"
+            + "<Row Id=\"row\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" Height=\"10\" />"
             + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "</Row></UiPage>", 400f, 600f).Snapshot;
@@ -449,7 +453,7 @@ internal static class KernelLayoutTests
         // 2. Registered label set but empty label: same fallback.
         UiLayoutSnapshot emptyLabel = Arrange(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Row Id=\"row\">"
+            + "<Row Id=\"row\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"auto\" Kind=\"" + TestLabelKind + "\" Width=\"Auto\" Label=\"\" Height=\"10\" />"
             + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "</Row></UiPage>", 400f, 600f).Snapshot;
@@ -459,7 +463,7 @@ internal static class KernelLayoutTests
         // 3. Fixed siblings are still honored; the fallback child splits only the remainder.
         UiLayoutSnapshot withFixed = Arrange(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Row Id=\"row\">"
+            + "<Row Id=\"row\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"fixed\" Kind=\"" + TestWidgetKind + "\" Width=\"90\" Height=\"10\" />"
             + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" Height=\"10\" />"
             + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
@@ -472,7 +476,7 @@ internal static class KernelLayoutTests
         // 4. A positive MinWidth rescues the child into the Auto bucket through the declared clamp.
         UiLayoutSnapshot floored = Arrange(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Row Id=\"row\">"
+            + "<Row Id=\"row\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" MinWidth=\"40\" Height=\"10\" />"
             + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "</Row></UiPage>", 400f, 600f).Snapshot;
@@ -482,7 +486,7 @@ internal static class KernelLayoutTests
         // 5. On the fallback path the declared MaxWidth clamps the flex share like any child.
         UiLayoutSnapshot capped = Arrange(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Row Id=\"row\">"
+            + "<Row Id=\"row\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" MaxWidth=\"100\" Height=\"10\" />"
             + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "</Row></UiPage>", 400f, 600f).Snapshot;
@@ -493,7 +497,7 @@ internal static class KernelLayoutTests
         // demote measurable content); covered again here because the lane above mixes both kinds.
         UiLayoutSnapshot mixed = Arrange(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Row Id=\"row\">"
+            + "<Row Id=\"row\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"label\" Kind=\"" + TestLabelKind + "\" Width=\"Auto\" Label=\"音量\" Height=\"10\" />"
             + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" Height=\"10\" />"
             + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
@@ -506,7 +510,7 @@ internal static class KernelLayoutTests
         // 7. Stack keeps its own fallback (full width), unchanged by A1.
         UiLayoutSnapshot stacked = Arrange(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Column Id=\"column\">"
+            + "<Column Id=\"column\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" Height=\"10\" />"
             + "</Column></UiPage>", 400f, 600f).Snapshot;
         Check(Near(stacked.RectById["auto"].width, 400f),
@@ -519,7 +523,7 @@ internal static class KernelLayoutTests
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Row Id=\"row\" Breakpoint=\"200\" Narrow=\"Column\" Gap=\"4\">"
+            + "<Row Id=\"row\" Breakpoint=\"200\" Narrow=\"Column\" Padding=\"0\" Gap=\"4\">"
             + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "<Widget Id=\"b\" Kind=\"" + TestWidgetKind + "\" Height=\"20\" />"
             + "</Row></UiPage>";
@@ -548,7 +552,7 @@ internal static class KernelLayoutTests
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Row Id=\"row\" Breakpoint=\"200\">"
+            + "<Row Id=\"row\" Breakpoint=\"200\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "<Widget Id=\"b\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" NarrowHidden=\"true\" />"
             + "</Row></UiPage>";
@@ -567,7 +571,7 @@ internal static class KernelLayoutTests
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Wrap Id=\"wrap\" Breakpoint=\"200\" Cols=\"2\" NarrowCols=\"1\">"
+            + "<Wrap Id=\"wrap\" Breakpoint=\"200\" Cols=\"2\" NarrowCols=\"1\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "<Widget Id=\"b\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "<Widget Id=\"c\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
@@ -720,6 +724,121 @@ internal static class KernelLayoutTests
         Reject("<Column Id=\"c\" Narrow=\"Row\"><Widget Id=\"a\" Kind=\"test/sized\" /></Column>", "Narrow without Breakpoint rejected");
     }
 
+    // CP-0 (0.7.x Batch 1): a theme's geometry moves the space BETWEEN containers, not only the space
+    // inside a control. The container below declares neither Padding nor Gap, so both tokens come from the
+    // theme - which is the seam that did not exist before, because ParsePadding fell back to zero and
+    // ReadGap to zero. The escape hatch is the explicit attribute, pinned by the lane that follows.
+
+    private static void VerifyDensityReachesContainers()
+    {
+        RegisterTestWidget(10f, null, false);
+
+        const string xml =
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Stack Id=\"stack\">"
+            + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "<Widget Id=\"b\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "</Stack></UiPage>";
+
+        // Padding 2, gap 2: a.y = 2, b.y = 2 + 10 + 2, container height = 2 + 10 + 2 + 10 + 2.
+        UiLayoutSnapshot tight = ArrangeWithGeometry(xml, new UiGeometry(2f, 4f, 2f, 28f, 1f));
+        Check(Near(tight.RectById["a"].y, 2f) && Near(tight.RectById["b"].y, 14f)
+            && Near(tight.RectById["stack"].height, 26f),
+            "an undeclared container takes the theme's geometry (padding 2, gap 2)");
+
+        // Padding 10, gap 10 under the same page: a.y = 10, b.y = 30, height = 50.
+        UiLayoutSnapshot loose = ArrangeWithGeometry(xml, new UiGeometry(10f, 4f, 10f, 28f, 1f));
+        Check(Near(loose.RectById["a"].y, 10f) && Near(loose.RectById["b"].y, 30f)
+            && Near(loose.RectById["stack"].height, 50f),
+            "a theme-only change moves the arranged rects: the page's rhythm is no longer frozen in XML");
+        Check(!Near(loose.RectById["a"].y, tight.RectById["a"].y),
+            "the two themes really differ, so the lane is not reading one geometry twice");
+    }
+
+    private static void VerifyDensityEscapeHatch()
+    {
+        RegisterTestWidget(10f, null, false);
+
+        // The same page with the documented escape hatch: an explicit attribute still wins, so these
+        // numbers are the pre-CP-0 arrangement whatever the theme carries.
+        const string pinned =
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Stack Id=\"stack\" Padding=\"0\" Gap=\"0\">"
+            + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "<Widget Id=\"b\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "</Stack></UiPage>";
+
+        UiLayoutSnapshot loose = ArrangeWithGeometry(pinned, new UiGeometry(10f, 4f, 10f, 28f, 1f));
+        Check(Near(loose.RectById["a"].y, 0f) && Near(loose.RectById["b"].y, 10f)
+            && Near(loose.RectById["stack"].height, 20f),
+            "Padding=\"0\"/Gap=\"0\" arranges exactly as the pre-CP-0 engine did");
+
+        UiLayoutSnapshot tight = ArrangeWithGeometry(pinned, new UiGeometry(2f, 4f, 2f, 28f, 1f));
+        Check(Near(tight.RectById["a"].y, loose.RectById["a"].y)
+            && Near(tight.RectById["stack"].height, loose.RectById["stack"].height),
+            "and the explicit attribute wins over either geometry, so the escape hatch is not density-shaped");
+    }
+
+    /// <summary>
+    /// CP-0's own invariant: the helper is called from both halves of the frame - the measure pass that
+    /// arranges the container's children and the draw pass that builds its title rect. Both resolve the same
+    /// theme token, so the title band sits on the same padding its children were arranged against. The draw
+    /// half is read from the harness's recorded label rect, which is the real call the outlet made.
+    /// </summary>
+    private static void VerifyContainerPaddingAgreesBetweenMeasureAndDraw()
+    {
+        RegisterTestWidget(10f, null, false);
+
+        UiTheme theme = UiTheme.DarkGold;
+        theme.Geometry = new UiGeometry(10f, 4f, 10f, 28f, 1f);
+
+        const string xml =
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Section Id=\"band\" Title=\"Band\">"
+            + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "</Section></UiPage>";
+
+        UiLayoutEngine engine = new(Scope);
+        UiWidgetContext ctx = new(
+            Scope, new UiSession(), new StubMetrics(), theme, new StubTranslation(), new UiBindings(), 400f, "root");
+        UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, new Vector2(400f, 100f), Parse(xml).Roots);
+
+        // Measure half: the child sits on the theme's 10px padding, below the 22px title band.
+        Check(Near(snapshot.RectById["a"].x, 10f) && Near(snapshot.RectById["a"].y, 32f),
+            "the measure half arranges the child against the theme's padding and the title band");
+
+        IList rects = LabelRects();
+        rects.Clear();
+        engine.Draw(ctx, snapshot, new Rect(0f, 0f, 400f, 100f));
+        Check(rects.Count == 1, "the container title is the one label this frame draws");
+        Rect header = (Rect)rects[0];
+        Check(Near(header.x, 10f) && Near(header.y, 10f) && Near(header.width, 380f),
+            "and the draw half builds the title rect from the same padding (x=10, inner width 380), so the two"
+            + " halves cannot disagree about a container's spacing");
+    }
+
+    /// <summary>
+    /// The harness's recorded label calls, reached by reflection: the test assembly compiles against the
+    /// game's reference assembly, so the stub's recording fields are not visible to the compiler - the same
+    /// route every other lane takes to them.
+    /// </summary>
+    private static IList LabelRects()
+    {
+        FieldInfo field = typeof(Verse.Widgets).GetField("LabelRects", BindingFlags.Public | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Missing stub field Verse.Widgets.LabelRects");
+        return (IList)field.GetValue(null)!;
+    }
+
+    private static UiLayoutSnapshot ArrangeWithGeometry(string xml, UiGeometry geometry)
+    {
+        UiTheme theme = UiTheme.DarkGold;
+        theme.Geometry = geometry;
+        UiLayoutEngine engine = new(Scope);
+        UiWidgetContext ctx = new(
+            Scope, new UiSession(), new StubMetrics(), theme, new StubTranslation(), new UiBindings(), 400f, "root");
+        return engine.ArrangeRoots(ctx, new Vector2(400f, 400f), Parse(xml).Roots);
+    }
+
     private static void Host(string body)
     {
         using UiHost host = new(
@@ -749,7 +868,7 @@ internal static class KernelLayoutTests
         RegisterTestWidget(10f, null, false);
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Column Id=\"column\" Gap=\"4\">"
+            + "<Column Id=\"column\" Padding=\"0\" Gap=\"4\">"
             + "<Widget Id=\"basic\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" Tab=\"Basic\" />"
             + "<Widget Id=\"packs\" Kind=\"" + TestWidgetKind + "\" Height=\"20\" Tab=\"Packs\" />"
             + "</Column></UiPage>";
@@ -804,7 +923,7 @@ internal static class KernelLayoutTests
     private static string ScrollXml()
     {
         return "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Scroll Id=\"scroll\" Height=\"50\">"
+            + "<Scroll Id=\"scroll\" Padding=\"0\" Gap=\"0\" Height=\"50\">"
             + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"30\" />"
             + "<Widget Id=\"b\" Kind=\"" + TestWidgetKind + "\" Height=\"30\" />"
             + "</Scroll>"

@@ -155,6 +155,16 @@ internal static class Program
         Console.WriteLine("Kernel architecture probes (headless button / two visuals / live resize)...");
         failures += KernelArchitectureProbeTests.RunAll();
 
+        // ---- Batch 1 (0.7.x) lanes. Owners: layout (placement + density), tone. ---------------
+        // ---- The Lead wires these; each owner's block is contiguous and merge-safe. ----------
+        Console.WriteLine("Kernel placement (Overlay matrix, refusal matrix, flow boundary, envelope)...");
+        failures += KernelPlacementTests.RunAll();
+
+        // ---- Batch 1 / tone - begin ----------------------------------------------------------
+        Console.WriteLine("Kernel tone vocabulary (four authored meanings, state redirects, one accent)...");
+        failures += KernelToneVocabularyTests.RunAll();
+        // ---- Batch 1 / tone - end ------------------------------------------------------------
+
         Console.WriteLine("Kernel lane registration (every lane file is invoked from Program.cs)...");
         failures += KernelLaneRegistrationTests.RunAll();
     }

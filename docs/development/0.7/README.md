@@ -16,8 +16,13 @@ Baseline: branch `0.7.x` forked from `0.6.x` at `12d0dbb` + the maintainer's unc
 | C | Two peer palettes `UiTheme.Vanilla` / `UiTheme.DarkGold`; `new UiTheme()` is an unpainted bag | 已实现 + 已自动化验证; palette literals verified; **视觉验收 pending** (comparable state sheet needs a real game pass) |
 | D | Gates + dev staging + contract/handoff docs | 已实现 + 已自动化验证 (9 gates, `-PackDev`); external acceptance below |
 
-No public *type*, kind or XML vocabulary was added or removed on this line; the API-tier type list stays
-the 0.6 pin. `UiTheme.Vanilla` is a public-unstable member addition, recorded in `05-api-contract.md`.
+**Amended by Batch 1 (2026-09-18).** Until Batch 1 this line added and removed no XML vocabulary; it now
+does both, plus a member removal, all inside `0.7.0` under the fast-development ruling. The API-tier *type*
+list is still the 0.6 pin — Batch 1 adds no public type. What moved, and the migrations, are in
+`05-api-contract.md` under "Batch 1": four placement attribute names added; container `Padding`/`Gap`
+defaulting to the theme's geometry instead of 0; the authored tone vocabulary shrinking to four meanings with
+`Active`/`Disabled` redirecting to states for one minor; and `UiTheme.HoverPoint` removed in favour of a
+derived accent step. `UiTheme.Vanilla` is a public-unstable member addition, recorded in the same file.
 
 ## What ordinary authors stop doing (B, honestly measured)
 

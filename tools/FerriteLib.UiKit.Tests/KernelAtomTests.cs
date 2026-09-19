@@ -197,7 +197,7 @@ internal static class KernelAtomTests
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Row Id=\"row\">"
+            + "<Row Id=\"row\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"note\" Kind=\"text/wrapped\" Width=\"Auto\" Text=\"音量\" />"
             + "<Widget Id=\"apply\" Kind=\"input/button\" Width=\"Auto\" ActionBind=\"Apply\" Text=\"ok\" />"
             + "<Widget Id=\"level\" Kind=\"input/slider\" Width=\"Auto\" Bind=\"Level\" Label=\"音量\" />"

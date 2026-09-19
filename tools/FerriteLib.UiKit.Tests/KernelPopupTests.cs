@@ -18,7 +18,7 @@ internal static class KernelPopupTests
     private const string HeightWidgetKind = "test/height";
     private static readonly string Xml =
         "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-        + "<Scroll Id=\"scroll\" Height=\"200\">"
+        + "<Scroll Id=\"scroll\" Padding=\"0\" Gap=\"0\" Height=\"200\">"
         + "<Widget Id=\"spacer\" Kind=\"" + HeightWidgetKind + "\" Height=\"100\" />"
         + "<Widget Id=\"dropdown\" Kind=\"input/dropdown\" OptionsBind=\"Options\" />"
         + "<Widget Id=\"tail\" Kind=\"" + HeightWidgetKind + "\" Height=\"100\" />"
@@ -169,7 +169,7 @@ internal static class KernelPopupTests
 
         const string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Column Id=\"col\" Gap=\"2\">"
+            + "<Column Id=\"col\" Padding=\"0\" Gap=\"2\">"
             + "<Widget Id=\"first\" Kind=\"input/dropdown\" OptionsBind=\"Options\" />"
             + "<Widget Id=\"second\" Kind=\"input/dropdown\" OptionsBind=\"Options\" />"
             + "</Column>"
@@ -277,7 +277,7 @@ internal static class KernelPopupTests
 
         const string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Column Id=\"col\" Gap=\"2\">"
+            + "<Column Id=\"col\" Padding=\"0\" Gap=\"2\">"
             + "<Widget Id=\"first\" Kind=\"input/dropdown\" OptionsBind=\"Options\" />"
             + "<Widget Id=\"second\" Kind=\"input/dropdown\" OptionsBind=\"Options\" />"
             + "</Column>"
@@ -389,8 +389,8 @@ internal static class KernelPopupTests
 
         const string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Scroll Id=\"scroll\" Height=\"200\">"
-            + "<Column Id=\"col\" Gap=\"2\">"
+            + "<Scroll Id=\"scroll\" Padding=\"0\" Gap=\"0\" Height=\"200\">"
+            + "<Column Id=\"col\" Padding=\"0\" Gap=\"2\">"
             + "<Widget Id=\"spacer\" Kind=\"" + HeightWidgetKind + "\" Height=\"300\" />"
             + "<Widget Id=\"first\" Kind=\"input/dropdown\" OptionsBind=\"Options\" />"
             + "<Widget Id=\"second\" Kind=\"input/dropdown\" OptionsBind=\"Options\" />"
@@ -482,7 +482,7 @@ internal static class KernelPopupTests
         // only possible above it.
         const string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Column Id=\"col\">"
+            + "<Column Id=\"col\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"spacer\" Kind=\"" + HeightWidgetKind + "\" Height=\"60\" />"
             + "<Widget Id=\"low\" Kind=\"input/dropdown\" OptionsBind=\"Options\" />"
             + "</Column>"

@@ -705,7 +705,9 @@ public sealed class UiHost : IDisposable
         target.TextOnDanger = source.TextOnDanger;
         target.TextDisabled = source.TextDisabled;
         target.AccentGold = source.AccentGold;
-        target.HoverPoint = source.HoverPoint;
+        // Batch 1 (CP-6④): there is no second stored accent to copy any more. The hover step is derived
+        // from the accent, so cloning the accent is enough - and a copied value would go stale the moment
+        // a region re-tinted the derived one.
         target.Border = source.Border;
         target.BorderStrong = source.BorderStrong;
         target.Divider = source.Divider;
@@ -864,7 +866,7 @@ public sealed class UiHost : IDisposable
     {
         foreach (UiElementSpec root in candidate.Roots)
         {
-            ValidateElement(root, root.Id.Length > 0 ? root.Id : root.Kind, parentNarrowCapable: false);
+            ValidateElement(root, root.Id.Length > 0 ? root.Id : root.Kind, parentNarrowCapable: false, parent: null);
         }
     }
 
@@ -880,18 +882,29 @@ public sealed class UiHost : IDisposable
     private static readonly HashSet<string> CommonWidgetAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
         "Id", "Kind", "Hidden", "Tab", "Width", "MinWidth", "MaxWidth", "NarrowHidden", "Scheme", "Density",
-        "Visible", "VisibleKey"
+        "Visible", "VisibleKey",
+        // CP-1 placement vocabulary (0.7.x, Batch 1): valid only for a child of a placement container.
+        // The engine refuses them elsewhere and refuses contradictory combinations; these two lists are
+        // the attribute-NAME gate, and UiLayoutEngine keeps a mirrored pair for template subtrees that a
+        // lane reflects against these, so the two must move together.
+        "AlignX", "OffsetX", "AlignY", "OffsetY"
     };
 
     private static readonly HashSet<string> ContainerAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
         "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Width", "Fill",
         "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden",
-        "Scheme", "Density", "Visible", "VisibleKey"
+        "Scheme", "Density", "Visible", "VisibleKey",
+        "AlignX", "OffsetX", "AlignY", "OffsetY"
     };
 
-    private void ValidateElement(UiElementSpec spec, string path, bool parentNarrowCapable)
+    private void ValidateElement(UiElementSpec spec, string path, bool parentNarrowCapable, UiElementSpec? parent)
     {
+        // CP-1/CP-2 placement contract, checked here because this is the creation-time door: a placement
+        // attribute is valid only inside a placement container, and a flow container's child accepts the
+        // cross-axis subset without an offset. The rule lives in UiPlacement so the engine can share it.
+        UiPlacement.ValidateChild(spec, path, source, parent);
+
         bool isWidget = string.Equals(spec.Kind, "Widget", StringComparison.Ordinal)
             || !IsContainerKind(spec.Kind);
 
@@ -941,7 +954,7 @@ public sealed class UiHost : IDisposable
         foreach (UiElementSpec child in spec.Children)
         {
             string childPath = path + "/" + (child.Id.Length > 0 ? child.Id : child.Kind);
-            ValidateElement(child, childPath, selfNarrowCapable);
+            ValidateElement(child, childPath, selfNarrowCapable, spec);
         }
     }
 

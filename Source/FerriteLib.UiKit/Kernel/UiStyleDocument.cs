@@ -493,7 +493,9 @@ public sealed class UiStyleDocument
             case "TextOnDanger":
             case "TextDisabled":
             case "AccentGold":
-            case "HoverPoint":
+            // Batch 1 (CP-6④): HoverPoint is no longer a token. A scheme that still declares it is
+            // refused here - one recorded issue, never a silent no-op - and the hover step is derived
+            // from AccentGold.
             case "Border":
             case "BorderStrong":
             case "Divider":

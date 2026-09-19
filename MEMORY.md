@@ -2,6 +2,31 @@
 
 ## Current durable state
 
+- **Batch 1 of the 0.7.x line landed (2026-09-19) — placement vocabulary, density reach, tone/accent
+  tightening.** `已实现 + 已自动化验证` only: no in-game session and no consumer compile. All of it inside
+  the one minor, under the 2026-09-18 fast-development ruling, with every break recorded in
+  `docs/development/0.7/05-api-contract.md` before it shipped.
+  (1) Four placement attribute names — `AlignX`/`OffsetX`/`AlignY`/`OffsetY` — implemented as one
+  parent-relative rule in the new `UiPlacement.cs`, valid in a placement container (`Overlay`) and, for a
+  flow container's child, on the cross axis with a pixel nudge only; ten creation-time refusals plus two
+  stated boundaries (validation uses the **declared** kind while the engine reads the **effective** one, so a
+  `Narrow` direction swap can leave a placement inert; template roots refuse all four).
+  (2) Container `Padding`/`Gap` fall back to `UiTheme.Geometry` instead of 0, and **both** call sites — the
+  measure path and the draw-side title rect — resolve identically, which is measured rather than asserted.
+  (3) The authored tone vocabulary shrinks to `{Neutral, Success, Warning, Danger}`; `Active` and
+  `Disabled` redirect to the states they always meant for one minor and write one appearance note per
+  declaration per page.
+  (4) `UiTheme.HoverPoint` is removed and replaced by the read-only derived `UiTheme.AccentHover`
+  (each RGB channel 30% of the remaining distance to white, alpha carried) — one stored accent.
+  **No new public type**; `UiStatusTone` stays stable with all six members, so the tightening is manifest
+  vocabulary only. The test surface gained two lanes (`KernelPlacementTests`, 13 checks, and
+  `KernelToneVocabularyTests`) and **42 existing expectations moved, every one classified**: all were
+  fixture pins of the accepted break (`Padding="0"`/`Gap="0"` with the number kept exactly); none was
+  relaxed, deleted or re-toleranced, and the reviewers' red-first artifacts are under `dist/`. Gates 9/9.
+  **Deferred to batch 2** because they are additive and cite nothing yet: CP-3 (skin-source axis), CP-6②
+  (role→surface mapping as data, blocked by CP-3), CP-5 (regional scope) and CP-7 (sibling-relative
+  placement). Evidence boundary: harness only.
+
 - **Maintainer ruling — splitting and breaking changes are allowed in this window (2026-09-18).** The
   0.7.x line is in a fast-development phase: nothing has been pushed, nothing is consumer-compiled, and the
   local consumers (US and the other local mods) can follow a break on request. Consequences a session may

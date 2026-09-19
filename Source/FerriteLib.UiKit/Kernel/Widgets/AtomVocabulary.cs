@@ -35,6 +35,14 @@ internal static class AtomVocabulary
 
     internal const string EmphasisAttribute = "Emphasis";
 
+    // What a retired authored tone name redirects to, as the appearance record spells it. There is no
+    // second channel for a deprecation: the note rides the existing appearance record, whose dedup key
+    // (element path, kind, attribute, authored text) already means "once per declaration, not once per
+    // frame". Both names are refused at the next minor boundary.
+    private const string ActiveRedirect = "the Active state (deprecated alias; the selected treatment)";
+
+    private const string DisabledRedirect = "the Disabled state (deprecated alias; derived from the bindings)";
+
     // The names the engine already reads on every widget regardless of kind (UiHost's common widget
     // vocabulary) plus the two identity names. Listed explicitly so an atom's schema reads as the
     // complete contract instead of "whatever the engine adds on the side" — the shape the six
@@ -212,6 +220,16 @@ internal static class AtomVocabulary
     /// The authored tone, or <see cref="UiStatusTone.Neutral"/> when none is declared. Names are matched
     /// case-insensitively, like every other attribute in this vocabulary, and only the declared names
     /// count: a numeric value is not a tone, which an <c>Enum.TryParse</c> would have silently accepted.
+    /// <para>
+    /// The authored vocabulary is the four <b>meanings</b> — <see cref="UiStatusTone.Neutral"/>,
+    /// <see cref="UiStatusTone.Success"/>, <see cref="UiStatusTone.Warning"/> and
+    /// <see cref="UiStatusTone.Danger"/>. <see cref="UiStatusTone.Active"/> and
+    /// <see cref="UiStatusTone.Disabled"/> are <b>states</b> (interaction, and the bindings' read side),
+    /// not values an author writes: for one minor each still resolves to the state it always meant and
+    /// records one deduplicated deprecation note on the appearance channel, so a page that writes it keeps
+    /// painting and is told where to move. The names are refused at the next minor boundary; the two enum
+    /// members stay regardless, because <see cref="UiStatusTone"/> is a stable type.
+    /// </para>
     /// </summary>
     private static UiStatusTone ParseTone(UiElementSpec spec, UiWidgetContext ctx)
     {
@@ -219,11 +237,26 @@ internal static class AtomVocabulary
         if (authored.Length == 0) return UiStatusTone.Neutral;
 
         if (string.Equals(authored, "Neutral", StringComparison.OrdinalIgnoreCase)) return UiStatusTone.Neutral;
-        if (string.Equals(authored, "Active", StringComparison.OrdinalIgnoreCase)) return UiStatusTone.Active;
         if (string.Equals(authored, "Success", StringComparison.OrdinalIgnoreCase)) return UiStatusTone.Success;
         if (string.Equals(authored, "Warning", StringComparison.OrdinalIgnoreCase)) return UiStatusTone.Warning;
         if (string.Equals(authored, "Danger", StringComparison.OrdinalIgnoreCase)) return UiStatusTone.Danger;
-        if (string.Equals(authored, "Disabled", StringComparison.OrdinalIgnoreCase)) return UiStatusTone.Disabled;
+
+        // Retired authored names, still redirecting for one minor. Deliberately after the four declared
+        // meanings and before the unknown-value fallback: a typo resolves to the default row and a retired
+        // name resolves to the state it names, and neither can be mistaken for the other. The value is the
+        // one the table already derived (Active = the selected treatment, Disabled = the disabled state),
+        // so the redirect is the existing answer, not a second mapping.
+        if (string.Equals(authored, "Active", StringComparison.OrdinalIgnoreCase))
+        {
+            ReportFallback(spec, ctx, ToneAttribute, authored, ActiveRedirect);
+            return UiStatusTone.Active;
+        }
+
+        if (string.Equals(authored, "Disabled", StringComparison.OrdinalIgnoreCase))
+        {
+            ReportFallback(spec, ctx, ToneAttribute, authored, DisabledRedirect);
+            return UiStatusTone.Disabled;
+        }
 
         ReportFallback(spec, ctx, ToneAttribute, authored, "Neutral");
         return UiStatusTone.Neutral;
@@ -242,6 +275,11 @@ internal static class AtomVocabulary
         return UiEmphasis.Normal;
     }
 
+    /// <summary>
+    /// Writes one appearance-class note for an authored role value the vocabulary does not declare: the
+    /// fallback an unknown value gets, and the deprecation a retired name gets. One write path, so the two
+    /// cannot drift apart.
+    /// </summary>
     private static void ReportFallback(UiElementSpec spec, UiWidgetContext ctx, string attribute, string authored, string resolved)
     {
         UiFitAudit.ReportStyleFallback(ctx.ElementPath, spec.Kind, attribute, authored, resolved);

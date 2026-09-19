@@ -41,7 +41,7 @@ internal static class KernelArchitectureProbeTests
         + Colour("Base") + Colour("Panel") + Colour("Raised") + Colour("Hover") + Colour("Selected")
         + Colour("Success") + Colour("Danger") + Colour("WorkspacePlane") + Colour("SectionBand")
         + Colour("TextPrimary") + Colour("TextSecondary") + Colour("TextOnGold") + Colour("TextOnDanger")
-        + Colour("TextDisabled") + Colour("AccentGold") + Colour("HoverPoint")
+        + Colour("TextDisabled") + Colour("AccentGold")
         + Colour("Border") + Colour("BorderStrong") + Colour("Divider")
         + Colour("BaseBorder") + Colour("PanelBorder") + Colour("RaisedBorder") + Colour("HoverBorder")
         + Colour("SelectedBorder") + Colour("SuccessBorder") + Colour("DangerBorder")
@@ -145,7 +145,7 @@ internal static class KernelArchitectureProbeTests
             UiTheme theme = ctx.Theme;
             bool armed = UiNative.IsMouseDownOver(rect);
             bool hovered = !armed && UiNative.IsMouseOver(rect);
-            Color rail = armed ? theme.Selected : hovered ? theme.HoverPoint : theme.BorderStrong;
+            Color rail = armed ? theme.Selected : hovered ? theme.AccentHover : theme.BorderStrong;
             UiThemeDraw.Solid(new Rect(rect.x, rect.yMax - 3f, rect.width, 3f), rail);
 
             if (UiNative.Button(rect, ctx)) ctx.Bindings.Invoke(Read(spec, "ActionBind"));
@@ -394,7 +394,7 @@ internal static class KernelArchitectureProbeTests
         + "<Column Id=\"content\" Fill=\"true\" Padding=\"4\">"
         + "<Widget Id=\"body\" Kind=\"chrome/rule\" Height=\"2\" />"
         + "</Column>"
-        + "<Row Id=\"footer\" Gap=\"0\">"
+        + "<Row Id=\"footer\" Padding=\"0\" Gap=\"0\">"
         + "<Widget Id=\"leftPad\" Kind=\"chrome/rule\" Height=\"1\" />"
         + "<Widget Id=\"bottomButton\" Kind=\"input/button\" ActionBind=\"Apply\" Text=\"Go\" Width=\"120\" />"
         + "<Widget Id=\"rightPad\" Kind=\"chrome/rule\" Height=\"1\" />"

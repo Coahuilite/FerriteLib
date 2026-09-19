@@ -255,7 +255,10 @@ internal static class KernelResolvedStyleTests
         Check(SameColor(new Color(1f, 0.65f, 0.46f, 1f), t.TextOnDanger), "DarkGold TextOnDanger");
         Check(SameColor(new Color(0.42f, 0.42f, 0.40f, 1f), t.TextDisabled), "DarkGold TextDisabled");
         Check(SameColor(new Color(0.82f, 0.60f, 0.22f, 1f), t.AccentGold), "DarkGold AccentGold");
-        Check(SameColor(new Color(0.96f, 0.80f, 0.42f, 1f), t.HoverPoint), "DarkGold HoverPoint");
+        // Batch 1 (CP-6④): one stored accent. The hover step is computed from it - 30% of the remaining
+        // distance toward white on every channel, alpha kept - so there is no second token to assert.
+        Check(SameColor(new Color(0.874f, 0.72f, 0.454f, 1f), t.AccentHover),
+            "DarkGold's hover step is the accent lifted toward white, not a second stored colour");
         Check(SameColor(new Color(0.21f, 0.21f, 0.20f, 1f), t.Border), "DarkGold Border");
         Check(SameColor(new Color(0.32f, 0.32f, 0.30f, 1f), t.BorderStrong), "DarkGold BorderStrong");
         Check(SameColor(new Color(0.14f, 0.14f, 0.13f, 1f), t.Divider), "DarkGold Divider");
@@ -296,6 +299,8 @@ internal static class KernelResolvedStyleTests
         Check(SameColor(new Color(0.13f, 0.30f, 0.18f, 1f), d.Success), "Vanilla Success is derived legible on neutral");
         Check(SameColor(new Color(0.42f, 0.15f, 0.12f, 1f), d.Danger), "Vanilla Danger is derived legible on neutral");
         Check(SameColor(new Color(0.93f, 0.77f, 0.22f, 1f), d.AccentGold), "Vanilla accent is the stated yellow candidate");
+        Check(SameColor(new Color(0.951f, 0.839f, 0.454f, 1f), d.AccentHover),
+            "Vanilla's hover step is derived from that one accent, not stored beside it");
         Check(d.AccentGold.r == d.AccentWith(0.5f).r && d.AccentGold.g == d.AccentWith(0.5f).g,
             "AccentWith still derives from the accent hue");
 
