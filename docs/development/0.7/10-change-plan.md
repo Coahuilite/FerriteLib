@@ -249,7 +249,17 @@ are amended in the same commit as CP-1 — recorded here now so neither is disco
 - **D4** Sibling-relative placement: keep out of this line (default), or register it as a named follow-up?
 - **D5** *What is `Tone`?* (a) A closed, code-owned **role vocabulary on the element**, with the three
   conflations fixed (CP-6): state separated from role, the role→surface mapping moved into the style
-  document, and `Tone="Disabled"` no longer authorable. (b) **Named roles defined by the style document**,
+  document, and `Tone="Disabled"` no longer authorable. **Sharpened 2026-09-18** by the maintainer's
+  "the theme must not change this, and the accent is one colour whose value is free" position: the split
+  that position implies is *vocabulary and meaning in code* (any skin must honour every tone) against
+  *mapping and colour in data* (what each tone is painted with, and what the accent is). Today the first
+  half is right and the second is wrong: the mapping is code (`UiStyleTable.Cell`), which is what makes
+  `Warning` and `Danger` indistinguishable. Provenance worth knowing: `UiStatusTone` first appears in
+  this repository's root commit **only as a drawing-outlet parameter** (`UiThemeDraw`'s
+  `StatusTreatment`/`StatusBadge`), and its definition was moved out of that outlet into the new
+  `UiResolvedStyle.cs` by the "add the resolved style table" commit — so the vocabulary was born as a
+  **paint argument** and later promoted to a **meaning**, which is exactly why it still carries
+  `Active` and `Disabled` beside `Danger`. (b) **Named roles defined by the style document**,
   the element referencing one by name — accepting that role references become danglable like `Scheme`, and
   that the author vocabulary then differs from the stable audit vocabulary (`UiStatusTone`). (c) Leave the
   conflations as they are. Recommended: **(a)** — it keeps the one appearance reference that cannot dangle,
@@ -270,6 +280,14 @@ document:
    without adding an enum member.
 3. **A dangling-role rule is stated once**: a role is code-owned and must resolve in every skin; a
    `Scheme`/`Density` name is document-owned and may dangle with the existing recorded fallback.
+4. **One accent, and it is a value not a system.** The accent is today **two stored tokens**:
+   `AccentGold` and `HoverPoint`. `HoverPoint` has exactly one consumer in the whole tree — the line
+   chart's hovered point (`LineChartWidget.cs:262`) — while everything else that names it is a copy, a
+   token-list entry or a palette literal. `AccentWith(alpha)` already shows the derive-instead-of-store
+   path exists, so the single-accent position is cheap here: keep one stored accent, derive its steps.
+   Its contact with the tone system is also exactly one line: `SelectedSurface`'s default edge
+   (`UiTheme.cs:201`, `SelectedBorder ?? AccentGold`) — the tone system does not otherwise depend on the
+   accent, and the accent does not depend on the tone system.
 
 **Status.** `proposed`, blocked by D5.
 
@@ -284,6 +302,7 @@ per-part style keys, and the L1 closure lane.
 | Date | Item | Change |
 |---|---|---|
 | 2026-09-18 | — | plan opened from the placement/alignment discussion; CP-0/CP-1/CP-2 `proposed`, nothing implemented |
+| 2026-09-18 | D5, CP-6 | Sharpened by the maintainer's position ("the theme must not change this; the accent is one colour whose value is free"): vocabulary and meaning stay in code, mapping and colour move to data. Provenance recorded — `UiStatusTone` was born as a **drawing-outlet parameter** and promoted to a meaning, which is why it conflates state with role. CP-6 gains the accent item: two stored accent tokens today, one consumer for the second |
 | 2026-09-18 | CP-4, D5, CP-6 | CP-4 revised: the "role moves into the style document" half is **withdrawn** — `Tone` is the only appearance reference that cannot dangle, and the capability it would buy has no citation. The measurement (a role vocabulary that conflates state, interaction and meaning, with `Disabled` reachable from two directions) became D5, and its fixes became CP-6 |
 | 2026-09-18 | CP-3..CP-5 | registered from the "layout file + style file" discussion: the skin-source axis, moving the role half of appearance into the style document, and regional scope. All `proposed`; the maintainer allowed splitting and breaking changes in this fast-development window |
 | 2026-09-18 | CP-0..CP-2 | **version axis settled**: the work stays on the 0.7.x line (no minor move; range stays `[0.7.0,0.8.0)`), because the line has never shipped and nothing is consumer-compiled against it. The plan moved from `docs/development/0.8/` to `docs/development/0.7/10-change-plan.md`, and the round-README amendment became an obligation of CP-1 |
