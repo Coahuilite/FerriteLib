@@ -150,7 +150,9 @@ make the two roles differ.
 
 **What survives.** The boundary question reduces to three narrower, now-motivated items, carried by CP-6.
 
-**Status.** `proposed`, **blocked by D5**; the role-move half is not planned.
+**Status.** **Withdrawn (2026-09-18) — D5 chose (a).** The role-move half is not planned, and the
+remaining boundary question is carried by CP-6; CP-4 owns no work of its own and is closed rather than
+left as a zombie item.
 
 ### CP-5 — regional scope in the style document  *(registered; not implemented)*
 
@@ -247,7 +249,19 @@ are amended in the same commit as CP-1 — recorded here now so neither is disco
   sub-element (more verbose, room for per-edge data later).
 - **D3** Ratio unit: parent inner span only, or allow a second ratio against the child's own span?
 - **D4** Sibling-relative placement: keep out of this line (default), or register it as a named follow-up?
-- **D5** *What is `Tone`?* (a) A closed, code-owned **role vocabulary on the element**, with the three
+- **D6** CP-6 item 1: which `Tone` members stay authorable? Recommended — `{Neutral, Success, Warning,
+  Danger}` remain authored **meanings**, while `Active` becomes a selected **state** and `Disabled` a
+  data-derived **state**. The alternative that costs nothing to weigh: keep `Active` authorable (a page
+  may want a highlighted row without a model behind it) and remove only `Disabled`, which is the one
+  member reachable from two directions. Migration for the authored case: one minor of acceptance with a
+  redirect, or an immediate refusal with a located contract error (the A2/A3 shape).
+- **D7** CP-6 item 4: the accent's derived steps. One stored accent plus a lighten rule, or keep the hover
+  step as an authored token while deleting only the duplicate *storage*? `HoverPoint` has one consumer
+  (`LineChartWidget`), so the cheap answer is a derivation; the open part is what the rule is.
+- **D5 — RESOLVED (maintainer confirmation 2026-09-18): (a).** A closed, code-owned role vocabulary on
+  the element; vocabulary and meaning live in code, mapping and colour move to data. The alternatives are
+  recorded below because they were weighed, not to keep them live. *What is `Tone`?* (a) A closed,
+  code-owned **role vocabulary on the element**, with the three
   conflations fixed (CP-6): state separated from role, the role→surface mapping moved into the style
   document, and `Tone="Disabled"` no longer authorable. **Sharpened 2026-09-18** by the maintainer's
   "the theme must not change this, and the accent is one colour whose value is free" position: the split
@@ -289,7 +303,10 @@ document:
    (`UiTheme.cs:201`, `SelectedBorder ?? AccentGold`) — the tone system does not otherwise depend on the
    accent, and the accent does not depend on the tone system.
 
-**Status.** `proposed`, blocked by D5.
+**Status.** `proposed`; **unblocked by D5 = (a)**, but not yet implementable as written — two
+sub-decisions are open (D6, D7) and **item 2 is blocked by CP-3**, because making the role→surface mapping
+data requires the document to be able to express a *surface*, which is CP-3's vocabulary extension. Items
+1, 3 and 4 are independent of CP-3 and can proceed first.
 
 ## 8. Registered elsewhere
 
@@ -302,6 +319,7 @@ per-part style keys, and the L1 closure lane.
 | Date | Item | Change |
 |---|---|---|
 | 2026-09-18 | — | plan opened from the placement/alignment discussion; CP-0/CP-1/CP-2 `proposed`, nothing implemented |
+| 2026-09-18 | D5 (resolved), CP-4 (closed), D6/D7 | **D5 = (a)** confirmed by the maintainer: vocabulary and meaning in code, mapping and colour in data. CP-4 is therefore closed with no work of its own. CP-6 is unblocked but not fully implementable: D6 (which members stay authorable) and D7 (the accent's derived steps) are open, and CP-6 item 2 waits on CP-3's vocabulary |
 | 2026-09-18 | D5, CP-6 | Sharpened by the maintainer's position ("the theme must not change this; the accent is one colour whose value is free"): vocabulary and meaning stay in code, mapping and colour move to data. Provenance recorded — `UiStatusTone` was born as a **drawing-outlet parameter** and promoted to a meaning, which is why it conflates state with role. CP-6 gains the accent item: two stored accent tokens today, one consumer for the second |
 | 2026-09-18 | CP-4, D5, CP-6 | CP-4 revised: the "role moves into the style document" half is **withdrawn** — `Tone` is the only appearance reference that cannot dangle, and the capability it would buy has no citation. The measurement (a role vocabulary that conflates state, interaction and meaning, with `Disabled` reachable from two directions) became D5, and its fixes became CP-6 |
 | 2026-09-18 | CP-3..CP-5 | registered from the "layout file + style file" discussion: the skin-source axis, moving the role half of appearance into the style document, and regional scope. All `proposed`; the maintainer allowed splitting and breaking changes in this fast-development window |
