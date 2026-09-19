@@ -26,6 +26,34 @@ out), and the density half as a prerequisite.
 state, the declared input contract, control-composed parts, keyboard focus, the image outlet, per-part
 style keys, and the L1 (orphan-name) closure lane.
 
+## 0b. Batch 1 — the decided scope (2026-09-18)
+
+All six Step-1 decisions are settled. **Batch 1 = every breaking change plus the additive placement
+vocabulary, delivered together**, so that the local consumer faces exactly one migration.
+
+| Decision | Settled as |
+|---|---|
+| D1 | The CP-0 change is accepted **inside this one minor**; no opt-in flag, no second mechanism. Escape hatch is the explicit attribute (`Padding="0"` / `Gap="0"`). |
+| D2 | **Four attributes** on the child (`AlignX`/`OffsetX`/`AlignY`/`OffsetY`). No `<Place>` sub-element — YAGNI. |
+| D3 | The ratio is a fraction of the **parent's inner box** (arranged rect minus its own `Padding`). One unit only; self-relative placement stays the pivot's job. |
+| D4 | **Not this line.** Registered as CP-7: it needs element references, an ordering discipline and cycle refusal, and tree restructuring already expresses the common case. |
+| D5 | **(a)** — vocabulary and meaning in code, mapping and colour in data. |
+| D6 | Authorable tones shrink to `{Neutral, Success, Warning, Danger}`. `Active` and `Disabled` stop being authored names and become **states**; both keep working as a redirect for one minor. |
+| D7 | `HoverPoint` is **deleted outright** — no redirect, no deprecated alias — and the accent becomes one stored colour with a derived hover step. |
+
+**Batch 1 work items:** CP-6①③④, CP-0, CP-1, CP-2, then delivery.
+**Deferred to batch 2 (after the consumer's live feedback):** CP-3 → CP-6② → CP-5, plus CP-7 if the
+feedback asks for it. Reason: those are purely additive and cite nothing today; the live pass is what
+would supply the citation.
+
+**A correction made while writing this spec.** CP-6① was expected to force a signature change —
+`UiResolvedStyle.Resolve(tone, emphasis, bool? writable)` becoming an explicit state parameter. It does
+not, and it should not: shrinking the *authored vocabulary* is enough to stop `Disabled` being reachable
+from two directions, while `UiStatusTone` keeps `Active`/`Disabled` internally because it is a **stable**
+type whose members may not be removed. So the split lands at the vocabulary level; the type's internal
+conflation is a documented limitation of a stable type, not a redesign. That is the smaller change, which
+is the point.
+
 ## 1. Items
 
 ### CP-0 — density reaches container spacing  *(prerequisite; blocks CP-1)*
@@ -360,6 +388,7 @@ per-part style keys, and the L1 closure lane.
 | Date | Item | Change |
 |---|---|---|
 | 2026-09-18 | — | plan opened from the placement/alignment discussion; CP-0/CP-1/CP-2 `proposed`, nothing implemented |
+| 2026-09-18 | all six | **All Step-1 decisions settled** and Batch 1's scope fixed in §0b. D7 changed on the maintainer's instruction: `HoverPoint` is deleted outright rather than redirected, because the local consumer can absorb a break on request. One correction: CP-6① does **not** need the `Resolve` signature change that was predicted — the vocabulary shrink is enough, and `UiStatusTone` is stable, so its members stay |
 | 2026-09-18 | D1..D4, D6, D7 | Recommendations recorded for all six Step-1 decisions, and **D1 approved** by the maintainer (one minor, no opt-in mechanism). D4's recommendation registers CP-7 (sibling-relative placement, not this line) |
 | 2026-09-18 | D5 (resolved), CP-4 (closed), D6/D7 | **D5 = (a)** confirmed by the maintainer: vocabulary and meaning in code, mapping and colour in data. CP-4 is therefore closed with no work of its own. CP-6 is unblocked but not fully implementable: D6 (which members stay authorable) and D7 (the accent's derived steps) are open, and CP-6 item 2 waits on CP-3's vocabulary |
 | 2026-09-18 | D5, CP-6 | Sharpened by the maintainer's position ("the theme must not change this; the accent is one colour whose value is free"): vocabulary and meaning stay in code, mapping and colour move to data. Provenance recorded — `UiStatusTone` was born as a **drawing-outlet parameter** and promoted to a meaning, which is why it conflates state with role. CP-6 gains the accent item: two stored accent tokens today, one consumer for the second |
