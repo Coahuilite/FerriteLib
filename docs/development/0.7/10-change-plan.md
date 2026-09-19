@@ -243,21 +243,48 @@ are amended in the same commit as CP-1 — recorded here now so neither is disco
 
 ## 7. Open decisions
 
-- **D1** CP-0's migration: accept it in one minor with the documented escape hatch, or make the token
-  fallback opt-in (and pay a second mechanism)?
-- **D2** Vocabulary shape: four attributes on the child (chosen: smallest vocabulary) against a `<Place>`
-  sub-element (more verbose, room for per-edge data later).
-- **D3** Ratio unit: parent inner span only, or allow a second ratio against the child's own span?
-- **D4** Sibling-relative placement: keep out of this line (default), or register it as a named follow-up?
-- **D6** CP-6 item 1: which `Tone` members stay authorable? Recommended — `{Neutral, Success, Warning,
+- **D1 — APPROVED (maintainer, 2026-09-18): accept it inside this one minor, with the documented escape
+  hatch.** Everything lands together; no opt-in flag and no second mechanism. Consequence measured: neither
+  palette overrides `UiGeometry`, so both carry `Padding = 6` and `Gap = 6`, and a container declaring
+  neither currently gets **0**. After CP-0 it gets 6. `Padding="0"` / `Gap="0"` keep the old result.
+- **D2** Vocabulary shape: four attributes on the child, against a `<Place>` sub-element.
+  **Recommendation: four attributes.** `UiElementSpec` attributes are generic key/value, so the parser needs
+  **no change**; a `<Place>` element needs a new element name, a containment rule and a second creation-time
+  validation path. The existing layout vocabulary is attributes throughout (`Gap`, `Padding`, `Width`,
+  `Fill`…) and the only child elements are containers, `Widget`, `Repeat` and `Templates`. The
+  sub-element's one real advantage — room for per-edge data later — has no requirement today.
+- **D3** Ratio unit. **Recommendation: parent inner span only.** Self-relative placement is already
+  expressed by the pivot (`AlignX="Center"` *is* pivot 0.5), so a second ratio would be a second mechanism
+  for one meaning, and it would make a single `OffsetX` name carry two units. The capability that would be
+  lost — offsetting by a fraction of the element's *own* width — has no citation.
+- **D4** Sibling-relative placement. **Recommendation: out of this line, registered as CP-7.** It needs
+  element references, an ordering or solving discipline, and cycle refusal — a different order of change
+  from CP-1, and it would put *references* into the manifest, the direction this library has refused. It is
+  registered rather than dropped because experiment 3 measured the gap it fills: "content below the title"
+  works only through flow order.
+- **D6** CP-6 item 1: which `Tone` members stay authorable? **Recommendation: `{Neutral, Success,
+  Warning, Danger}`.** Hard constraint discovered: `UiStatusTone` is a **stable** type, so no enum member
+  can be removed — only the *manifest vocabulary* can shrink. `Disabled` is the one member reachable from
+  two directions (authored, and derived from `writable == false`) with the derived value silently winning,
+  which is a name that lies; `Active` is already used as an interaction state by production widgets
+  (`ButtonWidget` resolves it while the pointer holds). No lane or fixture in this repository authors
+  either name, so the migration burden sits entirely with external pages. Consequence to decide with it:
+  `UiResolvedStyle.Resolve`'s third parameter (`bool? writable`) becomes an explicit state
+  (`{Normal, Selected, Disabled}`); that type is public-unstable, so a minor may carry it. The original
+  framing was — `{Neutral, Success, Warning,
   Danger}` remain authored **meanings**, while `Active` becomes a selected **state** and `Disabled` a
   data-derived **state**. The alternative that costs nothing to weigh: keep `Active` authorable (a page
   may want a highlighted row without a model behind it) and remove only `Disabled`, which is the one
   member reachable from two directions. Migration for the authored case: one minor of acceptance with a
   redirect, or an immediate refusal with a located contract error (the A2/A3 shape).
-- **D7** CP-6 item 4: the accent's derived steps. One stored accent plus a lighten rule, or keep the hover
-  step as an authored token while deleting only the duplicate *storage*? `HoverPoint` has one consumer
-  (`LineChartWidget`), so the cheap answer is a derivation; the open part is what the rule is.
+- **D7** CP-6 item 4: the accent's derived steps. **Recommendation: one stored accent, and `HoverPoint`
+  becomes a redirect for one minor.** `HoverPoint` has exactly one consumer in the tree
+  (`LineChartWidget.cs:262`); `AccentWith(alpha)` already proves the derive-instead-of-store path; and
+  "the accent is one colour whose value is free" is exactly what the maintainer asked for. The old *name*
+  stays accepted in both the C# surface and the document token list and redirects to the derived value, so
+  a page or a scheme that writes it keeps compiling and keeps painting. What remains genuinely open is the
+  rule itself: **toward-white by a fixed fraction** (simple, predictable, one constant) against an adaptive
+  lighten (harder to predict, no requirement).
 - **D5 — RESOLVED (maintainer confirmation 2026-09-18): (a).** A closed, code-owned role vocabulary on
   the element; vocabulary and meaning live in code, mapping and colour move to data. The alternatives are
   recorded below because they were weighed, not to keep them live. *What is `Tone`?* (a) A closed,
@@ -280,7 +307,21 @@ are amended in the same commit as CP-1 — recorded here now so neither is disco
   keeps `UiStatusTone` stable for the audit surface, and still lets a skin separate `Warning` from
   `Danger`; (b)'s only gain, new role names, has no citation yet.
 
-### CP-6 — split the tone axes and make the role mapping data  *(registered; blocked by D5)*
+### CP-7 — sibling-relative placement  *(registered; D4 recommends keeping it out of this line)*
+
+**Goal.** An element can relate to another **named** element — "below the title band", "as wide as the
+field" — rather than only to its parent's box or to flow order.
+
+**Why it is not CP-1.** It needs element references in the manifest, an ordering discipline between
+referenced and referencing elements, and cycle refusal at creation. CP-1 deliberately needs none of those
+(parent-relative placement is single-pass solvable and cannot cycle).
+
+**Why it is registered rather than dropped.** Experiment 3 measured the gap it fills: the one relation the
+current vocabulary cannot state is a relation to a *sibling*, and the workaround is flow order plus spacers.
+
+**Status.** `proposed`; not this line.
+
+### CP-6 — split the tone axes and make the role mapping data  *(unblocked by D5 = (a); D6/D7 recommended)*
 
 **Goal.** Fix the three conflations found while evaluating CP-4, without moving roles into the style
 document:
@@ -319,6 +360,7 @@ per-part style keys, and the L1 closure lane.
 | Date | Item | Change |
 |---|---|---|
 | 2026-09-18 | — | plan opened from the placement/alignment discussion; CP-0/CP-1/CP-2 `proposed`, nothing implemented |
+| 2026-09-18 | D1..D4, D6, D7 | Recommendations recorded for all six Step-1 decisions, and **D1 approved** by the maintainer (one minor, no opt-in mechanism). D4's recommendation registers CP-7 (sibling-relative placement, not this line) |
 | 2026-09-18 | D5 (resolved), CP-4 (closed), D6/D7 | **D5 = (a)** confirmed by the maintainer: vocabulary and meaning in code, mapping and colour in data. CP-4 is therefore closed with no work of its own. CP-6 is unblocked but not fully implementable: D6 (which members stay authorable) and D7 (the accent's derived steps) are open, and CP-6 item 2 waits on CP-3's vocabulary |
 | 2026-09-18 | D5, CP-6 | Sharpened by the maintainer's position ("the theme must not change this; the accent is one colour whose value is free"): vocabulary and meaning stay in code, mapping and colour move to data. Provenance recorded — `UiStatusTone` was born as a **drawing-outlet parameter** and promoted to a meaning, which is why it conflates state with role. CP-6 gains the accent item: two stored accent tokens today, one consumer for the second |
 | 2026-09-18 | CP-4, D5, CP-6 | CP-4 revised: the "role moves into the style document" half is **withdrawn** — `Tone` is the only appearance reference that cannot dangle, and the capability it would buy has no citation. The measurement (a role vocabulary that conflates state, interaction and meaning, with `Disabled` reachable from two directions) became D5, and its fixes became CP-6 |
