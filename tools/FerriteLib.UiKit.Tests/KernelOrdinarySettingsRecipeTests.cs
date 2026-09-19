@@ -383,7 +383,7 @@ internal static class KernelOrdinarySettingsRecipeTests
         catalog.Register(Consumer, WindowKind, null, k =>
         {
             var created = new UiPageWindow(
-                k, UiLayoutManifest.Parse(PageXml(true)), bindings, new UiTheme(),
+                k, UiLayoutManifest.Parse(PageXml(true)), bindings, UiTheme.Vanilla,
                 new RecipeTranslation(), "Recipe settings", "Close", _ => "unavailable",
                 new RecipeMetrics());
             created.windowRect = new Rect(0f, 0f, 600f, 400f);
@@ -441,7 +441,7 @@ internal static class KernelOrdinarySettingsRecipeTests
             Scope,
             UiLayoutManifest.Parse(PageXml(withBalance)),
             bindings,
-            new UiTheme(),
+            UiTheme.Vanilla,
             new RecipeMetrics(),
             new RecipeTranslation());
     }

@@ -32,12 +32,12 @@ appropriate minor.
 
 ## 3. What actually changed for you at 0.7.0
 
-- **Public surface: nothing.** No added/removed/renamed types, members, kinds or XML vocabulary; tiers
-  unchanged.
-- **Default theme moved**: `new UiTheme()` is now vanilla-aligned neutral surfaces with a reserved yellow
-  accent. If you liked the 0.6 look, take `UiTheme.DarkGold` as your starting instance and re-apply your
-  overrides — the property is now the frozen 0.6 palette, not an alias for the constructor. If you built a
-  custom theme on `new UiTheme()`, you inherit the new defaults for every token you did not set (deliberate).
+- **Public surface:** no types, kinds or XML vocabulary added or removed; tiers unchanged. `UiTheme`
+  (public-unstable) gained one named factory, `Vanilla`, so the two built-in palettes are peers.
+- **Two peer palettes, no constructor default.** Pass `UiTheme.Vanilla` (neutral surfaces, reserved
+  yellow) or `UiTheme.DarkGold` (warm gold, shared-border edges) at the existing required theme
+  parameter. They are two looks, not a default and its history. `new UiTheme()` is an unpainted token
+  bag — do not use it as a product skin. Start from a named factory and apply overrides.
 - **Two validations tightened**: a malformed/non-finite `Height` now throws an attributable
   `UiContractException` at host creation and at reload-candidate validation instead of a `FormatException`
   at arrange time; `Cols`/`NarrowCols` on a non-`Wrap` container are refused at creation (they never did
@@ -59,9 +59,7 @@ optional, not prerequisites.
 
 - **In-game and consumer acceptance for 0.7 is pending** — the four checks in
   `docs/development/0.7/README.md` §External acceptance are owned by the maintainer/consumer operator and
-  include one comparable new-default/DarkGold/custom state sheet. Library evidence is automated only.
-- A custom theme built on `new UiTheme()` sees the new defaults; that is a behavior choice recorded in the
-  contract, not a bug to work around.
+  include one comparable Vanilla/DarkGold/custom state sheet. Library evidence is automated only.
 - Known limits inherited from 0.6: main-thread-only notification delivery; IME composition outside the
   input deferral; no cross-sibling-window atomicity for consumer hooks; catalogue is a snapshot.
 - If the public surface forces you to hand-roll something, report it — a cited consumer need is what earns

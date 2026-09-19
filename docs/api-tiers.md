@@ -121,7 +121,8 @@ consequence is paid in the open rather than discovered by a stranger.
   region/page carriers the scheme and density classes waited for landed in batch B (`Scheme`/`Density` as
   engine vocabulary on every kind, plus the per-element style chain the engine carries and resolves), so
   what is left of that debt is the type size those two pinned composites would need before density can
-  reach them.
+  reach them. **0.7 amendment:** two named peer factories, `Vanilla` and `DarkGold`; `new UiTheme()` is
+  an unpainted bag, not a product default.
 - `UiThemeDraw` — the single text and panel outlet; per-surface tokens change what it takes to draw.
 - `UiFitAudit` — the audit surface; entry attribution follows the identity layer. The ruler moved with
   the routing: a subscribed host is measured with the `ITextMetrics` its own diagnostic scope carries, and
@@ -482,6 +483,21 @@ What the 0.5 window is for (working packages, ownership and status: `docs/develo
   stable keys through an `IReadOnlyList<string>` value binding, declares one binding per item under
   `<Items>.<key>.…`, announces that items key with `UiInvalidation.Structure`, and never writes a rectangle,
   a node identity or an input rule for a row.
+
+## The visual core, and what "without the page model" means
+
+`AGENTS.md` "The two layers" promises a visual core reachable **without** adopting the page model, and
+`KernelContractTests.VerifyVisualCoreIsPageModelFree` enforces it over an explicit file list:
+`UiTheme.cs`, `UiThemeDraw.cs`, `UiResolvedStyle.cs`, `UiStyleDocument.cs`, `UiStyleResolver.cs`,
+`UiKitFonts.cs`, `UiFont.cs`, `ITextMetrics.cs`, `VerseFerriteTextMetrics.cs`.
+
+**What the list does and does not prove.** It proves no file on it names a page-model type. It does **not**
+prove that a type is *usable* standalone: `UiStyleDocument`'s own API is page-model free and it is listed,
+but **consuming** a parsed document without a `UiHost` is exercised by no lane, and in production the
+document is reached through `UiHost`'s constructor. So the file list is a purity guarantee, while the
+"reachable without the page model" claim is honest for `UiTheme`, `UiThemeDraw`, `ITextMetrics` and the
+font types and **unverified for the style-document family**. Recorded rather than fixed: closing it needs a
+lane that drives a document with no host, which is a decision for the maintainer.
 
 ## Breaking changes inside the open 0.6 window
 

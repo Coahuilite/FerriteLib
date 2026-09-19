@@ -13,11 +13,11 @@ Baseline: branch `0.7.x` forked from `0.6.x` at `12d0dbb` + the maintainer's unc
 | --- | --- | --- |
 | A | Five reliability fixes: Row Auto fallback, Height creation validation, Wrap-only `Cols`/`NarrowCols`, dropdown value precedence, wrong-kind options diagnostics | 已实现 + 已自动化验证; every lane re-run against the reverted baseline and observed red (mutation proof in `40-verification.md`) |
 | B | Ordinary-author recipe: compile-checked public-only harness fixture + `docs/consumers/ordinary-settings.md` | 已实现 + 已自动化验证 (eight lanes). Not consumption evidence. |
-| C | Vanilla-aligned `new UiTheme()` default with reserved yellow; `UiTheme.DarkGold` frozen as explicit 0.6 history | 已实现 + 已自动化验证; palette literals verified; **视觉验收 pending** (comparable state sheet needs a real game pass) |
+| C | Two peer palettes `UiTheme.Vanilla` / `UiTheme.DarkGold`; `new UiTheme()` is an unpainted bag | 已实现 + 已自动化验证; palette literals verified; **视觉验收 pending** (comparable state sheet needs a real game pass) |
 | D | Gates + dev staging + contract/handoff docs | 已实现 + 已自动化验证 (9 gates, `-PackDev`); external acceptance below |
 
-No public signature, type, kind or XML vocabulary was added or removed on this line; the API-tier gate
-stays pinned at the 0.6 list.
+No public *type*, kind or XML vocabulary was added or removed on this line; the API-tier type list stays
+the 0.6 pin. `UiTheme.Vanilla` is a public-unstable member addition, recorded in `05-api-contract.md`.
 
 ## What ordinary authors stop doing (B, honestly measured)
 
@@ -52,7 +52,7 @@ Each item below needs a real game or a real consumer compile; none is claimed he
    maintainer.
 3. Document-reload last-known-good path in-game (valid/invalid candidates, no VM re-create, no duplicate
    subscriptions, no draft commit) — maintainer.
-4. One comparable state sheet: new default vs explicit `DarkGold` vs a custom override at the same
+4. One comparable state sheet: `Vanilla` vs `DarkGold` vs a custom override at the same
    window/scale/language across normal/hover/pressed/focus/disabled — maintainer visual acceptance.
 
 Supported-0.7-contract status: **established** (contract recorded, implementation automated-verified).

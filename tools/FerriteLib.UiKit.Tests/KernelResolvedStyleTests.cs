@@ -36,8 +36,8 @@ internal static class KernelResolvedStyleTests
         Run("The resolved font is the font the fitting audit measured with", VerifyResolvedFontIsMeasured);
         Run("Text sites write the colour the table hands out", VerifyTextSitesFollowTheTable);
         Run("A layout-token change re-arranges; a re-tint reuses the bands", VerifyLayoutRevisionInvalidatesBands);
-        Run("UiTheme.DarkGold carries the frozen 0.6 palette as explicit values (C)", VerifyDarkGoldIsFrozenHistory);
-        Run("new UiTheme() is the vanilla-aligned default and instances stay independent (C)", VerifyDefaultIsVanillaAligned);
+        Run("UiTheme.DarkGold is a built-in warm-gold palette, a peer of Vanilla (C)", VerifyDarkGoldPalette);
+        Run("UiTheme.Vanilla is a built-in vanilla-aligned palette; the constructor is a bag (C)", VerifyVanillaPaletteAndBag);
         ResetPointerSeams();
         return failures;
     }
@@ -232,93 +232,87 @@ internal static class KernelResolvedStyleTests
         CheckPaint(0, pairFill, pairEdge, "StatusTreatment paints the assigned pair");
     }
 
-    // --- C (0.7): the palette split. The freeze half is written FIRST and pins the 0.6 values as
-    // literals; only then may the constructor default move. Provenance for the new defaults lives
-    // with UiTheme itself and in docs/development/0.7/40-verification.md: the four substrate/edge
-    // pairs and the two option references are carried from the previous vanilla Verse.Widgets
-    // investigation (service build identity NOT established); everything else in the new default is
-    // DERIVED in the same direction, and this lane asserts exactly the shipped numbers.
+    // --- C (0.7, amended 2026-09-18): two named palettes, peers, neither selected by new().
+    // Vanilla's substrate/edge/option references come from the earlier vanilla Verse.Widgets
+    // investigation (service build identity NOT established); remaining Vanilla roles are DERIVED.
+    // DarkGold is a look of its own. The constructor is an unpainted bag.
 
-    private static void VerifyDarkGoldIsFrozenHistory()
+    private static void VerifyDarkGoldPalette()
     {
         UiTheme t = UiTheme.DarkGold;
-        Check(SameColor(new Color(0.065f, 0.065f, 0.063f, 1f), t.Base), "DarkGold Base = the 0.6 literal");
-        Check(SameColor(new Color(0.095f, 0.095f, 0.090f, 1f), t.Panel), "DarkGold Panel = the 0.6 literal");
-        Check(SameColor(new Color(0.135f, 0.135f, 0.128f, 1f), t.Raised), "DarkGold Raised = the 0.6 literal");
-        Check(SameColor(new Color(0.17f, 0.17f, 0.16f, 1f), t.Hover), "DarkGold Hover = the 0.6 literal");
-        Check(SameColor(new Color(0.17f, 0.14f, 0.08f, 1f), t.Selected), "DarkGold Selected = the 0.6 literal");
-        Check(SameColor(new Color(0.11f, 0.24f, 0.15f, 1f), t.Success), "DarkGold Success = the 0.6 literal");
-        Check(SameColor(new Color(0.38f, 0.14f, 0.11f, 1f), t.Danger), "DarkGold Danger = the 0.6 literal");
-        Check(SameColor(new Color(0.045f, 0.045f, 0.044f, 1f), t.WorkspacePlane), "DarkGold WorkspacePlane = the 0.6 literal");
-        Check(SameColor(new Color(0.085f, 0.085f, 0.080f, 1f), t.SectionBand), "DarkGold SectionBand = the 0.6 literal");
-        Check(SameColor(new Color(0.88f, 0.88f, 0.84f, 1f), t.TextPrimary), "DarkGold TextPrimary = the 0.6 literal");
-        Check(SameColor(new Color(0.58f, 0.58f, 0.55f, 1f), t.TextSecondary), "DarkGold TextSecondary = the 0.6 literal");
-        Check(SameColor(new Color(1f, 0.84f, 0.55f, 1f), t.TextOnGold), "DarkGold TextOnGold = the 0.6 literal");
-        Check(SameColor(new Color(1f, 0.65f, 0.46f, 1f), t.TextOnDanger), "DarkGold TextOnDanger = the 0.6 literal");
-        Check(SameColor(new Color(0.42f, 0.42f, 0.40f, 1f), t.TextDisabled), "DarkGold TextDisabled = the 0.6 literal");
-        Check(SameColor(new Color(0.82f, 0.60f, 0.22f, 1f), t.AccentGold), "DarkGold AccentGold = the 0.6 literal");
-        Check(SameColor(new Color(0.96f, 0.80f, 0.42f, 1f), t.HoverPoint), "DarkGold HoverPoint = the 0.6 literal");
-        Check(SameColor(new Color(0.21f, 0.21f, 0.20f, 1f), t.Border), "DarkGold Border = the 0.6 literal");
-        Check(SameColor(new Color(0.32f, 0.32f, 0.30f, 1f), t.BorderStrong), "DarkGold BorderStrong = the 0.6 literal");
-        Check(SameColor(new Color(0.14f, 0.14f, 0.13f, 1f), t.Divider), "DarkGold Divider = the 0.6 literal");
+        Check(SameColor(new Color(0.065f, 0.065f, 0.063f, 1f), t.Base), "DarkGold Base");
+        Check(SameColor(new Color(0.095f, 0.095f, 0.090f, 1f), t.Panel), "DarkGold Panel");
+        Check(SameColor(new Color(0.135f, 0.135f, 0.128f, 1f), t.Raised), "DarkGold Raised");
+        Check(SameColor(new Color(0.17f, 0.17f, 0.16f, 1f), t.Hover), "DarkGold Hover");
+        Check(SameColor(new Color(0.17f, 0.14f, 0.08f, 1f), t.Selected), "DarkGold Selected");
+        Check(SameColor(new Color(0.11f, 0.24f, 0.15f, 1f), t.Success), "DarkGold Success");
+        Check(SameColor(new Color(0.38f, 0.14f, 0.11f, 1f), t.Danger), "DarkGold Danger");
+        Check(SameColor(new Color(0.045f, 0.045f, 0.044f, 1f), t.WorkspacePlane), "DarkGold WorkspacePlane");
+        Check(SameColor(new Color(0.085f, 0.085f, 0.080f, 1f), t.SectionBand), "DarkGold SectionBand");
+        Check(SameColor(new Color(0.88f, 0.88f, 0.84f, 1f), t.TextPrimary), "DarkGold TextPrimary");
+        Check(SameColor(new Color(0.58f, 0.58f, 0.55f, 1f), t.TextSecondary), "DarkGold TextSecondary");
+        Check(SameColor(new Color(1f, 0.84f, 0.55f, 1f), t.TextOnGold), "DarkGold TextOnGold");
+        Check(SameColor(new Color(1f, 0.65f, 0.46f, 1f), t.TextOnDanger), "DarkGold TextOnDanger");
+        Check(SameColor(new Color(0.42f, 0.42f, 0.40f, 1f), t.TextDisabled), "DarkGold TextDisabled");
+        Check(SameColor(new Color(0.82f, 0.60f, 0.22f, 1f), t.AccentGold), "DarkGold AccentGold");
+        Check(SameColor(new Color(0.96f, 0.80f, 0.42f, 1f), t.HoverPoint), "DarkGold HoverPoint");
+        Check(SameColor(new Color(0.21f, 0.21f, 0.20f, 1f), t.Border), "DarkGold Border");
+        Check(SameColor(new Color(0.32f, 0.32f, 0.30f, 1f), t.BorderStrong), "DarkGold BorderStrong");
+        Check(SameColor(new Color(0.14f, 0.14f, 0.13f, 1f), t.Divider), "DarkGold Divider");
         Check(t.BaseBorder == null && t.PanelBorder == null && t.RaisedBorder == null
             && t.HoverBorder == null && t.SelectedBorder == null && t.SuccessBorder == null
             && t.DangerBorder == null,
-            "DarkGold keeps the 0.6 per-surface edges unclaimed");
+            "DarkGold leaves per-surface edges unclaimed");
         Check(t.DefaultFont == UiFont.Small && t.Geometry == UiGeometry.Default,
-            "DarkGold keeps the 0.6 font and density untouched");
+            "DarkGold keeps the shipped font and density");
 
         UiTheme again = UiTheme.DarkGold;
         Check(!ReferenceEquals(t, again), "DarkGold hands out a fresh instance, never one shared object");
         t.Base = new Color(0.5f, 0.5f, 0.5f, 1f);
         Check(!SameColor(t.Base, again.Base), "and re-tinting one DarkGold instance cannot repaint the next");
+
+        UiTheme vanilla = UiTheme.Vanilla;
+        Check(!SameColor(again.Base, vanilla.Base) && !SameColor(again.AccentGold, vanilla.AccentGold),
+            "DarkGold and Vanilla are different looks, not two names for one bag");
     }
 
-    private static void VerifyDefaultIsVanillaAligned()
+    private static void VerifyVanillaPaletteAndBag()
     {
-        UiTheme d = new();
-        // Verified references (previous vanilla Verse.Widgets investigation; build identity not established).
+        UiTheme d = UiTheme.Vanilla;
         Check(SameColor(new Color(21f / 255f, 25f / 255f, 29f / 255f, 1f), d.Base),
-            "default Base = the vanilla window substrate RGB(21,25,29)");
+            "Vanilla Base = the vanilla window substrate RGB(21,25,29)");
         Check(SameColor(new Color(42f / 255f, 43f / 255f, 44f / 255f, 1f), d.Panel),
-            "default Panel = the vanilla section substrate RGB(42,43,44)");
+            "Vanilla Panel = the vanilla section substrate RGB(42,43,44)");
         Check(d.BaseBorder.HasValue && SameColor(new Color(97f / 255f, 108f / 255f, 122f / 255f, 1f), d.BaseBorder.GetValueOrDefault()),
-            "default BaseBorder = the vanilla window edge RGB(97,108,122)");
+            "Vanilla BaseBorder = the vanilla window edge RGB(97,108,122)");
         Check(d.PanelBorder.HasValue && SameColor(new Color(135f / 255f, 135f / 255f, 135f / 255f, 1f), d.PanelBorder.GetValueOrDefault()),
-            "default PanelBorder = the vanilla section edge RGB(135,135,135)");
+            "Vanilla PanelBorder = the vanilla section edge RGB(135,135,135)");
         Check(SameColor(new Color(0.21f, 0.21f, 0.21f, 1f), d.Raised),
-            "default Raised = the vanilla unselected option reference RGB(0.21,0.21,0.21)");
+            "Vanilla Raised = the vanilla unselected option reference RGB(0.21,0.21,0.21)");
         Check(SameColor(new Color(0.32f, 0.28f, 0.21f, 1f), d.Selected),
-            "default Selected = the vanilla selected option reference RGB(0.32,0.28,0.21)");
+            "Vanilla Selected = the vanilla selected option reference RGB(0.32,0.28,0.21)");
 
-        // Derived roles: neutral steps in the same direction; the accent is a candidate yellow, not a
-        // claimed vanilla constant (the table does not establish it).
-        Check(SameColor(new Color(0.27f, 0.27f, 0.27f, 1f), d.Hover), "default Hover is derived one step above Raised");
-        Check(SameColor(new Color(0.13f, 0.30f, 0.18f, 1f), d.Success), "default Success is derived legible on neutral");
-        Check(SameColor(new Color(0.42f, 0.15f, 0.12f, 1f), d.Danger), "default Danger is derived legible on neutral");
-        Check(SameColor(new Color(0.93f, 0.77f, 0.22f, 1f), d.AccentGold), "default accent is the stated yellow candidate");
+        Check(SameColor(new Color(0.27f, 0.27f, 0.27f, 1f), d.Hover), "Vanilla Hover is derived one step above Raised");
+        Check(SameColor(new Color(0.13f, 0.30f, 0.18f, 1f), d.Success), "Vanilla Success is derived legible on neutral");
+        Check(SameColor(new Color(0.42f, 0.15f, 0.12f, 1f), d.Danger), "Vanilla Danger is derived legible on neutral");
+        Check(SameColor(new Color(0.93f, 0.77f, 0.22f, 1f), d.AccentGold), "Vanilla accent is the stated yellow candidate");
         Check(d.AccentGold.r == d.AccentWith(0.5f).r && d.AccentGold.g == d.AccentWith(0.5f).g,
             "AccentWith still derives from the accent hue");
 
-        // Yellow stays reserved: only selection's edge and the accent roles carry it; the common
-        // surfaces and text are neutral grays or near-white.
-        Check(d.Base.b > d.Base.r && d.Panel.g >= d.Panel.r, "substrate planes stay neutral/cool, not gold");
+        Check(d.Base.b > d.Base.r && d.Panel.g >= d.Panel.r, "Vanilla substrate planes stay neutral/cool, not gold");
         Check(!SameColor(d.PanelBorder.GetValueOrDefault(), d.AccentGold) && !SameColor(d.Border, d.AccentGold),
-            "the shared edges are not painted in the accent");
+            "Vanilla shared edges are not painted in the accent");
 
-        // Geometry and fonts do not move in package C.
         Check(d.DefaultFont == UiFont.Small && d.Geometry == UiGeometry.Default,
-            "the new default keeps the shipped font and density");
+            "Vanilla keeps the shipped font and density");
 
-        // Fresh-instance isolation, the same template rule DarkGold has.
-        UiTheme a = new();
-        UiTheme b = new();
-        Check(!ReferenceEquals(a, b), "two constructor defaults are two objects");
+        UiTheme a = UiTheme.Vanilla;
+        UiTheme b = UiTheme.Vanilla;
+        Check(!ReferenceEquals(a, b), "two Vanilla factories are two objects");
         a.TextPrimary = new Color(0.1f, 0.2f, 0.3f, 1f);
         Check(!SameColor(a.TextPrimary, b.TextPrimary), "and re-tinting one cannot repaint the other");
 
-        // Clone: complete token copy, then full independence.
-        UiTheme original = new();
+        UiTheme original = UiTheme.Vanilla;
         UiTheme copy = original.Clone();
         Check(!ReferenceEquals(original, copy), "Clone returns a fresh bag");
         Check(SameColor(original.Base, copy.Base) && SameColor(original.Panel, copy.Panel)
@@ -331,31 +325,37 @@ internal static class KernelResolvedStyleTests
         Check(!SameColor(original.AccentGold, copy.AccentGold),
             "and moving a token on the clone leaves the original untouched");
 
-        // A custom theme built on the default keeps its own overrides and inherits only the
-        // unspecified defaults; an explicit DarkGold base keeps the OLD baseline instead.
-        UiTheme custom = new() { Hover = new Color(0.5f, 0.1f, 0.1f, 1f) };
-        Check(SameColor(custom.Hover, new Color(0.5f, 0.1f, 0.1f, 1f)) && SameColor(custom.Base, d.Base),
-            "custom overrides survive on top of the new default");
+        UiTheme bag = new();
+        Check(bag.Base.r == 0f && bag.Base.g == 0f && bag.Base.b == 0f && bag.Base.a == 0f
+            && !bag.BaseBorder.HasValue && !bag.PanelBorder.HasValue,
+            "new UiTheme() is an unpainted bag, not Vanilla and not DarkGold");
+        Check(!SameColor(bag.Base, d.Base) && !SameColor(bag.Base, UiTheme.DarkGold.Base),
+            "the constructor does not select either built-in palette");
+        bag.Hover = new Color(0.5f, 0.1f, 0.1f, 1f);
+        Check(SameColor(bag.Hover, new Color(0.5f, 0.1f, 0.1f, 1f)) && bag.Base.a == 0f,
+            "overrides on a bare bag do not inherit a product palette for unspecified tokens");
+
+        UiTheme vanillaCustom = UiTheme.Vanilla;
+        vanillaCustom.Hover = new Color(0.5f, 0.1f, 0.1f, 1f);
+        Check(SameColor(vanillaCustom.Base, d.Base), "Vanilla + overrides keeps the Vanilla substrate");
         UiTheme darkCustom = UiTheme.DarkGold;
         darkCustom.Hover = new Color(0.5f, 0.1f, 0.1f, 1f);
         Check(SameColor(darkCustom.Base, new Color(0.065f, 0.065f, 0.063f, 1f)),
-            "the consumer route for the old baseline is DarkGold + overrides");
+            "DarkGold + overrides keeps the DarkGold substrate — a peer start, not a fallback");
 
-        // Two hosts on different palettes resolve through their own theme, one draw outlet each call.
-        UiTheme windowOne = new();
+        UiTheme windowOne = UiTheme.Vanilla;
         UiTheme windowTwo = UiTheme.DarkGold;
         Check(!ReferenceEquals(windowOne.Styles, windowTwo.Styles), "the two themes hold separate stores");
         ClearRecordedBoxes();
         UiThemeDraw.Panel(new Rect(0f, 0f, 40f, 40f), windowOne);
-        CheckPaint(0, windowOne.Panel, windowOne.PanelSurface.Border, "one window paints the vanilla plane");
+        CheckPaint(0, windowOne.Panel, windowOne.PanelSurface.Border, "one window paints the Vanilla plane");
         ClearRecordedBoxes();
         UiThemeDraw.Panel(new Rect(0f, 0f, 40f, 40f), windowTwo);
-        CheckPaint(0, windowTwo.Panel, windowTwo.Border, "the other paints the frozen DarkGold plane");
+        CheckPaint(0, windowTwo.Panel, windowTwo.Border, "the other paints the DarkGold plane");
 
-        // The table answers on the new bag without re-derivation: Active carries the yellow edge.
         UiResolvedStyle active = windowOne.Styles.Resolve(UiStatusTone.Active);
         Check(SameColor(active.Border, windowOne.AccentGold) && SameColor(active.Fill, windowOne.Selected),
-            "Active resolves to the selected plane outlined in the accent, not a filled-yellow plane");
+            "Vanilla Active resolves to the selected plane outlined in the accent, not a filled-yellow plane");
     }
 
     private static void VerifyDensityTokens()

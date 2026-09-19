@@ -2,6 +2,18 @@
 
 ## Current durable state
 
+- **Maintainer ruling — splitting and breaking changes are allowed in this window (2026-09-18).** The
+  0.7.x line is in a fast-development phase: nothing has been pushed, nothing is consumer-compiled, and the
+  local consumers (US and the other local mods) can follow a break on request. Consequences a session may
+  rely on: an existing type may be split, renamed or re-shaped when cohesion or coupling demands it; a
+  manifest attribute may move between the page file and the style document; and the "one minor per
+  break" convention is satisfied **inside** the line rather than by opening a new one, exactly as the
+  version-axis ruling above says. What this does **not** relax: every break is still recorded in the
+  line's contract before it ships, with its migration; the purity, containment, neutrality, tier and
+  version-axis gates still run; and once the line is delivered or published, this ruling lapses and the
+  normal pre-1.0 minor rule applies again. Scope: a development-phase permission, not a change to any
+  compatibility promise already made to a consumer.
+
 - **Maintainer ruling — the placement/alignment work stays on the 0.7.x line (2026-09-18).** New
   manifest vocabulary (the placement vocabulary planned in `docs/development/0.7/10-change-plan.md`) is a
   public addition, which normally moves the pre-1.0 minor. The maintainer kept the contract axis at
@@ -44,23 +56,24 @@
   build, runtime test, consumer integration, or release was changed or claimed. The 0.7 execution
   plan remains subject to a separate implementation approval.
 
-- **The 0.7.x line is implemented and automated-verified (2026-09-17, branch `0.7.x`, axes 0.7.0).**
-  Bounded subtraction-and-stabilization: five reliability fixes (Row Auto fallback to unsized; creation-time
-  `Height` validation incl. NaN/infinity, also on reload candidates; `Cols`/`NarrowCols` refused off `Wrap`;
-  dropdown value precedence in two ordered passes + a null-`ValueN` crash fix; wrong-kind options diagnostics
-  naming `BindOptions<T>`), one compile-checked public-only authoring recipe (`ordinary-settings.md` +
-  `KernelOrdinarySettingsRecipeTests.cs`), and the theme split — `new UiTheme()` is the vanilla-aligned
-  neutral/yellow default (substrate/edge/option values carried from the earlier vanilla `Verse.Widgets`
-  investigation whose build identity is NOT established; everything else derived and labeled), while
-  `UiTheme.DarkGold` is now an explicit frozen copy of the 0.6 palette, the `=> new()` coupling broken.
-  **Every A/C lane was re-run red against the reverted production file before being recorded green**
-  (tables and the C red-first pairing: `docs/development/0.7/40-verification.md`). No public signature,
-  type, kind or vocabulary moved; tiers unchanged. Gate run `-PackDev` all-green; dev package
-  `0.7.0-dev / commit=88095fb3cbed`, DLL SHA-256 `271128299A9CFF…FC8F82F`. **Scope limit:** this is all
-  `已实现 + 已自动化验证` over the stub; nothing is consumer-compiled against `[0.7.0,0.8.0)`, nothing is
-  已实机验证, and the default/DarkGold/custom visual state sheet is an open maintainer acceptance. The
-  supported 0.7 contract (`docs/development/0.7/05-api-contract.md`) was recorded before the behavior
-  changes and stands on the maintainer's 2026-09-17 ruling without waiting for a second consumer.
+- **The 0.7.x line is implemented and automated-verified (2026-09-17, branch `0.7.x`, axes 0.7.0),
+  with a C amendment 2026-09-18.** Bounded subtraction-and-stabilization: five reliability fixes (Row Auto
+  fallback to unsized; creation-time `Height` validation incl. NaN/infinity, also on reload candidates;
+  `Cols`/`NarrowCols` refused off `Wrap`; dropdown value precedence in two ordered passes + a null-`ValueN`
+  crash fix; wrong-kind options diagnostics naming `BindOptions<T>`), one compile-checked public-only
+  authoring recipe (`ordinary-settings.md` + `KernelOrdinarySettingsRecipeTests.cs`), and two peer built-in
+  palettes — `UiTheme.Vanilla` (neutral/yellow; substrate/edge/option values from the earlier vanilla
+  `Verse.Widgets` investigation whose build identity is NOT established; everything else derived and labeled)
+  and `UiTheme.DarkGold` (warm gold, shared-border edges). `new UiTheme()` is an unpainted token bag, not a
+  product skin; neither palette is default or history of the other. **Amendment recorded in
+  `docs/development/0.7/05-api-contract.md` before `Vanilla` shipped.** A lanes remain mutation-proven
+  (`docs/development/0.7/40-verification.md`). `Vanilla` is a public-unstable addition on `UiTheme`; no new
+  types, kinds or XML vocabulary. Gate run `-PackDev` all-green at the pre-amendment payload
+  `0.7.0-dev / commit=88095fb3cbed`, DLL SHA-256 `271128299A9CFF…FC8F82F` — that identity is stale once this
+  amendment rebuilds. **Scope limit:** this is all `已实现 + 已自动化验证` over the stub; nothing is
+  consumer-compiled against `[0.7.0,0.8.0)`, nothing is 已实机验证, and the Vanilla/DarkGold/custom visual
+  state sheet is an open maintainer acceptance. The supported 0.7 contract stands on the maintainer's
+  2026-09-17 ruling without waiting for a second consumer.
 
 - **`0.6.x` is PUBLISHED (2026-09-17) at `2545346`, after a pre-first-push history rewrite.** The line had
   been local-only; `scripts/privacy-audit.ps1 -FullHistory` failed on a **historical blob** — the fork

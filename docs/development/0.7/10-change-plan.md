@@ -99,6 +99,51 @@ a second owner for it is what this plan exists to avoid.
 
 **Status.** `proposed`; shares `ResolvePlacement` with CP-1.
 
+### CP-3 — the skin-source axis  *(registered; not implemented)*
+
+**Goal.** A look can be defined by data, not only by C# factories, so "a different skin" is a file rather
+than a recompile — and so a consumer that wants only the visual core can obtain a skin without a host.
+
+**Why now.** CP-1's predecessor package made `new UiTheme()` an unpainted bag and made the theme a
+required parameter, so the library now *forces* the question "where does a skin come from" on every
+consumer. Today the only answers are the two static factories, whose literals live in C#.
+
+**Shape.** One parser, one vocabulary, two text origins (already true for `<Styles>`), extended so a
+document can define the base tokens a palette is made of — not only the `Scheme`/`Density` overrides.
+
+**Not this.** No registry, no Def, no directory scan, no process-wide mutable static.
+
+**Status.** `proposed`.
+
+### CP-4 — the document boundary: role moves into the style document  *(registered; not implemented)*
+
+**Goal.** One file owns Appearance. Today the non-inheriting half of appearance — `Tone`/`Emphasis` —
+is written on the element in the **page** file while the inheriting half (`Scheme`/`Density`) lives in
+the **style** file, so "make this button read as danger" and "what danger looks like" are two different
+files. The element keeps a slot; the style document assigns it.
+
+**Why the boundary is wrong as drawn.** It is cut between Layout and Appearance, i.e. along a mechanism,
+rather than between *declaration* and *look*, i.e. along who edits what and how often. Redrawing it is what
+makes "replace the skin" a one-file operation.
+
+**Breaking.** Element attributes are manifest vocabulary; the round README's sentence and
+`FerriteLibVersion.cs`'s comment are amended with it (see the obligation above). Allowed by maintainer
+ruling 2026-09-18: this is the fast-development window, the line has never been delivered, and local
+consumers can follow.
+
+**Status.** `proposed`; depends on CP-3.
+
+### CP-5 — regional scope in the style document  *(registered; not implemented)*
+
+**Goal.** A named region of the page can be re-skinned without repeating an attribute on every element in
+it, and without a selector language.
+
+**Shape.** A scheme/density declaration may name the region it applies to (`For="region-id"`), matched by
+the region's declared name — nearest-wins stays the only precedence mechanism. Not a selector: no
+combinators, no specificity arithmetic, no pseudo-classes, no media queries.
+
+**Status.** `proposed`; shares CP-4's boundary decision.
+
 ## 2. Rules the contract must state
 
 | # | Rule |
@@ -195,4 +240,5 @@ per-part style keys, and the L1 closure lane.
 | Date | Item | Change |
 |---|---|---|
 | 2026-09-18 | — | plan opened from the placement/alignment discussion; CP-0/CP-1/CP-2 `proposed`, nothing implemented |
+| 2026-09-18 | CP-3..CP-5 | registered from the "layout file + style file" discussion: the skin-source axis, moving the role half of appearance into the style document, and regional scope. All `proposed`; the maintainer allowed splitting and breaking changes in this fast-development window |
 | 2026-09-18 | CP-0..CP-2 | **version axis settled**: the work stays on the 0.7.x line (no minor move; range stays `[0.7.0,0.8.0)`), because the line has never shipped and nothing is consumer-compiled against it. The plan moved from `docs/development/0.8/` to `docs/development/0.7/10-change-plan.md`, and the round-README amendment became an obligation of CP-1 |

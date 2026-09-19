@@ -35,14 +35,18 @@ plan, one home: `docs/development/0.7/10-change-plan.md`. It closes `docs/archit
       carries the round-README amendment in the same commit.
 - [ ] CP-2 — cross-axis alignment in flow containers.
 - [ ] D1–D4 — the four open decisions listed in the plan.
+- [ ] CP-3 — the skin-source axis: a look definable by data, not only by C# factories.
+- [ ] CP-4 — role (`Tone`/`Emphasis`) moves out of the page file into the style document; breaking.
+- [ ] CP-5 — regional scope in the style document (`For="region-id"`), not a selector language.
 
 ## 0.7.x round — implemented, external acceptance open (2026-09-17)
 
 Branch `0.7.x` (forked from the published `0.6.x` at `12d0dbb` + the maintainer's ruling docs), contract
-axis **0.7.0**. Scope: A reliability ×5, B ordinary-author recipe, C vanilla-aligned default theme,
-D contract + gates. Execution status, the supported contract and the four external checks each have one
-home: `docs/development/0.7/`. This section is a pointer only. Consumer/game acceptance is owned by the
-maintainer/operator and is **not** claimed here; push/tag/release need separate authorization.
+axis **0.7.0**. Scope: A reliability ×5, B ordinary-author recipe, C two peer palettes (`Vanilla` /
+`DarkGold`; constructor is a bag), D contract + gates. Execution status, the supported contract and the
+four external checks each have one home: `docs/development/0.7/`. This section is a pointer only.
+Consumer/game acceptance is owned by the maintainer/operator and is **not** claimed here; push/tag/release
+need separate authorization.
 
 ## 0.6.x round — open (2026-09-16)
 

@@ -4,11 +4,24 @@ Written before any behavior change on this branch, per the 0.7 plan. This file r
 to; `docs/api-tiers.md` keeps the per-type tier membership, which this line does not change. The consumer
 assertion range for the line is `[0.7.0, 0.8.0)`.
 
-## Public surface: unchanged
+## Public surface
 
-No new public types, members, widget kinds, or XML vocabulary land in 0.7. No signature changes. The API
-tier gate therefore pins the same list it pinned at 0.6.0, and any addition that later turns out to be
-necessary requires a scoped amendment recorded here first.
+No new public types, widget kinds, or XML vocabulary land in 0.7. No signature changes on existing
+members. The API-tier *type* list stays the 0.6 pin.
+
+**Amendment (2026-09-18):** `UiTheme` gains one public static factory, `Vanilla`, so the two built-in
+palettes are named peers. The addition is recorded here before the member ships.
+
+**Amendment 2 (2026-09-18), and it is a break, not an addition.** The same package makes `new UiTheme()`
+an unpainted token bag, so a theme built that way no longer inherits a recommended skin for the tokens it
+does not set. A consumer that relied on the constructor default is repainted. The pre-1.0 rule is
+unconditional for *additions*; a behavioural break is a fortiori a break, and recording it as an addition
+because no signature moved would be exactly the silent growth the 0.6 window rejected in writing. It is
+affordable here for one measured reason and no other: **the 0.7 line has never been delivered** — not
+published, not compiled against by any consumer, used locally only — so there is no pinned number and no
+migration for a stranger. The migration for a local consumer is one line, stated under C below. This
+paragraph is the amendment the 0.7 README's "no public type, kind or XML vocabulary" sentence takes
+with it.
 
 ## Behavior changes, in contract terms
 
@@ -56,22 +69,31 @@ unchanged (`InvalidOperationException` from the validation seam). A truly missin
 message; a key that legitimately carries both a value and an options registration is not rejected.
 Diagnosis only: no binding category is ever coerced into another.
 
-### C — `new UiTheme()` is the vanilla-aligned default; `DarkGold` is frozen history
+### C — two peer built-in palettes; the constructor is a bag, not a product
 
-The constructor default becomes a neutral-surface, yellow-accent palette aligned to vanilla window/section
-substrates and edges (provenance and the full role table live in the C lane record; derived values are
-marked derived). `UiTheme.DarkGold` returns a fresh independent instance carrying the complete 0.6 palette
-and geometry; its property name and every token name are unchanged. A custom theme constructed from
-`new UiTheme()` inherits the new defaults in 0.7 — deliberate — so a consumer wanting the old baseline
-starts from `UiTheme.DarkGold` and applies its overrides. Geometry, fonts, spacing, token names, and the
-renderer do not move in this package. Migration: consumers who liked the old default switch their
-theme source from `new UiTheme()` to `UiTheme.DarkGold`; nobody is forced to change.
+`UiTheme.Vanilla` and `UiTheme.DarkGold` are the two built-in palettes. They are peers: neither is
+the default, neither is history of the other, and neither is selected by constructing the bag.
+Each factory returns a fresh independent instance. Token names, geometry, fonts, spacing, and the
+renderer do not move in this package.
+
+- **Vanilla** — neutral-surface, yellow-accent palette aligned to vanilla window/section substrates
+  and edges (provenance and the role table live in the C lane; derived values are marked derived).
+- **DarkGold** — the warm-gold palette (near-black planes, shared-border-only edges). Same token
+  names; a different look, not a compatibility alias for `new()` and not a frozen 0.6 escape hatch.
+
+`new UiTheme()` constructs an empty token bag (style table, density, font) with no product palette.
+A host still requires an explicit non-null theme; pass `Vanilla` or `DarkGold`, or start from one of
+them and apply overrides. A custom `new UiTheme() { … }` no longer inherits a recommended skin for
+unspecified tokens.
+
+Migration: pick a named factory at the existing required theme parameter. There is no constructor
+default to keep, and no ranking between the two palettes.
 
 ## The selected ordinary-authoring path (B)
 
 The recommended author route is existing surface only: one layout manifest over public atoms/containers
 (`input/slider`, `input/number-field`, `input/dropdown`, text/section/wrap/scroll containers), typed
-bindings through `UiBindings` (`Bind`, `BindReadOnly`, `BindOptions`), explicit `NotifyChanged` from an
+bindings through `UiBindings` (`BindValue`, `BindReadOnly`, `BindOptions`), explicit `NotifyChanged` from an
 owned mutation path on an authoritative plain C# model, and `UiWindowHost`/`UiPageWindow` for the window.
 `UiNotifyAdapter` + `INotifyPropertyChanged` stays optional. No VM base class, no builder DSL, no second
 state store becomes part of the contract. The runnable reference lives in the harness fixture area and the

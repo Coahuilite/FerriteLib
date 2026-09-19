@@ -55,10 +55,12 @@ public static class FerriteLibVersion
     /// widget descriptor snapshot. If the 0.5.0 line's handoff has not been consumed by anyone yet, the
     /// 0.6.0 number is still the honest one: the rule below is unconditional for additions, and a consumer
     /// that pinned <c>[0.5.0,0.6.0)</c> keeps compiling against the 0.5.0 carrier it tested. The 0.6.0 →
-    /// 0.7.0 move is the subtraction-and-stabilization round: no new public surface, one bounded supported
-    /// contract, a vanilla-aligned default theme, and the first validation tightenings that land at a minor
-    /// boundary. The consumer-count prerequisite for that commitment was removed by maintainer ruling on
-    /// 2026-09-17; older freeze-gating wording elsewhere is superseded.
+    /// 0.7.0 move is the subtraction-and-stabilization round: one bounded supported contract, two peer
+    /// built-in palettes (<c>UiTheme.Vanilla</c> / <c>UiTheme.DarkGold</c>; the constructor is a bag),
+    /// and the first validation tightenings that land at a minor boundary. <c>Vanilla</c> is a public-unstable
+    /// addition on an existing type, recorded in the 0.7 contract before it shipped. The consumer-count
+    /// prerequisite for that commitment was removed by maintainer ruling on 2026-09-17; older freeze-gating
+    /// wording elsewhere is superseded.
     /// </summary>
     public static readonly Version Api = new Version(0, 7, 0);
 

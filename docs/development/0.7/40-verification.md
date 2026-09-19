@@ -7,10 +7,11 @@ none was invented). Gates: `pwsh -NoProfile -File scripts/verify-local.ps1 -Pack
 ## Regression provenance (what is mutation-proven vs pinned-forward)
 
 Each A lane was re-run against the reverted fix (`git stash` of the production file only, lane files kept)
-and observed red on the baseline, then green with the fix. That half is mutation proof. The C default lane
-was written red-first the same way (12 failing token assertions on the 0.6 default) while the DarkGold
-freeze lane was green before the move and must stay green after it — the pairing is the proof the split is
-real and not a wholesale relabel.
+and observed red on the baseline, then green with the fix. That half is mutation proof. The original C
+default lane was written red-first against `new()` carrying the 0.6 palette (12 failing token assertions)
+while the DarkGold literal lane stayed green — that pairing proved the split was real. **Amendment
+2026-09-18:** `new UiTheme()` is an unpainted bag; `Vanilla` and `DarkGold` are named peers. The C lanes
+now pin each factory's literals plus "the constructor selects neither palette".
 
 | Item | Baseline evidence (red assertions) | After fix | Commit |
 | --- | --- | --- | --- |
@@ -19,8 +20,7 @@ real and not a wholesale relabel.
 | A3 Wrap-only Cols | 4 red (Row, Column, Section-with-breakpoint, message) | green | `e30af94` |
 | A4 dropdown precedence | required case red (`Option1=b/Value2=b` displayed `b`, not `Second`) | green | `c8fe06e` |
 | A5 options diagnostic | category sentence red (baseline said only "missing") | green | `88f1c77` |
-| C default palette | 12 default-token assertions red before the change | green | `88095fb` |
-| C DarkGold freeze | green before AND after the change (frozen literals) | green | `88095fb` |
+| C Vanilla / DarkGold peers | constructor-as-default framing superseded; bag must not equal either palette | green after amendment | this commit |
 
 B's eight lanes are a new reference over existing surface: they cannot be red on a "before" (nothing in B
 changed production code); their weight is compile-check plus behavior pins — geometry-free authoring, the

@@ -599,6 +599,8 @@ internal static class KernelContractTests
             "UiTheme.cs",
             "UiThemeDraw.cs",
             "UiResolvedStyle.cs",
+            "UiStyleDocument.cs",
+            "UiStyleResolver.cs",
             "UiFitAudit.cs",
             "UiKitFonts.cs",
             "UiFont.cs",
