@@ -152,6 +152,9 @@ internal static class Program
         failures += KernelWidgetCatalogTests.RunAll();
         // --- end T3 widget catalogue ---
 
+        Console.WriteLine("Kernel architecture probes (headless button / two visuals / live resize)...");
+        failures += KernelArchitectureProbeTests.RunAll();
+
         Console.WriteLine("Kernel lane registration (every lane file is invoked from Program.cs)...");
         failures += KernelLaneRegistrationTests.RunAll();
     }

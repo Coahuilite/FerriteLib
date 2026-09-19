@@ -165,11 +165,39 @@ every gate here stays green.
 
 ## Memory protocol
 
-Three-file split: `AGENTS.md` stable, `MEMORY.md` the only volatile ledger, `TODO.md` the action surface.
-Record a PASS only with its scope and evidence source, saying which half is mutation-proven and which is
-only a future-regression guard. Cross-repo coordination lives in maintainer-local `HANDOFF.md`, which is
-gitignored: its section kinds and round lifecycle are pinned in that file's own header, no tracked file
-may depend on reading it, and an un-CLOSED round keeps a pointer line in `TODO.md`.
+Four-file split: `AGENTS.md` stable, `MEMORY.md` the only volatile ledger, `TODO.md` the action surface,
+`OBLIVIONIS.md` the cold archive.
+
+At every non-trivial session:
+
+- Read `MEMORY.md` before claiming project context; it stores confirmed durable facts, decisions,
+  constraints and evidence pointers.
+- Read `TODO.md` before continuing work; it stores only current goals, open actions, blockers and explicit
+  deferrals.
+- Read `OBLIVIONIS.md` only for a historical conflict or an explicit request; it is cold archive evidence
+  and cannot override current sources.
+- The three active memory files are maintained in accurate English; `OBLIVIONIS.md` follows the same
+  language rule when appended.
+
+Maintain these boundaries:
+
+- Update `MEMORY.md` only when durable facts or the open action surface changes.
+- **Compact by default.** Settled release and implementation detail lives in `docs/`; `MEMORY.md` keeps a
+  pointer to it, never a second copy of it — `OBLIVIONIS.md` exists so the ledger can shrink. Do not grow an
+  active memory file with finished work.
+- Update `TODO.md` only when its current task surface changes.
+- Record a PASS only with its scope and evidence source, saying which half is mutation-proven and which is
+  only a future-regression guard.
+- Do not store session narratives, transient artifacts, raw logs, completed test matrices, commit chains or
+  release checklists in an active memory file.
+- Documentation edits alone are not memory events; an external-state summary never overrides its
+  authoritative source.
+
+**Handoff material is transient and is not a memory tier** (maintainer ruling 2026-09-18, correcting a
+wrongful promotion). A maintainer-local `HANDOFF.md` is gitignored, is read at the moment of a round, holds
+no standing authority, and is never a place a tracked file points at for a protocol. Anything durable it
+carries is promoted into the files above or into `docs/` at that moment; a round that stays open keeps a
+pointer line in `TODO.md`, and a closed round leaves nothing behind.
 
 ## Boundaries
 

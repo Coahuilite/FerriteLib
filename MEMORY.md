@@ -2,6 +2,20 @@
 
 ## Current durable state
 
+- **Maintainer ruling — the memory protocol is repaired and handoff is demoted (2026-09-18).** The
+  protocol is four files: `AGENTS.md` (stable), `MEMORY.md` (the only volatile ledger), `TODO.md`
+  (action surface) and `OBLIVIONIS.md` (cold archive; created by this ruling and **empty by design** —
+  nothing has been archived out of this ledger yet). `AGENTS.md` "Memory protocol" now carries the
+  archive's read rule, the English rule, compact-by-default, "documentation edits are not memory events",
+  and the demotion itself. **Superseded here:** the two statements that made maintainer-local
+  `HANDOFF.md` the home of a protocol — "the round/buffer protocol lives only in maintainer-local
+  `HANDOFF.md`" (repository-shape ruling) and "Round lifecycle and section kinds are pinned in each repo's
+  HANDOFF header" (harvest-loop fact) — both restate a grant this ruling withdraws. The file stays
+  gitignored and transient. **Open action, separately authorized:** the first compaction of this ledger
+  into `OBLIVIONIS.md`; choosing what leaves the only volatile ledger is a maintainer decision, not a
+  session's. Scope of this update: rules and memory documents only — no source, API tier, version axis,
+  build, runtime test or release was touched or claimed.
+
 - **Maintainer ruling — consumer-count prerequisite removed (2026-09-17).** A second wired real
   consumer is no longer required before API stabilization or a supported-contract freeze. The
   previous rule created a circular dependency: the consumer could not integrate without a reasonably

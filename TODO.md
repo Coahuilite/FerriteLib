@@ -11,6 +11,29 @@ Real-consumer and in-game evidence remain separately recorded; specialized-kind 
 compatibility/version requirements are unchanged. Older scheduling text below does not restore the
 removed consumer-count prerequisite.
 
+## Memory protocol repaired — first compaction pending (2026-09-18)
+
+`AGENTS.md` now carries the four-file memory protocol (`AGENTS.md` / `MEMORY.md` / `TODO.md` /
+`OBLIVIONIS.md`) and demotes maintainer-local `HANDOFF.md` to a transient artifact with no standing
+authority. Two statements in `MEMORY.md` that granted that file a protocol role are superseded by the
+2026-09-18 ruling recorded there.
+
+- [ ] **First compaction into `OBLIVIONIS.md` — open action, needs separate authorization.** Superseded
+      and settled blocks move out of `MEMORY.md`/`TODO.md` **verbatim**; nothing has been archived yet,
+      and choosing what leaves the only volatile ledger is the maintainer's call. Not started by this
+      update: this update is rules and documents only.
+
+## 0.8 candidate — placement/alignment change plan (2026-09-18)
+
+Live plan, one home: `docs/development/0.8/10-change-plan.md`. It closes `docs/architecture.md` §3.2/§6.3's
+**alignment** gap and half of the **relation** gap, with CP-0 as a prerequisite. Nothing is implemented;
+the version axis is a candidate and opening the round is the maintainer's call.
+
+- [ ] CP-0 — `ParsePadding`/`ReadGap` fall back to the theme's geometry tokens (breaking; documented migration).
+- [ ] CP-1 — placement vocabulary (`AlignX`/`OffsetX`/`AlignY`/`OffsetY`) inside a placement container.
+- [ ] CP-2 — cross-axis alignment in flow containers.
+- [ ] D1–D4 — the four open decisions listed in the plan.
+
 ## 0.7.x round — implemented, external acceptance open (2026-09-17)
 
 Branch `0.7.x` (forked from the published `0.6.x` at `12d0dbb` + the maintainer's ruling docs), contract
