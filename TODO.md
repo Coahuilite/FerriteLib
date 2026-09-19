@@ -36,8 +36,11 @@ plan, one home: `docs/development/0.7/10-change-plan.md`. It closes `docs/archit
 - [ ] CP-2 — cross-axis alignment in flow containers.
 - [ ] D1–D4 — the four open decisions listed in the plan.
 - [ ] CP-3 — the skin-source axis: a look definable by data, not only by C# factories.
-- [ ] CP-4 — role (`Tone`/`Emphasis`) moves out of the page file into the style document; breaking.
+- [ ] CP-4 — the document boundary; `proposed`, **blocked by D5**. The "role moves into the style
+      document" half is withdrawn (`Tone` is the only appearance reference that cannot dangle).
 - [ ] CP-5 — regional scope in the style document (`For="region-id"`), not a selector language.
+- [ ] CP-6 — split the tone axes (state vs role) and make the role→surface mapping data; `proposed`, blocked by D5.
+- [ ] D5 — what `Tone` is: role vocabulary on the element (recommended), document-defined named roles, or leave as-is.
 
 ## 0.7.x round — implemented, external acceptance open (2026-09-17)
 

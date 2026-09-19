@@ -115,23 +115,42 @@ document can define the base tokens a palette is made of — not only the `Schem
 
 **Status.** `proposed`.
 
-### CP-4 — the document boundary: role moves into the style document  *(registered; not implemented)*
+### CP-4 — the document boundary: role handling  *(revised 2026-09-18; blocked by D5)*
 
-**Goal.** One file owns Appearance. Today the non-inheriting half of appearance — `Tone`/`Emphasis` —
-is written on the element in the **page** file while the inheriting half (`Scheme`/`Density`) lives in
-the **style** file, so "make this button read as danger" and "what danger looks like" are two different
-files. The element keeps a slot; the style document assigns it.
+**Goal.** One file owns Appearance, so that "replace the skin" is a one-file operation.
 
-**Why the boundary is wrong as drawn.** It is cut between Layout and Appearance, i.e. along a mechanism,
-rather than between *declaration* and *look*, i.e. along who edits what and how often. Redrawing it is what
-makes "replace the skin" a one-file operation.
+**Original shape, and why it was withdrawn.** This item first read "move `Tone`/`Emphasis` out of the page
+file and into the style document". That half is **withdrawn**, because the decisive evidence points the other
+way and the benefit was uncited:
 
-**Breaking.** Element attributes are manifest vocabulary; the round README's sentence and
-`FerriteLibVersion.cs`'s comment are amended with it (see the obligation above). Allowed by maintainer
-ruling 2026-09-18: this is the fast-development window, the line has never been delivered, and local
-consumers can follow.
+- `Tone` is the only appearance reference in the system that **cannot dangle**. `Scheme="dark"` names
+  something the *style document* defines, so a skin that does not define `dark` leaves the reference
+  unresolved (fallback recorded); `Tone="Danger"` names a member of a **code** vocabulary, so every skin
+  must be able to honour it, and a skin's freedom is what `Danger` *looks like*, not whether it exists.
+  A page therefore never breaks because a skin changed. Moving roles into the document would trade that
+  property away for "a skin may define new role names" — a capability with **zero citations**.
+- The file-boundary complaint is still real, but it is not about roles: it is that *who may write what* is
+  not stated.
 
-**Status.** `proposed`; depends on CP-3.
+**What the measurement actually found.** `UiStatusTone` conflates three different things, and one member is
+reachable from two directions:
+
+| Member | What it really is | Evidence |
+|---|---|---|
+| `Neutral` | absence of a role | `AtomVocabulary.ParseTone` returns it for an empty attribute |
+| `Active` | an **interaction state** | `ButtonWidget` resolves it while the pointer holds the element down |
+| `Success`/`Warning`/`Danger` | authored **semantic roles** | — |
+| `Disabled` | a **data-derived state** | `UiStyleTable.Resolve`: `writable == false → Disabled` |
+| `Disabled` again | **also authorable** | `ParseTone` accepts `"Disabled"` |
+
+So the same member is derived from the bindings *and* writable by an author, with the derived value
+silently winning. And `Warning` and `Danger` resolve to one treatment, because the role→surface mapping
+is code (`UiStyleTable.Cell`), not data — a skin can change what `Danger` is painted with, but cannot
+make the two roles differ.
+
+**What survives.** The boundary question reduces to three narrower, now-motivated items, carried by CP-6.
+
+**Status.** `proposed`, **blocked by D5**; the role-move half is not planned.
 
 ### CP-5 — regional scope in the style document  *(registered; not implemented)*
 
@@ -228,6 +247,31 @@ are amended in the same commit as CP-1 — recorded here now so neither is disco
   sub-element (more verbose, room for per-edge data later).
 - **D3** Ratio unit: parent inner span only, or allow a second ratio against the child's own span?
 - **D4** Sibling-relative placement: keep out of this line (default), or register it as a named follow-up?
+- **D5** *What is `Tone`?* (a) A closed, code-owned **role vocabulary on the element**, with the three
+  conflations fixed (CP-6): state separated from role, the role→surface mapping moved into the style
+  document, and `Tone="Disabled"` no longer authorable. (b) **Named roles defined by the style document**,
+  the element referencing one by name — accepting that role references become danglable like `Scheme`, and
+  that the author vocabulary then differs from the stable audit vocabulary (`UiStatusTone`). (c) Leave the
+  conflations as they are. Recommended: **(a)** — it keeps the one appearance reference that cannot dangle,
+  keeps `UiStatusTone` stable for the audit surface, and still lets a skin separate `Warning` from
+  `Danger`; (b)'s only gain, new role names, has no citation yet.
+
+### CP-6 — split the tone axes and make the role mapping data  *(registered; blocked by D5)*
+
+**Goal.** Fix the three conflations found while evaluating CP-4, without moving roles into the style
+document:
+
+1. **State leaves the authorable set.** `Disabled` and `Active` become states (derived from the bindings
+   and from interaction), not values an author writes. Migration for the one authored case: a page writing
+   `Tone="Disabled"` moves to its data side (`BindReadOnly` / `IsWritable`), or the library accepts the
+   old name for one minor and redirects it to the derived answer.
+2. **The role→surface mapping becomes data.** A style document may state which surfaces a tone resolves to,
+   so a skin can separate `Warning` from `Danger` — the L2 debt recorded in `docs/architecture.md` §6.3 —
+   without adding an enum member.
+3. **A dangling-role rule is stated once**: a role is code-owned and must resolve in every skin; a
+   `Scheme`/`Density` name is document-owned and may dangle with the existing recorded fallback.
+
+**Status.** `proposed`, blocked by D5.
 
 ## 8. Registered elsewhere
 
@@ -240,5 +284,6 @@ per-part style keys, and the L1 closure lane.
 | Date | Item | Change |
 |---|---|---|
 | 2026-09-18 | — | plan opened from the placement/alignment discussion; CP-0/CP-1/CP-2 `proposed`, nothing implemented |
+| 2026-09-18 | CP-4, D5, CP-6 | CP-4 revised: the "role moves into the style document" half is **withdrawn** — `Tone` is the only appearance reference that cannot dangle, and the capability it would buy has no citation. The measurement (a role vocabulary that conflates state, interaction and meaning, with `Disabled` reachable from two directions) became D5, and its fixes became CP-6 |
 | 2026-09-18 | CP-3..CP-5 | registered from the "layout file + style file" discussion: the skin-source axis, moving the role half of appearance into the style document, and regional scope. All `proposed`; the maintainer allowed splitting and breaking changes in this fast-development window |
 | 2026-09-18 | CP-0..CP-2 | **version axis settled**: the work stays on the 0.7.x line (no minor move; range stays `[0.7.0,0.8.0)`), because the line has never shipped and nothing is consumer-compiled against it. The plan moved from `docs/development/0.8/` to `docs/development/0.7/10-change-plan.md`, and the round-README amendment became an obligation of CP-1 |
