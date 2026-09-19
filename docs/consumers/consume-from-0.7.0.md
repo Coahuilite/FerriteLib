@@ -32,8 +32,11 @@ appropriate minor.
 
 ## 3. What actually changed for you at 0.7.0
 
-- **Public surface:** no types, kinds or XML vocabulary added or removed; tiers unchanged. `UiTheme`
-  (public-unstable) gained one named factory, `Vanilla`, so the two built-in palettes are peers.
+- **Public surface:** no type or kind added or removed, and no member signature changed; tiers unchanged.
+  `UiTheme` (public-unstable) gained one named factory, `Vanilla`, so the two built-in palettes are peers.
+  **Added XML vocabulary (Batch 1, §4b):** the four placement attribute names `AlignX`, `OffsetX`,
+  `AlignY`, `OffsetY`. **Removed:** the stored token `UiTheme.HoverPoint`, replaced by the derived
+  `UiTheme.AccentHover`.
 - **Two peer palettes, no constructor default.** Pass `UiTheme.Vanilla` (neutral surfaces, reserved
   yellow) or `UiTheme.DarkGold` (warm gold, shared-border edges) at the existing required theme
   parameter. They are two looks, not a default and its history. `new UiTheme()` is an unpainted token
@@ -43,7 +46,15 @@ appropriate minor.
   at arrange time; `Cols`/`NarrowCols` on a non-`Wrap` container are refused at creation (they never did
   anything there — remove the attribute or switch to `wrap`).
 - **Three behavior fixes**: a Row child with `Width="Auto"` that cannot be label-measured now shares space
-  like an unsized child instead of collapsing to a 1-unit stub; a dropdown shows the option whose **value**
+  like an unsized child instead of collapsing to a 1-unit stub;
+  **the migration for that one, stated properly because the obvious advice is wrong** — if what you relied on
+  was not the stub but the fact that *the same element behaves differently in the two container shapes*
+  (a collapsed filler in the wide `Row` that becomes full width once `Narrow="Column"` swaps the container),
+  then giving it a fixed `Width` pins the narrow state too and does **not** reproduce it. The supported route
+  is **two mutually exclusive presentations plus `VisibleKey`** — one child for the wide shape, one for the
+  narrow, each visible under its own binding. A narrow-only *child* has no single-attribute form today; that
+  gap is registered as `WideHidden` (symmetric with the existing `NarrowHidden`) and is not in this line;
+  a dropdown shows the option whose **value**
   equals the bound value even when an earlier option's display text matched; and a dropdown whose options
   key was registered as a value (`BindReadOnly<IReadOnlyList<T>>`) says so and names `BindOptions<T>`.
   Migration detail for each: `docs/development/0.7/05-api-contract.md`.
@@ -62,7 +73,7 @@ review, one is a page edit, one is a member swap.
 
 | Change | What you do |
 |---|---|
-| Container `Padding`/`Gap` now default to the theme's geometry (`6`) instead of 0 | Review every page's spacing. Add `Padding="0"` / `Gap="0"` where you want the previous result exactly. |
+| Container `Padding` **and** `Gap` now default to the theme's geometry instead of 0 | Review every page's spacing. Both built-in palettes carry `Padding = Gap = 6`, so an undeclared container moves from 0 to 6. An attribute you already declare keeps winning — a container with an explicit `Gap` is unaffected by the `Padding` fallback and vice versa. Add `Padding="0"` / `Gap="0"` where you want the previous result exactly. **Only those two tokens participate**: `Spacing`, `RowHeight` and `Hairline` stay widget-internal and never become a container default. |
 | `Tone` accepts only `Neutral`/`Success`/`Warning`/`Danger` | If a page wrote `Tone="Active"` or `Tone="Disabled"`, express the **state** instead: a read-only value binding for disabled, the control's own selected state for active. Both old names still work **for this minor only** and are refused at the next minor boundary (0.8). The only observable consequence today is **one appearance record per runtime element** (a collection row is its own element) — never one per frame, and the rendered treatment is unchanged. |
 | `UiTheme.HoverPoint` removed, replaced by `UiTheme.AccentHover` | Read `UiTheme.AccentHover` (read-only, derived from `AccentGold`). A scheme that declared `HoverPoint` now reports it as an unknown token instead of applying it. |
 | New: `AlignX`/`OffsetX`/`AlignY`/`OffsetY` | Optional, no migration. Inside an `Overlay` they place a child by an edge or the centre plus a percentage of the parent's usable width; a flow container's child gets its cross axis with a pixel nudge only. |

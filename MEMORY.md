@@ -293,6 +293,17 @@
   is **mutation-proven in one direction only**: reverting `<VersionPrefix>` to
   0.1.0 fails exactly that one assertion and nothing else. The reverse case - a future axis living in a
   fourth file - is guarded by no test, because no such file exists yet.
+- **A sibling-HintPath consumer reads `1.6/Assemblies/` directly, so the LAST build step decides what it
+  compiles against — and `-PackDev` builds Dev (measured 2026-09-19).** `-PackDev` is the dev channel and
+  deliberately leaves a Dev-configuration assembly at the shared OutputPath; a consumer whose HintPath points
+  at `../ferritelib/1.6/Assemblies/FerriteLib.UiKit.dll` therefore picks up Dev bytes unless a Release
+  rebuild follows it. The consumer reported it as a blocking gate ("US builds and publishes against a Release
+  carrier"); the fix is operational and ordered: gates → harness → `dotnet build -c Release --no-incremental`,
+  and **never** `-PackDev` afterwards. The detector is `AssemblyConfigurationAttribute`, not the version
+  suffix: `VersionSuffix=dev` is unconditional and a correct Release carrier still reads `0.7.0-dev+<sha>`,
+  which is why the build axis must not be mistaken for the configuration. A stale `.pdb` left beside the
+  carrier by the Dev build is a second, weaker tell and is gitignored; it was removed.
+
 - **A release asset must be built after the gates run, not during them.** The Dev and Release build
   gates leave `1.6/Assemblies/FerriteLib.UiKit.dll` carrying a `-dev` version suffix, and that is the
   correct identity for a rehearsal — so the github and steam channels refuse it (`Payload is a dev
