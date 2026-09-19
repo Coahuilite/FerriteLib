@@ -302,7 +302,11 @@
   and **never** `-PackDev` afterwards. The detector is `AssemblyConfigurationAttribute`, not the version
   suffix: `VersionSuffix=dev` is unconditional and a correct Release carrier still reads `0.7.0-dev+<sha>`,
   which is why the build axis must not be mistaken for the configuration. A stale `.pdb` left beside the
-  carrier by the Dev build is a second, weaker tell and is gitignored; it was removed.
+  carrier by the Dev build is a second, weaker tell and is gitignored — and it **reappears after every
+  `verify-local` run**, because gate 2 is the Dev build and gate 3 is the Release build over the same output
+  path: Release's `DebugType=none` stops producing a PDB but does not delete one already there. So the
+  delivery step's last action is "force a Release rebuild **and** remove the stale PDB", and folding that into
+  a script is a maintainer call rather than a session's.
 
 - **A release asset must be built after the gates run, not during them.** The Dev and Release build
   gates leave `1.6/Assemblies/FerriteLib.UiKit.dll` carrying a `-dev` version suffix, and that is the
