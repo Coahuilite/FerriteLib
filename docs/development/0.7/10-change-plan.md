@@ -154,10 +154,15 @@ classes lie.
 | Docs | `05-api-contract.md` (second amendment, before it ships), then `docs/architecture.md` §3.2/§6.3, the consumer guide, `MEMORY.md`, `TODO.md` | contract before code, the 0.7 precedent | — |
 | Version | — | **no move**: the axis stays `0.7.0` and the consumer range stays `[0.7.0,0.8.0)`; the vocabulary is a second amendment to `05-api-contract.md`, recorded before it ships | 0 |
 
-**Obligation on the round's own records.** `docs/development/0.7/README.md` states that "no public
-type, kind or XML vocabulary was added or removed on this line". CP-1 makes that sentence false, so the
-README's statement and its package table take this line's second amendment in the same commit as CP-1.
-Recorded here now so the sentence is not discovered as stale after the fact.
+**Obligations on the round's own records.** Two existing statements become false when CP-1 lands, and both
+are amended in the same commit as CP-1 — recorded here now so neither is discovered as stale after the fact:
+
+- `docs/development/0.7/README.md` states that "no public type, kind or XML vocabulary was added or removed
+  on this line"; the README's statement and its package table take this line's second amendment.
+- `Source/FerriteLib.UiKit/Kernel/FerriteLibVersion.cs`'s XML comment describes the `0.6.0 → 0.7.0` move
+  as "one bounded supported contract, two peer built-in palettes … and the first validation tightenings".
+  It gains the placement vocabulary. The axis **value** does not move: `Api` stays `new Version(0, 7, 0)`,
+  which is what the ruling in the header above means by "no minor move".
 
 ## 6. Verification plan
 
