@@ -159,6 +159,28 @@ range `[0.7.0,0.8.0)` do not move.
 **Not changed by this batch:** the renderer, the fourteen drawing outlets, `UiGeometry`'s five metrics, the
 token names other than `HoverPoint`, and the identity of the two built-in palettes.
 
+### B8 (2026-09-20) — `input/mode-row`'s declared label set drops the description names
+
+A **defect fix, not a vocabulary change**, and it stays inside `0.7.0` for that reason. The kind declared
+`Title1..8` **plus** `Description1..8` as its **label set** — the names `Width="Auto"` measures through
+`UiLayoutEngine.MeasureLabelWidth` — while no drawing path paints a description (`DrawOption` writes
+`option.Title` and nothing else). So an Auto column measured text that can never appear: pixels moved for
+invisible content.
+
+- **Fixed:** the label set is `Title1..8` only, so an Auto mode-row hugs its titles.
+- **Not changed:** the attribute **schema** still declares `Description1..8`, so a manifest that writes them
+  still creates, and `InputModeRowWidget` still reads them into its option. Removing the names from the
+  vocabulary — or giving them a drawing path — is a retirement-clock decision the maintainer owns and is
+  deliberately **not** part of this fix.
+- *Migration:* a page that relied on a long `DescriptionN` widening a `Width="Auto"` mode-row now gets the
+  title's width. If the wide column was the intent, declare the width explicitly (`Width="320"`) or a
+  `MinWidth`.
+
+The change is pinned by a failure-sensitive lane — `KernelLayoutTests`, "A mode-row's Auto width does not
+include a description (B8)" — shown red on the pre-fix code (the Auto column measured the 12-character
+description at 96px against the title's 16px) and green after. No other lane's expectations moved: this is a
+defect fix on one kind's declared label set, not the kind of break Batch 1 recorded.
+
 ## The selected ordinary-authoring path (B)
 
 The recommended author route is existing surface only: one layout manifest over public atoms/containers

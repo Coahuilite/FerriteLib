@@ -312,7 +312,7 @@ observations: none of them is a proposal, and a row becomes work only when a mai
 | State has no public read side | a node publishes `IsDisabled` and no hover/armed (measured); both are computed inside `Draw` | A second renderer cannot read the state it renders; no consumer can observe it |
 | The input contract has no declaration site | implicit in which funnel call a widget happens to make; the containment lane sees backend contact, not a contract | "What input does this kind take" is unstateable |
 | Focus is not an engine concept | `UiSession` has no focus surface; only the number field holds a private `Focused` in its value state | **Disclosure:** experiment 1's request listed focus and the lane did not verify it — there is nothing to verify |
-| The semantic axes are thin | `Tone` (five values) plus `Emphasis` (two values, one of which moves only the `neutral` cell) | No prominence or size axis for a style-free semantic vocabulary |
+| The semantic axes are thin | `Tone` names four authored meanings since Batch 1 (`Neutral`/`Success`/`Warning`/`Danger`; the stable `UiStatusTone` keeps all six members because `Active`/`Disabled` are states, not authored values) plus `Emphasis` (two values, one of which moves only the `neutral` cell) | No prominence or size axis for a style-free semantic vocabulary |
 
 **Appearance**
 

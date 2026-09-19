@@ -40,6 +40,7 @@ internal static class KernelLayoutTests
         Run("Auto widths are capped by the budget fixed siblings leave (N1)", VerifyAutoCappedByBudget);
         Run("Stack child with Width=Auto hugs its label (N1)", VerifyStackAutoChildHugsLabel);
         Run("Core stepper-slider is Auto-measurable through its declared label set (N1+N3)", VerifyCoreKindAutoMeasurable);
+        Run("A mode-row's Auto width does not include a description (B8)", VerifyModeRowAutoWidthExcludesDescription);
         Run("Row Auto child that cannot be measured falls back to unsized (A1)", VerifyRowAutoFallbackToFlex);
         Run("Breakpoint flips Row to a stack without reopening (N2)", VerifyBreakpointDirectionFlip);
         Run("NarrowHidden children vanish only in the narrow state (N2)", VerifyNarrowHidden);
@@ -429,6 +430,40 @@ internal static class KernelLayoutTests
         UiLayoutSnapshot snapshot = Arrange(xml, 400f, 600f).Snapshot;
         Check(Near(snapshot.RectById["slider"].width, 32f),
             "the core stepper-slider's declared label set feeds the same Auto seam (N3's reshape is N1 proving itself)");
+    }
+
+    // B8 (0.7.x fix, 2026-09-19): input/mode-row declares Description1..8 in its attribute schema and reads
+    // them into its Option, but no drawing path paints them. While those names were ALSO in the kind's
+    // declared label set, a Width="Auto" mode-row measured text that is never drawn - a defect that moves
+    // pixels. The fix removes them from the LABEL SET only; the schema half is untouched, so a manifest may
+    // still write a description (the maintainer decides whether the names stay or gain a drawing path).
+    // StubTextWidth: Small em=16, so a Latin letter is 8px - title "ab" is 16px and a 12-letter description
+    // would measure 96px, which is unmistakable if it still participated.
+    private static void VerifyModeRowAutoWidthExcludesDescription()
+    {
+        RegisterTestWidget(10f, null, false);
+
+        string ModeRow(string title, string description) =>
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\" Padding=\"0\" Gap=\"0\">"
+            + "<Widget Id=\"mode\" Kind=\"input/mode-row\" Width=\"Auto\" Height=\"28\""
+            + " Title1=\"" + title + "\" Value1=\"A\" Description1=\"" + description + "\" />"
+            + "<Widget Id=\"rest\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "</Row></UiPage>";
+
+        UiLayoutSnapshot longDescription = Arrange(ModeRow("ab", "WWWWWWWWWWWW"), 400f, 600f).Snapshot;
+        Check(Near(longDescription.RectById["mode"].width, 16f),
+            "a mode-row's Auto width does not include a description: title 'ab' measures 16px while the"
+            + " 12-character description would measure 96px");
+
+        UiLayoutSnapshot shortDescription = Arrange(ModeRow("ab", "WW"), 400f, 600f).Snapshot;
+        Check(Near(shortDescription.RectById["mode"].width, longDescription.RectById["mode"].width),
+            "changing only the description leaves the Auto width untouched");
+
+        UiLayoutSnapshot longerTitle = Arrange(ModeRow("abcd", "WWWWWWWWWWWW"), 400f, 600f).Snapshot;
+        Check(Near(longerTitle.RectById["mode"].width, 32f),
+            "and a longer title still widens the same element (16 -> 32), so the pin above is a measurement"
+            + " and not the unmeasurable-Auto fallback");
     }
 
     // A1 (0.7): the Row Auto fallback. Before the fix an unmeasurable Auto child was floored to a

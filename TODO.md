@@ -26,28 +26,56 @@ authority. Two statements in `MEMORY.md` that granted that file a protocol role 
 ## 0.7.x line — placement/alignment change plan (2026-09-18)
 
 Second amendment **inside 0.7.x**: the contract axis stays `0.7.0` and the consumer range stays
-`[0.7.0,0.8.0)`, because this line has never shipped and nothing is consumer-compiled against it. Live
-plan, one home: `docs/development/0.7/10-change-plan.md`. It closes `docs/architecture.md` §3.2/§6.3's
-**alignment** gap and half of the **relation** gap, with CP-0 as a prerequisite.
+`[0.7.0,0.8.0)`. The original 2026-09-18 reason — "never shipped, nothing consumer-compiled against it" —
+was **spent on 2026-09-19**, when the local consumer pinned `[0.7.0,0.8.0)` and compiled against the sibling
+carrier; the maintainer re-ruled that the work stays inside `0.7.0` as coordinated in-flight development,
+and that ruling **lapses** the moment a consumer is remote or the line is published (`MEMORY.md`, top entry;
+the plan §9 log). Live plan, one home: `docs/development/0.7/10-change-plan.md`. It closes
+`docs/architecture.md` §3.2/§6.3's **alignment** gap and half of the **relation** gap, with CP-0 as a
+prerequisite.
 
 - [x] **Batch 1 landed 2026-09-19** — CP-0, CP-1, CP-2 and CP-6①③④ implemented, two new lanes,
       42 expectations re-pinned (all classified as the accepted break, none relaxed), gates 9/9.
       Recorded in `MEMORY.md` and in the contract under "Batch 1".
-- [ ] **Delivery to the local consumer** — stage `dist/dev/FerriteLib/` (`-PackDev`), hand the consumer the
-      migration list in `docs/consumers/consume-from-0.7.0.md` §4b, and let it compile against
-      `[0.7.0,0.8.0)`. The four in-game checks in `docs/development/0.7/README.md` remain the
+- [ ] **Delivery to the local consumer** — the carrier is `1.6/Assemblies/FerriteLib.UiKit.dll` and the
+      sibling reads that path directly, so delivery is a **Release rebuild from the committed HEAD**
+      (`dotnet build … -c Release --no-incremental`), **not** `-PackDev` — the dev channel writes Dev bytes to
+      the same OutputPath and is the B1 carrier-configuration trap fixed on 2026-09-19 (`MEMORY.md`, "A
+      sibling-HintPath consumer reads …"). Hand the consumer the migration list in
+      `docs/consumers/consume-from-0.7.0.md` §4b and let it
+      compile against `[0.7.0,0.8.0)`. The four in-game checks in `docs/development/0.7/README.md` remain the
       maintainer's/operator's; they are the only thing that can lift the harness-only evidence boundary.
+- [ ] **Refresh `consume-from-0.7.0.md` §1's dev-artifact identity, or drop the identity block.** It quotes
+      `version.txt commit=88095fb3cbed` and a DLL SHA-256 that match neither the tree nor the staged folder
+      (measured 2026-09-20: `dist/dev/FerriteLib/version.txt` reads `commit=d82a3ca8db83`). §1 is the
+      consumer's first table, so a stale identity there is the one place it is read as current; the delivery
+      path this line actually uses is the **Release carrier**, not the dev folder. Refresh it the next time a
+      dev package is genuinely staged, or replace the row with the carrier + gates commands.
 - [ ] **Batch 2 (after the live feedback)** — CP-3 (skin-source axis) → CP-6② (role→surface mapping as
       data; blocked by CP-3) → CP-5 (regional scope), plus CP-7 (sibling-relative placement) if the feedback
       asks for it. Additive today and cited by nothing; the live pass is what would supply the citation.
 - [ ] **Batch 2 also owns the consumer's own list** (`modding_documents/team-mode/us-to-fl-2026-09-19-zh.md`,
       evaluated in `fl-to-us-2026-09-19-zh.md`): B2② `WideHidden`; B5 `WidthKey` (blocked on the consumer
       committing its citation); B6 the chrome action slot; B7 `input/text-field` (passes the kind gate);
-      B8's vocabulary half (`Description1..8` out of the schema — B8's label-set half is a defect and comes
-      first); B9 refused for this line; B10 text alignment as a **layout** attribute, not an appearance axis;
-      B11 the L1 orphan-name check, for which B8 is the first positive control.
+      B8's **vocabulary** half (`Description1..8` out of the schema, or a drawing path — maintainer ruling
+      owed; the **label-set** half, the pixel-moving defect, landed 2026-09-20 as a fix, `MEMORY.md`); B9
+      refused for this line; B10 text alignment as a **layout** attribute, not an appearance axis; B11 the L1
+      orphan-name check, for which B8 is the first positive control.
       All of it stays inside `0.7.0` under the 2026-09-19 coordinated-development ruling, each item with its
       own contract amendment and lane.
+      **Bucket classification is mandatory for every US→FL item** (maintainer policy directive 2026-09-20,
+      `MEMORY.md`): (A) US misuse / US's own job — fix on the consumer tree, file no request; (B) a genuine FL
+      gap, which must be a **general** capability, symmetric with an existing one or a funnel primitive, and
+      useful to a consumer that is not US. Buckets: B2②/B5/B6/B7/B10/B11 = (B) general, all non-blocking
+      (B7 strongest); B9 = (A) US's own kind; B8's label-set half = defect (landed), its vocabulary half = a
+      **shrinkage** of a general kind's vocabulary, maintainer's call. The consumer's diagnostics-lane
+      `diag-nav-col` report is **(A)**: `Width="Auto"` was documented as the label set's natural text width
+      and the 1px collapse was never a contract, so US fixed it with the existing general `VisibleKey` and it
+      produces **no FL work item and no version consequence**.
+- [ ] **Which Batch 2 item to start is a maintainer pick, not a session's (2026-09-19, unruled).** B7
+      `input/text-field` is the strongest on the kind gate; B5 waits on the consumer committing its citation;
+      B8's vocabulary half is the ruling that also unblocks B11's first positive control. Whichever is chosen
+      owes its own contract amendment **before** code, a failure-sensitive lane, and the consumer-guide line.
 - [x] D1–D7 — all seven Step-1/Batch-1 decisions settled; see the plan §0b for what each was settled as.
 
 ## 0.7.x round — implemented, external acceptance open (2026-09-17)
@@ -157,6 +185,13 @@ not design work.
       the refile already recorded here, and none of those lines moved — see `MEMORY.md`, "A report-only
       item with no delivery channel is not queued, it is lost". What stays open on this axis is only (b),
       the lib-release link in US's release body, which waits on this repo's own `v0.3.0` cut.
+
+- [ ] **Cross-repo report owed to US: the lib-release link in its release body — unblocked 2026-09-10,
+      still undelivered.** The original blocker ("this repo has published no 0.3.0 asset") is gone
+      (`v0.3.0-rc1` was cut that day; `v0.4.0-rc1` followed), so this is now a plain report and no longer
+      waits on this repo. The link target is whatever lib release the consumer's own pin was compiled
+      against, so the US side picks it — report, never edit its tree. Deliver it actively at the next
+      handoff: the round-3 lesson is that a report-only item with no delivery channel is lost.
 
 ## 1. In-game verification — the round-3 package makes this the next thing to do (2026-09-09)
 
@@ -579,6 +614,13 @@ identity is created locally at upload time.
       shared-OutputPath hazard `MEMORY.md` records and the `--no-incremental` workaround with it. It is not
       free: US's `scripts/build-dev.ps1` drives `-c Dev` on this project, so the change lands in a round
       with its migration, not in a packaging cleanup.
+- [ ] **Maintainer ruling owed: should "Release rebuild + PDB removal" become a script step?** The delivery
+      order is manual today and lives in prose (`MEMORY.md`, the sibling-HintPath bullet): commit → gates →
+      harness → `dotnet build -c Release --no-incremental` → `Remove-Item 1.6/Assemblies/FerriteLib.UiKit.pdb`.
+      A step in `verify-local`/`stage-package` would make the last artifact deterministic for a
+      sibling-HintPath consumer instead of relying on the operator, but it also changes what the dev channel
+      means (gate 2 is the Dev build, so a script step placed wrong would ship Dev bytes). Escalated
+      2026-09-19; not a session's call.
 
 - [x] **Pre-push privacy scan: the identity vector was a gate bug, not a leak (ruled and fixed
       2026-09-10).** The 2026-09-09 reopening said `Fe <19252128+Coahuilite@…>` on the PR #1 merge commit had

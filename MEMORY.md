@@ -2,6 +2,27 @@
 
 ## Current durable state
 
+- **Maintainer policy directive — every US→FL item is classified before it can become work (2026-09-20).**
+  Two buckets, exactly one per item, and the classification must be written down wherever the item is
+  recorded. **(A) US misuse / US's own job:** the consumer relied on incidental behaviour FL never contracted,
+  or the need is satisfiable on the tree with its own widget kinds — fix it consumer-side and **file no
+  request**. **(B) A genuine FL gap:** and then it must be a **general** capability — neutral, symmetric with
+  an existing general property or a primitive already in the funnel, and useful to a consumer that is not US;
+  a bespoke feature only one consumer would ever use stays a consumer kind, and when a (B) item needs new
+  public surface the escalation **must carry the generality argument explicitly**. The triage of the current
+  list, derived from FL's own dispositions: **B2② `WideHidden`, B5 `WidthKey`, B6 chrome action slot,
+  B7 `input/text-field`, B10 alignment, B11 orphan-name check are (B) general and non-blocking** (B7 the
+  strongest — the string sibling of `NumberFieldWidget` over the existing `UiNative.TextField` funnel
+  primitive); **B9 (tree inline child controls) is (A)** — composing a consumer kind is the consumer ladder's
+  first rung; **B8 is a defect, not a request** (label-set half fixed, schema half a maintainer call); and the
+  consumer's diagnostics-lane `diag-nav-col` report is **(A) US misuse** — `Width="Auto"` is documented as
+  the natural text width of a kind's registered label set and the 1px collapse was never a contract, so US
+  fixed it on its own side with the existing general `VisibleKey` plus two mutually exclusive presentations,
+  and it therefore produces **no FL work item and no reason to add surface or raise the minor**. FL's real
+  share of that report was its A1 migration advice, wrong for that shape and already corrected in
+  `docs/consumers/consume-from-0.7.0.md`. Scope: a classification rule and a triage; no surface, tier,
+  version axis or code changed by it.
+
 - **Maintainer ruling — the 0.7.x line continues through the consumer's first live pass (2026-09-19).** The
   local consumer has pinned `[0.7.0,0.8.0)` and compiled against the sibling carrier, so the "an rc that
   never shipped has no goalpost" argument that kept Batch 1 inside `0.7.0` is **spent**. The maintainer ruled
@@ -55,6 +76,24 @@
   **Deferred to batch 2** because they are additive and cite nothing yet: CP-3 (skin-source axis), CP-6②
   (role→surface mapping as data, blocked by CP-3), CP-5 (regional scope) and CP-7 (sibling-relative
   placement). Evidence boundary: harness only.
+
+- **B8's label-set half is fixed on the 0.7.x line (2026-09-20) — a defect fix, so it stays inside `0.7.0`.**
+  The consumer's first live pass reported `input/mode-row`'s `Description1..8` as "in the schema *and* the
+  label set, but never drawn" — transcribed, because a consumer tree is not cloneable here:
+  `Coahuilite/UniversalSqueaker@0a1b7c05c5ce:Source/UniversalSqueaker/UI/Kernel/UsModeRowWidget.cs:59-70,64`
+  (its own four-column mode row, each option carrying a help claim it keeps consumer-side). FL confirmed both
+  halves and split them. The **label set** is now
+  `Title1..8` only, so a `Width="Auto"` mode-row stops measuring text that can never appear — the seam is
+  `UiLayoutEngine.MeasureLabelWidth`, which measures the kind's *declared label set*, while `DrawOption`
+  paints `option.Title` alone. Pinned by a failure-sensitive lane (`KernelLayoutTests`, "A mode-row's Auto
+  width does not include a description (B8)"): **shown red on the pre-fix code** — the lane's three inner
+  checks `FAIL`ed (a 12-character description measured 96px against the title's 16px) while the lane line
+  itself still printed `ok:`, which is F2 — and green after (`HARNESS_EXIT=0`, zero `FAIL` lines, ALL PASS).
+  The **schema** half is deliberately untouched: the four names stay legal attributes and the widget still
+  reads them, so this is not a vocabulary retirement — removing them (or giving them a drawing path) is a
+  maintainer ruling, and the consumer keeps its help claim. Recorded in the line's contract (`docs/development/0.7/05-api-contract.md`,
+  "### B8") and in the consumer guide's fix list; no public type, signature, tier or manifest vocabulary
+  moved. Evidence boundary: harness only, no in-game run.
 
 - **Maintainer ruling — splitting and breaking changes are allowed in this window (2026-09-18).** The
   0.7.x line is in a fast-development phase: nothing has been pushed, nothing is consumer-compiled, and the
@@ -318,7 +357,10 @@
   `verify-local` run**, because gate 2 is the Dev build and gate 3 is the Release build over the same output
   path: Release's `DebugType=none` stops producing a PDB but does not delete one already there. So the
   delivery step's last action is "force a Release rebuild **and** remove the stale PDB", and folding that into
-  a script is a maintainer call rather than a session's.
+  a script is a maintainer call rather than a session's. **The harness is single-run**: two concurrent
+  `dotnet run`s over `tools/FerriteLib.UiKit.Tests` collide on the shared output path and die with `CS2012`
+  (measured 2026-09-19), so a cross-repo round where a sibling's gate rebuilds this project serialises on one
+  engineer for the whole build-and-harness stretch rather than parallelising it.
 
 - **A release asset must be built after the gates run, not during them.** The Dev and Release build
   gates leave `1.6/Assemblies/FerriteLib.UiKit.dll` carrying a `-dev` version suffix, and that is the
@@ -656,7 +698,11 @@
   only UI mod found that carries an explicit `apiVersion`. The lesson worth refusing to skip: **structural
   invitation and contractual support are separate axes, and every precedent found picked one and neglected
   the other.** The 2026-09-10 ruling commits FL to saying both out loud — the README states who may compile
-  against it, and the contributing doc, now owed, states what will not break.
+  against it, and the contributing doc, now owed, states what will not break. The wording rule that rides
+  that ruling, so no copy drifts into an over-claim: the use surface is **compile-your-own-DLL-free**, never
+  "code-free" — a page still needs a small C# host that injects the bindings, translation and theme instance,
+  because RimWorld has no data-driven window opening, so roughly twenty lines of bootstrap assembly are the
+  structural floor the style work narrows but cannot remove.
 
 - **What the industry converges on, transcribed (surveyed 2026-09-10 against Unity UXML/USS, WPF/MAUI/WinUI
   XAML, Android XML plus Compose, Godot scenes, Flutter, SwiftUI/UIKit, RmlUi and RimWorld Defs — external

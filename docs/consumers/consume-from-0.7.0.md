@@ -45,7 +45,7 @@ appropriate minor.
   `UiContractException` at host creation and at reload-candidate validation instead of a `FormatException`
   at arrange time; `Cols`/`NarrowCols` on a non-`Wrap` container are refused at creation (they never did
   anything there — remove the attribute or switch to `wrap`).
-- **Three behavior fixes**: a Row child with `Width="Auto"` that cannot be label-measured now shares space
+- **Four behavior fixes**: a Row child with `Width="Auto"` that cannot be label-measured now shares space
   like an unsized child instead of collapsing to a 1-unit stub;
   **the migration for that one, stated properly because the obvious advice is wrong** — if what you relied on
   was not the stub but the fact that *the same element behaves differently in the two container shapes*
@@ -55,8 +55,12 @@ appropriate minor.
   narrow, each visible under its own binding. A narrow-only *child* has no single-attribute form today; that
   gap is registered as `WideHidden` (symmetric with the existing `NarrowHidden`) and is not in this line;
   a dropdown shows the option whose **value**
-  equals the bound value even when an earlier option's display text matched; and a dropdown whose options
-  key was registered as a value (`BindReadOnly<IReadOnlyList<T>>`) says so and names `BindOptions<T>`.
+  equals the bound value even when an earlier option's display text matched; a dropdown whose options
+  key was registered as a value (`BindReadOnly<IReadOnlyList<T>>`) says so and names `BindOptions<T>`;
+  and a `input/mode-row` with `Width="Auto"` now measures its **titles only** — `Description1..8` stay legal
+  attributes that still create, but they left the kind's *label set* (never its schema) because nothing draws
+  them, so they no longer widen the column. If an Auto mode-row was relying on a description for its width,
+  declare the width explicitly.
   Migration detail for each: `docs/development/0.7/05-api-contract.md`.
 
 ## 4. The recommended way to author a settings page

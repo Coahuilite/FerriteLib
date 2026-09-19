@@ -32,10 +32,13 @@ public sealed class InputModeRowWidget : IUiWidget
                 "Value5", "Title5", "Description5", "Value6", "Title6", "Description6",
                 "Value7", "Title7", "Description7", "Value8", "Title8", "Description8"
             },
+            // The label set is what Width="Auto" measures (UiLayoutEngine.MeasureLabelWidth), and the only
+            // text this kind ever paints is an option's Title (DrawOption). Keeping Description1..8 here made
+            // an Auto column measure text that is never drawn, which moved pixels (B8); the set is titles
+            // only. The schema above still declares the description names, so a manifest may write them -
+            // removing them from the vocabulary is a separate, maintainer-decided step.
             new[] {
-                "Title1", "Description1", "Title2", "Description2", "Title3", "Description3",
-                "Title4", "Description4", "Title5", "Description5", "Title6", "Description6",
-                "Title7", "Description7", "Title8", "Description8"
+                "Title1", "Title2", "Title3", "Title4", "Title5", "Title6", "Title7", "Title8"
             });
     }
 
