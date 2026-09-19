@@ -23,14 +23,16 @@ authority. Two statements in `MEMORY.md` that granted that file a protocol role 
       and choosing what leaves the only volatile ledger is the maintainer's call. Not started by this
       update: this update is rules and documents only.
 
-## 0.8 candidate — placement/alignment change plan (2026-09-18)
+## 0.7.x line — placement/alignment change plan (2026-09-18)
 
-Live plan, one home: `docs/development/0.8/10-change-plan.md`. It closes `docs/architecture.md` §3.2/§6.3's
-**alignment** gap and half of the **relation** gap, with CP-0 as a prerequisite. Nothing is implemented;
-the version axis is a candidate and opening the round is the maintainer's call.
+Second amendment **inside 0.7.x**: the contract axis stays `0.7.0` and the consumer range stays
+`[0.7.0,0.8.0)`, because this line has never shipped and nothing is consumer-compiled against it. Live
+plan, one home: `docs/development/0.7/10-change-plan.md`. It closes `docs/architecture.md` §3.2/§6.3's
+**alignment** gap and half of the **relation** gap, with CP-0 as a prerequisite.
 
 - [ ] CP-0 — `ParsePadding`/`ReadGap` fall back to the theme's geometry tokens (breaking; documented migration).
-- [ ] CP-1 — placement vocabulary (`AlignX`/`OffsetX`/`AlignY`/`OffsetY`) inside a placement container.
+- [ ] CP-1 — placement vocabulary (`AlignX`/`OffsetX`/`AlignY`/`OffsetY`) inside a placement container;
+      carries the round-README amendment in the same commit.
 - [ ] CP-2 — cross-axis alignment in flow containers.
 - [ ] D1–D4 — the four open decisions listed in the plan.
 

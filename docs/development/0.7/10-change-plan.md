@@ -1,4 +1,4 @@
-# Change plan — placement and alignment (0.8 candidate)
+# Change plan — placement and alignment (0.7.x line)
 
 > **Status: a live plan, nothing implemented.** This file is the single home for the plan opened on
 > 2026-09-18; later discussion edits it in place — add, remove, amend items — rather than opening another
@@ -6,8 +6,14 @@
 > in `docs/architecture.md`. Every item below is `proposed` until it has a contract entry and a lane, and
 > no line here may be read as implemented or verified.
 >
-> The version axis is a **candidate**: new manifest vocabulary is a public addition, a pre-1.0 minor, which
-> points at `0.8.0` — but opening a round is the maintainer's call, not this document's.
+> **Version axis — settled (maintainer ruling 2026-09-18): the 0.7.x line, no minor move.** New manifest
+> vocabulary is a public addition, which normally moves the pre-1.0 minor, but the rule that decides it is
+> the one already written down: *an rc that never shipped has no goalpost to move* (`MEMORY.md`, the
+> 0.4.0 → 0.3.0 refile). Nothing is consumer-compiled against `[0.7.0,0.8.0)` and no package has been handed
+> over, so the axis stays `0.7.0` and the consumer range stays `[0.7.0,0.8.0)`. This work is recorded as a
+> **second amendment** to the line's contract before it ships — the `UiTheme.Vanilla` amendment is the
+> precedent. The contrast is the `0.5.0 → 0.6.0` move, which turned on a delivery fact ("the 0.5.0 dev
+> package and its `[0.5.0,0.6.0)` handoff were delivered"), not on the number being unreleased.
 
 ## 0. What this closes, and what it does not
 
@@ -145,8 +151,13 @@ classes lie.
 | Appearance | — | **none** — alignment is a relation, not a look; no token, so no closure debt | 0 |
 | Tests | a new lane + `KernelLayoutTests` | §6 | ~200 lines |
 | Gate | `Program.cs` | lane registration (the existing lane forces it) | 2 lines |
-| Docs | `05-api-contract.md` first, then `docs/architecture.md` §3.2/§6.3, the consumer guide, `MEMORY.md`, `TODO.md` | contract before code, the 0.7 precedent | — |
-| Version | `FerriteLibVersion.Api`, `About/About.xml`, csproj | minor: `0.8.0`, consumer range `[0.8.0,0.9.0)` | — |
+| Docs | `05-api-contract.md` (second amendment, before it ships), then `docs/architecture.md` §3.2/§6.3, the consumer guide, `MEMORY.md`, `TODO.md` | contract before code, the 0.7 precedent | — |
+| Version | — | **no move**: the axis stays `0.7.0` and the consumer range stays `[0.7.0,0.8.0)`; the vocabulary is a second amendment to `05-api-contract.md`, recorded before it ships | 0 |
+
+**Obligation on the round's own records.** `docs/development/0.7/README.md` states that "no public
+type, kind or XML vocabulary was added or removed on this line". CP-1 makes that sentence false, so the
+README's statement and its package table take this line's second amendment in the same commit as CP-1.
+Recorded here now so the sentence is not discovered as stale after the fact.
 
 ## 6. Verification plan
 
@@ -179,3 +190,4 @@ per-part style keys, and the L1 closure lane.
 | Date | Item | Change |
 |---|---|---|
 | 2026-09-18 | — | plan opened from the placement/alignment discussion; CP-0/CP-1/CP-2 `proposed`, nothing implemented |
+| 2026-09-18 | CP-0..CP-2 | **version axis settled**: the work stays on the 0.7.x line (no minor move; range stays `[0.7.0,0.8.0)`), because the line has never shipped and nothing is consumer-compiled against it. The plan moved from `docs/development/0.8/` to `docs/development/0.7/10-change-plan.md`, and the round-README amendment became an obligation of CP-1 |

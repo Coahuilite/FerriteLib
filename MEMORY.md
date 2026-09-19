@@ -2,6 +2,20 @@
 
 ## Current durable state
 
+- **Maintainer ruling — the placement/alignment work stays on the 0.7.x line (2026-09-18).** New
+  manifest vocabulary (the placement vocabulary planned in `docs/development/0.7/10-change-plan.md`) is a
+  public addition, which normally moves the pre-1.0 minor. The maintainer kept the contract axis at
+  **0.7.0** and the consumer range at `[0.7.0,0.8.0)`, on the rule this ledger already carries: **an rc
+  that never shipped has no goalpost to move** (the 2026-09-09 0.4.0 → 0.3.0 refile). What distinguishes it
+  from the `0.5.0 → 0.6.0` move is the delivery fact that ruling named: there the dev package and its
+  handoff had been delivered, while 0.7.0 has been neither published nor compiled against by anyone.
+  Consequences: the vocabulary is a **second amendment** to `docs/development/0.7/05-api-contract.md`
+  recorded before it ships; `docs/development/0.7/README.md`'s "no public type, kind or XML vocabulary was
+  added on this line" sentence is amended with it (recorded as an obligation of CP-1); and the plan moved
+  from `docs/development/0.8/` to `docs/development/0.7/`. Scope of this update: a version-axis and
+  document ruling only — no source, manifest vocabulary, API tier, payload or release was changed, and
+  nothing in the plan is implemented.
+
 - **Maintainer ruling — the memory protocol is repaired and handoff is demoted (2026-09-18).** The
   protocol is four files: `AGENTS.md` (stable), `MEMORY.md` (the only volatile ledger), `TODO.md`
   (action surface) and `OBLIVIONIS.md` (cold archive; created by this ruling and **empty by design** —
