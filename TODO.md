@@ -40,6 +40,14 @@ plan, one home: `docs/development/0.7/10-change-plan.md`. It closes `docs/archit
 - [ ] **Batch 2 (after the live feedback)** — CP-3 (skin-source axis) → CP-6② (role→surface mapping as
       data; blocked by CP-3) → CP-5 (regional scope), plus CP-7 (sibling-relative placement) if the feedback
       asks for it. Additive today and cited by nothing; the live pass is what would supply the citation.
+- [ ] **Batch 2 also owns the consumer's own list** (`modding_documents/team-mode/us-to-fl-2026-09-19-zh.md`,
+      evaluated in `fl-to-us-2026-09-19-zh.md`): B2② `WideHidden`; B5 `WidthKey` (blocked on the consumer
+      committing its citation); B6 the chrome action slot; B7 `input/text-field` (passes the kind gate);
+      B8's vocabulary half (`Description1..8` out of the schema — B8's label-set half is a defect and comes
+      first); B9 refused for this line; B10 text alignment as a **layout** attribute, not an appearance axis;
+      B11 the L1 orphan-name check, for which B8 is the first positive control.
+      All of it stays inside `0.7.0` under the 2026-09-19 coordinated-development ruling, each item with its
+      own contract amendment and lane.
 - [x] D1–D7 — all seven Step-1/Batch-1 decisions settled; see the plan §0b for what each was settled as.
 
 ## 0.7.x round — implemented, external acceptance open (2026-09-17)

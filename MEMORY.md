@@ -2,6 +2,18 @@
 
 ## Current durable state
 
+- **Maintainer ruling — the 0.7.x line continues through the consumer's first live pass (2026-09-19).** The
+  local consumer has pinned `[0.7.0,0.8.0)` and compiled against the sibling carrier, so the "an rc that
+  never shipped has no goalpost" argument that kept Batch 1 inside `0.7.0` is **spent**. The maintainer ruled
+  anyway that further public surface and fixes stay inside `0.7.0`, treating this stage as **coordinated
+  in-flight development**: the pin is a *range*, so growth under `0.7.0` does not invalidate it, and the
+  consumer is local, in the loop, and can absorb one recompile per carrier. **What this ruling does not do:**
+  it does not declare the surface stable, does not waive the contract amendment or the lane that each item
+  owes, and does not move any tier. **It lapses** the moment a consumer is remote or the line is published —
+  then the normal pre-1.0 rule applies again (any addition bumps the minor), which is the reading the
+  `0.5.0 → 0.6.0` precedent established for a delivered number. Scope: a scheduling/axis ruling; no code, no
+  vocabulary and no tier changed by it.
+
 - **Batch 1 of the 0.7.x line landed (2026-09-19) — placement vocabulary, density reach, tone/accent
   tightening.** `已实现 + 已自动化验证` only: no in-game session and no consumer compile. All of it inside
   the one minor, under the 2026-09-18 fast-development ruling, with every break recorded in
