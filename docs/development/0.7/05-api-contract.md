@@ -132,9 +132,11 @@ range `[0.7.0,0.8.0)` do not move.
    did** and writes one `UiStyleFallbackReport` with `Attribute="Tone"`, `Authored` as written, and
    `Resolved` = `"the Active state (deprecated alias; the selected treatment)"` or `"the Disabled state
    (deprecated alias; derived from the bindings)"`. Deduplication is the channel's existing key
-   (element path | kind | attribute | authored), so it is **one note per declaration per page, not one per
-   frame**, and the appearance half is live whether or not `UiFitAudit.Enabled` is set. The attribute *name*
-   stays fail-closed: only the accepted *value* set shrank.
+   (element path | kind | attribute | authored), so it is **one note per runtime element, not one per frame**
+   — a manifest declaration that a collection materialises N times is N elements and therefore N notes
+   (measured: two `Tone="Active"` declarations on distinct element paths record two). The appearance half is
+   live whether or not `UiFitAudit.Enabled` is set. The attribute *name* stays fail-closed: only the
+   accepted *value* set shrank.
 3. **`UiTheme.HoverPoint` is removed** (the type is public-unstable) and replaced by
    **`UiTheme.AccentHover`**. The accent is one stored colour with a derived hover step, and the derivation
    is a **value**, not a promise: `AccentHover` is read-only and recomputed on every read, and each RGB

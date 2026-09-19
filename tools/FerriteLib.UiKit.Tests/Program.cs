@@ -165,6 +165,11 @@ internal static class Program
         failures += KernelToneVocabularyTests.RunAll();
         // ---- Batch 1 / tone - end ------------------------------------------------------------
 
+        // ---- Batch 1 / independent verification (owner: verify) -------------------------------
+        Console.WriteLine("Kernel Batch 1 verification (independent probe: tone, density, placement)...");
+        failures += KernelBatch1VerificationTests.RunAll();
+        // ---- Batch 1 / verify - end ----------------------------------------------------------
+
         Console.WriteLine("Kernel lane registration (every lane file is invoked from Program.cs)...");
         failures += KernelLaneRegistrationTests.RunAll();
     }

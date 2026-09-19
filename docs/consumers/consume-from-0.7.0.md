@@ -63,7 +63,7 @@ review, one is a page edit, one is a member swap.
 | Change | What you do |
 |---|---|
 | Container `Padding`/`Gap` now default to the theme's geometry (`6`) instead of 0 | Review every page's spacing. Add `Padding="0"` / `Gap="0"` where you want the previous result exactly. |
-| `Tone` accepts only `Neutral`/`Success`/`Warning`/`Danger` | If a page wrote `Tone="Active"` or `Tone="Disabled"`, express the **state** instead: a read-only value binding for disabled, the control's own selected state for active. Both old names still work **for this minor only** and are refused at the next minor boundary (0.8). The only observable consequence today is **one appearance record per declaration per page** — the rendered treatment is unchanged. |
+| `Tone` accepts only `Neutral`/`Success`/`Warning`/`Danger` | If a page wrote `Tone="Active"` or `Tone="Disabled"`, express the **state** instead: a read-only value binding for disabled, the control's own selected state for active. Both old names still work **for this minor only** and are refused at the next minor boundary (0.8). The only observable consequence today is **one appearance record per runtime element** (a collection row is its own element) — never one per frame, and the rendered treatment is unchanged. |
 | `UiTheme.HoverPoint` removed, replaced by `UiTheme.AccentHover` | Read `UiTheme.AccentHover` (read-only, derived from `AccentGold`). A scheme that declared `HoverPoint` now reports it as an unknown token instead of applying it. |
 | New: `AlignX`/`OffsetX`/`AlignY`/`OffsetY` | Optional, no migration. Inside an `Overlay` they place a child by an edge or the centre plus a percentage of the parent's usable width; a flow container's child gets its cross axis with a pixel nudge only. |
 

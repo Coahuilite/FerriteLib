@@ -23,6 +23,23 @@
   `KernelToneVocabularyTests`) and **42 existing expectations moved, every one classified**: all were
   fixture pins of the accepted break (`Padding="0"`/`Gap="0"` with the number kept exactly); none was
   relaxed, deleted or re-toleranced, and the reviewers' red-first artifacts are under `dist/`. Gates 9/9.
+  **Independent verification (2026-09-19).** A verifier who wrote none of it produced its own lane, own
+  fixtures and own arithmetic — 18 probes, `已自动化验证`, not a replay of the authors' assertions. All
+  confirmed, including the ones that matter most: the deprecation note is per runtime element and not per
+  frame, the `Disabled` redirect really lands on the data-derived state, `Padding="0"`/`Gap="0"` reproduces
+  the pre-batch result to the float, a density-scoped container resolves the **same** pad in the measure half
+  and the draw half, all fourteen refusals are located, and content exceeding the arranged rect really does
+  arrive as a `UiOverflowReport` on the named `Height` axis of the fit audit.
+  It found one documentation defect (**F1**: `docs/architecture.md` still asserted "no alignment property of
+  any kind" and "density cannot reach the layout layer"; both corrected in this same work, which the plan's
+  change surface already named), one pre-existing lane-print convention that is **not** a Batch 1 defect
+  (**F2**: a lane prints `ok:` for a test whose inner checks failed), and one wrong sentence of the Lead's —
+  the deprecation note is **per runtime element**, not per manifest declaration, so a collection
+  materialising one declaration N times records N notes; the contract and the consumer guide were amended.
+  **Declared unverified rather than glossed:** a cross-build A/B against the pre-batch binary; pass
+  instrumentation for "no solver and no second pass"; an independent re-probe of the tone attribute-*name*
+  gate and of role non-inheritance; "refused at the next minor" (future by construction); a re-enumeration of
+  `UiStatusTone`'s six members; and in-game/consumer acceptance.
   **Deferred to batch 2** because they are additive and cite nothing yet: CP-3 (skin-source axis), CP-6②
   (role→surface mapping as data, blocked by CP-3), CP-5 (regional scope) and CP-7 (sibling-relative
   placement). Evidence boundary: harness only.

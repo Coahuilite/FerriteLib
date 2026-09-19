@@ -65,7 +65,7 @@ per arranged element (`UiNodeId`, `UiNode`). *(read)*
   private lists, and `KernelRepeatTests` reflects the originals so the copies cannot drift. It is a
   known duplication with a guard, not a hole. *(read)*
 
-### 3.2 Layout — answered for flow, silent about relations
+### 3.2 Layout — flow, plus parent-relative placement since Batch 1
 
 **Who answers.** Container kinds plus a fixed attribute set: `Gap`, `Padding`, `Height`, `Width`, `Fill`,
 `MinWidth`, `MaxWidth`, `Breakpoint`, `Narrow`, `Cols`, `NarrowCols`, `NarrowHidden`, with `Title`/`TitleKey`
@@ -73,15 +73,26 @@ for bands. Responsiveness is real and is **container-scoped**: `Breakpoint` is m
 container's own inner width (`UiLayoutEngine.cs:966-982`), and `Narrow` can swap a `Row` for a
 `Column` (:984-1005). *(read + measured)*
 
-**Complete?** For "where does it go" in a flow: yes. For "what is the spatial relation": no.
+**Complete?** For "where does it go" in a flow: yes. For "what is the spatial relation": **partly** —
+parent-relative placement landed in Batch 1; sibling-relative did not.
 
-**The gap.** There is no alignment property of any kind, and no relation between named elements. The only
-explicit relation in the library is hand-written in C#: `UiPopup.RectFor` places a popup below its
-anchor, flips it above when it does not fit, and clamps it into the viewport — with `OptionHeight = 24f`
-as a constant beside it (`UiPopup.cs:19,28`). Relations are expressible today only as *consequences of
-flow*: a fixed bottom edge is what a `Fill` sibling leaves behind, and horizontal centring is achieved
-with two equal flex spacers. Both were used in the measurement and both work; neither is a declaration.
-*(measured — see §4.3)*
+**Batch 1 closed the alignment half, and half of the relation half.** Four manifest attribute names —
+`AlignX`, `OffsetX`, `AlignY`, `OffsetY` — drive one parent-relative rule in `UiPlacement.cs`:
+`origin + fraction * (parentSpan - selfSpan) + offset`, one expression for both axes, no solver and no second
+arrangement pass. They are valid in a placement container (`Overlay`) and, for a flow container's child, on
+the cross axis with a pixel nudge only, with ten creation-time refusals. Two boundaries are stated in the
+contract: validation reads the **declared** kind while the engine reads the **effective** one, so a `Narrow`
+direction swap can leave a placement inert; and a template root refuses all four names because the collection
+element owns the generated row's slot. Container `Padding`/`Gap` also now fall back to `UiTheme.Geometry`
+when the attribute is absent, so **density reaches the layout layer** at container granularity (an explicit
+attribute still wins). *(read + measured — §4 and the Batch 1 section of the 0.7 contract)*
+
+**Still missing.** A relation to a **named sibling** (registered as CP-7: "below the title band" when the
+title is not the previous flow sibling). It needs element references, an ordering discipline and cycle
+refusal — none of which the parent-relative rule above requires, which is exactly why it is a separate item
+and not this one. The one remaining hand-written relation in C# is still `UiPopup.RectFor` (below/above,
+viewport flip and clamp) beside `OptionHeight = 24f`; and *text* alignment is still a `TextAnchor` literal
+inside each widget, so "which side is this text on" is still answered by Appearance.
 
 **Text alignment is not owned here either.** It is a `TextAnchor` literal inside each widget
 (`ButtonWidget.cs:113`, `DropdownWidget.cs:85`, …), so "which side is this text on" is answered
@@ -287,9 +298,9 @@ observations: none of them is a proposal, and a row becomes work only when a mai
 
 | Missing | Evidence | What it blocks |
 |---|---|---|
-| Alignment: none | no `Align`/`Justify`/`Margin` name exists in the engine at all; text alignment is a `TextAnchor` literal inside each widget (`ButtonWidget.cs:113`) | "Which side is this on" is answered by Appearance or by nobody |
-| Relations: none | no anchor, no named-sibling reference, no distance-from-edge. The only real relation is hand-written: `UiPopup.RectFor` (below/above, viewport flip and clamp) beside the constant `OptionHeight = 24f` (`UiPopup.cs:19,28`) | Experiment 3's centring and bottom edge are *idioms* — two equal spacers, a `Fill` sibling that ate the rest — not declarations |
-| Density cannot reach the layout layer | `UiLayoutEngine.cs` never reads `theme.Geometry` (zero references); container `Padding`/`Gap` are XML-only with a default of zero (`ParsePadding` → `Padding.Zero`, `ReadGap` → `0f`), while every density token is consumed **inside widget code** (`Geometry.Padding`/`Gap`/`Spacing`/`RowHeight` across the core atoms) | A theme change moves what happens *inside* a control but not the *relationships between* containers: the page's rhythm is frozen in XML. Also no per-part inset |
+| **Closed by Batch 1** — alignment and density reach | `UiPlacement.cs` supplies parent-relative placement on both axes (valid in `Overlay`, and on a flow child's cross axis with a pixel nudge); `ParsePadding`/`ReadGap` fall back to `UiTheme.Geometry` when the attribute is absent, and both the measure path and the draw-side title rect resolve identically | Nothing. Kept in the table so the reader sees the gap close rather than a row quietly disappearing |
+| Relations: parent-only | no reference to a **named sibling**, so "below the title band" works only when the title is the previous flow sibling. The one hand-written relation is `UiPopup.RectFor` (below/above, viewport flip, clamp) beside `OptionHeight = 24f` (`UiPopup.cs:19,28`); text alignment is a `TextAnchor` literal inside each widget (`ButtonWidget.cs:113`) | Registered as CP-7: it needs element references, an ordering discipline and cycle refusal, which parent-relative placement deliberately does not |
+| Per-part geometry insets | the density bundle is still one global five-tuple (`UiGeometry{Padding,Spacing,Gap,RowHeight,Hairline}`) | A *part* of a control cannot carry its own inset; a control's internal spacing is still its own code reading the global bundle |
 | Responsiveness: one dimension | one `Breakpoint` per container, one `Narrow` replacement kind, `Cols`/`NarrowCols`, `NarrowHidden` | No named breakpoints shared by a page, no multi-step variants, no per-element variant table |
 
 **Semantics**
