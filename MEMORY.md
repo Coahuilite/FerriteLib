@@ -2,6 +2,56 @@
 
 ## Current durable state
 
+- **P1-B closed 2026-09-20 (task-18) as evidence, not as new work: four of the ledger's five items were already
+  fixed on the 0.7 line, and the fifth is REJECTED with its argument.** The acceptance form was "revert the fix,
+  watch the named lane redden, restore" — the only red-first evidence available for a defect that is already
+  closed — and it was done for all four in **one** mutated build so each lane's red is attributable by assertion
+  name (`dist/p1b-verify/harness-red-baseline.txt`: HARNESS_EXIT=1, 20 `FAIL` lines; after reverting,
+  `harness-green.txt`: HARNESS_EXIT=0, 0 FAIL, ALL PASS, 2573 ok).
+  - **X-21 (dropdown display order) — FIXED at `c8fe06e` (A4)**; lane `KernelCoreWidgetTests` "Dropdown exact
+    value wins over display-text fallback (A4)", and the ledger's exact case is already its FIRST check
+    (`KernelCoreWidgetTests.cs:143`): `Option1="b" Value1="a" Option2="Second" Value2="b"` with current `b` must
+    display "Second". Reverting `FindDisplayText` to the single-pass "value OR text" test reddens it with
+    "the required case: a later exact value beats an earlier text collision" (+ the lane-level line). Two passes
+    (all values, then all texts) is the shipped shape.
+    **Not strengthened, deliberately:** a symmetric case where an earlier VALUE collides and a later TEXT matches
+    is not discriminating — the value pass is a superset of the old test, so both implementations answer
+    identically; adding it would be a second copy of the same proof, which is what "one lane" is for.
+  - **FL-3 (Row Auto silently collapsing) — FIXED at `21a81cd` (A1)**; lane `KernelLayoutTests`
+    "Row Auto child that cannot be measured falls back to unsized (A1)" (`VerifyRowAutoFallbackToFlex`).
+    Reverting `ResolveColumnWidths` to the pre-A1 `Math.Max(1f, natural)` stub reddens five assertions,
+    beginning with "unmeasurable Auto shares the remaining space with the omitted-Width sibling, no 1-unit stub".
+    The ledger's condition ("no positive MinWidth and no measurable label") is exactly the lane's first two cases.
+  - **FL-1 (Height had no creation-time validation) — FIXED at `e30af94` (A2)**; lane `KernelLayoutTests`
+    "Height is validated at creation, not at arrange (A2)" (`VerifyHeightValidation`). **The ledger's V1
+    question is now measured, not reasoned:** I added the reported spelling `Height="Fill"` as two cases (widget
+    and container) and ran them — both are refused **at creation** with a located `UiContractException`
+    ("widget Height=\"Fill\" (FL-1's reported value) — rejected at creation"), and the lane's helper fails if
+    anything but a `UiContractException` escapes, so the old arrange-time `FormatException` shape is excluded by
+    construction. Disabling the Height refusal reddens eight assertions including both new ones.
+  - **FL-2 (Cols/NarrowCols inert outside Wrap) — FIXED at `e30af94` (A3)**; lane `KernelLayoutTests`
+    "Cols/NarrowCols are Wrap-only vocabulary (A3)" (`VerifyColsWrapOnly`). Disabling the refusal reddens four
+    assertions, including the located-message check ("the refusal names the attribute, the rule and the element
+    path").
+  - **FL-4 (an unmeasurable `Width="Auto"` returns 0 silently while an unresolvable `VisibleKey` records a note)
+    — REJECTED, with the argument and a citation.** They are not the same class of fact. `VisibleKey` names a key
+    that *should* resolve, so its absence is a page defect and the note is the author's only signal. An
+    unmeasurable Auto is a **documented, supported answer**: A1's contract sentence says such a child "is allocated
+    like an otherwise identical child with no `Width` attribute", i.e. the authored value *did apply* — its answer
+    is "no natural width, take the unsized share". The fit audit's appearance channel exists for authored values
+    that did **not** apply (unknown tone, dropped style token, unresolvable `VisibleKey`), so a note here would
+    fire on legitimate pages and the channel would lose its meaning as a defect signal.
+    **Citation** (the growth rule wants provenance, not a request): a real page used the unmeasurable-Auto path on
+    purpose — `Coahuilite/UniversalSqueaker@0a1b7c05c5ce:Source/UniversalSqueaker/UI/Diagnostics/UsDiagnosticsSpec.cs:64`
+    declares `<Column Id="diag-nav-col" Width="Auto" Gap="4">` under a comment that says "An Auto column so it
+    costs the wide layout one pixel (a 1px rect is skipped by every widget's Draw); below the Breakpoint it takes
+    the full width". That specific idiom was later classified **(A) consumer misuse** in this phase (it depended
+    on the undocumented 1px collapse, and the consumer replaced it with `VisibleKey`), which is *why* this is a
+    rejection rather than a feature: the shape stays legal and documented under A1, and the correct place to
+    record it remains the A1 contract sentence plus the deferred general intrinsic-size seam, not a per-frame
+    warning. If a future consumer asks for "Auto could not measure" as an explicit, opt-in diagnostic, that is a
+    new request with its own citation.
+
 - **Phase order is fixed and P1 gates everything else (maintainer ruling 2026-09-20): P1 seam and library fixes →
   P2 migration and the legacy project's retirement → P3 the full UI/UX reset (last) → P4 new work.** This replaces
   the earlier "wait for one go" framing in `TODO.md`, and it is authoritative: **S3–S7 do not move until P1

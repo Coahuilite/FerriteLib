@@ -49,8 +49,21 @@ moves HEAD and invalidates the consumer's gate green.
       `1.6/Assemblies/` are rehearsals); **FL-12** `api-tiers.md`'s count corrected to **seventeen** with its
       predicate — the LIBRARY's own `Kernel/Widgets/` classes that declare `IUiWidget` (16 until
       `input/text-field`). Docs only: no source, no carrier build.
-- [ ] **P1-B (next)** — the real-defect batch X-21 / FL-3 / FL-1 / FL-2 / FL-4, each with a failure-sensitive lane
-      shown red first; anything judged not to fix gets REJECTED with its argument, never a silent skip.
+- [x] **P1-B closed 2026-09-20 (task-18) — evidence and dispositions, not new code.** Four of the five were
+      already fixed on this line, so the red-first evidence is a mutated build rather than a new lane:
+      **X-21** FIXED `c8fe06e` (A4) — lane `KernelCoreWidgetTests` and the ledger's exact case is its first
+      check (`:143`), reddening as "the required case: a later exact value beats an earlier text collision";
+      **FL-3** FIXED `21a81cd` (A1) — `KernelLayoutTests`' Row-Auto-fallback lane, five assertions red on the
+      pre-A1 1-unit stub; **FL-1** FIXED `e30af94` (A2) — the ledger's V1 spelling `Height="Fill"` is now run
+      for real (widget + container) and refused **at creation** with a located `UiContractException`, and the
+      lane excludes an arrange-time `FormatException` by construction; **FL-2** FIXED `e30af94` (A3) — four
+      assertions red with the refusal disabled. **FL-4 REJECTED** with its argument and a citation: an
+      unmeasurable Auto is A1's *documented* answer (the value applied; it just has no natural width) while an
+      unresolvable `VisibleKey` is a page defect, so a note would fire on legitimate pages — citation
+      `Coahuilite/UniversalSqueaker@0a1b7c05c5ce:…/Diagnostics/UsDiagnosticsSpec.cs:64` (the "Auto column so it
+      costs the wide layout one pixel" nav column, since reclassified (A) and replaced with `VisibleKey`).
+      Evidence: `dist/p1b-verify/harness-red-baseline.txt` (20 FAIL lines, one run) and `harness-green.txt`
+      (ALL PASS, 2573 ok).
 
 - [x] **G1 + G4 landed 2026-09-20** — route (a) approved by the maintainer. G1: the engine-wide
       `HelpKey` on widget elements, claimed on the existing session hover surface (no new member, no new

@@ -646,6 +646,13 @@ internal static class KernelLayoutTests
 
         Reject("<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"tall\" />", "malformed widget Height");
         Reject("<Column Id=\"c\" Height=\"bogus\"><Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" /></Column>", "malformed container Height");
+        // FL-1's reported spelling, run for real rather than reasoned about: before A2 this reached the
+        // arrange, threw a raw FormatException from outside the widget guard (so the failure was
+        // unattributable and could take the frame's page with it), and "Fill" is a plausible-looking word an
+        // author reaches for. Both element shapes are exercised, and the helper fails the lane if anything
+        // other than a UiContractException escapes - which is the regression this pair exists to catch.
+        Reject("<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"Fill\" />", "widget Height=\"Fill\" (FL-1's reported value)");
+        Reject("<Column Id=\"c\" Height=\"Fill\"><Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" /></Column>", "container Height=\"Fill\"");
         Reject("<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"NaN\" />", "NaN Height");
         Reject("<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"Infinity\" />", "infinite Height");
         Reject("<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"-Infinity\" />", "negative-infinite Height");
