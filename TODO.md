@@ -98,7 +98,14 @@ moves HEAD and invalidates the consumer's gate green.
 - [x] **P1-E-2b LANDED 2026-09-20 (task-25)**: **G2** `input/button` `PayloadKey` + **G3**
       `Chrome`+`Height=Auto`. Red evidence: one mutated build, 2 attributable FAIL lines; green after
       (ALL PASS, 2594 ok).
-- [ ] **FL-16 (typed `UiOption` pairs) - OPEN, WITHDRAWN on evidence, not deferred for effort.** The
+- [x] **FL-16 LANDED on the second attempt 2026-09-20 (task-26 step 2)**: typed `UiOption` display/value pairs on
+      `input/dropdown`, the batch's one new public type (`public-unstable`). Order obeyed: the lane was written and
+      seen RED before the type existed (stand-in shape), then type + tier entry + pair path in one commit, then the
+      revert proof on the FINAL lane (pair path removed -> red with `a valid pair-bound page recorded 1
+      diagnostic(s)`; restored -> ALL PASS 2596 ok). The element type is discovered by a NON-reporting probe
+      (`ValidateOptions<T>`) with exactly one authoritative read, so a valid page records nothing. MEMORY keeps the
+      withdrawn-first-attempt record.
+- [ ] **(superseded, kept for the record)** **FL-16 (typed `UiOption` pairs) - OPEN, WITHDRAWN on evidence.** The
       implementation, the public type and its tier entry were written and the suite went green; with the pair
       path reverted to the faithful pre-fix shape the lane stayed GREEN, so all three were removed rather than
       shipped. **Next attempt starts here:** bind the key as a pair list and read it back through the *string*

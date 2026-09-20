@@ -29,6 +29,7 @@ internal static class KernelCoreWidgetTests
         failures += Run("A button command receives the payload its row declares (G2)", VerifyButtonPayload);
         failures += Run("Chrome=\"none\" paints no surface and Auto height measures the content (G3)", VerifyBareHitArea);
         failures += Run("A binding element-type mismatch is reported, not just thrown (FL-23)", VerifyBindingMismatchIsReported);
+        failures += Run("Dynamic options accept typed display/value pairs without reporting (FL-16)", VerifyTypedOptionPairs);
         return failures;
     }
 
@@ -539,6 +540,50 @@ internal static class KernelCoreWidgetTests
     /// the finding, because the next attempt should start from the failure it exposes (the string fallback
     /// accepted a pair-bound key instead of reporting the mismatch) rather than from a fresh guess. See
     /// MEMORY.md and docs/development/0.7/60-capability-dispositions.md for the disposition.
+
+    /// <summary>
+    /// FL-16: a dynamic options list may carry display/value PAIRS, and a page that declares them must create,
+    /// render the display text and record NO diagnostic - an element type the dropdown accepts is not a
+    /// mismatch, which is exactly the line FL-23's reporting makes visible. Run first with a stand-in pair
+    /// type, because the public UiOption does not exist until this lane has been seen red.
+    /// </summary>
+    private static void VerifyTypedOptionPairs()
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+
+        // Rule from FL-23's counter trap: reset, then measure this step's delta.
+        UiFitAudit.Reset();
+
+        var pairs = new List<UiOption> { new UiOption("First", "x"), new UiOption("Second", "y") };
+        var bindings = new UiBindings();
+        string current = "y";
+        bindings.BindValue("choice", () => current, value => current = value);
+        bindings.BindOptions("opts", () => pairs);
+
+        using UiHost host = new(
+            "pairs", UiLayoutManifest.Parse(
+                "<UiPage Schema=\"2\" Source=\"pairs\">"
+                + "<Widget Id=\"dd\" Kind=\"input/dropdown\" Bind=\"choice\" OptionsBind=\"opts\" Height=\"24\" />"
+                + "</UiPage>"),
+            bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        host.MeasureAndArrange(new Vector2(300f, 100f));
+        ClearRecordedLabels();
+        host.DrawFrame(new Rect(0f, 0f, 300f, 100f));
+
+        var texts = (IList)StubField("LabelTexts");
+        bool showsDisplay = false;
+        foreach (object? text in texts)
+        {
+            if (string.Equals(text as string, "Second", StringComparison.Ordinal)) showsDisplay = true;
+        }
+
+        if (!showsDisplay) throw new Exception("the field did not render the pair's display text for its bound value");
+        if (UiFitAudit.StyleFallbackCount != 0)
+        {
+            throw new Exception("a valid pair-bound page recorded " + UiFitAudit.StyleFallbackCount + " diagnostic(s)");
+        }
+    }
 
     /// <summary>
     /// FL-23: reading an options binding as the wrong element type throws today, and that is correct - but

@@ -58,7 +58,24 @@ public sealed class DropdownWidget : IUiWidget
 
         if (spec.TryGetAttribute("OptionsBind", out string optionsKey) && optionsKey.Length > 0)
         {
-            bindings.ValidateOptions<string>(optionsKey, elementPath);
+            // FL-16: strings (display == value) or UiOption pairs. The probe uses ValidateOptions, which is the
+            // NON-reporting shape check - so a page that declared either accepted shape records nothing, and a
+            // page that declared a third type is refused here naming both accepted shapes.
+            if (!TryValidateOptions<UiOption>(bindings, optionsKey, elementPath))
+            {
+                try
+                {
+                    // The historical call stays the diagnosis for everything that is not a pair list: it already
+                    // separates "missing" from "registered as the wrong kind of key", which the A5 lane pins. The
+                    // pair shape is appended as the second accepted answer, never substituted for it.
+                    bindings.ValidateOptions<string>(optionsKey, elementPath);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    throw new InvalidOperationException(
+                        ex.Message + " The dropdown also accepts BindOptions<UiOption> (display, value).");
+                }
+            }
         }
 
         // The same option-level help contract the mode row declares, from one implementation: the popup's
@@ -170,6 +187,20 @@ public sealed class DropdownWidget : IUiWidget
     {
         if (spec.TryGetAttribute("OptionsBind", out string optionsKey) && optionsKey.Length > 0)
         {
+            // The shape is probed non-reportingly first, then read EXACTLY once, so the authoritative read is
+            // always the matching element type: a valid page can never record the FL-23 mismatch report.
+            if (TryValidateOptions<UiOption>(ctx.Bindings, optionsKey, ctx.ElementPath))
+            {
+                IReadOnlyList<UiOption> pairs = ctx.Bindings.GetOptions<UiOption>(optionsKey);
+                var pairResult = new List<Option>(pairs.Count);
+                foreach (UiOption item in pairs)
+                {
+                    pairResult.Add(new Option(item.Text.Length > 0 ? item.Text : item.Value, item.Value));
+                }
+
+                return pairResult;
+            }
+
             IReadOnlyList<string> dynamic = ctx.Bindings.GetOptions<string>(optionsKey);
             var result = new List<Option>(dynamic.Count);
             foreach (string item in dynamic)
@@ -235,6 +266,24 @@ public sealed class DropdownWidget : IUiWidget
         }
 
         return spec.TryGetAttribute("Label", out string label) ? label : "";
+    }
+
+    /// <summary>
+    /// True when the key is an options binding whose element type is <typeparamref name="T"/>. This is the
+    /// NON-reporting probe FL-23 requires: ValidateOptions throws on a mismatch and records nothing, so trying
+    /// the other accepted shape never emits a diagnostic for the shape a page did not declare.
+    /// </summary>
+    private static bool TryValidateOptions<T>(IUiBindings bindings, string key, string elementPath)
+    {
+        try
+        {
+            bindings.ValidateOptions<T>(key, elementPath);
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
     }
 
     private float ReadHeight(float fallback)

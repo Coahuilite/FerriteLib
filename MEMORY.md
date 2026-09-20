@@ -2,6 +2,17 @@
 
 ## Current durable state
 
+- **FL-16 landed on its second attempt, and the difference between the attempts is what to copy (2026-09-20).**
+  The first attempt wrote the implementation, saw the suite green, and withdrew because the lane stayed green
+  under a faithful revert. The second attempt ran the order the maintainer asked for and the evidence came out
+  right: lane written and seen RED before the public type existed (with a stand-in pair shape, since `UiOption`
+  could not be promoted first), then `UiOption` + its `public-unstable` tier entry + the pair path in one commit,
+  then the revert proof on the FINAL lane - pair path removed -> `a valid pair-bound page recorded 1
+  diagnostic(s)` (the FL-23 report firing on the mismatch) -> restored -> ALL PASS, 2596 ok. **The probe is
+  non-reporting** (`ValidateOptions<T>` throws and records nothing; `GetOptions<T>` is then called exactly once
+  for the matching type), which is both the FL-23 requirement and what makes `StyleFallbackCount == 0`
+  assertable for a valid page.
+
 - **FL-23 landed (2026-09-20): a wrong-type binding read is now REPORTED, not only thrown.** `GetOptions<T>` and
   `Invoke<T>` record one deduplicated diagnostic on the fail-soft channel (path = binding key, kind = `binding`,
   attribute = `OptionsBind`/`ActionBind`, authored/resolved = the two type names) before throwing as they always

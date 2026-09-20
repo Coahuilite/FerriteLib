@@ -441,6 +441,27 @@ exactly as before. The refusal is unchanged; being reported is the addition.
 list) must read through a **non-reporting** path, or a perfectly valid page would record a mismatch for the
 shape it is not. That is a design point for FL-16's redo, not a defect of this change.
 
+### FL-16 redone and landed: typed display/value options (2026-09-20)
+
+A dynamic options binding may now carry **pairs**: `BindOptions<UiOption>` gives each option a display text and
+the value the page commits, which is the separation the static `OptionN`/`ValueN` pairs always had. `UiOption`
+is a `public-unstable` addition and the only new public type in this batch; `BindOptions<string>` is unchanged,
+with display == value, so this is an addition and not a reshape.
+
+**The order this was done in is part of the contract, because the first attempt failed it.** The lane was written
+and run RED before the type existed (with a stand-in pair shape: `Options binding 'opts' at 'dd' is
+'ProbeOption', not 'String'`), then the implementation and the tier entry landed, and then the **revert proof**
+ran on the final lane: with the pair path removed the lane reddens - `a valid pair-bound page recorded 1
+diagnostic(s)` - and with it restored the suite is green. That red is exactly the FL-23 interaction: a page that
+declared the pair shape is read as strings, the read is a type mismatch, and the mismatch is now visible.
+
+**The probe is non-reporting, and that is load-bearing.** The element type a page declares is discovered by
+`ValidateOptions<T>` (which throws on a mismatch and records nothing) and the list is then read exactly once
+through `GetOptions<T>` for the matching type. A page that declared either accepted shape therefore records no
+diagnostic at all, which is what the lane asserts (`StyleFallbackCount == 0` after a reset, per the counter rule).
+A third element type is refused at creation with the historical diagnosis preserved and the pair shape appended
+as the second accepted answer.
+
 ## The selected ordinary-authoring path (B)
 
 The recommended author route is existing surface only: one layout manifest over public atoms/containers

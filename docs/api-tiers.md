@@ -69,6 +69,9 @@ consequence is paid in the open rather than discovered by a stranger.
 
 ## Public-unstable
 
+- `UiOption` — one option of a dynamic options binding: the display text and the value to commit (0.7.x, FL-16).
+  Plain strings on purpose, and the same separation the static `OptionN`/`ValueN` pairs always had;
+  `BindOptions<string>` keeps working with display == value, so this is an addition, not a reshape.
 - `UiHost` — per-window engine entry; identity and the manifest load-path fork both reach into it. The
   style document enters here too (`UiStyleDocument? document` on the constructor, the manifest's own
   `<Styles>` section when none is handed in): the page level is applied to the injected theme inside the
