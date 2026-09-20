@@ -95,10 +95,15 @@ moves HEAD and invalidates the consumer's gate green.
       `SelectedKey`, the `chrome/banner` role pair (G5), and the FL-21/FL-22 diagnostic wording. Four lanes,
       one mutated build for the red evidence (6 FAIL lines), green after (ALL PASS, 2592 ok). Nine gates, then the
       one Release carrier rebuild and the freeze notice at the end of the round.
-- [ ] **P1-E-2b (next batch, ACCEPT verdicts unchanged)** — **G2** `input/button` command payload,
-      **G3** chrome-free hit area sized to measured content, **FL-16** typed dynamic `UiOption` pairs (the one
-      new public type). Deferred for the evidence bar, not for merit: one failure-sensitive lane + its own
-      mutation each, which does not fit the window that just closed.
+- [x] **P1-E-2b LANDED 2026-09-20 (task-25)**: **G2** `input/button` `PayloadKey` + **G3**
+      `Chrome`+`Height=Auto`. Red evidence: one mutated build, 2 attributable FAIL lines; green after
+      (ALL PASS, 2594 ok).
+- [ ] **FL-16 (typed `UiOption` pairs) - OPEN, WITHDRAWN on evidence, not deferred for effort.** The
+      implementation, the public type and its tier entry were written and the suite went green; with the pair
+      path reverted to the faithful pre-fix shape the lane stayed GREEN, so all three were removed rather than
+      shipped. **Next attempt starts here:** bind the key as a pair list and read it back through the *string*
+      path, then assert the mismatch is REPORTED (today the string fallback accepts the pair-bound key, which
+      made the first lane blind); only then re-add the type and its tier entry in the same commit.
 - [x] **P1-E-2 (task-23, blocked by task-19 + this table)** — fold every ACCEPT into **one** carrier rebuild and
       one FREEZE NOTICE, so US/demo re-verify once. New surface stays inside `0.7.x` (no minor move). FL-17's
       per-row template is the largest item and is scheduled last inside the batch.

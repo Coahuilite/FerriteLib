@@ -2,6 +2,16 @@
 
 ## Current durable state
 
+- **A lane that stays green when the feature is removed is not evidence; this session paid for that lesson once
+  (2026-09-20).** FL-16 (typed `UiOption` pairs) was implemented, its public type classified and the whole suite
+  green - then the faithful pre-fix revert (a single string read in `BuildOptions`) left the new lane GREEN,
+  because the string fallback accepted a pair-bound key instead of reporting the element-type mismatch. The type,
+  its tier entry and the lane were **removed**, not shipped; the diagnosis seeds the next attempt. The same
+  standard did hold for the two items that landed in that batch: **G2 `PayloadKey`** (a command receives its
+  bound payload; scoped per item like the other binding roles, and the creation contract follows the shape -
+  `BindAction<string>` with a payload, `BindCommand` without) and **G3 `Chrome`+`Height=Auto`** (a bare hit area
+  whose height is measured from content), each red on its own assertion and green after.
+
 - **P1-E's first half landed 2026-09-20: four vocabulary items + two diagnostic corrections, each with a lane
   proven red against the reverted implementation in ONE mutated build** (HARNESS_EXIT=1, 6 FAIL lines — G5, the
   selected state, WideHidden, WidthKey — then green: ALL PASS, 2592 ok). **B2(2) `WideHidden`** is the exact

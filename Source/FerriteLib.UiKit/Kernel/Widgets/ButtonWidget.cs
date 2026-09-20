@@ -34,7 +34,11 @@ public sealed class ButtonWidget : IUiWidget
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new ButtonWidget(),
-            AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "ActionBind", "Text", "TextKey", "Height"),
+            // G2/G3 (0.7.x): PayloadKey gives the command a data payload (the row's own key inside a
+            // template), and Chrome="none" makes the button a bare hit area whose Height="Auto" is measured
+            // from its content instead of the theme's row height.
+            AtomVocabulary.Schema(
+                AtomRoles.ToneAndEmphasis, "ActionBind", "Text", "TextKey", "Height", "PayloadKey", "Chrome"),
             new[] { "Text", "TextKey" });
     }
 
@@ -53,11 +57,44 @@ public sealed class ButtonWidget : IUiWidget
                 + "a button with no action is a creation-time contract error, not a dead control.");
         }
 
-        bindings.ValidateCommand(actionKey, elementPath);
+        // The two shapes are different contracts, so the creation-time check must know which one this
+        // element declares: with a payload the consumer binds BindAction<string>, without one BindCommand.
+        string payloadKey = AtomVocabulary.Read(spec, "PayloadKey").Trim();
+        if (payloadKey.Length > 0)
+        {
+            bindings.ValidateValue<string>(payloadKey, elementPath);
+            bindings.ValidateAction<string>(actionKey, elementPath);
+        }
+        else
+        {
+            bindings.ValidateCommand(actionKey, elementPath);
+        }
+
+        // A Chrome value the kind does not implement is an inert declaration, so it is refused here rather
+        // than ignored (the A2/A3 shape). Only "none" is meaningful; absent means the normal painted button.
+        string chrome = AtomVocabulary.Read(spec, "Chrome").Trim();
+        if (chrome.Length > 0 && !string.Equals(chrome, "none", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"ButtonWidget at '{elementPath}' declares Chrome='{chrome}'; the only accepted value is 'none'"
+                + " (a bare hit area). Omit the attribute for the painted button.");
+        }
     }
 
     public float Measure(UiWidgetContext ctx)
     {
+        // G3: Height="Auto" measures the content, which is what a bare hit area needs; an empty caption has
+        // nothing to measure and falls back to the band every kind uses.
+        string declared = AtomVocabulary.Read(spec, "Height").Trim();
+        if (string.Equals(declared, "Auto", StringComparison.OrdinalIgnoreCase))
+        {
+            string text = AtomVocabulary.ResolveText(spec, ctx, "Text", "TextKey");
+            if (text.Length == 0) return ctx.Theme.Geometry.RowHeight;
+
+            float width = Math.Max(1f, ctx.ViewWidth - ctx.Theme.Geometry.Padding * 2f);
+            return Math.Max(1f, ctx.Metrics.MeasureText(text, AtomVocabulary.TextFont(ctx), width));
+        }
+
         return AtomVocabulary.ReadHeight(spec, ctx.Theme.Geometry.RowHeight);
     }
 
@@ -80,7 +117,33 @@ public sealed class ButtonWidget : IUiWidget
 
         if (UiNative.Button(rect, ctx))
         {
-            ctx.Bindings.Invoke(ReadActionKey());
+            // G2: with a PayloadKey the command receives the bound payload - the row's own key, which is what
+            // a repeated row needs to say which item it is. Without one the call is exactly what it was.
+            string payloadKey = AtomVocabulary.Read(spec, "PayloadKey").Trim();
+            string payload = "";
+            bool hasPayload = payloadKey.Length > 0;
+            if (hasPayload)
+            {
+                try
+                {
+                    hasPayload = ctx.Bindings.TryGet(payloadKey, out payload);
+                }
+                catch (InvalidOperationException)
+                {
+                    // A key bound to something that is not a string: fail-soft and loud, then fire without it.
+                    AtomVocabulary.ReportUnresolved(ctx, Kind, payloadKey, "no payload");
+                    hasPayload = false;
+                }
+            }
+
+            if (hasPayload)
+            {
+                ctx.Bindings.Invoke(ReadActionKey(), payload);
+            }
+            else
+            {
+                ctx.Bindings.Invoke(ReadActionKey());
+            }
         }
     }
 
@@ -103,7 +166,13 @@ public sealed class ButtonWidget : IUiWidget
             shown = new UiResolvedStyle(theme.HoverSurface.Fill, theme.HoverSurface.Border, idle.Text);
         }
 
-        UiThemeDraw.Surface(rect, shown.Surface, theme.Geometry.Hairline);
+        // G3: Chrome="none" paints no surface at all - a hit area, not a control - while the caption keeps
+        // the same inset and font, so the two shapes cannot disagree about where the text sits.
+        if (!string.Equals(AtomVocabulary.Read(spec, "Chrome").Trim(), "none", StringComparison.OrdinalIgnoreCase))
+        {
+            UiThemeDraw.Surface(rect, shown.Surface, theme.Geometry.Hairline);
+        }
+
         UiThemeDraw.Label(
             new Rect(rect.x + theme.Geometry.Padding, rect.y, Math.Max(1f, rect.width - theme.Geometry.Padding * 2f), rect.height),
             AtomVocabulary.ResolveText(spec, ctx, "Text", "TextKey"),

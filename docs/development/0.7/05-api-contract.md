@@ -407,6 +407,26 @@ bar is one failure-sensitive lane per item with its own mutation, and folding th
 public type) into the same window would put surface into a shared freeze that no lane had been shown red
 against. They stay listed for the next rebuild rather than half-landing here.
 
+### G2 and G3 landed, FL-16 withdrawn (2026-09-20)
+
+- **G2 `PayloadKey` on `input/button`** - the command is handed the payload its binding declares, so a repeated
+  row can say which item it is. It is scoped per item like the other binding roles (`Bind`/`ActionBind`/
+  `OptionsBind`/`VisibleKey`), and the creation contract follows the shape: with a payload the consumer binds
+  `BindAction<string>`, without one `BindCommand` as before. A key bound to something other than a string is
+  fail-soft, loud, and fires the payload-free command.
+- **G3 `Chrome="none"` + `Height="Auto"`** - a bare hit area: no surface is painted while the hit test still
+  fires, and the height comes from the measured content band instead of the theme row height (an empty caption
+  has nothing to measure and keeps the row height). Any other `Chrome` value is refused at creation, the A2/A3
+  shape, rather than ignored.
+
+**FL-16 (typed `UiOption` pairs) was withdrawn mid-batch, and the reason is the evidence, not the design.** The
+implementation, the public type and its tier entry were written and the suite went green - but with the pair
+path reverted to the faithful pre-fix shape (a single string read) **the lane stayed GREEN**. A lane that does
+not discriminate is not evidence, and the protocol is explicit that a new public type needs one. So the type,
+the tier entry and the lane were removed, and the diagnosis is recorded instead: the string fallback accepted a
+pair-bound key rather than reporting the element-type mismatch, which is what made the probe blind. The next
+attempt starts from that failure rather than from a fresh guess. Nothing here promotes a type.
+
 ## The selected ordinary-authoring path (B)
 
 The recommended author route is existing surface only: one layout manifest over public atoms/containers

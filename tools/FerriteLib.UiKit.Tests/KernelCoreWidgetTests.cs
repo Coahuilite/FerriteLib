@@ -26,6 +26,8 @@ internal static class KernelCoreWidgetTests
         failures += Run("Composite kinds keep their vocabulary and their manifests", VerifyCompositeVocabularyUnchanged);
         failures += Run("chrome/banner takes the role pair and keeps its ink (G5)", VerifyBannerRole);
         failures += Run("SelectedKey resolves the element to the active state (0.7.x)", VerifySelectedKey);
+        failures += Run("A button command receives the payload its row declares (G2)", VerifyButtonPayload);
+        failures += Run("Chrome=\"none\" paints no surface and Auto height measures the content (G3)", VerifyBareHitArea);
         return failures;
     }
 
@@ -435,6 +437,130 @@ internal static class KernelCoreWidgetTests
     /// declared label sets are the frozen vocabulary, and a manifest that used every declared attribute
     /// must still create, arrange and draw.
     /// </summary>
+    /// <summary>G2: PayloadKey hands the command the bound payload, so a repeated row can say which item it
+    /// is; a button without one still fires the payload-free command it always did.</summary>
+    private static void VerifyButtonPayload()
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+
+        string seen = "";
+        var bindings = new UiBindings();
+        bindings.BindValue<string>("row-payload", () => "item-7", _ => { });
+        bindings.BindAction<string>("act", payload => seen = payload);
+        using UiHost host = new(
+            "payload", UiLayoutManifest.Parse(
+                "<UiPage Schema=\"2\" Source=\"payload\">"
+                + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" PayloadKey=\"row-payload\" Text=\"go\" Height=\"24\" />"
+                + "</UiPage>"),
+            bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        host.MeasureAndArrange(new Vector2(300f, 100f));
+        UiNative.ButtonOverride = _ => true;
+        host.DrawFrame(new Rect(0f, 0f, 300f, 100f));
+        UiNative.ButtonOverride = null;
+        if (!string.Equals(seen, "item-7", StringComparison.Ordinal))
+        {
+            throw new Exception("the command received '" + seen + "' instead of the bound payload");
+        }
+
+        string plain = "";
+        var plainBindings = new UiBindings();
+        plainBindings.BindCommand("act", () => plain = "fired");
+        using UiHost host2 = new(
+            "payload", UiLayoutManifest.Parse(
+                "<UiPage Schema=\"2\" Source=\"payload\">"
+                + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" Text=\"go\" Height=\"24\" />"
+                + "</UiPage>"),
+            plainBindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        host2.MeasureAndArrange(new Vector2(300f, 100f));
+        UiNative.ButtonOverride = _ => true;
+        host2.DrawFrame(new Rect(0f, 0f, 300f, 100f));
+        UiNative.ButtonOverride = null;
+        if (!string.Equals(plain, "fired", StringComparison.Ordinal))
+        {
+            throw new Exception("a payload-free button no longer fires its command");
+        }
+    }
+
+    /// <summary>G3: Chrome="none" paints no surface while the hit test still fires, and Height="Auto" takes the
+    /// measured content band rather than the theme's row height.</summary>
+    private static void VerifyBareHitArea()
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+
+        int fills = SurfaceFills("Text=\"go\" Height=\"24\"");
+        int bare = SurfaceFills("Text=\"go\" Height=\"24\" Chrome=\"none\"");
+        if (fills == 0) throw new Exception("the painted button painted no surface, so the comparison is vacuous");
+        if (bare != 0) throw new Exception("Chrome=\"none\" still painted " + bare + " surface(s)");
+
+        var bindings = new UiBindings();
+        bindings.BindCommand("act", () => { });
+        using UiHost host = new(
+            "bare", UiLayoutManifest.Parse(
+                "<UiPage Schema=\"2\" Source=\"bare\">"
+                + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" Text=\"content\" Height=\"Auto\" Chrome=\"none\" />"
+                + "</UiPage>"),
+            bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(300f, 100f));
+        float auto = new StubMetrics().MeasureText("content", UiTheme.DarkGold.DefaultFont, 300f);
+        if (Math.Abs(snapshot.RectById["b"].height - auto) > 0.01f)
+        {
+            throw new Exception("Height=Auto arranged " + snapshot.RectById["b"].height + " instead of the measured " + auto);
+        }
+
+        if (!Rejected("Chrome=\"painted\" Text=\"x\" Height=\"24\"", "Chrome="))
+        {
+            throw new Exception("an unsupported Chrome value was accepted instead of refused at creation");
+        }
+    }
+
+    private static int SurfaceFills(string buttonAttributes)
+    {
+        var bindings = new UiBindings();
+        bindings.BindCommand("act", () => { });
+        ClearRecordedFill();
+        using UiHost host = new(
+            "bare", UiLayoutManifest.Parse(
+                "<UiPage Schema=\"2\" Source=\"bare\">"
+                + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" " + buttonAttributes + " />"
+                + "</UiPage>"),
+            bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        host.MeasureAndArrange(new Vector2(300f, 100f));
+        host.DrawFrame(new Rect(0f, 0f, 300f, 100f));
+        return ((IList)StubField("DrawBoxSolidColors")).Count;
+    }
+
+    /// <summary>
+    /// FL-16 probe, DELIBERATELY NOT REGISTERED AS A LANE. It was written for the typed-pair work and then had
+    /// to be withdrawn: with the pair path reverted (the faithful pre-fix shape) this probe stayed GREEN, which
+    /// means it does not discriminate — so it is not evidence and must not run as if it were. It is kept, with
+    /// the finding, because the next attempt should start from the failure it exposes (the string fallback
+    /// accepted a pair-bound key instead of reporting the mismatch) rather than from a fresh guess. See
+    /// MEMORY.md and docs/development/0.7/60-capability-dispositions.md for the disposition.
+
+    /// <summary>True when the page is refused at creation with <paramref name="expectedInMessage"/> in the
+    /// located diagnosis - the shape every vocabulary refusal in this batch must keep.</summary>
+    private static bool Rejected(string attributes, string expectedInMessage)
+    {
+        var bindings = new UiBindings();
+        bindings.BindCommand("act", () => { });
+        try
+        {
+            using UiHost host = new(
+                "bare", UiLayoutManifest.Parse(
+                    "<UiPage Schema=\"2\" Source=\"bare\">"
+                    + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" " + attributes + " />"
+                    + "</UiPage>"),
+                bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            return false;
+        }
+        catch (UiContractException ex)
+        {
+            return ex.Message.IndexOf(expectedInMessage, StringComparison.Ordinal) >= 0;
+        }
+    }
+
     /// <summary>G5: the banner resolves its ink through the role table, and an untone banner keeps the
     /// secondary ink it always had (the kind's declared default emphasis).</summary>
     private static void VerifyBannerRole()

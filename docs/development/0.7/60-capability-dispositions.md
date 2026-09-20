@@ -56,6 +56,15 @@ same commit.
 **Largest and last:** FL-17's per-row template on `container/tree`, which reuses `Repeat`'s materialisation and
 prune machinery and should be scheduled after the smaller items so one rebuild covers the rest.
 
+**Batch 2 outcome (2026-09-20, task-25).** **G2** and **G3** landed, each with a lane whose red is attributable
+by assertion name in one mutated build (2 FAIL lines: the command received an empty payload, and Chrome none
+still painted five surfaces), green after (ALL PASS, 2594 ok). **FL-16 was WITHDRAWN, not deferred for effort**:
+the implementation and the public type were written and the suite went green, but with the pair path reverted to
+the faithful pre-fix shape the lane stayed GREEN - a lane that does not discriminate is not evidence, so the
+type, its tier entry and the lane were removed rather than shipped. The recorded diagnosis is the starting point
+for the next attempt: the string fallback accepted a pair-bound key instead of reporting the element-type
+mismatch, which is exactly what made the probe blind.
+
 **Batch 1 outcome (2026-09-20, task-23).** Landed with lanes and mutation evidence: **B2(2) `WideHidden`**,
 **B5 `WidthKey`**, **`SelectedKey`**, **G5** (banner role pair), and the **FL-21/FL-22** wording.
 **Moved to the next batch, verdicts unchanged — G2, G3, FL-16**: each is ACCEPTed on the four gates, but the

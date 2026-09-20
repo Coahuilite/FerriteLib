@@ -1878,7 +1878,10 @@ public sealed class UiLayoutEngine
         if (!string.Equals(attribute, BindAttribute, StringComparison.OrdinalIgnoreCase)
             && !string.Equals(attribute, ActionBindAttribute, StringComparison.OrdinalIgnoreCase)
             && !string.Equals(attribute, OptionsBindAttribute, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(attribute, VisibleKeyAttribute, StringComparison.OrdinalIgnoreCase))
+            && !string.Equals(attribute, VisibleKeyAttribute, StringComparison.OrdinalIgnoreCase)
+            // G2: a button's payload is per item inside a template, so it is scoped exactly like the other
+            // binding roles - that is what makes "this row's key" answerable at all.
+            && !string.Equals(attribute, "PayloadKey", StringComparison.OrdinalIgnoreCase))
         {
             return value;
         }
