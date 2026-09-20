@@ -85,6 +85,15 @@ moves HEAD and invalidates the consumer's gate green.
       `MSB3027`/`MSB3021` inside gate 1's build output. Demonstrated against a deliberately held file.
       Related durable finding in `MEMORY.md`: the carrier build is deterministic, the suspect bytes were a
       dirty build reproduced byte-for-byte, and the stamp cannot record dirtiness.
+- [x] **P1-E disposition table written 2026-09-20 (task-22, docs only)** —
+      `docs/development/0.7/60-capability-dispositions.md`: G2/G3/G5, FL-13/16/17/18/19, FL-21/22,
+      B2(2)/B5/B6/B10, the style-document palette selector, the button selected state, and the two unproven
+      `state/empty` items. ACCEPTs: G2, G3, G5, FL-16, FL-17, FL-18+B6 (one item), B2(2), B5, `SelectedKey`;
+      ACCEPT-DOC: FL-21, FL-22; DEFER: FL-13+B10 (with the P3 reset), the palette selector (no citation);
+      CLOSED: FL-19; **not gaps**: the two `state/empty` items, each with the evidence it would need.
+- [ ] **P1-E-2 (task-23, blocked by task-19 + this table)** — fold every ACCEPT into **one** carrier rebuild and
+      one FREEZE NOTICE, so US/demo re-verify once. New surface stays inside `0.7.x` (no minor move). FL-17's
+      per-row template is the largest item and is scheduled last inside the batch.
 - [ ] **CONDITIONAL, tied to the hierarchy × composition decision — do not build alone.** A binding-resolved
       help identity (`HelpBind`) for a DATA-DEPENDENT key. The consumer has exactly two such sites, both in
       `us/scope-tree`, and that widget will not be migrated declaratively unless route A (an optional per-row

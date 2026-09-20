@@ -2,6 +2,20 @@
 
 ## Current durable state
 
+- **P1-E's capability dispositions are written and awaiting a ruling (2026-09-20, task-22; table in
+  `docs/development/0.7/60-capability-dispositions.md`).** The table gives every raised item one row — anchors,
+  consumer citation, the four promotion gates, what implementing it touches — with the outcome ACCEPT /
+  ACCEPT-DOC / DEFER / REJECT / CLOSED. Three outcomes change the surface rather than the prose, so they are
+  durable here: **FL-19 is CLOSED** (the mode-row's `Description1..8` left the label set in the B8 fix and are
+  now the payload `HoverHelpKey` publishes, so they are no longer orphan vocabulary, and the vocabulary half is
+  now harder to justify); **FL-13 and B10 are one item with two names and are DEFERRED to the P3 UI/UX reset**
+  (choosing the alignment axis now would freeze vocabulary the reset may contradict); and **the state-document
+  palette selector is DEFERRED for lack of a citation** — the resolver applies token overrides onto the host's
+  injected theme, and a request is not evidence. The ACCEPTs are manifest-only except FL-16 (one new public type,
+  `UiOption`) and FL-17 (the per-row template, scheduled last so one rebuild covers the rest). FL-21/FL-22 are
+  documentation only: their behaviour is implemented and correct, the wording is what misled a reader. The two
+  `state/empty` items are **not gaps** and are recorded with the evidence each would need.
+
 - **P1-B closed 2026-09-20 (task-18) as evidence, not as new work: four of the ledger's five items were already
   fixed on the 0.7 line, and the fifth is REJECTED with its argument.** The acceptance form was "revert the fix,
   watch the named lane redden, restore" — the only red-first evidence available for a defect that is already

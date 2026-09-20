@@ -2,7 +2,10 @@
 
 Status home for the line (plan: `ferritelib-0.7-development-plan-en.md`, maintainer approval 2026-09-17:
 "conform, go on"). Contract text lives in `05-api-contract.md` (written before the behavior changes);
-command evidence in `40-verification.md`. Not a second task ledger.
+command evidence in `40-verification.md`. Not a second task ledger. The **capability-disposition table** for the
+review batch — one row per raised item, with its ACCEPT / DEFER / REJECT / CLOSED outcome, anchors, citations and
+the four promotion gates — is `60-capability-dispositions.md`; nothing in it is implemented until the batched
+ruling folds the ACCEPTs into one rebuild.
 
 Baseline: branch `0.7.x` forked from `0.6.x` at `12d0dbb` + the maintainer's uncommitted ruling docs
 (preserved into the first commit). Axes opened at 0.7.0/0.7.0/0.7.0 in `8fe3026`.
