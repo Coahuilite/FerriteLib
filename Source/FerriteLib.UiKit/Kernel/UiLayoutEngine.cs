@@ -104,7 +104,7 @@ public sealed class UiLayoutEngine
     // cannot rot silently - which is the reason it is duplication rather than a hole.
     private static readonly HashSet<string> TemplateContainerAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Width", "Fill",
+        "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Tab", "Width", "Fill",
         "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden",
         "Scheme", "Density", "Visible", "VisibleKey",
         "AlignX", "OffsetX", "AlignY", "OffsetY"

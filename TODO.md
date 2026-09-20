@@ -47,6 +47,13 @@ invalidates the consumer's gate green.
       in the same round: `HoverHelpKey` now drives `input/dropdown`'s popup rows too, through one shared
       `OptionHelp` implementation. Three new lanes, five mutated controls (A/C/D/E plus the attribution bug the
       lane caught), gates 9/9. Contract: "Element-level help, and the option level generalized".
+- [x] **`Tab` on containers — LANDED 2026-09-20** (maintainer-approved coherence fix, "fix what needs
+      fixing"): two lines, `Tab` added to both container lists, because the engine's read and its
+      `ActiveTabKey` registration were already container-inclusive while the contract forbade the declaration.
+      Lane `KernelContainerTabTests` (+ the existing drift guard), red on either half of the mutation. The
+      consumer switches its checklist gate from `VisibleKey` to `Tab="Packs"` and deletes its one-bool shim at
+      the next freeze. Boundary unchanged and out of scope: per-row `Tab` inside a template stays inexpressible
+      by design (page-level answer) and belongs with route A.
 - [ ] **CONDITIONAL, tied to the hierarchy × composition decision — do not build alone.** A binding-resolved
       help identity (`HelpBind`) for a DATA-DEPENDENT key. The consumer has exactly two such sites, both in
       `us/scope-tree`, and that widget will not be migrated declaratively unless route A (an optional per-row

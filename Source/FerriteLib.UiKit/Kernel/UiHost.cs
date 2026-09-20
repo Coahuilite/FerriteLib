@@ -900,7 +900,12 @@ public sealed class UiHost : IDisposable
 
     private static readonly HashSet<string> ContainerAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Width", "Fill",
+        // Tab is here because the engine already reads it for every element it decides visibility for - the
+        // same IsHidden that reads NarrowHidden and Hidden, and RecordDeclaredKeys already registers the
+        // shared active-tab key for any declarer. Omitting it here forbade a capability the engine
+        // implemented; the 0.7 contract records the ruling (2026-09-20). A Tab-gated container hides its
+        // whole subtree, like every other hidden element.
+        "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Tab", "Width", "Fill",
         "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden",
         "Scheme", "Density", "Visible", "VisibleKey",
         "AlignX", "OffsetX", "AlignY", "OffsetY"

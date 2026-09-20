@@ -325,6 +325,47 @@ avoid. The other data-dependent shape — per-option help inside one element —
 *Migration:* none for the additions. One tightening: a container that declares `HelpKey` is now refused at
 creation.
 
+### `Tab` on containers (2026-09-20) — a coherence fix, not new surface
+
+**Maintainer ruling: approved. "Fix what needs fixing."** The context is an internal contradiction the consumer
+hit as a hard creation refusal while migrating a real card, and that the demo hit independently by reading the
+source: the engine reads `Tab` when deciding visibility for **roots and children of any type**, while the
+container attribute contract omitted the name — so a container could not be declared to appear on one tab.
+
+**What changed.** `Tab` joins the container vocabulary in both mirrored lists: `UiHost.ContainerAttributes`
+and the engine's `TemplateContainerAttributes`. Two lines; no other production change.
+
+**Why this is a coherence fix and not a new capability** — the ruling's reasoning, in the strongest form:
+- the read is already generic: `UiLayoutEngine.IsHidden` (:2570-2602) reads `Tab` unconditionally alongside
+  `NarrowHidden`, `Visible`/`VisibleKey` and `Hidden`, and every call site (:211 roots, :973 the shared
+  child filter `VisibleChildren`, :1262, :1408, :1543) passes container-typed children through it;
+- the invalidation plumbing is already container-inclusive: `RecordDeclaredKeys` (:436-455) registers
+  `UiBindings.ActiveTabKey` for **any** spec that declares `Tab`, and it is called from the same child walks
+  that include containers (:978, :1264, :1410, :1545), with nothing gating widget-ness;
+- the asymmetry is visible inside one function: of the three sibling visibility attributes `IsHidden` reads,
+  `NarrowHidden` and `Hidden` were in the container list and `Tab` was the only one missing.
+
+So the two lines **do not add a capability — they stop the contract from forbidding one the engine already
+implements**. The drift guard is already in place: `KernelRepeatTests` reflects both container lists and asserts
+they are the same vocabulary, so the change cannot half-land.
+
+**The one semantic consequence, stated rather than left to be discovered.** A `Tab`-gated container hides its
+whole **subtree**, and the `HelpKey` claims of that subtree disappear with it — consistent with every other
+hidden element, and with the engine's own handling of a hidden element (it keeps its node and its state, so
+nothing renumbers and nothing loses a state slot; `UiLayoutEngine` :1885-1887, pinned by `KernelIdentityTests`'
+Tab-switch lane).
+
+**Boundary, explicitly out of scope:** per-row `Tab` inside a template stays **inexpressible by design** — a
+`Tab` inside a template is deliberately not item-scoped, because a tab is a page-level answer and not an item's
+(`UiLayoutEngine` :1863-1867). Anything per-row belongs with the hierarchy × composition decision, not here.
+
+**Lane.** `KernelContainerTabTests`: a `Tab`-gated container creates, appears and disappears with
+`active-tab`, and an announcement on `active-tab` re-arranges it — with the container-list mutation as the
+red-first evidence, so the omission cannot silently return.
+
+*Migration:* none. A container declaring `Tab` was refused before, so no page can be relying on either
+behaviour.
+
 ## The selected ordinary-authoring path (B)
 
 The recommended author route is existing surface only: one layout manifest over public atoms/containers

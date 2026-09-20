@@ -2,6 +2,46 @@
 
 ## Current durable state
 
+- **`Tab` on containers is legal as of 2026-09-20 — a maintainer-approved coherence fix, and the ruling's own
+  words were "fix what needs fixing".** The defect was an internal contradiction: the engine reads `Tab` when
+  deciding visibility for **roots and children of any type**, while the container attribute contract omitted the
+  name, so the read was unreachable and a container could not be declared to appear on one tab. The consumer hit
+  it as a hard `UiContractException` while migrating a real card; the demo found the same thing by reading the
+  source. The change is **two lines** — `Tab` added to `UiHost.ContainerAttributes` and to the engine's mirrored
+  `TemplateContainerAttributes`.
+  **The four pieces of evidence, in the form that decides it (this is a coherence fix, not new surface):**
+  (1) the read is already generic — `UiLayoutEngine.IsHidden` (:2570-2602) reads `Tab` unconditionally alongside
+  `NarrowHidden`, `Visible`/`VisibleKey` and `Hidden`, and every call site (:211 roots, :973 the shared child
+  filter `VisibleChildren`, :1262, :1408, :1543) passes container-typed children through it;
+  (2) the invalidation plumbing is already container-inclusive — `RecordDeclaredKeys` (:436-455) registers
+  `UiBindings.ActiveTabKey` for **any** spec that declares `Tab` (called from :978, :1264, :1410, :1545, the same
+  walks that include containers), with nothing gating widget-ness. **That is the decisive one: the plumbing
+  admits containers while the contract did not, which is a contradiction rather than a policy**;
+  (3) the asymmetry sits inside one function: of the three sibling visibility attributes `IsHidden` reads,
+  `NarrowHidden` and `Hidden` were in the container list and `Tab` was the only one missing;
+  (4) it was never dead code — the read is live for widgets, atoms, `Repeat` (widget by validation, container by
+  arrangement) and widget rows in templates; only its container-element branch was unreachable. So the two lines
+  do not add a capability, they stop the contract from forbidding one the engine already implements.
+  **The one semantic consequence, stated so it is not discovered later:** a `Tab`-gated container hides its whole
+  **subtree**, and the `HelpKey` claims of that subtree go with it — consistent with every other hidden element,
+  and with the engine's rule that a hidden element keeps its node and state (:1885-1887; pinned by
+  `KernelIdentityTests`' Tab-switch lane).
+  **Boundary, deliberately out of scope:** per-row `Tab` inside a template stays inexpressible **by design** — a
+  `Tab` inside a template is not item-scoped because "a tab is a page-level answer and not an item's"
+  (`UiLayoutEngine` :1863-1867). Anything per-row belongs with the route-A hierarchy × composition decision.
+  **Lane** `KernelContainerTabTests` (16 printed `ok:` lines): the declaration creates (with a contrast that a
+  genuinely unknown container attribute is still refused), a gated container appears and disappears with
+  `active-tab` **subtree included** and switches back with no residue, announcing `active-tab` re-arranges in
+  place, a hidden container keeps its node and its state, and both container lists are read by reflection and
+  asserted to carry `Tab` and to be the same vocabulary. **Red-first evidence is the mutated list**: removing
+  `Tab` from the host list reddens six assertions (including `KernelRepeatTests`' drift guard), and removing it
+  from the engine list alone reddens three — so neither half can be reverted silently. Both reverted; the final
+  run is `HARNESS_EXIT=0`, zero `FAIL` lines, ALL PASS. Contract: "`Tab` on containers (2026-09-20) — a
+  coherence fix, not new surface"; evidence boundary: harness only.
+  **Observation, not fixed here:** that drift guard's failure message lists the host-minus-engine difference, so
+  when the HOST is the smaller list it prints "missing: " with an empty list. The lane still fires; only the
+  message is one-directional. Fixing another lane's diagnostics was out of this round's scope.
+
 - **Maintainer phase purpose (2026-09-20) — FL's queue is driven by the consumer's real use, not by a wish
   list.** The point of scheduling FL and US together is to **use US's practice to validate FL's components and
   features**; that is why the pins (FL 0.7.x, US 0.5.x) are allowed. What binds every FL session in this phase:

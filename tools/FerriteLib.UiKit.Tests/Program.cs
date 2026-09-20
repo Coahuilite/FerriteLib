@@ -185,6 +185,9 @@ internal static class Program
 
         Console.WriteLine("Kernel option help (the shared HoverHelpKey contract, mode-row and dropdown)...");
         failures += KernelOptionHelpTests.RunAll();
+
+        Console.WriteLine("Kernel container Tab (the coherence fix: the contract now admits the engine's read)...");
+        failures += KernelContainerTabTests.RunAll();
         // ---- end 0.7.x additions ------------------------------------------------------------------
 
         Console.WriteLine("Kernel lane registration (every lane file is invoked from Program.cs)...");
