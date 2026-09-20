@@ -173,6 +173,9 @@ internal static class Program
         // ---- 0.7.x additions (maintainer ruling 2026-09-20): additions land inside 0.7.0 --------
         Console.WriteLine("Kernel text field (B7: identity, draft, the commit rule, placeholder)...");
         failures += KernelTextFieldTests.RunAll();
+
+        Console.WriteLine("Kernel mode-row hover help (per-option identity published, never painted)...");
+        failures += KernelModeRowHelpTests.RunAll();
         // ---- end 0.7.x additions ------------------------------------------------------------------
 
         Console.WriteLine("Kernel lane registration (every lane file is invoked from Program.cs)...");

@@ -50,6 +50,6 @@ jobs:
           dotnet restore Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj --nologo
           dotnet restore tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj --nologo
 
-      - name: "Verify (7 gates: harness, Dev/Release builds, payload, content-free, LICENSE, identity)"
+      - name: "Verify (9 gates: harness, Dev/Release builds, payload, content-free, LICENSE, identity, stub traps, dependency reality)"
         shell: pwsh
         run: ./scripts/verify-local.ps1

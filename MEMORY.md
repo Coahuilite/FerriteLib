@@ -2,6 +2,20 @@
 
 ## Current durable state
 
+- **Maintainer phase purpose (2026-09-20) — FL's queue is driven by the consumer's real use, not by a wish
+  list.** The point of scheduling FL and US together is to **use US's practice to validate FL's components and
+  features**; that is why the pins (FL 0.7.x, US 0.5.x) are allowed. What binds every FL session in this phase:
+  the backlog is **friction that US's usage exposes**, classified (A) US misuse / (B) genuine general gap, with
+  only the (B) side fixed; **no other Batch 2 item is started**; and the one capability that looked missing —
+  composing a sub-tree per collection item — is **narrower than assumed**, because `Repeat` + `<Templates>`
+  already provides composition (sub-tree per item key, item-local scope, `input/checkbox` inside a row,
+  per-item measure, hits routed to inner widgets). What is genuinely absent is only the **cross of hierarchy and
+  composition** (`container/tree` renders one label band per row and takes no template; `Repeat` has no
+  level/indent); the maintainer **leans toward an optional per-row template on `container/tree`** (route A) but
+  will wait until US has used the existing components, so it is **held, not scheduled** — be ready to price it
+  when the friction report arrives. Every (B) fix moves HEAD and invalidates the consumer's gate green, so work
+  is batched: **one freeze per round, not one per item**.
+
 - **Maintainer ruling — additions are allowed inside `0.7.0` for the coordination phase (2026-09-20).** The
   axis keeps the **number** `0.7.0`; no minor is opened while the local consumer is mid-development, and the
   phase now runs until that consumer completes its UI work. This **amends** the 2026-09-19 ruling rather than
@@ -87,6 +101,38 @@
   (role→surface mapping as data, blocked by CP-3), CP-5 (regional scope) and CP-7 (sibling-relative
   placement). Evidence boundary: harness only.
 
+- **`input/mode-row` per-option hover help landed (2026-09-20) — the kind's half, and deliberately not a
+  tooltip.** The maintainer approved it and supplied the generality argument: **vanilla RimWorld's mode selectors
+  already show per-option help**, so this is expected behaviour of the control rather than one consumer's
+  convenience. The requirement, stated in consumer terms: (a) each option carries its own help identity,
+  declared and validated at creation; (b) the consumer can learn **which option is hovered** without
+  re-implementing this kind's cell geometry, because the wired consumer renders help itself in its own panel.
+  What shipped: the identity is the **existing `DescriptionN`** — no new per-option vocabulary, and the names B8
+  reported as orphans are now the payload — published through the new manifest attribute **`HoverHelpKey`** (an
+  element-declared, creation-validated **writable string** binding key), plus the new public-unstable funnel
+  member **`UiNative.IsMouseOver(Rect, UiWidgetContext)`**: the context-carrying counterpart of the raw
+  `IsMouseOver(Rect)`, applying the same disabled and higher-layer rules as `Button(Rect, ctx)` and consuming
+  nothing. The publication contract, stated once: while an option is hovered the row writes that option's
+  `DescriptionN`, or its `ValueN` when it declares none (so the key always **names** the hovered option), and
+  the empty string when nothing is hovered — **only when the answer changes**, so one write per transition
+  rather than one per frame. Two creation-time refusals: a `TitleN`/`DescriptionN` whose index has no `ValueN`
+  (inert before, refused now), and a `HoverHelpKey` that is not a writable string binding (the write would
+  otherwise be refused mid-frame and trip the recovery band). **No new type** — `UiNative` is public-unstable, so
+  the tier *type* list is unchanged and only its member clause moved (27 → 28).
+  **Lane** `KernelModeRowHelpTests` (9 lanes, 37 printed `ok:` lines = 28 assertions plus the nine lane lines):
+  hover moving between options changes the identity once per transition, re-hovering the same option writes
+  nothing, leaving clears it once (not per frame), the value fallback names an option that declares no
+  description, the click still selects in the same frame the claim is published, both creation-time refusals
+  fire, and the funnel rules are driven against real arranged nodes (a command-disabled element is not hovered;
+  an element under another element's popup layer is not hovered, while its own popup leaves it hovered). Its
+  `Run` keeps the F2-safe shape. **Red-first evidence is a mutated control** (a new capability has no pre-fix
+  revision): mutation 1 (the clear skipped when the identity is empty) reddens the leaving lane with three
+  assertions; mutation 2 (both creation-time refusals removed) reddens the two validation lanes with three. Both
+  reverted; the final run is `HARNESS_EXIT=0`, zero `FAIL` lines, ALL PASS.
+  **B8's open half, answered but not decided** (the maintainer still owns it): per-option help makes
+  `Description1..8` **not redundant** — they are the help identity the publication carries, so removing them
+  would remove the capability. That is a report, not a ruling. Evidence boundary: harness only.
+
 - **`input/text-field` landed (2026-09-20, B7) — an addition inside `0.7.0` under the 2026-09-20 ruling.**
   The maintainer called the library lacking a single-line text field **an oversight** and approved the shape this
   ledger had already ruled on: the string sibling of `input/number-field` over the existing funnel primitive,
@@ -144,7 +190,11 @@
   The **schema** half is deliberately untouched: the four names stay legal attributes and the widget still
   reads them, so this is not a vocabulary retirement — removing them (or giving them a drawing path) is a
   maintainer ruling, and it is **pure library hygiene** (an orphan name in a general kind's vocabulary), not a
-  consumer need and **not a reason to raise the minor**. Recorded in the line's contract (`docs/development/0.7/05-api-contract.md`,
+  consumer need and **not a reason to raise the minor**. **Updated later the same day, and it changes the shape
+  of the open question:** they are no longer orphan names — the mode-row's per-option hover help publishes
+  `DescriptionN` as each option's help identity (see the hover-help entry above), so the decision is now "keep
+  the help identity or drop the capability", not "delete a name nothing reads". Still the maintainer's call.
+  Recorded in the line's contract (`docs/development/0.7/05-api-contract.md`,
   "### B8") and in the consumer guide's fix list; no public type, signature, tier or manifest vocabulary
   moved. Evidence boundary: harness only, no in-game run, no consumer-side evidence either way.
 
@@ -414,6 +464,22 @@
   `dotnet run`s over `tools/FerriteLib.UiKit.Tests` collide on the shared output path and die with `CS2012`
   (measured 2026-09-19), so a cross-repo round where a sibling's gate rebuilds this project serialises on one
   engineer for the whole build-and-harness stretch rather than parallelising it.
+  **"Every pack is freshly built" — measured 2026-09-20, one gap found and closed.** The maintainer declined the
+  structural split (no `OutputPath` move, no channel redesign) on the ground that the side effect does not exist,
+  so the claim itself was measured channel by channel. **dev**: `pack-dev.ps1:39` already builds
+  `-c Dev --no-incremental` — verified by running it (exit 0, a full 21.95 s compile writing the carrier, then
+  `[stage-package] flavor=dev`), so nothing needed changing there. **github/steam**: neither packer builds at
+  all; they **refuse** a stale payload by comparing the DLL's embedded commit to HEAD
+  (`pack-release.ps1:73-78`, `pack-steam.ps1:58-61`) and the stager then measures the configuration stamp
+  (`stage-package.ps1:81-88`), so a stale or wrong-configuration payload cannot be packed — freshness by
+  refusal rather than by building. **The one real gap** was the CI release payload build,
+  `release.yml:119` (`dotnet build … -c Release -p:VersionSuffix=`), which was **incremental** and runs after
+  `verify-local.ps1` — whose gate 2 is a Dev build and gate 3 a Release build over the same shared OutputPath, so
+  an incremental Release build can report itself current while the carrier file was last written by the Dev gate
+  (the 2026-09-07 measurement). `-p:VersionSuffix=` usually forces the generated AssemblyInfo to change and
+  therefore a recompile, but that is an indirect mechanism; `--no-incremental` is now on that line, which makes
+  the claim literally true with no structural change. The stale "7 gates" labels in `release.yml` and `ci.yml`
+  were corrected to 9 in the same pass (the suite has nine `Invoke-Check` gates).
 
 - **A release asset must be built after the gates run, not during them.** The Dev and Release build
   gates leave `1.6/Assemblies/FerriteLib.UiKit.dll` carrying a `-dev` version suffix, and that is the

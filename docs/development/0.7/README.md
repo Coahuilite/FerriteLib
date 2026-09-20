@@ -30,7 +30,11 @@ single-line string sibling of `input/number-field`, plus one public-unstable mem
 `UiNative.TextField(Rect, string, UiSession, string, out bool)`. The API-tier *type* list is therefore **no
 longer the 0.6 pin**: it gains one internalize-candidate entry (`TextFieldWidget`). `Api` stays `0.7.0`. The
 entry, the "no migration — it is an addition" stance and the commit rule are in `05-api-contract.md` under
-Amendment 3 and "### B7".
+Amendment 3 and "### B7". The same day's second addition is `input/mode-row`'s **per-option hover help**: the
+manifest attribute `HoverHelpKey` publishes which option is hovered (the option's `DescriptionN`, or its
+`ValueN` when it declares none) so a consumer renders the help itself, plus `UiNative.IsMouseOver(Rect,
+UiWidgetContext)` for the arbitration-aware hover test. No new type there either; the section is "Mode-row
+hover help" in the same contract file.
 
 ## What ordinary authors stop doing (B, honestly measured)
 

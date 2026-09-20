@@ -231,6 +231,46 @@ shape and are transcribed in `MEMORY.md`
 generally needed, not consumption evidence for this implementation, and no consumer compiles against this kind
 yet.
 
+### Mode-row hover help (2026-09-20) — per-option identity published, never painted
+
+An **addition** inside `0.7.0` under Amendment 3, and the maintainer's own generality argument: vanilla
+RimWorld's mode selectors already show per-option help, so this is expected behaviour of the control rather
+than one consumer's convenience.
+
+**The requirement, in consumer terms.** (a) Each option carries its own help identity, declared and validated
+at creation; (b) a consumer can learn **which option is currently hovered** without re-deriving this kind's
+cell geometry. The consumer renders the help itself — the library paints no tooltip, and that is the contract,
+not an omission.
+
+- **The help identity is the existing `DescriptionN`.** No new per-option vocabulary: the names were already
+  declared in the schema and read by the kind, and this is the surface that finally consumes them. A
+  `TitleN`/`DescriptionN` whose index has no `ValueN` is now **refused at creation** — it could never be
+  drawn or published, so it is the inert declaration this contract refuses rather than one it ignores.
+- **New manifest attribute `HoverHelpKey`** (optional): the binding key that receives the hovered option's
+  help identity. Validated at creation as a **writable string value binding** — a read-only or unbound key
+  would refuse the write mid-frame and trip the recovery band, so it is refused where it can be reported
+  instead of discovered.
+- **What is published, exactly.** While an option is hovered, the row writes that option's declared
+  `DescriptionN`, or its `ValueN` when the option declares no description — so the key always **names** the
+  hovered option, with or without help text. When no option is hovered the row writes the empty string. The
+  write happens **only when the answer changes**, so a consumer reading the key sees one write per hover
+  transition rather than one per frame.
+- **"Hovered" means what it means everywhere else.** The row asks the funnel, not the raw rect test, so a
+  disabled row is not hovered and a row under another element's popup layer is not hovered either. The claim
+  **consumes nothing**: the click still selects the option in the same frame.
+- **New funnel member `UiNative.IsMouseOver(Rect, UiWidgetContext)`** — the context-carrying counterpart of
+  the raw `IsMouseOver(Rect)`, applying the disabled and higher-layer rules that
+  `Button(Rect, UiWidgetContext)` applies. Public because a kind that re-derived those rules from the raw
+  form would report a hover for an option underneath an open popup. `UiNative` is public-unstable, so this is
+  a member addition; **no new type**, so the API-tier type list is unchanged.
+- *Migration:* none — an addition. One behavioural tightening to know about: a manifest declaring `TitleN` or
+  `DescriptionN` for an index with no `ValueN` created silently before and is refused now (delete the orphan
+  declaration, or give the option a value).
+
+**Still open, and the maintainer's call:** whether the descriptions *stay* in the schema at all (B8's
+vocabulary half). This section is the argument that they should: removing them would remove the help identity
+the publication carries, so the "orphan name" they were reported as is now a name with a live consumer.
+
 ## The selected ordinary-authoring path (B)
 
 The recommended author route is existing surface only: one layout manifest over public atoms/containers

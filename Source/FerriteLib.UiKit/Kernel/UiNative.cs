@@ -529,6 +529,23 @@ public static class UiNative
         return Mouse.IsOver(rect);
     }
 
+    /// <summary>
+    /// The hover counterpart of <see cref="Button(Rect, UiWidgetContext)"/>: true when the pointer is inside
+    /// the rect <b>and</b> this element would take input there — not disabled, and not covered by a higher
+    /// layer. It consumes nothing, which is the point: a kind can ask "is this part of me hovered" and
+    /// publish the answer without stealing the click the way <c>Button</c> does. The two rules live in one
+    /// place for the same reason the hit rule does: a widget that re-derived them from the raw form would
+    /// answer "hovered" for an option underneath an open popup, or for a disabled control.
+    /// </summary>
+    public static bool IsMouseOver(Rect rect, UiWidgetContext ctx)
+    {
+        if (ctx == null) throw new ArgumentNullException(nameof(ctx));
+        UiNode element = ctx.Node ?? ctx.Session.ActiveNode;
+        if (IsInputDisabled(element)) return false;
+        if (ctx.Session.IsPointerOverHigherLayer(element, PointerPositionIn(ctx))) return false;
+        return IsMouseOver(rect);
+    }
+
     public static bool IsEnterPressed()
     {
         if (DebugEnter) return true;

@@ -34,6 +34,12 @@ the plan §9 log). Live plan, one home: `docs/development/0.7/10-change-plan.md`
 `docs/architecture.md` §3.2/§6.3's **alignment** gap and half of the **relation** gap, with CP-0 as a
 prerequisite.
 
+**Phase queue (2026-09-20):** FL's work in this phase is driven by **friction the consumer's real use
+exposes**, not by a wish list — no other Batch 2 item is started, and `container/tree`'s optional per-row
+template (the one capability `Repeat` + `<Templates>` does not already cover) is **held for pricing** until US's
+friction report arrives (`MEMORY.md`, phase-purpose entry). One freeze per round: every (B) fix moves HEAD and
+invalidates the consumer's gate green.
+
 - [x] **Batch 1 landed 2026-09-19** — CP-0, CP-1, CP-2 and CP-6①③④ implemented, two new lanes,
       42 expectations re-pinned (all classified as the accepted break, none relaxed), gates 9/9.
       Recorded in `MEMORY.md` and in the contract under "Batch 1".
@@ -51,8 +57,19 @@ prerequisite.
       consumer's first table, so a stale identity there is the one place it is read as current; the delivery
       path this line actually uses is the **Release carrier**, not the dev folder. Refresh it the next time a
       dev package is genuinely staged, or replace the row with the carrier + gates commands.
-- [ ] **Delivery guardrail: separate the dev and release artifacts, and make every pack a fresh build —
-      PROPOSAL ONLY, waiting on the maintainer's wording (2026-09-20).** Measured root cause:
+- [x] **Delivery guardrail — CLOSED 2026-09-20: the maintainer declined the structural split** ("the side
+      effect does not exist, because every pack is freshly built"), so no `OutputPath` move and no channel
+      redesign. The claim was then measured channel by channel: **dev** already builds
+      `-c Dev --no-incremental` (`pack-dev.ps1:39`; verified by running it — exit 0, a full 21.95 s compile,
+      `[stage-package] flavor=dev`), so nothing changed there; **github/steam** do not build but **refuse** a
+      stale payload (`pack-release.ps1:73-78`, `pack-steam.ps1:58-61`) and the stager measures the configuration
+      stamp (`stage-package.ps1:81-88`); **the one gap** was the CI payload build `release.yml:119`, which was
+      incremental and runs after `verify-local`'s Dev/Release gates over the shared OutputPath — it now carries
+      `--no-incremental`, which makes "every pack is freshly built" literally true with no structural change.
+      The stale "7 gates" labels in `release.yml` and `ci.yml` were corrected to 9 in the same pass. The
+      proposal below is kept as the record of what was weighed and declined.
+      Original proposal (declined): separate the dev and release artifacts, and make every pack a fresh build.
+      Measured root cause:
       `Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj:20` sets `<OutputPath>..\..\1.6\Assemblies\</OutputPath>`
       with **no configuration condition**, so Dev and Release write one folder, and `verify-local.ps1`'s
       `-PackDev` block runs `pack-dev.ps1` as the **last** step, after every check. Proposed shape, none of it
@@ -88,8 +105,14 @@ prerequisite.
       committing its citation); B6 the chrome action slot; **B7 `input/text-field` — LANDED 2026-09-20** (the
       kind + the identity-bearing `UiNative.TextField` overload; contract Amendment 3, tier entry, lane
       `KernelTextFieldTests`; no minor moved under the 2026-09-20 ruling);
+      **mode-row per-option hover help — LANDED 2026-09-20** (maintainer-approved, generality argument: vanilla
+      mode selectors already show per-option help; the identity is the existing `DescriptionN`, published
+      through the new `HoverHelpKey` binding key so the consumer renders the help itself — no tooltip — plus
+      `UiNative.IsMouseOver(Rect, ctx)`; contract section "Mode-row hover help", lane `KernelModeRowHelpTests`);
       B8's **vocabulary** half (`Description1..8` out of the schema, or a drawing path — maintainer ruling
-      owed; the **label-set** half, the pixel-moving defect, landed 2026-09-20 as a fix, `MEMORY.md`); B9
+      owed; the **label-set** half, the pixel-moving defect, landed 2026-09-20 as a fix, `MEMORY.md`; and the
+      descriptions are **no longer orphan names** — hover help now publishes them as the options' help identity,
+      so removing them would remove that capability: report only, the maintainer decides); B9
       refused for this line; B10 text alignment as a **layout** attribute, not an appearance axis; B11 the L1
       orphan-name check, for which B8 is the first positive control.
       All of it stays inside `0.7.0` under the 2026-09-19 coordinated-development ruling, each item with its

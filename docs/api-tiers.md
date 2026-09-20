@@ -103,7 +103,7 @@ consequence is paid in the open rather than discovered by a stranger.
   invalidation classes, moves a revision only on `NotifyChanged` (never on `Set`), refuses to run a
   command whose predicate answers false, and answers `TryGetBool` without throwing for a key bound to
   another type.
-- `UiNative` — the backend funnel's public face (27 members today); hit-stack and focus work will move
+- `UiNative` — the backend funnel's public face (28 members today); hit-stack and focus work will move
   members across its boundary. It also owns the one disabled-input rule: `Button(rect, ctx)` and
   `DropdownButton` refuse the pointer for an element the engine published disabled, and the
   session-plus-key primitives now do the same — `Slider`, `NumberField` and the identity-bearing
@@ -113,7 +113,10 @@ consequence is paid in the open rather than discovered by a stranger.
   pre-guard behaviour exactly. The identity-free `TextField(Rect, string)` remains for a caller with no
   element to name, and the gap this entry used to record — "the one interactive primitive that cannot
   consult the disabled state" — is **closed** by the identity-bearing overload (0.7.0, B7) rather than by
-  widening the raw form.
+  widening the raw form. The hover primitive follows the same shape: the raw `IsMouseOver(Rect)` stays for a
+  caller with no element, and `IsMouseOver(Rect, UiWidgetContext)` (0.7.0, mode-row hover help) applies the
+  disabled and higher-layer rules so a kind can publish "this part of me is hovered" without consuming the
+  click and without re-deriving the arbitration.
 - `UiPopup` — one popup per session by design today; the owned hit stack generalises exactly that.
 - `UiSessionGuard` — the recovery wrapper; the recovery key is an arranged path today.
 - `UiTheme` — per-surface (fill, border) pairs and a density bundle landed (`BaseSurface` through
