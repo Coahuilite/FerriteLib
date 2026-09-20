@@ -176,6 +176,15 @@ internal static class Program
 
         Console.WriteLine("Kernel mode-row hover help (per-option identity published, never painted)...");
         failures += KernelModeRowHelpTests.RunAll();
+
+        Console.WriteLine("Kernel element help (engine-wide HelpKey claimed on hover)...");
+        failures += KernelElementHelpTests.RunAll();
+
+        Console.WriteLine("Kernel mode-row localization (TitleKeyN through the translation seam)...");
+        failures += KernelModeRowLocalizationTests.RunAll();
+
+        Console.WriteLine("Kernel option help (the shared HoverHelpKey contract, mode-row and dropdown)...");
+        failures += KernelOptionHelpTests.RunAll();
         // ---- end 0.7.x additions ------------------------------------------------------------------
 
         Console.WriteLine("Kernel lane registration (every lane file is invoked from Program.cs)...");

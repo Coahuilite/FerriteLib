@@ -883,6 +883,14 @@ public sealed class UiHost : IDisposable
     {
         "Id", "Kind", "Hidden", "Tab", "Width", "MinWidth", "MaxWidth", "NarrowHidden", "Scheme", "Density",
         "Visible", "VisibleKey",
+        // The element's help identity (0.7.x): engine-wide like Visible/VisibleKey, because the ENGINE -
+        // not the kind - claims a hovered element's help. Deliberately NOT in the container list: only
+        // widgets are hit surfaces, so a declaration on a container or a template root could never claim,
+        // and the unknown-attribute gate refuses it there instead of leaving it silently inert. A
+        // binding-resolved sibling (a HelpBind) is CONTINGENT on the Route A decision and deliberately not
+        // built: the only two data-dependent sites live in a widget that will not be migrated
+        // declaratively unless Route A lands, so the need is not established yet (0.7 contract).
+        "HelpKey",
         // CP-1 placement vocabulary (0.7.x, Batch 1): valid only for a child of a placement container.
         // The engine refuses them elsewhere and refuses contradictory combinations; these two lists are
         // the attribute-NAME gate, and UiLayoutEngine keeps a mirrored pair for template subtrees that a

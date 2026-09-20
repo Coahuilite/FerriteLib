@@ -101,6 +101,56 @@
   (role→surface mapping as data, blocked by CP-3), CP-5 (regional scope) and CP-7 (sibling-relative
   placement). Evidence boundary: harness only.
 
+- **Element-level help landed, and the option level was generalized off its first kind (2026-09-20, G1 + G4).**
+  Additions inside `0.7.0`; the maintainer approved route (a) and supplied the argument: the consumer declares
+  help on EVERY element (its own corrected count is **35 claim sites = 33 widget claims + 2 in its shared draw
+  helper, plus 12 manifest declarations**, not the 43/46 an earlier count gave), so a page migrated to
+  declarative elements silently loses help — which is why `Repeat` has no consumer evidence, an inability
+  rather than an unwillingness.
+  **G1 — `HelpKey`, engine-wide on widget elements.** Any kind accepts it without listing it (the
+  `Visible`/`VisibleKey`/`Width` gate); the value is an **opaque literal identity** the consumer's catalog is
+  keyed by, never translated and never interpreted — a deliberate third flavour of the `*Key` family.
+  Publication is the **existing session claim machine**, so there is no new member and no second channel: the
+  engine's draw walk claims an element's `HelpKey` while the pointer is over it, and the consumer reads
+  `HoverClaim`/`HoverClaimElement` exactly as it already does. The claim is made **inside the element's node
+  scope** — that is what attributes it to the declaring element, and the first version of this wiring got it
+  wrong (claimed outside `EnterNode`, so `HoverClaimElement` named whatever node was active before); the lane
+  caught it with two red assertions before the fix. Refused on containers and template roots (not hit surfaces,
+  so it could never claim — the A3 shape rather than an inert declaration). `UiSession.ClaimHover`'s parameter
+  was renamed from `elementId` to `claim` and both it and `HoverClaim` are redocumented as an **opaque claim
+  token**: every caller already passed a help identity, which is exactly what the next reader would have
+  tripped over.
+  **The hover rule changed with it and that is a correction to the round before**: `UiNative.IsMouseOver(Rect,
+  UiWidgetContext)` no longer applies the disabled rule. Disabled-ness refuses input; hover also drives
+  inspection, and a control that is unavailable is exactly when help matters — the consumer picks an
+  `...UnavailableHelpKey` by row state and claims it, and vanilla shows tooltips on disabled controls. Only the
+  higher-layer rule stays.
+  **The option level, generalized.** `input/dropdown`'s popup rows are options of one element, so the element
+  hook cannot reach them: `HoverHelpKey` now drives both kinds through one implementation (`OptionHelp`), and
+  the dropdown publishes the hovered row's **value** (a dropdown's options come from the consumer's data, so the
+  value is the machine token a catalog is keyed by). `UiPopup.DrawOptionList` returns the hovered row's value so
+  the caller publishes without re-deriving the popup geometry; the return is additive. `HoverHelpKey` is
+  therefore **complementary** to `HelpKey`, not redundant: the claim carries one live topic for the page, the
+  binding carries a per-element fact the consumer's own model can read and invalidate.
+  **G4 — localized option labels on `input/mode-row`**: `TitleKey1..8` through the translation seam, key-wins
+  over the literal `TitleN`, value when neither; both families in the label set so `Width="Auto"` measures the
+  translated title; an orphan `TitleKeyN` refused at creation.
+  **A second engine defect fell out of G4 and is fixed**: the label-set seam tested "is this a translation key?"
+  with a plain `EndsWith("Key")`, which cannot see an INDEX suffix — `TitleKey1` ends in `1`. It now strips
+  trailing digits before the test. The threshold is measured, not asserted: the lane compares the Auto width
+  against the translated string's own measure and prints all three numbers (`72` raw key vs `88` translated).
+  **Contingent, deliberately not built**: a binding-resolved sibling (`HelpBind`) for a data-dependent identity.
+  The consumer has exactly two such sites (`UsScopeTreeWidget.cs:388,616`) and both live in a widget that will
+  not be migrated declaratively unless the hierarchy × composition decision lands, so the need is contingent on
+  that decision and recorded in the contract as such rather than pulling speculative surface into this round.
+  `DescriptionKeyN` was **cancelled** by the consumer (no evidence) and was not added.
+  **Lanes**: `KernelElementHelpTests`, `KernelModeRowLocalizationTests`, `KernelOptionHelpTests`; round 3's
+  lane corrected where the hover rule changed. **Red-first evidence is mutated controls**: mutation A (the
+  engine's claim disabled) reddens nine assertions; C (the mode row's key resolution removed) three; D (the Auto
+  seam back to the suffix test) one, printing the measured numbers; E (the popup's hover capture removed) three.
+  The attribution bug is its own red record (`harness-4.txt`: two assertions). All reverted; the final run is
+  `HARNESS_EXIT=0`, zero `FAIL` lines, ALL PASS. Evidence boundary: harness only.
+
 - **`input/mode-row` per-option hover help landed (2026-09-20) — the kind's half, and deliberately not a
   tooltip.** The maintainer approved it and supplied the generality argument: **vanilla RimWorld's mode selectors
   already show per-option help**, so this is expected behaviour of the control rather than one consumer's

@@ -271,6 +271,60 @@ not an omission.
 vocabulary half). This section is the argument that they should: removing them would remove the help identity
 the publication carries, so the "orphan name" they were reported as is now a name with a live consumer.
 
+### Element-level help, and the option level generalized (2026-09-20) — G1 + G4
+
+Additions inside `0.7.0` under Amendment 3, driven by the consumer's real usage rather than by a wish list:
+the maintainer approved route (a), whose whole argument is that a declarative page currently cannot carry help
+at all.
+
+**G1 — the element-level help hook, engine-wide.** `HelpKey` is a new **engine-wide attribute on widget
+elements**: any kind accepts it without listing it in its schema (the same gate as `Visible`/`VisibleKey`/
+`Width`), which is what makes it usable by a page and by a consumer's own kinds. It is an **opaque literal
+identity** — the key the CONSUMER's help catalog is keyed by — and the library never translates or interprets
+it. Deliberately a third flavour of the `*Key` family: translating it would destroy the lookup, and resolving
+it through a binding would make a static claim dynamic.
+
+- **Publication is the session's existing claim machine** — no new channel, no new public member: during its
+  draw walk the engine claims an element's `HelpKey` while the pointer is over it (`UiSession.ClaimHover`),
+  and the consumer reads `HoverClaim` / `HoverClaimElement` exactly as it already does. The claim is made
+  **inside** the element's node scope, which is what attributes it to the element that declared it.
+- **Refused on containers and template roots**, which are not hit surfaces: a declaration there could never
+  claim, so the unknown-attribute gate refuses it at creation (the A3 shape) instead of leaving it inert.
+- **The hover rule changed with it, and that is a correction to the previous round.** `UiNative.IsMouseOver(Rect,
+  UiWidgetContext)` no longer applies the DISABLED rule. Disabled-ness refuses input, and that refusal stays
+  where input is refused (`Button`, the session-plus-key primitives); hover also drives inspection, and a
+  control that is unavailable is exactly when a player needs the help explaining it. The consumer's own
+  unavailable-state help entries are the evidence, and vanilla shows tooltips on disabled controls for the same
+  reason. The higher-layer rule stays: an element under another element's open popup is not hovered.
+
+**The option level, generalized off the kind it started on.** `input/dropdown`'s popup rows are options of one
+element, so the element-level hook cannot reach them; the `HoverHelpKey` binding form now drives both kinds
+through one implementation (`OptionHelp`), and the dropdown's published identity is the option's **value** —
+a dropdown's options come from the consumer's data, so the value is the machine token a catalog is keyed by,
+which is the same choice the mode row already falls back to. `UiPopup.DrawOptionList` returns the hovered row's
+value so the caller publishes without re-deriving the popup's geometry; the return value is additive, so a
+caller that ignored the old `void` still compiles.
+
+**G4 — localized option labels on `input/mode-row`.** `TitleKey1..8` is a translation key resolved through
+`IUiTranslation`, key-wins over the literal `TitleN`, the option's value when neither is declared. Both name
+families are in the declared label set, so `Width="Auto"` measures the **translated** title. An orphan
+`TitleKeyN` (no `ValueN`) is refused at creation like the other per-option declarations.
+**One engine defect came out of this and is fixed here**: the label-set seam decided "is this a translation
+key?" with a plain `EndsWith("Key")` test, which cannot see an INDEX suffix — `TitleKey1` ends in `1`.
+`TitleKeyN` is the library's first indexed keyed label, so the seam had never had to handle one; it now strips
+trailing digits before the test, and the lane pins the difference (measured: the raw key's width against the
+translated string's).
+
+**Recorded as contingent, deliberately NOT built.** A binding-resolved sibling (a `HelpBind` read from the
+consumer's bindings) would serve a data-dependent identity — a key that depends on row state — and the consumer
+has exactly two such sites. Both live in a widget that will not be migrated declaratively unless the
+hierarchy × composition decision ("Route A") lands, so the need is **contingent on that decision** and is
+recorded here as such; building it now would be speculative surface, which is the thing this phase exists to
+avoid. The other data-dependent shape — per-option help inside one element — is covered by `HoverHelpKey`.
+
+*Migration:* none for the additions. One tightening: a container that declares `HelpKey` is now refused at
+creation.
+
 ## The selected ordinary-authoring path (B)
 
 The recommended author route is existing surface only: one layout manifest over public atoms/containers

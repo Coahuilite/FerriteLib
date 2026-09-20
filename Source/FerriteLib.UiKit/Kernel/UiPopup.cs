@@ -54,8 +54,15 @@ public static class UiPopup
     /// next frame's yield check, and invokes <paramref name="onSelected"/> with the chosen value after
     /// closing the popup. Option rows are single-line surfaces: a wrapping option means a too-narrow
     /// popup, which the fitting audit must see on the width axis rather than absorb silently.
+    /// <para>
+    /// Returns the <b>hovered</b> option's value, or an empty string when no row is hovered, so the caller can
+    /// publish an option-level fact — the dropdown's <c>HoverHelpKey</c> identity — without re-deriving this
+    /// helper's row geometry. The hover test is the raw rect form on purpose: the popup is the topmost layer
+    /// and these rows are its own, which is the same reason <see cref="UiNative.DropdownOptionRow"/> is the
+    /// context-free hit. Nothing is consumed by the test, so the row's click below is unaffected.
+    /// </para>
     /// </summary>
-    public static void DrawOptionList(
+    public static string DrawOptionList(
         Rect popupRect,
         string elementId,
         UiWidgetContext ctx,
@@ -78,9 +85,15 @@ public static class UiPopup
         }
         UiThemeDraw.Panel(popupRect, ctx.Theme);
 
+        string hovered = "";
         for (int i = 0; i < options.Count; i++)
         {
             Rect rowRect = new(popupRect.x, popupRect.y + i * OptionHeight, popupRect.width, OptionHeight);
+            if (UiNative.IsMouseOver(rowRect))
+            {
+                hovered = options[i].Value;
+            }
+
             bool selected = string.Equals(options[i].Value, current, StringComparison.Ordinal);
             // The same table the trigger field and the status outlets read: this row used to re-derive
             // the mapping verbatim, which is the fourth copy the one-table rule exists to delete.
@@ -103,5 +116,7 @@ public static class UiPopup
                 onSelected(options[i].Value);
             }
         }
+
+        return hovered;
     }
 }

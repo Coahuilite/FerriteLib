@@ -40,6 +40,19 @@ template (the one capability `Repeat` + `<Templates>` does not already cover) is
 friction report arrives (`MEMORY.md`, phase-purpose entry). One freeze per round: every (B) fix moves HEAD and
 invalidates the consumer's gate green.
 
+- [x] **G1 + G4 landed 2026-09-20** — route (a) approved by the maintainer. G1: the engine-wide
+      `HelpKey` on widget elements, claimed on the existing session hover surface (no new member, no new
+      channel), with the round-3 hover rule corrected to drop the disabled rule; G4: `TitleKey1..8` on
+      `input/mode-row`, plus the indexed-key fix in the `Width="Auto"` seam. The option level was generalized
+      in the same round: `HoverHelpKey` now drives `input/dropdown`'s popup rows too, through one shared
+      `OptionHelp` implementation. Three new lanes, five mutated controls (A/C/D/E plus the attribution bug the
+      lane caught), gates 9/9. Contract: "Element-level help, and the option level generalized".
+- [ ] **CONDITIONAL, tied to the hierarchy × composition decision — do not build alone.** A binding-resolved
+      help identity (`HelpBind`) for a DATA-DEPENDENT key. The consumer has exactly two such sites, both in
+      `us/scope-tree`, and that widget will not be migrated declaratively unless route A (an optional per-row
+      template on `container/tree`) lands — so if it stays composite, those two sites stay imperative forever
+      and no `HelpBind` is needed at all. Price it **with** that decision, never before it
+      (`docs/development/0.7/05-api-contract.md`, "Element-level help…"; `MEMORY.md`).
 - [x] **Batch 1 landed 2026-09-19** — CP-0, CP-1, CP-2 and CP-6①③④ implemented, two new lanes,
       42 expectations re-pinned (all classified as the accepted break, none relaxed), gates 9/9.
       Recorded in `MEMORY.md` and in the contract under "Batch 1".

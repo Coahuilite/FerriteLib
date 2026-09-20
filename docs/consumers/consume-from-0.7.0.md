@@ -34,8 +34,9 @@ appropriate minor.
 
 - **Public surface:** one kind was **added** inside `0.7.0` (B7): `input/text-field`, the single-line
   string sibling of `input/number-field`, carried by a new public-unstable funnel member
-  `UiNative.TextField(rect, key, session, value, out committed)`; and `input/mode-row` gained **per-option
-  hover help** — the new manifest attribute `HoverHelpKey` plus `UiNative.IsMouseOver(rect, ctx)`. Nothing was
+  `UiNative.TextField(rect, key, session, value, out committed)`; and the **help vocabulary** grew: the
+  engine-wide element attribute `HelpKey`, the option-level `HoverHelpKey` (now on `input/dropdown` as well
+  as `input/mode-row`), `input/mode-row`'s `TitleKey1..8`, and `UiNative.IsMouseOver(rect, ctx)`. Nothing was
   removed and no existing member signature changed. `UiTheme` (public-unstable) gained one named factory,
   `Vanilla`, so the two built-in palettes are peers.
   **Added XML vocabulary (Batch 1, §4b):** the four placement attribute names `AlignX`, `OffsetX`,
@@ -87,6 +88,9 @@ migration at all.
 | `UiTheme.HoverPoint` removed, replaced by `UiTheme.AccentHover` | Read `UiTheme.AccentHover` (read-only, derived from `AccentGold`). A scheme that declared `HoverPoint` now reports it as an unknown token instead of applying it. |
 | New: `input/text-field` | Optional, no migration — an addition, not a break. A single-line string field whose focus, draft and commit rule belong to the element: `Bind` (required), `Live` (default `true`; `false` defers the write until focus leaves), `Placeholder`/`PlaceholderKey`, `Label`/`LabelKey`, `Height`. A read-only binding refuses the write and the engine's disabled rule refuses the input, exactly as on `input/number-field`. If you hand-rolled one over `UiNative.TextField(rect, text)`, this is the supported shape now. |
 | New: `HoverHelpKey` on `input/mode-row` | Optional, no migration — and no tooltip: declare `HoverHelpKey="my-help"`, bind it with `BindValue<string>`, and the row writes **which option is hovered** there — the option's `DescriptionN`, or its `ValueN` when it declares none — clearing it (empty string) when the pointer leaves. You render the help yourself, wherever your page wants it; the row publishes only when the answer changes. One tightening to know: a `TitleN`/`DescriptionN` whose index has no `ValueN` used to be ignored and is now refused at creation. |
+| New: `HelpKey` on any widget element | Optional, no migration. Declare the identity your help catalog is keyed by (a literal, never translated) and the **engine** claims it while the pointer is over that element: read `Session.HoverClaim` for the identity and `Session.HoverClaimElement` for which element claimed it — the same pair you already read. Refused on containers and template roots, which are not hit surfaces. A disabled element still claims: the help explains why it is unavailable. |
+| New: `input/mode-row` `TitleKey1..8` | Optional, no migration. The translated sibling of `Title1..8` (key wins), and `Width="Auto"` now measures the translated title. An orphan `TitleKeyN`/`TitleN`/`DescriptionN` (no `ValueN`) is refused at creation. |
+| `HoverHelpKey` now works on `input/dropdown` too | Optional, no migration. Same attribute, same rule, applied to the popup's rows: the hovered row's **value** is published, cleared when nothing is hovered. |
 | New: `AlignX`/`OffsetX`/`AlignY`/`OffsetY` | Optional, no migration. Inside an `Overlay` they place a child by an edge or the centre plus a percentage of the parent's usable width; a flow container's child gets its cross axis with a pixel nudge only. |
 
 Nothing else in the compiled surface moved: no type or kind was **removed**, no existing member signature changed,

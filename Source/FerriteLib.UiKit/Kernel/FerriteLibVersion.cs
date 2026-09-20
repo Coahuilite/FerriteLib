@@ -64,9 +64,10 @@ public static class FerriteLibVersion
     /// migration before it ships. The consumer-count prerequisite for the supported contract was removed by
     /// maintainer ruling on 2026-09-17; older freeze-gating wording elsewhere is superseded. The 2026-09-20
     /// ruling then allowed **additions to stay inside this same number** for the coordination phase, so
-    /// `input/text-field` (B7) and `input/mode-row`'s per-option hover help land here rather than in a 0.8.0:
-    /// the number does not move, every addition still records its contract entry and lane first, and the normal
-    /// pre-1.0 rule returns when that phase ends.
+    /// `input/text-field` (B7), `input/mode-row`'s per-option hover help, and the element-level `HelpKey`
+    /// hook with localized mode-row labels (G1 + G4) land here rather than in a 0.8.0: the number does not
+    /// move, every addition still records its contract entry and lane first, and the normal pre-1.0 rule
+    /// returns when that phase ends.
     /// </summary>
     public static readonly Version Api = new Version(0, 7, 0);
 

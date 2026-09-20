@@ -72,8 +72,9 @@ internal static class KernelModeRowHelpTests
 
         IReadOnlyCollection<string>? labels = UiWidgetRegistry.GetLabelAttributes(UiWidgetRegistry.CoreScope, InputModeRowWidget.Kind);
         Check(
-            labels != null && labels.Count == 8 && Contains(labels, "Title1") && !Contains(labels, "Description1"),
-            "the label set is still the eight titles: the descriptions are published, never painted (B8's half)");
+            labels != null && labels.Count == 16 && Contains(labels, "Title1") && Contains(labels, "TitleKey1")
+                && !Contains(labels, "Description1"),
+            "the label set is both title families (16 names) and still excludes the descriptions, which are published, never painted (B8's half)");
     }
 
     private static void VerifyInertOptionRefusal()
@@ -115,7 +116,7 @@ internal static class KernelModeRowHelpTests
         Check(RejectWithBindings(
                 bindings,
                 "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\" Value1=\"A\" HoverHelpKey=\"published\" />",
-                "read-only"),
+                "not writable"),
             "a read-only HoverHelpKey is refused, because the publication is a write");
 
         // Wrong type: the key exists but cannot hold a string.
@@ -254,8 +255,12 @@ internal static class KernelModeRowHelpTests
         UiWidgetContext gateCtx = MakeContext(host.Session, bindings).WithNode(gate);
         UiWidgetContext modeCtx = MakeContext(host.Session, bindings).WithNode(mode);
 
-        Check(!UiNative.IsMouseOver(rect, gateCtx), "a disabled element is not hovered");
-        Check(UiNative.IsMouseOver(rect, modeCtx), "while the same rect on an enabled element is (the contrast the check needs)");
+        // Corrected in the element-help round: the hover test no longer applies the DISABLED rule. Disabled-ness
+        // refuses input (Button and the session-plus-key primitives), while hover also drives inspection - and a
+        // control that is unavailable is exactly when a player needs the help that explains it. The consumer's
+        // own unavailable-state help entries are the evidence for that split.
+        Check(UiNative.IsMouseOver(rect, gateCtx), "a disabled element IS hovered: help explains why it is unavailable instead of activating it");
+        Check(UiNative.IsMouseOver(rect, modeCtx), "and so is an enabled element covering the same rect");
 
         // Plant a popup layer that belongs to another element and covers the point: the mode row is under it.
         // A pass publishes the layers the previous pass recorded (BeginHitPass copies hitLayers into the

@@ -31,6 +31,7 @@ public sealed class DropdownWidget : IUiWidget
             () => new DropdownWidget(),
             new[] {
                 "Id", "Kind", "Bind", "OptionsBind", "Height", "Label", "LabelKey", "Tab", "Hidden",
+                OptionHelp.Attribute,
                 "Option1", "Value1", "Option2", "Value2", "Option3", "Value3", "Option4", "Value4",
                 "Option5", "Value5", "Option6", "Value6", "Option7", "Value7", "Option8", "Value8",
                 "Option9", "Value9", "Option10", "Value10", "Option11", "Value11", "Option12", "Value12",
@@ -59,6 +60,10 @@ public sealed class DropdownWidget : IUiWidget
         {
             bindings.ValidateOptions<string>(optionsKey, elementPath);
         }
+
+        // The same option-level help contract the mode row declares, from one implementation: the popup's
+        // rows are options of this element, so the engine's element-level HelpKey cannot reach them.
+        OptionHelp.Validate(bindings, spec, elementPath, "DropdownWidget");
     }
 
     public float Measure(UiWidgetContext ctx)
@@ -94,6 +99,7 @@ public sealed class DropdownWidget : IUiWidget
         // stored space, so both share one anchor source.
         UiNative.DropdownButton(fieldRect, bindKey, ctx);
 
+        string helpSink = OptionHelp.SinkKey(spec);
         if (ctx.Session.IsPopupOpen(bindKey))
         {
             Rect? anchor = ctx.Session.OpenPopupAnchor;
@@ -101,6 +107,12 @@ public sealed class DropdownWidget : IUiWidget
             {
                 ctx.Session.RegisterPopupDraw(() => DrawPopup(anchor.Value, options, current, ctx));
             }
+        }
+        else
+        {
+            // A closed popup has no hovered option, so the sink is cleared here rather than left holding the
+            // last row's identity. Change-detected, so a closed dropdown costs no writes at all.
+            OptionHelp.Publish(ctx, helpSink, "");
         }
     }
 
@@ -113,13 +125,18 @@ public sealed class DropdownWidget : IUiWidget
         }
 
         string bindKey = ReadBindKey();
-        UiPopup.DrawOptionList(
+        string hovered = UiPopup.DrawOptionList(
             UiPopup.RectFor(anchor, options.Count, ctx.Session.HostViewport),
             bindKey,
             ctx,
             pairs,
             current,
             value => ctx.Bindings.Set(bindKey, value));
+
+        // The option-level identity is the option's VALUE: a dropdown's options come from the consumer's data
+        // (an options binding or the static OptionN/ValueN pairs), so the value is the machine token its help
+        // catalog is keyed by - the same choice the mode row falls back to when a cell declares no help text.
+        OptionHelp.Publish(ctx, OptionHelp.SinkKey(spec), hovered);
     }
 
     private static void DrawField(Rect rect, string display, bool selected, UiTheme theme)

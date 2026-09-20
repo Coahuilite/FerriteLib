@@ -110,8 +110,15 @@ public sealed class UiSession : IDisposable
     public int ContentRevision { get; private set; }
 
     /// <summary>
-    /// The id a hover claim is currently explaining, or null when nothing is claimed. Read it after
-    /// <see cref="BeginFrame"/>; widgets refresh it during the pass with <see cref="ClaimHover"/>.
+    /// The claim the hover surface is currently presenting, or null when nothing is claimed. Read it after
+    /// <see cref="BeginFrame"/>; the engine and widgets refresh it during the pass with
+    /// <see cref="ClaimHover"/>.
+    /// <para>
+    /// The token is <b>opaque to this library</b> and deliberately so: a caller passes whatever identity its own
+    /// help surface is keyed by — the wired consumer's catalog keys and option values are the shipped examples,
+    /// and the engine passes an element's declared <c>HelpKey</c>. It is not an element id; the element that
+    /// made the claim is <see cref="HoverClaimElement"/>.
+    /// </para>
     /// </summary>
     public string? HoverClaim => hoverClaim.Length > 0 ? hoverClaim : null;
 
@@ -678,15 +685,22 @@ public sealed class UiSession : IDisposable
     }
 
     /// <summary>
-    /// Claims the hover-help surface for <paramref name="elementId"/> for this pass. Frame-stamped, so
+    /// Claims the hover-help surface with an opaque <paramref name="claim"/> for this pass. Frame-stamped, so
     /// <see cref="BeginHoverClaimFrame"/> can tell a claim made this pass from one it restored itself —
     /// the distinction a consumer had to hand-roll before this existed.
+    /// <para>
+    /// The parameter is a <b>claim token</b>, not an element id: the caller supplies the identity its own help
+    /// surface is keyed by (a catalog key, an option value, or an element's declared <c>HelpKey</c>), and this
+    /// library never interprets it. The element that made the claim is recorded separately as
+    /// <see cref="HoverClaimElement"/>, which is what tells two unnamed siblings apart when they claim the same
+    /// token.
+    /// </para>
     /// </summary>
-    public void ClaimHover(string elementId)
+    public void ClaimHover(string claim)
     {
-        if (elementId == null) throw new ArgumentNullException(nameof(elementId));
+        if (claim == null) throw new ArgumentNullException(nameof(claim));
         EnsureActive();
-        hoverClaim = elementId;
+        hoverClaim = claim;
         hoverClaimElement = activeNode.Id;
         hoverClaimStamp = Frame;
     }

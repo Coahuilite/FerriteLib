@@ -531,17 +531,24 @@ public static class UiNative
 
     /// <summary>
     /// The hover counterpart of <see cref="Button(Rect, UiWidgetContext)"/>: true when the pointer is inside
-    /// the rect <b>and</b> this element would take input there — not disabled, and not covered by a higher
-    /// layer. It consumes nothing, which is the point: a kind can ask "is this part of me hovered" and
-    /// publish the answer without stealing the click the way <c>Button</c> does. The two rules live in one
-    /// place for the same reason the hit rule does: a widget that re-derived them from the raw form would
-    /// answer "hovered" for an option underneath an open popup, or for a disabled control.
+    /// the rect and this element is not covered by a higher layer. It consumes nothing, which is the point: a
+    /// kind can ask "is this part of me hovered" and publish the answer without stealing the click the way
+    /// <c>Button</c> does.
+    /// <para>
+    /// The disabled rule is deliberately NOT applied here, and that is a correction rather than an omission.
+    /// Disabled-ness refuses <b>input</b> — it lives in <see cref="Button(Rect, UiWidgetContext)"/> and in the
+    /// session-plus-key primitives, where a disabled element must take no drag, edit or focus. Hover here also
+    /// drives <b>inspection</b>: the engine claims a hovered element's declared <c>HelpKey</c>, and a control
+    /// that is unavailable is exactly when a player needs to be told why. The consumer evidence is its own
+    /// unavailable-state help entries (a row whose action is disabled still claims the help that explains it),
+    /// and vanilla shows tooltips on disabled controls for the same reason. The higher-layer rule is the one
+    /// that does belong: an element under another element's open popup is not hovered by anyone's reading.
+    /// </para>
     /// </summary>
     public static bool IsMouseOver(Rect rect, UiWidgetContext ctx)
     {
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
         UiNode element = ctx.Node ?? ctx.Session.ActiveNode;
-        if (IsInputDisabled(element)) return false;
         if (ctx.Session.IsPointerOverHigherLayer(element, PointerPositionIn(ctx))) return false;
         return IsMouseOver(rect);
     }

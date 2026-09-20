@@ -11,20 +11,35 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// responsive: wide uses one row, medium uses two columns, narrow stacks vertically, and the cell
 /// metrics come from the theme's <see cref="UiGeometry"/> so density is one knob for the whole tree.
 /// <para>
+/// <b>Localized option labels.</b> Each slot's label is <c>TitleKeyN</c> resolved through the translation
+/// seam when declared, else the literal <c>TitleN</c>, else the option's value — the same key-wins rule
+/// every other <c>*Key</c> pair in the library uses, and the reason a bilingual page can use this kind at
+/// all. Both name families are in the declared label set, so <c>Width="Auto"</c> measures the TRANSLATED
+/// title rather than the literal one.
+/// </para>
+/// <para>
 /// <b>Per-option help, published rather than painted.</b> Each option may carry its own help identity in
 /// its <c>DescriptionN</c>; the kind does not draw it (a tooltip is the consumer's call, and vanilla's own
-/// mode selectors render the help in a panel of their own). What the kind owes is the answer to "which
-/// option is the pointer on", so a consumer can render the help itself without re-deriving this kind's cell
-/// geometry: declare <c>HoverHelpKey</c> and the row writes the hovered option's help identity there, and
-/// clears it when the pointer leaves. See <see cref="PublishHoverHelp"/> for the exact contract.
+/// mode selectors render the help in a panel of their own). Two reads exist, and they are complementary:
+/// declare <c>HoverHelpKey</c> and the row writes the hovered option's identity into that binding
+/// (<see cref="OptionHelp"/>), and the hovered option's declared help text is also claimed on the session's
+/// hover surface (<c>UiSession.ClaimHover</c>), which is the general read the element-level <c>HelpKey</c>
+/// uses too. An option that declares no help text claims nothing, so the row's own <c>HelpKey</c> topic
+/// stands while the pointer is over it.
 /// </para>
 /// </summary>
 public sealed class InputModeRowWidget : IUiWidget
 {
     public const string Kind = "input/mode-row";
 
-    /// <summary>The element attribute naming the binding key that receives the hovered option's help identity.</summary>
+    /// <summary>
+    /// The element attribute naming the binding key that receives the hovered option's help identity. Public
+    /// because the option-level contract is shared with <c>input/dropdown</c> (see <see cref="OptionHelp"/>),
+    /// and this is where it was first declared.
+    /// </summary>
     public const string HoverHelpKeyAttribute = "HoverHelpKey";
+
+    private const int OptionSlots = 8;
 
     private UiElementSpec spec = UiElementSpec.Empty;
 
@@ -37,18 +52,25 @@ public sealed class InputModeRowWidget : IUiWidget
             Kind,
             () => new InputModeRowWidget(),
             new[] {
-                "Id", "Kind", "Bind", "Height", "Tab", "Hidden", HoverHelpKeyAttribute,
-                "Value1", "Title1", "Description1", "Value2", "Title2", "Description2",
-                "Value3", "Title3", "Description3", "Value4", "Title4", "Description4",
-                "Value5", "Title5", "Description5", "Value6", "Title6", "Description6",
-                "Value7", "Title7", "Description7", "Value8", "Title8", "Description8"
+                "Id", "Kind", "Bind", "Height", "Tab", "Hidden", OptionHelp.Attribute,
+                "Value1", "Title1", "TitleKey1", "Description1",
+                "Value2", "Title2", "TitleKey2", "Description2",
+                "Value3", "Title3", "TitleKey3", "Description3",
+                "Value4", "Title4", "TitleKey4", "Description4",
+                "Value5", "Title5", "TitleKey5", "Description5",
+                "Value6", "Title6", "TitleKey6", "Description6",
+                "Value7", "Title7", "TitleKey7", "Description7",
+                "Value8", "Title8", "TitleKey8", "Description8"
             },
-            // The label set is what Width="Auto" measures (UiLayoutEngine.MeasureLabelWidth), and the only
-            // text this kind paints is an option's Title (DrawOption). Description1..8 are the options' help
-            // identities - published through HoverHelpKey, still never painted - so they stay out of the label
-            // set: measuring them made an Auto column reserve width for text that never appears there (B8).
+            // The label set is what Width="Auto" measures (UiLayoutEngine.MeasureLabelWidth), and the text this
+            // kind paints as a label is a slot's title - the KEY form resolved through the seam when declared,
+            // else the literal. Both families therefore belong here (the same pair rule text/wrapped and the
+            // other labelled atoms already follow), and Description1..8 stay out of it: they are the options'
+            // help identities, published and never painted, so measuring them made an Auto column reserve width
+            // for text that never appears there (B8).
             new[] {
-                "Title1", "Title2", "Title3", "Title4", "Title5", "Title6", "Title7", "Title8"
+                "Title1", "TitleKey1", "Title2", "TitleKey2", "Title3", "TitleKey3", "Title4", "TitleKey4",
+                "Title5", "TitleKey5", "Title6", "TitleKey6", "Title7", "TitleKey7", "Title8", "TitleKey8"
             });
     }
 
@@ -68,46 +90,33 @@ public sealed class InputModeRowWidget : IUiWidget
 
         bindings.ValidateValue<string>(bindKey, elementPath);
 
-        // A per-option declaration must name an option. TitleN/DescriptionN whose index has no ValueN can
-        // never be drawn or published, so it is the inert declaration this contract refuses rather than a
-        // silently ignored one: the author either meant an option there or meant to delete the line.
+        // A per-option declaration must name an option. A TitleN/TitleKeyN/DescriptionN whose index has no
+        // ValueN can never be drawn or published, so it is the inert declaration this contract refuses rather
+        // than a silently ignored one: the author either meant an option there or meant to delete the line.
         for (int i = 1; i <= OptionSlots; i++)
         {
             string suffix = i.ToString(CultureInfo.InvariantCulture);
             if (HasText("Value" + suffix)) continue;
 
-            foreach (string attribute in new[] { "Title" + suffix, "Description" + suffix })
+            foreach (string attribute in new[] { "Title" + suffix, "TitleKey" + suffix, "Description" + suffix })
             {
                 if (!HasText(attribute)) continue;
 
                 throw new InvalidOperationException(
-                    $"'{attribute}' is declared without 'Value{suffix}': a per-option title or description whose"
-                    + " index has no option can never be drawn or published. Declare 'Value" + suffix
+                    $"'{attribute}' is declared without 'Value{suffix}': a per-option title, title key or description"
+                    + " whose index has no option can never be drawn or published. Declare 'Value" + suffix
                     + "' or remove the declaration.");
             }
         }
 
-        // The publication target, validated at creation rather than discovered at draw time: it must be a
-        // string value binding, and it must be writable, because the row writes the hovered option's help
-        // through it. A read-only key would refuse that write mid-frame and trip the recovery band.
-        if (spec.TryGetAttribute(HoverHelpKeyAttribute, out string hoverKey) && hoverKey.Length > 0)
-        {
-            bindings.ValidateValue<string>(hoverKey, elementPath);
-            if (!bindings.IsWritable(hoverKey))
-            {
-                throw new InvalidOperationException(
-                    $"'{HoverHelpKeyAttribute}' names the binding '{hoverKey}', which is not writable: the mode row"
-                    + " publishes the hovered option's help through it, so a read-only or unbound key would refuse"
-                    + " the write. Bind it with BindValue<string>.");
-            }
-        }
+        OptionHelp.Validate(bindings, spec, elementPath, "InputModeRowWidget");
     }
 
     public float Measure(UiWidgetContext ctx)
     {
         UiGeometry geometry = ctx.Theme.Geometry;
         int columns = ColumnsFor(ctx.ViewWidth);
-        int rows = (Options.Count + columns - 1) / columns;
+        int rows = (OptionsFor(ctx).Count + columns - 1) / columns;
         float rowHeight = ReadFloat("Height", geometry.RowHeight);
         return Math.Max(1f, rows * rowHeight + Math.Max(0, rows - 1) * geometry.Gap + geometry.Spacing * 2f);
     }
@@ -116,7 +125,7 @@ public sealed class InputModeRowWidget : IUiWidget
     {
         if (rect.width <= 1f || rect.height <= 1f) return;
 
-        List<Option> options = Options;
+        List<Option> options = OptionsFor(ctx);
         if (options.Count == 0) return;
 
         string bindKey = ReadBindKey();
@@ -140,11 +149,19 @@ public sealed class InputModeRowWidget : IUiWidget
             DrawOption(optionRect, options[i], selected, ctx.Theme);
 
             // Asked through the funnel, so "hovered" means the same thing here as it does to every other
-            // kind: the pointer is inside the cell AND this row would take input there. The call consumes
-            // nothing, which is why it can sit beside the hit test below.
+            // kind: the pointer is inside the cell AND this row is not covered by a higher layer. The call
+            // consumes nothing, which is why it can sit beside the hit test below.
             if (UiNative.IsMouseOver(optionRect, ctx))
             {
                 hoveredHelp = options[i].Help;
+                if (options[i].Description.Length > 0)
+                {
+                    // The general read, and the more specific topic: the engine has already claimed the row's
+                    // own HelpKey (if it declares one) earlier in this pass, and a live claim replaces the held
+                    // one, so an option with its own help text wins while the pointer is over it. An option
+                    // without one claims nothing and lets the row's topic stand.
+                    ctx.Session.ClaimHover(options[i].Description);
+                }
             }
 
             if (UiNative.Button(optionRect, ctx))
@@ -153,32 +170,7 @@ public sealed class InputModeRowWidget : IUiWidget
             }
         }
 
-        PublishHoverHelp(ctx, hoveredHelp);
-    }
-
-    /// <summary>
-    /// Publishes the hovered option's help identity through the element's declared
-    /// <see cref="HoverHelpKeyAttribute"/>, and clears it (an empty string) when no option is hovered. Written
-    /// only when the answer changes, so a consumer reading the key sees one write per hover transition rather
-    /// than one per frame.
-    /// <para>
-    /// The identity is the option's declared <c>DescriptionN</c>, or its <c>ValueN</c> when the option declares
-    /// no description — so the published string always names the hovered option, with or without help text,
-    /// and the consumer needs no second channel to find out which one it is. Nothing is painted: rendering the
-    /// help is the consumer's, which is exactly why the identity is published instead of shown.
-    /// </para>
-    /// </summary>
-    private void PublishHoverHelp(UiWidgetContext ctx, string help)
-    {
-        if (!spec.TryGetAttribute(HoverHelpKeyAttribute, out string key) || key.Length == 0) return;
-
-        if (ctx.Bindings.TryGet(key, out string published)
-            && string.Equals(published ?? "", help, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        ctx.Bindings.Set(key, help);
+        OptionHelp.Publish(ctx, OptionHelp.SinkKey(spec), hoveredHelp);
     }
 
     private string ReadBindKey()
@@ -214,29 +206,40 @@ public sealed class InputModeRowWidget : IUiWidget
         return 1;
     }
 
-    private List<Option> Options
+    private List<Option> OptionsFor(UiWidgetContext ctx)
     {
-        get
+        var result = new List<Option>();
+        for (int i = 1; i <= OptionSlots; i++)
         {
-            var result = new List<Option>();
-            for (int i = 1; i <= OptionSlots; i++)
+            string suffix = i.ToString(CultureInfo.InvariantCulture);
+            if (!spec.TryGetAttribute("Value" + suffix, out string value) || value.Length == 0)
             {
-                if (!spec.TryGetAttribute("Value" + i.ToString(CultureInfo.InvariantCulture), out string value)
-                    || value.Length == 0)
-                {
-                    continue;
-                }
-
-                spec.TryGetAttribute("Title" + i.ToString(CultureInfo.InvariantCulture), out string title);
-                spec.TryGetAttribute("Description" + i.ToString(CultureInfo.InvariantCulture), out string description);
-                result.Add(new Option(title.Length > 0 ? title : value, value, description ?? ""));
+                continue;
             }
 
-            return result;
+            spec.TryGetAttribute("Description" + suffix, out string description);
+            result.Add(new Option(ResolveTitle(suffix, value, ctx), value, description ?? ""));
         }
+
+        return result;
     }
 
-    /// <summary>True when the attribute is present and non-empty — the same rule <see cref="Options"/> uses
+    /// <summary>
+    /// One slot's label: the <c>TitleKeyN</c> through the translation seam when declared, else the literal
+    /// <c>TitleN</c>, else the option's value — the key-wins rule every other labelled kind in the library
+    /// uses, so a translated page and a literal page cannot disagree about which one is shown.
+    /// </summary>
+    private string ResolveTitle(string suffix, string value, UiWidgetContext ctx)
+    {
+        if (spec.TryGetAttribute("TitleKey" + suffix, out string key) && key.Length > 0)
+        {
+            return ctx.Translation.Translate(key);
+        }
+
+        return spec.TryGetAttribute("Title" + suffix, out string title) && title.Length > 0 ? title : value;
+    }
+
+    /// <summary>True when the attribute is present and non-empty — the same rule <see cref="OptionsFor"/> uses
     /// to decide an option exists, so validation and drawing cannot disagree about which indices are real.</summary>
     private bool HasText(string attribute)
     {
@@ -251,9 +254,6 @@ public sealed class InputModeRowWidget : IUiWidget
             : fallback;
     }
 
-    /// <summary>How many option slots the vocabulary declares — the loop bound for options and validation.</summary>
-    private const int OptionSlots = 8;
-
     private readonly struct Option
     {
         internal readonly string Title;
@@ -267,8 +267,8 @@ public sealed class InputModeRowWidget : IUiWidget
             Description = description;
         }
 
-        /// <summary>The help identity this option publishes: its declared description, or its value when it
-        /// declares none, so the hovered option is always named.</summary>
+        /// <summary>The option-level help identity this row publishes: its declared description, or its value
+        /// when it declares none, so the hovered option is always named.</summary>
         internal string Help => Description.Length > 0 ? Description : Value;
     }
 }

@@ -36,6 +36,14 @@ manifest attribute `HoverHelpKey` publishes which option is hovered (the option'
 UiWidgetContext)` for the arbitration-aware hover test. No new type there either; the section is "Mode-row
 hover help" in the same contract file.
 
+**Amended a third time, by G1 + G4 (2026-09-20).** The approval of route (a) added the **element-level help
+hook**: `HelpKey` is engine-wide on widget elements and the engine claims it on the session's existing hover
+surface — no new member, no new channel — with a binding-resolved sibling recorded as **contingent** on the
+hierarchy × composition decision rather than built. The same round generalized `HoverHelpKey` to the dropdown's
+popup rows and gave `input/mode-row` localized option labels (`TitleKey1..8`, plus the indexed-key fix in the
+`Width="Auto"` seam that the label set needed). `Api` stays `0.7.0`; the contract sections are "Element-level
+help, and the option level generalized" and "Mode-row hover help".
+
 ## What ordinary authors stop doing (B, honestly measured)
 
 Before/after on the same operation ("add a second numeric setting to a settings group"), against the

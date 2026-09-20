@@ -113,7 +113,7 @@ public sealed class UiLayoutEngine
     private static readonly HashSet<string> EngineWideWidgetAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
         "Id", "Kind", "Hidden", "Tab", "Width", "MinWidth", "MaxWidth", "NarrowHidden", "Scheme", "Density",
-        "Visible", "VisibleKey",
+        "Visible", "VisibleKey", "HelpKey",
         "AlignX", "OffsetX", "AlignY", "OffsetY"
     };
 
@@ -146,6 +146,7 @@ public sealed class UiLayoutEngine
     private const string ActionBindAttribute = "ActionBind";
     private const string OptionsBindAttribute = "OptionsBind";
     private const string VisibleKeyAttribute = "VisibleKey";
+    private const string HelpKeyAttribute = "HelpKey";
     private const string TabAttribute = "Tab";
 
     /// <summary>
@@ -599,6 +600,25 @@ public sealed class UiLayoutEngine
                         UiNode previous = ctx.Session.EnterNode(entry.Node);
                         try
                         {
+                            // The element's declared help identity, claimed while the pointer is over it and
+                            // BEFORE the widget draws - one rule for every kind, so a page that declares HelpKey
+                            // gets an inspect overlay without a line of per-widget code. It is claimed inside
+                            // EnterNode because that is what attributes the claim to THIS element: a claim made
+                            // outside would be attributed to whatever node was active before. A widget that owns
+                            // finer parts (a mode row's options) then refines the claim in its own Draw, where
+                            // the more specific topic wins because a live claim replaces the held one in the same
+                            // pass. Two things this deliberately does not do: it does not translate or interpret
+                            // the value (it is the identity a consumer's own catalog is keyed by), and it does not
+                            // refuse a DISABLED element - help explains why a control is unavailable rather than
+                            // activating it, and the disabled refusal stays where input is refused
+                            // (UiNative.Button). Only widgets claim: a container is not a hit surface, which is
+                            // why the attribute is refused on one at creation instead of being inert here.
+                            string helpKey = ReadAttribute(entry.Spec, HelpKeyAttribute);
+                            if (helpKey.Length > 0 && UiNative.IsMouseOver(drawRect, entryCtx))
+                            {
+                                ctx.Session.ClaimHover(helpKey);
+                            }
+
                             UiSessionGuard.DrawWidget(entry.Widget, drawRect, entryCtx, entry.Node);
                         }
                         finally
@@ -2202,13 +2222,31 @@ public sealed class UiLayoutEngine
             value = value.Trim();
             if (value.Length == 0) continue;
 
-            string text = attribute.EndsWith("Key", StringComparison.OrdinalIgnoreCase)
+            string text = IsTranslationKeyAttribute(attribute)
                 ? ctx.Translation.Translate(value)
                 : value;
             widest = Math.Max(widest, ctx.Metrics.MeasureWidth(text, ctx.Theme.DefaultFont));
         }
 
         return widest;
+    }
+
+    /// <summary>
+    /// True when a declared label attribute carries a translation KEY rather than literal text — the
+    /// <c>*Key</c> convention, which has to survive an index suffix: <c>TitleKey1</c> is a key whose index
+    /// follows the name exactly as it does in <c>Title1</c>/<c>Value1</c>, so a plain suffix test would miss it
+    /// and measure the raw identifier. That is the defect this rule closes: an Auto column would reserve the
+    /// width of the key text instead of the string the translation seam resolves it to.
+    /// </summary>
+    private static bool IsTranslationKeyAttribute(string attribute)
+    {
+        int end = attribute.Length;
+        while (end > 0 && char.IsDigit(attribute[end - 1]))
+        {
+            end--;
+        }
+
+        return end >= 3 && string.Equals(attribute.Substring(end - 3, 3), "Key", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>MinWidth/MaxWidth clamp, applied only when declared (absent attributes change nothing).</summary>

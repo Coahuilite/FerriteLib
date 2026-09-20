@@ -49,7 +49,7 @@ internal static class AtomVocabulary
     // pre-existing core kinds use as well.
     // Visible/VisibleKey are engine-wide like Hidden: the engine reads them for every kind, so an
     // atom that refused them would reject a page its container accepted.
-    private static readonly string[] EngineWideAttributes = { "Id", "Kind", "Tab", "Hidden", "Visible", "VisibleKey" };
+    private static readonly string[] EngineWideAttributes = { "Id", "Kind", "Tab", "Hidden", "Visible", "VisibleKey", "HelpKey" };
 
     /// <summary>
     /// The allowed-attribute array a core atom registers: the engine-wide names, the role names the kind

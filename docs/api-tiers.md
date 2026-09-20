@@ -82,7 +82,12 @@ consequence is paid in the open rather than discovered by a stranger.
   arrangement-cache clock (a layout-bearing theme token move, or one committed Measure/Structure batch),
   deliberately not the library's invalidation API: the consumer path is `IUiBindings.NotifyChanged` plus
   per-key revisions, and a Paint-class announcement leaves this clock alone. Focus traversal still lands
-  here when it is built.
+  here when it is built. The hover surface (`ClaimHover(string claim)`, `HoverClaim`, `HoverClaimElement`,
+  `HoverGraceFrames`, `BeginHoverClaimFrame`) takes an **opaque claim token**, not an element id: the engine
+  passes an element's declared `HelpKey` and a kind passes the identity its own help surface is keyed by
+  (the consumer's catalog keys, a mode row's option help). The parameter was named `elementId` until the
+  element-help round, which is what made readers assume the wrong thing; the rename is a source-level change
+  only for a caller that used a named argument, on a public-unstable type.
 - `UiValueState` — per-element state bag; its key is the path string the identity layer replaces.
 - `UiElementSpec` — the spec a widget reads; additions are breaking pre-1.0 by definition.
 - `UiWidgetContext` — what a widget is handed per pass; may carry a node instead of a path, and since
@@ -114,10 +119,16 @@ consequence is paid in the open rather than discovered by a stranger.
   element to name, and the gap this entry used to record — "the one interactive primitive that cannot
   consult the disabled state" — is **closed** by the identity-bearing overload (0.7.0, B7) rather than by
   widening the raw form. The hover primitive follows the same shape: the raw `IsMouseOver(Rect)` stays for a
-  caller with no element, and `IsMouseOver(Rect, UiWidgetContext)` (0.7.0, mode-row hover help) applies the
-  disabled and higher-layer rules so a kind can publish "this part of me is hovered" without consuming the
-  click and without re-deriving the arbitration.
+  caller with no element, and `IsMouseOver(Rect, UiWidgetContext)` (0.7.0) applies the **higher-layer** rule so
+  a kind or the engine can publish "this part of me is hovered" without consuming the click and without
+  re-deriving the arbitration. It deliberately does **not** apply the disabled rule: disabled-ness refuses
+  input (the paragraph above), while hover also drives inspection — the engine claims a hovered element's
+  declared `HelpKey` — and a control that is unavailable is exactly when a player needs the help explaining
+  it. Corrected in the element-help round, with the consumer's unavailable-state help entries as the evidence.
 - `UiPopup` — one popup per session by design today; the owned hit stack generalises exactly that.
+  `DrawOptionList` returns the **hovered** option's value (or an empty string), so a caller can publish an
+  option-level fact — the dropdown's `HoverHelpKey` identity — without re-deriving the row geometry; the
+  return value is additive, so a caller that ignored the old `void` still compiles unchanged.
 - `UiSessionGuard` — the recovery wrapper; the recovery key is an arranged path today.
 - `UiTheme` — per-surface (fill, border) pairs and a density bundle landed (`BaseSurface` through
   `DangerSurface`, `Geometry`, `LayoutRevision`, `Styles`); the table's third key slot now carries the
