@@ -14,8 +14,18 @@ describe the surface itself:
 | --- | --- |
 | Dev package folder | `dist/dev/FerriteLib/` (5 files) — staged by `scripts/verify-local.ps1 -PackDev` |
 | Dev package zip | `dist/dev/FerriteLib-0.6.0-dev.zip` — same folder, compressed for transfer |
-| version.txt | `FerriteLib 0.6.0-dev / build=dev / commit=7b62416fa623` |
-| DLL | `1.6/Assemblies/FerriteLib.UiKit.dll`, SHA-256 `2A7F9C9E9B1D060B32037A82E2989817A19B8317D2FB8B48A68F15B13DDECC0D` (contains the R06 fixes) |
+| version.txt (history) | `FerriteLib 0.6.0-dev / build=dev / commit=7b62416fa623` — recorded when this line was cut |
+| DLL (history) | `1.6/Assemblies/FerriteLib.UiKit.dll`, SHA-256 `2A7F9C9E…DECC0D` (the R06-fixed **Dev-channel** rehearsal of that commit) |
+
+**Which payload is authoritative, because more than one exists (FL-11).** The **GitHub Release asset** published
+from `coahuilite.ferritelib` is the only payload identity a consumer can verify — each release body names the
+commit it was built from and the asset's SHA-256. A repo dev folder, a sibling checkout's copy and whatever sits
+in `1.6/Assemblies/` after a build are **rehearsals**, and the reason two of them can carry the same Api with
+different bytes is that they are different *builds*: this table's row is a Dev-channel build (larger, `build=dev`)
+of one commit, while a consumer's `<HintPath>` in the same period bound a Release build of another commit. Two
+hash identities for one Api is not a contradiction to resolve by picking one — it is why you verify what you
+actually bound (the assembly's `AssemblyConfiguration` and embedded commit, plus the `Require` verdict) and take
+the artifact from the Release page.
 
 **Do not copy the DLL into your package.** Shim: reference it with `<HintPath>` + `<Private>false</Private>`
 (see §3). Only the `coahuilite.ferritelib` mod may ship `FerriteLib.UiKit.dll`.

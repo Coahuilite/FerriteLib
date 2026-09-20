@@ -6,16 +6,28 @@
 `docs/development/0.7/05-api-contract.md` (what 0.7.x commits to),
 `docs/development/0.5/20-api-and-xml.md` + `docs/development/0.6/20-api-and-xml.md` (the surface itself).
 
+> **Coming from 0.4 (or older)?** §4c is the one behaviour change in this line that does not fail to
+> compile: since 0.5, removing an element from the definition releases its state. Read it before you delete an
+> element from a page.
+
 ## 1. Which artefact to take
 
 | | |
 | --- | --- |
 | Dev package folder | `dist/dev/FerriteLib/` (5 files) — staged by `scripts/verify-local.ps1 -PackDev` |
-| version.txt | `FerriteLib 0.7.0-dev / build=dev / commit=88095fb3cbed` |
-| DLL | `1.6/Assemblies/FerriteLib.UiKit.dll`, SHA-256 `271128299A9CFF2C4CB5EBDFBB9246C3F6BEC2791A5D0117B894E6F96FC8F82F` |
+| version.txt | `FerriteLib 0.7.0-dev / build=dev / commit=88095fb3cbed` — **a rehearsal identity of one working tree, not a target** |
+| DLL | `1.6/Assemblies/FerriteLib.UiKit.dll`, SHA-256 `271128299A9CFF…FC8F82F` — **the same rehearsal, quoted as history** |
 
-Published integration goes through the GitHub Release asset once the maintainer cuts one; the dev folder is
-the rehearsal, not the publication. **Do not copy the DLL into your package** — `<HintPath>` +
+**Which payload is authoritative, because more than one exists (FL-11).** The **GitHub Release asset** published
+from `coahuilite.ferritelib` is the only payload identity a consumer can verify: each release body names the
+commit it was built from and the asset's SHA-256. The dev folder above, a **sibling checkout's copy**, and
+whatever happens to sit in `1.6/Assemblies/` after a build are all rehearsals: their identity is a property of
+one machine's tree at one moment, and two of them are *not* two identities for one artifact. Concretely, the 0.6
+docs recorded a **Dev-channel** rehearsal (`build=dev`, one commit) while a consumer's `<HintPath>` bound a
+**Release** build of a different commit — the byte difference is the configuration and the commit, not a
+different artifact. So: take the artifact from the Release page, and **verify what you actually bound at
+runtime** — the assembly's `AssemblyConfiguration`, its embedded commit, and the `Require` verdict — rather
+than matching a hash written in a document. **Do not copy the DLL into your package** — `<HintPath>` +
 `<Private>false</Private>`; only `coahuilite.ferritelib` ships it. Registry-scope, stale-build and
 machine-path traps are unchanged from 0.6 (§3–4 of `consume-from-0.6.0.md` still apply verbatim).
 
@@ -97,6 +109,45 @@ migration at all.
 Nothing else in the compiled surface moved: no type or kind was **removed**, no existing member signature changed,
 and **no `UiStatusTone` member was removed** (that type is stable — `Active` and `Disabled` remain members the
 library uses internally as states).
+
+## 4c. Removing an element releases its state — the behaviour change that cannot fail to compile
+
+**This is a migration section, not a 0.7 change.** The semantic inversion arrived in the **0.4 → 0.5** move and
+has continued through 0.6 and 0.7; it is **not** a 0.6 regression and it is not a reason to restore the old
+behaviour. Verified at the tips, not asserted: `PruneNodesExcept` is present in `0.5.x`
+(`git show 0.5.x:Source/FerriteLib.UiKit/Kernel/UiSession.cs` → 2 hits) and absent in `0.4.x` (0 hits), and the
+introducing commit `0ab9015` is an ancestor of `0.5.x`.
+
+**(a) What changed.** In 0.4, taking an element out of the definition (or changing its kind under an Id that used
+to be stable) left its node alive and merely unpainted. Since 0.5 the arrange **releases** every identity the
+definition no longer declares, and everything that node owned goes with it: its sub-nodes, its state slots, its
+scroll position, its dirty and recovery records, any hit layer it still occupied, and the widget instance keyed by
+it. Source: `UiSession.PruneNodesExcept`, `Source/FerriteLib.UiKit/Kernel/UiSession.cs:477-513` (the release
+list at `:504-513`), called from the arrange at `UiLayoutEngine.cs:304` and, for a collection, through the same
+pass (`UiLayoutEngine.cs:1631`). A **declared-but-hidden** element is explicitly *not* released — hidden is not
+removed (`UiSession.cs:463-468`).
+
+**(b) What it affects.** Anything you kept in the tree under that element's identity: a text draft, a scroll
+offset, focus/selection, a per-element recovery record, a sub-node's state, a re-subscription. After a removal and
+a re-add the element exists again with **fresh** state. Nothing warns you: the page compiles, the manifest is
+valid, and the only symptom is state that resets — which is exactly why this section exists.
+
+**(c) How to detect it in your own page.** Compare node/state on either side of the removal with
+`session.GetNodeByElementId("your-id")`: it answers **non-null while the element is still declared** (including
+while `Visible`/`VisibleKey`/`Tab` hides it) and **null once the identity is gone from the definition** — the
+lookup is about identity, not arrangement (`UiSession.cs:405-419`). If you need the state to survive, (c) is
+where you find out that it will not.
+
+**(d) The supported paths.**
+- **Temporarily hiding an element** — use `Visible`, `VisibleKey` or `Tab`. A declared-but-hidden element keeps
+  its node and its state on purpose, so a draft or a scroll position stays reachable (`UiSession.cs:463-468`,
+  `UiSession.cs:411-413`).
+- **Really removing an element** — accept the release: that *is* the semantic, and the prune exists because the
+  old behaviour leaked a stale node and orphaned state on every reload (`UiSession.cs:457-462`). Do not restore
+  the leak to preserve state.
+- **State that must survive a real removal** — hold it in **your model**, keyed by your own business identity
+  (an item key, a def name, a settings key), not by the tree path, and re-seed the element when you add it back.
+  The tree is a projection of your model; it is not the model's store.
 
 ## 5. What is still open (do not over-claim)
 

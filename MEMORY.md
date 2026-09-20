@@ -2,6 +2,36 @@
 
 ## Current durable state
 
+- **Phase order is fixed and P1 gates everything else (maintainer ruling 2026-09-20): P1 seam and library fixes →
+  P2 migration and the legacy project's retirement → P3 the full UI/UX reset (last) → P4 new work.** This replaces
+  the earlier "wait for one go" framing in `TODO.md`, and it is authoritative: **S3–S7 do not move until P1
+  closes**, and FL's backlog remains friction the consumer's real use exposes rather than a wish list.
+- **P1-A closed 2026-09-20 (documentation口径 only, no source and no carrier build): FL-8, FL-11, FL-12.** One of
+  the three was fixed twice, and the second reason is the durable part.
+  (1) **FL-8** — the old→new migration section is §4c of `docs/consumers/consume-from-0.7.0.md` with the four
+  required parts (change point, impact, detection, supported paths) and with the time attribution **verified at
+  the tips rather than asserted**: `PruneNodesExcept` is present in `0.5.x` (2 hits in
+  `git show 0.5.x:…/Kernel/UiSession.cs`) and absent in `0.4.x` (0 hits), and the introducing commit
+  `0ab9015` is an ancestor of `0.5.x`. It reads "introduced in the 0.4 → 0.5 move, continued since, **not** a
+  0.6 regression", and the supported paths are exactly the ledger's four: hide with `Visible`/`VisibleKey`/
+  `Tab`; accept the release for a real removal; keep state that must survive in the model keyed by business
+  identity.
+  (2) **FL-11** — the authoritative-payload rule is now stated in all three consumer documents
+  (`consume-from-0.7.0.md` §1, `consume-from-0.6.0.md` §1, `docs/consumers/README.md`): the **GitHub Release
+  asset** is the only verifiable payload identity; a repo dev folder, a sibling checkout's copy and whatever a
+  build left in `1.6/Assemblies/` are **rehearsals**, and two hashes for one Api are two builds (a Dev channel
+  builds different bytes than a Release one, and the commits differed) rather than two identities for one
+  artifact. Consumers are told to verify what they actually bound (`AssemblyConfiguration`, embedded commit,
+  `Require` verdict) instead of matching a number written in a document.
+  (3) **FL-12 — and the correction of my own first fix, which measured the wrong object.** The sentence's count is
+  the **library's own** kinds: the classes in `Source/FerriteLib.UiKit/Kernel/Widgets/` that declare
+  `IUiWidget`, internal ones included = **seventeen** (it was sixteen until `input/text-field` arrived, which is
+  the whole staleness). My first pass replaced "sixteen" with the **consumer's** widget count (18) — the wrong
+  tree, and the wrong question. The ledger's FL-12 entry makes the same substitution (it rebuts the library's 16
+  with the consumer's 18), so the correction is recorded here: **a count without its predicate is not a
+  measurement, and "how many kinds implement `IUiWidget`" must name whose tree** — the library's count answers
+  "how much surface must a change consider", the consumer's answers "how much of it one project uses".
+
 - **A carrier hash identifies a build's INPUTS, and the stamp cannot record dirtiness — measured 2026-09-20, with
   the reproduction that settles it.** During round 5 the carrier at `1.6/Assemblies/` was measured by the Lead
   as 246 784 B / SHA-256 `5E6F9BF4…` stamped `0.7.0-dev+64af720e…` while HEAD had already moved to

@@ -52,8 +52,10 @@ consequence is paid in the open rather than discovered by a stranger.
   library cannot see a consumer's language files, so the dev-only check ("resolve the keys my chrome uses,
   log the ones that come back equal to the key") is the host's to run, and a host that prefers a
   placeholder or an empty string is free to answer that way.
-- `IUiWidget` — the custom-kind interface; sixteen consumer kinds implement it, which is the only proven
-  extension point the library has.
+- `IUiWidget` — the custom-kind interface; **seventeen core kinds** implement it (counted 2026-09-20: the
+  classes in `Source/FerriteLib.UiKit/Kernel/Widgets/` that declare `IUiWidget`, internal ones included — it was
+  sixteen until `input/text-field` arrived), which is the only proven extension point the library has. The count
+  is of the LIBRARY's own kinds: a consumer's widget count is a different number answering a different question.
 - `UiWidgetRegistry` — kind registration carrying the per-kind attribute schema and label set; consumers
   register their own scope through it.
 - `UiContractException` — creation-time contract failure, the type a consumer catches to survive its own

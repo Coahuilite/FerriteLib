@@ -34,11 +34,23 @@ the plan §9 log). Live plan, one home: `docs/development/0.7/10-change-plan.md`
 `docs/architecture.md` §3.2/§6.3's **alignment** gap and half of the **relation** gap, with CP-0 as a
 prerequisite.
 
-**Phase queue (2026-09-20):** FL's work in this phase is driven by **friction the consumer's real use
-exposes**, not by a wish list — no other Batch 2 item is started, and `container/tree`'s optional per-row
-template (the one capability `Repeat` + `<Templates>` does not already cover) is **held for pricing** until US's
-friction report arrives (`MEMORY.md`, phase-purpose entry). One freeze per round: every (B) fix moves HEAD and
-invalidates the consumer's gate green.
+**Phase order — maintainer ruling 2026-09-20, authoritative, and it replaces the earlier "wait for one go":
+P1 seam and library fixes → P2 migration and retiring/removing the legacy project → P3 the full UI/UX reset
+(last) → P4 new work.** FL is in **P1**, the foundation of that chain: **S3–S7 must not move until P1 closes.**
+The backlog is still **friction the consumer's real use exposes**, not a wish list, and `container/tree`'s
+optional per-row template (the one capability `Repeat` + `<Templates>` does not already cover) stays **held for
+pricing** until the friction report arrives (`MEMORY.md`, phase-purpose entry). One freeze per round: every fix
+moves HEAD and invalidates the consumer's gate green.
+
+- [x] **P1-A — the three documentation口径 items, 2026-09-20**: **FL-8** the old→new migration section now exists
+      as §4c of `docs/consumers/consume-from-0.7.0.md` (four parts; time attribution verified at the branch tips,
+      "0.4 → 0.5 introduced, continued since, not a 0.6 regression"); **FL-11** the authoritative-payload rule is
+      stated in all three consumer documents (the GitHub Release asset; dev folders, sibling copies and
+      `1.6/Assemblies/` are rehearsals); **FL-12** `api-tiers.md`'s count corrected to **seventeen** with its
+      predicate — the LIBRARY's own `Kernel/Widgets/` classes that declare `IUiWidget` (16 until
+      `input/text-field`). Docs only: no source, no carrier build.
+- [ ] **P1-B (next)** — the real-defect batch X-21 / FL-3 / FL-1 / FL-2 / FL-4, each with a failure-sensitive lane
+      shown red first; anything judged not to fix gets REJECTED with its argument, never a silent skip.
 
 - [x] **G1 + G4 landed 2026-09-20** — route (a) approved by the maintainer. G1: the engine-wide
       `HelpKey` on widget elements, claimed on the existing session hover surface (no new member, no new
@@ -77,7 +89,10 @@ invalidates the consumer's gate green.
       `docs/consumers/consume-from-0.7.0.md` §4b and let it
       compile against `[0.7.0,0.8.0)`. The four in-game checks in `docs/development/0.7/README.md` remain the
       maintainer's/operator's; they are the only thing that can lift the harness-only evidence boundary.
-- [ ] **Refresh `consume-from-0.7.0.md` §1's dev-artifact identity, or drop the identity block.** It quotes
+- [x] **`consume-from-0.7.0.md` §1's rehearsal identity — CLOSED 2026-09-20 by FL-11.** The block stays as
+      history, now labelled as a rehearsal of one working tree with the authoritative-payload rule stated
+      directly above it (the GitHub Release asset), so the stale value is no longer read as a target.
+- [ ] **(superseded, kept for the record) Refresh `consume-from-0.7.0.md` §1's dev-artifact identity, or drop the identity block.** It quotes
       `version.txt commit=88095fb3cbed` and a DLL SHA-256 that match neither the tree nor the staged folder
       (measured 2026-09-20: `dist/dev/FerriteLib/version.txt` reads `commit=d82a3ca8db83`). §1 is the
       consumer's first table, so a stale identity there is the one place it is read as current; the delivery
