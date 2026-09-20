@@ -44,12 +44,13 @@ $testsProject = Join-Path $root 'tools\FerriteLib.UiKit.Tests\FerriteLib.UiKit.T
 $assembliesDir = Join-Path $root '1.6\Assemblies'
 $tempLog = Join-Path ([System.IO.Path]::GetTempPath()) ("fl-verify-" + [guid]::NewGuid().ToString('N') + '.log')
 
-# The payload path is SHARED with the sibling checkouts, and a sibling's harness or probe process LOADS the
-# carrier at runtime - a loaded assembly holds its file open, so a READER blocks this run's build exactly as
-# another builder would. Measured 2026-09-20: the symptom was MSB3026 retries ending in MSB3027/MSB3021 inside
-# gate 1's build output, which reads like a broken build rather than contention, and it cost a blocked delivery
-# round while the cause was hunted in the wrong repository. Probe the file before any gate runs and name it.
-# Skipped when the payload does not exist yet (a fresh clone builds it in gate 2).
+# The payload path is SHARED with the sibling checkouts, and a sibling process that LOADS the carrier at
+# runtime holds its file open EXCLUSIVELY - so a reader blocks this run's build exactly as another builder
+# would. Measured 2026-09-20: a sibling's verification script called Assembly.LoadFile on this DLL to print its
+# configuration and held it for its whole run; the symptom here was MSB3026 retries ending in MSB3027/MSB3021
+# inside gate 1's captured build output, which reads like a broken build rather than contention, and it cost a
+# blocked delivery round while the cause was hunted in the wrong repository. Probe the file before any gate runs
+# and name it. Skipped when the payload does not exist yet (a fresh clone builds it in gate 2).
 $payloadPath = Join-Path $assembliesDir 'FerriteLib.UiKit.dll'
 if (Test-Path -LiteralPath $payloadPath -PathType Leaf) {
     try {
@@ -58,9 +59,10 @@ if (Test-Path -LiteralPath $payloadPath -PathType Leaf) {
         $lockProbe.Close()
     } catch [System.IO.IOException] {
         throw ("The payload at $payloadPath is held by another process, so no gate can replace it: " +
-            $_.Exception.Message + ". The usual cause is a sibling checkout's harness or probe, which loads the " +
-            "carrier at runtime and keeps the file open. Stop that process (one builder at a time across the " +
-            "repositories sharing this path), then re-run.")
+            $_.Exception.Message + ". The usual cause is a sibling checkout's harness, probe or verification " +
+            "script, which loads the carrier at runtime - a loaded assembly holds its file open exclusively - " +
+            "so a reader blocks this build exactly as another builder would. Stop that process (one carrier " +
+            "user at a time across the repositories sharing this path), then re-run.")
     }
 }
 $buildExtraArgs = @()
