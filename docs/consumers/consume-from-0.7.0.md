@@ -32,8 +32,11 @@ appropriate minor.
 
 ## 3. What actually changed for you at 0.7.0
 
-- **Public surface:** no type or kind added or removed, and no member signature changed; tiers unchanged.
-  `UiTheme` (public-unstable) gained one named factory, `Vanilla`, so the two built-in palettes are peers.
+- **Public surface:** one kind was **added** inside `0.7.0` (B7): `input/text-field`, the single-line
+  string sibling of `input/number-field`, with one public-unstable funnel member to carry it —
+  `UiNative.TextField(rect, key, session, value, out committed)`. Nothing was removed and no existing member
+  signature changed. `UiTheme` (public-unstable) gained one named factory, `Vanilla`, so the two built-in
+  palettes are peers.
   **Added XML vocabulary (Batch 1, §4b):** the four placement attribute names `AlignX`, `OffsetX`,
   `AlignY`, `OffsetY`. **Removed:** the stored token `UiTheme.HoverPoint`, replaced by the derived
   `UiTheme.AccentHover`.
@@ -72,17 +75,19 @@ optional, not prerequisites.
 
 ## 4b. Batch 1 — the breaks to absorb before you test
 
-Recorded in `docs/development/0.7/05-api-contract.md` under "Batch 1", all inside `0.7.0`. One is visual
-review, one is a page edit, one is a member swap.
+Recorded in `docs/development/0.7/05-api-contract.md` under "Batch 1", all inside `0.7.0`. Batch 1's three
+were one visual review, one page edit and one member swap; the added kind below is an addition, so it needs no
+migration at all.
 
 | Change | What you do |
 |---|---|
 | Container `Padding` **and** `Gap` now default to the theme's geometry instead of 0 | Review every page's spacing. Both built-in palettes carry `Padding = Gap = 6`, so an undeclared container moves from 0 to 6. An attribute you already declare keeps winning — a container with an explicit `Gap` is unaffected by the `Padding` fallback and vice versa. Add `Padding="0"` / `Gap="0"` where you want the previous result exactly. **Only those two tokens participate**: `Spacing`, `RowHeight` and `Hairline` stay widget-internal and never become a container default. |
 | `Tone` accepts only `Neutral`/`Success`/`Warning`/`Danger` | If a page wrote `Tone="Active"` or `Tone="Disabled"`, express the **state** instead: a read-only value binding for disabled, the control's own selected state for active. Both old names still work **for this minor only** and are refused at the next minor boundary (0.8). The only observable consequence today is **one appearance record per runtime element** (a collection row is its own element) — never one per frame, and the rendered treatment is unchanged. |
 | `UiTheme.HoverPoint` removed, replaced by `UiTheme.AccentHover` | Read `UiTheme.AccentHover` (read-only, derived from `AccentGold`). A scheme that declared `HoverPoint` now reports it as an unknown token instead of applying it. |
+| New: `input/text-field` | Optional, no migration — an addition, not a break. A single-line string field whose focus, draft and commit rule belong to the element: `Bind` (required), `Live` (default `true`; `false` defers the write until focus leaves), `Placeholder`/`PlaceholderKey`, `Label`/`LabelKey`, `Height`. A read-only binding refuses the write and the engine's disabled rule refuses the input, exactly as on `input/number-field`. If you hand-rolled one over `UiNative.TextField(rect, text)`, this is the supported shape now. |
 | New: `AlignX`/`OffsetX`/`AlignY`/`OffsetY` | Optional, no migration. Inside an `Overlay` they place a child by an edge or the centre plus a percentage of the parent's usable width; a flow container's child gets its cross axis with a pixel nudge only. |
 
-Nothing else in the compiled surface moved: no type or kind was added or removed, no member signature changed,
+Nothing else in the compiled surface moved: no type or kind was **removed**, no existing member signature changed,
 and **no `UiStatusTone` member was removed** (that type is stable — `Active` and `Disabled` remain members the
 library uses internally as states).
 

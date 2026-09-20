@@ -257,15 +257,75 @@ public static class UiNative
     }
 
     /// <summary>
-    /// The raw text field, and the one interactive primitive here that carries no element identity: there is
-    /// no session and no key to resolve, so it cannot consult the element's disabled state. A caller that
-    /// wants the unified disabled interaction for a text field reaches it through
-    /// <see cref="NumberField"/>, which carries the session and the state key. Recorded as a named gap
-    /// rather than left implicit.
+    /// The raw text field, carrying no element identity: there is no session and no key to resolve, so it
+    /// cannot consult the element's disabled state, cannot hold a draft and cannot report a commit. A caller
+    /// that wants any of those — which is every page-model kind — reaches the field through
+    /// <see cref="TextField(Rect, string, UiSession, string, out bool)"/>, its identity-bearing sibling. This
+    /// form stays for a caller that genuinely has no element to name, and the gap it used to be is closed by
+    /// that overload rather than by widening this one.
     /// </summary>
     public static string TextField(Rect rect, string text)
     {
         return NativeTextField(rect, text);
+    }
+
+    /// <summary>
+    /// The identity-bearing text field: the string sibling of <see cref="NumberField"/>, and the form every
+    /// page-model kind uses. Same funnel contract as the numeric one — a disabled element never reaches the
+    /// native control and never focuses; a focused field keeps its draft in the session while the model holds
+    /// the committed value; and the disabled refusal happens before the native control so no click is
+    /// consumed.
+    /// <para>
+    /// The commit rule is stated once here so its two halves cannot drift: <paramref name="committed"/> is
+    /// true when the buffer changed this frame, <b>or</b> when focus just left with a buffer that differs
+    /// from the model. The first half is a live editor's keystroke; the second is a deferred editor's only
+    /// chance to write, because the frame that leaves focus is otherwise indistinguishable from a frame that
+    /// typed nothing. A caller that ignores the second half would leave the draft in the session and never
+    /// move the model.
+    /// </para>
+    /// </summary>
+    public static string TextField(
+        Rect rect,
+        string elementId,
+        UiSession session,
+        string value,
+        out bool committed)
+    {
+        if (session == null) throw new ArgumentNullException(nameof(session));
+        UiValueState state = session.GetOrCreateValueState(elementId);
+        string model = value ?? "";
+        if (IsElementDisabled(session, elementId))
+        {
+            // Disabled: the field never takes focus, never reaches the native control and never commits, so
+            // no click is consumed and no text is edited. The draft is dropped back onto the model so a
+            // re-enabled field resumes there instead of on a dead edit.
+            state.Focused = false;
+            state.EditText = model;
+            committed = false;
+            return model;
+        }
+
+        if (!state.Focused)
+        {
+            state.EditText = model;
+        }
+
+        if (IsMouseDownOver(rect))
+        {
+            state.Focused = true;
+        }
+
+        string displayText = state.Focused ? state.EditText : model;
+        string text = NativeTextField(rect, displayText) ?? "";
+        bool changed = !string.Equals(text, displayText, StringComparison.Ordinal);
+        state.EditText = text;
+
+        bool left = state.Focused && (IsEnterPressed() || IsFocusLost(rect));
+        if (left) state.Focused = false;
+
+        committed = changed || (left && !string.Equals(state.EditText, model, StringComparison.Ordinal));
+        if (committed) return state.EditText;
+        return state.Focused ? state.EditText : model;
     }
 
     public static string NumberField(

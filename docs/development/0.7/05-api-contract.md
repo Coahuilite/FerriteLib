@@ -9,6 +9,16 @@ assertion range for the line is `[0.7.0, 0.8.0)`.
 No new public types, widget kinds, or XML vocabulary land in 0.7. No signature changes on existing
 members. The API-tier *type* list stays the 0.6 pin.
 
+**Amendment 3 (2026-09-20) — additions are allowed inside `0.7.0` for this coordination phase.** The
+maintainer ruled that the axis keeps the **number** `0.7.0` and that no minor is opened while the local
+consumer is mid-development: additions land inside the line, each one still owing its contract entry (recorded
+here before the code), its failure-sensitive lane, its `docs/api-tiers.md` classification in the same commit,
+and its consumer-guide line. This supersedes the "no new public types, widget kinds or XML vocabulary"
+sentence above **for the duration of that phase only**; it declares no surface stable, waives no gate, and the
+normal pre-1.0 rule (an addition moves the minor) returns when the phase ends. The API-tier *type* list is no
+longer the 0.6 pin: it gains one internalize-candidate entry (`TextFieldWidget`) and one member on the
+public-unstable `UiNative`.
+
 **Amendment (2026-09-18):** `UiTheme` gains one public static factory, `Vanilla`, so the two built-in
 palettes are named peers. The addition is recorded here before the member ships.
 
@@ -180,6 +190,46 @@ The change is pinned by a failure-sensitive lane — `KernelLayoutTests`, "A mod
 include a description (B8)" — shown red on the pre-fix code (the Auto column measured the 12-character
 description at 96px against the title's 16px) and green after. No other lane's expectations moved: this is a
 defect fix on one kind's declared label set, not the kind of break Batch 1 recorded.
+
+### B7 (2026-09-20) — `input/text-field`, and the text-field funnel that carries element identity
+
+An **addition**, landing inside `0.7.0` under Amendment 3. The maintainer called the library lacking a
+single-line text field an oversight; the four-question promotion gate was already passed on the shape before
+this round — the string sibling of `input/number-field`, over the funnel primitive that the raw
+`UiNative.TextField(Rect, string)` already was.
+
+- **New kind `input/text-field`** (`TextFieldWidget`, internalize-candidate: a kind string in the manifest is
+  the only supported use). Schema: `Bind` (required), `Live`, `Placeholder`, `PlaceholderKey`, `Label`,
+  `LabelKey`, `Height`, plus the engine-wide names and the `Tone`/`Emphasis` roles. `Validate` refuses a
+  missing `Id`/`Bind` and a key bound to anything but a string, at creation.
+- **What it owns, and therefore what earns it a name**: per-element focus, the in-progress draft in the
+  session's value bag, the commit rule, the placeholder's conditional paint, and the disabled refusal — none of
+  which a manifest attribute can carry. A hand-rolled text box outside the tree loses the disabled refusal, the
+  recovery slot and the fit audit with it, which is the asymmetry this closes.
+- **New funnel member** `UiNative.TextField(Rect, string, UiSession, string, out bool)` — the identity-bearing
+  sibling of `NumberField`. Same disabled rule (a disabled element never reaches the native control and never
+  focuses), same draft-in-session rule, and one commit report. `UiNative` is public-unstable, which is why this
+  is a member addition rather than a new design.
+- **The commit rule, stated once**: `committed` is true when the buffer changed this frame, **or** when focus
+  just left with a buffer that differs from the model. `Live` (default true) writes on the keystroke; with
+  `Live=false` the write is deferred while the field holds focus and lands on the frame focus leaves. An edit
+  that arrives while the field is unfocused commits immediately under either setting — there is no draft to
+  defer.
+- **The label set is `Label`/`LabelKey` and nothing else.** `Placeholder`/`PlaceholderKey` are painted but
+  deliberately **not** in the label set: a hint shown inside an empty field is not the element's declared width,
+  and B8's rule is that the label set equals what the kind paints *as its label*. Nothing unpainted is declared
+  and nothing painted-as-label is missing.
+- **Not changed:** the raw `TextField(Rect, string)` keeps working for a caller with no element to name; no
+  existing member's signature moves; `Api` stays `0.7.0`.
+- *Migration:* none — an addition. A page that already hand-rolls a field over the raw overload plus a session
+  value state can move to the kind and gain the disabled refusal, the recovery slot and the fit audit; nothing
+  forces it to.
+
+**Provenance, and its boundary.** Two independent hand-rolls in the one wired consumer were forced into this
+shape and are transcribed in `MEMORY.md`
+(`Coahuilite/UniversalSqueaker@ad1a7447b298b104e6afafa5e7fa5567ec0f3556`); they are evidence that the shape is
+generally needed, not consumption evidence for this implementation, and no consumer compiles against this kind
+yet.
 
 ## The selected ordinary-authoring path (B)
 

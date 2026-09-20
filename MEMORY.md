@@ -2,6 +2,16 @@
 
 ## Current durable state
 
+- **Maintainer ruling — additions are allowed inside `0.7.0` for the coordination phase (2026-09-20).** The
+  axis keeps the **number** `0.7.0`; no minor is opened while the local consumer is mid-development, and the
+  phase now runs until that consumer completes its UI work. This **amends** the 2026-09-19 ruling rather than
+  replacing its reasoning: the goalpost argument is still spent, and the maintainer's answer is that a range
+  pin tolerates growth under it while the consumer is local and in the loop. What an addition still owes, every
+  time: a contract entry recorded **before** the code, a failure-sensitive lane, its `docs/api-tiers.md`
+  classification in the same commit, and its consumer-guide line. What the ruling does **not** do: declare any
+  surface stable, waive a gate, or move a tier. **When the phase ends, the normal pre-1.0 rule returns** — an
+  addition moves the minor. Recorded in the line's contract as Amendment 3. First addition under it: `input/text-field` (B7).
+
 - **Maintainer policy directive — every US→FL item is classified before it can become work (2026-09-20).**
   Two buckets, exactly one per item, and the classification must be written down wherever the item is
   recorded. **(A) US misuse / US's own job:** the consumer relied on incidental behaviour FL never contracted,
@@ -77,12 +87,54 @@
   (role→surface mapping as data, blocked by CP-3), CP-5 (regional scope) and CP-7 (sibling-relative
   placement). Evidence boundary: harness only.
 
+- **`input/text-field` landed (2026-09-20, B7) — an addition inside `0.7.0` under the 2026-09-20 ruling.**
+  The maintainer called the library lacking a single-line text field **an oversight** and approved the shape this
+  ledger had already ruled on: the string sibling of `input/number-field` over the existing funnel primitive,
+  so the four-question promotion gate was passed before the round. What shipped: the kind (schema `Bind`,
+  `Live`, `Placeholder`/`PlaceholderKey`, `Label`/`LabelKey`, `Height`, plus the engine-wide names and the
+  `Tone`/`Emphasis` roles; label set = `Label`/`LabelKey` only) and one new **public-unstable** funnel member,
+  `UiNative.TextField(Rect, string, UiSession, string, out bool)`, which closes the gap `docs/api-tiers.md` used
+  to name ("the one interactive primitive that cannot consult the disabled state"). It owns per-element focus,
+  the draft in the session's value bag, the commit rule (`committed` = the buffer changed, **or** focus left with
+  a buffer differing from the model; `Live` writes on the keystroke, `Live=false` defers while focused), the
+  placeholder's conditional paint, and the same disabled refusal as its numeric sibling.
+  **Provenance, two independent hand-rolls in the one wired consumer** (transcribed because its tree is not
+  cloneable here): `Coahuilite/UniversalSqueaker@ad1a7447b298b104e6afafa5e7fa5567ec0f3556:Source/UniversalSqueaker/UI/Kernel/UsVoicePackChecklistWidget.cs:272-323`
+  (`DrawSearchField`: `UiNative.TextField` at :286, session-held focus/draft at :279-283 and :313-321, a
+  placeholder painted only while empty and unfocused at :294-311) and the independent second hand-roll at
+  `Coahuilite/UniversalSqueaker@ad1a7447b298b104e6afafa5e7fa5567ec0f3556:Source/UniversalSqueaker/UI/Diagnostics/UsDiagnosticsWidgets.cs:521-556`
+  (funnel call at :534, session focus/draft at :527-531 and :545-553) —
+  two files, written independently, converging on one contract, with the model side bound as `search-text`
+  (`UsFilterBarWidget.cs:60,136`). That is evidence the **shape** is generally needed; it is **not** consumption
+  evidence, and no consumer compiles against the kind yet.
+  **Lane** `KernelTextFieldTests` (9 lanes, 63 printed `ok:` lines = 54 assertions plus the nine lane lines)
+  drives the interaction rather than the paint: a pointer
+  that focuses and one that does not, a live edit on the keystroke, a deferred draft that must not reach the
+  model until the commit frame, the blur and Enter commit paths (exactly one write), the read-only refusal, the
+  command-disabled funnel refusal against a real arranged element, the placeholder's four conditions, and the
+  measure. It also breaks the repo's F2 convention on purpose: its `Run` prints the lane's `ok:` **only** when the
+  action returned and left no failed check, so a green lane name cannot hide a red assertion in this file.
+  **Red-first evidence is a mutated control**, because a new kind has no pre-fix revision: with the deferred-write
+  condition narrowed to `if (live)` the deferred-commit lane reddens, and with the `writable == false` guard
+  removed the read-only lane reddens (it throws through the binding); both were reverted and the lane is green
+  (`HARNESS_EXIT=0`, zero `FAIL` lines, ALL PASS). **No gate enforces "an addition bumps the minor"** — measured:
+  `FerriteLibVersionTests` only pins the three axes agreeing on major.minor, and `FerriteLibApiTierTests` requires
+  a tier entry for every public type; neither reads the ruling. So nothing had to be weakened to land this, and
+  the classification lane reddening while `TextFieldWidget` was unclassified is the gate that did fire.
+  `Api` stays `0.7.0`. Recorded in the contract (Amendment 3 + "### B7"), the 0.7 README and the consumer guide.
+
 - **B8's label-set half is fixed on the 0.7.x line (2026-09-20) — a defect fix, so it stays inside `0.7.0`.**
-  The consumer's first live pass reported `input/mode-row`'s `Description1..8` as "in the schema *and* the
-  label set, but never drawn" — transcribed, because a consumer tree is not cloneable here:
-  `Coahuilite/UniversalSqueaker@0a1b7c05c5ce:Source/UniversalSqueaker/UI/Kernel/UsModeRowWidget.cs:59-70,64`
-  (its own four-column mode row, each option carrying a help claim it keeps consumer-side). FL confirmed both
-  halves and split them. The **label set** is now
+  **Provenance corrected the same day, because the first wording of this entry overstated it.** It said "the
+  consumer's first live pass reported it" and cited `UsModeRowWidget.cs` — but that file is the consumer's
+  **own** kind (`Coahuilite/UniversalSqueaker@ad1a7447b298b104e6afafa5e7fa5567ec0f3556:Source/UniversalSqueaker/UI/Kernel/UsModeRowWidget.cs:11`
+  declares `us/mode-row`), and it cannot be provenance for this library's `input/mode-row`. Re-measured in the
+  consumer tree: the literal `input/mode-row` appears **0** times under its `Source/**`, `Description1..8`
+  appears **0** times there, and the only mode row it declares is its own `us/mode-row` (its help catalog keys
+  off `us/mode-row`; the help claim stays on its side). B8 therefore arrived as a **report about this
+  library's own code** — which FL then verified in its own source — and it is a **library-internal latent
+  defect with zero consumer evidence**: a kind's declared label set must equal the text it paints, and
+  `input/mode-row` broke that on its own. The consumer's pixels were never affected, and the fix is right for
+  that reason rather than because anyone was hit by it. The **label set** is now
   `Title1..8` only, so a `Width="Auto"` mode-row stops measuring text that can never appear — the seam is
   `UiLayoutEngine.MeasureLabelWidth`, which measures the kind's *declared label set*, while `DrawOption`
   paints `option.Title` alone. Pinned by a failure-sensitive lane (`KernelLayoutTests`, "A mode-row's Auto
@@ -91,9 +143,10 @@
   itself still printed `ok:`, which is F2 — and green after (`HARNESS_EXIT=0`, zero `FAIL` lines, ALL PASS).
   The **schema** half is deliberately untouched: the four names stay legal attributes and the widget still
   reads them, so this is not a vocabulary retirement — removing them (or giving them a drawing path) is a
-  maintainer ruling, and the consumer keeps its help claim. Recorded in the line's contract (`docs/development/0.7/05-api-contract.md`,
+  maintainer ruling, and it is **pure library hygiene** (an orphan name in a general kind's vocabulary), not a
+  consumer need and **not a reason to raise the minor**. Recorded in the line's contract (`docs/development/0.7/05-api-contract.md`,
   "### B8") and in the consumer guide's fix list; no public type, signature, tier or manifest vocabulary
-  moved. Evidence boundary: harness only, no in-game run.
+  moved. Evidence boundary: harness only, no in-game run, no consumer-side evidence either way.
 
 - **Maintainer ruling — splitting and breaking changes are allowed in this window (2026-09-18).** The
   0.7.x line is in a fast-development phase: nothing has been pushed, nothing is consumer-compiled, and the

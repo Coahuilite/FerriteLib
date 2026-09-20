@@ -103,15 +103,17 @@ consequence is paid in the open rather than discovered by a stranger.
   invalidation classes, moves a revision only on `NotifyChanged` (never on `Set`), refuses to run a
   command whose predicate answers false, and answers `TryGetBool` without throwing for a key bound to
   another type.
-- `UiNative` — the backend funnel's public face (26 members today); hit-stack and focus work will move
+- `UiNative` — the backend funnel's public face (27 members today); hit-stack and focus work will move
   members across its boundary. It also owns the one disabled-input rule: `Button(rect, ctx)` and
   `DropdownButton` refuse the pointer for an element the engine published disabled, and the
-  session-plus-key primitives now do the same — `Slider` and `NumberField` resolve the element through the
+  session-plus-key primitives now do the same — `Slider`, `NumberField` and the identity-bearing
+  `TextField(Rect, string, UiSession, string, out bool)` resolve the element through the
   declared-Id bridge and never reach the native control while it is disabled, so a command-bound slider or
   field takes no drag, no edit and no focus, while a key that names no arranged element keeps the
-  pre-guard behaviour exactly. `TextField(Rect, string)` is the one interactive primitive carrying no
-  element identity (no session, no key) and therefore cannot consult the state: a named gap, closed by
-  adding the session/key form if a consumer ever needs a disabled text field.
+  pre-guard behaviour exactly. The identity-free `TextField(Rect, string)` remains for a caller with no
+  element to name, and the gap this entry used to record — "the one interactive primitive that cannot
+  consult the disabled state" — is **closed** by the identity-bearing overload (0.7.0, B7) rather than by
+  widening the raw form.
 - `UiPopup` — one popup per session by design today; the owned hit stack generalises exactly that.
 - `UiSessionGuard` — the recovery wrapper; the recovery key is an arranged path today.
 - `UiTheme` — per-surface (fill, border) pairs and a density bundle landed (`BaseSurface` through
@@ -393,6 +395,8 @@ consequence is paid in the open rather than discovered by a stranger.
 - `RuleWidget` — kind string only (`chrome/rule`).
 - `SliderWidget` — kind string only (`input/slider`).
 - `NumberFieldWidget` — kind string only (`input/number-field`).
+- `TextFieldWidget` — kind string only (`input/text-field`); the single-line field's focus, draft and
+  commit rule are reached from the manifest, not from the type.
 
 Removing them needs a place for the kind names: a stable container of `const string` kind identifiers, so
 `["Kind"] = "core/state/empty"` stays writable without a type reference. That is a 0.4.x item, and until it

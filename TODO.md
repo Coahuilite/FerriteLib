@@ -51,12 +51,43 @@ prerequisite.
       consumer's first table, so a stale identity there is the one place it is read as current; the delivery
       path this line actually uses is the **Release carrier**, not the dev folder. Refresh it the next time a
       dev package is genuinely staged, or replace the row with the carrier + gates commands.
+- [ ] **Delivery guardrail: separate the dev and release artifacts, and make every pack a fresh build —
+      PROPOSAL ONLY, waiting on the maintainer's wording (2026-09-20).** Measured root cause:
+      `Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj:20` sets `<OutputPath>..\..\1.6\Assemblies\</OutputPath>`
+      with **no configuration condition**, so Dev and Release write one folder, and `verify-local.ps1`'s
+      `-PackDev` block runs `pack-dev.ps1` as the **last** step, after every check. Proposed shape, none of it
+      implemented: (a) pin **Release** to `1.6/Assemblies/` (a de-facto published path a stranger's project
+      references — do not relocate it); (b) give **Dev** its own output folder so it cannot overwrite the
+      carrier; (c) force a clean rebuild + PDB removal at the end of every pack channel. Open questions the
+      proposal's two questions, answered by measurement in the round-2 report: **(i) nothing legitimate reads
+      Dev bytes from the carrier path.** The readers are gate 4 (`verify-local.ps1:121`, which asks MSBuild for
+      `TargetPath -p:Configuration=Release`, so it is Release-only), gate 5's content probe, gate 9
+      (`stub-coverage-scan.ps1:309` reads the DLL at that path — it should read the shipped bytes, and after
+      the change it does), the two publishing packers (`pack-release.ps1:28`, `pack-steam.ps1:19` — Release
+      channels), and the sibling consumer's HintPath, which improves. The one that must change is
+      `stage-package.ps1:31`, which hardcodes the carrier path for **all three** channels: after Dev moves it
+      would measure Release bytes against the `dev` channel and **refuse** at `:86-88` — fail-closed, not
+      silent, but the dev channel would stop working, so `$payloadDll` must become channel-aware in the same
+      change. **(ii) the measurement still holds and gets stronger**: it reads the bytes it is about to copy
+      (`Get-AssemblyConfiguration` at `:81`, ProductVersion at `:93`), so a channel-specific source makes it
+      measure the configuration the channel names, with no shared path left to confuse.
+      **Two findings that change the shape of (c).** The commit-freshness guardrail the maintainer asked for
+      **already exists on both publishing channels** as a *refusal* — `pack-release.ps1:73-78` and
+      `pack-steam.ps1:58-61` compare the payload's embedded commit to HEAD and throw; today's dev channel is
+      the only packer that builds, and it builds Dev into the shared path. So "force a clean rebuild at the end
+      of every pack channel" is a **design change to the three-channel split** (packers own identity, the
+      release workflow builds between the gates and the pack), not a gap to patch; and relocating Dev's output
+      makes the manual `Remove-Item …pdb` step unnecessary rather than mandatory, because the Dev PDB moves
+      with the Dev output while Release leaves none (`DebugType=none`). `artifacts/` is already gitignored, so
+      a Dev output folder under it keeps the tree clean.
 - [ ] **Batch 2 (after the live feedback)** — CP-3 (skin-source axis) → CP-6② (role→surface mapping as
       data; blocked by CP-3) → CP-5 (regional scope), plus CP-7 (sibling-relative placement) if the feedback
       asks for it. Additive today and cited by nothing; the live pass is what would supply the citation.
 - [ ] **Batch 2 also owns the consumer's own list** (`modding_documents/team-mode/us-to-fl-2026-09-19-zh.md`,
       evaluated in `fl-to-us-2026-09-19-zh.md`): B2② `WideHidden`; B5 `WidthKey` (blocked on the consumer
-      committing its citation); B6 the chrome action slot; B7 `input/text-field` (passes the kind gate);
+      committing its citation); B6 the chrome action slot; **B7 `input/text-field` — LANDED 2026-09-20** (the
+      kind + the identity-bearing `UiNative.TextField` overload; contract Amendment 3, tier entry, lane
+      `KernelTextFieldTests`; no minor moved under the 2026-09-20 ruling);
       B8's **vocabulary** half (`Description1..8` out of the schema, or a drawing path — maintainer ruling
       owed; the **label-set** half, the pixel-moving defect, landed 2026-09-20 as a fix, `MEMORY.md`); B9
       refused for this line; B10 text alignment as a **layout** attribute, not an appearance axis; B11 the L1
@@ -72,10 +103,12 @@ prerequisite.
       `diag-nav-col` report is **(A)**: `Width="Auto"` was documented as the label set's natural text width
       and the 1px collapse was never a contract, so US fixed it with the existing general `VisibleKey` and it
       produces **no FL work item and no version consequence**.
-- [ ] **Which Batch 2 item to start is a maintainer pick, not a session's (2026-09-19, unruled).** B7
-      `input/text-field` is the strongest on the kind gate; B5 waits on the consumer committing its citation;
-      B8's vocabulary half is the ruling that also unblocks B11's first positive control. Whichever is chosen
-      owes its own contract amendment **before** code, a failure-sensitive lane, and the consumer-guide line.
+- [x] **The Batch 2 pick was B7 `input/text-field`, ruled by the maintainer on 2026-09-20 and landed the same
+      day.** Remaining (B)-general candidates, in the order this ledger rates them: B5 `WidthKey` (waits on the
+      consumer committing its citation), B6 the chrome action slot, B2② `WideHidden`, B10 alignment as a layout
+      attribute, B11 the L1 orphan-name check (B8 is its first positive control). Each still owes its own
+      contract amendment **before** code, a failure-sensitive lane, and the consumer-guide line; all stay inside
+      `0.7.0` while the coordination phase runs.
 - [x] D1–D7 — all seven Step-1/Batch-1 decisions settled; see the plan §0b for what each was settled as.
 
 ## 0.7.x round — implemented, external acceptance open (2026-09-17)

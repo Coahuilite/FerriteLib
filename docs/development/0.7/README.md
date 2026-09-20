@@ -24,6 +24,14 @@ defaulting to the theme's geometry instead of 0; the authored tone vocabulary sh
 `Active`/`Disabled` redirecting to states for one minor; and `UiTheme.HoverPoint` removed in favour of a
 derived accent step. `UiTheme.Vanilla` is a public-unstable member addition, recorded in the same file.
 
+**Amended again by B7 (2026-09-20).** The coordination ruling that followed Batch 1 allows **additions** inside
+`0.7.0` while the local consumer is mid-development, and the first one landed: `input/text-field`, the
+single-line string sibling of `input/number-field`, plus one public-unstable member —
+`UiNative.TextField(Rect, string, UiSession, string, out bool)`. The API-tier *type* list is therefore **no
+longer the 0.6 pin**: it gains one internalize-candidate entry (`TextFieldWidget`). `Api` stays `0.7.0`. The
+entry, the "no migration — it is an addition" stance and the commit rule are in `05-api-contract.md` under
+Amendment 3 and "### B7".
+
 ## What ordinary authors stop doing (B, honestly measured)
 
 Before/after on the same operation ("add a second numeric setting to a settings group"), against the

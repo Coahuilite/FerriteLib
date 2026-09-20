@@ -62,7 +62,10 @@ public static class FerriteLibVersion
     /// replaced by a derived accent step. All of it lands inside this one minor because the line has never been
     /// delivered (fast-development ruling 2026-09-18), and every break is recorded in the 0.7 contract with its
     /// migration before it ships. The consumer-count prerequisite for the supported contract was removed by
-    /// maintainer ruling on 2026-09-17; older freeze-gating wording elsewhere is superseded.
+    /// maintainer ruling on 2026-09-17; older freeze-gating wording elsewhere is superseded. The 2026-09-20
+    /// ruling then allowed **additions to stay inside this same number** for the coordination phase, so
+    /// `input/text-field` (B7) lands here rather than in a 0.8.0: the number does not move, every addition still
+    /// records its contract entry and lane first, and the normal pre-1.0 rule returns when that phase ends.
     /// </summary>
     public static readonly Version Api = new Version(0, 7, 0);
 
