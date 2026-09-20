@@ -28,6 +28,7 @@ internal static class KernelCoreWidgetTests
         failures += Run("SelectedKey resolves the element to the active state (0.7.x)", VerifySelectedKey);
         failures += Run("A button command receives the payload its row declares (G2)", VerifyButtonPayload);
         failures += Run("Chrome=\"none\" paints no surface and Auto height measures the content (G3)", VerifyBareHitArea);
+        failures += Run("A binding element-type mismatch is reported, not just thrown (FL-23)", VerifyBindingMismatchIsReported);
         return failures;
     }
 
@@ -538,6 +539,67 @@ internal static class KernelCoreWidgetTests
     /// the finding, because the next attempt should start from the failure it exposes (the string fallback
     /// accepted a pair-bound key instead of reporting the mismatch) rather than from a fresh guess. See
     /// MEMORY.md and docs/development/0.7/60-capability-dispositions.md for the disposition.
+
+    /// <summary>
+    /// FL-23: reading an options binding as the wrong element type throws today, and that is correct - but
+    /// nothing lands on the library's audit surface, so a consumer that catches the throw keeps rendering a
+    /// silently degraded control and no report ever says why. The fix is one deduplicated diagnostic on the
+    /// same fail-soft channel FL-21/FL-22 use; this lane is its evidence, and it fails on the pre-fix tree.
+    /// </summary>
+    private static void VerifyBindingMismatchIsReported()
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+
+        // The channel is CUMULATIVE and shared with every other lane in the process, so the assertion must
+        // measure a delta from a reset - not a total (a first pass read the total and passed for the wrong
+        // reason: exactly the shape this batch exists to catch).
+        UiFitAudit.Reset();
+        var bindings = new UiBindings();
+        bindings.BindOptions("choices", () => new List<int> { 1, 2 });
+
+        // The throw stays: the read is answered as "wrong type", never coerced.
+        bool threw = false;
+        try
+        {
+            bindings.GetOptions<string>("choices");
+        }
+        catch (InvalidOperationException)
+        {
+            threw = true;
+        }
+
+        if (!threw) throw new Exception("a mismatched options read no longer reports the wrong element type");
+
+        int reported = UiFitAudit.StyleFallbackCount;
+        if (reported != 1)
+        {
+            throw new Exception(
+                "the mismatch threw but nothing was reported: StyleFallbackCount=" + reported
+                + " (expected exactly one diagnostic a consumer can read)");
+        }
+
+        // Reading it wrong twice must not stack: the channel is a report, not a frame log.
+        try
+        {
+            bindings.GetOptions<string>("choices");
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        if (UiFitAudit.StyleFallbackCount != 1)
+        {
+            throw new Exception("the second identical mismatch was reported again (count=" + UiFitAudit.StyleFallbackCount + ")");
+        }
+
+        // The matching read reports nothing at all.
+        bindings.GetOptions<int>("choices");
+        if (UiFitAudit.StyleFallbackCount != 1)
+        {
+            throw new Exception("a correct read recorded a diagnostic");
+        }
+    }
 
     /// <summary>True when the page is refused at creation with <paramref name="expectedInMessage"/> in the
     /// located diagnosis - the shape every vocabulary refusal in this batch must keep.</summary>

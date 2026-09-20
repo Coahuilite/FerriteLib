@@ -2,6 +2,18 @@
 
 ## Current durable state
 
+- **FL-23 landed (2026-09-20): a wrong-type binding read is now REPORTED, not only thrown.** `GetOptions<T>` and
+  `Invoke<T>` record one deduplicated diagnostic on the fail-soft channel (path = binding key, kind = `binding`,
+  attribute = `OptionsBind`/`ActionBind`, authored/resolved = the two type names) before throwing as they always
+  did. Evidence: the lane is red on the pre-fix tree ("the mismatch threw but nothing was reported:
+  StyleFallbackCount=0"), green after, and red again with the reporting call disabled; green run ALL PASS 2595 ok.
+  **Two durable lessons came out of it.** (1) `UiFitAudit`'s counters are CUMULATIVE and process-wide, so a
+  "count == 1" assertion must `Reset()` and measure a delta - the first version of this lane passed against the
+  unfixed tree for exactly that reason, which is the same green-for-the-wrong-reason shape the phase keeps
+  paying for. (2) The reporting makes FL-16's dual-shape probe a design problem: a probe that legitimately tries
+  one shape and falls back to the other must read through a NON-reporting path, or a valid page records a
+  mismatch for the shape it is not. FL-16's redo starts there.
+
 - **A lane that stays green when the feature is removed is not evidence; this session paid for that lesson once
   (2026-09-20).** FL-16 (typed `UiOption` pairs) was implemented, its public type classified and the whole suite
   green - then the faithful pre-fix revert (a single string read in `BuildOptions`) left the new lane GREEN,

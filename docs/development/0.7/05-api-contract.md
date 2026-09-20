@@ -427,6 +427,20 @@ the tier entry and the lane were removed, and the diagnosis is recorded instead:
 pair-bound key rather than reporting the element-type mismatch, which is what made the probe blind. The next
 attempt starts from that failure rather than from a fresh guess. Nothing here promotes a type.
 
+### FL-23: a binding element-type mismatch is reported, not only thrown (2026-09-20)
+
+Reading a typed binding as the wrong element type has always been refused - `GetOptions<T>` and `Invoke<T>`
+throw and name both types. What was missing is that the refusal was **invisible on the library's audit
+surface**: a consumer that catches the exception keeps rendering a degraded control and no report ever says
+why, which is the same 'fail-soft must not mean silent' hole as FL-21/FL-22. Both members now record one
+deduplicated diagnostic on the existing fail-soft channel (path = the binding key, kind = `binding`, attribute
+= `OptionsBind`/`ActionBind`, authored = the registered type, resolved = the requested type) **before** throwing
+exactly as before. The refusal is unchanged; being reported is the addition.
+
+**One pitfall this creates for the withdrawn FL-16 work:** a legitimate dual-shape probe (pair list, else string
+list) must read through a **non-reporting** path, or a perfectly valid page would record a mismatch for the
+shape it is not. That is a design point for FL-16's redo, not a defect of this change.
+
 ## The selected ordinary-authoring path (B)
 
 The recommended author route is existing surface only: one layout manifest over public atoms/containers

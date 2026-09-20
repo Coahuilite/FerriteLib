@@ -166,6 +166,10 @@ where you find out that it will not.
   measured into and `Needed` is the measured content it could not hold — an overflow is about the **label band**,
   not about the element's height. A consumer that renders "has N px" is quoting the band; say so, or name the
   element's own rect separately.
+- **A wrong-type binding read is reported as well as refused (FL-23).** Reading an options list or an action
+  payload as a different element type still throws, and it now also records one deduplicated finding on the
+  audit surface (the binding key is the path, the two type names are the authored/resolved pair), so a caught
+  exception is no longer the only trace of it.
 - **A fit-audit count is not a census (FL-22).** Findings are deduplicated by key (path, text, font, axis,
   needed, available), capped at `MaxReports = 48` with `Saturated` published when the cap is hit, and
   `Reset()` starts a new collection. Log lines count **distinct findings**, never elements, so an "xN" you print

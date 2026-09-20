@@ -260,6 +260,12 @@ public sealed class UiBindings : IUiBindings
 
         if (descriptor!.ItemType != typeof(T))
         {
+            // FL-23: the throw already names the wrong element type, but a consumer that catches it keeps
+            // rendering a degraded control with nothing on the library's audit surface to explain why. The
+            // refusal is unchanged; what is added is that it is REPORTED, once per distinct mismatch, on the
+            // same fail-soft channel the appearance and overflow findings use (FL-21/FL-22).
+            UiFitAudit.ReportStyleFallback(
+                elementId, "binding", "OptionsBind", descriptor.ItemType.Name, typeof(T).Name);
             throw new InvalidOperationException(
                 $"Options binding '{elementId}' is '{descriptor.ItemType.Name}', not '{typeof(T).Name}'.");
         }
@@ -276,6 +282,10 @@ public sealed class UiBindings : IUiBindings
 
         if (descriptor!.PayloadType != typeof(T))
         {
+            // FL-23, the same silence one member over: an action payload read as the wrong type is refused
+            // and now also reported, so a caught exception is still visible to whoever reads the audit.
+            UiFitAudit.ReportStyleFallback(
+                actionId, "binding", "ActionBind", descriptor.PayloadType.Name, typeof(T).Name);
             throw new InvalidOperationException(
                 $"Action binding '{actionId}' expects '{descriptor.PayloadType.Name}', not '{typeof(T).Name}'.");
         }
