@@ -40,7 +40,11 @@ public sealed class ChromeBannerWidget : IUiWidget
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new ChromeBannerWidget(),
-            new[] { "Id", "Kind", "Bind", "Text", "TextKey", "Height", "Tab", "Hidden" },
+            // G5: the banner joins the atoms' role pair instead of keeping a literal list that could not
+            // take a Tone. Its own look is text-only, so it reads the role's TEXT colour, and its default
+            // emphasis is Muted (ParseEmphasis below) - which is what keeps an untone banner's colour exactly
+            // what it was before the role pair arrived.
+            AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "Text", "TextKey", "Height"),
             new[] { "Text", "TextKey" });
     }
 
@@ -72,7 +76,13 @@ public sealed class ChromeBannerWidget : IUiWidget
         string text = ResolveText(ctx);
         if (text.Length == 0) return;
 
-        UiThemeDraw.Label(rect, text, ctx.Theme, ctx.Theme.TextSecondary, BandFont, TextAnchor.MiddleLeft);
+        UiThemeDraw.Label(
+            rect,
+            text,
+            ctx.Theme,
+            AtomVocabulary.ResolveRole(spec, ctx, writable: null, defaultEmphasis: UiEmphasis.Muted).Text,
+            BandFont,
+            TextAnchor.MiddleLeft);
     }
 
     /// <summary>

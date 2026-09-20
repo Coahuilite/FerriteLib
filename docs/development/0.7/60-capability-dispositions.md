@@ -56,5 +56,12 @@ same commit.
 **Largest and last:** FL-17's per-row template on `container/tree`, which reuses `Repeat`'s materialisation and
 prune machinery and should be scheduled after the smaller items so one rebuild covers the rest.
 
+**Batch 1 outcome (2026-09-20, task-23).** Landed with lanes and mutation evidence: **B2(2) `WideHidden`**,
+**B5 `WidthKey`**, **`SelectedKey`**, **G5** (banner role pair), and the **FL-21/FL-22** wording.
+**Moved to the next batch, verdicts unchanged — G2, G3, FL-16**: each is ACCEPTed on the four gates, but the
+batch's evidence bar is one failure-sensitive lane per item with its own mutation, and a new public type plus two
+more attributes would have shipped in the same freeze window without a lane shown red against them. They are
+listed here rather than half-landed. FL-17 and FL-18+B6 remain with the maintainer (task-24).
+
 **Then:** task-23 folds every ACCEPT into **one** carrier rebuild and one FREEZE NOTICE. New surface stays inside
 `0.7.x` under the phase ruling — no minor move. Nothing in this file is implemented yet.

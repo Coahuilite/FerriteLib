@@ -366,6 +366,47 @@ red-first evidence, so the omission cannot silently return.
 *Migration:* none. A container declaring `Tab` was refused before, so no page can be relying on either
 behaviour.
 
+### P1-E vocabulary batch (2026-09-20) — four small additions and two diagnostic corrections
+
+Inside `0.7.0` under Amendment 3, from the disposition table (`60-capability-dispositions.md`). Each item below
+carries its own lane, proven red against the reverted implementation in one mutated build and green after.
+
+- **B2(2) `WideHidden`** — the exact mirror of `NarrowHidden`: a child declaring it is arranged only while the
+  state is NOT narrow, so "this element belongs to the wide presentation" is expressible without the two
+  mutually exclusive subtrees the earlier workaround needed. Allowed on widgets and containers, subject to the
+  same parent rule as `NarrowHidden`: a declaration under no `Breakpoint` is refused at creation, because
+  nothing could ever switch the state it depends on (`UiHost`, `IsHidden`).
+- **B5 `WidthKey`** — the numeric sibling of `VisibleKey`: a float value binding answers the declared width
+  when no numeric `Width` is written (the static declaration wins, the same precedence the visibility pair
+  uses), the declared key is registered so an announcement on it re-arranges the declaring node, and a key that
+  cannot answer (missing, or bound to another type) leaves the unsized answer in place and records one
+  deduplicated appearance note.
+- **`SelectedKey`** — a bool binding that resolves the element's role to the **active** treatment when it
+  answers true, so a consumer that knows the element is selected does not have to re-author its `Tone` per
+  state. State beats the author, the same way writability does. Deliberately **not** a `ToneKey`: a binding
+  handing back `"Active"` would re-authorise a name this line retired, and the treatment is a state the library
+  already owns. An unresolvable key is fail-soft and recorded once, like `VisibleKey`. Engine-wide on widget
+  elements; it takes effect in the kinds that resolve a role (the atoms and `chrome/banner`).
+- **G5 `chrome/banner` adopts the role pair** — its literal schema list becomes
+  `AtomVocabulary.Schema(ToneAndEmphasis, …)`, and it paints the role's TEXT colour with a declared default
+  emphasis of `Muted`. That default is what keeps an untone banner's ink exactly what it was (the secondary
+  ink), so this is a vocabulary gain with no visual change for existing pages.
+
+**Diagnostic wording (FL-21, FL-22) — no code change.** `UiOverflowReport.Available` is the **inset label rect**
+the widget measured into, while `Needed` is the measured content the band could not hold; an overflow verdict is
+therefore about the **label band**, not the element's height, and the in-game misreading that prompted this is
+evidence that the field needed saying out loud (its XML doc now does). Separately, the fit audit **deduplicates
+by finding key** (path, text, font, axis, needed, available), is capped at `MaxReports = 48`, publishes
+`Saturated` when the cap is reached and is cleared by `Reset`: a count of log lines is a count of **distinct
+findings**, never a census of elements. Both statements are in the source and in the consumer guide.
+
+**Deferred to the next batch, with the reason: G2 (`input/button` command payload), G3 (a chrome-free hit area
+sized to measured content) and FL-16 (typed dynamic `UiOption` pairs).** Their dispositions in
+`60-capability-dispositions.md` are unchanged — each is ACCEPTed on the four gates — but this batch's evidence
+bar is one failure-sensitive lane per item with its own mutation, and folding three more items (one of them a new
+public type) into the same window would put surface into a shared freeze that no lane had been shown red
+against. They stay listed for the next rebuild rather than half-landing here.
+
 ## The selected ordinary-authoring path (B)
 
 The recommended author route is existing surface only: one layout manifest over public atoms/containers

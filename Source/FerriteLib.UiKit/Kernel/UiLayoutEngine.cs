@@ -104,15 +104,16 @@ public sealed class UiLayoutEngine
     // cannot rot silently - which is the reason it is duplication rather than a hole.
     private static readonly HashSet<string> TemplateContainerAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Tab", "Width", "Fill",
-        "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden",
+        "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Tab", "Width", "WidthKey",
+        "Fill", "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden", "WideHidden",
         "Scheme", "Density", "Visible", "VisibleKey",
         "AlignX", "OffsetX", "AlignY", "OffsetY"
     };
 
     private static readonly HashSet<string> EngineWideWidgetAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Id", "Kind", "Hidden", "Tab", "Width", "MinWidth", "MaxWidth", "NarrowHidden", "Scheme", "Density",
+        "Id", "Kind", "Hidden", "Tab", "Width", "WidthKey", "MinWidth", "MaxWidth", "NarrowHidden",
+        "WideHidden", "SelectedKey", "Scheme", "Density",
         "Visible", "VisibleKey", "HelpKey",
         "AlignX", "OffsetX", "AlignY", "OffsetY"
     };
@@ -146,6 +147,7 @@ public sealed class UiLayoutEngine
     private const string ActionBindAttribute = "ActionBind";
     private const string OptionsBindAttribute = "OptionsBind";
     private const string VisibleKeyAttribute = "VisibleKey";
+    private const string WidthKeyAttribute = "WidthKey";
     private const string HelpKeyAttribute = "HelpKey";
     private const string TabAttribute = "Tab";
 
@@ -446,6 +448,11 @@ public sealed class UiLayoutEngine
         }
 
         RecordKey(ReadAttribute(spec, VisibleKeyAttribute), owner, bindings);
+
+        // B5: a WidthKey declaration depends on its own binding, so an announcement on it re-arranges the
+        // node that carries it - the same registration VisibleKey gets, one line, and the reason the numeric
+        // form is not a second mechanism.
+        RecordKey(ReadAttribute(spec, WidthKeyAttribute), owner, bindings);
 
         // A collection element declares the binding its row set comes from. Without it an announcement on
         // that key would reach no node, and an insert, removal or reorder would leave the arranged rows as
@@ -2187,13 +2194,50 @@ public sealed class UiLayoutEngine
             || string.Equals(kind, "Clip", StringComparison.Ordinal);
     }
 
-    /// <summary>Numeric Width on a child; Auto and malformed values are not fixed.</summary>
-    private static bool TryFixedWidth(UiElementSpec spec, out float width)
+    /// <summary>
+    /// Numeric Width on a child; Auto and malformed values are not fixed. The static declaration comes
+    /// first, exactly like Visible/VisibleKey: <c>WidthKey</c> is consulted only when no usable Width is
+    /// written, and it answers the same question through a float value binding (B5).
+    /// </summary>
+    private static bool TryFixedWidth(UiElementSpec spec, UiWidgetContext ctx, out float width)
     {
         width = 0f;
-        return spec.TryGetAttribute("Width", out string raw)
+        if (spec.TryGetAttribute("Width", out string raw)
             && float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out width)
-            && width > 0f;
+            && width > 0f)
+        {
+            return true;
+        }
+
+        return TryBoundWidth(spec, ctx, out width);
+    }
+
+    /// <summary>
+    /// The <c>WidthKey</c> half of the rule: a numeric value binding answers the declared width. Fail-soft
+    /// and loud, like <c>VisibleKey</c> - a key that is missing or bound to another type leaves the static
+    /// answer in place and records one deduplicated appearance note, so a typo cannot silently size a column.
+    /// </summary>
+    private static bool TryBoundWidth(UiElementSpec spec, UiWidgetContext ctx, out float width)
+    {
+        width = 0f;
+        string key = ReadAttribute(spec, WidthKeyAttribute);
+        if (key.Length == 0) return false;
+
+        try
+        {
+            if (ctx.Bindings.TryGet(key, out float bound) && !float.IsNaN(bound) && !float.IsInfinity(bound) && bound > 0f)
+            {
+                width = bound;
+                return true;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // A key bound to another type: the fallback and its note below, not an exception per frame.
+        }
+
+        UiFitAudit.ReportStyleFallback(ctx.ElementPath, spec.Kind, WidthKeyAttribute, key, "unsized");
+        return false;
     }
 
     private static bool IsAutoWidth(UiElementSpec spec)
@@ -2271,7 +2315,7 @@ public sealed class UiLayoutEngine
 
     private static float ResolveWrapWidth(UiElementSpec spec, float innerWidth, UiWidgetContext ctx)
     {
-        if (TryFixedWidth(spec, out float fixedWidth))
+        if (TryFixedWidth(spec, ctx, out float fixedWidth))
         {
             return fixedWidth;
         }
@@ -2430,7 +2474,7 @@ public sealed class UiLayoutEngine
 
         for (int i = 0; i < children.Count; i++)
         {
-            if (TryFixedWidth(children[i].Spec, out float fixedWidth))
+            if (TryFixedWidth(children[i].Spec, ctx, out float fixedWidth))
             {
                 widths[i] = fixedWidth;
                 fixedSum += fixedWidth;
@@ -2574,6 +2618,18 @@ public sealed class UiLayoutEngine
             && spec.TryGetAttribute("NarrowHidden", out string narrowRaw)
             && (string.Equals(narrowRaw.Trim(), "true", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(narrowRaw.Trim(), "1", StringComparison.Ordinal)))
+        {
+            return true;
+        }
+
+        // B2(2): the exact mirror. A child that belongs only to the WIDE presentation declares WideHidden,
+        // which is the same static rule as NarrowHidden read under the opposite state. That is what makes
+        // "this element belongs to one presentation" expressible without the two mutually exclusive
+        // subtrees the earlier workaround needed.
+        if (!narrow
+            && spec.TryGetAttribute("WideHidden", out string wideRaw)
+            && (string.Equals(wideRaw.Trim(), "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(wideRaw.Trim(), "1", StringComparison.Ordinal)))
         {
             return true;
         }

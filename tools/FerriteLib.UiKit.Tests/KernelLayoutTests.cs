@@ -47,6 +47,8 @@ internal static class KernelLayoutTests
         Run("Wrap Cols/NarrowCols pin the column count per state (N2)", VerifyWrapColsResponsive);
         Run("Height is validated at creation, not at arrange (A2)", VerifyHeightValidation);
         Run("Cols/NarrowCols are Wrap-only vocabulary (A3)", VerifyColsWrapOnly);
+        Run("WideHidden children vanish only in the wide state (B2(2))", VerifyWideHidden);
+        Run("WidthKey answers the declared width and re-arranges on announcement (B5)", VerifyWidthKey);
         Run("Responsive vocabulary is rejected before it can silently no-op (N2 grammar)", VerifyResponsiveValidation);
         Run("Density reaches container spacing (CP-0)", VerifyDensityReachesContainers);
         Run("Padding=\"0\"/Gap=\"0\" keeps the pre-CP-0 result exactly (CP-0 escape hatch)", VerifyDensityEscapeHatch);
@@ -743,6 +745,69 @@ internal static class KernelLayoutTests
         Host("<Wrap Id=\"w\" Cols=\"2\"><Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" /></Wrap>");
         Host("<Wrap Id=\"w\" Breakpoint=\"200\" Cols=\"2\" NarrowCols=\"1\"><Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" /></Wrap>");
         Check(true, "valid wide and responsive Wrap declarations are untouched");
+    }
+
+    /// <summary>B2(2): WideHidden is the exact mirror of NarrowHidden, and needs the same kind of parent.</summary>
+    private static void VerifyWideHidden()
+    {
+        RegisterTestWidget(10f, null, false);
+        string xml =
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\" Breakpoint=\"200\" Padding=\"0\" Gap=\"0\">"
+            + "<Widget Id=\"wide\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" WideHidden=\"true\" />"
+            + "<Widget Id=\"both\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "</Row></UiPage>";
+
+        Check(!Arrange(xml, 400f, 600f).Snapshot.RectById.ContainsKey("wide"),
+            "in the wide state the WideHidden child is gone");
+        Check(Arrange(xml, 150f, 600f).Snapshot.RectById.ContainsKey("wide"),
+            "and below the breakpoint it is arranged again: the mirror, not a second rule");
+
+        RegisterTestWidget(10f, null, false);
+        Reject("<Widget Id=\"bare\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" WideHidden=\"true\" />",
+            "WideHidden under a parent with no Breakpoint is refused at creation");
+    }
+
+    /// <summary>B5: WidthKey answers the declared width through a float binding, wins nothing over a written
+    /// Width, re-arranges on announcement, and falls back loudly when it cannot answer.</summary>
+    private static void VerifyWidthKey()
+    {
+        RegisterTestWidget(10f, null, false);
+        float bound = 120f;
+        var bindings = new UiBindings();
+        bindings.BindValue("col-width", () => bound, value => bound = value);
+
+        string xml =
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Row Id=\"row\" Padding=\"0\" Gap=\"0\">"
+            + "<Widget Id=\"keyed\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" WidthKey=\"col-width\" />"
+            + "<Widget Id=\"rest\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
+            + "</Row></UiPage>";
+
+        var engine = new UiLayoutEngine(Scope);
+        var ctx = new UiWidgetContext(
+            Scope, new UiSession(), new StubMetrics(), UiTheme.DarkGold, new StubTranslation(), bindings, 400f, "root");
+
+        Check(Near(engine.ArrangeRoots(ctx, new Vector2(400f, 600f), Parse(xml).Roots).RectById["keyed"].width, 120f),
+            "the bound width is the declared width");
+
+        bound = 150f;
+        bindings.NotifyChanged("col-width");
+        Check(Near(engine.ArrangeRoots(ctx, new Vector2(400f, 600f), Parse(xml).Roots).RectById["keyed"].width, 150f),
+            "announcing the key re-arranges the element that declared it");
+
+        RegisterTestWidget(10f, null, false);
+        // A key bound to another TYPE is the unanswerable case: TryGet<float> reports the mismatch, so the
+        // element keeps the unsized distribution and the finding is recorded rather than guessed around.
+        string other = "not a width";
+        var mismatched = new UiBindings();
+        mismatched.BindValue("col-width", () => other, value => other = value);
+        UiFitAudit.Reset();
+        var ctx2 = new UiWidgetContext(
+            Scope, new UiSession(), new StubMetrics(), UiTheme.DarkGold, new StubTranslation(), mismatched, 400f, "root");
+        Check(Near(new UiLayoutEngine(Scope).ArrangeRoots(ctx2, new Vector2(400f, 600f), Parse(xml).Roots).RectById["keyed"].width, 200f),
+            "an unanswerable WidthKey falls back to the unsized distribution rather than guessing");
+        Check(UiFitAudit.StyleFallbackCount == 1, "and it is reported once through the fail-soft appearance channel");
     }
 
     private static void VerifyResponsiveValidation()

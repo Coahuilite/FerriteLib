@@ -24,6 +24,8 @@ internal static class KernelCoreWidgetTests
         failures += Run("Banner/empty-state bands are the text atom's band", VerifyCompositeBandsComeFromTheAtom);
         failures += Run("Composites draw text/font/rect through the one outlet", VerifyCompositeOutletTriple);
         failures += Run("Composite kinds keep their vocabulary and their manifests", VerifyCompositeVocabularyUnchanged);
+        failures += Run("chrome/banner takes the role pair and keeps its ink (G5)", VerifyBannerRole);
+        failures += Run("SelectedKey resolves the element to the active state (0.7.x)", VerifySelectedKey);
         return failures;
     }
 
@@ -433,12 +435,139 @@ internal static class KernelCoreWidgetTests
     /// declared label sets are the frozen vocabulary, and a manifest that used every declared attribute
     /// must still create, arrange and draw.
     /// </summary>
+    /// <summary>G5: the banner resolves its ink through the role table, and an untone banner keeps the
+    /// secondary ink it always had (the kind's declared default emphasis).</summary>
+    private static void VerifyBannerRole()
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+
+        IReadOnlyCollection<string>? schema = UiWidgetRegistry.GetAttributeSchema(UiWidgetRegistry.CoreScope, ChromeBannerWidget.Kind);
+        if (schema == null || !Contains(schema, "Tone") || !Contains(schema, "Emphasis"))
+        {
+            throw new Exception("chrome/banner does not declare the role pair (G5)");
+        }
+
+        Color plain = BannerInk("Tone=\"\"");
+        if (!SameColor(plain, UiTheme.DarkGold.TextSecondary))
+        {
+            throw new Exception("an untone banner no longer paints its documented secondary ink: " + Describe(plain));
+        }
+
+        Color danger = BannerInk("Tone=\"Danger\"");
+        if (SameColor(danger, plain))
+        {
+            throw new Exception("an authored Tone did not move the banner's ink: " + Describe(danger));
+        }
+    }
+
+    private static Color BannerInk(string toneAttribute)
+    {
+        ClearRecordedLabels();
+        var bindings = new UiBindings();
+        using UiHost host = new(
+            "banner-role", UiLayoutManifest.Parse(
+                "<UiPage Schema=\"2\" Source=\"banner-role\">"
+                + "<Widget Id=\"b\" Kind=\"chrome/banner\" Text=\"status\" Height=\"24\" " + toneAttribute + " />"
+                + "</UiPage>"),
+            bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        host.MeasureAndArrange(new Vector2(300f, 100f));
+        host.DrawFrame(new Rect(0f, 0f, 300f, 100f));
+
+        var colors = (IList)StubField("LabelColors");
+        if (colors.Count == 0) throw new Exception("the banner painted no label");
+        return (Color)colors[colors.Count - 1]!;
+    }
+
+    /// <summary>SelectedKey: a bound boolean resolves the element to the active treatment, and an
+    /// unresolvable key is fail-soft (the authored look stands) with one recorded note.</summary>
+    private static void VerifySelectedKey()
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+
+        if (ButtonFill(true) is Color selected && ButtonFill(false) is Color idle && SameColor(selected, idle))
+        {
+            throw new Exception("SelectedKey=true did not change the button's treatment");
+        }
+
+        bool selectedNow = false;
+        var bindings = new UiBindings();
+        bindings.BindValue("sel", () => selectedNow, value => selectedNow = value);
+        BindCommand(bindings);
+        UiFitAudit.Reset();
+        using UiHost host = new(
+            "selected-key", UiLayoutManifest.Parse(
+                "<UiPage Schema=\"2\" Source=\"selected-key\">"
+                + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" Text=\"x\" Height=\"24\" SelectedKey=\"missing-key\" />"
+                + "</UiPage>"),
+            bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        host.MeasureAndArrange(new Vector2(300f, 100f));
+        host.DrawFrame(new Rect(0f, 0f, 300f, 100f));
+        if (UiFitAudit.StyleFallbackCount != 1)
+        {
+            throw new Exception("an unresolvable SelectedKey recorded " + UiFitAudit.StyleFallbackCount + " note(s), expected exactly one");
+        }
+    }
+
+    private static Color? ButtonFill(bool selected)
+    {
+        bool state = selected;
+        var bindings = new UiBindings();
+        bindings.BindValue("sel", () => state, value => state = value);
+        BindCommand(bindings);
+        ClearRecordedFill();
+        using UiHost host = new(
+            "selected-key", UiLayoutManifest.Parse(
+                "<UiPage Schema=\"2\" Source=\"selected-key\">"
+                + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" Text=\"x\" Height=\"24\" SelectedKey=\"sel\" />"
+                + "</UiPage>"),
+            bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        host.MeasureAndArrange(new Vector2(300f, 100f));
+        host.DrawFrame(new Rect(0f, 0f, 300f, 100f));
+        var colors = (IList)StubField("DrawBoxSolidColors");
+        return colors.Count == 0 ? (Color?)null : (Color)colors[colors.Count - 1]!;
+    }
+
+    private static void BindCommand(UiBindings bindings)
+    {
+        bindings.BindCommand("act", () => { });
+    }
+
+    private static void ClearRecordedLabels() => ((IList)StubField("LabelColors")).Clear();
+
+    private static void ClearRecordedFill() => ((IList)StubField("DrawBoxSolidColors")).Clear();
+
+    private static object StubField(string name)
+    {
+        FieldInfo? field = typeof(Verse.Widgets).GetField(name, BindingFlags.Public | BindingFlags.Static);
+        if (field == null) throw new Exception("Verse stub is missing " + name);
+        return field.GetValue(null)!;
+    }
+
+    private static bool SameColor(Color left, Color right)
+    {
+        return Math.Abs(left.r - right.r) < 0.001f && Math.Abs(left.g - right.g) < 0.001f
+            && Math.Abs(left.b - right.b) < 0.001f && Math.Abs(left.a - right.a) < 0.001f;
+    }
+
+    private static string Describe(Color color)
+    {
+        return "(" + color.r + "," + color.g + "," + color.b + "," + color.a + ")";
+    }
+
     private static void VerifyCompositeVocabularyUnchanged()
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
 
-        CheckSchema(ChromeBannerWidget.Kind, new[] { "Id", "Kind", "Bind", "Text", "TextKey", "Height", "Tab", "Hidden" });
+        // G5: the banner declares the atoms' role pair now, so its schema is the engine-wide set plus
+        // Tone/Emphasis plus its own four names - the vocabulary move, pinned.
+        CheckSchema(ChromeBannerWidget.Kind, new[]
+        {
+            "Id", "Kind", "Tab", "Hidden", "Visible", "VisibleKey", "HelpKey", "SelectedKey", "WidthKey",
+            "WideHidden", "Tone", "Emphasis", "Bind", "Text", "TextKey", "Height"
+        });
         CheckSchema(EmptyStateWidget.Kind, new[] { "Id", "Kind", "Text", "TextKey", "Height", "Tab", "Hidden" });
         CheckLabels(ChromeBannerWidget.Kind);
         CheckLabels(EmptyStateWidget.Kind);

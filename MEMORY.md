@@ -2,6 +2,23 @@
 
 ## Current durable state
 
+- **P1-E's first half landed 2026-09-20: four vocabulary items + two diagnostic corrections, each with a lane
+  proven red against the reverted implementation in ONE mutated build** (HARNESS_EXIT=1, 6 FAIL lines — G5, the
+  selected state, WideHidden, WidthKey — then green: ALL PASS, 2592 ok). **B2(2) `WideHidden`** is the exact
+  mirror of `NarrowHidden` (arranged only while not narrow; refused under a parent with no `Breakpoint`, like
+  its twin). **B5 `WidthKey`** is the numeric sibling of `VisibleKey` (a written `Width` wins; the declared key
+  is registered so an announcement re-arranges; an unanswerable key leaves the unsized answer and records one
+  note). **`SelectedKey`** is a bool binding that resolves the role to the **active** treatment — deliberately
+  not a `ToneKey`, which would re-authorise the retired `Active` name; state beats the author, as writability
+  does. **G5** put `chrome/banner` on the atoms' role pair with a declared default emphasis of `Muted`, which is
+  what keeps an untone banner's ink identical. **FL-21/FL-22 are documentation only**: an overflow verdict is
+  about the **inset label band** (`Available`) against the content it could not hold (`Needed`), and a fit-audit
+  count is **distinct findings** (dedup key, `MaxReports = 48`, `Saturated`, `Reset`), never a census — both
+  statements now live in the source docs and the consumer guide. **G2, G3 and FL-16 are DEFERRED to the next
+  batch with their ACCEPT verdicts unchanged**: this batch's evidence bar is one failure-sensitive lane per item
+  with its own mutation, and folding a new public type plus two more attributes into the same freeze window would
+  ship surface no lane had been shown red against.
+
 - **P1-E's capability dispositions are written and awaiting a ruling (2026-09-20, task-22; table in
   `docs/development/0.7/60-capability-dispositions.md`).** The table gives every raised item one row — anchors,
   consumer citation, the four promotion gates, what implementing it touches — with the outcome ACCEPT /

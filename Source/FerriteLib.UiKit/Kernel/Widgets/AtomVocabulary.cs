@@ -49,7 +49,8 @@ internal static class AtomVocabulary
     // pre-existing core kinds use as well.
     // Visible/VisibleKey are engine-wide like Hidden: the engine reads them for every kind, so an
     // atom that refused them would reject a page its container accepted.
-    private static readonly string[] EngineWideAttributes = { "Id", "Kind", "Tab", "Hidden", "Visible", "VisibleKey", "HelpKey" };
+    private static readonly string[] EngineWideAttributes =
+        { "Id", "Kind", "Tab", "Hidden", "Visible", "VisibleKey", "HelpKey", "SelectedKey", "WidthKey", "WideHidden" };
 
     /// <summary>
     /// The allowed-attribute array a core atom registers: the engine-wide names, the role names the kind
@@ -211,9 +212,41 @@ internal static class AtomVocabulary
     /// Host creation while a typo in the value still renders.
     /// </para>
     /// </summary>
-    internal static UiResolvedStyle ResolveRole(UiElementSpec spec, UiWidgetContext ctx, bool? writable)
+    /// <summary>
+    /// The emphasis a kind falls back to when the author declared none. Every atom reads the theme's
+    /// primary ink; <c>chrome/banner</c> is the one kind whose own look has always been the secondary ink,
+    /// so the banner declares <paramref name="defaultEmphasis"/> as Muted and keeps its colour while
+    /// gaining the role vocabulary (G5).
+    /// </summary>
+    internal static UiResolvedStyle ResolveRole(
+        UiElementSpec spec, UiWidgetContext ctx, bool? writable, UiEmphasis defaultEmphasis = UiEmphasis.Normal)
     {
-        return ctx.Theme.Styles.Resolve(ParseTone(spec, ctx), ParseEmphasis(spec, ctx), writable);
+        // SelectedKey (0.7.x) is the binding-driven SELECTED state, and state beats the author for the same
+        // reason writability does: a consumer that knows the element is selected must not have to re-author
+        // its Tone per state. Deliberately not a ToneKey - a binding that hands back "Active" would
+        // re-authorise a name this line retired, and the treatment is a state the library already owns.
+        if (Selected(spec, ctx))
+        {
+            return ctx.Theme.Styles.Resolve(UiStatusTone.Active, ParseEmphasis(spec, ctx, defaultEmphasis), writable);
+        }
+
+        return ctx.Theme.Styles.Resolve(ParseTone(spec, ctx), ParseEmphasis(spec, ctx, defaultEmphasis), writable);
+    }
+
+    /// <summary>
+    /// The element's bound selected state: true only when <c>SelectedKey</c> is declared and its bool
+    /// binding answers true. An unresolvable key is fail-soft (the authored role stands) and is reported
+    /// once through the appearance channel, exactly like <c>VisibleKey</c> - a misspelled key that silently
+    /// painted the unselected look would be the "accepted but did nothing" shape this contract refuses.
+    /// </summary>
+    internal static bool Selected(UiElementSpec spec, UiWidgetContext ctx)
+    {
+        string key = Read(spec, "SelectedKey").Trim();
+        if (key.Length == 0) return false;
+        if (ctx.Bindings.TryGetBool(key, out bool selected)) return selected;
+
+        ReportUnresolved(ctx, spec.Kind, key, "unselected");
+        return false;
     }
 
     /// <summary>
@@ -262,17 +295,17 @@ internal static class AtomVocabulary
         return UiStatusTone.Neutral;
     }
 
-    /// <summary>The authored emphasis, or <see cref="UiEmphasis.Normal"/> when none is declared.</summary>
-    private static UiEmphasis ParseEmphasis(UiElementSpec spec, UiWidgetContext ctx)
+    /// <summary>The authored emphasis, or the kind's declared default (see ResolveRole) when none is set.</summary>
+    private static UiEmphasis ParseEmphasis(UiElementSpec spec, UiWidgetContext ctx, UiEmphasis fallback)
     {
         string authored = Read(spec, EmphasisAttribute).Trim();
-        if (authored.Length == 0) return UiEmphasis.Normal;
+        if (authored.Length == 0) return fallback;
 
         if (string.Equals(authored, "Normal", StringComparison.OrdinalIgnoreCase)) return UiEmphasis.Normal;
         if (string.Equals(authored, "Muted", StringComparison.OrdinalIgnoreCase)) return UiEmphasis.Muted;
 
-        ReportFallback(spec, ctx, EmphasisAttribute, authored, "Normal");
-        return UiEmphasis.Normal;
+        ReportFallback(spec, ctx, EmphasisAttribute, authored, fallback == UiEmphasis.Muted ? "Muted" : "Normal");
+        return fallback;
     }
 
     /// <summary>

@@ -881,7 +881,8 @@ public sealed class UiHost : IDisposable
     // name existed, so an author could not reach the document's schemes at all.
     private static readonly HashSet<string> CommonWidgetAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Id", "Kind", "Hidden", "Tab", "Width", "MinWidth", "MaxWidth", "NarrowHidden", "Scheme", "Density",
+        "Id", "Kind", "Hidden", "Tab", "Width", "WidthKey", "MinWidth", "MaxWidth", "NarrowHidden",
+        "WideHidden", "SelectedKey", "Scheme", "Density",
         "Visible", "VisibleKey",
         // The element's help identity (0.7.x): engine-wide like Visible/VisibleKey, because the ENGINE -
         // not the kind - claims a hovered element's help. Deliberately NOT in the container list: only
@@ -905,8 +906,8 @@ public sealed class UiHost : IDisposable
         // shared active-tab key for any declarer. Omitting it here forbade a capability the engine
         // implemented; the 0.7 contract records the ruling (2026-09-20). A Tab-gated container hides its
         // whole subtree, like every other hidden element.
-        "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Tab", "Width", "Fill",
-        "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden",
+        "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Tab", "Width", "WidthKey",
+        "Fill", "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden", "WideHidden",
         "Scheme", "Density", "Visible", "VisibleKey",
         "AlignX", "OffsetX", "AlignY", "OffsetY"
     };
@@ -1050,13 +1051,17 @@ public sealed class UiHost : IDisposable
                 source, spec.Id, spec.Kind, path);
         }
 
-        // A narrow-state attribute under no Breakpoint is the silent no-op this library's creation
+        // A responsive-state attribute under no Breakpoint is the silent no-op this library's creation
         // contract exists to stop: the author believes they declared a variant that can never fire.
-        if (spec.TryGetAttribute("NarrowHidden", out _) && !parentNarrowCapable)
+        // WideHidden is the mirror of NarrowHidden and needs the same parent, for the same reason.
+        foreach (string responsive in new[] { "NarrowHidden", "WideHidden" })
         {
-            throw new UiContractException(
-                $"Element id=\"{spec.Id}\" at '{path}' declares NarrowHidden but its parent carries no Breakpoint; nothing can ever make it narrow.",
-                source, spec.Id, spec.Kind, path);
+            if (spec.TryGetAttribute(responsive, out _) && !parentNarrowCapable)
+            {
+                throw new UiContractException(
+                    $"Element id=\"{spec.Id}\" at '{path}' declares {responsive} but its parent carries no Breakpoint; nothing can ever switch the state it depends on.",
+                    source, spec.Id, spec.Kind, path);
+            }
         }
 
         if (!isContainer)

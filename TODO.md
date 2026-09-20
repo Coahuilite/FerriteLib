@@ -91,7 +91,15 @@ moves HEAD and invalidates the consumer's gate green.
       `state/empty` items. ACCEPTs: G2, G3, G5, FL-16, FL-17, FL-18+B6 (one item), B2(2), B5, `SelectedKey`;
       ACCEPT-DOC: FL-21, FL-22; DEFER: FL-13+B10 (with the P3 reset), the palette selector (no citation);
       CLOSED: FL-19; **not gaps**: the two `state/empty` items, each with the evidence it would need.
-- [ ] **P1-E-2 (task-23, blocked by task-19 + this table)** — fold every ACCEPT into **one** carrier rebuild and
+- [x] **P1-E-2 first half LANDED 2026-09-20 (task-23)**: `WideHidden` (B2(2)), `WidthKey` (B5),
+      `SelectedKey`, the `chrome/banner` role pair (G5), and the FL-21/FL-22 diagnostic wording. Four lanes,
+      one mutated build for the red evidence (6 FAIL lines), green after (ALL PASS, 2592 ok). Nine gates, then the
+      one Release carrier rebuild and the freeze notice at the end of the round.
+- [ ] **P1-E-2b (next batch, ACCEPT verdicts unchanged)** — **G2** `input/button` command payload,
+      **G3** chrome-free hit area sized to measured content, **FL-16** typed dynamic `UiOption` pairs (the one
+      new public type). Deferred for the evidence bar, not for merit: one failure-sensitive lane + its own
+      mutation each, which does not fit the window that just closed.
+- [x] **P1-E-2 (task-23, blocked by task-19 + this table)** — fold every ACCEPT into **one** carrier rebuild and
       one FREEZE NOTICE, so US/demo re-verify once. New surface stays inside `0.7.x` (no minor move). FL-17's
       per-row template is the largest item and is scheduled last inside the batch.
 - [ ] **CONDITIONAL, tied to the hierarchy × composition decision — do not build alone.** A binding-resolved

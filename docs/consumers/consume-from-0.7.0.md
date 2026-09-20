@@ -104,6 +104,10 @@ migration at all.
 | New: `input/mode-row` `TitleKey1..8` | Optional, no migration. The translated sibling of `Title1..8` (key wins), and `Width="Auto"` now measures the translated title. An orphan `TitleKeyN`/`TitleN`/`DescriptionN` (no `ValueN`) is refused at creation. |
 | `HoverHelpKey` now works on `input/dropdown` too | Optional, no migration. Same attribute, same rule, applied to the popup's rows: the hovered row's **value** is published, cleared when nothing is hovered. |
 | `Tab` now works on containers | Optional, no migration — a coherence fix, not new surface: the engine always read `Tab` when deciding visibility, and only the container contract left the name out. A container can now be declared to appear on one tab, and it takes its whole subtree with it when the tab is inactive (a hidden element keeps its node and state, as with `Visible`/`Hidden`). Per-row `Tab` inside a template stays inexpressible by design — a tab is a page-level answer. |
+| New: `WideHidden` | Optional, no migration. The mirror of `NarrowHidden`: the element is arranged only while the state is wide. Refused at creation when its parent carries no `Breakpoint`, exactly like `NarrowHidden`. |
+| New: `WidthKey` | Optional, no migration. A float value binding answers the declared width when no numeric `Width` is written (a written `Width` wins); announcing the key re-arranges the element, and a key that cannot answer records one appearance note and leaves the element unsized. |
+| New: `SelectedKey` | Optional, no migration. A bool binding that paints the element's **active** treatment while it answers true, so a selected row does not need its `Tone` re-authored per state. Honoured by the role-resolving kinds (the atoms and `chrome/banner`). |
+| `chrome/banner` takes `Tone`/`Emphasis` | Optional, no migration — an untone banner paints the same secondary ink it always did; an authored `Tone` now moves it. |
 | New: `AlignX`/`OffsetX`/`AlignY`/`OffsetY` | Optional, no migration. Inside an `Overlay` they place a child by an edge or the centre plus a percentage of the parent's usable width; a flow container's child gets its cross axis with a pixel nudge only. |
 
 Nothing else in the compiled surface moved: no type or kind was **removed**, no existing member signature changed,
@@ -156,5 +160,13 @@ where you find out that it will not.
   include one comparable Vanilla/DarkGold/custom state sheet. Library evidence is automated only.
 - Known limits inherited from 0.6: main-thread-only notification delivery; IME composition outside the
   input deferral; no cross-sibling-window atomicity for consumer hooks; catalogue is a snapshot.
+- **Reading an overflow verdict (FL-21).** `UiOverflowReport.Available` is the **inset label rect** the widget
+  measured into and `Needed` is the measured content it could not hold — an overflow is about the **label band**,
+  not about the element's height. A consumer that renders "has N px" is quoting the band; say so, or name the
+  element's own rect separately.
+- **A fit-audit count is not a census (FL-22).** Findings are deduplicated by key (path, text, font, axis,
+  needed, available), capped at `MaxReports = 48` with `Saturated` published when the cap is hit, and
+  `Reset()` starts a new collection. Log lines count **distinct findings**, never elements, so an "xN" you print
+  is a count of distinct reports and nothing else.
 - If the public surface forces you to hand-roll something, report it — a cited consumer need is what earns
   a capability; a request is not.
