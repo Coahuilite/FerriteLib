@@ -2,6 +2,38 @@
 
 ## Current durable state
 
+- **A carrier hash identifies a build's INPUTS, and the stamp cannot record dirtiness — measured 2026-09-20, with
+  the reproduction that settles it.** During round 5 the carrier at `1.6/Assemblies/` was measured by the Lead
+  as 246 784 B / SHA-256 `5E6F9BF4…` stamped `0.7.0-dev+64af720e…` while HEAD had already moved to
+  `ee387f1` (the Tab fix). Rather than guess between "non-deterministic build" and "dirty build", the answer
+  was produced: a **full rebuild of the same source with the stamp forced back to the old commit**
+  (`dotnet build … -c Release -t:Rebuild -p:SourceRevisionId=64af720e25efbb1d60708c2e1f497760893aba31`)
+  reproduced `5E6F9BF4…` **byte-for-byte**, and two full rebuilds at the current stamp both produced
+  `6BC192E4…`. So the build is **deterministic** — the difference was inputs, not entropy — and the suspect
+  bytes were a **dirty build**: the pre-commit harness run that compiled the uncommitted Tab fix while
+  `AssemblyInformationalVersion` still named the previous commit. Byte **length is not a signal**: all three
+  builds were 246 784 B.
+  What follows, so it is not rediscovered: (i) the stamp records the **committed** revision, so it is honest about
+  the commit and silent about uncommitted source; (ii) in practice that is caught because committing the source
+  MOVES HEAD, which leaves the carrier's stamp stale and makes every attribution check refuse it — the residual
+  window is a dirty build whose source is never committed or is reverted, which no stamp can see; (iii) so the
+  delivery order stays load-bearing (commit first, build last, report the identity measured from that build), and
+  a hash quoted anywhere is an identity **only with its inputs pinned** — a hash ledger entry without the build
+  command and the clean/dirty state is a machine-local fact, not an identity.
+- **The shared payload path is shared with READERS, not only with builders (measured 2026-09-20), and the
+  diagnostic now says so.** `1.6/Assemblies/FerriteLib.UiKit.dll` was held by another process while a delivery
+  ran, and the symptom was `MSB3026` retries ending in `MSB3027`/`MSB3021` deep inside gate 1's captured
+  build output — which reads like a broken build, not contention, and it cost a blocked round while the cause
+  was hunted in the wrong repository. A **loaded assembly holds its file open**, so a sibling checkout's harness
+  or probe blocks this build exactly as another builder would. `scripts/verify-local.ps1` now probes the
+  payload for an exclusive open before any gate runs and fails fast naming the cause and the remedy; the probe
+  was demonstrated against a deliberately held file (it threw the new message and ran no `dotnet`) and passes in
+  a quiet window (the 9 gates below). **Correction to a claim this session made in a channel message:** a
+  consumer's gate 6 does **not** rebuild this carrier — its action block only checks existence, reads the stamp,
+  requires this tree clean and compares the embedded commit to HEAD ("US never builds the carrier from here").
+  It can LOCK the file transiently by loading it; it cannot overwrite it. Any unexplained byte change at that
+  path is a build, and only this repository builds it.
+
 - **`Tab` on containers is legal as of 2026-09-20 — a maintainer-approved coherence fix, and the ruling's own
   words were "fix what needs fixing".** The defect was an internal contradiction: the engine reads `Tab` when
   deciding visibility for **roots and children of any type**, while the container attribute contract omitted the

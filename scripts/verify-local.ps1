@@ -43,6 +43,26 @@ $projectFile = Join-Path $root 'Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj'
 $testsProject = Join-Path $root 'tools\FerriteLib.UiKit.Tests\FerriteLib.UiKit.Tests.csproj'
 $assembliesDir = Join-Path $root '1.6\Assemblies'
 $tempLog = Join-Path ([System.IO.Path]::GetTempPath()) ("fl-verify-" + [guid]::NewGuid().ToString('N') + '.log')
+
+# The payload path is SHARED with the sibling checkouts, and a sibling's harness or probe process LOADS the
+# carrier at runtime - a loaded assembly holds its file open, so a READER blocks this run's build exactly as
+# another builder would. Measured 2026-09-20: the symptom was MSB3026 retries ending in MSB3027/MSB3021 inside
+# gate 1's build output, which reads like a broken build rather than contention, and it cost a blocked delivery
+# round while the cause was hunted in the wrong repository. Probe the file before any gate runs and name it.
+# Skipped when the payload does not exist yet (a fresh clone builds it in gate 2).
+$payloadPath = Join-Path $assembliesDir 'FerriteLib.UiKit.dll'
+if (Test-Path -LiteralPath $payloadPath -PathType Leaf) {
+    try {
+        $lockProbe = [System.IO.File]::Open($payloadPath, [System.IO.FileMode]::Open,
+            [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+        $lockProbe.Close()
+    } catch [System.IO.IOException] {
+        throw ("The payload at $payloadPath is held by another process, so no gate can replace it: " +
+            $_.Exception.Message + ". The usual cause is a sibling checkout's harness or probe, which loads the " +
+            "carrier at runtime and keeps the file open. Stop that process (one builder at a time across the " +
+            "repositories sharing this path), then re-run.")
+    }
+}
 $buildExtraArgs = @()
 if ($NoRestore) { $buildExtraArgs += '--no-restore' }
 

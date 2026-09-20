@@ -54,6 +54,12 @@ invalidates the consumer's gate green.
       consumer switches its checklist gate from `VisibleKey` to `Tab="Packs"` and deletes its one-bool shim at
       the next freeze. Boundary unchanged and out of scope: per-row `Tab` inside a template stays inexpressible
       by design (page-level answer) and belongs with route A.
+- [x] **Gate-1 contention diagnostic — LANDED 2026-09-20** (accepted by the Lead): `verify-local.ps1` now
+      probes the payload for an exclusive open before any gate and fails fast naming the cause (a sibling
+      checkout's harness or probe loads the carrier and holds the file) instead of letting it surface as
+      `MSB3027`/`MSB3021` inside gate 1's build output. Demonstrated against a deliberately held file.
+      Related durable finding in `MEMORY.md`: the carrier build is deterministic, the suspect bytes were a
+      dirty build reproduced byte-for-byte, and the stamp cannot record dirtiness.
 - [ ] **CONDITIONAL, tied to the hierarchy × composition decision — do not build alone.** A binding-resolved
       help identity (`HelpBind`) for a DATA-DEPENDENT key. The consumer has exactly two such sites, both in
       `us/scope-tree`, and that widget will not be migrated declaratively unless route A (an optional per-row
