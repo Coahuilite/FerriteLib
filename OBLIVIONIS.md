@@ -24,6 +24,8 @@
   block still parses as a list. Nothing was rewritten. The live ledger keeps a compact fact index plus
   pointers here. Frozen range: `MEMORY.md` lines 584-2181 as they stood at compaction.
 
+<!-- frozen block: MEMORY.md lines 584-2181, 2026-09-20 -->
+
 - Repository split out of the Universal Squeaker tree on 2026-09-03. FerriteLib is a prerequisite mod,
   `coahuilite.ferritelib`, display name FerriteLib. The three version axes are re-derived from the tree and
   never quoted from this file (`grep -n 'Api = new Version' Source/FerriteLib.UiKit/Kernel/FerriteLibVersion.cs`,
