@@ -2,7 +2,8 @@
 
 > Stable layer: only the rules a session must hold before acting. Everything evidenced, measured, or
 > dated lives in `MEMORY.md`; everything actionable in `TODO.md`. Read `MEMORY.md` before claiming
-> project context.
+> project context — and note that a `MEMORY.md` citation into `OBLIVIONIS.md` is a citation into the cold
+> archive, which holds the pre-0.7 history verbatim and cannot override a current source.
 
 ## Project identity
 
@@ -23,7 +24,8 @@ state, invalidation, recovery, and one audit surface — are owned here. The lib
 consumer's tree keeps inside it, not what it ships in controls. Non-goals (no uGUI backend, no reflection,
 DI or codegen, no expressions in manifest XML, no Def hot-reload promise, no world-space rendering), the
 evidence classes behind each, and the 2026-09-10 ruling that the library is referenceable by strangers and
-held to general-library standards: `MEMORY.md`, "Charter".
+held to general-library standards: `OBLIVIONIS.md`, "Charter" (the founding spec, the surveys and the
+style-layer argument live there).
 
 ## Compatibility and retirement
 
@@ -94,7 +96,7 @@ Consumer ladder when the library lacks something:
    exception to this: `UiWindowHost` owns the chrome, so a page never has to leave the tree to exist.
 2. **Propose promotion** — one release after it survives, carrying the transcription above plus the
    metric. Outside contributors propose by issue; the maintainer-side vehicle is a `HANDOFF` round
-   (harvest loop and full form: `MEMORY.md`).
+   (harvest loop and full form: `OBLIVIONIS.md`, "Ecosystem protocol").
 3. **Register an exemption** — only for what structurally cannot live in a page tree, which after the
    round-1 shell is world-space rendering and nothing else currently known. Allowlisted file + written
    ruling + named closing item: rent, not exit.
@@ -116,8 +118,9 @@ every kind brings an attribute schema, a declared label set, a tier entry and ev
 A kind is earned by owning what a manifest cannot express — per-element interaction state, a measure
 contract over its own content, or a hit/geometry rule. The test is about ownership, not about being atomic:
 a composite may hold a name (no surveyed toolkit dissolves its named composites into atom-only code —
-`MEMORY.md`), but it must not duplicate a surface the engine already carries, and once the atoms exist its
-innards must be an explicit composition over them, so the name stays stable and the tree inside is rebuilt.
+`OBLIVIONIS.md`, the industry survey), but it must not duplicate a surface the engine already carries,
+and once the atoms exist its innards must be an explicit composition over them, so the name stays stable
+and the tree inside is rebuilt.
 What never earns a name is a widget instance handed out by type: composing by type is the bypass the
 tree-membership metric counts.
 
@@ -147,6 +150,26 @@ pwsh -NoProfile -File scripts/pack-steam.ps1  -Version v0.3.0-rc2    # + Worksho
 `-PackDev` stages `dist/dev/FerriteLib/` and stops there: nothing under `scripts/` writes outside the
 repository, and installing a folder into a game `Mods/` directory is the developer's own step (Boundaries).
 
+**The payload path is shared, and that is the trap.** `1.6/Assemblies/FerriteLib.UiKit.dll` is written by
+both configurations, so whatever ran last decides what a sibling-`HintPath` consumer compiles against:
+
+- **`-PackDev` writes Dev bytes to the shared carrier.** After it — and after any `verify-local` run, whose
+gate 2 is the Dev build — the delivery step ends with a forced `dotnet build -c Release --no-incremental`
+**and** removal of the stale `1.6/Assemblies/FerriteLib.UiKit.pdb` (Release sets `DebugType=none`, so it
+neither rewrites nor deletes an existing PDB). `AssemblyConfigurationAttribute` is the detector, never the
+version suffix: a correct Release carrier still reads `0.7.0-dev+<sha>`.
+- **A hash is an identity only with its inputs pinned.** Quote one with the build command and the clean/dirty
+state beside it. The stamp records the **committed** revision and is silent about uncommitted source.
+- **A doc-only commit reddens "embedded commit == HEAD" until the carrier is rebuilt.** That is expected
+rather than a defect — but broadcast it, because the consumer's gates read it.
+- **The carrier is exclusive, and readers count.** A loaded assembly holds its file open, so a sibling
+checkout's harness or probe blocks this build exactly as another builder would; the symptom is
+`MSB3026`/`MSB3027`/`MSB3021` deep inside captured build output, which reads like a broken build.
+**Never `Assembly.LoadFile` the payload in the session that is measuring it** — the handle survives to
+process exit. Read identity from a child process or from a copy.
+- **A build happens only when the maintainer intends to test.** Building is not a session's reflex, and two
+concurrent harness runs collide on the shared output path (`CS2012`).
+
 Three channels (`pack-dev` / `pack-release` / `pack-steam`), one staging engine (`stage-package.ps1`). The
 engine owns what a package *is* — the closed file set, the content probe, the licence copy, `version.txt`,
 and a **measured** build configuration, so a channel label that does not match the payload's bytes is
@@ -154,14 +177,38 @@ refused rather than trusted. The packers own identity only: dev tolerates a dirt
 requires the tag shape and the build axis, steam additionally a clean tree, and only github archives.
 `About/PublishedFileId.txt` is gitignored and the stager copies `About.xml` as a file rather than the
 directory, so no rehearsal or GitHub artifact can carry a Workshop identity. The measurements behind this
-split live in `MEMORY.md` ("Three channels, one staging engine", "A release asset must be built after the
-gates run", "Only the GitHub channel archives").
+split live in `MEMORY.md` ("Packaging discipline").
 
 A consumer integrates through the published GitHub Release asset; a same-level sibling folder with
 `Private=false` is one developer's lockstep arrangement, not a contract and not a layout a clone can
 assume (rationale: `MEMORY.md`). Either way `1.6/Assemblies/` and the `tools/.../Stubs/` tree with its
 `bin/stubs/` shape are de-facto published surfaces — relocating them breaks a consumer's harness while
 every gate here stays green.
+
+## Evidence discipline (each rule cost a wasted round)
+
+The ledger rule that a PASS names which half is mutation-proven needs these to be worth anything:
+
+- **Red is no more trustworthy than green.** Before changing the product or the assertion, check the
+  **instrument's inputs** — the fixture, the ruler, the screen, the channel. A lane can go green for the
+  wrong reason (a fallback that accepts the case under test, a process-wide accumulator another lane
+  satisfied, a stub ruler smaller than the real one, a scan reading a stale DLL) and red for the wrong
+  reason too (a lane with no language table measuring the key instead of the translation).
+- **A lane must go red under a faithful revert.** A lane that cannot tell the two states apart is not
+  evidence, and shipping a feature whose lane stays green when the feature is removed is the failure this
+  rule exists to stop. One mutation per item, attributable by assertion name.
+- **When a measurement or notification channel changes, re-audit every lane that asserts the old one.**
+  A stale lane is worse than no lane: it still runs, still passes, and no longer measures the thing.
+- **Counter assertions `Reset()` and measure an increment.** The fit-audit counters are cumulative and
+  process-wide, so a bare `count == 1` can be satisfied by a finding some other lane produced.
+- **A spatial budget only means something at the real size.** Under a small stub ruler the content is
+  shorter than it is in the game, so a budget that would collapse for real passes anyway.
+- **A new gate is mutation-tested, not just written**, and its criterion is "plant the defect and the
+  process exits non-zero", never "the console shows FAIL" — a lane that prints a failure without counting
+  it is not a gate.
+- **One coherent step per commit, and never leave an uncommitted half-finished state.** State explicitly
+  what is unbuilt and unverified rather than letting "fixed" cover it.
+- **A gate may only get stronger, or be re-cut in the same batch as the fix it depends on.**
 
 ## Memory protocol
 
