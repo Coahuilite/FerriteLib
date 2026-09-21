@@ -12,6 +12,8 @@
   been **wrongly promoted**: a handoff artifact is not a memory tier and holds no standing authority. The
   "Memory protocol" section of `AGENTS.md` was rewritten accordingly. This file is created **empty by
   design** — no block has been archived out of the ledger yet, because choosing what leaves the only
+  volatile ledger is a maintainer decision and is a separate, separately authorized action. (That action
+  was taken on 2026-09-20 — see the next entry.)
 
 - **2026-09-20 — first compaction of `MEMORY.md` (maintainer-requested).** The pre-2026-09-17 body of
   `MEMORY.md` was moved here **verbatim**: consumer coverage and the kind census, the Charter (founding
@@ -1621,3 +1623,219 @@ Paths and roles only; any line/file count here would be false within a day (see 
   strongest: reference-assembly read, stub harness, compile-time, and in-game observation - and only the
   last is written as "proven in a running game".
 
+- **2026-09-20 — the pre-compaction `TODO.md` history, moved here verbatim.** The action surface was
+  reduced from 805 to 302 lines once P1 closed on the library side, so this is the frozen record of what
+  was finished and settled before that: the memory-protocol repair and its (now executed) first-compaction
+  action, the 0.7.x placement/alignment plan with its per-item completion notes and red-first evidence, the
+  0.7.x and 0.6.x/0.5.x round sections, the round-1..3 HANDOFF checklists, and the superseded delivery and
+  packaging proposals with their measured disposition. Anything still actionable stayed in `TODO.md`; the
+  durable rulings behind these items are in `MEMORY.md`. Frozen range: `TODO.md` lines 14-218 as they stood
+  at compaction.
+
+<!-- frozen block: TODO.md lines 14-218, 2026-09-20 -->
+
+## Memory protocol repaired — first compaction pending (2026-09-18)
+
+`AGENTS.md` now carries the four-file memory protocol (`AGENTS.md` / `MEMORY.md` / `TODO.md` /
+`OBLIVIONIS.md`) and demotes maintainer-local `HANDOFF.md` to a transient artifact with no standing
+authority. Two statements in `MEMORY.md` that granted that file a protocol role are superseded by the
+2026-09-18 ruling recorded there.
+
+- [ ] **First compaction into `OBLIVIONIS.md` — open action, needs separate authorization.** Superseded
+      and settled blocks move out of `MEMORY.md`/`TODO.md` **verbatim**; nothing has been archived yet,
+      and choosing what leaves the only volatile ledger is the maintainer's call. Not started by this
+      update: this update is rules and documents only.
+
+## 0.7.x line — placement/alignment change plan (2026-09-18)
+
+Second amendment **inside 0.7.x**: the contract axis stays `0.7.0` and the consumer range stays
+`[0.7.0,0.8.0)`. The original 2026-09-18 reason — "never shipped, nothing consumer-compiled against it" —
+was **spent on 2026-09-19**, when the local consumer pinned `[0.7.0,0.8.0)` and compiled against the sibling
+carrier; the maintainer re-ruled that the work stays inside `0.7.0` as coordinated in-flight development,
+and that ruling **lapses** the moment a consumer is remote or the line is published (`MEMORY.md`, top entry;
+the plan §9 log). Live plan, one home: `docs/development/0.7/10-change-plan.md`. It closes
+`docs/architecture.md` §3.2/§6.3's **alignment** gap and half of the **relation** gap, with CP-0 as a
+prerequisite.
+
+**Phase order — maintainer ruling 2026-09-20, authoritative, and it replaces the earlier "wait for one go":
+P1 seam and library fixes → P2 migration and retiring/removing the legacy project → P3 the full UI/UX reset
+(last) → P4 new work.** FL is in **P1**, the foundation of that chain: **S3–S7 must not move until P1 closes.**
+The backlog is still **friction the consumer's real use exposes**, not a wish list, and `container/tree`'s
+optional per-row template (the one capability `Repeat` + `<Templates>` does not already cover) stays **held for
+pricing** until the friction report arrives (`MEMORY.md`, phase-purpose entry). One freeze per round: every fix
+moves HEAD and invalidates the consumer's gate green.
+
+- [x] **P1-A — the three documentation口径 items, 2026-09-20**: **FL-8** the old→new migration section now exists
+      as §4c of `docs/consumers/consume-from-0.7.0.md` (four parts; time attribution verified at the branch tips,
+      "0.4 → 0.5 introduced, continued since, not a 0.6 regression"); **FL-11** the authoritative-payload rule is
+      stated in all three consumer documents (the GitHub Release asset; dev folders, sibling copies and
+      `1.6/Assemblies/` are rehearsals); **FL-12** `api-tiers.md`'s count corrected to **seventeen** with its
+      predicate — the LIBRARY's own `Kernel/Widgets/` classes that declare `IUiWidget` (16 until
+      `input/text-field`). Docs only: no source, no carrier build.
+- [x] **P1-B closed 2026-09-20 (task-18) — evidence and dispositions, not new code.** Four of the five were
+      already fixed on this line, so the red-first evidence is a mutated build rather than a new lane:
+      **X-21** FIXED `c8fe06e` (A4) — lane `KernelCoreWidgetTests` and the ledger's exact case is its first
+      check (`:143`), reddening as "the required case: a later exact value beats an earlier text collision";
+      **FL-3** FIXED `21a81cd` (A1) — `KernelLayoutTests`' Row-Auto-fallback lane, five assertions red on the
+      pre-A1 1-unit stub; **FL-1** FIXED `e30af94` (A2) — the ledger's V1 spelling `Height="Fill"` is now run
+      for real (widget + container) and refused **at creation** with a located `UiContractException`, and the
+      lane excludes an arrange-time `FormatException` by construction; **FL-2** FIXED `e30af94` (A3) — four
+      assertions red with the refusal disabled. **FL-4 REJECTED** with its argument and a citation: an
+      unmeasurable Auto is A1's *documented* answer (the value applied; it just has no natural width) while an
+      unresolvable `VisibleKey` is a page defect, so a note would fire on legitimate pages — citation
+      `Coahuilite/UniversalSqueaker@0a1b7c05c5ce:…/Diagnostics/UsDiagnosticsSpec.cs:64` (the "Auto column so it
+      costs the wide layout one pixel" nav column, since reclassified (A) and replaced with `VisibleKey`).
+      Evidence: `dist/p1b-verify/harness-red-baseline.txt` (20 FAIL lines, one run) and `harness-green.txt`
+      (ALL PASS, 2573 ok).
+
+- [x] **G1 + G4 landed 2026-09-20** — route (a) approved by the maintainer. G1: the engine-wide
+      `HelpKey` on widget elements, claimed on the existing session hover surface (no new member, no new
+      channel), with the round-3 hover rule corrected to drop the disabled rule; G4: `TitleKey1..8` on
+      `input/mode-row`, plus the indexed-key fix in the `Width="Auto"` seam. The option level was generalized
+      in the same round: `HoverHelpKey` now drives `input/dropdown`'s popup rows too, through one shared
+      `OptionHelp` implementation. Three new lanes, five mutated controls (A/C/D/E plus the attribution bug the
+      lane caught), gates 9/9. Contract: "Element-level help, and the option level generalized".
+- [x] **`Tab` on containers — LANDED 2026-09-20** (maintainer-approved coherence fix, "fix what needs
+      fixing"): two lines, `Tab` added to both container lists, because the engine's read and its
+      `ActiveTabKey` registration were already container-inclusive while the contract forbade the declaration.
+      Lane `KernelContainerTabTests` (+ the existing drift guard), red on either half of the mutation. The
+      consumer switches its checklist gate from `VisibleKey` to `Tab="Packs"` and deletes its one-bool shim at
+      the next freeze. Boundary unchanged and out of scope: per-row `Tab` inside a template stays inexpressible
+      by design (page-level answer) and belongs with route A.
+- [x] **Gate-1 contention diagnostic — LANDED 2026-09-20** (accepted by the Lead): `verify-local.ps1` now
+      probes the payload for an exclusive open before any gate and fails fast naming the cause (a sibling
+      checkout's harness or probe loads the carrier and holds the file) instead of letting it surface as
+      `MSB3027`/`MSB3021` inside gate 1's build output. Demonstrated against a deliberately held file.
+      Related durable finding in `MEMORY.md`: the carrier build is deterministic, the suspect bytes were a
+      dirty build reproduced byte-for-byte, and the stamp cannot record dirtiness.
+- [x] **P1-E disposition table written 2026-09-20 (task-22, docs only)** —
+      `docs/development/0.7/60-capability-dispositions.md`: G2/G3/G5, FL-13/16/17/18/19, FL-21/22,
+      B2(2)/B5/B6/B10, the style-document palette selector, the button selected state, and the two unproven
+      `state/empty` items. ACCEPTs: G2, G3, G5, FL-16, FL-17, FL-18+B6 (one item), B2(2), B5, `SelectedKey`;
+      ACCEPT-DOC: FL-21, FL-22; DEFER: FL-13+B10 (with the P3 reset), the palette selector (no citation);
+      CLOSED: FL-19; **not gaps**: the two `state/empty` items, each with the evidence it would need.
+- [x] **P1-E-2 first half LANDED 2026-09-20 (task-23)**: `WideHidden` (B2(2)), `WidthKey` (B5),
+      `SelectedKey`, the `chrome/banner` role pair (G5), and the FL-21/FL-22 diagnostic wording. Four lanes,
+      one mutated build for the red evidence (6 FAIL lines), green after (ALL PASS, 2592 ok). Nine gates, then the
+      one Release carrier rebuild and the freeze notice at the end of the round.
+- [x] **P1-E-2b LANDED 2026-09-20 (task-25)**: **G2** `input/button` `PayloadKey` + **G3**
+      `Chrome`+`Height=Auto`. Red evidence: one mutated build, 2 attributable FAIL lines; green after
+      (ALL PASS, 2594 ok).
+- [x] **FL-16 LANDED on the second attempt 2026-09-20 (task-26 step 2)**: typed `UiOption` display/value pairs on
+      `input/dropdown`, the batch's one new public type (`public-unstable`). Order obeyed: the lane was written and
+      seen RED before the type existed (stand-in shape), then type + tier entry + pair path in one commit, then the
+      revert proof on the FINAL lane (pair path removed -> red with `a valid pair-bound page recorded 1
+      diagnostic(s)`; restored -> ALL PASS 2596 ok). The element type is discovered by a NON-reporting probe
+      (`ValidateOptions<T>`) with exactly one authoritative read, so a valid page records nothing. MEMORY keeps the
+      withdrawn-first-attempt record.
+- [ ] **(superseded, kept for the record)** **FL-16 (typed `UiOption` pairs) - OPEN, WITHDRAWN on evidence.** The
+      implementation, the public type and its tier entry were written and the suite went green; with the pair
+      path reverted to the faithful pre-fix shape the lane stayed GREEN, so all three were removed rather than
+      shipped. **Next attempt starts here:** bind the key as a pair list and read it back through the *string*
+      path, then assert the mismatch is REPORTED (today the string fallback accepts the pair-bound key, which
+      made the first lane blind); only then re-add the type and its tier entry in the same commit.
+- [x] **P1-E-2 (task-23, blocked by task-19 + this table)** — fold every ACCEPT into **one** carrier rebuild and
+      one FREEZE NOTICE, so US/demo re-verify once. New surface stays inside `0.7.x` (no minor move). FL-17's
+      per-row template is the largest item and is scheduled last inside the batch.
+- [ ] **CONDITIONAL, tied to the hierarchy × composition decision — do not build alone.** A binding-resolved
+      help identity (`HelpBind`) for a DATA-DEPENDENT key. The consumer has exactly two such sites, both in
+      `us/scope-tree`, and that widget will not be migrated declaratively unless route A (an optional per-row
+      template on `container/tree`) lands — so if it stays composite, those two sites stay imperative forever
+      and no `HelpBind` is needed at all. Price it **with** that decision, never before it
+      (`docs/development/0.7/05-api-contract.md`, "Element-level help…"; `MEMORY.md`).
+- [x] **Batch 1 landed 2026-09-19** — CP-0, CP-1, CP-2 and CP-6①③④ implemented, two new lanes,
+      42 expectations re-pinned (all classified as the accepted break, none relaxed), gates 9/9.
+      Recorded in `MEMORY.md` and in the contract under "Batch 1".
+- [ ] **Delivery to the local consumer** — the carrier is `1.6/Assemblies/FerriteLib.UiKit.dll` and the
+      sibling reads that path directly, so delivery is a **Release rebuild from the committed HEAD**
+      (`dotnet build … -c Release --no-incremental`), **not** `-PackDev` — the dev channel writes Dev bytes to
+      the same OutputPath and is the B1 carrier-configuration trap fixed on 2026-09-19 (`MEMORY.md`, "A
+      sibling-HintPath consumer reads …"). Hand the consumer the migration list in
+      `docs/consumers/consume-from-0.7.0.md` §4b and let it
+      compile against `[0.7.0,0.8.0)`. The four in-game checks in `docs/development/0.7/README.md` remain the
+      maintainer's/operator's; they are the only thing that can lift the harness-only evidence boundary.
+- [x] **`consume-from-0.7.0.md` §1's rehearsal identity — CLOSED 2026-09-20 by FL-11.** The block stays as
+      history, now labelled as a rehearsal of one working tree with the authoritative-payload rule stated
+      directly above it (the GitHub Release asset), so the stale value is no longer read as a target.
+- [ ] **(superseded, kept for the record) Refresh `consume-from-0.7.0.md` §1's dev-artifact identity, or drop the identity block.** It quotes
+      `version.txt commit=88095fb3cbed` and a DLL SHA-256 that match neither the tree nor the staged folder
+      (measured 2026-09-20: `dist/dev/FerriteLib/version.txt` reads `commit=d82a3ca8db83`). §1 is the
+      consumer's first table, so a stale identity there is the one place it is read as current; the delivery
+      path this line actually uses is the **Release carrier**, not the dev folder. Refresh it the next time a
+      dev package is genuinely staged, or replace the row with the carrier + gates commands.
+- [x] **Delivery guardrail — CLOSED 2026-09-20: the maintainer declined the structural split** ("the side
+      effect does not exist, because every pack is freshly built"), so no `OutputPath` move and no channel
+      redesign. The claim was then measured channel by channel: **dev** already builds
+      `-c Dev --no-incremental` (`pack-dev.ps1:39`; verified by running it — exit 0, a full 21.95 s compile,
+      `[stage-package] flavor=dev`), so nothing changed there; **github/steam** do not build but **refuse** a
+      stale payload (`pack-release.ps1:73-78`, `pack-steam.ps1:58-61`) and the stager measures the configuration
+      stamp (`stage-package.ps1:81-88`); **the one gap** was the CI payload build `release.yml:119`, which was
+      incremental and runs after `verify-local`'s Dev/Release gates over the shared OutputPath — it now carries
+      `--no-incremental`, which makes "every pack is freshly built" literally true with no structural change.
+      The stale "7 gates" labels in `release.yml` and `ci.yml` were corrected to 9 in the same pass. The
+      proposal below is kept as the record of what was weighed and declined.
+      Original proposal (declined): separate the dev and release artifacts, and make every pack a fresh build.
+      Measured root cause:
+      `Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj:20` sets `<OutputPath>..\..\1.6\Assemblies\</OutputPath>`
+      with **no configuration condition**, so Dev and Release write one folder, and `verify-local.ps1`'s
+      `-PackDev` block runs `pack-dev.ps1` as the **last** step, after every check. Proposed shape, none of it
+      implemented: (a) pin **Release** to `1.6/Assemblies/` (a de-facto published path a stranger's project
+      references — do not relocate it); (b) give **Dev** its own output folder so it cannot overwrite the
+      carrier; (c) force a clean rebuild + PDB removal at the end of every pack channel. Open questions the
+      proposal's two questions, answered by measurement in the round-2 report: **(i) nothing legitimate reads
+      Dev bytes from the carrier path.** The readers are gate 4 (`verify-local.ps1:121`, which asks MSBuild for
+      `TargetPath -p:Configuration=Release`, so it is Release-only), gate 5's content probe, gate 9
+      (`stub-coverage-scan.ps1:309` reads the DLL at that path — it should read the shipped bytes, and after
+      the change it does), the two publishing packers (`pack-release.ps1:28`, `pack-steam.ps1:19` — Release
+      channels), and the sibling consumer's HintPath, which improves. The one that must change is
+      `stage-package.ps1:31`, which hardcodes the carrier path for **all three** channels: after Dev moves it
+      would measure Release bytes against the `dev` channel and **refuse** at `:86-88` — fail-closed, not
+      silent, but the dev channel would stop working, so `$payloadDll` must become channel-aware in the same
+      change. **(ii) the measurement still holds and gets stronger**: it reads the bytes it is about to copy
+      (`Get-AssemblyConfiguration` at `:81`, ProductVersion at `:93`), so a channel-specific source makes it
+      measure the configuration the channel names, with no shared path left to confuse.
+      **Two findings that change the shape of (c).** The commit-freshness guardrail the maintainer asked for
+      **already exists on both publishing channels** as a *refusal* — `pack-release.ps1:73-78` and
+      `pack-steam.ps1:58-61` compare the payload's embedded commit to HEAD and throw; today's dev channel is
+      the only packer that builds, and it builds Dev into the shared path. So "force a clean rebuild at the end
+      of every pack channel" is a **design change to the three-channel split** (packers own identity, the
+      release workflow builds between the gates and the pack), not a gap to patch; and relocating Dev's output
+      makes the manual `Remove-Item …pdb` step unnecessary rather than mandatory, because the Dev PDB moves
+      with the Dev output while Release leaves none (`DebugType=none`). `artifacts/` is already gitignored, so
+      a Dev output folder under it keeps the tree clean.
+- [ ] **Batch 2 (after the live feedback)** — CP-3 (skin-source axis) → CP-6② (role→surface mapping as
+      data; blocked by CP-3) → CP-5 (regional scope), plus CP-7 (sibling-relative placement) if the feedback
+      asks for it. Additive today and cited by nothing; the live pass is what would supply the citation.
+- [ ] **Batch 2 also owns the consumer's own list** (`modding_documents/team-mode/us-to-fl-2026-09-19-zh.md`,
+      evaluated in `fl-to-us-2026-09-19-zh.md`): B2② `WideHidden`; B5 `WidthKey` (blocked on the consumer
+      committing its citation); B6 the chrome action slot; **B7 `input/text-field` — LANDED 2026-09-20** (the
+      kind + the identity-bearing `UiNative.TextField` overload; contract Amendment 3, tier entry, lane
+      `KernelTextFieldTests`; no minor moved under the 2026-09-20 ruling);
+      **mode-row per-option hover help — LANDED 2026-09-20** (maintainer-approved, generality argument: vanilla
+      mode selectors already show per-option help; the identity is the existing `DescriptionN`, published
+      through the new `HoverHelpKey` binding key so the consumer renders the help itself — no tooltip — plus
+      `UiNative.IsMouseOver(Rect, ctx)`; contract section "Mode-row hover help", lane `KernelModeRowHelpTests`);
+      B8's **vocabulary** half (`Description1..8` out of the schema, or a drawing path — maintainer ruling
+      owed; the **label-set** half, the pixel-moving defect, landed 2026-09-20 as a fix, `MEMORY.md`; and the
+      descriptions are **no longer orphan names** — hover help now publishes them as the options' help identity,
+      so removing them would remove that capability: report only, the maintainer decides); B9
+      refused for this line; B10 text alignment as a **layout** attribute, not an appearance axis; B11 the L1
+      orphan-name check, for which B8 is the first positive control.
+      All of it stays inside `0.7.0` under the 2026-09-19 coordinated-development ruling, each item with its
+      own contract amendment and lane.
+      **Bucket classification is mandatory for every US→FL item** (maintainer policy directive 2026-09-20,
+      `MEMORY.md`): (A) US misuse / US's own job — fix on the consumer tree, file no request; (B) a genuine FL
+      gap, which must be a **general** capability, symmetric with an existing one or a funnel primitive, and
+      useful to a consumer that is not US. Buckets: B2②/B5/B6/B7/B10/B11 = (B) general, all non-blocking
+      (B7 strongest); B9 = (A) US's own kind; B8's label-set half = defect (landed), its vocabulary half = a
+      **shrinkage** of a general kind's vocabulary, maintainer's call. The consumer's diagnostics-lane
+      `diag-nav-col` report is **(A)**: `Width="Auto"` was documented as the label set's natural text width
+      and the 1px collapse was never a contract, so US fixed it with the existing general `VisibleKey` and it
+      produces **no FL work item and no version consequence**.
+- [x] **The Batch 2 pick was B7 `input/text-field`, ruled by the maintainer on 2026-09-20 and landed the same
+      day.** Remaining (B)-general candidates, in the order this ledger rates them: B5 `WidthKey` (waits on the
+      consumer committing its citation), B6 the chrome action slot, B2② `WideHidden`, B10 alignment as a layout
+      attribute, B11 the L1 orphan-name check (B8 is its first positive control). Each still owes its own
+      contract amendment **before** code, a failure-sensitive lane, and the consumer-guide line; all stay inside
+      `0.7.0` while the coordination phase runs.
+- [x] D1–D7 — all seven Step-1/Batch-1 decisions settled; see the plan §0b for what each was settled as.
