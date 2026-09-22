@@ -497,8 +497,10 @@ What the 0.5 window is for (working packages, ownership and status: `docs/develo
   now carry one `<Templates>` section whose named subtrees a `<Repeat Items="..." Template="..."/>`
   materializes once per consumer-supplied item key. Each row's identity is `<declaredId>#<itemKey>`, and each
   binding key inside a template resolves in the item's scope as `<Items>.<itemKey>.<declaredKey>` — for
-  `Bind`, `ActionBind`, `OptionsBind` and `VisibleKey`; `Tab` stays page-level on purpose. A `Repeat`
-  that names a template nothing declares, carries children of its own, or appears inside a template is refused
+  `Bind`, `ActionBind`, `OptionsBind`, `VisibleKey`, `PayloadKey` and `SelectedKey`; `Tab` stays
+  page-level on purpose. (This is the current set, and it grew after 0.5 - `PayloadKey` in G2 and
+  `SelectedKey` in B1, both inside `0.7.0`; `docs/development/0.7/05-api-contract.md` records each one.)
+  A `Repeat` that names a template nothing declares, carries children of its own, or appears inside a template is refused
   at parse time; a row whose key is blank, duplicated or carries a reserved identity character is refused with
   one bounded report rather than reconciled onto another row's state. New kinds: `input/checkbox`,
   `display/progress`, `container/tree`. `UiLayoutManifest` gains `Templates`, and

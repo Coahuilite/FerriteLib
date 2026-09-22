@@ -53,6 +53,10 @@ as such rather than passed off as the current one.
   this round** — 35 commits landed after it, 11 of them touching `Source/`, so the sentence that used to stand
   here ("later commits on this line are documentation-only, so the payload's stamp stays true") had been false
   for a long time.
+  **The rule this leaves behind:** a carrier's current identity — SHA-256 + stamp + the build command and the
+  clean/dirty state it was taken in — belongs to the round's FREEZE NOTICE and delivery report, never to a
+  tracked file, which can only ever pin a *past* build (recording the current pair is itself a commit, and the
+  stamp moves with HEAD).
 
 ## Pending external checks
 

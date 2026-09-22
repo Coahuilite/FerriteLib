@@ -252,6 +252,9 @@ public sealed class UiDocumentService : IDisposable {
   `Repeat` 带子元素或属性越界，都是**创建期拒绝**（`UiContractException`/`FormatException`），不是空列表。
 - 行身份 = `<declaredId>#<itemKey>`，行内绑定 key = `<Items>.<itemKey>.<declaredKey>`（`Bind`/`ActionBind`/
   `OptionsBind`/`VisibleKey` 四项被作用域化；`Tab` 保持页面级，因为 tab 不是某一行的答案）。
+  **前向指针（0.7 线补记）**：作用域化集合在 0.7 线增长过——`PayloadKey`（G2）与 `SelectedKey`（B1）先后加入。
+  上面这句记录的是 **0.5 当时的集合**，属历史、不随 0.7 改写；**今天的集合以 `docs/api-tiers.md` 与
+  `docs/development/0.7/05-api-contract.md` 为准。**
 - item key 契约：空白、重复、含保留字符（`/`、`#`、身份编码的两个标记字符）的 key **拒绝该行** —— 不产生元素、
   不产生节点、不产生状态，经有界通道（`UiFitAudit`，按 路径|kind|属性|值 去重）记录一条；**不做静默协调**。
   同 key 重排复用同一节点与状态；删除 key 由 session 既有 `PruneNodesExcept` 释放该行的节点、状态槽、子节点与命中层。
