@@ -33,12 +33,16 @@ $ErrorActionPreference = "Stop"
 #   -PackZip also writes the dev zip; -PackNupkg also writes the consumer reference package. Both are
 #   opt-in because nothing on the dev path needs them.
 #
-# A failing gate prints its retry hint under [hint] - and a hint that is a BUILD COMMAND is the trap,
-# because this script is a writer of the shared carrier (gate 2 is the Dev build, gate 3 the Release one).
-# The hint is read in a "you are verifying" frame, so it must not read like a repair: rebuilding the
-# carrier is a DELIVERY step, it REPLACES the frozen identity every consumer already verified, only the
-# payload owner runs it, and it ends with a re-issued FREEZE NOTICE. The build hints say so inline; the
-# general rule is AGENTS.md, "The payload path is shared, and that is the trap".
+# A failing gate prints its retry hint under [hint] - and a hint whose command WRITES the carrier is the
+# trap, because this script is itself a writer of the shared carrier (gate 2 is the Dev build, gate 3 the
+# Release one). Two shapes write it: the explicit `dotnet build` hints, and the harness hint
+# (`dotnet run --project tools/FerriteLib.UiKit.Tests`), which may recompile the carrier through its
+# ProjectReference whenever HEAD has moved (see the classifier comment below). The hint is read in a
+# "you are verifying" frame, so it must not read like a repair: writing the carrier is a DELIVERY step, it
+# REPLACES the frozen identity every consumer already verified, only the payload owner runs it, and it
+# ends with a re-issued FREEZE NOTICE. The general rule is AGENTS.md, "The payload path is shared, and
+# that is the trap". Both writers of the carrier are annotated: the explicit builds, and the harness run
+# that may recompile it because HEAD moved. The restore hint and the read-only retries carry no notice.
 
 # The neutrality guard, the visual-core/page-model boundary and the two version axes all run INSIDE
 # gate 1, from the library's own harness, each with a positive control. There is no second copy of
@@ -77,18 +81,32 @@ if ($NoRestore) { $buildExtraArgs += '--no-restore' }
 
 # Why the hint carries a notice (2026-09-22, real accident): a consumer-side verification session copied a
 # rebuild hint printed by a red gate, rebuilt the carrier and moved the frozen hash - the same accident
-# class as running the gate chain itself, and the reason a hint has to say what its command is. Build
-# hints get the notice; the setup restore hint and the non-build hints do not.
-$retryIsBuild = [regex]'(?i)dotnet\s+build'
-$retryNotice = @(
-    '[hint ]   (a) it REBUILDS the shared carrier 1.6/Assemblies/FerriteLib.UiKit.dll, the path every'
-    '[hint ]       sibling checkout compiles against - it is a DELIVERY step, not a repair; and'
+# class as running the gate chain itself, and the reason a hint has to say what its command is.
+# The classifier is the JUDGEMENT, not a command name: the question is whether that retry WRITES the
+# carrier. Two command shapes do. `dotnet build` writes it directly. `dotnet run --project` is ALSO a
+# writer even though nothing on the line says build: the harness project carries a ProjectReference to
+# the library, whose OutputPath is this very folder, and the generated AssemblyInfo embeds the commit -
+# so it may RECOMPILE the carrier, and it does so whenever HEAD has moved since the last build. The
+# harness notice therefore says MAY REBUILD rather than rebuilds: the failure mode is a silent one.
+# Read-only retries - the restore hint, the two scans, dependency-reality, `manually` - carry no notice.
+$retryWritesCarrier = [regex]'(?i)dotnet\s+build|dotnet\s+run\b'
+$retryBuildsCarrier = [regex]'(?i)dotnet\s+build'
+$retryCommonNotice = @(
+    '[hint ]   (a) that retry writes the shared carrier 1.6/Assemblies/FerriteLib.UiKit.dll, the path'
+    '[hint ]       every sibling checkout compiles against - a build there is a DELIVERY step, not a repair;'
     '[hint ]   (b) it REPLACES the current frozen identity: the SHA-256 moves, so the hash a consumer'
-    '[hint ]       already verified stops describing these bytes. Only the payload owner runs it, and a'
-    '[hint ]       rebuild ends the delivery step with the stale-PDB removal, the re-verification and a'
-    '[hint ]       re-issued FREEZE NOTICE. A verification-only session must not run it: verification of'
-    '[hint ]       a frozen carrier is read-only. Re-run the gates only as the delivery step.'
+    '[hint ]       already verified stops describing these bytes. Only the payload owner runs it, and it ends'
+    '[hint ]       the delivery step with the forced Release rebuild, the stale-PDB removal, the'
+    '[hint ]       re-verification and a re-issued FREEZE NOTICE. A verification-only session must not run'
+    '[hint ]       it: verification of a frozen carrier is read-only.'
 )
+$retryHarnessFile = Join-Path $root 'tools\FerriteLib.UiKit.Tests\FerriteLib.UiKit.Tests.csproj'
+$retryHarnessNotice = @()
+if (Test-Path -LiteralPath $retryHarnessFile) {
+    $retryHarnessNotice += '[hint ]   (c) this one MAY RECOMPILE it without saying so: the harness project references'
+    $retryHarnessNotice += '[hint ]       the library, whose OutputPath is that folder, and the generated AssemblyInfo'
+    $retryHarnessNotice += '[hint ]       embeds the commit - moving HEAD alone is enough to make the carrier stale.'
+}
 
 function Invoke-Check {
     param([string]$Name, [string]$Retry, [scriptblock]$Action)
@@ -110,7 +128,11 @@ function Invoke-Check {
             Get-Content -LiteralPath $tempLog -Tail 12 | ForEach-Object { Write-Host "    $_" }
         }
         Write-Host "  [hint] retry: $Retry"
-        if ($Retry -match $retryIsBuild) { $retryNotice | ForEach-Object { Write-Host $_ } }
+        # One notice per writer: the explicit builds get (a)/(b), the harness hint gets (c).
+        if ($Retry -match $retryWritesCarrier) {
+            $hintNotice = if ($Retry -match $retryBuildsCarrier) { @($retryCommonNotice) } else { @($retryHarnessNotice) }
+            $hintNotice | ForEach-Object { Write-Host $_ }
+        }
         Remove-Item -LiteralPath $tempLog -Force -ErrorAction SilentlyContinue
         exit 1
     }

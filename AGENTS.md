@@ -177,8 +177,12 @@ gate is read inside "I am verifying" — so a hint like `dotnet build ... -c Rel
 rebuild in exactly the frame that must not perform one. That is not hypothetical: 2026-09-22 a consumer-side
 verification session copied a red gate's rebuild hint, rebuilt the carrier and moved the frozen hash. Any
 verification step therefore starts by asking **whether it writes**, and a hint that does write is a delivery
-step: owner-only, hash-moving, ended by a new FREEZE NOTICE. `scripts/verify-local.ps1` prints its hints under
-`[hint]` and annotates the build ones, but the rule holds for every gate in every repository.
+step: owner-only, hash-moving, ended by a new FREEZE NOTICE. The judgement is **whether the command writes**,
+not whether it is named a build: gate 1's `dotnet run --project tools/FerriteLib.UiKit.Tests` writes too — the
+harness project's `ProjectReference` puts the library's own `OutputPath` in the graph, so moving HEAD alone is
+enough to recompile the carrier, which is why the rule reads "and so is the harness". `scripts/verify-local.ps1`
+prints its hints under `[hint]` and annotates exactly the two writers, but the rule holds for every gate in
+every repository.
 
 **Not claimed:** whether a *non-building* execution of an already-built harness
 (`dotnet run --no-build --no-restore -c Release`, or `bin/Release/net472/FerriteLib.UiKit.Tests.exe` directly)
