@@ -667,6 +667,21 @@
 - **Two concurrent harness runs collide** on the shared output path and die with `CS2012`, so a cross-repo
   build-and-harness stretch serialises on one engineer.
 
+- **Carrier identity moved on 2026-09-22, and the two lines were first-pushed the same day.** Current:
+  `e6683445f997` / SHA-256 `1BBF5F4DAE117569E3EB4F2B512AA07D76A59F8A486B034AF61EA89D9AF4EFA9` / 252416 B /
+  Release / no PDB / mtime `2026-09-22T15:40:25.6322725Z`; supersedes `876750a` / `58B57EAD…0083`. The
+  payload now embeds HEAD again (the docs commit had made "embedded commit == HEAD" red on purpose), US's
+  full chain ran green against it, and **US's carrier stayed byte-identical across that run** - the measurement
+  behind "a sibling consumer reads the payload read-only". `0.7.x` was pushed to `origin` after
+  `privacy-audit -FullHistory` came back CLEAN over 342 revisions; **no tag was created, so nothing was
+  published** (`release.yml` fires on tags/releases only).
+- **Staging is candidate-then-commit (2026-09-22, adopted from the demo's packer, which has always worked this
+  way).** `stage-package.ps1` copies and asserts against a SCRATCH tree (`dist/<channel>/.staging-<Mod>`) and
+  replaces the delivered folder only once every assertion has passed; it then re-points `$stageDir` at the
+  delivered path, so the archive step is unchanged. **Why:** the old order destroyed the delivered folder
+  first and asserted afterwards, so a refused pack left a half-written package behind. **Proof:** with a
+  post-copy failure planted, the pack exited non-zero and the delivered folder's file-hash fingerprint was
+  IDENTICAL before and after; the restored script exits 0 and leaves no `.staging-*` behind.
 ## Packaging discipline
 
 - **Three channels, one staging engine.** `stage-package.ps1` owns what a package *is* (closed five-file
@@ -743,6 +758,15 @@
   axes"); the payload owns all appearance, which is why a style document would be this library's own
   contract rather than an interop with the host.
 
+- **The SSH transport to the remote is intercepted on this machine; HTTPS through the local proxy is not.**
+  `github.com` resolves into the fake-IP range (`198.18.x.x`) and port 22 is closed mid-handshake
+  (`Connection closed by UNKNOWN port 65535`), while `git -c http.proxy=http://127.0.0.1:7897 push <https-url>`
+  succeeds - that is how the 0.7.x first push went out. Probe the transport before blaming permissions.
+- **A delivery-step build must be given the project path.** `dotnet build -c Release --no-incremental` at the
+  repository root fails with `MSB1003` (no project file there) **after** the dev pack has already written Dev
+  bytes to the shared carrier, so the carrier stays Dev (272896 B) until
+  `dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release --no-incremental` runs. "The build
+  succeeded" and "the right thing was built" are different claims.
 ## Diagnostic coverage — the rulings that shape the channels
 
 - **`Available` is the inset label band, not the element rect** (FL-21). An overflow verdict compares the

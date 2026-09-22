@@ -32,7 +32,11 @@ $payloadDll = Join-Path $root '1.6\Assemblies\FerriteLib.UiKit.dll'
 $aboutXml = Join-Path $root 'About\About.xml'
 $loadFolders = Join-Path $root 'LoadFolders.xml'
 $license = Join-Path $root 'LICENSE'
-$stageDir = [System.IO.Path]::GetFullPath($StageDir)
+$deliveryDir = [System.IO.Path]::GetFullPath($StageDir)
+# Candidate-then-commit (2026-09-22, adopted from the demo's packer): the copy and every assertion below
+# run against a SCRATCH tree; the delivered folder is replaced only after all of them pass, so a refused
+# pack leaves the previous package byte-identical instead of a half-written one.
+$stageDir = Join-Path (Split-Path -Parent $deliveryDir) ('.staging-' + (Split-Path -Leaf $deliveryDir))
 
 $dllRelative = '1.6/Assemblies/FerriteLib.UiKit.dll'
 $expectedFiles = @(
@@ -159,6 +163,12 @@ $assemblyCount = @($stagedFiles | Where-Object { $_ -like '*.dll' }).Count
 if ($assemblyCount -ne 1) {
     throw "The payload must be exactly one assembly; found $assemblyCount."
 }
+
+# --- commit: every assertion above passed, so replace the delivered folder now ---------------------
+if (Test-Path -LiteralPath $deliveryDir) { Remove-Item -LiteralPath $deliveryDir -Recurse -Force }
+Move-Item -LiteralPath $stageDir -Destination $deliveryDir
+$stageDir = $deliveryDir
+Write-Host "[stage-package] delivered $deliveryDir"
 
 Write-Host "[stage-package] flavor=$BuildFlavor label=$VersionLabel commit=$CommitLabel"
 Write-Host "[stage-package] staged $($stagedFiles.Count) files -> $stageDir"
