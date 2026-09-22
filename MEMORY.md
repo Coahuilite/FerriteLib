@@ -667,14 +667,14 @@
 - **Two concurrent harness runs collide** on the shared output path and die with `CS2012`, so a cross-repo
   build-and-harness stretch serialises on one engineer.
 
-- **Carrier identity moved on 2026-09-22, and the two lines were first-pushed the same day.** Current:
-  `e6683445f997` / SHA-256 `1BBF5F4DAE117569E3EB4F2B512AA07D76A59F8A486B034AF61EA89D9AF4EFA9` / 252416 B /
-  Release / no PDB / mtime `2026-09-22T15:40:25.6322725Z`; supersedes `876750a` / `58B57EAD…0083`. The
-  payload now embeds HEAD again (the docs commit had made "embedded commit == HEAD" red on purpose), US's
-  full chain ran green against it, and **US's carrier stayed byte-identical across that run** - the measurement
-  behind "a sibling consumer reads the payload read-only". `0.7.x` was pushed to `origin` after
-  `privacy-audit -FullHistory` came back CLEAN over 342 revisions; **no tag was created, so nothing was
-  published** (`release.yml` fires on tags/releases only).
+- **Carrier identity moved three times on 2026-09-22, and `0.7.x` was first-pushed the same day.** History:
+  `876750a`/`58B57EAD…` -> `e668344`/`1BBF5F4D…` -> `553fc53`/`3FA8CABE…` (all 252416 B, Release, no PDB).
+  **Do not pin the live identity in a tracked file:** every commit that moves HEAD forces a payload rebuild, so
+  a SHA written here is stale the moment it lands - that loop is why these are history lines. The live identity
+  is the **FREEZE NOTICE**, quoted as **hash + mtime**. The push went out after `privacy-audit -FullHistory` was
+  CLEAN over 342 revisions; **no tag was created, so nothing was published** (`release.yml` fires on
+  tags/releases only). **US's carrier stayed byte-identical across its full chain run** - the measurement behind
+  "a sibling consumer reads the payload read-only".
 - **Staging is candidate-then-commit (2026-09-22, adopted from the demo's packer, which has always worked this
   way).** `stage-package.ps1` copies and asserts against a SCRATCH tree (`dist/<channel>/.staging-<Mod>`) and
   replaces the delivered folder only once every assertion has passed; it then re-points `$stageDir` at the
