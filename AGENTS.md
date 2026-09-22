@@ -62,14 +62,22 @@ assembly and no `FerriteLib.Core`; re-open only if a consumer needs the visual c
   addition bumps minor too), release `About/About.xml <modVersion>`, build csproj `VersionPrefix` — the
   harness pins all three. `AssemblyInformationalVersion` embeds the commit SHA and is never a
   compatibility value.
-  **Bounded by a dated ruling: on the 0.7.x line a public addition does NOT bump the minor (maintainer
-  ruling 2026-09-22, "minor 可以不升级，仍然算到 0.7.x 内"; it continues the 2026-09-19/2026-09-18 line
-  rulings already in `MEMORY.md`). The generic pre-1.0 sentence above is the promise for a delivered or
-  published line — do not act on it here, and do not raise `Api.Minor` for an addition while the contract
-  axis is `0.7.0` and the consumer range is `[0.7.0,0.8.0)`. The harness lane that pins the three axes
-  into agreement still has to be re-cut for this ruling, and that re-cut is deferred to the batch that
-  lands the next FL capability — running the harness WRITES the shared carrier, so doing it now would move
-  the current freeze; `MEMORY.md` (§ Version axes) carries the deferral and its reason.
+  **TEMPORARY EXEMPTION, with an expiry: on the 0.7.x line a public addition does NOT bump the minor**
+  (maintainer ruling 2026-09-22, "minor 可以不升级，仍然算到 0.7.x 内"; reasoning added the same day: "这个算临时放行，
+  因为现在就在跨库合作开发 fl0.7.x" — this is a release valve, NOT a change to the rule itself). **Reason:**
+  the library and its consumer are in cross-repository lockstep development on 0.7.x, where a minor bump
+  buys no compatibility signal and only churns both trees. **Expires** at the first of: the 0.7.x line's first
+  release/tag, or the end of that lockstep — then the generic pre-1.0 sentence above resumes and an addition
+  moves the minor again. **Never inherited:** it belongs to the `0.7.x` line and this stage alone, and must
+  not be carried into the next line or into any published state by analogy. **No lane reads "additions" today, so
+  nothing has to be re-cut for this exemption** — measured 2026-09-22 across the whole harness and the
+  script gates: `FerriteLibVersionTests` pins the three axes agreeing on major.minor and never inspects the
+  surface, `FerriteLibApiTierTests` reacts to an addition by requiring a tier (a documentation act in
+  `docs/api-tiers.md`), and no gate or lane anywhere enforces the minor bump itself. If a future lane starts
+  reading additions — or its message wording starts asserting the minor rule — align it in the batch that
+  next touches the carrier, because running the harness WRITES the shared carrier and would otherwise move
+  the freeze. `MEMORY.md` (§ Version axes) carries the same exemption, its expiry, and the lane-by-lane audit
+  behind "no gate reads additions".
 - **The game cannot express a prerequisite version** (`ModRequirement` parses only `packageId`,
   `alternativePackageIds`, `displayName`); every consumer asserts the API range in its own constructor.
 

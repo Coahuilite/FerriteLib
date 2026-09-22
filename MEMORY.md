@@ -527,28 +527,46 @@
   `<VersionPrefix>`. `AssemblyInformationalVersion` embeds the commit and is never a compatibility value.
   On the 0.7.x line the axes are `0.7.0` and the consumer range is `[0.7.0,0.8.0)`.
 
-- **Maintainer ruling — a public addition does NOT bump the minor on the 0.7.x line (2026-09-22).** The
-  maintainer's words at task filing: "minor 可以不升级，仍然算到 0.7.x 内". **Criterion as it must be read:** the
-  question is whether the change is an *addition to the public surface*; if it is, it lands inside `0.7.0`
-  with the axes unmoved. **Scope:** this stage / the `0.7.x` line — contract axis `0.7.0`, consumer range
-  `[0.7.0,0.8.0)`. **Relation to the rules below:** it does not delete the generic pre-1.0 promise (which
-  stays the rule for a DELIVERED or PUBLISHED line, `0.5.0 -> 0.6.0` being the precedent) and it does not
-  re-open an exception case by case either — it is the same line ruling the opening entry of 2026-09-20
-  already carried ("additions are allowed inside `0.7.0` while the local consumer is mid-development"),
-  now stated by the maintainer as a direct answer to the question rather than derived from "an rc that
-  never shipped has no goalpost to move". **Consequence for the next session: do not raise `Api.Minor`
-  for a public addition while the line is `0.7.x`.**
-  **The gate half of this ruling is NOT landed, and is deliberately deferred.** `FerriteLibVersionTests`
-  pins the three axes agreeing on major.minor but reads nothing about additions, so today the ruling is
-  documentation-only and nothing enforces (or contradicts) it — the same state the 2026-09-21 batch entry
-  records. Re-cutting/aligning that lane belongs to the batch that lands the next FL capability, **because
-  running the harness is itself a writer of the shared carrier** (gate 1's `dotnet run --project` sits on
-  the harness's `ProjectReference` to the library, whose `OutputPath` is `1.6/Assemblies/`): re-cutting it
-  now would move the current freeze and force a delivery step for nothing, while that batch owes a delivery
-  step anyway and can absorb the re-cut without an extra hash move. Recorded here so it cannot read as an
-  omission; the deferral is also stated in `AGENTS.md` (the Version axes invariant). Scope of this entry:
-  a version-axis and document ruling only — no source, lane, tier, payload or release changed, and no build
-  was run (the frozen carrier `0F95DF35…DB10D6` at HEAD `b997f3a9` was left untouched).
+- **TEMPORARY EXEMPTION (maintainer ruling 2026-09-22): a public addition does NOT bump the minor on the
+  0.7.x line.** Words at filing: "minor 可以不升级，仍然算到 0.7.x 内"; the qualifying reason came the same day:
+  **"这个算临时放行，因为现在就在跨库合作开发 fl0.7.x"**. **What it is:** a release valve for the duration of the
+  `0.7.x` cross-repository lockstep development — NOT a change to the rule itself. **Criterion:** the question
+  is whether the change is an *addition to the public surface*; if it is, it lands inside `0.7.0` with the
+  axes unmoved (scope: this stage / the `0.7.x` line — contract axis `0.7.0`, consumer range
+  `[0.7.0,0.8.0)`). **Reason:** library and consumer evolve in lockstep, so a minor bump buys no
+  compatibility signal there and only churns both trees. **Expiry (suggested wording; a later maintainer
+  ruling overrides it):** the exemption lapses at the FIRST of — the `0.7.x` line's first release/tag, or
+  the end of the cross-repo lockstep development; from then on the generic pre-1.0 rule resumes and a
+  public addition moves the minor again. **Not inheritable:** it belongs to the `0.7.x` line and this stage
+  alone, and may not be carried into the next line or into any published state by analogy.
+  **Relation to the entries above:** it does not delete the generic pre-1.0 promise (`0.5.0 -> 0.6.0`
+  remains the precedent for a DELIVERED line) and it is not a case-by-case exception either — it is the same
+  line ruling the 2026-09-20 opening entry already carried ("additions are allowed inside `0.7.0` while the
+  local consumer is mid-development"), now stated by the maintainer directly rather than derived from "an rc
+  that never shipped has no goalpost to move". **Consequence for the next session: do not raise
+  `Api.Minor` for a public addition while the line is `0.7.x` — and do not treat this exemption as the rule
+  once the line has shipped.**
+  **The gate half: there is nothing to re-cut — audited 2026-09-22, lane by lane.** Every lane that reads
+  the public surface or a version axis, named: (1) **`FerriteLibVersionTests`** (Program.cs:76) — pins
+  `Api` == `<modVersion>` == `<VersionPrefix>` on major.minor (`:260`, `:316`) and drives `Require`/`Evaluate`
+  with synthetic ranges; it never enumerates the surface and never sees an addition, so it needs no change;
+  (2) **`FerriteLibApiTierTests`** (Program.cs:79) — reacts to an addition by requiring the new type in
+  `docs/api-tiers.md`, and to a stable-tier move by requiring the pinned array here to move with it
+  (`:114-117`); that is a **classification** act, NOT a version bump, and the lead's `api-tiers` claim
+  resolves exactly here; (3) **`KernelContractTests`** (`:675-677`) calls `Require` with the loaded `Api`, a
+  behaviour probe, not a surface reader; (4) **the script gates** — `verify-local` gate 7 only checks that
+  `<modVersion>` is present and parses, and the packers compare `<VersionPrefix>` against the tag/label,
+  never the surface. **=> No lane reads "additions", and no lane or gate anywhere enforces the minor bump.**
+  Therefore no re-cut is owed for this exemption; if a future lane starts reading additions (or its message
+  wording starts asserting the minor rule) align it in the batch that lands the next capability — running
+  the harness is itself a writer of the shared carrier, so such a change rides that batch's delivery step.
+  **A wrong statement of the lead's is corrected here for the record:** the lead told the maintainer that
+  "the gates would block your approved change". That is false as stated — what reacts is `api-tiers`'
+  classification lane, satisfied by classifying the new type, while the "bump the minor" half was never
+  executed by any gate. The defect was the wording in `AGENTS.md` (generic rule stated without the line's
+  exemption), and that wording is now fixed. Scope of this entry: a version-axis and document ruling only —
+  no source, lane, tier, payload or release changed, and no build was run (the frozen carrier
+  `0F95DF35…DB10D6` at HEAD `b997f3a9` was left untouched).
 
 - **The pre-1.0 rule: any change to the public surface — additions included — bumps `Api.Minor`,** and
   `modVersion` moves with it. The 0.1.0 -> 0.2.0 bump exists because an additive type (`UiPopup`) shipped

@@ -29,7 +29,9 @@ internal static class FerriteLibApiTierTests
 
     /// <summary>
     /// The promise, pinned. Additions to the library surface that belong here are a decision, not a side
-    /// effect: this array and the document change together, in the same commit as the minor bump.
+    /// effect: this array and the document change together, in one commit. No version consequence is
+    /// asserted here - on the 0.7.x line a public addition does not bump the minor (maintainer ruling
+    /// 2026-09-22, temporary exemption; MEMORY.md, "Version axes").
     /// </summary>
     private static readonly string[] PinnedStableTier =
     {
@@ -113,7 +115,7 @@ internal static class FerriteLibApiTierTests
         {
             throw new Exception("the stable tier moved without a decision here too: +["
                 + string.Join(", ", added) + "] -[" + string.Join(", ", removed)
-                + "] - a type gains or loses the no-break promise only in the commit that bumps the minor.");
+                + "] - a type gains or loses the no-break promise only through a decision in this array too.");
         }
     }
 
