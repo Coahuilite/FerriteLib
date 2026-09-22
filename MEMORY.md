@@ -2,16 +2,20 @@
 
 ## Current durable state
 
-- **`section/header`'s divider is now declarable off (2026-09-22), and the citation is the consumer's S6
-  direction.** The kind painted a 1px line under its title unconditionally — `Chrome` absent from its schema,
-  `Tone` not engine-wide — so no page could have a header without a rule under it, and a
-  borderless/whitespace-separated design ("no frames, no dividers") was blocked by it. Reported evidence:
-  **`us-dist` measured around `coahuilite/UniversalSqueaker@4456077` that the eight cards' `section/header`
-  divider cannot be removed** (the handoff supplied the commit, not a `path:line`; this session did not read that
-  tree), with the consumer's nav rail and attention rail as sibling semantics. `Chrome="none"` suppresses it, the
-  colour stays `theme.Divider` (a scheme can make it transparent), and any other `Chrome` value is refused at
-  creation. The kind had **no lane coverage before this**; lane and mutation:
-  `docs/development/0.7/05-api-contract.md`.
+- **`section/header`'s divider is declarable off — the defect is history, and the citation says so in three
+  parts (2026-09-22).** **The defect as it stood:** a consumer was forced to register its own kind in place of the
+  carrier's atom, and wrote the reason into its own manifest —
+  `coahuilite/UniversalSqueaker@9f28d46:Source/UniversalSqueaker/UI/Layout.Schema2.xml:92-93`:
+  *"It is a US kind rather than the carrier's section/header because that one paints a bottom rule no attribute can
+  move (S6-3)."* (The kind painted a 1px line under its title unconditionally: `Chrome` absent from its schema and
+  `Tone` not engine-wide; the consumer's nav rail and attention rail carry the sibling semantics.)
+  **Resolved:** that uncontrollability is fixed by `876750a` — `Chrome="none"` suppresses the line while the
+  colour stays `theme.Divider`, so a scheme can still restyle it, and any other `Chrome` value is refused at
+  creation. The kind had **no lane coverage at all** before that fix; lane and mutation are recorded in
+  `docs/development/0.7/05-api-contract.md`. **Residual, stated rather than implied:** the consumer's kind was
+  **not** withdrawn — it now exists for its **gold rail** (player-visible, asked for by the maintainer) rather than
+  for the line, and its own comment records that dropping the rail lets it return to
+  `section/header Chrome="none"`.
 
 - **`Height="MatchContent"` landed 2026-09-22, and its consumer citation is transcribed here because it is what
   fixed the scope: only a parent whose content height is a MAXIMUM over its children can answer the reference.**

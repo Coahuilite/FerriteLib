@@ -209,7 +209,20 @@ every repository.
 exercised the frozen payload rather than a stale copy. **Two boundaries:** it does not make the plain
 `dotnet run` a reader (that one still builds and writes — it is the writer this section names), and it runs the
 **last built** binaries, so with sources or HEAD moved since that build it measures stale code and is not a
-substitute for the gate chain when anything changed.
+substitute for the gate chain when anything changed. **Before trusting one, compare the loaded copy's SHA-256 with
+the carrier's** — that boundary is not theoretical: on 2026-09-22 a dirty build refreshed the harness's bin copy
+while the restore rebuilt only the library project, so the bin lagged one version containing a cancelled palette
+and a `--no-build` run would have measured the wrong bytes.
+
+**A hash is the identity; an mtime says whether anything was written — two different questions, and a FREEZE
+NOTICE that cites only the hash is underdetermined for a reader who checks the mtime.** The same bytes are the same
+carrier however many times they were written, so a **rebuild from identical inputs moves the mtime and leaves the
+hash unchanged: that is not a new identity and needs no downstream re-verification** (measured 2026-09-22: a
+restore rebuilt the carrier to the identical `58B57EAD…0083` and moved its mtime to `11:29:56Z`, and a
+test-project rebuild to those same bytes moved it again to `11:36:08Z`). The pair is the **same evidence used in
+opposite directions**, which is why both belong here side by side: the paragraph above uses an **unmoved mtime** to
+prove the carrier was not written at all, while a freeze notice uses the **hash** to fix which bytes are frozen.
+Read the one the question is about.
 - **A hash is an identity only with its inputs pinned.** Quote one with the build command and the clean/dirty
 state beside it. The stamp records the **committed** revision and is silent about uncommitted source.
 - **A doc-only commit reddens "embedded commit == HEAD" until the carrier is rebuilt.** That is expected

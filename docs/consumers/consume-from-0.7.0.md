@@ -31,6 +31,12 @@ than matching a hash written in a document. **Do not copy the DLL into your pack
 `<Private>false</Private>`; only `coahuilite.ferritelib` ships it. Registry-scope, stale-build and
 machine-path traps are unchanged from 0.6 (§3–4 of `consume-from-0.6.0.md` still apply verbatim).
 
+**A hash and an mtime answer different questions.** A frozen carrier is identified by its **hash** — the same bytes
+are the same artifact however many times they were written — while its **mtime** only says it was written. A notice
+that quotes a hash alone therefore settles nothing for a verifier who watches mtime: ask for the hash when the
+question is identity, and expect the mtime to move on **any** rebuild, including one that reproduces identical
+bytes (that is not a new identity and needs no re-verification from you).
+
 ## 2. Assert the version range
 
 ```csharp
@@ -119,6 +125,14 @@ migration at all.
 Nothing else in the compiled surface moved: no type or kind was **removed**, no existing member signature changed,
 and **no `UiStatusTone` member was removed** (that type is stable — `Active` and `Disabled` remain members the
 library uses internally as states).
+
+**One theming coupling worth a line, because a track measurement has already tripped on it.**
+`UiTheme.SelectedSurface.Border` is `SelectedBorder ?? AccentGold` — an *outline* whose fallback is the accent — so
+a scope that assigns `SelectedBorder` (a flat scheme sets it equal to `Selected`, to paint no frame) **aliases that
+fallback away**, and the border then reads as the fill rather than as gold. **If you mean the accent, ask for the
+accent**: `theme.AccentGold`, or `UiThemeDraw.AccentRail(rect, theme, active, width)` with no colour — its own
+fallback is `theme.AccentGold` (`UiThemeDraw.cs:150`), not the selected surface's border. The alias is introduced
+by passing `SelectedSurface.Border` in **explicitly**; the rail itself is not the trap.
 
 ## 4c. Removing an element releases its state — the behaviour change that cannot fail to compile
 
