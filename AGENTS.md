@@ -171,6 +171,15 @@ project graph. A full gate run belongs to the delivery step: the same builder en
 rebuild, the PDB removal and the re-verification, and issues a **new FREEZE NOTICE** — the hash may have moved,
 and downstream must re-verify against the new identity. Consequently a session that only means to VERIFY a
 frozen carrier must not run the gate chain at all.
+
+**A gate's retry hint is a build command, and that is the second face of the same trap.** The output of a red
+gate is read inside "I am verifying" — so a hint like `dotnet build ... -c Release --no-incremental` invites a
+rebuild in exactly the frame that must not perform one. That is not hypothetical: 2026-09-22 a consumer-side
+verification session copied a red gate's rebuild hint, rebuilt the carrier and moved the frozen hash. Any
+verification step therefore starts by asking **whether it writes**, and a hint that does write is a delivery
+step: owner-only, hash-moving, ended by a new FREEZE NOTICE. `scripts/verify-local.ps1` prints its hints under
+`[hint]` and annotates the build ones, but the rule holds for every gate in every repository.
+
 **Not claimed:** whether a *non-building* execution of an already-built harness
 (`dotnet run --no-build --no-restore -c Release`, or `bin/Release/net472/FerriteLib.UiKit.Tests.exe` directly)
 leaves the carrier untouched is **unmeasured**, so it is not offered as a verification path yet. The test is to

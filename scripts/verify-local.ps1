@@ -33,6 +33,13 @@ $ErrorActionPreference = "Stop"
 #   -PackZip also writes the dev zip; -PackNupkg also writes the consumer reference package. Both are
 #   opt-in because nothing on the dev path needs them.
 #
+# A failing gate prints its retry hint under [hint] - and a hint that is a BUILD COMMAND is the trap,
+# because this script is a writer of the shared carrier (gate 2 is the Dev build, gate 3 the Release one).
+# The hint is read in a "you are verifying" frame, so it must not read like a repair: rebuilding the
+# carrier is a DELIVERY step, it REPLACES the frozen identity every consumer already verified, only the
+# payload owner runs it, and it ends with a re-issued FREEZE NOTICE. The build hints say so inline; the
+# general rule is AGENTS.md, "The payload path is shared, and that is the trap".
+
 # The neutrality guard, the visual-core/page-model boundary and the two version axes all run INSIDE
 # gate 1, from the library's own harness, each with a positive control. There is no second copy of
 # those checks here on purpose: the previous arrangement had a consumer repository asserting the
@@ -68,6 +75,21 @@ if (Test-Path -LiteralPath $payloadPath -PathType Leaf) {
 $buildExtraArgs = @()
 if ($NoRestore) { $buildExtraArgs += '--no-restore' }
 
+# Why the hint carries a notice (2026-09-22, real accident): a consumer-side verification session copied a
+# rebuild hint printed by a red gate, rebuilt the carrier and moved the frozen hash - the same accident
+# class as running the gate chain itself, and the reason a hint has to say what its command is. Build
+# hints get the notice; the setup restore hint and the non-build hints do not.
+$retryIsBuild = [regex]'(?i)dotnet\s+build'
+$retryNotice = @(
+    '[hint ]   (a) it REBUILDS the shared carrier 1.6/Assemblies/FerriteLib.UiKit.dll, the path every'
+    '[hint ]       sibling checkout compiles against - it is a DELIVERY step, not a repair; and'
+    '[hint ]   (b) it REPLACES the current frozen identity: the SHA-256 moves, so the hash a consumer'
+    '[hint ]       already verified stops describing these bytes. Only the payload owner runs it, and a'
+    '[hint ]       rebuild ends the delivery step with the stale-PDB removal, the re-verification and a'
+    '[hint ]       re-issued FREEZE NOTICE. A verification-only session must not run it: verification of'
+    '[hint ]       a frozen carrier is read-only. Re-run the gates only as the delivery step.'
+)
+
 function Invoke-Check {
     param([string]$Name, [string]$Retry, [scriptblock]$Action)
 
@@ -87,7 +109,8 @@ function Invoke-Check {
         if (Test-Path -LiteralPath $tempLog) {
             Get-Content -LiteralPath $tempLog -Tail 12 | ForEach-Object { Write-Host "    $_" }
         }
-        Write-Host "  retry: $Retry"
+        Write-Host "  [hint] retry: $Retry"
+        if ($Retry -match $retryIsBuild) { $retryNotice | ForEach-Object { Write-Host $_ } }
         Remove-Item -LiteralPath $tempLog -Force -ErrorAction SilentlyContinue
         exit 1
     }
@@ -106,7 +129,7 @@ if (-not $NoRestore) {
         if (Test-Path -LiteralPath $tempLog) {
             Get-Content -LiteralPath $tempLog -Tail 12 | ForEach-Object { Write-Host "    $_" }
         }
-        Write-Host '  retry: dotnet restore tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj'
+        Write-Host '  [hint] retry: dotnet restore tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj'
         Remove-Item -LiteralPath $tempLog -Force -ErrorAction SilentlyContinue
         exit 1
     }
