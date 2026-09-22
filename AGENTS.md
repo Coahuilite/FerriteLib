@@ -62,6 +62,14 @@ assembly and no `FerriteLib.Core`; re-open only if a consumer needs the visual c
   addition bumps minor too), release `About/About.xml <modVersion>`, build csproj `VersionPrefix` — the
   harness pins all three. `AssemblyInformationalVersion` embeds the commit SHA and is never a
   compatibility value.
+  **Bounded by a dated ruling: on the 0.7.x line a public addition does NOT bump the minor (maintainer
+  ruling 2026-09-22, "minor 可以不升级，仍然算到 0.7.x 内"; it continues the 2026-09-19/2026-09-18 line
+  rulings already in `MEMORY.md`). The generic pre-1.0 sentence above is the promise for a delivered or
+  published line — do not act on it here, and do not raise `Api.Minor` for an addition while the contract
+  axis is `0.7.0` and the consumer range is `[0.7.0,0.8.0)`. The harness lane that pins the three axes
+  into agreement still has to be re-cut for this ruling, and that re-cut is deferred to the batch that
+  lands the next FL capability — running the harness WRITES the shared carrier, so doing it now would move
+  the current freeze; `MEMORY.md` (§ Version axes) carries the deferral and its reason.
 - **The game cannot express a prerequisite version** (`ModRequirement` parses only `packageId`,
   `alternativePackageIds`, `displayName`); every consumer asserts the API range in its own constructor.
 

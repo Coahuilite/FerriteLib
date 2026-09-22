@@ -526,6 +526,30 @@
   `grep -n 'Api = new Version' Source/FerriteLib.UiKit/Kernel/FerriteLibVersion.cs`, `<modVersion>`,
   `<VersionPrefix>`. `AssemblyInformationalVersion` embeds the commit and is never a compatibility value.
   On the 0.7.x line the axes are `0.7.0` and the consumer range is `[0.7.0,0.8.0)`.
+
+- **Maintainer ruling — a public addition does NOT bump the minor on the 0.7.x line (2026-09-22).** The
+  maintainer's words at task filing: "minor 可以不升级，仍然算到 0.7.x 内". **Criterion as it must be read:** the
+  question is whether the change is an *addition to the public surface*; if it is, it lands inside `0.7.0`
+  with the axes unmoved. **Scope:** this stage / the `0.7.x` line — contract axis `0.7.0`, consumer range
+  `[0.7.0,0.8.0)`. **Relation to the rules below:** it does not delete the generic pre-1.0 promise (which
+  stays the rule for a DELIVERED or PUBLISHED line, `0.5.0 -> 0.6.0` being the precedent) and it does not
+  re-open an exception case by case either — it is the same line ruling the opening entry of 2026-09-20
+  already carried ("additions are allowed inside `0.7.0` while the local consumer is mid-development"),
+  now stated by the maintainer as a direct answer to the question rather than derived from "an rc that
+  never shipped has no goalpost to move". **Consequence for the next session: do not raise `Api.Minor`
+  for a public addition while the line is `0.7.x`.**
+  **The gate half of this ruling is NOT landed, and is deliberately deferred.** `FerriteLibVersionTests`
+  pins the three axes agreeing on major.minor but reads nothing about additions, so today the ruling is
+  documentation-only and nothing enforces (or contradicts) it — the same state the 2026-09-21 batch entry
+  records. Re-cutting/aligning that lane belongs to the batch that lands the next FL capability, **because
+  running the harness is itself a writer of the shared carrier** (gate 1's `dotnet run --project` sits on
+  the harness's `ProjectReference` to the library, whose `OutputPath` is `1.6/Assemblies/`): re-cutting it
+  now would move the current freeze and force a delivery step for nothing, while that batch owes a delivery
+  step anyway and can absorb the re-cut without an extra hash move. Recorded here so it cannot read as an
+  omission; the deferral is also stated in `AGENTS.md` (the Version axes invariant). Scope of this entry:
+  a version-axis and document ruling only — no source, lane, tier, payload or release changed, and no build
+  was run (the frozen carrier `0F95DF35…DB10D6` at HEAD `b997f3a9` was left untouched).
+
 - **The pre-1.0 rule: any change to the public surface — additions included — bumps `Api.Minor`,** and
   `modVersion` moves with it. The 0.1.0 -> 0.2.0 bump exists because an additive type (`UiPopup`) shipped
   without one and a consumer desynced into a `TypeLoadException` inside `UiHost.Draw`. A bump is the

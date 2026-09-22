@@ -252,6 +252,13 @@ the responsiveness package landed, and `input/text-field` closed the last missin
       real theme exists.
 - [ ] Optional two-minute experiment: whether RimWorld tolerates an unknown tag in `About.xml`. The parsed
       tag set is closed and no tolerance could be proven from stripped metadata, so nothing depends on it.
+- [ ] **Re-align the version-axis lane with the 2026-09-22 ruling (a public addition does NOT bump the
+      minor on `0.7.x`), and land it in the batch that next touches the carrier — not before.** Today
+      `FerriteLibVersionTests` pins the three axes agreeing on major.minor and reads nothing about
+      additions, so the ruling is documentation-only (`MEMORY.md` § Version axes carries the ruling and the
+      deferral). Doing it alone would run the harness, which is itself a writer of the shared carrier —
+      it would move the current freeze and force a delivery step for a documentation change; the
+      capability batch owes that delivery step anyway and can absorb the re-cut without an extra hash move.
 
 ## 5. Publication — form decided 2026-09-05: two repos, two release pages, linked not copied
 
