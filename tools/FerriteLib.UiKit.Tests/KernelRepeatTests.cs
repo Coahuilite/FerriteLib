@@ -18,6 +18,8 @@ namespace FerriteLib.UiKit.Tests;
 /// <item>one arranged element per accepted item key, published under <c>&lt;templateId&gt;#&lt;itemKey&gt;</c>;</item>
 /// <item>a row's controls resolve <c>done</c> against <c>&lt;items&gt;.&lt;key&gt;.done</c>, never against a
 /// page-level key of the same name - the "row reads its own item, not a global selection" claim;</item>
+/// <item>the same for <c>SelectedKey</c>: "which row is selected" is one row's answer, so exactly one row
+/// carries the active treatment even while the page-level binding of the same name answers <c>true</c>;</item>
 /// <item>a reorder moves the geometry and leaves each key's node and state where they were;</item>
 /// <item>an insert touches only the inserted key;</item>
 /// <item>four insert/remove cycles leave the session node table, the engine's widget table and the
@@ -51,6 +53,7 @@ internal static class KernelRepeatTests
         RegisterProbeKind();
         Run("A row set renders one element per item key", VerifyRowSetRendersPerKey);
         Run("A row reads its own item scope, not the page's key of the same name", VerifyItemLocalScope);
+        Run("SelectedKey answers per row, not for the page the row set sits on", VerifySelectedKeyIsPerRow);
         Run("Reordering moves the geometry and keeps each key's node and state", VerifyReorderKeepsState);
         Run("Inserting a key does not renumber the rows that already exist", VerifyInsertDoesNotRenumber);
         Run("Insert/remove cycles accumulate no nodes, widget instances or materialization", VerifyCyclesDoNotAccumulate);
@@ -107,6 +110,121 @@ internal static class KernelRepeatTests
         Check(pageLevelDone == 0,
             "the page-level key the template names ('done') was neither read nor written by the row");
     }
+
+    /// <summary>
+    /// B1 (2026-09-22): the item-scope table carries <c>SelectedKey</c> too, because "which row is
+    /// selected" is one row's answer and not the page's - the same criterion that deliberately keeps
+    /// <c>Tab</c> out of that table. The observable is the number of rows painted with the active
+    /// treatment: the template declares <c>SelectedKey="selected"</c> once, every row reads it, and the
+    /// page-level binding of that very name is a decoy answering <c>true</c>. A row that resolved against
+    /// the page instead of its own item scope lights every row - which is the defect the consumer hit,
+    /// where a data-driven row set could not say which of its rows was the selected one.
+    /// </summary>
+    private static void VerifySelectedKeyIsPerRow()
+    {
+        UiFitAudit.Reset();
+        UiTheme theme = UiTheme.DarkGold;
+        var activeEdge = new Color(0.91f, 0.11f, 0.17f, 1f);
+        // The Active cell's border is theme.AccentGold and a rule paints exactly that border, so the probe
+        // colour counts whole rows without depending on the order the rows were drawn in.
+        theme.AccentGold = activeEdge;
+
+        var keys = new List<string> { "a", "b", "c" };
+        var selected = new Dictionary<string, bool>(StringComparer.Ordinal)
+        {
+            { "a", false }, { "b", true }, { "c", false },
+        };
+        var bindings = new UiBindings();
+        bindings.BindReadOnly<IReadOnlyList<string>>("items", () => keys, UiInvalidation.Structure);
+        // The decoy: the page-level key the template's SelectedKey names. It answers true, so every row
+        // that reads the page scope instead of its own item scope goes active.
+        bindings.BindReadOnly<bool>("selected", () => true);
+        for (int i = 0; i < keys.Count; i++)
+        {
+            string captured = keys[i];
+            bindings.BindReadOnly<bool>("items." + captured + ".selected", () => selected[captured]);
+        }
+
+        using var host = new UiHost(
+            Scope, UiLayoutManifest.Parse(SelectedKeyPageXml), bindings, theme, new StubMetrics(), new StubTranslation());
+
+        UiLayoutSnapshot snapshot = Arrange(host);
+        List<Rect> active = ActiveRuleRects(activeEdge);
+        Check(active.Count == 1,
+            "exactly one row carries the active treatment, not one per row: " + active.Count + " active row(s) of "
+            + keys.Count + " (a row reading the page-level decoy 'selected' would make it " + keys.Count + ")");
+        Check(active.Count == 1 && Within(active[0], snapshot.RectById["row#b"]),
+            "and it is the row whose own item key answers true ('b')");
+
+        // The same claim from the other side: the truth moves to another item key and the one active row
+        // moves with it, so the answer is per row and not a fixed slot.
+        selected["b"] = false;
+        selected["c"] = true;
+        host.Bindings.NotifyChanged("items");
+        snapshot = Arrange(host);
+        active = ActiveRuleRects(activeEdge);
+        Check(active.Count == 1 && Within(active[0], snapshot.RectById["row#c"]),
+            "moving which item key answers true moves the one active row with it");
+
+        // A future-regression guard rather than the mutation-proving half: with every item key bound,
+        // nothing takes the fail-soft path - the silence a correctly scoped page has to keep.
+        Check(UiFitAudit.StyleFallbackCount == 0,
+            "no row needed the fail-soft path: every SelectedKey resolved in its own item scope");
+    }
+
+    /// <summary>
+    /// Draws one frame and returns the arrangement. The recording hooks are cleared first: they are
+    /// process-wide accumulators, and a count taken over a list another lane (or the previous frame)
+    /// already wrote to is not a measurement of this frame.
+    /// </summary>
+    private static UiLayoutSnapshot Arrange(UiHost host)
+    {
+        ClearDrawRecordings();
+        Draw(host);
+        return host.MeasureAndArrange(new Vector2(240f, 400f));
+    }
+
+    private static List<Rect> ActiveRuleRects(Color activeEdge)
+    {
+        var colors = (IList)DrawRecording("DrawBoxSolidColors");
+        var rects = (IList)DrawRecording("DrawBoxSolidRects");
+        var found = new List<Rect>();
+        for (int i = 0; i < colors.Count && i < rects.Count; i++)
+        {
+            if (SameColor((Color)colors[i]!, activeEdge)) found.Add((Rect)rects[i]!);
+        }
+
+        return found;
+    }
+
+    private static void ClearDrawRecordings()
+    {
+        ((IList)DrawRecording("DrawBoxSolidColors")).Clear();
+        ((IList)DrawRecording("DrawBoxSolidRects")).Clear();
+    }
+
+    /// <summary>
+    /// The harness's visual recording lives on the Verse stub and is reached by reflection, because the
+    /// test assembly compiles against the game's reference assembly and only executes against the stub.
+    /// </summary>
+    private static object DrawRecording(string name)
+    {
+        FieldInfo? field = typeof(Verse.Widgets).GetField(name, BindingFlags.Public | BindingFlags.Static);
+        if (field == null) throw new Exception("the Verse stub carries no recording hook named " + name);
+        return field.GetValue(null)!;
+    }
+
+    private static bool Within(Rect inner, Rect outer)
+    {
+        return inner.y >= outer.y - 0.001f && inner.yMax <= outer.yMax + 0.001f;
+    }
+
+    private static bool SameColor(Color left, Color right)
+    {
+        return Math.Abs(left.r - right.r) < 0.001f && Math.Abs(left.g - right.g) < 0.001f
+            && Math.Abs(left.b - right.b) < 0.001f && Math.Abs(left.a - right.a) < 0.001f;
+    }
+
 
     private static void VerifyReorderKeepsState()
     {
@@ -492,6 +610,22 @@ internal static class KernelRepeatTests
         + "</Templates>"
         + "<Column Id=\"page\" Gap=\"4\">"
         + "<Repeat Id=\"rows\" Items=\"items\" Template=\"row\" Gap=\"4\" VisibleKey=\"show-rows\" />"
+        + "</Column>"
+        + "</UiPage>";
+
+    /// <summary>
+    /// The B1 page: one rule per row, and the only key the row declares is <c>SelectedKey</c>. A rule
+    /// carries no binding of its own, so the active border is the sole thing a row can be telling us.
+    /// </summary>
+    private const string SelectedKeyPageXml =
+        "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+        + "<Templates>"
+        + "<Row Id=\"row\" Gap=\"2\" Padding=\"2\">"
+        + "<Widget Id=\"pick\" Kind=\"chrome/rule\" Height=\"8\" SelectedKey=\"selected\" />"
+        + "</Row>"
+        + "</Templates>"
+        + "<Column Id=\"page\" Gap=\"4\">"
+        + "<Repeat Id=\"rows\" Items=\"items\" Template=\"row\" Gap=\"4\" />"
         + "</Column>"
         + "</UiPage>";
 

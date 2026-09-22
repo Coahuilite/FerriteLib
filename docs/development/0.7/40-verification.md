@@ -21,6 +21,7 @@ now pin each factory's literals plus "the constructor selects neither palette".
 | A4 dropdown precedence | required case red (`Option1=b/Value2=b` displayed `b`, not `Second`) | green | `c8fe06e` |
 | A5 options diagnostic | category sentence red (baseline said only "missing") | green | `88f1c77` |
 | C Vanilla / DarkGold peers | constructor-as-default framing superseded; bag must not equal either palette | green after amendment | this commit |
+| B1 `SelectedKey` item scope | lane written and run red **first** on the pre-fix tree (3 active rows of 3 — the page-level decoy answered for every row); red again under the faithful revert of the table entry (exit 1, the three assertions named in the output) | green, `ALL PASS` 2600 ok | this commit |
 
 B's eight lanes are a new reference over existing surface: they cannot be red on a "before" (nothing in B
 changed production code); their weight is compile-check plus behavior pins — geometry-free authoring, the
@@ -33,16 +34,25 @@ Everything here remains stub-harness evidence. None of it is 已由真实消费�
 
 ## Integrated gates and staged package (measured, not assumed)
 
-`verify-local.ps1 -PackDev` after the last code commit: all nine gates OK, staging OK.
+`verify-local.ps1` after the B1 code commit (2026-09-22): all nine gates OK. It was run **without**
+`-PackDev` in this round, so nothing was staged: the dev folder below is the C-round artifact and is labelled
+as such rather than passed off as the current one.
 
-- Staged folder: `dist/dev/FerriteLib/` (5 files)
-- `version.txt`: `FerriteLib 0.7.0-dev / build=dev / commit=88095fb3cbed`
-- `1.6/Assemblies/FerriteLib.UiKit.dll` SHA-256
-  `271128299A9CFF2C4CB5EBDFBB9246C3F6BEC2791A5D0117B894E6F96FC8F82F`
-- Commit stamp: built at the C commit; later commits on this line are documentation-only, so the payload's
-  embedded `AssemblyInformationalVersion` and the folder's stamp stay true.
 - Single-DLL/content-free payload, API tiers, visual-core separation, three-axis version agreement,
-  neutrality, containment: all re-asserted by the same gate run.
+  neutrality, containment: all re-asserted by that gate run.
+- A delivery ends with the carrier rebuilt **Release** (`dotnet build -c Release --no-incremental`, then the
+  stale `1.6/Assemblies/FerriteLib.UiKit.pdb` removed — Release sets `DebugType=none`, so it neither rewrites
+  nor deletes an existing PDB), and its identity read in a **child process**: `Assembly.LoadFile` in the
+  session that is doing the measuring holds the payload open until that process exits.
+- **A committed byte identity cannot be current, which is why the pair is not written down here.** The payload
+  embeds the committed SHA, so a commit whose content records the hash moves HEAD and moves the stamp with it;
+  a frozen carrier's record is the pair *plus* its build command and clean/dirty state, taken at the freeze.
+  History, superseded: the C-round measurement was `dist/dev/FerriteLib/` (5 files), `version.txt`
+  `FerriteLib 0.7.0-dev / build=dev / commit=88095fb3cbed`, payload SHA-256
+  `271128299A9CFF2C4CB5EBDFBB9246C3F6BEC2791A5D0117B894E6F96FC8F82F`. **That block was already stale before
+  this round** — 35 commits landed after it, 11 of them touching `Source/`, so the sentence that used to stand
+  here ("later commits on this line are documentation-only, so the payload's stamp stays true") had been false
+  for a long time.
 
 ## Pending external checks
 

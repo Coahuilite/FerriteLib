@@ -386,7 +386,11 @@ carries its own lane, proven red against the reverted implementation in one muta
   state. State beats the author, the same way writability does. Deliberately **not** a `ToneKey`: a binding
   handing back `"Active"` would re-authorise a name this line retired, and the treatment is a state the library
   already owns. An unresolvable key is fail-soft and recorded once, like `VisibleKey`. Engine-wide on widget
-  elements; it takes effect in the kinds that resolve a role (the atoms and `chrome/banner`).
+  elements; it takes effect in the kinds that resolve a role (the atoms and `chrome/banner`). **Inside a
+  `<Repeat>` template it is item-scoped** (B1, below). Two verifiable consequences of the `Active` cell:
+  the treatment takes `TextOnGold` and **ignores `Emphasis`** (`Active/Normal` and `Active/Muted` are the
+  same value, pinned by `KernelResolvedStyleTests`), so declare `SelectedKey` on the elements that should
+  turn gold — a row title — and **not** on a row container or on a detail line meant to stay secondary.
 - **G5 `chrome/banner` adopts the role pair** — its literal schema list becomes
   `AtomVocabulary.Schema(ToneAndEmphasis, …)`, and it paints the role's TEXT colour with a declared default
   emphasis of `Muted`. That default is what keeps an untone banner's ink exactly what it was (the secondary
@@ -410,8 +414,9 @@ against. They stay listed for the next rebuild rather than half-landing here.
 ### G2 and G3 landed, FL-16 withdrawn (2026-09-20)
 
 - **G2 `PayloadKey` on `input/button`** - the command is handed the payload its binding declares, so a repeated
-  row can say which item it is. It is scoped per item like the other binding roles (`Bind`/`ActionBind`/
-  `OptionsBind`/`VisibleKey`), and the creation contract follows the shape: with a payload the consumer binds
+  row can say which item it is. It is scoped per item like the other binding roles (the item-scope table
+  `QualifyItemBinding` holds: `Bind`, `ActionBind`, `OptionsBind`, `VisibleKey`, `PayloadKey`, and
+  `SelectedKey` since B1 below), and the creation contract follows the shape: with a payload the consumer binds
   `BindAction<string>`, without one `BindCommand` as before. A key bound to something other than a string is
   fail-soft, loud, and fires the payload-free command.
 - **G3 `Chrome="none"` + `Height="Auto"`** - a bare hit area: no surface is painted while the hit test still
@@ -426,6 +431,52 @@ not discriminate is not evidence, and the protocol is explicit that a new public
 the tier entry and the lane were removed, and the diagnosis is recorded instead: the string fallback accepted a
 pair-bound key rather than reporting the element-type mismatch, which is what made the probe blind. The next
 attempt starts from that failure rather than from a fresh guess. Nothing here promotes a type.
+
+### B1 (2026-09-22) — `SelectedKey` joins the item-scope table
+
+**Maintainer ruling: approved.** Technical debt must not be left to spread while it is visible and
+repairable. This is a **consistency fix, not new surface**: `UiLayoutEngine.QualifyItemBinding` moved a
+declared key into the item's scope for every binding role except `SelectedKey`, so a repeated row set could
+not state which of its rows was the selected one.
+
+**The criterion is the table's own, written beside it.** `Tab` is deliberately not scoped because a tab is a
+page-level answer and not an item's; the question the table asks of every attribute is *"is this an answer
+about one row?"*. `SelectedKey` answers *which row is selected*, so its absence was an inconsistency rather
+than a boundary.
+
+**Consumer evidence (reported in the S4-2 handoff).** The consumer's row-set rework (`7f54ea7`: `Repeat` +
+`<Templates>` over the race/xenotype cards) could not show a selected row. The minimal reproduction, which is
+what the lane pins: a template element declaring `SelectedKey="selected"` resolved the **page-level** key on
+every row instead of `<Items>.<itemKey>.selected`, so all rows answered together and the card's selected
+state was invisible.
+
+**What changed.** One clause in `QualifyItemBinding` plus the comment above it. The scoped set is now
+`Bind`, `ActionBind`, `OptionsBind`, `VisibleKey`, `PayloadKey` and `SelectedKey`; the comment states the
+criterion rather than a count of names, so the next reader checks a rule instead of a number.
+
+**Lane and mutation.** `KernelRepeatTests`, "SelectedKey answers per row, not for the page the row set sits
+on": three rows whose template declares `SelectedKey="selected"`, against a page-level binding of that same
+name that is a **decoy answering true**. The lane asserts that exactly one row carries the active treatment,
+that it is the row whose own item key answers true, and that moving which item key answers true moves the one
+active row with it. It was written and observed **RED first** — 3 active rows of 3, the consumer's defect
+exactly — then green after the clause landed, and red again with the entry removed from the table (**faithful
+revert**: exit 1 with the three assertions named in the output). One assertion is deliberately weaker and is
+labelled as such in the lane: `StyleFallbackCount == 0` is a future-regression guard, not the
+mutation-proving half, because the decoy is bound and so it holds in both states.
+
+**The `Active` cell ignores `Emphasis` for text — the semantics worth copying.** A `SelectedKey` that
+answers true resolves the element to `UiStatusTone.Active`, and that cell hands text `TextOnGold` under either
+emphasis (`Active/Normal` and `Active/Muted` resolve to one value, pinned by `KernelResolvedStyleTests`;
+emphasis is the muted/secondary axis and a saturated tone does not use it). Observed consequence on a
+two-line row: declaring `SelectedKey` on the row **title** turns that title gold while a detail line meant to
+stay secondary must keep its `Emphasis="Muted"` and therefore must **not** carry the declaration — a row
+container carrying it takes its whole subtree with it.
+
+*Migration:* none for a page that compiled before. The one shape whose meaning changes is a template that
+declared `SelectedKey` and expected it to read a **page-level** binding of the same name; it now resolves in
+the item's scope, which is the only shape that can answer "which row". Nothing in this repository, in the
+harness, or in the consumer's reported page depended on the old resolution — the entry's absence is what the
+consumer hit.
 
 ### FL-23: a binding element-type mismatch is reported, not only thrown (2026-09-20)
 

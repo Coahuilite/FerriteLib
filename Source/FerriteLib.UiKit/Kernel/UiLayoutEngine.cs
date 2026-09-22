@@ -1869,9 +1869,12 @@ public sealed class UiLayoutEngine
 
     /// <summary>
     /// One declared binding key moved into the item's scope: <c>done</c> becomes
-    /// <c>&lt;itemsKey&gt;.&lt;itemKey&gt;.done</c>. Only the four binding attributes are scoped; <c>Tab</c>
-    /// is deliberately not, because a tab is a page-level answer and not an item's, and every other attribute
-    /// is layout or appearance with nothing to resolve against bindings.
+    /// <c>&lt;itemsKey&gt;.&lt;itemKey&gt;.done</c>. Every binding role is scoped; <c>Tab</c> is
+    /// deliberately not, because a tab is a page-level answer and not an item's, and every other attribute
+    /// is layout or appearance with nothing to resolve against bindings. The criterion is "is this an
+    /// answer about one row?": <c>SelectedKey</c> answers which row is selected, so it sits in the same
+    /// table as <c>Bind</c>, <c>ActionBind</c>, <c>OptionsBind</c>, <c>VisibleKey</c> and <c>PayloadKey</c>
+    /// rather than resolving the page-level key of that name on every row.
     /// </summary>
     private static string QualifyItemBinding(string attribute, string value, string itemsKey, string itemKey)
     {
@@ -1881,7 +1884,11 @@ public sealed class UiLayoutEngine
             && !string.Equals(attribute, VisibleKeyAttribute, StringComparison.OrdinalIgnoreCase)
             // G2: a button's payload is per item inside a template, so it is scoped exactly like the other
             // binding roles - that is what makes "this row's key" answerable at all.
-            && !string.Equals(attribute, "PayloadKey", StringComparison.OrdinalIgnoreCase))
+            && !string.Equals(attribute, "PayloadKey", StringComparison.OrdinalIgnoreCase)
+            // B1: SelectedKey is the binding-driven SELECTED state, and "which row is selected" is an
+            // answer about one row - leaving it page-scoped made every row resolve one page-level key,
+            // which is how a data-driven row set lost the ability to show which of its rows was selected.
+            && !string.Equals(attribute, "SelectedKey", StringComparison.OrdinalIgnoreCase))
         {
             return value;
         }
