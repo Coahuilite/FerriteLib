@@ -28,6 +28,12 @@ $ErrorActionPreference = "Stop"
 #   9   the consumer half of the boundary metric is armed and tree-sensitive: rule (c) of
 #       tools/dependency-reality.ps1 fires on a planted bare call outside its allowlist, refuses the
 #       migrated two-argument form, and passes once that file is allowlisted (self-test + fixture)
+#   10  the development-only geometry instrument's DEV half really ran: a Dev harness run whose output
+#       carries the dev-only assertion names, a floor on the assertion and dump-line counts, the absence of
+#       the release-only half's name, and the printed numbers (see scripts/verify-dev-instrument.ps1)
+#       - because gate 1 runs the harness in Release, and a dev-only proof nobody re-runs is a proof that
+#       rots. This gate WRITES the carrier too: it builds and runs the harness in Dev (gate 2 writes Dev
+#       bytes, this one leaves Dev bytes plus a Dev PDB for the delivery step to end).
 # -PackDev: after all checks pass, stage the dev folder (a directory, not an archive). Placing it
 #   in a game Mods directory is the developer's own step - no script here writes outside the repository.
 #   -PackZip also writes the dev zip; -PackNupkg also writes the consumer reference package. Both are
@@ -346,6 +352,19 @@ Invoke-Check 'rule (c) consumer half is armed and tree-sensitive (dependency-rea
         finally {
             Remove-Item -LiteralPath $sandbox -Recurse -Force -ErrorAction SilentlyContinue
         }
+    }
+
+Invoke-Check 'development instrument: the Dev half really ran (numeric geometry + press verdicts)' `
+    'dotnet run --no-restore --project tools/FerriteLib.UiKit.Tests -c Dev' `
+    {
+        # The instrument is compiled only into a Dev build, and gate 1 runs the harness in Release - so
+        # without this gate its lane and its mutation proof would live only for whoever re-runs '-c Dev' by
+        # hand, which is exactly how a proof rots. The reader refuses to accept "the project compiled": it
+        # requires the dev-only assertion names, floors on the assertion and dump-line counts, the absence of
+        # the release-only name, and the numbers themselves. Its checker is control-tested on every run
+        # (four planted fixtures - empty, release-only, green-exit-but-missing-name, and a fully populated
+        # sample that must NOT be rejected).
+        & pwsh -NoProfile -File (Join-Path $root 'scripts\verify-dev-instrument.ps1') -ProjectRoot $root
     }
 
 if ($PackDev) {

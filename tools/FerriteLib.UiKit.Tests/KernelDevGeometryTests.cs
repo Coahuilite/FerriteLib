@@ -145,6 +145,7 @@ internal static class KernelDevGeometryTests
             UiNative.ButtonOverride = rect => true;
             host.DrawFrame(Viewport);
             string hit = Require(host.Diagnostics.DumpGeometry(), "verdict=hit");
+            PrintInputs(host.Diagnostics.DumpGeometry());
             Check(hit.IndexOf("path=root/row/band ", StringComparison.Ordinal) >= 0,
                 "a claimed press names the element that claimed it: " + hit);
             TryPoint(hit, "point=", out Vector2 hitPoint);
@@ -164,6 +165,7 @@ internal static class KernelDevGeometryTests
             UiNative.ButtonOverride = _ => false;
             host.DrawFrame(Viewport);
             string miss = Require(host.Diagnostics.DumpGeometry(), "verdict=miss");
+            PrintInputs(host.Diagnostics.DumpGeometry());
             Check(miss.IndexOf("path=root/row/band ", StringComparison.Ordinal) >= 0,
                 "a press the element ignored is reported as ignored, with the element named: " + miss);
         }
@@ -185,6 +187,7 @@ internal static class KernelDevGeometryTests
             UiNative.DebugMousePosition = band.center;
             disabled.DrawFrame(Viewport);
             string blocked = Require(disabled.Diagnostics.DumpGeometry(), "verdict=disabled");
+            PrintInputs(disabled.Diagnostics.DumpGeometry());
             Check(blocked.IndexOf("path=root/row/band ", StringComparison.Ordinal) >= 0,
                 "a disabled element reports why the press went nowhere: " + blocked);
         }
@@ -305,6 +308,18 @@ internal static class KernelDevGeometryTests
         foreach (string line in dump.Split(Lines, StringSplitOptions.None))
         {
             if (line.Length > 0) Console.WriteLine("    | " + line);
+        }
+    }
+
+    /// <summary>
+    /// Prints only the sampled presses of a dump. The geometry block is printed in full once; the input half
+    /// answers the other question this instrument was asked, so its lines are evidence the gate can see too.
+    /// </summary>
+    private static void PrintInputs(string dump)
+    {
+        foreach (string line in dump.Split(Lines, StringSplitOptions.None))
+        {
+            if (line.StartsWith("input ", StringComparison.Ordinal)) Console.WriteLine("    | " + line);
         }
     }
 

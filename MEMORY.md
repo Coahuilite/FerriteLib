@@ -28,10 +28,27 @@
   **Mutation-proven half:** the geometry producer, not the instrument — `ResolveHeight`'s `MatchContent` branch
   `+ 2f` reddens `the band's recorded height is the sibling's measured height: 32 vs 30` (exit 1); the revert
   restores ALL PASS. **Guard only, labelled in the lane:** the per-line `window == draw + origin` assertion,
-  which holds by construction today. **Boundary:** the instrument exists only in a Dev build and gate 1 runs the
-  harness in Release, so gate 1 exercises the **release half only** (absent, refused, empty dump); the numeric
-  half is not gate-protected, and running the harness twice in gate 1 is a gate-chain change left to the
-  maintainer. Contract entry, tier member clause and consumer-guide row landed in the same batch.
+  which holds by construction today. **Both halves are now gate-guarded** (maintainer ruling 2026-09-23, "必须证明真的跑了"): gate 1 runs the
+  harness in Release, so it holds the release half, and the **new gate 10** (`scripts/verify-dev-instrument.ps1`)
+  runs the harness in **Dev** and refuses to accept "the project compiled" — it requires the seven dev-only
+  assertion names, floors on the assertion (12) and dumped-node (5) counts, the absence of the release-only
+  half's name, and the numbers themselves, and it control-tests its own checker on every run (an empty output, a
+  release-only output, a green-exit-but-missing-name output, and a fully populated sample that must NOT be
+  rejected — the empty-enumeration bug class this repository keeps paying for). **Gate 10's own mutation
+  proofs**, each run through the gate alone so no earlier gate could be what reddened it: (i) the geometry
+  producer `+ 2f` ⇒ `GATE_EXIT=1` naming `the band's recorded height is the sibling's measured height: 32 vs
+  30`; (ii) the tests project's `FER_DEV` constant removed ⇒ `GATE_EXIT=1` naming release-branch assertions
+  instead of dev ones. Reverting either restores `dev half ran: 7 dev-only assertion(s) present, 2660 'ok:'
+  line(s), 6 dumped node line(s)`, exit 0. Contract entry, tier member clause, consumer-guide row and the
+  `40-verification` / `AGENTS.md` boundary line landed in the same batch.
+  **A real defect class came out of this, credited by the maintainer as a finding:** the harness project never
+  defined `FER_DEV`, so the `#if FER_DEV` branch in `KernelDocumentReloadTests` (`VerifyWatching`) **had never
+  been compiled by any run at all** — and, measured by mutation (ii), a `-c Dev` harness run was therefore
+  **red**, because the test took its release branch while the library was Dev and `a release build leaves
+  automatic watching off by default` failed. Writing a test inside a conditional-compilation block without
+  defining the constant for that configuration is the general shape: the lane exists, compiles nowhere, and
+  passes by absence. The tests csproj now mirrors the library's Dev gate, and gate 10 is what keeps the
+  arrangement from rotting.
   **Also durable, and it cost a round:** on net472 `string.Split(char)` binds to the
   `Split(char, StringSplitOptions)` overload this framework does not have — a `MissingMethodException` at run
   time, not at build time; the array form is the one that exists.
@@ -840,13 +857,21 @@
 
 ## Gates and what each actually proves
 
-Nine gates in `scripts/verify-local.ps1`: 1 harness, 2 Dev build (`FER_DEV`, warnings-as-errors), 3
+Ten gates in `scripts/verify-local.ps1`: 1 harness, 2 Dev build (`FER_DEV`, warnings-as-errors), 3
 Release build (warnings-as-errors), 4 payload present, 5 content-free (named-path probe for `Defs`,
 `Patches`, `Languages`, `Sounds`, `Textures`, `ThingSets` under `1.6/` - probed as names, not filtered
 from an enumeration, so an empty tree cannot pass vacuously), 6 LICENSE, 7 About.xml identity, 8 two
 halves (the net472 source-shape scan and the reference-driven stub-coverage scan), 9
 `dependency-reality.ps1 -SelfTest` over a TEMP fixture tree, so the boundary tool's pattern set is
-proven able to go red on every full run rather than only when someone remembers `-SelfTest`. The three
+proven able to go red on every full run rather than only when someone remembers `-SelfTest`, 10
+`verify-dev-instrument.ps1` — the development-only geometry instrument's **dev half**. Gate 1 runs the
+harness in Release, where `#if FER_DEV` is undefined, so gate 10 builds and runs it in **Dev** and refuses
+to accept "the project compiled": it requires the dev-only assertion names, floors on the assertion and
+dumped-node counts, the absence of the release-only half's name, and the numbers the instrument printed,
+and it control-tests its own checker on every run (an empty output, a release-half-only output, a
+green-exit-but-missing-name output and a fully populated sample that must NOT be rejected). **It is a
+third writer of the carrier** (gate 2 writes Dev bytes, gate 10 leaves Dev bytes plus a Dev PDB), which is
+why a full chain run always ends with the delivery step. The three
 source-text gates and the version axes all run *inside* gate 1, so **the gate count is not the check
 count**. Gate 6 proves only what is visible from inside this repo: the file exists, carries the MPL-2.0
 title, still contains Exhibit B and section 10.4, and does not apply the incompatibility notice in its

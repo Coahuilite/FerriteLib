@@ -680,11 +680,19 @@ the instrument: with `ResolveHeight`'s `MatchContent` branch returning its refer
 ALL PASS. That is what makes the number a measurement rather than a restatement of the declaration. The
 per-line `window == draw + origin` assertion is labelled a guard in the lane: it holds by construction today.
 
-**Evidence boundary, stated rather than implied.** The instrument exists only in a Dev build and gate 1 runs
-the harness in Release, so **gate 1 exercises the release half only** (absent, refused, empty dump); the
-numeric half and its mutation come from a `-c Dev` harness run (ALL PASS, printed dump) and are **not
-gate-protected**. Making the dev half gate-protected means running the harness twice in gate 1 — a gate-chain
-change, and the maintainer's call rather than this round's.
+**Both halves are gate-guarded, and the arrangement is written down** (maintainer ruling 2026-09-23: a
+dev-only mutation proof that only a human re-runs is a proof that rots). Gate 1 runs the harness in Release,
+so it holds this lane's release half. The **new gate 10** (`scripts/verify-dev-instrument.ps1`) runs the
+harness in **Dev** and refuses to accept "the project compiled": it requires the seven dev-only assertion
+names, floors on the assertion (12) and dumped-node (5) counts, the absence of the release-only half's name,
+and the numbers themselves, and its checker is control-tested on every run against four planted fixtures -
+among them a fully populated sample that must **not** be rejected and an empty one that must be. Its own
+mutation proofs, each run through the gate alone so no earlier gate could be what reddened it: the geometry
+producer `+2f` exits 1 naming `the band's recorded height is the sibling's measured height: 32 vs 30`, and
+removing the tests project's `FER_DEV` constant exits 1 naming release-branch assertions instead of dev ones.
+The same change fixed a measured defect class: with `FER_DEV` undefined in the harness project, the
+`#if FER_DEV` branch in `KernelDocumentReloadTests` had never been compiled, and a `-c Dev` run was red.
+Which gate guards which half is also recorded in `docs/development/0.7/40-verification.md` and `AGENTS.md`.
 
 *Migration:* none in either direction. A release payload cannot turn it on; a development build that never asks
 for it pays nothing.

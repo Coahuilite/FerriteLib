@@ -24,6 +24,7 @@ now pin each factory's literals plus "the constructor selects neither palette".
 | B1 `SelectedKey` item scope | lane written and run red **first** on the pre-fix tree (3 active rows of 3 — the page-level decoy answered for every row); red again under the faithful revert of the table entry (exit 1, the three assertions named in the output) | green, `ALL PASS` 2600 ok | this commit |
 | task-9 `Height="MatchContent"` | lane written and run red **first** (the value refused at creation, `invalid Height 'MatchContent'`); red again under the faithful revert of the engine half — the reference removed while the value stayed accepted: `the hit column takes the text column's measured height (50 vs 104)` | green, `ALL PASS` 2623 ok | this commit |
 | task-9 unknown scope name attribution | lane written and run red **first** on the pre-fix tree (`attributed to the element that declared it, not to the document: 'style-scope#styles'`); red again under the faithful revert of the attribution half (exactly that assertion and nothing else) | green, `ALL PASS` 2623 ok | this commit |
+| dev geometry instrument (task-12) | new surface, so the red evidence is a **mutation of the geometry producer**: gate 10 (Dev harness) reported `the band's recorded height is the sibling's measured height: 32 vs 30` with `ResolveHeight`'s `MatchContent` branch `+2f`, exit 1; and removing the tests project's `FER_DEV` constant reddened the same gate on the release-branch assertions instead - the "the lane was compiled out" defect | green: gate 10 `dev half ran: 7 dev-only assertion(s), 2660 'ok:', 6 dumped node line(s)`, exit 0; `verify-local` exit 0 | this commit |
 | task-10 `section/header` divider switch | lane written and run red **first** (the attribute did not exist: `Unknown attribute 'Chrome' on section/header`); red again under the faithful revert of the widget half — the value accepted, the paint no longer suppressed: `Chrome=none paints nothing in the element's rect (5 surface call(s))` | green, `ALL PASS` 2633 ok | this commit |
 
 B's eight lanes are a new reference over existing surface: they cannot be red on a "before" (nothing in B
@@ -60,6 +61,28 @@ as such rather than passed off as the current one.
   clean/dirty state it was taken in — belongs to the round's FREEZE NOTICE and delivery report, never to a
   tracked file, which can only ever pin a *past* build (recording the current pair is itself a commit, and the
   stamp moves with HEAD).
+
+## Which gate guards which half of the harness (2026-09-23)
+
+Not every lane is compiled in every configuration, and a half that no gate runs is a half that rots. The
+arrangement, so the next reader does not have to derive it:
+
+| Gate | Configuration | What it holds |
+| --- | --- | --- |
+| 1 | **Release** | The whole harness, therefore every lane's release half - including the dev instrument's
+`#else` branch (no instrument, opt-in refused, dump empty). |
+| 10 | **Dev** | The same harness in the Dev configuration, therefore every lane's `#if FER_DEV` half. It is
+not enough that the project compiled: `scripts/verify-dev-instrument.ps1` requires the dev-only assertion
+names, floors on the assertion and dumped-node counts, the absence of the release-only name, and the numbers
+the instrument printed, and it control-tests its own checker on every run. |
+
+**Why gate 10 exists at all, with the measurement that forced it.** The harness project did not define
+`FER_DEV`, so the `#if FER_DEV` branch in `KernelDocumentReloadTests` had **never been compiled by any run**
+- and a `-c Dev` run was consequently **red**: the lane took its release branch while the library was built
+Dev, and `a release build leaves automatic watching off by default` failed. The tests project now mirrors the
+library's Dev gate, which is what makes a lane able to hold the dev half, and gate 10 is what keeps it from
+quietly going back to compiling nowhere. **Gate 10 is a third writer of the shared carrier** (gate 2 writes
+Dev bytes; gate 10 leaves Dev bytes and a Dev PDB), so a full chain run always ends with the delivery step.
 
 ## Pending external checks
 

@@ -157,7 +157,7 @@ is a maintainer-side number, never a measurement a clone can reproduce.
 ## Build and verification
 
 ```powershell
-pwsh -NoProfile -File scripts/verify-local.ps1                       # 9 gates
+pwsh -NoProfile -File scripts/verify-local.ps1                       # 10 gates
 pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev              # + staged dev folder (placement is manual)
 pwsh -NoProfile -File scripts/pack-release.ps1 -Version v0.3.0-rc2   # + GitHub asset (what CI runs)
 pwsh -NoProfile -File scripts/pack-steam.ps1  -Version v0.3.0-rc2    # + Workshop upload folder
@@ -181,6 +181,15 @@ embeds the commit SHA — so any MSBuild pass over that graph can rewrite the ca
 since the last build is enough to make it out of date. (Measured twice, and both were real accidents rather
 than a precaution: 2026-09-20, a pre-commit harness run produced the round-5 carrier as a dirty build; and
 2026-09-22, a verify-only gate run after a freeze left the stale Dev PDB back beside the frozen carrier.)
+**Gate 10 is a third writer, and it is the gate that owns the development-only instrument's dev half.**
+`scripts/verify-dev-instrument.ps1` builds and runs the harness in **Dev** and refuses to accept "the project
+compiled": it requires the dev-only assertion names, floors on the assertion and dumped-node counts, the
+absence of the release-only half's name, and the numbers the instrument printed. It exists because gate 1 runs
+the harness in **Release**, where `#if FER_DEV` is undefined — a dev-only proof nobody re-runs is a proof that
+rots, and this repository has already paid for exactly that: the harness project did not define `FER_DEV`, so
+the `#if FER_DEV` branch in `KernelDocumentReloadTests` had never been compiled by any run, and a `-c Dev`
+run was red. A lane whose half is compiled out is a lane that does not run.
+
 **Verification of a frozen carrier is therefore read-only**: the hash, the configuration, the stamp read in a
 child process, the absence of a PDB, the exclusivity probe, and `git rev-parse`/`status` — never a build of the
 project graph. A full gate run belongs to the delivery step: the same builder ends it with the forced Release

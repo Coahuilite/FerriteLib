@@ -17,7 +17,7 @@ Baseline: branch `0.7.x` forked from `0.6.x` at `12d0dbb` + the maintainer's unc
 | A | Five reliability fixes: Row Auto fallback, Height creation validation, Wrap-only `Cols`/`NarrowCols`, dropdown value precedence, wrong-kind options diagnostics | 已实现 + 已自动化验证; every lane re-run against the reverted baseline and observed red (mutation proof in `40-verification.md`) |
 | B | Ordinary-author recipe: compile-checked public-only harness fixture + `docs/consumers/ordinary-settings.md` | 已实现 + 已自动化验证 (eight lanes). Not consumption evidence. |
 | C | Two peer palettes `UiTheme.Vanilla` / `UiTheme.DarkGold`; `new UiTheme()` is an unpainted bag | 已实现 + 已自动化验证; palette literals verified; **视觉验收 pending** (comparable state sheet needs a real game pass) |
-| D | Gates + dev staging + contract/handoff docs | 已实现 + 已自动化验证 (9 gates, `-PackDev`); external acceptance below |
+| D | Gates + dev staging + contract/handoff docs | 已实现 + 已自动化验证 (10 gates, `-PackDev`); external acceptance below |
 
 **Amended by Batch 1 (2026-09-18).** Until Batch 1 this line added and removed no XML vocabulary; it now
 does both, plus a member removal, all inside `0.7.0` under the fast-development ruling. The API-tier *type*
