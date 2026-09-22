@@ -513,6 +513,101 @@ diagnostic at all, which is what the lane asserts (`StyleFallbackCount == 0` aft
 A third element type is refused at creation with the historical diagnosis preserved and the pair shape appended
 as the second accepted answer.
 
+### `Height="MatchContent"` — the height axis' content-relative mode (2026-09-22)
+
+**Maintainer ruling: approved without asking again.** "Evaluate whether a change makes the library more general and
+easier to use, or is a custom feature one consumer asked for. If the change proves general, so that everyone gets
+better together, do it without asking me." The check that settled it: the WIDTH axis is complete
+(`Width`/`WidthKey`/`MinWidth`/`MaxWidth` on the widget table, `MinWidth`/`MaxWidth` on the container table,
+and `WidthKey` with its own registration, resolution and unsized report), while the height family had **zero hits**
+in the kernel - one whole axis missing on a family the other axis already had. A gap on a general axis, not a
+consumer's request; the promotion gate passes four ways (neutral, no new kind, no process-wide mutable static,
+lane-drivable) with a forced consumer behind it.
+
+**What changed.** `Height` accepted a number or `Auto`; it also accepts `MatchContent`, which resolves to the
+height the parent's content resolved to, with the declaring element contributing **nothing** to that computation.
+
+**The principle, not a list.** The reference can be answered only by a parent whose content height is a **maximum**
+over its children, because then it exists before the declaring child is measured and does not include it:
+
+- **accepted** — a child of a `Row` or an `Overlay` (both take the maximum over their children) that has at least
+  one sibling which does not declare the mode;
+- **refused at creation** — a vertical container (`Column`/`Stack`/`Section`/`Surface`/`Scroll`/`Clip`),
+  whose content height is the SUM of its children, which includes the declaring element and would make the reference
+  self-referential; a `Wrap`, whose line membership is discovered from the children in that line; a root, which has
+  no parent at all; and a parent whose every child declares the mode, which leaves no content to match. Each refusal
+  names the reason, not only the rule.
+
+**Degradation, stated rather than discovered.** A `Row` declaring `Narrow="Column"` becomes a vertical flow at its
+breakpoint, where the mode loses its reference and degrades to the element's own measured content - exactly `Auto` -
+instead of throwing or collapsing to a zero-height band. The same holds for a programmatically built spec and inside
+a template subtree (which the Host's creation-time walk does not cover: the known 0.5 gap).
+
+**A declaring container's own children** keep the layout their own content produced, top-aligned in the taller box,
+which is what every container does with space its content does not fill.
+
+**Consumer evidence (transcribed in `MEMORY.md`).**
+`coahuilite/UniversalSqueaker@d767d0f:Source/UniversalSqueaker/UI/Layout.Schema2.xml:350-359` — an `Overlay`
+"because the hit area must COVER the text rather than sit beside it", whose hit `Column` holds two
+`input/button Chrome="none" Height="Auto"` bands and whose text `Column` holds the label. The numbers come from
+`…@d767d0f:tools/UniversalSqueakerKernelHostTests/DeclarativePacksLaneTests.cs:398-401`, which printed
+`[packs-hit] flat row=… hit=… covered=hit/row*100` with `uncovered = row - hit`: **69.9% covered flat, 53.3%
+covered once the text wrapped, 42px of the row uncovered.** The cheap workaround is already refuted and worth
+writing down: `Height="Auto"` on a band measures the WRAPPED band while the caption draws single-line
+(`ButtonWidget`'s measure against `UiThemeDraw.Label(..., singleLine: true)` → `Text.WordWrap = false`), and the
+fit audit returns after the width axis whenever `singleLine` is set (`UiFitAudit` :280-289) — a shape that reserves
+several lines, paints one and reports nothing.
+
+**Lane and mutation.** `KernelContentHeightTests`: the citation's page. The hit column must equal the text column,
+measured **104 vs 104**, while the same page *without* the declaration keeps **50 against 104** — the positive
+control that the equality measures the mode and not the fixture. The lane also pins the refusal matrix (every
+refusal naming the mode) and the narrow degradation (at the breakpoint the band falls back to the theme row height,
+28, against the text's 76). Written and observed **RED first** (the value was refused outright:
+`invalid Height 'MatchContent'`), green after the clause landed, and red again under the faithful revert of the
+engine half — the reference removed while the value stayed accepted:
+`the hit column takes the text column's measured height (50 vs 104)`, exit 1.
+
+**API tiers.** No new exported type, so the tier list is unchanged and the classification gate stays green — checked
+rather than assumed.
+
+*Migration:* none. `MatchContent` is a value no earlier manifest could write, and every existing number/`Auto`
+declaration reads exactly as before.
+
+### An unknown scope name is attributed to the element that declared it (2026-09-22)
+
+**A consistency fix with a live citation, not a new channel.** An element-level appearance drop already reached the
+audit surface — the resolver records the drop and the Host publishes it in the frame that resolved it — but a
+resolution-time drop was published under the **document's** path (`<source>#styles`), so the finding said "some
+scheme is missing" and left its author to grep a palette they never declared in. The consumer's case:
+`Scheme="us-flat-panel"` on one column, defined in a palette applied to a theme instance instead of in the document
+the resolver reads. The scope looked applied and was not.
+
+**What changed.** `UiStyleIssue` gains `ElementPath` (a member addition to a `public-unstable` type, so it stays
+inside that tier's promise); the resolver's public `ThemeFor(chain)` keeps its signature and delegates to an internal
+overload carrying the declaring element's path; the engine hands that path in from the arranged node; and the Host
+publishes a drop under `issue.ElementPath` when there is one, falling back to the style origin for a document-level
+drop. The message, the fallback behaviour and the number of findings do not change.
+
+**The trap this closes, in the words a consumer needs.** A scheme (or density) NAME is resolved from the style
+document the Host was built with — a standalone `<Styles>` file, or the manifest's own `<Styles>` section; the
+Host's document parameter selects between them. A palette applied to a theme *instance* is **not** a definition site:
+defining a scheme only there means the resolver never sees the name, the scope silently keeps the page-level values,
+and the control merely looks styled. One sentence, one wasted step saved.
+
+**Lane and mutation.** `KernelStyleScopeTests`, "An unknown scope name is attributed to the element that declared
+it": a section declaring `Scheme="us-flat-panel"` against a document that defines no such scheme. Written and
+observed **RED first** — one finding, but `attributed to the element that declared it, not to the document:
+'style-scope#styles'` — then green (`root/region`, the scheme name in the diagnostic, and the page still arranging).
+The faithful revert of the attribution half (the Host ignoring `ElementPath`) reddens exactly that assertion and
+nothing else.
+
+**Stated limitation.** The resolver caches one theme per effective (scheme, density) pair, so the record lands on the
+first lookup that builds the pair; for a container's own declaration that is the declaring element, which is the case
+the consumer hit. Two different elements writing the same unknown name produce one finding, which is consistent with
+the audit surface's own rule that a count is a count of **distinct findings**, never a census of elements.
+
+*Migration:* none behaviourally. A consumer reading `UiStyleIssue` gets a new property and the same message.
+
 ## The selected ordinary-authoring path (B)
 
 The recommended author route is existing surface only: one layout manifest over public atoms/containers

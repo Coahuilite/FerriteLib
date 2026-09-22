@@ -21,9 +21,24 @@ namespace FerriteLib.UiKit.Kernel;
 /// no text, so it stays outside the backend funnel, and no new public type is introduced - the values are
 /// attribute strings.
 /// </para>
+/// <para>
+/// <b>The content-relative height mode shares this file's one question: who owns the box?</b>
+/// <c>Height="MatchContent"</c> asks the parent for the height its content resolved to, and that question is
+/// answerable only where the parent's content height is a <b>maximum</b> over its children (a <c>Row</c> or an
+/// <c>Overlay</c>). A container that SUMS its children would have to include the declaring element in the very
+/// reference it is asked for, a <c>Wrap</c> discovers a line's membership from the children in that line, and a
+/// root has no parent at all. The vocabulary, the parent predicate and the refusal rule live here so the Host,
+/// the engine and the template walk all read one definition.
+/// </para>
 /// </summary>
 internal static class UiPlacement
 {
+    /// <summary>
+    /// The content-relative height mode's one accepted value (0.7.x). <c>Height</c> otherwise takes a number or
+    /// <c>Auto</c>; this value means "the height the parent's content resolved to".
+    /// </summary>
+    internal const string MatchContentValue = "MatchContent";
+
     /// <summary>The four manifest attribute names this vocabulary owns.</summary>
     internal const string AlignXAttribute = "AlignX";
 
@@ -286,6 +301,35 @@ internal static class UiPlacement
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// True when this element declares the content-relative height mode. One reader for the Host's creation-time
+    /// contract, the engine's arrange and the engine's template walk, so the three cannot disagree about what
+    /// <c>Height="MatchContent"</c> names.
+    /// </summary>
+    internal static bool IsMatchContentHeight(UiElementSpec spec)
+    {
+        return spec.TryGetAttribute("Height", out string raw)
+            && string.Equals(raw.Trim(), MatchContentValue, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// True when a container's content height is a MAXIMUM over its children, which is the whole precondition
+    /// for <see cref="MatchContentValue"/>: the reference must exist before the declaring child is measured, and
+    /// it must not be built from that child.
+    /// <para>
+    /// A <c>Row</c> takes the tallest of its children and an <c>Overlay</c> does the same, so both can answer. A
+    /// vertical stack (<c>Column</c>/<c>Stack</c>/<c>Section</c>/<c>Surface</c>/<c>Scroll</c>/<c>Clip</c>) sums
+    /// its children - the declaring element included, which makes the reference self-referential - a
+    /// <c>Wrap</c> discovers a line's membership from the children in that line, and a root has no parent at
+    /// all. Those are refused where the element, the path and the reason are all still known.
+    /// </para>
+    /// </summary>
+    internal static bool HasContentHeightReference(string? kind)
+    {
+        return string.Equals(kind, "Row", StringComparison.Ordinal)
+            || string.Equals(kind, "Overlay", StringComparison.Ordinal);
     }
 
     private static void ValidateOffset(UiElementSpec spec, string path, string scope, string attribute, string raw)

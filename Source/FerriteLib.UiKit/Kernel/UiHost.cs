@@ -394,7 +394,11 @@ public sealed class UiHost : IDisposable
     /// </summary>
     private void PublishStyleIssue(UiStyleIssue issue)
     {
-        UiFitAudit.ReportStyleFallback(source + "#styles", "Styles", "Declaration", issue.ToString(), "defaults");
+        // The drop's own element when it belongs to one (an unknown scope name an element declared), the style
+        // origin otherwise: a document-level drop has no element to name, and reporting it under the element of
+        // whichever node happened to resolve first would be a worse lie than reporting the origin.
+        string path = issue.ElementPath ?? (source + "#styles");
+        UiFitAudit.ReportStyleFallback(path, "Styles", "Declaration", issue.ToString(), "defaults");
     }
 
     // --- document reload (P4) -------------------------------------------------------------------
@@ -964,12 +968,60 @@ public sealed class UiHost : IDisposable
 
         bool selfNarrowCapable = spec.TryGetAttribute("Breakpoint", out _);
         ValidateLayoutAttributes(spec, path, isContainer: !isWidget, selfNarrowCapable, parentNarrowCapable);
+        ValidateContentHeight(spec, path, parent);
 
         foreach (UiElementSpec child in spec.Children)
         {
             string childPath = path + "/" + (child.Id.Length > 0 ? child.Id : child.Kind);
             ValidateElement(child, childPath, selfNarrowCapable, spec);
         }
+    }
+
+    /// <summary>
+    /// The content-relative height mode's creation-time matrix (0.7.x). The mode says "take the height my
+    /// parent's content resolved to", so it is accepted exactly where that reference exists <b>before</b> the
+    /// declaring element is measured and is not built from it: a child of a <c>Row</c> or an <c>Overlay</c> (both
+    /// take the MAXIMUM over their children) that has at least one sibling which does not declare the mode.
+    /// A parent that sums its children, a <c>Wrap</c>, a root, and a parent whose every child declares it are
+    /// refused here - the same fail-closed shape as the placement matrix, for the same reason: a declaration the
+    /// arrangement could never honour is the silent no-op this contract layer exists to stop.
+    /// <para>
+    /// This is the Host's walk, so it covers page elements. A template subtree is deliberately outside it (its
+    /// binding keys are item-scoped and cannot exist as page bindings), which is the known gap the 0.5 contract
+    /// records: inside a template the engine degrades the mode to the element's own measured content instead.
+    /// </para>
+    /// </summary>
+    private void ValidateContentHeight(UiElementSpec spec, string path, UiElementSpec? parent)
+    {
+        if (!UiPlacement.IsMatchContentHeight(spec)) return;
+
+        if (parent == null)
+        {
+            throw new UiContractException(
+                $"Element id=\"{spec.Id}\" at '{path}' declares Height=\"MatchContent\" with no parent container; "
+                + "the mode takes the height the parent's content resolved to, so it is valid only on a child of a Row or an Overlay.",
+                source, spec.Id, spec.Kind, path);
+        }
+
+        if (!UiPlacement.HasContentHeightReference(parent.Kind))
+        {
+            throw new UiContractException(
+                $"Element id=\"{spec.Id}\" at '{path}' declares Height=\"MatchContent\" inside a <" + parent.Kind + ">; "
+                + "that container's content height is built from its own children (this element included), so there is no "
+                + "reference to match. A Row or an Overlay takes the maximum over its children and can answer it.",
+                source, spec.Id, spec.Kind, path);
+        }
+
+        for (int i = 0; i < parent.Children.Count; i++)
+        {
+            if (!UiPlacement.IsMatchContentHeight(parent.Children[i])) return;
+        }
+
+        throw new UiContractException(
+            $"Element id=\"{spec.Id}\" at '{path}' declares Height=\"MatchContent\" in a <" + parent.Kind
+            + "> whose every child declares the same; the height it would match comes from a sibling, so at least one "
+            + "child must not declare it.",
+            source, spec.Id, spec.Kind, path);
     }
 
     /// <summary>
@@ -1005,13 +1057,17 @@ public sealed class UiHost : IDisposable
         {
             string height = heightRaw.Trim();
             bool heightAuto = string.Equals(height, "Auto", StringComparison.OrdinalIgnoreCase);
+            // The content-relative mode (0.7.x) is the third accepted value. Its own placement matrix - which
+            // parents can answer the reference it asks for - is checked in ValidateContentHeight below, where
+            // the parent element is in hand.
+            bool heightContent = UiPlacement.IsMatchContentHeight(spec);
             bool heightNumber = float.TryParse(height, System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out float parsedHeight)
                 && !float.IsNaN(parsedHeight) && !float.IsInfinity(parsedHeight);
-            if (height.Length > 0 && !heightAuto && !heightNumber)
+            if (height.Length > 0 && !heightAuto && !heightContent && !heightNumber)
             {
                 throw new UiContractException(
-                    $"Element id=\"{spec.Id}\" at '{path}' has invalid Height '{heightRaw}'; expected a number or Auto.",
+                    $"Element id=\"{spec.Id}\" at '{path}' has invalid Height '{heightRaw}'; expected a number, Auto or MatchContent.",
                     source, spec.Id, spec.Kind, path);
             }
         }

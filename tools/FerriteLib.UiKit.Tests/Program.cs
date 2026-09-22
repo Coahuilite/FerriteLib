@@ -190,6 +190,11 @@ internal static class Program
         failures += KernelContainerTabTests.RunAll();
         // ---- end 0.7.x additions ------------------------------------------------------------------
 
+        // ---- 0.7.x height axis (owner: fl-dev) - one contiguous block ---------------------------
+        Console.WriteLine("Kernel content height (Height=MatchContent: the reference, its matrix, its degradation)...");
+        failures += KernelContentHeightTests.RunAll();
+        // ----------------------------------------------------------------------------------------
+
         Console.WriteLine("Kernel lane registration (every lane file is invoked from Program.cs)...");
         failures += KernelLaneRegistrationTests.RunAll();
     }

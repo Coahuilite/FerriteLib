@@ -2,6 +2,30 @@
 
 ## Current durable state
 
+- **`Height="MatchContent"` landed 2026-09-22, and its consumer citation is transcribed here because it is what
+  fixed the scope: only a parent whose content height is a MAXIMUM over its children can answer the reference.**
+  `coahuilite/UniversalSqueaker@d767d0f:Source/UniversalSqueaker/UI/Layout.Schema2.xml:350-359` — an `Overlay`
+  ("the hit area must COVER the text rather than sit beside it") whose hit `Column` holds two
+  `input/button Chrome="none" Height="Auto"` bands and whose text `Column` holds the label. The numbers come from
+  `…@d767d0f:tools/UniversalSqueakerKernelHostTests/DeclarativePacksLaneTests.cs:398-401`, which printed
+  `[packs-hit] flat row=… hit=… covered=hit/row*100` with `uncovered = row - hit`: **69.9% covered flat, 53.3%
+  covered once the text wrapped, 42px of the row uncovered**. **What it proved:** the page model could not express
+  "my hit area equals the sibling's content-measured height", so the consumer hand-sized two bands per row and
+  under-covered the moment the text wrapped; the cheap workaround (`Height="Auto"` on the band) was already
+  refuted — it measures the WRAPPED band while the caption draws single-line, and the fit audit returns after the
+  width axis whenever `singleLine` is set. Structural landing on the consumer side: `7f54ea7` (line numbers are
+  `d767d0f`'s). Contract, refusal principle, degradation and the lane with its mutation:
+  `docs/development/0.7/05-api-contract.md`.
+
+- **An unknown scope NAME is now attributed to the element that declared it (2026-09-22), and with it the trap a
+  consumer already paid for: schemes are defined by the DOCUMENT the Host was built with, never by a palette applied
+  to a theme instance.** The drop was already published, but under the document's path (`<source>#styles`), so an
+  author could not tell which element wrote the name. `UiStyleIssue` gained `ElementPath` (a member addition
+  inside its `public-unstable` tier — no new exported type), the resolver's public `ThemeFor(chain)` keeps its
+  signature and delegates to an internal overload carrying the path, and the Host publishes under it. Lane: written
+  red first on the pre-fix tree, green after, and red again under the faithful revert of the attribution half.
+  Detail: `docs/development/0.7/05-api-contract.md`.
+
 - **FL-16 landed on its second attempt, and the difference between the attempts is what to copy (2026-09-20).**
   The first attempt wrote the implementation, saw the suite green, and withdrew because the lane stayed green
   under a faithful revert. The second attempt ran the order the maintainer asked for and the evidence came out

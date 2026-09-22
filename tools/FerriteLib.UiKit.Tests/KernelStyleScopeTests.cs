@@ -46,6 +46,7 @@ internal static class KernelStyleScopeTests
         Run("The document's page level is in force before the first arrange", VerifyResolveBeforeMeasure);
         Run("Every dropped style value is visible in its own frame", VerifyDropsAreVisible);
         Run("A correct document is silent and an unknown scope name is not", VerifySilentWhenCorrect);
+        Run("An unknown scope name is attributed to the element that declared it", VerifyUnknownScopeNameIsAttributed);
         Run("Scheme and Density are vocabulary on containers and widgets", VerifyScopeVocabulary);
         Run("Two style sources at once is reported, not silent", VerifyTwoSourcesAreVisible);
         Reset();
@@ -278,6 +279,43 @@ internal static class KernelStyleScopeTests
                 Check(snapshot.RectById.ContainsKey("inside"),
                     "and the page keeps rendering on the values it would have had without it");
             }
+        }
+        finally
+        {
+            UiFitAudit.Detach();
+            UiFitAudit.Reset();
+        }
+    }
+
+    /// <summary>
+    /// The other half of "an unknown scope name is not silent": the finding has to be findable. A record that
+    /// names the scheme but attributes it to the DOCUMENT leaves the author grepping a palette they never
+    /// declared in it - the consumer's own case, where a <c>Scheme="us-flat-panel"</c> on one column resolved
+    /// against a document that did not define it. The resolver knows the name; the engine knows the element, so
+    /// the published finding carries the element's path, and the page keeps rendering on the page-level values.
+    /// </summary>
+    private static void VerifyUnknownScopeNameIsAttributed()
+    {
+        PrepareRegistry();
+        var records = new List<UiStyleFallbackReport>();
+        UiFitAudit.AttachStyleFallback(records.Add);
+        UiFitAudit.Reset();
+        try
+        {
+            UiTheme theme = UiTheme.DarkGold;
+            using UiHost host = new(Scope, RegionManifest("us-flat-panel"), new UiBindings(), theme, new StubMetrics(), new StubTranslation());
+            Check(records.Count == 0, "nothing is reported before an arrangement resolves the scope");
+
+            UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(320f, 200f));
+
+            Check(records.Count == 1, "the unknown scheme is one finding (got " + records.Count + ")");
+            string path = records.Count > 0 ? records[0].ElementPath : "(none)";
+            Check(path.IndexOf("region", StringComparison.Ordinal) >= 0,
+                "attributed to the element that declared it, not to the document: '" + path + "'");
+            Check(records.Count > 0 && records[0].Diagnostic.IndexOf("us-flat-panel", StringComparison.Ordinal) >= 0,
+                "and the scheme name is in the finding: " + (records.Count > 0 ? records[0].Diagnostic : "(none)"));
+            Check(snapshot.RectById.ContainsKey("inside"),
+                "while the page keeps rendering on the values it would have had without it");
         }
         finally
         {

@@ -64,6 +64,13 @@ public sealed class UiLayoutEngine
     /// zero moves every sibling, so a single failing control would still reshape the whole layout.
     /// </summary>
     private const float RecoveryBandHeight = 22f;
+
+    /// <summary>
+    /// "This arrange has no content-height reference for the element": what every measure call that is not a
+    /// child of a max-based parent passes, and the reason the mode degrades to the element's own content there
+    /// instead of throwing or collapsing to zero.
+    /// </summary>
+    private const float NoContentHeightReference = -1f;
     // Reserved width for a vertical scrollbar drawn inside the right edge of a Scroll viewport.
     // Matches Verse.GenUI.ScrollBarWidth (16f), the convention the US pages already follow.
     private const float ScrollbarWidth = 16f;
@@ -543,7 +550,7 @@ public sealed class UiLayoutEngine
             // the theme is what the chain resolves to, and the page level (an empty chain) keeps the
             // injected theme rather than a clone of it.
             UiWidgetContext entryCtx = ctx.WithStyleChain(entry.StyleChain);
-            entryCtx = entryCtx.WithTheme(ScopeTheme(entryCtx));
+            entryCtx = entryCtx.WithTheme(ScopeTheme(entryCtx, entry.Node));
             entryCtx = entry.MeasureWidth > 0f ? entryCtx.WithViewWidth(entry.MeasureWidth) : entryCtx;
             entryCtx = entryCtx.WithWindowOrigin(windowOrigin).WithNode(entry.Node);
 
@@ -778,10 +785,10 @@ public sealed class UiLayoutEngine
     /// Measure directly, Draw through the chain each arranged entry recorded - so a widget never measures
     /// with one theme and draws with another.
     /// </summary>
-    private UiWidgetContext ElementScope(UiWidgetContext ctx, UiElementSpec spec)
+    private UiWidgetContext ElementScope(UiWidgetContext ctx, UiElementSpec spec, UiNode node)
     {
         UiWidgetContext scoped = ctx.WithStyleDeclaration(DeclarationOf(spec));
-        return scoped.WithTheme(ScopeTheme(scoped));
+        return scoped.WithTheme(ScopeTheme(scoped, node));
     }
 
     /// <summary>
@@ -791,11 +798,15 @@ public sealed class UiLayoutEngine
     /// the same values. A declared scope resolves through the resolver, which builds each effective
     /// (scheme, density) pair once and hands out that same instance on every later frame.
     /// </summary>
-    private UiTheme ScopeTheme(UiWidgetContext ctx)
+    private UiTheme ScopeTheme(UiWidgetContext ctx, UiNode node)
     {
         IReadOnlyList<UiStyleDeclaration>? chain = ctx.StyleChain;
         if (styleResolver == null || chain == null || chain.Count == 0) return ctx.Theme;
-        return styleResolver.ThemeFor(chain);
+
+        // The scope NAME is the resolver's to read, and only the tree knows where it was written: handing the
+        // element's path down is what makes an unknown name a located finding instead of "some scheme is
+        // missing somewhere in this document".
+        return styleResolver.ThemeFor(chain, node.Id.Path);
     }
 
     /// <summary>
@@ -818,18 +829,33 @@ public sealed class UiLayoutEngine
         return value.Length == 0 ? null : value;
     }
 
-    private MeasuredBox MeasureElement(UiWidgetContext ctx, UiElementSpec spec, float width, float availableHeight, UiNode node)
+    private MeasuredBox MeasureElement(
+        UiWidgetContext ctx, UiElementSpec spec, float width, float availableHeight, UiNode node,
+        float contentHeightReference = NoContentHeightReference)
     {
         // The element's own style scope comes first: its declaration joins the chain and the theme below
         // every branch resolves against the chain, so a widget measures - and later draws - with the theme
         // its own scope resolved to. Containers are scoped the same way, which is what lets a region's
         // font reach the label widths measured inside it.
-        ctx = ElementScope(ctx, spec);
+        ctx = ElementScope(ctx, spec, node);
 
         // Every arranged element declares its binding keys to the engine here, so the next announcement
         // of any of them can target this node instead of the page. An element that is not arranged this
         // pass is recorded against its nearest arranged ancestor by the caller instead.
         RecordDeclaredKeys(spec, node, ctx.Bindings);
+
+        // The content-relative height mode. A parent that can answer has already handed the height its own
+        // content resolved to (the declaring element contributed nothing to it); everywhere else - a vertical
+        // flow, a Wrap line, a template the Host does not walk - the mode degrades to the element's own measured
+        // content, exactly as Auto does, so a programmatic spec cannot take a frame down.
+        bool matchContent = UiPlacement.IsMatchContentHeight(spec);
+        float? reference = contentHeightReference >= 0f ? contentHeightReference : null;
+        if (matchContent && reference.HasValue)
+        {
+            // The element's own content is not the geometry here, and for a container the reference is also the
+            // height its inner Fill children may claim.
+            availableHeight = reference.Value;
+        }
 
         string containerKind = GetContainerKind(spec);
         if (containerKind.Length == 0)
@@ -847,7 +873,7 @@ public sealed class UiLayoutEngine
             float height;
             try
             {
-                height = ResolveHeight(spec, widget, measureCtx, width, node);
+                height = ResolveHeight(spec, widget, measureCtx, width, node, matchContent ? reference : null);
             }
             finally
             {
@@ -871,7 +897,32 @@ public sealed class UiLayoutEngine
             return box;
         }
 
-        return MeasureContainer(ctx, spec, width, availableHeight, node);
+        MeasuredBox container = MeasureContainer(ctx, spec, width, availableHeight, node);
+        if (matchContent && reference.HasValue)
+        {
+            StretchToContent(container, node.Id, reference.Value);
+        }
+
+        return container;
+    }
+
+    /// <summary>
+    /// Sets a container's own box - and the entry it published - to the height its parent's content resolved to.
+    /// Its children keep the layout their own content produced, top-aligned in the taller box, which is what any
+    /// container does with space its content does not fill.
+    /// </summary>
+    private static void StretchToContent(MeasuredBox box, UiNodeId id, float height)
+    {
+        box.Height = height;
+        for (int i = 0; i < box.Entries.Count; i++)
+        {
+            PlacedEntry entry = box.Entries[i];
+            if (entry.Id.Equals(id))
+            {
+                entry.Rect = new Rect(entry.Rect.x, entry.Rect.y, entry.Rect.width, height);
+                return;
+            }
+        }
     }
 
     private MeasuredBox MeasureContainer(UiWidgetContext ctx, UiElementSpec spec, float width, float availableHeight, UiNode node)
@@ -1185,12 +1236,31 @@ public sealed class UiLayoutEngine
         // first and places them in a second pass. With no AlignY every child lands on innerY, exactly where
         // flow put it.
         var childBoxes = new MeasuredBox[visible.Count];
+        var childNodes = new UiNode[visible.Count];
+        var pending = new List<int>();
         float maxHeight = 0f;
+
+        // Two passes, because the content-relative height mode needs its reference BEFORE the declaring child is
+        // measured: the children that do not declare it are measured first, and their maximum is that reference.
+        // A child's node is still created here in declared order, so the mode cannot reorder identities.
         for (int i = 0; i < visible.Count; i++)
         {
-            UiNode childNode = ChildNode(ctx, node, visible[i].Spec, visible[i].DeclaredIndex);
-            childBoxes[i] = MeasureElement(ctx, visible[i].Spec, widths[i], availableHeight, childNode);
+            childNodes[i] = ChildNode(ctx, node, visible[i].Spec, visible[i].DeclaredIndex);
+            if (UiPlacement.IsMatchContentHeight(visible[i].Spec))
+            {
+                pending.Add(i);
+                continue;
+            }
+
+            childBoxes[i] = MeasureElement(ctx, visible[i].Spec, widths[i], availableHeight, childNodes[i]);
             maxHeight = Math.Max(maxHeight, childBoxes[i].Height);
+        }
+
+        for (int p = 0; p < pending.Count; p++)
+        {
+            int i = pending[p];
+            childBoxes[i] = MeasureElement(
+                ctx, visible[i].Spec, widths[i], availableHeight, childNodes[i], maxHeight);
         }
 
         float naturalHeight = padding.Top + titleHeight + maxHeight + padding.Bottom;
@@ -1404,11 +1474,14 @@ public sealed class UiLayoutEngine
         float maxHeight = 0f;
 
         var children = new List<UiElementSpec>();
-        var childBoxes = new List<MeasuredBox>();
+        var childWidths = new List<float>();
+        var childNodes = new List<UiNode>();
         var alignsX = new List<UiPlacement.Alignment>();
         var alignsY = new List<UiPlacement.Alignment>();
         var nudgesX = new List<float>();
 
+        // Declared order first: identity, width and the placement axes are collected for every visible child
+        // before anything is measured, so the height mode below cannot reorder them.
         for (int i = 0; i < spec.Children.Count; i++)
         {
             UiElementSpec child = spec.Children[i];
@@ -1420,17 +1493,37 @@ public sealed class UiLayoutEngine
 
             UiPlacement.Alignment alignX = UiPlacement.ParseAlign(
                 child, UiPlacement.AlignXAttribute, UiPlacement.Axis.Horizontal);
-            float childWidth = alignX.IsStretch ? innerWidth : ResolveWrapWidth(child, innerWidth, ctx);
-
-            UiNode childNode = ChildNode(ctx, node, child, i);
-            MeasuredBox childBox = MeasureElement(ctx, child, childWidth, availableHeight, childNode);
 
             children.Add(child);
-            childBoxes.Add(childBox);
+            childWidths.Add(alignX.IsStretch ? innerWidth : ResolveWrapWidth(child, innerWidth, ctx));
+            childNodes.Add(ChildNode(ctx, node, child, i));
             alignsX.Add(alignX);
             alignsY.Add(UiPlacement.ParseAlign(child, UiPlacement.AlignYAttribute, UiPlacement.Axis.Vertical));
             nudgesX.Add(UiPlacement.ParseOffset(child, UiPlacement.OffsetXAttribute, innerWidth));
-            maxHeight = Math.Max(maxHeight, childBox.Height);
+        }
+
+        // Two passes for the same reason a Row needs them: this container's content height is the MAXIMUM over
+        // its children, so the children that do not declare the content-relative mode produce the reference the
+        // declaring ones then resolve against - and the declaring ones contribute nothing to it.
+        var childBoxes = new MeasuredBox[children.Count];
+        var pending = new List<int>();
+        for (int i = 0; i < children.Count; i++)
+        {
+            if (UiPlacement.IsMatchContentHeight(children[i]))
+            {
+                pending.Add(i);
+                continue;
+            }
+
+            childBoxes[i] = MeasureElement(ctx, children[i], childWidths[i], availableHeight, childNodes[i]);
+            maxHeight = Math.Max(maxHeight, childBoxes[i].Height);
+        }
+
+        for (int p = 0; p < pending.Count; p++)
+        {
+            int i = pending[p];
+            childBoxes[i] = MeasureElement(
+                ctx, children[i], childWidths[i], availableHeight, childNodes[i], maxHeight);
         }
 
         float naturalHeight = padding.Top + titleHeight + maxHeight + padding.Bottom;
@@ -1441,7 +1534,7 @@ public sealed class UiLayoutEngine
         // Padding, with the title band (when there is one) excluded from the content area, exactly where the
         // children's flow origin already was.
         float innerHeight = Math.Max(0f, height - padding.Bottom - innerY);
-        for (int i = 0; i < childBoxes.Count; i++)
+        for (int i = 0; i < childBoxes.Length; i++)
         {
             MeasuredBox childBox = childBoxes[i];
             float x = UiPlacement.Origin(padding.Left, innerWidth, childBox.Width, alignsX[i], nudgesX[i]);
@@ -2381,7 +2474,8 @@ public sealed class UiLayoutEngine
             && int.TryParse(raw.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
     }
 
-    private static float ResolveHeight(UiElementSpec spec, IUiWidget widget, UiWidgetContext ctx, float width, UiNode node)
+    private static float ResolveHeight(
+        UiElementSpec spec, IUiWidget widget, UiWidgetContext ctx, float width, UiNode node, float? contentHeight)
     {
         if (spec.TryGetAttribute("Height", out string raw))
         {
@@ -2391,13 +2485,20 @@ public sealed class UiLayoutEngine
                 return MeasuredHeight(widget, ctx, node);
             }
 
+            if (UiPlacement.IsMatchContentHeight(spec))
+            {
+                // The parent that can answer already handed the height, and the element's own content is not the
+                // geometry. With no reference in reach the mode is Auto, which is the documented degradation.
+                return contentHeight ?? MeasuredHeight(widget, ctx, node);
+            }
+
             if (float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float fixedHeight))
             {
                 return Math.Max(0f, fixedHeight);
             }
 
             throw new FormatException(
-                $"Widget id=\"{spec.Id}\" (Kind=\"{spec.Kind}\") has invalid Height '{raw}'; expected a number or Auto.");
+                $"Widget id=\"{spec.Id}\" (Kind=\"{spec.Kind}\") has invalid Height '{raw}'; expected a number, Auto or MatchContent.");
         }
 
         return MeasuredHeight(widget, ctx, node);
@@ -2420,8 +2521,13 @@ public sealed class UiLayoutEngine
 
     private static float ResolveContainerHeight(UiElementSpec spec, float naturalHeight, float availableHeight)
     {
+        // The content-relative mode is deliberately NOT a fixed height: it resolves in MeasureElement, which is
+        // the only place that knows the parent's content height, and a container that declares it keeps its own
+        // natural/Fill answer here (the caller stretches the box when a reference reached it). Reading it as a
+        // fixed value would be the silent divergence between Measure and Draw this pass exists to prevent.
         if (spec.TryGetAttribute("Height", out string raw) && raw.Trim().Length > 0
-            && !string.Equals(raw.Trim(), "Auto", StringComparison.OrdinalIgnoreCase))
+            && !string.Equals(raw.Trim(), "Auto", StringComparison.OrdinalIgnoreCase)
+            && !UiPlacement.IsMatchContentHeight(spec))
         {
             if (float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float fixedHeight))
             {
@@ -2429,7 +2535,7 @@ public sealed class UiLayoutEngine
             }
 
             throw new FormatException(
-                $"Container id=\"{spec.Id}\" (Kind=\"{spec.Kind}\") has invalid Height '{raw}'; expected a number or Auto.");
+                $"Container id=\"{spec.Id}\" (Kind=\"{spec.Kind}\") has invalid Height '{raw}'; expected a number, Auto or MatchContent.");
         }
 
         if (IsFill(spec) && availableHeight > 0f)

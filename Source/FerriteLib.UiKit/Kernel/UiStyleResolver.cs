@@ -90,8 +90,8 @@ public sealed class UiStyleResolver
     public void ApplyTo(UiTheme theme)
     {
         if (theme == null) throw new ArgumentNullException(nameof(theme));
-        ApplyScheme(theme, document.DefaultScheme);
-        ApplyDensity(theme, document.DefaultDensity);
+        ApplyScheme(theme, document.DefaultScheme, null);
+        ApplyDensity(theme, document.DefaultDensity, null);
     }
 
     /// <summary>
@@ -101,6 +101,17 @@ public sealed class UiStyleResolver
     /// and are recorded.
     /// </summary>
     public UiTheme ThemeFor(IReadOnlyList<UiStyleDeclaration>? nearestFirst)
+    {
+        return ThemeFor(nearestFirst, null);
+    }
+
+    /// <summary>
+    /// The same lookup with the element that asked for it. The tree is the only layer that knows where a scope
+    /// name was written, so it hands its path in and an unknown name is recorded against that element instead of
+    /// against the document - which is the difference between "some scheme is missing" and "this column's scheme
+    /// is missing". Caching is unchanged: the record lands on the first lookup that builds the pair.
+    /// </summary>
+    internal UiTheme ThemeFor(IReadOnlyList<UiStyleDeclaration>? nearestFirst, string? elementPath)
     {
         // A cached scope is only as good as the baseline it was cloned from. Watch the layout clock the
         // injected theme already carries: when it moves, this cache is stale for exactly the reason the
@@ -120,13 +131,14 @@ public sealed class UiStyleResolver
         if (regionThemes.TryGetValue(key, out UiTheme? cached)) return cached;
 
         UiTheme theme = baseline.Clone();
-        ApplyScheme(theme, scheme);
-        ApplyDensity(theme, density);
+        ApplyScheme(theme, scheme, elementPath);
+        ApplyDensity(theme, density, elementPath);
 
         if (regionThemes.Count >= MaxScopes)
         {
             Record("More than " + MaxScopes.ToString(CultureInfo.InvariantCulture)
-                + " distinct scheme/density scopes; this scope's theme is rebuilt per use instead of cached.");
+                + " distinct scheme/density scopes; this scope's theme is rebuilt per use instead of cached.",
+                0, elementPath);
             return theme;
         }
 
@@ -190,14 +202,16 @@ public sealed class UiStyleResolver
         return document.DefaultDensity;
     }
 
-    private void ApplyScheme(UiTheme theme, string? name)
+    private void ApplyScheme(UiTheme theme, string? name, string? elementPath)
     {
         // Explicit null/empty test rather than string.IsNullOrEmpty: net472's overload carries no
         // [NotNullWhen(false)], so flow analysis cannot narrow through it (the repo's recorded trap).
         if (name == null || name.Length == 0) return;
         if (!document.TryGetScheme(name, out UiStyleDocument.SchemeDefinition definition))
         {
-            Record("Unknown scheme '" + name + "'; the scope keeps the values it would have had without it.");
+            Record(
+                "Unknown scheme '" + name + "'; the scope keeps the values it would have had without it.",
+                0, elementPath);
             return;
         }
 
@@ -209,12 +223,14 @@ public sealed class UiStyleResolver
         if (definition.Font.HasValue) theme.DefaultFont = definition.Font.Value;
     }
 
-    private void ApplyDensity(UiTheme theme, string? name)
+    private void ApplyDensity(UiTheme theme, string? name, string? elementPath)
     {
         if (name == null || name.Length == 0) return;
         if (!document.TryGetDensity(name, out UiStyleDocument.DensityDefinition definition))
         {
-            Record("Unknown density '" + name + "'; the scope keeps the values it would have had without it.");
+            Record(
+                "Unknown density '" + name + "'; the scope keeps the values it would have had without it.",
+                0, elementPath);
             return;
         }
 
@@ -282,9 +298,9 @@ public sealed class UiStyleResolver
         }
     }
 
-    private void Record(string message, int line = 0)
+    private void Record(string message, int line = 0, string? elementPath = null)
     {
         if (issues.Count >= MaxIssues) return;
-        issues.Add(new UiStyleIssue(message, line));
+        issues.Add(new UiStyleIssue(message, line, elementPath));
     }
 }

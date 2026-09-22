@@ -15,10 +15,11 @@ namespace FerriteLib.UiKit.Kernel;
 /// </summary>
 public readonly struct UiStyleIssue
 {
-    public UiStyleIssue(string message, int line = 0)
+    public UiStyleIssue(string message, int line = 0, string? elementPath = null)
     {
         Message = message ?? "";
         Line = line;
+        ElementPath = string.IsNullOrEmpty(elementPath) ? null : elementPath;
     }
 
     /// <summary>What was dropped or replaced, in one sentence.</summary>
@@ -26,6 +27,15 @@ public readonly struct UiStyleIssue
 
     /// <summary>1-based line when the source reported one, otherwise 0.</summary>
     public int Line { get; }
+
+    /// <summary>
+    /// The element that DECLARED the dropped value, when the drop belongs to one element rather than to the
+    /// document (0.7.x): a scope naming a scheme or density the document does not define is recorded with its
+    /// declaring element's path, so the published finding can say <i>where</i> the name was written. A
+    /// document-level drop (a bad value inside <c>&lt;Styles&gt;</c>) has no element and stays null, and the
+    /// audit surface then attributes it to the style origin as it always has.
+    /// </summary>
+    public string? ElementPath { get; }
 
     public override string ToString()
     {
