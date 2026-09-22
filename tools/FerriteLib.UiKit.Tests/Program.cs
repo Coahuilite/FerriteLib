@@ -198,6 +198,11 @@ internal static class Program
         Console.WriteLine("Kernel section header (the chrome a manifest can now turn off)...");
         failures += KernelSectionHeaderTests.RunAll();
 
+        // ---- 0.7.x development instrument (owner: fl-dev) - one contiguous block ----------------------
+        Console.WriteLine("Kernel dev geometry instrument (numeric rects, height mode, viewport, press verdicts)...");
+        failures += KernelDevGeometryTests.RunAll();
+        // ----------------------------------------------------------------------------------------------
+
         Console.WriteLine("Kernel lane registration (every lane file is invoked from Program.cs)...");
         failures += KernelLaneRegistrationTests.RunAll();
     }

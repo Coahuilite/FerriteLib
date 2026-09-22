@@ -103,10 +103,29 @@ public static class UiNative
         // click for whatever is underneath to miss. The check is here rather than in the widget for the
         // same reason the yield check is: one rule for every kind, including kinds this library has never
         // seen, instead of a per-widget branch each of them can forget.
-        if (IsInputDisabled(element)) return false;
+        if (IsInputDisabled(element))
+        {
+#if FER_DEV
+            UiDevGeometryProbe.NoteInput(ctx, element, rect, "disabled");
+#endif
+            return false;
+        }
 
-        if (ctx.Session.IsPointerOverHigherLayer(element, PointerPositionIn(ctx))) return false;
+        if (ctx.Session.IsPointerOverHigherLayer(element, PointerPositionIn(ctx)))
+        {
+#if FER_DEV
+            UiDevGeometryProbe.NoteInput(ctx, element, rect, "covered");
+#endif
+            return false;
+        }
+
+#if FER_DEV
+        bool fired = Button(rect);
+        UiDevGeometryProbe.NoteInput(ctx, element, rect, fired ? "hit" : "miss");
+        return fired;
+#else
         return Button(rect);
+#endif
     }
 
     /// <summary>

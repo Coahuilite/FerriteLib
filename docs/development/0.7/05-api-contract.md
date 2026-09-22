@@ -636,6 +636,59 @@ call(s))`.
 
 *Migration:* none. An absent `Chrome` paints exactly what the header always painted.
 
+### The development-only geometry instrument (2026-09-22) — a library capability, compiled out of a release
+
+**Why it is here rather than in a consumer.** The five things a consumer cannot hand-roll safely include
+**one audit surface**, and a numeric answer to "where is this element, and who did that press go to" is that
+surface's own body rather than a feature grown for one page. The maintainer's ruling is that the tool which
+makes precise layout possible belongs to the library.
+
+**What it reports, and nothing else.**
+- One line per arranged node, in paint order: display path, kind, container-ness, the **arranged** rect, the
+  rect the widget's Draw was handed, that rect in **window space**, the **origin** between those two spaces,
+  the declared **height mode** (`Fixed`/`Auto`/`MatchContent`) and **the height that mode resolved to**.
+- For a `Scroll`/`Clip` container: the same numbers plus its **viewport** (the arranged rect, named as such)
+  and its **content extent** — the real scrollable size, not the visible band.
+- One line per sampled press: the element's path and kind, the **pointer** and the **queried rect** in window
+  space, and the verdict — `disabled`, `covered`, `hit` or `miss`.
+
+The two spaces side by side are the point of the record: a recorder reading content-group space and a snapshot
+reading window space produce two positions for one control, and neither number says which space it is in.
+
+**The surface, and why it adds no type.** `UiDiagnosticSubscription.GeometryEnabled` (off by default),
+`.GeometryOverlay` (off by default, and refused until the instrument is on) and `.DumpGeometry()` (the
+diffable text). It hangs off the existing subscription, so its lifetime, isolation and release path are the
+diagnostic surface's own and the instrument adds no process-wide state of any kind — no new static, no new
+kind, no second channel.
+
+**The gate is the build configuration, and it fails closed.** The whole implementation is inside
+`#if FER_DEV`, plus three guarded call sites (the engine's per-entry draw walk, the engine's overlay call, and
+the funnel's click decision), so a release payload carries no capture, no buffer and no call: on a release
+payload `GeometryEnabled = true` **throws** instead of accepting the opt-in and then answering every question
+with emptiness. The harness project mirrors the constant in its own Dev configuration, which is what makes a
+lane able to hold the dev half at all.
+
+**It must not change the thing it measures.** No sample is read back by the engine, the session, the hit stack
+or the fit audit, and the optional overlay is painted after the element it outlines has drawn and after the fit
+audit closed for that entry, in that element's own draw-local space.
+
+**Lane and mutation.** `KernelDevGeometryTests` (dev half: six arranged lines from a page with a
+`Chrome="none" Height="MatchContent"` band, a scoped container and its child; press verdicts for
+`hit`/`miss`/`disabled`). The mutation that has to redden it is a change to the **geometry producer**, not to
+the instrument: with `ResolveHeight`'s `MatchContent` branch returning its reference `+ 2f`, the lane reports
+`the band's recorded height is the sibling's measured height: 32 vs 30` and the run exits 1; reverting restores
+ALL PASS. That is what makes the number a measurement rather than a restatement of the declaration. The
+per-line `window == draw + origin` assertion is labelled a guard in the lane: it holds by construction today.
+
+**Evidence boundary, stated rather than implied.** The instrument exists only in a Dev build and gate 1 runs
+the harness in Release, so **gate 1 exercises the release half only** (absent, refused, empty dump); the
+numeric half and its mutation come from a `-c Dev` harness run (ALL PASS, printed dump) and are **not
+gate-protected**. Making the dev half gate-protected means running the harness twice in gate 1 — a gate-chain
+change, and the maintainer's call rather than this round's.
+
+*Migration:* none in either direction. A release payload cannot turn it on; a development build that never asks
+for it pays nothing.
+
 ## The selected ordinary-authoring path (B)
 
 The recommended author route is existing surface only: one layout manifest over public atoms/containers

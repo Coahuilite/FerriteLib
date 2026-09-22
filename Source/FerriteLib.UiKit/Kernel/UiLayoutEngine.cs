@@ -572,6 +572,23 @@ public sealed class UiLayoutEngine
                     isPopup: false);
             }
 
+#if FER_DEV
+            // The development-only numeric instrument reads the geometry from this one point per entry:
+            // the arranged rect and the draw rect disagree exactly when a scroll/group origin is involved,
+            // which is the disagreement a reader must be able to see rather than infer. Nothing is
+            // recorded when the subscription did not opt in, and nothing at all exists in a release build.
+            UiDevGeometryProbe.Note(
+                entry.Node,
+                entry.Spec,
+                entry.ContainerKind,
+                entry.IsContainer,
+                IsScopedContainer(entry.ContainerKind),
+                entry.Rect,
+                entry.ContentRect,
+                drawRect,
+                entryCtx);
+#endif
+
             if (IsScopedContainer(entry.ContainerKind))
             {
                 DrawScopedContainer(
@@ -645,6 +662,13 @@ public sealed class UiLayoutEngine
                 {
                     UiFitAudit.EndElement();
                 }
+
+#if FER_DEV
+                // The optional overlay is painted LAST for this entry, after the fit audit closed and after
+                // the element drew, in the element's own draw-local space: an outline that could feed back
+                // into the thing it measures would be the instrument changing the measurement.
+                UiDevGeometryProbe.Outline(drawRect);
+#endif
 
                 index++;
             }

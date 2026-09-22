@@ -244,6 +244,99 @@ public sealed class UiDiagnosticSubscription : IDisposable
     /// <summary>Frames folded into one timing event. One aggregate per window, never a per-frame line.</summary>
     public int TimingSampleFrames { get; set; } = 60;
 
+#if FER_DEV
+    private UiDevGeometryCapture? geometry;
+#endif
+
+    /// <summary>
+    /// Opts this subscription in to the <b>development-only</b> geometry instrument: a numeric record of
+    /// where each arranged element actually was (arranged rect, drawn rect, height mode and resolved
+    /// height, a scroll viewport and its content extent) plus what each press landed on. The constructor
+    /// default is off, because the library's own answer to "how do I know what the layout did" must not be a
+    /// cost every page pays for.
+    /// <para>
+    /// <b>Fail-closed.</b> The instrument is compiled into a development build and out of a release one, so
+    /// on a release payload this setter <b>throws</b> rather than accepting the opt-in and then answering
+    /// every question with emptiness - a diagnostic that reports nothing and looks fine is the failure this
+    /// whole surface exists to end. The dump is diffable text (see <see cref="DumpGeometry"/>).
+    /// </para>
+    /// </summary>
+    public bool GeometryEnabled
+    {
+        get
+        {
+#if FER_DEV
+            return geometry != null;
+#else
+            return false;
+#endif
+        }
+        set
+        {
+#if FER_DEV
+            geometry = value ? geometry ?? new UiDevGeometryCapture() : null;
+#else
+            throw new InvalidOperationException(
+                "The geometry instrument is a development-build tool and this payload was built without it; "
+                + "enabling it is refused rather than answered with silence.");
+#endif
+        }
+    }
+
+    /// <summary>
+    /// Whether the instrument also paints an outline around each sampled element's draw rect. Off by
+    /// default, and it requires <see cref="GeometryEnabled"/>: the overlay describes what the instrument
+    /// sampled, so turning it on for a subscription that records nothing is refused instead of ignored.
+    /// </summary>
+    public bool GeometryOverlay
+    {
+        get
+        {
+#if FER_DEV
+            return geometry != null && geometry.Overlay;
+#else
+            return false;
+#endif
+        }
+        set
+        {
+#if FER_DEV
+            UiDevGeometryCapture? capture = geometry;
+            if (capture == null)
+            {
+                throw new InvalidOperationException(
+                    "Enable GeometryEnabled before turning the geometry overlay on: the overlay outlines what "
+                    + "the instrument sampled, and nothing is being sampled.");
+            }
+
+            capture.Overlay = value;
+#else
+            throw new InvalidOperationException(
+                "The geometry instrument is a development-build tool and this payload was built without it; "
+                + "enabling its overlay is refused rather than answered with silence.");
+#endif
+        }
+    }
+
+    /// <summary>
+    /// The diffable text dump of the most recent pass: one line per arranged node in paint order, then one
+    /// line per sampled hit query. Empty when the instrument is off, and always empty on a release payload,
+    /// where it cannot be turned on.
+    /// </summary>
+    public string DumpGeometry()
+    {
+#if FER_DEV
+        return geometry == null ? "" : geometry.Dump();
+#else
+        return "";
+#endif
+    }
+
+#if FER_DEV
+    /// <summary>The capture this subscription carries, or null. Read by the instrument's own chokepoints.</summary>
+    internal UiDevGeometryCapture? Geometry => geometry;
+#endif
+
     /// <summary>A copy of the retained events, oldest first. A copy, so the caller cannot mutate the ring.</summary>
     public IReadOnlyList<UiDiagnosticEvent> Snapshot()
     {
@@ -311,6 +404,9 @@ public sealed class UiDiagnosticSubscription : IDisposable
         Dropped = 0;
         Suppressed = 0;
         Published = 0;
+#if FER_DEV
+        geometry?.Clear();
+#endif
     }
 
     /// <summary>
@@ -333,6 +429,9 @@ public sealed class UiDiagnosticSubscription : IDisposable
         seen.Clear();
         start = 0;
         count = 0;
+#if FER_DEV
+        geometry = null;
+#endif
     }
 
     internal void PublishReload(UiReloadReport report)

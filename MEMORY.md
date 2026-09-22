@@ -2,6 +2,40 @@
 
 ## Current durable state
 
+- **The development-only geometry instrument landed (2026-09-22) — a numeric audit, not a consumer feature, and
+  the citation is what asked for it.** Maintainer ruling: a dev tool that makes precise layout possible belongs
+  to the library, because **the audit surface is one of the five things FL owns**. Provenance transcribed
+  (`coahuilite/UniversalSqueaker@6a469c5:Source/UniversalSqueaker/UI/Layout.Schema2.xml:382`):
+  `<Widget Id="race-layer-row-hit" Kind="input/button" Chrome="none" Height="MatchContent" ActionBind="select-domain" />`,
+  and what it proved, four measured points: (1) the host's lane presses that row and passes at 100% geometry
+  coverage while the maintainer's in-game click on the race row does nothing; (2) `Player.log` carries 0
+  `Exception`/`TRIPPED`/recovery band/`KeyNotFoundException`, so it is neither a missing command nor an
+  element replaced by the recovery band; (3) the harness's and the game's frame/coordinate spaces disagree —
+  the same control read `(736,270)` in one frame and `(752,398)` in the other, the recorder reporting
+  content-group space while the snapshot reported window space; (4) a px-level claim cannot be accepted by eye
+  ("行高相关 px 肉眼无法看出") ⇒ numbers.
+  **What landed:** `UiDiagnosticSubscription.GeometryEnabled` / `GeometryOverlay` / `DumpGeometry()` — no new
+  type, no new kind, no new static, because the capture lives on the subscription and inherits its opt-in,
+  isolation and release path. Fed from three guarded call sites: the engine's per-entry draw walk (arranged /
+  drawn / window rects, the origin between them, height mode and resolved height, a scoped container's viewport
+  and content extent), the engine's overlay call, and the funnel's click decision
+  (`disabled`/`covered`/`hit`/`miss`). One implementation file (`UiDevGeometryProbe.cs`), wholly inside
+  `#if FER_DEV`; a release payload has no capture and no call, and its enable path **throws** rather than
+  accepting the opt-in and answering with emptiness.
+  **Evidence:** `KernelDevGeometryTests` under a `-c Dev` harness run — ALL PASS with the printed dump:
+  `band … height=MatchContent h=30` equal to its sibling's `h=30`, the scrolled child `arranged=(0,30,…)` vs
+  `draw=(0,0,…)` with `origin=(0,30)`, and `viewport … content=(0,0,184,120)` over a 40px viewport.
+  **Mutation-proven half:** the geometry producer, not the instrument — `ResolveHeight`'s `MatchContent` branch
+  `+ 2f` reddens `the band's recorded height is the sibling's measured height: 32 vs 30` (exit 1); the revert
+  restores ALL PASS. **Guard only, labelled in the lane:** the per-line `window == draw + origin` assertion,
+  which holds by construction today. **Boundary:** the instrument exists only in a Dev build and gate 1 runs the
+  harness in Release, so gate 1 exercises the **release half only** (absent, refused, empty dump); the numeric
+  half is not gate-protected, and running the harness twice in gate 1 is a gate-chain change left to the
+  maintainer. Contract entry, tier member clause and consumer-guide row landed in the same batch.
+  **Also durable, and it cost a round:** on net472 `string.Split(char)` binds to the
+  `Split(char, StringSplitOptions)` overload this framework does not have — a `MissingMethodException` at run
+  time, not at build time; the array form is the one that exists.
+
 - **`section/header`'s divider is declarable off — the defect is history, and the citation says so in three
   parts (2026-09-22).** **The defect as it stood:** a consumer was forced to register its own kind in place of the
   carrier's atom, and wrote the reason into its own manifest —

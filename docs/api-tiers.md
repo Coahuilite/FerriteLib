@@ -346,7 +346,14 @@ consequence is paid in the open rather than discovered by a stranger.
   `DefaultBudget` when unnamed) with a dropped-count marker, a dedup table bounded by that same ring, and
   per-subscription `Count`/`Dropped`/`Suppressed`/`Published`. `Dispose` releases it, and so does
   disposing the owning host or session; it carries the host's identity string and the session id, never the
-  objects.
+  objects. It also carries the **development-only numeric instrument**: `GeometryEnabled` (off by default),
+  `GeometryOverlay` (off by default, and refused until the instrument is on) and `DumpGeometry()` (diffable
+  text: one line per arranged node with its arranged, drawn and window rects, the origin between them, its
+  height mode and the height that mode resolved to, plus a scoped container's viewport and content extent,
+  then one line per sampled press with its verdict). **All three are compiled out of a release payload**
+  (`FER_DEV`), where each enable path throws instead of accepting the request and answering every later
+  question with emptiness. The instrument observes only: no member of it is read back by the engine, the
+  session, the hit stack or the fit audit.
 - `UiDiagnosticEvent` — one attributed record: `Kind` plus a stable `Code`, `Host`, `SessionId`,
   `Node`/`ElementPath`, and the original record for the channel that produced it (`Report` for reload,
   `Overflow`/`Fallback` for the fit audit's two halves, `Timing` for a sampled aggregate). No field names a
