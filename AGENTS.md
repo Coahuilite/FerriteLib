@@ -158,6 +158,24 @@ gate 2 is the Dev build — the delivery step ends with a forced `dotnet build -
 **and** removal of the stale `1.6/Assemblies/FerriteLib.UiKit.pdb` (Release sets `DebugType=none`, so it
 neither rewrites nor deletes an existing PDB). `AssemblyConfigurationAttribute` is the detector, never the
 version suffix: a correct Release carrier still reads `0.7.0-dev+<sha>`.
+- **`verify-local` is a writer, and so is the harness.** Its gate 2 is the Dev build, and gate 1's
+`dotnet run --project tools/FerriteLib.UiKit.Tests` is not a reader either: the harness project carries a
+`ProjectReference` to the library, whose `OutputPath` is this very folder, and the generated `AssemblyInfo`
+embeds the commit SHA — so any MSBuild pass over that graph can rewrite the carrier, and a HEAD that has moved
+since the last build is enough to make it out of date. (Measured twice, and both were real accidents rather
+than a precaution: 2026-09-20, a pre-commit harness run produced the round-5 carrier as a dirty build; and
+2026-09-22, a verify-only gate run after a freeze left the stale Dev PDB back beside the frozen carrier.)
+**Verification of a frozen carrier is therefore read-only**: the hash, the configuration, the stamp read in a
+child process, the absence of a PDB, the exclusivity probe, and `git rev-parse`/`status` — never a build of the
+project graph. A full gate run belongs to the delivery step: the same builder ends it with the forced Release
+rebuild, the PDB removal and the re-verification, and issues a **new FREEZE NOTICE** — the hash may have moved,
+and downstream must re-verify against the new identity. Consequently a session that only means to VERIFY a
+frozen carrier must not run the gate chain at all.
+**Not claimed:** whether a *non-building* execution of an already-built harness
+(`dotnet run --no-build --no-restore -c Release`, or `bin/Release/net472/FerriteLib.UiKit.Tests.exe` directly)
+leaves the carrier untouched is **unmeasured**, so it is not offered as a verification path yet. The test is to
+record the payload's SHA-256 before and require it unchanged after, and it belongs to a freeze that is moving
+the hash anyway.
 - **A hash is an identity only with its inputs pinned.** Quote one with the build command and the clean/dirty
 state beside it. The stamp records the **committed** revision and is silent about uncommitted source.
 - **A doc-only commit reddens "embedded commit == HEAD" until the carrier is rebuilt.** That is expected
