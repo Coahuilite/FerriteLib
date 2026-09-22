@@ -24,6 +24,7 @@ now pin each factory's literals plus "the constructor selects neither palette".
 | B1 `SelectedKey` item scope | lane written and run red **first** on the pre-fix tree (3 active rows of 3 — the page-level decoy answered for every row); red again under the faithful revert of the table entry (exit 1, the three assertions named in the output) | green, `ALL PASS` 2600 ok | this commit |
 | task-9 `Height="MatchContent"` | lane written and run red **first** (the value refused at creation, `invalid Height 'MatchContent'`); red again under the faithful revert of the engine half — the reference removed while the value stayed accepted: `the hit column takes the text column's measured height (50 vs 104)` | green, `ALL PASS` 2623 ok | this commit |
 | task-9 unknown scope name attribution | lane written and run red **first** on the pre-fix tree (`attributed to the element that declared it, not to the document: 'style-scope#styles'`); red again under the faithful revert of the attribution half (exactly that assertion and nothing else) | green, `ALL PASS` 2623 ok | this commit |
+| task-10 `section/header` divider switch | lane written and run red **first** (the attribute did not exist: `Unknown attribute 'Chrome' on section/header`); red again under the faithful revert of the widget half — the value accepted, the paint no longer suppressed: `Chrome=none paints nothing in the element's rect (5 surface call(s))` | green, `ALL PASS` 2633 ok | this commit |
 
 B's eight lanes are a new reference over existing surface: they cannot be red on a "before" (nothing in B
 changed production code); their weight is compile-check plus behavior pins — geometry-free authoring, the
@@ -36,7 +37,7 @@ Everything here remains stub-harness evidence. None of it is 已由真实消费�
 
 ## Integrated gates and staged package (measured, not assumed)
 
-`verify-local.ps1` after the task-9 code commit (2026-09-22): all nine gates OK. It was run **without**
+`verify-local.ps1` after the task-10 code commit (2026-09-22): all nine gates OK. It was run **without**
 `-PackDev` in this round, so nothing was staged: the dev folder below is the C-round artifact and is labelled
 as such rather than passed off as the current one.
 

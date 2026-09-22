@@ -195,6 +195,9 @@ internal static class Program
         failures += KernelContentHeightTests.RunAll();
         // ----------------------------------------------------------------------------------------
 
+        Console.WriteLine("Kernel section header (the chrome a manifest can now turn off)...");
+        failures += KernelSectionHeaderTests.RunAll();
+
         Console.WriteLine("Kernel lane registration (every lane file is invoked from Program.cs)...");
         failures += KernelLaneRegistrationTests.RunAll();
     }

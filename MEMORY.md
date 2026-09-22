@@ -2,6 +2,17 @@
 
 ## Current durable state
 
+- **`section/header`'s divider is now declarable off (2026-09-22), and the citation is the consumer's S6
+  direction.** The kind painted a 1px line under its title unconditionally — `Chrome` absent from its schema,
+  `Tone` not engine-wide — so no page could have a header without a rule under it, and a
+  borderless/whitespace-separated design ("no frames, no dividers") was blocked by it. Reported evidence:
+  **`us-dist` measured around `coahuilite/UniversalSqueaker@4456077` that the eight cards' `section/header`
+  divider cannot be removed** (the handoff supplied the commit, not a `path:line`; this session did not read that
+  tree), with the consumer's nav rail and attention rail as sibling semantics. `Chrome="none"` suppresses it, the
+  colour stays `theme.Divider` (a scheme can make it transparent), and any other `Chrome` value is refused at
+  creation. The kind had **no lane coverage before this**; lane and mutation:
+  `docs/development/0.7/05-api-contract.md`.
+
 - **`Height="MatchContent"` landed 2026-09-22, and its consumer citation is transcribed here because it is what
   fixed the scope: only a parent whose content height is a MAXIMUM over its children can answer the reference.**
   `coahuilite/UniversalSqueaker@d767d0f:Source/UniversalSqueaker/UI/Layout.Schema2.xml:350-359` — an `Overlay`

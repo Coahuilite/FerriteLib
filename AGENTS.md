@@ -200,11 +200,16 @@ enough to recompile the carrier, which is why the rule reads "and so is the harn
 prints its hints under `[hint]` and annotates exactly the two writers, but the rule holds for every gate in
 every repository.
 
-**Not claimed:** whether a *non-building* execution of an already-built harness
-(`dotnet run --no-build --no-restore -c Release`, or `bin/Release/net472/FerriteLib.UiKit.Tests.exe` directly)
-leaves the carrier untouched is **unmeasured**, so it is not offered as a verification path yet. The test is to
-record the payload's SHA-256 before and require it unchanged after, and it belongs to a freeze that is moving
-the hash anyway.
+**A non-building execution of an already-built harness is a reader — measured 2026-09-22.**
+`dotnet run --no-build --no-restore --project tools/FerriteLib.UiKit.Tests -c Release` against a frozen carrier
+(`490d4f0`, Release) left it untouched: SHA-256 `E396E089…ACB` before and after, and the **mtime identical**
+(`14:24:45`) — the decisive signal, because a rewrite with equal bytes still moves it — with no PDB appearing,
+`HARNESS_EXIT=0`, `ALL PASS` 2623 ok. The copy the harness loaded
+(`tools/…/bin/Release/net472/FerriteLib.UiKit.dll`) was byte-identical to the carrier, so that run genuinely
+exercised the frozen payload rather than a stale copy. **Two boundaries:** it does not make the plain
+`dotnet run` a reader (that one still builds and writes — it is the writer this section names), and it runs the
+**last built** binaries, so with sources or HEAD moved since that build it measures stale code and is not a
+substitute for the gate chain when anything changed.
 - **A hash is an identity only with its inputs pinned.** Quote one with the build command and the clean/dirty
 state beside it. The stamp records the **committed** revision and is silent about uncommitted source.
 - **A doc-only commit reddens "embedded commit == HEAD" until the carrier is rebuilt.** That is expected

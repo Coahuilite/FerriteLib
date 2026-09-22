@@ -608,6 +608,34 @@ the audit surface's own rule that a count is a count of **distinct findings**, n
 
 *Migration:* none behaviourally. A consumer reading `UiStyleIssue` gets a new property and the same message.
 
+### `section/header`'s divider becomes declarable (2026-09-22)
+
+**A general defect, approved under "if the change proves general, do it without asking".** The kind painted a 1px
+surface along its own bottom edge unconditionally: `Chrome` was not in its schema, `Tone` is not engine-wide, and
+the only lever a manifest had was a scope-level scheme — which also repaints every other `Divider` in that scope.
+An atom painting something the manifest cannot control is the rule this library exists to keep, and any
+borderless/whitespace-separated design (the S6 direction: no frames, no dividers, separated by whitespace) was
+blocked by it — not one consumer's page only.
+
+**What changed.** Three lines in `SectionHeaderWidget`: `Chrome` joins its schema and implements exactly one
+value, `none`, which suppresses the divider while the title is still drawn; any other value is refused at creation
+naming `none` (the A2/A3 fail-closed shape `input/button` already uses for its bare hit area). No new attribute
+name was introduced, the divider is not made conditional on anything else, and its colour stays the theme's
+`Divider` token — so a scope's scheme can still restyle the line, transparent included, instead of switching it
+off.
+
+**Lane and mutation.** `KernelSectionHeaderTests` — the kind had **no lane coverage at all** before this, which is
+its own finding: the line had never been pinned. The lane holds that the default header paints five surface calls,
+all inside its own rect and all in `theme.Divider`; that `Chrome="none"` paints **nothing** (0 calls) while its
+title is still on the wire; that `Chrome="panel"` and `Chrome="true"` are refused at creation naming `none`;
+and that a scope's scheme moves the divider colour off the baseline token, so the fix cannot remove the theming
+half. Written and observed **RED first** (the attribute did not exist at all: `Unknown attribute 'Chrome' on
+section/header`), green after the three lines landed, and red again under the faithful revert of the widget half —
+the value accepted, the paint no longer suppressed: `Chrome=none paints nothing in the element's rect (5 surface
+call(s))`.
+
+*Migration:* none. An absent `Chrome` paints exactly what the header always painted.
+
 ## The selected ordinary-authoring path (B)
 
 The recommended author route is existing surface only: one layout manifest over public atoms/containers
