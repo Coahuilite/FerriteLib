@@ -1,5 +1,85 @@
 # MEMORY
 
+## Start here — the signpost (added 2026-09-23 for whoever takes this repository over)
+
+**Read these, in this order. They are the whole map.**
+
+| # | File | What it is |
+| --- | --- | --- |
+| 1 | `AGENTS.md` | The stable rules: invariants, boundaries, the shared-payload trap, evidence discipline. Read before acting. |
+| 2 | `MEMORY.md` | This file — the only volatile ledger: durable facts, rulings, evidence pointers. |
+| 3 | `TODO.md` | The action surface: current goals, open actions, blockers, explicit deferrals. Nothing else. |
+| 4 | `docs/development/0.7/05-api-contract.md` | What `0.7.x` commits to: every break and addition with its lane and its migration. |
+| 5 | `docs/development/0.7/40-verification.md` | **Which gate guards which half of the harness**, the mutation record, and the pending external checks. |
+| 6 | `docs/api-tiers.md` | The compatibility promise, type by type (stable / public-unstable / internalize-candidate). |
+| 7 | `docs/consumers/consume-from-0.7.0.md` | The consumer's view: wiring another mod against this carrier, and what moved. |
+| 8 | `docs/development/0.7/60-capability-dispositions.md` | ACCEPT / DEFER / REJECT per raised capability, against the four promotion gates. |
+
+### The developer mode the library owns
+
+**What it is.** `Source/FerriteLib.UiKit/Kernel/UiDevGeometryProbe.cs` — the whole file inside `#if FER_DEV`.
+It adds **no type, no kind and no process-wide static**: it is three members on the existing diagnostic
+surface — `UiDiagnosticSubscription.GeometryEnabled` / `.GeometryOverlay` / `.DumpGeometry()` — so its
+lifetime, isolation and release path are the subscription's own.
+
+**Why it is not spread over the tree.** It is fed from exactly three existing chokepoints: the engine's
+per-entry draw walk, the engine's overlay call, and the funnel's click decision. Nowhere else is instrumented.
+
+**What it records — the numbers a screenshot cannot settle.**
+- per arranged node: the **arranged**, **drawn** and **window-space** rects, the **origin** between those
+  spaces, the declared **height mode** (`Fixed`/`Auto`/`MatchContent`) and the height that mode resolved to;
+- for `Scroll`/`Clip`: the same plus the **viewport** and the **real content extent** (not the visible band);
+- per sampled press: element **path/kind**, the **pointer** and the **queried rect** in one space, and the
+  verdict **`disabled` | `covered` | `hit` | `miss`** — sampled on a press, never per frame.
+`DumpGeometry()` returns it as diffable text; `GeometryOverlay = true` outlines each sampled element.
+
+**It only observes.** No sample is read back by the engine, the session, the hit stack or the fit audit, and
+the overlay is painted after the element it outlines has drawn, in that element's own draw-local space.
+
+**It fails closed.** Compiled out of a release payload; there `GeometryEnabled = true` **throws** rather than
+accepting the opt-in and then answering every question with emptiness.
+
+**Which gate guards it: gate 10**, `scripts/verify-dev-instrument.ps1`, invoked by `verify-local.ps1`.
+Gate 1 runs the harness in Release, where `#if FER_DEV` is undefined, so the dev half needed a gate of its
+own. Gate 10 runs the harness in **Dev** and refuses to accept "the project compiled": it requires the
+dev-only assertion names, floors on the assertion and dumped-node counts, and the **absence** of the
+release-only half's name, and its checker is control-tested on every run against four planted fixtures (an
+empty output, a release-only output and a green-exit-but-missing-name output must be **rejected**; a fully
+populated sample must **not** be) — which is what closes the "an empty enumeration passes" bug class.
+**Gate 10 is a third writer of the shared carrier**; the other two are `-PackDev` / gate 2's Dev build and the
+harness itself through its `ProjectReference`.
+
+**How to run it by hand.**
+```powershell
+pwsh -NoProfile -File scripts/verify-dev-instrument.ps1      # gate 10 alone: Dev harness + its own controls
+dotnet run --project tools/FerriteLib.UiKit.Tests -c Dev     # the Dev harness: every lane's dev half
+```
+
+**Why it exists at all, with the measurement that forced it.** The harness project never defined `FER_DEV`, so
+the `#if FER_DEV` branch in `KernelDocumentReloadTests` had **never been compiled by any run**, and a
+`-c Dev` harness run was **red** (the test took its release branch while the library was Dev). "A test written
+inside a conditional-compilation block that no configuration defines" is the general defect class; the tests
+csproj now mirrors the library's Dev gate, and gate 10 keeps the arrangement from rotting.
+
+**One precondition for a consumer.** The instrument exists only in a **Dev payload**, so using it means one Dev
+build first — which writes Dev bytes to the shared carrier path — and the delivery step afterwards restores
+Release. There is no release-build path to it, by design.
+
+### Where the line stands (2026-09-23)
+
+- Branch `0.7.x`, contract axis `0.7.0`, consumer range `[0.7.0,0.8.0)`. **Ten gates, all green**
+  (`pwsh -NoProfile -File scripts/verify-local.ps1`).
+- **Carrier identity is never pinned in a tracked file.** The live identity is the **latest FREEZE NOTICE**,
+  quoted as **hash + mtime together**; the history lines further down name past builds only. A hash without its
+  build command and clean/dirty state is a machine-local fact.
+- **Local `0.7.x` is ahead of `origin/0.7.x` and has not been pushed.** Pushing, tagging and publishing are
+  maintainer actions — do not "tidy up" by pushing.
+- **`verify-local` writes the carrier** (gate 2's Dev build, gate 3's Release build, gate 10's Dev harness, and
+  gate 1's harness through its `ProjectReference`). To VERIFY a frozen carrier, use the read-only six: SHA-256,
+  `AssemblyConfiguration` read in a child process, the embedded stamp, the absence of a `.pdb`, the
+  exclusivity probe, and `git rev-parse`/`status` — never a build of the project graph.
+- `TODO.md` carries what is actually open.
+
 ## Current durable state
 
 - **The development-only geometry instrument landed (2026-09-22) — a numeric audit, not a consumer feature, and
@@ -719,7 +799,10 @@
   build-and-harness stretch serialises on one engineer.
 
 - **Carrier identity moved three times on 2026-09-22, and `0.7.x` was first-pushed the same day.** History:
-  `876750a`/`58B57EAD…` -> `e668344`/`1BBF5F4D…` -> `553fc53`/`3FA8CABE…` (all 252416 B, Release, no PDB).
+  `876750a`/`58B57EAD…` -> `e668344`/`1BBF5F4D…` -> `553fc53`/`3FA8CABE…` (all 252416 B, Release, no PDB) ->
+  `06ff1c2`/`1891A5CE…D649`/252416 B (the frozen Release the maintainer's live in-game pass ran against) -> a
+  2026-09-23 rebuild at HEAD `9938121` after gate 10 landed (253440 B, Release, no PDB), **whose hash is
+  deliberately not quoted here**: the live identity is the newest **FREEZE NOTICE**, quoted as hash + mtime.
   **Do not pin the live identity in a tracked file:** every commit that moves HEAD forces a payload rebuild, so
   a SHA written here is stale the moment it lands - that loop is why these are history lines. The live identity
   is the **FREEZE NOTICE**, quoted as **hash + mtime**. The push went out after `privacy-audit -FullHistory` was

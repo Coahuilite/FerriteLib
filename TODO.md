@@ -13,6 +13,12 @@ move until the consumer's P1 usage is done, and the backlog is friction the cons
 not a wish list.** One freeze per round: every (B) fix moves HEAD and invalidates the consumer's gate green,
 so the remaining batch items land **together**, with one carrier rebuild and one freeze notice.
 
+**Two states a newcomer must not "tidy up":** local `0.7.x` is **ahead of `origin/0.7.x` and unpushed**
+(pushing, tagging and publishing are maintainer actions), and **`verify-local` writes the shared carrier**
+(gate 2's Dev build, gate 3's Release build, gate 10's Dev harness, and gate 1's harness through its
+`ProjectReference`), so verifying a frozen carrier is the read-only six in `MEMORY.md` § Start here, never a
+gate run.
+
 P1 as delivered — landed, each with a failure-sensitive lane and its red evidence recorded in `MEMORY.md`:
 FL-8 / FL-11 / FL-12 (docs, P1-A) · FL-1, FL-2, FL-3, X-21 (already fixed on this line; P1-B proved them by
 mutated revert) · FL-4 (REJECTED, with citation) · FL-23 (wrong-type binding read now REPORTED) ·
@@ -21,8 +27,19 @@ mutated revert) · FL-4 (REJECTED, with citation) · FL-23 (wrong-type binding r
 `PayloadKey` + `Chrome="none"`/`Height="Auto"` (G2/G3) · typed `UiOption` (FL-16, second attempt) ·
 `input/text-field` (B7) · mode-row per-option hover help · `input/mode-row` label-set fix (B8).
 
+**Also landed since P1 closed (library-side, no consumer work owed):** the **development-only geometry
+instrument** — the library-held dev mode the maintainer asked for — and its **gate 10**, which is what keeps
+its dev half from rotting. Both are described in `MEMORY.md` § Start here; ten gates are green. The next batch
+that touches the carrier is **task-11** below.
+
 ## Next — the consumer-driven batch (waiting on the friction report)
 
+- [ ] **task-11 — no stroke / per-edge stroke in the shared border vocabulary: the next batch that touches the
+      carrier.** `Chrome` is today either the default or `none`, and a border is all four edges or none — so a
+      flat surface can only be faked with `fill == border`, and a gold rail can only be hand-drawn by the
+      consumer. **Scope must include the edge WIDTH**: the library's hairline is 1px while the consumer
+      hand-draws 3px. Citations: the consumer's flat scope, its `us/section-header`, and half of the "row
+      selected fill" dead end. It lands as **one** carrier batch with one freeze notice.
 - [ ] **FL-17 — the optional per-row template on `container/tree` (route A), the largest remaining item and
       scheduled last.** The one capability `Repeat` + `<Templates>` does not already cover: the cross of
       hierarchy and composition. `container/tree` renders one label band per row and takes no template, and
@@ -55,6 +72,11 @@ mutated revert) · FL-4 (REJECTED, with citation) · FL-23 (wrong-type binding r
 
 ## Library-side items that are real and unblocked
 
+- [ ] **A lane for the dev instrument's `covered` verdict.** `hit`, `miss` and `disabled` are pinned by
+      `KernelDevGeometryTests`; `covered` — the element sits under another element's open popup layer — is
+      implemented and printed by the instrument but **no lane drives it**, and an unexercised branch is
+      unproven surface. Cheapest shape: a dropdown's popup over a button, then one press line whose verdict is
+      `covered`. Gate 10 would carry it automatically, since it runs the Dev half.
 - [ ] **Make the licence-parity guard two-sided, or stop calling it ours.** Gate 6 is credited in prose
       with comparing `LICENSE` against the consumer's copy; it does not, and only the consumer's own gate
       does. The 2026-09-10 Boundaries narrowing (this repo answers for itself alone) settles the choice:
@@ -235,6 +257,10 @@ the responsiveness package landed, and `input/text-field` closed the last missin
 
 ## 4. Deferred by decision, with the upgrade path written down
 
+- [ ] **BACKLOG (maintainer ruling 2026-09-23): outline BOTH rects in the dev instrument's overlay.** The dump
+      already carries the arranged, drawn and window rects plus the origin between the spaces, which is what the
+      layout questions needed; drawing both outlines needs the engine's conversion inputs, so it is not worth
+      the scope today. Re-open only if a reader cannot answer a question from the numbers.
 - [ ] **Package feed / registry — deliberately not now.** Same-version republish is not re-fetched and build
       metadata is stripped from the cache identity, so a hash-suffixed dev version gives false freshness.
       Two of three revisit triggers are met (a remote exists; an outside party may consume the library); a
@@ -252,12 +278,10 @@ the responsiveness package landed, and `input/text-field` closed the last missin
       real theme exists.
 - [ ] Optional two-minute experiment: whether RimWorld tolerates an unknown tag in `About.xml`. The parsed
       tag set is closed and no tolerance could be proven from stripped metadata, so nothing depends on it.
-- **Version-axis lane — no re-cut owed (2026-09-22 audit, closed).** The 2026-09-22 temporary exemption
-      (a public addition does not bump the minor on `0.7.x`) needs no lane change: **no lane reads additions and
-      no gate enforces the minor bump** — named, lane by lane, in `MEMORY.md` § Version axes. The earlier item
-      here assumed a re-cut was pending; that premise was false, so it is not left standing. If a lane ever
-      starts reading additions (or its message wording starts asserting the minor rule), align it then, in the
-      batch that next touches the carrier.
+- **CLOSED (2026-09-22 audit): the version-axis lane owes no re-cut** — no lane reads additions and no
+      gate enforces the minor bump (named lane by lane in `MEMORY.md` § Version axes). Kept only as a pointer so
+      the question is not re-litigated; if a lane ever starts reading additions, align it in the batch that next
+      touches the carrier.
 
 ## 5. Publication — form decided 2026-09-05: two repos, two release pages, linked not copied
 
