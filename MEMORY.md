@@ -69,16 +69,19 @@ and delivery procedures do not override the current scripts or the next-stage ha
   the dirty set is a path plus a per-file sha256, because "the engine that ran is the committed engine" is
   otherwise an inference from a name list. A non-intended outcome label must also carry `# why this label:`,
   since two logs can share their red text and differ only in cause.
-  **Input records cover only the inputs a log cannot derive** (2026-09-24, and the first version of this
-  rule was wrong): `-DriverCarrier` records the payload the command LINKS, separately from the carriers it
-  may not move. It is deliberately not filled in everywhere - the Fl half's driver carrier is built inside
-  the same case, from the recorded HEAD, by the same baseline command, so its identity is derivable from the
-  log; the consumer half's is a cross-repo moving target (it moved at least once inside one session) and is
-  not. So the first batch's 11 logs (engine `e7f2215`) lack the line while the consumer half's next run
-  carries it, and that is a naming gap, not a data gap, **only where the derivation actually holds** - the
-  eight cases whose artifact is a test assembly, the stub tree or `none` do not get the identity by another
-  name. The purpose of an input record is to save the reader from having to ask the author, not to make the
-  log longer.
+  **Input records cover only the inputs a log cannot derive** (2026-09-24; the first version of this rule was
+  wrong and the second was loose): `-DriverCarrier` records the payload the command LINKS, separately from
+  the carriers it may not move. **"Derivable" means exactly this: re-running the recorded build command at
+  the recorded HEAD reproduces it - which is a BUILD, not a reading.** So the Fl half's driver carrier is
+  derivable (its build is in this repository, at the recorded HEAD) while the consumer half's is not (a
+  cross-repo moving target: it moved at least once inside one session) and must be recorded. The difference
+  between the halves is not whether the data exists but whether the build the derivation needs is in this
+  repository and at the recorded HEAD - and that is precisely why `-DriverCarrier` should exist: it turns
+  "rebuildable" into "recorded". The first batch's 11 logs (engine `e7f2215`) lack the line, and only the
+  three library-source cases (b1/b2/b11) get the number by another name, because there the K3 artifact IS the
+  library Dev DLL and the baseline line already prints it; the other eight - a test assembly, the stub tree,
+  or `none` - do not, so a read-only reviewer cannot obtain their driver identity at all. The purpose of an
+  input record is to save the reader from having to ask the author, not to make the log longer.
   **Two carriers, two names:** `-WatchCarrier` is the frozen root payload; the *driver* carrier is what the
   command links, and the consumer half selects the Dev payload explicitly. The consumer half performs a
   cross-repo write, so it is the consumer owner's step and belongs in the consumer repository long term.
