@@ -19,7 +19,9 @@ $ErrorActionPreference = "Stop"
 #   3   library Release build (TreatWarningsAsErrors)
 #   4   Dev/Release outputs exist in distinct configuration-specific build directories
 #   5   payload is content-free: no Defs, Patches, Languages, Sounds or Textures under 1.6
-#   6   LICENSE present and full MPL-2.0, with no applied incompatibility notice
+#   6   LICENSE present, full MPL-2.0 with no applied incompatibility notice, and byte-identical to
+#       the pinned series licence (SHA-256 literal in scripts/verify-license.ps1 - self-contained on
+#       purpose: no sibling path is read)
 #   7   About.xml identity (packageId, modVersion present and parsable as a Version)
 #   8   runtime-resolvability trap scans: no call site uses a member the reference assembly advertises
 #       but the net472 runtime lacks, and no member the payload or the harness takes from a stub-replaced
@@ -147,29 +149,19 @@ Invoke-Check 'carries no game content (assemblies-only mod)' `
         }
     }
 
-Invoke-Check 'LICENSE present and MPL-2.0' `
-    'manually' `
+Invoke-Check 'LICENSE present, full MPL-2.0, and the pinned series licence' `
+    'pwsh -NoProfile -File scripts/verify-license.ps1' `
     {
-        $licensePath = Join-Path $root 'LICENSE'
-        if (-not (Test-Path -LiteralPath $licensePath -PathType Leaf)) {
-            throw "FerriteLib has no LICENSE file."
-        }
-        $text = Get-Content -LiteralPath $licensePath -Raw
-        if ($text -notmatch 'Mozilla Public License Version 2\.0') { throw 'LICENSE is not the MPL-2.0 text.' }
-        # A truncated paste is the realistic failure: someone copies the header and stops.
-        if ($text -notmatch 'Exhibit B') { throw 'LICENSE is missing Exhibit B; the text is truncated.' }
-        if ($text -notmatch '10\.4\. Distributing Source Code Form') { throw 'LICENSE is missing section 10.4; the text is truncated.' }
-        # Deliberately NOT declared incompatible with secondary licenses: that would bar the assembly
-        # from being combined with GPL-family mods, and nothing here needs it.
+        # The checker is its own script so the mutation proof for this gate ("edit LICENSE and it goes
+        # red") can be run against this gate ALONE; through the whole chain, gates 1-5 would be
+        # candidates for the red. It is read-only, which is why the hint above is a re-run and not a
+        # build: re-running it can never touch the carrier.
         #
-        # Scoped to the header block on purpose. The full MPL text reproduced below always contains
-        # Exhibit B's sample notice, so searching the whole file reports a defect in every correct
-        # copy of the licence - the assertion that failed here, not the file.
-        $separator = $text.IndexOf('-----')
-        $header = if ($separator -gt 0) { $text.Substring(0, $separator) } else { $text }
-        if ($header -match 'Incompatible With Secondary Licenses., as defined') {
-            throw 'The applied notice declares incompatibility with secondary licenses; that was meant to stay allowed.'
-        }
+        # What it asserts, and the boundary it respects: the MPL-2.0 body, the two truncation probes, the
+        # allowed incompatibility notice - and the SHA-256 of the whole series licence pinned as a literal
+        # in that script. The cross-repository half (this file byte-identical to the consumer's copy) is
+        # the consumer's own gate; this repository answers only for its own copy.
+        & pwsh -NoProfile -File (Join-Path $root 'scripts\verify-license.ps1') -ProjectRoot $root
     }
 
 Invoke-Check 'About.xml identity is present and well-formed' `
