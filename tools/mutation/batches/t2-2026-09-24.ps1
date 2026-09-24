@@ -64,7 +64,7 @@ $themeDrawPlanted = "public static class UiThemeDraw`n{`n    // mutation: a real
 $cases = @(
     @{ Name = 't2-b1-covered-recording-removed'; Expect = "the dump carries no line with 'verdict=covered'"; Path = 'Source/FerriteLib.UiKit/Kernel/UiNative.cs'; Old = $coveredRecording; New = '            // mutation: the covered recording is removed.'; Run = 'run-fl-harness-dev.cmd'; Rebuild = 'rebuild-fl-dev.cmd'; Configuration = 'Dev' },
     @{ Name = 't2-b2-covered-yield-removed'; Expect = 'and it records no hit sample in the same pass:'; Path = 'Source/FerriteLib.UiKit/Kernel/UiNative.cs'; Old = $coveredYield; New = $coveredYieldKept; Run = 'run-fl-harness-dev.cmd'; Rebuild = 'rebuild-fl-dev.cmd'; Configuration = 'Dev' },
-    @{ Name = 't2-b3-rect-blind-override'; Outcome = 'instrument-refused-invalid-setting'; Expect = "the dump carries no line with 'verdict=covered'"; Path = 'tools/FerriteLib.UiKit.Tests/KernelDevGeometryTests.cs'; Old = '            UiNative.ButtonOverride = rect => Over(rect, point);'; New = '            UiNative.ButtonOverride = rect => true; // mutation: rect-blind'; Run = 'run-fl-harness-dev.cmd'; Rebuild = 'rebuild-fl-tests-dev.cmd'; Configuration = 'Dev' },
+    @{ Name = 't2-b3-rect-blind-override'; Outcome = 'instrument-refused-invalid-setting'; OutcomeWhy = 'the red text is the same as t2-b1''s, but the cause is the instrument refusing an invalid setting (a rect-blind override closes the popup before the covered element is drawn), not the product defect t2-b1 removes'; Expect = "the dump carries no line with 'verdict=covered'"; Path = 'tools/FerriteLib.UiKit.Tests/KernelDevGeometryTests.cs'; Old = '            UiNative.ButtonOverride = rect => Over(rect, point);'; New = '            UiNative.ButtonOverride = rect => true; // mutation: rect-blind'; Run = 'run-fl-harness-dev.cmd'; Rebuild = 'rebuild-fl-tests-dev.cmd'; Configuration = 'Dev' },
     @{ Name = 't2-b4-uipopup-planted'; Expect = "reaches into the page model via 'UiPopup'"; Path = 'Source/FerriteLib.UiKit/Kernel/UiThemeDraw.cs'; Old = $themeDrawClass; New = $themeDrawPlanted; Run = 'run-fl-harness-release.cmd'; Rebuild = 'rebuild-fl-release.cmd'; Configuration = 'Release' },
     @{ Name = 't2-b5-stub-rename-warm'; Expect = 'a rename leaves both names behind'; Path = 'tools/FerriteLib.UiKit.Tests/Stubs/VerseStub/VerseStub.csproj'; Old = '<OutputPath>..\..\bin\stubs\verse\</OutputPath>'; New = '<OutputPath>..\..\bin\stubs\verse-stub\</OutputPath>'; Run = 'run-fl-harness-release.cmd'; Rebuild = 'rebuild-fl-stubs-release.cmd'; Configuration = 'Release' },
     @{ Name = 't2-b6-stub-rename-both-files'; Expect = 'a rename leaves both names behind'; Path = 'tools/FerriteLib.UiKit.Tests/Stubs/VerseStub/VerseStub.csproj'; Old = '<OutputPath>..\..\bin\stubs\verse\</OutputPath>'; New = '<OutputPath>..\..\bin\stubs\verse-stub\</OutputPath>'; Path2 = 'tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj'; Old2 = '<UiKitRuntimeStub Include="$(MSBuildProjectDirectory)\bin\stubs\verse\Assembly-CSharp.dll" />'; New2 = '<UiKitRuntimeStub Include="$(MSBuildProjectDirectory)\bin\stubs\verse-stub\Assembly-CSharp.dll" />'; Run = 'run-fl-harness-release.cmd'; Rebuild = 'rebuild-fl-stubs-release.cmd'; Configuration = 'Release' },
@@ -76,16 +76,21 @@ $cases = @(
 )
 
 $ran = 0
+$outcomes = @{}
 foreach ($case in $cases) {
     if ($null -ne $Only -and $Only.Count -gt 0 -and $Only -notcontains $case.Name) { continue }
     $ran++
+    $label = if ($case.ContainsKey('Outcome')) { $case.Outcome } else { 'intended-red' }
+    if (-not $outcomes.ContainsKey($label)) { $outcomes[$label] = 0 }
+    $outcomes[$label]++
     $argv = @('-NoProfile', '-File', $engine,
         '-Name', $case.Name, '-ExpectAssertion', $case.Expect, '-Configuration', $case.Configuration,
         '-Path', $case.Path, '-Old', $case.Old, '-New', $case.New,
         '-CommandArgs', (Join-Path $commands $case.Run),
-        '-ProjectRoot', $root)
+        '-ProjectRoot', $root, '-BatchScript', $PSCommandPath)
     if ($ValidateOnly) { $argv += '-ValidateOnly' }
     if ($case.ContainsKey('Outcome')) { $argv += @('-Outcome', $case.Outcome) }
+    if ($case.ContainsKey('OutcomeWhy')) { $argv += @('-OutcomeWhy', $case.OutcomeWhy) }
     if ($case.ContainsKey('Rebuild')) { $argv += @('-RebuildArgs', (Join-Path $commands $case.Rebuild)) }
     if ($case.ContainsKey('Path2')) { $argv += @('-Path2', $case.Path2, '-Old2', $case.Old2, '-New2', $case.New2) }
     Write-Host "[t2-batch] $($case.Name)"
@@ -94,4 +99,7 @@ foreach ($case in $cases) {
 }
 
 if ($ran -eq 0) { throw "no case matched -Only; a filter that selects nothing is not a pass." }
-Write-Host "[t2-batch] $ran case(s) done"
+# The batch level reports the outcome distribution, so a reader does not have to open eleven logs to learn
+# whether every red was the mutation's or one of them was the instrument refusing an invalid setting.
+$summary = ($outcomes.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ', '
+Write-Host "[t2-batch] $ran case(s) done; outcomes: $summary"

@@ -61,7 +61,13 @@ param(
     # and it is checked in the opposite direction: the named assertion must be ABSENT.
     [ValidateSet('intended-red', 'instrument-refused-invalid-setting', 'wrong-reason-red')]
     [string]$Outcome = 'intended-red',
+    # Required whenever -Outcome is not 'intended-red': a red whose cause is not the mutation has to say why,
+    # because two logs whose red text is identical are otherwise told apart only by a label.
+    [string]$OutcomeWhy = '',
     [string]$LogDirectory = 'dist/dev-work',
+    # M11: the log pins the identity of the GENERATOR too, not only of the product. A run whose engine was
+    # dirty is not the same evidence as one whose engine is the committed file, and only the hash shows which.
+    [string]$BatchScript = '',
     [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
     [switch]$ValidateOnly,
     [switch]$SelfTest,
@@ -145,13 +151,17 @@ function Resolve-MutationTarget {
 function Invoke-MutationRun {
     param([string]$Root, [string]$Log, [string]$Name, [string[]]$CommandArgs, [string]$ExpectAssertion,
           [string]$Path, [string]$Old, [string]$New, [string]$Configuration, [string]$Artifact,
-          [string[]]$RebuildArgs, [string]$Path2, [string]$Old2, [string]$New2, [string]$WatchCarrier, [string]$Outcome)
+          [string[]]$RebuildArgs, [string]$Path2, [string]$Old2, [string]$New2, [string]$WatchCarrier, [string]$Outcome,
+          [string]$OutcomeWhy, [string]$BatchScript)
 
     $derived = Get-ArtifactForPath -Relative $Path -Configuration $Configuration
     if ($Artifact -eq 'derive') { $Artifact = $derived }
     if ($Artifact -ne $derived) {
         throw "K3: this mutation changes '$derived', and the run asked for a fingerprint of '$Artifact'." +
               " A fingerprint of an artifact the mutation cannot change is a number with no signal that reads like one; refusing."
+    }
+    if ($Outcome -ne 'intended-red' -and $OutcomeWhy.Length -eq 0) {
+        throw "-OutcomeWhy is required when -Outcome is '$Outcome': a non-intended red must say why it is one."
     }
     if ($Artifact -ne 'none' -and ($null -eq $RebuildArgs -or $RebuildArgs.Count -eq 0)) {
         throw 'M5: a mutation that changes a build output must name -RebuildArgs so the restored source is rebuilt after the restore.'
@@ -177,11 +187,28 @@ function Invoke-MutationRun {
     $lines.Add('# rebuild command: ' + $rebuildLabel)
     $lines.Add('# expected assertion (M2): ' + $ExpectAssertion)
     $lines.Add('# outcome: ' + $Outcome)
+    if ($OutcomeWhy.Length -gt 0) { $lines.Add('# why this label: ' + $OutcomeWhy) }
     $lines.Add('# artifact (K3, derived from the mutated file): ' + $Artifact + ' :: ' + $artifactBefore)
     $lines.Add('# carrier watched by M10: ' + $WatchCarrier)
     $lines.Add('# carrier before: ' + $carrierBefore)
     $lines.Add('# HEAD: ' + (((& git -C $Root rev-parse HEAD 2>$null) -join '').Trim()))
-    $lines.Add('# dirty: ' + ((@(& git -C $Root status --porcelain 2>$null) -join ' ; ')))
+    $lines.Add('# generator: ' + $PSCommandPath + ' sha256=' + (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash)
+    if ($BatchScript.Length -gt 0) {
+        $batchLine = '# batch: ' + $BatchScript
+        if (Test-Path -LiteralPath $BatchScript -PathType Leaf) { $batchLine += ' sha256=' + (Get-FileHash -LiteralPath $BatchScript -Algorithm SHA256).Hash }
+        $lines.Add($batchLine)
+    }
+    $dirtyLines = @()
+    foreach ($statusLine in @(& git -C $Root status --porcelain 2>$null)) {
+        $relative = $statusLine.Substring(3).Trim()
+        $full = Join-Path $Root $relative
+        if (Test-Path -LiteralPath $full -PathType Leaf) {
+            $dirtyLines += ($relative + ' sha256=' + (Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash)
+        } else {
+            $dirtyLines += ($relative + ' (not a file on disk)')
+        }
+    }
+    $lines.Add('# dirty (path + sha256, so "which bytes" is answerable, not only "which names"): ' + (($dirtyLines -join ' ; ')))
     foreach ($mutation in @($first, $second)) {
         if ($null -eq $mutation) { continue }
         $lines.Add('# mutated file: ' + $mutation.Relative + ' sha256 before: ' + (Fingerprint $mutation.Full))
@@ -289,6 +316,7 @@ function Invoke-SelfTest {
         # Each fixture starts from the same artifact bytes: a fixture that leaves the output poisoned would
         # otherwise decide what the NEXT fixture measures (the exact statefulness this battery exists to stop).
         [IO.File]::WriteAllText($script:fixtureArtifact, "library-v1`r`n", [Text.UTF8Encoding]::new($false))
+        Remove-Item -LiteralPath (Join-Path $sandbox 'flip.marker') -Force -ErrorAction SilentlyContinue
         $out = (& pwsh -NoProfile -File $PSCommandPath @Argv -LogDirectory 'dist/dev-work' -ProjectRoot $sandbox 2>&1 | Out-String)
         $ok = $LASTEXITCODE
         $want = if ($ExpectSuccess) { 'success' } else { 'refusal' }
@@ -340,6 +368,17 @@ function Invoke-SelfTest {
         $rebuildOk = New-FixtureCommand 'rebuild-ok.cmd' @('echo library-v1>"dist\build\Dev\FerriteLib.UiKit.dll"', 'exit /b 0')
         $rebuildNoop = New-FixtureCommand 'rebuild-noop.cmd' @('exit /b 0')
         $rebuildFail = New-FixtureCommand 'rebuild-fail.cmd' @('exit /b 3')
+        # Stateful on purpose: the FIRST invocation (the baseline build) produces the right bytes, the second
+        # (after the restore) produces different ones. That is the only way one rebuild command can express
+        # "it came back to the wrong state", which is the leftover-poison shape M5's second clause exists for.
+        $rebuildFlip = New-FixtureCommand 'rebuild-flip.cmd' @(
+            'if exist flip.marker (',
+            '  echo library-v2>"dist\build\Dev\FerriteLib.UiKit.dll"',
+            ') else (',
+            '  echo library-v1>"dist\build\Dev\FerriteLib.UiKit.dll"',
+            '  echo x>flip.marker',
+            ')',
+            'exit /b 0')
         # Each array-valued parameter is passed as ONE array element, because splatting passes an element
         # as one argument; these elements hold exactly one token, so the child binds them intact.
         $base = @('-Name', 'fixture', '-ExpectAssertion', 'the named assertion', '-Configuration', 'Dev')
@@ -356,6 +395,7 @@ function Invoke-SelfTest {
         Test-Fixture 'a red that never names the assertion is refused (M2)' (New-Argv 'Source/FerriteLib.UiKit/Probe.cs' 'anchor-one' 'x' $libraryGreen $rebuildOk '') $false 'M2'
         Test-Fixture 'a failing rebuild command is refused (M5)' (New-Argv 'Source/FerriteLib.UiKit/Probe.cs' 'anchor-one' 'x' $libraryRed $rebuildFail '') $false 'baseline build exited'
         Test-Fixture 'a rebuild that does not consume the restored source is refused (M5)' (New-Argv 'Source/FerriteLib.UiKit/Probe.cs' 'anchor-one' 'x' $libraryRed $rebuildNoop '') $false 'M5'
+        Test-Fixture 'a rebuild that does not return the artifact to the baseline is refused (M5)' (New-Argv 'Source/FerriteLib.UiKit/Probe.cs' 'anchor-one' 'x' $libraryRed $rebuildFlip '') $false 'M5: after the restore and the rebuild'
         Test-Fixture 'an artifact the mutation cannot change is refused (K3)' (New-Argv 'tools/FerriteLib.UiKit.Tests/Lane.cs' 'anchor-two' 'x' $libraryRed $rebuildOk 'dist/build/Dev/FerriteLib.UiKit.dll') $false 'K3'
         Test-Fixture 'a run that changes the carrier is refused (M10)' (New-Argv 'Source/FerriteLib.UiKit/Probe.cs' 'anchor-one' 'x' $carrierTouch $rebuildOk '') $false 'M10'
 
@@ -371,7 +411,7 @@ function Invoke-SelfTest {
     if ($script:fixturesRun -eq 0) { throw "mutation generator self-test: the filter '$FixtureFilter' matched no fixture; a filter that selects nothing is not a pass." }
     if ($script:fixtureFailures -gt 0) { throw "mutation generator self-test: $($script:fixtureFailures) of $($script:fixturesRun) fixture(s) failed." }
     Write-Host ("[mutation] self-test passed: {0} fixture(s) behaved as required - a correct run is accepted, and a missing anchor, an exit-0 non-mutation, a red for another reason, a failing rebuild command, a rebuild that consumes nothing, an artifact the mutation cannot change, a carrier change and an unverifiable restore are each refused." -f $script:fixturesRun)
-    Write-Host '[mutation] coverage boundary, stated rather than implied: M5''s second clause (the rebuilt artifact must equal the baseline) has no fixture red. With one rebuild command the baseline and the rebuild are self-consistent by construction, so a fixture cannot express "it came back to the wrong state". In the battery it is a live assertion that passes because the stub rebuild command removes the leftover folder; a mutation of that command would redden it and has not been run (UNRUN).'
+    Write-Host '[mutation] M5 second clause is covered by a stateful fixture: its rebuild command returns the RIGHT bytes on the baseline build and DIFFERENT ones after the restore, which is the leftover-poison shape the clause exists for.'
 }
 
 if ($SelfTest) { Invoke-SelfTest; exit 0 }
@@ -388,5 +428,6 @@ $log = Join-Path $root (Join-Path $LogDirectory ($Name + '.log'))
 # write nothing anywhere, including in a sibling checkout.
 $report = Invoke-MutationRun -Root $root -Log $log -Name $Name -CommandArgs $CommandArgs -ExpectAssertion $ExpectAssertion `
     -Path $Path -Old $Old -New $New -Configuration $Configuration -Artifact $Artifact -RebuildArgs $RebuildArgs `
-    -Path2 $Path2 -Old2 $Old2 -New2 $New2 -WatchCarrier $WatchCarrier -Outcome $Outcome -ValidateOnly:$ValidateOnly
+    -Path2 $Path2 -Old2 $Old2 -New2 $New2 -WatchCarrier $WatchCarrier -Outcome $Outcome -OutcomeWhy $OutcomeWhy `
+    -BatchScript $BatchScript -ValidateOnly:$ValidateOnly
 Write-Host ($report + '; log=' + $log)
