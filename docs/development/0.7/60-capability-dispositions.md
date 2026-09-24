@@ -4,7 +4,9 @@
 before anything is built. It is a **checklist, not prose**: each row carries its disposition, the source anchors
 that decide it, the consumer citation if one exists, the four promotion gates, and what implementing it would
 touch. Nothing here is implemented, and this round deliberately does not build or touch the carrier (a sibling
-checkout is verifying against it).
+checkout is verifying against it). **Added 2026-09-24:** §C is a later, separate review batch — an audit of two
+`docs/api-tiers.md` *reasons* rather than a capability request — and uses the same disposition vocabulary. It
+changes no tier by itself.
 
 **The four promotion gates** (AGENTS.md, "Ecosystem protocol"), stated once and abbreviated per row: **P**
 provenance cited (a real consumer was forced to hand-roll it — a request is not evidence); **N** neutral (no
@@ -74,3 +76,115 @@ listed here rather than half-landed. FL-17 and FL-18+B6 remain with the maintain
 
 **Then:** task-23 folds every ACCEPT into **one** carrier rebuild and one FREEZE NOTICE. New surface stays inside
 `0.7.x` under the phase ruling — no minor move. Nothing in this file is implemented yet.
+
+## C. Tier-reason review (2026-09-24) — one reason that no longer holds, and one citation that does not
+
+**What this batch is.** Not a capability request but an audit of two **reasons** written into
+`docs/api-tiers.md`'s public-unstable section, each citing a consumer artefact that has since moved. The audit
+started from "the consumer no longer references either name" and **that premise was half wrong**: it is true for
+`LineChartWidget` and false for `UiChartPointChange` (§C.2). The distinction matters, because only one of the two
+entries needs its verdict revisited. It is
+recorded here because the disposition is owed by the session/maintainer exactly as §A's are, and because the
+guard that owns that file cannot see this class of drift. Nothing here is implemented, no tier is changed by
+this section, and the reviewer ran **no build** — the review is documentation-only.
+
+### C.0 What the tier guard does and does not check (why a human has to look)
+
+`tools/FerriteLib.UiKit.Tests/FerriteLibApiTierTests.cs` enforces four things, and only these four:
+
+| Assertion (lane name) | What it reads |
+|---|---|
+| `Every public payload type is classified in exactly one tier` (:77-87) | the set of exported type **names** against the entries parsed from the three headings |
+| `No tier entry names a type that no longer exists` (:89-100) | an entry whose type has gone |
+| `The stable tier matches the pinned promise` (:102-120) | the **stable** section only, against `PinnedStableTier` (:36-50) |
+| `Tier comparison fires on a planted unclassified type` (:122-152) | a positive control that the reader is not vacuous |
+
+**No assertion reads an entry's reason text.** A reason that has stopped being true therefore cannot redden
+anything: "the entry exists" is the whole membership test. That is the general shape to remember — *a
+hand-kept document with a membership guard has no guard on its prose* — and the two entries below are what that
+costs when a consumer retires a composition. The lane's own summary says the same thing in its own words
+(`:10-21`, quoting the `UiWidgetRegistry.Clear` precedent).
+
+### C.1 `LineChartWidget` — the stated reason is false at the consumer's current tip
+
+**The reason as written** (`docs/api-tiers.md:180-181`): "named by the consumer's own composition, so it cannot
+go internal yet; that use is also the specimen behind the tree-membership metric, and the debt list would rather
+it be a kind string."
+
+**What the trees say now** (read-only; revisions pinned so the reading can be re-run):
+
+- **The composition is gone.** `coahuilite/UniversalSqueaker@f378715` deletes
+  `Source/UniversalSqueaker/UI/Kernel/UsAttenuationEditorWidget.cs` (S4-3b, 2026-09-22); a deletion-filtered
+  log over that path names `f378715` and nothing later.
+- **The consumer no longer names the type anywhere.** A type-name search over that repo's `Source/` and
+  `tools/` at `coahuilite/UniversalSqueaker@a13f8af` returns **zero** hits; the name survives only in that
+  repo's own `docs/` and `OBLIVIONIS.md` prose, which is not a compile-time reference.
+- **It is reached by kind string instead:**
+  `coahuilite/UniversalSqueaker@a13f8af:Source/UniversalSqueaker/UI/Layout.Schema2.xml:236` declares
+  `<Widget Id="attenuation-chart" Kind="chart/line" Bind="attenuation-points" ActionBind="attenuation-point"
+  Editable="true" EditablePoints="1,2" Height="64" …/>`, and the consumer's own lane pins that declaration
+  (`…@a13f8af:tools/UniversalSqueakerKernelHostTests/DeclarativeAttenuationLaneTests.cs:94-135`).
+- **The demo names only the string as well:**
+  `ferritelib_uikit_demo@29b4f61:Source/FerriteLibUiKitDemo/Xml/Settings.xml:123` and
+  `…@29b4f61:Source/FerriteLibUiKitDemo/DemoCatalog.cs:173`; a type-name search there is **zero**.
+- **The type's own shape is already the kind-string shape:**
+  `Source/FerriteLib.UiKit/Kernel/Widgets/LineChartWidget.cs:20` (`public sealed class LineChartWidget :
+  IUiWidget`), `:22` (`public const string Kind = "chart/line"`) and `:35-42` (its `Register()`), called
+  from **inside** the assembly at `Source/FerriteLib.UiKit/Kernel/KernelCoreWidgetRegistrar.cs:13`.
+
+⇒ The entry's own wish — "the debt list would rather it be a kind string" — is satisfied by both consumers
+today, and that is exactly the shape of every entry already in the internalize-candidate section
+(`WrappedTextWidget`, `ButtonWidget`, `SliderWidget`, `NumberFieldWidget`, …).
+
+**The three options, with what each needs.**
+
+| Option | What it needs | Assessment |
+|---|---|---|
+| Re-argue (keep public-unstable, find a new justification) | a consumer that names the type in code, or a general reason independent of consumers | **no such consumer exists at either pinned tip**; a request is not evidence (`AGENTS.md`, "Ecosystem protocol") |
+| **Move to internalize-candidate** | one edit in `docs/api-tiers.md` | **recommended.** Only the *stable* list is pinned in the lane (:102-120), so a move between the two non-stable tiers is one deliberate edit, not two. Actual **removal** still waits on the kind-name container that section already names (`docs/api-tiers.md:427-429`) |
+| Keep public-unstable, rewrite the reason | a sentence true at the current tips | acceptable fallback; it leaves a public type no consumer names, which is the debt class `TODO.md` calls "an unconsumed kind" |
+
+**Not measured (UNRUN).** Whether an `internal LineChartWidget` compiles and leaves the harness and the ten
+gates green. That question belongs to the batch that would make the change.
+
+### C.2 `UiChartPointChange` — the verdict holds, the citation does not, and the name is NOT unreferenced
+
+**The reason as written** (`docs/api-tiers.md:182-183`): "the typed drag result of `chart/line`, consumed by
+the attenuation editor today; it travels with that widget's shape, which the metric wants expressed as a kind
+plus bindings instead."
+
+**Correction to this review's own opening claim, found by checking the instrument's input.** The audit started
+from "the consumer has zero references to both names". That is true for `LineChartWidget` and **false** for
+`UiChartPointChange`: what `f378715` deleted was the *editor widget*, not the *consumption*. At
+`coahuilite/UniversalSqueaker@a13f8af` the type is named in shipped source and in the consumer's harness:
+
+- `Source/UniversalSqueaker/UI/UsKernelSettingsHost.cs:335` —
+  `bindings.BindAction<UiChartPointChange>("attenuation-point", change => { ApplyAttenuationPoint(…); bump(); });`
+- `…:944` — `private static void ApplyAttenuationPoint(…, UiChartPointChange change)`
+- `tools/UniversalSqueakerKernelHostTests/Program.cs:938` (`Invoke`), `:1351`
+  (`ValidateAction<UiChartPointChange>`), `:1715` (`Invoke`).
+
+The manifest routes to that binding: `…@a13f8af:Source/UniversalSqueaker/UI/Layout.Schema2.xml:236`
+(`Kind="chart/line" ActionBind="attenuation-point"`).
+
+⇒ A **generic type argument in a consumer's own source is a compile-time dependency on the type.** The tier
+stays public; what is wrong is the sentence's *location* ("the attenuation editor"), not its verdict.
+
+| Option | Assessment |
+|---|---|
+| **Keep public-unstable, rewrite the reason** | **recommended** — the citation becomes the host's typed action binding above, and the "kind plus bindings" sentence stays true |
+| Internalize | refuted by the citations above while the consumer binds the action by type; it would break that tree's build at compile time |
+| Re-argue | unnecessary; the verdict was never wrong |
+
+### C.3 What a ruling would touch, and one process note
+
+**Touched by any of these decisions:** `docs/api-tiers.md` only. No source, no lane, no manifest vocabulary,
+no carrier, no version axis — the classification lane is satisfied by an entry's presence and by the stable pin,
+so nothing here re-cuts a gate.
+
+**Process note (a suggestion, not a decision).** A tier reason that cites a consumer tree carries no
+re-derivation, so it rots silently. This repository's own rule for that class is already written down — prefer a
+re-derivable **predicate** over a commit anchor (`MEMORY.md`, "Documentation describes a moment, not a state").
+Applied here: a reason of this class should state what would have to be true ("no consumer names this type in
+code; both reach it by kind string") so the next reader can re-check it with one search, rather than naming a
+file that may since have been deleted.

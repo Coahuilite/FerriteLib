@@ -21,6 +21,11 @@ The second command builds Dev and stages `dist/dev/FerriteLib`. Its installable 
 Staging records `payload-sha256` in `version.txt` and verifies the copied DLL before replacing the previous package.
 Do not build and pack the same configuration concurrently.
 
+**This phase runs the dev channel only (maintainer ruling 2026-09-24).** `pack-release` and `pack-steam` are not
+run, no tag and no release are created, and the remote is an **off-site backup**. Local testing uses the Dev
+package. The release/steam packers and their stricter checks stay in the tree for the published line they belong
+to; they are not an action of this phase.
+
 The repository-root `1.6/Assemblies/FerriteLib.UiKit.dll` is a compatibility delivery, independent of build
 outputs. Existing consumers can continue reading it. Updating it is deliberate:
 

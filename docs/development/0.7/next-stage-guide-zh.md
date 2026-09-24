@@ -11,6 +11,11 @@ ModSettings 的既有 UI 重构计划作为实际推进面。沿用 retained pag
 US 的计划负责定义真实页面需求，FL 负责判断其中哪些属于通用库职责。FL 自身构建、测试和打包仍须独立，
 不能要求所有库开发者拥有 US 仓库。现行 API 分层、迁移规则和 0.7.x 临时版本豁免继续遵循 `AGENTS.md`。
 
+**本阶段的边界（2026-09-24 口径；完整裁定、日期与到期条件见团队台账与各仓 `MEMORY.md`，本手册不复制裁定清单）：**
+FL 停在 `0.7.x` 开发状态——不抬 minor、不进入下一条线，临时豁免继续有效，到期 = 首发/tag 或锁步结束；
+远端只作异地备份，不打 tag、不做 release；本地测试只用 Dev 包（`pack-release` / `pack-steam` 本阶段不跑）；
+金色身份采用系列金 `UiTheme.DarkGold` / `AccentGold`，外部外观基准的 `#EBAD4D` 不采用。
+
 | 归属 | 内容 |
 | --- | --- |
 | FL | 元素身份、测量与布局规则、坐标转换、输入与弹窗仲裁、状态和订阅生命周期、恢复、诊断事实 |
@@ -67,6 +72,11 @@ FL 的开发诊断已记录布局数值、坐标空间、事件进入 Host 时�
 
 为准备稳定的能力写清楚合法输入、状态所有权、布局与输入行为、错误和回退方式、兼容承诺，以及消费者示例。
 按 `docs/api-tiers.md` 逐项决定层级，保留迁移路径。单个页面通过不能自动把所有公开成员提升为 stable。
+
+这批条目的书写模板（八栏，含「证据与缺口」）与首批三个试写样例（裸命中带 `Chrome="none"`+`Height="MatchContent"`、
+`PayloadKey`、`SelectedKey`，各带消费者引证与 UNRUN 标注）在 [0.7 契约文件](05-api-contract.md) 的
+"Dependable-surface entries (stage 3)" 一节。**模板只是书写形式，不代替逐项分层决定**；`docs/api-tiers.md`
+里两条理由的复核见 [60-capability-dispositions.md](60-capability-dispositions.md) §C——**一条理由已失效（`LineChartWidget`）、一条引证过时但结论仍成立（`UiChartPointChange` 仍被消费者源码按类型命名）**。
 
 对多宿主共用有直接影响的共享状态应单独审查，例如 `UiFitAudit.Enabled` 的全局开关；目前它是已知风险，
 不能写成已经复现的跨模组故障。新增通用控件和大型可视化检查器仍需具体用途支撑。

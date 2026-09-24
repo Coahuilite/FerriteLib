@@ -16,7 +16,10 @@ to read and what to take.
 Permanent consumer-facing facts (kept current here so a later session or a consumer session does not have to
 re-derive them):
 
-- **The authoritative payload is the GitHub Release asset** published from `coahuilite.ferritelib` (its body
+- **In this phase there is no Release asset and none is created** (maintainer ruling 2026-09-24): the remote is an
+  off-site backup only — no tag, no release — local testing uses the **Dev** package, and `pack-release` /
+  `pack-steam` are not run. **When a line is published**, the authoritative payload is the GitHub Release asset
+  published from `coahuilite.ferritelib` (its body
   names the commit and the asset's SHA-256). A repo dev folder, a sibling checkout's copy and anything left in
   `1.6/Assemblies/` after a build are **rehearsals** — a Dev channel builds different bytes than a Release one,
   so two hashes for one Api are two builds, not two identities for one artifact. Verify what you actually bound

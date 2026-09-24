@@ -15,7 +15,13 @@ consumer is mid-development: additions land inside the line, each one still owin
 here before the code), its failure-sensitive lane, its `docs/api-tiers.md` classification in the same commit,
 and its consumer-guide line. This supersedes the "no new public types, widget kinds or XML vocabulary"
 sentence above **for the duration of that phase only**; it declares no surface stable, waives no gate, and the
-normal pre-1.0 rule (an addition moves the minor) returns when the phase ends. The API-tier *type* list is no
+normal pre-1.0 rule (an addition moves the minor) returns when the phase ends.
+
+**The phase's end is defined rather than open-ended, and the line stays `0.7.x` (maintainer ruling 2026-09-24).**
+The exemption lapses at the **first** of: the `0.7.x` line's first release/tag, or the end of the cross-repository
+lockstep development. Until then the line is in **development**: no minor is raised and no next line is opened.
+The exemption is **temporary and not inheritable** — it belongs to this line and this stage only, and it must not
+be carried into a later line or into any published state by analogy. The API-tier *type* list is no
 longer the 0.6 pin: it gains one internalize-candidate entry (`TextFieldWidget`) and one member on the
 public-unstable `UiNative`.
 
@@ -98,6 +104,13 @@ unspecified tokens.
 
 Migration: pick a named factory at the existing required theme parameter. There is no constructor
 default to keep, and no ranking between the two palettes.
+
+**Accent identity — decided, and no longer an open item (maintainer ruling 2026-09-24).** The library's accent
+identity is the **series gold already carried by `UiTheme.DarkGold` / `AccentGold`**, and it is unchanged: no token
+moves and neither factory is re-tinted. An alternative accent hex (`#EBAD4D`) came up during the appearance work
+as part of an **external product's** look; that product is an appearance reference, not a consumer of this library,
+and its palette is **not** adopted here — a product's colours are not a library default (`AGENTS.md`,
+"Neutrality"). Nothing in this line's palettes is pending a decision after this note.
 
 ### Batch 1 (2026-09-18) — placement vocabulary, density reach, tone/accent tightening
 
@@ -706,3 +719,156 @@ owned mutation path on an authoritative plain C# model, and `UiWindowHost`/`UiPa
 `UiNotifyAdapter` + `INotifyPropertyChanged` stays optional. No VM base class, no builder DSL, no second
 state store becomes part of the contract. The runnable reference lives in the harness fixture area and the
 prose guide in `docs/consumers/ordinary-settings.md`.
+
+## Dependable-surface entries (stage 3) — the template, and three worked examples
+
+`TODO.md` §"Stabilize the demonstrated contract surface" and `next-stage-guide-zh.md` §3 ask for the same
+thing: before a demonstrated capability is depended on, write down its legal inputs, ownership, layout and input
+behavior, errors and fallback, compatibility promise, and a consumer example. This section is the **form** for
+those entries plus the first three worked examples, so the next session does not invent a fourth shape. It is
+deliberately a section of an existing file rather than a new document.
+
+**Writing an entry is not a promotion.** An entry records what is already true and cites the evidence for it;
+the tier decision stays per item and belongs to the session/maintainer (`next-stage-guide-zh.md` §3: a single
+page passing does not promote every public member to stable). A filled entry with an empty evidence field is not
+an entry — write **UNRUN**.
+
+### The template
+
+| Field | What it must contain | Failure mode it prevents |
+|---|---|---|
+| **1. Status and ask** | the tier the capability has today, what is being asked (stabilize / keep unstable / internalize), and who rules | a stabilization that happens by accident because nobody wrote the ask |
+| **2. Legal inputs** | the exact vocabulary a consumer may write, and every refusal — each one named, located and at creation time | an author discovering the boundary by compiling |
+| **3. Ownership** | who owns the state, its lifetime, who disposes it, and that no process-wide mutable static is introduced | two hosts sharing state through a static |
+| **4. Layout and input behavior** | the **measured** numbers and the rule that produces them, with stub-harness facts separated from in-game facts | an adjective ("flexible") standing in for a measurement |
+| **5. Errors and fallback** | fail-soft vs fail-closed per input class, and the channel a fallback is reported on | "fail-soft must not mean silent" |
+| **6. Compatibility promise** | the tier clause verbatim, what would count as breaking, and the migration for a page that compiled before | a break discovered by a stranger |
+| **7. Consumer example** | `owner/repo@sha:path:line` (or `repo@sha:path:line` for the remote-less demo) plus what it proved | a capability nobody uses being called "proven" |
+| **8. Evidence and gaps** | which half is mutation-proven and under which assertion name, which is only a future-regression guard, and what is **UNRUN** | red and green both being trusted, and a guard read as proof |
+
+### E1 — a bare hit band: `Chrome="none"` plus a content-relative height
+
+**1. Status and ask.** Manifest vocabulary on `input/button` (G3) and on the engine-wide `Height` axis
+(`MatchContent`); no exported type is involved. Ask: keep as vocabulary and treat as dependable. The type tiers
+are untouched because no type is involved.
+
+**2. Legal inputs.** `Chrome="none"` paints no surface while the hit test still fires; **any other `Chrome`
+value is refused at creation** (the A2/A3 shape — refused, not ignored). `Height` accepts a number or `Auto`,
+and since 2026-09-22 also `MatchContent`, which resolves to the height the parent's content resolved to, with the
+declaring element contributing **nothing** to that computation. Accepted only where the parent's content height is
+a **maximum** over its children and at least one sibling does not declare the mode (a child of `Row` or
+`Overlay`). **Refused at creation, each naming its reason**: a vertical container
+(`Column`/`Stack`/`Section`/`Surface`/`Scroll`/`Clip`), a `Wrap`, a root, and a parent whose every
+child declares the mode.
+
+**3. Ownership.** No state of its own: the press goes through the funnel's `Button(rect, ctx)` on the element
+the engine published, and the drag/hot-control state belongs to the session. `Chrome="none"` means the element
+contributes no surface. No process-wide mutable static is added.
+
+**4. Layout and input behavior (measured).** `KernelContentHeightTests`: the hit column equals the text column
+at **104 vs 104**, while the same page *without* the declaration is **50 against 104** (the positive control that
+the equality measures the mode and not the fixture), and at a `Narrow="Column"` breakpoint the mode degrades to
+the element's own measured content — **28 against 76** — rather than throwing or collapsing. The disabled refusal
+and the popup-layer arbitration are `UiNative.Button(rect, ctx)`'s documented funnel rules and are **inherited,
+not re-measured for this attribute**; what the G3 lane pins for `Chrome="none"` is exactly
+no-surface-painted / hit-test-intact / height-from-content.
+
+**5. Errors and fallback.** Fail-closed for the vocabulary: an illegal `Chrome` value or an unanswerable
+`MatchContent` parent is a creation-time `UiContractException` naming the reason. The one degradation is the
+narrow-direction swap, which falls back to `Auto` by design and is pinned by the lane; the same degradation
+covers a programmatically built spec and a template subtree, which the Host's creation-time walk does not cover
+(the known 0.5 gap) — relevant because the consumer example below *is* inside a template.
+
+**6. Compatibility promise.** No type moves, so `docs/api-tiers.md` is unchanged (checked, not assumed). The
+promise is the manifest rule: `Chrome` accepts the default or `none`, and a third value is refused. Migration:
+none — a page that compiled before declares neither name.
+
+**7. Consumer example.**
+`coahuilite/UniversalSqueaker@a13f8af:Source/UniversalSqueaker/UI/Layout.Schema2.xml:381-387` — a `Repeat`
+template whose row is an `Overlay` holding one `input/button Chrome="none" Height="MatchContent"` declared
+**first** (it paints nothing, so the text column draws over it) and a text `Column` beside it. The consumer's own
+lane, `…@a13f8af:tools/UniversalSqueakerKernelHostTests/DeclarativePacksLaneTests.cs:441-477`, asserts coverage
+`>= 99.5%` of the row and prints the retired two-band workaround as its control (69.9% flat / 53.3% wrapped /
+42px dead). **What it proved:** the page model could not express "my hit area equals the sibling's
+content-measured height", and the cheap workaround (`Height="Auto"` on a band) was refuted by measurement — it
+measures the wrapped band while the caption draws single-line.
+
+**8. Evidence and gaps.** Mutation-proven in this file's own entries: the `MatchContent` engine half under the
+faithful revert — `the hit column takes the text column's measured height (50 vs 104)`, exit 1 — and, for the G3
+half, `Chrome none still painted five surface(s)`. **UNRUN here:** no in-game run. Every number above is
+stub-harness evidence; the real-font behavior of the same declarations is a game-acceptance item, not a claim of
+this entry.
+
+### E2 — `PayloadKey` on `input/button`: a repeated row names itself
+
+**1. Status and ask.** Manifest vocabulary (G2); no exported type. Ask: keep dependable. `input/button` stays
+internalize-candidate *as a type*, which is precisely what "kind string only" means.
+
+**2. Legal inputs.** `PayloadKey` on `input/button`, naming a value binding. **With a payload the consumer
+binds `BindAction<string>`; without one, `BindCommand` as before.** Inside a `Repeat`/template it is
+qualified per item (`<Items>.<itemKey>.<declaredKey>`) like `Bind`, `ActionBind`, `OptionsBind`,
+`VisibleKey` and `SelectedKey`.
+
+**3. Ownership.** The payload is the consumer's value: the atom reads it from the binding and hands it to
+`Invoke`; nothing is stored on the element, and no static is added.
+
+**4. Layout and input behavior.** The declaration changes no geometry. The press path is the funnel's button —
+disabled refusal and popup arbitration included — and the payload is read in the same frame the command runs.
+
+**5. Errors and fallback.** A key bound to something other than a string is **fail-soft, loud, and fires the
+payload-free command**: the page keeps working and the mismatch is reported rather than swallowed.
+
+**6. Compatibility promise.** No type moves. Migration: none — the attribute is optional, and a button that
+declares no `PayloadKey` keeps `BindCommand`.
+
+**7. Consumer example.** Two shapes on one real page at `coahuilite/UniversalSqueaker@a13f8af`:
+`…:Source/UniversalSqueaker/UI/Layout.Schema2.xml:382` (item-scoped — `ActionBind="select-domain"
+PayloadKey="payload"` inside a template row, registered per item at
+`…:Source/UniversalSqueaker/UI/UsKernelSettingsHost.cs:695` as
+`BindAction<string>(prefix + "select-domain", …)`) and `…:Layout.Schema2.xml:245-247` (page-level — three
+static preset buttons, each with its own read-only string binding, registered at `…:UsKernelSettingsHost.cs:315`).
+**What it proved:** a repeated row could not report its own item key before this landed, so the consumer toggled
+its hierarchy rows by hand.
+
+**8. Evidence and gaps.** Mutation-proven by assertion name in the batch that landed it: *the command received an
+empty payload* (`60-capability-dispositions.md`, "Batch 2 outcome"). **UNRUN here:** no in-game run; the
+in-game press path is the open Packs row-click defect's subject, not this entry's evidence.
+
+### E3 — `SelectedKey`: the model says "this one is on me"
+
+**1. Status and ask.** A bool binding the engine resolves (B1); no exported type. Ask: keep dependable.
+
+**2. Legal inputs.** `SelectedKey` names a bool value binding. It is **item-scoped** like the other binding
+roles — that was the B1 consistency fix and it is the shape a `Repeat` row needs. Declaring it on a container
+carries the declaration into its whole subtree.
+
+**3. Ownership.** The binding is the consumer's; the engine only resolves the element's role from it and stores
+nothing new. No static.
+
+**4. Layout and input behavior (measured).** A `SelectedKey` answering true resolves the element to
+`UiStatusTone.Active`, and that cell hands text `TextOnGold` **under either emphasis** (`Active/Normal` and
+`Active/Muted` resolve to one value, pinned by `KernelResolvedStyleTests`). So on a two-line row the declaration
+belongs on the **title**; a detail line that must stay secondary keeps `Emphasis="Muted"` and must **not** carry
+it. The binding moves paint, not geometry.
+
+**5. Errors and fallback.** The disposition's ACCEPT clause states that an unresolvable key is fail-soft and
+recorded once (the `VisibleKey` shape); the landed entry does not restate that half, so treat it as **stated
+there, not re-measured here**. One assertion in the landed lane is explicitly labelled a future-regression guard
+rather than the mutation-proving half (`StyleFallbackCount == 0`), because the decoy key is bound and so it holds
+in both states.
+
+**6. Compatibility promise.** No type moves. Migration: none for a page that compiled before. The one shape whose
+meaning changes is a template that declared `SelectedKey` and expected a page-level binding of the same name — it
+now resolves in the item's scope, which is the only shape that can answer "which row".
+
+**7. Consumer example.** `coahuilite/UniversalSqueaker@a13f8af:Source/UniversalSqueaker/UI/Layout.Schema2.xml:384`
+and `:391` (item-scoped, on each row's title) and `:245-247` (page-level, one bool per preset button), with the
+consumer's own reasoning for keeping it off the detail line at `…:Layout.Schema2.xml:266-271`. **What it proved:**
+the S4-2 row set could not show which row was selected — every row answered together because the page-level key
+was read.
+
+**8. Evidence and gaps.** Lane `KernelRepeatTests`, "SelectedKey answers per row, not for the page the row set
+sits on": three rows whose template declares `SelectedKey="selected"`, against a page-level decoy answering true;
+written and observed **RED first** (3 active rows of 3 — the consumer's defect exactly), green after, and red
+again under the faithful revert of the table entry (exit 1, the three assertions named). **UNRUN here:** no
+in-game run; the `TextOnGold` consequence is pinned by a lane, not observed in a game.

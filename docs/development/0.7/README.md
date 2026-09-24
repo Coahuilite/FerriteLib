@@ -88,5 +88,9 @@ Each item below needs a real game or a real consumer compile; none is claimed he
    window/scale/language across normal/hover/pressed/focus/disabled — maintainer visual acceptance.
 
 Supported-0.7-contract status: **established** (contract recorded, implementation automated-verified).
-Consumer-verified / game-verified: **not claimed**. Release acceptance and any push: maintainer decision,
-separate authorization.
+Consumer-verified / game-verified: **not claimed**.
+
+**Publication is not an action of this phase (maintainer ruling 2026-09-24).** The remote is an **off-site
+backup** only: no tag and no release are created, and `pack-release` / `pack-steam` are **not run**. Local testing
+uses the **Dev** package. The release channel stays in the tree as the channel a *published* line uses; nothing
+here is a pending release action.

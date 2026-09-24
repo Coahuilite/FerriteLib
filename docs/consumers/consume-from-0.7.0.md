@@ -18,6 +18,11 @@
 | version.txt | `FerriteLib 0.7.0-dev / build=dev / commit=88095fb3cbed` — **a rehearsal identity of one working tree, not a target** |
 | DLL | `1.6/Assemblies/FerriteLib.UiKit.dll`, SHA-256 `271128299A9CFF…FC8F82F` — **the same rehearsal, quoted as history** |
 
+**This line has no Release asset, and none is created while it is in development (maintainer ruling 2026-09-24).**
+The 0.7 line is local development: the remote is an **off-site backup** only — no tag, no release — and local
+testing uses the **Dev** package above (`pack-release` / `pack-steam` are not run in this phase). So *in this phase*
+the Dev folder is what you take; the rule below is the one that applies the moment a line is published.
+
 **Which payload is authoritative, because more than one exists (FL-11).** The **GitHub Release asset** published
 from `coahuilite.ferritelib` is the only payload identity a consumer can verify: each release body names the
 commit it was built from and the asset's SHA-256. The dev folder above, a **sibling checkout's copy**, and
@@ -25,8 +30,9 @@ whatever happens to sit in `1.6/Assemblies/` after a build are all rehearsals: t
 one machine's tree at one moment, and two of them are *not* two identities for one artifact. Concretely, the 0.6
 docs recorded a **Dev-channel** rehearsal (`build=dev`, one commit) while a consumer's `<HintPath>` bound a
 **Release** build of a different commit — the byte difference is the configuration and the commit, not a
-different artifact. So: take the artifact from the Release page, and **verify what you actually bound at
-runtime** — the assembly's `AssemblyConfiguration`, its embedded commit, and the `Require` verdict — rather
+different artifact. So: **once a line is published**, take the artifact from its Release page — and in every
+phase, **verify what you actually bound at runtime** — the assembly's `AssemblyConfiguration`, its embedded
+commit, and the `Require` verdict — rather
 than matching a hash written in a document. **Do not copy the DLL into your package** — `<HintPath>` +
 `<Private>false</Private>`; only `coahuilite.ferritelib` ships it. Registry-scope, stale-build and
 machine-path traps are unchanged from 0.6 (§3–4 of `consume-from-0.6.0.md` still apply verbatim).
