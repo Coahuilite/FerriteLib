@@ -41,6 +41,31 @@ the same: it relies on the harness's `ProjectReference`, which puts the library 
 Dev run. Adding a carrier path there points at the repository-root Release carrier instead, the Dev half of
 the instrument does not exist, and the lane reddens for a reason that has nothing to do with the mutation.
 
+## Two carriers, two names (and why the consumer half is cross-repo)
+
+The engine distinguishes two files that used to be one name:
+
+- the **driver carrier** is what the command LINKS. The consumer half's command selects it explicitly
+  (`-p:FerriteLibArtifactPath=..\ferritelib\dist\build\Dev\FerriteLib.UiKit.dll`), because a Dev run is
+  where the development instrument exists. The Fl half must NOT pass that flag: its harness reaches the
+  library through `ProjectReference`, which puts the Dev build in `dist/build/Dev`. Pointing it at the root
+  payload would hand it a Release carrier, the Dev half of the instrument would not exist, and the lane
+  would redden for a reason unrelated to the mutation;
+- the **watched carrier** (`-WatchCarrier`, M10) is what must come out untouched: this repository's frozen
+  root payload `1.6/Assemblies/FerriteLib.UiKit.dll`, compared by hash AND mtime.
+
+They are different files on purpose, which is why they have different names - an earlier version called the
+watched one `Carrier` while the command linked something else, and that reads as if they were the same file.
+
+**Structural risk.** The consumer half WRITES a source file in another repository (it mutates one file and
+restores it byte-for-byte) and then builds that repository. A script in this repository performing a
+cross-repo write is exactly the shape that caused an earlier incident, so:
+
+- run `-Half Us` only with the consumer owner's authorization, and never in the same window as a consumer
+  build;
+- the long-term home for the consumer half is the consumer repository, with this file keeping only the
+  shared engine and the Fl half. That is a recommendation, not a plan for this round.
+
 ## What the battery guarantees (M1-M10, as implemented here)
 
 | # | Guarantee | Where |
@@ -56,6 +81,8 @@ the instrument does not exist, and the lane reddens for a reason that has nothin
 | M9 | migration scripts go two-phase through `Invoke-AnchoredEdits.ps1` | that script + `-SelfTest` |
 | M10 | the run may not touch the repository-root carrier: hash+mtime identical before and after | `-Carrier` |
 | K3 | the artifact fingerprint is **derived** from the mutated file; a caller naming an unrelated artifact is refused instead of obeyed | `Get-ArtifactForPath` |
+| - | the reference the artifact must return to is established by a **baseline build** with the same rebuild command, from the clean source, immediately before the mutation | `Invoke-Mutation.ps1` baseline step |
+| - | every log carries an **outcome label**: `intended-red`, `instrument-refused-invalid-setting`, or `wrong-reason-red` (the last one is checked in the opposite direction: the named assertion must be ABSENT) | `-Outcome` |
 
 ## The generator's own three acceptance checks
 

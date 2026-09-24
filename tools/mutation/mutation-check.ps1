@@ -18,6 +18,14 @@
     The commands are one-token .cmd files under commands/ because a [string[]] cannot cross a `pwsh -File`
     boundary as an array; the engine is handed an executable rather than a token list.
 
+    STRUCTURAL RISK, stated so it is not discovered later: the consumer half WRITES a source file in another
+    repository (it mutates one file and restores it byte-for-byte). That is a cross-repo write performed by a
+    script that lives in this repository, and it is exactly the shape that caused a previous incident. It is
+    kept here for now because the engine, the criteria and the evidence belong together - but the long-term
+    home for the consumer half is the consumer repository, with this file keeping only the shared engine.
+    Until then: run -Half Us only with the consumer owner's authorization, and never in the same window as a
+    consumer build.
+
     Logs: dist/dev-work/ in each repository.
 #>
 param(
@@ -70,7 +78,10 @@ if ($Half -eq 'Us' -or $Half -eq 'Both') {
         '-New', 'string header = presses;',
         '-CommandArgs', (Join-Path $PSScriptRoot 'commands/run-us-harness-dev.cmd'),
         '-RebuildArgs', (Join-Path $PSScriptRoot 'commands/rebuild-us-dev.cmd'),
-        '-Carrier', '..\ferritelib\1.6\Assemblies\FerriteLib.UiKit.dll',
+        # What the consumer half must leave untouched: this repository's frozen ROOT payload. The payload it
+        # LINKS is a different file - run-us-harness-dev.cmd selects dist/build/Dev, where a Dev run puts the
+        # instrument - and that is the whole point of the distinction.
+        '-WatchCarrier', '..\ferritelib\1.6\Assemblies\FerriteLib.UiKit.dll',
         '-ProjectRoot', $consumer)
 }
 
