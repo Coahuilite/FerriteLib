@@ -57,6 +57,15 @@ The engine distinguishes two files that used to be one name:
 They are different files on purpose, which is why they have different names - an earlier version called the
 watched one `Carrier` while the command linked something else, and that reads as if they were the same file.
 
+A third field, `-DriverCarrier`, records the linked payload as an **input** (path + sha256 + mtime): "this is
+what I consumed" is a different claim from "this must not move", and a log that merges them answers neither.
+
+**Watch scope is per half, and the Fl half's single watch is deliberate, not a narrowing.** The Fl half
+watches the frozen root carrier alone, because the Dev payload is the artifact it REBUILDS - watching that
+would redden every case by design. The consumer half watches three: the frozen root carrier, the Dev payload
+it links, and the paired dev package a tester installs, since those are the three files that run is in a
+position to damage.
+
 **Structural risk.** The consumer half WRITES a source file in another repository (it mutates one file and
 restores it byte-for-byte) and then builds that repository. A script in this repository performing a
 cross-repo write is exactly the shape that caused an earlier incident, so:

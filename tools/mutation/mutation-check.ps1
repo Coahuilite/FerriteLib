@@ -84,6 +84,8 @@ if ($Half -eq 'Us' -or $Half -eq 'Both') {
         # Three payloads, because this half can damage all three: the frozen root carrier, the Dev build it
         # LINKS (reading does not move a hash), and the paired dev package a tester installs.
         '-WatchCarrier', '..\ferritelib\1.6\Assemblies\FerriteLib.UiKit.dll', '..\ferritelib\dist\build\Dev\FerriteLib.UiKit.dll', '..\ferritelib\dist\dev\FerriteLib\1.6\Assemblies\FerriteLib.UiKit.dll',
+        # ... and the same Dev payload is recorded as the INPUT this half consumed, which is a different claim.
+        '-DriverCarrier', '..\ferritelib\dist\build\Dev\FerriteLib.UiKit.dll',
         '-ProjectRoot', $consumer)
 }
 

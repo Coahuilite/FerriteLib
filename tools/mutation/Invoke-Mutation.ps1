@@ -70,6 +70,10 @@ param(
     # because two logs whose red text is identical are otherwise told apart only by a label.
     [string]$OutcomeWhy = '',
     [string]$LogDirectory = 'dist/dev-work',
+    # N-1: the payload the command LINKS is an INPUT, and an input is recorded (path + hash + mtime) rather
+    # than only asserted about. It is not the same field as -WatchCarrier: one says "this is what I consumed",
+    # the other says "this must not move", and a log that merges them cannot answer either question.
+    [string]$DriverCarrier = '',
     # M11: the log pins the identity of the GENERATOR too, not only of the product. A run whose engine was
     # dirty is not the same evidence as one whose engine is the committed file, and only the hash shows which.
     [string]$BatchScript = '',
@@ -157,7 +161,7 @@ function Invoke-MutationRun {
     param([string]$Root, [string]$Log, [string]$Name, [string[]]$CommandArgs, [string]$ExpectAssertion,
           [string]$Path, [string]$Old, [string]$New, [string]$Configuration, [string]$Artifact,
           [string[]]$RebuildArgs, [string]$Path2, [string]$Old2, [string]$New2, [string[]]$WatchCarrier, [string]$Outcome,
-          [string]$OutcomeWhy, [string]$BatchScript)
+          [string]$OutcomeWhy, [string]$BatchScript, [string]$DriverCarrier)
 
     $derived = Get-ArtifactForPath -Relative $Path -Configuration $Configuration
     if ($Artifact -eq 'derive') { $Artifact = $derived }
@@ -195,6 +199,9 @@ function Invoke-MutationRun {
     $lines.Add('# outcome: ' + $Outcome)
     if ($OutcomeWhy.Length -gt 0) { $lines.Add('# why this label: ' + $OutcomeWhy) }
     $lines.Add('# artifact (K3, derived from the mutated file): ' + $Artifact + ' :: ' + $artifactBefore)
+    if ($DriverCarrier.Length -gt 0) {
+        $lines.Add('# driver carrier (input the command links): ' + $DriverCarrier + ' :: ' + (Fingerprint -path (Join-Path $Root $DriverCarrier) -WithMtime))
+    }
     foreach ($watched in $WatchCarrier) {
         $lines.Add('# carrier watched by M10: ' + $watched + ' :: ' + $carrierBefore[$watched])
     }
@@ -438,5 +445,5 @@ $log = Join-Path $root (Join-Path $LogDirectory ($Name + '.log'))
 $report = Invoke-MutationRun -Root $root -Log $log -Name $Name -CommandArgs $CommandArgs -ExpectAssertion $ExpectAssertion `
     -Path $Path -Old $Old -New $New -Configuration $Configuration -Artifact $Artifact -RebuildArgs $RebuildArgs `
     -Path2 $Path2 -Old2 $Old2 -New2 $New2 -WatchCarrier $WatchCarrier -Outcome $Outcome -OutcomeWhy $OutcomeWhy `
-    -BatchScript $BatchScript -ValidateOnly:$ValidateOnly
+    -BatchScript $BatchScript -DriverCarrier $DriverCarrier -ValidateOnly:$ValidateOnly
 Write-Host ($report + '; log=' + $log)

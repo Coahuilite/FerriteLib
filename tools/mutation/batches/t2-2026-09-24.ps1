@@ -87,7 +87,10 @@ foreach ($case in $cases) {
         '-Name', $case.Name, '-ExpectAssertion', $case.Expect, '-Configuration', $case.Configuration,
         '-Path', $case.Path, '-Old', $case.Old, '-New', $case.New,
         '-CommandArgs', (Join-Path $commands $case.Run),
-        '-ProjectRoot', $root, '-BatchScript', $PSCommandPath)
+        '-ProjectRoot', $root, '-BatchScript', $PSCommandPath,
+        # The payload the harness links here is this repository's own Dev build (ProjectReference), and it is
+        # recorded as an INPUT; the watched carrier stays the frozen root one, deliberately single.
+        '-DriverCarrier', 'dist/build/Dev/FerriteLib.UiKit.dll')
     if ($ValidateOnly) { $argv += '-ValidateOnly' }
     if ($case.ContainsKey('Outcome')) { $argv += @('-Outcome', $case.Outcome) }
     if ($case.ContainsKey('OutcomeWhy')) { $argv += @('-OutcomeWhy', $case.OutcomeWhy) }
