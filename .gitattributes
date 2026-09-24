@@ -25,3 +25,8 @@
 # Replays and fixtures compare as raw bytes; a converted line ending is a content change there.
 # (This repo has no such files yet - the rule is here so the first one lands correctly.)
 fixtures/** text eol=lf
+
+# Windows command scripts are the one text format whose INTERPRETER cares: a multi-line block
+# (for/do/parentheses) can misparse with LF endings. Nothing here ships inside a mod package, so pinning
+# CRLF costs the byte-determinism rule above nothing.
+*.cmd text eol=crlf
