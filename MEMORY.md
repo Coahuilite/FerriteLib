@@ -51,6 +51,19 @@ The dated records below explain earlier changes and their scoped evidence. Curre
 current build behavior is in "Carrier identity and build isolation". Historical gate counts, capture sites,
 and delivery procedures do not override the current scripts or the next-stage handbook.
 
+- **Five library-side guards landed with their own mutations (2026-09-24, task-2), and the batch touched no
+  carrier byte.** (i) `KernelDevGeometryTests.VerifyCoveredVerdict` drives the funnel's fourth verdict — a
+  dropdown popup over a button, a press inside both, `verdict=covered` recorded for the covered element and
+  no command dispatched; dropping the recording reddens the verdict assertion, dropping the yield reddens
+  the dispatch assertion and `KernelPopupTests`' covering-popup lane. (ii) Gate 10's floor was re-cut to
+  measure passing assertions instead of counting `ok:` lines (§Gates). (iii) Gate 6 gained the
+  series-licence SHA-256 pin (§Gates). (iv) `KernelContractTests.VerifyStubSurfaceIsPublished` pins the four
+  stub project paths and the four `bin/stubs/…` assembly names a consumer copies, as literals; renaming
+  VerseStub's `OutputPath` with this repository's own csproj updated to match reddens it while every other
+  gate stays green. (v) `UiPopup` joined the boundary reject list — **a future-regression guard, not present
+  evidence** (§Gates). Evidence: `dist/dev-work/t2-*.log`; the full 10-gate chain is green at `545fe01`, and
+  the root carrier and `dist/dev/` were byte-identical before and after it (hash and mtime both).
+
 - **The development-only geometry instrument landed (2026-09-22) — a numeric audit, not a consumer feature, and
   the citation is what asked for it.** Maintainer ruling: a dev tool that makes precise layout possible belongs
   to the library, because **the audit surface is one of the five things FL owns**. Provenance transcribed
@@ -725,7 +738,11 @@ and delivery procedures do not override the current scripts or the next-stage ha
 - **The promise is an artifact: `docs/api-tiers.md` plus its guard lane.** Every exported type is classified
   stable / public-unstable / internalize-candidate exactly once, the stable list is pinned a second time
   inside `FerriteLibApiTierTests`, and an unclassified addition reddens the lane. A promotion or demotion
-  needs two deliberate edits in one commit. **API stabilization is not gated on a consumer count**
+  needs two deliberate edits in one commit. **What the lane reads, precisely:** it classifies the exported
+  type set and pins the stable list; it does **not** read the prose a tier entry gives as its reason, so a
+  tier reason can go stale with every gate green — which is how `LineChartWidget` / `UiChartPointChange`
+  kept a reason the consumer tree had already deleted (`TODO.md` carries the decision). **API stabilization
+  is not gated on a consumer count**
   (2026-09-17 ruling): define the contract, verify it, state the commitment; integration validates it.
 - **One assembly, two layers.** The declarative page engine (manifest, constrained layout, typed bindings,
   per-window session, widget registry, creation-time validation) and the visual core (theme tokens, drawing
@@ -788,10 +805,13 @@ and delivery procedures do not override the current scripts or the next-stage ha
   requires the tag shape and the build axis, steam additionally a clean tree, and only github archives.
   `About/PublishedFileId.txt` is gitignored and the stager copies `About.xml` as a file, so no rehearsal
   or GitHub artifact can carry a Workshop identity.
-- **A release asset is built after the gates run, not during them.** The Dev and Release gates leave a
-  `-dev`-suffixed DLL at the shared path; the github/steam channels refuse it, and the release workflow
-  rebuilds with `-p:VersionSuffix=` between the gates and the pack (now `--no-incremental`, so "freshly
-  built" is literally true). The packers refuse a stale payload by comparing the embedded commit to HEAD.
+- **A release asset is built after the gates run, not during them.** Every gate builds into
+  `dist/build/<Configuration>` and leaves both configurations there; there is no shared build slot. The
+  stager *measures* the payload's configuration instead of trusting the channel label
+  (`stage-package.ps1`), so a Dev payload cannot reach the github/steam channels, and the release workflow
+  rebuilds with `-p:VersionSuffix=` between the gates and the pack (`--no-incremental`, so "freshly built"
+  is literally true). The packers refuse a stale payload by comparing the embedded commit to HEAD. **None
+  of this touches the root compatibility carrier** — `scripts/export-carrier.ps1` is its only writer.
 - **The GitHub archive is a function of the commit.** Entry timestamps are written into the archive
   (sorted enumeration, each entry at the tagged commit's author date, top-level `FerriteLib/` inside);
   `Compress-Archive`'s mtime stamping gave two digests for one commit. No digest value is quoted in these
@@ -910,25 +930,41 @@ halves (the net472 source-shape scan and the reference-driven stub-coverage scan
 proven able to go red on every full run rather than only when someone remembers `-SelfTest`, 10
 `verify-dev-instrument.ps1` — the development-only geometry instrument's **dev half**. Gate 1 runs the
 harness in Release, where `#if FER_DEV` is undefined, so gate 10 builds and runs it in **Dev** and refuses
-to accept "the project compiled": it requires the dev-only assertion names, floors on the assertion and
-dumped-node counts, the absence of the release-only half's name, and the numbers the instrument printed,
-and it control-tests its own checker on every run (an empty output, a release-half-only output, a
-green-exit-but-missing-name output and a fully populated sample that must NOT be rejected). **It is a
-third writer of the carrier** (gate 2 writes Dev bytes, gate 10 leaves Dev bytes plus a Dev PDB), which is
-why a full chain run always ends with the delivery step. The three
+to accept "the project compiled": every named dev-only assertion must be observed as a **passing `ok:`
+line** (the count is measured from the output and printed beside the list length — the earlier wording
+quoted the list constant as if it were the measurement, and its `ok:`-line floor of 12 could not move
+against a real run's thousands), the release-only half's name must be absent, and the printed numbers must
+be there (dump header, a floor on dumped-node lines, a press line). Its checker is control-tested on every
+run (an empty output, a release-half-only output, a green-exit-but-missing-name output, an output where a
+listed name is present but not as a passing assertion, and a fully populated sample that must NOT be
+rejected). **No gate writes the compatibility carrier.** Gates 1, 2, 3 and 10 build into
+`dist/build/<Configuration>` (the library csproj pins `OutputPath` there and gate 4 asserts the evaluated
+`TargetPath` equals it), and the chain reads the root `1.6/Assemblies/` payload read-only: it snapshots
+hash+mtime before the first gate and refuses to finish if either moved. `scripts/export-carrier.ps1` is the
+**only** writer of that path — Release-only, an atomic `[IO.File]::Replace`, and it removes the PDB — and no
+gate, packer or workflow calls it, so a delivery is a deliberate step that ends the current freeze and
+needs a new FREEZE NOTICE. (The earlier text here called gate 10 "a third writer of the carrier" and had
+gate 2 writing Dev bytes into it; both were true before builds became configuration-isolated in
+`07f3c40`, and the sentence is corrected rather than deleted so the contradiction with "Carrier identity
+and build isolation" is not left standing.) The three
 source-text gates and the version axes all run *inside* gate 1, so **the gate count is not the check
-count**. Gate 6 proves only what is visible from inside this repo: the file exists, carries the MPL-2.0
-title, still contains Exhibit B and section 10.4, and does not apply the incompatibility notice in its
-header block.
-It does **not** compare the text against a consumer's copy, and no script in this repo refers to a
-sibling repo at all (checked: no `Get-FileHash`, no `..\` path in `scripts/`). The byte-parity assertion
-is consumer-side - US's own gate 10 hashes both copies.
+count**. Gate 6 proves what is visible from inside this repo, and since 2026-09-24 that is the whole file:
+it runs `scripts/verify-license.ps1`, which asserts the MPL-2.0 title, Exhibit B, section 10.4, the absence
+of the applied incompatibility notice — and **pins the series licence's SHA-256 as a literal**
+(`71B96808…`, 15 780 bytes, measured byte-identical to the wired consumer's copy), so a truncation that
+still carries every searched phrase is caught too. The checker is a script of its own so the mutation proof
+("edit `LICENSE` and the gate goes red") runs against this gate alone, and it is read-only, which is why
+gate 6's retry hint is a re-run of it rather than a build.
+It does **not** compare the text against a consumer's copy, and no script in this repo refers to a sibling
+repo at all (checked: no `..\` path in `scripts/`). That half — this file byte-identical to the consumer's
+copy — stays consumer-side: US's own gate 10 hashes both copies.
 
 Dated correction, 2026-09-04: earlier text here credited gate 6 (as "the seventh") with a SHA-256
-comparison to the consumer's copy. It never ran one, and **a `LICENSE` edited or truncated in this repo
-cannot turn any gate here red** — only a consumer-side gate notices, and only when the sibling tree is
-present. The byte-parity assertion is consumer-side. Anything that repeats "byte-identical to the
-consumer's copy" as a property of this repo's gates is wrong in the same way.
+comparison to the consumer's copy. It never ran one then, and **a `LICENSE` edited or truncated in this repo
+could not turn any gate here red** — only a consumer-side gate noticed, and only while its sibling tree was
+present. Closed 2026-09-24: the local half now exists as the pinned literal above, and the dated correction
+is kept because anything that repeats "byte-identical to the consumer's copy" as a property of this repo's
+gates is still wrong in the same way.
 
 Lane and assertion counts are re-derived, never quoted — they move within a day of work:
 `ls tools/FerriteLib.UiKit.Tests/*Tests.cs | wc -l`, `grep -c 'Run("' tools/FerriteLib.UiKit.Tests/*Tests.cs`,
@@ -946,15 +982,17 @@ be trusted across a boundary:
   empty enumeration, plants literals into both trees as a positive control, and pins the single
   self-exemption to one full path. The guard on the guard exists because the previous arrangement —
   US scanning this library from over the fence — passed vacuously the moment the trees moved.
-- Visual-core boundary lane: the seven visual-core files may not name any page-model type.
-  Mutation-checked by planting a `UiSession` reference.
-- The guard is a **name-list check, not a transitive one**: it reads the seven visual-core files and
-  rejects any line naming one of fourteen page-model symbols. So it catches `UiThemeDraw` → `UiSession`
-  directly, but not `UiThemeDraw` → `UiPopup` → `UiSession`, because `UiPopup` is in neither list — it
-  joined the tree on `4dd97bf`, after the guard was written, and appears in neither array of
-  `KernelContractTests.VerifyVisualCoreIsPageModelFree`. The two-layer claim is true of the code as it
-  stands and unenforced along that one new path. Read from both arrays; no mutation test of this hole has
-  been run, and the hole is currently hypothetical — nothing in the visual core calls `UiPopup`.
+- Visual-core boundary lane: the ten visual-core files may not name any page-model type. The reject list
+  carries 16 symbols since `UiPopup` was added on 2026-09-24. Mutation-checked by planting a `UiSession`
+  reference, and by planting a real `typeof(UiPopup)` reference into `UiThemeDraw.cs`, which reddens it at
+  `UiThemeDraw.cs:17`.
+- The guard is a **name-list check, not a transitive one**: it reads the visual-core files and rejects any
+  line naming one of the listed page-model symbols. `UiPopup` was in neither array until 2026-09-24 — it
+  joined the tree on `4dd97bf`, after the guard was written — so `UiThemeDraw` → `UiPopup` → `UiSession`
+  passed while breaking the "usable without a Host" claim; the symbol is in the list now. **The added symbol
+  is a future-regression guard, not present evidence**: nothing in the visual core names `UiPopup` today, so
+  what its mutation proves is that the guard can see the name at all, not that a live breach exists. The
+  real fix, still open in `TODO.md`, is to derive the set from the types.
 
 Honest limit on the theme lane: `VerifyThemeColorsDoNotAffectLayout` has two halves. The shared-instance
 half is mutation-proven. The rect-equality half has **no available failing mutation** today, because no

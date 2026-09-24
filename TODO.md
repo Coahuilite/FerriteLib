@@ -69,26 +69,15 @@ library before validating the real page, and their listing order does not overri
 
 ## Library-side items that are real and unblocked
 
-- [ ] **A lane for the dev instrument's `covered` verdict.** `hit`, `miss` and `disabled` are pinned by
-      `KernelDevGeometryTests`; `covered` — the element sits under another element's open popup layer — is
-      implemented and printed by the instrument but **no lane drives it**, and an unexercised branch is
-      unproven surface. Cheapest shape: a dropdown's popup over a button, then one press line whose verdict is
-      `covered`. Gate 10 would carry it automatically, since it runs the Dev half.
-- [ ] **Make the licence-parity guard two-sided, or stop calling it ours.** Gate 6 is credited in prose
-      with comparing `LICENSE` against the consumer's copy; it does not, and only the consumer's own gate
-      does. The 2026-09-10 Boundaries narrowing (this repo answers for itself alone) settles the choice:
-      **pin the expected SHA-256 of the series licence as a literal here and assert it locally**, which is
-      self-contained and mutation-testable by editing `LICENSE`. A sibling path check is not an option —
-      it is the vacuous-guard shape that got the neutrality scan moved in-repo.
-- [ ] **Give the harness `Stubs/**` a local guard.** The consumer builds our four stub projects by
-      relative path and copies them out of `bin/stubs/<name>/`, so that tree is a published surface.
-      Renaming a stub project or its output folder breaks the consumer while every gate here stays green.
-      A short assertion that the four project paths and their expected assembly names exist closes it.
-- [ ] **Keep the boundary guard's symbol list alive, or make it transitive.** `VerifyVisualCoreIsPageModelFree`
-      rejects hand-maintained page-model symbols in seven visual-core files; `UiPopup` is in neither list, so
-      `UiThemeDraw → UiPopup → UiSession` passes while breaking the "usable without a Host" claim. Cheapest
-      fix: add `UiPopup` and mutate-test it the way `UiWindowHost` was. Real fix, later: derive the set from
-      the types.
+- [ ] **Derive the visual-core boundary guard's symbol set from the types.** The cheap half landed
+      2026-09-24 (`UiPopup` added to the reject list, mutation-tested); the hand-maintained list is still the
+      real defect, since a type that joins the tree next is in neither array until somebody notices.
+- [ ] **Decide `LineChartWidget` / `UiChartPointChange`'s tier on live evidence.** `docs/api-tiers.md` keeps
+      both `public` on reasons the consumer tree has since deleted — the composite that named them was removed
+      in `f378715`, US and the demo reference neither, and US reaches the chart by manifest kind `chart/line`.
+      **No gate can notice a stale reason**: `FerriteLibApiTierTests` classifies the exported type set and pins
+      the stable list, it never reads an entry's prose. The review and the options are in
+      `docs/development/0.7/`; the call is the maintainer's.
 - [ ] **Wire `UiLayoutManifest.ParseFile`** — the style-document ruling (2026-09-10) settles the fork: a
       standalone style document with its own loader makes "XML authoring without recompiling" a library
       promise, so deleting the disk entry would strand its structural half. The file's location is the
