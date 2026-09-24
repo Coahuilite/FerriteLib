@@ -51,6 +51,27 @@ The dated records below explain earlier changes and their scoped evidence. Curre
 current build behavior is in "Carrier identity and build isolation". Historical gate counts, capture sites,
 and delivery procedures do not override the current scripts or the next-stage handbook.
 
+- **The mutation battery is tracked and self-testing (2026-09-24, task-15).** `tools/mutation/` holds the
+  engine (`Invoke-Mutation.ps1`), the two halves (`mutation-check.ps1`), the batch that describes a round's
+  mutations (`batches/t2-2026-09-24.ps1`) and the one-token commands they run. Logs stay in `dist/dev-work/`,
+  which is gitignored - tracking the GENERATOR is what keeps a log's command findable (M8), and the log's own
+  header carries it. The engine implements M1-M10/K3 as its README states: an anchor must be unique (a bare
+  `.Replace` is a silent no-op); the run must exit non-zero **and** print the named assertion (a red for
+  another reason is not evidence - measured once in this very battery); the restore is by bytes and is
+  re-read and asserted; after the restore the mutated configuration is REBUILT and its artifact must come
+  back to a **baseline established by the same command from clean source** (an earlier version compared
+  against whatever was on disk and false-reddened on a baseline built at an older commit); the log binds
+  itself; the artifact fingerprint is derived from the mutated file, so an unrelated artifact is refused
+  rather than fingerprinted with no signal (K3); and a watched carrier may not move its hash or mtime (M10).
+  Nine fixtures including a positive control prove the generator cannot lie; three of them are the acceptance
+  checks (missing anchor, un-restorable target, unrelated artifact), each runnable alone with `-Fixture`.
+  **Two carriers, two names:** `-WatchCarrier` is the frozen root payload; the *driver* carrier is what the
+  command links, and the consumer half selects the Dev payload explicitly. The consumer half performs a
+  cross-repo write, so it is the consumer owner's step and belongs in the consumer repository long term.
+  The three one-shot migration scripts that used to sit under `dist/` are **not** tracked: their batch landed
+  at `07f3c40`, they carry machine-specific absolute paths a tracked file may not contain, and their
+  replace-as-you-go shape is what M9 forbids. `Invoke-AnchoredEdits.ps1` replaces them - collect operations,
+  simulate every one, write only if all validated, `-ValidateOnly` to stop after the simulation.
 - **A popup layer covers exactly its option rows, so a press inside it always consumes a row (measured
   2026-09-24, and it is why one suggested control does not exist).** `UiPopup.RectFor` returns a rect whose
   height is `optionCount * OptionHeight` and `DrawOptionList` tiles one row per option across that rect, so

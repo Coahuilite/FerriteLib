@@ -88,6 +88,11 @@ library before validating the real page, and their listing order does not overri
 - [ ] **No gate can notice a stale tier reason** (the durable fact is in `MEMORY.md` §Version axes): the tier
       lane reads type **names** and the stable list, never an entry's prose. Re-open only if someone builds a
       prose-reading guard; until then a stale reason is a human review item, not a lane item.
+- [ ] **Move the battery's consumer half into the consumer repository.** `tools/mutation/mutation-check.ps1`
+      writes one source file in the consumer checkout and then builds it - a cross-repo write performed by a
+      script that lives here. The engine, the criteria and the Fl half belong here; the consumer half belongs
+      there, with this file keeping only the shared engine. Not urgent, and not to be done without the
+      consumer owner: it is a structural risk, not a defect.
 - [ ] **Wire `UiLayoutManifest.ParseFile`** — the style-document ruling (2026-09-10) settles the fork: a
       standalone style document with its own loader makes "XML authoring without recompiling" a library
       promise, so deleting the disk entry would strand its structural half. The file's location is the
