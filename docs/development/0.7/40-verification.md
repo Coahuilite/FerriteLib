@@ -44,10 +44,18 @@ as such rather than passed off as the current one.
 
 - Single-DLL/content-free payload, API tiers, visual-core separation, three-axis version agreement,
   neutrality, containment: all re-asserted by that gate run.
-- A delivery ends with the carrier rebuilt **Release** (`dotnet build -c Release --no-incremental`, then the
-  stale `1.6/Assemblies/FerriteLib.UiKit.pdb` removed — Release sets `DebugType=none`, so it neither rewrites
-  nor deletes an existing PDB), and its identity read in a **child process**: `Assembly.LoadFile` in the
-  session that is doing the measuring holds the payload open until that process exits.
+- A delivery ends with the carrier updated **Release** by the one script that writes that path: a Release
+  build (`dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release`, which writes
+  `dist/build/Release` and **not** the carrier) followed by `scripts/export-carrier.ps1` — Release-only (it reads
+  the configuration in a child process and refuses anything else), copied through a temporary candidate and
+  swapped in with `[IO.File]::Replace`, and it removes the stale `1.6/Assemblies/FerriteLib.UiKit.pdb` (Release
+  sets `DebugType=none`, so a build neither rewrites nor deletes an existing PDB). Its identity is then read in a
+  **child process**: `Assembly.LoadFile` in the session that is doing the measuring holds the payload open until
+  that process exits.
+  *(Mechanism corrected 2026-09-24: this bullet read "the carrier rebuilt Release (`dotnet build -c Release
+  --no-incremental`), then the stale PDB removed", which described building into the shared path. That was true
+  before builds became configuration-isolated in `07f3c40`; the sentence is corrected rather than deleted so the
+  contradiction with `docs/build-and-debug.md` is not left standing.)*
 - **A committed byte identity cannot be current, which is why the pair is not written down here.** The payload
   embeds the committed SHA, so a commit whose content records the hash moves HEAD and moves the stamp with it;
   a frozen carrier's record is the pair *plus* its build command and clean/dirty state, taken at the freeze.
@@ -81,8 +89,15 @@ the instrument printed, and it control-tests its own checker on every run. |
 - and a `-c Dev` run was consequently **red**: the lane took its release branch while the library was built
 Dev, and `a release build leaves automatic watching off by default` failed. The tests project now mirrors the
 library's Dev gate, which is what makes a lane able to hold the dev half, and gate 10 is what keeps it from
-quietly going back to compiling nowhere. **Gate 10 is a third writer of the shared carrier** (gate 2 writes
-Dev bytes; gate 10 leaves Dev bytes and a Dev PDB), so a full chain run always ends with the delivery step.
+quietly going back to compiling nowhere. **No gate writes the compatibility carrier** (corrected 2026-09-24:
+this sentence called gate 10 "a third writer of the shared carrier" and had gate 2 writing Dev bytes into it; both
+were true before builds became configuration-isolated in `07f3c40`). Gates 1, 2, 3 and 10 build into
+`dist/build/<Configuration>` — the library csproj pins `OutputPath` there and gate 4 asserts the evaluated
+`TargetPath` equals it — and the chain reads the root `1.6/Assemblies/` payload **read-only**: it snapshots the
+payload's hash **and** mtime before the first gate and refuses to finish if either moved
+(`scripts/verify-local.ps1`). `scripts/export-carrier.ps1` is the **only** writer of that path, and no gate,
+packer or workflow calls it, so a delivery is a deliberate step that ends the current freeze and needs a new
+FREEZE NOTICE.
 
 ## Pending external checks
 
