@@ -77,13 +77,13 @@ listed here rather than half-landed. FL-17 and FL-18+B6 remain with the maintain
 **Then:** task-23 folds every ACCEPT into **one** carrier rebuild and one FREEZE NOTICE. New surface stays inside
 `0.7.x` under the phase ruling — no minor move. Nothing in this file is implemented yet.
 
-## C. Tier-reason review (2026-09-24) — one reason that no longer holds, and one citation that does not
+## C. Tier-reason review (2026-09-24) — one reason found false, one citation corrected, one disposition owed
 
 **What this batch is.** Not a capability request but an audit of two **reasons** written into
 `docs/api-tiers.md`'s public-unstable section, each citing a consumer artefact that has since moved. The audit
 started from "the consumer no longer references either name" and **that premise was half wrong**: it is true for
 `LineChartWidget` and false for `UiChartPointChange` (§C.2). The distinction matters, because only one of the two
-entries needs its verdict revisited. It is
+entries needs its verdict revisited. The batch is
 recorded here because the disposition is owed by the session/maintainer exactly as §A's are, and because the
 guard that owns that file cannot see this class of drift. Nothing here is implemented, no tier is changed by
 this section, and the reviewer ran **no build** — the review is documentation-only.
@@ -144,6 +144,13 @@ today, and that is exactly the shape of every entry already in the internalize-c
 | **Move to internalize-candidate** | one edit in `docs/api-tiers.md` | **recommended.** Only the *stable* list is pinned in the lane (:102-120), so a move between the two non-stable tiers is one deliberate edit, not two. Actual **removal** still waits on the kind-name container that section already names (`docs/api-tiers.md:427-429`) |
 | Keep public-unstable, rewrite the reason | a sentence true at the current tips | acceptable fallback; it leaves a public type no consumer names, which is the debt class `TODO.md` calls "an unconsumed kind" |
 
+**Disposition (session ruling 2026-09-24): 待裁 — recommended, deliberately not executed.** The tier label is
+**not** changed now. Internalising a public type is a **breaking action**, so it belongs to the next breaking
+window (the 0.4.0-style sweep), and the entry itself records that removal waits on the stable kind-name container
+(`docs/api-tiers.md:427-429`). The recommendation above therefore stands as a *candidate* recorded here until that
+window opens, and the one edit a decision would need is measured rather than assumed — as C.0 records, only the
+**stable** list is pinned, so a public-unstable → internalize-candidate move is a single deliberate edit.
+
 **Not measured (UNRUN).** Whether an `internal LineChartWidget` compiles and leaves the harness and the ten
 gates green. That question belongs to the batch that would make the change.
 
@@ -176,11 +183,18 @@ stays public; what is wrong is the sentence's *location* ("the attenuation edito
 | Internalize | refuted by the citations above while the consumer binds the action by type; it would break that tree's build at compile time |
 | Re-argue | unnecessary; the verdict was never wrong |
 
+**Disposition (session ruling 2026-09-24): the citation is corrected in this same batch.** `docs/api-tiers.md`
+now names the current consumption sites — the host's typed action binding and that repo's harness generic type
+arguments — instead of the deleted composition file, and its **tier is unchanged** (accuracy, not a layering
+decision). Read C.2 as **closed for the citation half**. The entry's "kind plus bindings" sentence stays open as
+prose, which is the same class of item as C.1's, and no gate reads it.
+
 ### C.3 What a ruling would touch, and one process note
 
 **Touched by any of these decisions:** `docs/api-tiers.md` only. No source, no lane, no manifest vocabulary,
 no carrier, no version axis — the classification lane is satisfied by an entry's presence and by the stable pin,
-so nothing here re-cuts a gate.
+so nothing here re-cuts a gate. **Part of it is already done:** C.2's citation was corrected in the same batch
+(2026-09-24) with no tier move; C.1's tier label is untouched and waits for a ruling.
 
 **Process note (a suggestion, not a decision).** A tier reason that cites a consumer tree carries no
 re-derivation, so it rots silently. This repository's own rule for that class is already written down — prefer a

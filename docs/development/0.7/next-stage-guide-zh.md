@@ -76,7 +76,7 @@ FL 的开发诊断已记录布局数值、坐标空间、事件进入 Host 时�
 这批条目的书写模板（八栏，含「证据与缺口」）与首批三个试写样例（裸命中带 `Chrome="none"`+`Height="MatchContent"`、
 `PayloadKey`、`SelectedKey`，各带消费者引证与 UNRUN 标注）在 [0.7 契约文件](05-api-contract.md) 的
 "Dependable-surface entries (stage 3)" 一节。**模板只是书写形式，不代替逐项分层决定**；`docs/api-tiers.md`
-里两条理由的复核见 [60-capability-dispositions.md](60-capability-dispositions.md) §C——**一条理由已失效（`LineChartWidget`）、一条引证过时但结论仍成立（`UiChartPointChange` 仍被消费者源码按类型命名）**。
+里两条理由的复核见 [60-capability-dispositions.md](60-capability-dispositions.md) §C——**`LineChartWidget` 的理由已失效、分层移动列为待裁（内部化属下一个破坏性窗口）；`UiChartPointChange` 仍被消费者源码按类型命名（结论不变），其引证已按现址改正**。
 
 对多宿主共用有直接影响的共享状态应单独审查，例如 `UiFitAudit.Enabled` 的全局开关；目前它是已知风险，
 不能写成已经复现的跨模组故障。新增通用控件和大型可视化检查器仍需具体用途支撑。

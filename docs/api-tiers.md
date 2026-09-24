@@ -179,8 +179,19 @@ consequence is paid in the open rather than discovered by a stranger.
 - `UiWindowNotice` — the shell's notice vocabulary, same reason.
 - `LineChartWidget` — named by the consumer's own composition, so it cannot go internal yet; that use is
   also the specimen behind the tree-membership metric, and the debt list would rather it be a kind string.
-- `UiChartPointChange` — the typed drag result of `chart/line`, consumed by the attenuation editor today; it
-  travels with that widget's shape, which the metric wants expressed as a kind plus bindings instead.
+- `UiChartPointChange` — the typed drag result of `chart/line`, and it stays public because a consumer still names
+  the **type**: `coahuilite/UniversalSqueaker@a13f8af:Source/UniversalSqueaker/UI/UsKernelSettingsHost.cs:335`
+  binds it as `BindAction<UiChartPointChange>("attenuation-point", …)` (the receiving method is `:944`), and that
+  repo's harness names it the same way at
+  `…@a13f8af:tools/UniversalSqueakerKernelHostTests/Program.cs:938,1351,1715`. A generic type argument is a
+  compile-time dependency, so the type is a consumer contract rather than history: the composition file that used
+  to name it (there, `ValidateAction<UiChartPointChange>` at `:63`, together with `LineChartWidget`) was deleted at
+  `f378715` (S4-3b, 2026-09-22), and the declaration now reaches the kind by the string `chart/line`
+  (`…@a13f8af:Source/UniversalSqueaker/UI/Layout.Schema2.xml:236`) — but the payload type is still named in code.
+  It travels with that widget's shape, which the metric wants expressed as a kind plus bindings instead.
+  *(Reason corrected 2026-09-24: it read "consumed by the attenuation editor today", a file that no longer exists.
+  Tier unchanged — this was accuracy, not a layering decision; the review is §C.2 of
+  `docs/development/0.7/60-capability-dispositions.md`.)*
 - `UiOverflowReport` — the fit audit's overflow record, consumed by the wired consumer's own audit sink; its
   fields follow the audit's entry attribution, which the identity layer changes. It carries two
   **non-content discriminators** — `TextLength` and `RectWidth` (`RectWidth` was already there) — so a
