@@ -81,7 +81,9 @@ if ($Half -eq 'Us' -or $Half -eq 'Both') {
         # What the consumer half must leave untouched: this repository's frozen ROOT payload. The payload it
         # LINKS is a different file - run-us-harness-dev.cmd selects dist/build/Dev, where a Dev run puts the
         # instrument - and that is the whole point of the distinction.
-        '-WatchCarrier', '..\ferritelib\1.6\Assemblies\FerriteLib.UiKit.dll',
+        # Three payloads, because this half can damage all three: the frozen root carrier, the Dev build it
+        # LINKS (reading does not move a hash), and the paired dev package a tester installs.
+        '-WatchCarrier', '..\ferritelib\1.6\Assemblies\FerriteLib.UiKit.dll', '..\ferritelib\dist\build\Dev\FerriteLib.UiKit.dll', '..\ferritelib\dist\dev\FerriteLib\1.6\Assemblies\FerriteLib.UiKit.dll',
         '-ProjectRoot', $consumer)
 }
 

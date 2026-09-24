@@ -52,8 +52,13 @@ param(
     # -p:FerriteLibArtifactPath to this repository's Dev payload, because that is where a Dev run puts the
     # instrument). Two files, two roles, two names: an earlier version called this one 'Carrier' while the
     # command used a different file, which reads as if they were the same.
+    # A LIST, because one run can legitimately be in a position to damage more than one payload: the consumer
+    # half links this repository's Dev build and the paired dev package is what a tester installs, so watching
+    # only the frozen root carrier leaves the two files it actually touches unwatched (measured by the consumer
+    # owner during T18). The Fl half watches the root carrier alone - the Dev payload is the artifact IT
+    # rebuilds, so watching that here would redden every case by design.
     [Alias('Carrier')]
-    [string]$WatchCarrier = '1.6/Assemblies/FerriteLib.UiKit.dll',
+    [string[]]$WatchCarrier = @('1.6/Assemblies/FerriteLib.UiKit.dll'),
     # How this run's red is to be read. The distinction is not cosmetic: a red that names the intended
     # assertion, a red where the instrument refused an invalid setting, and a red for some other reason are
     # three different facts, and only the first two are evidence for the mutation (team ledger, the outcome
@@ -151,7 +156,7 @@ function Resolve-MutationTarget {
 function Invoke-MutationRun {
     param([string]$Root, [string]$Log, [string]$Name, [string[]]$CommandArgs, [string]$ExpectAssertion,
           [string]$Path, [string]$Old, [string]$New, [string]$Configuration, [string]$Artifact,
-          [string[]]$RebuildArgs, [string]$Path2, [string]$Old2, [string]$New2, [string]$WatchCarrier, [string]$Outcome,
+          [string[]]$RebuildArgs, [string]$Path2, [string]$Old2, [string]$New2, [string[]]$WatchCarrier, [string]$Outcome,
           [string]$OutcomeWhy, [string]$BatchScript)
 
     $derived = Get-ArtifactForPath -Relative $Path -Configuration $Configuration
@@ -174,9 +179,10 @@ function Invoke-MutationRun {
     }
 
     $artifactFull = if ($Artifact -eq 'none') { '' } else { Join-Path $Root $Artifact }
-    $carrierFull = Join-Path $Root $WatchCarrier
-
-    $carrierBefore = Fingerprint -path $carrierFull -WithMtime
+    $carrierBefore = @{}
+    foreach ($watched in $WatchCarrier) {
+        $carrierBefore[$watched] = Fingerprint -path (Join-Path $Root $watched) -WithMtime
+    }
     $artifactBefore = if ($Artifact -eq 'none') { 'not applicable (this mutation changes no build output)' } else { 'measured after a baseline build, below' }
 
     $lines = New-Object System.Collections.Generic.List[string]
@@ -189,8 +195,9 @@ function Invoke-MutationRun {
     $lines.Add('# outcome: ' + $Outcome)
     if ($OutcomeWhy.Length -gt 0) { $lines.Add('# why this label: ' + $OutcomeWhy) }
     $lines.Add('# artifact (K3, derived from the mutated file): ' + $Artifact + ' :: ' + $artifactBefore)
-    $lines.Add('# carrier watched by M10: ' + $WatchCarrier)
-    $lines.Add('# carrier before: ' + $carrierBefore)
+    foreach ($watched in $WatchCarrier) {
+        $lines.Add('# carrier watched by M10: ' + $watched + ' :: ' + $carrierBefore[$watched])
+    }
     $lines.Add('# HEAD: ' + (((& git -C $Root rev-parse HEAD 2>$null) -join '').Trim()))
     $lines.Add('# generator: ' + $PSCommandPath + ' sha256=' + (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash)
     if ($BatchScript.Length -gt 0) {
@@ -292,9 +299,11 @@ function Invoke-MutationRun {
         Add-Content -LiteralPath $Log -Encoding UTF8 -Value '# no build output is affected; no rebuild required (M5 does not apply).'
     }
 
-    $carrierAfter = Fingerprint -path $carrierFull -WithMtime
-    Add-Content -LiteralPath $Log -Encoding UTF8 -Value ('# carrier after: ' + $carrierAfter)
-    if ($carrierBefore -ne $carrierAfter) { throw 'M10: the run changed the repository-root carrier (hash or mtime).' }
+    foreach ($watched in $WatchCarrier) {
+        $carrierAfter = Fingerprint -path (Join-Path $Root $watched) -WithMtime
+        Add-Content -LiteralPath $Log -Encoding UTF8 -Value ('# carrier after: ' + $watched + ' :: ' + $carrierAfter)
+        if ($carrierBefore[$watched] -ne $carrierAfter) { throw "M10: the run changed a watched carrier ($watched): hash or mtime moved." }
+    }
 
     Add-Content -LiteralPath $Log -Encoding UTF8 -Value ('# verdict: ' + $Outcome + '; restored; rebuilt; carrier unchanged')
     Remove-Item -LiteralPath $runOutputPath -Force -ErrorAction SilentlyContinue
