@@ -72,12 +72,22 @@ library before validating the real page, and their listing order does not overri
 - [ ] **Derive the visual-core boundary guard's symbol set from the types.** The cheap half landed
       2026-09-24 (`UiPopup` added to the reject list, mutation-tested); the hand-maintained list is still the
       real defect, since a type that joins the tree next is in neither array until somebody notices.
-- [ ] **Decide `LineChartWidget` / `UiChartPointChange`'s tier on live evidence.** `docs/api-tiers.md` keeps
-      both `public` on reasons the consumer tree has since deleted — the composite that named them was removed
-      in `f378715`, US and the demo reference neither, and US reaches the chart by manifest kind `chart/line`.
-      **No gate can notice a stale reason**: `FerriteLibApiTierTests` classifies the exported type set and pins
-      the stable list, it never reads an entry's prose. The review and the options are in
-      `docs/development/0.7/`; the call is the maintainer's.
+- [ ] **`LineChartWidget` → internalize-candidate, at the next breaking window.** The tier reason is false
+      at the consumer's current tip (the composite that named it was removed in `f378715`; US and the demo
+      reference neither, and US reaches the chart by manifest kind `chart/line`). Internalising a public type
+      is a breaking action, so it belongs to the next 0.4.0-style sweep, and the entry itself records that
+      **removal** waits on the stable kind-name container (`docs/api-tiers.md:427-429`). Only the *stable*
+      list is pinned, so the move itself is one deliberate edit — the cost is measured in
+      `docs/development/0.7/60-capability-dispositions.md` §C.1, whose disposition is *owed, recommended, not
+      executed*.
+- [ ] **`UiChartPointChange` stays `public-unstable`; the citation was the defect and it is corrected.**
+      `f378715` deleted the *editor widget*, not the *consumption*: the consumer binds the action by type
+      (`BindAction<UiChartPointChange>` and the generic type arguments in its harness), and a generic type
+      argument is what keeps the type public. The corrected reason landed in `docs/api-tiers.md` with fl-contract's
+      T8; no tier label moved and no further work is owed here beyond keeping the citation live.
+- [ ] **No gate can notice a stale tier reason** (the durable fact is in `MEMORY.md` §Version axes): the tier
+      lane reads type **names** and the stable list, never an entry's prose. Re-open only if someone builds a
+      prose-reading guard; until then a stale reason is a human review item, not a lane item.
 - [ ] **Wire `UiLayoutManifest.ParseFile`** — the style-document ruling (2026-09-10) settles the fork: a
       standalone style document with its own loader makes "XML authoring without recompiling" a library
       promise, so deleting the disk entry would strand its structural half. The file's location is the

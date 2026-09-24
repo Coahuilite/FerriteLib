@@ -752,11 +752,17 @@ and delivery procedures do not override the current scripts or the next-stage ha
 - **The promise is an artifact: `docs/api-tiers.md` plus its guard lane.** Every exported type is classified
   stable / public-unstable / internalize-candidate exactly once, the stable list is pinned a second time
   inside `FerriteLibApiTierTests`, and an unclassified addition reddens the lane. A promotion or demotion
-  needs two deliberate edits in one commit. **What the lane reads, precisely:** it classifies the exported
-  type set and pins the stable list; it does **not** read the prose a tier entry gives as its reason, so a
-  tier reason can go stale with every gate green — which is how `LineChartWidget` / `UiChartPointChange`
-  kept a reason the consumer tree had already deleted (`TODO.md` carries the decision). **API stabilization
-  is not gated on a consumer count**
+  needs two deliberate edits in one commit. **What the lane reads, precisely — four assertions, and no
+  reason text:** `Every public payload type is classified in exactly one tier` (`:77-87`) reads exported
+  type **names** against the entries parsed from the three headings; `No tier entry names a type that no
+  longer exists` (`:89-100`) reads an entry whose type has gone; `The stable tier matches the pinned
+  promise` (`:102-120`) reads the **stable** section only, against `PinnedStableTier` (`:36-50`); and
+  `Tier comparison fires on a planted unclassified type` (`:122-152`) is the positive control. **No
+  assertion reads an entry's reason prose**, so a reason that stopped being true cannot redden anything —
+  "the entry exists" is the whole membership test. That is how `LineChartWidget` / `UiChartPointChange` kept
+  a reason the consumer tree had already deleted; the review, the citations and the owed dispositions are in
+  `docs/development/0.7/60-capability-dispositions.md` §C (its C.0 states the same blind spot from the
+  document side), and `TODO.md` carries the decision. **API stabilization is not gated on a consumer count**
   (2026-09-17 ruling): define the contract, verify it, state the commitment; integration validates it.
 - **One assembly, two layers.** The declarative page engine (manifest, constrained layout, typed bindings,
   per-window session, widget registry, creation-time validation) and the visual core (theme tokens, drawing
@@ -932,6 +938,14 @@ and delivery procedures do not override the current scripts or the next-stage ha
 - Mutation-test a new gate, not only the new feature. Half of `VerifyThemeColorsDoNotAffectLayout` is a
   future-regression guard rather than present evidence, and it is labelled that way for exactly this
   reason.
+- **`Mouse.IsOver` does not mean the same thing in the harness as in the game (measured 2026-09-24 by the
+  defect scout, read-only).** The harness stub checks the GUI clip region
+  (`tools/FerriteLib.UiKit.Tests/Stubs/VerseStub/VerseStubs.cs:558-567`); the game's own `Mouse.IsOver`
+  does not (`Mouse.cs:27-34` in the game's source). Consequence, recorded before it can bite: a future lane
+  built on "the pointer is really over this rect" would report a **false red** at a scroll viewport's edge,
+  because the harness applies a clip the game does not. Same family as "the lane measured the wrong
+  layer": it changes no conclusion today and it is exactly the kind of difference that makes the next lane
+  lie.
 
 ## Gates and what each actually proves
 
