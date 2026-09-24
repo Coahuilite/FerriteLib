@@ -612,6 +612,10 @@ internal static class KernelContractTests
         {
             "UiHost",
             "UiWindowHost",
+            // UiPopup joined the tree after this guard was written and was in neither array, so
+            // UiThemeDraw -> UiPopup -> UiSession passed while breaking the "usable without a Host" claim.
+            // The guard is a name-list check, not a transitive one; this closes the one path it missed.
+            "UiPopup",
             "UiSession",
             "UiSessionGuard",
             "UiLayoutEngine",
