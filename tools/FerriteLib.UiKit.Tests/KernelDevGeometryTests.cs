@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 
 using FerriteLib.UiKit.Kernel;
@@ -47,6 +48,7 @@ internal static class KernelDevGeometryTests
 #if FER_DEV
         Run("Every arranged node is reported with both rects, its height mode and its content extent", VerifyGeometryNumbers);
         Run("A press is attributed to the element that claimed it, in the pointer's own space", VerifyInputVerdicts);
+        Run("An element under an open popup layer yields the press and says so", VerifyCoveredVerdict);
         Run("Consumed input remains visible without changing native dispatch", VerifyConsumedInput);
         Run("The overlay is refused until the instrument is on", VerifyOverlayRequiresTheInstrument);
 #else
@@ -216,6 +218,109 @@ internal static class KernelDevGeometryTests
             UiNative.DebugMouseDown = false;
             UiNative.DebugMousePositionEnabled = false;
         }
+    }
+
+    /// <summary>
+    /// The funnel's fourth verdict. <c>hit</c>, <c>miss</c> and <c>disabled</c> are driven above;
+    /// <c>covered</c> - the element sits under another element's open popup layer - was implemented and
+    /// printed by the instrument with no lane driving it, and an unexercised branch is unproven surface.
+    /// <para>
+    /// The press point is <b>point-shaped</b> on purpose. A rect-blind override (<c>_ =&gt; true</c>) would
+    /// make the trigger toggle its own popup shut in the same pass, the overlap would never exist, and the
+    /// lane would pass without measuring anything. The same point shape is what keeps the
+    /// "it did not dispatch" assertion honest: the point IS inside the covered element's rect, so if the
+    /// yield were removed the override would fire it and the counter would move.
+    /// </para>
+    /// </summary>
+    private static void VerifyCoveredVerdict()
+    {
+        const string xml =
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Column Id=\"root\" Padding=\"0\" Gap=\"0\">"
+            + "<Widget Id=\"trigger\" Kind=\"input/dropdown\" OptionsBind=\"Options\" />"
+            + "<Widget Id=\"under\" Kind=\"input/button\" Text=\"Under\" Height=\"28\" ActionBind=\"under-act\" />"
+            + "</Column>"
+            + "</UiPage>";
+
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+
+        int underActions = 0;
+        var bindings = new UiBindings();
+        string current = "x";
+        bindings.BindValue("trigger", () => current, value => current = value);
+        bindings.BindOptions("Options", () => new List<string> { "x", "y" });
+        bindings.BindCommand("under-act", () => underActions++);
+
+        using UiHost host = new UiHost(
+            Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        host.Diagnostics.GeometryEnabled = true;
+
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(Viewport.width, Viewport.height));
+        host.Session.OpenPopup("trigger", snapshot.RectById["trigger"]);
+
+        // One frame publishes the popup layer; dispatch reads the pass that just finished, so the covered
+        // decision is only reachable from the second frame on. That ordering is the mechanism, not a
+        // detail of this lane.
+        host.DrawFrame(Viewport);
+        Rect? popup = PopupLayer(host.Session);
+        if (!popup.HasValue)
+        {
+            throw new Exception("the open popup pushed no hit layer, so nothing can be covered");
+        }
+
+        Rect under = snapshot.RectById["under"];
+        Vector2 point = new(under.center.x, Math.Max(popup.Value.y + 2f, under.y + 2f));
+        if (!Over(popup.Value, point) || !Over(under, point))
+        {
+            throw new Exception("test premise broken: " + Show(point) + " is not inside both the popup "
+                + Show(popup.Value) + " and the element it covers " + Show(under));
+        }
+
+        try
+        {
+            UiNative.DebugMousePositionEnabled = true;
+            UiNative.DebugMouseDown = true;
+            UiNative.DebugMousePosition = point;
+            UiNative.ButtonOverride = rect => Over(rect, point);
+
+            host.DrawFrame(Viewport);
+            string dump = host.Diagnostics.DumpGeometry();
+            PrintInputs(dump);
+            string covered = Require(dump, "verdict=covered");
+            Check(covered.IndexOf("path=root/under ", StringComparison.Ordinal) >= 0,
+                "an element under another element's open popup layer reports the covered verdict: " + covered);
+            Check(underActions == 0,
+                "and it does not dispatch its command while the layer is above it (fired "
+                + underActions.ToString(CultureInfo.InvariantCulture) + " time(s))");
+        }
+        finally
+        {
+            UiNative.ButtonOverride = null;
+            UiNative.DebugMousePosition = default;
+            UiNative.DebugMouseDown = false;
+            UiNative.DebugMousePositionEnabled = false;
+        }
+    }
+
+    /// <summary>
+    /// The topmost popup layer of the session's hit stack, or null when none is pushed. The lane reads the
+    /// stack directly, the way the popup lanes do, because the covered rule is a property of the layer.
+    /// </summary>
+    private static Rect? PopupLayer(UiSession session)
+    {
+        for (int i = session.HitLayers.Count - 1; i >= 0; i--)
+        {
+            if (session.HitLayers[i].IsPopup) return session.HitLayers[i].Rect;
+        }
+
+        return null;
+    }
+
+    /// <summary>Point containment, written out because the stub Rect has no Contains to lean on.</summary>
+    private static bool Over(Rect rect, Vector2 point)
+    {
+        return point.x >= rect.x && point.x <= rect.xMax && point.y >= rect.y && point.y <= rect.yMax;
     }
 
     private static void VerifyConsumedInput()

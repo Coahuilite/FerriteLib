@@ -48,7 +48,9 @@ $devOnlyAssertions = @(
     'a claimed press names the element that claimed it',
     'a disabled element reports why the press went nowhere',
     'a later query remains visible after consumption',
-    'diagnostics on and off dispatch exactly one command per native click'
+    'diagnostics on and off dispatch exactly one command per native click',
+    'an element under another element''s open popup layer reports the covered verdict:',
+    'and it does not dispatch its command while the layer is above it'
 )
 
 # The name only the release half can print. Seeing it in a Dev run means the branches are not exclusive.
@@ -178,6 +180,8 @@ $controlSample = @(
     '  ok: a disabled element reports why the press went nowhere'
     '  ok: a later query remains visible after consumption'
     '  ok: diagnostics on and off dispatch exactly one command per native click'
+    '  ok: an element under another element''s open popup layer reports the covered verdict: input path=root/under kind=input/button point=(50,30) rect=(0,28,100,28) verdict=covered event-before=MouseDown event-after=MouseDown'
+    '  ok: and it does not dispatch its command while the layer is above it (fired 0 time(s))'
     '  ok: filler 3'
     '  ok: filler 4'
     '  ok: filler 5'
