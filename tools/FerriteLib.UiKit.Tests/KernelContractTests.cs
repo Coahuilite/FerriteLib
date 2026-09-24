@@ -33,6 +33,7 @@ internal static class KernelContractTests
         failures += Run("Translation revision invalidates the layout cache", VerifyTranslationRevisionInvalidatesLayout);
         failures += Run("Theme colour tokens cannot move geometry", VerifyThemeColorsDoNotAffectLayout);
         failures += Run("Visual core never depends on the page model", VerifyVisualCoreIsPageModelFree);
+        failures += Run("The stub tree keeps the paths and assembly names a consumer copies", VerifyStubSurfaceIsPublished);
         failures += Run("Engine recovers a throwing widget without ending the frame", VerifyEngineOwnsPerElementRecovery);
         failures += Run("Require names the page trees this process built", VerifyHostLedgerSurfacesInRequire);
         return failures;
@@ -586,6 +587,52 @@ internal static class KernelContractTests
         }
     }
 
+
+    /// <summary>
+    /// The stub tree is a published surface, and nothing else here pins its names. A consumer's harness
+    /// builds these four projects by relative path and copies their outputs out of the canonical
+    /// <c>bin/stubs/&lt;folder&gt;/</c> locations, so renaming a project, its output folder or its
+    /// <c>AssemblyName</c> breaks that consumer while every gate in this repository stays green - the
+    /// paths here are literals on purpose, because a list read out of the files it is checking would move
+    /// with the rename it exists to catch.
+    /// </summary>
+    private static void VerifyStubSurfaceIsPublished()
+    {
+        string tests = Path.Combine(RepoRoot(), "tools", "FerriteLib.UiKit.Tests");
+        string[] projects =
+        {
+            "Stubs/UnityEngineStub/UnityEngineStub.csproj",
+            "Stubs/UnityEngineImGuiStub/UnityEngineImGuiStub.csproj",
+            "Stubs/UnityEngineTextRenderingModuleStub/UnityEngineTextRenderingModuleStub.csproj",
+            "Stubs/VerseStub/VerseStub.csproj"
+        };
+        string[] assemblies =
+        {
+            "unityengine/UnityEngine.CoreModule.dll",
+            "unityengine-imgui/UnityEngine.IMGUIModule.dll",
+            "unityengine-textrendering/UnityEngine.TextRenderingModule.dll",
+            "verse/Assembly-CSharp.dll"
+        };
+
+        for (int i = 0; i < projects.Length; i++)
+        {
+            string projectPath = Path.Combine(tests, projects[i].Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(projectPath))
+            {
+                throw new Exception("a stub project a consumer builds by relative path is gone: " + projects[i]
+                    + " (missing at " + projectPath + "); every gate here can stay green while that consumer's harness fails.");
+            }
+
+            string assemblyPath = Path.Combine(
+                tests, "bin", "stubs", assemblies[i].Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(assemblyPath))
+            {
+                throw new Exception("a stub assembly a consumer copies out of bin/stubs is missing or renamed: "
+                    + assemblies[i] + " (missing at " + assemblyPath
+                    + "); the harness build writes it there, so this is an OutputPath or AssemblyName change, not a missing build.");
+            }
+        }
+    }
 
     private static void VerifyVisualCoreIsPageModelFree()
     {
