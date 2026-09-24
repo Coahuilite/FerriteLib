@@ -18,17 +18,20 @@ $ErrorActionPreference = "Stop"
 #   - the Dev harness run exits 0 and ends with ALL PASS;
 #   - every DEV-ONLY assertion name is present in its output. Those names exist only inside the lane's dev
 #     branch, so their presence is what distinguishes "the dev half executed" from "the project compiled";
-#   - a minimum number of 'ok:' lines, because a single name can survive a partially-populated run and the
-#     bug class this repository keeps paying for is a check that enumerates nothing and passes;
+#   - every one of those names is observed as a PASSING assertion - an '  ok: ' line - and the gate prints
+#     the list length and the measured count side by side. Presence anywhere was not enough: a name echoed
+#     in a dump line, a FAIL line or a comment satisfied the old check, and the old report quoted the LIST
+#     length as if it were the measurement;
 #   - the RELEASE-only assertion name is ABSENT: in a Dev build the other half must not run, and seeing both
 #     halves would mean the two branches are no longer exclusive;
 #   - the printed dump itself: its header, at least a minimum number of node lines, and one press line.
 #     The instrument's whole purpose is numbers, so a run that omitted them is not a passing run.
 #
-# '-SelfTest' (always run, it is pure string logic) plants four fixtures against the SAME checker the real
+# '-SelfTest' (always run, it is pure string logic) plants five fixtures against the SAME checker the real
 # output goes through: an empty output, an output holding only the release half, an output with a perfect
-# exit code but a missing dev assertion, and a fully-populated output that must NOT be rejected. A checker
-# that cannot fail is not a gate, and a checker that rejects everything is not one either.
+# exit code but a missing dev assertion, an output where a listed name appears only outside a passing
+# assertion line, and a fully-populated output that must NOT be rejected. A checker that cannot fail is not
+# a gate, and a checker that rejects everything is not one either.
 #
 # The harness builds into dist/build/Dev; staged deliveries and the compatibility carrier are untouched.
 
@@ -55,10 +58,45 @@ $dumpHeader = '[ferritelib.geometry] pass='
 $dumpNode = '    | rect path=root/row/band '
 $dumpPress = '    | input path=root/row/band '
 
-# Floors, not promises: the names above are the real assertions and the floors only catch a run that is
-# populated in part. Measured 2026-09-23 on the shipped lane: 26 dev-only assertions, 6 dump node lines.
-$minimumDevAssertions = 12
+# Floors, not promises - but a floor is only a floor if the quantity it measures can move.
+#
+# The floor that used to live here counted 'ok:' lines and demanded 12 of them. A real Dev run prints
+# thousands (measured 2026-09-24 by the independent verifier: 2681), so it could not tell a complete run
+# from a mutilated one, and the gate's own report had the same defect one level up: it printed
+# "N dev-only assertion(s) present" where N was $devOnlyAssertions.Count - the LIST length, quoted as if it
+# were a measurement.
+#
+# Both are replaced by a quantity that moves with the state: how many of the listed names are observed as
+# PASSING assertions ('  ok: ' lines), counted from the output by Measure-DevOnlyPassing. The floor for the
+# total is derived from the list rather than a magic number, and the report states list length and measured
+# count side by side.
 $minimumDumpNodes = 5
+
+# Measured 2026-09-24 on the shipped lane (HEAD 545fe01): list 11 named dev-only assertions, 11 observed
+# passing, 2684 'ok:' lines in total, 6 dumped node lines.
+
+function Measure-DevOnlyPassing {
+    <#
+        How many of the named dev-only assertions the output shows as PASSING assertions. Counted from the
+        output, never from the list: a name that only appears in a dump line, a FAIL line or a comment is
+        not a run assertion, and the difference between the two counts is what this gate now measures.
+
+        It counts NAMES, not lines. The first version counted matching 'ok:' lines and this gate went red on
+        a green run (12 of 11) because one named assertion is legitimately printed twice - the consumed-input
+        lane loops over diagnostics on and off - so a line count is not the quantity the list describes.
+    #>
+    param([string]$Output)
+
+    $lines = [regex]::Matches($Output, '(?m)^  ok: .*$')
+    $measured = 0
+    foreach ($name in $devOnlyAssertions) {
+        foreach ($line in $lines) {
+            if ($line.Value.IndexOf($name, [System.StringComparison]::Ordinal) -ge 0) { $measured++; break }
+        }
+    }
+
+    return $measured
+}
 
 function Test-DevRun {
     <#
@@ -86,9 +124,19 @@ function Test-DevRun {
         return "the release-only assertion ran in a Dev build: the two halves of the lane are no longer exclusive ('$releaseOnlyAssertion')"
     }
 
+    # The measured half. Every listed name must be observed as a PASSING assertion, not merely present
+    # somewhere in the text, and the two counts are reported together so the gate's own words cannot be
+    # mistaken for a measurement again.
+    $measured = Measure-DevOnlyPassing -Output $Output
+    if ($measured -ne $devOnlyAssertions.Count) {
+        return "the dev half showed $measured of the $($devOnlyAssertions.Count) named dev-only assertion(s) as passing '  ok: ' line(s); a name that appears only in a dump line, a FAIL line or a comment is not a run assertion"
+    }
+
+    # A floor derived from the list, not a magic number: a run that printed fewer 'ok:' lines than it has
+    # named dev-only assertions is not a populated run.
     $assertions = ([regex]::Matches($Output, '(?m)^  ok: ')).Count
-    if ($assertions -lt $minimumDevAssertions) {
-        return "the run printed $assertions 'ok:' line(s), below the floor of $minimumDevAssertions; a partially populated run is the empty-enumeration failure this gate is written against"
+    if ($assertions -lt $devOnlyAssertions.Count) {
+        return "the run printed $assertions 'ok:' line(s), fewer than the $($devOnlyAssertions.Count) named dev-only assertions; a partially populated run is the empty-enumeration failure this gate is written against"
     }
 
     if ($Output.IndexOf($dumpHeader, [System.StringComparison]::Ordinal) -lt 0) {
@@ -151,7 +199,10 @@ $controlCases = @(
     @{ Name = 'an empty output';                      Output = '';                                                        ExitCode = 0 },
     @{ Name = 'a release-half-only output';           Output = "ALL PASS`n  ok: $releaseOnlyAssertion";                   ExitCode = 0 },
     @{ Name = 'a populated output with exit code 1';  Output = $controlSample;                                            ExitCode = 1 },
-    @{ Name = 'a populated output missing one name';  Output = ($controlSample -replace [regex]::Escape($devOnlyAssertions[2]), 'x'); ExitCode = 0 }
+    @{ Name = 'a populated output missing one name';  Output = ($controlSample -replace [regex]::Escape($devOnlyAssertions[2]), 'x'); ExitCode = 0 },
+    # The discriminator the old presence-only check lacked: the name is still in the text, but not as a
+    # passing assertion line, so the measured count is one short of the list.
+    @{ Name = 'a listed name that is not a passing assertion'; Output = ($controlSample -replace [regex]::Escape('  ok: a disabled element reports why the press went nowhere'), '    | rect path=root/row/band kind=input/button note="a disabled element reports why the press went nowhere"'); ExitCode = 0 }
 )
 
 foreach ($case in $controlCases) {
@@ -174,4 +225,7 @@ Assert-DevRun -Output $output -ExitCode $code -Label 'the Dev harness run'
 
 $assertions = ([regex]::Matches($output, '(?m)^  ok: ')).Count
 $nodes = ([regex]::Matches($output, '(?m)^    \| (rect|viewport) ')).Count
-Write-Host ("dev half ran: {0} dev-only assertion(s) present, {1} 'ok:' line(s), {2} dumped node line(s)" -f $devOnlyAssertions.Count, $assertions, $nodes)
+$measured = Measure-DevOnlyPassing -Output $output
+# List length and measured count, side by side: the old wording printed the list constant as if it were
+# the number of assertions found, which is what made the floor look like it was measuring something.
+Write-Host ("dev half ran: list {0} named dev-only assertion(s), measured {1} passing, {2} 'ok:' line(s) total, {3} dumped node line(s)" -f $devOnlyAssertions.Count, $measured, $assertions, $nodes)
