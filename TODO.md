@@ -3,39 +3,40 @@
 > The action surface only. Settled rulings, done work and the release/round history live in `MEMORY.md`
 > and `OBLIVIONIS.md`; a closed item is a pointer here, not a paragraph.
 
-## Where the line stands
+## Current objective and execution order
 
-Branch `0.7.x`, contract axis `0.7.0`, consumer range `[0.7.0,0.8.0)`. **FL is in P1 and P1 is closed on
-the library side**: the seam and library fixes are done; the current diagnostics/integration batch is described below.
-Phase order is the maintainer ruling of 2026-09-20 and it is authoritative — **P1 seam and library fixes →
-P2 migration and retiring the legacy project → P3 the full UI/UX reset (last) → P4 new work. S3–S7 do not
-move until the consumer's P1 usage is done, and the backlog is friction the consumer's real use exposes,
-not a wish list.** One freeze per round: every (B) fix moves HEAD and invalidates the consumer's gate green,
-so the remaining batch items land **together**, with one carrier rebuild and one freeze notice.
+Branch `0.7.x`, API `0.7.0`, consumer range `[0.7.0,0.8.0)`. Prioritize long-term library contracts and
+shared-mod use, accepting consumer release delay. Use the existing consumer settings redesign as the
+integration surface. The execution handbook is `docs/development/0.7/next-stage-guide-zh.md`; build and
+instrument commands are in `docs/build-and-debug.md`. Completed foundations and evidence pointers live
+in `MEMORY.md`. Local work remains unpushed.
 
-**Current development direction (2026-09-24):** prioritize the library's long-term contracts, using the real consumer settings redesign as the integration surface. Build isolation and consumed-input diagnostics are implemented; real-game click acceptance remains open. Commands and the next-slice criteria: `docs/build-and-debug.md`. Local branches remain unpushed.
+- [ ] **First acceptance slice: the real-game Packs row click.** Reproduce with a verified Dev package
+      pair; retain the working filter as a control. Capture window/UI scale, language, scroll state,
+      expected/actual selection, and the corresponding geometry/input records. The root cause is unknown.
+- [ ] **Locate and fix the owning layer.** Follow coordinates/clip → hit query → consumption → command →
+      model refresh. Add a narrowly scoped diagnostic only where evidence is missing; fix consumer-specific
+      composition in the consumer and generic contracts in FL. Close the game defect only after the
+      original scenario and nearby repeated-click/scroll/popup cases pass in RimWorld. The `covered`
+      verdict lane below is useful independent automated work while game evidence is pending.
+- [ ] **Continue one settings-page slice at a time.** Select the next slice from the existing redesign,
+      identify the contracts it touches, and record ownership, failure-sensitive tests and applicable game
+      acceptance. Review shared state/lifetimes when the slice touches coexistence; the global
+      `UiFitAudit.Enabled` switch is an unproven cross-mod risk, not a confirmed defect.
+- [ ] **Stabilize the demonstrated contract surface.** Document inputs, ownership, layout/input behavior,
+      fallback, migration and a consumer example, then decide API tiers individually. No blanket promotion
+      follows from one page or one automated gate chain passing.
 
-P1 as delivered — landed, each with a failure-sensitive lane and its red evidence recorded in `MEMORY.md`:
-FL-8 / FL-11 / FL-12 (docs, P1-A) · FL-1, FL-2, FL-3, X-21 (already fixed on this line; P1-B proved them by
-mutated revert) · FL-4 (REJECTED, with citation) · FL-23 (wrong-type binding read now REPORTED) ·
-`HelpKey` + `TitleKey1..8` (G1+G4) · `Tab` on containers · the gate-1 contention diagnostic · `WideHidden`,
-`WidthKey`, `SelectedKey`, the `chrome/banner` role pair, FL-21/FL-22 wording (P1-E-2 first half) ·
-`PayloadKey` + `Chrome="none"`/`Height="Auto"` (G2/G3) · typed `UiOption` (FL-16, second attempt) ·
-`input/text-field` (B7) · mode-row per-option hover help · `input/mode-row` label-set fix (B8).
+## Capability candidates — select through the current slice
 
-**Also landed since P1 closed (library-side, no consumer work owed):** the **development-only geometry
-instrument** — the library-held dev mode the maintainer asked for — and its **gate 10**, which is what keeps
-its dev half from rotting. Both are described in `MEMORY.md` § Start here; ten gates are green. The next batch
-that touches the carrier is **task-11** below.
+These retain their previous conditions and deferrals. They are not prerequisites to finish the entire
+library before validating the real page, and their listing order does not override the queue above.
 
-## Next — the consumer-driven batch (waiting on the friction report)
-
-- [ ] **task-11 — no stroke / per-edge stroke in the shared border vocabulary: the next batch that touches the
-      carrier.** `Chrome` is today either the default or `none`, and a border is all four edges or none — so a
-      flat surface can only be faked with `fill == border`, and a gold rail can only be hand-drawn by the
-      consumer. **Scope must include the edge WIDTH**: the library's hairline is 1px while the consumer
-      hand-draws 3px. Citations: the consumer's flat scope, its `us/section-header`, and half of the "row
-      selected fill" dead end. It lands as **one** carrier batch with one freeze notice.
+- [ ] **task-11 — no stroke / per-edge stroke with configurable edge width.** `Chrome` is currently the
+      default or `none`, and a border is all four edges or none. The consumer's flat scope and selected
+      rail motivate the candidate; the current 1px hairline cannot express its 3px rail. Select this work
+      when the active page slice requires it, with a general contract and its own acceptance. It is no
+      longer designated as the unconditional next carrier batch.
 - [ ] **FL-17 — the optional per-row template on `container/tree` (route A), the largest remaining item and
       scheduled last.** The one capability `Repeat` + `<Templates>` does not already cover: the cross of
       hierarchy and composition. `container/tree` renders one label band per row and takes no template, and
@@ -124,7 +125,6 @@ that touches the carrier is **task-11** below.
 - [ ] **Steam upload is not scripted and should not be, until the Workshop decision lands.** The precedent
       is manual upload from the staged directory; `pack-steam.ps1` produces the folder and prints the payload
       hash, and the upload waits on the maintainer's invited/unsupported call and the missing preview image.
-- [x] Configuration-isolated builds and an explicit compatibility export replace the shared-output rebuild/PDB ritual; see `docs/build-and-debug.md`.
 
 ## 1. In-game verification — still the critical path
 
@@ -133,7 +133,7 @@ future-regression guard and not a mutation proof of in-game geometry. The proced
 form: **`docs/in-game-walkthrough.md`** — fill one row per check there and record the outcome here. A blank
 row is not a pass, and "no error" is not one either.
 
-- [ ] **GO TO THE GAME.** The geometry-changing surface has never been in front of a player.
+- [ ] **Verify the current paired build in the game.** Earlier player observations do not constitute acceptance of the current geometry/input changes; the row-click case above remains open.
 - [ ] **The carrier guard's duplicate branch.** Copy `FerriteLib.UiKit.dll` into the *installed*
       `Mods/UniversalSqueaker/1.6/Assemblies` (never the repo — three gates refuse it there) and restart.
       Record **which** of three outcomes occurs; all three are valid results: (1) `DUPLICATE CARRIER` naming

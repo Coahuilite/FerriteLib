@@ -1,81 +1,55 @@
 # MEMORY
 
-## Start here — the signpost (added 2026-09-23 for whoever takes this repository over)
+## Start here — current direction (2026-09-24)
 
-**Read these, in this order. They are the whole map.**
+Read `AGENTS.md` for invariants, this file for durable state, and `TODO.md` for the active queue.
 
-| # | File | What it is |
-| --- | --- | --- |
-| 1 | `AGENTS.md` | The stable rules: invariants, boundaries, build isolation, evidence discipline. Read before acting. |
-| 2 | `MEMORY.md` | This file — the only volatile ledger: durable facts, rulings, evidence pointers. |
-| 3 | `TODO.md` | The action surface: current goals, open actions, blockers, explicit deferrals. Nothing else. |
-| 4 | `docs/development/0.7/05-api-contract.md` | What `0.7.x` commits to: every break and addition with its lane and its migration. |
-| 5 | `docs/development/0.7/40-verification.md` | **Which gate guards which half of the harness**, the mutation record, and the pending external checks. |
-| 6 | `docs/api-tiers.md` | The compatibility promise, type by type (stable / public-unstable / internalize-candidate). |
-| 7 | `docs/consumers/consume-from-0.7.0.md` | The consumer's view: wiring another mod against this carrier, and what moved. |
-| 8 | `docs/development/0.7/60-capability-dispositions.md` | ACCEPT / DEFER / REJECT per raised capability, against the four promotion gates. |
+| Document | Role |
+| --- | --- |
+| `docs/development/0.7/next-stage-guide-zh.md` | Next-stage development handbook: objective, ownership, slice order, and acceptance criteria. |
+| `docs/build-and-debug.md` | Operational commands, build-input selection, diagnostic interpretation, and automated-evidence limits. |
+| `docs/development/0.7/05-api-contract.md` | Existing 0.7.x contracts and migrations. |
+| `docs/development/0.7/40-verification.md` | Earlier line verification record; evidence applies to its named scope and revision. |
+| `docs/api-tiers.md` | Compatibility commitment by type. |
+| `docs/consumers/consume-from-0.7.0.md` | Consumer integration and migration guidance. |
+| `docs/development/0.7/60-capability-dispositions.md` | Existing capability decisions and their conditions; not the current execution order. |
 
-### The developer mode the library owns
+### Maintainer direction and current boundary
 
-**What it is.** `Source/FerriteLib.UiKit/Kernel/UiDevGeometryProbe.cs` — the whole file inside `#if FER_DEV`.
-It adds **no type, no kind and no process-wide static**: it is three members on the existing diagnostic
-surface — `UiDiagnosticSubscription.GeometryEnabled` / `.GeometryOverlay` / `.DumpGeometry()` — so its
-lifetime, isolation and release path are the subscription's own.
+- **Priority:** long-term FL stability and extensibility for shared mod use, accepting a delay to US.
+  Use the existing US ModSettings redesign as the real integration surface. Retain the page model over
+  Verse IMGUI and advance through complete consumer slices with explicit library/consumer ownership.
+- **Immediate acceptance:** reproduce and locate the reported Packs row-click failure in the real game,
+  then fix its owner and verify the original and adjacent scenarios. The root cause is still unknown.
+  Task-11 is a retained capability candidate, not an unconditional next implementation step.
+- **Implemented foundation:** configuration-isolated builds, explicit compatibility export, per-host
+  consumed-input diagnostics, and consumer compiler-reference/package hash checks. Commands and
+  failure-sensitive evidence are in `docs/build-and-debug.md`; this does not establish overall architecture
+  stability or close the game defect.
+- **Evidence boundary:** automated contracts, artifact identity, and real-game E2E are separate results.
+  Stub-based success cannot close an in-game input/layout defect. Multiple-mod coexistence has not been
+  demonstrated merely by making the library referenceable; the shared `UiFitAudit.Enabled` switch remains
+  a risk to review, not a reproduced cross-mod failure.
+- Branch `0.7.x`, API `0.7.0`, consumer range `[0.7.0,0.8.0)`. API tiers and the temporary 0.7.x version
+  exemption retain their existing conditions. Local work remains unpushed; publication is not authorized.
+- Packages identify their own bytes through `version.txt`, embedded source identity and measured hashes.
+  A docs-only commit does not rebuild them. Any strict embedded-commit-versus-HEAD check needs a fresh
+  build before its next acceptance run; previous evidence remains scoped to the artifact actually tested.
 
-**Why it is not spread over the tree.** It is fed from exactly three existing chokepoints: the engine's
-per-entry draw walk, the engine's overlay call, and the funnel's click decision. Nowhere else is instrumented.
+### The library-owned development instrument
 
-**What it records — the numbers a screenshot cannot settle.**
-- per arranged node: the **arranged**, **drawn** and **window-space** rects, the **origin** between those
-  spaces, the declared **height mode** (`Fixed`/`Auto`/`MatchContent`) and the height that mode resolved to;
-- for `Scroll`/`Clip`: the same plus the **viewport** and the **real content extent** (not the visible band);
-- per sampled press: element **path/kind**, the **pointer** and the **queried rect** in one space, and the
-  verdict **`disabled` | `covered` | `hit` | `miss`** — sampled on a press, never per frame.
-`DumpGeometry()` returns it as diffable text; `GeometryOverlay = true` outlines each sampled element.
-
-**It only observes.** No sample is read back by the engine, the session, the hit stack or the fit audit, and
-the overlay is painted after the element it outlines has drawn, in that element's own draw-local space.
-
-**It fails closed.** Compiled out of a release payload; there `GeometryEnabled = true` **throws** rather than
-accepting the opt-in and then answering every question with emptiness.
-
-**Which gate guards it: gate 10**, `scripts/verify-dev-instrument.ps1`, invoked by `verify-local.ps1`.
-Gate 1 runs the harness in Release, where `#if FER_DEV` is undefined, so the dev half needed a gate of its
-own. Gate 10 runs the harness in **Dev** and refuses to accept "the project compiled": it requires the
-dev-only assertion names, floors on the assertion and dumped-node counts, and the **absence** of the
-release-only half's name, and its checker is control-tested on every run against four planted fixtures (an
-empty output, a release-only output and a green-exit-but-missing-name output must be **rejected**; a fully
-populated sample must **not** be) — which is what closes the "an empty enumeration passes" bug class.
-**Build isolation (2026-09-24):** gates and harnesses write only `dist/build/<Configuration>`. The root compatibility carrier is updated only by explicit export. See `docs/build-and-debug.md`; older shared-output incidents below describe the previous layout.
-
-**How to run it by hand.**
-```powershell
-pwsh -NoProfile -File scripts/verify-dev-instrument.ps1      # gate 10 alone: Dev harness + its own controls
-dotnet run --project tools/FerriteLib.UiKit.Tests -c Dev     # the Dev harness: every lane's dev half
-```
-
-**Why it exists at all, with the measurement that forced it.** The harness project never defined `FER_DEV`, so
-the `#if FER_DEV` branch in `KernelDocumentReloadTests` had **never been compiled by any run**, and a
-`-c Dev` harness run was **red** (the test took its release branch while the library was Dev). "A test written
-inside a conditional-compilation block that no configuration defines" is the general defect class; the tests
-csproj now mirrors the library's Dev gate, and gate 10 keeps the arrangement from rotting.
-
-**One precondition for a consumer.** The instrument exists only in a **Dev payload**, so using it means one Dev
-build in `dist/build/Dev`, then explicitly selecting that artifact in the consumer. Release stays separate. There is no release-build path to the instrument, by design.
-
-### Where the line stands (2026-09-23)
-
-- Branch `0.7.x`, contract axis `0.7.0`, consumer range `[0.7.0,0.8.0)`. **Ten gates, all green**
-  (`pwsh -NoProfile -File scripts/verify-local.ps1`).
-- **Carrier identity is never pinned in a tracked file.** The live identity is the **latest FREEZE NOTICE**,
-  quoted as **hash + mtime together**; the history lines further down name past builds only. A hash without its
-  build command and clean/dirty state is a machine-local fact.
-- **Local `0.7.x` is ahead of `origin/0.7.x` and has not been pushed.** Pushing, tagging and publishing are
-  maintainer actions — do not "tidy up" by pushing.
-- **Current workflow:** `docs/build-and-debug.md`; native-event evidence and its limits are recorded there. The live staged package identifies itself through `version.txt` and its DLL hash.
-- `TODO.md` carries what is actually open.
+`UiDiagnosticSubscription.GeometryEnabled` / `.GeometryOverlay` / `.DumpGeometry()` expose the bounded,
+per-host instrument in `UiDevGeometryProbe.cs`. It observes engine geometry and native input decisions;
+its samples never govern layout or dispatch. Host entry preserves the event phase before consumption,
+queries report event-before/event-after, and an already-Used entry explicitly marks its origin unknown.
+Release excludes the capture and rejects enabling it. Gate 10 executes the Dev assertions, including the
+consumed-input case; gate 1 alone is not Dev coverage. Usage and proof details belong to the operational guide.
 
 ## Current durable state
+
+The dated records below explain earlier changes and their scoped evidence. Current priorities are above;
+current build behavior is in "Carrier identity and build isolation". Historical gate counts, capture sites,
+and delivery procedures do not override the current scripts or the next-stage handbook.
 
 - **The development-only geometry instrument landed (2026-09-22) — a numeric audit, not a consumer feature, and
   the citation is what asked for it.** Maintainer ruling: a dev tool that makes precise layout possible belongs
@@ -84,8 +58,8 @@ build in `dist/build/Dev`, then explicitly selecting that artifact in the consum
   `<Widget Id="race-layer-row-hit" Kind="input/button" Chrome="none" Height="MatchContent" ActionBind="select-domain" />`,
   and what it proved, four measured points: (1) the host's lane presses that row and passes at 100% geometry
   coverage while the maintainer's in-game click on the race row does nothing; (2) `Player.log` carries 0
-  `Exception`/`TRIPPED`/recovery band/`KeyNotFoundException`, so it is neither a missing command nor an
-  element replaced by the recovery band; (3) the harness's and the game's frame/coordinate spaces disagree —
+  `Exception`/`TRIPPED`/recovery band/`KeyNotFoundException`; their absence alone does not establish whether
+  the command was reached; (3) the harness's and the game's frame/coordinate spaces disagree —
   the same control read `(736,270)` in one frame and `(752,398)` in the other, the recorder reporting
   content-group space while the snapshot reported window space; (4) a px-level claim cannot be accepted by eye
   ("行高相关 px 肉眼无法看出") ⇒ numbers.
@@ -281,10 +255,10 @@ build in `dist/build/Dev`, then explicitly selecting that artifact in the consum
     warning. If a future consumer asks for "Auto could not measure" as an explicit, opt-in diagnostic, that is a
     new request with its own citation.
 
-- **Phase order is fixed and P1 gates everything else (maintainer ruling 2026-09-20): P1 seam and library fixes →
-  P2 migration and the legacy project's retirement → P3 the full UI/UX reset (last) → P4 new work.** This replaces
-  the earlier "wait for one go" framing in `TODO.md`, and it is authoritative: **S3–S7 do not move until P1
-  closes**, and FL's backlog remains friction the consumer's real use exposes rather than a wish list.
+- **Historical phase order (2026-09-20):** P1 seam/library fixes → P2 migration/legacy retirement → P3 full
+  UI/UX reset → P4 new work. This explains the earlier P1 records below. Current priorities and slice order
+  follow the 2026-09-24 maintainer direction and the next-stage handbook; the old phase labels do not reopen
+  completed work or make task-11 the automatic next batch.
 - **P1-A closed 2026-09-20 (documentation口径 only, no source and no carrier build): FL-8, FL-11, FL-12.** One of
   the three was fixed twice, and the second reason is the durable part.
   (1) **FL-8** — the old→new migration section is §4c of `docs/consumers/consume-from-0.7.0.md` with the four
@@ -724,7 +698,7 @@ build in `dist/build/Dev`, then explicitly selecting that artifact in the consum
   never the surface. **=> No lane reads "additions", and no lane or gate anywhere enforces the minor bump.**
   Therefore no re-cut is owed for this exemption; if a future lane starts reading additions (or its message
   wording starts asserting the minor rule) align it in the batch that lands the next capability — running
-  the harness is itself a writer of the shared carrier, so such a change rides that batch's delivery step.
+  the harness and library must exercise that change together. Builds now use isolated outputs; see "Carrier identity and build isolation".
   **A wrong statement of the lead's is corrected here for the record:** the lead told the maintainer that
   "the gates would block your approved change". That is false as stated — what reacts is `api-tiers`'
   classification lane, satisfied by classifying the new type, while the "bump the minor" half was never
@@ -765,7 +739,7 @@ build in `dist/build/Dev`, then explicitly selecting that artifact in the consum
   evidence; a transcription into this file (`owner/repo@sha:path:line` + excerpt + what it proved) is.
 - **Nothing persists into a save**, and the Squeaky Ratkin repo is never a write target.
 
-## Carrier identity and the shared payload path
+## Carrier identity and build isolation
 
 - **A hash is an identity only with its inputs pinned.** `1.6/Assemblies/FerriteLib.UiKit.dll` is the whole
   payload; a hash quoted without the build command and the clean/dirty state is a machine-local fact.
@@ -776,31 +750,25 @@ build in `dist/build/Dev`, then explicitly selecting that artifact in the consum
   is a dirty build whose source is never committed. Hence the delivery order — **commit first, build last,
   report the identity measured from that build** — and hence a doc-only commit reddens "embedded commit ==
   HEAD" until the carrier is rebuilt. That is expected, not a defect: broadcast the moved HEAD.
-- **A loaded assembly holds its file open, and readers count.** A sibling checkout's harness or probe
-  blocks a build exactly as another builder does, and the symptom is `MSB3026`/`MSB3027`/`MSB3021` deep
-  inside captured build output — which reads like a broken build, not contention.
-  `scripts/verify-local.ps1` probes the payload for an exclusive open before any gate and fails fast
-  naming the cause.
-- **Never `Assembly.LoadFile` the payload in the session that is measuring it** — the handle survives to
-  process exit. Read identity from a child process or from a copy (the Store build of PowerShell has a
-  trimmed `System.Reflection.Metadata`, so `PEReader.GetMetadataReader` is unavailable there anyway).
-- **`-PackDev` leaves Dev-configuration bytes at the shared output path**, and a sibling-`HintPath`
-  consumer compiling against `../ferritelib/1.6/Assemblies/` picks them up. After any `-PackDev` or
-  `verify-local` run the delivery step ends with a forced `dotnet build -c Release --no-incremental` **and**
-  removal of the stale `.pdb` (Release sets `DebugType=none`, so it neither rewrites nor deletes one
-  already there). `AssemblyConfigurationAttribute` is the detector, never the version suffix: a correct
-  Release carrier still reads `0.7.0-dev+<sha>`.
-- **Two concurrent harness runs collide** on the shared output path and die with `CS2012`, so a cross-repo
-  build-and-harness stretch serialises on one engineer.
+- **Current output contract:** builds and harnesses write `dist/build/<Configuration>`. Packagers read the
+  matching output and stage into `dist/<channel>`; only `export-carrier.ps1` updates the root compatibility
+  DLL, and it accepts Release only. Verification checks that the held compatibility DLL's hash and mtime
+  are unchanged. The former shared-output Release rebuild/PDB-removal ritual is retired.
+- **Loaded files can still be locked.** Read assembly metadata in a child process or a copy. Serialize
+  harness builds because their canonical `bin/stubs` output remains shared; isolate build configurations
+  without assuming that arbitrary concurrent writers of the same artifact are safe.
+- **Identity comes from the selected artifact.** Configuration is measured from
+  `AssemblyConfigurationAttribute`, not inferred from the version suffix. Staged `version.txt` records the
+  payload hash. An exporter copies the last built Release artifact and prints its identity; it does not
+  prove current HEAD or a clean source tree. Publication and consumer release checks retain stricter rules.
 
 - **Carrier identity moved three times on 2026-09-22, and `0.7.x` was first-pushed the same day.** History:
   `876750a`/`58B57EAD…` -> `e668344`/`1BBF5F4D…` -> `553fc53`/`3FA8CABE…` (all 252416 B, Release, no PDB) ->
   `06ff1c2`/`1891A5CE…D649`/252416 B (the frozen Release the maintainer's live in-game pass ran against) -> a
   2026-09-23 rebuild at HEAD `9938121` after gate 10 landed (253440 B, Release, no PDB), **whose hash is
-  deliberately not quoted here**: the live identity is the newest **FREEZE NOTICE**, quoted as hash + mtime.
-  **Do not pin the live identity in a tracked file:** every commit that moves HEAD forces a payload rebuild, so
-  a SHA written here is stale the moment it lands - that loop is why these are history lines. The live identity
-  is the **FREEZE NOTICE**, quoted as **hash + mtime**. The push went out after `privacy-audit -FullHistory` was
+  deliberately not quoted here**. Those deliveries used the old FREEZE NOTICE workflow (hash plus mtime);
+  current staged identities are read from the selected package, not inferred from this history. The push
+  went out after `privacy-audit -FullHistory` was
   CLEAN over 342 revisions; **no tag was created, so nothing was published** (`release.yml` fires on
   tags/releases only). **US's carrier stayed byte-identical across its full chain run** - the measurement behind
   "a sibling consumer reads the payload read-only".
@@ -891,11 +859,9 @@ build in `dist/build/Dev`, then explicitly selecting that artifact in the consum
   `github.com` resolves into the fake-IP range (`198.18.x.x`) and port 22 is closed mid-handshake
   (`Connection closed by UNKNOWN port 65535`), while `git -c http.proxy=http://127.0.0.1:7897 push <https-url>`
   succeeds - that is how the 0.7.x first push went out. Probe the transport before blaming permissions.
-- **A delivery-step build must be given the project path.** `dotnet build -c Release --no-incremental` at the
-  repository root fails with `MSB1003` (no project file there) **after** the dev pack has already written Dev
-  bytes to the shared carrier, so the carrier stays Dev (272896 B) until
-  `dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release --no-incremental` runs. "The build
-  succeeded" and "the right thing was built" are different claims.
+- **Build commands need the project path.** The repository root has no project file; use
+  `dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release`. It now writes the isolated Release
+  output. Updating a compatibility delivery remains a separate explicit export.
 ## Diagnostic coverage — the rulings that shape the channels
 
 - **`Available` is the inset label band, not the element rect** (FL-21). An overflow verdict compares the

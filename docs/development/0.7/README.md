@@ -1,5 +1,9 @@
 # 0.7.x — subtraction and stabilization: execution record
 
+For work after the build-isolation and diagnostic batch, start with the
+[next-stage development handbook](next-stage-guide-zh.md); `TODO.md` at the repository root is the active
+queue. This page retains the earlier line execution record and its scoped evidence.
+
 Status home for the line (plan: `ferritelib-0.7-development-plan-en.md`, maintainer approval 2026-09-17:
 "conform, go on"). Contract text lives in `05-api-contract.md` (written before the behavior changes);
 command evidence in `40-verification.md`. Not a second task ledger. The **capability-disposition table** for the

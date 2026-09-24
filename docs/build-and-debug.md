@@ -1,5 +1,8 @@
 # Build inputs, diagnostics, and development slices
 
+This is the operational guide. Development priorities, slice order, ownership decisions, and completion
+criteria live in the [next-stage development handbook](development/0.7/next-stage-guide-zh.md).
+
 ## Build once, select the input explicitly
 
 Ordinary builds and harnesses write `dist/build/<Configuration>/FerriteLib.UiKit.dll`.
@@ -61,22 +64,7 @@ without changing the held delivery. These checks belong to the existing build/di
 
 ## Development direction
 
-Keep the retained page model over Verse IMGUI. Grow it through complete slices of an actual consumer's
-settings redesign: one observed failure, its ownership decision, the smallest contract/fix, a failure-sensitive
-test, and a real-game acceptance case. Consumer data, business actions, and page composition stay with the
-consumer. FL owns element identity, coordinate/layout rules, input arbitration, state lifetime, recovery,
-and the diagnostic facts emitted at those boundaries.
-
-The next acceptance slice is a real row click inside scroll/overlay composition. Record the loaded package
-hashes, window size/UI scale, language, scroll position, intended row, before/after selection, and the
-corresponding geometry/input dump. Exercise repeated clicks at the same position, scrolling, and popup
-occlusion. First reproduce the failure; do not change dispatch on the strength of a suspected cause.
-
-Add clip-chain or command-dispatch tracing only if that reproduction shows the current report cannot
-locate the loss. Prefer an internal diagnostic addition before a new public API. A general interactive
-inspector, a new layout engine, and new widget kinds are not prerequisites for this slice.
-
-Acceptance has separate claims: automated contracts pass; package inputs match; the real-game scenario
-passes. Report each independently. A missing third claim keeps the in-game defect open even when all
-automated gates are green. Stabilize documented contracts after their own behavior and compatibility
-rules are established; do not use either consumer count or a hypothetical complete UI framework as a gate.
+Follow the [next-stage handbook](development/0.7/next-stage-guide-zh.md) and the active queue in `TODO.md`.
+The immediate game scenario remains row selection inside scroll/overlay composition. Automated contracts,
+package identity, and real-game acceptance are separate claims; the in-game defect remains open until its
+own real-game acceptance passes.
