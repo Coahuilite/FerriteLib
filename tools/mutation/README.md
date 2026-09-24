@@ -82,7 +82,8 @@ cross-repo write is exactly the shape that caused an earlier incident, so:
 | M10 | the run may not touch the repository-root carrier: hash+mtime identical before and after | `-Carrier` |
 | K3 | the artifact fingerprint is **derived** from the mutated file; a caller naming an unrelated artifact is refused instead of obeyed | `Get-ArtifactForPath` |
 | - | the reference the artifact must return to is established by a **baseline build** with the same rebuild command, from the clean source, immediately before the mutation | `Invoke-Mutation.ps1` baseline step |
-| - | every log carries an **outcome label**: `intended-red`, `instrument-refused-invalid-setting`, or `wrong-reason-red` (the last one is checked in the opposite direction: the named assertion must be ABSENT) | `-Outcome` |
+| - | every log carries an **outcome label**: `intended-red`, `instrument-refused-invalid-setting`, or `wrong-reason-red` (the last one is checked in the opposite direction: the named assertion must be ABSENT), and any non-intended label must carry `# why this label:` | `-Outcome`, `-OutcomeWhy` |
+| M11 | M6 applied to the instrument: the log pins the **generator's own identity** (`# generator: <path> sha256=…`, `# batch: <path> sha256=…`), and the dirty set is a path PLUS per-file sha256 - so "the engine that ran is the committed engine" is a hash, not an inference | log header |
 
 ## The generator's own three acceptance checks
 

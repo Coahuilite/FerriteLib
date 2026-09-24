@@ -65,6 +65,10 @@ and delivery procedures do not override the current scripts or the next-stage ha
   rather than fingerprinted with no signal (K3); and a watched carrier may not move its hash or mtime (M10).
   Nine fixtures including a positive control prove the generator cannot lie; three of them are the acceptance
   checks (missing anchor, un-restorable target, unrelated artifact), each runnable alone with `-Fixture`.
+  **M11 applies M6 to the instrument itself**: every log pins the generator's and the batch's own sha256, and
+  the dirty set is a path plus a per-file sha256, because "the engine that ran is the committed engine" is
+  otherwise an inference from a name list. A non-intended outcome label must also carry `# why this label:`,
+  since two logs can share their red text and differ only in cause.
   **Two carriers, two names:** `-WatchCarrier` is the frozen root payload; the *driver* carrier is what the
   command links, and the consumer half selects the Dev payload explicitly. The consumer half performs a
   cross-repo write, so it is the consumer owner's step and belongs in the consumer repository long term.
