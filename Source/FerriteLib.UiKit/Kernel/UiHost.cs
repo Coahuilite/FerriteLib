@@ -232,6 +232,9 @@ public sealed class UiHost : IDisposable
         {
             // Popups are drawn after content and must clamp themselves into the frame's usable window
             // space; publish it here, the one place that knows both the viewport and the session.
+#if FER_DEV
+            subscription?.Geometry?.BeginPass(session.Frame);
+#endif
             session.SetHostViewport(viewport);
             UiWidgetContext ctx = CreateContext(viewport.width);
             engine.Draw(ctx, snapshot, viewport);

@@ -107,19 +107,14 @@ jobs:
           dotnet restore Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj --nologo
           dotnet restore tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj --nologo
 
-      # Order matters. verify-local's Dev/Release build gates leave 1.6/Assemblies/ carrying a
+      # Order matters. verify-local's Release output in dist/build/Release carries a
       # -dev version suffix, and pack-release.ps1 refuses to publish that identity. So the gates run
       # first, on the tree exactly as tagged, and only then is the payload rebuilt as the artifact.
-      - name: Verify (9 gates)
+      - name: Verify (10 gates)
         shell: pwsh
         run: ./scripts/verify-local.ps1
 
-      # --no-incremental is load-bearing here rather than tidy. The gates above end with a Release build into
-      # the same shared OutputPath (1.6/Assemblies/), and up-to-dateness is judged per configuration while the
-      # path is shared - so an incremental build can report itself current while the file at the carrier path
-      # was last written by the Dev gate. The -p:VersionSuffix= change usually forces the generated
-      # AssemblyInfo to change and therefore a recompile, but "usually" is an indirect mechanism, not a
-      # guarantee; --no-incremental makes "every pack is freshly built" literally true.
+      # Build fresh with the publication version suffix. Staging independently verifies that identity.
       - name: Build the release payload
         shell: pwsh
         run: dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release -p:VersionSuffix= --no-incremental --nologo

@@ -30,10 +30,7 @@ $ErrorActionPreference = "Stop"
 # exit code but a missing dev assertion, and a fully-populated output that must NOT be rejected. A checker
 # that cannot fail is not a gate, and a checker that rejects everything is not one either.
 #
-# This script WRITES the shared carrier: 'dotnet run -c Dev' builds the harness and its ProjectReference,
-# whose OutputPath is 1.6/Assemblies/, so a full chain run leaves Dev bytes plus a Dev PDB beside the
-# payload. That is the delivery step's problem to end (forced Release rebuild + stale PDB removal), exactly
-# as gate 2's Dev build already was.
+# The harness builds into dist/build/Dev; staged deliveries and the compatibility carrier are untouched.
 
 $root = [System.IO.Path]::GetFullPath($ProjectRoot)
 $testsProject = Join-Path $root 'tools\FerriteLib.UiKit.Tests\FerriteLib.UiKit.Tests.csproj'
@@ -46,7 +43,9 @@ $devOnlyAssertions = @(
     'an element inside the scoped container is reported in the other space',
     'a scoped container is reported as a viewport rather than as an ordinary rect',
     'a claimed press names the element that claimed it',
-    'a disabled element reports why the press went nowhere'
+    'a disabled element reports why the press went nowhere',
+    'a later query remains visible after consumption',
+    'diagnostics on and off dispatch exactly one command per native click'
 )
 
 # The name only the release half can print. Seeing it in a Dev run means the branches are not exclusive.
@@ -129,8 +128,8 @@ $controlSample = @(
     '  ok: a scoped container is reported as a viewport rather than as an ordinary rect'
     '  ok: a claimed press names the element that claimed it'
     '  ok: a disabled element reports why the press went nowhere'
-    '  ok: filler 1'
-    '  ok: filler 2'
+    '  ok: a later query remains visible after consumption'
+    '  ok: diagnostics on and off dispatch exactly one command per native click'
     '  ok: filler 3'
     '  ok: filler 4'
     '  ok: filler 5'

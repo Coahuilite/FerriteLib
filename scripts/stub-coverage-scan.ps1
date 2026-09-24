@@ -306,7 +306,7 @@ foreach ($dir in $copyDirs) {
 # ------------------------------------------------------------------------- the targets (what must resolve)
 
 $targets = New-Object System.Collections.Generic.List[string]
-$payload = Join-Path $root '1.6/Assemblies/FerriteLib.UiKit.dll'
+$payload = Join-Path $root 'dist/build/Release/FerriteLib.UiKit.dll'
 if ($Assembly) {
     foreach ($one in $Assembly) {
         $full = [System.IO.Path]::GetFullPath($one)

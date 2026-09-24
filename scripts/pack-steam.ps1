@@ -16,7 +16,7 @@ $ErrorActionPreference = "Stop"
 
 $root = [System.IO.Path]::GetFullPath($ProjectRoot)
 $projectFile = Join-Path $root 'Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj'
-$payloadDll = Join-Path $root '1.6\Assemblies\FerriteLib.UiKit.dll'
+$payloadDll = Join-Path $root 'dist\build\Release\FerriteLib.UiKit.dll'
 $stageDir = Join-Path $root 'dist\steam\FerriteLib'
 
 # Same tag grammar as the GitHub channel, deliberately: a Workshop item and a release page carrying

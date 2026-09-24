@@ -7,12 +7,13 @@ public enum EventType
 {
     MouseDown = 0,
     MouseUp = 1,
-    MouseDrag = 2,
-    KeyDown = 3,
-    KeyUp = 4,
-    Repaint = 5,
-    Layout = 6,
-    Used = 7
+    // Values match Krafs.Rimworld.Ref 1.6.4871: callers inline the reference enum constants.
+    MouseDrag = 3,
+    KeyDown = 4,
+    KeyUp = 5,
+    Repaint = 7,
+    Layout = 8,
+    Used = 12
 }
 
 public sealed class Event
@@ -64,6 +65,7 @@ public sealed class Event
     public void Use()
     {
         used = true;
+        type = EventType.Used;
     }
 
     // The real UnityEngine.Event exposes this factory and no public constructor; the lanes compile
@@ -126,6 +128,19 @@ public static class GUI
     }
 
     private static readonly System.Collections.Generic.Stack<Vector2> groupOrigins = new();
+    private static readonly System.Collections.Generic.Stack<Rect> groupClips = new();
+
+    // Mouse hit tests respect every enclosing GUI clip, including a scroll viewport.
+    public static bool IsPointVisible(Vector2 local)
+    {
+        Vector2 origin = GroupOrigin;
+        var window = new Vector2(local.x + origin.x, local.y + origin.y);
+        foreach (Rect clip in groupClips)
+        {
+            if (window.x < clip.x || window.x >= clip.xMax || window.y < clip.y || window.y >= clip.yMax) return false;
+        }
+        return true;
+    }
 
     /// <summary>
     /// Accumulated origin of the innermost open group; zero outside any group. The stub presents
@@ -139,6 +154,7 @@ public static class GUI
         GroupDepth++;
         BeginGroupCalls++;
         Vector2 parent = GroupOrigin;
+        groupClips.Push(new Rect(parent.x + position.x, parent.y + position.y, position.width, position.height));
         groupOrigins.Push(new Vector2(parent.x + position.x, parent.y + position.y));
     }
 
@@ -147,5 +163,6 @@ public static class GUI
         if (GroupDepth > 0) GroupDepth--;
         EndGroupCalls++;
         if (groupOrigins.Count > 0) groupOrigins.Pop();
+        if (groupClips.Count > 0) groupClips.Pop();
     }
 }

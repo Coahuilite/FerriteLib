@@ -102,7 +102,8 @@ internal readonly struct UiDevGeometrySample
 /// </summary>
 internal readonly struct UiDevInputSample
 {
-    internal UiDevInputSample(int pass, string path, string kind, Rect rect, Vector2 point, string verdict)
+    internal UiDevInputSample(int pass, string path, string kind, Rect rect, Vector2 point, string verdict,
+        string eventBefore, string eventAfter)
     {
         Pass = pass;
         Path = path ?? "";
@@ -110,6 +111,8 @@ internal readonly struct UiDevInputSample
         Rect = rect;
         Point = point;
         Verdict = verdict ?? "";
+        EventBefore = eventBefore;
+        EventAfter = eventAfter;
     }
 
     internal int Pass { get; }
@@ -124,6 +127,8 @@ internal readonly struct UiDevInputSample
 
     /// <summary>What the funnel decided.</summary>
     internal string Verdict { get; }
+    internal string EventBefore { get; }
+    internal string EventAfter { get; }
 }
 
 /// <summary>
@@ -153,6 +158,7 @@ internal sealed class UiDevGeometryCapture
     internal bool Overlay { get; set; }
 
     internal int Pass => pass;
+    internal string EntryEvent { get; private set; } = "none";
 
     internal int GeometryCount => geometry.Count;
 
@@ -167,6 +173,7 @@ internal sealed class UiDevGeometryCapture
     {
         if (current == pass) return;
         pass = current;
+        EntryEvent = UiNative.DiagnosticEventName();
         geometry.Clear();
         input.Clear();
         DroppedGeometry = 0;
@@ -217,6 +224,8 @@ internal sealed class UiDevGeometryCapture
             .Append(" nodes-dropped=").Append(DroppedGeometry.ToString(CultureInfo.InvariantCulture))
             .Append(" inputs=").Append(input.Count.ToString(CultureInfo.InvariantCulture))
             .Append(" inputs-dropped=").Append(DroppedInput.ToString(CultureInfo.InvariantCulture))
+            .Append(" event=").Append(EntryEvent)
+            .Append(EntryEvent == "Used" ? " input-origin=unknown" : "")
             .Append('\n');
 
         for (int i = 0; i < geometry.Count; i++)
@@ -249,6 +258,8 @@ internal sealed class UiDevGeometryCapture
                 .Append(" point=").Append(Point(sample.Point))
                 .Append(" rect=").Append(Rect(sample.Rect))
                 .Append(" verdict=").Append(sample.Verdict)
+                .Append(" event-before=").Append(sample.EventBefore)
+                .Append(" event-after=").Append(sample.EventAfter)
                 .Append('\n');
         }
 
@@ -354,19 +365,22 @@ internal static class UiDevGeometryProbe
     /// <summary>
     /// Records one hit query's verdict. Sampling is press-shaped on purpose: a button is queried every frame
     /// it draws, and a per-frame line per control would be a log rather than a numeric answer, so a sample is
-    /// taken only when the pointer is down or up, or when the native control actually fired.
+    /// taken when the pass started with a pointer press/release, or the native control fired. A pass that
+    /// entered already Used is also observable, but explicitly marks its original input kind unknown.
     /// </summary>
-    internal static void NoteInput(UiWidgetContext ctx, UiNode? element, Rect rect, string verdict)
+    internal static void NoteInput(UiWidgetContext ctx, UiNode? element, Rect rect, string verdict, string eventBefore)
     {
         UiDevGeometryCapture? capture = UiDiagnosticHub.ActiveSubscription?.Geometry;
         if (capture == null) return;
 
-        bool pressed = string.Equals(verdict, "hit", StringComparison.Ordinal)
+        capture.BeginPass(ctx.Session.Frame);
+        bool sampleInput = string.Equals(verdict, "hit", StringComparison.Ordinal)
+            || capture.EntryEvent == "MouseDown" || capture.EntryEvent == "MouseUp"
+            || capture.EntryEvent == "Used"
             || UiNative.IsPointerDown()
             || UiNative.IsPointerUp();
-        if (!pressed) return;
+        if (!sampleInput) return;
 
-        capture.BeginPass(ctx.Session.Frame);
         Vector2 pointer = UiNative.PointerPosition();
         capture.Add(new UiDevInputSample(
             ctx.Session.Frame,
@@ -374,7 +388,7 @@ internal static class UiDevGeometryProbe
             element is null ? "" : element.Kind,
             ctx.ToWindowRect(rect),
             ctx.ToWindowRect(new Rect(pointer.x, pointer.y, 0f, 0f)).position,
-            verdict));
+            verdict, eventBefore, UiNative.DiagnosticEventName()));
     }
 
     /// <summary>The declared height mode, read the way the engine reads it rather than re-derived.</summary>

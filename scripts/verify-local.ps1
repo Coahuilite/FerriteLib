@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 #   1   FerriteLib.UiKit harness, Release (kernel lanes + version contract + neutrality + boundary)
 #   2   library Dev build (FER_DEV, TreatWarningsAsErrors)
 #   3   library Release build (TreatWarningsAsErrors)
-#   4   mod payload present at the path consumers bind to
+#   4   Dev/Release outputs exist in distinct configuration-specific build directories
 #   5   payload is content-free: no Defs, Patches, Languages, Sounds or Textures under 1.6
 #   6   LICENSE present and full MPL-2.0, with no applied incompatibility notice
 #   7   About.xml identity (packageId, modVersion present and parsable as a Version)
@@ -32,23 +32,13 @@ $ErrorActionPreference = "Stop"
 #       carries the dev-only assertion names, a floor on the assertion and dump-line counts, the absence of
 #       the release-only half's name, and the printed numbers (see scripts/verify-dev-instrument.ps1)
 #       - because gate 1 runs the harness in Release, and a dev-only proof nobody re-runs is a proof that
-#       rots. This gate WRITES the carrier too: it builds and runs the harness in Dev (gate 2 writes Dev
-#       bytes, this one leaves Dev bytes plus a Dev PDB for the delivery step to end).
+#       rots. It writes only the Dev build output; delivered packages remain untouched.
 # -PackDev: after all checks pass, stage the dev folder (a directory, not an archive). Placing it
 #   in a game Mods directory is the developer's own step - no script here writes outside the repository.
 #   -PackZip also writes the dev zip; -PackNupkg also writes the consumer reference package. Both are
 #   opt-in because nothing on the dev path needs them.
 #
-# A failing gate prints its retry hint under [hint] - and a hint whose command WRITES the carrier is the
-# trap, because this script is itself a writer of the shared carrier (gate 2 is the Dev build, gate 3 the
-# Release one). Two shapes write it: the explicit `dotnet build` hints, and the harness hint
-# (`dotnet run --project tools/FerriteLib.UiKit.Tests`), which may recompile the carrier through its
-# ProjectReference whenever HEAD has moved (see the classifier comment below). The hint is read in a
-# "you are verifying" frame, so it must not read like a repair: writing the carrier is a DELIVERY step, it
-# REPLACES the frozen identity every consumer already verified, only the payload owner runs it, and it
-# ends with a re-issued FREEZE NOTICE. The general rule is AGENTS.md, "The payload path is shared, and
-# that is the trap". Both writers of the carrier are annotated: the explicit builds, and the harness run
-# that may recompile it because HEAD moved. The restore hint and the read-only retries carry no notice.
+# Builds and harnesses write dist/build/<Configuration>; delivered carriers are read-only here.
 
 # The neutrality guard, the visual-core/page-model boundary and the two version axes all run INSIDE
 # gate 1, from the library's own harness, each with a positive control. There is no second copy of
@@ -58,61 +48,16 @@ $ErrorActionPreference = "Stop"
 $root = [System.IO.Path]::GetFullPath($ProjectRoot)
 $projectFile = Join-Path $root 'Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj'
 $testsProject = Join-Path $root 'tools\FerriteLib.UiKit.Tests\FerriteLib.UiKit.Tests.csproj'
-$assembliesDir = Join-Path $root '1.6\Assemblies'
+$assembliesDir = Join-Path $root 'dist\build\Release'
 $tempLog = Join-Path ([System.IO.Path]::GetTempPath()) ("fl-verify-" + [guid]::NewGuid().ToString('N') + '.log')
 
-# The payload path is SHARED with the sibling checkouts, and a sibling process that LOADS the carrier at
-# runtime holds its file open EXCLUSIVELY - so a reader blocks this run's build exactly as another builder
-# would. Measured 2026-09-20: a sibling's verification script called Assembly.LoadFile on this DLL to print its
-# configuration and held it for its whole run; the symptom here was MSB3026 retries ending in MSB3027/MSB3021
-# inside gate 1's captured build output, which reads like a broken build rather than contention, and it cost a
-# blocked delivery round while the cause was hunted in the wrong repository. Probe the file before any gate runs
-# and name it. Skipped when the payload does not exist yet (a fresh clone builds it in gate 2).
-$payloadPath = Join-Path $assembliesDir 'FerriteLib.UiKit.dll'
-if (Test-Path -LiteralPath $payloadPath -PathType Leaf) {
-    try {
-        $lockProbe = [System.IO.File]::Open($payloadPath, [System.IO.FileMode]::Open,
-            [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
-        $lockProbe.Close()
-    } catch [System.IO.IOException] {
-        throw ("The payload at $payloadPath is held by another process, so no gate can replace it: " +
-            $_.Exception.Message + ". The usual cause is a sibling checkout's harness, probe or verification " +
-            "script, which loads the carrier at runtime - a loaded assembly holds its file open exclusively - " +
-            "so a reader blocks this build exactly as another builder would. Stop that process (one carrier " +
-            "user at a time across the repositories sharing this path), then re-run.")
-    }
-}
+# Observe the compatibility delivery without opening it for writing. It may be loaded by a consumer.
+$deliveredPath = Join-Path $root '1.6\Assemblies\FerriteLib.UiKit.dll'
+$deliveredBefore = if (Test-Path -LiteralPath $deliveredPath) {
+    (Get-FileHash -LiteralPath $deliveredPath).Hash + ':' + (Get-Item -LiteralPath $deliveredPath).LastWriteTimeUtc.Ticks
+} else { 'absent' }
 $buildExtraArgs = @()
 if ($NoRestore) { $buildExtraArgs += '--no-restore' }
-
-# Why the hint carries a notice (2026-09-22, real accident): a consumer-side verification session copied a
-# rebuild hint printed by a red gate, rebuilt the carrier and moved the frozen hash - the same accident
-# class as running the gate chain itself, and the reason a hint has to say what its command is.
-# The classifier is the JUDGEMENT, not a command name: the question is whether that retry WRITES the
-# carrier. Two command shapes do. `dotnet build` writes it directly. `dotnet run --project` is ALSO a
-# writer even though nothing on the line says build: the harness project carries a ProjectReference to
-# the library, whose OutputPath is this very folder, and the generated AssemblyInfo embeds the commit -
-# so it may RECOMPILE the carrier, and it does so whenever HEAD has moved since the last build. The
-# harness notice therefore says MAY REBUILD rather than rebuilds: the failure mode is a silent one.
-# Read-only retries - the restore hint, the two scans, dependency-reality, `manually` - carry no notice.
-$retryWritesCarrier = [regex]'(?i)dotnet\s+build|dotnet\s+run\b'
-$retryBuildsCarrier = [regex]'(?i)dotnet\s+build'
-$retryCommonNotice = @(
-    '[hint ]   (a) that retry writes the shared carrier 1.6/Assemblies/FerriteLib.UiKit.dll, the path'
-    '[hint ]       every sibling checkout compiles against - a build there is a DELIVERY step, not a repair;'
-    '[hint ]   (b) it REPLACES the current frozen identity: the SHA-256 moves, so the hash a consumer'
-    '[hint ]       already verified stops describing these bytes. Only the payload owner runs it, and it ends'
-    '[hint ]       the delivery step with the forced Release rebuild, the stale-PDB removal, the'
-    '[hint ]       re-verification and a re-issued FREEZE NOTICE. A verification-only session must not run'
-    '[hint ]       it: verification of a frozen carrier is read-only.'
-)
-$retryHarnessFile = Join-Path $root 'tools\FerriteLib.UiKit.Tests\FerriteLib.UiKit.Tests.csproj'
-$retryHarnessNotice = @()
-if (Test-Path -LiteralPath $retryHarnessFile) {
-    $retryHarnessNotice += '[hint ]   (c) this one MAY RECOMPILE it without saying so: the harness project references'
-    $retryHarnessNotice += '[hint ]       the library, whose OutputPath is that folder, and the generated AssemblyInfo'
-    $retryHarnessNotice += '[hint ]       embeds the commit - moving HEAD alone is enough to make the carrier stale.'
-}
 
 function Invoke-Check {
     param([string]$Name, [string]$Retry, [scriptblock]$Action)
@@ -134,11 +79,6 @@ function Invoke-Check {
             Get-Content -LiteralPath $tempLog -Tail 12 | ForEach-Object { Write-Host "    $_" }
         }
         Write-Host "  [hint] retry: $Retry"
-        # One notice per writer: the explicit builds get (a)/(b), the harness hint gets (c).
-        if ($Retry -match $retryWritesCarrier) {
-            $hintNotice = if ($Retry -match $retryBuildsCarrier) { @($retryCommonNotice) } else { @($retryHarnessNotice) }
-            $hintNotice | ForEach-Object { Write-Host $_ }
-        }
         Remove-Item -LiteralPath $tempLog -Force -ErrorAction SilentlyContinue
         exit 1
     }
@@ -176,30 +116,19 @@ Invoke-Check 'library Release build (warnings as errors)' `
     'dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release' `
     { dotnet build $projectFile -c Release @buildExtraArgs }
 
-Invoke-Check 'mod payload present at the path consumers bind to' `
+Invoke-Check 'configuration-isolated build outputs exist and match evaluated TargetPath' `
     'dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release' `
     {
-        # Consumer mods reference 1.6/Assemblies/FerriteLib.UiKit.dll by this exact relative shape.
-        # If the output path moves, every consumer's compile-time reference and the runtime binding
-        # break together, so the layout is a contract and not an implementation detail.
-        $payload = Join-Path $assembliesDir 'FerriteLib.UiKit.dll'
-        if (-not (Test-Path -LiteralPath $payload -PathType Leaf)) {
-            throw "Missing payload: $payload"
+        foreach ($configuration in @('Dev', 'Release')) {
+            $payload = Join-Path $root "dist\build\$configuration\FerriteLib.UiKit.dll"
+            if (-not (Test-Path -LiteralPath $payload -PathType Leaf)) { throw "Missing build output: $payload" }
+            $target = (& dotnet msbuild $projectFile -getProperty:TargetPath "-p:Configuration=$configuration" -nologo | Select-Object -Last 1)
+            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($target)) { throw 'Could not evaluate TargetPath.' }
+            if ([IO.Path]::GetFullPath($target.Trim()) -ne [IO.Path]::GetFullPath($payload)) {
+                throw "Unexpected $configuration build output: $target; expected $payload"
+            }
         }
-
-        # Existence alone is not the claim. A stale DLL left in this gitignored folder kept the gate
-        # green while consumers bound to bytes this tree never built (measured 2026-09-11 by the
-        # independent verifier: moving <OutputPath> elsewhere reddened nothing). So ask MSBuild where
-        # it will actually write, and compare that evaluated path with the one consumers bind to.
-        $target = (& dotnet msbuild $projectFile -getProperty:TargetPath -p:Configuration=Release -nologo | Select-Object -Last 1)
-        if ([string]::IsNullOrWhiteSpace($target)) {
-            throw 'Could not read TargetPath from the project.'
-        }
-        $expected = [System.IO.Path]::GetFullPath($payload)
-        $actual = [System.IO.Path]::GetFullPath($target.Trim())
-        if ($actual -ne $expected) {
-            throw "Build output does not land where consumers bind: TargetPath=$actual expected=$expected"
-        }
+        & (Join-Path $PSScriptRoot 'verify-carrier-export.ps1') -ProjectRoot $root
     }
 
 Invoke-Check 'carries no game content (assemblies-only mod)' `
@@ -376,4 +305,8 @@ if ($PackDev) {
 }
 
 Remove-Item -LiteralPath $tempLog -Force -ErrorAction SilentlyContinue
-Write-Host '[verify] all checks passed.'
+$deliveredAfter = if (Test-Path -LiteralPath $deliveredPath) {
+    (Get-FileHash -LiteralPath $deliveredPath).Hash + ':' + (Get-Item -LiteralPath $deliveredPath).LastWriteTimeUtc.Ticks
+} else { 'absent' }
+if ($deliveredBefore -ne $deliveredAfter) { throw 'Verification changed the compatibility carrier (hash or mtime).' }
+Write-Host '[verify] all checks passed; compatibility carrier unchanged (hash and mtime).'

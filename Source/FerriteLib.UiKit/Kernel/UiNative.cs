@@ -89,15 +89,18 @@ public static class UiNative
     }
 
     /// <summary>
-    /// The invisible button with topmost-first dispatch: when the pointer sits inside a hit layer that
-    /// belongs to another element - a popup above this content, an overlapping neighbour painted later -
-    /// this element does not take the click. Every library widget and every consumer control that holds a
+    /// The invisible button with popup arbitration: when the pointer sits inside a higher popup hit layer
+    /// belonging to another element, this element does not take the click. Ordinary overlapping controls
+    /// still follow native IMGUI event consumption. Every library widget and consumer control that holds a
     /// context belongs here: one rule, and no per-element yield branch anywhere.
     /// </summary>
     public static bool Button(Rect rect, UiWidgetContext ctx)
     {
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
         UiNode element = ctx.Node ?? ctx.Session.ActiveNode;
+#if FER_DEV
+        string eventBefore = UiDiagnosticHub.ActiveSubscription?.Geometry == null ? "" : DiagnosticEventName();
+#endif
 
         // A disabled element does not capture the pointer at all - no hot control, no consumed event, no
         // click for whatever is underneath to miss. The check is here rather than in the widget for the
@@ -106,7 +109,7 @@ public static class UiNative
         if (IsInputDisabled(element))
         {
 #if FER_DEV
-            UiDevGeometryProbe.NoteInput(ctx, element, rect, "disabled");
+            UiDevGeometryProbe.NoteInput(ctx, element, rect, "disabled", eventBefore);
 #endif
             return false;
         }
@@ -114,19 +117,32 @@ public static class UiNative
         if (ctx.Session.IsPointerOverHigherLayer(element, PointerPositionIn(ctx)))
         {
 #if FER_DEV
-            UiDevGeometryProbe.NoteInput(ctx, element, rect, "covered");
+            UiDevGeometryProbe.NoteInput(ctx, element, rect, "covered", eventBefore);
 #endif
             return false;
         }
 
 #if FER_DEV
         bool fired = Button(rect);
-        UiDevGeometryProbe.NoteInput(ctx, element, rect, fired ? "hit" : "miss");
+        UiDevGeometryProbe.NoteInput(ctx, element, rect, fired ? "hit" : "miss", eventBefore);
         return fired;
 #else
         return Button(rect);
 #endif
     }
+
+#if FER_DEV
+    // Observation only: the original phase is retained by the host's capture before controls consume it.
+    internal static string DiagnosticEventName()
+    {
+        if (DebugMousePositionEnabled)
+        {
+            if (DebugMouseDown) return "MouseDown";
+            if (DebugMouseUp) return "MouseUp";
+        }
+        return Event.current == null ? "none" : Event.current.type.ToString();
+    }
+#endif
 
     /// <summary>
     /// True when the element being drawn is disabled and must not take input. The engine publishes the

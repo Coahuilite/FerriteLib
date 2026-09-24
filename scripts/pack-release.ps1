@@ -25,7 +25,7 @@ $ErrorActionPreference = "Stop"
 
 $root = [System.IO.Path]::GetFullPath($ProjectRoot)
 $projectFile = Join-Path $root 'Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj'
-$payloadDll = Join-Path $root '1.6\Assemblies\FerriteLib.UiKit.dll'
+$payloadDll = Join-Path $root 'dist\build\Release\FerriteLib.UiKit.dll'
 $stageDir = Join-Path $root 'dist\github\FerriteLib'
 
 # --- 1. the tag shape: vBASE, or vBASE-rcN with N >= 1 ------------------------------------------

@@ -43,14 +43,33 @@ internal static class KernelDevGeometryTests
     public static int RunAll()
     {
         failures = 0;
+        Run("The event double agrees with the reference constants and consumption contract", VerifyEventSemantics);
 #if FER_DEV
         Run("Every arranged node is reported with both rects, its height mode and its content extent", VerifyGeometryNumbers);
         Run("A press is attributed to the element that claimed it, in the pointer's own space", VerifyInputVerdicts);
+        Run("Consumed input remains visible without changing native dispatch", VerifyConsumedInput);
         Run("The overlay is refused until the instrument is on", VerifyOverlayRequiresTheInstrument);
 #else
         Run("A release payload has no instrument and refuses to pretend it has one", VerifyAbsentInRelease);
 #endif
         return failures;
+    }
+
+    private static void VerifyEventSemantics()
+    {
+        foreach (var pair in new[] {
+            (EventType.MouseDown, "MouseDown"), (EventType.MouseUp, "MouseUp"),
+            (EventType.MouseDrag, "MouseDrag"), (EventType.KeyDown, "KeyDown"),
+            (EventType.KeyUp, "KeyUp"), (EventType.Repaint, "Repaint"),
+            (EventType.Layout, "Layout"), (EventType.Used, "Used") })
+        {
+            Check(Enum.GetName(typeof(EventType), pair.Item1) == pair.Item2,
+                "the runtime event double matches the compiler's reference constant: " + pair.Item2);
+        }
+        Event raised = Event.KeyboardEvent("");
+        raised.type = EventType.MouseDown;
+        raised.Use();
+        Check(raised.type == EventType.Used, "Use changes the event type to Used, as the real IMGUI contract requires");
     }
 
 #if FER_DEV
@@ -197,6 +216,56 @@ internal static class KernelDevGeometryTests
             UiNative.DebugMouseDown = false;
             UiNative.DebugMousePositionEnabled = false;
         }
+    }
+
+    private static void VerifyConsumedInput()
+    {
+        const string xml = "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Column Id=\"root\" Padding=\"0\" Gap=\"0\">"
+            + "<Widget Id=\"first\" Kind=\"input/button\" Text=\"First\" Height=\"30\" ActionBind=\"act\" />"
+            + "<Widget Id=\"later\" Kind=\"input/button\" Text=\"Later\" Height=\"30\" ActionBind=\"other\" />"
+            + "</Column></UiPage>";
+        int actions = 0, otherActions = 0;
+        var bindings = new UiBindings();
+        bindings.BindCommand("act", () => actions++);
+        bindings.BindCommand("other", () => otherActions++);
+        using var host = new UiHost(Scope, UiLayoutManifest.Parse(xml), bindings,
+            UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        Rect first = Pass(host).RectById["first"];
+        try
+        {
+            foreach (bool enabled in new[] { true, false })
+            {
+                host.Diagnostics.GeometryEnabled = enabled;
+                foreach (EventType phase in new[] { EventType.MouseDown, EventType.MouseUp })
+                {
+                    Event raised = Event.KeyboardEvent("");
+                    raised.type = phase;
+                    raised.button = 0;
+                    raised.mousePosition = first.center;
+                    Event.current = raised;
+                    host.DrawFrame(Viewport);
+                    Check(raised.type == EventType.Used, "the native button consumes the event with diagnostics=" + enabled);
+                    if (!enabled) continue;
+                    string dump = host.Diagnostics.DumpGeometry();
+                    string firstInput = Require(dump, "input path=root/first ");
+                    string laterInput = Require(dump, "input path=root/later ");
+                    Check(firstInput.Contains("event-before=" + phase + " event-after=Used"),
+                        "the consuming control reports the phase transition: " + firstInput);
+                    Check(laterInput.Contains("verdict=miss event-before=Used event-after=Used"),
+                        "a later query remains visible after consumption: " + laterInput);
+                    Check(dump.Contains(" event=" + phase), "the host retains the original event phase");
+                    PrintInputs(dump);
+                }
+            }
+            Check(actions == 2 && otherActions == 0, "diagnostics on and off dispatch exactly one command per native click");
+            host.Diagnostics.GeometryEnabled = true;
+            Event repaint = Event.KeyboardEvent("");
+            repaint.type = EventType.Repaint;
+            Event.current = repaint;
+            host.DrawFrame(Viewport);
+            Check(!host.Diagnostics.DumpGeometry().Contains("input path="), "a repaint does not inherit consumed input from the previous pass");
+        }
+        finally { Event.current = null; GUIUtility.hotControl = 0; }
     }
 
     private static void VerifyOverlayRequiresTheInstrument()

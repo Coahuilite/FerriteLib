@@ -6,7 +6,7 @@
 
 | # | File | What it is |
 | --- | --- | --- |
-| 1 | `AGENTS.md` | The stable rules: invariants, boundaries, the shared-payload trap, evidence discipline. Read before acting. |
+| 1 | `AGENTS.md` | The stable rules: invariants, boundaries, build isolation, evidence discipline. Read before acting. |
 | 2 | `MEMORY.md` | This file — the only volatile ledger: durable facts, rulings, evidence pointers. |
 | 3 | `TODO.md` | The action surface: current goals, open actions, blockers, explicit deferrals. Nothing else. |
 | 4 | `docs/development/0.7/05-api-contract.md` | What `0.7.x` commits to: every break and addition with its lane and its migration. |
@@ -46,8 +46,7 @@ dev-only assertion names, floors on the assertion and dumped-node counts, and th
 release-only half's name, and its checker is control-tested on every run against four planted fixtures (an
 empty output, a release-only output and a green-exit-but-missing-name output must be **rejected**; a fully
 populated sample must **not** be) — which is what closes the "an empty enumeration passes" bug class.
-**Gate 10 is a third writer of the shared carrier**; the other two are `-PackDev` / gate 2's Dev build and the
-harness itself through its `ProjectReference`.
+**Build isolation (2026-09-24):** gates and harnesses write only `dist/build/<Configuration>`. The root compatibility carrier is updated only by explicit export. See `docs/build-and-debug.md`; older shared-output incidents below describe the previous layout.
 
 **How to run it by hand.**
 ```powershell
@@ -62,8 +61,7 @@ inside a conditional-compilation block that no configuration defines" is the gen
 csproj now mirrors the library's Dev gate, and gate 10 keeps the arrangement from rotting.
 
 **One precondition for a consumer.** The instrument exists only in a **Dev payload**, so using it means one Dev
-build first — which writes Dev bytes to the shared carrier path — and the delivery step afterwards restores
-Release. There is no release-build path to it, by design.
+build in `dist/build/Dev`, then explicitly selecting that artifact in the consumer. Release stays separate. There is no release-build path to the instrument, by design.
 
 ### Where the line stands (2026-09-23)
 
@@ -74,10 +72,7 @@ Release. There is no release-build path to it, by design.
   build command and clean/dirty state is a machine-local fact.
 - **Local `0.7.x` is ahead of `origin/0.7.x` and has not been pushed.** Pushing, tagging and publishing are
   maintainer actions — do not "tidy up" by pushing.
-- **`verify-local` writes the carrier** (gate 2's Dev build, gate 3's Release build, gate 10's Dev harness, and
-  gate 1's harness through its `ProjectReference`). To VERIFY a frozen carrier, use the read-only six: SHA-256,
-  `AssemblyConfiguration` read in a child process, the embedded stamp, the absence of a `.pdb`, the
-  exclusivity probe, and `git rev-parse`/`status` — never a build of the project graph.
+- **Current workflow:** `docs/build-and-debug.md`; native-event evidence and its limits are recorded there. The live staged package identifies itself through `version.txt` and its DLL hash.
 - `TODO.md` carries what is actually open.
 
 ## Current durable state

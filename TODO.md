@@ -6,18 +6,14 @@
 ## Where the line stands
 
 Branch `0.7.x`, contract axis `0.7.0`, consumer range `[0.7.0,0.8.0)`. **FL is in P1 and P1 is closed on
-the library side**: the seam and library fixes are done, and nothing library-side is currently running.
+the library side**: the seam and library fixes are done; the current diagnostics/integration batch is described below.
 Phase order is the maintainer ruling of 2026-09-20 and it is authoritative — **P1 seam and library fixes →
 P2 migration and retiring the legacy project → P3 the full UI/UX reset (last) → P4 new work. S3–S7 do not
 move until the consumer's P1 usage is done, and the backlog is friction the consumer's real use exposes,
 not a wish list.** One freeze per round: every (B) fix moves HEAD and invalidates the consumer's gate green,
 so the remaining batch items land **together**, with one carrier rebuild and one freeze notice.
 
-**Two states a newcomer must not "tidy up":** local `0.7.x` is **ahead of `origin/0.7.x` and unpushed**
-(pushing, tagging and publishing are maintainer actions), and **`verify-local` writes the shared carrier**
-(gate 2's Dev build, gate 3's Release build, gate 10's Dev harness, and gate 1's harness through its
-`ProjectReference`), so verifying a frozen carrier is the read-only six in `MEMORY.md` § Start here, never a
-gate run.
+**Current development direction (2026-09-24):** prioritize the library's long-term contracts, using the real consumer settings redesign as the integration surface. Build isolation and consumed-input diagnostics are implemented; real-game click acceptance remains open. Commands and the next-slice criteria: `docs/build-and-debug.md`. Local branches remain unpushed.
 
 P1 as delivered — landed, each with a failure-sensitive lane and its red evidence recorded in `MEMORY.md`:
 FL-8 / FL-11 / FL-12 (docs, P1-A) · FL-1, FL-2, FL-3, X-21 (already fixed on this line; P1-B proved them by
@@ -128,15 +124,7 @@ that touches the carrier is **task-11** below.
 - [ ] **Steam upload is not scripted and should not be, until the Workshop decision lands.** The precedent
       is manual upload from the staged directory; `pack-steam.ps1` produces the folder and prints the payload
       hash, and the upload waits on the maintainer's invited/unsupported call and the missing preview image.
-- [ ] **Maintainer ruling owed: should "Release rebuild + PDB removal" become a script step?** The delivery
-      order is manual and lives in prose (`MEMORY.md`): commit → gates → harness →
-      `dotnet build -c Release --no-incremental` → `Remove-Item 1.6/Assemblies/FerriteLib.UiKit.pdb`. A step
-      in `verify-local`/`stage-package` would make the last artifact deterministic for a sibling-`HintPath`
-      consumer instead of relying on the operator, but it changes what the dev channel means (gate 2 is the
-      Dev build, so a step placed wrong would ship Dev bytes). Escalated 2026-09-19; not a session's call.
-- [ ] **Optional consolidation, cross-repo, one round at the earliest:** collapse Dev/Release into one
-      configuration with a flavor property. That deletes the shared-`OutputPath` hazard; it is not free,
-      because the consumer drives `-c Dev` on this project, so it lands in a round with its migration.
+- [x] Configuration-isolated builds and an explicit compatibility export replace the shared-output rebuild/PDB ritual; see `docs/build-and-debug.md`.
 
 ## 1. In-game verification — still the critical path
 

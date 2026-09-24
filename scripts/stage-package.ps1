@@ -28,11 +28,16 @@ $ErrorActionPreference = "Stop"
 
 $root = [System.IO.Path]::GetFullPath($ProjectRoot)
 $projectFile = Join-Path $root 'Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj'
-$payloadDll = Join-Path $root '1.6\Assemblies\FerriteLib.UiKit.dll'
+$configuration = if ($BuildFlavor -eq 'dev') { 'Dev' } else { 'Release' }
+$payloadDll = Join-Path $root "dist\build\$configuration\FerriteLib.UiKit.dll"
 $aboutXml = Join-Path $root 'About\About.xml'
 $loadFolders = Join-Path $root 'LoadFolders.xml'
 $license = Join-Path $root 'LICENSE'
-$deliveryDir = [System.IO.Path]::GetFullPath($StageDir)
+$deliveryDir = [System.IO.Path]::GetFullPath($StageDir, $root)
+$distPrefix = [System.IO.Path]::GetFullPath((Join-Path $root 'dist')) + [IO.Path]::DirectorySeparatorChar
+if (-not $deliveryDir.StartsWith($distPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'StageDir must be a child of this repository''s dist directory.'
+}
 # Candidate-then-commit (2026-09-22, adopted from the demo's packer): the copy and every assertion below
 # run against a SCRATCH tree; the delivered folder is replaced only after all of them pass, so a refused
 # pack leaves the previous package byte-identical instead of a half-written one.
@@ -128,10 +133,11 @@ Copy-Item -LiteralPath $payloadDll -Destination (Join-Path $stageDir '1.6\Assemb
 # "how fresh is this folder" without opening the DLL: flavor, commit, and the source location MPL 3.2
 # asks for. On the release runner the platform names the repository; locally the 2026-09-07 naming
 # ruling is the source of truth.
+$payloadHash = (Get-FileHash -LiteralPath $payloadDll -Algorithm SHA256).Hash
 $sourceUrl = if ($env:GITHUB_REPOSITORY) { "$($env:GITHUB_SERVER_URL)/$env:GITHUB_REPOSITORY" } else { 'https://github.com/Coahuilite/FerriteLib' }
 [System.IO.File]::WriteAllText(
     (Join-Path $stageDir 'version.txt'),
-    "FerriteLib $VersionLabel`r`nbuild=$BuildFlavor`r`ncommit=$CommitLabel`r`nsource $sourceUrl`r`n")
+    "FerriteLib $VersionLabel`r`nbuild=$BuildFlavor`r`ncommit=$CommitLabel`r`npayload-sha256=$payloadHash`r`nsource $sourceUrl`r`n")
 
 # --- assertions on the finished tree -------------------------------------------------------------
 foreach ($directory in $forbiddenContent) {
@@ -163,6 +169,9 @@ $assemblyCount = @($stagedFiles | Where-Object { $_ -like '*.dll' }).Count
 if ($assemblyCount -ne 1) {
     throw "The payload must be exactly one assembly; found $assemblyCount."
 }
+
+$stagedHash = (Get-FileHash -LiteralPath (Join-Path $stageDir $dllRelative) -Algorithm SHA256).Hash
+if ($stagedHash -ne $payloadHash) { throw 'Payload changed during staging; refusing the candidate.' }
 
 # --- commit: every assertion above passed, so replace the delivered folder now ---------------------
 if (Test-Path -LiteralPath $deliveryDir) { Remove-Item -LiteralPath $deliveryDir -Recurse -Force }

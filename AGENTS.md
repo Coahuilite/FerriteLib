@@ -75,8 +75,7 @@ assembly and no `FerriteLib.Core`; re-open only if a consumer needs the visual c
   surface, `FerriteLibApiTierTests` reacts to an addition by requiring a tier (a documentation act in
   `docs/api-tiers.md`), and no gate or lane anywhere enforces the minor bump itself. If a future lane starts
   reading additions — or its message wording starts asserting the minor rule — align it in the batch that
-  next touches the carrier, because running the harness WRITES the shared carrier and would otherwise move
-  the freeze. `MEMORY.md` (§ Version axes) carries the same exemption, its expiry, and the lane-by-lane audit
+  next touches the carrier, because the harness and the library must exercise the same contract. `MEMORY.md` (§ Version axes) carries the same exemption, its expiry, and the lane-by-lane audit
   behind "no gate reads additions".
 - **The game cannot express a prerequisite version** (`ModRequirement` parses only `packageId`,
   `alternativePackageIds`, `displayName`); every consumer asserts the API range in its own constructor.
@@ -166,83 +165,19 @@ pwsh -NoProfile -File scripts/pack-steam.ps1  -Version v0.3.0-rc2    # + Worksho
 `-PackDev` stages `dist/dev/FerriteLib/` and stops there: nothing under `scripts/` writes outside the
 repository, and installing a folder into a game `Mods/` directory is the developer's own step (Boundaries).
 
-**The payload path is shared, and that is the trap.** `1.6/Assemblies/FerriteLib.UiKit.dll` is written by
-both configurations, so whatever ran last decides what a sibling-`HintPath` consumer compiles against:
+**Builds are configuration-isolated.** Library builds and harnesses write `dist/build/<Configuration>/`.
+The installable mod layout remains `1.6/Assemblies/` inside staged packages. Ordinary verification never
+updates the compatibility carrier at the repository root. `scripts/export-carrier.ps1` is the explicit
+Release-only delivery action for consumers still using that root path; it is not called by a gate or packer.
+The commands and the input-selection contract live in `docs/build-and-debug.md`.
 
-- **`-PackDev` writes Dev bytes to the shared carrier.** After it — and after any `verify-local` run, whose
-gate 2 is the Dev build — the delivery step ends with a forced `dotnet build -c Release --no-incremental`
-**and** removal of the stale `1.6/Assemblies/FerriteLib.UiKit.pdb` (Release sets `DebugType=none`, so it
-neither rewrites nor deletes an existing PDB). `AssemblyConfigurationAttribute` is the detector, never the
-version suffix: a correct Release carrier still reads `0.7.0-dev+<sha>`.
-- **`verify-local` is a writer, and so is the harness.** Its gate 2 is the Dev build, and gate 1's
-`dotnet run --project tools/FerriteLib.UiKit.Tests` is not a reader either: the harness project carries a
-`ProjectReference` to the library, whose `OutputPath` is this very folder, and the generated `AssemblyInfo`
-embeds the commit SHA — so any MSBuild pass over that graph can rewrite the carrier, and a HEAD that has moved
-since the last build is enough to make it out of date. (Measured twice, and both were real accidents rather
-than a precaution: 2026-09-20, a pre-commit harness run produced the round-5 carrier as a dirty build; and
-2026-09-22, a verify-only gate run after a freeze left the stale Dev PDB back beside the frozen carrier.)
-**Gate 10 is a third writer, and it is the gate that owns the development-only instrument's dev half.**
-`scripts/verify-dev-instrument.ps1` builds and runs the harness in **Dev** and refuses to accept "the project
-compiled": it requires the dev-only assertion names, floors on the assertion and dumped-node counts, the
-absence of the release-only half's name, and the numbers the instrument printed. It exists because gate 1 runs
-the harness in **Release**, where `#if FER_DEV` is undefined — a dev-only proof nobody re-runs is a proof that
-rots, and this repository has already paid for exactly that: the harness project did not define `FER_DEV`, so
-the `#if FER_DEV` branch in `KernelDocumentReloadTests` had never been compiled by any run, and a `-c Dev`
-run was red. A lane whose half is compiled out is a lane that does not run.
-
-**Verification of a frozen carrier is therefore read-only**: the hash, the configuration, the stamp read in a
-child process, the absence of a PDB, the exclusivity probe, and `git rev-parse`/`status` — never a build of the
-project graph. A full gate run belongs to the delivery step: the same builder ends it with the forced Release
-rebuild, the PDB removal and the re-verification, and issues a **new FREEZE NOTICE** — the hash may have moved,
-and downstream must re-verify against the new identity. Consequently a session that only means to VERIFY a
-frozen carrier must not run the gate chain at all.
-
-**A gate's retry hint is a build command, and that is the second face of the same trap.** The output of a red
-gate is read inside "I am verifying" — so a hint like `dotnet build ... -c Release --no-incremental` invites a
-rebuild in exactly the frame that must not perform one. That is not hypothetical: 2026-09-22 a consumer-side
-verification session copied a red gate's rebuild hint, rebuilt the carrier and moved the frozen hash. Any
-verification step therefore starts by asking **whether it writes**, and a hint that does write is a delivery
-step: owner-only, hash-moving, ended by a new FREEZE NOTICE. The judgement is **whether the command writes**,
-not whether it is named a build: gate 1's `dotnet run --project tools/FerriteLib.UiKit.Tests` writes too — the
-harness project's `ProjectReference` puts the library's own `OutputPath` in the graph, so moving HEAD alone is
-enough to recompile the carrier, which is why the rule reads "and so is the harness". `scripts/verify-local.ps1`
-prints its hints under `[hint]` and annotates exactly the two writers, but the rule holds for every gate in
-every repository.
-
-**A non-building execution of an already-built harness is a reader — measured 2026-09-22.**
-`dotnet run --no-build --no-restore --project tools/FerriteLib.UiKit.Tests -c Release` against a frozen carrier
-(`490d4f0`, Release) left it untouched: SHA-256 `E396E089…ACB` before and after, and the **mtime identical**
-(`14:24:45`) — the decisive signal, because a rewrite with equal bytes still moves it — with no PDB appearing,
-`HARNESS_EXIT=0`, `ALL PASS` 2623 ok. The copy the harness loaded
-(`tools/…/bin/Release/net472/FerriteLib.UiKit.dll`) was byte-identical to the carrier, so that run genuinely
-exercised the frozen payload rather than a stale copy. **Two boundaries:** it does not make the plain
-`dotnet run` a reader (that one still builds and writes — it is the writer this section names), and it runs the
-**last built** binaries, so with sources or HEAD moved since that build it measures stale code and is not a
-substitute for the gate chain when anything changed. **Before trusting one, compare the loaded copy's SHA-256 with
-the carrier's** — that boundary is not theoretical: on 2026-09-22 a dirty build refreshed the harness's bin copy
-while the restore rebuilt only the library project, so the bin lagged one version containing a cancelled palette
-and a `--no-build` run would have measured the wrong bytes.
-
-**A hash is the identity; an mtime says whether anything was written — two different questions, and a FREEZE
-NOTICE that cites only the hash is underdetermined for a reader who checks the mtime.** The same bytes are the same
-carrier however many times they were written, so a **rebuild from identical inputs moves the mtime and leaves the
-hash unchanged: that is not a new identity and needs no downstream re-verification** (measured 2026-09-22: a
-restore rebuilt the carrier to the identical `58B57EAD…0083` and moved its mtime to `11:29:56Z`, and a
-test-project rebuild to those same bytes moved it again to `11:36:08Z`). The pair is the **same evidence used in
-opposite directions**, which is why both belong here side by side: the paragraph above uses an **unmoved mtime** to
-prove the carrier was not written at all, while a freeze notice uses the **hash** to fix which bytes are frozen.
-Read the one the question is about.
-- **A hash is an identity only with its inputs pinned.** Quote one with the build command and the clean/dirty
-state beside it. The stamp records the **committed** revision and is silent about uncommitted source.
-- **A doc-only commit reddens "embedded commit == HEAD" until the carrier is rebuilt.** That is expected
-rather than a defect — but broadcast it, because the consumer's gates read it.
-- **The carrier is exclusive, and readers count.** A loaded assembly holds its file open, so a sibling
-checkout's harness or probe blocks this build exactly as another builder would; the symptom is
-`MSB3026`/`MSB3027`/`MSB3021` deep inside captured build output, which reads like a broken build.
-**Never `Assembly.LoadFile` the payload in the session that is measuring it** — the handle survives to
-process exit. Read identity from a child process or from a copy.
-- **A build happens only when the maintainer intends to test.** Building is not a session's reflex, and two
-concurrent harness runs collide on the shared output path (`CS2012`).
+- Read assembly identity in a child process or a copy: a persistent `Assembly.LoadFile` can lock a build input.
+- Serialize harness builds: their canonical `bin/stubs` output is still shared across configurations.
+- A hash identifies bytes; the mtime can detect a rewrite of equal bytes. Keep both when checking a held delivery.
+- A build embeds committed HEAD, not dirty source. Record clean/dirty state with any acceptance identity.
+- A docs-only commit moves the embedded source identity on the next build; it does not update staged packages.
+- Gate 10 must execute the Dev-only instrument assertions. Release-only success is not instrument coverage.
+- Harness success is contract evidence against stubs, not in-game end-to-end acceptance.
 
 Three channels (`pack-dev` / `pack-release` / `pack-steam`), one staging engine (`stage-package.ps1`). The
 engine owns what a package *is* — the closed file set, the content probe, the licence copy, `version.txt`,

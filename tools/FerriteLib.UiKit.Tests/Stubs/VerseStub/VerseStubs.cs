@@ -499,13 +499,15 @@ public static class Widgets
         // Real scroll views open a GUI group whose origin is the visible out rect minus the scroll
         // offset; controls inside then draw and hit-test in content-local space. The stub models that
         // so pointer-space defects like the 2026-09-04 click theft are expressible in the harness.
-        UnityEngine.GUI.BeginGroup(new Rect(outRect.x - scrollPosition.x, outRect.y - scrollPosition.y, viewRect.width, viewRect.height));
+        UnityEngine.GUI.BeginGroup(outRect);
+        UnityEngine.GUI.BeginGroup(new Rect(-scrollPosition.x, -scrollPosition.y, viewRect.width, viewRect.height));
     }
 
     public static void EndScrollView()
     {
         if (ScrollViewDepth > 0) ScrollViewDepth--;
         EndScrollViewCalls++;
+        UnityEngine.GUI.EndGroup();
         UnityEngine.GUI.EndGroup();
     }
 }
@@ -560,12 +562,14 @@ public static class Mouse
         Event? e = Event.current;
         if (e == null) return false;
         Vector2 p = e.mousePosition;
-        return p.x >= rect.x && p.x <= rect.xMax && p.y >= rect.y && p.y <= rect.yMax;
+        return GUI.IsPointVisible(p) && p.x >= rect.x && p.x <= rect.xMax && p.y >= rect.y && p.y <= rect.yMax;
     }
 }
 
 public static class Log
 {
+    // Optional scoped observer for consumer diagnostics tests; no messages are retained by the stub.
+    public static System.Action<string>? MessageObserver;
     public static void Warning(string message)
     {
     }
@@ -579,6 +583,7 @@ public static class Log
 
     public static void Message(string message)
     {
+        MessageObserver?.Invoke(message);
     }
 }
 
