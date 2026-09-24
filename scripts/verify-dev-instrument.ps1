@@ -50,7 +50,10 @@ $devOnlyAssertions = @(
     'a later query remains visible after consumption',
     'diagnostics on and off dispatch exactly one command per native click',
     'an element under another element''s open popup layer reports the covered verdict:',
-    'and it does not dispatch its command while the layer is above it'
+    'and it records no hit sample in the same pass:',
+    'and it does not dispatch its command while the layer is above it',
+    'the option row consumed the click and closed the popup, not the trigger:',
+    'and with no popup layer left the same press hits it and dispatches once (fired'
 )
 
 # The name only the release half can print. Seeing it in a Dev run means the branches are not exclusive.
@@ -74,8 +77,8 @@ $dumpPress = '    | input path=root/row/band '
 # count side by side.
 $minimumDumpNodes = 5
 
-# Measured 2026-09-24 on the shipped lane (HEAD 545fe01): list 11 named dev-only assertions, 11 observed
-# passing, 2684 'ok:' lines in total, 6 dumped node lines.
+# Measured 2026-09-24 on the shipped lane: list 14 named dev-only assertions, 14 observed passing, 2687
+# 'ok:' lines in total, 6 dumped node lines.
 
 function Measure-DevOnlyPassing {
     <#
@@ -181,7 +184,10 @@ $controlSample = @(
     '  ok: a later query remains visible after consumption'
     '  ok: diagnostics on and off dispatch exactly one command per native click'
     '  ok: an element under another element''s open popup layer reports the covered verdict: input path=root/under kind=input/button point=(50,30) rect=(0,28,100,28) verdict=covered event-before=MouseDown event-after=MouseDown'
+    '  ok: and it records no hit sample in the same pass: input path=root/under kind=input/button point=(100,30) rect=(0,28,200,28) verdict=covered event-before=MouseDown event-after=MouseDown'
     '  ok: and it does not dispatch its command while the layer is above it (fired 0 time(s))'
+    '  ok: the option row consumed the click and closed the popup, not the trigger: value=''x'' popup-open=False'
+    '  ok: and with no popup layer left the same press hits it and dispatches once (fired 1 time(s)): input path=root/under kind=input/button point=(100,30) rect=(0,28,200,28) verdict=hit event-before=MouseDown event-after=MouseDown'
     '  ok: filler 3'
     '  ok: filler 4'
     '  ok: filler 5'

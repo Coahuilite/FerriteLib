@@ -225,11 +225,23 @@ internal static class KernelDevGeometryTests
     /// <c>covered</c> - the element sits under another element's open popup layer - was implemented and
     /// printed by the instrument with no lane driving it, and an unexercised branch is unproven surface.
     /// <para>
-    /// The press point is <b>point-shaped</b> on purpose. A rect-blind override (<c>_ =&gt; true</c>) would
-    /// make the trigger toggle its own popup shut in the same pass, the overlap would never exist, and the
-    /// lane would pass without measuring anything. The same point shape is what keeps the
-    /// "it did not dispatch" assertion honest: the point IS inside the covered element's rect, so if the
-    /// yield were removed the override would fire it and the counter would move.
+    /// The press point is <b>point-shaped</b> on purpose, and the reason is read from the code rather than
+    /// assumed. The trigger draws before the covered element, so a rect-blind override would make the
+    /// trigger's own button fire; <c>DropdownButtonCore</c> then closes the popup it owns, and
+    /// <c>UiSession.ClosePopup</c> drops the popup layer from BOTH <c>hitLayers</c> and
+    /// <c>dispatchLayers</c> (<c>UiSession.cs:296-303</c>) - so the covered element, drawn after the
+    /// trigger, would see no layer, <c>Require("verdict=covered")</c> would throw, and this lane would go
+    /// RED rather than falsely green. The point shape is what keeps the lane measuring the verdict it
+    /// names, and it is also what keeps the "it did not dispatch" assertion honest: the point IS inside
+    /// the covered element's rect, so if the yield were removed the override would fire it and the counter
+    /// would move.
+    /// </para>
+    /// <para>
+    /// Around the one press the lane asserts the verdict, the ABSENCE of a hit sample for the same element
+    /// in the same pass, and the mechanism: the option row consumed the click (the value binding moved) and
+    /// the trigger did not toggle the popup shut. The last frame is the counterfactual - the same press with
+    /// no popup layer left hits the element and dispatches exactly once - so the covered verdict is shown to
+    /// depend on the layer rather than on the seam.
     /// </para>
     /// </summary>
     private static void VerifyCoveredVerdict()
@@ -247,7 +259,9 @@ internal static class KernelDevGeometryTests
 
         int underActions = 0;
         var bindings = new UiBindings();
-        string current = "x";
+        // "y", not "x": the press lands on the popup's first option row, whose value is "x", so the value
+        // binding moving to "x" is what proves the ROW consumed the click rather than the trigger.
+        string current = "y";
         bindings.BindValue("trigger", () => current, value => current = value);
         bindings.BindOptions("Options", () => new List<string> { "x", "y" });
         bindings.BindCommand("under-act", () => underActions++);
@@ -259,40 +273,66 @@ internal static class KernelDevGeometryTests
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(Viewport.width, Viewport.height));
         host.Session.OpenPopup("trigger", snapshot.RectById["trigger"]);
 
-        // One frame publishes the popup layer; dispatch reads the pass that just finished, so the covered
-        // decision is only reachable from the second frame on. That ordering is the mechanism, not a
-        // detail of this lane.
-        host.DrawFrame(Viewport);
-        Rect? popup = PopupLayer(host.Session);
-        if (!popup.HasValue)
-        {
-            throw new Exception("the open popup pushed no hit layer, so nothing can be covered");
-        }
-
-        Rect under = snapshot.RectById["under"];
-        Vector2 point = new(under.center.x, Math.Max(popup.Value.y + 2f, under.y + 2f));
-        if (!Over(popup.Value, point) || !Over(under, point))
-        {
-            throw new Exception("test premise broken: " + Show(point) + " is not inside both the popup "
-                + Show(popup.Value) + " and the element it covers " + Show(under));
-        }
-
+        // A pass the engine is not part of must not decide what this lane measures: a leftover Event.current
+        // from an earlier lane is an input, and checking the instrument's inputs is the rule this phase keeps
+        // paying for. The debug seam supplies the pointer instead.
+        Event? previousEvent = Event.current;
+        Event.current = null;
         try
         {
+            // One frame publishes the popup layer; dispatch reads the pass that just finished, so the covered
+            // decision is only reachable from the second frame on. That ordering is the mechanism, not a
+            // detail of this lane.
+            host.DrawFrame(Viewport);
+            Rect? popup = PopupLayer(host.Session);
+            if (!popup.HasValue)
+            {
+                throw new Exception("the open popup pushed no hit layer, so nothing can be covered");
+            }
+
+            Rect under = snapshot.RectById["under"];
+            Vector2 point = new(under.center.x, Math.Max(popup.Value.y + 2f, under.y + 2f));
+            if (!Over(popup.Value, point) || !Over(under, point))
+            {
+                throw new Exception("test premise broken: " + Show(point) + " is not inside both the popup "
+                    + Show(popup.Value) + " and the element it covers " + Show(under));
+            }
+
             UiNative.DebugMousePositionEnabled = true;
             UiNative.DebugMouseDown = true;
             UiNative.DebugMousePosition = point;
             UiNative.ButtonOverride = rect => Over(rect, point);
 
+            // Frame two: the press lands inside the popup layer AND inside the covered element.
             host.DrawFrame(Viewport);
             string dump = host.Diagnostics.DumpGeometry();
             PrintInputs(dump);
             string covered = Require(dump, "verdict=covered");
             Check(covered.IndexOf("path=root/under ", StringComparison.Ordinal) >= 0,
                 "an element under another element's open popup layer reports the covered verdict: " + covered);
+            // The assertion that separates "yielded" from "recorded and did not yield": the same pass must
+            // carry no hit sample for the same element (a non-yielding run records two).
+            Check(!HasInputVerdict(dump, "root/under", "hit"),
+                "and it records no hit sample in the same pass: " + ShowInputs(dump, "root/under"));
             Check(underActions == 0,
                 "and it does not dispatch its command while the layer is above it (fired "
                 + underActions.ToString(CultureInfo.InvariantCulture) + " time(s))");
+            // The mechanism, measured rather than described: the option row is the top layer, so IT consumed
+            // the click and closed the popup. A trigger that had stolen the click would close the popup too,
+            // which is exactly why the value write is what tells the two apart.
+            Check(string.Equals(current, "x", StringComparison.Ordinal) && !host.Session.IsPopupOpen("trigger"),
+                "the option row consumed the click and closed the popup, not the trigger: value='" + current
+                + "' popup-open=" + host.Session.IsPopupOpen("trigger").ToString());
+
+            // Frame three: the counterfactual. The same press with no popup layer left must hit the element
+            // and dispatch exactly once, which is what makes the covered verdict a property of the layer.
+            host.DrawFrame(Viewport);
+            string after = host.Diagnostics.DumpGeometry();
+            PrintInputs(after);
+            string hit = Require(after, "verdict=hit");
+            Check(hit.IndexOf("path=root/under ", StringComparison.Ordinal) >= 0 && underActions == 1,
+                "and with no popup layer left the same press hits it and dispatches once (fired "
+                + underActions.ToString(CultureInfo.InvariantCulture) + " time(s)): " + hit);
         }
         finally
         {
@@ -300,6 +340,7 @@ internal static class KernelDevGeometryTests
             UiNative.DebugMousePosition = default;
             UiNative.DebugMouseDown = false;
             UiNative.DebugMousePositionEnabled = false;
+            Event.current = previousEvent;
         }
     }
 
@@ -321,6 +362,35 @@ internal static class KernelDevGeometryTests
     private static bool Over(Rect rect, Vector2 point)
     {
         return point.x >= rect.x && point.x <= rect.xMax && point.y >= rect.y && point.y <= rect.yMax;
+    }
+
+    /// <summary>True when that pass recorded an input sample for that element carrying that verdict.</summary>
+    private static bool HasInputVerdict(string dump, string elementPath, string verdict)
+    {
+        foreach (string line in dump.Split(Lines, StringSplitOptions.None))
+        {
+            if (!line.StartsWith("input ", StringComparison.Ordinal)) continue;
+            if (line.IndexOf("path=" + elementPath + " ", StringComparison.Ordinal) < 0) continue;
+            if (line.IndexOf("verdict=" + verdict + " ", StringComparison.Ordinal) >= 0) return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>The input samples of one pass that mention an element, for a failure message.</summary>
+    private static string ShowInputs(string dump, string elementPath)
+    {
+        var shown = new List<string>();
+        foreach (string line in dump.Split(Lines, StringSplitOptions.None))
+        {
+            if (line.StartsWith("input ", StringComparison.Ordinal)
+                && line.IndexOf("path=" + elementPath + " ", StringComparison.Ordinal) >= 0)
+            {
+                shown.Add(line);
+            }
+        }
+
+        return shown.Count == 0 ? "(no input sample for " + elementPath + ")" : string.Join(" | ", shown);
     }
 
     private static void VerifyConsumedInput()

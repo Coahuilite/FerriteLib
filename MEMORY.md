@@ -51,17 +51,31 @@ The dated records below explain earlier changes and their scoped evidence. Curre
 current build behavior is in "Carrier identity and build isolation". Historical gate counts, capture sites,
 and delivery procedures do not override the current scripts or the next-stage handbook.
 
+- **A popup layer covers exactly its option rows, so a press inside it always consumes a row (measured
+  2026-09-24, and it is why one suggested control does not exist).** `UiPopup.RectFor` returns a rect whose
+  height is `optionCount * OptionHeight` and `DrawOptionList` tiles one row per option across that rect, so
+  every point inside the layer is inside a row. The row fires and calls `Session.ClosePopup()`, which drops
+  the layer from BOTH `hitLayers` and `dispatchLayers` (`UiSession.cs:296-303`). Consequence for a lane:
+  "assert the popup is still open after a covered press" is not a control that can hold - the covered press
+  closes it through the row. What a lane CAN assert is the value write (the option row, not the trigger,
+  consumed the click) plus the counterfactual (with the layer gone, the same press hits and dispatches).
+  Measured on the `covered` lane: a rect-blind override reddens its premise assertion, because the trigger
+  draws first, fires, and closes the popup it owns.
 - **Five library-side guards landed with their own mutations (2026-09-24, task-2), and the batch touched no
   carrier byte.** (i) `KernelDevGeometryTests.VerifyCoveredVerdict` drives the funnel's fourth verdict — a
   dropdown popup over a button, a press inside both, `verdict=covered` recorded for the covered element and
   no command dispatched; dropping the recording reddens the verdict assertion, dropping the yield reddens
-  the dispatch assertion and `KernelPopupTests`' covering-popup lane. (ii) Gate 10's floor was re-cut to
+  the dispatch assertion, the "no hit sample in the same pass" assertion and `KernelPopupTests`'
+  covering-popup lane. The lane also asserts the mechanism and the counterfactual (see the popup-layer fact
+  above), so the verdict is shown to depend on the layer. (ii) Gate 10's floor was re-cut to
   measure passing assertions instead of counting `ok:` lines (§Gates). (iii) Gate 6 gained the
   series-licence SHA-256 pin (§Gates). (iv) `KernelContractTests.VerifyStubSurfaceIsPublished` pins the four
   stub project paths and the four `bin/stubs/…` assembly names a consumer copies, as literals; renaming
   VerseStub's `OutputPath` with this repository's own csproj updated to match reddens it while every other
-  gate stays green. (v) `UiPopup` joined the boundary reject list — **a future-regression guard, not present
-  evidence** (§Gates). Evidence: `dist/dev-work/t2-*.log`; the full 10-gate chain is green at `545fe01`, and
+  gate stays green. (v) `UiPopup` joined the boundary reject list — **an armed proof plus a
+  future-regression guard** (§Gates): the mutation plants exactly the defect the guard exists to catch and
+  the guard reddens naming `UiThemeDraw.cs:17` and the symbol, while nothing in the visual core names
+  `UiPopup` today. Evidence: `dist/dev-work/t2-*.log`; the full 10-gate chain is green at `545fe01`, and
   the root carrier and `dist/dev/` were byte-identical before and after it (hash and mtime both).
 
 - **The development-only geometry instrument landed (2026-09-22) — a numeric audit, not a consumer feature, and
@@ -990,9 +1004,11 @@ be trusted across a boundary:
   line naming one of the listed page-model symbols. `UiPopup` was in neither array until 2026-09-24 — it
   joined the tree on `4dd97bf`, after the guard was written — so `UiThemeDraw` → `UiPopup` → `UiSession`
   passed while breaking the "usable without a Host" claim; the symbol is in the list now. **The added symbol
-  is a future-regression guard, not present evidence**: nothing in the visual core names `UiPopup` today, so
-  what its mutation proves is that the guard can see the name at all, not that a live breach exists. The
-  real fix, still open in `TODO.md`, is to derive the set from the types.
+  is an armed proof plus a future-regression guard.** Armed, because strengthening a guard is a change a
+  mutation can hold to account: planting a real `typeof(UiPopup)` reference reddens it naming
+  `UiThemeDraw.cs:17` and the symbol, which is the defect the guard exists to catch. A guard for the future,
+  because nothing in the visual core names `UiPopup` today — so what is proven is that the guard is armed,
+  not that a live breach exists. The real fix, still open in `TODO.md`, is to derive the set from the types.
 
 Honest limit on the theme lane: `VerifyThemeColorsDoNotAffectLayout` has two halves. The shared-instance
 half is mutation-proven. The rect-equality half has **no available failing mutation** today, because no

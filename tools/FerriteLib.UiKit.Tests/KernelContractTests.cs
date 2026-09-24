@@ -593,12 +593,21 @@ internal static class KernelContractTests
     /// builds these four projects by relative path and copies their outputs out of the canonical
     /// <c>bin/stubs/&lt;folder&gt;/</c> locations, so renaming a project, its output folder or its
     /// <c>AssemblyName</c> breaks that consumer while every gate in this repository stays green - the
-    /// paths here are literals on purpose, because a list read out of the files it is checking would move
+    /// names here are literals on purpose, because a list read out of the files it is checking would move
     /// with the rename it exists to catch.
+    /// <para>
+    /// Every set is <b>closed</b>, and that is the whole point of the shape. A per-path existence check
+    /// passes on a WARM tree: rename the output folder, and the old folder still holds the old assembly, so
+    /// the lane stays green while its own message says "missing or renamed". Asserting the exact folder set
+    /// and the exact <c>*.dll</c> set inside each folder reddens on the warm tree too, because a rename
+    /// leaves BOTH names behind. The per-folder set is a set and not "exactly one DLL" on purpose: three of
+    /// the four folders also receive the ProjectReference copies their stub depends on.
+    /// </para>
     /// </summary>
     private static void VerifyStubSurfaceIsPublished()
     {
         string tests = Path.Combine(RepoRoot(), "tools", "FerriteLib.UiKit.Tests");
+        string stubRoot = Path.Combine(tests, "bin", "stubs");
         string[] projects =
         {
             "Stubs/UnityEngineStub/UnityEngineStub.csproj",
@@ -606,12 +615,13 @@ internal static class KernelContractTests
             "Stubs/UnityEngineTextRenderingModuleStub/UnityEngineTextRenderingModuleStub.csproj",
             "Stubs/VerseStub/VerseStub.csproj"
         };
-        string[] assemblies =
+        string[] folders = { "unityengine", "unityengine-imgui", "unityengine-textrendering", "verse" };
+        string[][] assemblies =
         {
-            "unityengine/UnityEngine.CoreModule.dll",
-            "unityengine-imgui/UnityEngine.IMGUIModule.dll",
-            "unityengine-textrendering/UnityEngine.TextRenderingModule.dll",
-            "verse/Assembly-CSharp.dll"
+            new[] { "UnityEngine.CoreModule.dll" },
+            new[] { "UnityEngine.CoreModule.dll", "UnityEngine.IMGUIModule.dll" },
+            new[] { "UnityEngine.CoreModule.dll", "UnityEngine.TextRenderingModule.dll" },
+            new[] { "UnityEngine.CoreModule.dll", "UnityEngine.IMGUIModule.dll", "Assembly-CSharp.dll" }
         };
 
         for (int i = 0; i < projects.Length; i++)
@@ -622,16 +632,61 @@ internal static class KernelContractTests
                 throw new Exception("a stub project a consumer builds by relative path is gone: " + projects[i]
                     + " (missing at " + projectPath + "); every gate here can stay green while that consumer's harness fails.");
             }
+        }
 
-            string assemblyPath = Path.Combine(
-                tests, "bin", "stubs", assemblies[i].Replace('/', Path.DirectorySeparatorChar));
-            if (!File.Exists(assemblyPath))
+        if (!Directory.Exists(stubRoot))
+        {
+            throw new Exception("the harness's canonical stub output root is gone: " + stubRoot
+                + "; the build writes it, so this is a path change or a build that never ran, and either way nothing below can be measured.");
+        }
+
+        // Closed set one: the output FOLDERS. A renamed OutputPath leaves the old folder in place, so this
+        // is the assertion a warm tree cannot pass while the published name has moved.
+        string[] actualFolders = Directory.GetDirectories(stubRoot);
+        for (int i = 0; i < actualFolders.Length; i++) actualFolders[i] = Path.GetFileName(actualFolders[i]);
+        Array.Sort(actualFolders, StringComparer.Ordinal);
+        string[] expectedFolders = (string[])folders.Clone();
+        Array.Sort(expectedFolders, StringComparer.Ordinal);
+        if (!SameSet(actualFolders, expectedFolders))
+        {
+            throw new Exception("bin/stubs/ carries [" + string.Join(", ", actualFolders)
+                + "] where a consumer copies out of [" + string.Join(", ", expectedFolders)
+                + "] - a rename leaves both names behind, and a stale folder here is a published name that moved.");
+        }
+
+        // Closed set two: the assembly file names inside each folder, so a renamed AssemblyName is caught
+        // even while the old assembly is still sitting beside it.
+        for (int i = 0; i < folders.Length; i++)
+        {
+            string folder = Path.Combine(stubRoot, folders[i]);
+            string[] actualDlls = Directory.GetFiles(folder, "*.dll");
+            for (int j = 0; j < actualDlls.Length; j++) actualDlls[j] = Path.GetFileName(actualDlls[j]);
+            Array.Sort(actualDlls, StringComparer.Ordinal);
+            string[] expectedDlls = (string[])assemblies[i].Clone();
+            Array.Sort(expectedDlls, StringComparer.Ordinal);
+            if (!SameSet(actualDlls, expectedDlls))
             {
-                throw new Exception("a stub assembly a consumer copies out of bin/stubs is missing or renamed: "
-                    + assemblies[i] + " (missing at " + assemblyPath
-                    + "); the harness build writes it there, so this is an OutputPath or AssemblyName change, not a missing build.");
+                throw new Exception("bin/stubs/" + folders[i] + "/ holds [" + string.Join(", ", actualDlls)
+                    + "] where a consumer copies out [" + string.Join(", ", expectedDlls)
+                    + "] - the harness build writes exactly the declared set, so this is an OutputPath or AssemblyName change.");
             }
         }
+    }
+
+    /// <summary>
+    /// Set equality over two already-sorted name arrays. Written out rather than taking a LINQ dependency:
+    /// this lane is about a published layout, and a `using System.Linq;` added for one comparison would be
+    /// the kind of quiet widening this repository keeps paying for.
+    /// </summary>
+    private static bool SameSet(string[] sortedLeft, string[] sortedRight)
+    {
+        if (sortedLeft.Length != sortedRight.Length) return false;
+        for (int i = 0; i < sortedLeft.Length; i++)
+        {
+            if (!string.Equals(sortedLeft[i], sortedRight[i], StringComparison.Ordinal)) return false;
+        }
+
+        return true;
     }
 
     private static void VerifyVisualCoreIsPageModelFree()
