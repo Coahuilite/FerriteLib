@@ -109,6 +109,27 @@ and delivery procedures do not override the current scripts or the next-stage ha
   assertion alone can never see a dead ruler; a diagnostic assertion compares the lane's arithmetic with the
   ruler so the two cannot drift in silence. In that lane `VerifyHeightFinding` is **PLUMBING** (one line in a
   wide band: axis routing, not wrapping). Absolute pixel truth stays the real font engine's.
+- **A run's log carries its own identity (2026-09-25, T31).** `tools/evidence/Write-EvidenceFooter.ps1`
+  appends the M6/M11 footer - generator and batch hashes, HEAD, the dirty set, the configuration-derived
+  artifact line, the two carriers as hash+mtime pairs, the gate lines and the pinned files - and
+  `verify-local.ps1 -EvidenceFooter` prints it as the last output of a GREEN chain, so a redirected log answers
+  "which bytes produced this?" itself instead of being bound to a commit by the reader's inference from
+  timestamps. (A red chain exits from inside `Invoke-Check`, so a red log is bound by calling the writer
+  directly and stating the non-zero exit.) The SHAPE is the consumer repository's writer, deliberately: two
+  footers would be the drift this project has already paid for once. A footer added after the fact is marked
+  `recomputed, not recorded at run time` and says that its `git HEAD` is the HEAD NOW, not at run time.
+- **The half-width convention exists TWICE, and both copies are now compared (2026-09-25, T31).** The
+  tests-side `StubTextWidth` and the inline model inside the Verse stub's `Text.CalcSize` implement the same
+  convention; the second is the one `VerseFerriteTextMetrics` - and therefore a production host - walks.
+  Nothing compared them, so an edit to either was a silent divergence. Measured by mutating the STUB copy alone:
+  **6 assertions reddened and all six were the new cross-check** (`VerifyStubWidthModelMatchesTheSharedOne`),
+  nothing else in the harness noticed. Mutating the tests-side copy reddens 23 assertions in all, so that copy
+  is load-bearing across the lanes; the stub copy had no lane at all.
+- **Measured correction:** all **5** `UiPageWindow` construction sites inject a ruler (2 in the recipe and
+  lifecycle lanes, 3 in the window-catalog lane). An earlier note in a commit message said "both", which came
+  from a truncated search - the same error class as the truncated call-site list this ledger already records
+  once. Two `UiWindowHost` subclasses (`ProbeShell`, `LaneShellBase`) do take the production default, for chrome
+  whose assertions are rects and horizontal fit.
 - **A popup layer covers exactly its option rows, so a press inside it always consumes a row (measured
   2026-09-24, and it is why one suggested control does not exist).** `UiPopup.RectFor` returns a rect whose
   height is `optionCount * OptionHeight` and `DrawOptionList` tiles one row per option across that rect, so

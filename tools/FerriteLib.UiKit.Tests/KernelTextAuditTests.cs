@@ -48,6 +48,7 @@ internal static class KernelTextAuditTests
         Run("Paragraph given room for its lines is never reported", VerifyWrappedParagraphIsSilent);
         Run("A paragraph the band cannot hold IS reported", VerifyWrappedParagraphOverflowIsReported);
         Run("The lane's fixture arithmetic still matches the ruler", VerifyFixtureArithmeticMatchesTheRuler);
+        Run("The two harness width implementations agree", VerifyStubWidthModelMatchesTheSharedOne);
         Run("Fitting text reports nothing", VerifyFittingTextIsSilent);
         Run("Finding budget bounds the audit", VerifySaturation);
         Run("Detaching unbinds the sink", VerifyDetach);
@@ -315,12 +316,45 @@ internal static class KernelTextAuditTests
     }
 
     /// <summary>
+    /// The half-width convention exists TWICE: this project's <see cref="StubTextWidth"/>, and the inline
+    /// model the Verse stub's <c>Text.CalcSize</c> carries. The second one is what
+    /// <see cref="VerseFerriteTextMetrics"/> walks, so it is what a production host measures with - and until
+    /// now nothing compared them, which means an edit to either would have been a silent divergence between
+    /// what these lanes measure and what a game-side host measures. Same strings, same fonts, both paths, one
+    /// number. (The exact glyph advances exist only in the game, so this holds the two HARNESS models
+    /// together; it says nothing about the real font.)
+    /// </summary>
+    private static void VerifyStubWidthModelMatchesTheSharedOne()
+    {
+        var production = new VerseFerriteTextMetrics();
+        string[] samples = { "abcd", "中文字符", "mixed 中文 text", "\u2212+", new string('x', 40) };
+        UiFont[] fonts = { UiFont.Tiny, UiFont.Small, UiFont.Medium };
+
+        foreach (UiFont font in fonts)
+        {
+            foreach (string sample in samples)
+            {
+                float shared = StubTextWidth.Of(sample, font);
+                float stub = production.MeasureWidth(sample, font);
+                Check(Near(shared, stub),
+                    "the shared width model and the Verse stub agree for " + font + " on "
+                    + sample.Length + " char(s) (" + shared.ToString("0.###") + " vs " + stub.ToString("0.###") + ")");
+            }
+        }
+    }
+
+    /// <summary>
     /// The wrapped height a fixture's CLAIM implies, computed in the lane: the half-width advance divided by
-    /// the width, rounded up, times the calibrated one-line height. The advance comes from the shared width
-    /// model (one implementation, <see cref="StubTextWidth"/>, the premise every ruler agrees on) - what must
-    /// never be copied from the instrument under test is how TALL it thinks the text is, because then the
-    /// fixture could not fail. <see cref="VerifyFixtureArithmeticMatchesTheRuler"/> keeps the two from
-    /// drifting apart in silence.
+    /// the width, rounded up, times the calibrated one-line height. What must never be copied from the
+    /// instrument under test is how TALL it thinks the text is, because then the fixture could not fail;
+    /// <see cref="VerifyFixtureArithmeticMatchesTheRuler"/> keeps that copy and the ruler from drifting apart
+    /// in silence.
+    ///
+    /// The ADVANCE comes from this project's half-width model, <see cref="StubTextWidth"/> - and that model
+    /// has a second implementation, the inline one inside the Verse stub's <c>Text.CalcSize</c>, which is the
+    /// one the consumer's production path walks. Two implementations of one convention is exactly the drift
+    /// this batch is about, so <see cref="VerifyStubWidthModelMatchesTheSharedOne"/> compares them rather
+    /// than trusting that they were written the same way.
     /// </summary>
     private static float WrappedHeight(string text, UiFont font, float width)
     {
