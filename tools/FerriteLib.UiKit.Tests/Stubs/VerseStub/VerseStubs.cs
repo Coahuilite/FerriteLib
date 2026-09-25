@@ -356,11 +356,49 @@ public static class Text
 
     public static bool WordWrap { get; set; } = true;
 
-    // Deterministic stub so real widget Measure/Draw paths (e.g. ChromeBannerWidget, the US
+    // Deterministic wrap model, so real widget Measure/Draw paths (e.g. ChromeBannerWidget, the US
     // kernel sections) can execute text-height layout without a real IMGUI text engine.
+    //
+    // 2026-09-24 (T27): this returned a constant 16f. A constant makes every height budget and every vertical
+    // fit verdict vacuous in the harness - a wrapped paragraph cannot report taller than one line, so "the
+    // band holds the text" was decided by the rect alone. The width model beside it was always real, which is
+    // how one axis stayed measurable while the other did not. Both axes now share ONE line height; see
+    // LineHeight, which CalcSize uses too.
     public static float CalcHeight(string text, float width)
     {
-        return 16f;
+        if (string.IsNullOrEmpty(text)) return 0f;
+        return WrappedLines(text, width) * LineHeight(Font);
+    }
+
+    /// <summary>
+    /// How many lines <paramref name="text"/> occupies in <paramref name="width"/>: the half-width advance
+    /// CalcSize reports, divided by the available width, rounded up and at least one.
+    /// </summary>
+    private static int WrappedLines(string text, float width)
+    {
+        float em = EmOf(Font);
+        float units = 0f;
+        foreach (char c in text) units += IsWide(c) ? 2f : 1f;
+        float advance = units * em * 0.5f;
+        return Math.Max(1, (int)Math.Ceiling(advance / Math.Max(1f, width)));
+    }
+
+    /// <summary>
+    /// ONE line height, calibrated from in-game <c>ui.text.overflow</c> need values (tiny 18.0, small
+    /// 21.33333, medium 30.0) and shared by <see cref="CalcHeight"/> and <see cref="CalcSize"/>. It is measured
+    /// rather than derived: a wrong line height is not a small error, it is the difference between a band that
+    /// holds its lines and one that does not. <b>Large is NOT calibrated</b> - no in-game value exists for it
+    /// yet - so it borrows small's until someone measures it; filling that gap with a formula would put the
+    /// same defect in a new place.
+    /// </summary>
+    private static float LineHeight(GameFont font)
+    {
+        return font switch
+        {
+            GameFont.Tiny => 18f,
+            GameFont.Medium => 30f,
+            _ => 21.33333f
+        };
     }
 
     /// <summary>
@@ -374,7 +412,9 @@ public static class Text
         float em = EmOf(Font);
         float units = 0f;
         foreach (char c in text ?? "") units += IsWide(c) ? 2f : 1f;
-        return new Vector2(units * em * 0.5f, em * 1.25f);
+        // One line's height is LineHeight(font) - the same value CalcHeight multiplies by its line count.
+        // Two different line heights inside one stub is the drift this pair exists to prevent.
+        return new Vector2(units * em * 0.5f, LineHeight(Font));
     }
 
     private static float EmOf(GameFont font)
