@@ -6,7 +6,14 @@ param(
     [switch]$PackDev,
     [switch]$PackZip,
     [switch]$PackNupkg,
-    [switch]$NoRestore
+    [switch]$NoRestore,
+    # Print the M6/M11 evidence footer as the last output, so a redirected chain log carries its own
+    # identity (HEAD, dirty set, per-gate results, pinned files, and the two carriers as hash+mtime pairs)
+    # instead of being bound to a commit by the reader's inference from file timestamps. The writer is
+    # tools/evidence/Write-EvidenceFooter.ps1 - one shape, shared with the consumer repository.
+    # It runs only on the success path: a RED chain exits from inside Invoke-Check, so bind a red log with
+    # the writer directly, stating the non-zero exit.
+    [switch]$EvidenceFooter
 )
 
 Set-StrictMode -Version Latest
@@ -85,7 +92,10 @@ function Invoke-Check {
         exit 1
     }
     Write-Host 'OK'
+    $script:gateResults += ("{0}=OK" -f $Name)
 }
+
+$script:gateResults = @()
 
 # A fresh clone has no obj/ tree, and every lane below runs --no-restore on purpose (a cross-repo gate
 # must never silently re-resolve a stale graph). So the bootstrap restore happens exactly once, here,
@@ -302,3 +312,14 @@ $deliveredAfter = if (Test-Path -LiteralPath $deliveredPath) {
 } else { 'absent' }
 if ($deliveredBefore -ne $deliveredAfter) { throw 'Verification changed the compatibility carrier (hash or mtime).' }
 Write-Host '[verify] all checks passed; compatibility carrier unchanged (hash and mtime).'
+
+if ($EvidenceFooter) {
+    # One shape, invoked in-process so the gate array crosses no process boundary: this is the same file
+    # the consumer repository uses, parameter for parameter.
+    & (Join-Path $root 'tools\evidence\Write-EvidenceFooter.ps1') -ToStdout -Configuration Both `
+        -Subject 'scripts/verify-local.ps1 (the 10-gate chain, Release + Dev)' `
+        -Command 'pwsh -NoProfile -File scripts/verify-local.ps1 -NoRestore -EvidenceFooter' `
+        -ExitCode 0 -Gate $script:gateResults `
+        -PinPath @('scripts/verify-local.ps1', 'scripts/verify-license.ps1', 'scripts/verify-dev-instrument.ps1',
+                   'tools/FerriteLib.UiKit.Tests/StubTextWidth.cs', 'tools/FerriteLib.UiKit.Tests/KernelTextAuditTests.cs')
+}
