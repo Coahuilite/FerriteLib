@@ -31,3 +31,17 @@ re-derive them):
   `<Private>false</Private>` and never copy the DLL.
 - After fetching a new package, rebuild with `--no-incremental` (path-resolved reference + stale build trap).
 - `UiHost.Source` is the widget-registry scope — register kinds under the exact page identity you open.
+
+## Dated consumer-facing reports
+
+Reports written for one consumer, kept here so they have a **delivery channel** instead of living as an
+untracked file. A dated report is a snapshot of its **evidence time**, not of today: read its own evidence-class
+and unmeasured sections before quoting any number from it.
+
+- [`../handoff-ngs-uikit-delta-2026-09-25-zh.md`](../handoff-ngs-uikit-delta-2026-09-25-zh.md) — **面向 NGS
+  (NivariansGrandStructure) 的 0.7.0 消费者影响报告** (Chinese): what the public surface gained from early 0.7.0
+  to the then-current HEAD, the four breaking changes for a consumer pinned to `[0.7.0,0.8.0)`, the capability
+  boundary of the external XML-driven UI, the byte / SHA-256 identity of the existing build artifacts, and the
+  explicit unmeasured list. **作者归属待维护者确认 (author attribution pending the maintainer's confirmation)**;
+  committed at `1236567`; it carries a pre-delivery identity re-check in its **§6.1**. Evidence is read-only —
+  no build, test, package or mutation step was run — so every UNRUN / 未取证 item stays marked as such.
