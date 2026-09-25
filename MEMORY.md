@@ -883,7 +883,15 @@ and delivery procedures do not override the current scripts or the next-stage ha
   `06ff1c2`/`1891A5CE…D649`/252416 B (the frozen Release the maintainer's live in-game pass ran against) -> a
   2026-09-23 rebuild at HEAD `9938121` after gate 10 landed (253440 B, Release, no PDB), **whose hash is
   deliberately not quoted here**. Those deliveries used the old FREEZE NOTICE workflow (hash plus mtime);
-  current staged identities are read from the selected package, not inferred from this history. The push
+  current staged identities are read from the selected package, not inferred from this history.
+  **2026-09-25 delivery (T32) - quoted WITH its inputs, which is what the entry above could not do:** rebuilt
+  at HEAD `4d66cf7` (Release, 253440 B, no PDB), identity `BF633AF6…BFA2945` /
+  `2026-09-25T15:17:17.7668528Z`. Its inputs are pinned here (that commit, that configuration, PDB absent) and
+  the carrier is byte-identical to the `dist/build/Release` artifact the same day's 10-gate chain verified, so
+  the number is an identity rather than a coincidence. **The paired dev package was NOT re-cut** (`Source/`
+  unchanged since `07f3c40`, measured `git diff --stat 07f3c40..HEAD -- Source` empty), so the consumer's
+  embedded `FerriteLib.SHA256=4729E275…` still holds and the pairing invariant is intact. The FREEZE NOTICE and
+  the M6 footer of the chain log carry the pair. The push
   went out after `privacy-audit -FullHistory` was
   CLEAN over 342 revisions; **no tag was created, so nothing was published** (`release.yml` fires on
   tags/releases only). **US's carrier stayed byte-identical across its full chain run** - the measurement behind
