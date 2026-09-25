@@ -89,6 +89,26 @@ and delivery procedures do not override the current scripts or the next-stage ha
   at `07f3c40`, they carry machine-specific absolute paths a tracked file may not contain, and their
   replace-as-you-go shape is what M9 forbids. `Invoke-AnchoredEdits.ps1` replaces them - collect operations,
   simulate every one, write only if all validated, `-ValidateOnly` to stop after the simulation.
+- **The harness text convention: width is modelled, line height is CALIBRATED (2026-09-24, T27/T29).**
+  Width: a CJK ideograph or full-width punctuation is one em, anything else about half an em -
+  `advance = units * em * 0.5`, `em` = 12/16/18 for Tiny/Small-Large/Medium. Height: one line is
+  **measured, not derived** - Tiny 18.0, Small 21.33333, Medium 30.0, calibrated from in-game
+  `ui.text.overflow` need values - and a string needs `ceil(advance / width) * lineHeight`, so the answer
+  depends on the text, the font AND the width. **Large is not calibrated** and borrows Small's until someone
+  measures it; a formula filling that gap is the same defect in a new place. Both fit-audit and layout take
+  ONE wrap-aware `ITextMetrics` instance (injected, never hard-coded). The Verse stub's `CalcHeight`
+  returned a constant 16f until T29, which made every vertical budget and vertical fit verdict vacuous while
+  the width axis stayed real. That change flips **no** lane - every `UiHost` lane must inject a ruler (the
+  constructor throws on null) and the two `UiWindowHost` subclasses on the production default draw chrome
+  whose assertions are rects and horizontal fit - so it is **future-proofing, not the repair of a current
+  false green**; writing it as a repair would be a false claim.
+  **A fixture's size comes from its claim, never from the instrument** (ledger rule). The wrap lane's
+  paragraph case drew into a 40px band and `TinyBand = 16f` that *was* the dead ruler's return value, so it
+  was green because the ruler could not count lines. It now derives its band in the lane and is paired with a
+  **negative control** - the same paragraph in half the height it needs must be reported - because a silent
+  assertion alone can never see a dead ruler; a diagnostic assertion compares the lane's arithmetic with the
+  ruler so the two cannot drift in silence. In that lane `VerifyHeightFinding` is **PLUMBING** (one line in a
+  wide band: axis routing, not wrapping). Absolute pixel truth stays the real font engine's.
 - **A popup layer covers exactly its option rows, so a press inside it always consumes a row (measured
   2026-09-24, and it is why one suggested control does not exist).** `UiPopup.RectFor` returns a rect whose
   height is `optionCount * OptionHeight` and `DrawOptionList` tiles one row per option across that rect, so
