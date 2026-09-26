@@ -118,6 +118,9 @@ and delivery procedures do not override the current scripts or the next-stage ha
   directly and stating the non-zero exit.) The SHAPE is the consumer repository's writer, deliberately: two
   footers would be the drift this project has already paid for once. A footer added after the fact is marked
   `recomputed, not recorded at run time` and says that its `git HEAD` is the HEAD NOW, not at run time.
+  Its `# generator:` is the WRITER's own sha256 and its `# batch:` is
+  `SHA256(subject|command|configuration|exit|HEAD|dirty)` - verify both by RECOMPUTING them, never by looking
+  for a same-named file.
 - **The half-width convention exists TWICE, and both copies are now compared (2026-09-25, T31).** The
   tests-side `StubTextWidth` and the inline model inside the Verse stub's `Text.CalcSize` implement the same
   convention; the second is the one `VerseFerriteTextMetrics` - and therefore a production host - walks.
@@ -884,14 +887,34 @@ and delivery procedures do not override the current scripts or the next-stage ha
   2026-09-23 rebuild at HEAD `9938121` after gate 10 landed (253440 B, Release, no PDB), **whose hash is
   deliberately not quoted here**. Those deliveries used the old FREEZE NOTICE workflow (hash plus mtime);
   current staged identities are read from the selected package, not inferred from this history.
-  **2026-09-25 delivery (T32) - quoted WITH its inputs, which is what the entry above could not do:** rebuilt
-  at HEAD `4d66cf7` (Release, 253440 B, no PDB), identity `BF633AF6…BFA2945` /
-  `2026-09-25T15:17:17.7668528Z`. Its inputs are pinned here (that commit, that configuration, PDB absent) and
-  the carrier is byte-identical to the `dist/build/Release` artifact the same day's 10-gate chain verified, so
-  the number is an identity rather than a coincidence. **The paired dev package was NOT re-cut** (`Source/`
-  unchanged since `07f3c40`, measured `git diff --stat 07f3c40..HEAD -- Source` empty), so the consumer's
-  embedded `FerriteLib.SHA256=4729E275…` still holds and the pairing invariant is intact. The FREEZE NOTICE and
-  the M6 footer of the chain log carry the pair. The push
+  **2026-09-25 delivery (T32).** The frozen carrier's identity is recorded in the CROSS-REPOSITORY coordination
+  ledger (§14.43 / §16 - outside both repositories, which is the only place it can live). What belongs in a
+  tracked file is the RULE, because of a self-reference that is not a discipline problem: **committed files
+  cannot contain the hash of a carrier built from themselves.** The payload embeds the SHA of the commit it was
+  built from, so writing that SHA down requires a commit, that commit moves HEAD, and the next build is a
+  different payload - the number can never catch itself. The shape recorded here is therefore: the export commit
+  MUST be the current HEAD **at export time**; Release; 253440 B; **no PDB**; byte-identical to the
+  `dist/build/Release` artifact the same day's chain verified; and the paired dev package NOT re-cut (`Source/`
+  unchanged since `07f3c40`, measured, which is what keeps the consumer's embedded
+  `FerriteLib.SHA256=4729E275…` valid).
+  **Order is the rule: commit first, export last.** The consumer's chain has two teeth and this order is what
+  keeps clear of both: a commit after the export leaves the payload's embedded commit behind HEAD, and comparing
+  the two SHAs *for equality* counts a documentation commit as payload staleness, so that chain **throws**
+  rather than going soft-red; and the same chain requires the carrier checkout to be **clean**, so an
+  uncommitted tree fails it too. The invariant that actually matters is that the payload's product SOURCE equals
+  the current product source - which is what the consumer's check is being re-cut to (task-36): the embedded
+  commit is an ancestor of HEAD AND `git diff <embedded>..HEAD -- Source` is empty.
+  **This line previously recorded `4d66cf7` / `BF633AF6…`; superseded and wrong**, because that export ran
+  before its ledger commit instead of after. Kept as a correction rather than deleted.
+  **Delivery checklist, in order - each step is the one that failed if the next throws:** (a) commit everything
+  first; (b) `dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release`; (c)
+  `scripts/export-carrier.ps1`; (d) assert no PDB beside the carrier; (e)
+  `scripts/verify-local.ps1 -NoRestore -EvidenceFooter`; (f) re-check the carrier pair AND that `dist/dev` did
+  not move; (g) issue the FREEZE NOTICE (hash + mtime as a pair) and put the identity in the coordination
+  ledger; (h) commit nothing that moves HEAD until the next delivery.
+  **Status at handover:** the FL half of this delivery is complete and independently reviewed (six items, plus
+  three recomputations of the footer's fields), with the carrier, the `dist/build/Release` artifact and the
+  exported root payload all the same bytes. The push
   went out after `privacy-audit -FullHistory` was
   CLEAN over 342 revisions; **no tag was created, so nothing was published** (`release.yml` fires on
   tags/releases only). **US's carrier stayed byte-identical across its full chain run** - the measurement behind
