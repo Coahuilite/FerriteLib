@@ -58,7 +58,7 @@ internal static class KernelToneVocabularyTests
     private static void VerifyFourAuthoredMeanings()
     {
         PrepareRegistry();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         using UiSession session = new();
         var bindings = new UiBindings();
         bindings.BindCommand("go", () => { });
@@ -98,7 +98,7 @@ internal static class KernelToneVocabularyTests
     private static void VerifyActiveRedirect()
     {
         PrepareRegistry();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         using UiSession session = new();
         var bindings = new UiBindings();
         bindings.BindCommand("go", () => { });
@@ -146,7 +146,7 @@ internal static class KernelToneVocabularyTests
     private static void VerifyDisabledRedirect()
     {
         PrepareRegistry();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         using UiSession session = new();
         var bindings = new UiBindings();
         bindings.BindCommand("go", () => { });
@@ -193,7 +193,7 @@ internal static class KernelToneVocabularyTests
     private static void VerifyValueLadderUnchanged()
     {
         PrepareRegistry();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         using UiSession session = new();
         var bindings = new UiBindings();
         bindings.BindCommand("go", () => { });
@@ -300,27 +300,67 @@ internal static class KernelToneVocabularyTests
 
     private static void VerifyDanglingRule()
     {
-        // A role is code-owned: the vocabulary is a closed enum, and the table answers every member even
-        // for a skin that claims no token at all. A role reference therefore cannot dangle.
-        UiTheme unpainted = new();
-        foreach (UiStatusTone tone in Enum.GetValues(typeof(UiStatusTone)))
+        // A role is code-owned: the vocabulary is a closed enum, and the table answers every member for a skin
+        // that claims no token of its own. Since the bag became PARTIAL - every unset token answers the
+        // shipped palette - "answers every member" no longer means "answers with the bag's zeroes": it means
+        // it resolves the approved mapping, out of whatever the theme's effective tokens are.
+        UiTheme bag = new();
+        UiStatusTone[] everyTone = (UiStatusTone[])Enum.GetValues(typeof(UiStatusTone));
+        foreach (UiStatusTone tone in everyTone)
         {
-            UiResolvedStyle style = unpainted.Styles.Resolve(tone);
-            Check(style.Fill.a == 0f && style.Border.a == 0f && style.Text.a == 0f,
-                "an unpainted skin still answers the role " + tone + " with the bag's own values");
+            UiResolvedStyle style = bag.Styles.Resolve(tone);
+            Check(style.Fill.a > 0f && style.Border.a > 0f && style.Text.a > 0f,
+                "the role " + tone + " resolves to a paintable treatment on a partial bag, not to nothing");
         }
 
-        Check(unpainted.Styles.FallbackCount == 0,
-            "and answering a declared role is a rule, never a recorded fallback");
+        Check(SameColor(bag.Styles.Resolve(UiStatusTone.Neutral).Fill, bag.Raised)
+                && SameColor(bag.Styles.Resolve(UiStatusTone.Neutral).Border, bag.RaisedSurface.Border),
+            "the neutral role reads the raised plane and that plane's effective edge, both inherited");
+        Check(SameColor(bag.Styles.Resolve(UiStatusTone.Active).Fill, bag.Selected)
+                && SameColor(bag.Styles.Resolve(UiStatusTone.Active).Border, bag.AccentGold),
+            "the active role reads the selected plane and the accent edge");
+        Check(SameColor(bag.Styles.Resolve(UiStatusTone.Disabled).Fill, bag.Base)
+                && SameColor(bag.Styles.Resolve(UiStatusTone.Disabled).Text, bag.TextDisabled),
+            "and the disabled role reads the substrate and the disabled ink");
+        Check(bag.Styles.FallbackCount == 0,
+            "answering a declared role is a rule, never a recorded fallback");
+
+        // An explicit override is what the role then answers, because the table is a read-through view.
+        var own = new Color(0.11f, 0.22f, 0.33f, 1f);
+        UiTheme overridden = new()
+        {
+            Selected = own
+        };
+        Check(SameColor(overridden.Styles.Resolve(UiStatusTone.Active).Fill, own),
+            "an explicit token override reaches the role that reads it, and no fallback is recorded for it");
+        Check(overridden.Styles.FallbackCount == 0,
+            "because an override is an assignment, not a miss");
+
+        // The one thing that IS a fallback: a value outside the closed enum. It still answers, and it says so.
+        UiTheme unknown = new();
+        Check(unknown.Styles.FallbackCount == 0, "a fresh store has recorded no fallback yet");
+        UiResolvedStyle undeclared = unknown.Styles.Resolve((UiStatusTone)77);
+        Check(SameStyle(undeclared, unknown.Styles.Resolve(UiStatusTone.Neutral)),
+            "an undeclared tone still answers the neutral treatment instead of throwing");
+        Check(unknown.Styles.FallbackCount == 1,
+            "and it is recorded as a fallback, which is the only shape in this lane that is one");
 
         // A Scheme name is document-owned: a name no skin declares cannot resolve, and that is recorded
         // and survivable rather than fatal.
         UiStyleDocument document = UiStyleDocument.Parse("<Styles Schema=\"1\"></Styles>");
-        var resolver = new UiStyleResolver(UiTheme.DarkGold, document);
+        var resolver = new UiStyleResolver(UiTheme.Vanilla, document);
         UiTheme scope = resolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "nobody-declares-this") });
         Check(resolver.Issues.Count == 1, "a dangling scheme name is recorded at resolution time");
-        Check(SameColor(scope.Panel, UiTheme.DarkGold.Panel),
+        Check(SameColor(scope.Panel, UiTheme.Vanilla.Panel),
             "and the scope keeps the values it would have had without it: the page still renders");
+    }
+
+    /// <summary>Compares two resolved treatments field by field.</summary>
+    private static bool SameStyle(UiResolvedStyle left, UiResolvedStyle right)
+    {
+        return SameColor(left.Fill, right.Fill)
+            && SameColor(left.Border, right.Border)
+            && SameColor(left.Text, right.Text);
     }
 
     // --- the stable type ---------------------------------------------------------------------------
@@ -390,7 +430,7 @@ internal static class KernelToneVocabularyTests
     {
         try
         {
-            using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
             Check(false, what + " - but the host accepted it");
         }
         catch (UiContractException)

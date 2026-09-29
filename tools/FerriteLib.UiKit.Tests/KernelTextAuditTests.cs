@@ -307,7 +307,7 @@ internal static class KernelTextAuditTests
 
     private static void Draw(Rect rect, string text, UiFont font, bool singleLine = false)
     {
-        UiThemeDraw.Label(rect, text, UiTheme.DarkGold, null, font, TextAnchor.MiddleLeft, singleLine);
+        UiThemeDraw.Label(rect, text, UiTheme.Vanilla, null, font, TextAnchor.MiddleLeft, singleLine);
     }
 
     private static bool Near(float expected, float actual)

@@ -54,6 +54,20 @@ public sealed class DropdownWidget : IUiWidget
                 $"DropdownWidget at '{elementPath}' requires a non-empty Id or Bind to use as its typed binding key.");
         }
 
+        if (bindings is IUiTypedChoices typedSeam
+            && typedSeam.TryGetValueType(bindKey, out Type declared)
+            && declared != typeof(string))
+        {
+            // R4-A: a value bound to anything but a string is served by the TYPED path, and that path can only
+            // be fed by UiChoice<T> options. A string list, a UiOption list or the static OptionN/ValueN
+            // attributes carry strings only, so each of them would have to spell the value to hand it back -
+            // the round-trip this path exists to remove. The refusal therefore names the typed shape instead of
+            // accepting a string-shaped stand-in for it.
+            ValidateTypedOptions(typedSeam, bindKey, declared, elementPath);
+            OptionHelp.Validate(bindings, spec, elementPath, "DropdownWidget");
+            return;
+        }
+
         bindings.ValidateValue<string>(bindKey, elementPath);
 
         if (spec.TryGetAttribute("OptionsBind", out string optionsKey) && optionsKey.Length > 0)
@@ -67,13 +81,16 @@ public sealed class DropdownWidget : IUiWidget
                 {
                     // The historical call stays the diagnosis for everything that is not a pair list: it already
                     // separates "missing" from "registered as the wrong kind of key", which the A5 lane pins. The
-                    // pair shape is appended as the second accepted answer, never substituted for it.
+                    // pair shape is appended as the second accepted answer, never substituted for it, and the
+                    // typed shape is named last so a page that meant a typed value is told how to get one.
                     bindings.ValidateOptions<string>(optionsKey, elementPath);
                 }
                 catch (InvalidOperationException ex)
                 {
                     throw new InvalidOperationException(
-                        ex.Message + " The dropdown also accepts BindOptions<UiOption> (display, value).");
+                        ex.Message + " The dropdown also accepts BindOptions<UiOption> (display, value)."
+                        + " A typed value (anything but a string) needs BindOptions<UiChoice<T>> with the SAME T"
+                        + " as its BindValue<T>, which carries the value itself rather than its spelling.");
                 }
             }
         }
@@ -81,6 +98,37 @@ public sealed class DropdownWidget : IUiWidget
         // The same option-level help contract the mode row declares, from one implementation: the popup's
         // rows are options of this element, so the engine's element-level HelpKey cannot reach them.
         OptionHelp.Validate(bindings, spec, elementPath, "DropdownWidget");
+    }
+
+    /// <summary>
+    /// The typed path's creation-time contract: the options the element reads must be typed choices, and every
+    /// one of them must carry a value of the value binding's own type. Both halves are checked here because a
+    /// mismatch found at click time would be a control that silently does nothing, which is exactly the
+    /// failure mode the typed path exists to make impossible.
+    /// </summary>
+    private void ValidateTypedOptions(IUiTypedChoices seam, string bindKey, Type declared, string elementPath)
+    {
+        string optionsKey = ReadOptionsKey(bindKey);
+        if (!seam.TryGetChoices(optionsKey, out IReadOnlyList<UiChoice<object?>> choices))
+        {
+            throw new InvalidOperationException(
+                $"Value binding '{bindKey}' at '{elementPath}' is '{declared.Name}', so this dropdown needs typed"
+                + $" choices of that same type: bind BindOptions<UiChoice<{declared.Name}>>('{optionsKey}', ...)."
+                + " A plain string list, a UiOption list and the static OptionN/ValueN attributes all carry strings"
+                + " only, and handing a string to a typed setter is the round-trip this path removes.");
+        }
+
+        foreach (UiChoice<object?> choice in choices)
+        {
+            if (!seam.AcceptsValue(bindKey, choice.Value))
+            {
+                throw new InvalidOperationException(
+                    $"Typed choices '{optionsKey}' at '{elementPath}' carry a value of type '"
+                    + (choice.Value == null ? "null" : choice.Value.GetType().Name)
+                    + $"' under the label '{choice.Text}', which is not the '{declared.Name}' its value binding"
+                    + " accepts.");
+            }
+        }
     }
 
     public float Measure(UiWidgetContext ctx)
@@ -93,23 +141,21 @@ public sealed class DropdownWidget : IUiWidget
         if (rect.width <= 1f || rect.height <= 1f) return;
 
         string bindKey = ReadBindKey();
+        if (ctx.Bindings is IUiTypedChoices typedSeam
+            && typedSeam.TryGetValueType(bindKey, out Type declared)
+            && declared != typeof(string))
+        {
+            DrawTyped(rect, ctx, bindKey, typedSeam);
+            return;
+        }
+
         ctx.Bindings.TryGet(bindKey, out string current);
         List<Option> options = BuildOptions(ctx);
         if (options.Count == 0) return;
 
-        string label = ReadLabel(ctx);
-        float labelWidth = label.Length > 0 ? LabelWidth : 0f;
-        Rect fieldRect = new(rect.x + labelWidth, rect.y, Math.Max(1f, rect.width - labelWidth), rect.height);
-        if (labelWidth > 0f)
-        {
-            // The field label lives in a fixed LabelWidth column: it is a single line by design, so the
-            // fitting audit must measure its width rather than assume wrapping will rescue a long word.
-            UiThemeDraw.Label(new Rect(rect.x, rect.y, labelWidth, rect.height), label, ctx.Theme, ctx.Theme.TextPrimary, UiFont.Small, TextAnchor.MiddleLeft, singleLine: true);
-        }
-
         string display = FindDisplayText(options, current);
         bool open = ctx.Session.IsPopupOpen(bindKey);
-        DrawField(fieldRect, display, open || current.Length > 0, ctx.Theme);
+        Rect fieldRect = DrawLabelledField(rect, ReadLabel(ctx), display, open || current.Length > 0, ctx);
 
         // The trigger click stores the popup anchor in Host window space (the engine translates
         // draw rects inside scrolls/groups); the popup pass draws and hit-tests in that same
@@ -131,6 +177,120 @@ public sealed class DropdownWidget : IUiWidget
             // last row's identity. Change-detected, so a closed dropdown costs no writes at all.
             OptionHelp.Publish(ctx, helpSink, "");
         }
+    }
+
+    /// <summary>
+    /// The element's field, for both draw paths: the optional single-line label in its fixed column, the value
+    /// plane and the text outlet, with the layout arithmetic in one place. Returns the field rect, which is what
+    /// the trigger's hit test and the popup anchor are taken from.
+    /// </summary>
+    private Rect DrawLabelledField(Rect rect, string label, string display, bool selected, UiWidgetContext ctx)
+    {
+        float labelWidth = label.Length > 0 ? LabelWidth : 0f;
+        Rect fieldRect = new(rect.x + labelWidth, rect.y, Math.Max(1f, rect.width - labelWidth), rect.height);
+        if (labelWidth > 0f)
+        {
+            // The field label lives in a fixed LabelWidth column: it is a single line by design, so the
+            // fitting audit must measure its width rather than assume wrapping will rescue a long word.
+            UiThemeDraw.Label(new Rect(rect.x, rect.y, labelWidth, rect.height), label, ctx.Theme, ctx.Theme.TextPrimary, UiFont.Small, TextAnchor.MiddleLeft, singleLine: true);
+        }
+
+        DrawField(fieldRect, display, selected, ctx.Theme);
+        return fieldRect;
+    }
+
+    // --- R4-A: the typed path, taken when the value binding's declared type is not a string ------------------
+
+    /// <summary>
+    /// Draws the element from TYPED choices: the field shows the chosen option's own label, the popup lists the
+    /// same labels, and choosing one hands the option's real value to the typed setter through
+    /// <see cref="IUiTypedChoices"/>. Nothing here spells a value: the current value is matched to an option by
+    /// identity, so a value that no option carries displays nothing rather than its own text, and an unmatched
+    /// value can never be written back by a click.
+    /// </summary>
+    private void DrawTyped(Rect rect, UiWidgetContext ctx, string bindKey, IUiTypedChoices seam)
+    {
+        if (!seam.TryGetChoices(ReadOptionsKey(bindKey), out IReadOnlyList<UiChoice<object?>> choices) || choices.Count == 0)
+        {
+            return;
+        }
+
+        bool hasCurrent = seam.TryGetTypedValue(bindKey, out object? current);
+        string display = hasCurrent ? FindChoiceText(choices, current) : "";
+        bool open = ctx.Session.IsPopupOpen(bindKey);
+        Rect fieldRect = DrawLabelledField(rect, ReadLabel(ctx), display, open || hasCurrent, ctx);
+
+        // The trigger click stores the popup anchor in Host window space, exactly as the string path does: the
+        // anchor source is the primitive, not this path's choice.
+        UiNative.DropdownButton(fieldRect, bindKey, ctx);
+
+        string helpSink = OptionHelp.SinkKey(spec);
+        if (ctx.Session.IsPopupOpen(bindKey))
+        {
+            Rect? anchor = ctx.Session.OpenPopupAnchor;
+            if (anchor.HasValue)
+            {
+                ctx.Session.RegisterPopupDraw(() => DrawTypedPopup(anchor.Value, bindKey, choices, current, ctx, seam));
+            }
+        }
+        else
+        {
+            OptionHelp.Publish(ctx, helpSink, "");
+        }
+    }
+
+    private void DrawTypedPopup(
+        Rect anchor,
+        string bindKey,
+        IReadOnlyList<UiChoice<object?>> choices,
+        object? current,
+        UiWidgetContext ctx,
+        IUiTypedChoices seam)
+    {
+        int hovered = UiPopup.DrawChoiceList(
+            UiPopup.RectFor(anchor, choices.Count, ctx.Session.HostViewport),
+            bindKey,
+            ctx,
+            choices,
+            current,
+            value =>
+            {
+                // A refused write (a value of the wrong type, or a read-only binding) changes nothing at all:
+                // TrySetTypedValue reports the refusal instead of throwing or coercing.
+                seam.TrySetTypedValue(bindKey, value);
+            });
+
+        // A typed option's option-level identity is its LABEL: the value is not a string, so the popup cannot
+        // report one, and the label is the only string the author gave this option.
+        OptionHelp.Publish(ctx, OptionHelp.SinkKey(spec), hovered >= 0 && hovered < choices.Count ? choices[hovered].Text : "");
+    }
+
+    /// <summary>
+    /// The label the field shows for the current value: the first option whose value IS that value, by identity.
+    /// There is no text pass and no raw-value fallback here - a typed value that no option carries is not a
+    /// spelling to be displayed, and inventing one would be the round-trip this path removes.
+    /// </summary>
+    private static string FindChoiceText(IReadOnlyList<UiChoice<object?>> choices, object? current)
+    {
+        foreach (UiChoice<object?> choice in choices)
+        {
+            if (Equals(choice.Value, current))
+            {
+                return choice.Text;
+            }
+        }
+
+        return "";
+    }
+
+    /// <summary>
+    /// The key the element reads its options from: its declared <c>OptionsBind</c>, else its own value key. The
+    /// typed path uses the same rule, so a page that binds its choices under the value key works without
+    /// declaring anything extra.
+    /// </summary>
+    private string ReadOptionsKey(string bindKey)
+    {
+        return spec.TryGetAttribute("OptionsBind", out string optionsKey) && optionsKey.Length > 0 ? optionsKey : bindKey;
     }
 
     private void DrawPopup(Rect anchor, List<Option> options, string current, UiWidgetContext ctx)

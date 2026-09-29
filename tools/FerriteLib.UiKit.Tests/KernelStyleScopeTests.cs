@@ -59,7 +59,7 @@ internal static class KernelStyleScopeTests
     {
         PrepareRegistry();
         ResetProbe();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         using UiHost host = new(Scope, RegionManifest(), new UiBindings(), theme, new StubMetrics(), new StubTranslation());
 
         ClearBoxes();
@@ -86,7 +86,7 @@ internal static class KernelStyleScopeTests
     private static void VerifyScopeInstanceIsStable()
     {
         PrepareRegistry();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         using UiHost host = new(Scope, RegionManifest(), new UiBindings(), theme, new StubMetrics(), new StubTranslation());
 
         ResetProbe();
@@ -116,7 +116,7 @@ internal static class KernelStyleScopeTests
     private static void VerifyScopeFollowsLayoutClock()
     {
         PrepareRegistry();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         using UiHost host = new(Scope, ClockManifest(), new UiBindings(), theme, new FontMetrics(), new StubTranslation());
 
         // Frame 1: the scope is built from the baseline as it stands.
@@ -174,7 +174,7 @@ internal static class KernelStyleScopeTests
             "<Styles Schema=\"1\" Density=\"compact\">"
             + "<Density Name=\"compact\"><Metric Token=\"RowHeight\" Value=\"20\"/></Density>"
             + "</Styles>");
-        UiTheme standaloneTheme = UiTheme.DarkGold;
+        UiTheme standaloneTheme = UiTheme.Vanilla;
         int standaloneRevision = standaloneTheme.LayoutRevision;
         using (UiHost host = new(Scope, ProbeManifest(""), new UiBindings(), standaloneTheme, new StubMetrics(), new StubTranslation(), standalone))
         {
@@ -188,7 +188,7 @@ internal static class KernelStyleScopeTests
         }
 
         // The embedded origin: the same values through the manifest's own <Styles> section, no parameter.
-        UiTheme embeddedTheme = UiTheme.DarkGold;
+        UiTheme embeddedTheme = UiTheme.Vanilla;
         int embeddedRevision = embeddedTheme.LayoutRevision;
         using (UiHost host = new(Scope, ProbeManifest(CompactDensitySection), new UiBindings(), embeddedTheme, new StubMetrics(), new StubTranslation()))
         {
@@ -225,7 +225,7 @@ internal static class KernelStyleScopeTests
             Check(broken.Issues.Count == 4,
                 "the parser recorded its own four drops (got " + broken.Issues.Count + ")");
 
-            UiTheme theme = UiTheme.DarkGold;
+            UiTheme theme = UiTheme.Vanilla;
             ResetProbe();
             using UiHost host = new(Scope, RegionManifest("partial", ""), new UiBindings(), theme, new StubMetrics(), new StubTranslation(), broken);
 
@@ -258,7 +258,7 @@ internal static class KernelStyleScopeTests
         UiFitAudit.Reset();
         try
         {
-            UiTheme theme = UiTheme.DarkGold;
+            UiTheme theme = UiTheme.Vanilla;
             using (UiHost host = new(Scope, RegionManifest(), new UiBindings(), theme, new StubMetrics(), new StubTranslation()))
             {
                 host.DrawFrame(new Rect(0f, 0f, 320f, 240f));
@@ -269,7 +269,7 @@ internal static class KernelStyleScopeTests
             // The other end: a scope naming a scheme nobody declared is the same kind of drop, and it is
             // reported by the frame that resolved it - the host publishes the resolver's record right
             // after the arrangement that produced it, not one frame later.
-            UiTheme naming = UiTheme.DarkGold;
+            UiTheme naming = UiTheme.Vanilla;
             using (UiHost host = new(Scope, RegionManifest("stranger"), new UiBindings(), naming, new StubMetrics(), new StubTranslation()))
             {
                 Check(records.Count == 0, "nothing is reported before an arrangement resolves the scope");
@@ -302,7 +302,7 @@ internal static class KernelStyleScopeTests
         UiFitAudit.Reset();
         try
         {
-            UiTheme theme = UiTheme.DarkGold;
+            UiTheme theme = UiTheme.Vanilla;
             using UiHost host = new(Scope, RegionManifest("us-flat-panel"), new UiBindings(), theme, new StubMetrics(), new StubTranslation());
             Check(records.Count == 0, "nothing is reported before an arrangement resolves the scope");
 
@@ -341,7 +341,7 @@ internal static class KernelStyleScopeTests
                 "<Styles Schema=\"1\">"
                 + "<Density Name=\"compact\"><Metric Token=\"RowHeight\" Value=\"20\"/></Density>"
                 + "</Styles>");
-            UiTheme theme = UiTheme.DarkGold;
+            UiTheme theme = UiTheme.Vanilla;
             using (UiHost host = new(Scope, ProbeManifest(IceAndCompactSection), new UiBindings(), theme, new StubMetrics(), new StubTranslation(), handedIn))
             {
                 Check(records.Count == 1,
@@ -359,13 +359,13 @@ internal static class KernelStyleScopeTests
             UiFitAudit.Reset();
             records.Clear();
 
-            UiTheme embedded = UiTheme.DarkGold;
+            UiTheme embedded = UiTheme.Vanilla;
             using (UiHost host = new(Scope, ProbeManifest(IceAndCompactSection), new UiBindings(), embedded, new StubMetrics(), new StubTranslation()))
             {
                 Check(records.Count == 0, "a manifest <Styles> section on its own says nothing");
             }
 
-            UiTheme standalone = UiTheme.DarkGold;
+            UiTheme standalone = UiTheme.Vanilla;
             using (UiHost host = new(Scope, ProbeManifest(""), new UiBindings(), standalone, new StubMetrics(), new StubTranslation(), handedIn))
             {
                 Check(records.Count == 0, "a handed-in document on its own says nothing");
@@ -386,13 +386,13 @@ internal static class KernelStyleScopeTests
 
         // Both carriers are engine vocabulary, not a kind's: a container is a region its subtree inherits,
         // and a widget narrows its own scope. Neither has to be declared in a kind's schema.
-        UiTheme containerTheme = UiTheme.DarkGold;
+        UiTheme containerTheme = UiTheme.Vanilla;
         using (UiHost host = new(Scope, RegionManifest(), new UiBindings(), containerTheme, new StubMetrics(), new StubTranslation()))
         {
             Check(host.Manifest.Roots.Count == 1, "Scheme/Density are accepted on a container");
         }
 
-        UiTheme widgetTheme = UiTheme.DarkGold;
+        UiTheme widgetTheme = UiTheme.Vanilla;
         using (UiHost host = new(Scope, ProbeManifest("", " Scheme=\"ice\" Density=\"compact\""), new UiBindings(), widgetTheme, new StubMetrics(), new StubTranslation()))
         {
             Check(host.Manifest.Roots.Count == 1, "and on a widget");
@@ -401,7 +401,7 @@ internal static class KernelStyleScopeTests
         bool refused = false;
         try
         {
-            UiTheme typoTheme = UiTheme.DarkGold;
+            UiTheme typoTheme = UiTheme.Vanilla;
             using UiHost host = new(Scope, ProbeManifest("", " Scheem=\"ice\""), new UiBindings(), typoTheme, new StubMetrics(), new StubTranslation());
         }
         catch (UiContractException)
@@ -420,7 +420,7 @@ internal static class KernelStyleScopeTests
         UiFitAudit.Reset();
         try
         {
-            UiTheme orphan = UiTheme.DarkGold;
+            UiTheme orphan = UiTheme.Vanilla;
             using UiHost host = new(Scope, ProbeManifest("", " Scheme=\"ice\""), new UiBindings(), orphan, new StubMetrics(), new StubTranslation());
             Check(records.Count == 0, "nothing is reported before the scope is resolved");
             host.MeasureAndArrange(new Vector2(300f, 200f));

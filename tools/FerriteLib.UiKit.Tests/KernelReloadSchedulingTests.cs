@@ -540,7 +540,7 @@ internal static class KernelReloadSchedulingTests
         service.Add(new UiDocumentSource("lay", UiDocumentKind.Layout, layoutPath), layout1);
         service.Add(new UiDocumentSource("sty", UiDocumentKind.Style, stylePath), style1);
 
-        UiTheme theme = UiTheme.DarkGold.Clone();
+        UiTheme theme = UiTheme.Vanilla.Clone();
         using var host = NewHost("sched-pair", UiLayoutManifest.Parse(layout1), new UiBindings(), theme);
         service.Attach(host, "lay", "sty");
         Check(SameColor(theme.Panel, new Color(0f, 0f, 1f, 1f)), "the first style version applied on attach");
@@ -940,7 +940,7 @@ internal static class KernelReloadSchedulingTests
         service.Add(new UiDocumentSource("lay", UiDocumentKind.Layout, layoutPath), layout1);
         service.Add(new UiDocumentSource("sty", UiDocumentKind.Style, stylePath), style1);
 
-        UiTheme theme = UiTheme.DarkGold.Clone();
+        UiTheme theme = UiTheme.Vanilla.Clone();
         using var host = NewHost("sched-inpass-all", UiLayoutManifest.Parse(layout1), new UiBindings(), theme);
         service.Attach(host, "lay", "sty");
         PendingTrigger = null;
@@ -1050,7 +1050,7 @@ internal static class KernelReloadSchedulingTests
 
     private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindings bindings)
     {
-        return new UiHost(source, manifest, bindings, UiTheme.DarkGold, new FixedMetrics(), new FixedTranslation());
+        return new UiHost(source, manifest, bindings, UiTheme.Vanilla, new FixedMetrics(), new FixedTranslation());
     }
 
     private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindings bindings, UiTheme theme)

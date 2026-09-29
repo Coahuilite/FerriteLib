@@ -924,7 +924,7 @@ internal static class KernelIdentityTests
             Scope,
             UiLayoutManifest.Parse(xml),
             bindings ?? new UiBindings(),
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new FixedMetrics(),
             new FixedTranslation());
     }

@@ -52,7 +52,7 @@ internal static class KernelSectionHeaderTests
     /// </summary>
     private static void VerifyDividerIsPaintedByDefault()
     {
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         ClearBoxes();
         using UiHost host = NewHost(Page(""), theme);
         UiLayoutSnapshot snapshot = Arrange(host, 200f);
@@ -70,7 +70,7 @@ internal static class KernelSectionHeaderTests
     /// </summary>
     private static void VerifyChromeNonePaintsNothing()
     {
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         ClearBoxes();
         using UiHost host = NewHost(Page(" Chrome=\"none\""), theme);
         UiLayoutSnapshot snapshot = Arrange(host, 200f);
@@ -98,7 +98,7 @@ internal static class KernelSectionHeaderTests
     /// </summary>
     private static void VerifySchemeMovesTheDivider()
     {
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         ClearBoxes();
         using UiHost host = NewHost(Page(" Scheme=\"quiet\"", QuietScheme), theme);
         Arrange(host, 200f);
@@ -141,7 +141,7 @@ internal static class KernelSectionHeaderTests
     {
         try
         {
-            using var host = NewHost(xml, UiTheme.DarkGold);
+            using var host = NewHost(xml, UiTheme.Vanilla);
             return null;
         }
         catch (Exception ex)

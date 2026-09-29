@@ -46,7 +46,7 @@ internal static class KernelFixturePageTests
         "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
         + "<Templates>"
         + "<Row Id=\"entry\" Gap=\"6\" Padding=\"2\">"
-        + "<Widget Id=\"done\" Kind=\"input/checkbox\" Bind=\"done\" LabelKey=\"fixture.entry.done\" />"
+        + "<Widget Id=\"done\" Kind=\"input/checkbox\" Bind=\"done\" LabelKey=\"fixture.entry.done\" Appearance=\"checkbox\" />"
         + "<Widget Id=\"caption\" Kind=\"text/wrapped\" Bind=\"caption\" />"
         + "<Widget Id=\"amount\" Kind=\"display/progress\" Bind=\"amount\" Max=\"1\" Height=\"8\" />"
         + "</Row>"
@@ -78,7 +78,7 @@ internal static class KernelFixturePageTests
         ClearDraws();
         UiLayoutSnapshot snapshot = Arrange(host);
 
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         foreach (string key in model.Keys)
         {
             UiNode? row = host.Session.GetNodeByElementId("entry#" + key);
@@ -235,7 +235,7 @@ internal static class KernelFixturePageTests
         bindings = bindingsImpl;
 
         var host = new UiHost(
-            Scope, UiLayoutManifest.Parse(FixturePageXml), bindingsImpl, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            Scope, UiLayoutManifest.Parse(FixturePageXml), bindingsImpl, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
 
         // The per-item half of the bindings: one projection per key, exactly what a consumer's own page code
         // does when its collection changes. No identity, no rectangle, no input rule.

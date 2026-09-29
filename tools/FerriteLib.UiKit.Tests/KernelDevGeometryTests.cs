@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Reflection;
 
 using FerriteLib.UiKit.Kernel;
+using FerriteLib.UiKit.Kernel.Widgets;
 using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
@@ -51,6 +53,11 @@ internal static class KernelDevGeometryTests
         Run("An element under an open popup layer yields the press and says so", VerifyCoveredVerdict);
         Run("Consumed input remains visible without changing native dispatch", VerifyConsumedInput);
         Run("The overlay is refused until the instrument is on", VerifyOverlayRequiresTheInstrument);
+        Run("The structured snapshot and the text dump describe one captured pass", VerifyStructuredSnapshotMatchesTheDump);
+        Run("The effective appearance is resolved through the kind's own seam, with provenance", VerifyEffectiveAppearance);
+        Run("Boundaries and unknowns: effective clip, popup ownership, and what this site cannot see", VerifyBoundariesAndUnknowns);
+        Run("A bounded capture reports its head and counts what it dropped", VerifyBoundedCaptureAndDroppedCount);
+        Run("A snapshot is a copy, and two hosts never share one capture", VerifySnapshotIsACopyAndHostsAreSeparate);
 #else
         Run("A release payload has no instrument and refuses to pretend it has one", VerifyAbsentInRelease);
 #endif
@@ -267,7 +274,7 @@ internal static class KernelDevGeometryTests
         bindings.BindCommand("under-act", () => underActions++);
 
         using UiHost host = new UiHost(
-            Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.Diagnostics.GeometryEnabled = true;
 
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(Viewport.width, Viewport.height));
@@ -404,7 +411,7 @@ internal static class KernelDevGeometryTests
         bindings.BindCommand("act", () => actions++);
         bindings.BindCommand("other", () => otherActions++);
         using var host = new UiHost(Scope, UiLayoutManifest.Parse(xml), bindings,
-            UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         Rect first = Pass(host).RectById["first"];
         try
         {
@@ -464,6 +471,673 @@ internal static class KernelDevGeometryTests
         host.Diagnostics.GeometryOverlay = false;
         Check(!host.Diagnostics.GeometryOverlay, "and can be turned off again");
     }
+
+    // --- structured snapshot (R3-A) ----------------------------------------------------------------
+
+    /// <summary>
+    /// R3-A.1 and R3-A.5(1): the human dump and the machine-readable snapshot are two renderings of ONE
+    /// capture. The assertions compare them fact by fact rather than trusting that they agree, and the
+    /// provenance assertions run on a <b>non-default scope</b> so the scheme/density/font fields have
+    /// something real to report.
+    /// <para>
+    /// MUTATION-TARGET: the per-node agreement assertions - if the snapshot were built from a second
+    /// collection (or a replayed pass) these are what redden. GUARD: the pass/count agreement, which holds
+    /// under any single-capture implementation.
+    /// </para>
+    /// </summary>
+    private static void VerifyStructuredSnapshotMatchesTheDump()
+    {
+        // The registry is reset before the first host rather than between the two: this lane must not depend
+        // on what an earlier lane left registered, and a host built against a cleared registry would fail for
+        // a reason that has nothing to do with what is being measured here.
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+
+        // (a) The page-level case: an element that names no scheme and no density keeps the injected theme.
+        using (UiHost plain = NewHost(Page))
+        {
+            plain.Diagnostics.GeometryEnabled = true;
+            Pass(plain);
+            string dump = plain.Diagnostics.DumpGeometry();
+            UiDevGeometrySnapshot snapshot = SnapshotOf(plain.Diagnostics);
+            CompareEveryNode(dump, snapshot, "plain page");
+
+            UiDevNodeSnapshot band = RequireNode(snapshot, "root/row/band");
+            Check(band.ThemeOrigin == "page" && band.Scheme.Length == 0 && band.Density.Length == 0,
+                "an element that styles nothing draws with the injected theme: origin=" + band.ThemeOrigin
+                + " scheme='" + band.Scheme + "' density='" + band.Density + "'");
+            Check(band.Tone.Length == 0 && band.Emphasis.Length == 0,
+                "and the sample reports an absent authored role as absent rather than as a default name");
+            Check(RequireNode(snapshot, "root/row/caption").Emphasis == "Muted",
+                "while a declared role is reported as the AUTHORED text read from the declaration "
+                + "(the caption declares Emphasis=\"Muted\")");
+            Check(band.ScopeFont == UiTheme.Vanilla.DefaultFont,
+                "the reported font is the injected theme's own selection: " + band.ScopeFont);
+            Check(!band.PaintedFont.HasValue,
+                "and the font finally painted is reported as unobservable rather than filled in with it: "
+                + (band.PaintedFont.HasValue ? band.PaintedFont.Value.ToString() : "null"));
+            Check(band.AppearanceSource == UiDevNodeSnapshot.NoAppearanceSource && band.Appearance.Length == 0,
+                "a kind that declares no look set is reported as having none, which is a fact about the kind: "
+                + band.AppearanceSource + " look='" + band.Appearance + "'");
+        }
+
+        // (b) A non-default scope, so provenance and the selected font are exercised for real.
+        using (UiHost scoped = NewHost(ScopedPage))
+        {
+            scoped.Diagnostics.GeometryEnabled = true;
+            Pass(scoped);
+            string dump = scoped.Diagnostics.DumpGeometry();
+            Print(dump);
+            UiDevGeometrySnapshot snapshot = SnapshotOf(scoped.Diagnostics);
+            CompareEveryNode(dump, snapshot, "scoped page");
+
+            UiDevNodeSnapshot band = RequireNode(snapshot, "root/band");
+            Check(band.Scheme == "tinted" && band.Density == "cozy",
+                "the sample names the scheme and density the element resolved through: '"
+                + band.Scheme + "'/'" + band.Density + "'");
+            Check(band.ThemeOrigin == "region",
+                "and says the appearance came from a resolver-built region: " + band.ThemeOrigin);
+            Check(band.ScopeFont == UiFont.Medium,
+                "and the font that scope selected is the scope font the sample reports: " + band.ScopeFont);
+            Check(!band.PaintedFont.HasValue,
+                "while the painted font stays a documented unknown instead of being filled in with the scope "
+                + "default: a kind that passes its own constant would otherwise be misreported");
+            Check(band.NodeKey.IndexOf(UiNodeId.KeySeparator) >= 0 && band.NodeKey != band.Path,
+                "the identity is the node's CANONICAL key rather than a re-derived display string: key='"
+                + band.NodeKey + "' path='" + band.Path + "'");
+            Check(RequireNode(snapshot, "root").Scheme == "tinted",
+                "a container that declares the scope reports it too, so inheritance is visible rather than assumed");
+        }
+    }
+
+    /// <summary>
+    /// R3-A.2 (CORRECTION): the EFFECTIVE appearance, not the authored role text. Real draws, three cases:
+    /// the kind's default look, an explicit declaration selecting the other look, and a scope that
+    /// re-registers the same kind with its own look set - so the registry's scope-first rule is what
+    /// answered. MUTATION-TARGET: the declared-vs-default pair and the scoped-alias provenance; an
+    /// instrument that reported the kind's default regardless, or that ignored the scope's own set, reddens
+    /// them. GUARD: the no-seam case in the fixture lane, which holds for any faithful read.
+    /// </summary>
+    private static void VerifyEffectiveAppearance()
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+
+        // (a) The core registration, reached from a scope that registers nothing of its own: the default and
+        // the declared look are two DIFFERENT effective values of the same kind.
+        using (UiHost host = NewBoolHost(AppearancePage))
+        {
+            host.Diagnostics.GeometryEnabled = true;
+            Pass(host);
+            string dump = host.Diagnostics.DumpGeometry();
+            UiDevGeometrySnapshot snapshot = SnapshotOf(host.Diagnostics);
+            Print(dump);
+            CompareEveryNode(dump, snapshot, "appearance page");
+
+            UiDevNodeSnapshot plain = RequireNode(snapshot, "root/plain");
+            UiDevNodeSnapshot chosen = RequireNode(snapshot, "root/chosen");
+            Check(plain.Appearance == CheckboxWidget.SwitchLook && !plain.AppearanceDeclared,
+                "an element that declares no look reports the kind's default: " + plain.Appearance);
+            Check(chosen.Appearance == CheckboxWidget.CheckboxLook && chosen.AppearanceDeclared,
+                "and one that declares the other look reports the declared value: " + chosen.Appearance);
+            Check(plain.Appearance != chosen.Appearance,
+                "so one kind resolves two different effective appearances: '" + plain.Appearance
+                + "' vs '" + chosen.Appearance + "'");
+            Check(plain.AppearanceDefault == CheckboxWidget.SwitchLook
+                    && plain.AppearanceSupported.IndexOf(CheckboxWidget.CheckboxLook, StringComparison.Ordinal) >= 0,
+                "with the kind's own default and accepted set beside it: " + plain.AppearanceDefault
+                + " / " + plain.AppearanceSupported);
+            Check(plain.AppearanceSource == UiDevNodeSnapshot.CoreAppearanceSource
+                    && !plain.AppearancePairRegistered,
+                "and the provenance says core, because this scope registers no look set for the kind: source="
+                + plain.AppearanceSource + " pair=" + plain.AppearancePairRegistered);
+        }
+
+        // (b) The scoped alias: the SAME kind and the SAME element declaration, re-registered in this scope
+        // with its own look set - so the registry's scope-first rule is what answered, and the answer differs
+        // from the core one while the element declares nothing at all.
+        try
+        {
+            UiWidgetRegistry.Register(
+                Scope,
+                CheckboxWidget.Kind,
+                () => new CheckboxWidget(),
+                new[] { "Id", "Kind", "Bind", "Appearance", "Height" },
+                null,
+                null,
+                new UiAppearanceResolver(CheckboxWidget.CheckboxLook, CheckboxWidget.SwitchLook));
+
+            using UiHost host = NewBoolHost(AliasPage);
+            host.Diagnostics.GeometryEnabled = true;
+            Pass(host);
+            UiDevGeometrySnapshot snapshot = SnapshotOf(host.Diagnostics);
+
+            UiDevNodeSnapshot alias = RequireNode(snapshot, "root/alias");
+            Check(alias.Appearance == CheckboxWidget.CheckboxLook && !alias.AppearanceDeclared,
+                "a scope that registers its own look set answers with ITS default: " + alias.Appearance);
+            Check(alias.AppearanceSource == UiDevNodeSnapshot.ScopeAppearanceSource
+                    && alias.AppearancePairRegistered,
+                "and the provenance names that scope rather than the core fallback: source="
+                + alias.AppearanceSource + " pair=" + alias.AppearancePairRegistered);
+            Check(alias.AppearanceDefault == CheckboxWidget.CheckboxLook
+                    && alias.AppearanceSupported.IndexOf(CheckboxWidget.SwitchLook, StringComparison.Ordinal) >= 0,
+                "with the scoped set's own default and accepted names: " + alias.AppearanceDefault
+                + " / " + alias.AppearanceSupported);
+        }
+        finally
+        {
+            // This lane is the only one that registers a scoped alias for a core kind. Leaving it registered
+            // would change what every later lane resolves for input/checkbox, so it is removed here rather
+            // than relied on to be overwritten.
+            UiWidgetRegistry.Clear();
+            UiWidgetRegistry.InitializeCore();
+        }
+    }
+
+    /// <summary>
+    /// R3-A.2/A.5(3): the boundaries, and the values that genuinely cannot be observed.
+    /// <list type="bullet">
+    /// <item>MUTATION-TARGET: the effective-clip assertions. Reverting the sample to "the innermost rect the
+    /// element passed through" (or to the element's own draw rect) reddens the containment and height
+    /// assertions, because the scroll's viewport would no longer appear on its children.</item>
+    /// <item>MUTATION-TARGET: the unknown-reason assertions. Filling any of those boundaries with a plausible
+    /// default - a zero rect, the element's own rect - reddens them, which is the honesty rule this lane
+    /// exists to keep.</item>
+    /// <item>GUARD: the popup ownership pair, which holds for any faithful session read.</item>
+    /// </list>
+    /// </summary>
+    private static void VerifyBoundariesAndUnknowns()
+    {
+        using UiHost host = NewHost(Page);
+        host.Diagnostics.GeometryEnabled = true;
+        Pass(host);
+        UiDevGeometrySnapshot snapshot = SnapshotOf(host.Diagnostics);
+
+        UiDevNodeSnapshot root = RequireNode(snapshot, "root");
+        UiDevNodeSnapshot list = RequireNode(snapshot, "root/list");
+        UiDevNodeSnapshot inner = RequireNode(snapshot, "root/list/inner");
+
+        Check(root.Clip.IsKnown && list.Clip.IsKnown && inner.Clip.IsKnown,
+            "every sampled element reports the clip that was in force");
+        Check(ContainsRect(root.Clip.Rect, inner.Clip.Rect),
+            "the effective clip is the intersection, so the nested one stays inside the outer one: "
+            + Show(inner.Clip.Rect) + " inside " + Show(root.Clip.Rect));
+        Check(inner.Clip.Rect.height < root.Clip.Rect.height,
+            "the scroll's own viewport constrains its children - a boundary the innermost rect alone does not "
+            + "describe: " + Text(inner.Clip.Rect.height) + " < " + Text(root.Clip.Rect.height));
+        Check(SameRect(list.Clip.Rect, root.Clip.Rect),
+            "and a scoped container's own sample carries the clip it was drawn INSIDE, while its viewport "
+            + "appears on its children: " + Show(list.Clip.Rect));
+
+        Check(list.IsScopedContainer && list.Content.IsKnown,
+            "a scoped container publishes its content extent, and the sample carries it: " + list.Content);
+        Check(!inner.IsScopedContainer && !inner.Content.IsKnown
+                && inner.Content.UnknownReason == UiDevNodeSnapshot.ContentUnknownReason,
+            "an element that is not a scoped container reports no content rect, with the documented reason");
+
+        Check(!inner.Hover.IsKnown && inner.Hover.UnknownReason == UiDevNodeSnapshot.HoverUnknownReason,
+            "hover is unknown at a geometry sample, with the reason that says why: " + inner.Hover);
+        Check(!inner.Focus.IsKnown && inner.Focus.UnknownReason == UiDevNodeSnapshot.FocusUnknownReason,
+            "and focus is unknown because this library publishes no focus owner to report: " + inner.Focus);
+        Check(inner.OpenPopupId.Length == 0 && !inner.OwnsOpenPopup && !inner.PopupAnchor.IsKnown
+                && inner.PopupAnchor.UnknownReason == UiDevNodeSnapshot.NoOpenPopupUnknownReason,
+            "with no popup open the anchor is unknown for its own documented reason, and nothing claims ownership");
+
+        // The AVAILABLE half of the same contract, on a page whose trigger really owns a session popup.
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+        string current = "y";
+        var bindings = new UiBindings();
+        bindings.BindValue("trigger", () => current, value => current = value);
+        bindings.BindOptions("Options", () => new List<string> { "x", "y" });
+        bindings.BindCommand("act", () => { });
+        using UiHost popupHost = new UiHost(
+            Scope, UiLayoutManifest.Parse(PopupPage), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
+        popupHost.Diagnostics.GeometryEnabled = true;
+        UiLayoutSnapshot arranged = popupHost.MeasureAndArrange(new Vector2(Viewport.width, Viewport.height));
+        popupHost.Session.OpenPopup("trigger", arranged.RectById["trigger"]);
+        popupHost.DrawFrame(Viewport);
+        UiDevGeometrySnapshot withPopup = SnapshotOf(popupHost.Diagnostics);
+
+        UiDevNodeSnapshot trigger = RequireNode(withPopup, "root/trigger");
+        Check(trigger.OpenPopupId == "trigger" && trigger.OwnsOpenPopup,
+            "a popup owned by an element is reported as owned by it: '" + trigger.OpenPopupId + "'");
+        Check(trigger.PopupAnchor.IsKnown && SameRect(trigger.PopupAnchor.Rect, trigger.Window),
+            "and its anchor is reportable, in the same window space as the element's own drawn rect: "
+            + trigger.PopupAnchor);
+        UiDevNodeSnapshot under = RequireNode(withPopup, "root/under");
+        Check(under.OpenPopupId == "trigger" && !under.OwnsOpenPopup,
+            "while a sibling sees the same open popup and does not claim to own it");
+        popupHost.Session.ClosePopup();
+    }
+
+    /// <summary>
+    /// R3-A.3/A.5(4): the capture stays bounded and says what it lost, on a REAL overflow.
+    /// <para>
+    /// The manifest validator counts DECLARED elements and the capture counts ARRANGED/DRAWN entries, so this
+    /// fixture keeps the declaration tiny - one page, one template, one <c>Repeat</c> - and lets the runtime
+    /// expansion produce a Row plus a rule per item. Nothing here weakens the parser's limit; the overflow is
+    /// produced by a valid page that the engine expands.
+    /// </para>
+    /// <list type="bullet">
+    /// <item>MUTATION-TARGET: the dropped-count assertions. A capture that keeps the whole pass, or that
+    /// reports a zero drop while dropping, reddens them.</item>
+    /// <item>MUTATION-TARGET: the overlay delta, which is what makes the overlay a rendering of the retained
+    /// capture rather than of the pass.</item>
+    /// <item>GUARD: the retained-head and text/data agreement assertions, which hold for any faithful
+    /// bounded capture.</item>
+    /// </list>
+    /// </summary>
+    private static void VerifyBoundedCaptureAndDroppedCount()
+    {
+        // ~2 entries per item (the template's Row and its rule), so 320 items is comfortably past the bound
+        // while staying a cheap frame.
+        const int items = 320;
+        var keys = new List<string>();
+        for (int i = 0; i < items; i++)
+        {
+            keys.Add("item" + i.ToString("000", CultureInfo.InvariantCulture));
+        }
+
+        // The expansion RATE is measured from two small runs rather than assumed, and the big run is then
+        // checked against it: nothing here compares the capture's own constant with itself.
+        List<string> three = keys.GetRange(0, 3);
+        List<string> five = keys.GetRange(0, 5);
+        UiDevGeometrySnapshot smallRun = RunOverflow(three);
+        UiDevGeometrySnapshot fiveRun = RunOverflow(five);
+        int small = ProducedEntries(smallRun);
+        int fiveEntries = ProducedEntries(fiveRun);
+        Check(fiveEntries > small && (fiveEntries - small) % 2 == 0,
+            "the fixture expands linearly, so the rate is measurable: " + small + " entries for 3 items, "
+            + fiveEntries + " for 5");
+        int perItem = (fiveEntries - small) / 2;
+        long produced = small + ((long)(items - 3) * perItem);
+
+        using UiHost host = NewHost(OverflowPage, keys);
+        host.Diagnostics.GeometryEnabled = true;
+        Pass(host);
+        UiDevGeometrySnapshot snapshot = SnapshotOf(host.Diagnostics);
+        string dump = host.Diagnostics.DumpGeometry();
+
+        Check(snapshot.Nodes.Count == UiDevGeometryCapture.MaxGeometrySamples,
+            "the capture keeps exactly its bound of nodes, not the whole pass: " + snapshot.Nodes.Count);
+        Check(snapshot.Nodes.Count + snapshot.NodesDropped == produced,
+            "and accounts for the whole pass: kept=" + snapshot.Nodes.Count.ToString(CultureInfo.InvariantCulture)
+            + " dropped=" + snapshot.NodesDropped.ToString(CultureInfo.InvariantCulture) + " produced="
+            + produced.ToString(CultureInfo.InvariantCulture) + " (" + perItem.ToString(CultureInfo.InvariantCulture)
+            + " per item)");
+        Check(snapshot.NodesDropped == produced - UiDevGeometryCapture.MaxGeometrySamples,
+            "so the dropped count is the real remainder, not a marker that happens to be non-zero: "
+            + snapshot.NodesDropped.ToString(CultureInfo.InvariantCulture) + " dropped of "
+            + produced.ToString(CultureInfo.InvariantCulture));
+        Check(HeaderCount(dump, "nodes=") == snapshot.Nodes.Count
+                && HeaderCount(dump, "nodes-dropped=") == snapshot.NodesDropped,
+            "and the text rendering reports the same head and the same dropped count as the data");
+        Check(snapshot.Nodes[0].Path == "rows",
+            "paint order is preserved and the retained part is the head of the pass: first=" + snapshot.Nodes[0].Path);
+        Check(snapshot.Nodes[UiDevGeometryCapture.MaxGeometrySamples - 1].Path.StartsWith("rows/", StringComparison.Ordinal),
+            "and the head ends inside the expanded rows rather than at the page root: last retained="
+            + snapshot.Nodes[UiDevGeometryCapture.MaxGeometrySamples - 1].Path);
+
+        // The tail, at its FULL path, and non-vacuously. The derivation is proved on the small run first:
+        // there the LAST item's rule IS retained, so the very same construction finds a real node - which is
+        // what stops a misspelled path from satisfying the absence assertion below for free.
+        string lastSmallRule = ItemRulePath(three[2]);
+        Check(smallRun.NodeByPath(lastSmallRule) != null,
+            "the derived full path finds the last item's rule when it is retained, so the lookup is proved: "
+            + lastSmallRule);
+        string firstRule = ItemRulePath(keys[0]);
+        Check(snapshot.NodeByPath(firstRule) != null,
+            "and it finds the first item's rule in the overflowing pass: " + firstRule);
+        string droppedTail = ItemRulePath(keys[items - 1]);
+        Check(snapshot.NodeByPath(droppedTail) == null,
+            "while the LAST item's rule - same shape, full path, really produced by this pass - is what the "
+            + "capture did not keep: " + droppedTail);
+        Check(dump.IndexOf(droppedTail, StringComparison.Ordinal) < 0,
+            "and the text rendering does not carry it either");
+
+        // The overlay is the third rendering of the same capture, so it must paint exactly what was RETAINED:
+        // measured as the difference the overlay switch makes, because the widgets paint their own solids too.
+        ClearSolids();
+        host.DrawFrame(Viewport);
+        int withoutOverlay = SolidCount();
+        host.Diagnostics.GeometryOverlay = true;
+        ClearSolids();
+        host.DrawFrame(Viewport);
+        int withOverlay = SolidCount();
+        host.Diagnostics.GeometryOverlay = false;
+        UiDevGeometrySnapshot overlayPass = SnapshotOf(host.Diagnostics);
+        Check(withOverlay - withoutOverlay == overlayPass.Nodes.Count * OverlayHairlinesPerNode,
+            "the overlay outlines exactly the entries the bounded capture kept, and nothing it dropped: "
+            + (withOverlay - withoutOverlay).ToString(CultureInfo.InvariantCulture) + " solids over "
+            + overlayPass.Nodes.Count.ToString(CultureInfo.InvariantCulture) + " retained nodes ("
+            + (overlayPass.Nodes.Count + overlayPass.NodesDropped).ToString(CultureInfo.InvariantCulture) + " drew)");
+    }
+
+    /// <summary>
+    /// Runs the overflow fixture with one item list and returns the snapshot of the pass it drew. The host is
+    /// disposed here; the snapshot is a copy, which is exactly the property that makes that safe.
+    /// </summary>
+    private static UiDevGeometrySnapshot RunOverflow(List<string> itemKeys)
+    {
+        using UiHost host = NewHost(OverflowPage, itemKeys);
+        host.Diagnostics.GeometryEnabled = true;
+        Pass(host);
+        return SnapshotOf(host.Diagnostics);
+    }
+
+    /// <summary>What one pass produced: what the capture kept plus what it counted as dropped.</summary>
+    private static int ProducedEntries(UiDevGeometrySnapshot snapshot)
+    {
+        return snapshot.Nodes.Count + (int)snapshot.NodesDropped;
+    }
+
+    /// <summary>
+    /// The full path of the rule the template instantiates for one item. The engine composes a per-item
+    /// identity as <c>&lt;declaredId&gt;#&lt;itemKey&gt;</c> for the template root and every element inside it
+    /// (<c>UiLayoutEngine.BuildItemSpec</c>), and a node's path is its declared/derived Id chain - so the
+    /// fixture's own naming, read from the source above, fixes this string without reading a dump.
+    /// </summary>
+    private static string ItemRulePath(string itemKey)
+    {
+        return "rows/row#" + itemKey + "/r#" + itemKey;
+    }
+
+    /// <summary>Four hairlines per outlined entry: one per edge of its draw rect.</summary>
+    private const int OverlayHairlinesPerNode = 4;
+
+    /// <summary>
+    /// The stub's recorded solids. Reached by reflection because the harness compiles against the game's
+    /// reference assembly, which does not declare the stub's recording hooks.
+    /// </summary>
+    private static int SolidCount()
+    {
+        FieldInfo? field = typeof(Verse.Widgets).GetField(
+            "DrawBoxSolidColors", BindingFlags.Public | BindingFlags.Static);
+        if (field == null) throw new Exception("the stub no longer exposes DrawBoxSolidColors");
+        return ((System.Collections.IList)field.GetValue(null)!).Count;
+    }
+
+    private static void ClearSolids()
+    {
+        MethodInfo? clear = typeof(Verse.Widgets).GetMethod(
+            "ClearDrawBoxSolidCalls", BindingFlags.Public | BindingFlags.Static);
+        if (clear == null) throw new Exception("the stub no longer exposes ClearDrawBoxSolidCalls");
+        clear.Invoke(null, null);
+    }
+
+    /// <summary>
+    /// R3-A.3/A.5(5): a snapshot is a copy, two hosts never share a capture, and disposal releases only its
+    /// own. MUTATION-TARGET: the same-host redraw - the snapshot taken before the SECOND draw on the same
+    /// host must still report the earlier pass, which is what hands out a live view over the capture's buffer
+    /// instead of a copy. GUARD: the cross-host isolation and the identity fields, which hold either way (a
+    /// live view would pass both, which is exactly why the same-host case was needed).
+    /// </summary>
+    private static void VerifySnapshotIsACopyAndHostsAreSeparate()
+    {
+        using UiHost a = NewHost(Page);
+        using UiHost b = NewHost(OtherPage);
+        UiDiagnosticSubscription aSubscription = a.Diagnostics;
+        UiDiagnosticSubscription bSubscription = b.Diagnostics;
+        aSubscription.GeometryEnabled = true;
+        bSubscription.GeometryEnabled = true;
+
+        Pass(a);
+        UiDevGeometrySnapshot first = SnapshotOf(aSubscription);
+        int firstPass = first.Pass;
+        int firstNodePass = first.Nodes[0].Pass;
+        Check(first.Host == Scope && first.SessionId == a.Session.Identity,
+            "the snapshot names the host and the session it came from");
+        // Both directions, and both non-vacuous: A's own page has its band (so the lookup mechanism is
+        // live), and A has none of B's ids - while B below has its own and neither of A's.
+        Check(first.NodeByPath("root/row/band") != null && first.NodeByPath("root/other") == null,
+            "host A's snapshot carries its own page (its nested band) and none of host B's elements"
+            + " (A band=" + (first.NodeByPath("root/row/band") != null) + ", A other="
+            + (first.NodeByPath("root/other") != null) + ")");
+
+        UiLayoutSnapshot aBefore = a.MeasureAndArrange(new Vector2(Viewport.width, Viewport.height));
+        Pass(b);
+        UiDevGeometrySnapshot afterOtherHost = SnapshotOf(aSubscription);
+        UiDevGeometrySnapshot bSnapshot = SnapshotOf(bSubscription);
+
+        Check(bSnapshot.SessionId == b.Session.Identity && bSnapshot.SessionId != first.SessionId,
+            "each host's capture belongs to its own session");
+        Check(bSnapshot.NodeByPath("root/other") != null && bSnapshot.NodeByPath("root/row/band") == null,
+            "and B's carries B's page, so one host's frame never lands in another host's capture"
+            + " (B other=" + (bSnapshot.NodeByPath("root/other") != null) + ", B band="
+            + (bSnapshot.NodeByPath("root/row/band") != null) + ")");
+        Check(afterOtherHost.Pass == firstPass,
+            "another host's draw does not move this host's capture: " + firstPass + " -> " + afterOtherHost.Pass);
+
+        // The decisive case for the copy property: the SAME host draws again, so its capture really does
+        // move on. A snapshot handed out before that must still describe the earlier pass - a live view over
+        // the capture's buffer would follow it, and this is the assertion that would notice.
+        Pass(a);
+        UiDevGeometrySnapshot afterSameHost = SnapshotOf(aSubscription);
+        Check(afterSameHost.Pass == firstPass + 1,
+            "a second draw on the SAME host advances the capture's pass: " + firstPass + " -> " + afterSameHost.Pass);
+        Check(first.Pass == firstPass && first.Nodes[0].Pass == firstNodePass
+                && first.Nodes[0].Pass == first.Pass,
+            "and the snapshot taken before it still describes the EARLIER pass, unchanged, with its node agree-"
+            + "ing with it: held=" + first.Pass.ToString(CultureInfo.InvariantCulture) + " node="
+            + first.Nodes[0].Pass.ToString(CultureInfo.InvariantCulture) + " capture="
+            + afterSameHost.Pass.ToString(CultureInfo.InvariantCulture));
+        Check(!ReferenceEquals(first, afterSameHost), "each call hands out a fresh snapshot object");
+        Check(!ReferenceEquals(first.Nodes[0], afterSameHost.Nodes[0]),
+            "and fresh node objects inside it, so a later pass cannot rewrite an earlier snapshot's nodes");
+        Check(SameRect(first.Nodes[0].Arranged, aBefore.RectById["root"]),
+            "which is the pass it was taken in: the first node's arranged rect is the page root's own rect");
+
+        // Disposal releases one capture and leaves its sibling alone.
+        aSubscription.Dispose();
+        Check(!aSubscription.IsActive, "disposing a subscription deactivates it");
+        Check(!aSubscription.TryGetGeometrySnapshot(out UiDevGeometrySnapshot? gone) && gone == null,
+            "and a disposed subscription answers no snapshot rather than an empty-looking one");
+        Check(bSubscription.IsActive && SnapshotOf(bSubscription).Nodes.Count > 0,
+            "while the other host's capture is untouched");
+    }
+
+    /// <summary>
+    /// Compares one dump against one snapshot topic by topic, for EVERY retained node. This is the same-source
+    /// assertion: it would fail if either rendering dropped a field, reordered the pass, or read a different
+    /// collection.
+    /// </summary>
+    private static void CompareEveryNode(string dump, UiDevGeometrySnapshot snapshot, string label)
+    {
+        string header = HeaderLine(dump);
+        Check(Same(Number(header, "pass="), snapshot.Pass),
+            label + ": the dump header and the snapshot name the same pass (" + header + ")");
+        Check(HeaderCount(dump, "nodes=") == snapshot.Nodes.Count,
+            label + ": and the same number of retained nodes");
+        Check(HeaderCount(dump, "nodes-dropped=") == snapshot.NodesDropped,
+            label + ": and the same dropped-node count");
+        Check(CountLines(dump, "input ") == snapshot.Inputs.Count,
+            label + ": and the same number of input samples");
+
+        int compared = 0;
+        foreach (UiDevNodeSnapshot node in snapshot.Nodes)
+        {
+            string line = RequireNodeLine(dump, node.Path);
+            Check(line.IndexOf("key=" + node.NodeKey, StringComparison.Ordinal) >= 0,
+                label + ": the dump carries the same canonical key for " + node.Path);
+            Check(line.IndexOf("kind=" + node.Kind + " ", StringComparison.Ordinal) >= 0,
+                label + ": and the same kind for " + node.Path);
+            TryRect(line, "arranged=", out Rect arranged);
+            TryRect(line, "draw=", out Rect draw);
+            Check(SameRect(arranged, node.Arranged) && SameRect(draw, node.Draw),
+                label + ": and the same arranged/draw rects for " + node.Path);
+            Check(line.IndexOf("scope-font=" + node.ScopeFont.ToString() + " ", StringComparison.Ordinal) >= 0,
+                label + ": and the same scope font for " + node.Path);
+            // The painted font is compared through its DOCUMENTED unknown text, so a rendering that started
+            // printing the scope font there reddens here rather than passing as "close enough".
+            Check(line.IndexOf(
+                    "painted-font="
+                    + (node.PaintedFont.HasValue
+                        ? node.PaintedFont.Value.ToString()
+                        : "unknown(" + UiDevNodeSnapshot.PaintedFontUnknownReason + ")") + " ",
+                    StringComparison.Ordinal) >= 0,
+                label + ": and the same painted-font answer for " + node.Path);
+            Check(line.IndexOf("appearance=" + Dash(node.Appearance) + " ", StringComparison.Ordinal) >= 0
+                    && line.IndexOf("appearance-declared=" + (node.AppearanceDeclared ? "yes" : "no") + " ",
+                        StringComparison.Ordinal) >= 0
+                    && line.IndexOf("appearance-default=" + Dash(node.AppearanceDefault) + " ",
+                        StringComparison.Ordinal) >= 0
+                    && line.IndexOf("appearance-supports=" + Dash(node.AppearanceSupported) + " ",
+                        StringComparison.Ordinal) >= 0
+                    && line.IndexOf("appearance-source=" + node.AppearanceSource + " ",
+                        StringComparison.Ordinal) >= 0
+                    && line.IndexOf("appearance-pair=" + (node.AppearancePairRegistered ? "yes" : "no") + " ",
+                        StringComparison.Ordinal) >= 0,
+                label + ": and the same effective appearance and provenance for " + node.Path
+                + " (look='" + node.Appearance + "' source=" + node.AppearanceSource + ")");
+            Check(line.IndexOf("theme=" + node.ThemeOrigin + " ", StringComparison.Ordinal) >= 0,
+                label + ": and the same appearance origin for " + node.Path);
+            Check(line.IndexOf("clip=" + node.Clip.ToString() + " ", StringComparison.Ordinal) >= 0,
+                label + ": and the same effective clip for " + node.Path);
+            // Every remaining boundary, INCLUDING the two that are always unknown: the point of comparing
+            // them is that a snapshot that started reporting hover as known while the text still said
+            // "unknown" must redden here rather than pass on a subset of fields.
+            Check(line.IndexOf("content=" + node.Content.ToString() + " ", StringComparison.Ordinal) >= 0,
+                label + ": and the same content boundary for " + node.Path);
+            Check(line.IndexOf("hover=" + node.Hover.ToString() + " ", StringComparison.Ordinal) >= 0,
+                label + ": and the same hover boundary for " + node.Path);
+            Check(line.IndexOf("focus=" + node.Focus.ToString() + " ", StringComparison.Ordinal) >= 0,
+                label + ": and the same focus boundary for " + node.Path);
+            Check(line.IndexOf("popup-anchor=" + node.PopupAnchor.ToString() + " ", StringComparison.Ordinal) >= 0,
+                label + ": and the same popup-anchor boundary for " + node.Path);
+            compared++;
+        }
+
+        Check(compared == snapshot.Nodes.Count && compared > 0,
+            label + ": every retained node was compared, not a sample of them (" + compared + ")");
+    }
+
+    private static UiDevGeometrySnapshot SnapshotOf(UiDiagnosticSubscription diagnostics)
+    {
+        if (!diagnostics.TryGetGeometrySnapshot(out UiDevGeometrySnapshot? snapshot) || snapshot == null)
+        {
+            throw new Exception("the instrument is on but answered no snapshot");
+        }
+
+        return snapshot;
+    }
+
+    private static UiDevNodeSnapshot RequireNode(UiDevGeometrySnapshot snapshot, string path)
+    {
+        UiDevNodeSnapshot? node = snapshot.NodeByPath(path);
+        if (node == null)
+        {
+            throw new Exception("the snapshot carries no node with path '" + path + "'");
+        }
+
+        return node;
+    }
+
+    /// <summary>The dump's line for one node path. Input lines carry a path too, so they are excluded.</summary>
+    private static string RequireNodeLine(string dump, string path)
+    {
+        foreach (string line in dump.Split(Lines, StringSplitOptions.None))
+        {
+            if (line.StartsWith("input ", StringComparison.Ordinal)) continue;
+            if (line.IndexOf("path=" + path + " ", StringComparison.Ordinal) >= 0) return line;
+        }
+
+        throw new Exception("the dump carries no node line with 'path=" + path + "'");
+    }
+
+    private static string HeaderLine(string dump)
+    {
+        int end = dump.IndexOf('\n');
+        return end < 0 ? dump : dump.Substring(0, end);
+    }
+
+    private static float HeaderCount(string dump, string name)
+    {
+        return Number(HeaderLine(dump), name);
+    }
+
+    private static int CountLines(string dump, string prefix)
+    {
+        int found = 0;
+        foreach (string line in dump.Split(Lines, StringSplitOptions.None))
+        {
+            if (line.StartsWith(prefix, StringComparison.Ordinal)) found++;
+        }
+
+        return found;
+    }
+
+    /// <summary>An empty text field as the dump spells it, so the two renderings compare like for like.</summary>
+    private static string Dash(string value)
+    {
+        return string.IsNullOrEmpty(value) ? "-" : value;
+    }
+
+    /// <summary>Rect containment, written out because the stub Rect has no Contains to lean on.</summary>
+    private static bool ContainsRect(Rect outer, Rect inner)
+    {
+        return inner.x >= outer.x - 0.001f && inner.y >= outer.y - 0.001f
+            && inner.xMax <= outer.xMax + 0.001f && inner.yMax <= outer.yMax + 0.001f;
+    }
+
+    /// <summary>The non-default scope: a scheme with a selected font and a named density, on a container.</summary>
+    private const string ScopedPage =
+        "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+        + "<Styles Schema=\"1\">"
+        + "<Scheme Name=\"tinted\"><Color Token=\"Panel\" Value=\"#112233ff\"/>"
+        + "<Metric Token=\"Font\" Value=\"Medium\" /></Scheme>"
+        + "<Density Name=\"cozy\"><Metric Token=\"RowHeight\" Value=\"40\" /></Density>"
+        + "</Styles>"
+        + "<Column Id=\"root\" Scheme=\"tinted\" Density=\"cozy\" Padding=\"0\" Gap=\"0\">"
+        + "<Widget Id=\"band\" Kind=\"input/button\" Text=\"Band\" ActionBind=\"act\" />"
+        + "</Column>"
+        + "</UiPage>";
+
+    /// <summary>A second page with a distinct element id, for the host-separation lane.</summary>
+    private const string OtherPage =
+        "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+        + "<Column Id=\"root\" Padding=\"0\" Gap=\"0\">"
+        + "<Widget Id=\"other\" Kind=\"chrome/banner\" Text=\"Other\" Height=\"20\" />"
+        + "</Column>"
+        + "</UiPage>";
+
+    /// <summary>A trigger that can really own a session popup, and a sibling that does not.</summary>
+    private const string PopupPage =
+        "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+        + "<Column Id=\"root\" Padding=\"0\" Gap=\"0\">"
+        + "<Widget Id=\"trigger\" Kind=\"input/dropdown\" OptionsBind=\"Options\" />"
+        + "<Widget Id=\"under\" Kind=\"input/button\" Text=\"Under\" Height=\"28\" ActionBind=\"act\" />"
+        + "</Column>"
+        + "</UiPage>";
+
+    /// <summary>
+    /// The overflow fixture: ONE template and ONE <c>Repeat</c> at the page root, so the DECLARED element
+    /// count is four (page, templates section, template Row, template rule, repeat) - far under the manifest
+    /// validator's node limit - while every bound item expands to a Row plus a rule at arrange/draw time,
+    /// which is what the capture's 512-entry bound counts. The rule's declared Id is <c>r</c> and the
+    /// template root's is <c>row</c>, so the composed per-item paths are <c>rows/row#&lt;key&gt;/r#&lt;key&gt;</c>.
+    /// </summary>
+    private const string OverflowPage =
+        "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Templates>"
+        + "<Row Id=\"row\"><Widget Id=\"r\" Kind=\"chrome/rule\" Height=\"2\" /></Row>"
+        + "</Templates><Repeat Id=\"rows\" Items=\"items\" Template=\"row\" /></UiPage>";
+
+    /// <summary>Two checkboxes of one kind: one takes the default look, one declares the other.</summary>
+    private const string AppearancePage =
+        "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+        + "<Column Id=\"root\" Padding=\"0\" Gap=\"0\">"
+        + "<Widget Id=\"plain\" Kind=\"input/checkbox\" Bind=\"flag\" Height=\"20\" />"
+        + "<Widget Id=\"chosen\" Kind=\"input/checkbox\" Bind=\"box\" Height=\"20\" Appearance=\"checkbox\" />"
+        + "</Column>"
+        + "</UiPage>";
+
+    /// <summary>One checkbox that declares no look, so the scope's own default is what answers.</summary>
+    private const string AliasPage =
+        "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+        + "<Column Id=\"root\" Padding=\"0\" Gap=\"0\">"
+        + "<Widget Id=\"alias\" Kind=\"input/checkbox\" Bind=\"flag\" Height=\"20\" />"
+        + "</Column>"
+        + "</UiPage>";
 #else
     // --- release half -----------------------------------------------------------------------------
 
@@ -493,6 +1167,9 @@ internal static class KernelDevGeometryTests
         Pass(host);
         Check(diagnostics.DumpGeometry().Length == 0,
             "and a full frame leaves the dump empty, which is what compiling it out means");
+        Check(!diagnostics.TryGetGeometrySnapshot(out UiDevGeometrySnapshot? none) && none == null,
+            "and the structured reader answers 'nothing captured' rather than an empty-looking snapshot: "
+            + (none == null ? "null" : none.ToString()));
 
         bool overlayRefused = false;
         try
@@ -537,7 +1214,36 @@ internal static class KernelDevGeometryTests
         }
 
         return new UiHost(
-            Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
+    }
+
+    /// <summary>
+    /// The same host with a collection binding, which is what a <c>Repeat</c> expands: the item list is the
+    /// only thing the runtime multiplies, so the declared page stays tiny while the pass does not.
+    /// </summary>
+    private static UiHost NewHost(string xml, List<string> itemKeys)
+    {
+        var bindings = new UiBindings();
+        bindings.BindCommand("act", () => { });
+        bindings.BindReadOnly<IReadOnlyList<string>>("items", () => itemKeys, UiInvalidation.Structure);
+        return new UiHost(
+            Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
+    }
+
+    /// <summary>
+    /// The same host with the two writable boolean bindings the appearance fixtures' checkboxes declare. The
+    /// state is writable because that is the kind's own contract (a checkbox toggles it), and a lane that made
+    /// it read-only would be measuring a fixture difference rather than the appearance.
+    /// </summary>
+    private static UiHost NewBoolHost(string xml)
+    {
+        bool flag = true;
+        bool box = false;
+        var bindings = new UiBindings();
+        bindings.BindValue<bool>("flag", () => flag, value => flag = value);
+        bindings.BindValue<bool>("box", () => box, value => box = value);
+        return new UiHost(
+            Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
     }
 
     /// <summary>One complete frame (draw included), then the snapshot the same geometry produced.</summary>

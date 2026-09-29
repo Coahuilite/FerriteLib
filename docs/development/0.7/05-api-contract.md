@@ -87,6 +87,12 @@ Diagnosis only: no binding category is ever coerced into another.
 
 ### C — two peer built-in palettes; the constructor is a bag, not a product
 
+> **SUPERSEDED on the 0.7.x line by §R2 (below).** The library ships **one** look (`Vanilla`), the warm-gold
+> factory is removed with no alias, and `new UiTheme()` is a **partial bag whose unset tokens answer
+> `Vanilla`** — explicitly transparent included, which must stay transparent. The text below is the 2026-09-18
+> decision and its reasoning at the time; it is kept because the accent-identity ruling inside it still
+> stands, and because a removed promise is more useful with its history attached than without it.
+
 `UiTheme.Vanilla` and `UiTheme.DarkGold` are the two built-in palettes. They are peers: neither is
 the default, neither is history of the other, and neither is selected by constructing the bag.
 Each factory returns a fresh independent instance. Token names, geometry, fonts, spacing, and the
@@ -707,6 +713,15 @@ The same change fixed a measured defect class: with `FER_DEV` undefined in the h
 `#if FER_DEV` branch in `KernelDocumentReloadTests` had never been compiled, and a `-c Dev` run was red.
 Which gate guards which half is also recorded in `docs/development/0.7/40-verification.md` and `AGENTS.md`.
 
+**Amendment (2026-09-29, R3-A, no version bump): the two numbers in the paragraph above are the 2026-09-23
+record and no longer describe the gate.** The named list is no longer seven entries - it was fourteen by the
+2026-09-24 batch, and R3-A added sixteen more, so it stands at thirty - and the assertion floor is no longer
+the constant `12`: it is derived from the list length, which is what stops a list that grows from passing
+vacuously. The R3-A names exist so that deleting or compiling out one of the four new lanes reddens gate 10
+instead of leaving it green, and the t2 batch case that pins this counter's red message (`showed N of the M
+named`) was re-cut to the new numbers in the same slice, because a stale expectation there is a mutation that
+cannot report its intended red.
+
 *Migration:* none in either direction. A release payload cannot turn it on; a development build that never asks
 for it pays nothing.
 
@@ -872,3 +887,290 @@ sits on": three rows whose template declares `SelectedKey="selected"`, against a
 written and observed **RED first** (3 active rows of 3 — the consumer's defect exactly), green after, and red
 again under the faithful revert of the table entry (exit 1, the three assertions named). **UNRUN here:** no
 in-game run; the `TextOnGold` consequence is pinned by a lane, not observed in a game.
+
+## R1 — a resolved appearance seam, and the boolean kind that reads it
+
+An appearance is a **name a kind declares**, not a private attribute read. `input/checkbox` had one
+(`Appearance="switch" | "checkbox"`), resolved inside the widget by
+`CheckboxWidget.ResolveAppearance(UiElementSpec)`, and that private reading had three costs: the registry
+could not report which looks a kind has, so a creation-time contract could only be written inside the widget;
+the natural-width contribution — which the registry invokes **without a widget instance**, to measure a
+child's `Width="Auto"` — had to re-parse the attribute; and nothing but that one file could see the seam.
+
+**The landing.** `UiAppearanceResolver` (kernel, **internal**) holds a kind's complete look set and one
+normalization rule: `Resolve(spec)` answers the canonical look name plus whether the element *declared* one
+this kind supports. `UiWidgetRegistry.Register` gains a **seventh**, **internal** parameter carrying that
+resolver, kept as a separate overload so the five- and six-parameter overloads keep their exact CLR
+signatures (the same rule that put the natural-body overload where it is).
+`UiWidgetRegistry.GetAppearanceResolver` publishes it, so the set the widget resolves through and the set a
+contract validates against are one object. `UiElementSpec` is untouched; `IUiWidget`'s three signatures are
+untouched.
+
+**Why the seventh parameter is internal, stated as a boundary.** The seam is this batch's shape and no
+consumer has asked for an appearance axis on a kind of its own, so it stays inside the assembly while the
+one kind that has looks uses it. Making it public would be an addition that owes a `docs/api-tiers.md` tier
+and a vocabulary a stranger's kind would then be frozen to — the exact decision a citation is supposed to
+trigger. Re-open it with a consumer that has hand-rolled the same axis. Consequently **no exported type is
+added by this batch, so no tier entry is owed and no minor moves.**
+
+**What the seam buys, stated as the two properties it makes structural.** (i) *Measure and draw cannot
+disagree about the look*: `CheckboxWidget` resolves once per call through `Looks` and both halves read the
+resolved value — the natural body from the registry's entry point and the painted body from `Draw`'s band —
+and the drawn body is derived from the band the natural width was computed against, so the two are one
+number rather than two derivations that happen to agree. (ii) *An unknown look is a creation-time refusal,
+not a per-frame fallback*: `ResolvedAppearance.Declared` is false for absent, blank **and** unrecognized
+declarations alike, and `Validate` refuses the third of those once, located on the element with the authored
+text.
+
+**Tight metrics, pinned by `KernelControlKindTests.VerifyBooleanAppearanceSeam`** (measured through a host on
+the real registered kind, and the lane was extended rather than replaced):
+
+| Case | Natural width |
+|---|---|
+| switch, nothing drawn beside it | 34 (the track alone) |
+| switch, `Label=""` (declared, blank) | 34 (a gap for a label nobody draws is reserved space) |
+| switch, label drawn | 34 + 6 (the switch's own gap) + the measured label |
+| checkbox, nothing drawn beside it | the band's box side |
+| checkbox, label drawn | side + `theme.Geometry.Padding` |
+
+The switch's 34 is `SwitchTrackWidth`, a shape constant declared by the kind and deliberately **not** derived
+from density — deriving a track from `RowHeight` would silently resize the control whenever density moved. An
+explicit `Height` still wins over the look's natural band in both halves: `Measure` reads it through
+`AtomVocabulary.ReadHeight`, and `Paint` sizes the body against that same resolved band, so the drawn box
+grows with the band the page asked for instead of using the arranged rect.
+
+**The OFF switch's outline is a control edge, not the raised surface's own.** The OFF track fills with
+`RaisedSurface.Fill` and outlines from the theme's control-edge ladder (`BorderStrong`, else `Border`). Under
+a scope that spells "no box" as fill == border — which sets `Raised` and `RaisedBorder` to the same colour —
+reading the edge from `RaisedSurface.Border` flattens both halves of the track onto the card face and the
+control disappears. A fill and an edge read from two independent tokens cannot both collapse that way. The ON
+track is unaffected: a selected state is a treatment the resolved-value table owns, and it keeps its own pair.
+
+**Compatibility.** No exported type is added, so no tier entry is owed and no minor moves. A consumer's
+`Appearance="checkbox"` page keeps compiling and keeps drawing the box-and-mark look; a kind that registers
+through the five- or six-parameter overload behaves exactly as before.
+
+## R2 — one shipped palette, a partial bag, a scoped re-tint, and the font redirect
+
+**1. The bag is partial and answers `Vanilla`.** `new UiTheme()` is a complete, drawable look: every colour
+token it never assigned answers the shipped palette, resolved per token on read. A consumer changes the four
+tokens it cares about and keeps a coherent look everywhere else. The one asymmetry, and the reason the
+fallback is a per-token claim flag rather than a comparison against the default: **an explicitly assigned
+transparent is a value.** `theme.Panel = new Color(0,0,0,0)` must stay transparent, not be repainted by
+Vanilla — a UI that wants a gap where a plane would be has to be able to say so. A nullable per-surface edge
+keeps its documented `null` = "use the shared token" meaning, so transparency there is spelled as a
+transparent colour.
+
+**2. `UiTheme.DarkGold` is removed, with no alias and no shim.** The library ships one look. The warm-gold
+palette moved into the harness (`tools/FerriteLib.UiKit.Tests/TestPalettes.cs`) because the only thing that
+needs a *second* palette is a lane asserting what a second palette does, and a per-token claim lookup.
+
+| Count | What happened |
+|---|---|
+| 225 | `UiTheme.DarkGold` references in the harness, all migrated |
+| 203 | → `UiTheme.Vanilla`: lanes whose subject is layout, identity, input, invalidation or diagnostics, where the palette is a fixture and any complete token set does |
+| 22 | → `TestPalettes.DarkGold`: the lanes that genuinely need a distinct second look |
+
+**Preserved, not weakened:** `KernelResolvedStyleTests.VerifyDarkGoldPalette` keeps every one of its value
+cells (`Base`, `Panel`, `Raised`, `Hover`, `Selected`, `Success`, `Danger`, `WorkspacePlane`, `SectionBand`,
+all five text tokens, `AccentGold`, the derived `AccentHover`, `Border`, `BorderStrong`, `Divider`), the
+"leaves every per-surface edge unclaimed" assertion, and the fresh-instance / independent-re-tint pair. Only
+the *source* of the palette moved: the cells now read `TestPalettes.DarkGold`, which carries exactly the
+values the library factory used to. The `Vanilla + DarkGold are different looks` comparison survives for the
+same reason.
+
+**3. A colour-only re-tint refreshes scoped themes and moves no layout.** `UiStyleResolver` caches one clone
+per effective (scheme, density) pair, and a clone copies token **values**. A cached region therefore kept the
+palette it was built with, so re-tinting the injected theme left every styled region painting the old colours
+— the stale-colour defect this fixes. The fix is a second clock on the theme rather than a broader one:
+`UiTheme.ColourRevision` moves on any colour assignment that changes a value and on nothing else, and
+`ThemeFor` drops the cached clones when **either** `LayoutRevision` or `ColourRevision` has moved since the
+last lookup.
+
+*Why it cannot move layout.* The two clocks are disjoint by construction: the colour setters write only
+`ColourRevision`, and `LayoutRevision`'s only writers remain `DefaultFont` and `Geometry`. No colour
+assignment reaches the layout clock, so the engine's band cache — which compares `LayoutRevision` — is not
+invalidated, the arranged snapshot is reused, and widget, session, focus, selection and popup state are
+untouched (a repaint drops no node and no state). A scope that applies a colour equal to what the token
+already holds is not a change either: both setters compare before they mark.
+
+**4. (R12-T) Typography is a font selection; density is a separate axis.** A `<Scheme>` may carry the density
+metric vocabulary (`<Metric Token="RowHeight" Value="…"/>`), and typography is one token of that same
+vocabulary: **`<Metric Token="Font" Value="Tiny|Small|Medium"/>`**. Its value is a FONT CLASS, and it is the
+only thing `UiStyleResolver.ApplyFont` writes — `UiTheme.DefaultFont`, which is what `ctx.Theme.DefaultFont`
+answers, what `ITextMetrics.MeasureWidth`/`MeasureText` are called with, what the fit audit compares, and what
+`UiThemeDraw.Label` paints with when the caller names no font. One selection, obeyed by measurement and paint
+because both read the same member; nothing re-derives it.
+
+The legacy `<Font Value="…"/>` element **keeps working by redirecting into that same font path**: the parser
+sets the identical typography selection, records one issue naming both the legacy spelling and its successor
+(`<Metric Token="Font" …/>`), and reports the redirect through the appearance channel. It is never ignored, and
+it is **never translated into a distance** — an earlier revision of this batch mapped it to `RowHeight`, which
+would have destroyed the declaration's meaning while appearing to honour it. A scheme declaring both is
+resolved by the metric, and the shadowing is reported rather than resolved quietly.
+
+Density stays independent in both directions: the font token is separated in the parser before the numeric
+metric reader ever sees it, `ApplyMetric` has no font case, and `UiTheme.DefaultFont`/`UiTheme.Geometry` are
+two distinct properties with two distinct setters. Selecting a scheme therefore cannot silently move density,
+and changing a font is not implemented as changing a row height. Both are layout-bearing, so both move
+`LayoutRevision` — a different typeface really does measure differently — while a colour moves only
+`ColourRevision` (item 3 above).
+
+`UiStyleDocument.ReadMetric` is still shared by `<Scheme>` and `<Density>`, so the numeric vocabulary cannot
+drift between them; the `Font` key is routed to `ReadFontMetric` before that call, which is what keeps a
+typeface out of a `Dictionary<string, float>` by construction rather than by convention.
+
+**5. (R12-A) The appearance seam was corrected, not rebuilt.** One bool behaviour (`input/checkbox`) still
+serves both looks; the shared seam (`UiAppearanceResolver`, per-kind sets via the internal 7-arg `Register`
+overload, `UiWidgetRegistry.GetAppearanceResolver`) was left in place, and what changed is what the seam feeds.
+The resolved look is read once per call and drives the creation-time contract, the natural band, the natural
+width and the paint, so premeasure → natural-body → draw agree on normalization (case and surrounding
+whitespace), on empty labels (`Label=""` reserves no gap) and on explicit dimensions (a declared `Height`
+decides the band in measure *and* draw). The kind's public surface is unchanged: `IUiWidget` keeps all three
+signatures and the **five-parameter `Register` overload keeps its exact CLR signature** (the six- and
+seven-parameter overloads are additions beside it; the seven-parameter one is `internal`). The three
+`Register` overloads and `GetNaturalBody` are member-level additions on an already-`stable` type and are
+documented as such in `docs/api-tiers.md`; no exported type is added, so no type-level tier entry is owed.
+
+**Evidence, labelled.** (a) CURRENT INSPECTED: every path and line in the batch report. (b) DATED HISTORICAL:
+the 2026-09-18 palette decision quoted above. (c) INFERENCE: that the harness's migrated fixtures behave
+identically under `Vanilla` — argued from the source of every affected assertion, not executed. (d)
+UNVERIFIED RUNTIME: **nothing in this batch was compiled or executed** — the shell sandbox fails OS-side
+(`SetNamedSecurityInfoW Win32 5`), so no `dotnet`, no gate, no harness run and no game run; every claim above
+is static, and the build/verification slot is the PM's.
+
+## R3-A — the per-host instrument grows a machine-readable rendering
+
+An addition, inside `0.7.0` under Amendment 3, and **not** a correction round: R1/R2 were accepted after their
+own recovery run, and nothing here reopens them.
+
+**A.1 — one instrument, three views.** The development instrument already had two renderings: the diffable
+`DumpGeometry()` text and the optional outline. `UiDiagnosticSubscription.TryGetGeometrySnapshot` adds a third,
+as data. All three read the capture's own stored samples — the dump and the snapshot are built from the same
+two lists in the same calls that fill them, and the overlay is now painted only for entries the bounded capture
+actually RETAINED (`UiDevGeometryProbe.Note` returns that answer and `Outline` takes it). There is no second
+collection, no replay and no synthesised input, which is what makes the relationship structural rather than a
+promise two collectors keep.
+
+**A.2 — what is captured.** `UiDevGeometrySample` and `UiDevInputSample` gained stable identity (the node's
+canonical `UiNodeId.Key`, its display path, its declared ordinal and `Id`), the effective appearance and its
+provenance (the resolved theme's `DefaultFont`, the scheme and density names read through the resolver's own
+accessors over the same chain the theme was resolved from, whether the element drew with the injected theme or
+a resolver-built region, and the theme's two revision counters), the authored role text, the published
+disabled state, the **effective clip** (the session's own already-intersected value, in window space — so a
+scoped container's sample carries the clip it was drawn inside while its viewport appears on its children),
+the popup boundary (`OpenPopupId`, the anchor, and whether this element owns it), and the input's consumption
+as the phase transition plus an explicit `OriginUnknown` for a pass that entered already `Used`.
+
+**Honesty rule, and where it bites.** Three boundaries are recorded as `UiDevBoundary.Unknown` **with a
+documented reason in the data**, never as a plausible default: hover (published during an element's own draw,
+which runs after the sample), focus (this library publishes no focus owner — the session's active node is the
+draw-time element stack, and no keyboard or focus subsystem was invented to have something to observe), and a
+content rect on anything that is not a scoped container. The authored `Tone`/`Emphasis` are recorded as
+authored TEXT rather than as a resolved treatment: the treatment is computed inside the widget, which may also
+be applying hover/armed state, and calling the role parser from the instrument would record a deprecation note
+the instrument itself caused.
+
+**A.3 — invariants held.** Bounded storage and current-pass semantics are unchanged (the dropped counters are
+still per-pass and still reported); subscriptions remain off by default, per-host, with the same isolation and
+disposal behaviour; a handed-out snapshot holds no node, session or host object and cannot change after a later
+draw, because it is built fresh from values per call and every setter is `internal`; nothing logs per frame and
+nothing dispatches or consumes input; and a release payload still refuses enablement and captures nothing,
+with the new reader answering `false` rather than throwing.
+
+**A.4 — surface and tiers.** `Snapshot()` and `DumpGeometry()` keep their signatures. Four types are added —
+`UiDevGeometrySnapshot`, `UiDevNodeSnapshot`, `UiDevInputSnapshot`, `UiDevBoundary` — all classified
+**public-unstable** in `docs/api-tiers.md`. They are **public rather than internal** because of the packaging
+constraint the demo packer establishes (it bans `InternalsVisibleTo`, so a structured export a consumer must
+call has to be genuinely exported), and they are **deliberately outside `#if FER_DEV`** because the tier
+document is one file read in both configurations: a Dev-only public type must be listed — which fails
+`VerifyNoTierEntryIsStale` in a **release** build, since the entry would name a type that payload does not
+export — or omitted, which fails `VerifyAllPublicTypesAreClassified` in a **Dev** build. A type that exists in
+one configuration only therefore cannot satisfy the tier harness either way, and it would also be a
+compile-against-Dev / ship-against-Release trap. The **four types are callable but inert in a release
+payload**: they are exported and nameable, nothing there ever produces an instance, the reader answers `false`
+and the enable path still throws. The capture behind them stays compiled out. No version bump — the 0.7.x
+temporary public-addition rule applies.
+
+**A.5 — lanes.** `KernelDevGeometryTests` drives a real `UiHost.DrawFrame` and adds: the dump-versus-snapshot
+agreement compared fact by fact for EVERY retained node on two pages (one page-level, one with a NON-DEFAULT
+scheme and density so provenance and the selected font are exercised), covering the identity, the rects, the
+font, the appearance origin and every boundary INCLUDING the two that are always unknown - the dump renders
+those from the same sample field the snapshot reads, so a snapshot that started reporting hover as known
+while the text still said `unknown` reddens the agreement rather than passing on a subset of fields; the
+nested-clip containment and the popup available-or-unknown pair, including the documented unknowns; a bounded
+capture whose head, dropped count, text/data agreement and retained-only overlay are all asserted (the
+overlay measured as the difference the switch makes); a copy/two-host/disposal lane whose decisive case is a
+SECOND draw on the SAME host, after which an already-handed-out snapshot must still report the earlier pass;
+and, in the release half, the new reader's refusal. The existing R12 and earlier assertions are untouched.
+
+**Mutation proposal (proposed, NOT run).** `tools/mutation/batches/r3a-2026-09-29.ps1` names one-change cases
+for the new failure modes: the text and data renderings disagreeing on the clip, the clip read from the
+element's own draw rect instead of the session's effective clip, an unknown boundary filled with a plausible
+rect, the node identity taken from the display string instead of the canonical key, the bounded capture's
+dropped counter zeroed, the overlay painted for a dropped entry, the declared look reported as the kind's
+default, and - as the only two-anchor case, because one edit cannot express it - the collector reusing one
+snapshot instance so an already-handed-out snapshot follows a later draw. Each case names its mutation-target
+assertion and its guards. It is a proposal in the tracked batch format so PM can validate anchors and run it;
+this session did not execute it.
+
+**Evidence, labelled.** (a) CURRENT INSPECTED: the files and lines in this batch's report. (b) DATED
+HISTORICAL: nothing here re-reads a prior ruling. (c) INFERENCE: that the four new lanes will hold as written —
+argued from the source of every assertion, not observed. (d) UNVERIFIED RUNTIME: **nothing in this slice was
+compiled or executed**; no `dotnet`, no gate, no harness, no mutation.
+
+## R3-A-CORR — the correction pass the PM-measured red baseline bought
+
+`verify-local.ps1 -NoRestore` passed checks 1-9 and **failed gate 10 with three fixture errors in the R3-A
+lanes**. Four defects were corrected; the frozen contract above is unchanged except where its own words were
+not true.
+
+**C1 — fixture identities and a real overflow.** Two lookups in the appearance/boundary lanes addressed
+`root/band` on the `Page` fixture, whose button is nested at `root/row/band`; both now use the real path, and
+the cross-host exclusion asserts both directions non-vacuously (A has its own nested band and not B's id; B
+has its id and not A's band). The bounded lane declared **520 sibling widgets in one manifest**, which the
+manifest's own node validation refuses at creation - so the lane never reached the capture. It is replaced by
+a **runtime expansion**: one template (`Row` + a `chrome/rule`) and one `Repeat` over a bound item list, so
+the declared page stays tiny while each item expands to a Row and a rule at arrange/draw time. The expansion
+**rate is measured**, not assumed (two small runs), and the big run is checked against it; the dropped tail is
+asserted at its **full** composed path (`rows/row#item319/r#item319`, the engine composing
+`<declaredId>#<itemKey>`), non-vacuously: the same construction is first proved to find the last item's rule
+on a small run where it IS retained, and the first item's rule is proved present in the overflowing pass.
+
+**C2 — the effective appearance was missing.** Authored `Tone`/`Emphasis` is not resolved appearance. The
+same capture now resolves the element's look through the registry's own seam -
+`UiWidgetRegistry.GetAppearanceResolver(ctx.Source, kind)` → `UiAppearanceResolver.Resolve(spec)`, the very
+instance the kind registered and its own widget resolves through - and reports the canonical look, whether the
+element declared one, the kind's default and accepted set, and the provenance: `scope` when the resolver is
+the element's own scope's registered set, `core` when it is the core scope's, `none` when the kind declares no
+seam at all. Which scope answered is proved by asking for the core resolver as well and comparing instances,
+so it is identity rather than a heuristic, and `AppearancePairRegistered` separately reports the mixed case (a
+scope that declares the kind but no looks for it). **Fonts:** the field is renamed `ScopeFont` and a new
+`PaintedFont` reports what a label finally paints with - null, with a documented reason, because that choice is
+made inside the element's own draw and several kinds pass their own constant. Calling `ScopeFont` the painted
+font would have been the misreport the split exists to prevent; there is no per-element `Font` attribute in
+this library.
+
+**C3 — the copy mutant is now faithful.** The c7 case cached the first snapshot around an object initializer,
+which only makes later calls go stale: the snapshot never follows a later draw, so its named assertion stayed
+green and the case proved nothing. `Snapshot` now creates a fresh instance and calls a `Fill` that assigns
+every field on every call, and the mutant reuses that instance - so the collector **refreshes it in place** and
+an already-handed-out snapshot follows the next draw. The assertion that reddens is the one that should: the
+snapshot taken before the second draw on the same host no longer describes the earlier pass. Both properties
+stay tested: new-pass advancement (which the live instance also satisfies, so it is a guard) and old-copy
+preservation, with node `Pass` agreeing with its snapshot's.
+
+**C4 — the documentation now matches the code.** "Immutable" was a stronger claim than the code makes: the
+lists are the arrays the call allocated, so a caller who down-casts its own copy can change that copy. What is
+guaranteed - a fresh snapshot object and fresh node/input objects per call, no view over the capture's buffers,
+an old snapshot detached from later draws, no node/session/host object held - is stated, and the stronger claim
+is explicitly not. The popup members now report their real sampling moment (as the engine reaches the element,
+BEFORE its own draw, so a popup opened later in the same pass is not there yet and one about to be closed is
+still there), and every boundary names its coordinate space (clip and popup anchor in Host window space, input
+rect and point in window space, content in scroll-local space).
+
+**Evidence, labelled (CORR).** (a) CURRENT INSPECTED: the PM-measured baseline and every file and line in the
+correction report. (b) DATED HISTORICAL: the 2026-09-24 gate-10 measurement, kept as the record for the list it
+was taken against. (c) INFERENCE: that the renamed gate names and the re-cut t2 expectation now match the
+lanes - argued from the literal strings, not observed. (d) UNVERIFIED RUNTIME: **nothing was compiled or
+executed**; no `dotnet`, no gate, no harness, no mutation.

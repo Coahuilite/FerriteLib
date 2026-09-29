@@ -33,8 +33,17 @@ namespace FerriteLib.UiKit.Kernel;
 /// token (the default font, the density bundle) moving means every band measured against the old value is
 /// stale, so the cached clones are dropped and rebuilt lazily on the next lookup. This is not a second
 /// clock - it is the revision the engine's band cache already compares, read here so both caches expire
-/// together. Colour tokens deliberately do not move that revision, which is also why a cached scope keeps
-/// the palette it was built with: the same boundary the band cache draws, drawn once.
+/// together.
+/// </para>
+/// <para>
+/// <b>A colour-only re-tint expires the same cache through its own clock, and moves no layout.</b> A cached
+/// clone copies token VALUES, so a palette change on the injected theme would otherwise leave every region
+/// painting the old colours forever - the resolver would keep handing out the instances it built under the
+/// previous palette. <see cref="UiTheme.ColourRevision"/> is the peer clock that closes it: a colour
+/// assignment drops the cached clones and the next lookup rebuilds them, while
+/// <see cref="UiTheme.LayoutRevision"/> stays exactly where it was, so the engine's band cache and the
+/// arranged page are untouched. Reading two clocks rather than one is the point - the whole reason a colour
+/// does not move the layout clock is that re-arranging the page to repaint it would be cost for nothing.
 /// </para>
 /// <para>
 /// Resolution-time drops (a scope naming a scheme nobody declared, a scope budget overrun) are recorded
@@ -54,6 +63,11 @@ public sealed class UiStyleResolver
     private readonly Dictionary<string, UiTheme> regionThemes = new(StringComparer.Ordinal);
     private readonly List<UiStyleIssue> issues = new();
 
+    // The baseline's paint-side revision as this resolver last saw it. It exists because a cached clone
+    // holds values, not a reference: a palette change on the injected theme has to drop the clones or every
+    // region keeps the colours it was built with.
+    private int observedBaselineColourRevision;
+
     // The baseline's layout revision as this resolver last saw it. Deliberately not a clock of its own: it
     // is a read head over the revision the engine's band cache compares, so a move expires both caches.
     private int observedBaselineRevision;
@@ -63,6 +77,7 @@ public sealed class UiStyleResolver
         this.baseline = baseline ?? throw new ArgumentNullException(nameof(baseline));
         this.document = document ?? throw new ArgumentNullException(nameof(document));
         observedBaselineRevision = this.baseline.LayoutRevision;
+        observedBaselineColourRevision = this.baseline.ColourRevision;
     }
 
     /// <summary>The consumer-injected theme every scope starts from.</summary>
@@ -81,22 +96,24 @@ public sealed class UiStyleResolver
     public int ScopeCount => regionThemes.Count;
 
     /// <summary>
-    /// Applies the document's page-level scheme and density to <paramref name="theme"/> in place. This is
-    /// the resolve-before-Measure slot: the consumer (or the host, once it holds a document) runs it
-    /// before the first arrange, and because every applied token moves <see cref="UiTheme.LayoutRevision"/>
-    /// the existing band cache is invalidated by the clock it already compares - no second clock, and the
-    /// first arrangement already sees the document's values.
+    /// Applies the document's page-level scheme to <paramref name="theme"/> before the first arrange.
+    /// Typography and density advance <see cref="UiTheme.LayoutRevision"/>; colour assignments advance
+    /// <see cref="UiTheme.ColourRevision"/> without invalidating the arranged bands.
+    /// <para>
+    /// The legacy <c>&lt;Font&gt;</c> declaration selects typography through the same path as Metric Font.
+    /// It changes the font used for measurement and drawing independently of density such as RowHeight.
+    /// </para>
     /// </summary>
     public void ApplyTo(UiTheme theme)
     {
         if (theme == null) throw new ArgumentNullException(nameof(theme));
-        ApplyScheme(theme, document.DefaultScheme, null);
-        ApplyDensity(theme, document.DefaultDensity, null);
+
+        ApplyNamedScopes(theme, document.DefaultScheme, document.DefaultDensity, null);
     }
 
     /// <summary>
     /// The theme a scope draws with, built once per effective (scheme, density) pair and reused - the same
-    /// instance on every later frame, until the baseline's layout revision moves and the cached instances
+    /// instance on every later frame, until either of the baseline's revisions moves and the cached instances
     /// are dropped. Unknown names fall back to the nearest declared ancestor's values (or the baseline)
     /// and are recorded.
     /// </summary>
@@ -113,14 +130,18 @@ public sealed class UiStyleResolver
     /// </summary>
     internal UiTheme ThemeFor(IReadOnlyList<UiStyleDeclaration>? nearestFirst, string? elementPath)
     {
-        // A cached scope is only as good as the baseline it was cloned from. Watch the layout clock the
-        // injected theme already carries: when it moves, this cache is stale for exactly the reason the
-        // engine's band cache is, and the next lookup rebuilds lazily. Colours never move that clock, so a
-        // re-tint alone keeps the instances a region has been using.
+        // A cached scope is only as good as the baseline it was cloned from, and a clone carries VALUES, so
+        // two clocks have to be watched and they answer two different questions. The layout clock is the
+        // revision the engine's band cache compares, so a font or density move expires both caches together.
+        // The colour clock is the paint-side peer: a re-tint leaves every arranged rect exactly where it was
+        // (and the band cache untouched) while the cached clones, which would otherwise keep painting the
+        // palette they were built under, are dropped and rebuilt on the next lookup.
         int baselineRevision = baseline.LayoutRevision;
-        if (baselineRevision != observedBaselineRevision)
+        int baselineColourRevision = baseline.ColourRevision;
+        if (baselineRevision != observedBaselineRevision || baselineColourRevision != observedBaselineColourRevision)
         {
             observedBaselineRevision = baselineRevision;
+            observedBaselineColourRevision = baselineColourRevision;
             regionThemes.Clear();
         }
 
@@ -131,8 +152,7 @@ public sealed class UiStyleResolver
         if (regionThemes.TryGetValue(key, out UiTheme? cached)) return cached;
 
         UiTheme theme = baseline.Clone();
-        ApplyScheme(theme, scheme, elementPath);
-        ApplyDensity(theme, density, elementPath);
+        ApplyNamedScopes(theme, scheme, density, elementPath);
 
         if (regionThemes.Count >= MaxScopes)
         {
@@ -144,6 +164,74 @@ public sealed class UiStyleResolver
 
         regionThemes.Add(key, theme);
         return theme;
+    }
+
+    /// <summary>
+    /// Applies the two inheriting names in the documented order. A scheme contributes its colours and its
+    /// premeasure metrics (the density vocabulary, including a redirected legacy font); a named density
+    /// contributes metrics after it, so the more specific name wins on a token both declare. Both go through
+    /// the same <see cref="ApplyMetric"/> funnel, which is why one fact - a row height - cannot be expressed
+    /// twice in two different ways.
+    /// <para>
+    /// Typography is the one part of a scheme that is not a metric: <see cref="ApplyFont"/> writes the selected
+    /// typeface to <see cref="UiTheme.DefaultFont"/>, which is the single value text measurement, the fit
+    /// audit and the label outlet all read. A font change therefore moves the layout clock (a glyph run really
+    /// does occupy a different width) while a RowHeight metric moves the same clock as a DISTANCE - the two
+    /// axes are independent, and neither is implemented in terms of the other.
+    /// </para>
+    /// </summary>
+    private void ApplyNamedScopes(UiTheme theme, string? scheme, string? density, string? elementPath)
+    {
+        if (scheme != null && scheme.Length > 0)
+        {
+            if (document.TryGetScheme(scheme, out UiStyleDocument.SchemeDefinition definition))
+            {
+                foreach (KeyValuePair<string, Color> pair in definition.Colours)
+                {
+                    ApplyColour(theme, pair.Key, pair.Value);
+                }
+
+                if (definition.Font.HasValue) ApplyFont(theme, definition.Font.Value);
+
+                foreach (KeyValuePair<string, float> pair in definition.Metrics)
+                {
+                    ApplyMetric(theme, pair.Key, pair.Value);
+                }
+            }
+            else
+            {
+                Record(
+                    "Unknown scheme '" + scheme + "'; the scope keeps the values it would have had without it.",
+                    0, elementPath);
+            }
+        }
+
+        if (density == null || density.Length == 0) return;
+        if (!document.TryGetDensity(density, out UiStyleDocument.DensityDefinition densityDefinition))
+        {
+            Record(
+                "Unknown density '" + density + "'; the scope keeps the values it would have had without it.",
+                0, elementPath);
+            return;
+        }
+
+        foreach (KeyValuePair<string, float> pair in densityDefinition.Metrics)
+        {
+            ApplyMetric(theme, pair.Key, pair.Value);
+        }
+    }
+
+    /// <summary>
+    /// Applies a scheme's typography selection. It writes <see cref="UiTheme.DefaultFont"/> and nothing else,
+    /// so the selected font is what <c>ctx.Theme.DefaultFont</c> answers, what
+    /// <see cref="ITextMetrics.MeasureWidth"/>/<c>MeasureText</c> is called with, and what
+    /// <see cref="UiThemeDraw.Label"/> paints with when the caller names no font - one selection, obeyed by
+    /// measurement and paint. The theme's own setter moves the layout clock, which is correct: a different
+    /// typeface measures differently.
+    /// </summary>
+    private static void ApplyFont(UiTheme theme, UiFont font)
+    {
+        theme.DefaultFont = font;
     }
 
     /// <summary>
@@ -200,44 +288,6 @@ public sealed class UiStyleResolver
         }
 
         return document.DefaultDensity;
-    }
-
-    private void ApplyScheme(UiTheme theme, string? name, string? elementPath)
-    {
-        // Explicit null/empty test rather than string.IsNullOrEmpty: net472's overload carries no
-        // [NotNullWhen(false)], so flow analysis cannot narrow through it (the repo's recorded trap).
-        if (name == null || name.Length == 0) return;
-        if (!document.TryGetScheme(name, out UiStyleDocument.SchemeDefinition definition))
-        {
-            Record(
-                "Unknown scheme '" + name + "'; the scope keeps the values it would have had without it.",
-                0, elementPath);
-            return;
-        }
-
-        foreach (KeyValuePair<string, Color> pair in definition.Colours)
-        {
-            ApplyColour(theme, pair.Key, pair.Value);
-        }
-
-        if (definition.Font.HasValue) theme.DefaultFont = definition.Font.Value;
-    }
-
-    private void ApplyDensity(UiTheme theme, string? name, string? elementPath)
-    {
-        if (name == null || name.Length == 0) return;
-        if (!document.TryGetDensity(name, out UiStyleDocument.DensityDefinition definition))
-        {
-            Record(
-                "Unknown density '" + name + "'; the scope keeps the values it would have had without it.",
-                0, elementPath);
-            return;
-        }
-
-        foreach (KeyValuePair<string, float> pair in definition.Metrics)
-        {
-            ApplyMetric(theme, pair.Key, pair.Value);
-        }
     }
 
     private static void ApplyColour(UiTheme theme, string token, Color value)

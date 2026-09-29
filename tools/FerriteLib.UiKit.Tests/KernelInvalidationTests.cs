@@ -309,7 +309,7 @@ internal static class KernelInvalidationTests
         DrawnHeights.Clear();
         announceInDraw = false;
         return new UiHost(
-            Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
     }
 
     private static int Count(string key)

@@ -39,6 +39,42 @@ $root = [System.IO.Path]::GetFullPath($ProjectRoot)
 $testsProject = Join-Path $root 'tools\FerriteLib.UiKit.Tests\FerriteLib.UiKit.Tests.csproj'
 
 # Assertion names that exist only inside the lane's '#if FER_DEV' branch.
+#
+# R3-A's names are held ONCE, in their own array, because the checker's control sample below is built from
+# them: a fixture that spells a name differently from the list is not a control for that name. One or more
+# per new lane, so a lane that is deleted, compiled out or silently skipped leaves this gate red.
+$r3aAssertions = @(
+    'the dump header and the snapshot name the same pass',
+    'the dump carries the same canonical key for ',
+    'and the same hover boundary for ',
+    'every retained node was compared, not a sample of them',
+    'the sample names the scheme and density the element resolved through: ',
+    'the identity is the node''s CANONICAL key rather than a re-derived display string',
+    'the effective clip is the intersection, so the nested one stays inside the outer one: ',
+    'hover is unknown at a geometry sample, with the reason that says why: ',
+    'focus is unknown because this library publishes no focus owner to report: ',
+    'a popup owned by an element is reported as owned by it: ',
+    'the capture keeps exactly its bound of nodes, not the whole pass: ',
+    'so the dropped count is the real remainder, not a marker that happens to be non-zero: ',
+    'the overlay outlines exactly the entries the bounded capture kept, and nothing it dropped: ',
+    'a second draw on the SAME host advances the capture''s pass: ',
+    'still describes the EARLIER pass, unchanged',
+    'a disposed subscription answers no snapshot rather than an empty-looking one',
+    # R3-A correction: the EFFECTIVE appearance and the font distinction. The names that changed in the
+    # correction replaced their older spellings here too - a stale name is a gate that can never go green.
+    'with the scoped set''s own default and accepted names: ',
+    'an element that declares no look reports the kind''s default: ',
+    'and one that declares the other look reports the declared value: ',
+    'so one kind resolves two different effective appearances: ',
+    'and the provenance names that scope rather than the core fallback: ',
+    'and the same scope font for ',
+    'and the same effective appearance and provenance for ',
+    'and the font finally painted is reported as unobservable rather than filled in with it: ',
+    # R3-A correction: the overflow fixture is real RUNTIME expansion, measured rather than assumed.
+    'the fixture expands linearly, so the rate is measurable: ',
+    'the derived full path finds the last item''s rule when it is retained, so the lookup is proved: '
+)
+
 $devOnlyAssertions = @(
     'the instrument is off until a subscription asks: default off',
     'the MatchContent band reports the mode it declared',
@@ -54,7 +90,7 @@ $devOnlyAssertions = @(
     'and it does not dispatch its command while the layer is above it',
     'the option row consumed the click and closed the popup, not the trigger:',
     'and with no popup layer left the same press hits it and dispatches once (fired'
-)
+) + $r3aAssertions
 
 # The name only the release half can print. Seeing it in a Dev run means the branches are not exclusive.
 $releaseOnlyAssertion = 'a release payload has no instrument and refuses to pretend it has one'
@@ -78,7 +114,13 @@ $dumpPress = '    | input path=root/row/band '
 $minimumDumpNodes = 5
 
 # Measured 2026-09-24 on the shipped lane: list 14 named dev-only assertions, 14 observed passing, 2687
-# 'ok:' lines in total, 6 dumped node lines.
+# 'ok:' lines in total, 6 dumped node lines. The list grew to 30 with the R3-A names, then to 40 with the
+# R3-A correction's names (2026-09-29) - and neither addition is re-measured here: the shell sandbox fails
+# OS-side, so the dated 14-name measurement stands as the record for the list it was taken against, and the
+# next real run re-measures the current one.
+# The t2 mutation batch pins this counter's red message ('showed N of the M named'), so growing the list
+# re-cuts that case's expectation in the same batch, and a name that a correction RENAMED has to be replaced
+# here too: a stale name is a gate that can never go green again.
 
 function Measure-DevOnlyPassing {
     <#
@@ -172,7 +214,7 @@ function Assert-DevRun {
 
 # --- the checker's own control, on every run ---------------------------------------------------------
 # A fixture is only a control if it goes through the same function the real output does.
-$controlSample = @(
+$controlSample = (@(
     'ALL PASS'
     '  ok: the instrument is off until a subscription asks: default off'
     '  ok: the MatchContent band reports the mode it declared'
@@ -199,7 +241,7 @@ $controlSample = @(
     '    | viewport path=root/list kind=Scroll'
     '    | rect path=root/list/inner kind=chrome/banner'
     '    | input path=root/row/band kind=input/button point=(50,15) rect=(0,0,100,30) verdict=hit'
-) -join "`n"
+) + @($r3aAssertions | ForEach-Object { "  ok: $_" })) -join "`n"
 
 if (Test-DevRun -Output $controlSample -ExitCode 0) {
     throw "the dev-instrument checker rejects a fully populated dev-half sample: $(Test-DevRun -Output $controlSample -ExitCode 0)"

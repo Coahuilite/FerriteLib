@@ -114,7 +114,7 @@ internal static class KernelCommandStateTests
 
     private static void VerifyDisabledPlane()
     {
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         var bindings = new UiBindings();
         bindings.BindCommand("gated", () => { }, () => false);
         bindings.BindCommand("open", () => { });
@@ -322,7 +322,7 @@ internal static class KernelCommandStateTests
     private static UiHost Host(string xml, UiBindings bindings)
     {
         return new UiHost(
-            Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
     }
 
     /// <summary>

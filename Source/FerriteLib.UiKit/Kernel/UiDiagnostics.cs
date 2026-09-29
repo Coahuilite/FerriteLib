@@ -326,9 +326,44 @@ public sealed class UiDiagnosticSubscription : IDisposable
     public string DumpGeometry()
     {
 #if FER_DEV
-        return geometry == null ? "" : geometry.Dump();
+        return geometry == null ? "" : geometry.Dump(Host, SessionId);
 #else
         return "";
+#endif
+    }
+
+    /// <summary>
+    /// The most recent pass as <b>data</b> rather than as text: the same capture <see cref="DumpGeometry"/>
+    /// renders, handed out as an immutable snapshot whose node and input lists carry their own dropped
+    /// counts.
+    /// <para>
+    /// <b>Two renderings, one capture.</b> Both this and the text dump are built from the capture's own
+    /// stored samples, so they describe the same frame; there is no second collector to keep in step, and a
+    /// lane asserts the agreement rather than trusting it.
+    /// </para>
+    /// <para>
+    /// <b>False rather than empty on a release payload.</b> The instrument is compiled out there, so "nothing
+    /// was captured" is the only truthful answer and the caller is told so instead of being handed an empty
+    /// object that reads like a page with nothing in it. This is the one reader that does not throw in a
+    /// release build (unlike the enable path): a diagnostic that a consumer calls unconditionally must not
+    /// become an exception in the shipped configuration.
+    /// </para>
+    /// </summary>
+    public bool TryGetGeometrySnapshot(out UiDevGeometrySnapshot? snapshot)
+    {
+#if FER_DEV
+        UiDevGeometryCapture? capture = geometry;
+        if (capture == null || capture.Pass < 0)
+        {
+            snapshot = null;
+            return false;
+        }
+
+        snapshot = capture.Snapshot(Host, SessionId);
+        return true;
+#else
+        snapshot = null;
+        return false;
 #endif
     }
 

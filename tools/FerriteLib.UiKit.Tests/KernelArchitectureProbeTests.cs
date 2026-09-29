@@ -238,7 +238,7 @@ internal static class KernelArchitectureProbeTests
         HeadlessButtonProbe widget = new();
         widget.Configure(new UiElementSpec("ghost", HeadlessButtonProbe.Kind, Attrs(("ActionBind", "apply"))));
         using UiSession session = new();
-        UiWidgetContext ctx = MakeContext(session, bindings, UiTheme.DarkGold);
+        UiWidgetContext ctx = MakeContext(session, bindings, UiTheme.Vanilla);
         var rect = new Rect(10f, 10f, 120f, 24f);
 
         DrivePointer(new Vector2(50f, 20f));
@@ -298,7 +298,7 @@ internal static class KernelArchitectureProbeTests
         bindings.BindCommand("AClassic", () => classic++);
         bindings.BindCommand("ARail", () => rail++);
 
-        using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.DarkGold,
+        using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla,
             new ProbeMetrics(), new ProbeTranslation());
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(400f, 120f));
         Rect classicRect = snapshot.RectById["classic"];
@@ -407,7 +407,7 @@ internal static class KernelArchitectureProbeTests
         var bindings = new UiBindings();
         bindings.BindCommand("Apply", () => fired++);
 
-        using UiHost host = new(Scope, UiLayoutManifest.Parse(RelationPage), bindings, UiTheme.DarkGold,
+        using UiHost host = new(Scope, UiLayoutManifest.Parse(RelationPage), bindings, UiTheme.Vanilla,
             new ProbeMetrics(), new ProbeTranslation());
 
         // The caller's whole vocabulary: one available size, then a frame. Nothing here sets a rect.
@@ -500,7 +500,7 @@ internal static class KernelArchitectureProbeTests
         var bindings = new UiBindings();
         bindings.BindCommand("Apply", () => fired.Value++, canExecute);
         UiStyleDocument? document = ghostScheme ? UiStyleDocument.Parse(GhostStyleDocument) : null;
-        return new UiHost(Scope, UiLayoutManifest.Parse(ButtonPage(ghostScheme)), bindings, UiTheme.DarkGold,
+        return new UiHost(Scope, UiLayoutManifest.Parse(ButtonPage(ghostScheme)), bindings, UiTheme.Vanilla,
             new ProbeMetrics(), new ProbeTranslation(), document);
     }
 
@@ -541,7 +541,7 @@ internal static class KernelArchitectureProbeTests
     {
         try
         {
-            using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.DarkGold,
+            using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.Vanilla,
                 new ProbeMetrics(), new ProbeTranslation());
             Check(false, what + " - but the host accepted it");
         }

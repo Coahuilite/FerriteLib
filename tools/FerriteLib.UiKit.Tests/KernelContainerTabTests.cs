@@ -160,7 +160,7 @@ internal static class KernelContainerTabTests
             Scope,
             UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"" + Scope + "\">" + body + "</UiPage>"),
             bindings,
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
     }

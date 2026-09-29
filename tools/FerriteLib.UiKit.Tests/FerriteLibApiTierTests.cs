@@ -151,16 +151,30 @@ internal static class FerriteLibApiTierTests
         }
     }
 
-    /// <summary>Type names the payload exports, nested ones dotted, order irrelevant.</summary>
+    /// <summary>
+    /// Type names the payload exports, nested ones dotted, order irrelevant, de-duplicated. A generic type's
+    /// <c>Name</c> carries an arity suffix (<c>UiChoice`1</c>) which is STRIPPED here: the tier document is
+    /// prose whose entries are read back between two backticks, so an entry can never spell the suffix, and two
+    /// types differing only by arity would be one classification decision in any case. The generic form is
+    /// written out inside the entry's own sentence instead.
+    /// </summary>
     private static List<string> PublicTypeNames()
     {
         Assembly payload = typeof(FerriteLibVersion).Assembly;
         return payload.GetExportedTypes()
             .Where(type => type.Namespace != null && type.Namespace.StartsWith("FerriteLib.UiKit", StringComparison.Ordinal))
             .Select(type => type.IsNested && type.DeclaringType != null
-                ? type.DeclaringType.Name + "." + type.Name
-                : type.Name)
+                ? StripArity(type.DeclaringType.Name) + "." + StripArity(type.Name)
+                : StripArity(type.Name))
+            .Distinct(StringComparer.Ordinal)
             .ToList();
+    }
+
+    /// <summary>The name without the arity suffix a generic type's <c>Name</c> carries.</summary>
+    private static string StripArity(string name)
+    {
+        int tick = name.IndexOf('`');
+        return tick < 0 ? name : name.Substring(0, tick);
     }
 
     /// <summary>Type name to the heading of the section that lists it.</summary>

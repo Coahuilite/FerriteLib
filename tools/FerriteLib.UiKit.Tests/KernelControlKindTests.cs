@@ -15,7 +15,9 @@ namespace FerriteLib.UiKit.Tests;
 /// <item><b>input/checkbox</b> - two states over a bool binding, its own hit rule, and the two disabled
 /// shapes: a value the model publishes read-only (the writability funnel) and a command the owner has taken
 /// away (the command funnel P2 built). Neither executes, neither captures the pointer, and both paint the one
-/// disabled treatment.</item>
+/// disabled treatment. Its <c>Appearance</c> axis is resolved through the SHARED seam
+/// (<see cref="UiAppearanceResolver"/>), which is what makes the measured body and the drawn body one number
+/// and what makes an unknown look a creation-time refusal instead of a silent default.</item>
 /// <item><b>display/progress</b> - the value contract (a float read as a fraction of a declared Max, clamped),
 /// the measure contract (one fixed band, so a value announcement is Paint-class and reuses the arrangement),
 /// and the negative rule that it takes no pointer at all.</item>
@@ -40,6 +42,8 @@ internal static class KernelControlKindTests
     {
         failures = 0;
         Run("A checkbox is two states over a bool binding and its click writes the inverse", VerifyCheckboxToggles);
+        Run("The bool kind's selected appearance enters natural size and shares one input path", VerifyBooleanAppearanceSeam);
+        Run("The switch thumb: OFF neutral ink, ON the accent", VerifySwitchThumbTokens);
         Run("A checkbox's hit rule is its own band: a click outside writes nothing", VerifyCheckboxHitRule);
         Run("A read-only checkbox paints the disabled treatment and takes no pointer", VerifyReadOnlyCheckbox);
         Run("A command-gated checkbox neither executes nor captures", VerifyGatedCheckbox);
@@ -56,6 +60,265 @@ internal static class KernelControlKindTests
         return failures;
     }
 
+    // --- boolean appearance seam (R1) -----------------------------------------------------------
+
+    /// <summary>The default square switch's body with nothing drawn beside it: the track alone.</summary>
+    private const float SwitchBody = 34f;
+
+    /// <summary>The gap the switch holds before a label it actually draws.</summary>
+    private const float SwitchGap = 6f;
+
+    /// <summary>The checkbox look's own floor, mirroring the kind's documented minimum box.</summary>
+    private const float CheckboxMinSide = 8f;
+
+    /// <summary>
+    /// Where the switch's thumb lands in a cleared recording: one painted surface is one fill plus four
+    /// edges (<c>VerifyDensityTokens</c> pins that count), and the knob is the next solid after the track.
+    /// </summary>
+    private const int SwitchKnobSolidIndex = 5;
+
+    /// <summary>
+    /// The checkbox look's variant of the same quantity the switch's body states: the box side inside a
+    /// default uniform band. Spelled as the arithmetic rather than as a literal, so the lane says WHICH
+    /// relationship it is pinning - "the box is the band less its own padding, floored" - instead of pinning a
+    /// number a run once produced.
+    /// </summary>
+    private static readonly float CheckboxBoxSide = UiGeometry.Default.RowHeight - UiGeometry.Default.Padding * 2f;
+
+    /// <summary>
+    /// R1's new seam, asserted on the REAL registered kind through a host - not on a helper.
+    /// <list type="number">
+    /// <item>the default appearance is the square switch, and its BODY enters <c>Width="Auto"</c>: with no
+    /// label the natural width is the body alone, which text-only measurement could never produce;</item>
+    /// <item>the DRAWN track is that same number, so measure and draw are one value rather than two
+    /// derivations that happen to agree;</item>
+    /// <item>each appearance is measured against its OWN expectation, so the lane says what a look's body is
+    /// rather than asserting a relationship between two quantities the metrics never defined;</item>
+    /// <item>a label is added to the body rather than replacing it, and a BLANK declaration reserves
+    /// nothing;</item>
+    /// <item>both appearances share ONE input path: each writes exactly once per click;</item>
+    /// <item>the declaration is resolved through the SHARED seam: the registry publishes the kind's look set
+    /// and the set answers the same way it does, case-insensitively, while an unknown value is refused at
+    /// creation instead of being silently drawn as the default;</item>
+    /// <item>the switch's OFF outline is the theme's control edge, so it survives a scope that flattens the
+    /// raised surface onto its own edge.</item>
+    /// </list>
+    /// </summary>
+    private static void VerifyBooleanAppearanceSeam()
+    {
+        // Body only, default appearance (no Appearance attribute at all).
+        flagValue = false;
+        float switchWidth;
+        using (UiHost host = Host(BoolAutoPage(""), CheckboxBindings()))
+        {
+            UiLayoutSnapshot snapshot = Arrange(host);
+            switchWidth = snapshot.RectById["flag"].width;
+            Check(Near(switchWidth, SwitchBody),
+                "an unlabelled bool control with the default appearance reserves its own body, not zero: got "
+                + switchWidth.ToString("0.###") + ", expected " + SwitchBody.ToString("0.###"));
+            ClickAt(host, Centre(snapshot.RectById["flag"]));
+            Check(flagValue, "the default switch is the same one bool behaviour: a click writes the inverse");
+        }
+
+        // The other appearance, with the SAME fixture shape as the case-folding check below: an unlabelled
+        // bool control. Its natural body is derived from the pinned metrics rather than read off the run, so
+        // the expectation and the mechanism are stated together.
+        flagValue = false;
+        using (UiHost host = Host(BoolAutoPage(" Appearance=\"checkbox\""), CheckboxBindings()))
+        {
+            UiLayoutSnapshot snapshot = Arrange(host);
+            float boxWidth = snapshot.RectById["flag"].width;
+            Check(Near(boxWidth, CheckboxBoxSide),
+                "the checkbox appearance reserves its box side, derived from the pinned metrics - body "
+                + CheckboxBoxSide.ToString("0.###") + " = max(" + CheckboxMinSide.ToString("0.###")
+                + ", " + (UiGeometry.Default.RowHeight - UiGeometry.Default.Padding * 2f).ToString("0.###")
+                + "), gap included: got " + boxWidth.ToString("0.###"));
+            ClickAt(host, Centre(snapshot.RectById["flag"]));
+            Check(flagValue, "the checkbox appearance takes the SAME input path and writes once");
+        }
+
+        // The two appearances are DIFFERENT SHAPES, and each is asserted against its own expectation rather
+        // than against the other's: comparing them to each other would be asserting a relationship the
+        // metrics do not define, which is exactly how a lane ends up pinning an accident.
+        Check(!Near(SwitchBody, CheckboxBoxSide),
+            "switch body and checkbox box side are two quantities, not one constant: switch="
+            + SwitchBody.ToString("0.###") + " checkbox=" + CheckboxBoxSide.ToString("0.###"));
+        using (UiHost host = Host(BoolAutoPage(" Appearance=\"switch\""), CheckboxBindings()))
+        {
+            Check(Near(Arrange(host).RectById["flag"].width, SwitchBody),
+                "the switch look measures its own track body, spelled out explicitly");
+        }
+
+        // A BLANK label reserves nothing: the attribute is declared, but no text is drawn beside the body.
+        using (UiHost host = Host(BoolAutoPage(" Label=\"\""), CheckboxBindings()))
+        {
+            UiLayoutSnapshot snapshot = Arrange(host);
+            float blank = snapshot.RectById["flag"].width;
+            Check(Near(blank, SwitchBody),
+                "a blank label reserves no gap: got " + blank.ToString("0.###") + ", expected "
+                + SwitchBody.ToString("0.###"));
+        }
+
+        // A drawn label is ADDED to the body, with the switch's own gap.
+        using (UiHost host = Host(BoolAutoPage(" Label=\"Flag\""), CheckboxBindings()))
+        {
+            UiLayoutSnapshot snapshot = Arrange(host);
+            float labelled = snapshot.RectById["flag"].width;
+            Check(labelled > SwitchBody + SwitchGap,
+                "the label is added to the body and its gap, not measured instead of it: got "
+                + labelled.ToString("0.###") + ", body+gap is "
+                + (SwitchBody + SwitchGap).ToString("0.###"));
+        }
+
+        // A declared Height still decides the band, ahead of the appearance's natural height.
+        using (UiHost host = Host(BoolAutoPage(" Height=\"40\""), CheckboxBindings()))
+        {
+            UiLayoutSnapshot snapshot = Arrange(host);
+            Check(Near(snapshot.RectById["flag"].height, 40f),
+                "an explicit Height still decides the band, got "
+                + snapshot.RectById["flag"].height.ToString("0.###"));
+        }
+
+        // The declared look set is the SHARED seam, not a private reading of the attribute: the registry
+        // publishes it for the kind, and the resolver it hands back is the one the widget resolves through.
+        UiAppearanceResolver? resolver = UiWidgetRegistry.GetAppearanceResolver(Scope, CheckboxWidget.Kind);
+        Check(resolver != null, "the registry publishes the bool kind's appearance seam");
+        Check(resolver != null && string.Equals(resolver.Default, CheckboxWidget.SwitchLook, StringComparison.Ordinal),
+            "whose default look is the square switch, so an element that declares nothing is not look-less");
+        var supported = new List<string>(resolver?.Supported ?? (IReadOnlyCollection<string>)Array.Empty<string>());
+        Check(supported.Contains(CheckboxWidget.SwitchLook) && supported.Contains(CheckboxWidget.CheckboxLook)
+            && supported.Count == 2,
+            "and it carries exactly the two looks the kind draws: [" + string.Join(", ", supported) + "]");
+
+        // The seam folds case, so a declaration is not a spelling test - and the VALUE it resolves to is the
+        // canonical name, which is what every later comparison reads.
+        var upper = new UiElementSpec("flag", CheckboxWidget.Kind, new Dictionary<string, string>
+        {
+            ["Appearance"] = "CHECKBOX"
+        });
+        ResolvedAppearance upperLook = resolver!.Resolve(upper);
+        Check(upperLook.Declared && string.Equals(upperLook.Value, CheckboxWidget.CheckboxLook, StringComparison.Ordinal),
+            "a differently-cased declaration resolves to the canonical look name, not to the authored spelling");
+        using (UiHost host = Host(BoolAutoPage(" Appearance=\"CHECKBOX\""), CheckboxBindings()))
+        {
+            float upperWidth = Arrange(host).RectById["flag"].width;
+            Check(Near(upperWidth, CheckboxBoxSide),
+                "and the host measures the same checkbox body the lower-case spelling does - the comparison is "
+                + "checkbox against checkbox, the equivalent fixture: CHECKBOX=" + upperWidth.ToString("0.###")
+                + ", checkbox=" + CheckboxBoxSide.ToString("0.###"));
+            Check(!Near(upperWidth, switchWidth),
+                "while the switch keeps its own, unrelated body: the look's distinction is intact");
+        }
+
+        // The negative control for the resolver's own inputs: the SAME element with no declaration answers
+        // the default and reports it as undeclared, so "declared" is measuring the declaration and not the
+        // resolver's willingness to say yes.
+        var silent = new UiElementSpec("flag", CheckboxWidget.Kind, new Dictionary<string, string>());
+        ResolvedAppearance silentLook = resolver!.Resolve(silent);
+        Check(!silentLook.Declared && string.Equals(silentLook.Value, CheckboxWidget.SwitchLook, StringComparison.Ordinal),
+            "an element that declares nothing answers the default AND reports that nothing was declared");
+
+        // An unknown value is refused AT CREATION through the same seam, rather than degrading per frame.
+        Check(CreationFailure(BoolPage(" Appearance=\"fancy\"")) != null,
+            "an unknown appearance is refused at creation through the shared look set");
+        Check(CreationFailure(BoolPage(" Appearance=\"switch\"")) == null,
+            "while the declared default, spelled out, is accepted");
+        Check(CreationFailure(BoolPage(" Appearance=\"Checkbox\"")) == null,
+            "and so is the alternative under either case");
+
+        // The OFF outline is the theme's control edge. A palette that flattens the raised plane onto its own
+        // edge (fill == border, this vocabulary's way of saying "no box") must still leave the track visible,
+        // which is only possible if the fill and the edge come from two independent tokens.
+        var flat = new Color(0.10f, 0.09f, 0.07f, 1f);
+        var controlEdge = new Color(0.55f, 0.55f, 0.55f, 1f);
+        UiTheme flattened = UiTheme.Vanilla;
+        flattened.Raised = flat;
+        flattened.RaisedBorder = flat;
+        flattened.BorderStrong = controlEdge;
+
+        flagValue = false;
+        using (UiHost host = Host(BoolAutoPage(""), CheckboxBindings(), flattened))
+        {
+            ClearDraws();
+            host.DrawFrame(new Rect(0f, 0f, 200f, 60f));
+            IList colors = RecordedColors();
+            Check(colors.Count >= 5, "the OFF switch painted its track: " + colors.Count + " solid(s)");
+            bool fill = colors.Count > 0 && SameColor((Color)colors[0], flat);
+            bool edge = colors.Count >= 5;
+            for (int i = 1; i < 5 && i < colors.Count; i++)
+            {
+                edge &= SameColor((Color)colors[i], controlEdge);
+            }
+
+            Check(fill, "the OFF track fills with the raised plane it sits on");
+            Check(edge, "and outlines with the theme's control edge, so a flattened raised surface cannot hide it");
+        }
+    }
+
+    /// <summary>
+    /// The switch's thumb, observed on ACTUAL DRAW calls rather than on the source: one painted surface is one
+    /// fill plus four edges, so the sixth recorded solid on an otherwise empty page is the knob.
+    /// <list type="bullet">
+    /// <item><b>MUTATION-TARGET</b> - an ON switch paints its thumb in the ACCENT. The accent is what says
+    /// "on"; the selected plane's TEXT colour is ink FOR a gold plane, and a thumb wearing it reads as a label
+    /// on the control rather than as the control's own state.</item>
+    /// <item><b>GUARD</b> - an OFF switch paints its thumb in the neutral ink and no accent at all. It holds
+    /// on both sides of the ON mutation, so it is a regression guard, not the failure-sensitive half.</item>
+    /// </list>
+    /// </summary>
+    private static void VerifySwitchThumbTokens()
+    {
+        flagValue = true;
+        using (UiHost on = Host(BoolAutoPage(""), CheckboxBindings()))
+        {
+            ClearDraws();
+            on.DrawFrame(new Rect(0f, 0f, 200f, 60f));
+            IList onColors = RecordedColors();
+            Check(onColors.Count > SwitchKnobSolidIndex,
+                "an ON switch recorded its track and its thumb: " + onColors.Count + " solid(s)");
+            Check(onColors.Count > SwitchKnobSolidIndex
+                    && SameColor((Color)onColors[SwitchKnobSolidIndex], UiTheme.Vanilla.AccentGold),
+                "an ON switch paints its THUMB in the accent token, not in the selected plane's text colour: got "
+                + (onColors.Count > SwitchKnobSolidIndex ? Describe((Color)onColors[SwitchKnobSolidIndex]) : "(none)")
+                + ", accent is " + Describe(UiTheme.Vanilla.AccentGold));
+        }
+
+        flagValue = false;
+        using (UiHost off = Host(BoolAutoPage(""), CheckboxBindings()))
+        {
+            ClearDraws();
+            off.DrawFrame(new Rect(0f, 0f, 200f, 60f));
+            IList offColors = RecordedColors();
+            Check(offColors.Count > SwitchKnobSolidIndex
+                    && SameColor((Color)offColors[SwitchKnobSolidIndex], UiTheme.Vanilla.TextPrimary),
+                "while an OFF switch paints its thumb in the neutral ink");
+            bool accent = false;
+            foreach (object color in offColors)
+            {
+                accent |= SameColor((Color)color, UiTheme.Vanilla.AccentGold);
+            }
+
+            Check(!accent, "and an OFF switch paints no accent at all");
+        }
+    }
+
+    private static string BoolAutoPage(string extra)
+    {
+        return "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Column Id=\"col\">"
+            + "<Widget Id=\"flag\" Kind=\"input/checkbox\" Bind=\"flag\" Width=\"Auto\"" + extra + " />"
+            + "</Column>"
+            + "</UiPage>";
+    }
+
+    /// <summary>The same widget outside a column, for the creation-time refusals.</summary>
+    private static string BoolPage(string extra)
+    {
+        return "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Widget Id=\"flag\" Kind=\"input/checkbox\" Bind=\"flag\"" + extra + " />"
+            + "</UiPage>";
+    }
+
     // --- checkbox -------------------------------------------------------------------------------
 
     private static void VerifyCheckboxToggles()
@@ -63,7 +326,7 @@ internal static class KernelControlKindTests
         flagValue = true;
         using UiHost host = Host(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Widget Id=\"flag\" Kind=\"input/checkbox\" Bind=\"flag\" Label=\"Flag\" />"
+            + "<Widget Id=\"flag\" Kind=\"input/checkbox\" Bind=\"flag\" Label=\"Flag\" Appearance=\"checkbox\" />"
             + "</UiPage>",
             CheckboxBindings());
 
@@ -80,7 +343,7 @@ internal static class KernelControlKindTests
         flagValue = false;
         using UiHost host = Host(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Widget Id=\"flag\" Kind=\"input/checkbox\" Bind=\"flag\" Label=\"Flag\" Width=\"60\" />"
+            + "<Widget Id=\"flag\" Kind=\"input/checkbox\" Bind=\"flag\" Label=\"Flag\" Width=\"60\" Appearance=\"checkbox\" />"
             + "</UiPage>",
             CheckboxBindings());
 
@@ -98,7 +361,7 @@ internal static class KernelControlKindTests
         bindings.BindReadOnly<bool>("flag", () => false);
         using UiHost host = Host(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Widget Id=\"flag\" Kind=\"input/checkbox\" Bind=\"flag\" Label=\"Flag\" />"
+            + "<Widget Id=\"flag\" Kind=\"input/checkbox\" Bind=\"flag\" Label=\"Flag\" Appearance=\"checkbox\" />"
             + "</UiPage>",
             bindings);
 
@@ -109,7 +372,7 @@ internal static class KernelControlKindTests
         ClearDraws();
         host.DrawFrame(new Rect(0f, 0f, 200f, 60f));
         Check(RecordedColors().Count >= 5, "the checkbox painted its box");
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         Check(
             SameColor((Color)RecordedColors()[0], theme.Base) && SameColor((Color)RecordedColors()[1], theme.Divider),
             "and the plane is the one disabled treatment the resolved-value table owns");
@@ -137,7 +400,7 @@ internal static class KernelControlKindTests
 
         using UiHost host = Host(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Widget Id=\"flag\" Kind=\"input/checkbox\" Bind=\"flag\" ActionBind=\"gated\" Label=\"Flag\" />"
+            + "<Widget Id=\"flag\" Kind=\"input/checkbox\" Bind=\"flag\" ActionBind=\"gated\" Label=\"Flag\" Appearance=\"checkbox\" />"
             + "</UiPage>",
             bindings);
 
@@ -191,7 +454,7 @@ internal static class KernelControlKindTests
     {
         using UiHost host = Host(ProgressPage(), ProgressBindings(out _));
 
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         float edge = Math.Max(1f, theme.Geometry.Hairline);
         Rect band = Arrange(host).RectById["bar"];
         float inner = band.width - edge * 2f;
@@ -424,8 +687,28 @@ internal static class KernelControlKindTests
 
     private static UiHost Host(string xml, UiBindings bindings)
     {
+        return Host(xml, bindings, UiTheme.Vanilla);
+    }
+
+    private static UiHost Host(string xml, UiBindings bindings, UiTheme theme)
+    {
         return new UiHost(
-            Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            Scope, UiLayoutManifest.Parse(xml), bindings, theme, new StubMetrics(), new StubTranslation());
+    }
+
+    /// <summary>Builds a host only to see whether creation refuses it; a null answer means it was accepted.</summary>
+    private static string? CreationFailure(string xml)
+    {
+        try
+        {
+            using var host = new UiHost(
+                Scope, UiLayoutManifest.Parse(xml), CheckboxBindings(), UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return ex.GetType().Name + ": " + ex.Message;
+        }
     }
 
     private static string? CreationFailure(string xml, UiBindings bindings)
@@ -433,7 +716,7 @@ internal static class KernelControlKindTests
         try
         {
             using var host = new UiHost(
-                Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+                Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
             return null;
         }
         catch (Exception ex)
@@ -537,6 +820,11 @@ internal static class KernelControlKindTests
     private static bool SameColor(Color left, Color right)
     {
         return Near(left.r, right.r) && Near(left.g, right.g) && Near(left.b, right.b) && Near(left.a, right.a);
+    }
+
+    private static string Describe(Color color)
+    {
+        return "(" + color.r + ", " + color.g + ", " + color.b + ", " + color.a + ")";
     }
 
     private static bool Near(float left, float right)

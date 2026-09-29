@@ -30,6 +30,7 @@ internal static class KernelCoreWidgetTests
         failures += Run("Chrome=\"none\" paints no surface and Auto height measures the content (G3)", VerifyBareHitArea);
         failures += Run("A binding element-type mismatch is reported, not just thrown (FL-23)", VerifyBindingMismatchIsReported);
         failures += Run("Dynamic options accept typed display/value pairs without reporting (FL-16)", VerifyTypedOptionPairs);
+        failures += Run("Typed choices render the label and commit the real instance (R4-A)", VerifyTypedChoices);
         return failures;
     }
 
@@ -80,7 +81,7 @@ internal static class KernelCoreWidgetTests
         bindings.BindReadOnly<IReadOnlyList<Vector2>>(
             "chart", () => new List<Vector2> { new(0f, 0f), new(1f, 1f) });
 
-        using UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(500f, 600f));
         if (!snapshot.RectById.ContainsKey("banner")
             || !snapshot.RectById.ContainsKey("mode")
@@ -112,7 +113,7 @@ internal static class KernelCoreWidgetTests
         bindings.BindValue("dropdown", () => current, v => current = v);
         bindings.BindOptions("Options", () => new List<string> { "x", "y" });
 
-        using UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(300f, 200f));
         Rect fieldRect = snapshot.RectById["dropdown"];
 
@@ -188,7 +189,7 @@ internal static class KernelCoreWidgetTests
             bindings.BindOptions("Options", () => options);
         }
 
-        using UiHost host = new("test", UiLayoutManifest.Parse(xml), bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new("test", UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(300f, 200f));
 
         IList texts = (IList)Field(typeof(Verse.Widgets), "LabelTexts", null);
@@ -286,7 +287,7 @@ internal static class KernelCoreWidgetTests
             + "</UiPage>";
         string creationMessage = MessageOf(() =>
         {
-            using UiHost h = new("test", UiLayoutManifest.Parse(xml), hostBindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            using UiHost h = new("test", UiLayoutManifest.Parse(xml), hostBindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         });
         Check(creationMessage.Contains("read-only value") && creationMessage.Contains("BindOptions")
             && creationMessage.Contains("Options"),
@@ -320,7 +321,7 @@ internal static class KernelCoreWidgetTests
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
         using UiSession session = new();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
 
         var cases = new (string Text, float Width)[]
         {
@@ -386,7 +387,7 @@ internal static class KernelCoreWidgetTests
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
         using UiSession session = new();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         var reports = new List<UiOverflowReport>();
 
         UiFitAudit.Attach(new WrappingMetrics(), report => reports.Add(report));
@@ -455,7 +456,7 @@ internal static class KernelCoreWidgetTests
                 "<UiPage Schema=\"2\" Source=\"payload\">"
                 + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" PayloadKey=\"row-payload\" Text=\"go\" Height=\"24\" />"
                 + "</UiPage>"),
-            bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.MeasureAndArrange(new Vector2(300f, 100f));
         UiNative.ButtonOverride = _ => true;
         host.DrawFrame(new Rect(0f, 0f, 300f, 100f));
@@ -473,7 +474,7 @@ internal static class KernelCoreWidgetTests
                 "<UiPage Schema=\"2\" Source=\"payload\">"
                 + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" Text=\"go\" Height=\"24\" />"
                 + "</UiPage>"),
-            plainBindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            plainBindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host2.MeasureAndArrange(new Vector2(300f, 100f));
         UiNative.ButtonOverride = _ => true;
         host2.DrawFrame(new Rect(0f, 0f, 300f, 100f));
@@ -503,9 +504,9 @@ internal static class KernelCoreWidgetTests
                 "<UiPage Schema=\"2\" Source=\"bare\">"
                 + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" Text=\"content\" Height=\"Auto\" Chrome=\"none\" />"
                 + "</UiPage>"),
-            bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(300f, 100f));
-        float auto = new StubMetrics().MeasureText("content", UiTheme.DarkGold.DefaultFont, 300f);
+        float auto = new StubMetrics().MeasureText("content", UiTheme.Vanilla.DefaultFont, 300f);
         if (Math.Abs(snapshot.RectById["b"].height - auto) > 0.01f)
         {
             throw new Exception("Height=Auto arranged " + snapshot.RectById["b"].height + " instead of the measured " + auto);
@@ -527,7 +528,7 @@ internal static class KernelCoreWidgetTests
                 "<UiPage Schema=\"2\" Source=\"bare\">"
                 + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" " + buttonAttributes + " />"
                 + "</UiPage>"),
-            bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.MeasureAndArrange(new Vector2(300f, 100f));
         host.DrawFrame(new Rect(0f, 0f, 300f, 100f));
         return ((IList)StubField("DrawBoxSolidColors")).Count;
@@ -566,7 +567,7 @@ internal static class KernelCoreWidgetTests
                 "<UiPage Schema=\"2\" Source=\"pairs\">"
                 + "<Widget Id=\"dd\" Kind=\"input/dropdown\" Bind=\"choice\" OptionsBind=\"opts\" Height=\"24\" />"
                 + "</UiPage>"),
-            bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.MeasureAndArrange(new Vector2(300f, 100f));
         ClearRecordedLabels();
         host.DrawFrame(new Rect(0f, 0f, 300f, 100f));
@@ -659,7 +660,7 @@ internal static class KernelCoreWidgetTests
                     "<UiPage Schema=\"2\" Source=\"bare\">"
                     + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" " + attributes + " />"
                     + "</UiPage>"),
-                bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+                bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
             return false;
         }
         catch (UiContractException ex)
@@ -682,7 +683,7 @@ internal static class KernelCoreWidgetTests
         }
 
         Color plain = BannerInk("Tone=\"\"");
-        if (!SameColor(plain, UiTheme.DarkGold.TextSecondary))
+        if (!SameColor(plain, UiTheme.Vanilla.TextSecondary))
         {
             throw new Exception("an untone banner no longer paints its documented secondary ink: " + Describe(plain));
         }
@@ -703,7 +704,7 @@ internal static class KernelCoreWidgetTests
                 "<UiPage Schema=\"2\" Source=\"banner-role\">"
                 + "<Widget Id=\"b\" Kind=\"chrome/banner\" Text=\"status\" Height=\"24\" " + toneAttribute + " />"
                 + "</UiPage>"),
-            bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.MeasureAndArrange(new Vector2(300f, 100f));
         host.DrawFrame(new Rect(0f, 0f, 300f, 100f));
 
@@ -734,7 +735,7 @@ internal static class KernelCoreWidgetTests
                 "<UiPage Schema=\"2\" Source=\"selected-key\">"
                 + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" Text=\"x\" Height=\"24\" SelectedKey=\"missing-key\" />"
                 + "</UiPage>"),
-            bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.MeasureAndArrange(new Vector2(300f, 100f));
         host.DrawFrame(new Rect(0f, 0f, 300f, 100f));
         if (UiFitAudit.StyleFallbackCount != 1)
@@ -755,7 +756,7 @@ internal static class KernelCoreWidgetTests
                 "<UiPage Schema=\"2\" Source=\"selected-key\">"
                 + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" Text=\"x\" Height=\"24\" SelectedKey=\"sel\" />"
                 + "</UiPage>"),
-            bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.MeasureAndArrange(new Vector2(300f, 100f));
         host.DrawFrame(new Rect(0f, 0f, 300f, 100f));
         var colors = (IList)StubField("DrawBoxSolidColors");
@@ -767,7 +768,12 @@ internal static class KernelCoreWidgetTests
         bindings.BindCommand("act", () => { });
     }
 
-    private static void ClearRecordedLabels() => ((IList)StubField("LabelColors")).Clear();
+    private static void ClearRecordedLabels()
+    {
+        ((IList)StubField("LabelColors")).Clear();
+        ((IList)StubField("LabelTexts")).Clear();
+        ((IList)StubField("LabelRects")).Clear();
+    }
 
     private static void ClearRecordedFill() => ((IList)StubField("DrawBoxSolidColors")).Clear();
 
@@ -818,7 +824,7 @@ internal static class KernelCoreWidgetTests
         var bindings = new UiBindings();
         bindings.BindReadOnly("BannerText", () => bannerText);
 
-        using UiHost host = new("composite-test", UiLayoutManifest.Parse(xml), bindings, UiTheme.DarkGold, new WrappingMetrics(), new StubTranslation());
+        using UiHost host = new("composite-test", UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla, new WrappingMetrics(), new StubTranslation());
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(300f, 400f));
 
         foreach (string id in new[] { "banner", "bannerKeyed", "empty" })
@@ -1003,5 +1009,300 @@ internal static class KernelCoreWidgetTests
         }
 
         public int TranslationRevision => 0;
+    }
+
+    // --- R4-A (0.7.x): the genuinely TYPED value/options path ------------------------------------------
+    //
+    // Three things are asserted here at once, and the legacy lanes above are the other half of the evidence
+    // (they must keep passing untouched): the field renders the CHOICE's label, the setter receives the real
+    // instance - by runtime type, and for a reference type by REFERENCE - and a value of the wrong type is
+    // refused without writing anything. The last assertion drives a page whose bindings do not implement the
+    // optional seam at all, which is the source-compatibility half of the change.
+
+    private enum Scope
+    {
+        Near,
+        Far
+    }
+
+    private sealed class ModeToken
+    {
+        internal ModeToken(string name) => Name = name;
+
+        internal string Name { get; }
+    }
+
+    private static void VerifyTypedChoices()
+    {
+        // 1. An enum value. The labels are words no value-to-string conversion could produce (the members are
+        // Near/Far), so a display that renders a label at all is already evidence the value was not spelled.
+        Scope chosen = Scope.Near;
+        string displayedBefore = ClickTypedDropdown(
+            () => chosen,
+            value => chosen = value,
+            new List<UiChoice<Scope>>
+            {
+                new UiChoice<Scope>("Within reach", Scope.Near),
+                new UiChoice<Scope>("Far away", Scope.Far)
+            },
+            clickRow: 1,
+            out object? received,
+            out string displayedAfter);
+
+        Check(displayedBefore == "Within reach", "the field shows the choice's label, not the value's name");
+        Check(displayedAfter == "Far away", "and it follows the choice that was clicked");
+        Check(chosen == Scope.Far, "the click committed that choice's value");
+        Check(received is Scope.Far && received.GetType() == typeof(Scope),
+            "the typed setter received the real enum, and its runtime type is the declared one");
+
+        // 2. A reference-typed value: what arrives is the instance the choice carried, not an equal one.
+        var first = new ModeToken("first");
+        var second = new ModeToken("second");
+        ModeToken picked = first;
+        string before = ClickTypedDropdown(
+            () => picked,
+            value => picked = value,
+            new List<UiChoice<ModeToken>>
+            {
+                new UiChoice<ModeToken>("First", first),
+                new UiChoice<ModeToken>("Second", second)
+            },
+            clickRow: 1,
+            out object? arrived,
+            out string after);
+
+        Check(before == "First" && after == "Second", "a reference-typed choice renders its own labels");
+        Check(ReferenceEquals(arrived, second), "the setter received the instance itself, not a copy and not a string");
+        Check(ReferenceEquals(picked, second), "and the model holds that same instance");
+
+        Scope typedMode = Scope.Near;
+        Scope? writtenMode = null;
+        int modeWrites = 0;
+        var modeBindings = new UiBindings();
+        modeBindings.BindValue("mode", () => typedMode,
+            value => { typedMode = value; writtenMode = value; modeWrites++; });
+        modeBindings.BindOptions("mode", () => new List<UiChoice<Scope>>
+        {
+            new UiChoice<Scope>("Within reach", Scope.Near),
+            new UiChoice<Scope>("Far away", Scope.Far)
+        });
+        using (UiHost modeHost = new("typed-mode-row", UiLayoutManifest.Parse(
+            "<UiPage Schema=\"2\" Source=\"typed-mode-row\">"
+            + "<Widget Id=\"mode\" Kind=\"input/mode-row\" Height=\"28\" /></UiPage>"),
+            modeBindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation()))
+        {
+            UiLayoutSnapshot modeSnapshot = modeHost.MeasureAndArrange(new Vector2(300f, 100f));
+            var cells = new List<Rect>();
+            try
+            {
+                UiNative.ButtonOverride = rect => { cells.Add(rect); return false; };
+                DrawOnce(modeHost, modeSnapshot, 300f, 100f);
+                Check(cells.Count == 2, "mode-row draws one actionable cell per typed choice");
+                Rect target = cells[1];
+                UiNative.ButtonOverride = rect => SameRect(rect, target);
+                DrawOnce(modeHost, modeSnapshot, 300f, 100f);
+            }
+            finally { UiNative.ButtonOverride = null; }
+        }
+        Check(modeWrites == 1 && writtenMode == Scope.Far && typedMode == Scope.Far,
+            "mode-row click sends the real enum to its setter exactly once");
+
+        // 3. Type identity IS the validation: a mismatched value is refused, and nothing is written.
+        var seam = new UiBindings();
+        ModeToken kept = first;
+        seam.BindValue("pick", () => kept, value => kept = value);
+        seam.BindOptions("pick", () => new List<UiChoice<ModeToken>> { new UiChoice<ModeToken>("First", first) });
+        Check(!seam.AcceptsValue("pick", "first"), "a string is not an accepted value where the binding is a ModeToken");
+        Check(!seam.TrySetTypedValue("pick", "first"), "the mismatched write is refused");
+        Check(ReferenceEquals(kept, first), "and the refusal wrote nothing");
+        Check(seam.TrySetTypedValue("pick", second), "a value of the declared type is written");
+        Check(ReferenceEquals(kept, second), "and it is the one that arrived");
+        Check(!seam.TrySetTypedValue("nobody-bound-this", second), "an unbound key is refused, not thrown");
+        seam.TryGetChoices("pick", out IReadOnlyList<UiChoice<object?>> erased);
+        Check(erased.Count == 1 && erased[0].Text == "First" && ReferenceEquals(erased[0].Value, first),
+            "the choices a widget receives are labels plus the real boxed values");
+
+        // 4. The two legacy option shapes are NOT choices lists, so those pages keep their own path.
+        var legacy = new UiBindings();
+        legacy.BindOptions("strings", () => new List<string> { "a" });
+        legacy.BindOptions("pairs", () => new List<UiOption> { new UiOption("A", "a") });
+        Check(!legacy.TryGetChoices("strings", out _), "a string options list is not a choices list");
+        Check(!legacy.TryGetChoices("pairs", out _), "a UiOption options list is not a choices list");
+
+        // 5. An IUiBindings implementation WITHOUT the seam: not castable to it, and still string-only. This is
+        //    the evidence that the additive seam left every existing implementation source-compatible.
+        var inner = new UiBindings();
+        string mode = "a";
+        inner.BindValue("mode", () => mode, value => mode = value);
+        inner.BindOptions("Options", () => new List<string> { "a", "b" });
+        IUiBindings stringOnly = new StringOnlyBindings(inner);
+        Check(!(stringOnly is IUiTypedChoices), "an implementation without the typed seam is not one");
+
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+        using (UiHost host = new(
+            "strings", UiLayoutManifest.Parse(
+                "<UiPage Schema=\"2\" Source=\"strings\">"
+                + "<Widget Id=\"dropdown\" Kind=\"input/dropdown\" Bind=\"mode\" OptionsBind=\"Options\" Height=\"24\" />"
+                + "</UiPage>"),
+            stringOnly, UiTheme.Vanilla, new StubMetrics(), new StubTranslation()))
+        {
+            UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(300f, 100f));
+            Check(DrawOnlyLabel(host, snapshot, 300f, 100f) == "a",
+                "a seam-less implementation still renders the string path's exact member");
+        }
+    }
+
+    /// <summary>
+    /// Drives one typed dropdown by its real draw path: click the field to open the popup, click the option row
+    /// at <paramref name="clickRow"/> by that row's own popup rect, then let the popup close again. Returns what
+    /// the field showed before the click and, through the outs, what the typed setter received and what the
+    /// field shows afterwards.
+    /// </summary>
+    private static string ClickTypedDropdown<T>(
+        Func<T> get,
+        Action<T> set,
+        IReadOnlyList<UiChoice<T>> options,
+        int clickRow,
+        out object? received,
+        out string after)
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+
+        var bindings = new UiBindings();
+        object? captured = null;
+        bindings.BindValue("pick", get, value =>
+        {
+            set(value);
+            captured = value;
+        });
+        bindings.BindOptions("pick-options", () => options);
+
+        using UiHost host = new(
+            "typed", UiLayoutManifest.Parse(
+                "<UiPage Schema=\"2\" Source=\"typed\">"
+                + "<Widget Id=\"pick\" Kind=\"input/dropdown\" OptionsBind=\"pick-options\" Height=\"24\" />"
+                + "</UiPage>"),
+            bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
+
+        const float width = 300f;
+        const float height = 100f;
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(width, height));
+        Rect field = snapshot.RectById["pick"];
+
+        string before;
+        try
+        {
+            before = DrawOnlyLabel(host, snapshot, width, height);
+            UiNative.ButtonOverride = rect => SameRect(rect, field);
+            DrawOnce(host, snapshot, width, height);
+            if (!host.Session.IsPopupOpen("pick"))
+            {
+                throw new Exception("the typed dropdown did not open its popup");
+            }
+
+            Rect anchor = host.Session.OpenPopupAnchor!.Value;
+            Rect popup = UiPopup.RectFor(anchor, options.Count, host.Session.HostViewport);
+            Rect row = new(popup.x, popup.y + clickRow * UiPopup.OptionHeight, popup.width, UiPopup.OptionHeight);
+            UiNative.ButtonOverride = rect => SameRect(rect, row);
+            DrawOnce(host, snapshot, width, height);
+        }
+        finally
+        {
+            UiNative.ButtonOverride = null;
+        }
+
+        after = DrawOnlyLabel(host, snapshot, width, height);
+        received = captured;
+        return before;
+    }
+
+    /// <summary>One draw whose only label is the dropdown field's display text.</summary>
+    private static string DrawOnlyLabel(UiHost host, UiLayoutSnapshot snapshot, float width, float height)
+    {
+        DrawOnce(host, snapshot, width, height);
+        var texts = (IList)StubField("LabelTexts");
+        if (texts.Count != 1)
+        {
+            throw new Exception("expected exactly one drawn label for the field, got " + texts.Count);
+        }
+
+        return (string)texts[0]!;
+    }
+
+    private static void DrawOnce(UiHost host, UiLayoutSnapshot snapshot, float width, float height)
+    {
+        ClearRecordedLabels();
+        host.BeginFrame();
+        host.Draw(new Rect(0f, 0f, width, height), snapshot);
+        host.EndFrame();
+    }
+
+    private static bool SameRect(Rect left, Rect right)
+    {
+        return Math.Abs(left.x - right.x) < 0.01f
+            && Math.Abs(left.y - right.y) < 0.01f
+            && Math.Abs(left.width - right.width) < 0.01f
+            && Math.Abs(left.height - right.height) < 0.01f;
+    }
+
+    /// <summary>
+    /// An <see cref="IUiBindings"/> implementation with NO typed seam, written against the surface as it stood
+    /// before R4-A. It compiles only while the typed path stays on the OPTIONAL companion interface, and it is
+    /// what proves a consumer that implements the surface itself keeps building and keeps working string-only.
+    /// </summary>
+    private sealed class StringOnlyBindings : IUiBindings
+    {
+        private readonly IUiBindings inner;
+
+        internal StringOnlyBindings(IUiBindings inner) => this.inner = inner;
+
+        public void BindValue<T>(string elementId, Func<T> get, Action<T> set, UiInvalidation invalidates = UiInvalidation.Everything)
+            => inner.BindValue(elementId, get, set, invalidates);
+
+        public void BindReadOnly<T>(string elementId, Func<T> get, UiInvalidation invalidates = UiInvalidation.Everything)
+            => inner.BindReadOnly(elementId, get, invalidates);
+
+        public void BindOptions<T>(string elementId, Func<IReadOnlyList<T>> get, UiInvalidation invalidates = UiInvalidation.Everything)
+            => inner.BindOptions(elementId, get, invalidates);
+
+        public void BindAction<T>(string actionId, Action<T> action, UiInvalidation invalidates = UiInvalidation.Everything)
+            => inner.BindAction(actionId, action, invalidates);
+
+        public void BindCommand(string actionId, Action action, Func<bool>? canExecute = null, UiInvalidation invalidates = UiInvalidation.Paint)
+            => inner.BindCommand(actionId, action, canExecute, invalidates);
+
+        public T Get<T>(string elementId) => inner.Get<T>(elementId);
+
+        public bool TryGet<T>(string elementId, out T value) => inner.TryGet(elementId, out value);
+
+        public bool TryGetBool(string key, out bool value) => inner.TryGetBool(key, out value);
+
+        public void Set<T>(string elementId, T value) => inner.Set(elementId, value);
+
+        public bool IsWritable(string elementId) => inner.IsWritable(elementId);
+
+        public IReadOnlyList<T> GetOptions<T>(string elementId) => inner.GetOptions<T>(elementId);
+
+        public void Invoke<T>(string actionId, T payload) => inner.Invoke(actionId, payload);
+
+        public void Invoke(string actionId) => inner.Invoke(actionId);
+
+        public bool CanExecute(string actionId) => inner.CanExecute(actionId);
+
+        public int GetRevision(string key) => inner.GetRevision(key);
+
+        public UiInvalidation GetInvalidation(string key) => inner.GetInvalidation(key);
+
+        public void NotifyChanged(params string[] keys) => inner.NotifyChanged(keys);
+
+        public void ValidateValue<T>(string elementId, string elementPath) => inner.ValidateValue<T>(elementId, elementPath);
+
+        public void ValidateOptions<T>(string elementId, string elementPath) => inner.ValidateOptions<T>(elementId, elementPath);
+
+        public void ValidateAction<T>(string actionId, string elementPath) => inner.ValidateAction<T>(actionId, elementPath);
+
+        public void ValidateCommand(string actionId, string elementPath) => inner.ValidateCommand(actionId, elementPath);
     }
 }

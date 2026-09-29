@@ -95,7 +95,7 @@ internal static class KernelWritabilityTests
 
     private static void VerifyReadOnlyPaintsDisabled()
     {
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         var bindings = new UiBindings();
         bindings.BindReadOnly("published", () => 1f);
         bindings.BindValue("editable", () => 1f, _ => { });
@@ -124,7 +124,7 @@ internal static class KernelWritabilityTests
 
     private static void VerifyUnknownWritabilityKeepsTone()
     {
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
 
         ClearRecordedBoxes();
         UiThemeDraw.StatusTreatment(new Rect(0f, 0f, 60f, 20f), theme, UiStatusTone.Danger);

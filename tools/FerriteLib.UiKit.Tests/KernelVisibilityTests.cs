@@ -242,7 +242,7 @@ internal static class KernelVisibilityTests
         bindings.BindReadOnly("show-c", () => showC, UiInvalidation.Structure);
 
         using var session = new UiSession();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         UiWidgetContext ctx = new(
             Scope, session, new StubMetrics(), theme, new StubTranslation(), bindings, 200f, "root");
 
@@ -326,7 +326,7 @@ internal static class KernelVisibilityTests
         UiWidgetRegistry.Register(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Id", "Kind", "Tag", "Height" });
         MeasuredPaths.Clear();
         return new UiHost(
-            Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
     }
 
     private static void Reject(string xml, string what)

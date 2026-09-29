@@ -111,7 +111,7 @@ internal static class KernelElementHelpTests
                 + "<Widget Id=\"plain\" Kind=\"" + ProbeKind + "\" Height=\"24\" />"
                 + "</Column></UiPage>"),
             new UiBindings(),
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
 
@@ -130,7 +130,7 @@ internal static class KernelElementHelpTests
                 + "<Widget Id=\"a\" Kind=\"" + ProbeKind + "\" Height=\"24\" HelpKey=\"us/Whatever/Exact-Token\" />"
                 + "</Column></UiPage>"),
             new UiBindings(),
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
 
@@ -157,7 +157,7 @@ internal static class KernelElementHelpTests
                 + "<Widget Id=\"gate\" Kind=\"" + CommandKind + "\" ActionBind=\"gate\" Height=\"24\" HelpKey=\"help/unavailable\" />"
                 + "</Column></UiPage>"),
             bindings,
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
 
@@ -202,12 +202,12 @@ internal static class KernelElementHelpTests
                 + " Value1=\"A\" Title1=\"A\" Description1=\"help/row/option-a\" />"
                 + "</Column></UiPage>"),
             bindings,
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
 
         // The cell starts at the theme's Spacing inset; its centre is inside the option, not the row padding.
-        UiGeometry geometry = UiTheme.DarkGold.Geometry;
+        UiGeometry geometry = UiTheme.Vanilla.Geometry;
         EnablePointer(new Vector2(Width / 2f, geometry.Spacing + 10f));
         host.DrawFrame(Viewport());
 
@@ -257,7 +257,7 @@ internal static class KernelElementHelpTests
                 + "<Widget Id=\"b\" Kind=\"" + ProbeKind + "\" Height=\"24\" HelpKey=\"help/b\" />"
                 + "</Column></UiPage>"),
             new UiBindings(),
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
     }
@@ -281,7 +281,7 @@ internal static class KernelElementHelpTests
             Scope,
             UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"" + Scope + "\">" + body + "</UiPage>"),
             new UiBindings(),
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
     }

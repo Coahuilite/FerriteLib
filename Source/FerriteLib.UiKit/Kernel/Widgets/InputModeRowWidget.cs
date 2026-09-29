@@ -88,6 +88,40 @@ public sealed class InputModeRowWidget : IUiWidget
                 $"InputModeRowWidget at '{elementPath}' requires a non-empty Id or Bind to use as its typed binding key.");
         }
 
+        if (bindings is IUiTypedChoices typedSeam
+            && typedSeam.TryGetValueType(bindKey, out Type declared)
+            && declared != typeof(string))
+        {
+            // R4-A: a value bound to anything but a string is served by the typed path, whose cells are the
+            // typed choices bound under the value key. ValidateValue<string> would refuse that binding outright,
+            // and the static ValueN family carries strings only, so neither can supply a value of this type
+            // without spelling it. The orphan rule below is about the static family and does not apply here:
+            // in this mode a TitleN/DescriptionN labels a CHOICE, so it needs no ValueN of its own.
+            if (!typedSeam.TryGetChoices(bindKey, out IReadOnlyList<UiChoice<object?>> choices))
+            {
+                throw new InvalidOperationException(
+                    $"Value binding '{bindKey}' at '{elementPath}' is '{declared.Name}', so this mode row needs typed"
+                    + $" choices of that same type: bind BindOptions<UiChoice<{declared.Name}>>('{bindKey}', ...)."
+                    + " The static ValueN attributes and a string list carry strings only, and handing a string to a"
+                    + " typed setter is the round-trip this path removes.");
+            }
+
+            foreach (UiChoice<object?> choice in choices)
+            {
+                if (!typedSeam.AcceptsValue(bindKey, choice.Value))
+                {
+                    throw new InvalidOperationException(
+                        $"Typed choices '{bindKey}' at '{elementPath}' carry a value of type '"
+                        + (choice.Value == null ? "null" : choice.Value.GetType().Name)
+                        + $"' under the label '{choice.Text}', which is not the '{declared.Name}' its value binding"
+                        + " accepts.");
+                }
+            }
+
+            OptionHelp.Validate(bindings, spec, elementPath, "InputModeRowWidget");
+            return;
+        }
+
         bindings.ValidateValue<string>(bindKey, elementPath);
 
         // A per-option declaration must name an option. A TitleN/TitleKeyN/DescriptionN whose index has no
@@ -129,7 +163,20 @@ public sealed class InputModeRowWidget : IUiWidget
         if (options.Count == 0) return;
 
         string bindKey = ReadBindKey();
-        ctx.Bindings.TryGet(bindKey, out string current);
+        // The typed mode reads its current value through the seam - TryGet<string> would refuse a binding of
+        // another type, which is exactly the binding this path serves - and keeps it as the real instance.
+        bool typed = TryTypedSeam(ctx, bindKey, out IUiTypedChoices? seam);
+        string current = "";
+        object? currentTyped = null;
+        if (typed)
+        {
+            seam!.TryGetTypedValue(bindKey, out currentTyped);
+        }
+        else
+        {
+            ctx.Bindings.TryGet(bindKey, out current);
+        }
+
         UiGeometry geometry = ctx.Theme.Geometry;
         int columns = ColumnsFor(rect.width);
         int rows = (options.Count + columns - 1) / columns;
@@ -145,7 +192,9 @@ public sealed class InputModeRowWidget : IUiWidget
             float x = rect.x + geometry.Spacing + col * (columnWidth + geometry.Gap);
             float y = rect.y + geometry.Spacing + row * (rowHeight + geometry.Gap);
             var optionRect = new Rect(x, y, columnWidth, rowHeight);
-            bool selected = string.Equals(options[i].Value, current, StringComparison.Ordinal);
+            bool selected = options[i].Typed
+                ? Equals(options[i].TypedValue, currentTyped)
+                : string.Equals(options[i].Value, current, StringComparison.Ordinal);
             DrawOption(optionRect, options[i], selected, ctx.Theme);
 
             // Asked through the funnel, so "hovered" means the same thing here as it does to every other
@@ -166,11 +215,33 @@ public sealed class InputModeRowWidget : IUiWidget
 
             if (UiNative.Button(optionRect, ctx))
             {
-                ctx.Bindings.Set(bindKey, options[i].Value);
+                if (options[i].Typed)
+                {
+                    // A refused write (a value of the wrong type) changes nothing: the refusal is reported and
+                    // the cell simply does not move the model.
+                    seam!.TrySetTypedValue(bindKey, options[i].TypedValue);
+                }
+                else
+                {
+                    ctx.Bindings.Set(bindKey, options[i].Value);
+                }
             }
         }
 
         OptionHelp.Publish(ctx, OptionHelp.SinkKey(spec), hoveredHelp);
+    }
+
+    /// <summary>
+    /// True when this element is served by the typed path: its bindings expose the optional seam AND its value
+    /// binding is bound to something other than a string. A row whose value is a plain string therefore takes
+    /// today's path byte for byte, whether or not the seam exists.
+    /// </summary>
+    private bool TryTypedSeam(UiWidgetContext ctx, string bindKey, out IUiTypedChoices? seam)
+    {
+        seam = ctx.Bindings as IUiTypedChoices;
+        return seam != null
+            && seam.TryGetValueType(bindKey, out Type valueType)
+            && valueType != typeof(string);
     }
 
     private string ReadBindKey()
@@ -208,6 +279,26 @@ public sealed class InputModeRowWidget : IUiWidget
 
     private List<Option> OptionsFor(UiWidgetContext ctx)
     {
+        string bindKey = ReadBindKey();
+        if (TryTypedSeam(ctx, bindKey, out IUiTypedChoices? seam)
+            && seam!.TryGetChoices(bindKey, out IReadOnlyList<UiChoice<object?>> choices))
+        {
+            // R4-A: the cells are the typed choices bound under the VALUE key. The slot's TitleKeyN/TitleN still
+            // names the cell when it is declared (the localization rule above is unchanged), and the choice's own
+            // label is the fallback - so a translated page keeps its words and a typed page gets the label its
+            // consumer wrote. ValueN is not read on this path: it carries a string, and a string is exactly what
+            // this path refuses to hand a typed setter.
+            var typedCells = new List<Option>(choices.Count);
+            for (int i = 0; i < choices.Count; i++)
+            {
+                string suffix = (i + 1).ToString(CultureInfo.InvariantCulture);
+                spec.TryGetAttribute("Description" + suffix, out string description);
+                typedCells.Add(new Option(ResolveTitle(suffix, choices[i].Text, ctx), choices[i], description ?? ""));
+            }
+
+            return typedCells;
+        }
+
         var result = new List<Option>();
         for (int i = 1; i <= OptionSlots; i++)
         {
@@ -257,18 +348,41 @@ public sealed class InputModeRowWidget : IUiWidget
     private readonly struct Option
     {
         internal readonly string Title;
+
+        /// <summary>The string path's value. Empty on a typed cell, whose value is <see cref="TypedValue"/>.</summary>
         internal readonly string Value;
+
+        /// <summary>The typed path's value: the real instance, boxed. Unused on a string cell.</summary>
+        internal readonly object? TypedValue;
+
+        /// <summary>Which of the two values above this cell carries. A typed value may legitimately BE null.</summary>
+        internal readonly bool Typed;
+
         internal readonly string Description;
 
+        /// <summary>A string-path cell: the static ValueN family or nothing.</summary>
         internal Option(string title, string value, string description)
         {
             Title = title;
             Value = value;
+            TypedValue = null;
+            Typed = false;
             Description = description;
         }
 
-        /// <summary>The option-level help identity this row publishes: its declared description, or its value
-        /// when it declares none, so the hovered option is always named.</summary>
-        internal string Help => Description.Length > 0 ? Description : Value;
+        /// <summary>A typed-path cell: one UiChoice&lt;T&gt; of the value key's typed choices.</summary>
+        internal Option(string title, UiChoice<object?> choice, string description)
+        {
+            Title = title;
+            Value = "";
+            TypedValue = choice.Value;
+            Typed = true;
+            Description = description;
+        }
+
+        /// <summary>The option-level help identity this row publishes: its declared description, else the
+        /// option's own machine token - its value on the string path, its label on the typed one, because a
+        /// typed value is not a string the help catalog could be keyed by.</summary>
+        internal string Help => Description.Length > 0 ? Description : (Typed ? Title : Value);
     }
 }

@@ -138,7 +138,7 @@ internal static class KernelContentHeightTests
             "wide (still a Row): the mode resolves against the row's content");
 
         UiLayoutSnapshot narrow = Arrange(host, 150f);
-        float rowHeight = UiTheme.DarkGold.Geometry.RowHeight;
+        float rowHeight = UiTheme.Vanilla.Geometry.RowHeight;
         Check(Near(narrow.RectById["band"].height, rowHeight),
             "narrow (the Row became a Column): the mode degrades to the element's own content band ("
             + narrow.RectById["band"].height + " vs the theme row height " + rowHeight + ")");
@@ -187,7 +187,7 @@ internal static class KernelContentHeightTests
     private static UiHost NewHost(string xml)
     {
         return new UiHost(
-            Scope, UiLayoutManifest.Parse(xml), MakeBindings(), UiTheme.DarkGold, new WrappedMetrics(),
+            Scope, UiLayoutManifest.Parse(xml), MakeBindings(), UiTheme.Vanilla, new WrappedMetrics(),
             new StubTranslation());
     }
 

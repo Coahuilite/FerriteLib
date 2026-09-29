@@ -69,7 +69,7 @@ internal static class KernelContractTests
 
         try
         {
-            using UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
             throw new Exception("Unknown widget attribute was not rejected");
         }
         catch (UiContractException ex)
@@ -94,7 +94,7 @@ internal static class KernelContractTests
         var bindings = new UiBindings();
         try
         {
-            using UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
             throw new Exception("Unknown container attribute was not rejected");
         }
         catch (UiContractException ex)
@@ -121,7 +121,7 @@ internal static class KernelContractTests
         bindings.BindValue("by-id", () => 0.1f, _ => { });
         bindings.BindValue("explicit-key", () => 0.9f, _ => { });
 
-        using UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.Close();
 
         // The reverse must fail: Bind pointing at an unregistered key.
@@ -129,7 +129,7 @@ internal static class KernelContractTests
         missing.BindValue("by-attr", () => 0.1f, _ => { });
         try
         {
-            using UiHost bad = new("test", manifest, missing, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            using UiHost bad = new("test", manifest, missing, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
             throw new Exception("Explicit Bind key mismatch was not rejected");
         }
         catch (UiContractException)
@@ -151,7 +151,7 @@ internal static class KernelContractTests
         var bindings = new UiBindings();
         try
         {
-            using UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
             throw new Exception("Missing binding was not rejected");
         }
         catch (UiContractException ex)
@@ -177,7 +177,7 @@ internal static class KernelContractTests
         missing.BindReadOnly<IReadOnlyList<Vector2>>("points", () => new List<Vector2> { new(0f, 1f), new(1f, 0f) });
         try
         {
-            using UiHost missingHost = new("test", manifest, missing, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            using UiHost missingHost = new("test", manifest, missing, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
             throw new Exception("Missing ActionBind was not rejected");
         }
         catch (UiContractException ex)
@@ -191,7 +191,7 @@ internal static class KernelContractTests
         wrongType.BindAction<string>("point-changed", _ => { });
         try
         {
-            using UiHost wrongHost = new("test", manifest, wrongType, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            using UiHost wrongHost = new("test", manifest, wrongType, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
             throw new Exception("Wrong ActionBind payload type was not rejected");
         }
         catch (UiContractException)
@@ -203,7 +203,7 @@ internal static class KernelContractTests
         var good = new UiBindings();
         good.BindReadOnly<IReadOnlyList<Vector2>>("points", () => new List<Vector2> { new(0f, 1f), new(1f, 0f) });
         good.BindAction<UiChartPointChange>("point-changed", _ => { });
-        using UiHost host = new("test", manifest, good, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new("test", manifest, good, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.Close();
     }
 
@@ -230,7 +230,7 @@ internal static class KernelContractTests
         UiLayoutManifest manifest = UiLayoutManifest.Parse(xml);
         var bindings = new UiBindings();
 
-        using UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(800f, 300f));
 
         // Fill scroll viewport height = available height; content keeps its natural height.
@@ -277,7 +277,7 @@ internal static class KernelContractTests
         UiLayoutManifest manifest = UiLayoutManifest.Parse(xml);
         var bindings = new UiBindings();
 
-        using UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
 
         host.Session.SetScrollTarget("target");
         host.DrawFrame(new Rect(0f, 0f, 200f, 200f));
@@ -321,7 +321,7 @@ internal static class KernelContractTests
         bindings.BindReadOnly<IReadOnlyList<Vector2>>("points", () => points);
         bindings.BindAction<UiChartPointChange>("point-changed", change => changes.Add(change));
 
-        using UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(300f, 100f));
         Rect chartRect = snapshot.RectById["chart"];
 
@@ -417,7 +417,7 @@ internal static class KernelContractTests
         float current = 10f;
         bindings.BindReadOnly("height", () => current);
 
-        using UiHost host = new("rev-test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new("rev-test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         UiLayoutSnapshot first = host.MeasureAndArrange(new Vector2(200f, 200f));
         if (Math.Abs(first.RectById["h"].height - 10f) > 0.01f)
         {
@@ -478,7 +478,7 @@ internal static class KernelContractTests
         bindings.BindReadOnly("height", () => current);
 
         StubTranslation translation = new StubTranslation();
-        using UiHost host = new("lang-test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), translation);
+        using UiHost host = new("lang-test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), translation);
         UiLayoutSnapshot first = host.MeasureAndArrange(new Vector2(200f, 200f));
         if (!ReferenceEquals(first, host.MeasureAndArrange(new Vector2(200f, 200f))))
         {
@@ -508,9 +508,9 @@ internal static class KernelContractTests
         // two themes differing in every colour token must yield identical geometry. Any colour that
         // ever leaks into a size or a rect fails here. DefaultFont is deliberately not perturbed - it
         // feeds text measurement, so it is a metric that happens to live on the theme.
-        if (ReferenceEquals(UiTheme.DarkGold, UiTheme.DarkGold))
+        if (ReferenceEquals(UiTheme.Vanilla, UiTheme.Vanilla))
         {
-            throw new Exception("UiTheme.DarkGold hands out a shared instance; consumers repaint each other");
+            throw new Exception("UiTheme.Vanilla hands out a shared instance; consumers repaint each other");
         }
 
         UiWidgetRegistry.Clear();
@@ -531,8 +531,8 @@ internal static class KernelContractTests
         var bindings = new UiBindings();
         bindings.BindReadOnly("height", () => 20f);
 
-        UiTheme plain = UiTheme.DarkGold;
-        UiTheme altered = UiTheme.DarkGold;
+        UiTheme plain = UiTheme.Vanilla;
+        UiTheme altered = UiTheme.Vanilla;
         altered.Base = new Color(1f, 0f, 0f, 1f);
         altered.Panel = new Color(0f, 1f, 0f, 0.5f);
         altered.Raised = new Color(0f, 0f, 1f, 1f);
@@ -774,7 +774,7 @@ internal static class KernelContractTests
             + "</UiPage>");
 
         var bindings = new UiBindings();
-        using (new UiHost(source, manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation()))
+        using (new UiHost(source, manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation()))
         {
         }
 
@@ -816,7 +816,7 @@ internal static class KernelContractTests
             + "</UiPage>");
 
         var bindings = new UiBindings();
-        using UiHost host = new("recover-test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new("recover-test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
 
         var viewport = new Rect(0f, 0f, 300f, 200f);
         RecordingWidget.Draws = 0;
@@ -1079,7 +1079,7 @@ internal static class KernelContractTests
         bindings.BindReadOnly<IReadOnlyList<Vector2>>(elementId + "-points", () => points);
         bindings.BindAction<UiChartPointChange>(elementId + "-changed", _ => { });
 
-        UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(width, height));
         return (host, snapshot, snapshot.RectById[elementId]);
     }
@@ -1122,7 +1122,7 @@ internal static class KernelContractTests
         var bindings = new UiBindings();
         bindings.BindValue("active-tab", () => "GroupA", _ => { });
 
-        using UiHost host = new(scope, manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new(scope, manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(800f, 600f));
 
         if (!snapshot.Viewports.TryGetValue("content-scroll", out Rect contentViewport)

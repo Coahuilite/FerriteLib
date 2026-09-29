@@ -23,6 +23,19 @@ public static class UiWidgetRegistry
     // measures: the kind, not the engine, names its label attributes (US->FL round 3, N1).
     private static readonly Dictionary<string, Dictionary<string, IReadOnlyCollection<string>>> LabelAttributes =
         new(StringComparer.Ordinal);
+    // The non-text half of a kind's natural width: the body a kind draws (a box, a track and its spacing)
+    // that a label-set measurement cannot see. Kind-level metadata on purpose - it is declared at
+    // registration exactly like the schema and the label set, so nothing has to reach a widget INSTANCE to
+    // measure, and IUiWidget.Measure keeps its one signature. Absent means "text-only", the previous answer.
+    private static readonly Dictionary<string, Dictionary<string, Func<UiElementSpec, UiWidgetContext, float>>> NaturalBodies =
+        new(StringComparer.Ordinal);
+    // The looks a kind can draw, declared at registration like the schema and the label set. This is the
+    // set the shared appearance seam (UiAppearanceResolver) resolves an element's `Appearance` against, and
+    // it is kind-level metadata on purpose: the natural-body entry point measures a look WITHOUT a widget
+    // instance, so the accepted names have to be readable without reaching one. A kind that declares none
+    // has no appearance axis at all, which is every kind but `input/checkbox` today.
+    private static readonly Dictionary<string, Dictionary<string, UiAppearanceResolver>> SupportedLooks =
+        new(StringComparer.Ordinal);
     private static bool coreInitialized;
 
     public static void InitializeCore()
@@ -67,6 +80,49 @@ public static class UiWidgetRegistry
         IReadOnlyCollection<string>? allowedAttributes,
         IReadOnlyCollection<string>? labelAttributes)
     {
+        Register(scope, kind, factory, allowedAttributes, labelAttributes, null);
+    }
+
+    /// <summary>
+    /// The same registration plus the kind's non-text natural-width contribution. This is a NEW overload
+    /// rather than an optional parameter on the one above: adding a parameter changes that method's CLR
+    /// signature, so an already-compiled consumer would stop binding. The five-parameter overload stays
+    /// exactly as it was, and a kind that declares no body keeps the text-only answer.
+    /// </summary>
+    public static void Register(
+        string scope,
+        string kind,
+        Func<IUiWidget> factory,
+        IReadOnlyCollection<string>? allowedAttributes,
+        IReadOnlyCollection<string>? labelAttributes,
+        Func<UiElementSpec, UiWidgetContext, float>? naturalBody)
+    {
+        Register(scope, kind, factory, allowedAttributes, labelAttributes, naturalBody, null);
+    }
+
+    /// <summary>
+    /// The same registration plus the kind's declared appearance looks - the set the shared seam
+    /// (<see cref="UiAppearanceResolver"/>) resolves an element's <c>Appearance</c> against, and the set a
+    /// creation-time contract validates a declaration against. A NEW overload again, and for the same
+    /// reason as the one above: the six-parameter overload keeps its exact CLR signature, so a kind
+    /// registered through it keeps binding and keeps its behaviour.
+    /// <para>
+    /// <b>Internal, and that is a boundary rather than an oversight.</b> The seam is this batch's shape and
+    /// no consumer has asked for an appearance axis on its own kind, so it stays inside the assembly while
+    /// the one kind that has looks uses it. Exposing it would be an addition in <c>docs/api-tiers.md</c> and
+    /// a vocabulary a stranger's kind would then be frozen to, which is exactly the decision a citation is
+    /// supposed to trigger. Re-open it with a consumer that has hand-rolled the same axis.
+    /// </para>
+    /// </summary>
+    internal static void Register(
+        string scope,
+        string kind,
+        Func<IUiWidget> factory,
+        IReadOnlyCollection<string>? allowedAttributes,
+        IReadOnlyCollection<string>? labelAttributes,
+        Func<UiElementSpec, UiWidgetContext, float>? naturalBody,
+        UiAppearanceResolver? supportedLooks)
+    {
         if (scope == null) throw new ArgumentNullException(nameof(scope));
         if (kind == null) throw new ArgumentNullException(nameof(kind));
         if (factory == null) throw new ArgumentNullException(nameof(factory));
@@ -108,6 +164,28 @@ public static class UiWidgetRegistry
                 }
 
                 labelSets[kind] = new HashSet<string>(labelAttributes, StringComparer.OrdinalIgnoreCase);
+            }
+
+            if (naturalBody != null)
+            {
+                if (!NaturalBodies.TryGetValue(scope, out Dictionary<string, Func<UiElementSpec, UiWidgetContext, float>>? bodies))
+                {
+                    bodies = new Dictionary<string, Func<UiElementSpec, UiWidgetContext, float>>(StringComparer.Ordinal);
+                    NaturalBodies.Add(scope, bodies);
+                }
+
+                bodies[kind] = naturalBody;
+            }
+
+            if (supportedLooks != null)
+            {
+                if (!SupportedLooks.TryGetValue(scope, out Dictionary<string, UiAppearanceResolver>? looks))
+                {
+                    looks = new Dictionary<string, UiAppearanceResolver>(StringComparer.Ordinal);
+                    SupportedLooks.Add(scope, looks);
+                }
+
+                looks[kind] = supportedLooks;
             }
         }
     }
@@ -156,6 +234,59 @@ public static class UiWidgetRegistry
                 && coreSets.TryGetValue(kind, out IReadOnlyCollection<string>? coreSet))
             {
                 return coreSet;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Returns a kind's non-text natural-width contribution (exact scope first, core scope fallback), or
+    /// null when the kind declared none. This is the body half of <c>Width="Auto"</c>: a box, a track or a
+    /// thumb that the label measurement cannot see. Null keeps the previous, text-only answer, so a kind
+    /// that declares nothing is measured exactly as it was before this seam existed.
+    /// </summary>
+    public static Func<UiElementSpec, UiWidgetContext, float>? GetNaturalBody(string scope, string kind)
+    {
+        lock (Gate)
+        {
+            if (NaturalBodies.TryGetValue(scope, out Dictionary<string, Func<UiElementSpec, UiWidgetContext, float>>? bodies)
+                && bodies.TryGetValue(kind, out Func<UiElementSpec, UiWidgetContext, float>? body))
+            {
+                return body;
+            }
+
+            if (!string.Equals(scope, CoreScope, StringComparison.Ordinal)
+                && NaturalBodies.TryGetValue(CoreScope, out Dictionary<string, Func<UiElementSpec, UiWidgetContext, float>>? coreBodies)
+                && coreBodies.TryGetValue(kind, out Func<UiElementSpec, UiWidgetContext, float>? coreBody))
+            {
+                return coreBody;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The appearance seam a kind declared (exact scope first, core scope fallback), or null when the kind
+    /// has no appearance axis. The resolver it hands back is the same object the kind registered, so the
+    /// set a caller validates against and the set the widget resolves through cannot be two lists.
+    /// </summary>
+    internal static UiAppearanceResolver? GetAppearanceResolver(string scope, string kind)
+    {
+        lock (Gate)
+        {
+            if (SupportedLooks.TryGetValue(scope, out Dictionary<string, UiAppearanceResolver>? looks)
+                && looks.TryGetValue(kind, out UiAppearanceResolver? resolver))
+            {
+                return resolver;
+            }
+
+            if (!string.Equals(scope, CoreScope, StringComparison.Ordinal)
+                && SupportedLooks.TryGetValue(CoreScope, out Dictionary<string, UiAppearanceResolver>? coreLooks)
+                && coreLooks.TryGetValue(kind, out UiAppearanceResolver? coreResolver))
+            {
+                return coreResolver;
             }
         }
 
@@ -380,6 +511,8 @@ public static class UiWidgetRegistry
             Scopes.Clear();
             AttributeSchemas.Clear();
             LabelAttributes.Clear();
+            NaturalBodies.Clear();
+            SupportedLooks.Clear();
             coreInitialized = false;
         }
     }

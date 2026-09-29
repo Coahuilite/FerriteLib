@@ -89,7 +89,7 @@ internal static class KernelSmokeTests
             "test",
             manifest,
             bindings,
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
 
@@ -115,7 +115,7 @@ internal static class KernelSmokeTests
             "test",
             manifest,
             bindings,
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
 
@@ -183,7 +183,7 @@ internal static class KernelSmokeTests
                 "test",
                 manifest,
                 bindings,
-                UiTheme.DarkGold,
+                UiTheme.Vanilla,
                 new StubMetrics(),
                 new StubTranslation());
             throw new Exception("Binding type mismatch was not rejected");
@@ -213,8 +213,8 @@ internal static class KernelSmokeTests
         var bindings2 = new UiBindings();
         bindings2.BindValue("a", () => 0.8f, _ => { });
 
-        UiHost host1 = new("test", manifest, bindings1, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
-        UiHost host2 = new("test", manifest, bindings2, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        UiHost host1 = new("test", manifest, bindings1, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
+        UiHost host2 = new("test", manifest, bindings2, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
 
         if (ReferenceEquals(host1.Session, host2.Session)) throw new Exception("Hosts share a session");
         // Scroll state is keyed by node now; any node in host1's session proves the isolation claim.

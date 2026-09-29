@@ -96,6 +96,17 @@ public static class UiNative
     /// </summary>
     public static bool Button(Rect rect, UiWidgetContext ctx)
     {
+        return Button(rect, ctx, null);
+    }
+
+    /// <summary>
+    /// The context-carrying button with an explicit popup owner id. A dropdown trigger passes its OWN id so
+    /// its own popup does not make it yield (that is what preserves toggle-to-close); every other caller
+    /// passes null, which means "owns no popup" and therefore yields to ANY covering popup - the rule a
+    /// covered sibling control of a composite element needs.
+    /// </summary>
+    internal static bool Button(Rect rect, UiWidgetContext ctx, string? ownPopupId)
+    {
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
         UiNode element = ctx.Node ?? ctx.Session.ActiveNode;
 #if FER_DEV
@@ -114,7 +125,7 @@ public static class UiNative
             return false;
         }
 
-        if (ctx.Session.IsPointerOverHigherLayer(element, PointerPositionIn(ctx)))
+        if (ctx.Session.IsPointerOverHigherLayer(element, PointerPositionIn(ctx), ownPopupId))
         {
 #if FER_DEV
             UiDevGeometryProbe.NoteInput(ctx, element, rect, "covered", eventBefore);
@@ -208,10 +219,17 @@ public static class UiNative
         // is drawn by hand through the session overload as well.
         if (IsInputDisabled(ctx?.Node ?? session.ActiveNode)) return false;
 
+        // Keep the open popup attached to this trigger, and release it when the trigger has left the window.
+        // The anchor handed to this call is THIS frame's window-space rect (the context overload computes it
+        // fresh at the call site) while the open-time store would otherwise freeze the menu where it was
+        // opened. A no-op unless this element owns the open popup; a disabled trigger never reaches here, so
+        // its popup is released by the pass-boundary reconcile instead of being refreshed.
+        session.NotePopupOwnerDrawn(elementId, anchor);
+
         // The hit stack decides: a popup drawn over this trigger is a layer above it, so the trigger must
         // not take the click - unless the popup is its own, which the same layer comparison handles.
-        bool covered = ctx != null && session.IsPointerOverHigherLayer(
-            ctx.Node ?? session.ActiveNode, PointerPositionIn(ctx));
+        bool covered = session.IsPointerOverHigherLayer(
+            ctx?.Node ?? session.ActiveNode, PointerPositionIn(ctx), elementId);
         if (Trace != null && session.OpenPopupId != null)
         {
             Vector2 local = PointerPosition();
@@ -225,7 +243,11 @@ public static class UiNative
         }
 
         if (covered) return false;
-        if (ctx != null ? !Button(rect, ctx) : !Button(rect)) return false;
+        // The owner's own trigger must not be refused by its own popup: thread the id through this second,
+        // context-carrying check too. Otherwise the RectFor clamp branch - which CAN place a popup over its
+        // own anchor - would make the trigger yield to itself, so a close-click would fire the option under
+        // the pointer instead of closing the popup.
+        if (ctx != null ? !Button(rect, ctx, elementId) : !Button(rect)) return false;
 
         if (session.IsPopupOpen(elementId))
         {
@@ -259,10 +281,37 @@ public static class UiNative
         return fired;
     }
 
+    /// <summary>
+    /// True when a popup covers the pointer for a primitive that owns no popup of its own. Such a primitive
+    /// must not take the press at all: the same refusal the context-carrying button applies, extended to the
+    /// pointer-capturing primitives so a covered slider or field cannot steal the click an option row is about
+    /// to make. The pointer is lifted into window space by the origin the engine published for the element
+    /// being drawn - the same conversion the funnel uses.
+    /// </summary>
+    private static bool IsCoveredByPopup(UiSession session)
+    {
+        // No element identity: a value-state-keyed primitive owns no popup, so ANY covering popup covers it.
+        return session.IsPointerOverHigherLayer(session.ActiveNode, PointerPosition() + session.CurrentWindowOrigin);
+    }
+
     public static float Slider(Rect rect, string elementId, UiSession session, float value, float min, float max, out bool changed)
     {
         if (session == null) throw new ArgumentNullException(nameof(session));
         UiValueState state = session.GetOrCreateValueState(elementId);
+        if (IsCoveredByPopup(session))
+        {
+            // Covered: mirror the disabled branch's contract exactly - the native control is never reached,
+            // no drag can start and nothing takes the hot control from the option row under the popup.
+            state.FloatValue = ClampValue(value, min, max);
+            if (!state.Focused)
+            {
+                state.EditText = FormatValue(state.FloatValue, "0.##");
+            }
+
+            changed = false;
+            return state.FloatValue;
+        }
+
         if (IsElementDisabled(session, elementId))
         {
             // Disabled: the native control is never reached, so no drag can start and nothing can take the
@@ -329,6 +378,16 @@ public static class UiNative
         if (session == null) throw new ArgumentNullException(nameof(session));
         UiValueState state = session.GetOrCreateValueState(elementId);
         string model = value ?? "";
+        if (IsCoveredByPopup(session))
+        {
+            // Covered: the field must not consume the click the option row underneath it is about to make.
+            // Same shape as the disabled refusal - no focus, no native control, no commit.
+            state.Focused = false;
+            state.EditText = model;
+            committed = false;
+            return model;
+        }
+
         if (IsElementDisabled(session, elementId))
         {
             // Disabled: the field never takes focus, never reaches the native control and never commits, so
@@ -375,6 +434,17 @@ public static class UiNative
     {
         if (session == null) throw new ArgumentNullException(nameof(session));
         UiValueState state = session.GetOrCreateValueState(elementId);
+        if (IsCoveredByPopup(session))
+        {
+            // Covered: mirror the disabled refusal - no focus, no parse, no native control, no commit, so the
+            // click survives for the option row the popup is drawing over this field.
+            state.Focused = false;
+            state.FloatValue = ClampValue(value, min, max);
+            state.EditText = FormatValue(state.FloatValue, format);
+            committed = false;
+            return state.EditText;
+        }
+
         if (IsElementDisabled(session, elementId))
         {
             // Disabled: the field never takes focus, never parses and never commits, and the native control

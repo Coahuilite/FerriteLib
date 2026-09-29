@@ -56,8 +56,22 @@ consequence is paid in the open rather than discovered by a stranger.
   classes in `Source/FerriteLib.UiKit/Kernel/Widgets/` that declare `IUiWidget`, internal ones included — it was
   sixteen until `input/text-field` arrived), which is the only proven extension point the library has. The count
   is of the LIBRARY's own kinds: a consumer's widget count is a different number answering a different question.
+  **The 17/13/12 relation, stated because three counts of one fact read as a disagreement:** four of the
+  seventeen classes are `internal` (`RepeatTemplateWidget`, `CheckboxWidget`, `ProgressWidget`, `TreeWidget`), so
+  **thirteen** widget classes are exported; of those, **twelve** are classified `internalize-candidate` below and
+  the thirteenth, `LineChartWidget`, is `public-unstable`. A count of the internalize list is therefore not a
+  count of the library's kinds, and neither is a count of its exported classes.
 - `UiWidgetRegistry` — kind registration carrying the per-kind attribute schema and label set; consumers
-  register their own scope through it.
+  register their own scope through it. **Member-level additions to a `stable` type are part of this promise
+  too, so they are listed here rather than left to the type name.** Two `Register` overloads have been added
+  beside the original five-parameter one, and the five-parameter signature is unchanged: the **six-parameter**
+  overload declares the kind's non-text natural-width contribution (its body — a box, a track, a thumb — which
+  a label-set measurement cannot see), and a **seven-parameter** overload additionally carries the kind's
+  appearance look set. The seven-parameter overload is `internal`, because the appearance seam is this
+  library's own shape and no consumer has asked for an appearance axis on a kind of its own; exposing it would
+  freeze a vocabulary a stranger's kind would then be bound to, so it waits for a citation. The read side is
+  `GetNaturalBody(scope, kind)` (public, the body half of `Width="Auto"`) and `GetAppearanceResolver`
+  (`internal`). A kind registered through the original overloads behaves exactly as before.
 - `UiContractException` — creation-time contract failure, the type a consumer catches to survive its own
   manifest.
 - `UiUnknownWidgetKindException` — the same contract's kind half.
@@ -72,6 +86,12 @@ consequence is paid in the open rather than discovered by a stranger.
 - `UiOption` — one option of a dynamic options binding: the display text and the value to commit (0.7.x, FL-16).
   Plain strings on purpose, and the same separation the static `OptionN`/`ValueN` pairs always had;
   `BindOptions<string>` keeps working with display == value, so this is an addition, not a reshape.
+- `UiChoice` — the typed sibling of `UiOption`: one option of a TYPED options binding, carrying the display
+  text and the real `T` to commit (`UiChoice<T>`, 0.7.x, R4-A). Bound with `BindOptions<UiChoice<T>>` beside
+  `BindValue<T>`, so the value travels to the consumer's own `Action<T>` setter as the instance the choice
+  carried — no string round-trip, no parse, no conversion anywhere on that path. `UiOption` and every
+  string-typed registration keep their own paths untouched; the declared element type is what selects the
+  read, so this too is an addition, not a reshape.
 - `UiHost` — per-window engine entry; identity and the manifest load-path fork both reach into it. The
   style document enters here too (`UiStyleDocument? document` on the constructor, the manifest's own
   `<Styles>` section when none is handed in): the page level is applied to the injected theme inside the
@@ -109,10 +129,19 @@ consequence is paid in the open rather than discovered by a stranger.
   query needs, and the `Bind*` registrations take an optional `UiInvalidation` (command registration also
   takes the executability predicate). Every one is a breaking addition for every implementer, which is why
   they land once in this window.
+- `IUiTypedChoices` — the OPTIONAL typed half of the bindings surface (0.7.x, R4-A): the declared value type
+  of a key, a boxed read of the current value, the acceptance test the write applies, a write that refuses a
+  value of the wrong type **without writing anything**, and the key's typed choices as labels plus boxed
+  values. `UiBindings` implements it and a widget probes for it, which is the whole reason it is a companion
+  interface rather than new members here: net472 has no default interface members, so a required addition
+  would stop every existing `IUiBindings` implementation from compiling. An implementation without it keeps
+  building and keeps working string-only.
 - `UiBindings` — the reference implementation, same reason: it carries the per-key revisions and declared
   invalidation classes, moves a revision only on `NotifyChanged` (never on `Set`), refuses to run a
   command whose predicate answers false, and answers `TryGetBool` without throwing for a key bound to
-  another type.
+  another type. It also implements `IUiTypedChoices`, and recognises a `UiChoice<T>` options registration at
+  **bind time** (`default(T) is IUiChoice`) rather than by reflection, so the erased view exists for exactly
+  the registrations that declared it and no other list shape is affected.
 - `UiNative` — the backend funnel's public face (28 members today); hit-stack and focus work will move
   members across its boundary. It also owns the one disabled-input rule: `Button(rect, ctx)` and
   `DropdownButton` refuse the pointer for an element the engine published disabled, and the
@@ -134,6 +163,11 @@ consequence is paid in the open rather than discovered by a stranger.
   `DrawOptionList` returns the **hovered** option's value (or an empty string), so a caller can publish an
   option-level fact — the dropdown's `HoverHelpKey` identity — without re-deriving the row geometry; the
   return value is additive, so a caller that ignored the old `void` still compiles unchanged.
+  `DrawChoiceList` (0.7.x, R4-A) is its typed sibling: the same panel, hit layer, clamp/flip rule and row
+  hit for `UiChoice<object>` rows, comparing values by identity and handing the chosen option's real
+  instance back, and returning the hovered row's **index** (or -1) because a typed value is not a string a
+  help catalog could be keyed by. Both lists paint and publish through the same private helpers, so the
+  hit-layer rule still exists in one place.
 - `UiSessionGuard` — the recovery wrapper; the recovery key is an arranged path today.
 - `UiTheme` — per-surface (fill, border) pairs and a density bundle landed (`BaseSurface` through
   `DangerSurface`, `Geometry`, `LayoutRevision`, `Styles`); the table's third key slot now carries the
@@ -144,9 +178,16 @@ consequence is paid in the open rather than discovered by a stranger.
   region/page carriers the scheme and density classes waited for landed in batch B (`Scheme`/`Density` as
   engine vocabulary on every kind, plus the per-element style chain the engine carries and resolves), so
   what is left of that debt is the type size those two pinned composites would need before density can
-  reach them. **0.7 amendment:** two named peer factories, `Vanilla` and `DarkGold`; `new UiTheme()` is
-  an unpainted bag, not a product default. **Batch 1 amendment:** the accent is one stored colour,
+  reach them. **0.7 amendment:** one named peer factory, `Vanilla`; `new UiTheme()` is a PARTIAL bag whose
+  every unset colour token answers `Vanilla`, and an explicitly assigned colour — including a transparent
+  one — is a value the fallback must not replace. **Batch 1 amendment:** the accent is one stored colour,
   `AccentGold`, plus the read-only derived `AccentHover`; the stored `HoverPoint` member is removed.
+  **R2 amendment (0.7.x):** `Vanilla` is the only shipped look (the peer `DarkGold` factory is **removed**,
+  with no alias and no shim), and a second clock joins `LayoutRevision`: `ColourRevision` moves on any colour
+  assignment that changes a value and on nothing else. The pair is the point — a colour token must be able to
+  invalidate a cache of cloned themes without re-arranging the page, and `LayoutRevision` still means "a rect
+  moved". A consumer that re-tints a theme it handed to a `UiHost` gets refreshed region/scoped themes; a
+  consumer that wants the retired warm-gold look assigns the tokens on its own bag.
 - `UiThemeDraw` — the single text and panel outlet; per-surface tokens change what it takes to draw.
 - `UiFitAudit` — the audit surface; entry attribution follows the identity layer. The ruler moved with
   the routing: a subscribed host is measured with the `ITextMetrics` its own diagnostic scope carries, and
@@ -222,9 +263,13 @@ consequence is paid in the open rather than discovered by a stranger.
   consumes the request once. Still open, because the display path is what a human reads and existing
   consumers assert on: `VisibleIds`, the fit audit and the recovery band can still print one text for two
   elements whose `Kind` contains `/` (`input/stepper-slider`); `UiNative`'s hot-control id stays
-  string-keyed. The popup owner key is no longer a yield input: since the owned hit stack, cover decisions
-  are layer comparisons, and the popup's own state (`OpenPopupId`/`OpenPopupAnchor`/`IsPopupOpen`/
-  `ClosePopup`) only says whether a popup is open. Identity and per-element state never depend on the
+  string-keyed. Cover decisions use the owned hit stack; a popup layer also carries `PopupOwnerId` to
+  distinguish independent dropdowns inside one composite node. Only the matching trigger may claim that
+  owner-id exemption. Popup state remains session-owned. A drawn dropdown refreshes its open anchor in
+  window coordinates each hit pass. If its trigger no longer intersects the effective nested clip, or
+  the owner is absent by the end of the pass, the popup closes and its stale hit layers are cleared.
+  Opening a popup without drawing the matching dropdown does not create an owner-independent overlay.
+  These are internal lifecycle rules, not new exported APIs. Identity and per-element state never depend on the
   display path: `GetNode`, `GetNodeByElementId`, `GetValueStates`, `ActiveElement`, `ActiveNode`,
   `TrippedNodes`, `ScrollPositions`, `HitLayers` and `HoverClaimElement` are all node- or
   identity-keyed.
@@ -240,9 +285,12 @@ consequence is paid in the open rather than discovered by a stranger.
   own identity and state. Public-unstable: the hit stack and focus are the next steps that read this tree.
 
 - `UiHitLayer` — one entry of the owned hit stack: the element whose paint covers a window-space rect,
-  and whether the layer is a popup. `UiSession.HitLayers` is the stack in paint order (bottom-to-top) and
+  whether the layer is a popup, and its optional `PopupOwnerId`. The existing three-argument constructor
+  remains available (no owner exemption). `UiSession.HitLayers` is the stack in paint order (bottom-to-top) and
   `UiSession.IsPointerOverHigherLayer` is the one dispatch rule: the topmost layer containing the pointer
-  decides, and a layer belonging to the caller keeps the click. This replaces the single-popup yield branch
+  decides. Its two-argument overload yields even for the same node; the three-argument overload accepts
+  the caller's own popup id to preserve trigger toggle-to-close. Context-bearing buttons and session-bearing
+  sliders/fields yield to any covering popup; dropdown triggers pass their own id. This replaces the single-popup yield branch
   (`UiNative.YieldsToCoveringPopup`, `UiSession.OpenPopupRect`, `SetPopupRect`, `IsPointOverPopup` -
   all removed in the same 0.4.0 window), so every primitive answers the same question the same way.
   **Contract for the context-free overload:** `UiNative.Button(Rect)` has no session and no draw origin, and
@@ -269,15 +317,28 @@ consequence is paid in the open rather than discovered by a stranger.
   either text origin: the standalone `<Styles>` file and the manifest's `<Styles>` section share one parser
   and one vocabulary. All of its failures are appearance-class; the one page-level case is a section that
   is not well-formed, because then the manifest itself does not parse (co-location's real cost).
+  **R12-T amendment (0.7.x):** a `<Scheme>` may carry the density metric vocabulary
+  (`<Metric Token="…" Value="…"/>`), and **typography is its own token of that vocabulary**:
+  `<Metric Token="Font" Value="Tiny|Small|Medium"/>` selects a font class, which is what
+  `UiTheme.DefaultFont` receives and therefore what text measurement, the fit audit and `UiThemeDraw.Label`
+  all read — one selection, obeyed by measure and paint. The legacy `<Font Value="…"/>` declaration keeps
+  working by being **redirected to that same font path**, never ignored and never translated into a distance:
+  the parser sets the same typography selection, records one issue naming both the legacy spelling and its
+  successor, and reports the redirect through the appearance channel. A scheme that declares both is resolved
+  by the metric, and says so. Density/`RowHeight` stays an **independent** axis — a font change is never
+  implemented as a spacing change, and selecting a scheme does not silently move density.
 - `UiStyleResolver` — the written precedence chain `state > element > container > page > theme > default`
   and the region themes built once per effective scheme/density pair. Scheme and density inherit; roles do
   not, and that asymmetry is the design rather than a gap. The engine resolves each element's chain through
   `ThemeFor` and reuses the cached instance in Measure and Draw, while an empty chain is the page level and
   answers with the injected theme itself; `UiHost.StyleResolver` is the live instance for a page, and its
-  `Issues` are the resolution-time half of the same record the document keeps. The cache is bound to the
-  injected theme's own `UiTheme.LayoutRevision` — the revision the engine's band cache already compares —
-  so a layout-bearing token moving drops the cached clones and the next scope lookup rebuilds them, while a
-  colour-only re-tint leaves the instances alone, exactly as it leaves the band cache alone.
+  `Issues` are the resolution-time half of the same record the document keeps. The cache expires on **two**
+  of the injected theme's own clocks, and they answer two different questions: `UiTheme.LayoutRevision` (the
+  revision the engine's band cache already compares) means a layout-bearing token moved, while
+  `UiTheme.ColourRevision` is the paint-side peer — a cached region theme is a CLONE, so a re-tint has to
+  drop it or the region keeps painting the palette it was built with, and a re-tint must not re-arrange the
+  page. Reading both, and only dropping the clones, is what makes a scoped palette refresh free of layout
+  damage.
 - `UiStyleDeclaration` — one node's own style attributes as the resolver reads them (scheme, density, tone,
   emphasis), handed in nearest first along the tree; the engine's chain carries the two that inherit and
   leaves the roles on the element's own spec.
@@ -364,7 +425,65 @@ consequence is paid in the open rather than discovered by a stranger.
   then one line per sampled press with its verdict). **All three are compiled out of a release payload**
   (`FER_DEV`), where each enable path throws instead of accepting the request and answering every later
   question with emptiness. The instrument observes only: no member of it is read back by the engine, the
-  session, the hit stack or the fit audit.
+  session, the hit stack or the fit audit. **R3-A addition:** `TryGetGeometrySnapshot(out UiDevGeometrySnapshot?)`
+  is the machine-readable rendering of the SAME capture the text dump renders - built from the capture's own
+  stored samples in the same call, never from a second collection or a replayed pass. It is the one reader
+  that does **not** throw in a release payload: it answers `false` with a null snapshot, because a call a
+  consumer makes unconditionally must not become an exception in the shipped configuration, and because
+  "nothing was captured" is the truthful answer there rather than an empty object that reads like an empty
+  page.
+- `UiDevGeometrySnapshot` — one captured pass as data: `Host`, `SessionId`, `Pass`, `EntryEvent`, the
+  immutable `Nodes` / `Inputs` lists, their `NodesDropped` / `InputsDropped` markers, and the
+  `NodeByKey` / `NodeByPath` lookups (key first, because a display path can be ambiguous when a kind itself
+  contains the separator). It is a **fresh copy per call**: every call allocates a new snapshot and new node
+  and input objects, no member is a view over the capture's buffers, an old snapshot is detached from later
+  draws, and it holds no node, session or host object - only strings, value types and the two lists. What is
+  **not** claimed is a caller-level immutable collection: the lists ARE the arrays that call allocated, so a
+  caller who down-casts its own copy and mutates it changes that copy (and nothing else). A consumer cannot
+  construct one, and there is no "empty snapshot" state: the reader answers `false` instead, so an obtained
+  snapshot always describes a real pass.
+  **Tier: public-unstable**, and the reason it is public at all rather than internal is the packaging
+  constraint the demo packer establishes: `InternalsVisibleTo` is banned there, so a structured export a
+  consumer must call has to be genuinely public. **The four TYPES are deliberately NOT inside `#if FER_DEV`**,
+  unlike the capture behind them. The lane that decides that is the **RELEASE** stale-entry check,
+  `FerriteLibApiTierTests.VerifyNoTierEntryIsStale`: this document is one file read in BOTH configurations,
+  and a Dev-only public type must either be listed - which fails that Release lane, because the entry names a
+  type the release payload does not export - or omitted, which fails
+  `VerifyAllPublicTypesAreClassified` in a **Dev** build. There is no third option, so a public type that
+  exists in one configuration only cannot satisfy the tier harness at all; it is also a
+  compile-against-Dev / ship-against-Release trap for a consumer. These four types are therefore
+  **callable but inert in a release payload**: a consumer can name them and the assembly exports them, and
+  nothing in that payload ever produces an instance - the reader answers `false`, the capture is compiled out,
+  and the enable path still throws. No version bump: the 0.7.x temporary public-addition rule applies.
+- `UiDevNodeSnapshot` — one arranged element as the instrument observed it: `NodeKey` (the canonical
+  `UiNodeId.Key`, not a re-derived display string) with `Path`, `Ordinal` and `ElementId` beside it; `Kind`,
+  the container facts and `IsHitSurface`; the four spaces (`Arranged`, `Draw`, `Window`, `Origin`) plus the
+  `Content` boundary and the `HeightMode` / `ResolvedHeight` pair; the appearance and its provenance
+  (`ScopeFont`, `PaintedFont`, `Scheme`, `Density`, `ThemeOrigin`, `ThemeLayoutRevision`,
+  `ThemeColourRevision`, the AUTHORED `Tone` / `Emphasis` text, `Disabled`); the **effective appearance**
+  (`Appearance`, `AppearanceDeclared`, `AppearanceDefault`, `AppearanceSupported`, `AppearanceSource`,
+  `AppearancePairRegistered`) resolved through the registry's own seam
+  (`GetAppearanceResolver(scope, kind)` → `UiAppearanceResolver.Resolve(spec)`) with the core-versus-scope
+  provenance proved by instance identity; and the boundaries `Clip`, `Hover`, `Focus`, `OpenPopupId`,
+  `PopupAnchor`, `OwnsOpenPopup`. Three values are **always unknown with a documented reason**, and the reason
+  strings are `const` members so a consumer can compare against them: hover is published during an element's
+  own draw, which runs after the sample; this library publishes no focus owner at all (the session's active
+  node is the draw-time element stack); and the font a label finally paints with is chosen inside that same
+  draw, so `PaintedFont` is null while `ScopeFont` reports the scope's selection - the font measurement and
+  the shared text vocabulary use, and never a stand-in for what a kind's own constant paints. `Tone` /
+  `Emphasis` are the authored text rather than the resolved treatment, because the resolution happens inside a
+  widget - which may also be applying hover/armed state - and calling the role parser here would record a
+  deprecation note that the instrument itself caused. Public-unstable for the same reason as the snapshot
+  above.
+- `UiDevInputSnapshot` — one hit query as observed: `NodeKey` / `Path` / `Kind` / `ElementId`, the queried
+  `Rect` and `Point` (both Host window space), `Verdict`, `EventBefore` / `EventAfter`, whether the query
+  `Consumed` the event (the phase transition to `Used`, derived from the two phases beside it rather than
+  asked of the funnel), and `OriginUnknown` / `EntryEvent` for a pass that entered already `Used`, where the
+  originating input is not observable and is not guessed. Public-unstable.
+- `UiDevBoundary` — one boundary the instrument tried to observe: `Known(rect)` or `Unknown(reason)`, with
+  `IsKnown`, `Rect` and `UnknownReason`. The type exists so that "not measured" cannot be rendered as a zero
+  rect a reader would take for a measurement, and `Unknown` refuses an empty reason for the same purpose.
+  Public-unstable.
 - `UiDiagnosticEvent` — one attributed record: `Kind` plus a stable `Code`, `Host`, `SessionId`,
   `Node`/`ElementPath`, and the original record for the channel that produced it (`Report` for reload,
   `Overflow`/`Fallback` for the fit audit's two halves, `Timing` for a sampled aggregate). No field names a

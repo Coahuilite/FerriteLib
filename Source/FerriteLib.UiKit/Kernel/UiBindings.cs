@@ -13,7 +13,7 @@ namespace FerriteLib.UiKit.Kernel;
 /// the engine folds the announcements into one commit at the next arrangement boundary.
 /// </para>
 /// </summary>
-public sealed class UiBindings : IUiBindings
+public sealed class UiBindings : IUiBindings, IUiTypedChoices
 {
 
     /// <summary>
@@ -64,6 +64,16 @@ public sealed class UiBindings : IUiBindings
     {
         public abstract Type ItemType { get; }
         public abstract object GetListBoxed();
+
+        /// <summary>
+        /// True when the item type is a <see cref="UiChoice{T}"/>: the list carries typed choices rather than
+        /// strings or <see cref="UiOption"/> pairs, which is what the type-erased seam needs to know before it
+        /// can hand a widget labels plus boxed values.
+        /// </summary>
+        public virtual bool IsChoiceList => false;
+
+        /// <summary>The value type those choices declare, or null when this is not a choices list.</summary>
+        public virtual Type? ChoiceValueType => null;
     }
 
     private sealed class OptionsDescriptor<T> : OptionsDescriptor
@@ -78,6 +88,14 @@ public sealed class UiBindings : IUiBindings
         public override Type ItemType => typeof(T);
 
         public override object GetListBoxed() => get();
+
+        // The shape is answered WITHOUT reflection and without an instance of the list: default(T) is a boxed
+        // UiChoice<U> exactly when T is one (a struct, so it implements the erased face on its own), and a
+        // default choice carries the declared U in its ValueType. A string list, a UiOption list and every
+        // other item type answer false, so their pages keep the string path untouched.
+        public override bool IsChoiceList => default(T) is IUiChoice;
+
+        public override Type? ChoiceValueType => (default(T) is IUiChoice sample) ? sample.ValueType : null;
     }
 
     private abstract class ActionDescriptor
@@ -271,6 +289,113 @@ public sealed class UiBindings : IUiBindings
         }
 
         return (IReadOnlyList<T>)descriptor.GetListBoxed();
+    }
+
+    // --- IUiTypedChoices: the additive, type-erased half the non-generic widgets probe (R4-A, 0.7.x) -------
+
+    /// <summary>
+    /// The declared type of a key: its value binding's type when it has one, else the value type its typed
+    /// choices declare. A key that is neither answers false, so a widget can tell "not typed here" from
+    /// "bound to string" without guessing.
+    /// </summary>
+    public bool TryGetValueType(string key, out Type valueType)
+    {
+        if (key == null) throw new ArgumentNullException(nameof(key));
+        if (values.TryGetValue(key, out ValueDescriptor? descriptor))
+        {
+            valueType = descriptor!.ValueType;
+            return true;
+        }
+
+        if (options.TryGetValue(key, out OptionsDescriptor? choices) && choices!.ChoiceValueType != null)
+        {
+            valueType = choices.ChoiceValueType!;
+            return true;
+        }
+
+        valueType = typeof(object);
+        return false;
+    }
+
+    /// <summary>The current value as its real instance, boxed - the read half of the typed path.</summary>
+    public bool TryGetTypedValue(string key, out object? value)
+    {
+        if (key == null) throw new ArgumentNullException(nameof(key));
+        if (values.TryGetValue(key, out ValueDescriptor? descriptor))
+        {
+            value = descriptor!.GetBoxed();
+            return true;
+        }
+
+        value = null;
+        return false;
+    }
+
+    /// <summary>
+    /// True when the value the consumer's own setter would receive is an instance of the declared type. This is
+    /// the acceptance test the write applies, exposed so a control can judge its whole option list at creation
+    /// time - an option whose value is the wrong type is an authoring mistake, not something to find one
+    /// refused click at a time. Writes nothing.
+    /// </summary>
+    public bool AcceptsValue(string key, object? value)
+    {
+        if (key == null) throw new ArgumentNullException(nameof(key));
+        return values.TryGetValue(key, out ValueDescriptor? descriptor) && Accepts(descriptor!.ValueType, value);
+    }
+
+    /// <summary>
+    /// Writes a boxed value through the key's own typed setter, and REFUSES a value of the wrong type without
+    /// writing anything: the decorated <c>(T)value</c> cast would otherwise throw inside the setter (or, worse,
+    /// coerce), so the type check happens here, before any write, and a refusal is reported as false.
+    /// </summary>
+    public bool TrySetTypedValue(string key, object? value)
+    {
+        if (key == null) throw new ArgumentNullException(nameof(key));
+        if (!values.TryGetValue(key, out ValueDescriptor? descriptor) || !descriptor!.CanWrite) return false;
+        if (!Accepts(descriptor.ValueType, value)) return false;
+        descriptor.SetBoxed(value);
+        return true;
+    }
+
+    /// <summary>
+    /// The typed choices bound at a key, erased to labels plus boxed values. False for every other options
+    /// shape (a string list, a <see cref="UiOption"/> list) and for a key with no options binding, which is
+    /// what keeps those pages on their existing path.
+    /// </summary>
+    public bool TryGetChoices(string key, out IReadOnlyList<UiChoice<object?>> choices)
+    {
+        if (key == null) throw new ArgumentNullException(nameof(key));
+        if (options.TryGetValue(key, out OptionsDescriptor? descriptor)
+            && descriptor!.IsChoiceList
+            && descriptor.GetListBoxed() is System.Collections.IEnumerable items)
+        {
+            var erased = new List<UiChoice<object?>>();
+            foreach (object? item in items)
+            {
+                if (item is IUiChoice choice)
+                {
+                    erased.Add(new UiChoice<object?>(choice.Text, choice.BoxedValue));
+                }
+            }
+
+            choices = erased;
+            return true;
+        }
+
+        choices = Array.Empty<UiChoice<object?>>();
+        return false;
+    }
+
+    /// <summary>
+    /// The whole acceptance rule, in one place: null is a value of the declared type only where the declared
+    /// type is a reference type or a nullable value type, and any other value must be an instance of that type
+    /// (unwrapped for nullables, whose boxed form is the underlying value).
+    /// </summary>
+    private static bool Accepts(Type declared, object? value)
+    {
+        Type? underlying = Nullable.GetUnderlyingType(declared);
+        if (value == null) return !declared.IsValueType || underlying != null;
+        return (underlying ?? declared).IsInstanceOfType(value);
     }
 
     public void Invoke<T>(string actionId, T payload)

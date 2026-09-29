@@ -177,7 +177,7 @@ internal static class KernelOptionHelpTests
                 + " Option1=\"Alpha\" Value1=\"a\" Option2=\"Beta\" Value2=\"b\" />"
                 + "</UiPage>"),
             bindings,
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
     }

@@ -46,6 +46,11 @@ public sealed class UiSession : IDisposable
     private readonly List<Action> popupDrawActions = new();
     private string? openPopupId;
     private Rect? openPopupAnchor;
+    // Whether the open popup's owner reported itself drawn in the pass in progress. Reset at every pass
+    // boundary, where a false value releases the popup (see EndHitPass) - that is the half a call-site
+    // refresh cannot see: an owner that is no longer arranged may never call its trigger again.
+    private bool popupOwnerDrawn;
+    internal Rect? CurrentClip { get; set; }
     private Rect hostViewport;
     private string? scrollTargetElementId;
     private string hoverClaim = "";
@@ -192,6 +197,8 @@ public sealed class UiSession : IDisposable
     internal void BeginHitPass()
     {
         EnsureActive();
+        popupOwnerDrawn = false;
+        CurrentClip = hostViewport.width > 0f && hostViewport.height > 0f ? hostViewport : (Rect?)null;
         dispatchLayers.Clear();
         dispatchLayers.AddRange(hitLayers);
         hitLayers.Clear();
@@ -201,17 +208,17 @@ public sealed class UiSession : IDisposable
     /// Appends one layer to the pass in progress. Content layers are appended as their elements draw, so the
     /// stack ends up in paint order; a popup appends after content and is therefore above it.
     /// </summary>
-    internal void PushHitLayer(UiNode element, Rect windowRect, bool isPopup)
+    internal void PushHitLayer(UiNode element, Rect windowRect, bool isPopup, string? popupOwnerId = null)
     {
         if (element == null) return;
-        hitLayers.Add(new UiHitLayer(element, windowRect, isPopup));
+        hitLayers.Add(new UiHitLayer(element, windowRect, isPopup, popupOwnerId));
     }
 
     /// <summary>
     /// Topmost-first dispatch: true when <paramref name="windowPoint"/> falls inside a popup layer that
-    /// belongs to another element, so the caller must not take the click. The topmost covering popup wins,
-    /// and one belonging to the caller (its own trigger's popup) keeps the click here, which is what
-    /// preserves toggle-to-close.
+    /// covers the caller, so it must not take the click. Element identity alone does not grant an exemption:
+    /// a composite can contain several independent controls. A dropdown trigger uses the owner-id overload
+    /// to preserve toggle-to-close for its own popup.
     /// <para>
     /// Content layers are recorded in the stack in paint order but do not arbitrate one another yet: IMGUI
     /// already serialises content input by draw order, and a rect lookup cannot tell a real pointer from an
@@ -221,15 +228,86 @@ public sealed class UiSession : IDisposable
     /// </summary>
     public bool IsPointerOverHigherLayer(UiNode element, Vector2 windowPoint)
     {
+        return IsPointerOverHigherLayer(element, windowPoint, null);
+    }
+
+    /// <summary>
+    /// Popup-owner-aware dispatch. <paramref name="ownPopupId"/> is the caller's own dropdown id, or null for
+    /// a caller that owns no popup. A covering popup yields ONLY to the dropdown that owns it; every other
+    /// caller must yield - including a sibling control drawn with the same element.
+    /// <para>
+    /// Keying this on element identity was wrong for composites: <see cref="PushHitLayer"/> recorded only the
+    /// element, and one composite element hosts several dropdowns, so an open popup never covered its own
+    /// siblings. The covered sibling then captured the MouseDown first (content draws before the deferred
+    /// popup pass) and stole the press from the option row.
+    /// </para>
+    /// </summary>
+    public bool IsPointerOverHigherLayer(UiNode element, Vector2 windowPoint, string? ownPopupId)
+    {
         for (int i = dispatchLayers.Count - 1; i >= 0; i--)
         {
             UiHitLayer layer = dispatchLayers[i];
             if (!layer.IsPopup) continue;
             if (!Contains(layer.Rect, windowPoint)) continue;
-            return !ReferenceEquals(layer.Element, element);
+            if (ownPopupId != null && layer.PopupOwnerId != null
+                && string.Equals(layer.PopupOwnerId, ownPopupId, StringComparison.Ordinal))
+            {
+                // My own popup does not cover me: this is what preserves toggle-to-close for the trigger.
+                continue;
+            }
+
+            return true;
         }
 
         return false;
+    }
+
+    internal void EndHitPass()
+    {
+        if (openPopupId != null && !popupOwnerDrawn) ClosePopup();
+    }
+
+    internal void ConstrainClip(Rect rect)
+    {
+        if (CurrentClip.HasValue)
+        {
+            Rect clip = CurrentClip.Value;
+            float x = Math.Max(clip.x, rect.x), y = Math.Max(clip.y, rect.y);
+            rect = new Rect(x, y, Math.Max(0f, Math.Min(clip.xMax, rect.xMax) - x),
+                Math.Max(0f, Math.Min(clip.yMax, rect.yMax) - y));
+        }
+        CurrentClip = rect;
+    }
+
+    /// <summary>
+    /// The owner of the open popup reports that it is drawn, and where it now is in Host window space. This
+    /// is the only writer of an open popup's anchor after the open itself, and that is the point: a trigger
+    /// inside a scroll keeps moving while its menu is open, and an anchor stored once at open time leaves the
+    /// menu behind at the position it was opened at. The caller has already computed this frame's
+    /// window-space rect for its own hit test, so rendering and hit geometry read one number instead of
+    /// drifting apart.
+    /// </summary>
+    internal void NotePopupOwnerDrawn(string ownerId, Rect windowRect)
+    {
+        if (ownerId == null) throw new ArgumentNullException(nameof(ownerId));
+        if (openPopupId == null || !string.Equals(openPopupId, ownerId, StringComparison.Ordinal)) return;
+
+        if (CurrentClip.HasValue && !Intersects(windowRect, CurrentClip.Value))
+        {
+            ClosePopup();
+            return;
+        }
+
+        openPopupAnchor = windowRect;
+        popupOwnerDrawn = true;
+    }
+
+    /// <summary>True when two rects share area. Touching edges do not count, so an element exactly against
+    /// the viewport border reads as outside it - the same "fits" reading <see cref="UiPopup.RectFor"/> has.
+    /// </summary>
+    private static bool Intersects(Rect left, Rect right)
+    {
+        return right.width > 0f && right.height > 0f && left.xMax > right.x && left.x < right.xMax && left.yMax > right.y && left.y < right.yMax;
     }
 
     private static bool Contains(Rect rect, Vector2 point)
@@ -287,6 +365,9 @@ public sealed class UiSession : IDisposable
         EnsureActive();
         openPopupId = ownerId;
         openPopupAnchor = anchor;
+        // The owner is drawn by definition - it is reporting this open from inside its own Draw - so the
+        // pass-boundary reconcile must not release the popup on the next pass for lack of a report.
+        popupOwnerDrawn = true;
     }
 
     /// <summary>
@@ -298,6 +379,7 @@ public sealed class UiSession : IDisposable
         EnsureActive();
         openPopupId = null;
         openPopupAnchor = null;
+        popupOwnerDrawn = false;
         DropPopupLayers(hitLayers);
         DropPopupLayers(dispatchLayers);
     }

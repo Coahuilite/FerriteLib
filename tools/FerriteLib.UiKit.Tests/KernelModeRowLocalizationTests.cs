@@ -118,7 +118,7 @@ internal static class KernelModeRowLocalizationTests
         // the convention text/wrapped and the other labelled atoms already follow. What this check proves is
         // that the KEY half participates at all: 88px comes from the translated string and nothing else.
         var probe = new StubMetrics();
-        UiFont font = UiTheme.DarkGold.DefaultFont;
+        UiFont font = UiTheme.Vanilla.DefaultFont;
         Check(Near(snapshot.RectById["mode"].width, probe.MeasureWidth("[US.Mode.A]", font)),
             "Auto measures the translated title, so a bilingual page reserves the width it shows — measured "
             + snapshot.RectById["mode"].width + ", translated=" + probe.MeasureWidth("[US.Mode.A]", font)
@@ -174,7 +174,7 @@ internal static class KernelModeRowLocalizationTests
         };
         fixture.Widget.Configure(new UiElementSpec("mode", InputModeRowWidget.Kind, attrs));
         fixture.Context = new UiWidgetContext(
-            Scope, new UiSession(), new StubMetrics(), UiTheme.DarkGold,
+            Scope, new UiSession(), new StubMetrics(), UiTheme.Vanilla,
             new StubTranslation(), bindings, Width, "root");
         return fixture;
     }
@@ -195,7 +195,7 @@ internal static class KernelModeRowLocalizationTests
         var bindings = new UiBindings();
         bindings.BindValue<string>("mode", () => "A", _ => { });
         var ctx = new UiWidgetContext(
-            Scope, new UiSession(), new StubMetrics(), UiTheme.DarkGold,
+            Scope, new UiSession(), new StubMetrics(), UiTheme.Vanilla,
             new StubTranslation(), bindings, 400f, "root");
         return engine.ArrangeRoots(ctx, new Vector2(400f, 600f), UiLayoutManifest.Parse(xml).Roots);
     }
@@ -218,7 +218,7 @@ internal static class KernelModeRowLocalizationTests
                 Scope,
                 UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"" + Scope + "\">" + body + "</UiPage>"),
                 bindings,
-                UiTheme.DarkGold,
+                UiTheme.Vanilla,
                 new StubMetrics(),
                 new StubTranslation());
             return false;

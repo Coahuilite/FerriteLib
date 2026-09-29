@@ -125,7 +125,7 @@ internal static class KernelAtomTests
         bindings.BindValue("Level", () => level, v => level = v);
         bindings.BindValue("Count", () => count, v => count = v);
 
-        using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.DarkGold, new WrappedMetrics(), new StubTranslation());
+        using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla, new WrappedMetrics(), new StubTranslation());
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(400f, 620f));
 
         foreach (string id in new[] { "note", "apply", "sep", "level", "count" })
@@ -155,7 +155,7 @@ internal static class KernelAtomTests
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
         using UiSession session = new();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
 
         WrappedTextWidget widget = new();
         widget.Configure(new UiElementSpec("note", WrappedTextWidget.Kind, Attrs(("Text", Notes))));
@@ -213,7 +213,7 @@ internal static class KernelAtomTests
         bindings.BindValue("Level", () => level, v => level = v);
         bindings.BindValue("Count", () => count, v => count = v);
 
-        using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.DarkGold, new WrappedMetrics(), new StubTranslation());
+        using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla, new WrappedMetrics(), new StubTranslation());
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(400f, 200f));
 
         Check(Near(32f, snapshot.RectById["note"].width), "text/wrapped Auto = 2 ideographs x 16px");
@@ -230,7 +230,7 @@ internal static class KernelAtomTests
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
         using UiSession session = new();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
 
         int fired = 0;
         var bindings = new UiBindings();
@@ -297,7 +297,7 @@ internal static class KernelAtomTests
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
         using UiSession session = new();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
 
         RuleWidget widget = new();
         widget.Configure(new UiElementSpec("sep", RuleWidget.Kind, Attrs(("Thickness", "2"), ("Inset", "4"))));
@@ -336,7 +336,7 @@ internal static class KernelAtomTests
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
         using UiSession session = new();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
 
         float value = 0.2f;
         var bindings = new UiBindings();
@@ -378,7 +378,7 @@ internal static class KernelAtomTests
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
         using UiSession session = new();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
 
         float value = 0.5f;
         var bindings = new UiBindings();
@@ -492,7 +492,7 @@ internal static class KernelAtomTests
     {
         try
         {
-            using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.DarkGold, new WrappedMetrics(), new StubTranslation());
+            using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.Vanilla, new WrappedMetrics(), new StubTranslation());
             Check(false, what + " - but the host accepted it");
         }
         catch (UiContractException)

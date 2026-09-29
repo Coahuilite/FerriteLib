@@ -527,6 +527,7 @@ public sealed class UiLayoutEngine
         // reads, and this pass builds the next one as its elements draw.
         ctx.Session.BeginHitPass();
         DrawEntries(lastEntries, 0, lastEntries.Count, ctx, new Vector2(viewport.x, viewport.y), null, Vector2.zero);
+        ctx.Session.EndHitPass();
     }
 
     private void DrawEntries(
@@ -575,18 +576,27 @@ public sealed class UiLayoutEngine
 #if FER_DEV
             // The development-only numeric instrument reads the geometry from this one point per entry:
             // the arranged rect and the draw rect disagree exactly when a scroll/group origin is involved,
-            // which is the disagreement a reader must be able to see rather than infer. Nothing is
-            // recorded when the subscription did not opt in, and nothing at all exists in a release build.
-            UiDevGeometryProbe.Note(
+            // which is the disagreement a reader must be able to see rather than infer. Identity, appearance
+            // and provenance come from what has already resolved for this entry - the node the engine just
+            // published, the theme its own chain resolved to, and the session's effective clip - so the
+            // sample describes the pass that ran instead of a second derivation of it. Nothing is recorded
+            // when the subscription did not opt in (the probe returns before it touches the resolver), and
+            // nothing at all exists in a release build. The answer says whether the bounded capture kept this
+            // entry, and the overlay below paints exactly the entries it kept.
+            bool sampled = UiDevGeometryProbe.Note(
                 entry.Node,
                 entry.Spec,
                 entry.ContainerKind,
                 entry.IsContainer,
                 IsScopedContainer(entry.ContainerKind),
+                entry.Widget != null,
                 entry.Rect,
                 entry.ContentRect,
                 drawRect,
-                entryCtx);
+                entryCtx,
+                !ReferenceEquals(entryCtx.Theme, ctx.Theme),
+                styleResolver,
+                entryCtx.StyleChain);
 #endif
 
             if (IsScopedContainer(entry.ContainerKind))
@@ -666,8 +676,9 @@ public sealed class UiLayoutEngine
 #if FER_DEV
                 // The optional overlay is painted LAST for this entry, after the fit audit closed and after
                 // the element drew, in the element's own draw-local space: an outline that could feed back
-                // into the thing it measures would be the instrument changing the measurement.
-                UiDevGeometryProbe.Outline(drawRect);
+                // into the thing it measures would be the instrument changing the measurement. It paints only
+                // what the capture retained, so the picture cannot show a node the data does not describe.
+                UiDevGeometryProbe.Outline(drawRect, sampled);
 #endif
 
                 index++;
@@ -699,17 +710,19 @@ public sealed class UiLayoutEngine
             Vector2 scopeWindowOrigin = nativeOrigin.HasValue
                 ? new Vector2(windowOrigin.x + outRect.x, windowOrigin.y + outRect.y)
                 : outRect.position;
-            Vector2 childWindowOrigin = new(
-                scopeWindowOrigin.x - scrollPosition.x,
-                scopeWindowOrigin.y - scrollPosition.y);
+            Rect? parentClip = ctx.Session.CurrentClip;
+            ctx.Session.ConstrainClip(new Rect(scopeWindowOrigin.x, scopeWindowOrigin.y, outRect.width, outRect.height));
 
             try
             {
                 VerseWidgets.BeginScrollView(outRect, ref scrollPosition, contentRect);
+                // BeginScrollView may consume a wheel event and change the offset in this very pass.
+                Vector2 childWindowOrigin = new(scopeWindowOrigin.x - scrollPosition.x, scopeWindowOrigin.y - scrollPosition.y);
                 DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.position, childWindowOrigin);
             }
             finally
             {
+                ctx.Session.CurrentClip = parentClip;
                 ctx.Session.SetScrollPosition(entry.Node, scrollPosition);
                 VerseWidgets.EndScrollView();
             }
@@ -723,6 +736,8 @@ public sealed class UiLayoutEngine
         Vector2 groupWindowOrigin = nativeOrigin.HasValue
             ? new Vector2(windowOrigin.x + outRect.x, windowOrigin.y + outRect.y)
             : outRect.position;
+        Rect? outerClip = ctx.Session.CurrentClip;
+        ctx.Session.ConstrainClip(new Rect(groupWindowOrigin.x, groupWindowOrigin.y, outRect.width, outRect.height));
         try
         {
             GUI.BeginGroup(outRect);
@@ -730,6 +745,7 @@ public sealed class UiLayoutEngine
         }
         finally
         {
+            ctx.Session.CurrentClip = outerClip;
             GUI.EndGroup();
         }
     }
@@ -2374,17 +2390,25 @@ public sealed class UiLayoutEngine
     }
 
     /// <summary>
-    /// Text-natural width of a child (N1): the maximum measured advance over the label attributes
-    /// its kind declared at registration, each resolved through translation when the attribute
-    /// name ends in Key. Zero means "not Auto-measurable" — a kind without a declared label set,
-    /// or with none of them filled — and the caller falls back to the unsized distribution.
-    /// General widget natural-size measurement stays unshipped until a second citation makes it
-    /// real; this seam is deliberately text-only.
+    /// Natural width of a child (N1): the maximum measured advance over the label attributes its kind
+    /// declared at registration, each resolved through translation when the attribute name ends in Key,
+    /// PLUS the non-text body the kind declares at registration (a box, a track and the space it holds
+    /// open). Text-only measurement reserved too little room for a control that draws its own body, which
+    /// is the defect the body contribution closes; a kind that declares no body keeps its exact previous
+    /// answer. Zero still means "not Auto-measurable" — no label set, no body, or neither filled — and the
+    /// caller falls back to the unsized distribution.
     /// </summary>
     private static float MeasureLabelWidth(UiElementSpec spec, UiWidgetContext ctx)
     {
+        float body = 0f;
+        Func<UiElementSpec, UiWidgetContext, float>? naturalBody = UiWidgetRegistry.GetNaturalBody(ctx.Source, spec.Kind);
+        if (naturalBody != null)
+        {
+            body = Math.Max(0f, naturalBody(spec, ctx));
+        }
+
         IReadOnlyCollection<string>? labels = UiWidgetRegistry.GetLabelAttributes(ctx.Source, spec.Kind);
-        if (labels == null) return 0f;
+        if (labels == null) return body;
 
         float widest = 0f;
         foreach (string attribute in labels)
@@ -2399,7 +2423,7 @@ public sealed class UiLayoutEngine
             widest = Math.Max(widest, ctx.Metrics.MeasureWidth(text, ctx.Theme.DefaultFont));
         }
 
-        return widest;
+        return widest <= 0f ? body : widest + body;
     }
 
     /// <summary>

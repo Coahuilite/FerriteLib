@@ -679,8 +679,8 @@ internal static class KernelDocumentReloadTests
 
         using var service = NewService(false);
         service.Add(new UiDocumentSource("shared-style", UiDocumentKind.Style, path), v1);
-        UiTheme themeA = UiTheme.DarkGold.Clone();
-        UiTheme themeB = UiTheme.DarkGold.Clone();
+        UiTheme themeA = UiTheme.Vanilla.Clone();
+        UiTheme themeB = UiTheme.Vanilla.Clone();
         using var hostA = NewHost("style-a", UiLayoutManifest.Parse(KeepPage("style-a")), new UiBindings(), themeA);
         using var hostB = NewHost("style-b", UiLayoutManifest.Parse(KeepPage("style-b")), new UiBindings(), themeB);
         service.Attach(hostA, null, "shared-style");
@@ -765,7 +765,7 @@ internal static class KernelDocumentReloadTests
         string v1 = KeepPage("scope-retint");
         File.WriteAllText(path, v1);
 
-        UiTheme theme = UiTheme.DarkGold.Clone();
+        UiTheme theme = UiTheme.Vanilla.Clone();
         using var service = NewService(false);
         service.Add(new UiDocumentSource("tint", UiDocumentKind.Layout, path), v1);
         using var host = NewHost("scope-retint", UiLayoutManifest.Parse(v1), new UiBindings(), theme);
@@ -792,7 +792,7 @@ internal static class KernelDocumentReloadTests
 
         using var styleService = NewService(false);
         styleService.Add(new UiDocumentSource("tint-style", UiDocumentKind.Style, stylePath), styleV1);
-        UiTheme themed = UiTheme.DarkGold.Clone();
+        UiTheme themed = UiTheme.Vanilla.Clone();
         Color panelBaseline = themed.Panel;
         Color baseBaseline = themed.Base;
         using var styled = NewHost("scope-retint-style", UiLayoutManifest.Parse(KeepPage("scope-retint-style")), new UiBindings(), themed);
@@ -979,7 +979,7 @@ internal static class KernelDocumentReloadTests
         string valid = PageSchemeStyle("ice", "#0000ff");
         string validPath = Path.Combine(dir, "valid.xml");
         File.WriteAllText(validPath, valid);
-        UiTheme theme = UiTheme.DarkGold.Clone();
+        UiTheme theme = UiTheme.Vanilla.Clone();
         using var validService = NewService(false);
         validService.Add(new UiDocumentSource("s5v", UiDocumentKind.Style, validPath), valid);
         using var validHost = NewHost(
@@ -1467,7 +1467,7 @@ internal static class KernelDocumentReloadTests
 
     private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindings bindings)
     {
-        return new UiHost(source, manifest, bindings, UiTheme.DarkGold, new FixedMetrics(), new FixedTranslation());
+        return new UiHost(source, manifest, bindings, UiTheme.Vanilla, new FixedMetrics(), new FixedTranslation());
     }
 
     /// <summary>A host built on a theme the lane holds, so a page-level application is observable.</summary>

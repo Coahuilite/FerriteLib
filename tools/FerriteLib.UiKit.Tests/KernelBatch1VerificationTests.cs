@@ -200,7 +200,7 @@ internal static class KernelBatch1VerificationTests
         UiWidgetRegistry.InitializeCore();
 
         using UiSession session = new();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         var bindings = new UiBindings();
         bindings.BindReadOnly<string>("ro", () => "x");
         UiWidgetContext ctx = new(Scope, session, Metrics(), theme, Translation(), bindings, 200f, "root");
@@ -259,7 +259,7 @@ internal static class KernelBatch1VerificationTests
 
         // Independent: the scheme still applies everything else, and the derived step follows the applied
         // accent - so a red HoverPoint declaration cannot leak into the theme.
-        var resolver = new UiStyleResolver(UiTheme.DarkGold, ghost);
+        var resolver = new UiStyleResolver(UiTheme.Vanilla, ghost);
         UiTheme scoped = resolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "ghost") });
         Check(SameColor(scoped.AccentGold, new Color(0f, 1f, 0f, 1f)),
             "the rest of the scheme still applies (AccentGold is the scheme's green)");
@@ -710,7 +710,7 @@ internal static class KernelBatch1VerificationTests
                 + W("t", WrappedTextWidget.Kind, "Text=\"abcdefghij\" Height=\"20\"")
                 + "</Stack>");
             using UiHost host = new(
-                Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.DarkGold, new OverflowMetrics(), Translation());
+                Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.Vanilla, new OverflowMetrics(), Translation());
             host.DrawFrame(new Rect(0f, 0f, 120f, 200f));
 
             Check(reports.Count >= 1,
@@ -857,7 +857,7 @@ internal static class KernelBatch1VerificationTests
             Scope,
             UiLayoutManifest.Parse(xml),
             bindings ?? new UiBindings(),
-            theme ?? UiTheme.DarkGold,
+            theme ?? UiTheme.Vanilla,
             Metrics(),
             Translation(),
             document);
@@ -865,7 +865,7 @@ internal static class KernelBatch1VerificationTests
 
     private static UiLayoutSnapshot Arrange(string xml, float width, float height)
     {
-        return Arrange(xml, UiTheme.DarkGold, width, height);
+        return Arrange(xml, UiTheme.Vanilla, width, height);
     }
 
     private static UiLayoutSnapshot Arrange(string xml, UiTheme theme, float width, float height)

@@ -241,7 +241,7 @@ internal static class KernelModeRowHelpTests
                 + "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\" Value1=\"A\" />"
                 + "</UiPage>"),
             bindings,
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
 
@@ -271,11 +271,11 @@ internal static class KernelModeRowHelpTests
         host.Session.BeginHitPass();
         Check(!UiNative.IsMouseOver(rect, modeCtx), "an element under another element's popup layer is not hovered");
 
-        // The complementary half of the same rule: a popup the element owns does not make it 'covered', which
-        // is what keeps toggle-to-close working for the kind that opened it.
+        // Sharing a node with a popup is not an ownership claim: other controls in a composite must yield.
+        // Only the dropdown trigger's explicit owner id preserves toggle-to-close (KernelPopupTests).
         host.Session.PushHitLayer(mode, rect, isPopup: true);
         host.Session.BeginHitPass();
-        Check(UiNative.IsMouseOver(rect, modeCtx), "while its own popup leaves it hovered");
+        Check(!UiNative.IsMouseOver(rect, modeCtx), "a same-node popup also suppresses content hover");
     }
 
     // --- fixture -----------------------------------------------------------------------------------
@@ -334,7 +334,7 @@ internal static class KernelModeRowHelpTests
     /// </summary>
     private static Vector2 CellCenter(Fixture fixture, int index)
     {
-        UiGeometry g = UiTheme.DarkGold.Geometry;
+        UiGeometry g = UiTheme.Vanilla.Geometry;
         int columns = fixture.Rect.width >= 560f ? 4 : fixture.Rect.width >= 360f ? 2 : 1;
         float innerWidth = Math.Max(1f, fixture.Rect.width - g.Spacing * 2f);
         float columnWidth = (innerWidth - (columns - 1) * g.Gap) / columns;
@@ -356,7 +356,7 @@ internal static class KernelModeRowHelpTests
     private static UiWidgetContext MakeContext(UiSession session, IUiBindings bindings)
     {
         return new UiWidgetContext(
-            Scope, session, new StubMetrics(), UiTheme.DarkGold,
+            Scope, session, new StubMetrics(), UiTheme.Vanilla,
             new StubTranslation(), bindings, Width, "root");
     }
 
@@ -371,7 +371,7 @@ internal static class KernelModeRowHelpTests
             Scope,
             UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"" + Scope + "\">" + body + "</UiPage>"),
             bindings,
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
     }

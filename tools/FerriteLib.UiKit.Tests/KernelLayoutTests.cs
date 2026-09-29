@@ -694,7 +694,7 @@ internal static class KernelLayoutTests
             Scope,
             UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
                 + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" /></UiPage>"),
-            new UiBindings(), UiTheme.DarkGold, new StubMetrics(), new StubTranslation()))
+            new UiBindings(), UiTheme.Vanilla, new StubMetrics(), new StubTranslation()))
         {
             Check(!host.TryPrepareLayoutCandidate(
                     Parse("<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
@@ -786,7 +786,7 @@ internal static class KernelLayoutTests
 
         var engine = new UiLayoutEngine(Scope);
         var ctx = new UiWidgetContext(
-            Scope, new UiSession(), new StubMetrics(), UiTheme.DarkGold, new StubTranslation(), bindings, 400f, "root");
+            Scope, new UiSession(), new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 400f, "root");
 
         Check(Near(engine.ArrangeRoots(ctx, new Vector2(400f, 600f), Parse(xml).Roots).RectById["keyed"].width, 120f),
             "the bound width is the declared width");
@@ -804,7 +804,7 @@ internal static class KernelLayoutTests
         mismatched.BindValue("col-width", () => other, value => other = value);
         UiFitAudit.Reset();
         var ctx2 = new UiWidgetContext(
-            Scope, new UiSession(), new StubMetrics(), UiTheme.DarkGold, new StubTranslation(), mismatched, 400f, "root");
+            Scope, new UiSession(), new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), mismatched, 400f, "root");
         Check(Near(new UiLayoutEngine(Scope).ArrangeRoots(ctx2, new Vector2(400f, 600f), Parse(xml).Roots).RectById["keyed"].width, 200f),
             "an unanswerable WidthKey falls back to the unsized distribution rather than guessing");
         Check(UiFitAudit.StyleFallbackCount == 1, "and it is reported once through the fail-soft appearance channel");
@@ -896,7 +896,7 @@ internal static class KernelLayoutTests
     {
         RegisterTestWidget(10f, null, false);
 
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         theme.Geometry = new UiGeometry(10f, 4f, 10f, 28f, 1f);
 
         const string xml =
@@ -938,7 +938,7 @@ internal static class KernelLayoutTests
 
     private static UiLayoutSnapshot ArrangeWithGeometry(string xml, UiGeometry geometry)
     {
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         theme.Geometry = geometry;
         UiLayoutEngine engine = new(Scope);
         UiWidgetContext ctx = new(
@@ -952,7 +952,7 @@ internal static class KernelLayoutTests
             Scope,
             UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"" + Scope + "\">" + body + "</UiPage>"),
             new UiBindings(),
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
     }
@@ -984,7 +984,7 @@ internal static class KernelLayoutTests
         string activeTab = "Packs";
         var bindings = new UiBindings();
         bindings.BindValue("active-tab", () => activeTab, value => activeTab = value);
-        UiWidgetContext ctx = new(Scope, session, new StubMetrics(), UiTheme.DarkGold, new StubTranslation(), bindings, 200f, "root");
+        UiWidgetContext ctx = new(Scope, session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 200f, "root");
 
         UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, new Vector2(200f, 100f), Parse(xml).Roots);
         Check(!snapshot.RectById.ContainsKey("basic"), "Inactive Tab element is absent from layout");
@@ -1066,7 +1066,7 @@ internal static class KernelLayoutTests
             Scope,
             new UiSession(),
             new StubMetrics(),
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubTranslation(),
             new UiBindings(),
             400f,

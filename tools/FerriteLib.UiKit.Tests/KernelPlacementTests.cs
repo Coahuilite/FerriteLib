@@ -322,7 +322,7 @@ internal static class KernelPlacementTests
             Scope,
             UiLayoutManifest.Parse(Page(body)),
             bindings,
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
     }
@@ -433,7 +433,7 @@ internal static class KernelPlacementTests
             Scope,
             UiLayoutManifest.Parse(xml),
             new UiBindings(),
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
     }
@@ -474,7 +474,7 @@ internal static class KernelPlacementTests
             Scope,
             new UiSession(),
             new StubMetrics(),
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubTranslation(),
             new UiBindings(),
             400f,

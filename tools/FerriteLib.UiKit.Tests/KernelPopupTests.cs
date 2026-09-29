@@ -28,12 +28,15 @@ internal static class KernelPopupTests
     public static int RunAll()
     {
         int failures = 0;
+        failures += Run("Same-node composite siblings yield to popup options", VerifyCompositeSiblingsYield);
+        failures += Run("Covered value primitives skip native input and recover after close", VerifyCoveredValuePrimitives);
         failures += Run("Covered trigger yields under a real IMGUI event pump", VerifyCoveredTriggerYieldsUnderRealEventPump);
         failures += Run("Covered trigger yields inside a scrolled, offset container", VerifyCoveredTriggerYieldsInsideScrolledOffsetContainer);
         failures += Run("Scroll dropdown anchor/popup share Host window space", VerifyScrollDropdownWindowSpace);
         failures += Run("Popup row over a lower trigger selects, and does not open that trigger", VerifyPopupWinsOverCoveredTrigger);
         failures += Run("Popup flips above the trigger instead of leaving the viewport", VerifyPopupFlipsIntoViewport);
         failures += Run("UiPopup rect rules: below, flip, pin, clamp, unpublished viewport", VerifyUiPopupRectRules);
+        failures += Run("An open popup follows its trigger through a scroll, and is released when the trigger leaves", VerifyOpenPopupFollowsTheTrigger);
         return failures;
     }
 
@@ -64,7 +67,7 @@ internal static class KernelPopupTests
         bindings.BindValue("dropdown", () => current, value => current = value);
         bindings.BindOptions("Options", () => new List<string> { "x", "y" });
 
-        using UiHost host = new(Scope, manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new(Scope, manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
 
         // Content is 100 + 28 + 100 = 228 tall; viewport is 200, so the scroll offset clamps to 28.
         // Vertical overflow reserves the 16px scrollbar width, leaving a 284px trigger.
@@ -183,7 +186,7 @@ internal static class KernelPopupTests
         bindings.BindValue("second", () => second, value => second = value);
         bindings.BindOptions("Options", () => new List<string> { "x", "y" });
 
-        using UiHost host = new(Scope, manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new(Scope, manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
 
         // Triggers: first (0,0,300,28), second (0,30,300,28). First's popup covers y 28..76, so its
         // second option row (y 52..76) sits on top of the second trigger.
@@ -291,7 +294,7 @@ internal static class KernelPopupTests
         bindings.BindValue("second", () => second, value => second = value);
         bindings.BindOptions("Options", () => new List<string> { "x", "y" });
 
-        using UiHost host = new(Scope, manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new(Scope, manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
 
         var trace = new List<string>();
         UiNative.Trace = trace.Add;
@@ -406,14 +409,14 @@ internal static class KernelPopupTests
         bindings.BindValue("second", () => second, value => second = value);
         bindings.BindOptions("Options", () => new List<string> { "x", "y" });
 
-        using UiHost host = new(Scope, manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new(Scope, manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
 
         // Warm arrange: the node the scroll offset belongs to exists only after the page has been
         // arranged once.
         host.MeasureAndArrange(new Vector2(300f, 300f));
         UiNode scrollNode = host.Session.GetNodeByElementId("scroll")
             ?? throw new Exception("the arranged scroll element has no node");
-        host.Session.SetScrollPosition(scrollNode, new Vector2(0f, 40f));
+        host.Session.SetScrollPosition(scrollNode, new Vector2(0f, 160f));
 
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(300f, 300f));
         host.Session.OpenPopup("first", snapshot.RectById["first"]);
@@ -494,7 +497,7 @@ internal static class KernelPopupTests
         bindings.BindValue("low", () => current, value => current = value);
         bindings.BindOptions("Options", () => new List<string> { "x", "y" });
 
-        using UiHost host = new(Scope, manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new(Scope, manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
 
         try
         {
@@ -568,10 +571,312 @@ internal static class KernelPopupTests
         }
     }
 
+    /// <summary>
+    /// The open popup's anchor is a per-frame fact, not an open-time one. A trigger inside a scroll keeps
+    /// moving while its menu is open, so the menu follows the trigger; and a popup whose owner stops being
+    /// drawn is released at the end of the same hit pass instead of surviving as a menu attached to nothing.
+    /// <para>
+    /// <b>Mutation proof.</b> Remove the <c>openPopupAnchor = windowRect</c> refresh in
+    /// <c>UiSession.NotePopupOwnerDrawn</c> and assertion A reddens (the y difference becomes 0 instead
+    /// of -20). Replace the close in <c>UiSession.EndHitPass</c> with a ledger read and assertion B
+    /// reddens (the hidden owner's popup survives). Remove the scroll scope's clip intersection and
+    /// assertion C reddens (an owner outside the inner viewport leaves a popup). Each was run separately.
+    /// Reopening, hit-layer cleanup and host-boundary assertions are additional regression guards.
+    /// </para>
+    /// </summary>
+    private static void VerifyOpenPopupFollowsTheTrigger()
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+        UiWidgetRegistry.Register(Scope, HeightWidgetKind, () => new HeightWidget());
+
+        const string xml =
+            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Column Padding=\"0\" Gap=\"0\"><Widget Kind=\"" + HeightWidgetKind + "\" Height=\"60\" />"
+            + "<Scroll Id=\"scroll\" Padding=\"0\" Gap=\"0\" Height=\"200\">"
+            + "<Widget Id=\"spacer\" Kind=\"" + HeightWidgetKind + "\" Height=\"100\" />"
+            + "<Widget Id=\"dropdown\" Kind=\"input/dropdown\" OptionsBind=\"Options\" VisibleKey=\"dropdown-visible\" />"
+            + "<Widget Id=\"tail\" Kind=\"" + HeightWidgetKind + "\" Height=\"300\" />"
+            + "</Scroll></Column>"
+            + "</UiPage>";
+
+        var bindings = new UiBindings();
+        string current = "x";
+        bool visible = true;
+        bindings.BindValue("dropdown", () => current, value => current = value);
+        bindings.BindOptions("Options", () => new List<string> { "x", "y" });
+        bindings.BindReadOnly("dropdown-visible", () => visible);
+
+        using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
+
+        // A NON-ZERO Host viewport origin on purpose: a zero one hides double-offset bugs (same reason the
+        // scrolled-anchor lane above uses one).
+        Rect viewport = new(20f, 30f, 300f, 300f);
+        host.MeasureAndArrange(new Vector2(300f, 300f));
+        UiNode scrollNode = host.Session.GetNodeByElementId("scroll")
+            ?? throw new Exception("the arranged scroll element has no node");
+
+        // Content-local trigger rect at scroll 0: 100px spacer above it, 284 wide because vertical overflow
+        // reserves the scrollbar (the same geometry the scrolled-anchor lane documents).
+        Rect triggerContentLocal = new(0f, 100f, 284f, 28f);
+        try
+        {
+            Event.current = null;
+
+            // Frame 1: click the trigger, popup opens and its layer is published.
+            UiNative.ButtonOverride = rect => SameRect(rect, triggerContentLocal);
+            host.DrawFrame(viewport);
+            if (!host.Session.IsPopupOpen("dropdown"))
+            {
+                throw new Exception("the scrolled trigger did not open its popup");
+            }
+
+            Rect? opened = PopupLayer(host.Session);
+            if (!opened.HasValue)
+            {
+                throw new Exception("the popup pass pushed no hit layer, so nothing can follow the trigger");
+            }
+
+            // Frame 2: the container scrolls by 20 WITH THE POPUP ALREADY OPEN - the reported case. No press
+            // at all: the anchor must be refreshed by the trigger's own draw.
+            host.Session.SetScrollPosition(scrollNode, new Vector2(0f, 20f));
+            UiNative.ButtonOverride = _ => false;
+            host.DrawFrame(viewport);
+
+            Rect? scrolled = PopupLayer(host.Session);
+            if (!scrolled.HasValue)
+            {
+                throw new Exception("the popup layer vanished when the container scrolled: the menu was dismissed rather than followed");
+            }
+
+            // (A) MUTATION PROOF: without the per-frame refresh this difference is 0.
+            if (Math.Abs(scrolled.Value.y - (opened.Value.y - 20f)) > 0.01f)
+            {
+                throw new Exception("the popup follows its trigger through a scroll: opened at y="
+                    + opened.Value.y + ", after a 20px scroll it is at y=" + scrolled.Value.y
+                    + " where the trigger's own -20 requires " + (opened.Value.y - 20f));
+            }
+
+            // Frame 3: the owner is no longer arranged, so no call site can report it. The announce is
+            // explicit because a read-only VisibleKey cannot invalidate the arrange cache by itself.
+            visible = false;
+            host.Session.BumpContentRevision();
+            host.DrawFrame(viewport);
+
+            // (B) The orphan release, before this pass draws deferred menus.
+            if (host.Session.IsPopupOpen("dropdown"))
+            {
+                throw new Exception("a popup whose owner is no longer drawn survived as an orphan menu");
+            }
+
+            if (PopupLayer(host.Session).HasValue)
+            {
+                throw new Exception("the orphan popup's hit layer outlived the popup");
+            }
+
+            // The stale location must be inert: the menu is gone, and the press must not reach the (hidden)
+            // trigger either.
+            Vector2 stale = new(scrolled.Value.x + 10f, scrolled.Value.y + 10f);
+            string before = current;
+            UiNative.ButtonOverride = rect => Over(rect, stale);
+            host.DrawFrame(viewport);
+            if (!string.Equals(current, before, StringComparison.Ordinal) || host.Session.IsPopupOpen("dropdown"))
+            {
+                throw new Exception("the stale popup location still acted (value now '" + current + "')");
+            }
+
+            // Recovery: arranged again, the trigger opens its popup again.
+            visible = true;
+            host.Session.BumpContentRevision();
+            UiNative.ButtonOverride = rect => SameRect(rect, triggerContentLocal);
+            host.DrawFrame(viewport);
+            if (!host.Session.IsPopupOpen("dropdown"))
+            {
+                throw new Exception("the trigger did not reopen its popup after its owner came back");
+            }
+
+            // (C) The owner leaves the inner scroll clip but remains in the Host viewport.
+            // At offset 130 its bottom is window y=88, inside the host but before the scroll viewport y=90.
+            host.Session.SetScrollPosition(scrollNode, new Vector2(0f, 130f));
+            UiNative.ButtonOverride = _ => false;
+            host.DrawFrame(viewport);
+            if (host.Session.IsPopupOpen("dropdown") || PopupLayer(host.Session).HasValue)
+                throw new Exception("the inner scroll clip left an orphan popup/hit layer");
+            host.Session.SetScrollPosition(scrollNode, Vector2.zero);
+            UiNative.ButtonOverride = rect => SameRect(rect, triggerContentLocal);
+            host.DrawFrame(viewport);
+            if (!host.Session.IsPopupOpen("dropdown")) throw new Exception("clipped owner did not recover");
+
+            // The viewport branch of the same rule, driven directly against the published viewport: an owner
+            // rect that leaves the Host viewport releases the popup at once, so an owner that is scrolled
+            // clear of the window cannot leave a menu behind even while it is still being drawn.
+            host.Session.NotePopupOwnerDrawn("dropdown", new Rect(-1000f, -1000f, 10f, 10f));
+            if (host.Session.IsPopupOpen("dropdown"))
+            {
+                throw new Exception("an owner rect outside the Host viewport did not release its popup");
+            }
+        }
+        finally
+        {
+            UiNative.ButtonOverride = null;
+            Event.current = null;
+        }
+    }
+
     /// <summary>Point containment, written out because the stub Rect has no Contains to lean on.</summary>
     private static bool Over(Rect rect, Vector2 point)
     {
         return point.x >= rect.x && point.x <= rect.xMax && point.y >= rect.y && point.y <= rect.yMax;
+    }
+
+    // Native-call seam guard (not game rendering evidence). Removing the popup refusal must redden it.
+    private static void VerifyCoveredValuePrimitives()
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+        UiWidgetRegistry.Register(Scope, HeightWidgetKind, () => new HeightWidget());
+        using UiHost host = new(Scope, UiLayoutManifest.Parse(Xml),
+            MakePrimitiveBindings(), UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
+        host.MeasureAndArrange(new Vector2(300f, 300f));
+        UiSession session = host.Session;
+        UiNode node = session.GetNodeByElementId("dropdown")!;
+        session.SetCurrentWindowOrigin(new Vector2(20f, 30f));
+        session.PushHitLayer(node, new Rect(20f, 30f, 100f, 100f), true, "owner");
+        session.BeginHitPass();
+        int nativeCalls = 0;
+        try
+        {
+            UiNative.DebugMousePositionEnabled = true;
+            UiNative.DebugMousePosition = new Vector2(10f, 10f);
+            UiNative.DebugMouseDown = true;
+            UiNative.SliderOverride = (_, value, _, _) => { nativeCalls++; return value; };
+            UiNative.TextFieldOverride = (_, value) => { nativeCalls++; return value; };
+            void DrawControls()
+            {
+                Rect rect = new(0f, 0f, 100f, 30f);
+                UiNative.Slider(rect, "sibling-slider", session, 1f, 0f, 2f, out _);
+                UiNative.TextField(rect, "sibling-text", session, "value", out _);
+                UiNative.NumberField(rect, "sibling-number", session, 1f, 0f, 2f, "0.##", out _);
+            }
+            DrawControls();
+            if (nativeCalls != 0 || UiNative.DebugHotControl != 0)
+                throw new Exception("covered primitives reached native input/capture");
+            session.BeginHitPass();
+            DrawControls();
+            if (nativeCalls != 3) throw new Exception("native input did not recover when popup layer disappeared");
+        }
+        finally
+        {
+            UiNative.DebugMousePositionEnabled = false;
+            UiNative.DebugMouseDown = false;
+            UiNative.DebugHotControl = 0;
+            UiNative.SliderOverride = null;
+            UiNative.TextFieldOverride = null;
+        }
+    }
+
+    private static UiBindings MakePrimitiveBindings()
+    {
+        var bindings = new UiBindings();
+        bindings.BindValue("dropdown", () => "x", _ => { });
+        bindings.BindOptions("Options", () => new List<string> { "x", "y" });
+        return bindings;
+    }
+
+    // Real event-pump regression: unlike the separate-node lanes above, both controls share one context.
+    // Mutation proof: restoring the element-identity exemption must make the option assertion fail.
+    private static void VerifyCompositeSiblingsYield()
+    {
+        foreach (bool scroll in new[] { false, true })
+        foreach (bool button in new[] { false, true })
+        foreach (float optionOffset in new[] { 1f, 12f, 23f })
+        {
+            UiWidgetRegistry.Clear();
+            UiWidgetRegistry.InitializeCore();
+            var widget = new CompositeWidget { ButtonSibling = button };
+            UiWidgetRegistry.Register(Scope, "test/composite", () => widget);
+            string body = "<Widget Id=\"composite\" Kind=\"test/composite\" />";
+            if (scroll) body = "<Scroll Id=\"viewport\" Height=\"160\" Padding=\"0\">" + body + "</Scroll>";
+            var manifest = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"" + Scope + "\">" + body + "</UiPage>");
+            using UiHost host = new(Scope, manifest, new UiBindings(), UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
+            Rect viewport = new(20f, 30f, 300f, 300f);
+            void Frame(EventType type, Vector2 point)
+            {
+                Event e = Event.KeyboardEvent("space");
+                e.type = type;
+                e.button = 0;
+                e.mousePosition = point;
+                Event.current = e;
+                host.DrawFrame(viewport);
+            }
+
+            try
+            {
+                Frame(EventType.Repaint, new Vector2(0f, 0f));
+                if (scroll)
+                {
+                    host.Session.SetScrollPosition(host.Session.GetNodeByElementId("viewport")!, new Vector2(0f, 10f));
+                    Frame(EventType.Repaint, new Vector2(0f, 0f));
+                }
+                Vector2 trigger = new(widget.First.x + 10f, widget.First.y + 12f);
+                Frame(EventType.MouseDown, trigger);
+                Frame(EventType.MouseUp, trigger);
+                Frame(EventType.Repaint, trigger);
+                Rect popup = PopupLayer(host.Session) ?? throw new Exception("composite popup did not publish");
+                Vector2 option = new(popup.x + 10f, popup.y + 24f + optionOffset);
+                if (!Over(widget.Sibling, option)) throw new Exception("fixture does not overlap the sibling");
+                Frame(EventType.Layout, option);
+                Frame(EventType.MouseDown, option);
+                Frame(EventType.MouseUp, option);
+                Frame(EventType.Repaint, option);
+                if (widget.Selected != "y" || widget.ButtonClicks != 0 || host.Session.OpenPopupId != null)
+                    throw new Exception("same-node option lost to sibling: button=" + button + ", scroll=" + scroll + ", offset=" + optionOffset);
+
+                // No stale occlusion after close: the underlying control must work again.
+                Frame(EventType.Repaint, option);
+                Frame(EventType.MouseDown, option);
+                Frame(EventType.MouseUp, option);
+                if (button ? widget.ButtonClicks != 1 : !host.Session.IsPopupOpen("composite-second"))
+                    throw new Exception("sibling did not recover input after popup close");
+            }
+            finally
+            {
+                Event.current = null;
+                GUIUtility.hotControl = 0;
+            }
+        }
+    }
+
+    private sealed class CompositeWidget : IUiWidget
+    {
+        public string Kind => "test/composite";
+        public bool ButtonSibling;
+        public int ButtonClicks;
+        public string Selected = "x";
+        public Rect First;
+        public Rect Sibling;
+        public void Configure(UiElementSpec spec) { }
+        public void Validate(IUiBindings bindings, string elementPath) { }
+        public float Measure(UiWidgetContext ctx) => 220f;
+        public void Draw(Rect rect, UiWidgetContext ctx)
+        {
+            Rect first = new(rect.x, rect.y + 20f, 150f, 28f);
+            Rect sibling = new(rect.x, rect.y + 60f, 150f, 48f);
+            First = ctx.ToWindowRect(first);
+            Sibling = ctx.ToWindowRect(sibling);
+            UiNative.DropdownButton(first, "composite-first", ctx);
+            if (ButtonSibling)
+            {
+                if (UiNative.Button(sibling, ctx)) ButtonClicks++;
+            }
+            else UiNative.DropdownButton(sibling, "composite-second", ctx);
+            if (!ctx.Session.IsPopupOpen("composite-first")) return;
+            Rect anchor = ctx.Session.OpenPopupAnchor!.Value;
+            ctx.Session.RegisterPopupDraw(() => UiPopup.DrawOptionList(
+                UiPopup.RectFor(anchor, 2, ctx.Session.HostViewport), "composite-first", ctx,
+                new List<KeyValuePair<string, string>> { new("X", "x"), new("Y", "y") },
+                Selected, value => Selected = value));
+        }
     }
 
     private sealed class HeightWidget : IUiWidget

@@ -868,7 +868,7 @@ internal static class KernelDiagnosticsTests
     private static UiHost NewHost(string source, UiLayoutManifest manifest)
     {
         return new UiHost(
-            source, manifest, new UiBindings(), UiTheme.DarkGold.Clone(), new FixedMetrics(), new FixedTranslation());
+            source, manifest, new UiBindings(), UiTheme.Vanilla.Clone(), new FixedMetrics(), new FixedTranslation());
     }
 
     private static void Draw(UiHost host)
@@ -879,7 +879,7 @@ internal static class KernelDiagnosticsTests
     private static UiHost NewHost(string source, string xml, ITextMetrics metrics)
     {
         return new UiHost(
-            source, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.DarkGold.Clone(), metrics, new FixedTranslation());
+            source, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.Vanilla.Clone(), metrics, new FixedTranslation());
     }
 
     private static string Page(string source, string widgetId, string kind)

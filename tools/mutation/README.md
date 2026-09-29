@@ -21,10 +21,18 @@ pwsh -NoProfile -File tools/mutation/Invoke-Mutation.ps1 -SelfTest      # the ge
 pwsh -NoProfile -File tools/mutation/Invoke-AnchoredEdits.ps1 -SelfTest # the two-phase engine's fixtures
 pwsh -NoProfile -File tools/mutation/batches/t2-2026-09-24.ps1 -ValidateOnly  # a batch, before it writes
 pwsh -NoProfile -File tools/mutation/batches/t2-2026-09-24.ps1              # ... and for real
+pwsh -NoProfile -File tools/mutation/batches/r12-2026-09-28.ps1 -ValidateOnly  # the R12-CORR batch
+pwsh -NoProfile -File tools/mutation/batches/r12-2026-09-28.ps1                # typography/appearance/switch
+pwsh -NoProfile -File tools/mutation/batches/r12-2026-09-28.ps1 -Only r12-c3-scope-cache-not-expired-on-colour
+pwsh -NoProfile -File tools/mutation/batches/r3a-2026-09-29.ps1 -ValidateOnly  # the R3-A batch (Dev only)
+pwsh -NoProfile -File tools/mutation/batches/r3a-2026-09-29.ps1                # same-capture snapshot/overlay
 ```
 
-A batch is a tracked file too (`batches/t2-2026-09-24.ps1`): the mutations one round's evidence rests on,
-with the assertion each must redden. Re-run it after any engine change, because a changed generator
+A batch is a tracked file too (`batches/t2-2026-09-24.ps1`, `batches/r12-2026-09-28.ps1`,
+`batches/r3a-2026-09-29.ps1`): the mutations one
+round's evidence rests on, with the assertion each must redden. Each case also names which assertion is the
+**mutation target** and which are **guards** that hold on both sides, so a reader never has to upgrade a guard
+into proof. Re-run a batch after any engine change, because a changed generator
 invalidates every log it produced - which is exactly what happened to this batch's first run (polluted
 fingerprints, K2, and one log red for the wrong reason, kept under `dist/dev-work/superseded/` as an
 incident record).

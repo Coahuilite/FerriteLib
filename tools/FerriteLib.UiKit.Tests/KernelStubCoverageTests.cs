@@ -340,7 +340,7 @@ internal static class KernelStubCoverageTests
             + "<Widget Id=\"probe\" Kind=\"" + ProbeKind + "\" Height=\"24\"/>"
             + "</UiPage>");
 
-        using UiHost host = new(Scope, manifest, new UiBindings(), UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new(Scope, manifest, new UiBindings(), UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
 
         KernelTripGuard.ExpectNoTrips(host.Session, "stub-coverage page draw");
@@ -362,7 +362,7 @@ internal static class KernelStubCoverageTests
             + "<Widget Id=\"boom\" Kind=\"" + ThrowingProbeKind + "\" Height=\"24\"/>"
             + "</UiPage>");
 
-        using UiHost host = new(Scope, manifest, new UiBindings(), UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new(Scope, manifest, new UiBindings(), UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
 
         Check(KernelTripGuard.AnyTripped(host.Session),
@@ -391,7 +391,7 @@ internal static class KernelStubCoverageTests
     {
         PrepareRegistry();
 
-        using UiHost host = new(Scope, ProbeManifest(), new UiBindings(), UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new(Scope, ProbeManifest(), new UiBindings(), UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
 
         // A healthy session passes either way; what the switch changes is that a tripping lane can say so

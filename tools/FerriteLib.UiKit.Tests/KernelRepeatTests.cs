@@ -123,7 +123,7 @@ internal static class KernelRepeatTests
     private static void VerifySelectedKeyIsPerRow()
     {
         UiFitAudit.Reset();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         var activeEdge = new Color(0.91f, 0.11f, 0.17f, 1f);
         // The Active cell's border is theme.AccentGold and a rule paints exactly that border, so the probe
         // colour counts whole rows without depending on the order the rows were drawn in.
@@ -535,7 +535,7 @@ internal static class KernelRepeatTests
         UiFitAudit.Reset();
         UiBindings bindings = MakeBindings(new[] { "a" }, ItemBindingMode.NewKindsAbsent);
         using var host = new UiHost(
-            Scope, UiLayoutManifest.Parse(PageXml), bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            Scope, UiLayoutManifest.Parse(PageXml), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
 
         Draw(host);
         Check(!host.Session.IsTripped(Require(host, "flag#a")),
@@ -635,7 +635,7 @@ internal static class KernelRepeatTests
             Scope,
             UiLayoutManifest.Parse(PageXml),
             MakeBindings(keys, mode),
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
     }
@@ -756,7 +756,7 @@ internal static class KernelRepeatTests
                 Scope,
                 UiLayoutManifest.Parse(xml),
                 MakeBindings(new[] { "a" }),
-                UiTheme.DarkGold,
+                UiTheme.Vanilla,
                 new StubMetrics(),
                 new StubTranslation());
             return null;

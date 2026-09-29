@@ -391,7 +391,7 @@ internal static class KernelWindowCatalogTests
                 new UiWindowKey("c", "standalone", ""),
                 Page(),
                 new UiBindings(),
-                UiTheme.DarkGold,
+                UiTheme.Vanilla,
                 new LaneTranslation(),
                 "standalone",
                 "close",
@@ -774,7 +774,7 @@ internal static class KernelWindowCatalogTests
                 UiLayoutManifest.Parse(
                     "<UiPage Schema='2' Source='window-catalog-broken'><Widget Id='x' Kind='lane/not-registered' /></UiPage>"),
                 new UiBindings(),
-                UiTheme.DarkGold,
+                UiTheme.Vanilla,
                 new LaneTranslation(),
                 "broken",
                 "close",
@@ -1295,7 +1295,7 @@ internal static class KernelWindowCatalogTests
                     key,
                     Page(),
                     new UiBindings(),
-                    UiTheme.DarkGold,
+                    UiTheme.Vanilla,
                     new LaneTranslation(),
                     title,
                     "close",
@@ -1366,7 +1366,7 @@ internal static class KernelWindowCatalogTests
 
         internal bool Prerequisite = true;
 
-        protected override UiTheme Theme => UiTheme.DarkGold;
+        protected override UiTheme Theme => UiTheme.Vanilla;
 
         protected override string Title => title;
 
@@ -1380,7 +1380,7 @@ internal static class KernelWindowCatalogTests
                 source,
                 Page(),
                 new UiBindings(),
-                UiTheme.DarkGold,
+                UiTheme.Vanilla,
                 ruler,
                 new LaneTranslation());
 
@@ -1405,7 +1405,7 @@ internal static class KernelWindowCatalogTests
     /// </summary>
     private class LaneShellBase : UiWindowHost
     {
-        protected override UiTheme Theme => UiTheme.DarkGold;
+        protected override UiTheme Theme => UiTheme.Vanilla;
 
         protected override UiHost CreateHost()
         {
@@ -1413,7 +1413,7 @@ internal static class KernelWindowCatalogTests
                 "window-catalog-lane",
                 Page(),
                 new UiBindings(),
-                UiTheme.DarkGold,
+                UiTheme.Vanilla,
                 new LaneMetrics(),
                 new LaneTranslation());
         }

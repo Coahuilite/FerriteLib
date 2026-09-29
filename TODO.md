@@ -11,14 +11,12 @@ integration surface. The execution handbook is `docs/development/0.7/next-stage-
 instrument commands are in `docs/build-and-debug.md`. Completed foundations and evidence pointers live
 in `MEMORY.md`. Local work remains unpushed.
 
-- [ ] **First acceptance slice: the real-game Packs row click.** Reproduce with a verified Dev package
-      pair; retain the working filter as a control. Capture window/UI scale, language, scroll state,
-      expected/actual selection, and the corresponding geometry/input records. The root cause is unknown.
-- [ ] **Locate and fix the owning layer.** Follow coordinates/clip → hit query → consumption → command →
-      model refresh. Add a narrowly scoped diagnostic only where evidence is missing; fix consumer-specific
-      composition in the consumer and generic contracts in FL. Close the game defect only after the
-      original scenario and nearby repeated-click/scroll/popup cases pass in RimWorld. The `covered`
-      verdict lane below is useful independent automated work while game evidence is pending.
+- [x] **P1 composite popup arbitration:** maintainer passed Packs and Tuning A/B; owner-id isolation and
+      session-bearing primitive guards remain in place. This does not accept the separate scroll defect.
+- [ ] **P1 follow-up: game-accept live popup anchoring.** The anchor/clip/orphan-owner fix passed the full
+      verify/PackDev chain and three faithful reverts. Open a dropdown first, then scroll its containing
+      page: it follows a visible owner and closes when that owner leaves the effective clip or disappears.
+      Check Packs and Tuning plus input recovery; do not repeat the old full diagnostic matrix.
 - [ ] **Continue one settings-page slice at a time.** Select the next slice from the existing redesign,
       identify the contracts it touches, and record ownership, failure-sensitive tests and applicable game
       acceptance. Review shared state/lifetimes when the slice touches coexistence; the global
@@ -69,6 +67,64 @@ library before validating the real page, and their listing order does not overri
 
 ## Library-side items that are real and unblocked
 
+- [ ] **Run the R12 faithful-revert batch.** `tools/mutation/batches/r12-2026-09-28.ps1` lands with the
+      correction round (**tracked, not run** — the shell sandbox fails OS-side `SetNamedSecurityInfoW Win32 5`, so
+      `dotnet` cannot run and the PM/Codex owns every build, test and mutation command). Validate the anchors
+      first (`-ValidateOnly`), then run it whole or one case at a time with `-Only <name>`. Its seven cases cover
+      exactly the behaviour this batch changed: the selected font reaching measure, the font NOT moving density,
+      the scoped `ColourRevision` cache refresh, the claim that keeps an explicit transparent, the look's body
+      entering natural size, the OFF control edge, and the restored ON accent. Each case names its
+      **mutation-target** assertion and the **guards** that hold on both sides — a guard is regression
+      protection, never evidence. **Every old anchor in that file is deliberately single-line**: a multi-line
+      anchor is line-ending sensitive and would refuse on a checkout with the other convention.
+- [ ] **The R12-FL surfaces still need a real run.** Nothing in this line has been compiled since the R12
+      corrections: `KernelResolvedStyleTests` (the corridor lanes: `VerifyLegacySchemeFontRedirect`,
+      `VerifySelectedFontReachesHostMeasure`, `VerifyScopedPaletteRefresh`, `VerifyPartialBagFallsBackToVanilla`,
+      `VerifyPartialBagEdgeFallback`, `VerifyPerSurfaceEdgeCoverage`, `VerifyColourRevisionIsThePaintClock`),
+      `KernelControlKindTests` (`VerifyBooleanAppearanceSeam`, `VerifySwitchThumbTokens`),
+      `KernelToneVocabularyTests.VerifyDanglingRule`, and the parser lanes whose issue counts a readable legacy
+      `<Font>` must not change. Contract and migration record: `docs/development/0.7/05-api-contract.md` §R1/§R2.
+- [ ] **Run the R3-A instrument batch.** `tools/mutation/batches/r3a-2026-09-29.ps1` lands with the R3-A slice
+      and its correction (**tracked, not run**). Eight cases, each naming its mutation-target assertion and its
+      guards: the text rendering and the data rendering disagreeing on the clip, the clip read from the element's
+      own rect instead of the session's effective one, an unobservable boundary filled with a plausible rect, the
+      node identity taken from the display path instead of the canonical key, the dropped-node counter not kept,
+      the overlay painting entries the bounded capture dropped, the declared look reported as the kind's default,
+      and the collector **reusing one snapshot instance** so an already-handed-out snapshot follows a later draw
+      (the batch's only **two-anchor** case — one edit cannot express it; the production `Fill` seam is what makes
+      the reuse a refresh in place rather than a stale cache). **It must run in the DEV configuration**
+      (`run-fl-harness-dev.cmd`) because the whole instrument is inside `#if FER_DEV`; the batch's own default
+      does that. Validate the anchors first (`-ValidateOnly`).
+- [ ] **The R3-A surfaces still need a real run, on the corrected baseline.** The PM-measured run failed gate 10
+      with three R3 fixture errors (two wrong `Page` paths and a bounded fixture the manifest validator refused
+      before capture); all three are corrected, but **nothing has been compiled since**, so the corrected lanes
+      are unverified. Five R3 lanes in `KernelDevGeometryTests` are **Dev-only**
+      (`VerifyStructuredSnapshotMatchesTheDump`, `VerifyEffectiveAppearance`, `VerifyBoundariesAndUnknowns`,
+      `VerifyBoundedCaptureAndDroppedCount`, `VerifySnapshotIsACopyAndHostsAreSeparate`), so a Release-only pass
+      is not instrument coverage — that is
+      the Gate 10 rule in `AGENTS.md` — and the release half's new assertion (`TryGetGeometrySnapshot`
+      answering `false`) only runs in Release. Both configurations are required for this slice.
+      `scripts/verify-dev-instrument.ps1` now names the R3-A assertions (forty names in the list, the renamed
+      ones REPLACED rather than left stale), so deleting or compiling out one of those lanes reddens Gate 10
+      instead of leaving it green; the t2 batch case that pins that counter's red message was re-cut to the new
+      numbers. One residual to eyeball in that run: the
+      instrument file was rewritten wholesale in this slice, so `UiDevGeometryProbe.Outline`'s exact ink and
+      hairline geometry are a faithful-intent reconstruction inside the same funnel (`UiThemeDraw.Solid`, the
+      only solid outlet the containment lane allows there) rather than a byte-preserved original — no lane and
+      no document pins the overlay's pixels. Contract and tier record:
+      `docs/development/0.7/05-api-contract.md` §R3-A and `docs/api-tiers.md`.
+- [ ] **R4-A's typed value/options path needs a real run** (tracked, **not compiled, not run**). Landed: the
+      public carrier `UiChoice<T>`, the optional companion interface `IUiTypedChoices` (five members:
+      `TryGetValueType`, `TryGetTypedValue`, `AcceptsValue`, `TrySetTypedValue`, `TryGetChoices`), implemented by
+      `UiBindings` and probed by `input/dropdown` and `input/mode-row` whenever the value binding's declared
+      type is not `string`; `UiPopup.DrawChoiceList` is the typed sibling of `DrawOptionList`, and both lists
+      now paint/publish through shared private helpers so the hit-layer rule still exists once. `IUiBindings`
+      gained **no** member, so every existing implementation keeps compiling; the new lane
+      `KernelCoreWidgetTests.VerifyTypedChoices` is the evidence (label-vs-value, the real instance by type and
+      by reference, a refused mismatch with no write, the two legacy option shapes staying non-typed, and a
+      seam-less `IUiBindings` implementation still working string-only). No version bump and no tier change
+      beyond the `docs/api-tiers.md` entries (the recorded 0.7.x public-addition exemption applies). What the
+      run must show: the new lane green, the legacy A4/FL-16/A5/popup lanes untouched, Gate 10 unchanged.
 - [ ] **Derive the visual-core boundary guard's symbol set from the types.** The cheap half landed
       2026-09-24 (`UiPopup` added to the reject list, mutation-tested); the hand-maintained list is still the
       real defect, since a type that joins the tree next is in neither array until somebody notices.
@@ -138,6 +194,25 @@ form: **`docs/in-game-walkthrough.md`** — fill one row per check there and rec
 row is not a pass, and "no error" is not one either.
 
 - [ ] **Verify the current paired build in the game.** Earlier player observations do not constitute acceptance of the current geometry/input changes; the row-click case above remains open.
+- [x] **PASSED BY THE USER (2026-09-28): the popup click-priority pair — (A) Packs and (B) Tuning.** Both entry
+      points were explicitly passed in game, so the owner-arbitration defect (a covered control stealing the
+      option click inside one composite element) is CLOSED by human acceptance. Its fix is the owner-id-keyed
+      yield (`UiHitLayer.PopupOwnerId`; the `UiSession.IsPointerOverHigherLayer` owner overload;
+      `UiPopup.DrawOptionList` publishing the owner id; `UiNative` threading its own id through both checks)
+      plus the covered-popup refusal in the value primitives. Lanes: `KernelPopupTests` (same-node siblings,
+      covered primitives, real event pump, scrolled/offset container).
+- [ ] **NEW, NOT yet human-verified: an open dropdown must not detach from its trigger when the parent
+      scrolls.** The anchor is now a per-frame fact — `UiSession.NotePopupOwnerDrawn` is the only writer after
+      the open, refreshed from the trigger's own window-space rect before the covered check, so rendering and
+      hit geometry read one number. Lifecycle: the popup is released when the owner's rect leaves the Host
+      viewport, and at the next `BeginHitPass` when the owner did not report at all. Lane:
+      `KernelPopupTests.VerifyOpenPopupFollowsTheTrigger` (popup opened BEFORE the scroll, non-zero origin,
+      owner gone ⇒ no orphan clickable menu, recovery after it returns).
+- [ ] **RESIDUAL, recorded not implemented: an owner clipped by an INNER `Scroll` but still inside the Host
+      viewport still reports**, so its popup follows a clamped anchor instead of being dismissed. Closing it
+      needs the engine to publish the element's effective clip rect into the context (one field) plus a lane.
+- [ ] **Verify in-game: open a dropdown, then scroll its parent — on BOTH the Packs and the Tuning page.**
+      This is the human gate for the anchor fix; a green harness does not close it.
 - [ ] **The carrier guard's duplicate branch.** Copy `FerriteLib.UiKit.dll` into the *installed*
       `Mods/UniversalSqueaker/1.6/Assemblies` (never the repo — three gates refuse it there) and restart.
       Record **which** of three outcomes occurs; all three are valid results: (1) `DUPLICATE CARRIER` naming
@@ -264,10 +339,12 @@ the responsiveness package landed, and `input/text-field` closed the last missin
       rediscovery: focus state already exists per element; what is missing is a focus *owner* on the session
       plus a traversal rule over visible elements in tree order. The expensive half is **naming** — `Tab`
       already means a workspace tab here, so a keyboard axis needs a different word, and that word is schema.
-- [ ] **Theme token restructure to per-surface (fill, border) pairs**, so a consumer can express a chrome
-      family other than DarkGold's — including the game's own, which today is not representable. Do it before
-      freezing, since it is breaking. Then `UiTheme`'s public-surface freeze, per its own rule: when a second
-      real theme exists.
+- [ ] **Default-look discussion / remaining theme acceptance.** `UiSurfaceStyle`, per-surface border
+      overrides, and the named `UiTheme.Vanilla` / `DarkGold` palettes already exist; the old "not
+      representable" item was stale. The demo explicitly chooses Vanilla, which is a reference/derived
+      palette, not a verified exact match to a named game build. Discuss a recommended out-of-box look and
+      a neutral square-toggle promotion from the real consumer; no theme implementation is authorized by
+      that discussion alone. Preserve explicit host injection and decide API freezing separately.
 - [ ] Optional two-minute experiment: whether RimWorld tolerates an unknown tag in `About.xml`. The parsed
       tag set is closed and no tolerance could be proven from stripped metadata, so nothing depends on it.
 - **CLOSED (2026-09-22 audit): the version-axis lane owes no re-cut** — no lane reads additions and no

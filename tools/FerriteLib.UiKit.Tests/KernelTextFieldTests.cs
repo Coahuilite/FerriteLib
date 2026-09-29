@@ -251,7 +251,7 @@ internal static class KernelTextFieldTests
                 + "<Widget Id=\"search\" Kind=\"input/text-field\" Bind=\"published\" Height=\"24\" Placeholder=\"find a pack\" />"
                 + "</UiPage>"),
             bindings,
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
 
@@ -293,7 +293,7 @@ internal static class KernelTextFieldTests
                 + "<Widget Id=\"gate\" Kind=\"" + ProbeKind + "\" ActionBind=\"gate\" Height=\"24\" />"
                 + "</UiPage>"),
             bindings,
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
 
@@ -409,7 +409,7 @@ internal static class KernelTextFieldTests
     private static UiWidgetContext MakeContext(UiSession session, IUiBindings bindings)
     {
         return new UiWidgetContext(
-            "text-field-test", session, new StubMetrics(), UiTheme.DarkGold,
+            "text-field-test", session, new StubMetrics(), UiTheme.Vanilla,
             new StubTranslation(), bindings, Width, "root");
     }
 

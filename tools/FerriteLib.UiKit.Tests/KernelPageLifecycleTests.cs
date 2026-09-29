@@ -622,7 +622,7 @@ internal static class KernelPageLifecycleTests
             new UiWindowKey(consumer, kind, ""),
             manifest,
             bindings,
-            UiTheme.DarkGold,
+            UiTheme.Vanilla,
             new LaneTranslation(),
             "title",
             "close",
@@ -810,7 +810,7 @@ internal static class KernelPageLifecycleTests
         /// <summary>The close veto this double answers with; true (the default) allows a close.</summary>
         internal bool AllowClose = true;
 
-        protected override UiTheme Theme => UiTheme.DarkGold;
+        protected override UiTheme Theme => UiTheme.Vanilla;
 
         protected override string Title => "title";
 
