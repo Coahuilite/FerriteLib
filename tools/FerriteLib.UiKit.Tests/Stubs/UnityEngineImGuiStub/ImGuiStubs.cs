@@ -83,6 +83,15 @@ public enum FocusType
     Native = 2
 }
 
+/// <summary>Unity's texture scaling mode; the library draws its own letterboxed rect, so this stays the
+/// stretch form and the fit is <c>UiThemeDraw.FitImage</c>'s answer rather than Unity's.</summary>
+public enum ScaleMode
+{
+    StretchToFill = 0,
+    ScaleAndCrop = 1,
+    ScaleToFit = 2
+}
+
 public static class GUIUtility
 {
     private static int controlIdCounter;
@@ -115,6 +124,29 @@ public static class GUI
     public static int GroupDepth;
     public static int BeginGroupCalls;
     public static int EndGroupCalls;
+
+    // The texture outlet's recording hooks, in the same shape as Verse.Widgets' draw recorders: what was
+    // handed to DrawTexture, in call order, so a lane can assert the FIT rect and the TINT it was drawn with.
+    public static readonly System.Collections.Generic.List<Rect> DrawTextureRects = new();
+    public static readonly System.Collections.Generic.List<Texture> DrawTextureTextures = new();
+    public static readonly System.Collections.Generic.List<Color> DrawTextureColors = new();
+    public static readonly System.Collections.Generic.List<ScaleMode> DrawTextureModes = new();
+
+    public static void ClearDrawTextureCalls()
+    {
+        DrawTextureRects.Clear();
+        DrawTextureTextures.Clear();
+        DrawTextureColors.Clear();
+        DrawTextureModes.Clear();
+    }
+
+    public static void DrawTexture(Rect rect, Texture texture, ScaleMode mode, bool alphaBlend)
+    {
+        DrawTextureRects.Add(rect);
+        DrawTextureTextures.Add(texture);
+        DrawTextureColors.Add(color);
+        DrawTextureModes.Add(mode);
+    }
 
     public static Color color { get; set; } = Color.white;
 

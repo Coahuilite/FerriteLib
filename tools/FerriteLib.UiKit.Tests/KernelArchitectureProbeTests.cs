@@ -342,8 +342,8 @@ internal static class KernelArchitectureProbeTests
         Check(typeof(ButtonWidget).IsSealed,
             "input/button is sealed: its paint cannot be replaced by inheriting from it");
 
-        // Pinned outlet vocabulary: the drawing surface is a closed list of 14 names, and none of them
-        // paints an image, a layer or a transform. An addition has to be decided here as well as in the
+        // R4-B adds the authorized image outlet and its aspect-fit geometry helper to the pinned surface.
+        // There is still no layer or transform outlet. An addition is decided here as well as in the
         // library, which is the point - the alternative is discovering the change from a screenshot.
         var outlets = new List<string>();
         foreach (MethodInfo method in typeof(UiThemeDraw).GetMethods(BindingFlags.Public | BindingFlags.Static))
@@ -354,11 +354,11 @@ internal static class KernelArchitectureProbeTests
         outlets.Sort(StringComparer.Ordinal);
         string[] pinned =
         {
-            "AccentRail", "BackgroundPlane", "Base", "FocusRail", "Label", "Panel", "RecoveryBand",
+            "AccentRail", "BackgroundPlane", "Base", "FitImage", "FocusRail", "Image", "Label", "Panel", "RecoveryBand",
             "SectionBand", "SectionHeader", "Solid", "StatusBadge", "StatusTreatment", "Surface", "Workspace"
         };
 
-        Check(outlets.Count == pinned.Length, "the drawing outlet vocabulary is the pinned 14 names, got "
+        Check(outlets.Count == pinned.Length && Array.TrueForAll(pinned, outlets.Contains), "the drawing outlet vocabulary is the pinned 16 names, got "
             + outlets.Count + ": " + string.Join(", ", outlets));
         bool imageOutlet = false;
         foreach (string name in outlets)
@@ -372,7 +372,7 @@ internal static class KernelArchitectureProbeTests
             }
         }
 
-        Check(!imageOutlet, "no outlet paints an image: an image-only button has no paint primitive today");
+        Check(imageOutlet, "R4-B exposes the shared image outlet for composed controls");
 
         var published = new List<string>();
         foreach (PropertyInfo property in typeof(UiNode).GetProperties()) published.Add(property.Name);

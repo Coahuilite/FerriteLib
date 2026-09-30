@@ -29,6 +29,15 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// deduplicated report - because rendering it would silently give two model rows one identity. That is
 /// the same refusal the keyed repeater makes, with the same reason.
 /// </para>
+/// <para>
+/// <b>The composed row (R4-B).</b> One band can carry, left to right: the indent, the disclosure marker, a
+/// checkbox, an image and the label - each part opt-in per row, and every part absent by default, so a page
+/// that declares none of them gets the band this kind always drew. The checkbox and the marker are their own
+/// targets only when the page binds <c>CheckBind</c>/<c>DisclosureBind</c> (both <c>Action&lt;string&gt;</c>
+/// with the row's key); the row body stays <c>ActionBind</c>, and a part that took the click is not offered
+/// to the body as well. The row's selection is <see cref="UiTreeRow.Selected"/>, its expansion
+/// <see cref="UiTreeRow.Expanded"/>: both are the model's answers, re-read every pass.
+/// </para>
 /// </summary>
 internal sealed class TreeWidget : IUiWidget
 {
@@ -44,7 +53,7 @@ internal sealed class TreeWidget : IUiWidget
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new TreeWidget(),
-            AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "ActionBind", "RowHeight"));
+            AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "ActionBind", "DisclosureBind", "CheckBind", "RowHeight"));
         // Deliberately no label set: this kind's labels are row data, not attributes, so Width="Auto" has
         // nothing honest to measure and falls back to the unsized distribution.
     }
@@ -77,6 +86,19 @@ internal sealed class TreeWidget : IUiWidget
             bindings.ValidateAction<string>(actionKey, elementPath);
         }
 
+        // R4-B: the two optional part targets, each carrying the row's stable key like the body action does.
+        string disclosureKey = AtomVocabulary.Read(spec, "DisclosureBind").Trim();
+        if (disclosureKey.Length > 0)
+        {
+            bindings.ValidateAction<string>(disclosureKey, elementPath);
+        }
+
+        string checkKey = AtomVocabulary.Read(spec, "CheckBind").Trim();
+        if (checkKey.Length > 0)
+        {
+            bindings.ValidateAction<string>(checkKey, elementPath);
+        }
+
         if (spec.TryGetAttribute("RowHeight", out string raw) && raw.Trim().Length > 0
             && (!float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float declared)
                 || declared <= 0f))
@@ -88,9 +110,19 @@ internal sealed class TreeWidget : IUiWidget
 
     public float Measure(UiWidgetContext ctx)
     {
-        // One band per accepted row, at the declared or density-derived height. The label is single-line,
-        // so no row's text can move the measurement.
-        return CollectRows(ctx, ReadBindKey()).Count * ReadRowHeight(ctx);
+        // One band per accepted row, each measured from its own content: a row carrying an image reserves at
+        // least the picture's natural height plus padding, and every other row keeps the declared or
+        // density-derived height this kind has always used. The label is single-line, so no row's text can
+        // move the measurement.
+        List<UiTreeRow> rows = CollectRows(ctx, ReadBindKey());
+        float rowHeight = ReadRowHeight(ctx);
+        float total = 0f;
+        for (int i = 0; i < rows.Count; i++)
+        {
+            total += UiRowBand.Measure(rows[i], ctx.Theme, rowHeight);
+        }
+
+        return total;
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)
@@ -103,14 +135,25 @@ internal sealed class TreeWidget : IUiWidget
 
         UiTheme theme = ctx.Theme;
         float rowHeight = ReadRowHeight(ctx);
-        float pad = theme.Geometry.Padding;
         UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, writable: null);
         string actionKey = AtomVocabulary.Read(spec, "ActionBind").Trim();
+        string disclosureKey = AtomVocabulary.Read(spec, "DisclosureBind").Trim();
+        string checkKey = AtomVocabulary.Read(spec, "CheckBind").Trim();
 
+        // One actions instance per pass, not per row: the callbacks are keyed by the row the PRIMITIVE hands
+        // them, so the band's own routing stays the primitive's and the kind only decides what a part does.
+        var actions = new UiRowBandActions(
+            actionKey.Length > 0 ? key => ctx.Bindings.Invoke<string>(actionKey, key) : null,
+            disclosureKey.Length > 0 ? key => ctx.Bindings.Invoke<string>(disclosureKey, key) : null,
+            checkKey.Length > 0 ? key => ctx.Bindings.Invoke<string>(checkKey, key) : null);
+
+        float y = rect.y;
         for (int i = 0; i < rows.Count; i++)
         {
             UiTreeRow row = rows[i];
-            var band = new Rect(rect.x, rect.y + i * rowHeight, rect.width, rowHeight);
+            float bandHeight = UiRowBand.Measure(row, theme, rowHeight);
+            var band = new Rect(rect.x, y, rect.width, bandHeight);
+            y += bandHeight;
             if (band.y >= rect.yMax) break;
 
             // The element's own interaction state, read from the funnel: armed beats hover, exactly as the
@@ -126,54 +169,12 @@ internal sealed class TreeWidget : IUiWidget
                 UiThemeDraw.Solid(band, theme.HoverSurface.Fill);
             }
 
-            float x = band.x + pad + Math.Max(0f, row.Depth * theme.Geometry.Spacing);
-            if (row.Expandable)
-            {
-                float side = Math.Max(6f, rowHeight - pad * 2f);
-                var marker = new Rect(x, band.y + (band.height - side) * 0.5f, side, side);
-                if (row.Expanded)
-                {
-                    // Filled and outlined both come from the resolved answer, so a tone move carries the
-                    // marker with the label instead of leaving a second colour literal here.
-                    UiThemeDraw.Surface(marker, style.Surface, theme.Geometry.Hairline);
-                    float inset = Math.Max(2f, side * 0.25f);
-                    UiThemeDraw.Solid(
-                        new Rect(marker.x + inset, marker.y + inset, Math.Max(1f, side - inset * 2f), Math.Max(1f, side - inset * 2f)),
-                        style.Text);
-                }
-                else
-                {
-                    UiThemeDraw.Surface(marker, new UiSurfaceStyle(theme.Base, style.Text), theme.Geometry.Hairline);
-                }
+            // The band itself is the shared public primitive (R4-B): this kind is its first driver, and a
+            // consumer's own composite calls the identical entry point for its rows.
+            UiRowBand.Draw(row, band, ctx, rowHeight, style, actions);
 
-                x = marker.xMax + pad;
-            }
-
-            float labelWidth = band.xMax - x;
-            if (labelWidth > 1f)
-            {
-                UiThemeDraw.Label(
-                    new Rect(x, band.y, labelWidth, band.height),
-                    ReadText(row, ctx),
-                    theme,
-                    style.Text,
-                    AtomVocabulary.TextFont(ctx),
-                    TextAnchor.MiddleLeft,
-                    singleLine: true);
-            }
-
-            // One band, one target: the funnel owns whether the element may take it, and the payload is the
-            // row's own key, read by the model - never an index the library would have to keep stable.
-            if (actionKey.Length > 0 && UiNative.Button(band, ctx))
-            {
-                ctx.Bindings.Invoke<string>(actionKey, row.Key);
-            }
+            if (band.yMax >= rect.yMax) break;
         }
-    }
-
-    private static string ReadText(UiTreeRow row, UiWidgetContext ctx)
-    {
-        return row.TextKey.Length > 0 ? ctx.Translation.Translate(row.TextKey) : row.Text;
     }
 
     private float ReadRowHeight(UiWidgetContext ctx)

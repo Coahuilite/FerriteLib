@@ -36,6 +36,9 @@ internal static class KernelControlKindTests
     private static int commandFired;
     private static bool commandAllowed = true;
     private static string pickedKey = "";
+    private static string pickedDisclosure = "";
+    private static string pickedCheck = "";
+    private static Texture2D? textureIcon;
     private static List<UiTreeRow> treeRows = new();
 
     public static int RunAll()
@@ -57,6 +60,9 @@ internal static class KernelControlKindTests
         Run("A tree's expansion marker follows the model by stable key, not by band index", VerifyTreeExpansionFollowsKey);
         Run("A tree refuses a row it cannot identify and still hits the rows it can", VerifyTreeRefusals);
         Run("A tree refuses its own creation contract violations", VerifyTreeCreationRefusals);
+        Run("A bound image is letterboxed, tinted by the resolved style, and its absence is a slot (R4-B)", VerifyImageOutlet);
+        Run("A composed tree row carries disclosure, checkbox, image and label with their own hit parts (R4-B)", VerifyTreeComposedRow);
+        Run("The row band takes a caller's indent step and a right-aligned checkbox (R4-B)", VerifyRowBandLayoutOverrides);
         return failures;
     }
 
@@ -640,10 +646,212 @@ internal static class KernelControlKindTests
             "a tree with no row source is refused at creation");
         Check(CreationFailure(string.Format(page, "Bind=\"tree\" ActionBind=\"nobody\""), bindings) != null,
             "and an ActionBind nothing bound is refused too");
+        Check(CreationFailure(string.Format(page, "Bind=\"tree\" DisclosureBind=\"nobody\""), bindings) != null,
+            "and a DisclosureBind nothing bound is refused, so a part target is a real contract too");
+        Check(CreationFailure(string.Format(page, "Bind=\"tree\" CheckBind=\"nobody\""), bindings) != null,
+            "and a CheckBind nothing bound with it");
         Check(CreationFailure(string.Format(page, "Bind=\"tree\" RowHeight=\"0\""), bindings) != null,
             "and a non-positive RowHeight is refused rather than degraded");
         Check(CreationFailure(string.Format(page, "Bind=\"tree\" RowHeight=\"18\""), bindings) == null,
             "while a declared RowHeight is accepted");
+    }
+
+    // --- bound image outlet (R4-B, B1) -----------------------------------------------------------
+
+    private static void VerifyImageOutlet()
+    {
+        textureIcon = MakeTexture(64, 32);
+        using UiHost host = Host(ImagePage("Width=\"80\" Height=\"20\""), ImageBindings());
+
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(200f, 120f));
+        Rect element = snapshot.RectById["icon"];
+        ClearDraws();
+        host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
+
+        IList textures = TextureRects();
+        IList labelInks = (IList)Field(typeof(Verse.Widgets), "LabelColors", null);
+        Check(textures.Count == 1, "the bound texture is drawn exactly once: " + textures.Count);
+
+        var fitted = (Rect)textures[0]!;
+        Check(Near(fitted.width, 40f) && Near(fitted.height, 20f),
+            "a 64x32 texture in an 80x20 slot letterboxes to 40x20, keeping its aspect: " + fitted);
+        Check(Near(fitted.x, element.x + 20f) && Near(fitted.y, element.y),
+            "and it centres on the axis that has slack: " + fitted);
+        Check(fitted.x >= element.x - 0.01f && fitted.xMax <= element.xMax + 0.01f
+            && fitted.y >= element.y - 0.01f && fitted.yMax <= element.yMax + 0.01f,
+            "the drawn rect never leaves the element it was handed");
+
+        // The page's own label is the control: an icon's ink must be the SAME resolved style a string takes,
+        // so the lane compares the two outlets' recorded colours instead of naming a token here.
+        Check(labelInks.Count == 1 && SameColor((Color)TextureInks()[0]!, (Color)labelInks[0]!),
+            "the icon's tint is the same resolved ink the label beside it took");
+        Check(Equals(TextureModes()[0], ScaleMode.StretchToFill),
+            "and the draw stretches into the library's own fitted rect rather than asking Unity to fit");
+
+        // No texture: the element paints its empty slot and NO texture at all - visible, and not a broken glyph.
+        textureIcon = null;
+        host.Bindings.NotifyChanged("icon");
+        ClearDraws();
+        host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
+        Check(TextureRects().Count == 0, "a null texture draws no texture at all");
+        bool slotPainted = false;
+        foreach (object entry in (IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null))
+        {
+            var rect = (Rect)entry;
+            if (Near(rect.width, 80f) && Near(rect.height, 20f)) slotPainted = true;
+        }
+
+        Check(slotPainted, "and the element paints its own empty slot in its resolved style instead");
+
+        // Hidden: nothing at all, which is how "hidden" stays distinguishable from "there is no icon".
+        textureIcon = MakeTexture(64, 32);
+        using UiHost hidden = Host(ImageOnlyPage("Width=\"80\" Height=\"20\" Hidden=\"true\""), ImageBindings());
+        hidden.MeasureAndArrange(new Vector2(200f, 120f));
+        ClearDraws();
+        hidden.DrawFrame(new Rect(0f, 0f, 200f, 120f));
+        Check(TextureRects().Count == 0
+            && ((IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null)).Count == 0,
+            "a hidden element paints nothing at all, so a hidden image and an empty slot differ");
+
+        // Pointer: an image takes none, so it can sit on top of a row without stealing the row's click.
+        using UiHost live = Host(ImageOnlyPage("Width=\"80\" Height=\"20\""), ImageBindings());
+        UiLayoutSnapshot liveSnapshot = live.MeasureAndArrange(new Vector2(200f, 120f));
+        ClickAt(live, Centre(liveSnapshot.RectById["icon"]));
+        Check(!live.Session.OwnedHotControl.HasValue,
+            "and clicking an image captures no pointer and dispatches nothing");
+    }
+
+    // --- composed tree row (R4-B, B2) ------------------------------------------------------------
+
+    private static void VerifyTreeComposedRow()
+    {
+        Texture2D icon = MakeTexture(32, 32);
+        treeRows = new List<UiTreeRow>
+        {
+            new("tall", 0, "tall", expandable: true, expanded: false, checkable: true, isChecked: false, image: icon),
+            new("short", 0, "short"),
+        };
+
+        using UiHost host = Host(TreeComposedPage(), TreeComposedBindings());
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(200f, 120f));
+        Rect tree = snapshot.RectById["tree"];
+        ClearDraws();
+        host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
+
+        IList labelRects = (IList)Field(typeof(Verse.Widgets), "LabelRects", null);
+        Check(labelRects.Count == 2, "one label per row, with the parts beside them: " + labelRects.Count);
+        Check(TextureRects().Count == 1, "the row carrying a picture draws it, and the plain row draws none");
+
+        // Measured, not assumed: the second row's band starts below the picture's own height plus padding, so
+        // the first band is taller than the declared RowHeight. The label rects are the kind's own bands.
+        float firstBand = ((Rect)labelRects[1]!).y - ((Rect)labelRects[0]!).y;
+        Check(firstBand >= 32f, "the image row's band is measured from the picture, not from RowHeight: " + firstBand);
+
+        // Each part is its own target and carries the row's stable key. The target rects are read out of the
+        // kind's own paints (a surface paints its fill first, then its edges) rather than re-derived here.
+        IList solids = (IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null);
+        Check(solids.Count >= 10, "the collapsed marker and the empty box each painted: " + solids.Count);
+        var markerRect = (Rect)solids[0]!;
+        var boxRect = (Rect)solids[5]!;
+
+        pickedKey = "";
+        pickedDisclosure = "";
+        pickedCheck = "";
+        ClickAt(host, Centre(markerRect));
+        Check(pickedDisclosure == "tall" && pickedCheck.Length == 0 && pickedKey.Length == 0,
+            "clicking the disclosure reports the disclosure for that row alone: '" + pickedDisclosure + "'");
+
+        pickedKey = "";
+        pickedDisclosure = "";
+        pickedCheck = "";
+        ClickAt(host, Centre(boxRect));
+        Check(pickedCheck == "tall" && pickedDisclosure.Length == 0 && pickedKey.Length == 0,
+            "clicking the checkbox reports the checkbox alone: '" + pickedCheck + "'");
+
+        pickedKey = "";
+        pickedDisclosure = "";
+        pickedCheck = "";
+        ClickAt(host, new Vector2(tree.xMax - 4f, ((Rect)labelRects[0]!).y + 4f));
+        Check(pickedKey == "tall" && pickedDisclosure.Length == 0 && pickedCheck.Length == 0,
+            "and the row body, right of every part, still reports the row: '" + pickedKey + "'");
+
+        // Selection and expansion are the MODEL's answers, re-read every pass: flipping one repaints its own
+        // band and moves neither the other row's ink nor the other flag.
+        treeRows = new List<UiTreeRow>
+        {
+            new("tall", 0, "tall", expandable: true, expanded: true, checkable: true, isChecked: true, image: icon),
+            new("short", 0, "short", selected: true),
+        };
+        host.Bindings.NotifyChanged("tree");
+        ClearDraws();
+        host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
+        IList inks = (IList)Field(typeof(Verse.Widgets), "LabelColors", null);
+        Check(inks.Count == 2 && !SameColor((Color)inks[0]!, (Color)inks[1]!),
+            "the selected row paints its own resolved ink while its neighbour keeps the page's");
+        Check(((IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null)).Count >= 10,
+            "an expanded marker and a ticked box both paint, each from its own row flag");
+    }
+
+    // --- the band's caller-supplied layout (R4-B) -------------------------------------------------
+
+    private static void VerifyRowBandLayoutOverrides()
+    {
+        UiTheme theme = UiTheme.Vanilla;
+        Texture2D icon = MakeTexture(16, 16);
+        UiTreeRow row = new("row", 2, "row", expandable: true, checkable: true, image: icon);
+
+        using UiHost host = Host(TreeComposedPage(), TreeComposedBindings());
+        UiWidgetContext ctx = host.CreateContext(180f, "row-band-lane");
+        UiResolvedStyle style = theme.Styles.Resolve(UiStatusTone.Neutral, UiEmphasis.Muted, null);
+        var actions = new UiRowBandActions(null, key => pickedDisclosure = key, key => pickedCheck = key);
+
+        float rowHeight = 20f;
+        var band = new Rect(0f, 0f, 180f, UiRowBand.Measure(row, theme, rowHeight));
+
+        // 1. The library's own answer: the theme's spacing per level, and the box after the indent. The part
+        //    rects are read out of the band's own paints (a surface paints its fill first), never re-derived.
+        ClearDraws();
+        UiRowBand.Draw(row, band, ctx, rowHeight, style, actions);
+        IList defaultSolids = (IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null);
+        Check(defaultSolids.Count >= 10, "the default layout paints the marker and the box: " + defaultSolids.Count);
+        var defaultMarker = (Rect)defaultSolids[0]!;
+        var defaultBox = (Rect)defaultSolids[5]!;
+        Check(defaultBox.x < band.xMax * 0.5f, "and the box sits left, right after the indent: " + defaultBox);
+
+        // 2. A caller's own indent step: the same band, indented further, with the box still following it.
+        var indented = new UiRowBandLayout(indentStep: 18f, checkboxRightInset: null);
+        ClearDraws();
+        UiRowBand.Draw(row, band, ctx, rowHeight, style, actions, indented);
+        IList indentedSolids = (IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null);
+        var indentedMarker = (Rect)indentedSolids[0]!;
+        Check(indentedMarker.x > defaultMarker.x + 20f,
+            "an 18px step indents two levels far past the theme's 4px one: " + defaultMarker.x + " -> " + indentedMarker.x);
+        Check(Near(indentedMarker.x, band.x + theme.Geometry.Padding + 2f * 18f),
+            "and the step is the caller's number, not the theme's: " + indentedMarker.x);
+
+        // 3. A right-aligned box: its own rect at the band's far edge, and a REAL hit target there.
+        var rightAligned = new UiRowBandLayout(indentStep: 18f, checkboxRightInset: 6f);
+        ClearDraws();
+        UiRowBand.Draw(row, band, ctx, rowHeight, style, actions, rightAligned);
+        IList rightSolids = (IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null);
+        var rightBox = (Rect)rightSolids[5]!;
+        Check(Near(rightBox.xMax, band.xMax - 6f), "the box's far edge is the caller's inset from the band: " + rightBox);
+        Check(rightBox.x > indentedMarker.x, "and it no longer sits after the indent at all");
+
+        pickedCheck = "";
+        pickedDisclosure = "";
+        ClickDrawAt(Centre(rightBox), () => UiRowBand.Draw(row, band, ctx, rowHeight, style, actions, rightAligned));
+        Check(pickedCheck == "row" && pickedDisclosure.Length == 0,
+            "clicking the right-aligned box reports the checkbox for that row alone: '" + pickedCheck + "'");
+
+        // A null checkbox is painted but is not a target: the same click falls through to the body, which this
+        // lane left unbound, so nothing fires at all.
+        var noCheck = new UiRowBandActions(null, key => pickedDisclosure = key, null);
+        pickedCheck = "";
+        pickedDisclosure = "";
+        ClickDrawAt(Centre(rightBox), () => UiRowBand.Draw(row, band, ctx, rowHeight, style, actions: noCheck, rightAligned));
+        Check(pickedCheck.Length == 0 && pickedDisclosure.Length == 0,
+            "and with no checkbox target bound, a click on the box reports nothing");
     }
 
     // --- pages and bindings ----------------------------------------------------------------------
@@ -660,6 +868,74 @@ internal static class KernelControlKindTests
         return "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
             + "<Widget Id=\"tree\" Kind=\"container/tree\" Bind=\"tree\" ActionBind=\"pick\" RowHeight=\"20\" Width=\"100\" />"
             + "</UiPage>";
+    }
+
+    private static string ImageOnlyPage(string attributes)
+    {
+        return "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Column Id=\"images\" Padding=\"0\">"
+            + "<Widget Id=\"icon\" Kind=\"display/image\" Bind=\"icon\" AlignX=\"Left\" " + attributes + " />"
+            + "</Column></UiPage>";
+    }
+
+    private static string ImagePage(string attributes)
+    {
+        return "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Column Id=\"images\" Padding=\"0\">"
+            + "<Widget Id=\"icon\" Kind=\"display/image\" Bind=\"icon\" AlignX=\"Left\" " + attributes + " />"
+            + "<Widget Id=\"caption\" Kind=\"text/wrapped\" TextKey=\"R4B.Caption\" />"
+            + "</Column></UiPage>";
+    }
+
+    /// <summary>The composed row's page: the body action plus the two optional part targets (R4-B).</summary>
+    private static string TreeComposedPage()
+    {
+        return "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Widget Id=\"tree\" Kind=\"container/tree\" Bind=\"tree\" ActionBind=\"pick\""
+            + " DisclosureBind=\"disclose\" CheckBind=\"check\" RowHeight=\"20\" Width=\"180\" />"
+            + "</UiPage>";
+    }
+
+    private static UiBindings ImageBindings()
+    {
+        var bindings = new UiBindings();
+        bindings.BindReadOnly<Texture2D?>("icon", () => textureIcon, UiInvalidation.Structure);
+        return bindings;
+    }
+
+    private static UiBindings TreeComposedBindings()
+    {
+        var bindings = new UiBindings();
+        bindings.BindReadOnly<IReadOnlyList<UiTreeRow>>("tree", () => treeRows, UiInvalidation.Structure);
+        bindings.BindAction<string>("pick", key => pickedKey = key);
+        bindings.BindAction<string>("disclose", key => pickedDisclosure = key);
+        bindings.BindAction<string>("check", key => pickedCheck = key);
+        return bindings;
+    }
+
+    /// <summary>
+    /// The engine reference assembly strips Unity's constructors, so a lane cannot <c>new</c> a texture: the
+    /// stub the harness RUNS against is what can be constructed, and it is the same assembly whose recorders
+    /// the assertions read. One reflection call, in the lane only - production code never builds a texture.
+    /// </summary>
+    private static Texture2D MakeTexture(int width, int height)
+    {
+        return (Texture2D)Activator.CreateInstance(typeof(Texture2D), width, height)!;
+    }
+
+    private static IList TextureRects()
+    {
+        return (IList)Field(typeof(GUI), "DrawTextureRects", null);
+    }
+
+    private static IList TextureInks()
+    {
+        return (IList)Field(typeof(GUI), "DrawTextureColors", null);
+    }
+
+    private static IList TextureModes()
+    {
+        return (IList)Field(typeof(GUI), "DrawTextureModes", null);
     }
 
     private static UiBindings CheckboxBindings()
@@ -744,6 +1020,24 @@ internal static class KernelControlKindTests
         Pump(host, EventType.MouseUp, point);
     }
 
+    /// <summary>
+    /// The same two-pass click as <see cref="ClickAt"/>, but driving a caller's own draw instead of a host
+    /// frame: this is how a lane exercises the public row band the way a consumer's composite does.
+    /// </summary>
+    private static void ClickDrawAt(Vector2 point, Action draw)
+    {
+        foreach (EventType type in new[] { EventType.MouseDown, EventType.MouseUp })
+        {
+            Event e = Event.KeyboardEvent("space");
+            e.type = type;
+            e.button = 0;
+            e.mousePosition = point;
+            Event.current = e;
+            draw();
+            Event.current = null;
+        }
+    }
+
     private static void Pump(UiHost host, EventType type, Vector2 point)
     {
         Event e = Event.KeyboardEvent("space");
@@ -796,6 +1090,7 @@ internal static class KernelControlKindTests
         ((IList)Field(typeof(Verse.Widgets), "LabelRects", null)).Clear();
         ((IList)Field(typeof(Verse.Widgets), "LabelTexts", null)).Clear();
         ((IList)Field(typeof(Verse.Widgets), "LabelColors", null)).Clear();
+        Invoke(typeof(GUI), "ClearDrawTextureCalls");
     }
 
     private static IList RecordedColors()

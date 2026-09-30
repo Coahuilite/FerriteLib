@@ -535,6 +535,28 @@ public static class Time
     public static float realtimeSinceStartup => 0f;
 }
 
+/// <summary>
+/// A texture, at the two members the library reads from one: its natural width and height. The library
+/// never loads or creates a texture - a consumer binds one - so this stub stays constructible and holds the
+/// size it was made with, which is what lets a lane assert a fit against a known aspect ratio.
+/// </summary>
+public class Texture : Object
+{
+    public int width { get; set; }
+
+    public int height { get; set; }
+}
+
+/// <summary>The 2D form, which is what the bindings declare; a size is the only state a lane needs.</summary>
+public class Texture2D : Texture
+{
+    public Texture2D(int width, int height)
+    {
+        this.width = width;
+        this.height = height;
+    }
+}
+
 public enum KeyCode
 {
     None = 0,

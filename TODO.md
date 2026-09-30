@@ -125,6 +125,7 @@ library before validating the real page, and their listing order does not overri
       seam-less `IUiBindings` implementation still working string-only). No version bump and no tier change
       beyond the `docs/api-tiers.md` entries (the recorded 0.7.x public-addition exemption applies). What the
       run must show: the new lane green, the legacy A4/FL-16/A5/popup lanes untouched, Gate 10 unchanged.
+- [ ] **Game-check R4-B images and composed rows in the paired rehearsal.** All 10 local gates pass after PM integration; API tier details are in "docs/api-tiers.md". Real RimWorld rendering/input remain unverified.
 - [ ] **Derive the visual-core boundary guard's symbol set from the types.** The cheap half landed
       2026-09-24 (`UiPopup` added to the reject list, mutation-tested); the hand-maintained list is still the
       real defect, since a type that joins the tree next is in neither array until somebody notices.

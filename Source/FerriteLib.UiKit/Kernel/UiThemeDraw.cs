@@ -220,6 +220,61 @@ public static class UiThemeDraw
             VerseWidgets.DrawBoxSolid(rect, color);
         }
     }
+
+    /// <summary>
+    /// The letterbox fit, and the library's one answer to "where does a picture go inside this rect": the
+    /// largest rect with <paramref name="naturalSize"/>'s aspect ratio that fits inside
+    /// <paramref name="slot"/>, centred on both axes. Deterministic and total - a non-positive natural size
+    /// or slot answers an empty rect, which every caller reads as "nothing to fit" rather than as a
+    /// zero-sized draw.
+    /// </summary>
+    public static Rect FitImage(Rect slot, Vector2 naturalSize)
+    {
+        if (naturalSize.x <= 0f || naturalSize.y <= 0f || slot.width <= 0f || slot.height <= 0f)
+        {
+            return default;
+        }
+
+        float scale = Math.Min(slot.width / naturalSize.x, slot.height / naturalSize.y);
+        float width = naturalSize.x * scale;
+        float height = naturalSize.y * scale;
+        return new Rect(slot.x + (slot.width - width) * 0.5f, slot.y + (slot.height - height) * 0.5f, width, height);
+    }
+
+    /// <summary>
+    /// One texture, letterboxed into <paramref name="rect"/> (see <see cref="FitImage"/>) and tinted through
+    /// <c>GUI.color</c> exactly as <see cref="Label"/> tints a string - so an icon's ink comes from the same
+    /// resolved style the row's text does, never from a colour literal here. Returns false when there is no
+    /// texture or it has no usable size: nothing is painted in that case and the CALLER decides what it means
+    /// (the image kind paints its empty slot, a hidden element is not drawn at all). It consumes no input, and
+    /// a null texture is an answer rather than a fault.
+    /// </summary>
+    public static bool Image(Rect rect, Texture? texture, Color tint)
+    {
+        if (texture == null)
+        {
+            return false;
+        }
+
+        Rect fitted = FitImage(rect, new Vector2(texture.width, texture.height));
+        if (fitted.width <= 1f || fitted.height <= 1f)
+        {
+            return false;
+        }
+
+        Color oldColor = GUI.color;
+        try
+        {
+            GUI.color = tint;
+            GUI.DrawTexture(fitted, texture, ScaleMode.StretchToFill, true);
+        }
+        finally
+        {
+            GUI.color = oldColor;
+        }
+
+        return true;
+    }
 }
 
 /// <summary>

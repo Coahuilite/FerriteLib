@@ -2,7 +2,7 @@
 
 ## PM integration checkpoint — 2026-09-30
 
-R1/R2 appearance/palette, R3 per-host geometry diagnostics, and R4-A typed dropdown/mode-row passed the current local verification chain (Release/Dev). PM fixed nullable erased values and recording fixtures and added a real mode-row click-to-enum-setter check. US and Demo companion checks also passed with the current carrier. Game acceptance awaits final tree/image integration and play packages. User authorized local checkpoint commits; no publication.
+R1/R2 appearance/palette, R3 per-host geometry diagnostics, R4-A typed choices and R4-B images/shared row composition pass all 10 normal local checks (Release/Dev). US passes its 15 integration checks and Demo passes both carrier probes. R4-B PM integration corrected imports, the image Height schema, texture stub property signatures and the image fixture's placement container. UiRowBandLayout also accepts an optional control size to preserve consumer checkbox geometry. These are local/stub observations; real game acceptance is pending the paired rehearsal. User authorized local checkpoint commits; no publication.
 
 ## Start here — current direction (2026-09-24)
 

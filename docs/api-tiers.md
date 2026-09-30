@@ -188,7 +188,11 @@ consequence is paid in the open rather than discovered by a stranger.
   invalidate a cache of cloned themes without re-arranging the page, and `LayoutRevision` still means "a rect
   moved". A consumer that re-tints a theme it handed to a `UiHost` gets refreshed region/scoped themes; a
   consumer that wants the retired warm-gold look assigns the tokens on its own bag.
-- `UiThemeDraw` — the single text and panel outlet; per-surface tokens change what it takes to draw.
+- `UiThemeDraw` — the single text and panel outlet; per-surface tokens change what it takes to draw. R4-B adds
+  the library's only image outlet beside it: `Image(Rect rect, Texture? texture, Color tint)` draws one bound
+  texture tinted through `GUI.color` exactly as a label is, and answers false when there is nothing to paint
+  (the caller decides what that means), and `FitImage(Rect slot, Vector2 naturalSize)` is the letterbox rule it
+  uses — the largest centred rect with the texture's aspect that fits the slot, total for a non-positive size.
 - `UiFitAudit` — the audit surface; entry attribution follows the identity layer. The ruler moved with
   the routing: a subscribed host is measured with the `ITextMetrics` its own diagnostic scope carries, and
   the process-wide slot bound by `Attach` serves only the legacy (unsubscribed) channel. That split is a
@@ -496,7 +500,29 @@ consequence is paid in the open rather than discovered by a stranger.
   control: the kind owns the band geometry and the hit rule, the consumer owns the ordering and the answer.
   Public-unstable because the collection vocabulary is new in 0.5 and this type's fields follow the first real
   consumer's shape. The key is the only identity the kind uses — a blank or duplicated one is refused rather
-  than replaced by a position.
+  than replaced by a position. R4-B appends the composed row's own answers — `Selected`, `Checkable`,
+  `Checked`, `Image` (the consumer's `Texture2D`, which the library never loads) and `ImageSize` — as
+  optional constructor parameters, so every existing construction keeps compiling and every new part is
+  opt-in per row.
+- `UiRowBand` — the composed tree-row band, published so a consumer's own composite can drive it per row
+  (R4-B): `Measure(UiTreeRow row, UiTheme theme, float rowHeight)` for the height a band needs, and
+  `Draw(UiTreeRow row, Rect band, UiWidgetContext ctx, float rowHeight, UiResolvedStyle style,
+  UiRowBandActions actions, UiRowBandLayout layout = default)` for the indent/disclosure/checkbox/image/label
+  band and its per-part hit. `container/tree` is its first driver and calls these two members itself, so there
+  is exactly one implementation of the band's measure, its painted order and its hit rule; the primitive holds
+  no state and clamps everything it paints into the band it is handed.
+- `UiRowBandLayout` — the placement inputs that call lets a caller override: `IndentStep` (the distance one
+  `UiTreeRow.Depth` level indents by; null keeps the theme's `Geometry.Spacing`, zero is a real flat answer) and
+  `CheckboxRightInset` (when set, the checkbox's far edge sits that far inside the band's right edge and the
+  label's room ends before it; null keeps the box immediately after the indent), and `ControlSize` (optional
+  disclosure/checkbox visual side, clamped to the band height; null keeps the theme-derived size). `default(UiRowBandLayout)` is
+  the library's own behaviour, so a caller with no convention of its own passes nothing and gets exactly what
+  `container/tree` gets. Both are caller-SUPPLIED inputs to the band's one placement decision, never a
+  replacement for it.
+- `UiRowBandActions` — the three optional per-part targets one band reports through (`Body`, `Disclosure`,
+  `Checkbox`, each `Action<string>` carrying the row's stable key). A null part is painted but not a target,
+  and the click falls through to the body; no index and no part name is ever parsed, so a consumer dispatches
+  to its own typed action with its own data.
 
 ### Added in the open 0.6 window
 

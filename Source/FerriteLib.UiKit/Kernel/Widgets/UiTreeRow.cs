@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
@@ -28,7 +29,18 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// </summary>
 public readonly struct UiTreeRow
 {
-    public UiTreeRow(string key, int depth, string text, bool expandable = false, bool expanded = false, string textKey = "")
+    public UiTreeRow(
+        string key,
+        int depth,
+        string text,
+        bool expandable = false,
+        bool expanded = false,
+        string textKey = "",
+        bool selected = false,
+        bool checkable = false,
+        bool isChecked = false,
+        Texture2D? image = null,
+        Vector2 imageSize = default)
     {
         Key = key ?? throw new ArgumentNullException(nameof(key));
         Depth = depth;
@@ -36,6 +48,11 @@ public readonly struct UiTreeRow
         TextKey = textKey ?? "";
         Expandable = expandable;
         Expanded = expanded;
+        Selected = selected;
+        Checkable = checkable;
+        Checked = isChecked;
+        Image = image;
+        ImageSize = imageSize;
     }
 
     /// <summary>
@@ -63,4 +80,31 @@ public readonly struct UiTreeRow
 
     /// <summary>The model's current expanded answer, painted as the marker's state.</summary>
     public bool Expanded { get; }
+
+    /// <summary>
+    /// The model's selection answer for this row. Painted in the resolved Active tone - the same tone a chosen
+    /// mode-row cell and a chosen dropdown option use - so "selected" reads the same everywhere. State, like
+    /// <see cref="Expanded"/>: the consumer keys it by <see cref="Key"/> and the kind only paints it.
+    /// </summary>
+    public bool Selected { get; }
+
+    /// <summary>True when this row paints a checkbox at all; a row without one keeps its whole band for the label.</summary>
+    public bool Checkable { get; }
+
+    /// <summary>The model's current checkbox answer for this row, painted as the box's state.</summary>
+    public bool Checked { get; }
+
+    /// <summary>
+    /// The consumer's own texture for this row, or null for a row with no image. The library never loads one:
+    /// a consumer supplies the value (a Verse-side adapter is the usual way to turn a def/thing into a
+    /// <see cref="Texture2D"/>) and the tree only lays it out, fits it and paints it.
+    /// </summary>
+    public Texture2D? Image { get; }
+
+    /// <summary>
+    /// An explicit size for <see cref="Image"/>, in the same units the manifest uses. A non-positive
+    /// component means "the texture's own natural size on this axis", which is the default - so a consumer
+    /// states a size only when the icon must be a fixed slot rather than the picture's own proportions.
+    /// </summary>
+    public Vector2 ImageSize { get; }
 }

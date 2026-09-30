@@ -83,6 +83,7 @@ internal static class KernelContainmentTests
         ["UiThemeDraw.cs"] = new[]
         {
             "GUI.color",
+            "GUI.DrawTexture",
             "Text.Anchor",
             "Text.Font",
             "Text.WordWrap",

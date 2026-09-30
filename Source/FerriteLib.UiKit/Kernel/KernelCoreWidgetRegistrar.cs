@@ -25,6 +25,7 @@ public static class KernelCoreWidgetRegistrar
         // Items/Template contract) still needs the creation-time owner every element has.
         Widgets.CheckboxWidget.Register();
         Widgets.ProgressWidget.Register();
+        Widgets.ImageWidget.Register();
         Widgets.TreeWidget.Register();
         Widgets.RepeatTemplateWidget.Register();
     }
