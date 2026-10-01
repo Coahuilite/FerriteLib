@@ -39,6 +39,12 @@ public interface IExposable
     void ExposeData();
 }
 
+/// <summary>Only the base type contract needed to construct consumer settings; no Scribe simulation.</summary>
+public class ModSettings : IExposable
+{
+    public virtual void ExposeData() { }
+}
+
 /// <summary>
 /// Minimal Verse float-pair value type (settings/tuning records reference it; only the type and
 /// the min/max fields are needed for the widget paths to load).
