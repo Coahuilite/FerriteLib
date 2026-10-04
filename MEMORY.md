@@ -1,5 +1,28 @@
 # MEMORY
 
+## Current state (2026-10-04)
+
+- **Frozen playable package: FerriteLib `b31e2c3`** (with US `889f34b` and Demo `d972dbc`), recorded
+  authoritatively in the workspace PM's `v1-playable-package-manifest.json` (21 files across the three packs;
+  only this package carries the FL DLL). Real-game acceptance of the paired rehearsal is **pending**; the
+  library's local checks and the consumer's 15 checks are technical evidence only.
+  **A later source, docs or memory commit moves HEAD without changing these frozen package bytes** - package
+  identity is what the stager measured, not what HEAD points at.
+- **Working direction (the PM's `WORKING-DIRECTION-20261004.md` is the authority).** Task specs lead with
+  **purpose, ownership and the main path plus a few key invariants**; process and history stay in handoff
+  material rather than being repeated into every task. **Checks belong at the responsible boundary**, and work
+  inside a boundary proceeds on already-established contracts - "add more validation" is not a goal, and
+  **a hash answers payload identity, never business correctness**. Accept that a first design and
+  implementation can be wrong: an unexpected error keeps its context and original exception and surfaces **at
+  the responsible boundary**, and a failure that is isolated or absorbed by recovery UI must not be recorded as
+  success. Add tolerance only for **known business states or observed faults** - no speculative null-guards or
+  fallback sweeps across the library on the chance that something is wrong.
+- **Proposed, NOT implemented: the observability patch.** A diagnostic-publish exception inside
+  `UiDocumentService.PublishToHost` is caught without being recorded. Whether a real call path can reach it is
+  still being verified by the PM, and the location is **not** assumed to be the root cause. If a patch is
+  written it covers only a **confirmed** error-exposure gap, is checked and committed on its own, and keeps the
+  current playtest packages intact. Do not widen this into a general audit or a process-ban list.
+
 ## PM integration checkpoint — 2026-09-30
 
 R1/R2 appearance/palette, R3 per-host geometry diagnostics, R4-A typed choices and R4-B images/shared row composition pass all 10 normal local checks (Release/Dev). US passes its 15 integration checks and Demo passes both carrier probes. R4-B PM integration corrected imports, the image Height schema, texture stub property signatures and the image fixture's placement container. UiRowBandLayout also accepts an optional control size to preserve consumer checkbox geometry. These are local/stub observations; real game acceptance is pending the paired rehearsal. User authorized local checkpoint commits; no publication.
