@@ -17,11 +17,12 @@
   the responsible boundary**, and a failure that is isolated or absorbed by recovery UI must not be recorded as
   success. Add tolerance only for **known business states or observed faults** - no speculative null-guards or
   fallback sweeps across the library on the chance that something is wrong.
-- **Proposed, NOT implemented: the observability patch.** A diagnostic-publish exception inside
-  `UiDocumentService.PublishToHost` is caught without being recorded. Whether a real call path can reach it is
-  still being verified by the PM, and the location is **not** assumed to be the root cause. If a patch is
-  written it covers only a **confirmed** error-exposure gap, is checked and committed on its own, and keeps the
-  current playtest packages intact. Do not widen this into a general audit or a process-ban list.
+- **Diagnostic-publication observability (source-only, 2026-10-04).** The actual reload path writes the
+  library's own subscription buffer, not an external callback. `PublishToHost` now propagates unexpected
+  non-OOM failures with host/document/path/version/result context and the original exception as its inner
+  cause; it does not silently discard them or roll back a previously determined document result. All 10
+  existing local checks pass. No live-game publication failure was reproduced and this is not a global
+  recovery audit. The frozen rehearsal package does not include this later source change.
 
 ## PM integration checkpoint — 2026-09-30
 

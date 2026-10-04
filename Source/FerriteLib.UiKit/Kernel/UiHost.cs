@@ -437,8 +437,8 @@ public sealed class UiHost : IDisposable
     /// <summary>
     /// Attributes one document-service report to this host. The service calls it for every host a reload
     /// batch affected, so a report reaches exactly the windows that read the document and never a window
-    /// that reads a different one. A host with no subscription returns on the null check, and nothing here
-    /// may throw into a reload path - the caller isolates the call for that reason.
+    /// that reads a different one. A host with no active subscription has nothing to record; unexpected
+    /// buffer failures propagate to the document service, which adds the host and reload context.
     /// </summary>
     internal void PublishReloadReport(UiReloadReport? report)
     {

@@ -1026,9 +1026,8 @@ public sealed class UiDocumentService : IDisposable
     /// the affected dependency list before it reads the candidate, so even a parse failure - which never
     /// reaches a host's validation - still names the windows it touched.
     /// <para>
-    /// Additive and inert by construction: a host with no subscription returns on a null check, and a
-    /// diagnostic must never break a hot reload, so a throwing subscriber is isolated here instead of
-    /// aborting a batch.
+    /// A host without a subscription has nothing to record. Publishing to an active subscription writes
+    /// the library's own buffer, not an external callback; unexpected failures must remain visible.
     /// </para>
     /// </summary>
     private static void PublishToHosts(List<Dependency> hosts, UiReloadReport report)
@@ -1039,7 +1038,7 @@ public sealed class UiDocumentService : IDisposable
         }
     }
 
-    /// <summary>One host's half of <see cref="PublishToHosts"/>, isolated so a subscriber cannot throw into a reload.</summary>
+    /// <summary>Publishes one host's result, adding reload context to any unexpected internal failure.</summary>
     private static void PublishToHost(UiHost host, UiReloadReport report)
     {
         try
@@ -1048,8 +1047,11 @@ public sealed class UiDocumentService : IDisposable
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            // A diagnostic failure is not a reload failure. The subscription is the only thing that could
-            // throw here, and letting it abort a batch would make the diagnostic surface a hazard.
+            throw new InvalidOperationException(
+                "Reload diagnostic publication failed for host '" + host.Source
+                + "', document '" + report.DocumentId + "', path '" + report.Path
+                + "', version '" + report.Version + "' (accepted=" + report.Accepted
+                + "). The document result was already determined; publication does not roll it back.", ex);
         }
     }
 

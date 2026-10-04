@@ -15,12 +15,9 @@ in `MEMORY.md`. Local work remains unpushed.
 authority is the PM's `v1-playable-package-manifest.json`). Real-game acceptance is pending. A docs or memory
 commit moves HEAD without changing those package bytes.
 
-- [ ] **Proposed observability patch - CONFIRM THE GAP FIRST, then land it on its own.** An exception raised
-  while publishing diagnostics inside `UiDocumentService.PublishToHost` is caught and not recorded, so a real
-  failure can leave no trace. Before writing anything, determine whether a real call path can reach that catch;
-  the location is **not** assumed to be the root cause. If it is confirmed, fix only that error-exposure gap,
-  verify and commit it separately, and keep the current playtest packages intact. This is not a mandate for a
-  general library audit, a speculative null-guard sweep or a process-ban list.
+- [x] **Expose unexpected reload diagnostic-publication failures.** The internal-buffer path now propagates
+  host/document context plus the original exception; 10 existing local checks pass. Source-only checkpoint,
+  outside the frozen rehearsal package. Runtime failure reproduction remains absent, not a claimed pass.
 
 - [x] **P1 composite popup arbitration:** maintainer passed Packs and Tuning A/B; owner-id isolation and
       session-bearing primitive guards remain in place. This does not accept the separate scroll defect.
