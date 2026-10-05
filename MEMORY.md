@@ -1,12 +1,13 @@
 # MEMORY
 
-## Current state (2026-10-04)
+## Current state (2026-10-06)
 
-- **Frozen playable package: FerriteLib `b31e2c3`** (with US `889f34b` and Demo `d972dbc`), recorded
-  authoritatively in the workspace PM's `v1-playable-package-manifest.json` (21 files across the three packs;
-  only this package carries the FL DLL). Real-game acceptance of the paired rehearsal is **pending**; the
-  library's local checks and the consumer's 15 checks are technical evidence only.
-  **A later source, docs or memory commit moves HEAD without changing these frozen package bytes** - package
+- **Held package: FerriteLib built at `0181268`** — `dist/dev/FerriteLib` is 5 files, payload
+  `1.6/Assemblies/FerriteLib.UiKit.dll` sha256 `c1371f623a3a…` (the PM's paired-package manifest is the
+  per-file authority and names the US/Demo pairing; the 2026-10-04 freeze at `b31e2c3` is superseded by this
+  staging). Real-game acceptance of the paired rehearsal remains pending; the library's local checks and the
+  consumer's checks are technical evidence only.
+  **A later source, docs or memory commit moves HEAD without changing these held bytes** - package
   identity is what the stager measured, not what HEAD points at.
 - **Working direction (the PM's `WORKING-DIRECTION-20261004.md` is the authority).** Task specs lead with
   **purpose, ownership and the main path plus a few key invariants**; process and history stay in handoff
@@ -22,7 +23,19 @@
   non-OOM failures with host/document/path/version/result context and the original exception as its inner
   cause; it does not silently discard them or roll back a previously determined document result. All 10
   existing local checks pass. No live-game publication failure was reproduced and this is not a global
-  recovery audit. The frozen rehearsal package does not include this later source change.
+  recovery audit. The held package is staged from this commit, so it includes the change; it does NOT
+  include the later SA1 source.
+- **SA1 appearance work (2026-10-06): source technical pass, awaiting consumer integration and human
+  acceptance.** `input/dropdown` joins the appearance seam (`Appearance="field"` default / `"selector"`
+  reserved rail + independent arrow zone, drawn through the one shared `UiThemeDraw.SelectorField`);
+  `UiTheme.SwitchThumbOff` is a palette-document colour role (unset answers `TextPrimary` - the historical
+  thumb; the ON half keeps `AccentGold`); `GeometryOverlay` is now independent of `GeometryEnabled`
+  (outline-only paints the draw-step entries and stores nothing; the scoped viewport's own band is a STATED
+  COVERAGE LIMIT, not an omission: its content is outlined entry by entry, pinned retained-minus-scoped).
+  Contracts: `docs/development/0.7/05-api-contract.md` §SA1, `docs/api-tiers.md`,
+  `docs/consumers/consume-from-0.7.0.md`. Evidence: 10 local gates green with named faithful reverts
+  (r2/r3 rounds); local/stub only - real-font, in-game appearance and the consumers' adoption (US palette
+  document + composites, Demo showcase) remain open, and none of this is in the held package.
 
 ## PM integration checkpoint — 2026-09-30
 

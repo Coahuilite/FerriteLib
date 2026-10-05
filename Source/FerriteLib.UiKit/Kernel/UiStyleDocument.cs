@@ -635,6 +635,11 @@ public sealed class UiStyleDocument
             case "TextOnDanger":
             case "TextDisabled":
             case "AccentGold":
+            // SA1.1(r3): the switch thumb's OFF ink is declarable like every other colour role, so a
+            // consumer configures it through its single palette document instead of a C#-side assignment
+            // that would bypass the source and split scope consistency. Unset it still answers the theme's
+            // own TextPrimary at READ time (UiTheme.SwitchThumbOff) - this gate only recognises the name.
+            case "SwitchThumbOff":
             // Batch 1 (CP-6④): HoverPoint is no longer a token. A scheme that still declares it is
             // refused here - one recorded issue, never a silent no-op - and the hover step is derived
             // from AccentGold.

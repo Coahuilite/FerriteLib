@@ -39,9 +39,11 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// ON track is unaffected: the selected surface is a state treatment and keeps its own pair.
 /// </para>
 /// <para>
-/// <b>The thumb's two halves are two kinds of token.</b> OFF paints a neutral ink
-/// (<c>TextPrimary</c>) on the neutral track; ON paints the <c>AccentGold</c>, because the accent is what
-/// says "this control is on" in this series' look. The ON thumb is deliberately not
+/// <b>The thumb's two halves are two kinds of token.</b> OFF paints the <c>SwitchThumbOff</c> ink -
+/// which answers the theme's <c>TextPrimary</c> until a consumer assigns it separately (SA1.1), so the
+/// historical neutral thumb is untouched and a dedicated OFF grey no longer has to darken important text;
+/// ON paints the <c>AccentGold</c>, because the accent is what says "this control is on" in this series'
+/// look. The ON thumb is deliberately not
 /// <c>TextOnGold</c> - that token is ink FOR a gold plane, so a thumb wearing it reads as a label rather
 /// than as the control's own state, and the two coincide on a palette whose selected plane is light.
 /// </para>
@@ -387,7 +389,10 @@ internal sealed class CheckboxWidget : IUiWidget
         // accent is deliberately not the selected surface's text colour (<c>TextOnGold</c>, which is ink FOR
         // a gold plane): a thumb painted in the plane's text colour would read as a label rather than as the
         // control's own state, and on a palette whose selected plane is light the two coincide.
-        UiThemeDraw.Solid(knobRect, state ? theme.AccentGold : theme.TextPrimary);
+        // SA1.1: the OFF half reads theme.SwitchThumbOff, whose unset fallback IS this TextPrimary read -
+        // not assigning the token keeps the historical neutral ink, and assigning it greys the thumb
+        // without touching any label.
+        UiThemeDraw.Solid(knobRect, state ? theme.AccentGold : theme.SwitchThumbOff);
 
         return trackWidth;
     }

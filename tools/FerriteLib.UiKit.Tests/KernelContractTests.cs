@@ -548,6 +548,7 @@ internal static class KernelContractTests
         altered.TextOnDanger = new Color(0.7f, 0.7f, 0.7f, 1f);
         altered.TextDisabled = new Color(0.1f, 0.2f, 0.3f, 1f);
         altered.AccentGold = new Color(0.4f, 0.5f, 0.6f, 1f);
+        altered.SwitchThumbOff = new Color(0.7f, 0.2f, 0.6f, 1f); // SA1.1: a colour cannot move a rect either
         // Batch 1 (CP-6④): no second accent token exists. The derived hover step moves with AccentGold by
         // construction, so perturbing the accent is what perturbs it.
         altered.Border = new Color(0f, 0f, 0f, 0f);

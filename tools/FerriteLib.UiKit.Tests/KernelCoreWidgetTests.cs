@@ -31,6 +31,7 @@ internal static class KernelCoreWidgetTests
         failures += Run("A binding element-type mismatch is reported, not just thrown (FL-23)", VerifyBindingMismatchIsReported);
         failures += Run("Dynamic options accept typed display/value pairs without reporting (FL-16)", VerifyTypedOptionPairs);
         failures += Run("Typed choices render the label and commit the real instance (R4-A)", VerifyTypedChoices);
+        failures += Run("The dropdown's selector look reserves its outlets and refuses an unknown name (SA1.1)", VerifyDropdownSelectorAppearance);
         return failures;
     }
 
@@ -1151,6 +1152,169 @@ internal static class KernelCoreWidgetTests
             Check(DrawOnlyLabel(host, snapshot, 300f, 100f) == "a",
                 "a seam-less implementation still renders the string path's exact member");
         }
+    }
+
+    /// <summary>
+    /// SA1.1: <c>input/dropdown</c> gains the shared appearance seam with a second look, <c>selector</c>.
+    /// The lane pins the four things a consumer needs to be able to rely on: the name is accepted at
+    /// creation and an unknown one is refused naming both values; the default look still draws the exact
+    /// outlets it always had (old consumers unchanged, which is the compatibility half); the selector's
+    /// outlets come from the SAME shared helpers a consumer composite calls, so core kind and composite
+    /// cannot diverge; and the selector's extra pixels are the shape it promises - rail, divider, arrow -
+    /// with no reserved slot for a help button in either look.
+    /// <para>
+    /// MUTATION-TARGET: the outlet arithmetic (revert the selector branch and the plain outlets are found
+    /// where the selector's were expected) and the solid delta (delete the arrow or the rail and the count
+    /// moves; the count is exact, not a floor). The refusal message is asserted to name both accepted
+    /// looks because an author holding a mistyped attribute is the person who reads it.
+    /// </para>
+    /// </summary>
+    private static void VerifyDropdownSelectorAppearance()
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+
+        // The kind declares its look set through the schema and the seam - the manifest vocabulary gate.
+        IReadOnlyCollection<string>? schema = UiWidgetRegistry.GetAttributeSchema(
+            UiWidgetRegistry.CoreScope, DropdownWidget.Kind);
+        Check(schema != null && Contains(schema!, UiAppearanceResolver.Attribute),
+            "input/dropdown's schema declares the Appearance attribute, so a page may write it");
+        UiAppearanceResolver? seam = UiWidgetRegistry.GetAppearanceResolver(
+            UiWidgetRegistry.CoreScope, DropdownWidget.Kind);
+        Check(seam != null && Contains(seam!.Supported, "selector") && Contains(seam!.Supported, "field"),
+            "and the kind registers both looks with the shared seam");
+
+        float padding = UiTheme.Vanilla.Geometry.Padding;
+
+        // (1) Default look: the plain field's text outlet is exactly what it was before the seam existed,
+        // and no selector part appears in its recording. Observations are GEOMETRY - which rect was painted
+        // where - not call counts, so an appearance-equivalent repaint cannot redden this for the wrong
+        // reason (PM r1 point 4).
+        using (UiHost plain = DropdownSelectorHost(""))
+        {
+            UiLayoutSnapshot snapshot = plain.MeasureAndArrange(new Vector2(300f, 100f));
+            Rect field = snapshot.RectById["dd"];
+            DrawOnce(plain, snapshot, 300f, 100f);
+            ClearRecordedFill();
+            ClearRecordedLabels();
+            plain.BeginFrame();
+            plain.Draw(new Rect(0f, 0f, 300f, 100f), snapshot);
+            plain.EndFrame();
+            var rects = (IList)StubField("LabelRects");
+            Rect outlet = (Rect)rects[rects.Count - 1]!;
+            CheckClose(field.x + padding, outlet.x, "the default field still starts its text one padding in");
+            CheckClose(field.width - padding * 2f, outlet.width,
+                "and the default outlet still spans the field minus both insets");
+            Check(!HasSelectorRail(RecordedSolidRects(), field),
+                "the plain field paints no accent rail and no arrow zone at its edges");
+        }
+
+        // (2) Selector look: the reserved rail, the divider in front of the arrow zone, the arrow inside
+        // the zone, and the text between them - each found by the rect it occupies.
+        using (UiHost selector = DropdownSelectorHost(" Appearance=\"selector\""))
+        {
+            UiLayoutSnapshot snapshot = selector.MeasureAndArrange(new Vector2(300f, 100f));
+            Rect field = snapshot.RectById["dd"];
+            DrawOnce(selector, snapshot, 300f, 100f);
+            ClearRecordedFill();
+            ClearRecordedLabels();
+            selector.BeginFrame();
+            selector.Draw(new Rect(0f, 0f, 300f, 100f), snapshot);
+            selector.EndFrame();
+            IList solidRects = RecordedSolidRects();
+            var rects = (IList)StubField("LabelRects");
+            Rect outlet = (Rect)rects[rects.Count - 1]!;
+
+            CheckClose(field.x + UiThemeDraw.SelectorAccentWidth + padding, outlet.x,
+                "the selector's text starts past the reserved accent rail");
+            CheckClose(field.xMax - UiThemeDraw.SelectorArrowZoneWidth - padding, outlet.xMax,
+                "and ends before the reserved arrow zone: the arrow is an independent region");
+            Check(HasSelectorRail(solidRects, field),
+                "a rail-width solid spans the field's left edge at exactly the reserved width");
+            float hairline = Math.Max(1f, UiTheme.Vanilla.Geometry.Hairline);
+            Rect zone = UiThemeDraw.SelectorArrowZone(field);
+            bool divider = false;
+            foreach (object entry in solidRects)
+            {
+                Rect r = (Rect)entry!;
+                divider |= Math.Abs(r.x - (zone.x - hairline)) <= 0.01f
+                    && Math.Abs(r.width - hairline) <= 0.01f && Math.Abs(r.height - field.height) <= 0.01f;
+            }
+
+            Check(divider, "the arrow zone stands behind its own divider hairline");
+            float centreX = zone.x + zone.width * 0.5f;
+            bool arrow = false;
+            foreach (object entry in solidRects)
+            {
+                Rect r = (Rect)entry!;
+                arrow |= r.width > 2f
+                    && Math.Abs(r.x + r.width * 0.5f - centreX) <= 0.5f
+                    && r.x >= zone.x - 0.01f && r.xMax <= zone.xMax + 0.01f
+                    && r.y >= zone.y - 0.01f && r.yMax <= zone.yMax + 0.01f;
+            }
+
+            Check(arrow, "arrow ink is painted INSIDE the reserved zone, centred on it - however many rows "
+                + "the current implementation stacks it into");
+        }
+
+        // (3) An unknown look is refused at creation, naming both accepted values.
+        bool refused = false;
+        string message = "";
+        try
+        {
+            DropdownSelectorHost(" Appearance=\"combo\"").Dispose();
+        }
+        catch (UiContractException ex)
+        {
+            refused = true;
+            message = ex.Message;
+        }
+
+        Check(refused, "an appearance the kind does not draw is refused at creation, not degraded");
+        Check(message.IndexOf("combo", StringComparison.Ordinal) >= 0
+                && message.IndexOf("selector", StringComparison.Ordinal) >= 0
+                && message.IndexOf("field", StringComparison.Ordinal) >= 0,
+            "and the refusal names the authored text and both accepted looks: " + message);
+    }
+
+    /// <summary>The recorded solid rects of the last drawing pass.</summary>
+    private static IList RecordedSolidRects() => (IList)StubField("DrawBoxSolidRects");
+
+    /// <summary>True when a rail-width, full-height solid sits on the field's left edge.</summary>
+    private static bool HasSelectorRail(IList solidRects, Rect field)
+    {
+        foreach (object entry in solidRects)
+        {
+            Rect r = (Rect)entry!;
+            if (Math.Abs(r.x - field.x) <= 0.01f
+                && Math.Abs(r.width - UiThemeDraw.SelectorAccentWidth) <= 0.01f
+                && Math.Abs(r.height - field.height) <= 0.01f)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
+    /// <summary>
+    /// One dropdown page with the given appearance attribute text ("" for the default). The bindings mirror
+    /// the long-standing field fixtures here: a writable string value and a two-option list.
+    /// </summary>
+    private static UiHost DropdownSelectorHost(string appearanceAttribute)
+    {
+        var bindings = new UiBindings();
+        string mode = "one";
+        bindings.BindValue("mode", () => mode, value => mode = value);
+        bindings.BindOptions("Options", () => new List<string> { "one", "two" });
+        return new UiHost(
+            "selector", UiLayoutManifest.Parse(
+                "<UiPage Schema=\"2\" Source=\"selector\">"
+                + "<Widget Id=\"dd\" Kind=\"input/dropdown\" Bind=\"mode\" OptionsBind=\"Options\" Height=\"24\""
+                + appearanceAttribute + " />"
+                + "</UiPage>"),
+            bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
     }
 
     /// <summary>

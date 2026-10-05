@@ -11,13 +11,13 @@ integration surface. The execution handbook is `docs/development/0.7/next-stage-
 instrument commands are in `docs/build-and-debug.md`. Completed foundations and evidence pointers live
 in `MEMORY.md`. Local work remains unpushed.
 
-**Frozen for the current rehearsal: this repository at `b31e2c3`** (paired US `889f34b`, Demo `d972dbc`; the
-authority is the PM's `v1-playable-package-manifest.json`). Real-game acceptance is pending. A docs or memory
-commit moves HEAD without changing those package bytes.
+**Held package: built at `0181268`** (`dist/dev/FerriteLib`, 5 files, payload DLL `c1371f623a3a…`; the PM's
+paired-package manifest is the per-file authority). Real-game acceptance is pending. A docs or memory commit
+moves HEAD without changing those held bytes.
 
 - [x] **Expose unexpected reload diagnostic-publication failures.** The internal-buffer path now propagates
-  host/document context plus the original exception; 10 existing local checks pass. Source-only checkpoint,
-  outside the frozen rehearsal package. Runtime failure reproduction remains absent, not a claimed pass.
+      host/document context plus the original exception; 10 existing local checks pass. This commit IS the
+      held package's source (`0181268`). Runtime failure reproduction remains absent, not a claimed pass.
 
 - [x] **P1 composite popup arbitration:** maintainer passed Packs and Tuning A/B; owner-id isolation and
       session-bearing primitive guards remain in place. This does not accept the separate scroll defect.
@@ -133,6 +133,15 @@ library before validating the real page, and their listing order does not overri
       seam-less `IUiBindings` implementation still working string-only). No version bump and no tier change
       beyond the `docs/api-tiers.md` entries (the recorded 0.7.x public-addition exemption applies). What the
       run must show: the new lane green, the legacy A4/FL-16/A5/popup lanes untouched, Gate 10 unchanged.
+- [ ] **SA1 (selector look, SwitchThumbOff, independent outline): source technical pass through r3; pending
+      consumption and human acceptance.** Interfaces and contracts are the authority:
+      `docs/development/0.7/05-api-contract.md` §SA1, `docs/api-tiers.md`,
+      `docs/consumers/consume-from-0.7.0.md` (grammar/resolver/cloned-scope wiring for
+      `<Color Token="SwitchThumbOff"/>`; `UiThemeDraw.SelectorField` as the single shared selector paint;
+      `GeometryOverlay` independent of the capture, scoped-viewport band a stated coverage limit pinned
+      retained-minus-scoped). Local evidence: 10 gates green in the r2/r3 build slots with named faithful
+      reverts each side. Open: paired integration, US palette-document and
+      composite adoption, Demo showcase, real-font/in-game appearance. Not in the held package.
 - [ ] **Game-check R4-B images and composed rows in the paired rehearsal.** All 10 local gates pass after PM integration; API tier details are in "docs/api-tiers.md". Real RimWorld rendering/input remain unverified.
 - [ ] **Derive the visual-core boundary guard's symbol set from the types.** The cheap half landed
       2026-09-24 (`UiPopup` added to the reject list, mutation-tested); the hand-maintained list is still the

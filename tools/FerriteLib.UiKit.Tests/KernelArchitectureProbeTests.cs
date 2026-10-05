@@ -343,8 +343,11 @@ internal static class KernelArchitectureProbeTests
             "input/button is sealed: its paint cannot be replaced by inheriting from it");
 
         // R4-B adds the authorized image outlet and its aspect-fit geometry helper to the pinned surface.
-        // There is still no layer or transform outlet. An addition is decided here as well as in the
-        // library, which is the point - the alternative is discovering the change from a screenshot.
+        // SA1.1(r2) adds the selector family - the reserved-zone and outlet geometry helpers, the arrow,
+        // and the complete SelectorField composition - and the version vocabulary is recorded in
+        // docs/api-tiers.md. There is still no layer or transform outlet. An addition is decided here as
+        // well as in the library, which is the point - the alternative is discovering the change from a
+        // screenshot.
         var outlets = new List<string>();
         foreach (MethodInfo method in typeof(UiThemeDraw).GetMethods(BindingFlags.Public | BindingFlags.Static))
         {
@@ -355,10 +358,11 @@ internal static class KernelArchitectureProbeTests
         string[] pinned =
         {
             "AccentRail", "BackgroundPlane", "Base", "FitImage", "FocusRail", "Image", "Label", "Panel", "RecoveryBand",
-            "SectionBand", "SectionHeader", "Solid", "StatusBadge", "StatusTreatment", "Surface", "Workspace"
+            "SectionBand", "SectionHeader", "SelectorArrow", "SelectorArrowZone", "SelectorField", "SelectorTextOutlet",
+            "Solid", "StatusBadge", "StatusTreatment", "Surface", "Workspace"
         };
 
-        Check(outlets.Count == pinned.Length && Array.TrueForAll(pinned, outlets.Contains), "the drawing outlet vocabulary is the pinned 16 names, got "
+        Check(outlets.Count == pinned.Length && Array.TrueForAll(pinned, outlets.Contains), "the drawing outlet vocabulary is the pinned 20 names, got "
             + outlets.Count + ": " + string.Join(", ", outlets));
         bool imageOutlet = false;
         foreach (string name in outlets)

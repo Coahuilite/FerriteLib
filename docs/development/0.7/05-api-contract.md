@@ -675,10 +675,23 @@ The two spaces side by side are the point of the record: a recorder reading cont
 reading window space produce two positions for one control, and neither number says which space it is in.
 
 **The surface, and why it adds no type.** `UiDiagnosticSubscription.GeometryEnabled` (off by default),
-`.GeometryOverlay` (off by default, and refused until the instrument is on) and `.DumpGeometry()` (the
-diffable text). It hangs off the existing subscription, so its lifetime, isolation and release path are the
-diagnostic surface's own and the instrument adds no process-wide state of any kind — no new static, no new
-kind, no second channel.
+`.GeometryOverlay` and `.DumpGeometry()` (the diffable text). It hangs off the existing subscription, so its
+lifetime, isolation and release path are the diagnostic surface's own and the instrument adds no
+process-wide state of any kind — no new static, no new kind, no second channel.
+
+**SA1.5: the outline is an independent switch.** It used to be refused until `GeometryEnabled` was on, which
+made "look at my layout" pay for "record my layout" - the user ruling that the outline may be turned on
+anytime to review the layout ends that coupling. The outline field now lives on the subscription, not inside
+the capture: with no capture it outlines every entry that reaches the engine's per-entry DRAW step and stores
+nothing (no buffer, the dump stays empty, `TryGetGeometrySnapshot` keeps answering false - the report channel
+stays honest because it never gained a sample to report), and with a capture live it paints exactly the
+RETAINED entries at that step as before. The step is the stated coverage limit: a scoped container's own
+viewport rect has no draw step at its own entry - its content is outlined entry by entry through the nested
+walk, and the viewport band itself is deliberately not outlined (outlining it would open a second paint
+outlet at the clip push). Both modes render the same walk at the same call site in the same draw-local
+rect: there is no second layout system, and `KernelDevGeometryTests` pins the outlined set honestly as
+retained-minus-scoped rather than claiming every arranged rect is outlined. Turning `GeometryEnabled` off
+afterwards does not silence the picture; a release payload still refuses both switches outright.
 
 **The gate is the build configuration, and it fails closed.** The whole implementation is inside
 `#if FER_DEV`, plus three guarded call sites (the engine's per-entry draw walk, the engine's overlay call, and
@@ -949,6 +962,67 @@ track is unaffected: a selected state is a treatment the resolved-value table ow
 **Compatibility.** No exported type is added, so no tier entry is owed and no minor moves. A consumer's
 `Appearance="checkbox"` page keeps compiling and keeps drawing the box-and-mark look; a kind that registers
 through the five- or six-parameter overload behaves exactly as before.
+
+## SA1 — the same seam on `input/dropdown`, the shared selector outlets, and the independent outline
+
+**The vocabulary.** `input/dropdown` now declares the appearance axis the checkbox opened:
+`Appearance="field" | "selector"` through the SAME `UiAppearanceResolver` seam (registered via the internal
+seventh parameter, so `input/dropdown` and `input/checkbox` are the two kinds that declare looks, and the
+seam itself stays internal - no consumer has asked for an appearance axis on a kind of its own). Absent or
+blank declares the default `field`; an unknown name is refused at creation naming the authored text and both
+accepted looks. `field` is drawn by the code that drew the field before this entry: plane, hairline, one
+padding-inset text outlet - so every existing page keeps its pixels. That pixel-compatibility is asserted,
+not promised: `KernelCoreWidgetTests` measures the default outlet and its five solids on the registered kind.
+
+**The selector shape, and where each half lives.** The contract this look answers separates SHAPE from
+COLOUR, and the split is by type of number: the reserved slots are shape constants on `UiThemeDraw`
+(`SelectorAccentWidth` 3 - the left accent line; `SelectorArrowZoneWidth` 18 - the independent right arrow
+region), the fill/edge/ink are tokens (the same `Active`/`Neutral` status ladder the field always resolved;
+the rail is `AccentRail`'s own `AccentGold` default; the arrow and the divider take the resolved surface's
+text/border). The arrow is a procedural triangle stacked through `Solid` - no texture, no font glyph, no
+second backend outlet. Neither look reserves a slot for a help button: the "?" is the reference mod's own
+chrome and stays outside the library's vocabulary.
+
+**The shared entry, for the consumer's composites and the demo page (r2: one composition, not three
+recipes).** `UiThemeDraw.SelectorField(field, display, theme, style, font?)` is the COMPLETE selector paint -
+plane, rail, divider, arrow and text outlet in this one order - and the core dropdown kind draws through it,
+so a consumer kind that paints its own dropdown-shaped control calls the SAME method and cannot diverge even
+in the composition sequence. The pieces stay public too for callers that need only part of it:
+`SelectorArrowZone(field)`, `SelectorTextOutlet(field, theme)`, `SelectorArrow(zone, theme, color?)`. The hit
+trigger stays `UiNative.DropdownButton` (one popup, one anchor source - SA1 adds no second business
+popup/input). Colour adoption is the consumer's own theme work: a dark plane is the page's `Neutral`/`Active`
+tokens, gold accents are `AccentGold` / the selected surface's pair. The switch was audited against the same
+reference on the token half: FL's geometry is already the reference's `34x18` track, `14px` square knob,
+`2px` inset and `6px` label gap - **no switch kind, attribute or shape constant changed**. What the audit
+found as a real gap is the OFF-thumb colour: the thumb read the shared `TextPrimary`, so greying it could
+only have been done by darkening every important text. SA1.1 lands `UiTheme.SwitchThumbOff`: unset it answers
+`TextPrimary` (historical thumb, unchanged), assigned it greys the thumb and nothing else; the ON half keeps
+answering `AccentGold`. Since r3 the role is ALSO a document colour token: `<Color Token="SwitchThumbOff"/>`
+is in the grammar, the resolver applies it onto the scoped clone like every other colour, and the lane drives
+the grey through the real document->resolver->clone->paint path (plus the same document with a scope that
+declares nothing, which keeps the bright thumb). The row-wide hover plate behind a toggle stays the consumer's
+band, not the control.
+
+**The outline, separated from the recorder.** Covered by the SA1.5 paragraph above; the lane
+`KernelDevGeometryTests.VerifyOverlayIsIndependentOfCapture` holds all four directions (accept-without-
+capture, store-nothing-while-painting, capture-off-keeps-painting, per-subscription isolation), the both-on
+case re-measures the retained-entry equality at the draw step, and the outlined set is pinned honestly as
+retained-minus-scoped - the scoped viewport's own band is a stated coverage limit, not a claim of full
+coverage (r3, after r2 observed the 20-vs-24 mismatch rather than forcing it).
+
+**What the selector lane observes (PM r1 point 4).** `KernelCoreWidgetTests.VerifyDropdownSelectorAppearance`
+reads GEOMETRY - the rail solid's rect on the left edge, the divider rect before the arrow zone, arrow ink
+contained in and centred on the zone, and the exact text-outlet rect - never a call count, so a repaint that
+keeps the picture equivalent (a different row count in the procedural arrow, a different surface spelling)
+cannot redden it for the wrong reason; the default-field half of the lane pins that no rail appears where
+the old field drew. `KernelControlKindTests.VerifySwitchThumbTokens` finds the knob by its 14x14 rect among
+the recorded solids rather than by draw position, for the same reason.
+
+**Compatibility.** No exported type is added; three classified types gain members (`UiThemeDraw` outlets and
+`SelectorField`, `UiTheme.SwitchThumbOff`, `UiDiagnosticSubscription` semantics on an existing property). Old
+manifests, old compiled consumers and the `field` default are pixel-identical; an unset `SwitchThumbOff`
+paints the thumb it always painted; the `GeometryOverlay` setter is strictly more permissive in a dev build
+and unchanged in a release one. The 0.7.x temporary public-addition exemption applies: no minor bump.
 
 ## R2 — one shipped palette, a partial bag, a scoped re-tint, and the font redirect
 

@@ -12,10 +12,36 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// its text come from the theme's <see cref="UiStyleTable"/>; its height and text inset from the
 /// theme's <see cref="UiGeometry"/>. Popup state lives in <see cref="UiSession"/> and is drawn by
 /// <see cref="UiHost"/> after content.
+/// <para>
+/// <b>Appearance is not kind, and not colour.</b> One selection BEHAVIOUR (typed/string read-back, the
+/// one session-owned popup, the option-help publication) serves every field look; only the field's own
+/// painting branches. The looks are declared once here through the shared seam
+/// (<see cref="UiAppearanceResolver"/>): the default <c>field</c> is the plane this kind has always
+/// drawn - old consumers keep it by omission - and <c>selector</c> is the reserved-rail plus arrow-zone
+/// field, drawn through the same shared outlets a consumer composite calls
+/// (<see cref="UiThemeDraw.SelectorArrowZone"/> / <see cref="UiThemeDraw.SelectorTextOutlet"/> /
+/// <see cref="UiThemeDraw.SelectorArrow"/>), so the core kind and the adopted composite cannot diverge.
+/// Colours stay tokens (the status ladder resolved for open/current state); the rail width, arrow slot
+/// and glyph are these look's shape constants. A second dropdown kind would freeze vocabulary the
+/// attribute already carries; a reserved help slot is deliberately NOT part of either look.
+/// </para>
 /// </summary>
 public sealed class DropdownWidget : IUiWidget
 {
     public const string Kind = "input/dropdown";
+
+    /// <summary>This kind's default look: the plain status-toned field, drawn exactly as before.</summary>
+    internal const string FieldLook = "field";
+
+    /// <summary>The reserved-rail selector field: accent line left, independent arrow zone right.</summary>
+    internal const string SelectorLook = "selector";
+
+    /// <summary>
+    /// This kind's appearance seam: the accepted looks, the default, and the one resolver every half of
+    /// this file goes through - registered with the kind, so the creation contract and the drawing
+    /// resolve against the same set (see <see cref="CheckboxWidget"/> for the pattern's origin).
+    /// </summary>
+    internal static readonly UiAppearanceResolver Looks = new UiAppearanceResolver(FieldLook, SelectorLook);
 
     private const float LabelWidth = 80f;
 
@@ -31,13 +57,16 @@ public sealed class DropdownWidget : IUiWidget
             () => new DropdownWidget(),
             new[] {
                 "Id", "Kind", "Bind", "OptionsBind", "Height", "Label", "LabelKey", "Tab", "Hidden",
+                UiAppearanceResolver.Attribute,
                 OptionHelp.Attribute,
                 "Option1", "Value1", "Option2", "Value2", "Option3", "Value3", "Option4", "Value4",
                 "Option5", "Value5", "Option6", "Value6", "Option7", "Value7", "Option8", "Value8",
                 "Option9", "Value9", "Option10", "Value10", "Option11", "Value11", "Option12", "Value12",
                 "Option13", "Value13", "Option14", "Value14", "Option15", "Value15", "Option16", "Value16"
             },
-            new[] { "Label", "LabelKey" });
+            new[] { "Label", "LabelKey" },
+            null,
+            Looks);
     }
 
     public void Configure(UiElementSpec spec)
@@ -52,6 +81,20 @@ public sealed class DropdownWidget : IUiWidget
         {
             throw new InvalidOperationException(
                 $"DropdownWidget at '{elementPath}' requires a non-empty Id or Bind to use as its typed binding key.");
+        }
+
+        // The look is refused here, once, and never degraded on every frame after: the same fail-closed
+        // rule the checkbox declares (see CheckboxWidget.Validate), so a mistyped appearance is located on
+        // the element instead of silently drawing the default forever.
+        ResolvedAppearance appearance = Looks.Resolve(spec);
+        if (!appearance.Declared && DeclaresAppearance(spec))
+        {
+            spec.TryGetAttribute(UiAppearanceResolver.Attribute, out string authored);
+            throw new InvalidOperationException(
+                "DropdownWidget at '" + elementPath + "' declares "
+                + UiAppearanceResolver.Attribute + "='" + (authored ?? "").Trim()
+                + "'; the accepted values are '" + FieldLook + "' (the default plain field) and '"
+                + SelectorLook + "' (accent rail plus arrow zone). Omit the attribute for the default.");
         }
 
         if (bindings is IUiTypedChoices typedSeam
@@ -182,7 +225,9 @@ public sealed class DropdownWidget : IUiWidget
     /// <summary>
     /// The element's field, for both draw paths: the optional single-line label in its fixed column, the value
     /// plane and the text outlet, with the layout arithmetic in one place. Returns the field rect, which is what
-    /// the trigger's hit test and the popup anchor are taken from.
+    /// the trigger's hit test and the popup anchor are taken from. The look is resolved HERE - once per frame,
+    /// through the same seam the creation contract and the natural-body entry point use - so the field that
+    /// was refused at creation is never a different field at draw.
     /// </summary>
     private Rect DrawLabelledField(Rect rect, string label, string display, bool selected, UiWidgetContext ctx)
     {
@@ -195,8 +240,21 @@ public sealed class DropdownWidget : IUiWidget
             UiThemeDraw.Label(new Rect(rect.x, rect.y, labelWidth, rect.height), label, ctx.Theme, ctx.Theme.TextPrimary, UiFont.Small, TextAnchor.MiddleLeft, singleLine: true);
         }
 
-        DrawField(fieldRect, display, selected, ctx.Theme);
+        DrawField(fieldRect, display, selected, ctx.Theme, Looks.Resolve(spec).Value);
         return fieldRect;
+    }
+
+    /// <summary>True when the resolved look is the selector field; the name is matched case-insensitively.</summary>
+    private static bool IsSelector(string look)
+    {
+        return string.Equals(look, SelectorLook, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>True when the element declared a non-blank look at all; a blank declaration is the default.</summary>
+    private static bool DeclaresAppearance(UiElementSpec spec)
+    {
+        return spec.TryGetAttribute(UiAppearanceResolver.Attribute, out string raw)
+            && !string.IsNullOrWhiteSpace(raw);
     }
 
     // --- R4-A: the typed path, taken when the value binding's declared type is not a string ------------------
@@ -316,11 +374,19 @@ public sealed class DropdownWidget : IUiWidget
         OptionHelp.Publish(ctx, OptionHelp.SinkKey(spec), hovered);
     }
 
-    private static void DrawField(Rect rect, string display, bool selected, UiTheme theme)
+    private static void DrawField(Rect rect, string display, bool selected, UiTheme theme, string look)
     {
         // The mapping is a table query, not a second copy of it: this method used to re-derive the
-        // three tokens the status outlet already computes, which is how the two drifted apart.
+        // three tokens the status outlet already computes, which is how the two drifted apart. The style
+        // ladder below is ONE resolution for both looks - the selector changes the field's SHAPE, never
+        // which state paints.
         UiResolvedStyle style = theme.Styles.Resolve(selected ? UiStatusTone.Active : UiStatusTone.Neutral);
+        if (IsSelector(look))
+        {
+            DrawSelectorField(rect, display, style, theme);
+            return;
+        }
+
         float padding = theme.Geometry.Padding;
         UiThemeDraw.Surface(rect, style.Surface, theme.Geometry.Hairline);
         UiThemeDraw.Label(
@@ -331,6 +397,16 @@ public sealed class DropdownWidget : IUiWidget
             UiFont.Small,
             TextAnchor.MiddleLeft,
             singleLine: true);
+    }
+
+    /// <summary>
+    /// The selector field is the shared <see cref="UiThemeDraw.SelectorField"/> entry itself - the core kind
+    /// composes through the very method a consumer composite calls, so "the same outlets" means the same
+    /// CODE, not two spellings of the same arithmetic. No question-mark slot exists in either look.
+    /// </summary>
+    private static void DrawSelectorField(Rect rect, string display, UiResolvedStyle style, UiTheme theme)
+    {
+        UiThemeDraw.SelectorField(rect, display, theme, style);
     }
 
     private string ReadBindKey()

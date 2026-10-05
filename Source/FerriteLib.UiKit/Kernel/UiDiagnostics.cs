@@ -246,6 +246,13 @@ public sealed class UiDiagnosticSubscription : IDisposable
 
 #if FER_DEV
     private UiDevGeometryCapture? geometry;
+
+    // SA1.5: the outline switch lives on the SUBSCRIPTION, not inside the capture. A capture owns stored
+    // samples; the outline owns a per-frame paint. Binding them meant the only way to SEE the layout was to
+    // also RECORD it - the user ruling that the outline may be turned on independently ends that. Two
+    // independent switches, one field each, both per-subscription: turning the outline on stores nothing,
+    // and turning capture off does not silence a picture someone is looking at.
+    private bool geometryOverlay;
 #endif
 
     /// <summary>
@@ -259,6 +266,11 @@ public sealed class UiDiagnosticSubscription : IDisposable
     /// on a release payload this setter <b>throws</b> rather than accepting the opt-in and then answering
     /// every question with emptiness - a diagnostic that reports nothing and looks fine is the failure this
     /// whole surface exists to end. The dump is diffable text (see <see cref="DumpGeometry"/>).
+    /// </para>
+    /// <para>
+    /// <b>Independent of the outline.</b> Turning this off does not turn <see cref="GeometryOverlay"/> off:
+    /// the stored record and the painted picture are separate switches (SA1.5), and a page that stops
+    /// recording keeps whatever outline the developer was already reading.
     /// </para>
     /// </summary>
     public bool GeometryEnabled
@@ -284,16 +296,27 @@ public sealed class UiDiagnosticSubscription : IDisposable
     }
 
     /// <summary>
-    /// Whether the instrument also paints an outline around each sampled element's draw rect. Off by
-    /// default, and it requires <see cref="GeometryEnabled"/>: the overlay describes what the instrument
-    /// sampled, so turning it on for a subscription that records nothing is refused instead of ignored.
+    /// Whether the outlined elements' draw rects are painted on screen. Off by default, and INDEPENDENT of
+    /// <see cref="GeometryEnabled"/> (SA1.5): the outline is a rendering of the same engine draw walk, not
+    /// a rendering of the stored capture. The outlined set is exactly the entries that reach the engine's
+    /// per-entry draw step; a scoped container's OWN viewport rect is not outlined at its own step - its
+    /// content is outlined entry by entry through the nested walk (a stated coverage limit, not a gap to
+    /// paper over: outlining the viewport band would require painting at the clip push, a second outlet the
+    /// instrument deliberately does not open). Within that exit:
+    /// <list type="bullet">
+    /// <item>outline on, capture off: every drawn entry is outlined, and NOTHING is sampled - no buffer,
+    /// no dump content, no snapshot, and the report path keeps honestly saying it captured nothing.</item>
+    /// <item>outline on, capture on: the picture stays the third rendering of the one bounded capture, so
+    /// it paints exactly the retained entries that reach the draw step and nothing the capture dropped.</item>
+    /// </list>
+    /// Release payloads refuse the switch outright, because they have no walk to render.
     /// </summary>
     public bool GeometryOverlay
     {
         get
         {
 #if FER_DEV
-            return geometry != null && geometry.Overlay;
+            return geometryOverlay;
 #else
             return false;
 #endif
@@ -301,19 +324,11 @@ public sealed class UiDiagnosticSubscription : IDisposable
         set
         {
 #if FER_DEV
-            UiDevGeometryCapture? capture = geometry;
-            if (capture == null)
-            {
-                throw new InvalidOperationException(
-                    "Enable GeometryEnabled before turning the geometry overlay on: the overlay outlines what "
-                    + "the instrument sampled, and nothing is being sampled.");
-            }
-
-            capture.Overlay = value;
+            geometryOverlay = value;
 #else
             throw new InvalidOperationException(
                 "The geometry instrument is a development-build tool and this payload was built without it; "
-                + "enabling its overlay is refused rather than answered with silence.");
+                + "enabling its outline is refused rather than answered with silence.");
 #endif
         }
     }

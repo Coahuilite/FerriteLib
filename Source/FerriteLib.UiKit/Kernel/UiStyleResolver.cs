@@ -309,6 +309,7 @@ public sealed class UiStyleResolver
             case "TextOnDanger": theme.TextOnDanger = value; break;
             case "TextDisabled": theme.TextDisabled = value; break;
             case "AccentGold": theme.AccentGold = value; break;
+            case "SwitchThumbOff": theme.SwitchThumbOff = value; break;
             // Batch 1 (CP-6④): there is no second accent token. A document that declares HoverPoint is
             // reported as an unknown token by UiStyleDocument, so it never reaches this switch; the hover
             // step is read from the accent through UiTheme.AccentHover.

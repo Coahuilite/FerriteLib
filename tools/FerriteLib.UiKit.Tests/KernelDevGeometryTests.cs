@@ -52,7 +52,7 @@ internal static class KernelDevGeometryTests
         Run("A press is attributed to the element that claimed it, in the pointer's own space", VerifyInputVerdicts);
         Run("An element under an open popup layer yields the press and says so", VerifyCoveredVerdict);
         Run("Consumed input remains visible without changing native dispatch", VerifyConsumedInput);
-        Run("The overlay is refused until the instrument is on", VerifyOverlayRequiresTheInstrument);
+        Run("The outline switch is independent of the capture switch", VerifyOverlayIsIndependentOfCapture);
         Run("The structured snapshot and the text dump describe one captured pass", VerifyStructuredSnapshotMatchesTheDump);
         Run("The effective appearance is resolved through the kind's own seam, with provenance", VerifyEffectiveAppearance);
         Run("Boundaries and unknowns: effective clip, popup ownership, and what this site cannot see", VerifyBoundariesAndUnknowns);
@@ -450,26 +450,93 @@ internal static class KernelDevGeometryTests
         finally { Event.current = null; GUIUtility.hotControl = 0; }
     }
 
-    private static void VerifyOverlayRequiresTheInstrument()
+    /// <summary>
+    /// SA1.5: the outline no longer waits for the capture. Turning the picture on must not quietly start
+    /// recording, and the recording stopping must not silence a picture someone is reading.
+    /// <para>
+    /// MUTATION-TARGET: the acceptance itself (a revert to "refused until the instrument is on" throws in
+    /// the first lines here), the outline-only pass storing nothing (a revert that creates a capture as a
+    /// side effect reddens the empty-dump and reader assertions), and capture-off keeping the switch on (a
+    /// revert that clears the flag with the capture reddens the survival assertions). The retained-entry
+    /// faithfulness WHILE a capture is live stays pinned by VerifyBoundedCaptureAndDroppedCount, which the
+    /// both-on case here deliberately re-measures through the same helpers.
+    /// </para>
+    /// </summary>
+    private static void VerifyOverlayIsIndependentOfCapture()
     {
         using UiHost host = NewHost(Page);
-        bool refused = false;
-        try
+        UiDiagnosticSubscription diagnostics = host.Diagnostics;
+        Check(!diagnostics.GeometryOverlay, "the outline is off by default, with or without the capture");
+
+        diagnostics.GeometryOverlay = true; // this call threw before SA1.5
+        Check(diagnostics.GeometryOverlay, "turning the outline on without the instrument is accepted now");
+        Check(!diagnostics.GeometryEnabled, "and accepting it did not quietly turn the capture on");
+
+        ClearSolids();
+        Pass(host);
+        int outlineOnly = SolidCount();
+        Check(diagnostics.DumpGeometry().Length == 0,
+            "the outline-only pass leaves the dump empty: there is no capture to store it in");
+        Check(!diagnostics.TryGetGeometrySnapshot(out UiDevGeometrySnapshot? nothing) && nothing == null,
+            "and the structured reader keeps saying nothing was captured, so no report sample is retained");
+
+        // The capture joining changes no pixels: both modes render the SAME engine walk.
+        diagnostics.GeometryEnabled = true;
+        ClearSolids();
+        Pass(host);
+        int withCapture = SolidCount();
+        Check(withCapture == outlineOnly,
+            "turning capture on adds no pixels of its own: one geometry source, not a second");
+
+        // The both-on case: the picture is the third rendering of the bounded capture, exactly as before.
+        diagnostics.GeometryOverlay = false;
+        ClearSolids();
+        Pass(host);
+        int withoutOverlay = SolidCount();
+        diagnostics.GeometryOverlay = true;
+        ClearSolids();
+        Pass(host);
+        int withOverlay = SolidCount();
+        UiDevGeometrySnapshot retained = SnapshotOf(diagnostics);
+        // The walk paints the outline at each entry's own draw step, and a scoped container's viewport is
+        // drawn through its content's nested walk instead (pre-existing behaviour, pinned here so the
+        // picture's coverage is stated rather than assumed): the outlined set is the retained entries
+        // minus the scoped ones, non-vacuously.
+        int scoped = 0;
+        foreach (UiDevNodeSnapshot node in retained.Nodes)
         {
-            host.Diagnostics.GeometryOverlay = true;
-        }
-        catch (InvalidOperationException ex)
-        {
-            refused = ex.Message.IndexOf("GeometryEnabled", StringComparison.Ordinal) >= 0;
+            if (node.IsScopedContainer) scoped++;
         }
 
-        Check(refused, "the overlay is refused, naming the switch it depends on, before anything is sampled");
+        int outlined = retained.Nodes.Count - scoped;
+        Check(outlined > 0 && scoped > 0
+                && withOverlay - withoutOverlay == outlined * OverlayHairlinesPerNode,
+            "with the capture live the outline paints exactly the entries the walk draws: "
+            + (withOverlay - withoutOverlay).ToString(CultureInfo.InvariantCulture) + " solids over "
+            + outlined.ToString(CultureInfo.InvariantCulture) + " outlined of "
+            + retained.Nodes.Count.ToString(CultureInfo.InvariantCulture) + " retained ("
+            + scoped.ToString(CultureInfo.InvariantCulture) + " scoped viewports, outlined through their content)");
+        Check(outlineOnly == withOverlay,
+            "and the standalone outline painted the same set: nothing was dropped, both modes read one walk ("
+            + outlineOnly.ToString(CultureInfo.InvariantCulture)
+            + " vs " + withOverlay.ToString(CultureInfo.InvariantCulture) + ")");
 
-        host.Diagnostics.GeometryEnabled = true;
-        host.Diagnostics.GeometryOverlay = true;
-        Check(host.Diagnostics.GeometryOverlay, "and it is accepted once the instrument is on");
-        host.Diagnostics.GeometryOverlay = false;
-        Check(!host.Diagnostics.GeometryOverlay, "and can be turned off again");
+        // The capture leaving must not silence the picture.
+        diagnostics.GeometryEnabled = false;
+        Check(diagnostics.GeometryOverlay, "switching the capture off leaves the outline switch on");
+        ClearSolids();
+        Pass(host);
+        int afterCaptureOff = SolidCount();
+        Check(afterCaptureOff == withOverlay, "and the outline keeps painting the same entries");
+        Check(diagnostics.DumpGeometry().Length == 0,
+            "while the report channel returns to honestly saying nothing was captured");
+
+        diagnostics.GeometryOverlay = false;
+        Check(!diagnostics.GeometryOverlay, "and it is turned off again without any capture present");
+
+        using UiHost other = NewHost(OtherPage);
+        Check(!other.Diagnostics.GeometryOverlay,
+            "and the switch is per subscription: another host's outline stays off");
     }
 
     // --- structured snapshot (R3-A) ----------------------------------------------------------------

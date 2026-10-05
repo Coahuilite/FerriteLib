@@ -33,7 +33,7 @@ public static class UiWidgetRegistry
     // set the shared appearance seam (UiAppearanceResolver) resolves an element's `Appearance` against, and
     // it is kind-level metadata on purpose: the natural-body entry point measures a look WITHOUT a widget
     // instance, so the accepted names have to be readable without reaching one. A kind that declares none
-    // has no appearance axis at all, which is every kind but `input/checkbox` today.
+    // has no appearance axis at all; the kinds that declare one today are `input/checkbox` and `input/dropdown`.
     private static readonly Dictionary<string, Dictionary<string, UiAppearanceResolver>> SupportedLooks =
         new(StringComparer.Ordinal);
     private static bool coreInitialized;

@@ -161,6 +161,113 @@ public static class UiThemeDraw
         AccentRail(rect, theme, focused, width);
     }
 
+    // --- the selector field: one neutral shape, three outlets (SA1.1) ------------------------------
+
+    /// <summary>
+    /// The width of the left accent rail the selector look reserves. A SHAPE constant, not a token: the
+    /// rail's colour stays a token argument (<see cref="AccentRail"/>'s own default), so restyling can
+    /// never move the rect, and the width is fixed because the rail is part of the look's identity -
+    /// an element drawn 3px here and an element drawn 1px here would be two different looks wearing one
+    /// name. Callers reserve this width; they do not re-invent it.
+    /// </summary>
+    public const float SelectorAccentWidth = 3f;
+
+    /// <summary>
+    /// The width of the right slot the arrow area reserves: the value text ends before it, so the arrow
+    /// is an independent region rather than ink overlapping the text it explains.
+    /// </summary>
+    public const float SelectorArrowZoneWidth = 18f;
+
+    /// <summary>The arrow's base width in px; the glyph is drawn procedurally, so no font or texture is involved.</summary>
+    public const float SelectorArrowWidth = 10f;
+
+    /// <summary>The arrow's height in px.</summary>
+    public const float SelectorArrowHeight = 6f;
+
+    /// <summary>The arrow slot inside a selector field: the <see cref="SelectorArrowZoneWidth"/> at the field's right edge.</summary>
+    public static Rect SelectorArrowZone(Rect field)
+    {
+        float width = Math.Min(SelectorArrowZoneWidth, Math.Max(0f, field.width));
+        return new Rect(field.xMax - width, field.y, width, field.height);
+    }
+
+    /// <summary>
+    /// The value-text outlet of a selector field: everything between the reserved accent rail and the
+    /// reserved arrow slot, further inset by the theme's own padding. Measure and draw both reserve
+    /// through these outlets, so a consumer composite that adopts the selector look cannot drift from
+    /// the core kind that registers it.
+    /// </summary>
+    public static Rect SelectorTextOutlet(Rect field, UiTheme theme)
+    {
+        float padding = theme.Geometry.Padding;
+        float x = field.x + Math.Min(SelectorAccentWidth, field.width) + padding;
+        float right = SelectorArrowZone(field).x - padding;
+        return new Rect(x, field.y, Math.Max(0f, right - x), field.height);
+    }
+
+    /// <summary>
+    /// Paints the selector's down arrow centred in <paramref name="zone"/>: a filled triangle stacked
+    /// from unit-height solids, point at the bottom. Procedural on purpose - the library ships no
+    /// textures and the game's font carries no guaranteed glyph for an arrow - and every hairline goes
+    /// through <see cref="Solid"/>, so this adds no second backend outlet. The colour is the caller's
+    /// token (default: the theme's primary ink); the shape is these constants.
+    /// </summary>
+    public static void SelectorArrow(Rect zone, UiTheme theme, Color? color = null)
+    {
+        if (zone.width <= 0f || zone.height <= 0f) return;
+        Color ink = color ?? theme.TextPrimary;
+
+        float baseWidth = Math.Min(SelectorArrowWidth, Math.Max(1f, zone.width));
+        float height = Math.Min(SelectorArrowHeight, Math.Max(1f, zone.height));
+        float centreX = zone.x + zone.width * 0.5f;
+        float top = zone.y + (zone.height - height) * 0.5f;
+        int rows = Mathf.CeilToInt(height);
+        for (int row = 0; row < rows; row++)
+        {
+            // Linear taper from the base to the point; the last row is the tip.
+            float step = rows <= 1 ? 0f : (float)row / (rows - 1);
+            float rowWidth = Math.Max(1f, baseWidth * (1f - step));
+            Solid(new Rect(centreX - rowWidth * 0.5f, top + row, rowWidth, 1f), ink);
+        }
+    }
+
+    /// <summary>
+    /// The COMPLETE selector field - the shared entry (SA1.1): plane and hairline through <see cref="Surface"/>,
+    /// the accent rail at <see cref="SelectorAccentWidth"/>, the arrow zone with its own divider hairline, and
+    /// the value text inside <see cref="SelectorTextOutlet"/> - composed in this one order. The core kind's
+    /// selector look and a consumer's own dropdown-shaped composite both call THIS method, so the two cannot
+    /// diverge by re-spelling the sequence; a caller that resolves the status ladder itself still gets the
+    /// same colours, because every colour here comes from the passed <paramref name="style"/> or the theme's
+    /// accent. Nothing reserves a slot for a help button.
+    /// </summary>
+    /// <param name="font">
+    /// The text font; null takes <see cref="UiFont.Small"/>, the size the core dropdown field has always
+    /// drawn its value text at.
+    /// </param>
+    public static void SelectorField(Rect field, string display, UiTheme theme, UiResolvedStyle style, UiFont? font = null)
+    {
+        if (field.width <= 1f || field.height <= 1f) return;
+
+        Surface(field, style.Surface, theme.Geometry.Hairline);
+
+        Rect arrow = SelectorArrowZone(field);
+        if (arrow.width > 0f)
+        {
+            Solid(
+                new Rect(arrow.x - theme.Geometry.Hairline, field.y, theme.Geometry.Hairline, field.height),
+                style.Surface.Border);
+            SelectorArrow(arrow, theme, style.Text);
+        }
+
+        AccentRail(field, theme, width: SelectorAccentWidth);
+
+        Rect outlet = SelectorTextOutlet(field, theme);
+        if (outlet.width > 1f)
+        {
+            Label(outlet, display, theme, style.Text, font ?? UiFont.Small, TextAnchor.MiddleLeft, singleLine: true);
+        }
+    }
+
     /// <param name="writable">
     /// False when the element's data side says its value cannot be written: the treatment is then the
     /// disabled one whatever tone was authored, because state beats author — the one written precedence

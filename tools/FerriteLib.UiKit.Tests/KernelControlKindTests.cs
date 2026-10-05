@@ -78,12 +78,6 @@ internal static class KernelControlKindTests
     private const float CheckboxMinSide = 8f;
 
     /// <summary>
-    /// Where the switch's thumb lands in a cleared recording: one painted surface is one fill plus four
-    /// edges (<c>VerifyDensityTokens</c> pins that count), and the knob is the next solid after the track.
-    /// </summary>
-    private const int SwitchKnobSolidIndex = 5;
-
-    /// <summary>
     /// The checkbox look's variant of the same quantity the switch's body states: the box side inside a
     /// default uniform band. Spelled as the arithmetic rather than as a literal, so the lane says WHICH
     /// relationship it is pinning - "the box is the band less its own padding, floored" - instead of pinning a
@@ -262,14 +256,23 @@ internal static class KernelControlKindTests
     }
 
     /// <summary>
-    /// The switch's thumb, observed on ACTUAL DRAW calls rather than on the source: one painted surface is one
-    /// fill plus four edges, so the sixth recorded solid on an otherwise empty page is the knob.
+    /// The switch's thumb, observed on ACTUAL DRAW calls rather than on the source. The knob solid is found
+    /// BY GEOMETRY (a 14x14 painted square among the recorded rects), never by draw order or a call count,
+    /// so an appearance-equivalent repaint of the track cannot redden this lane for the wrong reason.
     /// <list type="bullet">
     /// <item><b>MUTATION-TARGET</b> - an ON switch paints its thumb in the ACCENT. The accent is what says
     /// "on"; the selected plane's TEXT colour is ink FOR a gold plane, and a thumb wearing it reads as a label
     /// on the control rather than as the control's own state.</item>
     /// <item><b>GUARD</b> - an OFF switch paints its thumb in the neutral ink and no accent at all. It holds
     /// on both sides of the ON mutation, so it is a regression guard, not the failure-sensitive half.</item>
+    /// <item><b>MUTATION-TARGET (SA1.1, production path since r3)</b> - the OFF thumb is its OWN colour
+    /// role: declarable in the palette document (<c>&lt;Color Token="SwitchThumbOff"/&gt;</c> in the grammar,
+    /// applied by the resolver onto the scoped clone), unset it answers the theme's TextPrimary. The grey
+    /// paints the thumb WITHOUT touching the label ink (a grey thumb may not darken every important text),
+    /// the ON half keeps answering the accent, and a scope that declares no role under the SAME document
+    /// keeps the historical bright thumb (default compatibility, production-observed). Reverting the grammar
+    /// case or the resolver application reddens the grey read-back; leaking the role to labels or the
+    /// on-state reddens the others.</item>
     /// </list>
     /// </summary>
     private static void VerifySwitchThumbTokens()
@@ -279,14 +282,9 @@ internal static class KernelControlKindTests
         {
             ClearDraws();
             on.DrawFrame(new Rect(0f, 0f, 200f, 60f));
-            IList onColors = RecordedColors();
-            Check(onColors.Count > SwitchKnobSolidIndex,
-                "an ON switch recorded its track and its thumb: " + onColors.Count + " solid(s)");
-            Check(onColors.Count > SwitchKnobSolidIndex
-                    && SameColor((Color)onColors[SwitchKnobSolidIndex], UiTheme.Vanilla.AccentGold),
+            Check(SameColor(KnobColour(), UiTheme.Vanilla.AccentGold),
                 "an ON switch paints its THUMB in the accent token, not in the selected plane's text colour: got "
-                + (onColors.Count > SwitchKnobSolidIndex ? Describe((Color)onColors[SwitchKnobSolidIndex]) : "(none)")
-                + ", accent is " + Describe(UiTheme.Vanilla.AccentGold));
+                + Describe(KnobColour()) + ", accent is " + Describe(UiTheme.Vanilla.AccentGold));
         }
 
         flagValue = false;
@@ -294,18 +292,102 @@ internal static class KernelControlKindTests
         {
             ClearDraws();
             off.DrawFrame(new Rect(0f, 0f, 200f, 60f));
-            IList offColors = RecordedColors();
-            Check(offColors.Count > SwitchKnobSolidIndex
-                    && SameColor((Color)offColors[SwitchKnobSolidIndex], UiTheme.Vanilla.TextPrimary),
-                "while an OFF switch paints its thumb in the neutral ink");
+            Check(SameColor(KnobColour(), UiTheme.Vanilla.TextPrimary),
+                "while an OFF switch paints its thumb in the neutral ink - the UNSET fallback of the token");
             bool accent = false;
-            foreach (object color in offColors)
+            foreach (object color in RecordedColors())
             {
                 accent |= SameColor((Color)color, UiTheme.Vanilla.AccentGold);
             }
 
             Check(!accent, "and an OFF switch paints no accent at all");
         }
+
+        // SA1.1(r3) MUTATION-TARGET: the PRODUCTION declaration path. The grey arrives through the consumer's
+        // single palette document - UiStyleDocument parses the scheme, the Host's resolver applies it to the
+        // scoped clone, the kind paints - not through a C# assignment. Dropping the grammar case or the
+        // resolver application reddens the grey read-back (the declaration becomes an unknown token and the
+        // thumb falls back to the bright ink); letting the role reach labels or the ON half reddens the other
+        // two. A scope that does NOT declare the role keeps the historical bright thumb: the same document,
+        // no Scheme on the column, checked here so "default compatible" is a production fact, not a claim.
+        UiStyleDocument slate = UiStyleDocument.Parse(
+            "<Styles Schema=\"1\">"
+            + "<Scheme Name=\"slate\"><Color Token=\"SwitchThumbOff\" Value=\"0.32,0.33,0.35,1\"/></Scheme>"
+            + "</Styles>");
+        Check(slate.Issues.Count == 0,
+            "the palette document accepts SwitchThumbOff as a colour role: " + slate.Issues.Count + " issue(s)");
+        var thumbGrey = new Color(0.32f, 0.33f, 0.35f, 1f);
+
+        flagValue = false;
+        using (UiHost offGrey = SlateHost("<Column Id=\"col\" Scheme=\"slate\">", slate))
+        {
+            ClearDraws();
+            offGrey.DrawFrame(new Rect(0f, 0f, 200f, 60f));
+            Check(SameColor(KnobColour(), thumbGrey),
+                "the declared OFF-thumb colour paints the thumb through the real document->resolver->clone path: got "
+                + Describe(KnobColour()));
+            IList inks = (IList)Field(typeof(Verse.Widgets), "LabelColors", null);
+            Check(inks.Count > 0 && SameColor((Color)inks[inks.Count - 1], UiTheme.Vanilla.TextPrimary)
+                    && !SameColor((Color)inks[inks.Count - 1], thumbGrey),
+                "and the label keeps its bright ink - the grey thumb never rides on important text");
+        }
+
+        flagValue = true;
+        using (UiHost onGrey = SlateHost("<Column Id=\"col\" Scheme=\"slate\">", slate))
+        {
+            ClearDraws();
+            onGrey.DrawFrame(new Rect(0f, 0f, 200f, 60f));
+            Check(SameColor(KnobColour(), UiTheme.Vanilla.AccentGold),
+                "the ON thumb still answers the accent under the same scope declaration");
+        }
+
+        flagValue = false;
+        using (UiHost unslated = SlateHost("<Column Id=\"col\">", slate))
+        {
+            ClearDraws();
+            unslated.DrawFrame(new Rect(0f, 0f, 200f, 60f));
+            Check(SameColor(KnobColour(), UiTheme.Vanilla.TextPrimary),
+                "a scope that declares no OFF-thumb keeps the historical bright thumb even with the document in hand");
+        }
+    }
+
+    /// <summary>
+    /// The switch page under one column-open element (slated or not), with a style document handed to the
+    /// Host - the consumer's own wiring: parse, resolve, clone, paint.
+    /// </summary>
+    private static UiHost SlateHost(string columnOpen, UiStyleDocument document)
+    {
+        return new UiHost(
+            Scope,
+            UiLayoutManifest.Parse(
+                "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+                + columnOpen
+                + "<Widget Id=\"flag\" Kind=\"input/checkbox\" Bind=\"flag\" Width=\"Auto\" Label=\"Flag\" />"
+                + "</Column></UiPage>"),
+            CheckboxBindings(), UiTheme.Vanilla, new StubMetrics(), new StubTranslation(), document);
+    }
+
+    /// <summary>
+    /// The colour of the thumb solid, found by GEOMETRY: the only 14x14 painted square the switch kind
+    /// draws is its knob (the track is 34x18 and its edges are hairlines), so this survives any
+    /// appearance-equivalent repainting that reorders or re-splits the surface calls. Throws - rather than
+    /// answering a default - when the pass recorded no thumb, because a missing knob IS the defect.
+    /// </summary>
+    private static Color KnobColour()
+    {
+        IList rects = (IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null);
+        IList colors = RecordedColors();
+        float side = CheckboxWidget.SwitchKnobSize;
+        for (int i = 0; i < rects.Count; i++)
+        {
+            Rect r = (Rect)rects[i]!;
+            if (Math.Abs(r.width - side) <= 0.01f && Math.Abs(r.height - side) <= 0.01f)
+            {
+                return (Color)colors[i]!;
+            }
+        }
+
+        throw new Exception("the pass recorded no " + side + "x" + side + " thumb solid");
     }
 
     private static string BoolAutoPage(string extra)

@@ -187,12 +187,26 @@ consequence is paid in the open rather than discovered by a stranger.
   assignment that changes a value and on nothing else. The pair is the point — a colour token must be able to
   invalidate a cache of cloned themes without re-arranging the page, and `LayoutRevision` still means "a rect
   moved". A consumer that re-tints a theme it handed to a `UiHost` gets refreshed region/scoped themes; a
-  consumer that wants the retired warm-gold look assigns the tokens on its own bag.
+  consumer that wants the retired warm-gold look assigns the tokens on its own bag. SA1.1 adds one
+  assignable colour token: `SwitchThumbOff` - the switch thumb's OFF ink, which answers the theme's own
+  `TextPrimary` until assigned (the historical thumb, unchanged for every unset bag), so a consumer can grey
+  the thumb without darkening any label, and the assignment cannot reach the ON half (`AccentGold`).
 - `UiThemeDraw` — the single text and panel outlet; per-surface tokens change what it takes to draw. R4-B adds
   the library's only image outlet beside it: `Image(Rect rect, Texture? texture, Color tint)` draws one bound
   texture tinted through `GUI.color` exactly as a label is, and answers false when there is nothing to paint
   (the caller decides what that means), and `FitImage(Rect slot, Vector2 naturalSize)` is the letterbox rule it
   uses — the largest centred rect with the texture's aspect that fits the slot, total for a non-positive size.
+  SA1.1 adds the selector field's shared shape outlets beside them: `SelectorAccentWidth` (3) and
+  `SelectorArrowZoneWidth` (18) are the reserved slots, `SelectorArrowZone(field)` / `SelectorTextOutlet(field,
+  theme)` compute them from one rule so the core `input/dropdown` look and a consumer composite cannot diverge,
+  and `SelectorArrow(zone, theme, color?)` paints a procedural triangle through the existing `Solid` outlet —
+  no texture, no font glyph, no second backend path. SA1.1(r2) lands the COMPLETE field as one entry:
+  `SelectorField(field, display, theme, style, font?)` composes plane, rail, divider, arrow and text outlet in
+  the one order, and the core dropdown kind draws through this method - core and composite share the
+  composition itself, not two spellings of it. Shape and colour stay separated: these members own rects,
+  every colour is a token argument.
+  No exported type is added by this change (the members sit on classified types), so no tier moves; the
+  0.7.x temporary public-addition exemption applies, which means no minor bump either.
 - `UiFitAudit` — the audit surface; entry attribution follows the identity layer. The ruler moved with
   the routing: a subscribed host is measured with the `ITextMetrics` its own diagnostic scope carries, and
   the process-wide slot bound by `Attach` serves only the legacy (unsubscribed) channel. That split is a
@@ -423,7 +437,12 @@ consequence is paid in the open rather than discovered by a stranger.
   per-subscription `Count`/`Dropped`/`Suppressed`/`Published`. `Dispose` releases it, and so does
   disposing the owning host or session; it carries the host's identity string and the session id, never the
   objects. It also carries the **development-only numeric instrument**: `GeometryEnabled` (off by default),
-  `GeometryOverlay` (off by default, and refused until the instrument is on) and `DumpGeometry()` (diffable
+  `GeometryOverlay` (off by default; since SA1.5 an **independent switch** - with no capture live it outlines
+  every entry that reaches the engine's per-entry draw step while storing nothing, and with a capture live it
+  outlines exactly the retained entries at that step; a scoped container's own viewport rect is a stated
+  coverage limit - it has no draw step, and its content is outlined entry by entry - pinned as
+  retained-minus-scoped by the lane; turning `GeometryEnabled` off does not turn it off) and
+  `DumpGeometry()` (diffable
   text: one line per arranged node with its arranged, drawn and window rects, the origin between them, its
   height mode and the height that mode resolved to, plus a scoped container's viewport and content extent,
   then one line per sampled press with its verdict). **All three are compiled out of a release payload**

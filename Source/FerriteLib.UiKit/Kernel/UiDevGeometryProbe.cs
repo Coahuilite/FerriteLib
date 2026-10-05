@@ -216,11 +216,13 @@ internal struct UiDevInputSample
 /// head plus a dropped count rather than an unbounded log.
 /// </para>
 /// <para>
-/// <b>One capture, three renderings.</b> <see cref="Dump"/> renders the stored samples as diffable text,
-/// <see cref="Snapshot"/> renders the SAME samples as a freshly-copied object graph, and
-/// <see cref="UiDevGeometryProbe.Outline"/> paints an outline around the same RETAINED nodes from the same
-/// capture. There is no second collector and no replay: all three read one list, so they cannot describe
-/// different frames.
+/// <b>One pass, two switches.</b> <see cref="Dump"/> renders the stored samples as diffable text and
+/// <see cref="Snapshot"/> renders the SAME samples as a freshly-copied object graph - those two are
+/// renderings of this capture and cannot describe different frames. The outline
+/// (<see cref="UiDevGeometryProbe.Outline"/>) is a THIRD consumer of the same engine walk, but since
+/// SA1.5 its switch lives on the subscription, not here: with this capture live it paints exactly the
+/// RETAINED entries (this class's bound is what the picture must be faithful to), and with no capture
+/// it still paints the draw-step entries it is called for while storing nothing.
 /// </para>
 /// </summary>
 internal sealed class UiDevGeometryCapture
@@ -234,9 +236,6 @@ internal sealed class UiDevGeometryCapture
     private readonly List<UiDevGeometrySample> geometry = new List<UiDevGeometrySample>();
     private readonly List<UiDevInputSample> input = new List<UiDevInputSample>();
     private int pass = -1;
-
-    /// <summary>Whether the outline overlay is painted as well as recorded.</summary>
-    internal bool Overlay { get; set; }
 
     internal int Pass => pass;
     internal string EntryEvent { get; private set; } = "none";
@@ -288,7 +287,7 @@ internal sealed class UiDevGeometryCapture
         input.Add(sample);
     }
 
-    /// <summary>Empties both halves without touching the pass number or the overlay switch.</summary>
+    /// <summary>Empties both halves without touching the pass number (the outline switch is not here since SA1.5).</summary>
     internal void Clear()
     {
         geometry.Clear();
@@ -604,7 +603,9 @@ internal static class UiDevGeometryProbe
     /// </para>
     /// <para>
     /// The answer says whether the capture RETAINED this entry, which is what the optional overlay keys its
-    /// painting off: three renderings of one bounded capture, not three collectors.
+    /// painting off: while a capture is live, the picture and the data are one bounded capture rendered twice,
+    /// not two collectors. With no capture the same call paints every entry reaching the draw step and
+    /// stores nothing (SA1.5; the scoped viewport's own rect has no draw step - see Outline).
     /// </para>
     /// </summary>
     internal static bool Note(
@@ -756,15 +757,28 @@ internal static class UiDevGeometryProbe
     /// so it lines up with the element by construction, and through the theme's single solid outlet so the
     /// backend-containment allowlist does not grow a second one.
     /// <para>
-    /// <paramref name="retained"/> is the answer <see cref="Note"/> gave for this same entry, so the overlay
-    /// paints exactly the entries the bounded capture kept: the picture and the data are the same capture
-    /// rendered twice, and a node the capture dropped is not outlined as if it had been recorded.
+    /// <b>SA1.5: the outline switch is independent of the capture switch.</b> Both modes render the SAME
+    /// engine walk - this very call site, in this very draw-local rect - so there is no second layout
+    /// system to disagree with. The call site is the engine's per-entry DRAW step, which is also the
+    /// stated coverage limit: a scoped container's own viewport rect has no draw step at its own entry
+    /// (its content walks nested below and is outlined entry by entry), so the viewport band itself is
+    /// deliberately not outlined - <c>KernelDevGeometryTests</c> pins the outlined set as retained minus
+    /// scoped, not a silent approximation.
+    /// <list type="bullet">
+    /// <item>capture on: <paramref name="retained"/> is the answer <see cref="Note"/> gave for this same
+    /// entry, and the picture stays the third rendering of the one bounded capture - a node the capture
+    /// dropped is not outlined as if the data described it;</item>
+    /// <item>capture off: there is no bounded list to be faithful to, so every entry reaching this step
+    /// is outlined, nothing is sampled, no buffer exists, and the dump/snapshot readers keep answering
+    /// truthfully that nothing was captured.</item>
+    /// </list>
     /// </para>
     /// </summary>
     internal static void Outline(Rect drawRect, bool retained)
     {
-        UiDevGeometryCapture? capture = UiDiagnosticHub.ActiveSubscription?.Geometry;
-        if (capture == null || !capture.Overlay || !retained) return;
+        UiDiagnosticSubscription? subscription = UiDiagnosticHub.ActiveSubscription;
+        if (subscription == null || !subscription.GeometryOverlay) return;
+        if (subscription.GeometryEnabled && !retained) return;
         if (drawRect.width <= 0f || drawRect.height <= 0f) return;
 
         const float hairline = 1f;

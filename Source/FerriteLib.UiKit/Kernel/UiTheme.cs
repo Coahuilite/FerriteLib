@@ -153,11 +153,16 @@ public sealed class UiTheme
     private const uint SuccessBorderBit = 1u << 23;
     private const uint DangerBorderBit = 1u << 24;
 
+    /// <summary>SA1.1: the switch's OFF-thumb token. 25 is the first free slot after the 24 declaration-order
+    /// tokens, and the uint budget named in the block comment above has room for it.</summary>
+    private const uint SwitchThumbOffBit = 1u << 25;
+
     private uint claimed;
     private Color baseColour, panel, raised, hover, selected, success, danger;
     private Color workspacePlane, sectionBand;
     private Color textPrimary, textSecondary, textOnGold, textOnDanger, textDisabled;
     private Color accentGold;
+    private Color switchThumbOff;
     private Color border, borderStrong, divider;
     private Color? baseBorder, panelBorder, raisedBorder, hoverBorder, selectedBorder, successBorder, dangerBorder;
     private UiFont defaultFont = UiFont.Small;
@@ -232,6 +237,7 @@ public sealed class UiTheme
         textOnDanger = source.textOnDanger;
         textDisabled = source.textDisabled;
         accentGold = source.accentGold;
+        switchThumbOff = source.switchThumbOff;
         border = source.border;
         borderStrong = source.borderStrong;
         divider = source.divider;
@@ -265,6 +271,21 @@ public sealed class UiTheme
     public Color TextDisabled { get => ColourOf(TextDisabledBit, textDisabled, VanillaTemplate.Defaults.TextDisabled); set => SetColour(TextDisabledBit, ref textDisabled, value); }
 
     public Color AccentGold { get => ColourOf(AccentGoldBit, accentGold, VanillaTemplate.Defaults.AccentGold); set => SetColour(AccentGoldBit, ref accentGold, value); }
+
+    /// <summary>
+    /// The switch thumb's OFF colour (SA1.1). Unset it answers THIS theme's own <see cref="TextPrimary"/> -
+    /// which is the historical behaviour, so a bag that never assigns it paints the same neutral thumb it
+    /// always did, and a theme that re-tints its primary ink still moves the thumb with it. A consumer that
+    /// wants a dedicated grey for the OFF state declares it in its palette document
+    /// (<c>&lt;Color Token="SwitchThumbOff"/&gt;</c> - grammar, resolver and scoped clones wired) or assigns
+    /// this property, and leaves every important text at full weight: it is the thumb-side peer of
+    /// <see cref="AccentGold"/>, which is the on-state meaning, and neither assignment can reach the other half.
+    /// </summary>
+    public Color SwitchThumbOff
+    {
+        get => (claimed & SwitchThumbOffBit) != 0 ? switchThumbOff : TextPrimary;
+        set => SetColour(SwitchThumbOffBit, ref switchThumbOff, value);
+    }
 
     /// <summary>
     /// The accent's hover step: every channel of <see cref="AccentGold"/> lifted <see cref="HoverLift"/> of

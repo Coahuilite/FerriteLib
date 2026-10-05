@@ -582,7 +582,8 @@ public sealed class UiLayoutEngine
             // sample describes the pass that ran instead of a second derivation of it. Nothing is recorded
             // when the subscription did not opt in (the probe returns before it touches the resolver), and
             // nothing at all exists in a release build. The answer says whether the bounded capture kept this
-            // entry, and the overlay below paints exactly the entries it kept.
+            // entry, which is what the outline is faithful to WHILE a capture is live; with no capture the
+            // same call still paints when the standalone outline switch is on (SA1.5).
             bool sampled = UiDevGeometryProbe.Note(
                 entry.Node,
                 entry.Spec,
@@ -674,10 +675,11 @@ public sealed class UiLayoutEngine
                 }
 
 #if FER_DEV
-                // The optional overlay is painted LAST for this entry, after the fit audit closed and after
+                // The optional outline is painted LAST for this entry, after the fit audit closed and after
                 // the element drew, in the element's own draw-local space: an outline that could feed back
                 // into the thing it measures would be the instrument changing the measurement. It paints only
-                // what the capture retained, so the picture cannot show a node the data does not describe.
+                // what the capture retained, so the picture cannot show a node the data does not describe -
+                // and with capture off (SA1.5) it paints this same walk and stores nothing.
                 UiDevGeometryProbe.Outline(drawRect, sampled);
 #endif
 
