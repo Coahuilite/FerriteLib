@@ -23,10 +23,10 @@
   non-OOM failures with host/document/path/version/result context and the original exception as its inner
   cause; it does not silently discard them or roll back a previously determined document result. All 10
   existing local checks pass. No live-game publication failure was reproduced and this is not a global
-  recovery audit. The held package is staged from this commit, so it includes the change; it does NOT
-  include the later SA1 source.
-- **SA1 appearance work (2026-10-06): source technical pass, awaiting consumer integration and human
-  acceptance.** `input/dropdown` joins the appearance seam (`Appearance="field"` default / `"selector"`
+  recovery audit. The held package is staged from `0181268`, so it includes the change; it does NOT
+  include the later SA1 source (committed as `c080855`).
+- **SA1 appearance work (product change `c080855`, 2026-10-06): source technical pass; consumer
+  integration and human acceptance are tracked separately.** `input/dropdown` joins the appearance seam (`Appearance="field"` default / `"selector"`
   reserved rail + independent arrow zone, drawn through the one shared `UiThemeDraw.SelectorField`);
   `UiTheme.SwitchThumbOff` is a palette-document colour role (unset answers `TextPrimary` - the historical
   thumb; the ON half keeps `AccentGold`); `GeometryOverlay` is now independent of `GeometryEnabled`
