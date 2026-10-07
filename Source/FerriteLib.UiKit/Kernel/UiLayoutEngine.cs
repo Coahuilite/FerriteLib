@@ -48,6 +48,15 @@ public sealed class UiLayoutEngine
         internal Rect Rect;
         internal Rect? ContentRect;
         internal int SubtreeCount;
+
+        /// <summary>
+        /// Set on the root entry of one MATERIALIZED Repeat row (D4 VisibleRows). The Scroll's counting
+        /// budget must see rows, not the Repeat as one blob and not the title/detail/hover/hit pieces
+        /// inside a row as several: this flag is stamped by <see cref="MeasureRepeat"/> on the single
+        /// root entry each row box contributes, so counting reads the same measured rects the pass
+        /// already produced instead of re-deriving anything.
+        /// </summary>
+        internal bool IsMaterializedRow;
     }
 
     private sealed class MeasuredBox
@@ -113,6 +122,9 @@ public sealed class UiLayoutEngine
     {
         "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Tab", "Width", "WidthKey",
         "Fill", "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden", "WideHidden",
+        // D4: same vocabulary the page-level container gate keeps; KernelRepeatTests reflects both private
+        // originals and fails when the copies drift, so the attribute is added in lockstep or not at all.
+        "VisibleRows",
         "Scheme", "Density", "Visible", "VisibleKey",
         "AlignX", "OffsetX", "AlignY", "OffsetY"
     };
@@ -1626,11 +1638,21 @@ public sealed class UiLayoutEngine
         bool narrow)
     {
         var entries = new List<PlacedEntry>();
+        var tops = new List<PlacedEntry>();
         float naturalContentHeight = MeasureScrollContent(
-            ctx, spec, innerWidth, padding, gap, innerY, availableHeight, node, entries, narrow);
+            ctx, spec, innerWidth, padding, gap, innerY, availableHeight, node, entries, narrow, tops);
 
         float naturalHeight = padding.Top + titleHeight + naturalContentHeight + padding.Bottom;
-        float viewportHeight = ResolveContainerHeight(spec, naturalHeight, availableHeight);
+
+        // D4: `VisibleRows` is a third answer for a Scroll's own height, and the closed vocabulary stays
+        // static-first - a declared numeric Height behaves exactly as it always did and the count is never
+        // consulted. When the count answers, the budget is READ from the row-root rects this pass has
+        // already measured: no consumer font/width chain is copied, and nothing waits for a previous
+        // frame's write-back, because the children were measured before this line.
+        bool counting = TryViewportRows(spec, out float rows);
+        float viewportHeight = counting
+            ? ViewportRowsBudget(tops, rows, padding, naturalHeight)
+            : ResolveContainerHeight(spec, naturalHeight, availableHeight);
 
         // A vertical scrollbar is drawn inside the right edge of the viewport only when the
         // natural content height exceeds the viewport. Reserve its width then (and only then) so
@@ -1639,15 +1661,23 @@ public sealed class UiLayoutEngine
         // the full viewport width. Children are re-measured at the reserved width so the arranged
         // rects, the published content rect and the BeginScrollView view rect all agree.
         float contentWidth = width;
-        if (naturalContentHeight > viewportHeight + 0.01f)
+        if ((counting ? naturalHeight : naturalContentHeight) > viewportHeight + 0.01f)
         {
             contentWidth = Math.Max(1f, width - ScrollbarWidth);
             float reservedInnerWidth = Math.Max(1f, contentWidth - padding.Left - padding.Right);
             entries.Clear();
+            tops.Clear();
             float reflowedContentHeight = MeasureScrollContent(
                 ctx, spec, reservedInnerWidth, padding, gap, innerY, availableHeight, node, entries,
-                IsNarrow(spec, reservedInnerWidth));
+                IsNarrow(spec, reservedInnerWidth), tops);
             naturalHeight = padding.Top + titleHeight + reflowedContentHeight + padding.Bottom;
+            if (counting)
+            {
+                // The narrowed rects are the pass's real rows (wrapped text grows with the narrower
+                // width): the budget recomputes FROM them, so a half row costs what the half row
+                // actually occupies - never the full-width first round's estimate.
+                viewportHeight = ViewportRowsBudget(tops, rows, padding, naturalHeight);
+            }
         }
 
         var box = new MeasuredBox { Width = width, Height = viewportHeight };
@@ -1672,7 +1702,12 @@ public sealed class UiLayoutEngine
     /// <summary>
     /// Measures the scroll children at <paramref name="contentInnerWidth"/> into
     /// <paramref name="entries"/> and returns the resulting natural content height
-    /// (scroll padding and title excluded).
+    /// (scroll padding and title excluded). <paramref name="countableTops"/> (D4) collects the SAME
+    /// pass's countable entries in flow order: one Repeat expands transparently to its materialized
+    /// row roots - never the Repeat as one blob, never a row's title/detail/hover/hit pieces as
+    /// several - while any other visible direct child counts as exactly its root entry. A child the
+    /// <c>IsHidden</c> pass refuses (the consumer empty-state's VisibleKey half included) contributes no
+    /// entry and nothing to count.
     /// </summary>
     private float MeasureScrollContent(
         UiWidgetContext ctx,
@@ -1684,11 +1719,11 @@ public sealed class UiLayoutEngine
         float availableHeight,
         UiNode node,
         List<PlacedEntry> entries,
-        bool narrow)
+        bool narrow,
+        List<PlacedEntry> countableTops)
     {
         float y = innerY;
         bool first = true;
-
         for (int i = 0; i < spec.Children.Count; i++)
         {
             UiElementSpec child = spec.Children[i];
@@ -1717,12 +1752,103 @@ public sealed class UiLayoutEngine
             float nudgeX = UiPlacement.ParseOffset(child, UiPlacement.OffsetXAttribute, contentInnerWidth);
             float childX = UiPlacement.Origin(padding.Left, contentInnerWidth, childBox.Width, alignX, nudgeX);
             childBox = OffsetBox(childBox, childX, y);
+            if (string.Equals(child.Kind, "Repeat", StringComparison.Ordinal))
+            {
+                // Walk the row roots by their subtree spans: after collecting one stamped root, jump its
+                // full SubtreeCount. A nested Repeat inside a row stamps its own rows too - without the
+                // jump those inner roots would count as extra OUTER entries, which the contract's "one
+                // entry per materialized row of THIS scroll" forbids.
+                // (e starts at 0: a Repeat is often the scroll's ONLY child, so the first row root is
+                // the first entry - skipping it would silently answer "no countable rows".)
+                List<PlacedEntry> rowEntries = childBox.Entries;
+                for (int e = 0; e < rowEntries.Count;)
+                {
+                    PlacedEntry candidate = rowEntries[e];
+                    if (candidate.IsMaterializedRow)
+                    {
+                        countableTops.Add(candidate);
+                        e += candidate.SubtreeCount > 0 ? candidate.SubtreeCount : 1;
+                    }
+                    else
+                    {
+                        e++;
+                    }
+                }
+            }
+            else if (childBox.Entries.Count > 0)
+            {
+                countableTops.Add(childBox.Entries[0]);
+            }
+
             entries.AddRange(childBox.Entries);
             y += childBox.Height;
             first = false;
         }
 
         return Math.Max(0f, y - innerY);
+    }
+
+    /// <summary>
+    /// The <c>VisibleRows</c> gate (D4). A Scroll-only attribute (UiHost refuses the name elsewhere and
+    /// refuses bad numbers at creation; the checks here are the belt to that braces), consulted only when
+    /// no usable numeric <c>Height</c> is written - the same static-first order <c>WidthKey</c> keeps
+    /// against <c>Width</c>. Absent, blank or malformed answers "not declared" so a programmatically
+    /// built spec can never crash a frame.
+    /// </summary>
+    private static bool TryViewportRows(UiElementSpec spec, out float rows)
+    {
+        rows = 0f;
+        if (!spec.TryGetAttribute("VisibleRows", out string raw)) return false;
+        string value = (raw ?? "").Trim();
+        if (value.Length == 0) return false;
+        if (spec.TryGetAttribute("Height", out string heightRaw)
+            && float.TryParse((heightRaw ?? "").Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float _))
+        {
+            // ANY numeric Height keeps its exact prior meaning, zero included: ResolveContainerHeight
+            // answers a declared 0 with a 0-high viewport, and a new attribute must not rewrite that.
+            return false;
+        }
+
+        return float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out rows)
+            && rows > 0f && !float.IsNaN(rows) && !float.IsInfinity(rows);
+    }
+
+    /// <summary>
+    /// The budget from the SAME round's counted rects: the first floor(k) entries reach their measured
+    /// bottoms; the fractional part shows that fraction of the NEXT entry's OWN measured height, taken
+    /// from the gap the flow already left (the full gap before the next entry stays, so a "half row"
+    /// genuinely shows half a row, not half a row minus half a gap); a list shorter than k - or nothing
+    /// countable at all - answers natural, and the result is clamped to natural so a promise over rows
+    /// that fit never reserves a scrollbar. Positions are the pass's own content-space rects, so the
+    /// scroll's padding and title ride in by construction and there is no consumer arithmetic to copy.
+    /// After a reserved-scrollbar re-measure this function runs again on the narrowed rects, which is
+    /// what keeps "4.5 rows" true for wrapped text at the width the rows actually get.
+    /// </summary>
+    private static float ViewportRowsBudget(
+        List<PlacedEntry> tops, float rows, Padding padding, float naturalHeight)
+    {
+        if (tops.Count == 0) return naturalHeight;
+
+        // The fewer-than-k rule FIRST, on the float: a large finite count (1e9 rows promised over four)
+        // answers natural - and converting it to int before this comparison could overflow to a negative
+        // index and break the same rule the guard exists to keep.
+        if (rows >= tops.Count) return naturalHeight;
+
+        int full = (int)Math.Floor(rows);
+        float frac = rows - full;
+
+        float bottom;
+        if (frac > 0f)
+        {
+            Rect next = tops[full].Rect;
+            bottom = next.y + frac * next.height;
+        }
+        else
+        {
+            bottom = tops[full - 1].Rect.yMax;
+        }
+
+        return Math.Min(naturalHeight, bottom + padding.Bottom);
     }
 
     // --- the keyed repeater (P3) -----------------------------------------------------------------
@@ -1832,6 +1958,8 @@ public sealed class UiLayoutEngine
                 Math.Max(0f, availableHeight - (y - innerY)),
                 rowNode);
             rowBox = OffsetBox(rowBox, padding.Left, y);
+            // The root entry of the row box is the row: the counting budget's one entry per row (D4).
+            if (rowBox.Entries.Count > 0) rowBox.Entries[0].IsMaterializedRow = true;
             box.Entries.AddRange(rowBox.Entries);
             y += rowBox.Height;
             first = false;
@@ -2281,7 +2409,9 @@ public sealed class UiLayoutEngine
                 MeasureWidth = entry.MeasureWidth,
                 Rect = new Rect(entry.Rect.x + x, entry.Rect.y + y, entry.Rect.width, entry.Rect.height),
                 ContentRect = entry.ContentRect,
-                SubtreeCount = entry.SubtreeCount
+                SubtreeCount = entry.SubtreeCount,
+                // The row stamp must survive the offset copy, or the counting budget sees no rows.
+                IsMaterializedRow = entry.IsMaterializedRow
             };
             result.Entries.Add(copy);
         }

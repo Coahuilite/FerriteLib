@@ -49,6 +49,16 @@
   mirrors. Re-cut lane (full-retained) plus planned chrome paint/record deltas; the equality-vs-draw item
   is a GUARD per PM review r2. Draggable overlay = US composition on `UiWindowOptions`, no FL framework.
   Neutral: no consumer page names or diagnostic business data in FL.
+- **D4-Viewport `VisibleRows` (source, 2026-10-07): the Scroll sizes its viewport from the SAME arrange
+  round's measured rows** - Repeat expands transparently to stamped row roots, hidden siblings ignored,
+  fewer-or-none countable answers natural, any numeric Height (zero included) stays first, and the budget recomputes after the
+  scrollbar reserves its width. This closes the gap the consumer's `DomainListBudget` stated in its own
+  comment and worked around with a creation-time injected, never-refreshed floor chain. Contract:
+  `docs/development/0.7/05-api-contract.md` §D4-Viewport. BUILT and run 2026-10-07: Dev harness ALL PASS,
+  10 gates green; two PM-verified faithful backouts red-then-green (row-root stamp and narrowed-width
+  budget recomputation). Direct children, padded overflow and visible empty input are guarded; deleting
+  existing visibility is fault injection, not new-feature backout proof. No exported C# shape moved, no library
+  default carries the 4.5.
 
 ## PM integration checkpoint — 2026-09-30
 

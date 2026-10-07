@@ -150,6 +150,19 @@ library before validating the real page, and their listing order does not overri
       across frames, stub gap (`GenUI.AtZero`) fixed, final `verify-local` 10 gates green, frozen Dev/
       Release DLL hashes byte-identical to slot 1 (r2 changed no product code). Open: PM commit + artifact
       handoff to US, US consumption lane, real-game appearance/pointer (human).
+- [x] **D4-Viewport `VisibleRows` (source, 2026-10-07): BUILT, Dev harness ALL PASS, 10 gates green**
+      (PM held the shared-stubs slot; carrier unchanged). Scroll-only positive `VisibleRows` budgets the
+      viewport from the SAME round's measured rows (floor(k) bottoms + the fraction of the next row's own
+      height from its real position; Repeat expands to stamped row roots - the stamp survives the
+      OffsetBox copy; hidden siblings skipped; fewer/none answer natural; any numeric Height, zero
+      included, outranks it; the budget recomputes after the scrollbar's reserved-width re-measure),
+      creation refusals in `UiHost`, mirrored vocabularies in lockstep, `KernelRepeatTests` lane with a
+      per-text wrap ledger. Two PM-verified faithful backouts red-then-green: delete row-root stamp and
+      skip the narrowed-width budget recomputation. Direct-child counting, padding overflow and the
+      visible empty fixture are guards; existing visibility fault injection is not feature backout proof.
+      Contract: `docs/development/0.7/05-api-contract.md` §D4-Viewport +
+      `docs/consumers/consume-from-0.7.0.md`. Open: PM commit + artifact handoff to US, US deletes
+      `DomainListBudget` and declares 4.5, real-game appearance (human).
 - [ ] **Game-check R4-B images and composed rows in the paired rehearsal.** All 10 local gates pass after PM integration; API tier details are in "docs/api-tiers.md". Real RimWorld rendering/input remain unverified.
 - [ ] **Derive the visual-core boundary guard's symbol set from the types.** The cheap half landed
       2026-09-24 (`UiPopup` added to the reject list, mutation-tested); the hand-maintained list is still the

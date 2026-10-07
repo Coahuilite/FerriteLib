@@ -915,6 +915,7 @@ public sealed class UiHost : IDisposable
         // whole subtree, like every other hidden element.
         "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Tab", "Width", "WidthKey",
         "Fill", "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden", "WideHidden",
+        "VisibleRows",
         "Scheme", "Density", "Visible", "VisibleKey",
         "AlignX", "OffsetX", "AlignY", "OffsetY"
     };
@@ -972,11 +973,47 @@ public sealed class UiHost : IDisposable
         bool selfNarrowCapable = spec.TryGetAttribute("Breakpoint", out _);
         ValidateLayoutAttributes(spec, path, isContainer: !isWidget, selfNarrowCapable, parentNarrowCapable);
         ValidateContentHeight(spec, path, parent);
+        ValidateViewportRows(spec, path, isWidget);
 
         foreach (UiElementSpec child in spec.Children)
         {
             string childPath = path + "/" + (child.Id.Length > 0 ? child.Id : child.Kind);
             ValidateElement(child, childPath, selfNarrowCapable, spec);
+        }
+    }
+
+    /// <summary>
+    /// Creation-time grammar for the D4 viewport count (same stance as the MatchContent matrix and the
+    /// closed <c>Height</c> vocabulary): <c>VisibleRows</c> is Scroll-only - a number another element
+    /// would silently ignore is an inert declaration this library refuses at creation, located - and it
+    /// must parse to a positive finite decimal (fractions are the point: 4.5 is a legal promise, "abc",
+    /// 0 and -1 are authoring errors). The engine's read stays fail-soft for programmatically built
+    /// specs; a MANIFEST that ships these is a contract error, caught here where element, attribute and
+    /// path are known.
+    /// </summary>
+    private void ValidateViewportRows(UiElementSpec spec, string path, bool isWidget)
+    {
+        if (!spec.TryGetAttribute("VisibleRows", out string raw)) return;
+
+        if (isWidget || !string.Equals(spec.Kind, "Scroll", StringComparison.Ordinal))
+        {
+            throw new UiContractException(
+                $"Element id=\"{spec.Id}\" at '{path}' declares VisibleRows on a <" + spec.Kind
+                + ">; the count sizes a SCROLL viewport from its measured rows, and every other element's"
+                + " height means something else. Declare it on the <Scroll>.",
+                source, spec.Id, spec.Kind, path);
+        }
+
+        string value = (raw ?? "").Trim();
+        if (value.Length == 0
+            || !float.TryParse(value, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float rows)
+            || rows <= 0f || float.IsNaN(rows) || float.IsInfinity(rows))
+        {
+            throw new UiContractException(
+                $"Element id=\"{spec.Id}\" at '{path}' declares VisibleRows='" + (raw ?? "")
+                + "'; expected a positive finite number of rows (fractions allowed, e.g. 4.5).",
+                source, spec.Id, spec.Kind, path);
         }
     }
 

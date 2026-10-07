@@ -1080,6 +1080,39 @@ GUARD, not a faithful (PM review r2: a re-spelled equivalent arithmetic cannot b
 a semantic red requires changing an actual geometry input). Real mouse drag/resize of a window carrying
 the overlay remains in-game, not harness-provable.
 
+## D4-Viewport — `VisibleRows`: the Scroll budgets itself from its measured rows
+
+**The gap, cited.** The consumer's pack lists need "at least 4.5 readable entries" at whatever width and
+language is current. Its budget helper states the missing capability in its own words
+(`UniversalSqueaker@0584bb0:Source/UniversalSqueaker/UI/Layout/DomainListBudget.cs:21-24`: a per-arrange-width
+viewport "would need a binding-driven container height the declarative API does not have") and works around it
+by copying the shell's width chain and injecting one number at host creation - which filter, xeno, language,
+content and resize never refresh (PM layout review, 2026-10-07 §17). The engine's own order is what closes it
+honestly: `MeasureScroll` measures its children FIRST, resolves the viewport from those rects, and when the
+scrollbar reserves its width it re-measures the children and recomputes the budget from the narrowed rects -
+so no previous-frame write-back and no copied geometry exist anywhere in the chain.
+
+**The vocabulary.** `VisibleRows` on `Scroll` only: a positive finite decimal, fractions included. Static
+numeric `Height` - zero included, since a declared 0 already answers a 0-high viewport - keeps its exact prior priority (the same static-first order `WidthKey` keeps against `Width`);
+with no Height, the budget is the first floor(k) countable entries' measured bottoms plus, when k carries
+a fraction, that fraction of the NEXT entry's OWN measured height taken from its real position (the full
+gap before it stays, so a half row shows half a row), plus the scroll's own bottom padding,
+clamped to natural. Countable entries: a direct `Repeat` expands transparently to its materialized row roots
+(stamped `IsMaterializedRow` at the single root entry per row - never the Repeat as one blob, never its
+inner parts as several); any other visible direct child counts as its root entry; a `VisibleKey`-hidden
+sibling (the empty state) contributes nothing; fewer countable than k - or none at all - answer natural.
+Bad numbers and non-`Scroll` hosts of the attribute are creation refusals (`UiHost.ValidateViewportRows`),
+the engine read stays fail-soft for programmatic specs, matching the closed-Height rule it joins.
+
+**What it does NOT become.** No HeightKey (not needed by any cited gap - the fallback note in
+`evidence/.../d4-capability-r2.md` stays the record), no general list editor, no consumer numbers as defaults
+(4.5 is a manifest value), no vocabulary outside the two mirrored container lists (their drift lane pins them).
+
+**Evidence.** Lanes in `KernelRepeatTests` (fractional equality from published final rects, the wrap-step
+same-round case, the consumer's Repeat+empty structure both ways, empty-state natural, static priority, the
+refusal matrix, the shrink-to-two re-budget) are SOURCE here; nothing in this section is a claimed run - the
+named faithfuls and the 10 gates belong to the PM-scheduled build window.
+
 ## R2 — one shipped palette, a partial bag, a scoped re-tint, and the font redirect
 
 **1. The bag is partial and answers `Vanilla`.** `new UiTheme()` is a complete, drawable look: every colour

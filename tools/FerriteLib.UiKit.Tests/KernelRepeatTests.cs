@@ -70,6 +70,7 @@ internal static class KernelRepeatTests
         Run("An item-local value that arrives a frame later is read without a recovery trip", VerifyLateItemLocalValueIsReadLater);
         Run("An existing atom keeps its own throwing-read contract", VerifyAtomsKeepTheirOwnContract);
         Run("An absent item-local key on an atom draws its default and reports once", VerifyAbsentAtomKeyIsLoud);
+        Run("Scroll VisibleRows budgets the viewport from the same round's measured rows", VerifyScrollVisibleRowsBudget);
         return failures;
     }
 
@@ -973,5 +974,325 @@ internal static class KernelRepeatTests
         }
 
         public int TranslationRevision => 0;
+    }
+
+    // --- D4: Scroll VisibleRows counting (source round; run lives with the PM build slot) --------
+
+    /// <summary>
+    /// D4's viewport count, pinned on the real structures: the budget is read from the SAME round's
+    /// measured row roots - the Repeat transparently expands to one entry per materialized row, a hidden
+    /// sibling (the consumer's empty-state under VisibleKey) contributes nothing, a declared numeric Height
+    /// keeps its static priority, bad declarations are creation refusals, and an items change re-budgets
+    /// through the existing invalidation.
+    /// <list type="bullet">
+    /// <item><b>MUTATION-TARGET</b> - the fractional equality (two rows plus half the third's own height, from
+    /// the published row rects of the FINAL pass). Delete the IsMaterializedRow stamp in MeasureRepeat and
+    /// the Repeat counts as one blob, the equality reddens; skip the re-measured round's budget and the
+    /// WrapStep case reddens (its rows are taller after the scrollbar reserved its width, so the
+    /// first-round budget is a different number).</item>
+    /// <item><b>GUARDS</b> - hidden/visible empty states and fewer-than-k cases exercise existing visibility.
+    /// Disabling IsHidden is fault injection into that existing contract, not a faithful revert of this
+    /// increment. Reserved-width observation, strict between-bounds, the refusal matrix, and
+    /// the shrink-to-two-rows re-budget: these pin existing contracts around the mutation-proving pair
+    /// rather than standing as its proof.</item>
+    /// </list>
+    /// </summary>
+    private static void VerifyScrollVisibleRowsBudget()
+    {
+        RegisterProbeKind();
+
+        // (1) four equal rows, k=2.5: the viewport stops mid-third-row, budgeted from published rects.
+        var keys = new List<string> { "a", "b", "c", "d" };
+        using (UiHost host = RowsHost(VisibleRowsPage(" VisibleRows=\"2.5\"", ""), keys, false))
+        {
+            UiLayoutSnapshot s = host.MeasureAndArrange(new Vector2(400f, 400f));
+            Rect a = RowRect(s, "a");
+            Rect b = RowRect(s, "b");
+            Rect c = RowRect(s, "c");
+            Check(a.y < b.y && b.y < c.y, "the count runs in flow order down the row roots");
+            float expected = c.y + 0.5f * c.height;
+            Rect viewport = s.RectById["list"];
+            Check(Near(viewport.height, expected),
+                "the viewport cuts at half the third row's OWN height, the full gap before it kept: got "
+                + viewport.height + ", expected " + expected);
+            Check(viewport.height > b.yMax + 1f && viewport.height < c.yMax,
+                "and it is genuinely mid-row - not a row boundary and not the whole list");
+            Check(Near(s.ScrollContents["list"].width, viewport.width - 16f)
+                    && s.ScrollContents["list"].height > viewport.height,
+                "the overflow reserved the scrollbar width and the content stayed taller than the viewport");
+
+            // (2) shrink the set below the count: natural height, everything visible.
+            keys.RemoveRange(2, 2);
+            host.Bindings.NotifyChanged("items");
+            s = host.MeasureAndArrange(new Vector2(400f, 400f));
+            Check(Near(s.RectById["list"].height, s.ScrollContents["list"].height),
+                "a two-row list under a 2.5 promise answers natural: every row is visible");
+        }
+
+        keys.Clear();
+        keys.AddRange(new[] { "a", "b", "c", "d" });
+
+        // (3) the reserved-width re-measure round is the round the budget comes from: rows wrap TALLER at
+        // the narrowed width (the deterministic model crosses a line-count threshold on the same text),
+        // so a budget taken from the full-width first pass is a different number than the equality below.
+        WrapStepMetrics wrapMetrics = new WrapStepMetrics();
+        using (UiHost host = new UiHost(
+                   Scope, UiLayoutManifest.Parse(VisibleRowsPage(" VisibleRows=\"2.5\"", "")),
+                   RowsBindings(keys, true), UiTheme.Vanilla, wrapMetrics, new StubTranslation()))
+        {
+            UiLayoutSnapshot s = host.MeasureAndArrange(new Vector2(400f, 400f));
+            Rect a = RowRect(s, "a");
+            Rect c = RowRect(s, "c");
+            // The straddle must be shown on the SAME text the engine wrapped - the widths of other texts
+            // (titles, the page's own measurements) must not masquerade as this detail's full/reserved
+            // pair. Inputs printed first so a calibration failure is distinguishable from a proof failure.
+            string detailText = LongDetail("a");
+            float detailAdvance = StubTextWidth.Of(detailText, UiFont.Small);
+            float wideLines = wrapMetrics.MeasureText(detailText, UiFont.Small, wrapMetrics.DetailWidest);
+            float narrowLines = wrapMetrics.MeasureText(detailText, UiFont.Small, wrapMetrics.DetailNarrowest);
+            Console.WriteLine("    | VisibleRows wrap-step inputs: advance=" + detailAdvance
+                + " detail-widths seen (" + wrapMetrics.DetailNarrowest + ", " + wrapMetrics.DetailWidest + ")"
+                + " detail-height wide-round=" + wideLines + " narrow-round=" + narrowLines
+                + " final row heights a=" + a.height + " c=" + c.height
+                + " viewport=" + s.RectById["list"].height);
+            // wideLines/narrowLines are HEIGHTS (16px per line in this stub); the straddle is in lines.
+            float linesAtWide = wideLines / 16f;
+            bool straddleValid = wrapMetrics.SawTwoWidths
+                && narrowLines > wideLines
+                // the extra line is caused by the reservation alone: at the full width the text fits
+                // linesAtWide lines, and it does NOT fit that many once the width is reserved.
+                && detailAdvance <= wrapMetrics.DetailWidest * linesAtWide
+                && detailAdvance > wrapMetrics.DetailNarrowest * linesAtWide;
+            Check(straddleValid,
+                "the SAME detail text crosses the wrap threshold between the full and reserved widths the "
+                + "engine measured at it (inputs above; a failure here is calibration, not a proof)");
+            if (!straddleValid)
+            {
+                Console.Error.WriteLine("  (wrap-step equality below is NOT a proof: inputs invalid)");
+            }
+
+            float expected = c.y + 0.5f * c.height;
+            Check(Near(s.RectById["list"].height, expected),
+                "with wrapped rows the viewport equals the FINAL round's cut from the final rects");
+            Check(Near(s.ScrollContents["list"].width, s.RectById["list"].width - 16f),
+                "and the reservation happened: content is 16 narrower than the viewport");
+        }
+
+        // (4) the consumer's real shape: Repeat plus an empty state behind VisibleKey. Three rows and a
+        // hidden empty under k=3.5 -> the count sees three rows -> natural. Count the hidden widget and the
+        // viewport lands mid-empty instead of at natural; count the Repeat as one blob and it lands at the
+        // first row's bottom - both redder than this equality.
+        using (UiHost host = RowsHost(
+                   VisibleRowsPage(" VisibleRows=\"3.5\"",
+                       "<Widget Id=\"empty\" Kind=\"state/empty\" Text=\"nothing\" VisibleKey=\"has-items\" />"),
+                   new List<string> { "a", "b", "c" }, false))
+        {
+            UiLayoutSnapshot s = host.MeasureAndArrange(new Vector2(400f, 400f));
+            Check(Near(s.RectById["list"].height, s.ScrollContents["list"].height),
+                "a three-row list under 3.5 answers natural even with the hidden empty-state sibling present");
+            bool emptyVisible = false;
+            foreach (string id in s.VisibleIds)
+            {
+                if (id == "empty" || id.EndsWith("/empty", StringComparison.Ordinal)) emptyVisible = true;
+            }
+
+            Check(!emptyVisible, "the empty widget stayed hidden (the sibling the count must ignore)");
+        }
+
+        // (5) empty list, visible empty state: one countable entry under k=4.5 -> natural, no reservation.
+        using (UiHost host = RowsHost(
+                   VisibleRowsPage(" VisibleRows=\"4.5\"",
+                       "<Widget Id=\"empty\" Kind=\"state/empty\" Text=\"nothing\" VisibleKey=\"has-items\" />"),
+                   new List<string>(), true))
+        {
+            UiLayoutSnapshot s = host.MeasureAndArrange(new Vector2(400f, 400f));
+            Check(s.RectById.ContainsKey("empty"), "the empty-list fixture actually shows its empty state");
+            Check(Near(s.RectById["list"].height, s.ScrollContents["list"].height)
+                    && Near(s.ScrollContents["list"].width, s.RectById["list"].width),
+                "an empty list budgets to the visible empty state: everything shows and no scrollbar is reserved");
+        }
+
+        // Direct visible children each count once; the whole padded natural height determines overflow.
+        string padded = "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Scroll Id=\"list\""
+            + " Padding=\"100\" Gap=\"4\" VisibleRows=\"2.5\">"
+            + "<Widget Id=\"a\" Kind=\"state/empty\" Text=\"a\" Height=\"40\" />"
+            + "<Widget Id=\"b\" Kind=\"state/empty\" Text=\"b\" Height=\"40\" />"
+            + "<Widget Id=\"c\" Kind=\"state/empty\" Text=\"c\" Height=\"40\" />"
+            + "</Scroll></UiPage>";
+        using (UiHost host = RowsHost(padded, new List<string>(), false))
+        {
+            UiLayoutSnapshot s = host.MeasureAndArrange(new Vector2(400f, 600f));
+            Check(Near(s.RectById["list"].height, s.RectById["c"].y + 0.5f * s.RectById["c"].height + 100f),
+                "ordinary direct children each count once and padding remains in the viewport budget");
+            Check(s.ScrollContents["list"].height > s.RectById["list"].height
+                    && Near(s.ScrollContents["list"].width, s.RectById["list"].width - 16f),
+                "padded counted content taller than the viewport reserves the scrollbar width");
+        }
+
+        // (5b) a large finite count must answer natural through the float comparison, never reach the
+        // int conversion that would overflow it into a negative index (guard for the budget's order).
+        using (UiHost host = RowsHost(VisibleRowsPage(" VisibleRows=\"1000000000\"", ""),
+                   new List<string> { "a", "b", "c", "d" }, true))
+        {
+            UiLayoutSnapshot s = host.MeasureAndArrange(new Vector2(400f, 400f));
+            Check(Near(s.RectById["list"].height, s.ScrollContents["list"].height),
+                "a billion promised rows over four real ones answer natural - no int overflow in the way");
+        }
+
+        // (6) the static stays first: a declared numeric Height keeps answering exactly as before.
+        using (UiHost host = RowsHost(
+                   VisibleRowsPage(" Height=\"60\" VisibleRows=\"2.5\"", ""),
+                   new List<string> { "a", "b", "c", "d" }, true))
+        {
+            UiLayoutSnapshot s = host.MeasureAndArrange(new Vector2(400f, 400f));
+            Check(Near(s.RectById["list"].height, 60f),
+                "a declared numeric Height outranks VisibleRows and sizes the viewport by itself");
+        }
+
+        // (7) creation refusals: bad numbers and the attribute on the wrong element (guards around the
+        // mutation-proving equalities; the vocabulary lists are pinned for drift by the existing lane).
+        Check(CreationRefuses("abc"), "VisibleRows='abc' is refused at creation, naming the attribute and value");
+        Check(CreationRefuses("0"), "VisibleRows='0' is refused at creation");
+        Check(CreationRefuses("-2.5"), "a negative count is refused at creation");
+        Check(ColumnRefusesVisibleRows(), "VisibleRows on a non-Scroll container is refused, not left inert");
+    }
+
+    /// <summary>One row per item key: title + detail, both width-wrapped leaves.</summary>
+    private static string VisibleRowsPage(string scrollAttrs, string scrollTail)
+    {
+        return "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+            + "<Templates>"
+            + "<Row Id=\"row\" Gap=\"2\" Padding=\"0\">"
+            + "<Widget Id=\"title\" Kind=\"text/wrapped\" Bind=\"title\" />"
+            + "<Widget Id=\"detail\" Kind=\"text/wrapped\" Bind=\"detail\" />"
+            + "</Row>"
+            + "</Templates>"
+            + "<Column Id=\"page\" Gap=\"0\" Padding=\"0\">"
+            + "<Scroll Id=\"list\" Gap=\"4\" Padding=\"0\"" + scrollAttrs + ">"
+            + "<Repeat Id=\"rows\" Items=\"items\" Template=\"row\" Gap=\"4\" />"
+            + scrollTail
+            + "</Scroll>"
+            + "</Column>"
+            + "</UiPage>";
+    }
+
+    private static UiHost RowsHost(string xml, List<string> keys, bool hasItems)
+    {
+        return new UiHost(
+            Scope, UiLayoutManifest.Parse(xml), RowsBindings(keys, hasItems), UiTheme.Vanilla,
+            new StubMetrics(), new StubTranslation());
+    }
+
+    /// <summary>
+    /// A detail string whose measured advance is 47 Latin chars x half-em = 376 at Small - the horizontal
+    /// row assigns 193px before reservation and 185px after it, producing two and three lines. The SAME
+    /// deterministic metrics answers those heights. The lane asserts the band against the widths
+    /// actually observed; if the reservation never happened the assertion fails and the equality below
+    /// is NOT accepted as proof of anything.
+    /// </summary>
+    private static string LongDetail(string key)
+    {
+        // 47 chars x 8px = 376px advance: it fits 2 lines at the full row width (193) and 3 lines at
+        // the scrollbar-reserved width (185) - the straddle the lane must show on THIS text.
+        return new string('x', 46) + key;
+    }
+
+    private static UiBindings RowsBindings(List<string> keys, bool hasItems)
+    {
+        // The SAME list instance the lane mutates: the re-budget case changes the row set in place and
+        // notifies "items" - the consumer's own path; a copied list would test nothing.
+        var bindings = new UiBindings();
+        bindings.BindReadOnly<IReadOnlyList<string>>("items", () => keys, UiInvalidation.Structure);
+        bindings.BindReadOnly<bool>("has-items", () => hasItems);
+        foreach (string key in keys)
+        {
+            bindings.BindReadOnly<string>("items." + key + ".title", () => key + " title");
+            bindings.BindReadOnly<string>("items." + key + ".detail", () => LongDetail(key));
+        }
+
+        return bindings;
+    }
+
+    private static Rect RowRect(UiLayoutSnapshot snapshot, string itemKey)
+    {
+        // VisibleIds carries display PATHS while RectById is keyed by the materialized element Id
+        // ("row#<key>"): match on the last path segment, then look the Id up.
+        string id = "row#" + itemKey;
+        foreach (string path in snapshot.VisibleIds)
+        {
+            if (path == id || path.EndsWith("/" + id, StringComparison.Ordinal))
+            {
+                return snapshot.RectById[id];
+            }
+        }
+
+        throw new Exception("the snapshot carries no row root for '" + itemKey + "'");
+    }
+
+    private static bool CreationRefuses(string authored)
+    {
+        try
+        {
+            using UiHost host = RowsHost(VisibleRowsPage(" VisibleRows=\"" + authored + "\"", ""),
+                new List<string> { "a" }, true);
+            return false;
+        }
+        catch (UiContractException ex)
+        {
+            return ex.Message.IndexOf("VisibleRows", StringComparison.Ordinal) >= 0
+                && ex.Message.IndexOf(authored, StringComparison.Ordinal) >= 0;
+        }
+    }
+
+    private static bool ColumnRefusesVisibleRows()
+    {
+        try
+        {
+            using UiHost host = RowsHost(
+                "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
+                + "<Column Id=\"page\" VisibleRows=\"2\" /></UiPage>",
+                new List<string>(), true);
+            return false;
+        }
+        catch (UiContractException ex)
+        {
+            return ex.Message.IndexOf("Scroll", StringComparison.Ordinal) >= 0;
+        }
+    }
+
+    /// <summary>
+    /// Deterministic wrap model: the height is exactly the ceil(advance/width) line count times the em -
+    /// same text, font and width always answer the same height, whatever order the calls came in. The
+    /// width ledger is kept PER TEXT (and only for the lane's bound detail strings): the full/reserved
+    /// pair asserted by the lane must be the widths the engine measured THAT text at, not the extremes of
+    /// every text on the page. Other names answer without recording.
+    /// </summary>
+    private sealed class WrapStepMetrics : ITextMetrics
+    {
+        public float DetailWidest { get; private set; } = -1f;
+        public float DetailNarrowest { get; private set; } = float.MaxValue;
+
+        public bool SawTwoWidths => DetailWidest - DetailNarrowest > 1f;
+
+        public float MeasureText(string text, UiFont font, float width)
+        {
+            if (string.IsNullOrEmpty(text)) return 0f;
+            if (IsDetailText(text))
+            {
+                if (width > DetailWidest) DetailWidest = width;
+                if (width < DetailNarrowest) DetailNarrowest = width;
+            }
+
+            float advance = StubTextWidth.Of(text, font);
+            float lines = Math.Max(1f, (float)Math.Ceiling(advance / Math.Max(1f, width)));
+            return lines * 16f;
+        }
+
+        public float MeasureWidth(string text, UiFont font) => StubTextWidth.Of(text, font);
+
+        private static bool IsDetailText(string text)
+        {
+            return text.Length == 47 && text[0] == 'x' && text[45] == 'x';
+        }
     }
 }
