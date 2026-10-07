@@ -599,6 +599,12 @@ public static class GenUI
     {
         return new Rect(rect.x - marginX, rect.y - marginY, rect.width + marginX * 2f, rect.height + marginY * 2f);
     }
+
+    /// <summary>The rect with its position zeroed and its size kept - the game's draw-group face.</summary>
+    public static Rect AtZero(this Rect rect)
+    {
+        return new Rect(0f, 0f, rect.width, rect.height);
+    }
 }
 
 public static class Mouse

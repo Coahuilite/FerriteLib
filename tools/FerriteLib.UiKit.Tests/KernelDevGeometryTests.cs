@@ -57,6 +57,7 @@ internal static class KernelDevGeometryTests
         Run("The effective appearance is resolved through the kind's own seam, with provenance", VerifyEffectiveAppearance);
         Run("Boundaries and unknowns: effective clip, popup ownership, and what this site cannot see", VerifyBoundariesAndUnknowns);
         Run("A bounded capture reports its head and counts what it dropped", VerifyBoundedCaptureAndDroppedCount);
+        Run("Shell chrome records the completed pass and outlines independently", VerifyShellChromePassOrder);
         Run("A snapshot is a copy, and two hosts never share one capture", VerifySnapshotIsACopyAndHostsAreSeparate);
 #else
         Run("A release payload has no instrument and refuses to pretend it has one", VerifyAbsentInRelease);
@@ -498,24 +499,24 @@ internal static class KernelDevGeometryTests
         Pass(host);
         int withOverlay = SolidCount();
         UiDevGeometrySnapshot retained = SnapshotOf(diagnostics);
-        // The walk paints the outline at each entry's own draw step, and a scoped container's viewport is
-        // drawn through its content's nested walk instead (pre-existing behaviour, pinned here so the
-        // picture's coverage is stated rather than assumed): the outlined set is the retained entries
-        // minus the scoped ones, non-vacuously.
+        // DT1 closed the stated viewport limit: the outline paints EVERY retained entry at its own draw
+        // step, the scoped container's own band included (the engine outlines it after the nested walk,
+        // same rect, same retained answer). MUTATION-TARGET: delete that moved call in DrawEntries' scoped
+        // branch and this equality loses exactly scoped*4 hairlines; the fixture genuinely carries a
+        // scoped container (scoped > 0 asserted), so the count cannot satisfy this for free.
         int scoped = 0;
         foreach (UiDevNodeSnapshot node in retained.Nodes)
         {
             if (node.IsScopedContainer) scoped++;
         }
 
-        int outlined = retained.Nodes.Count - scoped;
-        Check(outlined > 0 && scoped > 0
-                && withOverlay - withoutOverlay == outlined * OverlayHairlinesPerNode,
-            "with the capture live the outline paints exactly the entries the walk draws: "
+        Check(retained.Nodes.Count > 0 && scoped > 0
+                && withOverlay - withoutOverlay == retained.Nodes.Count * OverlayHairlinesPerNode,
+            "with the capture live the outline paints every retained entry at its own step, scoped "
+            + "viewports included: "
             + (withOverlay - withoutOverlay).ToString(CultureInfo.InvariantCulture) + " solids over "
-            + outlined.ToString(CultureInfo.InvariantCulture) + " outlined of "
             + retained.Nodes.Count.ToString(CultureInfo.InvariantCulture) + " retained ("
-            + scoped.ToString(CultureInfo.InvariantCulture) + " scoped viewports, outlined through their content)");
+            + scoped.ToString(CultureInfo.InvariantCulture) + " of them scoped viewports)");
         Check(outlineOnly == withOverlay,
             "and the standalone outline painted the same set: nothing was dropped, both modes read one walk ("
             + outlineOnly.ToString(CultureInfo.InvariantCulture)
@@ -1205,6 +1206,242 @@ internal static class KernelDevGeometryTests
         + "<Widget Id=\"alias\" Kind=\"input/checkbox\" Bind=\"flag\" Height=\"20\" />"
         + "</Column>"
         + "</UiPage>";
+
+    /// <summary>
+    /// DT1 pass-order lane (r2-calibrated): drives REAL UiWindowHost passes through the game's own
+    /// entrant. Rimsage Source/Verse/Window.cs, InnerWindowOnGUI Lines 205-309: the game computes
+    /// <c>windowRect.AtZero()</c>, contracts it by <c>Margin</c>, calls <c>BeginGroup</c>, and hands
+    /// <c>DoWindowContents</c> the ZERO-BASED face - and this shell seals <c>Margin</c> to 0, so the
+    /// production entrant is <c>windowRect.AtZero()</c>. The stub's own <c>WindowOnGUI</c> hands the
+    /// position-offset face instead (kept for the older lanes, never widened here); driving through the
+    /// game-shaped call is what lets the drawn/outline rects below be claims about the product rather than
+    /// about the double. The first frame builds the host, the HostAttached door lets a subscription see
+    /// that very frame, and the report is read from INSIDE BeforeDraw - exactly where the consumer's
+    /// panel publishes the previous completed pass.
+    /// <list type="bullet">
+    /// <item><b>MUTATION-TARGET (order)</b> - the report taken in frame two's BeforeDraw still describes
+    /// frame one: same header pass, same OLD chrome rect, and it never carries frame two's resized rect.
+    /// Moving the chrome record back to DrawChrome time (the pre-integration position) splices frame two
+    /// onto frame one and reddens this.</item>
+    /// <item><b>MUTATION-TARGET (entrant)</b> - driving through the stub's position-offset entrant
+    /// instead of the game-shaped zero-based face reddens the draw-local assertion below: the outline
+    /// would start at (30,40) while the capture says the chrome lives at those screen coordinates - the
+    /// mismatch PM review r2 caught by reading the stub against the game.</item>
+    /// <item><b>MUTATION-TARGET (record / paint)</b> - deleting the RecordShellChrome call drops the
+    /// chrome to its explicit none-state while the paint remains; deleting the
+    /// OutlineShellChrome call removes the twelve hairlines and the chain check with them while the
+    /// record stays.</item>
+    /// <item><b>GUARD</b> - the frame-one copy is re-checked AFTER frame two for real (chrome rect, pass
+    /// number and root window all still frame one's); the first frame's BeforeDraw reads an empty report;
+    /// the switch-off pass adds zero chrome hairlines. These are independent guards. A record deletion
+    /// removes the copy check's chrome prerequisite and can also fail it; that failure is not a
+    /// mutation proof of snapshot immutability.</item>
+    /// </list>
+    /// </summary>
+    private static void VerifyShellChromePassOrder()
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+
+        ChromeWindow window = new ChromeWindow();
+        window.windowRect = new Rect(0f, 0f, 200f, 200f);
+
+        window.DriveProductionPass();
+        Check(window.BeforeDrawDumps.Count == 1 && window.BeforeDrawDumps[0].Length == 0,
+            "the first frame's BeforeDraw reads an empty report - no completed pass exists yet");
+        UiDiagnosticSubscription? subscription = window.Subscription;
+        Check(subscription != null && subscription.GeometryEnabled,
+            "the subscription made through HostAttached sees the very first frame");
+        if (subscription == null) return;
+
+        string frameOne = subscription.DumpGeometry();
+        int passOne = HeaderPass(frameOne);
+        Check(frameOne.IndexOf("chrome space=window outer=(0,0,200,200)", StringComparison.Ordinal) >= 0,
+            "frame one's capture carries its chrome beside its nodes: " + Head(frameOne));
+        Check(frameOne.IndexOf("viewport path=root/list", StringComparison.Ordinal) >= 0,
+            "and the scoped viewport node of the same pass");
+        UiDevGeometrySnapshot copyOne = SnapshotOf(subscription);
+        Check(copyOne.ShellChrome is UiWindowChrome oneChrome
+                && SameChrome(oneChrome.Outer, new Rect(0f, 0f, 200f, 200f)),
+            "the data rendering hands out the same frame-one chrome as the text one");
+
+        window.windowRect = new Rect(30f, 40f, 220f, 210f); // drag + resize between frames
+        window.DriveProductionPass();
+
+        string prior = window.BeforeDrawDumps[1];
+        Check(HeaderPass(prior) == passOne && passOne > 0,
+            "what frame two's BeforeDraw reports is frame ONE's pass, header included: "
+            + HeaderPass(prior) + " vs " + passOne);
+        Check(prior.IndexOf("outer=(0,0,200,200)", StringComparison.Ordinal) >= 0
+                && prior.IndexOf("outer=(30,40,220,210)", StringComparison.Ordinal) < 0,
+            "and its chrome is the OLD rect - recording chrome at DrawChrome time would splice frame two's"
+            + " geometry onto frame one");
+        Check(!ReferenceEquals(SnapshotOf(subscription), copyOne),
+            "each read hands out a fresh copy, never a live view");
+        UiDevGeometrySnapshot afterTwo = SnapshotOf(subscription);
+        Check(copyOne.ShellChrome is UiWindowChrome stillOne
+                && SameChrome(stillOne.Outer, new Rect(0f, 0f, 200f, 200f))
+                && copyOne.Pass == passOne && afterTwo.Pass != passOne
+                && afterTwo.ShellChrome is UiWindowChrome nowChrome
+                && !SameChrome(nowChrome.Outer, stillOne.Outer),
+            "GUARD, checked across frames after the resize: the frame-one copy still answers frame one "
+            + "(chrome, pass) while frame two records its own");
+        string frameTwo = subscription.DumpGeometry();
+        Check(frameTwo.IndexOf("chrome space=window outer=(30,40,220,210)", StringComparison.Ordinal) >= 0
+                && HeaderPass(frameTwo) != passOne,
+            "frame two, once complete, records its OWN pass and its OWN chrome: " + Head(frameTwo));
+
+        // The chrome outline runs on the same switch and ink, independent of the record, and its
+        // draw-local rects must lift through the real window origin onto the screen chrome recorded.
+        subscription.GeometryOverlay = false;
+        ClearSolids();
+        window.DriveProductionPass();
+        int chromeInkOff = SolidCount();
+        subscription.GeometryOverlay = true;
+        ClearSolids();
+        window.DriveProductionPass();
+        int chromeInkOn = SolidCount();
+        UiDevGeometrySnapshot inkPass = SnapshotOf(subscription);
+        Check(inkPass.Nodes.Count > 0
+                && chromeInkOn - chromeInkOff == (inkPass.Nodes.Count + 3) * OverlayHairlinesPerNode,
+            "the chrome bands add their three rects on top of the element outlines the SAME switch paints: "
+            + (chromeInkOn - chromeInkOff).ToString(CultureInfo.InvariantCulture) + " = ("
+            + inkPass.Nodes.Count.ToString(CultureInfo.InvariantCulture) + " entries + 3 chrome) x 4");
+
+        // The LAST twelve hairlines are the three chrome bands, painted after the page walk. Through the
+        // game-shaped entrant they are face-local: the outer frame's top edge sits at x=0 with the full
+        // face width, the title band's bottom edge at y=TitleBar-1. The window's (30,40) must NOT leak
+        // into them - and adding that origin must land exactly on the screen chrome the capture recorded.
+        System.Collections.IList inkRects = SolidRectsRecorded();
+        int first = inkRects.Count - 12;
+        Check(first >= 0, "the overlay pass recorded the twelve chrome hairlines");
+        Rect outerTop = (Rect)inkRects[first]!;
+        Rect titleBottom = (Rect)inkRects[first + 5]!;
+        UiWindowChrome recordedChrome = inkPass.ShellChrome!.Value;
+        Check(Same(outerTop.x, 0f) && Same(outerTop.y, 0f) && Same(outerTop.width, 220f)
+                && Same(titleBottom.y, 55f) && Same(titleBottom.width, 220f),
+            "the chrome bands paint FACE-LOCAL - the window position never leaks into a draw-local rect: "
+            + "outerTop=(" + outerTop.x + "," + outerTop.y + "," + outerTop.width + ") titleBottom.y="
+            + titleBottom.y);
+        Check(SameChrome(
+                new Rect(outerTop.x + recordedChrome.Outer.x, outerTop.y + recordedChrome.Outer.y,
+                    outerTop.width, outerTop.height),
+                new Rect(recordedChrome.Outer.x, recordedChrome.Outer.y, recordedChrome.Outer.width, 1f))
+                && SameChrome(
+                new Rect(titleBottom.x + recordedChrome.Outer.x, titleBottom.y + recordedChrome.Outer.y,
+                    titleBottom.width, titleBottom.height),
+                new Rect(recordedChrome.Outer.x, recordedChrome.Outer.y + recordedChrome.TitleBarHeight - 1f,
+                    recordedChrome.Outer.width, 1f)),
+            "draw-local outline + the real window origin == the screen chrome the same pass recorded "
+            + "- one geometry, two renderings, through the production space conversion");
+        Check(subscription.DumpGeometry().IndexOf("chrome space=window", StringComparison.Ordinal) >= 0,
+            "the record flows whatever the paint switch says");
+        subscription.GeometryOverlay = false;
+        ClearSolids();
+        window.DriveProductionPass();
+        Check(SolidCount() == chromeInkOff, "and the chrome ink leaves with the switch");
+
+        window.Close();
+    }
+
+    /// <summary>The stub's recorded solid rects - paint order, the same list SolidCount counts.</summary>
+    private static System.Collections.IList SolidRectsRecorded()
+    {
+        FieldInfo? field = typeof(Verse.Widgets).GetField(
+            "DrawBoxSolidRects", BindingFlags.Public | BindingFlags.Static);
+        if (field == null) throw new Exception("the stub no longer exposes DrawBoxSolidRects");
+        return (System.Collections.IList)field.GetValue(null)!;
+    }
+
+    /// <summary>The header pass number of a dump, or -2 when there is none.</summary>
+    private static int HeaderPass(string dump)
+    {
+        int at = dump.IndexOf("pass=", StringComparison.Ordinal);
+        if (at < 0) return -2;
+        int start = at + 5;
+        int end = start;
+        while (end < dump.Length && (char.IsDigit(dump[end]) || dump[end] == '-')) end++;
+        return int.Parse(dump.Substring(start, end - start), CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>First line of a dump, bounded, for assertion messages.</summary>
+    private static string Head(string dump)
+    {
+        int nl = dump.IndexOf('\n');
+        string line = nl < 0 ? dump : dump.Substring(0, nl);
+        return line.Length > 140 ? line.Substring(0, 140) : line;
+    }
+
+    private static bool SameChrome(Rect left, Rect right)
+    {
+        return Math.Abs(left.x - right.x) <= 0.01f && Math.Abs(left.y - right.y) <= 0.01f
+            && Math.Abs(left.width - right.width) <= 0.01f && Math.Abs(left.height - right.height) <= 0.01f;
+    }
+
+    /// <summary>
+    /// A titled, closable shell over the standard Page, recording what BeforeDraw sees. The subscription
+    /// is made inside HostAttached - the documented door that lets a consumer see the very first frame.
+    /// </summary>
+    private sealed class ChromeWindow : UiWindowHost
+    {
+        private readonly UiBindings bindings = new UiBindings();
+
+        internal readonly List<string> BeforeDrawDumps = new List<string>();
+
+        internal ChromeWindow()
+        {
+            bindings.BindCommand("act", () => { });
+            HostAttached += attached =>
+            {
+                Subscription = UiDiagnosticHub.Subscribe(attached);
+                Subscription.GeometryEnabled = true;
+            };
+        }
+
+        internal UiDiagnosticSubscription? Subscription { get; private set; }
+
+        /// <summary>
+        /// The game-shaped pass: Rimsage Source/Verse/Window.cs InnerWindowOnGUI (Lines 205-309) hands
+        /// DoWindowContents the ZERO-BASED contracted face, and this shell seals Margin to 0 - so the
+        /// production entrant is exactly windowRect.AtZero(). The stub's own WindowOnGUI keeps its
+        /// position-offset plumbing for the older lanes (not widened here); this fixture calls through the
+        /// real virtual the game calls, so draw-local geometry in this lane is a product claim.
+        /// </summary>
+        internal void DriveProductionPass()
+        {
+            // windowRect.AtZero(), spelled out so the fixture needs no Verse-using for the extension.
+            DoWindowContents(new Rect(0f, 0f, windowRect.width, windowRect.height));
+        }
+
+        protected override UiTheme Theme => UiTheme.Vanilla;
+
+        protected override string Title => "chrome-lane";
+
+        protected override string CloseText => "x";
+
+        protected override ITextMetrics Metrics => new StubMetrics();
+
+        protected override UiHost CreateHost()
+        {
+            return new UiHost(
+                Scope,
+                UiLayoutManifest.Parse(Page),
+                bindings,
+                UiTheme.Vanilla,
+                new StubMetrics(),
+                new StubTranslation());
+        }
+
+        protected override void DrawNotice(Rect rect, UiWindowNotice notice)
+        {
+        }
+
+        protected override void BeforeDraw(Rect contentRect)
+        {
+            UiDiagnosticSubscription? ambient = UiDiagnosticHub.ActiveSubscription;
+            BeforeDrawDumps.Add(ambient == null ? "" : ambient.DumpGeometry());
+        }
+    }
 #else
     // --- release half -----------------------------------------------------------------------------
 

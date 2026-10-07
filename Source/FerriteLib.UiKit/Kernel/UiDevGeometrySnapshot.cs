@@ -521,6 +521,15 @@ public sealed class UiDevGeometrySnapshot
     /// <summary>Input samples this pass produced that the bounded capture did not keep.</summary>
     public long InputsDropped { get; internal set; }
 
+    /// <summary>
+    /// The window shell's own bands, recorded in THIS pass by the shell while it painted them (DT1 r2):
+    /// outer frame, title band, close affordance and content box in window space, plus the insets they
+    /// were computed with. It arrives through the same host/session/pass header as the node and input
+    /// lists - a report reads this field together with its pass, not a present-tense accessor glued to a
+    /// finished dump. Null: no shell chrome drew in this pass, which the text rendering states in words.
+    /// </summary>
+    public UiWindowChrome? ShellChrome { get; internal set; }
+
     /// <summary>The node with this canonical identity, or null. Keyed by <see cref="UiDevNodeSnapshot.NodeKey"/>.</summary>
     public UiDevNodeSnapshot? NodeByKey(string nodeKey)
     {

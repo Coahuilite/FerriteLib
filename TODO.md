@@ -138,10 +138,18 @@ library before validating the real page, and their listing order does not overri
       `docs/development/0.7/05-api-contract.md` §SA1, `docs/api-tiers.md`,
       `docs/consumers/consume-from-0.7.0.md` (grammar/resolver/cloned-scope wiring for
       `<Color Token="SwitchThumbOff"/>`; `UiThemeDraw.SelectorField` as the single shared selector paint;
-      `GeometryOverlay` independent of the capture, scoped-viewport band a stated coverage limit pinned
-      retained-minus-scoped). Local evidence: 10 gates green in the r2/r3 build slots with named faithful
-      reverts each side. Open: paired integration, US palette-document and
-      composite adoption, Demo showcase, real-font/in-game appearance. Not in the held package.
+      `GeometryOverlay` independent of the capture (its scoped-viewport coverage limit was CLOSED by the
+      DT1 fix below; the r3-era lane wording was re-cut in that batch). Local evidence: 10 gates green in
+      the r2/r3 build slots with named faithful reverts each side. Open: paired integration, US
+      palette-document and composite adoption, Demo showcase, real-font/in-game appearance. Not in the
+      held package.
+- [ ] **DT1 outline coverage: TECHNICALLY CLOSED through r2 (2026-10-07).** Named faithfuls red-then-green
+      through the GAME-SHAPED entrant (`DoWindowContents(windowRect.AtZero())` per the InnerWindowOnGUI
+      reading; stub entrant kept for older lanes), draw-local->screen chain plus order/record/paint/scoped
+      reverts re-observed with raw logs under the relay `fl-tech-r2-logs/`, cross-frame copy guard checked
+      across frames, stub gap (`GenUI.AtZero`) fixed, final `verify-local` 10 gates green, frozen Dev/
+      Release DLL hashes byte-identical to slot 1 (r2 changed no product code). Open: PM commit + artifact
+      handoff to US, US consumption lane, real-game appearance/pointer (human).
 - [ ] **Game-check R4-B images and composed rows in the paired rehearsal.** All 10 local gates pass after PM integration; API tier details are in "docs/api-tiers.md". Real RimWorld rendering/input remain unverified.
 - [ ] **Derive the visual-core boundary guard's symbol set from the types.** The cheap half landed
       2026-09-24 (`UiPopup` added to the reject list, mutation-tested); the hand-maintained list is still the

@@ -235,6 +235,16 @@ consequence is paid in the open rather than discovered by a stranger.
   The same round adds `Key`, `IsActiveTarget`, `Session`, the
   `PreOpen`/`PostOpen`/`OnCloseRequest`/`PreClose`/`PostClose` hooks and the protected `CanClose`
   veto to this type; all of it is additive, and a window no catalog attached behaves exactly as before.
+  DT1 adds `ShellChrome` (a `UiWindowChrome` snapshot of the shell's own frame/title-band/close/content
+  rects in window space, answered by the same arithmetic that paints the chrome and drives the Dev
+  outline) as the PRESENT measurement - so a consumer stops mirroring `TitleBarHeight`/`SidePadding` into
+  its own constants; a report of a COMPLETED pass instead quotes the capture's own chrome record
+  (`UiDevGeometrySnapshot.ShellChrome`, written by the shell when the chrome drew). Additive, no behavior
+  change; the 0.7.x temporary public-addition exemption applies.
+- `UiWindowChrome` — the read-only geometry snapshot `UiWindowHost.ShellChrome` answers with: outer, title
+  band, close affordance, content box, plus the two inset values it was built from. Classified
+  public-unstable with the shell it describes; the constructor is internal, so the only source of a value
+  is a real shell computing itself.
 - `UiWindowNotice` — the shell's notice vocabulary, same reason.
 - `LineChartWidget` — named by the consumer's own composition, so it cannot go internal yet; that use is
   also the specimen behind the tree-membership metric, and the debt list would rather it be a kind string.
@@ -439,24 +449,30 @@ consequence is paid in the open rather than discovered by a stranger.
   objects. It also carries the **development-only numeric instrument**: `GeometryEnabled` (off by default),
   `GeometryOverlay` (off by default; since SA1.5 an **independent switch** - with no capture live it outlines
   every entry that reaches the engine's per-entry draw step while storing nothing, and with a capture live it
-  outlines exactly the retained entries at that step; a scoped container's own viewport rect is a stated
-  coverage limit - it has no draw step, and its content is outlined entry by entry - pinned as
-  retained-minus-scoped by the lane; turning `GeometryEnabled` off does not turn it off) and
+  outlines exactly the retained entries at that step; since DT1 the scoped container's OWN viewport band is
+  outlined too - at its own entry, after its nested walk, same rect and same retained answer - and the
+  shell's own frame/title/close bands both outline through the same switch and RECORD into the same capture
+  the moment they draw (dump `chrome` line, snapshot `ShellChrome` field; a pass whose window drew no
+  chrome says so explicitly; `UiWindowHost.ShellChrome` stays the present-tense read, distinct from the
+  completed-pass record); turning `GeometryEnabled` off does not turn it off) and
   `DumpGeometry()` (diffable
   text: one line per arranged node with its arranged, drawn and window rects, the origin between them, its
   height mode and the height that mode resolved to, plus a scoped container's viewport and content extent,
-  then one line per sampled press with its verdict). **All three are compiled out of a release payload**
+  then one line per sampled press with its verdict, then the pass's `chrome` line). **All three are
+  compiled out of a release payload**
   (`FER_DEV`), where each enable path throws instead of accepting the request and answering every later
   question with emptiness. The instrument observes only: no member of it is read back by the engine, the
   session, the hit stack or the fit audit. **R3-A addition:** `TryGetGeometrySnapshot(out UiDevGeometrySnapshot?)`
   is the machine-readable rendering of the SAME capture the text dump renders - built from the capture's own
   stored samples in the same call, never from a second collection or a replayed pass. It is the one reader
-  that does **not** throw in a release payload: it answers `false` with a null snapshot, because a call a
+  that does **not** throw in a release payload (unlike the enable path): a call a
   consumer makes unconditionally must not become an exception in the shipped configuration, and because
   "nothing was captured" is the truthful answer there rather than an empty object that reads like an empty
   page.
 - `UiDevGeometrySnapshot` — one captured pass as data: `Host`, `SessionId`, `Pass`, `EntryEvent`, the
-  immutable `Nodes` / `Inputs` lists, their `NodesDropped` / `InputsDropped` markers, and the
+  immutable `Nodes` / `Inputs` lists, their `NodesDropped` / `InputsDropped` markers, the DT1 `ShellChrome`
+  record (the shell's own bands as drawn in THIS pass - window frame/title/close/content in window space,
+  null when no shell chrome drew), and the
   `NodeByKey` / `NodeByPath` lookups (key first, because a display path can be ambiguous when a kind itself
   contains the separator). It is a **fresh copy per call**: every call allocates a new snapshot and new node
   and input objects, no member is a view over the capture's buffers, an old snapshot is detached from later

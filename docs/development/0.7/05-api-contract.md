@@ -685,13 +685,19 @@ anytime to review the layout ends that coupling. The outline field now lives on 
 the capture: with no capture it outlines every entry that reaches the engine's per-entry DRAW step and stores
 nothing (no buffer, the dump stays empty, `TryGetGeometrySnapshot` keeps answering false - the report channel
 stays honest because it never gained a sample to report), and with a capture live it paints exactly the
-RETAINED entries at that step as before. The step is the stated coverage limit: a scoped container's own
-viewport rect has no draw step at its own entry - its content is outlined entry by entry through the nested
-walk, and the viewport band itself is deliberately not outlined (outlining it would open a second paint
-outlet at the clip push). Both modes render the same walk at the same call site in the same draw-local
-rect: there is no second layout system, and `KernelDevGeometryTests` pins the outlined set honestly as
-retained-minus-scoped rather than claiming every arranged rect is outlined. Turning `GeometryEnabled` off
-afterwards does not silence the picture; a release payload still refuses both switches outright.
+RETAINED entries at that step as before. DT1 (the 2026-10-07 ruling that an uncovered outline is a library
+defect, superseding the limit this section used to state) closed the scoped case: a container's OWN viewport
+band is now outlined at its own entry - the engine's call sits after the nested walk returns, with the same
+draw-local rect and the same `retained` answer its Note gave, so no second paint outlet at the clip push was
+needed. Shell chrome joins through the same switch and ink, AND through the same buffer: the shell records
+its window-space chrome into the existing capture the moment it paints (dump `chrome` line, snapshot
+`ShellChrome` field), so a report's chrome numbers belong to the pass they describe instead of a
+present-tense read spliced onto a finished dump; `UiWindowHost.ShellChrome` remains for acting on the
+window as it is NOW, the two tenses documented apart. Both modes render one walk at draw-step call sites: there
+is no second layout system, and `KernelDevGeometryTests` now pins the outlined set as the FULL retained list
+(fixture asserts a scoped container exists, so the equality cannot be met by luck). Turning
+`GeometryEnabled` off afterwards does not silence the picture; a release payload still refuses both switches
+outright.
 
 **The gate is the build configuration, and it fails closed.** The whole implementation is inside
 `#if FER_DEV`, plus three guarded call sites (the engine's per-entry draw walk, the engine's overlay call, and
@@ -1006,9 +1012,10 @@ band, not the control.
 **The outline, separated from the recorder.** Covered by the SA1.5 paragraph above; the lane
 `KernelDevGeometryTests.VerifyOverlayIsIndependentOfCapture` holds all four directions (accept-without-
 capture, store-nothing-while-painting, capture-off-keeps-painting, per-subscription isolation), the both-on
-case re-measures the retained-entry equality at the draw step, and the outlined set is pinned honestly as
-retained-minus-scoped - the scoped viewport's own band is a stated coverage limit, not a claim of full
-coverage (r3, after r2 observed the 20-vs-24 mismatch rather than forcing it).
+case re-measures the retained-entry equality at the draw step. The outlined set was pinned in r3 as
+retained-minus-scoped under the coverage limit the section stated; **DT1 supersedes both the limit and the
+pin** - see the DT1 entry below for the closed coverage and the shell-chrome addition (the 2026-10-07
+ruling records why "declared as a limit" was not "resolved").
 
 **What the selector lane observes (PM r1 point 4).** `KernelCoreWidgetTests.VerifyDropdownSelectorAppearance`
 reads GEOMETRY - the rail solid's rect on the left edge, the divider rect before the arrow zone, arrow ink
@@ -1023,6 +1030,55 @@ the recorded solids rather than by draw position, for the same reason.
 manifests, old compiled consumers and the `field` default are pixel-identical; an unset `SwitchThumbOff`
 paints the thumb it always painted; the `GeometryOverlay` setter is strictly more permissive in a dev build
 and unchanged in a release one. The 0.7.x temporary public-addition exemption applies: no minor bump.
+
+## DT1 — the outline covers everything the library itself draws
+
+**The defect, in the ruling's words.** 描边不覆盖视为 FL 缺陷 (2026-10-07): areas this library painted but the
+outline switch did not reach were carried as "stated coverage limits"; a stated limit is honest recording,
+not a fix, and two areas stayed uncovered - the scoped container's own viewport band, and the shell's own
+chrome (window frame, title band, close affordance). The ruling supersedes the earlier wording in the SA1.5
+section; the SA1-round records stay as history of what was observed then.
+
+**The fix stays one-source.** No new collector, no second ink, no new paint outlet:
+- Viewport: the engine's existing per-entry outline call is also made for a scoped entry, positioned after
+  `DrawScopedContainer` returns, so the band is outlined over its drawn content in the entry's own
+  draw-local space, with the same `retained` answer `Note()` produced for it. Capture-live faithfulness is
+  untouched: a dropped scoped node is still not outlined.
+- Shell chrome: `DrawShell` saves the geometry it drew, then calls the two probe entries after
+  `host.DrawFrame` completes, inside that host's current diagnostic scope (including a newly created
+  first-pass host). `BeforeDraw` can still report the previous completed pass before any new chrome is
+  published; `BeginPass` clears the old chrome with the other samples. `RecordShellChrome` writes
+  the shell's `UiWindowChrome` - computed exactly once there - into the SAME bounded capture the node and
+  input samples land in, stamped by that buffer's own pass, so the dump's `chrome` line and the snapshot's
+  `ShellChrome` field describe the completed pass; `OutlineShellChrome` paints the same three bands with
+  the same switch and ink every element outline uses. The rects come from `CloseButtonRect`/`TitleBandRect`
+  extracted from the drawing code - draw, outline and record read ONE arithmetic.
+- Report attribution lives in the capture, not in a present-tense read: a consumer's report composes the
+  dump/snapshot (host, session, pass header; node, input and `chrome` lines from one buffer). Public
+  `UiWindowHost.ShellChrome` remains for acting on the window as it is NOW - and for retiring the
+  consumer's mirrored chrome constants (one helper site plus its lane, observed 2026-10-06) - with its
+  doc stating the tense split: quoting a finished pass means reading `UiDevGeometrySnapshot.ShellChrome`,
+  never gluing the accessor's current numbers onto an older dump.
+
+**What DT1 deliberately does NOT add.** No panel framework: a small draggable developer overlay is today's
+`UiWindowHost` + `UiWindowOptions` (`Draggable`/`Resizeable`/`NormalSize`/`AllowMultipleInstances` are
+public already) with a page manifest - US composes it. No US page names, no diagnostic business data, no
+game-wide inspector: the switch, the ink, the isolation and this accessor are all consumer-neutral, and
+the per-window toggle remains which subscription's `GeometryOverlay` the consumer sets.
+
+**Compatibility.** Additive: one public type (`UiWindowChrome`), one public property on a classified type,
+and Dev-only paint extension - a release payload changes by nothing at all, and a dev payload without the
+overlay switch changes by nothing at all. The 0.7.x public-addition exemption applies: no minor bump.
+**Unverified until PM's build round:** lane `VerifyOverlayIsIndependentOfCapture` re-cut to the FULL
+retained list; planned lanes - scoped-band delta (delete the engine's scoped Outline call ⇒ red by
+exactly scoped×4 hairlines), chrome PAINT delta (delete `OutlineShellChrome` ⇒ red; flag off ⇒
+zero-delta guard), chrome RECORD delta (delete `RecordShellChrome` ⇒ the dump's `chrome` line and the
+snapshot field fall to the explicit none-state while outlines keep working - the faithful that proves
+report attribution rides the capture, not an accessor), and one pass's equality of the two chrome
+renderings (dump line vs snapshot field, same buffer). The accessor-vs-draw arithmetic equality is a
+GUARD, not a faithful (PM review r2: a re-spelled equivalent arithmetic cannot be forced red; showing
+a semantic red requires changing an actual geometry input). Real mouse drag/resize of a window carrying
+the overlay remains in-game, not harness-provable.
 
 ## R2 — one shipped palette, a partial bag, a scoped re-tint, and the font redirect
 

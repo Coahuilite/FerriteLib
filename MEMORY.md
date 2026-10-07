@@ -1,6 +1,6 @@
 # MEMORY
 
-## Current state (2026-10-06)
+## Current state (2026-10-07)
 
 - **Held package: FerriteLib built at `0181268`** — `dist/dev/FerriteLib` is 5 files, payload
   `1.6/Assemblies/FerriteLib.UiKit.dll` sha256 `c1371f623a3a…` (the PM's paired-package manifest is the
@@ -29,13 +29,26 @@
   integration and human acceptance are tracked separately.** `input/dropdown` joins the appearance seam (`Appearance="field"` default / `"selector"`
   reserved rail + independent arrow zone, drawn through the one shared `UiThemeDraw.SelectorField`);
   `UiTheme.SwitchThumbOff` is a palette-document colour role (unset answers `TextPrimary` - the historical
-  thumb; the ON half keeps `AccentGold`); `GeometryOverlay` is now independent of `GeometryEnabled`
-  (outline-only paints the draw-step entries and stores nothing; the scoped viewport's own band is a STATED
-  COVERAGE LIMIT, not an omission: its content is outlined entry by entry, pinned retained-minus-scoped).
-  Contracts: `docs/development/0.7/05-api-contract.md` §SA1, `docs/api-tiers.md`,
+  thumb; the ON half keeps `AccentGold`); `GeometryOverlay` is independent of `GeometryEnabled`
+  (outline-only paints the draw-step entries and stores nothing). DT1 (2026-10-07 ruling: uncovered
+  outline is a library defect) closed the coverage: scoped viewport bands and the shell's own chrome
+  (frame/title/close) outline from the same switch; chrome RECORDS into the same capture when it draws
+  (dump `chrome` line / snapshot `ShellChrome` = completed pass), `UiWindowHost.ShellChrome` is the
+  present-tense read. (r2 correction: reports quote the capture, never an accessor spliced onto a pass.)
+  Contracts: `docs/development/0.7/05-api-contract.md` §SA1 + §DT1, `docs/api-tiers.md`,
   `docs/consumers/consume-from-0.7.0.md`. Evidence: 10 local gates green with named faithful reverts
   (r2/r3 rounds); local/stub only - real-font, in-game appearance and the consumers' adoption (US palette
   document + composites, Demo showcase) remain open, and none of this is in the held package.
+- **DT1 outline-coverage fix (2026-10-07, slot 1): technically CLOSED on the local boundary** (all
+  faithfuls red-then-green through the real WindowOnGUI path; 10 gates green; Dev/Release artifacts frozen
+  and handed to PM; uncommitted).
+  Scoped viewport outlines at its own engine step; shell chrome (frame/title/close) outlines AND records
+  into the same capture (dump `chrome` line, snapshot `ShellChrome`, explicit none-state), all from the
+  shell's own `CloseButtonRect`/`TitleBandRect` arithmetic; `UiWindowHost.ShellChrome` (`UiWindowChrome`,
+  internal ctor) stays the present-tense measurement for acting on the live window and retiring consumer
+  mirrors. Re-cut lane (full-retained) plus planned chrome paint/record deltas; the equality-vs-draw item
+  is a GUARD per PM review r2. Draggable overlay = US composition on `UiWindowOptions`, no FL framework.
+  Neutral: no consumer page names or diagnostic business data in FL.
 
 ## PM integration checkpoint — 2026-09-30
 

@@ -354,6 +354,14 @@ public abstract class UiWindowHost : Window
     {
         ResolvePointerDown();
         DrawChrome(inRect);
+#if FER_DEV
+        // DT1 (r2 reading): the shell's chrome joins the instrument's TWO channels from this one place.
+        // Keep the geometry the chrome just drew. BeforeDraw may publish the PREVIOUS completed pass;
+        // do not overwrite its capture here. Publish these bands after this host's DrawFrame completes.
+        UiWindowChrome chromeNow = ShellChrome;
+        Rect chromeTitleNow = TitleBandRect(inRect);
+        Rect chromeCloseNow = CloseButtonRect(inRect);
+#endif
         Rect content = ContentRect(inRect);
         BeforeDraw(content);
 
@@ -404,6 +412,15 @@ public abstract class UiWindowHost : Window
             }
 
             host.DrawFrame(content);
+#if FER_DEV
+            // The host can be created on this first pass, or released by a close during DrawFrame.
+            // Resolve its own subscription now; never inherit the outer scope's pre-creation null.
+            using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, Metrics))
+            {
+                UiDevGeometryProbe.RecordShellChrome(chromeNow);
+                UiDevGeometryProbe.OutlineShellChrome(inRect, chromeTitleNow, chromeCloseNow);
+            }
+#endif
         }
         catch (Exception ex)
         {
@@ -674,13 +691,7 @@ public abstract class UiWindowHost : Window
     private void DrawCloseButton(Rect rect)
     {
         UiTheme theme = Theme;
-        Vector2 size = CloseButtonSize;
-        var button = new Rect(
-            rect.xMax - size.x - SidePadding,
-            rect.y + (TitleBarHeight - size.y) * 0.5f,
-            size.x,
-            size.y);
-
+        Rect button = CloseButtonRect(rect);
         bool hovered = UiNative.IsMouseOver(button);
         UiThemeDraw.Surface(
             button,
@@ -700,5 +711,66 @@ public abstract class UiWindowHost : Window
         {
             Close();
         }
+    }
+
+    /// <summary>
+    /// Where the close affordance sits for a given window-face rect: the ONE arithmetic the shell uses -
+    /// drawn by <see cref="DrawCloseButton"/>, outlined by the Dev instrument, and reported through
+    /// <see cref="ShellChrome"/>. Size comes from <see cref="CloseButtonSize"/>, itself metric-driven.
+    /// </summary>
+    private Rect CloseButtonRect(Rect face)
+    {
+        Vector2 size = CloseButtonSize;
+        return new Rect(
+            face.xMax - size.x - SidePadding,
+            face.y + (TitleBarHeight - size.y) * 0.5f,
+            size.x,
+            size.y);
+    }
+
+    /// <summary>The title band the shell reserves: full width, from the face top to <see cref="TitleBarHeight"/>.</summary>
+    private Rect TitleBandRect(Rect face)
+    {
+        return new Rect(face.x, face.y, face.width, TitleBarHeight);
+    }
+
+    /// <summary>
+    /// The shell's own geometry in window (screen) space, answered by the SAME arithmetic that paints the
+    /// chrome (DT1). A consumer reads this INSTEAD of mirroring <see cref="TitleBarHeight"/>/
+    /// <see cref="SidePadding"/> into its own constants - the drift risk the chrome-mirror observation
+    /// recorded - for anything acting on the window as it is NOW.
+    /// <para>
+    /// <b>This accessor is the present measurement, and it is not the capture.</b> The record of a
+    /// COMPLETED pass - the one a report must quote - is <c>UiDevGeometrySnapshot.ShellChrome</c> (and the
+    /// dump's <c>chrome</c> line), written by the shell at its own draw time into the same buffer as the
+    /// node samples; gluing this present-tense value onto a finished pass would misreport a drag or a
+    /// resize, which is exactly what the instrument's one-buffer rule exists to prevent.
+    /// </para>
+    /// <para>
+    /// Space: <see cref="UiWindowChrome.Outer"/> is <c>windowRect</c> as the game moved it (drag and resize
+    /// included, read at whatever moment the caller asks); the inner rects are that face plus the shell's
+    /// insets, because <c>Margin</c> is sealed to zero and the draw group origin is the window origin
+    /// (see <see cref="ToWindowSpace"/>).
+    /// </para>
+    /// </summary>
+    public UiWindowChrome ShellChrome
+    {
+        get
+        {
+            Rect face = windowRect.AtZero();
+            return new UiWindowChrome(
+                windowRect,
+                ToWindowRect(TitleBandRect(face)),
+                ToWindowRect(CloseButtonRect(face)),
+                ToWindowRect(ContentRect(face)),
+                SidePadding,
+                TitleBarHeight);
+        }
+    }
+
+    /// <summary>A face-local rect lifted into window (screen) space; Margin is sealed to zero.</summary>
+    private Rect ToWindowRect(Rect local)
+    {
+        return new Rect(windowRect.x + local.x, windowRect.y + local.y, local.width, local.height);
     }
 }

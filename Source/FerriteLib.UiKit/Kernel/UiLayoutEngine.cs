@@ -581,9 +581,11 @@ public sealed class UiLayoutEngine
             // published, the theme its own chain resolved to, and the session's effective clip - so the
             // sample describes the pass that ran instead of a second derivation of it. Nothing is recorded
             // when the subscription did not opt in (the probe returns before it touches the resolver), and
-            // nothing at all exists in a release build. The answer says whether the bounded capture kept this
-            // entry, which is what the outline is faithful to WHILE a capture is live; with no capture the
-            // same call still paints when the standalone outline switch is on (SA1.5).
+            // nothing at all exists in a release build. The answer says whether the bounded capture kept
+            // this entry, which is what the outline is faithful to WHILE a capture is live; with no capture
+            // the same call still paints when the standalone outline switch is on (SA1.5). The outline now
+            // covers every entry that reaches this step - the scoped containers included, at their own
+            // draw rect after their content (DT1 closed the stated viewport limit).
             bool sampled = UiDevGeometryProbe.Note(
                 entry.Node,
                 entry.Spec,
@@ -612,6 +614,14 @@ public sealed class UiLayoutEngine
                     viewportPosition,
                     nativeOrigin,
                     windowOrigin);
+#if FER_DEV
+                // DT1: the viewport's OWN band is outlined here, after its content has drawn and in this
+                // scope's own draw-local space - the same rect, the same entry, the same `sampled` answer
+                // Note() gave above. The nested walk below never had a step at this entry, which is how
+                // the clipped edges went unseen; one moved call makes the picture the third rendering of
+                // this entry too, and no second collector exists to disagree with the capture.
+                UiDevGeometryProbe.Outline(drawRect, sampled);
+#endif
                 index += entry.SubtreeCount;
             }
             else

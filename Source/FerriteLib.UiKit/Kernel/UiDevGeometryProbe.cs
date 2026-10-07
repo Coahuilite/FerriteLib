@@ -222,7 +222,11 @@ internal struct UiDevInputSample
 /// (<see cref="UiDevGeometryProbe.Outline"/>) is a THIRD consumer of the same engine walk, but since
 /// SA1.5 its switch lives on the subscription, not here: with this capture live it paints exactly the
 /// RETAINED entries (this class's bound is what the picture must be faithful to), and with no capture
-/// it still paints the draw-step entries it is called for while storing nothing.
+/// it still paints the draw-step entries it is called for while storing nothing. DT1 adds the shell's
+/// own chrome to the same buffer: <see cref="Chrome"/> is written after the page's DrawFrame completes,
+/// using the geometry the shell drew earlier in that pass, and is rendered by both
+/// the text and the data rendering, and is painted by the same outline switch. One buffer, one pass: a
+/// report never splices a present-tense accessor onto a finished dump.
 /// </para>
 /// </summary>
 internal sealed class UiDevGeometryCapture
@@ -235,7 +239,21 @@ internal sealed class UiDevGeometryCapture
 
     private readonly List<UiDevGeometrySample> geometry = new List<UiDevGeometrySample>();
     private readonly List<UiDevInputSample> input = new List<UiDevInputSample>();
+    private UiWindowChrome? chrome;
     private int pass = -1;
+
+    /// <summary>
+    /// The shell's chrome as RECORDED when it drew for this pass (DT1 r2): the same buffer, the same
+    /// host/session/pass the node and input lines carry. BeginPass clears it with the other samples;
+    /// the shell publishes its saved draw geometry AFTER DrawFrame completes. BeforeDraw can therefore
+    /// still read the previous pass without a new frame overwriting its chrome. A non-shell host keeps
+    /// null and the renderings say so.
+    /// </summary>
+    internal UiWindowChrome? Chrome
+    {
+        get => chrome;
+        set => chrome = value;
+    }
 
     internal int Pass => pass;
     internal string EntryEvent { get; private set; } = "none";
@@ -256,6 +274,7 @@ internal sealed class UiDevGeometryCapture
         EntryEvent = UiNative.DiagnosticEventName();
         geometry.Clear();
         input.Clear();
+        chrome = null;
         DroppedGeometry = 0;
         DroppedInput = 0;
     }
@@ -287,11 +306,13 @@ internal sealed class UiDevGeometryCapture
         input.Add(sample);
     }
 
-    /// <summary>Empties both halves without touching the pass number (the outline switch is not here since SA1.5).</summary>
+    /// <summary>Empties the buffers and the chrome record without touching the pass number (the outline
+    /// switch is not here since SA1.5).</summary>
     internal void Clear()
     {
         geometry.Clear();
         input.Clear();
+        chrome = null;
         DroppedGeometry = 0;
         DroppedInput = 0;
     }
@@ -385,6 +406,25 @@ internal sealed class UiDevGeometryCapture
                 .Append(" key=").Append(sample.NodeKey)
                 .Append(" id=").Append(sample.ElementId)
                 .Append('\n');
+        }
+
+        // The shell's own bands, from this same buffer: one line, window space, or the explicit statement
+        // that no shell chrome drew in this pass. Rendered from the SAME field the snapshot hands out, so
+        // the two renderings cannot disagree about a chrome that was or was not recorded.
+        if (chrome is UiWindowChrome shell)
+        {
+            text.Append("chrome space=window")
+                .Append(" outer=").Append(Rect(shell.Outer))
+                .Append(" title=").Append(Rect(shell.TitleBand))
+                .Append(" close=").Append(Rect(shell.CloseButton))
+                .Append(" content=").Append(Rect(shell.Content))
+                .Append(" side-padding=").Append(Number(shell.SidePadding))
+                .Append(" title-bar=").Append(Number(shell.TitleBarHeight))
+                .Append('\n');
+        }
+        else
+        {
+            text.Append("chrome=none (no shell chrome was recorded in this pass)\n");
         }
 
         return text.ToString();
@@ -514,6 +554,9 @@ internal sealed class UiDevGeometryCapture
         snapshot.Inputs = inputs;
         snapshot.NodesDropped = DroppedGeometry;
         snapshot.InputsDropped = DroppedInput;
+        // The shell's own bands from THIS buffer and THIS pass - a completed-pass record, not a
+        // present-tense measurement; null says no shell chrome drew in the pass (DT1 r2).
+        snapshot.ShellChrome = chrome;
     }
 
     private static string Number(float value)
@@ -605,7 +648,7 @@ internal static class UiDevGeometryProbe
     /// The answer says whether the capture RETAINED this entry, which is what the optional overlay keys its
     /// painting off: while a capture is live, the picture and the data are one bounded capture rendered twice,
     /// not two collectors. With no capture the same call paints every entry reaching the draw step and
-    /// stores nothing (SA1.5; the scoped viewport's own rect has no draw step - see Outline).
+    /// stores nothing (SA1.5; scoped viewports are outlined at their own entry since DT1).
     /// </para>
     /// </summary>
     internal static bool Note(
@@ -753,17 +796,17 @@ internal static class UiDevGeometryProbe
     }
 
     /// <summary>
-    /// Paints the outline over one entry's draw rect, after that entry has drawn. Drawn in draw-local space
-    /// so it lines up with the element by construction, and through the theme's single solid outlet so the
+    /// Paints the outline over one entry's draw rect, after that entry (or, for a scoped container, after
+    /// its whole nested walk) has drawn. Drawn in draw-local space so it lines up with the element by
+    /// construction, and through the theme's single solid outlet (<see cref="OutlineRect"/>) so the
     /// backend-containment allowlist does not grow a second one.
     /// <para>
-    /// <b>SA1.5: the outline switch is independent of the capture switch.</b> Both modes render the SAME
-    /// engine walk - this very call site, in this very draw-local rect - so there is no second layout
-    /// system to disagree with. The call site is the engine's per-entry DRAW step, which is also the
-    /// stated coverage limit: a scoped container's own viewport rect has no draw step at its own entry
-    /// (its content walks nested below and is outlined entry by entry), so the viewport band itself is
-    /// deliberately not outlined - <c>KernelDevGeometryTests</c> pins the outlined set as retained minus
-    /// scoped, not a silent approximation.
+    /// <b>SA1.5 kept, DT1 extended: the switch is independent of the capture, and coverage is the engine's
+    /// per-entry draw step for EVERY entry - the scoped viewport's own band included.</b> The viewport call
+    /// sits in <c>UiLayoutEngine.DrawEntries</c> right after the nested walk returns, with the same
+    /// draw-local rect and the same <paramref name="retained"/> answer as its Note; the earlier stated
+    /// limit (viewport band not outlined) was superseded by the 2026-10-07 user ruling and
+    /// <c>KernelDevGeometryTests</c> now pins the outlined set as the full retained list.
     /// <list type="bullet">
     /// <item>capture on: <paramref name="retained"/> is the answer <see cref="Note"/> gave for this same
     /// entry, and the picture stays the third rendering of the one bounded capture - a node the capture
@@ -772,6 +815,7 @@ internal static class UiDevGeometryProbe
     /// is outlined, nothing is sampled, no buffer exists, and the dump/snapshot readers keep answering
     /// truthfully that nothing was captured.</item>
     /// </list>
+    /// Shell chrome has its own entry, <see cref="OutlineShellChrome"/>, because those rects carry no node.
     /// </para>
     /// </summary>
     internal static void Outline(Rect drawRect, bool retained)
@@ -779,6 +823,44 @@ internal static class UiDevGeometryProbe
         UiDiagnosticSubscription? subscription = UiDiagnosticHub.ActiveSubscription;
         if (subscription == null || !subscription.GeometryOverlay) return;
         if (subscription.GeometryEnabled && !retained) return;
+        OutlineRect(drawRect);
+    }
+
+    /// <summary>
+    /// Outlines the shell's own bands - the window frame, the title band and the close affordance - from
+    /// the rects the shell itself computed to paint them (DT1). The switch and the ink are the SAME as
+    /// every element outline, read from the ambient subscription the window's own host opened for this
+    /// pass (per-host isolation is the diagnostic surface's rule, not a new one). The geometry RECORD is
+    /// the separate, always-when-capturing <see cref="RecordShellChrome"/>; this half only paints.
+    /// </summary>
+    internal static void OutlineShellChrome(Rect windowFrame, Rect titleBand, Rect closeButton)
+    {
+        UiDiagnosticSubscription? subscription = UiDiagnosticHub.ActiveSubscription;
+        if (subscription == null || !subscription.GeometryOverlay) return;
+        OutlineRect(windowFrame);
+        OutlineRect(titleBand);
+        OutlineRect(closeButton);
+    }
+
+    /// <summary>
+    /// Records the shell's chrome into the SAME bounded capture the node and input samples land in
+    /// (DT1 r2): called after the shell's page DrawFrame completes, using its saved chrome geometry, so the dump line,
+    /// the snapshot's ShellChrome field and the outline all describe the one pass, and a report never
+    /// glues a present-tense measurement onto a finished pass. Independent of the outline switch; there
+    /// is one chrome per window so no bound is involved. With capture off there is no buffer and nothing
+    /// is retained - an outline-only window paints its chrome bands and its readers keep answering that
+    /// nothing was captured.
+    /// </summary>
+    internal static void RecordShellChrome(UiWindowChrome chrome)
+    {
+        UiDevGeometryCapture? capture = UiDiagnosticHub.ActiveSubscription?.Geometry;
+        if (capture == null) return;
+        capture.Chrome = chrome;
+    }
+
+    /// <summary>Four hairlines around one rect - the one outline paint outlet.</summary>
+    private static void OutlineRect(Rect drawRect)
+    {
         if (drawRect.width <= 0f || drawRect.height <= 0f) return;
 
         const float hairline = 1f;

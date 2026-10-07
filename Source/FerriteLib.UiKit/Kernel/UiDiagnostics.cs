@@ -298,11 +298,14 @@ public sealed class UiDiagnosticSubscription : IDisposable
     /// <summary>
     /// Whether the outlined elements' draw rects are painted on screen. Off by default, and INDEPENDENT of
     /// <see cref="GeometryEnabled"/> (SA1.5): the outline is a rendering of the same engine draw walk, not
-    /// a rendering of the stored capture. The outlined set is exactly the entries that reach the engine's
-    /// per-entry draw step; a scoped container's OWN viewport rect is not outlined at its own step - its
-    /// content is outlined entry by entry through the nested walk (a stated coverage limit, not a gap to
-    /// paper over: outlining the viewport band would require painting at the clip push, a second outlet the
-    /// instrument deliberately does not open). Within that exit:
+    /// a rendering of the stored capture. The outlined set is every entry that reaches the engine's
+    /// per-entry draw step - since DT1 that includes a scoped container's OWN viewport band, outlined
+    /// after its nested walk at the same rect and the same retained answer (the earlier "viewport band not
+    /// outlined" limit was superseded by the 2026-10-07 ruling; the call sits at the entry's own step, so
+    /// no clip-push outlet was opened). The shell's own bands (frame, title, close) join the same switch
+    /// and ink, and RECORD their geometry into the capture the moment they draw - the dump's chrome line
+    /// and <c>TryGetGeometrySnapshot</c>'s <c>ShellChrome</c> field are the completed-pass numbers,
+    /// separate from any present-tense accessor. Within that exit:
     /// <list type="bullet">
     /// <item>outline on, capture off: every drawn entry is outlined, and NOTHING is sampled - no buffer,
     /// no dump content, no snapshot, and the report path keeps honestly saying it captured nothing.</item>
