@@ -59,6 +59,12 @@
   budget recomputation). Direct children, padded overflow and visible empty input are guarded; deleting
   existing visibility is fault injection, not new-feature backout proof. No exported C# shape moved, no library
   default carries the 4.5.
+- **Consumer production-path harness support (2026-10-07):** canonical stubs declare minimal Def,
+  SoundDef, XenotypeDef, Mod, Pawn, CellRect and Harmony type tokens plus Find.WindowStack and
+  Window.onlyDrawInDevMode. They support type loading and the existing window shell, not definition
+  loading, audio, world simulation or Harmony patch execution. All 10 local checks pass after the
+  addition; unchanged VisibleRows methods retain their two prior faithful proofs. New source identity
+  and consumer handoff are recorded in the PM checkpoint manifest; held packages stay untouched.
 
 ## PM integration checkpoint — 2026-09-30
 

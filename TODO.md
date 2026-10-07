@@ -148,8 +148,8 @@ library before validating the real page, and their listing order does not overri
       reading; stub entrant kept for older lanes), draw-local->screen chain plus order/record/paint/scoped
       reverts re-observed with raw logs under the relay `fl-tech-r2-logs/`, cross-frame copy guard checked
       across frames, stub gap (`GenUI.AtZero`) fixed, final `verify-local` 10 gates green, frozen Dev/
-      Release DLL hashes byte-identical to slot 1 (r2 changed no product code). Open: PM commit + artifact
-      handoff to US, US consumption lane, real-game appearance/pointer (human).
+      Release DLL hashes byte-identical to slot 1 (r2 changed no product code). Committed; consumer
+      integration is tracked by the PM checkpoint. Open: real-game appearance/pointer (human).
 - [x] **D4-Viewport `VisibleRows` (source, 2026-10-07): BUILT, Dev harness ALL PASS, 10 gates green**
       (PM held the shared-stubs slot; carrier unchanged). Scroll-only positive `VisibleRows` budgets the
       viewport from the SAME round's measured rows (floor(k) bottoms + the fraction of the next row's own
@@ -163,6 +163,9 @@ library before validating the real page, and their listing order does not overri
       Contract: `docs/development/0.7/05-api-contract.md` §D4-Viewport +
       `docs/consumers/consume-from-0.7.0.md`. Open: PM commit + artifact handoff to US, US deletes
       `DomainListBudget` and declares 4.5, real-game appearance (human).
+- [x] **Canonical consumer type-loading support (2026-10-07):** minimal definition/world/mod/Harmony
+      type tokens and the dev-only Window field; no database/audio/patch simulation. 10 local checks
+      pass. Checkpoint source identities and consumer verification belong to the PM handoff.
 - [ ] **Game-check R4-B images and composed rows in the paired rehearsal.** All 10 local gates pass after PM integration; API tier details are in "docs/api-tiers.md". Real RimWorld rendering/input remain unverified.
 - [ ] **Derive the visual-core boundary guard's symbol set from the types.** The cheap half landed
       2026-09-24 (`UiPopup` added to the reject list, mutation-tested); the hand-maintained list is still the

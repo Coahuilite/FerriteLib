@@ -720,6 +720,7 @@ public abstract class Window
 
     public WindowLayer layer;
     public string optionalTitle = "";
+    public bool onlyDrawInDevMode;
     // Field defaults are the GAME'S OWN, read from Source/Verse/Window.cs through the local source index.
     // A reference assembly advertises the fields but not their initializers, which is exactly how this
     // double drifted before (2026-09-15, the R-extra-3 finding): doCloseX, doCloseButton,
@@ -933,4 +934,60 @@ public class WindowStack
 public static class UnityData
 {
     public static bool IsInMainThread => true;
+}
+
+/// <summary>
+/// Minimal loaded-definition base for consumer production-projection harnesses. The public fields
+/// match the reference assembly; this does not implement the game definition database.
+/// </summary>
+public class Def
+{
+    public string defName = "";
+    public string label = "";
+}
+/// <summary>
+/// Sound definition type token only. Audio lookup and playback remain game-only paths.
+/// </summary>
+public class SoundDef : Def
+{
+}
+
+/// <summary>
+/// The game's Mod base, stubbed as an empty class: a consumer's mod singleton type derives from it, so any
+/// harness path that touches the singleton's type needs the base to exist. No stubbed member is
+/// read on those paths (the settings mutators' notification seam is documented as game-only).
+/// </summary>
+public class Mod
+{
+}
+
+/// <summary>
+/// The game's pawn, stubbed as an empty reference type: a diagnostics source names it in its
+/// lookup dictionaries and row-factory signatures, so the TYPES must load; the harness overlay is
+/// empty, so no member of it is ever executed (a lane that needs live pawns is a game walkthrough,
+/// not a stub invention).
+/// </summary>
+public class Pawn
+{
+}
+
+/// <summary>
+/// The game's camera cell rect, stubbed as an empty struct: the periodic-population snapshot names
+/// it as a field type, so the containing types must load; the harness never fills a snapshot, so no
+/// member of it executes.
+/// </summary>
+public struct CellRect
+{
+}
+
+/// <summary>
+/// The game's static world locator, stubbed with the single slot a consumer's window seams name at JIT
+/// time: a method that mentions Find.WindowStack must be able to resolve the type even when the
+/// harness always injects its own stack and never executes that branch. The default instance is a
+/// live stub WindowStack, so a production call that forgot to inject lands in a visible empty
+/// stack instead of a null reference.
+/// </summary>
+public static class Find
+{
+    public static WindowStack WindowStack { get; set; } = new WindowStack();
 }
