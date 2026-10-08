@@ -1337,3 +1337,90 @@ correction report. (b) DATED HISTORICAL: the 2026-09-24 gate-10 measurement, kep
 was taken against. (c) INFERENCE: that the renamed gate names and the re-cut t2 expectation now match the
 lanes - argued from the literal strings, not observed. (d) UNVERIFIED RUNTIME: **nothing was compiled or
 executed**; no `dotnet`, no gate, no harness, no mutation.
+
+## FL-IC1 (2026-10-08) — one receive-eligibility rule, one capture owner, a bounded scrollable menu
+
+Specification: the interaction-convergence contract sections the PM relay names 3, 5 and 6, against the three
+failure witnesses the independent all-controls audit confirmed in current source (own-popup overlap, chart press
+under a menu, unbounded menu height). The slice fixes those three and the shared rule they were each missing;
+FL-IC2 (edit transactions, the window Cancel/Accept entry and the tree cancel) is a separate slice and is NOT in
+this section. Nothing here is a real-game acceptance.
+
+**The ruling, in one paragraph each.**
+
+- *Receive eligibility.* A control may take a NEW press only when the element (or an ancestor) is not disabled,
+  the native backend lets the window receive input at that point (the raw hover answer, which is what honours the
+  enclosing scroll views and the obscuring stack), the pointer is inside the element's own rect, no popup layer
+  covers the point, and the point is inside the effective clip the engine published for that element. The first
+  two answers are the ones `Button(rect, ctx)` already consulted; `UiNative.CanReceivePointerPress(rect, ctx)` is
+  the same rule for a control that takes the pointer itself instead of handing the press to a native control, so a
+  raw-pointer kind does not grow its own copy of the conditions.
+- *Popup priority is geometric.* A popup layer covers the pointer or it does not. Owning the popup is not an
+  exemption, and that exemption was the defect: a menu that `RectFor` pinned or clamped over its own trigger let
+  the trigger consume the press and close the menu, so the option row under the pointer never saw a live event
+  (the reported in-game F09, and the audit's D1 stub witness). A dropdown keeps its toggle-to-close because the
+  menu's rect is not the trigger's rect: a click on the strip of bar the menu leaves free still closes it, while a
+  click inside the menu belongs to the row.
+- *Capture ownership.* A session capture records the element that took it, not only an id. Normal release, owner
+  stop-drawing (hidden, switched away, removed) and host close each end exactly that session's capture, and the
+  native release still refuses to clear a hot control it does not own. A capture with no recorded element owner is
+  deliberately not reconciled at the pass boundary - nothing owns its draw - and is still released by `Dispose`.
+  Continuation of a drag is a separate question from a new press: it follows the capture, never this frame's hover,
+  and the release is not gated by position either.
+- *The menu is bounded and scrolls.* `RectFor` returns a height of whole option rows that fit the Host viewport
+  instead of `optionCount * OptionHeight`, both option lists draw/hover/hit-test only the rows inside that rect,
+  and the wheel is routed by priority at the engine's pass boundary: a notch that lands inside the open menu moves
+  the menu and is consumed before any scroll container under it can take it. Geometry, hit test and scroll read
+  one rect and one offset.
+
+**Public surface, all of it inside `0.7.0` under the standing temporary exemption, none of it promoted.** Seven
+members on existing public-unstable types, no new type, no new kind, no XML vocabulary, and no signature changed
+on an existing member: `UiNative.CanReceivePointerPress`, `UiNative.WindowPointer`, `UiNative.PointerWheelNotches`,
+`UiPopup.VisibleRowCount`, the `UiPopup.WheelRowsPerNotch` constant, `UiSession.OpenPopupScrollRows` and
+`UiSession.OwnedHotControlOwner`. `UiNative`'s public member count moves 28 to 31, which is the number the tier
+document now reports. `docs/api-tiers.md` carries the per-entry statements, including the one a reader must not
+miss: `IsPointerOverHigherLayer(UiNode, Vector2, string?)` keeps its signature and no longer grants an exemption,
+and removing the parameter is a signature change that waits for a minor boundary.
+
+**Behaviour changes on existing surface, stated as breaks rather than as additions.** Three, and a consumer that
+recompiled against the previous carrier changes observed behaviour in all three: a menu that covers its own
+trigger now selects instead of closing; a `chart/line` press under an open menu, outside the effective clip or on a
+disabled element now does nothing at all instead of capturing and emitting; and a menu longer than the viewport is
+now shorter and scrolls. None of them needs a code edit at the call site: every one goes through `UiPopup` or
+`UiNative`, and the consumer's own composite dropdown already reads `RectFor` plus `DrawOptionList`, which is the
+reason the fix was put there rather than in either caller. The wheel's *direction and weight* are the library's
+convention (a positive notch asks for the later rows, three rows per notch); the stub proves the routing and the
+clamp, not the feel, and the feel is a human-pass item.
+
+**Event timing, because the ordering is the contract.** One IMGUI event is one host pass. The pass opens, the
+previous pass's complete paint order (menu layer included) becomes the stack dispatch reads, and the wheel question
+is answered at that moment - before any element drew, so nothing had consumed the notch yet. Content then draws: a
+context-bearing control asks eligibility against those layers, and a covering menu makes it refuse without touching
+the event. The pass closes, releasing an orphaned popup and a capture whose owner did not report drawing. The
+deferred popup pass then paints the bounded rows and hit-tests them, and it is the pass that consumes the click an
+option takes. The consequence a reader has to hold: the popup geometry dispatch consults is always ONE event old,
+which is what makes a press taken by a control drawn under the menu impossible, and what makes a menu that moved
+between the two passes (a scroll, a resize) apply its previous rect for that one frame. That is the existing
+published-layer rule, not a new one, and the audit records it as a known boundary.
+
+**What these lanes do not show, kept explicit.** Real Unity wheel handling (weight, direction, and whether a
+native `BeginScrollView` under the menu takes the notch first in the real client), a real native
+`HorizontalSlider` drag, text input and IME, and the game's `WindowStack` input authority are outside the stub
+harness. The lanes here drive the faithful stub pump - separate Layout/MouseDown/MouseUp/ScrollWheel events, the
+stub's hot-control capture and `Use()` contract, group-local pointer read-back - and say which claim they rest on.
+The paired human pass covers the in-game half: overlap selection, long-menu reachability and wheel, chart drag,
+Enter/Esc and the narrow Chinese layout, in one short session.
+
+**Lanes.** `KernelInputEligibilityTests` (twelve scenarios: string and typed overlap selection, the uncovered close
+strip, the forty-option bound-and-scroll with both ends reachable, wheel priority inside and outside the menu, the
+covered chart's refusal and the option row that takes the click instead, the normal drag after the menu closes,
+continuation and release outside the rect, a disabled chart, a clipped band, the pass-boundary capture release
+beside another session's untouched capture, and the released identity's capture). `KernelPopupTests` keeps its nine
+earlier scenarios green, and `KernelDevGeometryTests.VerifyEventSemantics` now pins `EventType.ScrollWheel`
+between the double and the reference constant.
+
+**Faithful reverts.** `tools/mutation/batches/fl-ic1-20261008.ps1`: restoring the owner-id exemption, removing the
+chart's press gate, and unbounding the menu height each redden the named assertion in this slice's own lane and
+nothing else, with the byte-exact restore, rebuild-to-baseline and carrier watch the battery requires. The
+pass-boundary capture release and the scroll clamp carry a labelled fourth case. The logs land in
+`dist/dev-work/` as always.

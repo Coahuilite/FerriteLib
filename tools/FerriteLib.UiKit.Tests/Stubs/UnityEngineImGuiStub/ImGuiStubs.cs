@@ -11,6 +11,7 @@ public enum EventType
     MouseDrag = 3,
     KeyDown = 4,
     KeyUp = 5,
+    ScrollWheel = 6,
     Repaint = 7,
     Layout = 8,
     Used = 12
@@ -41,6 +42,17 @@ public sealed class Event
         set => _mousePosition = value;
     }
 
+    private Vector2 _delta;
+    /// <summary>
+    /// The wheel movement of this event. Declared because the kernel reads it through
+    /// <c>UiNative.PointerWheelNotches()</c>, and a double that omits a member the code under test calls is a
+    /// defect in the double, not in the caller. No group translation applies to it: a delta is not a position.
+    /// </summary>
+    public Vector2 delta
+    {
+        get => _delta;
+        set => _delta = value;
+    }
     private KeyCode _keyCode;
     public KeyCode keyCode
     {

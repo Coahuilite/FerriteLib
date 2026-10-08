@@ -50,6 +50,20 @@ public sealed class UiSession : IDisposable
     // boundary, where a false value releases the popup (see EndHitPass) - that is the half a call-site
     // refresh cannot see: an owner that is no longer arranged may never call its trigger again.
     private bool popupOwnerDrawn;
+    // How far the open popup's option list is scrolled, in ROWS past its first option, and the largest scroll
+    // the list published for the pass it last drew. The popup draws, hit-tests and scrolls through one rect
+    // (UiPopup), so these two numbers are that rect's only vertical state; they belong with the rest of the
+    // popup's session-local facts and die when the popup closes or the session is disposed.
+    private int openPopupScrollRows;
+    private int openPopupMaxScrollRows;
+    // The element that holds this session's pointer capture, so "the owner is no longer valid" is a
+    // readable fact rather than an anonymous int: a capture belongs to a session, a control id AND a node.
+    private UiNode? ownedHotControlOwner;
+    // Whether that owner reported itself drawn in the pass in progress, the capture half of the same
+    // pass-boundary reconcile the open popup uses: a control that is hidden, removed or switched away
+    // cannot run its own MouseUp release any more, and a capture nobody can release stops later presses
+    // from reaching whatever is now on screen.
+    private bool captureOwnerDrawn;
     internal Rect? CurrentClip { get; set; }
     private Rect hostViewport;
     private string? scrollTargetElementId;
@@ -198,6 +212,7 @@ public sealed class UiSession : IDisposable
     {
         EnsureActive();
         popupOwnerDrawn = false;
+        captureOwnerDrawn = false;
         CurrentClip = hostViewport.width > 0f && hostViewport.height > 0f ? hostViewport : (Rect?)null;
         dispatchLayers.Clear();
         dispatchLayers.AddRange(hitLayers);
@@ -216,9 +231,19 @@ public sealed class UiSession : IDisposable
 
     /// <summary>
     /// Topmost-first dispatch: true when <paramref name="windowPoint"/> falls inside a popup layer that
-    /// covers the caller, so it must not take the click. Element identity alone does not grant an exemption:
-    /// a composite can contain several independent controls. A dropdown trigger uses the owner-id overload
-    /// to preserve toggle-to-close for its own popup.
+    /// covers the caller, so it must not take the click. Element identity grants no exemption, and owning the
+    /// popup is not an exemption either: the covering layer's rect is the whole question. A dropdown trigger
+    /// therefore keeps its toggle-to-close, because a trigger click that lands OUTSIDE the menu's rect is not
+    /// covered by anything, while a click that lands INSIDE it belongs to the option row under the pointer -
+    /// which is the ruling of the interaction contract: one session's option menu outranks the trigger bar and
+    /// the chart beneath it.
+    /// <para>
+    /// The owner-id exemption this method used to carry is the confirmed F09/D1 defect: <c>UiPopup.RectFor</c>
+    /// can place a menu over its own anchor (the clamp branch, and any bounded menu taller than the room on
+    /// both sides of the trigger), the covered trigger then consumed the press first, and the option row drew
+    /// afterwards into an event that was already used. It was never an exemption for a SIBLING of the same
+    /// composite element, and geometry does not need one for the owner either.
+    /// </para>
     /// <para>
     /// Content layers are recorded in the stack in paint order but do not arbitrate one another yet: IMGUI
     /// already serialises content input by draw order, and a rect lookup cannot tell a real pointer from an
@@ -228,43 +253,121 @@ public sealed class UiSession : IDisposable
     /// </summary>
     public bool IsPointerOverHigherLayer(UiNode element, Vector2 windowPoint)
     {
-        return IsPointerOverHigherLayer(element, windowPoint, null);
-    }
-
-    /// <summary>
-    /// Popup-owner-aware dispatch. <paramref name="ownPopupId"/> is the caller's own dropdown id, or null for
-    /// a caller that owns no popup. A covering popup yields ONLY to the dropdown that owns it; every other
-    /// caller must yield - including a sibling control drawn with the same element.
-    /// <para>
-    /// Keying this on element identity was wrong for composites: <see cref="PushHitLayer"/> recorded only the
-    /// element, and one composite element hosts several dropdowns, so an open popup never covered its own
-    /// siblings. The covered sibling then captured the MouseDown first (content draws before the deferred
-    /// popup pass) and stole the press from the option row.
-    /// </para>
-    /// </summary>
-    public bool IsPointerOverHigherLayer(UiNode element, Vector2 windowPoint, string? ownPopupId)
-    {
         for (int i = dispatchLayers.Count - 1; i >= 0; i--)
         {
             UiHitLayer layer = dispatchLayers[i];
             if (!layer.IsPopup) continue;
             if (!Contains(layer.Rect, windowPoint)) continue;
-            if (ownPopupId != null && layer.PopupOwnerId != null
-                && string.Equals(layer.PopupOwnerId, ownPopupId, StringComparison.Ordinal))
-            {
-                // My own popup does not cover me: this is what preserves toggle-to-close for the trigger.
-                continue;
-            }
-
             return true;
         }
 
         return false;
     }
 
+    /// <summary>
+    /// Same dispatch as <see cref="IsPointerOverHigherLayer(UiNode,Vector2)"/>, with the caller's own popup id
+    /// beside it. The id is a RECORD, not a licence: coverage is geometric for every caller, including the
+    /// dropdown that owns the covering menu, since FL-IC1 retired the owner exemption this overload used to
+    /// apply. The signature stays because it is public surface and a removal belongs at a minor boundary, not
+    /// inside a behaviour slice; a call site keeps compiling and starts yielding the way the contract reads.
+    /// </summary>
+    public bool IsPointerOverHigherLayer(UiNode element, Vector2 windowPoint, string? ownPopupId)
+    {
+        return IsPointerOverHigherLayer(element, windowPoint);
+    }
+
+    /// <summary>
+    /// True when the pointer sits inside the rect of the popup this session has open, read from the same
+    /// published layers as every other coverage decision. The bounded option list uses it to decide whether
+    /// the wheel belongs to the menu.
+    /// </summary>
+    internal bool OpenPopupCoversPointer(Vector2 windowPoint)
+    {
+        if (openPopupId == null) return false;
+
+        for (int i = dispatchLayers.Count - 1; i >= 0; i--)
+        {
+            UiHitLayer layer = dispatchLayers[i];
+            if (!layer.IsPopup) continue;
+            if (layer.PopupOwnerId != null
+                && string.Equals(layer.PopupOwnerId, openPopupId, StringComparison.Ordinal))
+            {
+                return Contains(layer.Rect, windowPoint);
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// How far the open option list is scrolled, in rows past its first option. <see cref="UiPopup"/> is the
+    /// only frame that knows how many rows the bounded menu shows, so it is the only writer of the extent:
+    /// the list publishes its own limit every pass it draws and clamps here, which is what makes the geometry,
+    /// the hit test and the scroll read ONE finite viewport instead of three opinions. Zero whenever no popup
+    /// is open, and a new open starts at the top.
+    /// </summary>
+    public int OpenPopupScrollRows => openPopupScrollRows;
+
+    /// <summary>The largest scroll the menu published for the pass it last drew.</summary>
+    internal int OpenPopupMaxScrollRows => openPopupMaxScrollRows;
+
+    /// <summary>
+    /// Records the scrollable range of the option list that is drawing, and pulls the stored scroll back
+    /// inside it. A menu whose list shrank (a filter, a removal) must not keep a scroll past its own end:
+    /// that would hit-test rows that are not on screen.
+    /// </summary>
+    internal void NotePopupScrollExtent(int maxScrollRows)
+    {
+        if (openPopupId == null)
+        {
+            openPopupScrollRows = 0;
+            openPopupMaxScrollRows = 0;
+            return;
+        }
+
+        openPopupMaxScrollRows = maxScrollRows < 0 ? 0 : maxScrollRows;
+        if (openPopupScrollRows > openPopupMaxScrollRows) openPopupScrollRows = openPopupMaxScrollRows;
+        if (openPopupScrollRows < 0) openPopupScrollRows = 0;
+    }
+
+    /// <summary>
+    /// Moves the open menu's scroll by <paramref name="deltaRows"/> rows, clamped to the range the list
+    /// published. Negative deltas scroll toward the first option. Returns true when the scroll moved, so the
+    /// caller can say whether the wheel actually did something.
+    /// </summary>
+    internal bool ScrollPopupByRows(int deltaRows)
+    {
+        if (openPopupId == null || deltaRows == 0) return false;
+
+        int next = openPopupScrollRows + deltaRows;
+        if (next < 0) next = 0;
+        if (next > openPopupMaxScrollRows) next = openPopupMaxScrollRows;
+        if (next == openPopupScrollRows) return false;
+
+        openPopupScrollRows = next;
+        if (UiNative.Trace != null)
+        {
+            // Caller-agnostic facts only, like every other line the funnel reports: which menu moved, where
+            // it stands, how far it can go. This session cannot read the backend - the event phase belongs to
+            // the funnel's own trace lines, not to a session that has no business touching Event.current.
+            UiNative.Trace("wheel popup id=" + openPopupId + " rows=" + openPopupScrollRows
+                + " of " + openPopupMaxScrollRows);
+        }
+
+        return true;
+    }
+
     internal void EndHitPass()
     {
         if (openPopupId != null && !popupOwnerDrawn) ClosePopup();
+
+        // An owner that stopped being drawn owns no live interaction. Release THIS session's capture and no
+        // other's, and never touch a native control the session never recorded: the native slider's own drag
+        // identity stays Verse's, which is why only a capture with a recorded element owner is reconciled.
+        if (ownedHotControl.HasValue && ownedHotControlOwner != null && !captureOwnerDrawn)
+        {
+            ReleaseHotControl(ownedHotControl.Value);
+        }
     }
 
     internal void ConstrainClip(Rect rect)
@@ -277,6 +380,19 @@ public sealed class UiSession : IDisposable
                 Math.Max(0f, Math.Min(clip.yMax, rect.yMax) - y));
         }
         CurrentClip = rect;
+    }
+
+    /// <summary>
+    /// True when a window-space point is inside the clip the engine published for the element being drawn -
+    /// the Host viewport, narrowed by every Scroll/Clip scope around it. A control that takes the pointer
+    /// without handing the press to a native control has to answer this itself: nothing underneath it does,
+    /// which is why the raw-pointer chart had to ask and a covered chart kept writing values. An unpublished
+    /// clip (a frame with no Host viewport) refuses nothing.
+    /// </summary>
+    internal bool IsPointInEffectiveClip(Vector2 windowPoint)
+    {
+        Rect? clip = CurrentClip;
+        return !clip.HasValue || Contains(clip.Value, windowPoint);
     }
 
     /// <summary>
@@ -365,6 +481,10 @@ public sealed class UiSession : IDisposable
         EnsureActive();
         openPopupId = ownerId;
         openPopupAnchor = anchor;
+        // A menu that opens is at its top: the scroll belongs to this open, not to the element, so a second
+        // open of the same dropdown never inherits where the last one happened to be parked.
+        openPopupScrollRows = 0;
+        openPopupMaxScrollRows = 0;
         // The owner is drawn by definition - it is reporting this open from inside its own Draw - so the
         // pass-boundary reconcile must not release the popup on the next pass for lack of a report.
         popupOwnerDrawn = true;
@@ -379,6 +499,8 @@ public sealed class UiSession : IDisposable
         EnsureActive();
         openPopupId = null;
         openPopupAnchor = null;
+        openPopupScrollRows = 0;
+        openPopupMaxScrollRows = 0;
         popupOwnerDrawn = false;
         DropPopupLayers(hitLayers);
         DropPopupLayers(dispatchLayers);
@@ -592,6 +714,14 @@ public sealed class UiSession : IDisposable
             trippedLogs.Remove(node);
             scrollPositions.Remove(node);
             if (ReferenceEquals(activeNode, node)) activeNode = unscopedNode;
+        }
+
+        // A released identity cannot hold a pointer capture any more: that is "the owner is no longer valid",
+        // and the release goes through the same owner-scoped door as a normal release, so another session's
+        // capture and another window's GUIUtility state stay exactly as they were.
+        if (ownedHotControl.HasValue && ownedHotControlOwner != null && released.Contains(ownedHotControlOwner))
+        {
+            ReleaseHotControl(ownedHotControl.Value);
         }
 
         DropLayersOf(released, hitLayers);
@@ -830,6 +960,15 @@ public sealed class UiSession : IDisposable
     /// <summary>Native hot control id currently captured by this session, if any.</summary>
     public int? OwnedHotControl => ownedHotControl;
 
+    /// <summary>
+    /// The element that holds <see cref="OwnedHotControl"/>, or null when the capture was taken outside any
+    /// element draw. Capture identity is a session, a control id AND a node: "the owner is no longer valid"
+    /// has to be answerable, and an int alone cannot say whose it was. A capture with no recorded element is
+    /// deliberately NOT reconciled at the pass boundary - nothing owns its draw - and is still released by
+    /// <see cref="Dispose"/>, which is the close path for everything.
+    /// </summary>
+    public UiNode? OwnedHotControlOwner => ownedHotControlOwner;
+
     /// <summary>True when <paramref name="controlId"/> is the hot control this session owns.</summary>
     public bool IsHotControlOwned(int controlId)
     {
@@ -837,15 +976,29 @@ public sealed class UiSession : IDisposable
     }
 
     /// <summary>
-    /// Captures the native hot control for <paramref name="controlId"/> and records session
-    /// ownership. Only the owning session may release it; closing/disposing the host releases
-    /// exactly this session's capture and never another session's.
+    /// Captures the native hot control for <paramref name="controlId"/> and records session ownership
+    /// beside the element that is drawing. Only the owning session may release it; closing/disposing the
+    /// host releases exactly this session's capture and never another session's.
     /// </summary>
     public void CaptureHotControl(int controlId)
     {
         EnsureActive();
         ownedHotControl = controlId;
+        ownedHotControlOwner = ReferenceEquals(activeNode, unscopedNode) ? null : activeNode;
+        // Taking the capture is itself a report that the owner is drawing right now.
+        captureOwnerDrawn = true;
         UiNative.CaptureHotControl(controlId);
+    }
+
+    /// <summary>
+    /// The capture half of <see cref="NotePopupOwnerDrawn"/>: a raw-pointer control reports that it drew while
+    /// it owns the capture, so the pass-boundary reconcile can tell "this owner is still on screen and still
+    /// holds the press" from "this owner stopped being drawn and nobody else can release what it took".
+    /// A no-op unless this session owns <paramref name="controlId"/>.
+    /// </summary>
+    internal void NoteHotControlOwnerDrawn(int controlId)
+    {
+        if (IsHotControlOwned(controlId)) captureOwnerDrawn = true;
     }
 
     /// <summary>
@@ -859,6 +1012,7 @@ public sealed class UiSession : IDisposable
         {
             UiNative.ReleaseHotControl(controlId);
             ownedHotControl = null;
+            ownedHotControlOwner = null;
         }
     }
 
@@ -878,6 +1032,7 @@ public sealed class UiSession : IDisposable
             // ownership record together with popup/focus/drag transient state.
             UiNative.ReleaseHotControl(ownedHotControl.Value);
             ownedHotControl = null;
+            ownedHotControlOwner = null;
         }
 
         scrollPositions.Clear();
@@ -895,6 +1050,9 @@ public sealed class UiSession : IDisposable
         popupDrawActions.Clear();
         openPopupId = null;
         openPopupAnchor = null;
+        openPopupScrollRows = 0;
+        openPopupMaxScrollRows = 0;
+        captureOwnerDrawn = false;
         hitLayers.Clear();
         dispatchLayers.Clear();
         currentWindowOrigin = default;

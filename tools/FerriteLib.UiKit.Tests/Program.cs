@@ -73,6 +73,9 @@ internal static class Program
         Console.WriteLine("Kernel popup/window-space (greenfield)...");
         failures += KernelPopupTests.RunAll();
 
+        Console.WriteLine("Kernel receive eligibility and capture ownership (FL-IC1: own-popup overlap, chart gates, bounded menu)...");
+        failures += KernelInputEligibilityTests.RunAll();
+
         Console.WriteLine("FerriteLib version contract + carrier guard...");
         failures += FerriteLibVersionTests.RunAll();
 

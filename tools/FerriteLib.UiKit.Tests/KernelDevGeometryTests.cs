@@ -67,11 +67,13 @@ internal static class KernelDevGeometryTests
 
     private static void VerifyEventSemantics()
     {
+        // ScrollWheel is in the list because the bounded option menu reads it (UiNative.PointerWheelNotches):
+        // the constant has to agree on both sides of the double or the wheel routes to a phase nothing sees.
         foreach (var pair in new[] {
             (EventType.MouseDown, "MouseDown"), (EventType.MouseUp, "MouseUp"),
             (EventType.MouseDrag, "MouseDrag"), (EventType.KeyDown, "KeyDown"),
-            (EventType.KeyUp, "KeyUp"), (EventType.Repaint, "Repaint"),
-            (EventType.Layout, "Layout"), (EventType.Used, "Used") })
+            (EventType.KeyUp, "KeyUp"), (EventType.ScrollWheel, "ScrollWheel"),
+            (EventType.Repaint, "Repaint"), (EventType.Layout, "Layout"), (EventType.Used, "Used") })
         {
             Check(Enum.GetName(typeof(EventType), pair.Item1) == pair.Item2,
                 "the runtime event double matches the compiler's reference constant: " + pair.Item2);

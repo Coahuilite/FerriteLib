@@ -103,8 +103,13 @@ consequence is paid in the open rather than discovered by a stranger.
   section that carried something — is the same rule applied to the choice itself: the document wins and the
   displaced section is reported, because quietly picking one of two authored sources is the silent fallback
   this library refuses.
-- `UiSession` — session state. `ContentRevision`/`BumpContentRevision` are the engine's
-  arrangement-cache clock (a layout-bearing theme token move, or one committed Measure/Structure batch),
+- `UiSession` — session state. Since FL-IC1 (2026-10-08) it also owns the two facts the interaction contract
+  needs an owner for: the open menu's scroll (`OpenPopupScrollRows`, reset when a popup opens or closes and
+  clamped by `UiPopup`, which is the only frame that knows how many rows the bounded rect shows) and the
+  pointer capture with the element that took it (`OwnedHotControlOwner`). A capture whose recorded owner
+  stopped being drawn is released at the pass boundary, and a node the definition releases releases its own
+  capture through the same owner-scoped door; a capture taken outside any element draw is deliberately NOT
+  reconciled, because nothing owns its draw, and is still released by `Dispose`. `ContentRevision`/`BumpContentRevision` are the engine's
   deliberately not the library's invalidation API: the consumer path is `IUiBindings.NotifyChanged` plus
   per-key revisions, and a Paint-class announcement leaves this clock alone. Focus traversal still lands
   here when it is built. The hover surface (`ClaimHover(string claim)`, `HoverClaim`, `HoverClaimElement`,
@@ -142,8 +147,20 @@ consequence is paid in the open rather than discovered by a stranger.
   another type. It also implements `IUiTypedChoices`, and recognises a `UiChoice<T>` options registration at
   **bind time** (`default(T) is IUiChoice`) rather than by reflection, so the erased view exists for exactly
   the registrations that declared it and no other list shape is affected.
-- `UiNative` — the backend funnel's public face (28 members today); hit-stack and focus work will move
-  members across its boundary. It also owns the one disabled-input rule: `Button(rect, ctx)` and
+- `UiNative` — the backend funnel's public face (31 members counted 2026-10-08: 28 before FL-IC1 plus
+  `CanReceivePointerPress`, `WindowPointer` and `PointerWheelNotches`); hit-stack and focus work will move
+  members across its boundary.
+  FL-IC1 put the receive-eligibility rule in this type rather than in each kind: `CanReceivePointerPress(rect, ctx)`
+  answers the four questions a control that takes the pointer itself must ask - an interactive node (the element
+  or an ancestor is not disabled), the native window and scroll authority (the raw hover answer, which is what
+  refuses a point the enclosing scroll view or the obscuring stack rejects), the element's own rect, and the
+  effective clip the engine published - and `Button(rect, ctx)` consults the first two of those before it hands a
+  press to the native control, so one answer serves every kind instead of one branch per widget. **It answers a
+  NEW press only:** continuing a drag is a question of capture ownership, and a caller that gated its release with
+  this method would decide an in-progress hold by where the pointer happens to be this frame. The wheel is read
+  in one place too (`PointerWheelNotches`), and the funnel's popup-priority rule hands a notch that lands inside
+  the open menu to that menu before any content draws.
+  It also owns the one disabled-input rule: `Button(rect, ctx)` and
   `DropdownButton` refuse the pointer for an element the engine published disabled, and the
   session-plus-key primitives now do the same — `Slider`, `NumberField` and the identity-bearing
   `TextField(Rect, string, UiSession, string, out bool)` resolve the element through the
@@ -163,11 +180,19 @@ consequence is paid in the open rather than discovered by a stranger.
   `DrawOptionList` returns the **hovered** option's value (or an empty string), so a caller can publish an
   option-level fact — the dropdown's `HoverHelpKey` identity — without re-deriving the row geometry; the
   return value is additive, so a caller that ignored the old `void` still compiles unchanged.
-  `DrawChoiceList` (0.7.x, R4-A) is its typed sibling: the same panel, hit layer, clamp/flip rule and row
+  `DrawChoiceList` (0.7.x, R4-A) is its typed sibling: the same panel, hit layer, viewport rules and row
   hit for `UiChoice<object>` rows, comparing values by identity and handing the chosen option's real
   instance back, and returning the hovered row's **index** (or -1) because a typed value is not a string a
   help catalog could be keyed by. Both lists paint and publish through the same private helpers, so the
   hit-layer rule still exists in one place.
+  **FL-IC1 (2026-10-08) changed the height rule, not the signatures.** `RectFor(anchor, optionCount, viewport)`
+  now bounds the menu to whole rows that fit the viewport (`VisibleRowCount`) instead of returning
+  `optionCount * OptionHeight` whatever the window said, and both option lists draw, hover and hit-test only the
+  rows inside that bounded rect, offset by `UiSession.OpenPopupScrollRows`; `WheelRowsPerNotch` says how far one
+  notch moves them. A consumer that already goes through `RectFor` + a list (the only supported route) needs no
+  edit: a forty-option menu that used to run off the window now scrolls inside it, which is the behaviour the
+  old signature always promised. The escape hatch is unchanged: a viewport the host never published (zero
+  height) bounds nothing. `OptionHeight` stays the shared row constant the fitting audit reads.
 - `UiSessionGuard` — the recovery wrapper; the recovery key is an arranged path today.
 - `UiTheme` — per-surface (fill, border) pairs and a density bundle landed (`BaseSurface` through
   `DangerSurface`, `Geometry`, `LayoutRevision`, `Styles`); the table's third key slot now carries the
@@ -246,8 +271,19 @@ consequence is paid in the open rather than discovered by a stranger.
   public-unstable with the shell it describes; the constructor is internal, so the only source of a value
   is a real shell computing itself.
 - `UiWindowNotice` — the shell's notice vocabulary, same reason.
-- `LineChartWidget` — named by the consumer's own composition, so it cannot go internal yet; that use is
-  also the specimen behind the tree-membership metric, and the debt list would rather it be a kind string.
+- `LineChartWidget` (`chart/line`) — named by the consumer's own composition, so it cannot go internal yet; that
+  use is also the specimen behind the tree-membership metric, and the debt list would rather it be a kind string.
+  **Its input contract changed in FL-IC1 (2026-10-08) and its shape did not.** A NEW press now goes through
+  `UiNative.CanReceivePointerPress` before the widget touches the hot control, because this kind reads the pointer
+  itself and no native control answers the window, the clip or a covering menu on its behalf: a chart under an open
+  option menu captured the press and committed the drag anyway (the confirmed D2 witness, reachable from the
+  consumer's distance page). Continuation and release are deliberately NOT gated that way - they follow the
+  capture the session owns, not the pointer's position this frame - so a drag that runs past the plot edge keeps
+  running and ends on its own MouseUp; the session records the drawing element as the capture's owner, and a
+  capture whose owner stopped being drawn is released at the pass boundary. No attribute, no kind string, no
+  binding and no signature moved. **Not shown by any lane:** a real native slider drag, real IMGUI clipping of the
+  native group, and the game's window-input authority - the harness drives the library's routing through the stub
+  pump, and the in-game half belongs to the paired human pass.
 - `UiChartPointChange` — the typed drag result of `chart/line`, and it stays public because a consumer still names
   the **type**: `coahuilite/UniversalSqueaker@a13f8af:Source/UniversalSqueaker/UI/UsKernelSettingsHost.cs:335`
   binds it as `BindAction<UiChartPointChange>("attenuation-point", …)` (the receiving method is `:944`), and that
@@ -314,11 +350,19 @@ consequence is paid in the open rather than discovered by a stranger.
 
 - `UiHitLayer` — one entry of the owned hit stack: the element whose paint covers a window-space rect,
   whether the layer is a popup, and its optional `PopupOwnerId`. The existing three-argument constructor
-  remains available (no owner exemption). `UiSession.HitLayers` is the stack in paint order (bottom-to-top) and
-  `UiSession.IsPointerOverHigherLayer` is the one dispatch rule: the topmost layer containing the pointer
-  decides. Its two-argument overload yields even for the same node; the three-argument overload accepts
-  the caller's own popup id to preserve trigger toggle-to-close. Context-bearing buttons and session-bearing
-  sliders/fields yield to any covering popup; dropdown triggers pass their own id. This replaces the single-popup yield branch
+  remains available. `UiSession.HitLayers` is the stack in paint order (bottom-to-top) and
+  `UiSession.IsPointerOverHigherLayer` is the one dispatch rule: the topmost popup layer whose rect contains
+  the pointer decides, and nothing else. **FL-IC1 (2026-10-08) retired the owner-id exemption**: a dropdown's
+  own menu used to be unable to cover its own trigger, which is what made an option row drawn over that trigger
+  unselectable (the F09/D1 witness, reported from the real game). Coverage is geometric for every caller now,
+  and the trigger keeps its toggle-to-close by geometry instead - the menu's rect is not the trigger's rect, so a
+  click on the part of the bar the menu leaves free still closes it. The three-argument
+  `IsPointerOverHigherLayer(UiNode, Vector2, string?)` overload keeps its signature and now answers exactly what
+  the two-argument form does; `PopupOwnerId` is still recorded on the layer, because the wheel-priority rule and
+  the diagnostics need to know which dropdown a covering menu belongs to, and a reader of the stack needs the
+  attribution. Dropping the parameter is a signature removal and waits for a minor boundary; until then this
+  paragraph is the statement that the id is a record, not a licence. Context-bearing buttons and session-bearing
+  sliders/fields yield to any covering popup, as before. This replaces the single-popup yield branch
   (`UiNative.YieldsToCoveringPopup`, `UiSession.OpenPopupRect`, `SetPopupRect`, `IsPointOverPopup` -
   all removed in the same 0.4.0 window), so every primitive answers the same question the same way.
   **Contract for the context-free overload:** `UiNative.Button(Rect)` has no session and no draw origin, and

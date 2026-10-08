@@ -271,8 +271,9 @@ internal static class KernelModeRowHelpTests
         host.Session.BeginHitPass();
         Check(!UiNative.IsMouseOver(rect, modeCtx), "an element under another element's popup layer is not hovered");
 
-        // Sharing a node with a popup is not an ownership claim: other controls in a composite must yield.
-        // Only the dropdown trigger's explicit owner id preserves toggle-to-close (KernelPopupTests).
+        // A popup layer over the same node covers it too: coverage is the rect, and no owner id exempts
+        // anything from it any more (FL-IC1 retired the trigger's own-popup exemption, which is what had let
+        // a menu drawn over its own trigger steal the click from its rows - see KernelInputEligibilityTests).
         host.Session.PushHitLayer(mode, rect, isPopup: true);
         host.Session.BeginHitPass();
         Check(!UiNative.IsMouseOver(rect, modeCtx), "a same-node popup also suppresses content hover");

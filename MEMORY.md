@@ -88,6 +88,17 @@
   archive (`INTERACTION-CONVERGENCE-TASKS-20261008.md`), not excluded from the US checkpoint.
   Provenance for a new specialized kind still needs a citation; a confirmed public
   capability does not wait for a second consumer to hand-roll it.
+- **FL-IC1 is implemented and locally validated (2026-10-08, `0.7.x`, awaiting PM acceptance).** One
+  receive-eligibility rule (`UiNative.CanReceivePointerPress`: interactive node, native hover authority, the
+  element's own rect, no covering popup, inside the published clip), capture ownership that names the drawing
+  element and ends at the pass boundary when that owner stops being drawn, geometric popup coverage with the
+  trigger's own-id exemption retired, and a menu bounded to whole rows inside the viewport with the wheel routed
+  to the open menu at the engine's pass boundary. Contract, migration and the stub-versus-in-game boundary are in
+  `docs/development/0.7/05-api-contract.md` ("FL-IC1"); tiers in `docs/api-tiers.md`; lanes in
+  `KernelInputEligibilityTests`; faithful reverts in `tools/mutation/batches/fl-ic1-20261008.ps1`. Seven public
+  members added, no new type, no kind, no signature removed. The wheel's real weight and direction, a native
+  slider drag and the game's window-input authority remain unverified stub-side and belong to the short human pass.
+  FL-IC2 (edit transaction, the window Cancel/Accept entry, tree cancel) is NOT part of this slice.
 
 ## PM integration checkpoint — 2026-09-30
 
@@ -331,16 +342,20 @@ and delivery procedures do not override the current scripts or the next-stage ha
   from a truncated search - the same error class as the truncated call-site list this ledger already records
   once. Two `UiWindowHost` subclasses (`ProbeShell`, `LaneShellBase`) do take the production default, for chrome
   whose assertions are rects and horizontal fit.
-- **A popup layer covers exactly its option rows, so a press inside it always consumes a row (measured
-  2026-09-24, and it is why one suggested control does not exist).** `UiPopup.RectFor` returns a rect whose
-  height is `optionCount * OptionHeight` and `DrawOptionList` tiles one row per option across that rect, so
-  every point inside the layer is inside a row. The row fires and calls `Session.ClosePopup()`, which drops
-  the layer from BOTH `hitLayers` and `dispatchLayers` (`UiSession.cs:296-303`). Consequence for a lane:
-  "assert the popup is still open after a covered press" is not a control that can hold - the covered press
-  closes it through the row. What a lane CAN assert is the value write (the option row, not the trigger,
-  consumed the click) plus the counterfactual (with the layer gone, the same press hits and dispatches).
-  Measured on the `covered` lane: a rect-blind override reddens its premise assertion, because the trigger
-  draws first, fires, and closes the popup it owns.
+- **A popup layer covers exactly its option rows, so a press inside it always consumes a row.** `UiPopup.RectFor`
+  returns a rect whose height is a whole number of `OptionHeight` rows (since FL-IC1 it is bounded to the
+  viewport, which keeps that property rather than breaking it) and both option lists tile one row per visible
+  option across it, so every point inside the layer is inside a row. The row fires and calls `Session.ClosePopup()`,
+  which drops the layer from BOTH `hitLayers` and `dispatchLayers`. Consequence for a lane: "assert the popup is
+  still open after a covered press" is not a control that can hold - the covered press closes it through the row.
+  What a lane CAN assert is the value write (the option row, not the trigger, consumed the click) plus the
+  counterfactual (with the layer gone, the same press hits and dispatches).
+  **Corrected 2026-10-08 (FL-IC1): the last sentence of the original note is superseded.** It said a rect-blind
+  override reddened the premise "because the trigger draws first, fires, and closes the popup it owns" - that was
+  the owner-id exemption's behaviour, and the exemption was the F09/D1 defect. Coverage is geometric now: a press
+  inside the menu belongs to the row even when the menu lies over the trigger that owns it, so the trigger draws
+  first, *yields*, and the row fires. The `covered` verdict and its mutation proof are unchanged; what changed is
+  that a dropdown's own popup no longer escapes that verdict.
 - **Five library-side guards landed with their own mutations (2026-09-24, task-2), and the batch touched no
   carrier byte.** (i) `KernelDevGeometryTests.VerifyCoveredVerdict` drives the funnel's fourth verdict — a
   dropdown popup over a button, a press inside both, `verdict=covered` recorded for the covered element and

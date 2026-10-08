@@ -538,6 +538,15 @@ public sealed class UiLayoutEngine
         // One hit pass per draw: the previous pass's complete paint order becomes the stack input dispatch
         // reads, and this pass builds the next one as its elements draw.
         ctx.Session.BeginHitPass();
+
+        // The wheel belongs to the open menu before it belongs to anything under it: a layer covering the point
+        // outranks what is beneath it. Asking here - after the pass opened, so the layers are the ones
+        // the last pass published, and before any element drew, so no native scroll view has consumed the
+        // notch yet - is what makes that priority real instead of aspirational: the popup pass runs AFTER
+        // content, and a menu over a scrolled page would otherwise never see a wheel event at all. When the
+        // menu moves, the event is consumed and this frame's scroll containers keep their position.
+        UiNative.TakePopupWheelIfCovering(ctx.Session);
+
         DrawEntries(lastEntries, 0, lastEntries.Count, ctx, new Vector2(viewport.x, viewport.y), null, Vector2.zero);
         ctx.Session.EndHitPass();
     }

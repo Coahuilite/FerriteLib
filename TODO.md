@@ -21,12 +21,23 @@ moves HEAD without changing those held bytes.
       host/document context plus the original exception; 10 existing local checks pass. This commit IS the
       held package's source (`0181268`). Runtime failure reproduction remains absent, not a claimed pass.
 
-- [x] **P1 composite popup arbitration:** maintainer passed Packs and Tuning A/B; owner-id isolation and
-      session-bearing primitive guards remain in place. This does not accept the separate scroll defect.
+- [x] **P1 composite popup arbitration:** maintainer passed Packs and Tuning A/B; session-bearing primitive
+      guards remain in place. **The owner-id isolation this line named is gone:** FL-IC1 retired it, because a
+      menu drawn over its own trigger left that trigger's option rows unselectable (reported in game as F09,
+      witnessed as D1). Popup coverage is geometric now, and the trigger keeps its toggle-to-close on the strip
+      the menu does not cover. That is a stub/lane result, not a game acceptance.
 - [ ] **P1 follow-up: game-accept live popup anchoring.** The anchor/clip/orphan-owner fix passed the full
       verify/PackDev chain and three faithful reverts. Open a dropdown first, then scroll its containing
       page: it follows a visible owner and closes when that owner leaves the effective clip or disappears.
       Check Packs and Tuning plus input recovery; do not repeat the old full diagnostic matrix.
+- [ ] **FL-IC1 short human pass (stub passes do not close it).** In one short session: an option menu covering
+      its own trigger selects, a 40-item menu's first and last rows are reachable and the wheel moves the menu
+      rather than the page under it, a chart under an open menu writes nothing while a normal drag still
+      captures, moves and releases, and the typed menu answers the same way as the string one.
+- [ ] **FL-IC2 (next FL slice, not started here).** The edit transaction (a deferred number's valid draft commits
+      once on a later Enter or outside-click; Esc drops the draft), the window's real Cancel/Accept entry before
+      contents draw, and the tree-cancel capability over the existing node hierarchy. FL-IC1's lanes deliberately
+      touch none of it.
 - [ ] **Continue one settings-page slice at a time.** Select the next slice from the existing redesign,
       identify the contracts it touches, and record ownership, failure-sensitive tests and applicable game
       acceptance. Review shared state/lifetimes when the slice touches coexistence; the global

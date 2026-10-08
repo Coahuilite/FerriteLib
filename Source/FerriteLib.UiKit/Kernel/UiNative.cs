@@ -19,6 +19,7 @@ public static class UiNative
     internal static bool DebugMouseDown;
     internal static bool DebugMouseDrag;
     internal static bool DebugMouseUp;
+    internal static float DebugWheelNotches;
     internal static bool DebugEnter;
     internal static bool DebugFocusLost;
     internal static bool DebugLayoutEvent;
@@ -89,23 +90,19 @@ public static class UiNative
     }
 
     /// <summary>
-    /// The invisible button with popup arbitration: when the pointer sits inside a higher popup hit layer
-    /// belonging to another element, this element does not take the click. Ordinary overlapping controls
-    /// still follow native IMGUI event consumption. Every library widget and consumer control that holds a
-    /// context belongs here: one rule, and no per-element yield branch anywhere.
+    /// The invisible button with popup arbitration: when the pointer sits inside a popup layer, this element
+    /// does not take the click. Ordinary overlapping controls still follow native IMGUI event consumption.
+    /// Every library widget and consumer control that holds a context belongs here: one rule, and no
+    /// per-element yield branch anywhere.
+    /// <para>
+    /// The rule is geometric and it has no owner exemption. A dropdown trigger keeps its toggle-to-close
+    /// because the trigger's own rect is not the menu's rect: a click outside the published menu hits the
+    /// trigger, and a click inside it belongs to the option row under the pointer - including when the menu
+    /// was clamped or bounded over its own trigger, which is the case the owner-id exemption used to hand to
+    /// the trigger and lose the selection (F09/D1, retired in FL-IC1).
+    /// </para>
     /// </summary>
     public static bool Button(Rect rect, UiWidgetContext ctx)
-    {
-        return Button(rect, ctx, null);
-    }
-
-    /// <summary>
-    /// The context-carrying button with an explicit popup owner id. A dropdown trigger passes its OWN id so
-    /// its own popup does not make it yield (that is what preserves toggle-to-close); every other caller
-    /// passes null, which means "owns no popup" and therefore yields to ANY covering popup - the rule a
-    /// covered sibling control of a composite element needs.
-    /// </summary>
-    internal static bool Button(Rect rect, UiWidgetContext ctx, string? ownPopupId)
     {
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
         UiNode element = ctx.Node ?? ctx.Session.ActiveNode;
@@ -125,7 +122,7 @@ public static class UiNative
             return false;
         }
 
-        if (ctx.Session.IsPointerOverHigherLayer(element, PointerPositionIn(ctx), ownPopupId))
+        if (ctx.Session.IsPointerOverHigherLayer(element, WindowPointer(ctx)))
         {
 #if FER_DEV
             UiDevGeometryProbe.NoteInput(ctx, element, rect, "covered", eventBefore);
@@ -140,6 +137,51 @@ public static class UiNative
 #else
         return Button(rect);
 #endif
+    }
+
+    /// <summary>
+    /// The receive-eligibility answer for a control that takes the pointer itself instead of handing a press
+    /// to a native control: a new interaction must belong to a window the backend lets receive input, a valid
+    /// viewport, and an interactive node, and a popup covering that point outranks it. Four questions,
+    /// answered by the same code <see cref="Button(Rect,UiWidgetContext)"/> consults, plus the effective clip
+    /// a raw-pointer control cannot delegate to a native group:
+    /// <list type="bullet">
+    /// <item>the element (or an ancestor) is not disabled;</item>
+    /// <item>the pointer is not inside any popup layer - the menu, not the thing under it, takes the press;</item>
+    /// <item>the pointer is inside <paramref name="rect"/> by the native hover answer, so the window, the
+    /// enclosing scroll views and the obscuring stack all get to say no the way they do for every native
+    /// control;</item>
+    /// <item>the pointer is inside the clip the engine published for this element.</item>
+    /// </list>
+    /// <para>
+    /// This answers a NEW press only. Continuing an existing drag is a question of capture ownership, not of
+    /// where the pointer happens to be this frame, and a caller that gates its release with this method
+    /// re-creates the failure this rule exists to prevent: a held drag ends on its release, not on a hover.
+    /// </para>
+    /// </summary>
+    public static bool CanReceivePointerPress(Rect rect, UiWidgetContext ctx)
+    {
+        if (ctx == null) throw new ArgumentNullException(nameof(ctx));
+        UiSession session = ctx.Session;
+        UiNode element = ctx.Node ?? session.ActiveNode;
+        Vector2 windowPoint = WindowPointer(ctx);
+
+        if (IsInputDisabled(element)) return false;
+        if (session.IsPointerOverHigherLayer(element, windowPoint)) return false;
+        if (!IsMouseOver(rect)) return false;
+        return session.IsPointInEffectiveClip(windowPoint);
+    }
+
+    /// <summary>
+    /// The event pointer in Host window space, lifted by the origin the engine published for the element being
+    /// drawn. A control that holds a context needs this to compare its own draw-space geometry with the
+    /// window-space hit stack; a caller with no context is already in window space and keeps
+    /// <see cref="PointerPosition()"/>.
+    /// </summary>
+    public static Vector2 WindowPointer(UiWidgetContext ctx)
+    {
+        if (ctx == null) throw new ArgumentNullException(nameof(ctx));
+        return PointerPositionIn(ctx);
     }
 
 #if FER_DEV
@@ -226,28 +268,29 @@ public static class UiNative
         // its popup is released by the pass-boundary reconcile instead of being refreshed.
         session.NotePopupOwnerDrawn(elementId, anchor);
 
-        // The hit stack decides: a popup drawn over this trigger is a layer above it, so the trigger must
-        // not take the click - unless the popup is its own, which the same layer comparison handles.
-        bool covered = session.IsPointerOverHigherLayer(
-            ctx?.Node ?? session.ActiveNode, PointerPositionIn(ctx), elementId);
+        // The hit stack decides, and it decides geometrically: a popup layer whose rect contains the pointer
+        // is a layer above the trigger, so the trigger must not take the click - the option row under that
+        // pointer takes it. The trigger keeps its toggle-to-close without an identity exemption, because the
+        // menu's rect is not the trigger's rect: a click on the part of the trigger the menu does not cover
+        // is covered by nothing and still reaches this branch's other side: the option menu outranks the
+        // trigger bar beneath it, and only where the menu is not.
+        bool covered = session.IsPointerOverHigherLayer(ctx?.Node ?? session.ActiveNode, PointerPositionIn(ctx));
         if (Trace != null && session.OpenPopupId != null)
         {
             Vector2 local = PointerPosition();
             Vector2 window = PointerPositionIn(ctx);
             Trace("trigger id=" + elementId
                 + " owner=" + session.OpenPopupId
+                + " ownPopup=" + (string.Equals(session.OpenPopupId, elementId, StringComparison.Ordinal) ? "true" : "false")
                 + " event=" + (Event.current != null ? Event.current.type.ToString() : "none")
                 + " pointerLocal=" + Describe(local)
                 + " pointerWindow=" + Describe(window)
+                + " anchor=" + Describe(anchor)
                 + " yields=" + (covered ? "true" : "false"));
         }
 
         if (covered) return false;
-        // The owner's own trigger must not be refused by its own popup: thread the id through this second,
-        // context-carrying check too. Otherwise the RectFor clamp branch - which CAN place a popup over its
-        // own anchor - would make the trigger yield to itself, so a close-click would fire the option under
-        // the pointer instead of closing the popup.
-        if (ctx != null ? !Button(rect, ctx, elementId) : !Button(rect)) return false;
+        if (ctx != null ? !Button(rect, ctx) : !Button(rect)) return false;
 
         if (session.IsPopupOpen(elementId))
         {
@@ -535,6 +578,55 @@ public static class UiNative
         if (DebugMousePositionEnabled) return DebugMouseUp;
         Event? current = Event.current;
         return current != null && current.type == EventType.MouseUp && current.button == 0;
+    }
+
+    /// <summary>
+    /// The wheel movement of the current event in NOTCHES, or 0 when this event is not a wheel event. The
+    /// library's one read of <c>Event.delta</c>: a control that scrolls asks here instead of touching the
+    /// event, the same reason a control that clicks asks <see cref="IsPointerDown"/>.
+    /// <para>
+    /// The sign is the library's convention, stated once: a POSITIVE value asks for the LATER part of the
+    /// content, and it is <c>-delta.y</c> because IMGUI reports a downward notch as a negative delta. Whether a
+    /// real device's wheel reaches the menu at all, and with what weight, is in-game behaviour the stub cannot
+    /// show: the harness pumps a wheel event with a chosen delta and proves the routing; the short playtest
+    /// judges the feel. A notch is not a row either - see <see cref="UiPopup.WheelRowsPerNotch"/>.
+    /// </para>
+    /// </summary>
+    public static float PointerWheelNotches()
+    {
+        if (DebugMousePositionEnabled) return DebugWheelNotches;
+        Event? current = Event.current;
+        if (current == null || current.type != EventType.ScrollWheel) return 0f;
+        return -current.delta.y;
+    }
+
+    /// <summary>
+    /// The wheel half of the popup-priority rule: while the session has a menu open and the pointer sits inside
+    /// the rect that menu published, the MENU takes the wheel, and the scroll container or chart underneath
+    /// never sees the event: a layer covering the point outranks what is under it.
+    /// <para>
+    /// It is read at the engine's pass boundary, immediately after the pass opens: that is the one moment the
+    /// dispatch stack holds the previous pass's complete paint order, menu layer included, while no control has
+    /// consumed anything yet. So the geometry is the same rect every click decision in this frame reads, and
+    /// consuming here is what stops a native scroll view from taking the notch first.
+    /// </para>
+    /// </summary>
+    internal static void TakePopupWheelIfCovering(UiSession session)
+    {
+        if (session == null) throw new ArgumentNullException(nameof(session));
+
+        float notches = PointerWheelNotches();
+        if (notches == 0f || session.OpenPopupId == null) return;
+        if (!session.OpenPopupCoversPointer(PointerPosition())) return;
+
+        int rows = (int)Math.Round(notches * UiPopup.WheelRowsPerNotch, MidpointRounding.AwayFromZero);
+        if (rows == 0) rows = notches > 0f ? 1 : -1;
+
+        if (session.ScrollPopupByRows(rows))
+        {
+            // Exactly one consumer for one event: the menu moved, so nothing below it may also move.
+            ConsumePointerEvent();
+        }
     }
 
     /// <summary>
