@@ -5,11 +5,13 @@
 
 ## Current objective and execution order
 
-Branch `0.7.x`, API `0.7.0`, consumer range `[0.7.0,0.8.0)`. Prioritize long-term library contracts and
-shared-mod use, accepting consumer release delay. Use the existing consumer settings redesign as the
-integration surface. The execution handbook is `docs/development/0.7/next-stage-guide-zh.md`; build and
-instrument commands are in `docs/build-and-debug.md`. Completed foundations and evidence pointers live
-in `MEMORY.md`. Local work remains unpushed.
+Branch `0.7.x`, API `0.7.0`, consumer range `[0.7.0,0.8.0)`. Historical event: privacy alignment
+`4d67b70` was pushed to `origin/0.7.x` and CI run `37714688341` succeeded. That SHA is not a live
+working-tree identity; documentation edits dirty the tree and a later docs commit moves HEAD without
+rebuilding held bytes. Prioritize long-term library contracts and shared-mod use, accepting consumer release
+delay. Use the existing consumer settings redesign as the integration surface. The execution handbook is
+`docs/development/0.7/next-stage-guide-zh.md`; build and instrument commands are in
+`docs/build-and-debug.md`. Completed foundations and evidence pointers live in `MEMORY.md`.
 
 **Held package: built at `0181268`** (`dist/dev/FerriteLib`, 5 files, payload DLL `c1371f623a3a…`; the PM's
 paired-package manifest is the per-file authority). Real-game acceptance is pending. A docs or memory commit
@@ -37,6 +39,9 @@ moves HEAD without changing those held bytes.
 
 These retain their previous conditions and deferrals. They are not prerequisites to finish the entire
 library before validating the real page, and their listing order does not override the queue above.
+They also stay independent of the US checkpoint except FL-IC1/2: do not fold the unrelated broader
+library backlog (task-11, FL-17, FL-18/B6, FL-13/B10) into that archive as extra blockers. FL-IC1/2
+remain agreed dependencies after the FL/US archive.
 
 - [ ] **task-11 — no stroke / per-edge stroke with configurable edge width.** `Chrome` is currently the
       default or `none`, and a border is all four edges or none. The consumer's flat scope and selected
@@ -109,8 +114,8 @@ library before validating the real page, and their listing order does not overri
       are unverified. Five R3 lanes in `KernelDevGeometryTests` are **Dev-only**
       (`VerifyStructuredSnapshotMatchesTheDump`, `VerifyEffectiveAppearance`, `VerifyBoundariesAndUnknowns`,
       `VerifyBoundedCaptureAndDroppedCount`, `VerifySnapshotIsACopyAndHostsAreSeparate`), so a Release-only pass
-      is not instrument coverage — that is
-      the Gate 10 rule in `AGENTS.md` — and the release half's new assertion (`TryGetGeometrySnapshot`
+      is not instrument coverage — that is the Gate 10 Dev-instrument rule in `AGENTS.md` "Build and
+      verification" — and the release half's new assertion (`TryGetGeometrySnapshot`
       answering `false`) only runs in Release. Both configurations are required for this slice.
       `scripts/verify-dev-instrument.ps1` now names the R3-A assertions (forty names in the list, the renamed
       ones REPLACED rather than left stale), so deleting or compiling out one of those lanes reddens Gate 10
@@ -161,8 +166,10 @@ library before validating the real page, and their listing order does not overri
       skip the narrowed-width budget recomputation. Direct-child counting, padding overflow and the
       visible empty fixture are guards; existing visibility fault injection is not feature backout proof.
       Contract: `docs/development/0.7/05-api-contract.md` §D4-Viewport +
-      `docs/consumers/consume-from-0.7.0.md`. Open: PM commit + artifact handoff to US, US deletes
-      `DomainListBudget` and declares 4.5, real-game appearance (human).
+      `docs/consumers/consume-from-0.7.0.md`. US source integration is delivered:
+      `UsKernelSettingsHost.cs:83` and `Layout.Schema2.xml:459`/`:471` declare `VisibleRows=4.5`;
+      no `DomainListBudget` remains under US `Source`. Remaining: genuinely unmeasured human
+      in-game appearance only. No new FL product task. FL source for this item is already committed.
 - [x] **Canonical consumer type-loading support (2026-10-07):** minimal definition/world/mod/Harmony
       type tokens and the dev-only Window field; no database/audio/patch simulation. 10 local checks
       pass. Checkpoint source identities and consumer verification belong to the PM handoff.

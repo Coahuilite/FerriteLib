@@ -1,8 +1,22 @@
 # MEMORY
 
-## Current state (2026-10-07)
+## Current state (2026-10-08)
 
-- **Push privacy automation (2026-10-08).** `scripts/privacy-audit.ps1` follows the series' Mwah five-vector gate. `scripts/install-hooks.ps1` enables automatic full-history pre-push checks in each clone; `.github/workflows/privacy-audit.yml` covers every pushed branch and PR. `docs/push-privacy-gate.md` defines scope and limits. Historical regex literals are distinguished from actual UNC paths; current prose uses account descriptions rather than runtime personal tokens. Build and package acceptance remain separate.
+- **Historical privacy push (2026-10-08):** the privacy-gate alignment
+  `4d67b70fb44f06c4a473f87de19f135dfa263c8d` on `0.7.x` was pushed, and GitHub Actions
+  Privacy audit run `37714688341` succeeded for that SHA. That is a historical event, not a
+  live working-tree or live-HEAD identity. Documentation edits after that SHA change the
+  working tree; a later documentation commit moves HEAD without rebuilding held package bytes.
+  Read current HEAD from Git or the PM manifest. CI above is evidence for `4d67b70`, not for a
+  forthcoming documentation commit.
+- **Push privacy automation (2026-10-08).** `scripts/privacy-audit.ps1` follows the series' Mwah
+  five-vector gate. `scripts/install-hooks.ps1` enables automatic full-history pre-push checks in each
+  clone; `.github/workflows/privacy-audit.yml` covers every pushed branch and PR.
+  `docs/push-privacy-gate.md` defines scope and limits. Historical regex literals are distinguished from
+  actual UNC paths; current prose uses account descriptions rather than runtime personal tokens. Build
+  and package acceptance remain separate. Ordinary GitHub push of this already-public `0.7.x` line is
+  not a first-push of an unpublished line; rewriting published history is not implied by ordinary push
+  permission.
 - **Held package: FerriteLib built at `0181268`** — `dist/dev/FerriteLib` is 5 files, payload
   `1.6/Assemblies/FerriteLib.UiKit.dll` sha256 `c1371f623a3a…` (the PM's paired-package manifest is the
   per-file authority and names the US/Demo pairing; the 2026-10-04 freeze at `b31e2c3` is superseded by this
@@ -42,7 +56,7 @@
   document + composites, Demo showcase) remain open, and none of this is in the held package.
 - **DT1 outline-coverage fix (2026-10-07, slot 1): technically CLOSED on the local boundary** (all
   faithfuls red-then-green through the real WindowOnGUI path; 10 gates green; Dev/Release artifacts frozen
-  and handed to PM; uncommitted).
+  and handed to PM; later committed at `069195d`).
   Scoped viewport outlines at its own engine step; shell chrome (frame/title/close) outlines AND records
   into the same capture (dump `chrome` line, snapshot `ShellChrome`, explicit none-state), all from the
   shell's own `CloseButtonRect`/`TitleBandRect` arithmetic; `UiWindowHost.ShellChrome` (`UiWindowChrome`,
@@ -53,19 +67,27 @@
 - **D4-Viewport `VisibleRows` (source, 2026-10-07): the Scroll sizes its viewport from the SAME arrange
   round's measured rows** - Repeat expands transparently to stamped row roots, hidden siblings ignored,
   fewer-or-none countable answers natural, any numeric Height (zero included) stays first, and the budget recomputes after the
-  scrollbar reserves its width. This closes the gap the consumer's `DomainListBudget` stated in its own
+  scrollbar reserves its width. This closed the gap the consumer's former `DomainListBudget` stated in its own
   comment and worked around with a creation-time injected, never-refreshed floor chain. Contract:
   `docs/development/0.7/05-api-contract.md` §D4-Viewport. BUILT and run 2026-10-07: Dev harness ALL PASS,
   10 gates green; two PM-verified faithful backouts red-then-green (row-root stamp and narrowed-width
   budget recomputation). Direct children, padded overflow and visible empty input are guarded; deleting
   existing visibility is fault injection, not new-feature backout proof. No exported C# shape moved, no library
-  default carries the 4.5.
+  default carries the 4.5. US source integration is delivered: `UsKernelSettingsHost.cs:83` and
+  `Layout.Schema2.xml:459`/`:471` declare `VisibleRows=4.5`; no `DomainListBudget` remains under US `Source`.
+  Remaining: genuinely unmeasured human in-game appearance. No new FL product task.
 - **Consumer production-path harness support (2026-10-07):** canonical stubs declare minimal Def,
   SoundDef, XenotypeDef, Mod, Pawn, CellRect and Harmony type tokens plus Find.WindowStack and
   Window.onlyDrawInDevMode. They support type loading and the existing window shell, not definition
   loading, audio, world simulation or Harmony patch execution. All 10 local checks pass after the
   addition; unchanged VisibleRows methods retain their two prior faithful proofs. New source identity
   and consumer handoff are recorded in the PM checkpoint manifest; held packages stay untouched.
+- **Open common-capability work stays independent of the US checkpoint except FL-IC1/2.**
+  task-11, FL-17, FL-18/B6 and FL-13/B10 remain unrelated broader library backlog. FL-IC1/2
+  (receive/capture; edit transaction and tree cancel) are agreed dependencies after the FL/US
+  archive (`INTERACTION-CONVERGENCE-TASKS-20261008.md`), not excluded from the US checkpoint.
+  Provenance for a new specialized kind still needs a citation; a confirmed public
+  capability does not wait for a second consumer to hand-roll it.
 
 ## PM integration checkpoint — 2026-09-30
 
@@ -106,7 +128,9 @@ Read `AGENTS.md` for invariants, this file for durable state, and `TODO.md` for 
   demonstrated merely by making the library referenceable; the shared `UiFitAudit.Enabled` switch remains
   a risk to review, not a reproduced cross-mod failure.
 - Branch `0.7.x`, API `0.7.0`, consumer range `[0.7.0,0.8.0)`. API tiers and the temporary 0.7.x version
-  exemption retain their existing conditions. Local work remains unpushed; publication is not authorized.
+  exemption retain their existing conditions. Historical ordinary GitHub push of privacy alignment
+  `4d67b70` succeeded (CI run `37714688341` for that SHA, not a forthcoming documentation commit);
+  tags, releases and Workshop publication remain separately authorized.
 - Packages identify their own bytes through `version.txt`, embedded source identity and measured hashes.
   A docs-only commit does not rebuild them. Any strict embedded-commit-versus-HEAD check needs a fresh
   build before its next acceptance run; previous evidence remains scoped to the artifact actually tested.
@@ -125,6 +149,22 @@ consumed-input case; gate 1 alone is not Dev coverage. Usage and proof details b
 The dated records below explain earlier changes and their scoped evidence. Current priorities are above;
 current build behavior is in "Carrier identity and build isolation". Historical gate counts, capture sites,
 and delivery procedures do not override the current scripts or the next-stage handbook.
+
+### Evidence lessons (measured cases, not standing acceptance gates)
+
+- Earlier rounds produced misleading red and green results when the fixture, ruler, screen or observation
+  channel differed from the intended input. A named product backout proved specific fixes; a guard that
+  stays green on both sides is regression protection, not the proof. A channel change changed which checks
+  applied. These are reasons to select relevant verification, not a requirement to enlarge every suite or
+  to treat every unexecuted mutation batch as a standing gate.
+- Counter-based checks once reused another lane's accumulated findings. Resetting the measurement and
+  checking the increment distinguished the current operation. A spatial budget under a stub ruler smaller
+  than the game is not in-game geometry evidence.
+- A new gate is useful when planting the defect makes the process exit non-zero. Printing FAIL without
+  counting it is not a gate. Strengthening a gate belongs with the change it depends on; it is not a
+  permanent ban on later recuts.
+- Coherent verified changes were committed separately. Invoking a check without observing its completion
+  did not establish a green result, and "fixed" does not cover an unbuilt or unverified half.
 
 - **The mutation battery is tracked and self-testing (2026-09-24, task-15).** `tools/mutation/` holds the
   engine (`Invoke-Mutation.ps1`), the two halves (`mutation-check.ps1`), the batch that describes a round's
@@ -1085,6 +1125,15 @@ and delivery procedures do not override the current scripts or the next-stage ha
   post-copy failure planted, the pack exited non-zero and the delivered folder's file-hash fingerprint was
   IDENTICAL before and after; the restored script exits 0 and leaves no `.staging-*` behind.
 ## Packaging discipline
+- **Prior push lessons (moved from AGENTS on 2026-10-08).** The 0.6 first-push round paid for a
+  full-history scan before an unpublished line left the machine: a working-tree fix still failed while
+  history kept the blob, and a backup tag created after the fix re-exposed that history. Keep recovery
+  copies as local bundles rather than extra Git refs. Unpublished-range rewrites, when separately
+  authorized, preserved dates/messages and required a byte-identical tip plus rebuilt payloads because
+  `AssemblyInformationalVersion` embeds the SHA. A stray commit identity forced rewriting everything
+  after it. Stale feature branches and worktrees also kept history reachable. Those incidents explain
+  checking actual refs and inputs; they do not establish a permanent ban on authorized history repair or
+  require deleting the current repository's version branches automatically.
 
 - **Three channels, one staging engine.** `stage-package.ps1` owns what a package *is* (closed five-file
   set, content probe on named paths, licence copy, `version.txt`, optional deterministic archive) and

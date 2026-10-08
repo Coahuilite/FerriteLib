@@ -194,31 +194,6 @@ assume (rationale: `MEMORY.md`). Either way `1.6/Assemblies/` and the `tools/...
 `bin/stubs/` shape are de-facto published surfaces — relocating them breaks a consumer's harness while
 every gate here stays green.
 
-## Evidence discipline (each rule cost a wasted round)
-
-The ledger rule that a PASS names which half is mutation-proven needs these to be worth anything:
-
-- **Red is no more trustworthy than green.** Before changing the product or the assertion, check the
-  **instrument's inputs** — the fixture, the ruler, the screen, the channel. A lane can go green for the
-  wrong reason (a fallback that accepts the case under test, a process-wide accumulator another lane
-  satisfied, a stub ruler smaller than the real one, a scan reading a stale DLL) and red for the wrong
-  reason too (a lane with no language table measuring the key instead of the translation).
-- **A lane must go red under a faithful revert.** A lane that cannot tell the two states apart is not
-  evidence, and shipping a feature whose lane stays green when the feature is removed is the failure this
-  rule exists to stop. One mutation per item, attributable by assertion name.
-- **When a measurement or notification channel changes, re-audit every lane that asserts the old one.**
-  A stale lane is worse than no lane: it still runs, still passes, and no longer measures the thing.
-- **Counter assertions `Reset()` and measure an increment.** The fit-audit counters are cumulative and
-  process-wide, so a bare `count == 1` can be satisfied by a finding some other lane produced.
-- **A spatial budget only means something at the real size.** Under a small stub ruler the content is
-  shorter than it is in the game, so a budget that would collapse for real passes anyway.
-- **A new gate is mutation-tested, not just written**, and its criterion is "plant the defect and the
-  process exits non-zero", never "the console shows FAIL" — a lane that prints a failure without counting
-  it is not a gate.
-- **One coherent step per commit, and never leave an uncommitted half-finished state.** State explicitly
-  what is unbuilt and unverified rather than letting "fixed" cover it.
-- **A gate may only get stronger, or be re-cut in the same batch as the fix it depends on.**
-
 ## Memory protocol
 
 Four-file split: `AGENTS.md` stable, `MEMORY.md` the only volatile ledger, `TODO.md` the action surface,
@@ -238,12 +213,12 @@ At every non-trivial session:
 Maintain these boundaries:
 
 - Update `MEMORY.md` only when durable facts or the open action surface changes.
+- Keep incident-derived lessons and measured implementation facts in `MEMORY.md`, rather than promoting
+  them into standing instructions here.
 - **Compact by default.** Settled release and implementation detail lives in `docs/`; `MEMORY.md` keeps a
   pointer to it, never a second copy of it — `OBLIVIONIS.md` exists so the ledger can shrink. Do not grow an
   active memory file with finished work.
 - Update `TODO.md` only when its current task surface changes.
-- Record a PASS only with its scope and evidence source, saying which half is mutation-proven and which is
-  only a future-regression guard.
 - Do not store session narratives, transient artifacts, raw logs, completed test matrices, commit chains or
   release checklists in an active memory file.
 - Documentation edits alone are not memory events; an external-state summary never overrides its
@@ -260,37 +235,14 @@ pointer line in `TODO.md`, and a closed round leaves nothing behind.
 - Default scope is this repository alone: a public checkout holds no sibling mod and no consumer tree, so
   no rule, gate, script or evidence here may require one. Another repo is read-only, and only for a
   session the maintainer names; writing one needs their authorization in that same instruction.
-- No `git remote`, no push, no tag, no release, no registry publish without explicit maintainer
-  authorization. Local commits are fine.
+- Local commits are permitted. Configuring a remote, pushing, tagging, releasing or publishing to a
+  registry remains an external operation and needs explicit maintainer authorization.
 - No personal absolute paths, log excerpts, tokens or `PublishedFileId.txt` values in tracked files, and no
   `../<sibling>` citations either — external evidence is a transcription or a public permalink.
+- A privacy review of the complete reachable range (`scripts/privacy-audit.ps1 -FullHistory`) precedes a
+  push. Scope and limits: `docs/push-privacy-gate.md`. Scanner success is a privacy result, not gameplay,
+  build or release acceptance.
 - **No script places a mod in the game.** Nothing under `scripts/` writes outside the repository, and no
   step copies, links or junctions anything into a `Mods/` directory — a link back into the repo would bind
   build output to a machine-local layout another clone cannot see, reproduce, or (without elevation)
   create. Keep artifacts under `dist/` and say where they are.
-
-## Push discipline (added 2026-09-17; each rule was paid for once, on the 0.6.x first push)
-
-Extends the boundaries above; it does not relax them.
-
-- **Run `scripts/privacy-audit.ps1 -FullHistory` before the FIRST push of a line, not only before a
-  release.** A line that has never been pushed is where a history rewrite is still cheap; afterwards it is
-  not. (The 0.6 line sat local-only for a whole round and its pre-push audit failed on a blob from the
-  *fork* commit.)
-- **The audit scans `git rev-list --all`, so the check is "no reachable ref carries a personal path", not
-  "the working tree is clean today".** Consequences seen: a path already fixed in the tree still failed
-  while history kept the blob (`4a9c6b9` fixed the file; `02a6aea` still carried it); and a **backup tag
-  created after the fix re-exposed the old history and failed the audit by itself**. Keep backups outside
-  the repository (`git bundle` on local disk), not as tags or branches.
-- **Clean history by rewriting only the unpublished range**, preserving author/committer dates and
-  messages, and verify the final tree is byte-identical to the pre-rewrite tip. Expect a cross-repo
-  cascade: the rewritten SHA is what a consumer cites and what the payload's
-  `AssemblyInformationalVersion` embeds, so the payload must be **rebuilt** and the consumer's gates
-  re-run (`scripts/stage-package.ps1` measures the build, so a stale payload is refused rather than
-  trusted). Never rewrite a range that is already public.
-- **Short-lived feature branches are deleted with their worktrees when their work lands.** Eleven stale
-  `feat/0.5-*` / `feat/0.6-*` branches plus eleven `.fl-worktrees/` entries survived earlier rounds —
-  hygiene debt, and (per the rule above) an audit liability. Confirm `git worktree list` shows only the
-  main checkout before a push.
-- **The commit identity is set once per repository and checked before writing history**, not before
-  pushing it: a stray identity in one commit forces a rewrite of everything after it.

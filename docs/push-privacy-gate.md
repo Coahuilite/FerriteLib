@@ -22,5 +22,8 @@ metadata scanning. Inspect tracked images before pushing. Historical binary
 metadata is not covered by the historical text vector. Findings do not authorize
 history rewriting; resolve genuine leaks and classify false positives explicitly.
 
+Ordinary authorized pushes of an already-public version branch still run the hook and CI. They are not a
+first-push of an unpublished line. Findings still do not authorize rewriting published history.
+
 Scope for this change: privacy automation only. No product payload, release,
 tag or settings data is produced or changed by the scanner or hook installer.
