@@ -158,8 +158,12 @@ consequence is paid in the open rather than discovered by a stranger.
   press to the native control, so one answer serves every kind instead of one branch per widget. **It answers a
   NEW press only:** continuing a drag is a question of capture ownership, and a caller that gated its release with
   this method would decide an in-progress hold by where the pointer happens to be this frame. The wheel is read
-  in one place too (`PointerWheelNotches`), and the funnel's popup-priority rule hands a notch that lands inside
-  the open menu to that menu before any content draws.
+  in one place too (`PointerWheelNotches`), read with the sign the native IMGUI scroll view uses - a positive
+  `delta.y` asks for the later rows, so a menu in a scrolled page cannot scroll the opposite way to the page
+  beside it. The funnel's popup-priority rule hands a notch that lands inside the open menu to that menu before
+  any content draws, and it OWNS that notch whether or not the scroll moved: a clamped menu at its first or last
+  row still swallows the event, because handing it back would start the page scrolling under the menu the player
+  is reading. The clamp is the menu's edge, not a release of the priority.
   It also owns the one disabled-input rule: `Button(rect, ctx)` and
   `DropdownButton` refuse the pointer for an element the engine published disabled, and the
   session-plus-key primitives now do the same — `Slider`, `NumberField` and the identity-bearing

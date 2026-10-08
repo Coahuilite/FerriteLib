@@ -34,15 +34,19 @@ public static class UiPopup
     /// a menu that shows no row cannot be chosen from at all. A viewport the host never published (zero height)
     /// bounds nothing, which is the same escape hatch <see cref="RectFor"/> keeps.
     /// <para>
+    /// The floor of one row is the one place the bound is not absolute: a viewport shorter than
+    /// <see cref="OptionHeight"/> still gets a single row, so that menu stands one row proud of the window edge.
+    /// It is written down rather than smoothed over because the alternative - a zero-height menu - is the same
+    /// unreachable-option defect this slice exists to fix, one row smaller. The shortest real host this line
+    /// ships into is far above that, and it is a playtest question, not a product blocker.
+    /// </para>
+    /// <para>
     /// This is the single answer behind the height, the row loop and the scroll limit, so a long menu's last
     /// option is reachable by scrolling instead of being painted below the window where no pointer can arrive.
     /// </para>
     /// </summary>
     public static int VisibleRowCount(int optionCount, Rect viewport)
     {
-        if (optionCount <= 0) return 0;
-        if (viewport.height <= 0f) return optionCount;
-
         int fits = (int)(viewport.height / OptionHeight);
         if (fits < 1) fits = 1;
         return fits < optionCount ? fits : optionCount;

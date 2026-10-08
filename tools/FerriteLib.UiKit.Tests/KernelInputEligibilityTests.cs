@@ -26,10 +26,14 @@ namespace FerriteLib.UiKit.Tests;
 /// <para>
 /// <b>What these lanes cannot show.</b> They drive the library's routing through the faithful stub event pump
 /// - separate Layout / MouseDown / MouseUp / wheel events, native hot-control capture in the stub
-/// <c>ButtonInvisible</c>, and the group-local pointer read-back - not a real Unity input device. A real
-/// wheel's weight and direction, a native <c>HorizontalSlider</c> drag, IME text entry and the game's
-/// <c>WindowStack</c> input authority are not simulated here; the in-game half of the same scenarios belongs
-/// to the short human pass, and <c>docs/api-tiers.md</c> says so beside the contract.
+/// <c>ButtonInvisible</c>, and the group-local pointer read-back - not a real Unity input device. The wheel is
+/// pumped with the sign the native IMGUI scroll view uses (a positive <c>delta.y</c> asks for the later rows),
+/// so the routing, the clamp and the ownership of a covered notch are proven against that protocol; a real
+/// device's weight, and whether Unity's own scroll view under a menu reaches the notch before the library's
+/// pass-boundary rule, is in-game behaviour the double does not model. A native <c>HorizontalSlider</c> drag,
+/// IME text entry and the game's <c>WindowStack</c> input authority are likewise out of reach here. The in-game
+/// half of every scenario in this file belongs to the short human pass, and <c>docs/api-tiers.md</c> says so
+/// beside the contract.
 /// </para>
 /// </summary>
 internal static class KernelInputEligibilityTests
@@ -53,9 +57,11 @@ internal static class KernelInputEligibilityTests
         failures += Run("The strip of the trigger the menu does not cover still closes it, and writes nothing",
             VerifyUncoveredTriggerStripStillCloses);
 
-        // D4: the bounded, scrollable menu.
+        // D4: the bounded, scrollable menu, on both option-list forms.
         failures += Run("A forty-option menu stays inside the viewport and reaches its first and last option",
             VerifyLongMenuStaysInViewportAndReachesEnds);
+        failures += Run("The typed list is bounded, scrolled and clamped by the same window as the string list",
+            VerifyTypedLongMenuScrollsLikeTheStringList);
         failures += Run("The wheel belongs to the open menu: inside it the menu moves, outside it nothing does",
             VerifyWheelBelongsToTheOpenMenu);
 
@@ -261,6 +267,9 @@ internal static class KernelInputEligibilityTests
             "the premise this slice exists for: the list is longer than the menu shows (visible=" + visible
             + " of " + options.Count + ")");
 
+        // Each lane of this file leaves the shared native hot control as it found it: the doubles clear it
+        // only when the same control id sees the release, so a lane that ended mid-press would poison the next.
+        GUIUtility.hotControl = 0;
         Vector2 bottomSlot = new Vector2(menu.x + 10f, menu.yMax - OptionHeight / 2f);
         page.Click(bottomSlot);
         Check(string.Equals(current, options[visible - 1], StringComparison.Ordinal),
@@ -269,23 +278,85 @@ internal static class KernelInputEligibilityTests
 
         page.OpenMenuAt(trigger);
         Check(page.Session.OpenPopupScrollRows == 0, "a menu that opens starts at its first option");
-        for (int notch = 0; notch < 20; notch++) page.Wheel(bottomSlot, down: true);
+        for (int notch = 0; notch < 20; notch++)
+        {
+            Check(page.Wheel(bottomSlot, down: true), "a notch inside the open menu is owned by that menu");
+        }
 
         Check(page.Session.OpenPopupScrollRows == options.Count - visible,
             "the scroll stops at the end of the list instead of running past it (rows="
             + page.Session.OpenPopupScrollRows + ")");
+
+        // Backward in the SAME open, not a reopen: the round trip belongs to one menu, and a notch past either
+        // end stays clamped there instead of travelling on into the page underneath.
+        for (int notch = 0; notch < 20; notch++) page.Wheel(bottomSlot, down: false);
+        Check(page.Session.OpenPopupScrollRows == 0,
+            "scrolling back inside one open stops at the top, and a past-the-top notch is clamped, not passed on");
+        Check(page.Session.OpenPopupId != null, "and no amount of owned scrolling dismissed the menu");
+        page.Click(new Vector2(menu.x + 10f, menu.y + OptionHeight / 2f));
+        Check(string.Equals(current, options[0], StringComparison.Ordinal),
+            "so the FIRST option is selectable from the same open state that reached the last one");
+
+        // And forward in a fresh open, the last option is selectable at the bottom slot.
+        page.OpenMenuAt(trigger);
+        for (int notch = 0; notch < 20; notch++) page.Wheel(bottomSlot, down: true);
         page.Click(bottomSlot);
         Check(string.Equals(current, options[options.Count - 1], StringComparison.Ordinal),
             "the LAST option of a forty-item menu is reachable and selectable (current='" + current + "')");
-
-        page.OpenMenuAt(trigger);
-        for (int notch = 0; notch < 20; notch++) page.Wheel(bottomSlot, down: false);
-        Check(page.Session.OpenPopupScrollRows == 0, "scrolling past the top stops at the top");
-        page.Click(new Vector2(menu.x + 10f, menu.y + OptionHeight / 2f));
-        Check(string.Equals(current, options[0], StringComparison.Ordinal),
-            "and the FIRST option is selectable again after scrolling back");
         Check(writes == 3, "each reachable selection wrote once (writes=" + writes + ")");
         KernelTripGuard.ExpectNoTrips(page.Session, "bounded scrollable menu");
+    }
+
+    /// <summary>
+    /// The parity claim, tested rather than asserted in prose: the bounded window, the published scroll range
+    /// and the one-open round trip belong to <see cref="UiPopup"/>'s row window, which BOTH option lists go
+    /// through - so the typed list, with forty typed values and no string anywhere in its selection, has to
+    /// behave row-for-row like the string list above.
+    /// </summary>
+    private static void VerifyTypedLongMenuScrollsLikeTheStringList()
+    {
+        var values = new List<int>();
+        for (int i = 1; i <= 40; i++) values.Add(i);
+
+        int current = 1;
+        int writes = 0;
+        using Fixture page = TypedIntDropdown(IntChoices(values), () => current,
+            value => { writes++; current = value; }, 300f);
+
+        GUIUtility.hotControl = 0;
+        Rect trigger = page.RectOf("dropdown");
+        page.OpenMenuAt(trigger);
+        Rect menu = page.RequirePopupLayer();
+
+        Check(menu.height <= page.Viewport.height + 0.01f && menu.yMax <= page.Viewport.yMax + 0.01f
+                && Math.Abs(menu.height % OptionHeight) < 0.01f,
+            "the typed menu is bounded to whole rows by the same rule: " + menu);
+        int visible = (int)(menu.height / OptionHeight);
+        Check(visible >= 1 && visible < values.Count,
+            "and the typed list is longer than the typed menu shows (visible=" + visible + " of " + values.Count + ")");
+
+        Vector2 bottomSlot = new Vector2(menu.x + 10f, menu.yMax - OptionHeight / 2f);
+        for (int notch = 0; notch < 20; notch++)
+        {
+            Check(page.Wheel(bottomSlot, down: true), "a notch inside the typed menu is owned by it, as the string list's");
+        }
+
+        Check(page.Session.OpenPopupScrollRows == values.Count - visible,
+            "the typed list publishes the same scroll range (rows=" + page.Session.OpenPopupScrollRows
+            + ", visible=" + visible + ")");
+        page.Click(bottomSlot);
+        Check(current == 40 && writes == 1,
+            "the typed last option is selectable at the scrolled bottom slot (current=" + current + ")");
+
+        page.OpenMenuAt(trigger);
+        for (int notch = 0; notch < 20; notch++) page.Wheel(bottomSlot, down: true);
+        for (int notch = 0; notch < 20; notch++) page.Wheel(bottomSlot, down: false);
+        Check(page.Session.OpenPopupScrollRows == 0 && page.Session.OpenPopupId != null,
+            "and the typed menu returns to its first row inside one open, without the scroll leaving the top");
+        page.Click(new Vector2(menu.x + 10f, menu.y + OptionHeight / 2f));
+        Check(current == 1 && writes == 2,
+            "with the typed first option selectable there (current=" + current + ")");
+        KernelTripGuard.ExpectNoTrips(page.Session, "typed menu scrolls like the string menu");
     }
 
     private static void VerifyWheelBelongsToTheOpenMenu()
@@ -303,21 +374,36 @@ internal static class KernelInputEligibilityTests
         Vector2 outside = new Vector2(menu.x + 10f, page.Viewport.yMax - 6f);
         Check(!Over(menu, outside), "the outside point is not inside the menu: " + outside);
 
-        page.Wheel(outside, down: true);
-        Check(page.Session.OpenPopupScrollRows == 0, "a notch outside the open menu does not scroll it");
+        GUIUtility.hotControl = 0;
+        Check(!page.Wheel(outside, down: true), "a notch outside the open menu is not the menu's event");
+        Check(page.Session.OpenPopupScrollRows == 0, "and it does not scroll the menu");
 
-        page.Wheel(new Vector2(menu.x + 10f, menu.yMax - OptionHeight / 2f), down: true);
+        Vector2 inside = new Vector2(menu.x + 10f, menu.yMax - OptionHeight / 2f);
+        Check(page.Wheel(inside, down: true), "a notch inside the menu IS the menu's event");
         Check(page.Session.OpenPopupScrollRows > 0,
-            "a notch inside the menu moves the menu, which is the priority the ruling asks for");
+            "and the menu moved, which is the priority the ruling asks for");
 
         int moved = page.Session.OpenPopupScrollRows;
-        page.Wheel(outside, down: true);
-        Check(page.Session.OpenPopupScrollRows == moved,
-                "and a notch that lands outside the menu leaves the scroll exactly where it was");
-
+        Check(!page.Wheel(outside, down: true),
+            "and a notch that lands outside the menu leaves both the scroll and the event alone");
         page.Click(outside);
         Check(page.Session.OpenPopupId != null && page.Session.OpenPopupScrollRows == moved,
             "a click outside the menu neither dismissed it nor moved it: only a row or the trigger acts");
+
+        // The end of the list is not a release of the priority: a notch that cannot move the menu is still
+        // owned by it, or the page under the menu starts scrolling under the player's eyes. The menu is closed
+        // here the way a row closes it - a forty-item menu covers its own trigger completely, so the
+        // uncovered-strip route belongs to the short-menu lane above and not to this one.
+        page.Click(inside);
+        Check(page.Session.OpenPopupId == null, "the bottom row closed the menu by selecting, as every row does");
+        page.OpenMenuAt(trigger);
+        for (int notch = 0; notch < 40; notch++) page.Wheel(inside, down: true);
+        int saturated = page.Session.OpenPopupScrollRows;
+        Check(saturated > 0, "the menu reached its own end (rows=" + saturated + ")");
+        Check(page.Wheel(inside, down: true),
+            "a notch at the saturated end is still owned by the menu instead of falling through to the content under it");
+        Check(page.Session.OpenPopupScrollRows == saturated,
+            "and owning it does not push the scroll past the end of the list");
         KernelTripGuard.ExpectNoTrips(page.Session, "wheel priority over the menu");
     }
 
@@ -625,6 +711,39 @@ internal static class KernelInputEligibilityTests
 
     // --- fixtures ------------------------------------------------------------------------------------------
 
+    private static UiChoice<int>[] IntChoices(List<int> values)
+    {
+        var choices = new UiChoice<int>[values.Count];
+        for (int i = 0; i < values.Count; i++)
+        {
+            choices[i] = new UiChoice<int>(
+                "n" + values[i].ToString(System.Globalization.CultureInfo.InvariantCulture), values[i]);
+        }
+
+        return choices;
+    }
+
+    /// <summary>
+    /// The same page as <see cref="DropdownPage"/>, driven by a TYPED value binding and typed choices, so the
+    /// dropdown takes the <see cref="UiPopup.DrawChoiceList"/> route and nothing about the geometry differs.
+    /// </summary>
+    private static Fixture TypedIntDropdown(UiChoice<int>[] choices, Func<int> get, Action<int> set,
+        float viewportHeight)
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+        UiWidgetRegistry.Register(Scope, HeightKind, () => new SpacerWidget());
+
+        var bindings = new UiBindings();
+        bindings.BindValue("dropdown", get, set);
+        bindings.BindOptions("modes", () => choices);
+
+        return new Fixture(
+            new UiHost(Scope, UiLayoutManifest.Parse(LowDropdownPage("modes")), bindings, UiTheme.Vanilla,
+                new LaneMetrics(), new LaneTranslation()),
+            new Rect(0f, 0f, 300f, viewportHeight));
+    }
+
     private static List<string> LongOptions(int count)
     {
         var options = new List<string>(count);
@@ -802,21 +921,28 @@ internal static class KernelInputEligibilityTests
         }
 
         /// <summary>
-        /// One wheel notch at <paramref name="point"/>. A down notch arrives as a negative <c>delta.y</c>,
-        /// which the funnel reads as "toward the later rows". The harness injects the value, so these lanes
-        /// prove the routing and the clamp; a real device's weight and direction are the playtest's.
+        /// One wheel notch at <paramref name="point"/>, pumped with the sign the native IMGUI scroll view uses:
+        /// a POSITIVE <c>delta.y</c> asks for the LATER rows, which is what <see cref="UiNative.PointerWheelNotches"/>
+        /// hands to the menu. Returns whether the event was consumed - the difference between the menu owning
+        /// its own rect and the notch falling through to the content underneath. The harness injects the value,
+        /// so these lanes prove the routing, the clamp and the ownership; a real device's weight and direction
+        /// remain the playtest's.
         /// </summary>
-        public void Wheel(Vector2 point, bool down)
+        public bool Wheel(Vector2 point, bool down)
         {
             Arrange();
             Event e = Event.KeyboardEvent("space");
             e.type = EventType.ScrollWheel;
             e.button = 0;
             e.mousePosition = point;
-            e.delta = new Vector2(0f, down ? -1f : 1f);
+            e.delta = new Vector2(0f, down ? 1f : -1f);
             Event.current = e;
             Host.DrawFrame(Viewport);
+            // The reference Event exposes no 'used' getter; consumption is what Use() leaves behind: the type
+            // flips to Used. The same read answers for the double and for the game.
+            bool consumed = e.type == EventType.Used;
             Event.current = null;
+            return consumed;
         }
 
         /// <summary>Opens the page's dropdown by clicking the middle of its own trigger band.</summary>

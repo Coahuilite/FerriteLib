@@ -585,11 +585,15 @@ public static class UiNative
     /// library's one read of <c>Event.delta</c>: a control that scrolls asks here instead of touching the
     /// event, the same reason a control that clicks asks <see cref="IsPointerDown"/>.
     /// <para>
-    /// The sign is the library's convention, stated once: a POSITIVE value asks for the LATER part of the
-    /// content, and it is <c>-delta.y</c> because IMGUI reports a downward notch as a negative delta. Whether a
-    /// real device's wheel reaches the menu at all, and with what weight, is in-game behaviour the stub cannot
-    /// show: the harness pumps a wheel event with a chosen delta and proves the routing; the short playtest
-    /// judges the feel. A notch is not a row either - see <see cref="UiPopup.WheelRowsPerNotch"/>.
+    /// The sign is the NATIVE protocol, not a library preference: Unity's IMGUI scroll view adds a positive
+    /// <c>delta.y</c> to the scroll position, so a positive value here asks for the LATER part of the content.
+    /// It is <c>delta.y</c> read straight, and that is deliberate - a negation here would make the menu scroll
+    /// the other way round from every <c>Scroll</c> container in the same window, and a harness that pumps its
+    /// own invented sign cannot tell the difference (measured by the PM's independent probe on this slice's
+    /// first version: a native-sign notch advanced nothing). Whether a real device reaches the menu at all, and
+    /// with what weight, remains in-game behaviour the stub cannot show: the harness pumps the event with the
+    /// cited sign and proves the routing and the clamp, the short playtest judges the feel. A notch is not a
+    /// row either - see <see cref="UiPopup.WheelRowsPerNotch"/>.
     /// </para>
     /// </summary>
     public static float PointerWheelNotches()
@@ -597,13 +601,19 @@ public static class UiNative
         if (DebugMousePositionEnabled) return DebugWheelNotches;
         Event? current = Event.current;
         if (current == null || current.type != EventType.ScrollWheel) return 0f;
-        return -current.delta.y;
+        return current.delta.y;
     }
 
     /// <summary>
     /// The wheel half of the popup-priority rule: while the session has a menu open and the pointer sits inside
-    /// the rect that menu published, the MENU takes the wheel, and the scroll container or chart underneath
-    /// never sees the event: a layer covering the point outranks what is under it.
+    /// the rect that menu published, the MENU owns that wheel event, and the scroll container or chart
+    /// underneath never sees it - a layer covering the point outranks what is under it.
+    /// <para>
+    /// <b>Owns it at its ends too.</b> The event is consumed whether or not the scroll moved. A notch at the
+    /// first or last row is still a notch inside the menu: if only a move counted as owning it, the saturated
+    /// menu would hand the notch to the page beneath, and the covered content would start scrolling under a
+    /// menu the player is still looking at. The clamp is the menu's own edge, not a release of the priority.
+    /// </para>
     /// <para>
     /// It is read at the engine's pass boundary, immediately after the pass opens: that is the one moment the
     /// dispatch stack holds the previous pass's complete paint order, menu layer included, while no control has
@@ -622,11 +632,9 @@ public static class UiNative
         int rows = (int)Math.Round(notches * UiPopup.WheelRowsPerNotch, MidpointRounding.AwayFromZero);
         if (rows == 0) rows = notches > 0f ? 1 : -1;
 
-        if (session.ScrollPopupByRows(rows))
-        {
-            // Exactly one consumer for one event: the menu moved, so nothing below it may also move.
-            ConsumePointerEvent();
-        }
+        // The return value is not the condition for consuming: the menu owns the event wherever its scroll stands.
+        session.ScrollPopupByRows(rows);
+        ConsumePointerEvent();
     }
 
     /// <summary>

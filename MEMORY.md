@@ -88,7 +88,15 @@
   archive (`INTERACTION-CONVERGENCE-TASKS-20261008.md`), not excluded from the US checkpoint.
   Provenance for a new specialized kind still needs a citation; a confirmed public
   capability does not wait for a second consumer to hand-roll it.
-- **FL-IC1 is implemented and locally validated (2026-10-08, `0.7.x`, awaiting PM acceptance).** One
+- **FL-IC1 is implemented, corrected against the PM's in-progress review, and locally validated (2026-10-08,
+  `0.7.x`; awaiting PM acceptance, and not a real-game pass).** Four review findings were real defects in the
+  first version and are fixed: the wheel read `-delta.y` while the native IMGUI scroll view adds a positive
+  `delta.y`, and this slice's own lanes pumped the same negation, so nothing in the harness could see the
+  inversion (the PM's probe on a copy of the changed sources caught it); a notch at a clamped end of an open menu
+  was not consumed and so reached the page underneath; the "back to the first option" lane reopened the menu
+  instead of travelling backward inside one open; and `KernelInputEligibilityTests.RunAll` called `Run` without
+  summing its result, so a failing lane sat inside a green run - the printing-not-counting class this ledger
+  already records. One
   receive-eligibility rule (`UiNative.CanReceivePointerPress`: interactive node, native hover authority, the
   element's own rect, no covering popup, inside the published clip), capture ownership that names the drawing
   element and ends at the pass boundary when that owner stops being drawn, geometric popup coverage with the
@@ -96,9 +104,15 @@
   to the open menu at the engine's pass boundary. Contract, migration and the stub-versus-in-game boundary are in
   `docs/development/0.7/05-api-contract.md` ("FL-IC1"); tiers in `docs/api-tiers.md`; lanes in
   `KernelInputEligibilityTests`; faithful reverts in `tools/mutation/batches/fl-ic1-20261008.ps1`. Seven public
-  members added, no new type, no kind, no signature removed. The wheel's real weight and direction, a native
-  slider drag and the game's window-input authority remain unverified stub-side and belong to the short human pass.
-  FL-IC2 (edit transaction, the window Cancel/Accept entry, tree cancel) is NOT part of this slice.
+  members added, no new type, no kind, no signature removed. Thirteen lanes now, with every wheel assertion
+  reading whether the event came back consumed and the end-to-end scroll round trip proven inside one open on both
+  option lists. The wheel's real weight, and whether a native scroll view under a menu consumes the notch before
+  the library's pass-boundary rule, stay unverified stub-side - as do a native slider drag and the game's
+  window-input authority - and belong to the short human pass. The faithful-revert batch restores the retired
+  owner-id rule WITH both decisions it guarded (narrowing only one would be caught by the other and redden
+  nothing), and the wheel-ownership-at-the-ends rule has no mutation case by design, which the batch header says:
+  its claim is the saturated-end lane, not a fabricated mutant. FL-IC2 (edit transaction, the window Cancel/Accept
+  entry, tree cancel) is NOT part of this slice.
 
 ## PM integration checkpoint — 2026-09-30
 

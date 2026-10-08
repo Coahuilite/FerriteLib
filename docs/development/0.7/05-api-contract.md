@@ -1368,10 +1368,15 @@ this section. Nothing here is a real-game acceptance.
   Continuation of a drag is a separate question from a new press: it follows the capture, never this frame's hover,
   and the release is not gated by position either.
 - *The menu is bounded and scrolls.* `RectFor` returns a height of whole option rows that fit the Host viewport
-  instead of `optionCount * OptionHeight`, both option lists draw/hover/hit-test only the rows inside that rect,
-  and the wheel is routed by priority at the engine's pass boundary: a notch that lands inside the open menu moves
-  the menu and is consumed before any scroll container under it can take it. Geometry, hit test and scroll read
-  one rect and one offset.
+  (`VisibleRowCount`) instead of `optionCount * OptionHeight`, both option lists draw/hover/hit-test only the rows
+  inside that rect, offset by `UiSession.OpenPopupScrollRows`, and the wheel is routed by priority at the engine's
+  pass boundary: a notch that lands inside the open menu moves the menu and is consumed before any scroll container
+  under it can take it. Geometry, hit test and scroll read one rect and one offset. The notch is owned wherever the
+  menu's rect is, **including at its own ends**: a saturated first or last row still swallows the event, because
+  handing it back would start the page scrolling under the menu the player is reading - the clamp is the menu's
+  edge, not a release of the priority. The one-row floor is the single place the bound is not absolute: a viewport
+  shorter than one row still shows one row, since a zero-row menu would be the same unreachable-option defect with
+  less paint, and that case is a playtest question rather than a product blocker.
 
 **Public surface, all of it inside `0.7.0` under the standing temporary exemption, none of it promoted.** Seven
 members on existing public-unstable types, no new type, no new kind, no XML vocabulary, and no signature changed
@@ -1388,9 +1393,12 @@ trigger now selects instead of closing; a `chart/line` press under an open menu,
 disabled element now does nothing at all instead of capturing and emitting; and a menu longer than the viewport is
 now shorter and scrolls. None of them needs a code edit at the call site: every one goes through `UiPopup` or
 `UiNative`, and the consumer's own composite dropdown already reads `RectFor` plus `DrawOptionList`, which is the
-reason the fix was put there rather than in either caller. The wheel's *direction and weight* are the library's
-convention (a positive notch asks for the later rows, three rows per notch); the stub proves the routing and the
-clamp, not the feel, and the feel is a human-pass item.
+reason the fix was put there rather than in either caller. The wheel's **sign is not a library convention**:
+`PointerWheelNotches` answers `Event.delta.y` exactly as the native IMGUI scroll view reads it (a positive delta
+asks for the later rows), because a menu scrolling the other way round from the `Scroll` containers beside it would
+be a second protocol inside one window. Three rows per notch (`UiPopup.WheelRowsPerNotch`) IS a library default and
+is named as one. What the stub cannot show is a real device's weight, and whether Unity's own scroll view under a
+menu consumes the notch before the pass-boundary rule; both stay human-pass items.
 
 **Event timing, because the ordering is the contract.** One IMGUI event is one host pass. The pass opens, the
 previous pass's complete paint order (menu layer included) becomes the stack dispatch reads, and the wheel question
@@ -1411,16 +1419,41 @@ stub's hot-control capture and `Use()` contract, group-local pointer read-back -
 The paired human pass covers the in-game half: overlap selection, long-menu reachability and wheel, chart drag,
 Enter/Esc and the narrow Chinese layout, in one short session.
 
-**Lanes.** `KernelInputEligibilityTests` (twelve scenarios: string and typed overlap selection, the uncovered close
-strip, the forty-option bound-and-scroll with both ends reachable, wheel priority inside and outside the menu, the
-covered chart's refusal and the option row that takes the click instead, the normal drag after the menu closes,
-continuation and release outside the rect, a disabled chart, a clipped band, the pass-boundary capture release
-beside another session's untouched capture, and the released identity's capture). `KernelPopupTests` keeps its nine
+**Lanes.** `KernelInputEligibilityTests` (thirteen scenarios: string and typed overlap selection, the uncovered
+close strip, the forty-option bound-and-scroll with the round trip made inside ONE open menu and both ends
+selectable, the same round trip measured on the typed list against the string list's own numbers, wheel priority
+inside and outside the menu and at the saturated end, the covered chart's refusal and the option row that takes the
+click instead, the normal drag after the menu closes, continuation and release outside the rect, a disabled chart,
+a clipped band, the pass-boundary capture release beside another session's untouched capture, and the released
+identity's capture). Every wheel assertion reads whether the event came back consumed, so "the menu owns this
+notch" and "the notch fell through" are two observable results rather than a scroll position that merely happens
+to be unchanged, and every press-pumping lane leaves the shared native hot control as it found it - the doubles
+clear it only for the control id that holds it, so a lane ending mid-press would poison the next. `KernelPopupTests` keeps its nine
 earlier scenarios green, and `KernelDevGeometryTests.VerifyEventSemantics` now pins `EventType.ScrollWheel`
 between the double and the reference constant.
 
-**Faithful reverts.** `tools/mutation/batches/fl-ic1-20261008.ps1`: restoring the owner-id exemption, removing the
-chart's press gate, and unbounding the menu height each redden the named assertion in this slice's own lane and
-nothing else, with the byte-exact restore, rebuild-to-baseline and carrier watch the battery requires. The
-pass-boundary capture release and the scroll clamp carry a labelled fourth case. The logs land in
-`dist/dev-work/` as always.
+**Faithful reverts.** `tools/mutation/batches/fl-ic1-20261008.ps1`, five cases on single-line anchors: the
+owner-id exemption restored WITH the two decisions it used to guard (the retired rule reached both the trigger's
+own coverage test and the context-carrying button behind it, so a mutation narrowing only the first would be
+caught by the second and redden nothing; the case restores both in one block, and the same-node sibling lanes stay
+green on both sides precisely because the restored rule is keyed on the dropdown id and not on node identity -
+which is the difference between reverting this slice and reverting the 0.4.0 fix underneath it); the chart's press
+gate removed; the menu height unbounded; the capture's owner left unrecorded; and the published scroll range
+zeroed. Each names the assertion it must redden, restores by bytes, rebuilds to the baseline fingerprint and
+watches the root carrier, and the batch was run against the committed tree so each log binds that HEAD.
+
+One rule in this slice has **no** mutation case, and the batch header says so rather than hiding it: the
+wheel-ownership-at-the-ends rule replaces a two-statement shape (`if (moved) { Consume(); }`) that one anchored
+region cannot narrow without leaving the unconditional consume behind. That claim rests on its lane - a notch
+pumped at the saturated end must return consumed with the scroll unmoved - which is also the reading the PM's
+independent probe measured as failing before the correction.
+
+**Review integrated.** The PM's in-progress review of this slice (`evidence/interaction-development-20261008/fl/pm-in-progress-review1.md`
+and the probe under `pm-wheel-probe/`, built from a copy of the changed sources with executable stubs) named four
+defects in the first version: the negated wheel sign, which the slice's own lanes could not see because they
+pumped the same negation; a covered notch falling through to the page below once the menu hit either end; a
+"back to the first option" lane that reopened instead of travelling backward inside one open menu; and a
+`RunAll` that printed FAIL without summing it, so a red lane could sit inside a green run. All four are corrected
+above and in the code, the honest sign/ownership and round-trip readings are now asserted where they were
+assumed, and the probe's cited Unity source is protocol evidence, not a game or device measurement - the
+real-window half remains the short human pass.
