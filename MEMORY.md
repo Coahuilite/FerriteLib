@@ -2,6 +2,7 @@
 
 ## Current state (2026-10-07)
 
+- **Push privacy automation (2026-10-08).** `scripts/privacy-audit.ps1` follows the series' Mwah five-vector gate. `scripts/install-hooks.ps1` enables automatic full-history pre-push checks in each clone; `.github/workflows/privacy-audit.yml` covers every pushed branch and PR. `docs/push-privacy-gate.md` defines scope and limits. Historical regex literals are distinguished from actual UNC paths; current prose uses account descriptions rather than runtime personal tokens. Build and package acceptance remain separate.
 - **Held package: FerriteLib built at `0181268`** — `dist/dev/FerriteLib` is 5 files, payload
   `1.6/Assemblies/FerriteLib.UiKit.dll` sha256 `c1371f623a3a…` (the PM's paired-package manifest is the
   per-file authority and names the US/Demo pairing; the 2026-10-04 freeze at `b31e2c3` is superseded by this
@@ -1354,12 +1355,12 @@ colour token currently feeds layout — it is a future-regression guard, not pre
   paths is what "the tested bytes and the shipped bytes are one tree" means.
 - **A green pre-push privacy scan says nothing about the identity a remote merge button will stamp.**
   The 2026-09-07 scan passed at the pushed tip; the 2026-09-09 PR #1 merge added one commit whose
-  author is the clicker's display name (`Fe <…@users.noreply…>`), GitHub itself as committer, and the
+  author is the clicker's public account display name (with a GitHub noreply address), GitHub itself as committer, and the
   `-FullHistory` identity vector went red through no edit of ours. The scan must be re-run after
   remote-side history events, not only before pushes — the same rule it already states for commits,
   extended to merge buttons, tags' absence and any other hand that writes to the graph. **The fix planned
   here — amend the merge commit's author and force-push both branches — was overtaken on 2026-09-10:
-  `gh api user` shows `Fe` is this account's own GitHub-published display name, so the vector was a gate bug
+  `gh api user` confirms the name is this account's own GitHub-published display name, so the vector was a gate bug
   rather than a leak, and the gate now measures accounts instead of name strings (see the privacy-gate
   record in this file). The lesson about re-running after remote-side history events stands; the
   history-rewrite advice does not.**

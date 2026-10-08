@@ -1176,7 +1176,7 @@
   carry attribution, not just conclusions. Lesson filed with it: when a ruling's grounds restate an
   existing ledger line, cite the line — do not re-derive it in the ruling and drop the original.
 - **The privacy gate measures accounts, not display names (ruled and implemented 2026-09-10).** `gh api
-  user` reports login `Coahuilite`, id `19252128`, name `Fe`, email `null` — so the `Fe` sitting on the
+  user` reports login `Coahuilite`, id `19252128`, the account's public display name, email `null` — so the name sitting on the
   PR #1 web-merge commit is that account's own GitHub-published display name, which is precisely what
   GitHub's merge button stamps as author, and the committer `GitHub <noreply@github.com>` is platform
   boilerplate. One human, one account, one noreply address: the earlier "three identities, rewrite the

@@ -30,3 +30,4 @@ fixtures/** text eol=lf
 # (for/do/parentheses) can misparse with LF endings. Nothing here ships inside a mod package, so pinning
 # CRLF costs the byte-determinism rule above nothing.
 *.cmd text eol=crlf
+scripts/githooks/* text eol=lf

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Install this clone's automatic full-history gate with install-hooks.ps1.
+root=$(git rev-parse --show-toplevel) || exit 1
+pwsh -NoProfile -File "$root/scripts/privacy-audit.ps1" -FullHistory < /dev/null
+code=$?
+if [ $code -ne 0 ]; then
+    echo "pre-push: privacy audit failed (exit $code); push blocked." >&2
+fi
+exit $code
