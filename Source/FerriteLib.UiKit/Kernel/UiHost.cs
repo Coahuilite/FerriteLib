@@ -319,6 +319,100 @@ public sealed class UiHost : IDisposable
         }
     }
 
+    /// <summary>
+    /// One Cancel press, one undone layer: the ladder the interaction contract asks for (§3.2, §3.5, §3.6).
+    /// It is tried in this order and stops at the first layer that answers, because each step undoes
+    /// something the player started MORE recently than the layer below it:
+    /// <list type="number">
+    /// <item>the session's open option menu closes — a menu is the topmost thing on screen and the cheapest
+    /// thing to have not wanted;</item>
+    /// <item>a pointer capture this session holds is released, which ends the drag owned by it (the chart
+    /// clears its own drag state when it finds it no longer holds the control, so releasing is the whole
+    /// action — the value already written during the drag stays, because a Cancel ends an interaction, it
+    /// does not roll back a result);</item>
+    /// <item>an open edit is marked <c>DiscardRequested</c>, which its own field applies at its next draw in
+    /// this same pass: the draft is dropped, the model is untouched, and unparseable text is discarded by the
+    /// same rule that refuses to write it;</item>
+    /// <item>otherwise the walk starts at the subject — the element a consumer named through
+    /// <see cref="UiSession.SetCancelTarget(string)"/>, else the last element that actually TOOK an
+    /// interaction — and climbs the tree to the nearest element whose <c>CancelBind</c> names a command that
+    /// can run now. A layer that declares nothing is passed through, which is what lets a section be a
+    /// return layer without being a control, and a layer whose command is currently vetoed is skipped rather
+    /// than run, so the walk finds the nearest layer that can actually answer.</item>
+    /// </list>
+    /// <para>
+    /// The key that drove this may be a business selection rather than a control: the contract's starting
+    /// point is the interaction subject, never the last node drawn, and a page whose rows are selected by
+    /// clicking a card has no control that "holds" that choice.
+    /// </para>
+    /// <para>
+    /// Returns false when there is nothing to cancel, and consumes nothing in that case: the caller —
+    /// <see cref="UiWindowHost.OnCancelKeyPressed"/>, or a consumer's own window subclass — then keeps
+    /// Verse's meaning of the key, which is the layer that closes the window. A page that declares no
+    /// <c>CancelBind</c> anywhere therefore behaves exactly as it did before this method existed.
+    /// </para>
+    /// </summary>
+    public bool TryHandleCancel()
+    {
+        if (!session.IsActive) return false;
+
+        if (session.OpenPopupId != null)
+        {
+            session.ClosePopup();
+            UiNative.ConsumeKeyEvent();
+            return true;
+        }
+
+        int? capture = session.OwnedHotControl;
+        if (capture.HasValue && session.OwnedHotControlOwner != null)
+        {
+            session.ReleaseHotControl(capture.Value);
+            UiNative.ConsumeKeyEvent();
+            return true;
+        }
+
+        UiValueState? edit = session.ActiveEditState;
+        if (edit != null)
+        {
+            edit.DiscardRequested = true;
+            UiNative.ConsumeKeyEvent();
+            return true;
+        }
+
+        for (UiNode? node = session.CancelTargetNode ?? session.LastInteractionNode;
+            node != null;
+            node = node.Parent)
+        {
+            string key = node.CancelBindingKey;
+            if (key.Length == 0) continue;
+            if (bindings.TryInvokeCommand(key))
+            {
+                UiNative.ConsumeKeyEvent();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The Accept half of the same rule: while an edit is open, Enter answers the EDIT and must not close the
+    /// window (§3.5). Marking the state is all this does — the field applies it at its own next draw, in the
+    /// same event pass, which is where the parse, the clamp and the binding write live. With no open edit the
+    /// caller keeps Verse's meaning, so a consumer's declared <c>closeOnAccept</c> convention is untouched.
+    /// </summary>
+    public bool TryHandleAccept()
+    {
+        if (!session.IsActive) return false;
+
+        UiValueState? edit = session.ActiveEditState;
+        if (edit == null) return false;
+
+        edit.CommitRequested = true;
+        UiNative.ConsumeKeyEvent();
+        return true;
+    }
+
     public void Close()
     {
         // A closed host must not stay referenced by a live document service, and the service's documents
@@ -903,7 +997,13 @@ public sealed class UiHost : IDisposable
         // The engine refuses them elsewhere and refuses contradictory combinations; these two lists are
         // the attribute-NAME gate, and UiLayoutEngine keeps a mirrored pair for template subtrees that a
         // lane reflects against these, so the two must move together.
-        "AlignX", "OffsetX", "AlignY", "OffsetY"
+        "AlignX", "OffsetX", "AlignY", "OffsetY",
+        // FL-IC2 (interaction contract §3.6): the tree's Cancel layer. Engine-wide like VisibleKey and HelpKey,
+        // because the ENGINE reads it and publishes it on the node for the ladder to walk - no widget kind owns
+        // it, so no kind's attribute schema has to grow for a page to declare a return layer. Unlike HelpKey it
+        // IS allowed on a container: a section that draws nothing of its own is still a layer a player can
+        // return from, which is the whole difference between a hit surface and a tree node.
+        "CancelBind"
     };
 
     private static readonly HashSet<string> ContainerAttributes = new(StringComparer.OrdinalIgnoreCase)
@@ -917,7 +1017,10 @@ public sealed class UiHost : IDisposable
         "Fill", "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden", "WideHidden",
         "VisibleRows",
         "Scheme", "Density", "Visible", "VisibleKey",
-        "AlignX", "OffsetX", "AlignY", "OffsetY"
+        "AlignX", "OffsetX", "AlignY", "OffsetY",
+        // FL-IC2: see the widget list; UiLayoutEngine's mirrored pair carries the same addition, and the drift
+        // lane refuses one-sided edits.
+        "CancelBind"
     };
 
     private void ValidateElement(UiElementSpec spec, string path, bool parentNarrowCapable, UiElementSpec? parent)

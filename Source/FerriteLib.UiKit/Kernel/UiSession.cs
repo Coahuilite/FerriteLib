@@ -64,6 +64,19 @@ public sealed class UiSession : IDisposable
     // cannot run its own MouseUp release any more, and a capture nobody can release stops later presses
     // from reaching whatever is now on screen.
     private bool captureOwnerDrawn;
+    // The pass-boundary press fact above; false outside a press pass and re-read at every BeginHitPass.
+    private bool passBeganWithPrimaryPress;
+    // The three things a single Cancel keypress can be asked to undo, in the order the interaction contract
+    // puts them (FL-IC2, §3.2/§3.4/§3.6): the open popup, the held pointer capture, the open edit — and the
+    // tree walk those three leave untouched starts from the last node that actually took an interaction, or
+    // from a business target a consumer named. Each is a REFERENCE to a node, never an id string: id strings
+    // are how the covered-trigger defect found two answers to "which element owns this", and the node table
+    // already owns identity. They are cleared at the pass boundary when their node stops being arranged, and
+    // with the session.
+    private UiNode? activeEditNode;
+    private UiValueState? activeEditState;
+    private UiNode? lastInteractionNode;
+    private UiNode? cancelTargetNode;
     internal Rect? CurrentClip { get; set; }
     private Rect hostViewport;
     private string? scrollTargetElementId;
@@ -213,11 +226,25 @@ public sealed class UiSession : IDisposable
         EnsureActive();
         popupOwnerDrawn = false;
         captureOwnerDrawn = false;
+
+        // Recorded before any element draws: whether THIS pass is a primary-button press at all. A field needs
+        // that fact to end an edit on a click outside it, but by the time the field draws, a control drawn
+        // EARLIER in the same pass may already have consumed the event, and IMGUI leaves nothing in the type to
+        // tell "a press that was taken" from "a frame with no press". Reading it at the pass boundary is the
+        // only moment that cannot depend on draw order (§3.4: an outside click ends the edit, whoever ate it).
+        passBeganWithPrimaryPress = UiNative.IsPointerDown();
+
         CurrentClip = hostViewport.width > 0f && hostViewport.height > 0f ? hostViewport : (Rect?)null;
         dispatchLayers.Clear();
         dispatchLayers.AddRange(hitLayers);
         hitLayers.Clear();
     }
+
+    /// <summary>
+    /// True when the pass now running began as a primary-button press, read before any control could consume
+    /// it. The field-side blur rule needs it because consumption erases the evidence from the event itself.
+    /// </summary>
+    internal bool PassBeganWithPrimaryPress => passBeganWithPrimaryPress;
 
     /// <summary>
     /// Appends one layer to the pass in progress. Content layers are appended as their elements draw, so the
@@ -368,6 +395,166 @@ public sealed class UiSession : IDisposable
         {
             ReleaseHotControl(ownedHotControl.Value);
         }
+
+        ReconcileInteractionRecords();
+    }
+
+    /// <summary>
+    /// The node holding this session's open edit, or null when no field is being edited. This is the record
+    /// the window's Accept and Cancel hooks act through (FL-IC2): the hooks run before the page is drawn, so
+    /// they can only mark a state the funnel will read at that field's next draw.
+    /// </summary>
+    public UiNode? ActiveEditNode => activeEditNode;
+
+    /// <summary>
+    /// The node that last TOOK an interaction through the funnel — a button press that fired, a dropdown that
+    /// opened or closed, a capture that was taken, an edit that was opened. The Cancel tree walk starts here
+    /// when no consumer named a target, because the contract's starting point is the actual interaction
+    /// subject, never the last thing drawn.
+    /// </summary>
+    public UiNode? LastInteractionNode => lastInteractionNode;
+
+    /// <summary>
+    /// The element a consumer named as the business subject a Cancel should act on, or null. Read through the
+    /// node table by id, so a stale id cannot outlive the element it named.
+    /// </summary>
+    public UiNode? CancelTargetNode => cancelTargetNode;
+
+    /// <summary>
+    /// Names the business subject of a Cancel: the row a player selected, the panel a filter opened. The id is
+    /// resolved here and now, so an unknown or not-yet-arranged id is refused by the return value instead of
+    /// becoming a dangling string the ladder would later fail to find. Returns true when the target is set.
+    /// </summary>
+    public bool SetCancelTarget(string elementId)
+    {
+        EnsureActive();
+        return SetCancelTarget(GetNodeByElementId(elementId));
+    }
+
+    /// <summary>
+    /// The node form of the same entry, for the subject a declared id cannot reach: a composite's OWN
+    /// sub-control, minted through <see cref="UiWidgetContext.Child(string)"/>, carries no element id and no
+    /// arranged rect of its own, yet a consumer may well want "return from this branch" to start there. The
+    /// node is accepted only when this session's table still holds it, so a released or foreign node is refused
+    /// rather than becoming a subject the walk would climb from into nothing.
+    /// </summary>
+    public bool SetCancelTarget(UiNode? node)
+    {
+        EnsureActive();
+        if (node == null) return false;
+        if (!nodes.TryGetValue(node.Id, out UiNode? held) || !ReferenceEquals(held, node)) return false;
+        cancelTargetNode = node;
+        return true;
+    }
+
+    /// <summary>
+    /// The state of the open edit, so the window's hooks can mark it without reaching into the widget that
+    /// owns it. Null exactly when <see cref="ActiveEditNode"/> is.
+    /// </summary>
+    internal UiValueState? ActiveEditState => activeEditState;
+
+    /// <summary>
+    /// Records that the element being drawn opened an edit. Called by the funnel, never by a widget: the
+    /// funnel is the one place that knows a native control was actually handed the keyboard, which is the
+    /// same evidence rule that makes it the only place the disabled and covered refusals can be enforced.
+    /// </summary>
+    internal void NoteEditOpened(UiValueState state)
+    {
+        EnsureActive();
+        if (state == null) throw new ArgumentNullException(nameof(state));
+        activeEditNode = activeNode;
+        activeEditState = state;
+        lastInteractionNode = activeNode;
+    }
+
+    /// <summary>
+    /// Records that an edit ended. Only the edit the session still points at can clear the pointer, so an
+    /// older field finishing after a newer one opened cannot drop the newer record.
+    /// </summary>
+    internal void NoteEditClosed(UiValueState state)
+    {
+        if (state == null || !ReferenceEquals(state, activeEditState)) return;
+        activeEditNode = null;
+        activeEditState = null;
+    }
+
+    /// <summary>
+    /// Records that this node took the interaction the current event carried. The funnel calls it where a
+    /// press or an open actually took effect, so a click that was refused (disabled, covered, clipped) never
+    /// becomes a Cancel starting point.
+    /// </summary>
+    internal void NoteInteractionTarget(UiNode node)
+    {
+        if (node == null) return;
+        EnsureActive();
+        lastInteractionNode = node;
+    }
+
+    /// <summary>
+    /// Drops the business target. The pass boundary also drops it when its node stops being arranged, so a
+    /// consumer that forgets this call still cannot leave the ladder pointing at a dead row.
+    /// </summary>
+    public void ClearCancelTarget()
+    {
+        EnsureActive();
+        cancelTargetNode = null;
+    }
+
+    /// <summary>
+    /// The third arm of the pass-boundary reconcile, next to the popup and the capture: an open edit, an
+    /// interaction record and a business target all point at nodes, and a node that has left the page (hidden
+    /// by a Tab or a VisibleKey, removed from the manifest, or switched away from) owns no live interaction.
+    /// Leaving them would be the failure the contract names — a Cancel that acts on a subject the player can no
+    /// longer see.
+    /// <para>
+    /// <b>Leaving the page ENDS an edit; it does not commit it.</b> Clearing the reference alone left the
+    /// state's own <c>Focused</c> flag standing, so a field that came back (the same node, the same retained
+    /// state, a Tab switched away and returned) still claimed to be editing while the session no longer knew
+    /// which edit was open — and the window's Accept hook, which acts through that record, then refused a key
+    /// the still-focused field was waiting for. The entry and the state are one fact and have to move together:
+    /// the edit is ended on the state, which drops its draft back onto the model at the next draw. A value a
+    /// player typed into a row they switched away from is not a commit (§3.7).
+    /// </para>
+    /// <para>
+    /// <b>A sub-node is in play while its element is.</b> A composite's child carries no geometry by design, so
+    /// reading <see cref="UiNode.IsArranged"/> alone would drop a press the player really made on a control the
+    /// page really drew, and the tree walk would start nowhere. Liveness is inherited from the element that
+    /// minted the child, which is the same parent-chain rule the disabled answer and the hit layer already use.
+    /// </para>
+    /// </summary>
+    private void ReconcileInteractionRecords()
+    {
+        if (activeEditNode != null && (!InPlay(activeEditNode) || activeEditState == null))
+        {
+            UiValueState? dropped = activeEditState;
+            if (dropped != null)
+            {
+                dropped.Focused = false;
+                dropped.CommitRequested = false;
+                dropped.DiscardRequested = false;
+            }
+
+            activeEditNode = null;
+            activeEditState = null;
+        }
+
+        if (lastInteractionNode != null && !InPlay(lastInteractionNode)) lastInteractionNode = null;
+        if (cancelTargetNode != null && !InPlay(cancelTargetNode)) cancelTargetNode = null;
+    }
+
+    /// <summary>
+    /// Whether a node the interaction records point at is still on the page: an arranged element is, a
+    /// composite's child is while the element that minted it is, and anything else is not.
+    /// </summary>
+    private static bool InPlay(UiNode node)
+    {
+        for (UiNode? cursor = node; cursor != null; cursor = cursor.Parent)
+        {
+            if (cursor.IsArranged) return true;
+            if (!IsSubNode(cursor.Id)) return false;
+        }
+
+        return false;
     }
 
     internal void ConstrainClip(Rect rect)
@@ -1040,6 +1227,12 @@ public sealed class UiSession : IDisposable
         dirtyNodes.Clear();
         trippedNodes.Clear();
         activeNode = unscopedNode;
+        // The ladder's three records name nodes, and the node table above is gone with them: a torn-down
+        // session must not leave a Cancel pointing at an element that no longer exists anywhere (§3.7).
+        activeEditNode = null;
+        activeEditState = null;
+        lastInteractionNode = null;
+        cancelTargetNode = null;
         hoverClaim = "";
         hoverClaimElement = default;
         hoverHeld = "";

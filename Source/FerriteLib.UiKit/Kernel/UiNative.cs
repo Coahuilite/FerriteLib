@@ -133,9 +133,12 @@ public static class UiNative
 #if FER_DEV
         bool fired = Button(rect);
         UiDevGeometryProbe.NoteInput(ctx, element, rect, fired ? "hit" : "miss", eventBefore);
+        if (fired) ctx.Session.NoteInteractionTarget(element);
         return fired;
 #else
-        return Button(rect);
+        bool pressed = Button(rect);
+        if (pressed) ctx.Session.NoteInteractionTarget(element);
+        return pressed;
 #endif
     }
 
@@ -301,6 +304,11 @@ public static class UiNative
             session.OpenPopup(elementId, anchor);
         }
 
+        // The trigger is the interaction subject now: a Cancel from here walks the tree starting at this
+        // element, which is what the contract means by a starting point taken from the actual interaction
+        // rather than from the last node drawn (§3.6).
+        session.NoteInteractionTarget(ctx?.Node ?? session.ActiveNode);
+
         return true;
     }
 
@@ -421,23 +429,41 @@ public static class UiNative
         if (session == null) throw new ArgumentNullException(nameof(session));
         UiValueState state = session.GetOrCreateValueState(elementId);
         string model = value ?? "";
-        if (IsCoveredByPopup(session))
+        if (state.DiscardRequested)
         {
-            // Covered: the field must not consume the click the option row underneath it is about to make.
-            // Same shape as the disabled refusal - no focus, no native control, no commit.
+            // The window's Cancel hook ended this edit one step before the page was drawn. Restore the buffer
+            // from the model and write nothing: discarding means restoring, never coercing an unparseable
+            // draft into some default (§3.4/§3.6).
+            state.DiscardRequested = false;
+            state.CommitRequested = false;
             state.Focused = false;
             state.EditText = model;
+            session.NoteEditClosed(state);
             committed = false;
             return model;
+        }
+
+        if (IsCoveredByPopup(session))
+        {
+            // Covered: the edit PAUSES. The native control is never reached, so the field consumes no click
+            // and the option row under the popup keeps its press — but the draft and the focus stay where the
+            // player left them, because a menu opening over a field is not an answer to the edit in it. Only
+            // the field's own Enter/blur or the window's two hooks end an edit (§3.4).
+            committed = false;
+            return state.Focused ? state.EditText : model;
         }
 
         if (IsElementDisabled(session, elementId))
         {
             // Disabled: the field never takes focus, never reaches the native control and never commits, so
             // no click is consumed and no text is edited. The draft is dropped back onto the model so a
-            // re-enabled field resumes there instead of on a dead edit.
+            // re-enabled field resumes there instead of on a dead edit, and a request the hooks left behind
+            // addresses a dead edit and dies with it.
+            state.DiscardRequested = false;
+            state.CommitRequested = false;
             state.Focused = false;
             state.EditText = model;
+            session.NoteEditClosed(state);
             committed = false;
             return model;
         }
@@ -450,6 +476,7 @@ public static class UiNative
         if (IsMouseDownOver(rect))
         {
             state.Focused = true;
+            session.NoteEditOpened(state);
         }
 
         string displayText = state.Focused ? state.EditText : model;
@@ -457,8 +484,16 @@ public static class UiNative
         bool changed = !string.Equals(text, displayText, StringComparison.Ordinal);
         state.EditText = text;
 
-        bool left = state.Focused && (IsEnterPressed() || IsFocusLost(rect));
-        if (left) state.Focused = false;
+        // An edit ends three ways and only three ways: the field's own Enter, its own loss of focus, or the
+        // window's Accept hook marking the state. The third is the same event pass as the other two, because
+        // the hook runs at the top of the window's pass and the contents are drawn right after it.
+        bool left = state.Focused && (state.CommitRequested || IsEnterPressed() || IsFocusLost(rect, session));
+        if (left)
+        {
+            state.CommitRequested = false;
+            state.Focused = false;
+            session.NoteEditClosed(state);
+        }
 
         committed = changed || (left && !string.Equals(state.EditText, model, StringComparison.Ordinal));
         if (committed) return state.EditText;
@@ -477,25 +512,43 @@ public static class UiNative
     {
         if (session == null) throw new ArgumentNullException(nameof(session));
         UiValueState state = session.GetOrCreateValueState(elementId);
-        if (IsCoveredByPopup(session))
+        if (state.DiscardRequested)
         {
-            // Covered: mirror the disabled refusal - no focus, no parse, no native control, no commit, so the
-            // click survives for the option row the popup is drawing over this field.
+            // The window's Cancel hook ended this edit before the field was reached: the buffer is restored
+            // from the model and nothing is written, which is also how unparseable text leaves — a discarded
+            // draft is not a value, and the library never invents one to write (§3.4/§3.6).
+            state.DiscardRequested = false;
+            state.CommitRequested = false;
             state.Focused = false;
             state.FloatValue = ClampValue(value, min, max);
             state.EditText = FormatValue(state.FloatValue, format);
+            session.NoteEditClosed(state);
             committed = false;
             return state.EditText;
+        }
+
+        if (IsCoveredByPopup(session))
+        {
+            // Covered: the edit pauses rather than ending. No native control is reached, so the field consumes
+            // no click and parses nothing, and the option row the popup is drawing over this field still gets
+            // its press. The draft and the focus survive: a menu opening over a number the player is halfway
+            // through typing does not answer that edit, in either direction (§3.4).
+            committed = false;
+            return state.Focused ? state.EditText : FormatValue(ClampValue(value, min, max), format);
         }
 
         if (IsElementDisabled(session, elementId))
         {
             // Disabled: the field never takes focus, never parses and never commits, and the native control
             // is never reached - so no click is consumed and no text is edited. The buffer is reset to the
-            // model's value so a re-enabled field resumes there instead of on a dead edit.
+            // model's value so a re-enabled field resumes there instead of on a dead edit, and a hook request
+            // addressed to that dead edit dies with it.
+            state.DiscardRequested = false;
+            state.CommitRequested = false;
             state.Focused = false;
             state.FloatValue = ClampValue(value, min, max);
             state.EditText = FormatValue(state.FloatValue, format);
+            session.NoteEditClosed(state);
             committed = false;
             return state.EditText;
         }
@@ -509,6 +562,7 @@ public static class UiNative
         if (IsMouseDownOver(rect))
         {
             state.Focused = true;
+            session.NoteEditOpened(state);
         }
 
         string displayText = state.Focused ? state.EditText : FormatValue(state.FloatValue, format);
@@ -531,10 +585,20 @@ public static class UiNative
             state.EditText = text;
         }
 
-        if (state.Focused && (IsEnterPressed() || IsFocusLost(rect)))
+        // The commit rule, stated once so the two field kinds cannot drift (and so a deferred editor cannot
+        // lose its draft): a keystroke commits for a live editor, and the frame that ENDS the edit commits for
+        // a deferred one, because that frame is otherwise indistinguishable from a frame that typed nothing.
+        // Witness 2 was exactly this half missing — the parsed draft was still in the session when the model
+        // was reset to itself on the next frame, so a Live=false field silently swallowed what the player
+        // typed. An unparseable draft never earns that commit; it is dropped by the reset below.
+        bool ending = state.Focused && (state.CommitRequested || IsEnterPressed() || IsFocusLost(rect, session));
+        if (ending)
         {
+            state.CommitRequested = false;
+            if (parsed && Math.Abs(state.FloatValue - value) > 0.0001f) committed = true;
             state.EditText = FormatValue(state.FloatValue, format);
             state.Focused = false;
+            session.NoteEditClosed(state);
         }
 
         return state.Focused ? state.EditText : FormatValue(state.FloatValue, format);
@@ -666,6 +730,18 @@ public static class UiNative
         if (current != null) current.Use();
     }
 
+    /// <summary>
+    /// Marks the current keyboard event handled, so a key the interaction ladder consumed cannot also reach a
+    /// native control or a second handler in the same pass. The key sibling of
+    /// <see cref="ConsumePointerEvent"/>, and the reason one Cancel press performs one action: without it the
+    /// game's late second Cancel check inside the same window pass would fire the layer below again.
+    /// </summary>
+    public static void ConsumeKeyEvent()
+    {
+        Event? current = Event.current;
+        if (current != null) current.Use();
+    }
+
     internal static bool TryParseNumber(string text, out float value)
     {
         if (text != null && text.Trim().Length > 0
@@ -788,6 +864,22 @@ public static class UiNative
             && current.type == EventType.MouseDown
             && current.button == 0
             && !IsMouseOver(rect);
+    }
+
+    /// <summary>
+    /// The blur a field asks when it knows its session. The read above can only see a press that is still live:
+    /// a control drawn EARLIER in the same pass may already have consumed the MouseDown, and IMGUI leaves the
+    /// event standing as <c>Used</c> rather than as evidence of what it was. The session recorded at the pass
+    /// boundary whether this frame was a primary press at all, so a click outside the field ends the edit
+    /// whoever consumed it — which is the difference between the contract's rule and a rule that holds only
+    /// while the field happens to draw before whatever the player clicked.
+    /// </summary>
+    internal static bool IsFocusLost(Rect rect, UiSession session)
+    {
+        if (session == null) return IsFocusLost(rect);
+        if (DebugFocusLost) return true;
+        if (IsFocusLost(rect)) return true;
+        return session.PassBeganWithPrimaryPress && !IsMouseOver(rect);
     }
 
     private static float NativeHorizontalSlider(Rect rect, float value, float min, float max)

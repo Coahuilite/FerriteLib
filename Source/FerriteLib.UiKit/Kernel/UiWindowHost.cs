@@ -350,6 +350,51 @@ public abstract class UiWindowHost : Window
         }
     }
 
+    /// <summary>
+    /// The native Cancel key enters the page through here, which is the ONLY reason the ladder exists as a
+    /// host method: Verse dispatches this hook at the top of the window's pass, before
+    /// <see cref="DoWindowContents"/> has drawn anything, so a page's option menu, held drag or open edit can
+    /// be undone before any widget gets a chance to react to the same key. The shell offers the ladder first
+    /// refusal and only then hands the key to <c>base</c>, which is Verse's own meaning of it — close the
+    /// window when <c>closeOnCancel</c> says so. A page with nothing to undo therefore still closes exactly
+    /// the way it did before this override existed, and a page with something to undo loses one layer per
+    /// press instead of the whole window.
+    /// <para>
+    /// Sealed, like the content pass: the shell owns when the tree gets first refusal. A consumer that needs
+    /// a business layer under the tree declares <c>CancelBind</c> on the element that is that layer, and names
+    /// the subject with <see cref="UiSession.SetCancelTarget(string)"/> — both reach this same ladder, and
+    /// neither needs a window subclass.
+    /// </para>
+    /// <para>
+    /// The vanilla precondition is unchanged and is a real boundary: Verse only calls this hook for a window
+    /// that <c>closeOnCancel</c> or <c>forceCatchAcceptAndCancelEventEvenIfUnfocused</c> makes eligible and
+    /// that the window stack lets receive input. A shell configured with <c>CloseOnCancel=false</c> does not
+    /// hear the key at all, which is the game's convention and not something this library rewrites on a
+    /// consumer's behalf; a consumer that wants the ladder in such a window sets that public Verse field.
+    /// </para>
+    /// </summary>
+    public sealed override void OnCancelKeyPressed()
+    {
+        UiHost? page = host;
+        if (page != null && page.TryHandleCancel()) return;
+
+        base.OnCancelKeyPressed();
+    }
+
+    /// <summary>
+    /// The Accept key, with the same first-refusal shape: while a field in this page holds an open edit,
+    /// Enter answers that edit and the window stays open (§3.5 — a committed value must not also be a closed
+    /// settings window). With no open edit, <c>base</c> keeps the consumer's declared <c>closeOnAccept</c>
+    /// convention untouched.
+    /// </summary>
+    public sealed override void OnAcceptKeyPressed()
+    {
+        UiHost? page = host;
+        if (page != null && page.TryHandleAccept()) return;
+
+        base.OnAcceptKeyPressed();
+    }
+
     private void DrawShell(Rect inRect)
     {
         ResolvePointerDown();

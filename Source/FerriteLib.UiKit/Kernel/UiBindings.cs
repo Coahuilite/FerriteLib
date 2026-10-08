@@ -445,6 +445,23 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
         return !commands.TryGetValue(actionId, out CommandDescriptor? descriptor) || CanRun(descriptor!);
     }
 
+    /// <summary>
+    /// Existence AND executability in one answer, for the caller that must not throw: the Cancel ladder asks a
+    /// declared key whether it names a command it can run now, and a key nobody bound is one more rung to
+    /// climb past rather than an exception to recover from. <see cref="CanExecute"/> cannot serve this read
+    /// because it answers true for an unbound key on purpose, and <see cref="Invoke(string)"/> cannot because
+    /// it throws for one.
+    /// </summary>
+    public bool TryInvokeCommand(string actionId)
+    {
+        if (actionId == null) throw new ArgumentNullException(nameof(actionId));
+        if (!commands.TryGetValue(actionId, out CommandDescriptor? descriptor)) return false;
+        if (!CanRun(descriptor!)) return false;
+
+        descriptor!.Action();
+        return true;
+    }
+
     private static bool CanRun(CommandDescriptor descriptor)
     {
         return descriptor.CanExecute == null || descriptor.CanExecute();

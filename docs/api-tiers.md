@@ -103,6 +103,14 @@ consequence is paid in the open rather than discovered by a stranger.
   section that carried something — is the same rule applied to the choice itself: the document wins and the
   displaced section is reported, because quietly picking one of two authored sources is the silent fallback
   this library refuses.
+  FL-IC2 (2026-10-08) adds the two entry points the window keys reach the page through: `TryHandleCancel()` and
+  `TryHandleAccept()`, each returning whether the page answered the key. They are public because the ladder is
+  the page's own business and `UiWindowHost` is not the only window shape a consumer may own — a consumer that
+  drives its own `Verse.Window` subclass calls these from its own `OnCancelKeyPressed`/`OnAcceptKeyPressed`. Each
+  consumes the key when it answered and consumes NOTHING when it did not, so a page with no popup, no capture, no
+  open edit and no executable `CancelBind` on the way up keeps Verse's meaning of the key untouched. The order is
+  the contract's (menu, capture, edit, then the nearest executable layer climbing from the subject), and it is
+  documented on the method because a reader has to be able to check it without reading the body.
 - `UiSession` — session state. Since FL-IC1 (2026-10-08) it also owns the two facts the interaction contract
   needs an owner for: the open menu's scroll (`OpenPopupScrollRows`, reset when a popup opens or closes and
   clamped by `UiPopup`, which is the only frame that knows how many rows the bounded rect shows) and the
@@ -118,7 +126,24 @@ consequence is paid in the open rather than discovered by a stranger.
   (the consumer's catalog keys, a mode row's option help). The parameter was named `elementId` until the
   element-help round, which is what made readers assume the wrong thing; the rename is a source-level change
   only for a caller that used a named argument, on a public-unstable type.
-- `UiValueState` — per-element state bag; its key is the path string the identity layer replaces.
+  FL-IC2 (2026-10-08) adds the three records the Cancel ladder reads and the entry that names one of them:
+  `ActiveEditNode`, `LastInteractionNode` and `CancelTargetNode` (all `UiNode?`, all null when nothing holds
+  them), `SetCancelTarget(string elementId)` and the `SetCancelTarget(UiNode? node)` form for a composite's own
+  sub-control (which has no declared id to name it by), and `ClearCancelTarget()`. The string form resolves
+  through the node table NOW, so an id that names nothing is a false return rather than a dangling string; the
+  node form accepts only a node this session's table still holds. All three are references, never id strings,
+  and the pass boundary drops a record whose node has left the page — where leaving the page also ENDS an open
+  edit on its own state, because a record cleared alone left the field still claiming to be editing (§3.7).
+  `SetCancelTarget` is the only consumer-facing entry here; the writes the funnel makes
+  (`NoteEditOpened`/`NoteEditClosed`/`NoteInteractionTarget`) stay internal, so no kind can move the ladder's
+  subject by calling a recorder it does not own.
+- `UiValueState` — per-element state bag; its key is the path string the identity layer replaces. FL-IC2
+  (2026-10-08) added the two halves of an edit transaction, `CommitRequested` and `DiscardRequested`, and both
+  are deliberately **`internal`**: a window's Accept/Cancel hook runs before the page is drawn, so it can only
+  mark the state, and the funnel applies that mark at the field's next draw — the same event pass. A consumer
+  that wants to know whether an edit is open reads `UiSession.ActiveEditNode`; a custom widget driving
+  `UiNative.NumberField`/`TextField` has the transaction applied for it, which is why these are not the
+  widget's to set or clear.
 - `UiElementSpec` — the spec a widget reads; additions are breaking pre-1.0 by definition.
 - `UiWidgetContext` — what a widget is handed per pass; may carry a node instead of a path, and since
   batch B a nearest-first `StyleChain` — the scheme/density declarations from the element outward, the
@@ -134,6 +159,14 @@ consequence is paid in the open rather than discovered by a stranger.
   query needs, and the `Bind*` registrations take an optional `UiInvalidation` (command registration also
   takes the executability predicate). Every one is a breaking addition for every implementer, which is why
   they land once in this window.
+  FL-IC2 (2026-10-08) adds `TryInvokeCommand(actionId)`, which reports whether the key named a registered
+  command AND ran it — the existence-aware read `CanExecute` deliberately is not (it answers true for an unbound
+  key, because that read is a disabled veto and not an existence test) and which `Invoke` cannot be (it throws
+  for one). It exists for the Cancel climb, where a page may declare a key its consumer never registered and a
+  thrown `KeyNotFoundException` would take the window down instead of moving one layer up the tree. **This is a
+  breaking addition for any hand-written `IUiBindings` implementation** — a type in the tree implements this
+  interface, so the consumer's harness needs the one-line forward; `UiBindings` answers it, and the delegating
+  double in this repository's own harness shows the shape.
 - `IUiTypedChoices` — the OPTIONAL typed half of the bindings surface (0.7.x, R4-A): the declared value type
   of a key, a boxed read of the current value, the acceptance test the write applies, a write that refuses a
   value of the wrong type **without writing anything**, and the key's typed choices as labels plus boxed
@@ -147,9 +180,16 @@ consequence is paid in the open rather than discovered by a stranger.
   another type. It also implements `IUiTypedChoices`, and recognises a `UiChoice<T>` options registration at
   **bind time** (`default(T) is IUiChoice`) rather than by reflection, so the erased view exists for exactly
   the registrations that declared it and no other list shape is affected.
-- `UiNative` — the backend funnel's public face (31 members counted 2026-10-08: 28 before FL-IC1 plus
-  `CanReceivePointerPress`, `WindowPointer` and `PointerWheelNotches`); hit-stack and focus work will move
-  members across its boundary.
+  `TryInvokeCommand` (FL-IC2) is the one member that answers existence and executability together: a key with no
+  command registered returns false and runs nothing, a registered command whose predicate answers false likewise,
+  and only a command that may run is invoked — with true reported. The climb past an unregistered `CancelBind`
+  rests on this, and it is why the read is not built out of `CanExecute` plus `Invoke`.
+- `UiNative` — the backend funnel's public face (32 members counted 2026-10-08: 28 before FL-IC1, plus
+  `CanReceivePointerPress`, `WindowPointer` and `PointerWheelNotches` in that slice, plus `ConsumeKeyEvent` in
+  FL-IC2); hit-stack and focus work will move members across its boundary. `ConsumeKeyEvent` is the key sibling
+  of `ConsumePointerEvent` and is what makes one press undo one layer: the game re-reads an unconsumed Cancel key
+  at the end of the same window pass, so a ladder that answered a layer without consuming the key would also
+  close the window.
   FL-IC1 put the receive-eligibility rule in this type rather than in each kind: `CanReceivePointerPress(rect, ctx)`
   answers the four questions a control that takes the pointer itself must ask - an interactive node (the element
   or an ancestor is not disabled), the native window and scroll authority (the raw hover answer, which is what
@@ -270,6 +310,16 @@ consequence is paid in the open rather than discovered by a stranger.
   its own constants; a report of a COMPLETED pass instead quotes the capture's own chrome record
   (`UiDevGeometrySnapshot.ShellChrome`, written by the shell when the chrome drew). Additive, no behavior
   change; the 0.7.x temporary public-addition exemption applies.
+  FL-IC2 (2026-10-08) seals Verse's two key hooks here: `OnCancelKeyPressed`/`OnAcceptKeyPressed` offer the page's
+  ladder first refusal and call `base` only when the page answered nothing, so Enter on an open edit commits the
+  edit instead of closing the window, and Escape undoes one layer per press before it can mean close. Sealed for
+  the same reason the content pass is: the shell owns when the tree gets first refusal, and a consumer's business
+  layer reaches the same ladder through a `CancelBind` declaration or `UiSession.SetCancelTarget` rather than
+  through a window subclass. The vanilla precondition is unchanged and is a real boundary — Verse only calls
+  these hooks for a window its `closeOnCancel`/`closeOnAccept` (or
+  `forceCatchAcceptAndCancelEventEvenIfUnfocused`) makes eligible, so a shell configured `CloseOnCancel=false`
+  does not hear the key at all; that is the game's convention, and a consumer that wants the ladder there sets
+  that public Verse field itself. Additive, no behavior change for a page with nothing to undo.
 - `UiWindowChrome` — the read-only geometry snapshot `UiWindowHost.ShellChrome` answers with: outer, title
   band, close affordance, content box, plus the two inset values it was built from. Classified
   public-unstable with the shell it describes; the constructor is internal, so the only source of a value
@@ -351,6 +401,11 @@ consequence is paid in the open rather than discovered by a stranger.
   per-pass hand-off, and `UiWidgetContext.Child(name)` (which replaces the 0.4.0-window `ForChild`, and the
   path-only `WithElement` before it) mints a sub-node under the element so a widget's own controls get their
   own identity and state. Public-unstable: the hit stack and focus are the next steps that read this tree.
+  FL-IC2 (2026-10-08) adds `CancelBindingKey` (public get, internal set): the command key this element declared
+  as its cancel layer, already resolved through whatever scope it sits in, or empty. The engine publishes it once
+  per draw next to `IsDisabled` because the Cancel ladder runs from a window hook, before any widget's context
+  exists, so a fact it needs has to be on the tree rather than inside a kind. Executability is NOT cached here —
+  the ladder asks the live binding, which is the same reason a disabled grey-out is resolved per draw.
 
 - `UiHitLayer` — one entry of the owned hit stack: the element whose paint covers a window-space rect,
   whether the layer is a popup, and its optional `PopupOwnerId`. The existing three-argument constructor
@@ -736,6 +791,14 @@ What the 0.5 window is for (working packages, ownership and status: `docs/develo
   meaning as the legacy static form. An unresolvable `VisibleKey` is not fatal - the element stays visible
   and one deduplicated appearance fallback is recorded - so a page whose model key is missing or not yet
   bound still exists.
+- **`CancelBind` joins the engine-wide vocabulary** (FL-IC2, 2026-10-08). It names a COMMAND key (the
+  `ActionBind` role, not a value), is read by the engine and published on the node for the Cancel ladder to
+  climb, and is allowed on a container as well as a widget — a section that draws nothing of its own is still a
+  layer a player can return from, which is the difference between a hit surface and a tree node. Inside a
+  `<Repeat>` row it is item-scoped exactly like `Bind`/`ActionBind`/`SelectedKey`, so a row's cancel names that
+  row's own command and there is no second scope resolution. A key that names no registered command, or one
+  whose predicate currently answers false, is not an error: the climb passes it and runs the nearest layer that
+  can answer. Nothing about an existing page changes until a `CancelBind` is declared.
 - **`UiSession.ContentRevision`/`BumpContentRevision` are demoted to the arrangement-cache clock.** No
   signature changed; what changed is the contract. A consumer must not use them as its refresh channel
   (that is `NotifyChanged`), and a Paint-class announcement must not move the clock.

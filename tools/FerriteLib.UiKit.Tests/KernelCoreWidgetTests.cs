@@ -1455,6 +1455,8 @@ internal static class KernelCoreWidgetTests
 
         public bool CanExecute(string actionId) => inner.CanExecute(actionId);
 
+        public bool TryInvokeCommand(string actionId) => inner.TryInvokeCommand(actionId);
+
         public int GetRevision(string key) => inner.GetRevision(key);
 
         public UiInvalidation GetInvalidation(string key) => inner.GetInvalidation(key);

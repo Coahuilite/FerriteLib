@@ -97,6 +97,17 @@ public interface IUiBindings
     bool CanExecute(string actionId);
 
     /// <summary>
+    /// Runs the command bound to <paramref name="actionId"/> when — and only when — such a command is
+    /// registered AND may run now, and reports whether it ran. The existence-aware sibling of
+    /// <see cref="CanExecute"/> and <see cref="Invoke(string)"/>, added for the one caller that must ask both
+    /// questions and is not allowed to throw: the Cancel ladder walks the element tree looking for the nearest
+    /// layer a declared key actually names, and a page may declare a key its consumer never registered — a
+    /// thrown <see cref="System.Collections.Generic.KeyNotFoundException"/> there would take the window down
+    /// instead of moving one layer up the tree.
+    /// </summary>
+    bool TryInvokeCommand(string actionId);
+
+    /// <summary>
     /// The revision of one binding key: monotonic, starts at zero, and moves when the consumer announces
     /// that the authoritative model behind the key changed (<see cref="NotifyChanged"/>). This is the
     /// per-key replacement for one global counter, and it is what a widget, a diagnostic or a test reads

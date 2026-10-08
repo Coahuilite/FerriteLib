@@ -126,7 +126,12 @@ public sealed class UiLayoutEngine
         // originals and fails when the copies drift, so the attribute is added in lockstep or not at all.
         "VisibleRows",
         "Scheme", "Density", "Visible", "VisibleKey",
-        "AlignX", "OffsetX", "AlignY", "OffsetY"
+        "AlignX", "OffsetX", "AlignY", "OffsetY",
+        // FL-IC2: the Cancel layer of the tree walk. Engine-wide on a container as well as a widget, because
+        // the ladder walks the TREE and a section is a legitimate layer to return from — the element that
+        // owns no drawing of its own still names a business action. UiHost keeps the mirrored pair; the
+        // drift lane refuses one-sided edits.
+        "CancelBind"
     };
 
     private static readonly HashSet<string> EngineWideWidgetAttributes = new(StringComparer.OrdinalIgnoreCase)
@@ -134,7 +139,9 @@ public sealed class UiLayoutEngine
         "Id", "Kind", "Hidden", "Tab", "Width", "WidthKey", "MinWidth", "MaxWidth", "NarrowHidden",
         "WideHidden", "SelectedKey", "Scheme", "Density",
         "Visible", "VisibleKey", "HelpKey",
-        "AlignX", "OffsetX", "AlignY", "OffsetY"
+        "AlignX", "OffsetX", "AlignY", "OffsetY",
+        // FL-IC2: see the container list above; the two move together or the drift lane fails.
+        "CancelBind"
     };
 
     private static readonly string[] NoSchema = Array.Empty<string>();
@@ -168,6 +175,9 @@ public sealed class UiLayoutEngine
     private const string VisibleKeyAttribute = "VisibleKey";
     private const string WidthKeyAttribute = "WidthKey";
     private const string HelpKeyAttribute = "HelpKey";
+    // FL-IC2: the tree's Cancel layer. Engine-wide like VisibleKey/HelpKey because the ENGINE reads it and
+    // publishes it on the node; no kind owns it, so no kind's schema has to grow for a page to declare it.
+    private const string CancelBindAttribute = "CancelBind";
     private const string TabAttribute = "Tab";
 
     /// <summary>
@@ -580,6 +590,11 @@ public sealed class UiLayoutEngine
             // interactive entry points read it, so a disabled element neither executes nor captures the
             // pointer. Resolved once per element per draw from the command the element declares.
             entry.Node.IsDisabled = ResolveDisabled(entry.Spec, entryCtx);
+
+            // FL-IC2: the same one-per-draw publication for the Cancel ladder. Read from the entry's own spec,
+            // which inside a Repeat row is the item-scoped one, so a row's Cancel names that row's command and
+            // not a page-level key the row happens to share a name with.
+            entry.Node.CancelBindingKey = ReadAttribute(entry.Spec, CancelBindAttribute);
 
             // The element's content layer, in window space (draw rect plus the context's offset), and the
             // origin the funnel lifts a draw-local pointer by. Only widgets are hit surfaces: a container
@@ -2170,7 +2185,11 @@ public sealed class UiLayoutEngine
             // B1: SelectedKey is the binding-driven SELECTED state, and "which row is selected" is an
             // answer about one row - leaving it page-scoped made every row resolve one page-level key,
             // which is how a data-driven row set lost the ability to show which of its rows was selected.
-            && !string.Equals(attribute, "SelectedKey", StringComparison.OrdinalIgnoreCase))
+            && !string.Equals(attribute, "SelectedKey", StringComparison.OrdinalIgnoreCase)
+            // FL-IC2: "return from this row" is an answer about one row for exactly the same reason, and the
+            // contract asks for the tree walk to reuse the existing scope resolution rather than invent a
+            // second one - a Cancel declared inside a row template names the row's own command.
+            && !string.Equals(attribute, CancelBindAttribute, StringComparison.OrdinalIgnoreCase))
         {
             return value;
         }

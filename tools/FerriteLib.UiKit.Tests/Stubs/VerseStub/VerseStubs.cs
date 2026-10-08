@@ -743,6 +743,12 @@ public abstract class Window
     public bool draggable;
     public bool drawShadow = true;
     public bool focusWhenOpened = true;
+    // Existence read from the 1.6.4871 reference assembly (public bool, no initializer -> rests false, the
+    // game's own default). It is the eligibility half of the window stack's Accept/Cancel dispatch: a window
+    // that does not close on a key can still ask to hear it. FL-IC2's shell does NOT set it, because the
+    // library must not rewrite a vanilla convention on a consumer's behalf; the double carries it so a lane
+    // can show the eligibility rule and a consumer's own wiring can be written against a member that exists.
+    public bool forceCatchAcceptAndCancelEventEvenIfUnfocused;
     public Rect windowRect;
 
     protected virtual float Margin => StandardMargin;
@@ -785,11 +791,69 @@ public abstract class Window
     /// </summary>
     public virtual void Close(bool doCloseSound = true)
     {
+        // The game's own route: a window closing asks the stack to remove it, and the stack asks
+        // OnCloseRequest first, so a refusal keeps the window open. The double had an empty body while no
+        // lane needed the consequence; FL-IC2's late second Cancel check reads exactly that consequence (a
+        // window closed during its own pass is no longer IsOpen), so an empty Close would have made the
+        // double answer a question the game answers differently.
+        Find.WindowStack.TryRemove(this, doCloseSound);
     }
+
+    /// <summary>
+    /// The game's Cancel hook (<c>public virtual void OnCancelKeyPressed()</c>, existence read from the
+    /// 1.6.4871 reference assembly). The body below is the plan's reading made executable, the same stance
+    /// <see cref="WindowStack"/> documents for the add/remove order: close when the window says it closes on
+    /// Cancel, and consume the event so the key cannot also reach a control drawn later in the pass. A lane
+    /// asserts only what that reading and the library's own behaviour agree on — that the hook runs BEFORE
+    /// <c>DoWindowContents</c>, that a consumed key performs one action, and that a window which declines to
+    /// close leaves the event alone.
+    /// </summary>
+    public virtual void OnCancelKeyPressed()
+    {
+        if (closeOnCancel)
+        {
+            Close();
+            Event? current = Event.current;
+            if (current != null) current.Use();
+        }
+    }
+
+    /// <summary>The Accept half of <see cref="OnCancelKeyPressed"/>, same provenance and same reading.</summary>
+    public virtual void OnAcceptKeyPressed()
+    {
+        if (closeOnAccept)
+        {
+            Close();
+            Event? current = Event.current;
+            if (current != null) current.Use();
+        }
+    }
+
+    /// <summary>
+    /// Whether this window is still in the stack - the game's own answer, which the late second Cancel check
+    /// below reads: a window that a control closed during the contents pass must not be closed a second time
+    /// by the same key.
+    /// </summary>
+    public bool IsOpen => Find.WindowStack.IsOpen(this);
 
     /// <summary>One window pass, as the game's window stack would drive it.</summary>
     public virtual void WindowOnGUI()
     {
+        // The key dispatch, at the top of the pass and before the contents - the order FL-IC2's ladder depends
+        // on, and the reason a lane may not claim "the hook fired" by calling Widget.Draw alone. The game
+        /// asks a player-rebindable key binding here; the double reads the two default keys directly, which
+        /// is a documented simplification: nothing in this repository's claim depends on WHICH key is bound,
+        /// only on when the dispatch happens and what a consumed key cannot do afterwards.
+        Event? keyEvent = Event.current;
+        if (keyEvent != null && keyEvent.type == EventType.KeyDown)
+        {
+            if (keyEvent.keyCode == KeyCode.Escape) Find.WindowStack.Notify_PressedCancel();
+            else if (keyEvent.keyCode == KeyCode.Return || keyEvent.keyCode == KeyCode.KeypadEnter)
+            {
+                Find.WindowStack.Notify_PressedAccept();
+            }
+        }
+
         float margin = Margin;
         var inRect = new Rect(
             windowRect.x + margin,
@@ -797,6 +861,16 @@ public abstract class Window
             Math.Max(1f, windowRect.width - margin * 2f),
             Math.Max(1f, windowRect.height - margin * 2f));
         DoWindowContents(inRect);
+
+        // The late second check the game performs after the contents: a key the window never consumed (no
+        // eligible handler, or a handler that declined) still closes a Cancel-closing window at the end of
+        // the pass. Re-reading IsOpen is the point - a window closed during its own contents pass is gone,
+        // and a key consumed by the ladder above reads as Used, not KeyDown, so it cannot fire twice.
+        Event? late = Event.current;
+        if (late != null && late.type == EventType.KeyDown && late.keyCode == KeyCode.Escape && IsOpen)
+        {
+            OnCancelKeyPressed();
+        }
     }
 }
 
@@ -899,6 +973,60 @@ public class WindowStack
     public void Notify_ManuallySetFocus(Window window)
     {
         focusedWindow = window;
+    }
+
+    /// <summary>
+    /// Routes Cancel to the window the stack would route it to. The eligibility test is the plan's reading
+    /// made executable (see the class header): a window hears the key when it closes on Cancel or asks to
+    /// catch the key anyway, AND the stack lets it receive input. Only the first eligible window is asked,
+    /// and it is asked once - the game breaks after dispatching, which is half of why one press cannot undo
+    /// two layers through this door.
+    /// </summary>
+    public void Notify_PressedCancel()
+    {
+        for (int i = 0; i < windows.Count; i++)
+        {
+            Window window = windows[i];
+            if ((window.closeOnCancel || window.forceCatchAcceptAndCancelEventEvenIfUnfocused) && GetsInput(window))
+            {
+                window.OnCancelKeyPressed();
+                return;
+            }
+        }
+    }
+
+    /// <summary>The Accept half of <see cref="Notify_PressedCancel"/>, same eligibility shape.</summary>
+    public void Notify_PressedAccept()
+    {
+        for (int i = 0; i < windows.Count; i++)
+        {
+            Window window = windows[i];
+            if ((window.closeOnAccept || window.forceCatchAcceptAndCancelEventEvenIfUnfocused) && GetsInput(window))
+            {
+                window.OnAcceptKeyPressed();
+                return;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The input-receiving test, narrowed to the one rule this repository has a written fact about: a window
+    /// above it in the stack that absorbs input around itself takes the key away (<c>00-baseline.md</c> §
+    /// vanilla-boundary, "GetsInput 受上层 absorbInputAroundWindow 影响"). Beyond that, the topmost added window
+    /// or the focused one receives. The real method also consults obscuring and mouse position; no lane here
+    /// depends on either, and this double states what it does not model rather than guessing at it.
+    /// </summary>
+    public bool GetsInput(Window window)
+    {
+        int index = windows.IndexOf(window);
+        if (index < 0) return false;
+
+        for (int i = index + 1; i < windows.Count; i++)
+        {
+            if (windows[i].absorbInputAroundWindow) return false;
+        }
+
+        return index == windows.Count - 1 || ReferenceEquals(focusedWindow, window);
     }
 
     /// <summary>

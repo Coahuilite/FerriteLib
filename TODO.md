@@ -34,10 +34,17 @@ moves HEAD without changing those held bytes.
       its own trigger selects, a 40-item menu's first and last rows are reachable and the wheel moves the menu
       rather than the page under it, a chart under an open menu writes nothing while a normal drag still
       captures, moves and releases, and the typed menu answers the same way as the string one.
-- [ ] **FL-IC2 (next FL slice, not started here).** The edit transaction (a deferred number's valid draft commits
-      once on a later Enter or outside-click; Esc drops the draft), the window's real Cancel/Accept entry before
-      contents draw, and the tree-cancel capability over the existing node hierarchy. FL-IC1's lanes deliberately
-      touch none of it.
+- [ ] **FL-IC2 short human pass (stub passes do not close it).** In one short session, in a real consumer window:
+      a `Live="false"` number field keeps what was typed when focus leaves by a click on a control drawn earlier,
+      Enter commits the open edit without closing the window, Escape drops the draft without writing it and
+      without closing the window, and a second Escape undoes the next layer (menu, then the tree, then close).
+      The window-stack dispatch order and eligibility are the harness double's reading, and Verse only calls the
+      hooks for a window its `closeOnCancel`/`closeOnAccept` makes eligible - both are in-game facts this lane
+      set cannot establish.
+- [ ] **Consumer-side consequence of FL-IC2.** `IUiBindings` gained `TryInvokeCommand`, a breaking addition for a
+      hand-written implementation; the wired consumer's harness needs the one-line forward before it compiles
+      against this carrier. Declaring `CancelBind` is optional, so a page that declares nothing changes behaviour
+      except through the two window keys.
 - [ ] **Continue one settings-page slice at a time.** Select the next slice from the existing redesign,
       identify the contracts it touches, and record ownership, failure-sensitive tests and applicable game
       acceptance. Review shared state/lifetimes when the slice touches coexistence; the global

@@ -559,8 +559,12 @@ public class Texture2D : Texture
 
 public enum KeyCode
 {
+    // The values are Unity's own (the game reads UnityEngine.KeyCode through the real assembly), and the
+    // double carries only what a lane names: Escape is the Cancel key the window stack dispatches on,
+    // Return/KeypadEnter the Accept key UiNative.IsEnterPressed already reads.
     None = 0,
     Return = 13,
+    Escape = 27,
     KeypadEnter = 271
 }
 

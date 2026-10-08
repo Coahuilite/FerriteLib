@@ -100,6 +100,17 @@ public sealed class UiNode
     /// </summary>
     public bool IsDisabled { get; internal set; }
 
+    /// <summary>
+    /// The command key this element declared as its Cancel binding, already resolved through whatever scope
+    /// the element sits in (a row of a <c>Repeat</c> carries the item-scoped key, not the declared one), or
+    /// empty when it declared none. The engine publishes it once per arrange next to
+    /// <see cref="IsDisabled"/> because the node is the only carrier the Cancel ladder can walk: the ladder
+    /// runs from a window hook, before any widget's context exists, so a fact it needs has to be on the tree
+    /// rather than inside a kind. Executability is NOT cached here — the ladder asks the live binding, which
+    /// is the same reason a disabled element's grey-out is resolved per draw and not stored.
+    /// </summary>
+    public string CancelBindingKey { get; internal set; } = "";
+
     /// <summary>Marks this node's Measure as needed. Idempotent.</summary>
     public void MarkDirty()
     {

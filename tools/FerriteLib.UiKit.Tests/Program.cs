@@ -76,6 +76,10 @@ internal static class Program
         Console.WriteLine("Kernel receive eligibility and capture ownership (FL-IC1: own-popup overlap, chart gates, bounded menu)...");
         failures += KernelInputEligibilityTests.RunAll();
 
+        Console.WriteLine("Kernel edit transactions and the Cancel ladder (FL-IC2: commit-once, native hooks, tree return)...");
+        failures += KernelEditTransactionTests.RunAll();
+        failures += KernelCancelLadderTests.RunAll();
+
         Console.WriteLine("FerriteLib version contract + carrier guard...");
         failures += FerriteLibVersionTests.RunAll();
 

@@ -111,8 +111,34 @@
   window-input authority - and belong to the short human pass. The faithful-revert batch restores the retired
   owner-id rule WITH both decisions it guarded (narrowing only one would be caught by the other and redden
   nothing), and the wheel-ownership-at-the-ends rule has no mutation case by design, which the batch header says:
-  its claim is the saturated-end lane, not a fabricated mutant. FL-IC2 (edit transaction, the window Cancel/Accept
-  entry, tree cancel) is NOT part of this slice.
+  its claim is the saturated-end lane, not a fabricated mutant.
+
+- **FL-IC2 is implemented, corrected against the PM's three in-progress witnesses, and locally validated
+  (2026-10-08, `0.7.x`; awaiting PM acceptance, and not a real-game pass).** One edit transaction with a single
+  commit: a deferred field's parsed draft is carried by the frame that ENDS the edit (witness 2 was the numeric
+  atom holding half the rule the string atom already stated), an unparseable draft is never written and is dropped
+  rather than coerced, and a popup drawn over a field PAUSES the edit instead of answering it. The window's two
+  keys enter through `UiWindowHost`'s sealed `OnCancelKeyPressed`/`OnAcceptKeyPressed` — Verse dispatches them
+  before `DoWindowContents`, so a hook marks the session's recorded edit and the funnel applies it at that
+  field's next draw in the same pass — and the page gets first refusal, `base` keeping the consumer's declared
+  close convention untouched. `CancelBind` joins the engine-wide vocabulary (a command key, allowed on a
+  container as well as a widget, item-scoped inside a `Repeat` row), and one press undoes one layer: menu, then a
+  held capture, then an open edit, then the nearest EXECUTABLE layer climbing `Parent` from the subject — the
+  element a consumer named, else the last element that actually took an interaction. The three interaction
+  records live in `UiSession` as node references, and the pass boundary drops a record whose node left the page,
+  ending an open edit ON ITS STATE as it goes. Contract, migration and the stub-versus-in-game boundary are in
+  `docs/development/0.7/05-api-contract.md` ("FL-IC2"); tiers in `docs/api-tiers.md`; lanes in
+  `KernelEditTransactionTests` (13) and `KernelCancelLadderTests` (12); faithful reverts in
+  `tools/mutation/batches/fl-ic2-20261008.ps1` (eight cases, all intended-red). The PM's three witnesses —
+  a hidden edit leaving `Focused` standing while the record was cleared, a composite `ctx.Child` press discarded
+  by a geometry-only liveness test, and a deferred draft surviving a blank outside click but not a click an
+  earlier-drawn control consumed — were all real defects in the in-progress copy, are fixed with a lane each, and
+  the same three programs were re-run green against the finished copy under
+  `evidence/interaction-development-20261008/fl/pm-ic2-recheck-20261008/`. Two limits that are rulings, not
+  gaps: a shell with `CloseOnCancel=false` never hears the key (Verse's eligibility, which the library does not
+  rewrite on a consumer's behalf), and the window-stack dispatch order in the double is the plan's reading made
+  executable, not a game run. `IUiBindings.TryInvokeCommand` is a member added to an interface — a breaking
+  addition for a hand-written implementation, and the consumer's harness needs the one-line forward.
 
 ## PM integration checkpoint — 2026-09-30
 

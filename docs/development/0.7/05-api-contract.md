@@ -1457,3 +1457,126 @@ pumped the same negation; a covered notch falling through to the page below once
 above and in the code, the honest sign/ownership and round-trip readings are now asserted where they were
 assumed, and the probe's cited Unity source is protocol evidence, not a game or device measurement - the
 real-window half remains the short human pass.
+
+## FL-IC2 (2026-10-08) — one edit transaction, two window keys, one Cancel that climbs the tree
+
+Specification: the same contract's §3.4 (edit transaction), §3.5 (the native key entry), §3.6 (the tree cancel) and
+§3.7 (the lifecycle of an interaction record), against the witness the independent audit confirmed in current source
+(a deferred number field that lost its parsed draft) and the three entry/lifecycle witnesses the PM ran against this
+slice while it was still in the tree. FL-IC1's rules (receive eligibility, capture ownership, the bounded menu) are
+not restated here and were not re-cut; this section is what sits above them. Nothing here is a real-game acceptance.
+
+**The ruling, in one paragraph each.**
+
+- *An edit is a transaction with one commit.* A field's parsed draft lives in the session's value state, not in the
+  model, and exactly one frame carries it across: a keystroke, for an editor the page declared `Live="true"`; the
+  frame that ENDS the edit, for a deferred one. The second half is the whole of witness 2 — the numeric atom had
+  the first and not the second, so the frame that released focus reported "nothing happened", the next frame reset
+  the buffer onto the model, and what the player typed was gone. The rule is now stated once, in both fields, in the
+  same words, and the string field's pre-existing shape is what the numeric one was aligned to rather than the other
+  way round. An unparseable draft never earns that commit: a discarded draft is not a value, and the library does not
+  invent one to write.
+- *Three doors end an edit, and a covered field is not one of them.* The field's own Enter, its own loss of focus,
+  and the window's two hooks. Coverage pauses rather than answers: a menu drawn over a field the player is typing
+  into reaches no native control (so the option row under it keeps its press), writes nothing in either direction,
+  and leaves the draft and the focus where they were.
+- *The two keys are the window's, and the page gets first refusal.* `UiWindowHost` overrides Verse's
+  `OnCancelKeyPressed`/`OnAcceptKeyPressed` — the hooks the game dispatches at the TOP of a window pass, before
+  `DoWindowContents` — and offers the ladder the key first. Because the hook runs before anything draws, it cannot
+  reach into a widget; it marks the session's recorded edit and the funnel applies that mark at the field's next
+  draw, which is the same event pass. With nothing to undo, `base` keeps Verse's meaning of the key untouched, so a
+  page that declares no cancel layer behaves exactly as it did. The consumption is load-bearing: the game re-reads
+  an unconsumed Cancel key at the end of the same pass, so an answered-but-unconsumed press would undo one layer and
+  then close the window.
+- *Cancel undoes one layer per press, deepest answered first.* The open option menu; then a pointer capture this
+  session holds (a Cancel ends an interaction, it does not roll back a value the drag already wrote); then an open
+  edit; then the tree. The walk starts at the SUBJECT — the element a consumer named through
+  `UiSession.SetCancelTarget`, else the last element that actually TOOK an interaction through the funnel — and climbs
+  `Parent` links to the nearest element whose `CancelBind` names a command that can run NOW. A layer that declares
+  nothing is passed through, which is what lets a section be a return layer without being a control; a layer whose
+  command is currently vetoed is climbed past rather than run; a layer naming a key nobody registered is climbed past
+  rather than allowed to throw. "逐层返回" is therefore the business state moving up — each layer makes itself inert
+  when it answers — and not the library remembering how far it has climbed.
+- *A record that leaves the page ends the thing it recorded.* The three interaction records (open edit, last
+  interaction, business target) name nodes, and at the pass boundary a record whose node has left the page is
+  dropped — and an open edit is ended ON ITS STATE as well, because clearing only the reference left a field that
+  came back still claiming to be editing while the entry the hooks act through was empty. Liveness is inherited: a
+  composite's own sub-control has no declared id and no arranged rect by construction, so judging it by geometry
+  alone discarded a press the player really made and the walk started nowhere.
+
+**Public surface, all of it inside `0.7.x` under the standing temporary exemption, none of it promoted.** No new
+type, no new kind, no signature changed on an existing member. One XML vocabulary word: `CancelBind`, engine-wide
+like `VisibleKey` and `HelpKey`, allowed on a widget AND on a container (unlike `HelpKey`, which is refused on a
+container because only widgets are hit surfaces — a section that draws nothing is still a layer to return from). It
+is scoped inside a `Repeat` row exactly like `Bind`/`ActionBind`/`SelectedKey`, so a row's cancel names that row's
+own command and no second scope resolution exists. Nine members on existing public-unstable types:
+`UiHost.TryHandleCancel`, `UiHost.TryHandleAccept`, `UiSession.ActiveEditNode`, `UiSession.LastInteractionNode`,
+`UiSession.CancelTargetNode`, `UiSession.SetCancelTarget(string)`, `UiSession.SetCancelTarget(UiNode?)`,
+`UiSession.ClearCancelTarget`, `UiNode.CancelBindingKey`, plus `UiNative.ConsumeKeyEvent` and the
+`IUiBindings.TryInvokeCommand` the climb needs; and two overrides on the shell (`OnCancelKeyPressed`,
+`OnAcceptKeyPressed`) which are Verse's own virtuals, newly answered. `UiValueState` grows two `internal` flags —
+the transaction is applied by the funnel, and a consumer observes an open edit through the session, never by polling
+a state bit. `TryInvokeCommand` is a member added to `IUiBindings`: a consumer that implements that interface by hand
+(more than one type in the tree does) must add it, and the harness's own delegating double shows the one-line form.
+
+**Behaviour changes on existing surface.** Three, and all are the contract's own corrections rather than a widened
+API: a `Live="false"` number field now writes its parsed draft when the edit ends instead of swallowing it; a click
+outside a field now ends that edit even when a control drawn EARLIER in the same pass consumed the press (the old
+blur read needed a still-live `MouseDown`, which made the rule hold only while the field drew first); and Enter/Escape
+inside a `UiWindowHost` window now answer the page's open menu, held drag, open edit or nearest cancel layer before
+they can mean close. A consumer that wants the old key behaviour opts out by declaring no `CancelBind` and no target
+— with nothing to undo the ladder answers nothing and consumes nothing.
+
+**Event timing, because the ordering is the whole slice.** Verse dispatches Accept/Cancel at the top of the window's
+pass; the shell offers the ladder, the ladder marks the session, and the page then draws — so the field applies the
+mark in the SAME pass, and the lane asserts that by reading `Event.current` from the shell's `BeforeDraw` door: the
+phase is already `Used` before the contents run, which is what makes "the hook ran first" an observation rather than
+a reading of the code. The pass boundary is also where the blur evidence is taken: a control that consumes a press
+leaves the event standing as `Used` with no trace of what it was, so `BeginHitPass` records whether the frame began
+as a primary press at all, before anything drew. The consequence a reader has to hold: the pass-boundary press fact
+and the published popup layers are read at the same moment, one event ahead of the controls that consult them.
+
+**What these lanes do not show, kept explicit.** The window stack is the harness double: its Accept/Cancel dispatch
+order and eligibility test are the plan's reading made executable (documented as such in `VerseStubs.cs`), the game's
+real `GetsInput` also consults obscuring and mouse position, and the key is read as the default Escape/Return rather
+than through a rebindable `KeyBindingDefOf`. Which window a real stack hands the key to with several mod windows open,
+what a rebind does to that hook, real IME text entry, and a native `HorizontalSlider` drag remain the short human
+pass. The vanilla precondition is a real boundary too: Verse only calls these hooks for a window `closeOnCancel` (or
+`forceCatchAcceptAndCancelEventEvenIfUnfocused`) makes eligible, so a shell configured `CloseOnCancel=false` does not
+hear the key — the game's convention, which this library does not rewrite on a consumer's behalf; a consumer that
+wants the ladder there sets that public Verse field.
+
+**Lanes.** `KernelEditTransactionTests` (thirteen scenarios: the deferred draft committing once on the exit frame and
+never again; unparseable text never written and dropped silently; the live field's keystroke write preserved; the
+string field's existing rule held against the shared statement; Accept committing once and keeping the window open
+with the event already used before the contents drew; Cancel dropping the draft, writing nothing and reaching no tree
+layer; nothing-to-undo still closing the window exactly once with the late second check defused; a covered edit
+paused rather than ended and its draft committing after the menu closes; an edit whose element is taken out of play
+leaving no record; a hidden edit ending on its own state and the re-shown field agreeing with the Accept entry; a
+press an earlier control consumed still ending the edit and committing once). `KernelCancelLadderTests` (twelve
+scenarios: the menu as first layer answered before the page draws; one press one layer down the stack across four
+presses; a held chart drag ended before the tree; the nearest EXECUTABLE layer answering with a vetoed one climbed
+past; a declaring-free container passed through; a row's cancel naming that row's own scoped key and a sibling's not
+answering for it; a named business target starting the walk above the clicked control; an unregistered key climbed
+past instead of throwing; a hidden subject ceasing to be a subject; an element that was never pressed not being one;
+and a composite's `ctx.Child` press remaining a subject whose element's layer answers). Every key assertion reads
+whether the event came back consumed, and every window lane removes its shell from the stack it added it to.
+
+**Faithful reverts.** `tools/mutation/batches/fl-ic2-20261008.ps1`, eight cases on single-line anchors: the exit
+frame's commit removed (witness 2); the covered branch ending the edit instead of pausing it; the pass boundary
+clearing only the record (the PM's hidden-edit witness); liveness judged by geometry alone (the PM's child-cancel
+witness); the blur reading only a still-live press (the PM's blur witness); the ladder answering no popup; the shell
+falling through to Verse after a layer answered; and the shell never offering the page the Accept key at all. Each
+names the assertion it must redden and the assertions that stay green on both sides, restores by bytes, rebuilds to
+the baseline fingerprint and watches the root carrier.
+
+**Review integrated.** The PM's in-progress review of this slice
+(`evidence/interaction-development-20261008/fl/pm-ic2-in-progress-review.md`, with the three programs under
+`pm-ic2-child-probe/`) named one defect per entry, each measured by running a copy of the then-dirty source against
+the executable stubs: the hidden edit leaving `Focused` standing while the record was cleared; a composite's child
+press being discarded at the pass boundary so the tree walk started nowhere; and a deferred draft surviving a blank
+outside click but not a click a control drawn earlier had consumed. All three are fixed above and in the code, each
+with a lane of its own, and the same three programs were re-run against the finished working copy under
+`pm-ic2-recheck-20261008/` (source snapshot hashed into `inputs.json`, per-witness logs, `result.json` recording
+exit 0 for child-cancel, hidden-edit and blur-order). The recheck is a source-and-stub result on the working copy: it
+binds no commit, and it is not the game's window stack.
