@@ -108,8 +108,10 @@ consequence is paid in the open rather than discovered by a stranger.
   the page's own business and `UiWindowHost` is not the only window shape a consumer may own — a consumer that
   drives its own `Verse.Window` subclass calls these from its own `OnCancelKeyPressed`/`OnAcceptKeyPressed`. Each
   consumes the key when it answered and consumes NOTHING when it did not, so a page with no popup, no capture, no
-  open edit and no executable `CancelBind` on the way up keeps Verse's meaning of the key untouched. The order is
-  the contract's (menu, capture, edit, then the nearest executable layer climbing from the subject), and it is
+  open edit and no executable `CancelBind` on the way up keeps Verse's meaning of the key untouched — and note that
+  the two entry points are not symmetric: `TryHandleAccept` answers ONLY an open edit, while `TryHandleCancel` walks
+  menu, capture, edit and then the tree, so a consumer reading one list for both keys is reading a rule the library
+  does not have. The order is the contract's, and it is
   documented on the method because a reader has to be able to check it without reading the body.
 - `UiSession` — session state. Since FL-IC1 (2026-10-08) it also owns the two facts the interaction contract
   needs an owner for: the open menu's scroll (`OpenPopupScrollRows`, reset when a popup opens or closes and
@@ -310,16 +312,24 @@ consequence is paid in the open rather than discovered by a stranger.
   its own constants; a report of a COMPLETED pass instead quotes the capture's own chrome record
   (`UiDevGeometrySnapshot.ShellChrome`, written by the shell when the chrome drew). Additive, no behavior
   change; the 0.7.x temporary public-addition exemption applies.
-  FL-IC2 (2026-10-08) seals Verse's two key hooks here: `OnCancelKeyPressed`/`OnAcceptKeyPressed` offer the page's
+  FL-IC2 (2026-10-08) answers Verse's two key hooks here: `OnCancelKeyPressed`/`OnAcceptKeyPressed` offer the page's
   ladder first refusal and call `base` only when the page answered nothing, so Enter on an open edit commits the
-  edit instead of closing the window, and Escape undoes one layer per press before it can mean close. Sealed for
-  the same reason the content pass is: the shell owns when the tree gets first refusal, and a consumer's business
-  layer reaches the same ladder through a `CancelBind` declaration or `UiSession.SetCancelTarget` rather than
-  through a window subclass. The vanilla precondition is unchanged and is a real boundary — Verse only calls
-  these hooks for a window its `closeOnCancel`/`closeOnAccept` (or
-  `forceCatchAcceptAndCancelEventEvenIfUnfocused`) makes eligible, so a shell configured `CloseOnCancel=false`
-  does not hear the key at all; that is the game's convention, and a consumer that wants the ladder there sets
-  that public Verse field itself. Additive, no behavior change for a page with nothing to undo.
+  edit instead of closing the window, and Escape undoes one layer per press before it can mean close. **The Accept
+  override is sealed and the Cancel override is not**, and the asymmetry is evidence-driven rather than tidy: the
+  wired consumer's two diagnostic windows are `UiWindowHost` subclasses that already override `OnCancelKeyPressed`
+  for a two-press Escape close, so sealing it would have made existing consumer code unable to compile against this
+  carrier. The supported shape for a consumer policy is the new extension point
+  `protected virtual bool TryHandleUnansweredCancel()` - asked ONLY after the page's ladder declined, answering
+  whether it handled the press, with the shell consuming the key on its behalf (a consumer that keeps raw backend
+  calls out of its own source cannot reach `Event.current`, and an answered but unconsumed key is re-read by the
+  game at the end of the same window pass). Overriding `OnCancelKeyPressed` wholesale still works and still
+  bypasses the ladder; calling `base` restores both. There is no Accept-side sibling, because no consumer owns an
+  Accept policy. The vanilla precondition is unchanged and is a real boundary — Verse only calls these hooks for a
+  window its `closeOnCancel`/`closeOnAccept` (or `forceCatchAcceptAndCancelEventEvenIfUnfocused`) makes eligible, so
+  a shell configured `CloseOnCancel=false` does not hear the key at all; the library does not force that field for
+  every shell, because that would change eligibility inside someone else's stack, and a consumer that wants the
+  ladder there sets the public Verse field per window - which still cannot take a key from a window above, since
+  eligibility is ANDed with the stack's input test. Additive for a window with no menu, capture or edit open.
 - `UiWindowChrome` — the read-only geometry snapshot `UiWindowHost.ShellChrome` answers with: outer, title
   band, close affordance, content box, plus the two inset values it was built from. Classified
   public-unstable with the shell it describes; the constructor is internal, so the only source of a value

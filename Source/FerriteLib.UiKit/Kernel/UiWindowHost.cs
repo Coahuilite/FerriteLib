@@ -355,37 +355,71 @@ public abstract class UiWindowHost : Window
     /// host method: Verse dispatches this hook at the top of the window's pass, before
     /// <see cref="DoWindowContents"/> has drawn anything, so a page's option menu, held drag or open edit can
     /// be undone before any widget gets a chance to react to the same key. The shell offers the ladder first
-    /// refusal and only then hands the key to <c>base</c>, which is Verse's own meaning of it — close the
-    /// window when <c>closeOnCancel</c> says so. A page with nothing to undo therefore still closes exactly
-    /// the way it did before this override existed, and a page with something to undo loses one layer per
-    /// press instead of the whole window.
+    /// refusal, then <see cref="TryHandleUnansweredCancel"/> for a policy the page's tree cannot express, and
+    /// only then hands the key to <c>base</c>, which is Verse's own meaning of it — close the window when
+    /// <c>closeOnCancel</c> says so. A window with no library interaction open and no executable business
+    /// cancel layer therefore still behaves exactly as it did before this override existed; a window with
+    /// something to undo loses one layer per press instead of the whole window.
     /// <para>
-    /// Sealed, like the content pass: the shell owns when the tree gets first refusal. A consumer that needs
-    /// a business layer under the tree declares <c>CancelBind</c> on the element that is that layer, and names
-    /// the subject with <see cref="UiSession.SetCancelTarget(string)"/> — both reach this same ladder, and
-    /// neither needs a window subclass.
+    /// NOT sealed, deliberately: a consumer that already owns a cancel policy on its shell — the wired
+    /// consumer's two diagnostic windows arm a two-press Escape close in their own override — has to keep
+    /// compiling against this carrier. Overriding this method wholesale bypasses the ladder, so the supported
+    /// shape is to call <c>base</c> and implement <see cref="TryHandleUnansweredCancel"/>; a subclass that
+    /// replaces the method entirely is choosing to own the key, which is its right and no longer the
+    /// library's refusal.
     /// </para>
     /// <para>
     /// The vanilla precondition is unchanged and is a real boundary: Verse only calls this hook for a window
     /// that <c>closeOnCancel</c> or <c>forceCatchAcceptAndCancelEventEvenIfUnfocused</c> makes eligible and
     /// that the window stack lets receive input. A shell configured with <c>CloseOnCancel=false</c> does not
-    /// hear the key at all, which is the game's convention and not something this library rewrites on a
-    /// consumer's behalf; a consumer that wants the ladder in such a window sets that public Verse field.
+    /// hear the key at all, and this library does not rewrite that by forcing the catch field on a
+    /// consumer's behalf — a window that sets it itself still cannot take a key from a window above it that
+    /// absorbs input around itself, because eligibility is ANDed with the stack's input test. The wiring note
+    /// a consumer with <c>CloseOnCancel=false</c> needs is therefore its own one-line assignment of that
+    /// public Verse field, and which window a real multi-window stack hands the key to remains a human-pass
+    /// observation.
     /// </para>
     /// </summary>
-    public sealed override void OnCancelKeyPressed()
+    public override void OnCancelKeyPressed()
     {
         UiHost? page = host;
         if (page != null && page.TryHandleCancel()) return;
+
+        if (TryHandleUnansweredCancel())
+        {
+            // The shell consumes on the handler's behalf, because the handler has no other way to: a consumer
+            // that keeps raw backend calls out of its own source cannot reach Event.current, and an answered
+            // but unconsumed Cancel key is re-read by the game at the end of the same window pass.
+            UiNative.ConsumeKeyEvent();
+            return;
+        }
 
         base.OnCancelKeyPressed();
     }
 
     /// <summary>
-    /// The Accept key, with the same first-refusal shape: while a field in this page holds an open edit,
-    /// Enter answers that edit and the window stays open (§3.5 — a committed value must not also be a closed
-    /// settings window). With no open edit, <c>base</c> keeps the consumer's declared <c>closeOnAccept</c>
-    /// convention untouched.
+    /// The neutral extension point for a cancel policy that is neither the page's tree nor Verse's close:
+    /// an arm-then-confirm exit, a window-local guard, anything whose meaning belongs to the consumer's
+    /// window rather than to a page element. It is asked ONLY after the library ladder declined, so a layer
+    /// the player can see on screen always outranks a policy the player cannot; returning true means the
+    /// policy handled the press, and the shell then consumes the key so the same press cannot also reach the
+    /// native close. The default answers false, which is the delivered behaviour: Verse's convention stays
+    /// the last word.
+    /// <para>
+    /// Cancel only, on purpose. The evidence for an extension point here is a consumer that already owns this
+    /// exact policy on two windows; nothing in any consumer owns an Accept-side equivalent, so there is no
+    /// sibling hook, no opt-out switch and no second window-input authority — the ladder and this one answer
+    /// are the whole surface.
+    /// </para>
+    /// </summary>
+    protected virtual bool TryHandleUnansweredCancel() => false;
+
+    /// <summary>
+    /// The Accept key, in the same first-refusal shape but with a narrower reach: <c>Enter</c> answers ONLY an
+    /// open edit the page holds (§3.5 — a committed value must not also be a closed settings window). It does
+    /// not close a menu, end a drag or climb the tree; those are the Cancel key's layers, and a consumer that
+    /// reads one list for both keys is reading a rule this shell does not have. With no open edit,
+    /// <c>base</c> keeps the consumer's declared <c>closeOnAccept</c> convention untouched.
     /// </summary>
     public sealed override void OnAcceptKeyPressed()
     {

@@ -347,9 +347,12 @@ public sealed class UiHost : IDisposable
     /// </para>
     /// <para>
     /// Returns false when there is nothing to cancel, and consumes nothing in that case: the caller —
-    /// <see cref="UiWindowHost.OnCancelKeyPressed"/>, or a consumer's own window subclass — then keeps
-    /// Verse's meaning of the key, which is the layer that closes the window. A page that declares no
-    /// <c>CancelBind</c> anywhere therefore behaves exactly as it did before this method existed.
+    /// <see cref="UiWindowHost.OnCancelKeyPressed"/> (which then asks its own
+    /// <see cref="UiWindowHost.TryHandleUnansweredCancel"/> extension point before Verse), or a consumer's own
+    /// window subclass — keeps Verse's meaning of the key, which is the layer that closes the window. The
+    /// preserved behaviour belongs to a window with NO library interaction open: declaring no
+    /// <c>CancelBind</c> is not sufficient on its own, because the menu, the held capture and the open edit
+    /// are answered by this ladder whether or not the page declares a single cancel layer.
     /// </para>
     /// </summary>
     public bool TryHandleCancel()

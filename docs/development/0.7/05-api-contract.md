@@ -1509,24 +1509,33 @@ type, no new kind, no signature changed on an existing member. One XML vocabular
 like `VisibleKey` and `HelpKey`, allowed on a widget AND on a container (unlike `HelpKey`, which is refused on a
 container because only widgets are hit surfaces — a section that draws nothing is still a layer to return from). It
 is scoped inside a `Repeat` row exactly like `Bind`/`ActionBind`/`SelectedKey`, so a row's cancel names that row's
-own command and no second scope resolution exists. Eleven new public members on existing public-unstable types:
+own command and no second scope resolution exists. Twelve new members on existing public-unstable types:
 `UiHost.TryHandleCancel`, `UiHost.TryHandleAccept`, `UiSession.ActiveEditNode`, `UiSession.LastInteractionNode`,
 `UiSession.CancelTargetNode`, `UiSession.SetCancelTarget(string)`, `UiSession.SetCancelTarget(UiNode?)`,
-`UiSession.ClearCancelTarget`, `UiNode.CancelBindingKey`, `UiNative.ConsumeKeyEvent` and the
-`IUiBindings.TryInvokeCommand` the climb needs (with its `UiBindings` implementation, twelve declarations in all);
-plus two overrides on the shell (`OnCancelKeyPressed`, `OnAcceptKeyPressed`), which are Verse's own virtuals,
-newly answered. `UiValueState` grows two `internal` flags —
-the transaction is applied by the funnel, and a consumer observes an open edit through the session, never by polling
-a state bit. `TryInvokeCommand` is a member added to `IUiBindings`: a consumer that implements that interface by hand
-(more than one type in the tree does) must add it, and the harness's own delegating double shows the one-line form.
+`UiSession.ClearCancelTarget`, `UiNode.CancelBindingKey`, `UiNative.ConsumeKeyEvent`, the
+`IUiBindings.TryInvokeCommand` the climb needs and its `UiBindings` implementation (thirteen declarations counting
+the interface member twice); plus two answers on the shell — Verse's own `OnCancelKeyPressed` and
+`OnAcceptKeyPressed`, newly overridden — and one new extension point,
+`protected virtual bool UiWindowHost.TryHandleUnansweredCancel()`, which defaults to false and is asked only after
+the page's ladder declined. The Cancel override is deliberately NOT sealed: the wired consumer already owns a
+two-press Escape policy on two `UiWindowHost` subclasses, and a sealed override would have locked that existing code
+out of this carrier. `UiValueState` grows two `internal` flags — the transaction is applied by the funnel, and a
+consumer observes an open edit through the session, never by polling a state bit. `TryInvokeCommand` is a member
+added to `IUiBindings`: a consumer that implements that interface by hand (more than one type in the tree does) must
+add it, and the harness's own delegating double shows the one-line form.
 
 **Behaviour changes on existing surface.** Three, and all are the contract's own corrections rather than a widened
 API: a `Live="false"` number field now writes its parsed draft when the edit ends instead of swallowing it; a click
 outside a field now ends that edit even when a control drawn EARLIER in the same pass consumed the press (the old
-blur read needed a still-live `MouseDown`, which made the rule hold only while the field drew first); and Enter/Escape
-inside a `UiWindowHost` window now answer the page's open menu, held drag, open edit or nearest cancel layer before
-they can mean close. A consumer that wants the old key behaviour opts out by declaring no `CancelBind` and no target
-— with nothing to undo the ladder answers nothing and consumes nothing.
+blur read needed a still-live `MouseDown`, which made the rule hold only while the field drew first); and the two
+window keys are now answered inside the window before they can mean close. **The two keys are not the same rule and
+are described separately, because they do different work:** `Enter` answers ONLY an open edit — it does not close a
+menu, end a drag or climb the tree — while `Escape` answers the open menu, then a held capture, then an open edit,
+then the nearest executable `CancelBind`. The preserved behaviour belongs to a window with **no library interaction
+open**: declaring no `CancelBind` and naming no target is NOT sufficient to keep the old key meaning, because the
+menu, the capture and the edit are answered whether or not the page declares a single cancel layer. What a page that
+declares nothing keeps is the tree step and the close: with no menu open, no capture held and no edit focused, the
+ladder answers nothing, consumes nothing, and Verse's meaning of both keys is exactly what it was.
 
 **Event timing, because the ordering is the whole slice.** Verse dispatches Accept/Cancel at the top of the window's
 pass; the shell offers the ladder, the ladder marks the session, and the page then draws — so the field applies the
@@ -1542,42 +1551,65 @@ order and eligibility test are the plan's reading made executable (documented as
 real `GetsInput` also consults obscuring and mouse position, and the key is read as the default Escape/Return rather
 than through a rebindable `KeyBindingDefOf`. Which window a real stack hands the key to with several mod windows open,
 what a rebind does to that hook, real IME text entry, and a native `HorizontalSlider` drag remain the short human
-pass. The vanilla precondition is a real boundary too: Verse only calls these hooks for a window `closeOnCancel` (or
-`forceCatchAcceptAndCancelEventEvenIfUnfocused`) makes eligible, so a shell configured `CloseOnCancel=false` does not
-hear the key — the game's convention, which this library does not rewrite on a consumer's behalf; a consumer that
-wants the ladder there sets that public Verse field.
+pass. The vanilla precondition is a real boundary too, and it is the wiring note a migrating consumer needs: Verse
+only calls these hooks for a window that `closeOnCancel` (or
+`forceCatchAcceptAndCancelEventEvenIfUnfocused`) makes eligible, so a shell configured `CloseOnCancel=false` — which
+is what the consumer's two diagnostic windows do today — does not hear the key at all. The library does not force
+that field, because doing so for every shell would change which window is eligible in someone else's stack; the
+consumer sets it per window, and that per-window opt-in still cannot steal a key from a window above, because
+eligibility is ANDed with the stack's input test. What the harness cannot show is the multi-window result of that
+AND, so it remains a named human-pass item.
 
-**Lanes.** `KernelEditTransactionTests` (thirteen scenarios: the deferred draft committing once on the exit frame and
+**Lanes.** `KernelEditTransactionTests` (eleven scenarios: the deferred draft committing once on the exit frame and
 never again; unparseable text never written and dropped silently; the live field's keystroke write preserved; the
 string field's existing rule held against the shared statement; Accept committing once and keeping the window open
 with the event already used before the contents drew; Cancel dropping the draft, writing nothing and reaching no tree
 layer; nothing-to-undo still closing the window exactly once with the late second check defused; a covered edit
 paused rather than ended and its draft committing after the menu closes; an edit whose element is taken out of play
 leaving no record; a hidden edit ending on its own state and the re-shown field agreeing with the Accept entry; a
-press an earlier control consumed still ending the edit and committing once). `KernelCancelLadderTests` (twelve
+press an earlier control consumed still ending the edit and committing once). `KernelCancelLadderTests` (thirteen
 scenarios: the menu as first layer answered before the page draws; one press one layer down the stack across four
 presses; a held chart drag ended before the tree; the nearest EXECUTABLE layer answering with a vetoed one climbed
 past; a declaring-free container passed through; a row's cancel naming that row's own scoped key and a sibling's not
 answering for it; a named business target starting the walk above the clicked control; an unregistered key climbed
 past instead of throwing; a hidden subject ceasing to be a subject; an element that was never pressed not being one;
-and a composite's `ctx.Child` press remaining a subject whose element's layer answers). Every key assertion reads
+a composite's `ctx.Child` press remaining a subject whose element's layer answers; and a DERIVED shell implementing
+its own cancel policy through `TryHandleUnansweredCancel` - asked only after the page declined, and consuming the key
+it answered so the native close cannot also fire. Every key assertion reads
 whether the event came back consumed, and every window lane removes its shell from the stack it added it to.
 
-**Faithful reverts.** `tools/mutation/batches/fl-ic2-20261008.ps1`, eight cases on single-line anchors: the exit
+**Faithful reverts.** `tools/mutation/batches/fl-ic2-20261008.ps1`, ten cases on single-line anchors: the exit
 frame's commit removed (witness 2); the covered branch ending the edit instead of pausing it; the pass boundary
 clearing only the record (the PM's hidden-edit witness); liveness judged by geometry alone (the PM's child-cancel
-witness); the blur reading only a still-live press (the PM's blur witness); the ladder answering no popup; the shell
-falling through to Verse after a layer answered; and the shell never offering the page the Accept key at all. Each
-names the assertion it must redden and the assertions that stay green on both sides, restores by bytes, rebuilds to
-the baseline fingerprint and watches the root carrier.
+witness); the blur reading only a still-live press (the PM's blur witness); the ladder answering no popup; the ladder
+answering without consuming the key; the shell never offering the page the Accept key; the consumer's cancel policy
+being asked BEFORE the page (the ordering the delivery review required); and the policy answering without the shell
+consuming the key. Each names the assertion it must redden and the assertions that stay green on both sides, restores
+by bytes, rebuilds to the baseline fingerprint and watches the root carrier.
 
-**Review integrated.** The PM's in-progress review of this slice
+**Review integrated.** Two reviews shaped this slice. The PM's in-progress review
 (`evidence/interaction-development-20261008/fl/pm-ic2-in-progress-review.md`, with the three programs under
 `pm-ic2-child-probe/`) named one defect per entry, each measured by running a copy of the then-dirty source against
 the executable stubs: the hidden edit leaving `Focused` standing while the record was cleared; a composite's child
 press being discarded at the pass boundary so the tree walk started nowhere; and a deferred draft surviving a blank
 outside click but not a click a control drawn earlier had consumed. All three are fixed above and in the code, each
-with a lane of its own, and the same three programs were re-run against the finished working copy under
-`pm-ic2-recheck-20261008/` (source snapshot hashed into `inputs.json`, per-witness logs, `result.json` recording
-exit 0 for child-cancel, hidden-edit and blur-order). The recheck is a source-and-stub result on the working copy: it
-binds no commit, and it is not the game's window stack.
+with a lane of its own, and the same three programs were re-run against the finished tree under
+`pm-ic2-recheck-20261008/` (working copy) and again under `pm-ic2-recheck-committed-20261008/` (clean tree, source
+snapshot hashed into `inputs.json`, `result.json` recording exit 0 for child-cancel, hidden-edit and blur-order).
+
+The delivery review (`pm-ic2-consumer-review1.md`, against the first delivered head) then found two things the
+in-progress pass could not see. **The sealed Cancel hook locked a real consumer out:** the wired consumer's two
+diagnostic windows are `UiWindowHost` subclasses that already override `OnCancelKeyPressed` for a two-press Escape
+close, and a `sealed override` cannot be inherited - so the shell's hook is no longer sealed, and the neutral
+`protected virtual bool TryHandleUnansweredCancel()` is asked only after the page's ladder declined, answers whether
+it handled the press, and has its key consumed by the shell (the handler has no other way: a consumer keeping raw
+backend calls out of its source cannot reach `Event.current`, and an unconsumed answered key is re-read at the end of
+the same pass). No Accept-side sibling was invented, because no consumer owns an Accept policy. The migration is a
+contract statement, not a code change here: those two windows re-wire onto this entry and keep their two-press exit,
+and because they set `closeOnCancel = false` they must also set the public Verse field
+`forceCatchAcceptAndCancelEventEvenIfUnfocused` to be eligible for the hook at all - a per-window opt-in that cannot
+steal a key from a window above, since eligibility is still ANDed with the stack's input test. Which window a real
+multi-window stack hands the key to stays a human-pass observation. **Two statements in the delivered contract were
+wrong** and are corrected above: `Enter` answers only an open edit (it was written as if both keys shared the
+menu/drag/edit/tree list), and "a page that declares nothing keeps the old key behaviour" is true only when no menu,
+capture or edit is open, because those three layers do not depend on any declaration.

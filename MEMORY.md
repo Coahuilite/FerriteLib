@@ -139,6 +139,21 @@
   rewrite on a consumer's behalf), and the window-stack dispatch order in the double is the plan's reading made
   executable, not a game run. `IUiBindings.TryInvokeCommand` is a member added to an interface — a breaking
   addition for a hand-written implementation, and the consumer's harness needs the one-line forward.
+  **Corrected against the delivery review (`pm-ic2-consumer-review1.md`, two findings, both real):** the first
+  version sealed `OnCancelKeyPressed`, which locked out the consumer's two existing `UiWindowHost` subclasses that
+  already override it for a two-press Escape close — the Cancel override is therefore not sealed and the supported
+  shape is the new `protected virtual bool TryHandleUnansweredCancel()`, asked only after the page's ladder
+  declined, answering whether it handled the press, with the shell consuming the key on the handler's behalf (the
+  consumer keeps raw backend calls out of its source and cannot reach `Event.current` itself). No Accept-side
+  sibling exists, because no consumer owns an Accept policy. A window with `closeOnCancel = false` is not eligible
+  for the hook at all and the library does not force `forceCatchAcceptAndCancelEventEvenIfUnfocused` on its
+  behalf — that per-window opt-in is the migration note, and it still cannot take a key from a window above, since
+  eligibility is ANDed with the stack's input test. **Two statements in the delivered contract were wrong and are
+  corrected in the docs and XML:** `TryHandleAccept` answers only an open edit (it was described as sharing the
+  menu/capture/edit/tree list with Cancel), and "a page that declares nothing keeps the old key behaviour" holds
+  only when no menu, capture or edit is open, because those three layers depend on no declaration. Two lanes and
+  two mutation cases (c9 policy asked before the page, c10 policy answer not consumed) cover the new ordering;
+  the earlier six revert cases and the three PM witness programs were not re-cut.
 
 ## PM integration checkpoint — 2026-09-30
 

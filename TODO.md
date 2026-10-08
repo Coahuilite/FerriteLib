@@ -42,9 +42,14 @@ moves HEAD without changing those held bytes.
       hooks for a window its `closeOnCancel`/`closeOnAccept` makes eligible - both are in-game facts this lane
       set cannot establish.
 - [ ] **Consumer-side consequence of FL-IC2.** `IUiBindings` gained `TryInvokeCommand`, a breaking addition for a
-      hand-written implementation; the wired consumer's harness needs the one-line forward before it compiles
-      against this carrier. Declaring `CancelBind` is optional, so a page that declares nothing changes behaviour
-      except through the two window keys.
+      hand-written implementation, so the wired consumer's harness needs the one-line forward before it compiles
+      against this carrier. Its two diagnostic windows keep their own two-press Escape policy through the new
+      `UiWindowHost.TryHandleUnansweredCancel()` (asked only after the page's ladder declined; the shell consumes
+      the key it answered), and because they set `closeOnCancel = false` they must also set the public Verse field
+      `forceCatchAcceptAndCancelEventEvenIfUnfocused` to be eligible for the hook at all. Note for whoever wires
+      it: declaring no `CancelBind` removes only the tree layer - an open menu, a held capture or a focused edit
+      is still answered before the key can mean close.
+      FL does not change US product source in this slice; the rewire is the consumer's own task.
 - [ ] **Continue one settings-page slice at a time.** Select the next slice from the existing redesign,
       identify the contracts it touches, and record ownership, failure-sensitive tests and applicable game
       acceptance. Review shared state/lifetimes when the slice touches coexistence; the global

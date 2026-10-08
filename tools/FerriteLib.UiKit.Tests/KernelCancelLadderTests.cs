@@ -87,6 +87,10 @@ internal static class KernelCancelLadderTests
             VerifyUnpressedElementIsNotASubject);
         failures += Run("A composite's child press is a cancel subject whose element's layer answers",
             VerifyAChildPressIsACancelSubjectOfItsElement);
+        failures += Run("A derived shell's own cancel policy is asked only after the page declined",
+            VerifyShellCancelPolicyAnswersAfterThePage);
+        failures += Run("A policy that answers consumes the key and keeps the window out of Verse's close",
+            VerifyShellCancelPolicyAnswerConsumesAndKeepsTheWindow);
 
         return failures;
     }
@@ -570,6 +574,15 @@ internal static class KernelCancelLadderTests
             return opening;
         }
 
+        internal PolicyShell AttachPolicyShell()
+        {
+            PolicyShell opening = new PolicyShell(this);
+            Find.WindowStack.Add(opening);
+            opening.windowRect = new Rect(0f, 0f, Viewport.width, Viewport.height);
+            opening.PumpLayout();
+            return opening;
+        }
+
         internal void DetachShell(LadderShell closing)
         {
             UiNative.DebugMousePositionEnabled = false;
@@ -586,9 +599,9 @@ internal static class KernelCancelLadderTests
     /// The window half: a real shell pass through the double's <c>WindowOnGUI</c>, recording the event phase
     /// the page is about to be drawn in and counting closes, so a doubled action is visible as a number.
     /// </summary>
-    private sealed class LadderShell : UiWindowHost
+    private class LadderShell : UiWindowHost
     {
-        private readonly Page page;
+        protected readonly Page page;
 
         internal LadderShell(Page page)
         {
@@ -649,6 +662,93 @@ internal static class KernelCancelLadderTests
             Event.current = e;
             WindowOnGUI();
             Event.current = null;
+        }
+    }
+
+    /// <summary>
+    /// A DERIVED shell implementing its own cancel policy through the extension point, which is the shape the
+    /// consumer's existing diagnostic windows have: they own an arm-then-confirm Escape close that no page
+    /// element can express. It exists so the entry is proven compilable and reachable from a subclass, and so
+    /// the ordering - library layer first, consumer policy second, Verse last - is an observation.
+    /// </summary>
+    private sealed class PolicyShell : LadderShell
+    {
+        internal PolicyShell(Page page) : base(page)
+        {
+        }
+
+        internal int PolicyCalls;
+
+        internal bool PolicyAnswers;
+
+        protected override bool TryHandleUnansweredCancel()
+        {
+            PolicyCalls++;
+            return PolicyAnswers;
+        }
+    }
+
+    /// <summary>
+    /// The ordering claim: a layer the player can see on screen outranks a policy the player cannot. The page
+    /// answers the open menu and the consumer's hook is not consulted at all; only once the page has nothing
+    /// left does the policy get asked, and a policy that declines leaves Verse's meaning of the key untouched.
+    /// </summary>
+    private static void VerifyShellCancelPolicyAnswersAfterThePage()
+    {
+        using Page page = new();
+        PolicyShell shell = page.AttachPolicyShell();
+        try
+        {
+            page.OpenMenu();
+            bool consumed = shell.PumpKey(KeyCode.Escape);
+
+            Check(page.Session.OpenPopupId == null, "the page's own layer answered the press");
+            Check(shell.PolicyCalls == 0,
+                "and the consumer's policy was never asked, because the library answers first: " + shell.PolicyCalls);
+            Check(consumed, "the answered key is consumed");
+            Check(page.WindowCloses == 0, "and the window stayed open through the page's layer");
+
+            shell.PumpKey(KeyCode.Escape);
+            Check(shell.PolicyCalls == 1, "with no library layer open, the policy is asked once");
+            Check(page.WindowCloses == 1, "a policy answering false keeps the native close");
+            Check(!Find.WindowStack.IsOpen(shell), "with the window out of the stack");
+        }
+        finally
+        {
+            page.DetachShell(shell);
+        }
+    }
+
+    /// <summary>
+    /// The consumer's own two-press arm, expressed through the entry: when the policy answers, the shell
+    /// consumes the key on its behalf - the handler has no other way to, and an unconsumed answered key would
+    /// be re-read by the game at the end of the same window pass and close the window the policy just armed.
+    /// </summary>
+    private static void VerifyShellCancelPolicyAnswerConsumesAndKeepsTheWindow()
+    {
+        using Page page = new();
+        PolicyShell shell = page.AttachPolicyShell();
+        try
+        {
+            shell.PolicyAnswers = true;
+
+            bool consumed = shell.PumpKey(KeyCode.Escape);
+
+            // Consumption is asserted first because it is the claim this lane exists for: an answered but
+            // unconsumed key is re-read by the game at the end of the same pass, which shows up here as the
+            // policy being asked twice and the press failing to do the one thing it answered.
+            Check(consumed, "the key the policy answered comes back consumed, so the late second Cancel check cannot run again");
+            Check(shell.PolicyCalls == 1, "the policy answered the press the page declined, exactly once");
+            Check(page.WindowCloses == 0, "Verse's close never runs on a press the policy took");
+            Check(Find.WindowStack.IsOpen(shell), "the window stays open under its own policy");
+
+            shell.PolicyAnswers = false;
+            shell.PumpKey(KeyCode.Escape);
+            Check(page.WindowCloses == 1, "and once the policy stops answering, the native convention returns");
+        }
+        finally
+        {
+            page.DetachShell(shell);
         }
     }
 
