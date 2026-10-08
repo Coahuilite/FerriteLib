@@ -1509,12 +1509,13 @@ type, no new kind, no signature changed on an existing member. One XML vocabular
 like `VisibleKey` and `HelpKey`, allowed on a widget AND on a container (unlike `HelpKey`, which is refused on a
 container because only widgets are hit surfaces — a section that draws nothing is still a layer to return from). It
 is scoped inside a `Repeat` row exactly like `Bind`/`ActionBind`/`SelectedKey`, so a row's cancel names that row's
-own command and no second scope resolution exists. Nine members on existing public-unstable types:
+own command and no second scope resolution exists. Eleven new public members on existing public-unstable types:
 `UiHost.TryHandleCancel`, `UiHost.TryHandleAccept`, `UiSession.ActiveEditNode`, `UiSession.LastInteractionNode`,
 `UiSession.CancelTargetNode`, `UiSession.SetCancelTarget(string)`, `UiSession.SetCancelTarget(UiNode?)`,
-`UiSession.ClearCancelTarget`, `UiNode.CancelBindingKey`, plus `UiNative.ConsumeKeyEvent` and the
-`IUiBindings.TryInvokeCommand` the climb needs; and two overrides on the shell (`OnCancelKeyPressed`,
-`OnAcceptKeyPressed`) which are Verse's own virtuals, newly answered. `UiValueState` grows two `internal` flags —
+`UiSession.ClearCancelTarget`, `UiNode.CancelBindingKey`, `UiNative.ConsumeKeyEvent` and the
+`IUiBindings.TryInvokeCommand` the climb needs (with its `UiBindings` implementation, twelve declarations in all);
+plus two overrides on the shell (`OnCancelKeyPressed`, `OnAcceptKeyPressed`), which are Verse's own virtuals,
+newly answered. `UiValueState` grows two `internal` flags —
 the transaction is applied by the funnel, and a consumer observes an open edit through the session, never by polling
 a state bit. `TryInvokeCommand` is a member added to `IUiBindings`: a consumer that implements that interface by hand
 (more than one type in the tree does) must add it, and the harness's own delegating double shows the one-line form.
