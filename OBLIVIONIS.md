@@ -2588,4 +2588,3 @@ R1/R2 appearance/palette, R3 per-host geometry diagnostics, R4-A typed choices a
   **Scope of this update:** rules/documentation only; no source, API tier membership, version axis,
   build, runtime test, consumer integration, or release was changed or claimed. The 0.7 execution
   plan remains subject to a separate implementation approval.
-
