@@ -200,6 +200,8 @@ jobs:
           Pre-1.0: the public API is still provisional and a minor bump is a breaking change. The supported range a consumer asserts lives in its own code, because RimWorld's ``modDependencies`` cannot express a version at all.
 
           This build targets **RimWorld 1.6** and is a testing RC: UI/UX and copy work on the library surface continues after this trial, and this page does not claim complete compatibility coverage. FerriteLib adds nothing to saves and stores no settings of its own; keep it installed while any consumer mod (currently Universal Squeaker) depends on it.
+
+          Testing status: the accepted native checks (seven interaction scenarios, the diagnostics checks and a quick kernel smoke) ran on the local development (Dev) build of this line; this archive is a fresh CI build of the Release configuration from the same accepted product source (plus release plumbing/docs) and has not been independently repeated in native gameplay.
           "@
           $body | Out-File -FilePath release-body.md -Encoding utf8NoBOM
 
