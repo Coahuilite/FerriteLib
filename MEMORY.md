@@ -3,7 +3,8 @@
 ## Current state (2026-10-09)
 
 - **Build and delivery identity.** The line's last **source** commit is
-  `d5af4d8209823bb19f7c112805fcb1b8caf56bbc` on `0.7.x` (committed as `worker <worker@localhost>`), and every
+  `d5af4d8209823bb19f7c112805fcb1b8caf56bbc` on `0.7.x` (committed as `worker <worker@localhost>`, the accepted
+  automation placeholder - see "Push privacy automation"), and every
   accepted payload, carrier and rehearsal in this checkpoint attributes to it. The compatibility carrier at
   `1.6/Assemblies/FerriteLib.UiKit.dll` and the Release payload are both
   `648f5769fe9a31c13a645086e3e17a2482316ea20e1f0f27a4c8739f994a264a` (the carrier was exported during the
@@ -30,6 +31,12 @@
   quick kernel smoke were accepted in the same turn). No formal window-report artifact was captured - a
   recorded supplementary gap, not by itself a new publication blocker. Installation stays the developer's own
   step.
+- **RC publication window opened (2026-10-09).** User decision: RC means a GitHub **Pre-release**, never stable and
+  never `latest`; the 0.7.x line's first publication is `v0.7.0-rc1`, cut only after conflict-free main
+  integration and a green CI/privacy run for the exact integrated SHA, with the asset built and uploaded by the
+  existing release workflow (never a local DLL/zip upload). No history rewrite: the exact
+  `worker <worker@localhost>` commits stay as they are. External push/tag steps run only under the maintainer/PM
+  briefing; nothing has been pushed or tagged yet.
 - **FL-IC1 and FL-IC2 are PM-accepted at the source/stub boundary.** IC1 accepted 2026-10-08 08:28 UTC at
   `8dad3d5` + `11f1603`; IC2 accepted 2026-10-08 14:13 UTC over the chain `11f1603 → 84d1504 → 1d86ff8 →
   `d5af4d8`. Contracts: `docs/development/0.7/05-api-contract.md` §FL-IC1 and §FL-IC2; tiers in
@@ -89,7 +96,9 @@
 - **Push privacy automation.** `scripts/privacy-audit.ps1` follows the series' Mwah five-vector gate,
   `scripts/install-hooks.ps1` enables the full-history pre-push check per clone, and
   `.github/workflows/privacy-audit.yml` covers every pushed branch and PR; scope and limits in
-  `docs/push-privacy-gate.md`. Historical event: the privacy alignment `4d67b70` was pushed to `0.7.x` and CI
+  `docs/push-privacy-gate.md`. The exact identity `worker <worker@localhost>` is accepted by the identity vector
+  as a literal placeholder (user decision 2026-10-09; case-sensitive exact match only - not a noreply address,
+  no localhost/domain-wide exemption). Historical event: the privacy alignment `4d67b70` was pushed to `0.7.x` and CI
   run `37714688341` succeeded **for that SHA** — it is not a live-HEAD identity, and a docs or memory commit
   moves HEAD without rebuilding held bytes. Scanner success is a privacy result, never gameplay, build or
   release acceptance.
@@ -347,9 +356,10 @@ and delivery procedures do not override the current scripts or the next-stage ha
   consumer is mid-development", archived in `OBLIVIONIS.md` 2026-10-09), now stated by the maintainer directly
   rather than derived from "an rc that never shipped has no goalpost to move". **Consequence for the next
   session: do not raise `Api.Minor` for a public addition while the line is `0.7.x` — and do not treat this
-  exemption as the rule once the line has shipped.** **Status 2026-10-09: still in force** — the line has no
-  release and no tag, and the `interaction-20261009-r1` rehearsal is a staged directory, not a publication, so
-  neither expiry criterion has been met; FL-IC1's and FL-IC2's public additions landed inside `0.7.0` under it.
+  exemption as the rule once the line has shipped.** **Status 2026-10-09: in force until this line's first
+  publication, the authorized `v0.7.0-rc1` (CI-built, cut from integrated `main`; see "RC publication window
+  opened"). That publication ends the exemption by the expiry wording above and does not retroactively bump this
+  release — the axes stay `0.7.0`; FL-IC1's and FL-IC2's public additions landed inside `0.7.0` under it.**
   **The gate half: there is nothing to re-cut — audited 2026-09-22, lane by lane.** Every lane that reads
   the public surface or a version axis, named: (1) **`FerriteLibVersionTests`** (Program.cs:76) — pins
   `Api` == `<modVersion>` == `<VersionPrefix>` on major.minor (`:260`, `:316`) and drives `Require`/`Evaluate`

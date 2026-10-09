@@ -21,6 +21,11 @@ handbook is `docs/development/0.7/next-stage-guide-zh.md`; build and instrument 
 the current rehearsal. **The bounded human pass was accepted by the maintainer on 2026-10-09**
 (`human-pass-20261009.md`; no re-run required).
 
+**RC publication (2026-10-09):** user-authorized CI-built prerelease route for `v0.7.0-rc1` after conflict-free
+main integration; the preparation (identity acceptance in the privacy gate, release-note scope, consumer-doc
+publication state) is committed locally on this branch; external push/tag steps wait on the maintainer-side
+briefing.
+
 - [x] **Expose unexpected reload diagnostic-publication failures.** The internal-buffer path now propagates
       host/document context plus the original exception; 10 existing local checks pass. Runtime failure
       reproduction remains absent, not a claimed pass. (Its source `0181268` is no longer the held package's
