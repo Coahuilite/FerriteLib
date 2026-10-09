@@ -5,6 +5,9 @@
 # release-oriented mechanical checks; ordinary version-branch pushes use the hook.
 # Repository-specific accepted history debt starts empty. Never copy another
 # repository's exemptions or treat scanner findings as authorization to rewrite.
+# The EXACT automation identity `worker <worker@localhost>` is maintainer-accepted
+# (2026-10-09) as a literal placeholder only: it is not a GitHub noreply address and
+# grants no localhost/domain-wide exemption (see the identity vector below).
 [CmdletBinding()]
 param(
     [switch]$FullHistory,
@@ -156,12 +159,30 @@ try {
     $identities = Select-Unique ($authors + $committers)
     $noreplyPattern = '^[^<]+ <[0-9]+\+[^@]+@users\.noreply\.github\.com>$'
     $botPattern = '^GitHub <noreply@github\.com>$'
-    $badIdentities = @($identities | Where-Object { $_ -notmatch $noreplyPattern -and $_ -notmatch $botPattern })
+    # Accepted automation placeholder (maintainer decision 2026-10-09): the exact literal
+    # 'worker <worker@localhost>' only - case-sensitive full-string equality. It is NOT a GitHub
+    # noreply address and grants no localhost/domain-wide exemption; every other identity vector,
+    # credential check and secrecy/path check below is unchanged.
+    $automationIdentities = @('worker <worker@localhost>')
+    $badIdentities = @($identities | Where-Object {
+        $_ -notmatch $noreplyPattern -and $_ -notmatch $botPattern -and -not ($automationIdentities -ccontains $_)
+    })
     if ($identities.Count -eq 0) { Add-Failure 'identity scan found no commits' '' }
     if ($badIdentities.Count -gt 0) {
-        Add-Failure "identity: $($badIdentities.Count) non-noreply identity/identities" 'Identity values withheld; inspect git author/committer locally.'
+        Add-Failure "identity: $($badIdentities.Count) identity/identities neither GitHub-noreply nor the exact accepted automation placeholder" 'Identity values withheld; inspect git author/committer locally.'
     }
-    Write-Host "identity: $($identities.Count) unique identity/identities, all noreply"
+    $automationCount = @($identities | Where-Object { $automationIdentities -ccontains $_ }).Count
+    if ($badIdentities.Count -gt 0) {
+        $suffix = if ($automationCount -gt 0) { " ($automationCount exact accepted automation placeholder present)" } else { '' }
+        Write-Host "identity: $($identities.Count) unique identity/identities; $($badIdentities.Count) not accepted$suffix"
+    }
+    elseif ($automationCount -gt 0) {
+        # Reporting must not call the placeholder a noreply address (2026-10-09 decision).
+        Write-Host "identity: $($identities.Count) unique identity/identities; $automationCount is the accepted automation placeholder 'worker <worker@localhost>' (not noreply); the rest are GitHub noreply/merge bot"
+    }
+    else {
+        Write-Host "identity: $($identities.Count) unique identity/identities, all noreply"
+    }
 
     # ---- vector3：历史 blob（-FullHistory） ----
     if ($FullHistory) {

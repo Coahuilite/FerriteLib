@@ -5,6 +5,15 @@ tracked text and names, commit/tag messages and author/committer identities,
 reachable historical text, structured binary metadata and runtime-derived
 personal tokens. Repository-specific history exemptions start empty.
 
+**Accepted automation placeholder (maintainer decision 2026-10-09).** The
+identity vector additionally accepts the exact literal
+`worker <worker@localhost>` by case-sensitive full-string equality only. It is a
+placeholder for automation commits, **not a GitHub noreply address**, and it
+opens no localhost-domain, email-domain, display-name or pattern exemption: a
+near-miss spelling (another name, another domain, a case change) is still a
+finding, and every other vector — credentials, paths, messages, binary
+metadata, runtime anonymity — is unchanged.
+
 Run once in each clone: pwsh -NoProfile -File scripts/install-hooks.ps1.
 The pre-push hook automatically runs privacy-audit.ps1 -FullHistory. A dedicated
 GitHub workflow runs the same audit with fetch-depth: 0 on every push and PR,
