@@ -125,12 +125,32 @@ public sealed class WrappedTextWidget : IUiWidget
         return AtomVocabulary.WritableOf(ctx, AtomVocabulary.Read(spec, "Bind"));
     }
 
+    /// <summary>
+    /// The bound string, or this leaf's documented default when the key cannot be resolved.
+    /// <para>
+    /// <b>The absent case is fail-soft and loud; the mistyped case is not.</b> An absent key is a state a page
+    /// can legitimately be in when it draws - an item-local key inside a repeater template whose per-item
+    /// binding the consumer has not registered yet, or any other runtime key that has not arrived - so the
+    /// leaf paints its empty default, keeps the band it reserves for an empty string, and records one
+    /// deduplicated report through the same bounded channel the collection kinds use
+    /// (<see cref="AtomVocabulary.ReportUnresolved"/>). A key bound to another type is an authoring defect and
+    /// keeps its own answer: <see cref="IUiBindings.TryGet{T}"/> raises it, the tree's guard replaces the slot
+    /// with one recovery band, and the trip is recorded once per slot. A <b>page-level</b> <c>Bind</c> nobody
+    /// registered reaches neither branch, because <see cref="Validate"/> refuses it at Host creation - the
+    /// fail-soft rule is about keys that can be unresolved at runtime, not about tolerating a manifest typo.
+    /// </para>
+    /// </summary>
     private string ResolveText(UiWidgetContext ctx)
     {
         if (spec.TryGetAttribute("Bind", out string bindKey) && bindKey.Length > 0)
         {
-            ctx.Bindings.TryGet(bindKey, out string bound);
-            return bound ?? "";
+            if (ctx.Bindings.TryGet(bindKey, out string bound))
+            {
+                return bound ?? "";
+            }
+
+            AtomVocabulary.ReportUnresolved(ctx, Kind, bindKey, "empty text");
+            return "";
         }
 
         return AtomVocabulary.ResolveText(spec, ctx, "Text", "TextKey");

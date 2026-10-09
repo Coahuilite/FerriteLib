@@ -48,17 +48,17 @@ public abstract class UiWindowHost : Window
     private bool pageUnavailable;
     private bool noticeDueNextFrame;
     private Exception? lastFailure;
+    private bool activeTarget = true;
+    private UiWindowCatalog? catalog;
 
-    // Identity the shell's own text is attributed to in the fit audit, built once because the concrete
-    // type is already known here and a per-frame string would be a per-frame allocation.
-    private readonly string chromeScope;
-    private readonly string noticeScope;
+    // Identity the shell's own text is attributed to in the fit audit: built lazily and cached, because
+    // the concrete type is known here but the window key is attached by the catalog after construction,
+    // and a per-frame string would be a per-frame allocation. See BuildScope for the identity itself.
+    private string? chromeScope;
+    private string? noticeScope;
 
     protected UiWindowHost()
     {
-        chromeScope = GetType().Name + "/chrome";
-        noticeScope = GetType().Name + "/notice";
-
         // The shell paints its own background, accent rule and close affordance, so the game's
         // equivalents must be off: two backgrounds or two close buttons is the defect this type
         // exists to prevent, not a style preference. Modality (forcePause, absorbInputAroundWindow,
@@ -202,9 +202,245 @@ public abstract class UiWindowHost : Window
     /// <summary>The live page host, or null before first draw and after a failure.</summary>
     protected UiHost? Host => host;
 
+    /// <summary>
+    /// The live page session, or null before the first successful pass and after a failure. Exposed
+    /// because a window that stops being the active target keeps this session - its scroll, selection and
+    /// drafts - and "the same session is still there" is the observable form of that promise.
+    /// </summary>
+    public UiSession? Session => host?.Session;
+
+    /// <summary>
+    /// Raised once, on the draw thread, immediately after this window built its page host and before that
+    /// host draws its first frame. It is the reliable public attach path a consumer needs in order to stop
+    /// polling for a host that does not exist yet: a host is built lazily inside the guarded pass, so
+    /// <see cref="Session"/> is null for every frame before the first one, and a consumer that read it early
+    /// had no way to tell "not yet" from "failed" without guessing at the frame count.
+    /// <para>
+    /// <b>What the handler may do.</b> Opt the host into diagnostics, attach a reload-report sink, register
+    /// this page's document dependency - the same things it could do after the first draw, only sooner. What
+    /// it must not do is throw: the handler runs inside this window's guarded pass, so an exception here is
+    /// treated exactly like an exception from the page and the window enters its failure notice. That is
+    /// deliberate - a silent swallow would make a consumer's broken lifecycle code indistinguishable from a
+    /// page that never loaded.
+    /// </para>
+    /// <para>
+    /// <b>Who owns what.</b> The window owns this host and disposes it; the consumer owns the manifest, the
+    /// bindings, the theme, the model and the view model, and this library never disposes any of them. A
+    /// borrowed Model or VM is borrowed for exactly as long as the subscription the consumer made here.
+    /// </para>
+    /// </summary>
+    public event Action<UiHost>? HostAttached;
+
+    /// <summary>
+    /// Raised immediately before this window disposes the page host it owns - on close, and when a failed
+    /// pass tears the host down. The host is still alive when the handler runs, so a consumer releases its
+    /// subscriptions here (unsubscribe a notification adapter, detach the document dependency) rather than
+    /// leaving a dead page wired into a live model.
+    /// <para>
+    /// The same "cannot throw" contract as <see cref="HostAttached"/> applies, and the same ownership split:
+    /// this releases the page's connection, never the consumer's objects.
+    /// </para>
+    /// </summary>
+    public event Action<UiHost>? HostDetached;
+
+    /// <summary>
+    /// The key this window is addressed by, or null when no catalog attached it. A window created
+    /// outside a catalog keeps the null and behaves exactly as the shell always did.
+    /// </summary>
+    public UiWindowKey? Key { get; internal set; }
+
+    /// <summary>
+    /// True while this window is the catalog's one active target. A window outside a catalog is always
+    /// the active target, which is what keeps the pre-catalog shell's behaviour unchanged.
+    /// </summary>
+    public bool IsActiveTarget => activeTarget;
+
+    /// <summary>
+    /// The policy a catalog applied to this window, or null when none was applied. Readable by a consumer
+    /// subclass and by the catalog in this assembly, which is why it is not merely protected: the
+    /// catalog's own activation rule consults it.
+    /// </summary>
+    protected internal UiWindowOptions? AppliedOptions { get; private set; }
+
+    /// <summary>
+    /// Applies a registration's policy. A null switch leaves the game's own value untouched: the library
+    /// writes no product default into forcePause or preventCameraMotion. The one non-nullable switch,
+    /// <see cref="UiWindowOptions.AllowMultipleInstances"/>, reaches the vanilla add path's exact-type
+    /// rule directly, because the library's own key - not the C# type - is what deduplicates instances.
+    /// </summary>
+    internal void ApplyOptions(UiWindowOptions options)
+    {
+        if (options == null) throw new ArgumentNullException(nameof(options));
+
+        AppliedOptions = options;
+
+        // The vanilla add path removes a same-typed sibling that carries onlyOneOfTypeAllowed, so this
+        // flag is how the option reaches the game's own rule instead of the library re-implementing it.
+        onlyOneOfTypeAllowed = !options.AllowMultipleInstances;
+
+        if (options.ForcePause is bool forcePauseValue) forcePause = forcePauseValue;
+        if (options.PreventCameraMotion is bool cameraValue) preventCameraMotion = cameraValue;
+        if (options.AbsorbInputAroundWindow is bool absorbValue) absorbInputAroundWindow = absorbValue;
+        if (options.Draggable is bool draggableValue) draggable = draggableValue;
+        if (options.Resizeable is bool resizeableValue) resizeable = resizeableValue;
+        if (options.CloseOnAccept is bool acceptValue) closeOnAccept = acceptValue;
+        if (options.CloseOnCancel is bool cancelValue) closeOnCancel = cancelValue;
+        if (options.CloseOnClickedOutside is bool outsideValue) closeOnClickedOutside = outsideValue;
+    }
+
+    /// <summary>Binds this window to the catalog that owns its instance identity. One catalog per window.</summary>
+    internal void AttachToCatalog(UiWindowCatalog owner)
+    {
+        if (owner == null) throw new ArgumentNullException(nameof(owner));
+        if (catalog != null && !ReferenceEquals(catalog, owner))
+        {
+            throw new InvalidOperationException("A window cannot be attached to two window catalogs.");
+        }
+
+        catalog = owner;
+    }
+
+    /// <summary>
+    /// Moves this window in or out of the active target. Losing the target releases the page session's
+    /// IMGUI capture, which is the pointer half of "a control in a deactivated window stops receiving
+    /// input": the control that captured the pointer before the target moved cannot be dragged from a
+    /// window the user is no longer working in. <c>UiSession.ReleaseHotControl</c> only ever releases the
+    /// session's own capture, so this cannot free another window's drag.
+    /// </summary>
+    internal void SetActiveTarget(bool active)
+    {
+        if (activeTarget == active) return;
+
+        activeTarget = active;
+        if (!active)
+        {
+            UiSession? session = host?.Session;
+            if (session != null && session.IsActive)
+            {
+                int? owned = session.OwnedHotControl;
+                if (owned.HasValue)
+                {
+                    session.ReleaseHotControl(owned.Value);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// One window pass. The shell's own bands - chrome and the failure notice - are drawn outside
+    /// <see cref="UiHost.DrawFrame"/>, so the ambient attribution a host opens around its own arrange/draw
+    /// never covered them: their fit findings fell back to the process-wide channel, and with two windows
+    /// open a chrome overflow could not be routed to the window that produced it. That is the routing half
+    /// of the ambiguity the keyed chrome scope already fixes on the naming half, so the whole shell pass
+    /// runs inside the owning host's diagnostic scope.
+    /// <para>
+    /// <b>Where no host exists the scope opens with null, never with a subscription of its own.</b> The
+    /// first pass draws chrome before <see cref="CreateHost"/> has run, and a failed pass disposes the host
+    /// together with its subscription; in both cases the audit keeps its pre-existing legacy path, and the
+    /// null scope still clears the ambient subscription so a window can never inherit whichever host
+    /// happens to be drawing around it. A host nobody subscribed to stays exactly as cheap and quiet as
+    /// before: this creates no subscription and measures nothing the audit was not already measuring.
+    /// </para>
+    /// </summary>
     public sealed override void DoWindowContents(Rect inRect)
     {
+        using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, host == null ? null : Metrics))
+        {
+            DrawShell(inRect);
+        }
+    }
+
+    /// <summary>
+    /// The native Cancel key enters the page through here, which is the ONLY reason the ladder exists as a
+    /// host method: Verse dispatches this hook at the top of the window's pass, before
+    /// <see cref="DoWindowContents"/> has drawn anything, so a page's option menu, held drag or open edit can
+    /// be undone before any widget gets a chance to react to the same key. The shell offers the ladder first
+    /// refusal, then <see cref="TryHandleUnansweredCancel"/> for a policy the page's tree cannot express, and
+    /// only then hands the key to <c>base</c>, which is Verse's own meaning of it — close the window when
+    /// <c>closeOnCancel</c> says so. A window with no library interaction open and no executable business
+    /// cancel layer therefore still behaves exactly as it did before this override existed; a window with
+    /// something to undo loses one layer per press instead of the whole window.
+    /// <para>
+    /// NOT sealed, deliberately: a consumer that already owns a cancel policy on its shell — the wired
+    /// consumer's two diagnostic windows arm a two-press Escape close in their own override — has to keep
+    /// compiling against this carrier. Overriding this method wholesale bypasses the ladder, so the supported
+    /// shape is to call <c>base</c> and implement <see cref="TryHandleUnansweredCancel"/>; a subclass that
+    /// replaces the method entirely is choosing to own the key, which is its right and no longer the
+    /// library's refusal.
+    /// </para>
+    /// <para>
+    /// The vanilla precondition is unchanged and is a real boundary: Verse only calls this hook for a window
+    /// that <c>closeOnCancel</c> or <c>forceCatchAcceptAndCancelEventEvenIfUnfocused</c> makes eligible and
+    /// that the window stack lets receive input. A shell configured with <c>CloseOnCancel=false</c> does not
+    /// hear the key at all, and this library does not rewrite that by forcing the catch field on a
+    /// consumer's behalf — a window that sets it itself still cannot take a key from a window above it that
+    /// absorbs input around itself, because eligibility is ANDed with the stack's input test. The wiring note
+    /// a consumer with <c>CloseOnCancel=false</c> needs is therefore its own one-line assignment of that
+    /// public Verse field, and which window a real multi-window stack hands the key to remains a human-pass
+    /// observation.
+    /// </para>
+    /// </summary>
+    public override void OnCancelKeyPressed()
+    {
+        UiHost? page = host;
+        if (page != null && page.TryHandleCancel()) return;
+
+        if (TryHandleUnansweredCancel())
+        {
+            // The shell consumes on the handler's behalf, because the handler has no other way to: a consumer
+            // that keeps raw backend calls out of its own source cannot reach Event.current, and an answered
+            // but unconsumed Cancel key is re-read by the game at the end of the same window pass.
+            UiNative.ConsumeKeyEvent();
+            return;
+        }
+
+        base.OnCancelKeyPressed();
+    }
+
+    /// <summary>
+    /// The neutral extension point for a cancel policy that is neither the page's tree nor Verse's close:
+    /// an arm-then-confirm exit, a window-local guard, anything whose meaning belongs to the consumer's
+    /// window rather than to a page element. It is asked ONLY after the library ladder declined, so a layer
+    /// the player can see on screen always outranks a policy the player cannot; returning true means the
+    /// policy handled the press, and the shell then consumes the key so the same press cannot also reach the
+    /// native close. The default answers false, which is the delivered behaviour: Verse's convention stays
+    /// the last word.
+    /// <para>
+    /// Cancel only, on purpose. The evidence for an extension point here is a consumer that already owns this
+    /// exact policy on two windows; nothing in any consumer owns an Accept-side equivalent, so there is no
+    /// sibling hook, no opt-out switch and no second window-input authority — the ladder and this one answer
+    /// are the whole surface.
+    /// </para>
+    /// </summary>
+    protected virtual bool TryHandleUnansweredCancel() => false;
+
+    /// <summary>
+    /// The Accept key, in the same first-refusal shape but with a narrower reach: <c>Enter</c> answers ONLY an
+    /// open edit the page holds (§3.5 — a committed value must not also be a closed settings window). It does
+    /// not close a menu, end a drag or climb the tree; those are the Cancel key's layers, and a consumer that
+    /// reads one list for both keys is reading a rule this shell does not have. With no open edit,
+    /// <c>base</c> keeps the consumer's declared <c>closeOnAccept</c> convention untouched.
+    /// </summary>
+    public sealed override void OnAcceptKeyPressed()
+    {
+        UiHost? page = host;
+        if (page != null && page.TryHandleAccept()) return;
+
+        base.OnAcceptKeyPressed();
+    }
+
+    private void DrawShell(Rect inRect)
+    {
+        ResolvePointerDown();
         DrawChrome(inRect);
+#if FER_DEV
+        // DT1 (r2 reading): the shell's chrome joins the instrument's TWO channels from this one place.
+        // Keep the geometry the chrome just drew. BeforeDraw may publish the PREVIOUS completed pass;
+        // do not overwrite its capture here. Publish these bands after this host's DrawFrame completes.
+        UiWindowChrome chromeNow = ShellChrome;
+        Rect chromeTitleNow = TitleBandRect(inRect);
+        Rect chromeCloseNow = CloseButtonRect(inRect);
+#endif
         Rect content = ContentRect(inRect);
         BeforeDraw(content);
 
@@ -234,25 +470,144 @@ public abstract class UiWindowHost : Window
 
         try
         {
-            host ??= CreateHost();
+            if (host == null)
+            {
+                UiHost created = CreateHost();
+                host = created;
+                // Before the first draw of that host, which is the whole point of the door: a subscription
+                // made here sees the first frame, and a consumer never has to poll for a host that does not
+                // exist yet.
+                HostAttached?.Invoke(created);
+            }
+
+            // The announcement door is public, and closing the window is a legitimate thing for a handler to
+            // do there - a page opened to answer one question closes itself when there is nothing to show. A
+            // close runs PreClose -> ReleaseHost, which nulls this field and disposes the host, so the pass
+            // that was about to draw it has nothing left to draw. Re-read the field rather than the local
+            // created above: ReleaseHost nulls the field precisely so the close is observable here.
+            if (host == null)
+            {
+                return;
+            }
+
             host.DrawFrame(content);
+#if FER_DEV
+            // The host can be created on this first pass, or released by a close during DrawFrame.
+            // Resolve its own subscription now; never inherit the outer scope's pre-creation null.
+            using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, Metrics))
+            {
+                UiDevGeometryProbe.RecordShellChrome(chromeNow);
+                UiDevGeometryProbe.OutlineShellChrome(inRect, chromeTitleNow, chromeCloseNow);
+            }
+#endif
         }
         catch (Exception ex)
         {
             noticeDueNextFrame = true;
             lastFailure = ex;
-            host?.Dispose();
-            host = null;
+            ReleaseHost();
             OnDrawFailure(ex);
+        }
+    }
+
+    /// <summary>
+    /// A window is about to enter the stack. The normal size is restored here so a reopened window comes
+    /// back at its resting size, and the catalog is told before anything else runs so the instance is
+    /// addressable by its key from the first hook onward.
+    /// </summary>
+    public override void PreOpen()
+    {
+        Vector2? normal = AppliedOptions?.NormalSize;
+        if (normal.HasValue)
+        {
+            windowRect = new Rect(windowRect.x, windowRect.y, normal.Value.x, normal.Value.y);
+        }
+
+        catalog?.NotifyPreOpen(this);
+        base.PreOpen();
+    }
+
+    public override void PostOpen()
+    {
+        base.PostOpen();
+        catalog?.NotifyPostOpen(this);
+    }
+
+    /// <summary>
+    /// The consumer's close veto, answered through the vanilla hook. The catalog is told only after the
+    /// hook agreed to close, so a refused close never looks like a removal to the identity map.
+    /// </summary>
+    public override bool OnCloseRequest()
+    {
+        if (!CanClose())
+        {
+            return false;
+        }
+
+        bool allowed = base.OnCloseRequest();
+        if (allowed)
+        {
+            catalog?.NotifyCloseRequested(this);
+        }
+
+        return allowed;
+    }
+
+    /// <summary>The consumer's veto. True by default, which is the game's own answer.</summary>
+    protected virtual bool CanClose()
+    {
+        return true;
+    }
+
+    /// <summary>
+    /// Announces the page host is going away and then disposes it: the one place teardown happens, so a close
+    /// and a failed pass cannot drift apart in what they tell the consumer.
+    /// <para>
+    /// <b>Disposal is not conditional on the handler behaving.</b> <see cref="HostDetached"/> is contracted
+    /// not to throw, and if it does the exception must not defeat the teardown: the host is disposed in a
+    /// <c>finally</c>, so the session dies either way. The throw is recorded as this window's failure rather
+    /// than escaping into the game's window-stack code, and the pass's own failure wins if there already is
+    /// one - a page that threw is reported as the page that threw, not as its teardown handler.
+    /// </para>
+    /// </summary>
+    private void ReleaseHost()
+    {
+        UiHost? released = host;
+        host = null;
+        if (released == null)
+        {
+            return;
+        }
+
+        try
+        {
+            HostDetached?.Invoke(released);
+        }
+        catch (Exception detachError)
+        {
+            if (lastFailure == null) lastFailure = detachError;
+        }
+        finally
+        {
+            released.Dispose();
         }
     }
 
     public override void PreClose()
     {
+        // The target is dropped before the page goes away, so no input or capture reaches a closing
+        // window; the catalog then removes the instance for real at PostClose.
+        catalog?.NotifyPreClose(this);
+
         // Closing disposes the session with the host, so reopening gets a clean retry.
-        host?.Dispose();
-        host = null;
+        ReleaseHost();
         base.PreClose();
+    }
+
+    public override void PostClose()
+    {
+        base.PostClose();
+        catalog?.NotifyPostClose(this);
     }
 
     private Rect ContentRect(Rect inRect)
@@ -275,16 +630,18 @@ public abstract class UiWindowHost : Window
     /// shell is what can say whose notice it is.
     /// </para>
     /// <para>
-    /// Trade-off, recorded rather than hidden: the identity is the concrete window TYPE, not a manifest
-    /// element path, because the shell has no id and no manifest yet when it paints chrome. Two instances
-    /// of one window class therefore share a chrome path; findings are keyed by path and text, so a
-    /// second instance's identical finding is deduplicated rather than misattributed. The <c>/chrome</c>
-    /// and <c>/notice</c> suffixes keep the two bands apart.
+    /// Identity, recorded rather than hidden: the concrete window TYPE plus the window key when a catalog
+    /// attached one, because the shell has no manifest element id when it paints chrome. The key was
+    /// added in the 0.5.x window round: a single generic page shell serves every ordinary page, so
+    /// type-only identity would put two open panels on the same chrome path and a finding about one would
+    /// read as a finding about the other. Findings are keyed by path and text, so with the key in the path
+    /// two instances are told apart instead of deduplicated into one. The <c>/chrome</c> and
+    /// <c>/notice</c> suffixes keep the two bands apart.
     /// </para>
     /// </summary>
     private void DrawChrome(Rect rect)
     {
-        UiFitAudit.BeginElement(chromeScope);
+        UiFitAudit.BeginElement(ChromeScope);
         try
         {
             DrawChromeCore(rect);
@@ -298,7 +655,7 @@ public abstract class UiWindowHost : Window
     /// <summary>Draws the notice inside the shell's notice scope; see <see cref="DrawChrome"/>.</summary>
     private void DrawNoticeScoped(Rect content, UiWindowNotice notice)
     {
-        UiFitAudit.BeginElement(noticeScope);
+        UiFitAudit.BeginElement(NoticeScope);
         try
         {
             DrawNotice(content, notice);
@@ -307,6 +664,76 @@ public abstract class UiWindowHost : Window
         {
             UiFitAudit.EndElement();
         }
+    }
+
+    /// <summary>The fit-audit scope the chrome is drawn inside; see <see cref="DrawChrome"/>.</summary>
+    private string ChromeScope => chromeScope ??= BuildScope("chrome");
+
+    /// <summary>The fit-audit scope the notice is drawn inside; see <see cref="DrawChrome"/>.</summary>
+    private string NoticeScope => noticeScope ??= BuildScope("notice");
+
+    /// <summary>
+    /// The audit identity for one of the shell's own bands: the concrete type, plus the window key in
+    /// brackets when a catalog attached one. Built lazily and cached because the key is attached after
+    /// construction, so the string cannot be decided once in the constructor.
+    /// </summary>
+    private string BuildScope(string band)
+    {
+        string identity = Key is UiWindowKey key ? GetType().Name + "[" + key + "]" : GetType().Name;
+        return identity + "/" + band;
+    }
+
+    /// <summary>
+    /// The active-target half of the shell's input rule, run before anything draws. A pointer-down asks
+    /// the catalog which instance the pointer is over: the click that selects a deactivated window is
+    /// consumed here so it cannot also operate a control of that window (the first click selects, the
+    /// second operates); a click outside every instance clears the target, so a control in the window
+    /// that was selected before does not keep taking input.
+    /// <para>
+    /// <b>Coordinates.</b> <c>Event.current.mousePosition</c> is group-local inside the window's draw
+    /// group, so the pointer is translated into the space the catalog compares rects in before it is
+    /// handed over; see <see cref="ToWindowSpace"/>. Without that translation a click inside a second,
+    /// offset window resolved to whichever window covered the local coordinate on screen.
+    /// </para>
+    /// <para>
+    /// <b>What the harness cannot prove.</b> Real keyboard routing after the target moves, and how this
+    /// selection click composes with the vanilla stack's own click handling, are in-game behaviour: the
+    /// stubs model the library's rule, not IMGUI's. The 0.5 verification checklist (A1/A2/A3/A3b) is
+    /// where that half is confirmed.
+    /// </para>
+    /// </summary>
+    private void ResolvePointerDown()
+    {
+        if (catalog == null || !UiNative.IsPointerDown())
+        {
+            return;
+        }
+
+        bool wasActive = activeTarget;
+        catalog.NotifyPointerDown(ToWindowSpace(UiNative.PointerPosition()));
+
+        if (!wasActive && activeTarget)
+        {
+            // Consumed so the activating click cannot reach the page this pass: a control drawn while the
+            // window was deactivated must not fire from the click that selected the window.
+            UiNative.ConsumePointerEvent();
+        }
+    }
+
+    /// <summary>
+    /// A content-local point translated into the window space the catalog's rects live in.
+    /// <para>
+    /// <b>Why the offset is the window's own origin.</b> The game draws the page inside a group whose
+    /// rect is <c>windowRect.AtZero().ContractedBy(Margin)</c> and hands <c>DoWindowContents</c> that
+    /// rect at zero (Verse.Window.InnerWindowOnGUI), so the event pointer inside it is group-local. This
+    /// shell seals <c>Margin</c> to zero, which makes the group origin the window's own screen origin and
+    /// the conversion exact: <c>windowRect.position + local</c>. It is also why the catalog can compare
+    /// the result against every instance's screen <c>windowRect</c>.
+    /// </para>
+    /// </summary>
+    private Vector2 ToWindowSpace(Vector2 contentLocal)
+    {
+        return new Vector2(windowRect.x + contentLocal.x, windowRect.y + contentLocal.y);
     }
 
     private void DrawChromeCore(Rect rect)
@@ -343,13 +770,7 @@ public abstract class UiWindowHost : Window
     private void DrawCloseButton(Rect rect)
     {
         UiTheme theme = Theme;
-        Vector2 size = CloseButtonSize;
-        var button = new Rect(
-            rect.xMax - size.x - SidePadding,
-            rect.y + (TitleBarHeight - size.y) * 0.5f,
-            size.x,
-            size.y);
-
+        Rect button = CloseButtonRect(rect);
         bool hovered = UiNative.IsMouseOver(button);
         UiThemeDraw.Surface(
             button,
@@ -369,5 +790,66 @@ public abstract class UiWindowHost : Window
         {
             Close();
         }
+    }
+
+    /// <summary>
+    /// Where the close affordance sits for a given window-face rect: the ONE arithmetic the shell uses -
+    /// drawn by <see cref="DrawCloseButton"/>, outlined by the Dev instrument, and reported through
+    /// <see cref="ShellChrome"/>. Size comes from <see cref="CloseButtonSize"/>, itself metric-driven.
+    /// </summary>
+    private Rect CloseButtonRect(Rect face)
+    {
+        Vector2 size = CloseButtonSize;
+        return new Rect(
+            face.xMax - size.x - SidePadding,
+            face.y + (TitleBarHeight - size.y) * 0.5f,
+            size.x,
+            size.y);
+    }
+
+    /// <summary>The title band the shell reserves: full width, from the face top to <see cref="TitleBarHeight"/>.</summary>
+    private Rect TitleBandRect(Rect face)
+    {
+        return new Rect(face.x, face.y, face.width, TitleBarHeight);
+    }
+
+    /// <summary>
+    /// The shell's own geometry in window (screen) space, answered by the SAME arithmetic that paints the
+    /// chrome (DT1). A consumer reads this INSTEAD of mirroring <see cref="TitleBarHeight"/>/
+    /// <see cref="SidePadding"/> into its own constants - the drift risk the chrome-mirror observation
+    /// recorded - for anything acting on the window as it is NOW.
+    /// <para>
+    /// <b>This accessor is the present measurement, and it is not the capture.</b> The record of a
+    /// COMPLETED pass - the one a report must quote - is <c>UiDevGeometrySnapshot.ShellChrome</c> (and the
+    /// dump's <c>chrome</c> line), written by the shell at its own draw time into the same buffer as the
+    /// node samples; gluing this present-tense value onto a finished pass would misreport a drag or a
+    /// resize, which is exactly what the instrument's one-buffer rule exists to prevent.
+    /// </para>
+    /// <para>
+    /// Space: <see cref="UiWindowChrome.Outer"/> is <c>windowRect</c> as the game moved it (drag and resize
+    /// included, read at whatever moment the caller asks); the inner rects are that face plus the shell's
+    /// insets, because <c>Margin</c> is sealed to zero and the draw group origin is the window origin
+    /// (see <see cref="ToWindowSpace"/>).
+    /// </para>
+    /// </summary>
+    public UiWindowChrome ShellChrome
+    {
+        get
+        {
+            Rect face = windowRect.AtZero();
+            return new UiWindowChrome(
+                windowRect,
+                ToWindowRect(TitleBandRect(face)),
+                ToWindowRect(CloseButtonRect(face)),
+                ToWindowRect(ContentRect(face)),
+                SidePadding,
+                TitleBarHeight);
+        }
+    }
+
+    /// <summary>A face-local rect lifted into window (screen) space; Margin is sealed to zero.</summary>
+    private Rect ToWindowRect(Rect local)
+    {
+        return new Rect(windowRect.x + local.x, windowRect.y + local.y, local.width, local.height);
     }
 }

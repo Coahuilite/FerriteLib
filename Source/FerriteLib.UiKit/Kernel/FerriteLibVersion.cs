@@ -47,9 +47,30 @@ public static class FerriteLibVersion
     /// is the style and atom sweep: the leaf atoms, the per-surface theme restructure, the geometry
     /// tokens, and the scheme/density/role attributes on the atom schemas — all of it public surface, so
     /// it is one minor, and it is the last minor in which breaking <c>UiTheme</c>'s shape is cheap,
-    /// because a second wired consumer is what starts the freeze.
+    /// because a second wired consumer is what starts the freeze. The 0.4.0 → 0.5.0 move is the window
+    /// round: instance identity, per-key binding notification, collection reconciliation, document hot
+    /// reload and per-host diagnostics, all in one minor. The 0.5.0 → 0.6.0 move is the MVVM and reload
+    /// round: the page lifecycle doors a consumer needs to stop polling for a host, the optional
+    /// <c>INotifyPropertyChanged</c> adapter, the reload scheduler's testable time seam and the read-only
+    /// widget descriptor snapshot. If the 0.5.0 line's handoff has not been consumed by anyone yet, the
+    /// 0.6.0 number is still the honest one: the rule below is unconditional for additions, and a consumer
+    /// that pinned <c>[0.5.0,0.6.0)</c> keeps compiling against the 0.5.0 carrier it tested. The 0.6.0 →
+    /// 0.7.0 move is the subtraction-and-stabilization round: one bounded supported contract, one shipped
+    /// built-in palette (<c>UiTheme.Vanilla</c>, which is also what every unset token answers on a partial
+    /// bag), the
+    /// first validation tightenings, and Batch 1 — the placement vocabulary, container spacing taking the
+    /// theme's geometry, the authored tone vocabulary shrinking to four meanings, and <c>UiTheme.HoverPoint</c>
+    /// replaced by a derived accent step. All of it lands inside this one minor because the line has never been
+    /// delivered (fast-development ruling 2026-09-18), and every break is recorded in the 0.7 contract with its
+    /// migration before it ships. The consumer-count prerequisite for the supported contract was removed by
+    /// maintainer ruling on 2026-09-17; older freeze-gating wording elsewhere is superseded. The 2026-09-20
+    /// ruling then allowed **additions to stay inside this same number** for the coordination phase, so
+    /// `input/text-field` (B7), `input/mode-row`'s per-option hover help, and the element-level `HelpKey`
+    /// hook with localized mode-row labels (G1 + G4) land here rather than in a 0.8.0: the number does not
+    /// move, every addition still records its contract entry and lane first, and the normal pre-1.0 rule
+    /// returns when that phase ends.
     /// </summary>
-    public static readonly Version Api = new Version(0, 4, 0);
+    public static readonly Version Api = new Version(0, 7, 0);
 
     /// <summary>Human-readable identity for logs.</summary>
     public static string Describe()

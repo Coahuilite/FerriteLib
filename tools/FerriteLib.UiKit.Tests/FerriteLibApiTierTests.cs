@@ -29,7 +29,9 @@ internal static class FerriteLibApiTierTests
 
     /// <summary>
     /// The promise, pinned. Additions to the library surface that belong here are a decision, not a side
-    /// effect: this array and the document change together, in the same commit as the minor bump.
+    /// effect: this array and the document change together, in one commit. No version consequence is
+    /// asserted here - on the 0.7.x line a public addition does not bump the minor (maintainer ruling
+    /// 2026-09-22, temporary exemption; MEMORY.md, "Version axes").
     /// </summary>
     private static readonly string[] PinnedStableTier =
     {
@@ -113,7 +115,7 @@ internal static class FerriteLibApiTierTests
         {
             throw new Exception("the stable tier moved without a decision here too: +["
                 + string.Join(", ", added) + "] -[" + string.Join(", ", removed)
-                + "] - a type gains or loses the no-break promise only in the commit that bumps the minor.");
+                + "] - a type gains or loses the no-break promise only through a decision in this array too.");
         }
     }
 
@@ -149,16 +151,30 @@ internal static class FerriteLibApiTierTests
         }
     }
 
-    /// <summary>Type names the payload exports, nested ones dotted, order irrelevant.</summary>
+    /// <summary>
+    /// Type names the payload exports, nested ones dotted, order irrelevant, de-duplicated. A generic type's
+    /// <c>Name</c> carries an arity suffix (<c>UiChoice`1</c>) which is STRIPPED here: the tier document is
+    /// prose whose entries are read back between two backticks, so an entry can never spell the suffix, and two
+    /// types differing only by arity would be one classification decision in any case. The generic form is
+    /// written out inside the entry's own sentence instead.
+    /// </summary>
     private static List<string> PublicTypeNames()
     {
         Assembly payload = typeof(FerriteLibVersion).Assembly;
         return payload.GetExportedTypes()
             .Where(type => type.Namespace != null && type.Namespace.StartsWith("FerriteLib.UiKit", StringComparison.Ordinal))
             .Select(type => type.IsNested && type.DeclaringType != null
-                ? type.DeclaringType.Name + "." + type.Name
-                : type.Name)
+                ? StripArity(type.DeclaringType.Name) + "." + StripArity(type.Name)
+                : StripArity(type.Name))
+            .Distinct(StringComparer.Ordinal)
             .ToList();
+    }
+
+    /// <summary>The name without the arity suffix a generic type's <c>Name</c> carries.</summary>
+    private static string StripArity(string name)
+    {
+        int tick = name.IndexOf('`');
+        return tick < 0 ? name : name.Substring(0, tick);
     }
 
     /// <summary>Type name to the heading of the section that lists it.</summary>

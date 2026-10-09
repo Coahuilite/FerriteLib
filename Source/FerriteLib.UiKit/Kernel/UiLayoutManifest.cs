@@ -27,6 +27,17 @@ namespace FerriteLib.UiKit.Kernel;
 /// revision discipline is their invalidation — a label change or language switch re-arranges,
 /// and no consumer may cache an Auto rect across revisions.
 /// </para>
+/// <para>
+/// Contract on the collection vocabulary (0.5, P3): a <c>&lt;Templates&gt;</c> section declares the
+/// per-item subtrees a <c>&lt;Repeat&gt;</c> materializes, each entry named by its <c>Id</c>; a Repeat names
+/// one with <c>Template</c> and its ordered item keys with <c>Items</c>, and carries no children of its
+/// own. Templates are deliberately outside <see cref="Roots"/>: their controls resolve binding keys
+/// against a per-item scope the engine composes at row instantiation, so those keys cannot be — and must
+/// not be — validated against the page bindings at Host creation. Their structural contract (kind and
+/// attribute vocabulary) is validated by the layout engine's template validator, with the template name
+/// and path in the refusal; the reference from a Repeat to a template, the one-Id-per-template and the
+/// per-template Id grammar are refused here, at parse time, because this parser is what owns the table.
+/// </para>
 /// </summary>
 public sealed class UiLayoutManifest
 {
@@ -36,10 +47,24 @@ public sealed class UiLayoutManifest
     /// <summary>Longest <c>&lt;Styles&gt;</c> section accepted, in characters. The style parser has its own bounds.</summary>
     private const int MaxStylesChars = 32768;
 
+    /// <summary>The template table of a manifest that declares no <c>&lt;Templates&gt;</c> section.</summary>
+    private static readonly IReadOnlyDictionary<string, UiElementSpec> NoTemplates =
+        new Dictionary<string, UiElementSpec>(StringComparer.Ordinal);
+
     private static readonly HashSet<string> SupportedElementNames = new(StringComparer.Ordinal)
     {
-        "UiPage", "Stack", "Row", "Column", "Wrap", "Overlay", "Section", "Surface", "Scroll", "Clip", "Widget"
+        "UiPage", "Stack", "Row", "Column", "Wrap", "Overlay", "Section", "Surface", "Scroll", "Clip", "Widget", "Repeat"
     };
+
+    /// <summary>Separator that joins an item key to a template element's declared Id at row instantiation.</summary>
+    /// <remarks>
+    /// The engine composes per-item identities and per-item binding keys from a template's declared names,
+    /// so the two namespaces have to stay injective. A declared Id inside <c>&lt;Templates&gt;</c> therefore
+    /// may not contain this character — refused at parse time, next to the '/' rule it is the sibling of —
+    /// and neither may an item key (the engine refuses such a row rather than reconciling it). Page Ids are
+    /// untouched: the rule is template vocabulary, so no existing manifest changes meaning.
+    /// </remarks>
+    internal const char ItemKeySeparator = '#';
 
     public string Source { get; }
 
@@ -54,12 +79,32 @@ public sealed class UiLayoutManifest
     /// </summary>
     public UiStyleDocument Styles { get; }
 
-    private UiLayoutManifest(string source, string schemaVersion, IReadOnlyList<UiElementSpec> roots, UiStyleDocument styles)
+    /// <summary>
+    /// The <c>&lt;Templates&gt;</c> table: per-item subtrees a <c>&lt;Repeat&gt;</c> materializes, keyed by
+    /// the declared <c>Id</c> that names them. Ordinal-keyed and immutable; a manifest without the section
+    /// carries an empty table, and a <c>&lt;Repeat&gt;</c> that names nothing in it is refused at parse
+    /// time rather than drawing an empty band.
+    /// <para>
+    /// The engine receives this table through its constructor (<see cref="UiHost"/> hands it the host's
+    /// manifest), because the template subtree is intentionally outside <see cref="Roots"/>. Nothing else
+    /// reads it: a template is not an element, has no node of its own, and only exists as the shape each
+    /// row is instantiated from.
+    /// </para>
+    /// </summary>
+    public IReadOnlyDictionary<string, UiElementSpec> Templates { get; }
+
+    private UiLayoutManifest(
+        string source,
+        string schemaVersion,
+        IReadOnlyList<UiElementSpec> roots,
+        UiStyleDocument styles,
+        IReadOnlyDictionary<string, UiElementSpec> templates)
     {
         Source = source;
         SchemaVersion = schemaVersion;
         Roots = roots;
         Styles = styles;
+        Templates = templates;
     }
 
     public static UiLayoutManifest Parse(string xml)
@@ -139,7 +184,8 @@ public sealed class UiLayoutManifest
 
             if (reader.IsEmptyElement)
             {
-                return new UiLayoutManifest(source, schema, Array.Empty<UiElementSpec>(), UiStyleDocument.Empty);
+                return new UiLayoutManifest(
+                    source, schema, Array.Empty<UiElementSpec>(), UiStyleDocument.Empty, NoTemplates);
             }
 
             break;
@@ -152,8 +198,10 @@ public sealed class UiLayoutManifest
 
         var roots = new List<UiElementSpec>();
         var ids = new HashSet<string>(StringComparer.Ordinal);
+        var templates = new Dictionary<string, UiElementSpec>(StringComparer.Ordinal);
         UiStyleDocument styles = UiStyleDocument.Empty;
         bool stylesSeen = false;
+        bool templatesSeen = false;
 
         while (reader.Read())
         {
@@ -185,10 +233,22 @@ public sealed class UiLayoutManifest
                         break;
                     }
 
+                    if (string.Equals(reader.Name, "Templates", StringComparison.Ordinal))
+                    {
+                        if (templatesSeen)
+                        {
+                            throw ParseError(lineInfo, "Duplicate <Templates> section; one manifest may carry one.");
+                        }
+
+                        templatesSeen = true;
+                        ReadTemplatesSection(reader, lineInfo, ref nodeCount, ids, templates);
+                        break;
+                    }
+
                     if (!SupportedElementNames.Contains(reader.Name))
                     {
                         throw ParseError(lineInfo,
-                            $"Unsupported element <{reader.Name}>; expected one of: Stack, Row, Column, Wrap, Overlay, Section, Surface, Scroll, Clip, Widget, Styles.");
+                            $"Unsupported element <{reader.Name}>; expected one of: Stack, Row, Column, Wrap, Overlay, Section, Surface, Scroll, Clip, Widget, Repeat, Styles, Templates.");
                     }
 
                     UiElementSpec root = ReadElement(reader, lineInfo, ref nodeCount, ids);
@@ -199,7 +259,8 @@ public sealed class UiLayoutManifest
                     if (string.Equals(reader.Name, "UiPage", StringComparison.Ordinal))
                     {
                         ValidateIdentitySegments(roots, pageLine);
-                        return new UiLayoutManifest(source, schema, roots, styles);
+                        ValidateTemplateReferences(roots, templates);
+                        return new UiLayoutManifest(source, schema, roots, styles, templates);
                     }
 
                     throw ParseError(lineInfo, $"Unexpected end element </{reader.Name}>.");
@@ -238,6 +299,171 @@ public sealed class UiLayoutManifest
         }
 
         return UiStyleDocument.Parse(xml);
+    }
+
+    /// <summary>
+    /// Captures the <c>&lt;Templates&gt;</c> section: every direct child is one named template subtree, kept
+    /// out of <see cref="Roots"/> on purpose so the Host's creation-time walk never validates a subtree whose
+    /// binding keys are item-scoped. The section's own structure is refused here — a missing or duplicated
+    /// template Id, an Id or template name carrying a reserved separator, and a nested <c>&lt;Repeat&gt;</c>
+    /// (a row template that materializes rows is a second reconciliation the engine does not have, and
+    /// half-supporting it is exactly the silent shape this library refuses).
+    /// </summary>
+    private static void ReadTemplatesSection(
+        XmlReader reader,
+        IXmlLineInfo lineInfo,
+        ref int nodeCount,
+        HashSet<string> ids,
+        Dictionary<string, UiElementSpec> templates)
+    {
+        if (reader.IsEmptyElement) return;
+
+        int sectionDepth = reader.Depth;
+        while (reader.Read())
+        {
+            nodeCount = BumpNode(nodeCount, lineInfo);
+
+            if (reader.NodeType == XmlNodeType.EndElement)
+            {
+                if (reader.Depth == sectionDepth
+                    && string.Equals(reader.Name, "Templates", StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                continue;
+            }
+
+            if (reader.NodeType == XmlNodeType.Text || reader.NodeType == XmlNodeType.CDATA)
+            {
+                throw ParseError(lineInfo, "Text content is not allowed inside <Templates>; expected template elements only.");
+            }
+
+            if (reader.NodeType != XmlNodeType.Element) continue;
+
+            if (reader.Depth > MaxDepth)
+            {
+                throw ParseError(lineInfo, $"UI layout exceeds the maximum depth of {MaxDepth}.");
+            }
+
+            if (reader.Depth != sectionDepth + 1)
+            {
+                throw ParseError(lineInfo,
+                    $"Unexpected nested element <{reader.Name}> inside <Templates>; one template element per direct child.");
+            }
+
+            if (!SupportedElementNames.Contains(reader.Name) || string.Equals(reader.Name, "UiPage", StringComparison.Ordinal))
+            {
+                throw ParseError(lineInfo,
+                    $"Unsupported template element <{reader.Name}>; expected a container or <Widget>.");
+            }
+
+            string name = reader.GetAttribute("Id") ?? reader.GetAttribute("id") ?? "";
+            if (name.Length == 0)
+            {
+                throw ParseError(lineInfo,
+                    $"Template <{reader.Name}> is missing the required Id; the Id is the name a <Repeat Template=\"...\"> refers to.");
+            }
+
+            if (name.IndexOf('/') >= 0 || name.IndexOf(ItemKeySeparator) >= 0)
+            {
+                throw ParseError(lineInfo,
+                    $"Template Id '{name}' carries a reserved separator ('/' or '{ItemKeySeparator}'); a template name is one identity segment.");
+            }
+
+            if (templates.ContainsKey(name))
+            {
+                throw ParseError(lineInfo, $"Duplicate template Id '{name}'; one template name names one subtree.");
+            }
+
+            UiElementSpec template = ReadElement(reader, lineInfo, ref nodeCount, ids);
+            ValidateTemplateIdentityGrammar(template, name);
+            templates.Add(name, template);
+        }
+
+        throw new FormatException("UI layout XML ended inside the <Templates> element.");
+    }
+
+    /// <summary>
+    /// The Id grammar inside a template subtree. Page-element Ids keep exactly the rules they had; a template
+    /// element adds one: it may not carry <see cref="ItemKeySeparator"/>, because the engine composes the
+    /// per-item identity of that element as <c>&lt;declaredId&gt;#&lt;itemKey&gt;</c> and a declared Id that
+    /// already spells the separator could collide with a different row's composed identity.
+    /// </summary>
+    private static void ValidateTemplateIdentityGrammar(UiElementSpec spec, string templateName)
+    {
+        if (spec.Id.IndexOf(ItemKeySeparator) >= 0)
+        {
+            throw new FormatException(
+                $"Invalid UI layout XML: template '{templateName}' declares element Id '{spec.Id}', which carries "
+                + $"the reserved item-key separator '{ItemKeySeparator}'.");
+        }
+
+        if (string.Equals(spec.Kind, "Repeat", StringComparison.Ordinal))
+        {
+            throw new FormatException(
+                $"Invalid UI layout XML: template '{templateName}' contains a <Repeat>. The engine materializes one "
+                + "row set per <Repeat>; a row template that materializes rows is refused rather than half-supported.");
+        }
+
+        for (int i = 0; i < spec.Children.Count; i++)
+        {
+            ValidateTemplateIdentityGrammar(spec.Children[i], templateName);
+        }
+    }
+
+    /// <summary>
+    /// Every <c>&lt;Repeat&gt;</c> names a template the same manifest declares and carries no children of its
+    /// own. Refused at parse time rather than at the first arrange because the table belongs to this parser:
+    /// a dangling reference is a manifest error, and the answer must not depend on which frame happens to
+    /// materialize the rows.
+    /// </summary>
+    private static void ValidateTemplateReferences(
+        IReadOnlyList<UiElementSpec> roots,
+        IReadOnlyDictionary<string, UiElementSpec> templates)
+    {
+        for (int i = 0; i < roots.Count; i++)
+        {
+            UiElementSpec root = roots[i];
+            ValidateTemplateReference(root, templates, root.Id.Length > 0 ? root.Id : root.Kind);
+        }
+    }
+
+    private static void ValidateTemplateReference(
+        UiElementSpec spec,
+        IReadOnlyDictionary<string, UiElementSpec> templates,
+        string path)
+    {
+        if (string.Equals(spec.Kind, "Repeat", StringComparison.Ordinal))
+        {
+            if (spec.Children.Count > 0)
+            {
+                throw new FormatException(
+                    $"Invalid UI layout XML: <Repeat Id=\"{spec.Id}\"> at '{path}' contains elements; the per-item "
+                    + "template is declared once in <Templates> and named by Template=\"...\".");
+            }
+
+            string name = spec.TryGetAttribute("Template", out string raw) ? raw.Trim() : "";
+            if (name.Length == 0)
+            {
+                throw new FormatException(
+                    $"Invalid UI layout XML: <Repeat Id=\"{spec.Id}\"> at '{path}' is missing the required Template "
+                    + "attribute naming a template declared in <Templates>.");
+            }
+
+            if (!templates.ContainsKey(name))
+            {
+                throw new FormatException(
+                    $"Invalid UI layout XML: <Repeat Id=\"{spec.Id}\"> at '{path}' names template '{name}', which "
+                    + "<Templates> does not declare.");
+            }
+        }
+
+        for (int i = 0; i < spec.Children.Count; i++)
+        {
+            UiElementSpec child = spec.Children[i];
+            ValidateTemplateReference(child, templates, path + "/" + (child.Id.Length > 0 ? child.Id : child.Kind));
+        }
     }
 
     private static UiElementSpec ReadElement(XmlReader reader, IXmlLineInfo lineInfo, ref int nodeCount, HashSet<string> ids)

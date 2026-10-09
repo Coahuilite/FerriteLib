@@ -107,16 +107,17 @@ jobs:
           dotnet restore Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj --nologo
           dotnet restore tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj --nologo
 
-      # Order matters. verify-local's Dev/Release build gates leave 1.6/Assemblies/ carrying a
+      # Order matters. verify-local's Release output in dist/build/Release carries a
       # -dev version suffix, and pack-release.ps1 refuses to publish that identity. So the gates run
       # first, on the tree exactly as tagged, and only then is the payload rebuilt as the artifact.
-      - name: Verify (7 gates)
+      - name: Verify (10 gates)
         shell: pwsh
         run: ./scripts/verify-local.ps1
 
+      # Build fresh with the publication version suffix. Staging independently verifies that identity.
       - name: Build the release payload
         shell: pwsh
-        run: dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release -p:VersionSuffix= --nologo
+        run: dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release -p:VersionSuffix= --no-incremental --nologo
 
       - name: Pack the release asset
         id: pack
@@ -163,7 +164,7 @@ jobs:
           }
           $delta = if ($commits.Count -gt 0) { ($commits | ForEach-Object { "- $_" }) -join "`n" } else { "- (no recorded commits in range)" }
           $isRc = $tag -match '-rc[1-9]\d*$'
-          $trialNote = if ($isRc) { "This is a **release candidate**: an early-testing build. Try it, and report what breaks - problems found here are problems not shipped to everyone." } else { "This is the stable release. It carries the same bytes as its last release candidate; the identity table below names the commit." }
+          $trialNote = if ($isRc) { "This is a **release candidate**: an early-testing build. Try it, and report what breaks - problems found here are problems not shipped to everyone. UI/UX and copy work on this line is still in progress." } else { "This is the stable release. It carries the same bytes as its last release candidate; the identity table below names the commit." }
           $deltaTitle = if ($prevTag) { "## Changes since $prevTag" } else { "## Changes" }
           $body = @"
           $trialNote
@@ -184,6 +185,7 @@ jobs:
           |---|---|
           | Package id | ``$packageId`` |
           | Release | ``$env:RELEASE_TAG`` |
+          | Game | RimWorld 1.6 |
           | Built from commit | ``$env:ASSET_COMMIT`` |
           | Asset SHA-256 | ``$env:ASSET_SHA256`` |
 
@@ -196,6 +198,10 @@ jobs:
           ## Status
 
           Pre-1.0: the public API is still provisional and a minor bump is a breaking change. The supported range a consumer asserts lives in its own code, because RimWorld's ``modDependencies`` cannot express a version at all.
+
+          This build targets **RimWorld 1.6** and is a testing RC: UI/UX and copy work on the library surface continues after this trial, and this page does not claim complete compatibility coverage. FerriteLib adds nothing to saves and stores no settings of its own; keep it installed while any consumer mod (currently Universal Squeaker) depends on it.
+
+          Testing status: the accepted native checks (seven interaction scenarios, the diagnostics checks and a quick kernel smoke) ran on the local development (Dev) build of this line; this archive is a fresh CI build of the Release configuration from the same accepted product source (plus release plumbing/docs) and has not been independently repeated in native gameplay.
           "@
           $body | Out-File -FilePath release-body.md -Encoding utf8NoBOM
 

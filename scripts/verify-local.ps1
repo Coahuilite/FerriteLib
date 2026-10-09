@@ -6,7 +6,14 @@ param(
     [switch]$PackDev,
     [switch]$PackZip,
     [switch]$PackNupkg,
-    [switch]$NoRestore
+    [switch]$NoRestore,
+    # Print the M6/M11 evidence footer as the last output, so a redirected chain log carries its own
+    # identity (HEAD, dirty set, per-gate results, pinned files, and the two carriers as hash+mtime pairs)
+    # instead of being bound to a commit by the reader's inference from file timestamps. The writer is
+    # tools/evidence/Write-EvidenceFooter.ps1 - one shape, shared with the consumer repository.
+    # It runs only on the success path: a RED chain exits from inside Invoke-Check, so bind a red log with
+    # the writer directly, stating the non-zero exit.
+    [switch]$EvidenceFooter
 )
 
 Set-StrictMode -Version Latest
@@ -17,9 +24,11 @@ $ErrorActionPreference = "Stop"
 #   1   FerriteLib.UiKit harness, Release (kernel lanes + version contract + neutrality + boundary)
 #   2   library Dev build (FER_DEV, TreatWarningsAsErrors)
 #   3   library Release build (TreatWarningsAsErrors)
-#   4   mod payload present at the path consumers bind to
+#   4   Dev/Release outputs exist in distinct configuration-specific build directories
 #   5   payload is content-free: no Defs, Patches, Languages, Sounds or Textures under 1.6
-#   6   LICENSE present and full MPL-2.0, with no applied incompatibility notice
+#   6   LICENSE present, full MPL-2.0 with no applied incompatibility notice, and byte-identical to
+#       the pinned series licence (SHA-256 literal in scripts/verify-license.ps1 - self-contained on
+#       purpose: no sibling path is read)
 #   7   About.xml identity (packageId, modVersion present and parsable as a Version)
 #   8   runtime-resolvability trap scans: no call site uses a member the reference assembly advertises
 #       but the net472 runtime lacks, and no member the payload or the harness takes from a stub-replaced
@@ -28,11 +37,18 @@ $ErrorActionPreference = "Stop"
 #   9   the consumer half of the boundary metric is armed and tree-sensitive: rule (c) of
 #       tools/dependency-reality.ps1 fires on a planted bare call outside its allowlist, refuses the
 #       migrated two-argument form, and passes once that file is allowlisted (self-test + fixture)
+#   10  the development-only geometry instrument's DEV half really ran: a Dev harness run whose output
+#       carries the dev-only assertion names, a floor on the assertion and dump-line counts, the absence of
+#       the release-only half's name, and the printed numbers (see scripts/verify-dev-instrument.ps1)
+#       - because gate 1 runs the harness in Release, and a dev-only proof nobody re-runs is a proof that
+#       rots. It writes only the Dev build output; delivered packages remain untouched.
 # -PackDev: after all checks pass, stage the dev folder (a directory, not an archive). Placing it
 #   in a game Mods directory is the developer's own step - no script here writes outside the repository.
 #   -PackZip also writes the dev zip; -PackNupkg also writes the consumer reference package. Both are
 #   opt-in because nothing on the dev path needs them.
 #
+# Builds and harnesses write dist/build/<Configuration>; delivered carriers are read-only here.
+
 # The neutrality guard, the visual-core/page-model boundary and the two version axes all run INSIDE
 # gate 1, from the library's own harness, each with a positive control. There is no second copy of
 # those checks here on purpose: the previous arrangement had a consumer repository asserting the
@@ -41,8 +57,14 @@ $ErrorActionPreference = "Stop"
 $root = [System.IO.Path]::GetFullPath($ProjectRoot)
 $projectFile = Join-Path $root 'Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj'
 $testsProject = Join-Path $root 'tools\FerriteLib.UiKit.Tests\FerriteLib.UiKit.Tests.csproj'
-$assembliesDir = Join-Path $root '1.6\Assemblies'
+$assembliesDir = Join-Path $root 'dist\build\Release'
 $tempLog = Join-Path ([System.IO.Path]::GetTempPath()) ("fl-verify-" + [guid]::NewGuid().ToString('N') + '.log')
+
+# Observe the compatibility delivery without opening it for writing. It may be loaded by a consumer.
+$deliveredPath = Join-Path $root '1.6\Assemblies\FerriteLib.UiKit.dll'
+$deliveredBefore = if (Test-Path -LiteralPath $deliveredPath) {
+    (Get-FileHash -LiteralPath $deliveredPath).Hash + ':' + (Get-Item -LiteralPath $deliveredPath).LastWriteTimeUtc.Ticks
+} else { 'absent' }
 $buildExtraArgs = @()
 if ($NoRestore) { $buildExtraArgs += '--no-restore' }
 
@@ -65,12 +87,15 @@ function Invoke-Check {
         if (Test-Path -LiteralPath $tempLog) {
             Get-Content -LiteralPath $tempLog -Tail 12 | ForEach-Object { Write-Host "    $_" }
         }
-        Write-Host "  retry: $Retry"
+        Write-Host "  [hint] retry: $Retry"
         Remove-Item -LiteralPath $tempLog -Force -ErrorAction SilentlyContinue
         exit 1
     }
     Write-Host 'OK'
+    $script:gateResults += ("{0}=OK" -f $Name)
 }
+
+$script:gateResults = @()
 
 # A fresh clone has no obj/ tree, and every lane below runs --no-restore on purpose (a cross-repo gate
 # must never silently re-resolve a stale graph). So the bootstrap restore happens exactly once, here,
@@ -84,7 +109,7 @@ if (-not $NoRestore) {
         if (Test-Path -LiteralPath $tempLog) {
             Get-Content -LiteralPath $tempLog -Tail 12 | ForEach-Object { Write-Host "    $_" }
         }
-        Write-Host '  retry: dotnet restore tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj'
+        Write-Host '  [hint] retry: dotnet restore tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj'
         Remove-Item -LiteralPath $tempLog -Force -ErrorAction SilentlyContinue
         exit 1
     }
@@ -103,30 +128,19 @@ Invoke-Check 'library Release build (warnings as errors)' `
     'dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release' `
     { dotnet build $projectFile -c Release @buildExtraArgs }
 
-Invoke-Check 'mod payload present at the path consumers bind to' `
+Invoke-Check 'configuration-isolated build outputs exist and match evaluated TargetPath' `
     'dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release' `
     {
-        # Consumer mods reference 1.6/Assemblies/FerriteLib.UiKit.dll by this exact relative shape.
-        # If the output path moves, every consumer's compile-time reference and the runtime binding
-        # break together, so the layout is a contract and not an implementation detail.
-        $payload = Join-Path $assembliesDir 'FerriteLib.UiKit.dll'
-        if (-not (Test-Path -LiteralPath $payload -PathType Leaf)) {
-            throw "Missing payload: $payload"
+        foreach ($configuration in @('Dev', 'Release')) {
+            $payload = Join-Path $root "dist\build\$configuration\FerriteLib.UiKit.dll"
+            if (-not (Test-Path -LiteralPath $payload -PathType Leaf)) { throw "Missing build output: $payload" }
+            $target = (& dotnet msbuild $projectFile -getProperty:TargetPath "-p:Configuration=$configuration" -nologo | Select-Object -Last 1)
+            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($target)) { throw 'Could not evaluate TargetPath.' }
+            if ([IO.Path]::GetFullPath($target.Trim()) -ne [IO.Path]::GetFullPath($payload)) {
+                throw "Unexpected $configuration build output: $target; expected $payload"
+            }
         }
-
-        # Existence alone is not the claim. A stale DLL left in this gitignored folder kept the gate
-        # green while consumers bound to bytes this tree never built (measured 2026-09-11 by the
-        # independent verifier: moving <OutputPath> elsewhere reddened nothing). So ask MSBuild where
-        # it will actually write, and compare that evaluated path with the one consumers bind to.
-        $target = (& dotnet msbuild $projectFile -getProperty:TargetPath -p:Configuration=Release -nologo | Select-Object -Last 1)
-        if ([string]::IsNullOrWhiteSpace($target)) {
-            throw 'Could not read TargetPath from the project.'
-        }
-        $expected = [System.IO.Path]::GetFullPath($payload)
-        $actual = [System.IO.Path]::GetFullPath($target.Trim())
-        if ($actual -ne $expected) {
-            throw "Build output does not land where consumers bind: TargetPath=$actual expected=$expected"
-        }
+        & (Join-Path $PSScriptRoot 'verify-carrier-export.ps1') -ProjectRoot $root
     }
 
 Invoke-Check 'carries no game content (assemblies-only mod)' `
@@ -145,29 +159,19 @@ Invoke-Check 'carries no game content (assemblies-only mod)' `
         }
     }
 
-Invoke-Check 'LICENSE present and MPL-2.0' `
-    'manually' `
+Invoke-Check 'LICENSE present, full MPL-2.0, and the pinned series licence' `
+    'pwsh -NoProfile -File scripts/verify-license.ps1' `
     {
-        $licensePath = Join-Path $root 'LICENSE'
-        if (-not (Test-Path -LiteralPath $licensePath -PathType Leaf)) {
-            throw "FerriteLib has no LICENSE file."
-        }
-        $text = Get-Content -LiteralPath $licensePath -Raw
-        if ($text -notmatch 'Mozilla Public License Version 2\.0') { throw 'LICENSE is not the MPL-2.0 text.' }
-        # A truncated paste is the realistic failure: someone copies the header and stops.
-        if ($text -notmatch 'Exhibit B') { throw 'LICENSE is missing Exhibit B; the text is truncated.' }
-        if ($text -notmatch '10\.4\. Distributing Source Code Form') { throw 'LICENSE is missing section 10.4; the text is truncated.' }
-        # Deliberately NOT declared incompatible with secondary licenses: that would bar the assembly
-        # from being combined with GPL-family mods, and nothing here needs it.
+        # The checker is its own script so the mutation proof for this gate ("edit LICENSE and it goes
+        # red") can be run against this gate ALONE; through the whole chain, gates 1-5 would be
+        # candidates for the red. It is read-only, which is why the hint above is a re-run and not a
+        # build: re-running it can never touch the carrier.
         #
-        # Scoped to the header block on purpose. The full MPL text reproduced below always contains
-        # Exhibit B's sample notice, so searching the whole file reports a defect in every correct
-        # copy of the licence - the assertion that failed here, not the file.
-        $separator = $text.IndexOf('-----')
-        $header = if ($separator -gt 0) { $text.Substring(0, $separator) } else { $text }
-        if ($header -match 'Incompatible With Secondary Licenses., as defined') {
-            throw 'The applied notice declares incompatibility with secondary licenses; that was meant to stay allowed.'
-        }
+        # What it asserts, and the boundary it respects: the MPL-2.0 body, the two truncation probes, the
+        # allowed incompatibility notice - and the SHA-256 of the whole series licence pinned as a literal
+        # in that script. The cross-repository half (this file byte-identical to the consumer's copy) is
+        # the consumer's own gate; this repository answers only for its own copy.
+        & pwsh -NoProfile -File (Join-Path $root 'scripts\verify-license.ps1') -ProjectRoot $root
     }
 
 Invoke-Check 'About.xml identity is present and well-formed' `
@@ -281,6 +285,19 @@ Invoke-Check 'rule (c) consumer half is armed and tree-sensitive (dependency-rea
         }
     }
 
+Invoke-Check 'development instrument: the Dev half really ran (numeric geometry + press verdicts)' `
+    'dotnet run --no-restore --project tools/FerriteLib.UiKit.Tests -c Dev' `
+    {
+        # The instrument is compiled only into a Dev build, and gate 1 runs the harness in Release - so
+        # without this gate its lane and its mutation proof would live only for whoever re-runs '-c Dev' by
+        # hand, which is exactly how a proof rots. The reader refuses to accept "the project compiled": it
+        # requires the dev-only assertion names, floors on the assertion and dump-line counts, the absence of
+        # the release-only name, and the numbers themselves. Its checker is control-tested on every run
+        # (four planted fixtures - empty, release-only, green-exit-but-missing-name, and a fully populated
+        # sample that must NOT be rejected).
+        & pwsh -NoProfile -File (Join-Path $root 'scripts\verify-dev-instrument.ps1') -ProjectRoot $root
+    }
+
 if ($PackDev) {
     $packArgs = @{ ProjectRoot = $root }
     if ($PackZip) { $packArgs.Zip = $true }
@@ -290,4 +307,19 @@ if ($PackDev) {
 }
 
 Remove-Item -LiteralPath $tempLog -Force -ErrorAction SilentlyContinue
-Write-Host '[verify] all checks passed.'
+$deliveredAfter = if (Test-Path -LiteralPath $deliveredPath) {
+    (Get-FileHash -LiteralPath $deliveredPath).Hash + ':' + (Get-Item -LiteralPath $deliveredPath).LastWriteTimeUtc.Ticks
+} else { 'absent' }
+if ($deliveredBefore -ne $deliveredAfter) { throw 'Verification changed the compatibility carrier (hash or mtime).' }
+Write-Host '[verify] all checks passed; compatibility carrier unchanged (hash and mtime).'
+
+if ($EvidenceFooter) {
+    # One shape, invoked in-process so the gate array crosses no process boundary: this is the same file
+    # the consumer repository uses, parameter for parameter.
+    & (Join-Path $root 'tools\evidence\Write-EvidenceFooter.ps1') -ToStdout -Configuration Both `
+        -Subject 'scripts/verify-local.ps1 (the 10-gate chain, Release + Dev)' `
+        -Command 'pwsh -NoProfile -File scripts/verify-local.ps1 -NoRestore -EvidenceFooter' `
+        -ExitCode 0 -Gate $script:gateResults `
+        -PinPath @('scripts/verify-local.ps1', 'scripts/verify-license.ps1', 'scripts/verify-dev-instrument.ps1',
+                   'tools/FerriteLib.UiKit.Tests/StubTextWidth.cs', 'tools/FerriteLib.UiKit.Tests/KernelTextAuditTests.cs')
+}

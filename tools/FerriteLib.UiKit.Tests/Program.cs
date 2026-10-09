@@ -64,11 +64,21 @@ internal static class Program
         Console.WriteLine("Kernel window shell (P2 chrome + failure contract)...");
         failures += KernelWindowHostTests.RunAll();
 
+        Console.WriteLine("Kernel window catalog (0.5 keyed instances + shell + active target + pause policy)...");
+        failures += KernelWindowCatalogTests.RunAll();
+
         Console.WriteLine("Kernel backend containment (funnel allowlist)...");
         failures += KernelContainmentTests.RunAll();
 
         Console.WriteLine("Kernel popup/window-space (greenfield)...");
         failures += KernelPopupTests.RunAll();
+
+        Console.WriteLine("Kernel receive eligibility and capture ownership (FL-IC1: own-popup overlap, chart gates, bounded menu)...");
+        failures += KernelInputEligibilityTests.RunAll();
+
+        Console.WriteLine("Kernel edit transactions and the Cancel ladder (FL-IC2: commit-once, native hooks, tree return)...");
+        failures += KernelEditTransactionTests.RunAll();
+        failures += KernelCancelLadderTests.RunAll();
 
         Console.WriteLine("FerriteLib version contract + carrier guard...");
         failures += FerriteLibVersionTests.RunAll();
@@ -91,6 +101,15 @@ internal static class Program
         Console.WriteLine("Kernel writability (read-only bindings drive the disabled treatment)...");
         failures += KernelWritabilityTests.RunAll();
 
+        Console.WriteLine("Kernel invalidation (per-key announce, class, batch commit)...");
+        failures += KernelInvalidationTests.RunAll();
+
+        Console.WriteLine("Kernel command state (canExecute, one disabled interaction)...");
+        failures += KernelCommandStateTests.RunAll();
+
+        Console.WriteLine("Kernel visibility (Visible/VisibleKey, identity, structural prune)...");
+        failures += KernelVisibilityTests.RunAll();
+
         Console.WriteLine("Kernel role attributes (Tone/Emphasis, fallback recording, density)...");
         failures += KernelRoleAttributeTests.RunAll();
 
@@ -102,5 +121,96 @@ internal static class Program
 
         Console.WriteLine("Kernel stub coverage (game members the harness must carry, trip guard)...");
         failures += KernelStubCoverageTests.RunAll();
+
+        Console.WriteLine("Kernel documents (file sources, dependencies, atomic reload, last-known-good)...");
+        failures += KernelDocumentReloadTests.RunAll();
+
+        Console.WriteLine("Kernel diagnostics (per-host subscriptions, attribution, budgets, reload/fit/recovery)...");
+        failures += KernelDiagnosticsTests.RunAll();
+
+        Console.WriteLine("Kernel keyed repeater (item scope, key reuse, removal cleanup, template contract)...");
+        failures += KernelRepeatTests.RunAll();
+
+        Console.WriteLine("Kernel common controls (checkbox / progress / tree contracts)...");
+        failures += KernelControlKindTests.RunAll();
+
+        Console.WriteLine("Kernel neutral fixture page (data-driven rows + the new controls, library fixture only)...");
+        failures += KernelFixturePageTests.RunAll();
+
+        Console.WriteLine("Kernel ordinary-settings recipe (B: public-only authoring, explicit notify, lifecycle)...");
+        failures += KernelOrdinarySettingsRecipeTests.RunAll();
+
+        // --- T2 automatic reload scheduling (owner: reload) - one contiguous block; ---- //
+        // --- mvvm and catalog add their own blocks and the Lead resolves the merge. ----- //
+        Console.WriteLine("Kernel reload scheduling (quiet period, bounded retry, pause independence, deferral)...");
+        failures += KernelReloadSchedulingTests.RunAll();
+        // ------------------------------------------------------------------------------- //
+
+        // ---- T1 MVVM / page lifecycle lanes (owner: mvvm) - begin -----------------------------
+        Console.WriteLine("Kernel notification adapter (explicit mapping, bounded batch, unsubscribe, thread refusal)...");
+        failures += KernelNotifyAdapterTests.RunAll();
+
+        Console.WriteLine("Kernel page lifecycle (attach/detach order, reload invariance, the page-level door)...");
+        failures += KernelPageLifecycleTests.RunAll();
+        // ---- T1 MVVM / page lifecycle lanes (owner: mvvm) - end -------------------------------
+
+        // --- T3 widget catalogue (owner: catalog) - one contiguous block, merge-conflict anchor ---
+        Console.WriteLine("Kernel widget catalogue (read-only description, scope-preserving identity, no factories)...");
+        failures += KernelWidgetCatalogTests.RunAll();
+        // --- end T3 widget catalogue ---
+
+        Console.WriteLine("Kernel architecture probes (headless button / two visuals / live resize)...");
+        failures += KernelArchitectureProbeTests.RunAll();
+
+        // ---- Batch 1 (0.7.x) lanes. Owners: layout (placement + density), tone. ---------------
+        // ---- The Lead wires these; each owner's block is contiguous and merge-safe. ----------
+        Console.WriteLine("Kernel placement (Overlay matrix, refusal matrix, flow boundary, envelope)...");
+        failures += KernelPlacementTests.RunAll();
+
+        // ---- Batch 1 / tone - begin ----------------------------------------------------------
+        Console.WriteLine("Kernel tone vocabulary (four authored meanings, state redirects, one accent)...");
+        failures += KernelToneVocabularyTests.RunAll();
+        // ---- Batch 1 / tone - end ------------------------------------------------------------
+
+        // ---- Batch 1 / independent verification (owner: verify) -------------------------------
+        Console.WriteLine("Kernel Batch 1 verification (independent probe: tone, density, placement)...");
+        failures += KernelBatch1VerificationTests.RunAll();
+        // ---- Batch 1 / verify - end ----------------------------------------------------------
+
+        // ---- 0.7.x additions (maintainer ruling 2026-09-20): additions land inside 0.7.0 --------
+        Console.WriteLine("Kernel text field (B7: identity, draft, the commit rule, placeholder)...");
+        failures += KernelTextFieldTests.RunAll();
+
+        Console.WriteLine("Kernel mode-row hover help (per-option identity published, never painted)...");
+        failures += KernelModeRowHelpTests.RunAll();
+
+        Console.WriteLine("Kernel element help (engine-wide HelpKey claimed on hover)...");
+        failures += KernelElementHelpTests.RunAll();
+
+        Console.WriteLine("Kernel mode-row localization (TitleKeyN through the translation seam)...");
+        failures += KernelModeRowLocalizationTests.RunAll();
+
+        Console.WriteLine("Kernel option help (the shared HoverHelpKey contract, mode-row and dropdown)...");
+        failures += KernelOptionHelpTests.RunAll();
+
+        Console.WriteLine("Kernel container Tab (the coherence fix: the contract now admits the engine's read)...");
+        failures += KernelContainerTabTests.RunAll();
+        // ---- end 0.7.x additions ------------------------------------------------------------------
+
+        // ---- 0.7.x height axis (owner: fl-dev) - one contiguous block ---------------------------
+        Console.WriteLine("Kernel content height (Height=MatchContent: the reference, its matrix, its degradation)...");
+        failures += KernelContentHeightTests.RunAll();
+        // ----------------------------------------------------------------------------------------
+
+        Console.WriteLine("Kernel section header (the chrome a manifest can now turn off)...");
+        failures += KernelSectionHeaderTests.RunAll();
+
+        // ---- 0.7.x development instrument (owner: fl-dev) - one contiguous block ----------------------
+        Console.WriteLine("Kernel dev geometry instrument (numeric rects, height mode, viewport, press verdicts)...");
+        failures += KernelDevGeometryTests.RunAll();
+        // ----------------------------------------------------------------------------------------------
+
+        Console.WriteLine("Kernel lane registration (every lane file is invoked from Program.cs)...");
+        failures += KernelLaneRegistrationTests.RunAll();
     }
 }

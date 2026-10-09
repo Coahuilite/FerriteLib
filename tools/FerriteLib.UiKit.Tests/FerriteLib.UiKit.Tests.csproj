@@ -15,6 +15,15 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 
+  <!-- The library's Dev gate lives in its own csproj; the harness needs the same constant in the same
+       configuration, or a lane's dev half is code no run can reach (measured 2026-09-22: the existing
+       #if FER_DEV pair in KernelDocumentReloadTests had never been compiled). The gates run Release, so
+       this changes nothing a gate measures; it is what makes 'dotnet run -c Dev' a run that can hold a
+       dev-only mechanism to account. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Dev'">
+    <DefineConstants>$(DefineConstants);FER_DEV</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj" />
     <PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4871" />

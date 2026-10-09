@@ -2,7 +2,8 @@
 
 > Stable layer: only the rules a session must hold before acting. Everything evidenced, measured, or
 > dated lives in `MEMORY.md`; everything actionable in `TODO.md`. Read `MEMORY.md` before claiming
-> project context.
+> project context — and note that a `MEMORY.md` citation into `OBLIVIONIS.md` is a citation into the cold
+> archive, which holds the pre-0.7 history verbatim and cannot override a current source.
 
 ## Project identity
 
@@ -23,7 +24,8 @@ state, invalidation, recovery, and one audit surface — are owned here. The lib
 consumer's tree keeps inside it, not what it ships in controls. Non-goals (no uGUI backend, no reflection,
 DI or codegen, no expressions in manifest XML, no Def hot-reload promise, no world-space rendering), the
 evidence classes behind each, and the 2026-09-10 ruling that the library is referenceable by strangers and
-held to general-library standards: `MEMORY.md`, "Charter".
+held to general-library standards: `OBLIVIONIS.md`, "Charter" (the founding spec, the surveys and the
+style-layer argument live there).
 
 ## Compatibility and retirement
 
@@ -60,6 +62,21 @@ assembly and no `FerriteLib.Core`; re-open only if a consumer needs the visual c
   addition bumps minor too), release `About/About.xml <modVersion>`, build csproj `VersionPrefix` — the
   harness pins all three. `AssemblyInformationalVersion` embeds the commit SHA and is never a
   compatibility value.
+  **TEMPORARY EXEMPTION, with an expiry: on the 0.7.x line a public addition does NOT bump the minor**
+  (maintainer ruling 2026-09-22, "minor 可以不升级，仍然算到 0.7.x 内"; reasoning added the same day: "这个算临时放行，
+  因为现在就在跨库合作开发 fl0.7.x" — this is a release valve, NOT a change to the rule itself). **Reason:**
+  the library and its consumer are in cross-repository lockstep development on 0.7.x, where a minor bump
+  buys no compatibility signal and only churns both trees. **Expires** at the first of: the 0.7.x line's first
+  release/tag, or the end of that lockstep — then the generic pre-1.0 sentence above resumes and an addition
+  moves the minor again. **Never inherited:** it belongs to the `0.7.x` line and this stage alone, and must
+  not be carried into the next line or into any published state by analogy. **No lane reads "additions" today, so
+  nothing has to be re-cut for this exemption** — measured 2026-09-22 across the whole harness and the
+  script gates: `FerriteLibVersionTests` pins the three axes agreeing on major.minor and never inspects the
+  surface, `FerriteLibApiTierTests` reacts to an addition by requiring a tier (a documentation act in
+  `docs/api-tiers.md`), and no gate or lane anywhere enforces the minor bump itself. If a future lane starts
+  reading additions — or its message wording starts asserting the minor rule — align it in the batch that
+  next touches the carrier, because the harness and the library must exercise the same contract. `MEMORY.md` (§ Version axes) carries the same exemption, its expiry, and the lane-by-lane audit
+  behind "no gate reads additions".
 - **The game cannot express a prerequisite version** (`ModRequirement` parses only `packageId`,
   `alternativePackageIds`, `displayName`); every consumer asserts the API range in its own constructor.
 
@@ -71,10 +88,13 @@ assembly and no `FerriteLib.Core`; re-open only if a consumer needs the visual c
   library cannot provide — a non-goal, not a backlog item. A consumer's whitelist entry for it is
   policy-backed and is not renegotiated per PR; the boundary that remains is that anything drawn into a
   window goes through the tree.
-- **API freeze is gated on the second wired consumer**, not on features; until it builds against this
-  surface, the API is provisional. After a Workshop page carries the stable packageId, "breaking
-  changes are expected" stops being free — the invited-vs-unsupported call (`TODO.md` §5) is open and
-  is a maintainer decision, never a session's.
+- **API stabilization is not gated on a consumer count.** Define the supported contract, verify its
+  behavior, and state the compatibility commitment so consumers have a dependable surface to adopt.
+  Real-consumer integration is valuable validation, not a prerequisite for stabilizing that surface;
+  missing integration evidence must remain explicit. This does not automatically promote existing API
+  tiers or waive version, migration, or verification requirements. After a Workshop page carries the
+  stable packageId, "breaking changes are expected" stops being free — the invited-vs-unsupported call
+  (`TODO.md` §5) remains a maintainer decision, never a session's.
 
 ## Ecosystem protocol (how this library may grow)
 
@@ -91,7 +111,7 @@ Consumer ladder when the library lacks something:
    exception to this: `UiWindowHost` owns the chrome, so a page never has to leave the tree to exist.
 2. **Propose promotion** — one release after it survives, carrying the transcription above plus the
    metric. Outside contributors propose by issue; the maintainer-side vehicle is a `HANDOFF` round
-   (harvest loop and full form: `MEMORY.md`).
+   (harvest loop and full form: `OBLIVIONIS.md`, "Ecosystem protocol").
 3. **Register an exemption** — only for what structurally cannot live in a page tree, which after the
    round-1 shell is world-space rendering and nothing else currently known. Allowlisted file + written
    ruling + named closing item: rent, not exit.
@@ -99,13 +119,23 @@ Consumer ladder when the library lacks something:
 Promotion gate — all four or it stays consumer-side: provenance cited; neutral, and no consumer's
 numbers as library defaults; no new process-wide mutable statics; a harness-drivable lane exists.
 
+**The gate governs *new specialized kinds*, not confirmed public capabilities** (2026-09-15, superseding
+the broader reading of the rule above). Registering a kind freezes vocabulary, which is why it waits for a
+citation. A capability a page model structurally cannot express — window-instance identity, binding
+notification, collection reconciliation, document hot reload, per-host diagnostics — is implemented from
+the confirmed requirement directly. The distinguishing question is "does the page model own a general
+surface here?", not "has somebody already hand-rolled a copy elsewhere"; a request is still not evidence
+for a *kind*, and our own demo is still not consumption. The superseded wording, the round it changed in and
+the affected decisions are recorded in `docs/development/0.5/00-baseline.md` §2.4.
+
 **What earns a kind.** Registering a widget kind is not shipping a convenience, it is freezing vocabulary:
 every kind brings an attribute schema, a declared label set, a tier entry and eventually a deprecation debt.
 A kind is earned by owning what a manifest cannot express — per-element interaction state, a measure
 contract over its own content, or a hit/geometry rule. The test is about ownership, not about being atomic:
 a composite may hold a name (no surveyed toolkit dissolves its named composites into atom-only code —
-`MEMORY.md`), but it must not duplicate a surface the engine already carries, and once the atoms exist its
-innards must be an explicit composition over them, so the name stays stable and the tree inside is rebuilt.
+`OBLIVIONIS.md`, the industry survey), but it must not duplicate a surface the engine already carries,
+and once the atoms exist its innards must be an explicit composition over them, so the name stays stable
+and the tree inside is rebuilt.
 What never earns a name is a widget instance handed out by type: composing by type is the bypass the
 tree-membership metric counts.
 
@@ -126,7 +156,7 @@ is a maintainer-side number, never a measurement a clone can reproduce.
 ## Build and verification
 
 ```powershell
-pwsh -NoProfile -File scripts/verify-local.ps1                       # 9 gates
+pwsh -NoProfile -File scripts/verify-local.ps1                       # 10 gates
 pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev              # + staged dev folder (placement is manual)
 pwsh -NoProfile -File scripts/pack-release.ps1 -Version v0.3.0-rc2   # + GitHub asset (what CI runs)
 pwsh -NoProfile -File scripts/pack-steam.ps1  -Version v0.3.0-rc2    # + Workshop upload folder
@@ -135,6 +165,20 @@ pwsh -NoProfile -File scripts/pack-steam.ps1  -Version v0.3.0-rc2    # + Worksho
 `-PackDev` stages `dist/dev/FerriteLib/` and stops there: nothing under `scripts/` writes outside the
 repository, and installing a folder into a game `Mods/` directory is the developer's own step (Boundaries).
 
+**Builds are configuration-isolated.** Library builds and harnesses write `dist/build/<Configuration>/`.
+The installable mod layout remains `1.6/Assemblies/` inside staged packages. Ordinary verification never
+updates the compatibility carrier at the repository root. `scripts/export-carrier.ps1` is the explicit
+Release-only delivery action for consumers still using that root path; it is not called by a gate or packer.
+The commands and the input-selection contract live in `docs/build-and-debug.md`.
+
+- Read assembly identity in a child process or a copy: a persistent `Assembly.LoadFile` can lock a build input.
+- Serialize harness builds: their canonical `bin/stubs` output is still shared across configurations.
+- A hash identifies bytes; the mtime can detect a rewrite of equal bytes. Keep both when checking a held delivery.
+- A build embeds committed HEAD, not dirty source. Record clean/dirty state with any acceptance identity.
+- A docs-only commit moves the embedded source identity on the next build; it does not update staged packages.
+- Gate 10 must execute the Dev-only instrument assertions. Release-only success is not instrument coverage.
+- Harness success is contract evidence against stubs, not in-game end-to-end acceptance.
+
 Three channels (`pack-dev` / `pack-release` / `pack-steam`), one staging engine (`stage-package.ps1`). The
 engine owns what a package *is* — the closed file set, the content probe, the licence copy, `version.txt`,
 and a **measured** build configuration, so a channel label that does not match the payload's bytes is
@@ -142,8 +186,7 @@ refused rather than trusted. The packers own identity only: dev tolerates a dirt
 requires the tag shape and the build axis, steam additionally a clean tree, and only github archives.
 `About/PublishedFileId.txt` is gitignored and the stager copies `About.xml` as a file rather than the
 directory, so no rehearsal or GitHub artifact can carry a Workshop identity. The measurements behind this
-split live in `MEMORY.md` ("Three channels, one staging engine", "A release asset must be built after the
-gates run", "Only the GitHub channel archives").
+split live in `MEMORY.md` ("Packaging discipline").
 
 A consumer integrates through the published GitHub Release asset; a same-level sibling folder with
 `Private=false` is one developer's lockstep arrangement, not a contract and not a layout a clone can
@@ -153,21 +196,52 @@ every gate here stays green.
 
 ## Memory protocol
 
-Three-file split: `AGENTS.md` stable, `MEMORY.md` the only volatile ledger, `TODO.md` the action surface.
-Record a PASS only with its scope and evidence source, saying which half is mutation-proven and which is
-only a future-regression guard. Cross-repo coordination lives in maintainer-local `HANDOFF.md`, which is
-gitignored: its section kinds and round lifecycle are pinned in that file's own header, no tracked file
-may depend on reading it, and an un-CLOSED round keeps a pointer line in `TODO.md`.
+Four-file split: `AGENTS.md` stable, `MEMORY.md` the only volatile ledger, `TODO.md` the action surface,
+`OBLIVIONIS.md` the cold archive.
+
+At every non-trivial session:
+
+- Read `MEMORY.md` before claiming project context; it stores confirmed durable facts, decisions,
+  constraints and evidence pointers.
+- Read `TODO.md` before continuing work; it stores only current goals, open actions, blockers and explicit
+  deferrals.
+- Read `OBLIVIONIS.md` only for a historical conflict or an explicit request; it is cold archive evidence
+  and cannot override current sources.
+- The three active memory files are maintained in accurate English; `OBLIVIONIS.md` follows the same
+  language rule when appended.
+
+Maintain these boundaries:
+
+- Update `MEMORY.md` only when durable facts or the open action surface changes.
+- Keep incident-derived lessons and measured implementation facts in `MEMORY.md`, rather than promoting
+  them into standing instructions here.
+- **Compact by default.** Settled release and implementation detail lives in `docs/`; `MEMORY.md` keeps a
+  pointer to it, never a second copy of it — `OBLIVIONIS.md` exists so the ledger can shrink. Do not grow an
+  active memory file with finished work.
+- Update `TODO.md` only when its current task surface changes.
+- Do not store session narratives, transient artifacts, raw logs, completed test matrices, commit chains or
+  release checklists in an active memory file.
+- Documentation edits alone are not memory events; an external-state summary never overrides its
+  authoritative source.
+
+**Handoff material is transient and is not a memory tier** (maintainer ruling 2026-09-18, correcting a
+wrongful promotion). A maintainer-local `HANDOFF.md` is gitignored, is read at the moment of a round, holds
+no standing authority, and is never a place a tracked file points at for a protocol. Anything durable it
+carries is promoted into the files above or into `docs/` at that moment; a round that stays open keeps a
+pointer line in `TODO.md`, and a closed round leaves nothing behind.
 
 ## Boundaries
 
 - Default scope is this repository alone: a public checkout holds no sibling mod and no consumer tree, so
   no rule, gate, script or evidence here may require one. Another repo is read-only, and only for a
   session the maintainer names; writing one needs their authorization in that same instruction.
-- No `git remote`, no push, no tag, no release, no registry publish without explicit maintainer
-  authorization. Local commits are fine.
+- Local commits are permitted. Configuring a remote, pushing, tagging, releasing or publishing to a
+  registry remains an external operation and needs explicit maintainer authorization.
 - No personal absolute paths, log excerpts, tokens or `PublishedFileId.txt` values in tracked files, and no
   `../<sibling>` citations either — external evidence is a transcription or a public permalink.
+- A privacy review of the complete reachable range (`scripts/privacy-audit.ps1 -FullHistory`) precedes a
+  push. Scope and limits: `docs/push-privacy-gate.md`. Scanner success is a privacy result, not gameplay,
+  build or release acceptance.
 - **No script places a mod in the game.** Nothing under `scripts/` writes outside the repository, and no
   step copies, links or junctions anything into a `Mods/` directory — a link back into the repo would bind
   build output to a machine-local layout another clone cannot see, reproduce, or (without elevation)

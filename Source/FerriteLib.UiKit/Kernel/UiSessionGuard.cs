@@ -148,6 +148,11 @@ public static class UiSessionGuard
         if (first)
         {
             LogWarning(diagnostic);
+
+            // The session-scoped record is where the trip is attributed: the session owns the subscription,
+            // so one window's recovery lands on that window's subscriber and on nobody else's. A session
+            // with no subscription no-ops, which is why this adds nothing to the unsubscribed path.
+            UiDiagnosticHub.PublishRecovery(session, key, kind, elementPath, diagnostic);
         }
     }
 

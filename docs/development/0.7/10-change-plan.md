@@ -1,0 +1,400 @@
+# Change plan — placement and alignment (0.7.x line)
+
+> **Status: a live plan, nothing implemented.** This file is the single home for the plan opened on
+> 2026-09-18; later discussion edits it in place — add, remove, amend items — rather than opening another
+> document. Authority order: **code > `MEMORY.md` > this file**, and the architecture it changes is mapped
+> in `docs/architecture.md`. Every item below is `proposed` until it has a contract entry and a lane, and
+> no line here may be read as implemented or verified.
+>
+> **Version axis — settled (maintainer ruling 2026-09-18): the 0.7.x line, no minor move.** New manifest
+> vocabulary is a public addition, which normally moves the pre-1.0 minor, but the rule that decides it is
+> the one already written down: *an rc that never shipped has no goalpost to move* (`MEMORY.md`, the
+> 0.4.0 → 0.3.0 refile). Nothing is consumer-compiled against `[0.7.0,0.8.0)` and no package has been handed
+> over, so the axis stays `0.7.0` and the consumer range stays `[0.7.0,0.8.0)`. This work is recorded as a
+> **second amendment** to the line's contract before it ships — the `UiTheme.Vanilla` amendment is the
+> precedent. The contrast is the `0.5.0 → 0.6.0` move, which turned on a delivery fact ("the 0.5.0 dev
+> package and its `[0.5.0,0.6.0)` handoff were delivered"), not on the number being unreleased.
+
+## 0. What this closes, and what it does not
+
+`docs/architecture.md` §3.2 and §6.3 register two layout gaps — **alignment: none** and **relations: none**
+— and one cross-cutting fact this plan makes load-bearing: **density cannot reach the layout layer**. The
+plan closes the first, half of the second (parent-relative placement; sibling-relative placement stays
+out), and the density half as a prerequisite.
+
+**Not closed here**, and still registered in §6.3: behaviour/painter separation, published interaction
+state, the declared input contract, control-composed parts, keyboard focus, the image outlet, per-part
+style keys, and the L1 (orphan-name) closure lane.
+
+## 0b. Batch 1 — the decided scope (2026-09-18)
+
+All six Step-1 decisions are settled. **Batch 1 = every breaking change plus the additive placement
+vocabulary, delivered together**, so that the local consumer faces exactly one migration.
+
+| Decision | Settled as |
+|---|---|
+| D1 | The CP-0 change is accepted **inside this one minor**; no opt-in flag, no second mechanism. Escape hatch is the explicit attribute (`Padding="0"` / `Gap="0"`). |
+| D2 | **Four attributes** on the child (`AlignX`/`OffsetX`/`AlignY`/`OffsetY`). No `<Place>` sub-element — YAGNI. |
+| D3 | The ratio is a fraction of the **parent's inner box** (arranged rect minus its own `Padding`). One unit only; self-relative placement stays the pivot's job. |
+| D4 | **Not this line.** Registered as CP-7: it needs element references, an ordering discipline and cycle refusal, and tree restructuring already expresses the common case. |
+| D5 | **(a)** — vocabulary and meaning in code, mapping and colour in data. |
+| D6 | Authorable tones shrink to `{Neutral, Success, Warning, Danger}`. `Active` and `Disabled` stop being authored names and become **states**; both keep working as a redirect for one minor. |
+| D7 | `HoverPoint` is **deleted outright** — no redirect, no deprecated alias — and the accent becomes one stored colour with a derived hover step. |
+
+**Batch 1 work items:** CP-6①③④, CP-0, CP-1, CP-2, then delivery.
+**Deferred to batch 2 (after the consumer's live feedback):** CP-3 → CP-6② → CP-5, plus CP-7 if the
+feedback asks for it. Reason: those are purely additive and cite nothing today; the live pass is what
+would supply the citation.
+
+**A correction made while writing this spec.** CP-6① was expected to force a signature change —
+`UiResolvedStyle.Resolve(tone, emphasis, bool? writable)` becoming an explicit state parameter. It does
+not, and it should not: shrinking the *authored vocabulary* is enough to stop `Disabled` being reachable
+from two directions, while `UiStatusTone` keeps `Active`/`Disabled` internally because it is a **stable**
+type whose members may not be removed. So the split lands at the vocabulary level; the type's internal
+conflation is a documented limitation of a stable type, not a redesign. That is the smaller change, which
+is the point.
+
+## 1. Items
+
+### CP-0 — density reaches container spacing  *(prerequisite; blocks CP-1)*
+
+**Goal.** A theme's geometry moves the space **between** containers, not only the space inside a control.
+
+**Why.** `UiLayoutEngine.cs` never reads `theme.Geometry`; container `Padding`/`Gap` are XML-only with a
+default of zero (`ParsePadding` → `Padding.Zero`, `ReadGap` → `0f`), while every density token is consumed
+inside widget code. A theme change therefore has no page-level effect — and CP-1's reference frame (the
+parent's inner box) would be frozen in XML.
+
+**Change.** `ParsePadding` and `ReadGap` fall back to `theme.Geometry.Padding` / `theme.Geometry.Gap` when
+the attribute is absent; an explicit attribute still wins, so `Padding="0"` keeps the old result.
+
+**Migration (breaking).** A container declaring neither attribute gets the token default instead of zero.
+The contract states it and names the escape hatch (`Padding="0"`).
+
+**Clock.** Reuse the existing one: `UiHost.MeasureAndArrange` turns a `theme.LayoutRevision` move into
+`BumpContentRevision`, so a density change already re-arranges. No second clock is introduced.
+
+**Verification.** One lane changes only the theme's geometry and asserts the arranged rects move; a second
+asserts `Padding="0"` arranges exactly as before.
+
+**Status.** `proposed`.
+
+### CP-1 — placement vocabulary inside a placement container
+
+**Goal.** An element can state where it sits in its parent's box: which edge or centre it references, how
+far along the parent's span, and a pixel nudge.
+
+**Why.** No alignment vocabulary exists anywhere in the engine, and a relation exists only as a
+consequence of flow. Measured in experiment 3: centring is two equal flex spacers and a fixed bottom edge
+is whatever a `Fill` sibling leaves behind.
+
+**Model — one rule, both axes.**
+
+```text
+x = parentRefX(inner, AlignX) + offsetX - pivotFraction(AlignX) * self.width
+```
+
+`AlignX` selects **both** the parent's reference point and the element's own pivot, so one name carries the
+pair: `Left` = (inner.x, self left), `Center` = (inner.centre, self centre), `Right` = (inner.xMax, self
+right), `Stretch` = today's full-width behaviour and the default. `OffsetX` is `N%` (a fraction of
+`inner.width`) or a bare number (pixels). The vertical axis is the same rule with `AlignY`/`OffsetY`.
+
+**Home.** `MeasureOverlay` (`UiLayoutEngine.cs:1260`) already puts every child at `(padding.Left, innerY)`
+with the full inner width — a placement container with no placement vocabulary. **No new container kind and
+no new structural concept.**
+
+**Attribute set — four names.** `AlignX`, `OffsetX`, `AlignY`, `OffsetY`.
+
+**Refused at creation** (fail-closed, the A2/A3 precedent): an unknown alignment value; a ratio outside
+0..100%; a malformed number; percentage placement on a child of a flow container; `Stretch` together with
+a numeric `Width`; placement together with `Fill` on the same element.
+
+**Deliberately cheap properties.** No expression and no reference, so the manifest's existing non-goal
+holds. Single-pass: the only unknown is the element's own width, and `Measure` already ran, so there is no
+solver, no second pass and no cycle.
+
+**Status.** `proposed`; blocked by CP-0.
+
+### CP-2 — cross-axis alignment in flow containers
+
+**Goal.** In a `Row` a child can sit top / middle / bottom; in a `Column`, left / centre / right.
+
+**Why.** Split from CP-1 because it lands in different code and has a different risk: the main axis stays
+flow, and the default must not move a single existing manifest.
+
+**Boundary.** Percentage offsets are **not** accepted here — the main axis already belongs to the flow, and
+a second owner for it is what this plan exists to avoid.
+
+**Status.** `proposed`; shares `ResolvePlacement` with CP-1.
+
+### CP-3 — the skin-source axis  *(registered; not implemented)*
+
+**Goal.** A look can be defined by data, not only by C# factories, so "a different skin" is a file rather
+than a recompile — and so a consumer that wants only the visual core can obtain a skin without a host.
+
+**Why now.** CP-1's predecessor package made `new UiTheme()` an unpainted bag and made the theme a
+required parameter, so the library now *forces* the question "where does a skin come from" on every
+consumer. Today the only answers are the two static factories, whose literals live in C#.
+
+**Shape.** One parser, one vocabulary, two text origins (already true for `<Styles>`), extended so a
+document can define the base tokens a palette is made of — not only the `Scheme`/`Density` overrides.
+
+**Not this.** No registry, no Def, no directory scan, no process-wide mutable static.
+
+**Status.** `proposed`.
+
+### CP-4 — the document boundary: role handling  *(revised 2026-09-18; blocked by D5)*
+
+**Goal.** One file owns Appearance, so that "replace the skin" is a one-file operation.
+
+**Original shape, and why it was withdrawn.** This item first read "move `Tone`/`Emphasis` out of the page
+file and into the style document". That half is **withdrawn**, because the decisive evidence points the other
+way and the benefit was uncited:
+
+- `Tone` is the only appearance reference in the system that **cannot dangle**. `Scheme="dark"` names
+  something the *style document* defines, so a skin that does not define `dark` leaves the reference
+  unresolved (fallback recorded); `Tone="Danger"` names a member of a **code** vocabulary, so every skin
+  must be able to honour it, and a skin's freedom is what `Danger` *looks like*, not whether it exists.
+  A page therefore never breaks because a skin changed. Moving roles into the document would trade that
+  property away for "a skin may define new role names" — a capability with **zero citations**.
+- The file-boundary complaint is still real, but it is not about roles: it is that *who may write what* is
+  not stated.
+
+**What the measurement actually found.** `UiStatusTone` conflates three different things, and one member is
+reachable from two directions:
+
+| Member | What it really is | Evidence |
+|---|---|---|
+| `Neutral` | absence of a role | `AtomVocabulary.ParseTone` returns it for an empty attribute |
+| `Active` | an **interaction state** | `ButtonWidget` resolves it while the pointer holds the element down |
+| `Success`/`Warning`/`Danger` | authored **semantic roles** | — |
+| `Disabled` | a **data-derived state** | `UiStyleTable.Resolve`: `writable == false → Disabled` |
+| `Disabled` again | **also authorable** | `ParseTone` accepts `"Disabled"` |
+
+So the same member is derived from the bindings *and* writable by an author, with the derived value
+silently winning. And `Warning` and `Danger` resolve to one treatment, because the role→surface mapping
+is code (`UiStyleTable.Cell`), not data — a skin can change what `Danger` is painted with, but cannot
+make the two roles differ.
+
+**What survives.** The boundary question reduces to three narrower, now-motivated items, carried by CP-6.
+
+**Status.** **Withdrawn (2026-09-18) — D5 chose (a).** The role-move half is not planned, and the
+remaining boundary question is carried by CP-6; CP-4 owns no work of its own and is closed rather than
+left as a zombie item.
+
+### CP-5 — regional scope in the style document  *(registered; not implemented)*
+
+**Goal.** A named region of the page can be re-skinned without repeating an attribute on every element in
+it, and without a selector language.
+
+**Shape.** A scheme/density declaration may name the region it applies to (`For="region-id"`), matched by
+the region's declared name — nearest-wins stays the only precedence mechanism. Not a selector: no
+combinators, no specificity arithmetic, no pseudo-classes, no media queries.
+
+**Status.** `proposed`; shares CP-4's boundary decision.
+
+## 2. Rules the contract must state
+
+| # | Rule |
+|---|---|
+| R1 | Placement vocabulary is valid only inside a placement container; a flow container's child accepts the cross-axis subset only. |
+| R2 | Absent vocabulary means today's behaviour — zero migration for existing manifests. |
+| R3 | The reference frame is the parent's **inner box** (after its `Padding`). |
+| R4 | The ratio is a fraction of the parent's inner span; the element's own reference point comes from `AlignX`/`AlignY` (the pivot), never from the painted shape. |
+| R5 | `OffsetX`/`OffsetY` accept `N%` or a bare number. Both are **layout data**, not density tokens — no third mechanism. |
+| R6 | Contradictory combinations are refused at creation; there is no implicit precedence. |
+| R7 | This line adds no responsive variant of the new vocabulary. Existing `Breakpoint`/`Narrow`/`NarrowHidden` cover today's cases. |
+
+## 3. The envelope rule
+
+R4 needs "the element's own box" defined. It is the arranged rect, and this is a rule about the existing
+mechanism rather than a new one:
+
+- **E1** The envelope is the arranged rect (`UiNode.Rect`) — not `ContentRect`, not the painted shape.
+- **E2** No arrangement, no envelope: an element that was not arranged (hidden, Tab-hidden) keeps its node
+  and its state and takes no placement.
+- **E3** Content exceeding the envelope is an **overflow finding** on the existing fit-audit channel
+  (`UiOverflowAxis`), never a larger envelope.
+
+E3 is a hard constraint rather than tidiness: `UiInvalidation.Paint` deliberately does not re-arrange, so
+an appearance-driven envelope would let a paint-class change move geometry — and make the invalidation
+classes lie.
+
+## 4. Refusals — what this plan will not do
+
+- no paint-side inset or overhang that can change the envelope (E3)
+- no expressions, no `calc`, no reference to a named sibling
+- no percentage placement inside a flow container
+- no new public type, no new style token, no appearance change at all
+- no responsive variants of the new vocabulary in this line
+- no solver and no second arrangement pass
+
+## 5. Change surface
+
+| Layer | File | Change | Size |
+|---|---|---|---|
+| Parser | `UiLayoutManifest.cs` | **nothing** — `UiElementSpec` attributes are generic key/value; vocabulary is checked by schema | 0 |
+| Vocabulary | `UiHost.cs:880-891` | the four names into `CommonWidgetAttributes` / `ContainerAttributes` | ~4 lines |
+| Vocabulary (mirror) | `UiLayoutEngine.cs:105-116` | the same names in the engine's mirrored lists (a lane reflects them and fails on drift) | ~4 lines |
+| Engine | `UiLayoutEngine.cs` `MeasureOverlay` (:1260) | replace `OffsetBox(childBox, padding.Left, innerY)` with the resolved placement | main work |
+| Engine | same file, new helper | `ResolvePlacement(spec, innerRect, size)` — one rule, both axes | ~30 lines |
+| Engine | `ParsePadding` (:2312), `ReadGap` (:2344) | the CP-0 fallback | ~4 lines |
+| Engine | `MeasureRow` / `MeasureStack` | CP-2, cross-axis only | moderate |
+| Validation | beside the `Height` validator (A2) | the refusal matrix, located `UiContractException` | ~40 lines |
+| Public types | — | **none** — values are attribute strings, so `docs/api-tiers.md` does not move | 0 |
+| Appearance | — | **none** — alignment is a relation, not a look; no token, so no closure debt | 0 |
+| Tests | a new lane + `KernelLayoutTests` | §6 | ~200 lines |
+| Gate | `Program.cs` | lane registration (the existing lane forces it) | 2 lines |
+| Docs | `05-api-contract.md` (second amendment, before it ships), then `docs/architecture.md` §3.2/§6.3, the consumer guide, `MEMORY.md`, `TODO.md` | contract before code, the 0.7 precedent | — |
+| Version | — | **no move**: the axis stays `0.7.0` and the consumer range stays `[0.7.0,0.8.0)`; the vocabulary is a second amendment to `05-api-contract.md`, recorded before it ships | 0 |
+
+**Obligations on the round's own records.** Two existing statements become false when CP-1 lands, and both
+are amended in the same commit as CP-1 — recorded here now so neither is discovered as stale after the fact:
+
+- `docs/development/0.7/README.md` states that "no public type, kind or XML vocabulary was added or removed
+  on this line"; the README's statement and its package table take this line's second amendment.
+- `Source/FerriteLib.UiKit/Kernel/FerriteLibVersion.cs`'s XML comment describes the `0.6.0 → 0.7.0` move
+  as "one bounded supported contract, two peer built-in palettes … and the first validation tightenings".
+  It gains the placement vocabulary. The axis **value** does not move: `Api` stays `new Version(0, 7, 0)`,
+  which is what the ruling in the header above means by "no minor move".
+
+## 6. Verification plan
+
+| Lane | Asserts |
+|---|---|
+| placement matrix | every origin × ratio × pivot combination against an `Overlay`, including ratio 0 and 100% |
+| refusal matrix | each refused combination throws at creation with the element path (the A2/A3 shape) |
+| flow boundary | a flow container's child arranges exactly as before, and CP-2's cross-axis subset works |
+| envelope guard | the probe kind that paints a 3px rail inside a 120px rect is placed by its rect, not by its paint; an overflowing element moves no sibling |
+| density reach (CP-0) | a theme-only geometry change moves arranged rects; `Padding="0"` keeps the old result |
+| registration | the new lane file is wired in `Program.cs` (already enforced) |
+
+## 7. Open decisions
+
+- **D1 — APPROVED (maintainer, 2026-09-18): accept it inside this one minor, with the documented escape
+  hatch.** Everything lands together; no opt-in flag and no second mechanism. Consequence measured: neither
+  palette overrides `UiGeometry`, so both carry `Padding = 6` and `Gap = 6`, and a container declaring
+  neither currently gets **0**. After CP-0 it gets 6. `Padding="0"` / `Gap="0"` keep the old result.
+- **D2** Vocabulary shape: four attributes on the child, against a `<Place>` sub-element.
+  **Recommendation: four attributes.** `UiElementSpec` attributes are generic key/value, so the parser needs
+  **no change**; a `<Place>` element needs a new element name, a containment rule and a second creation-time
+  validation path. The existing layout vocabulary is attributes throughout (`Gap`, `Padding`, `Width`,
+  `Fill`…) and the only child elements are containers, `Widget`, `Repeat` and `Templates`. The
+  sub-element's one real advantage — room for per-edge data later — has no requirement today.
+- **D3** Ratio unit. **Recommendation: parent inner span only.** Self-relative placement is already
+  expressed by the pivot (`AlignX="Center"` *is* pivot 0.5), so a second ratio would be a second mechanism
+  for one meaning, and it would make a single `OffsetX` name carry two units. The capability that would be
+  lost — offsetting by a fraction of the element's *own* width — has no citation.
+- **D4** Sibling-relative placement. **Recommendation: out of this line, registered as CP-7.** It needs
+  element references, an ordering or solving discipline, and cycle refusal — a different order of change
+  from CP-1, and it would put *references* into the manifest, the direction this library has refused. It is
+  registered rather than dropped because experiment 3 measured the gap it fills: "content below the title"
+  works only through flow order.
+- **D6** CP-6 item 1: which `Tone` members stay authorable? **Recommendation: `{Neutral, Success,
+  Warning, Danger}`.** Hard constraint discovered: `UiStatusTone` is a **stable** type, so no enum member
+  can be removed — only the *manifest vocabulary* can shrink. `Disabled` is the one member reachable from
+  two directions (authored, and derived from `writable == false`) with the derived value silently winning,
+  which is a name that lies; `Active` is already used as an interaction state by production widgets
+  (`ButtonWidget` resolves it while the pointer holds). No lane or fixture in this repository authors
+  either name, so the migration burden sits entirely with external pages. Consequence to decide with it:
+  `UiResolvedStyle.Resolve`'s third parameter (`bool? writable`) becomes an explicit state
+  (`{Normal, Selected, Disabled}`); that type is public-unstable, so a minor may carry it. The original
+  framing was — `{Neutral, Success, Warning,
+  Danger}` remain authored **meanings**, while `Active` becomes a selected **state** and `Disabled` a
+  data-derived **state**. The alternative that costs nothing to weigh: keep `Active` authorable (a page
+  may want a highlighted row without a model behind it) and remove only `Disabled`, which is the one
+  member reachable from two directions. Migration for the authored case: one minor of acceptance with a
+  redirect, or an immediate refusal with a located contract error (the A2/A3 shape).
+- **D7** CP-6 item 4: the accent's derived steps. **Recommendation: one stored accent, and `HoverPoint`
+  becomes a redirect for one minor.** `HoverPoint` has exactly one consumer in the tree
+  (`LineChartWidget.cs:262`); `AccentWith(alpha)` already proves the derive-instead-of-store path; and
+  "the accent is one colour whose value is free" is exactly what the maintainer asked for. The old *name*
+  stays accepted in both the C# surface and the document token list and redirects to the derived value, so
+  a page or a scheme that writes it keeps compiling and keeps painting. What remains genuinely open is the
+  rule itself: **toward-white by a fixed fraction** (simple, predictable, one constant) against an adaptive
+  lighten (harder to predict, no requirement).
+- **D5 — RESOLVED (maintainer confirmation 2026-09-18): (a).** A closed, code-owned role vocabulary on
+  the element; vocabulary and meaning live in code, mapping and colour move to data. The alternatives are
+  recorded below because they were weighed, not to keep them live. *What is `Tone`?* (a) A closed,
+  code-owned **role vocabulary on the element**, with the three
+  conflations fixed (CP-6): state separated from role, the role→surface mapping moved into the style
+  document, and `Tone="Disabled"` no longer authorable. **Sharpened 2026-09-18** by the maintainer's
+  "the theme must not change this, and the accent is one colour whose value is free" position: the split
+  that position implies is *vocabulary and meaning in code* (any skin must honour every tone) against
+  *mapping and colour in data* (what each tone is painted with, and what the accent is). Today the first
+  half is right and the second is wrong: the mapping is code (`UiStyleTable.Cell`), which is what makes
+  `Warning` and `Danger` indistinguishable. Provenance worth knowing: `UiStatusTone` first appears in
+  this repository's root commit **only as a drawing-outlet parameter** (`UiThemeDraw`'s
+  `StatusTreatment`/`StatusBadge`), and its definition was moved out of that outlet into the new
+  `UiResolvedStyle.cs` by the "add the resolved style table" commit — so the vocabulary was born as a
+  **paint argument** and later promoted to a **meaning**, which is exactly why it still carries
+  `Active` and `Disabled` beside `Danger`. (b) **Named roles defined by the style document**,
+  the element referencing one by name — accepting that role references become danglable like `Scheme`, and
+  that the author vocabulary then differs from the stable audit vocabulary (`UiStatusTone`). (c) Leave the
+  conflations as they are. Recommended: **(a)** — it keeps the one appearance reference that cannot dangle,
+  keeps `UiStatusTone` stable for the audit surface, and still lets a skin separate `Warning` from
+  `Danger`; (b)'s only gain, new role names, has no citation yet.
+
+### CP-7 — sibling-relative placement  *(registered; D4 recommends keeping it out of this line)*
+
+**Goal.** An element can relate to another **named** element — "below the title band", "as wide as the
+field" — rather than only to its parent's box or to flow order.
+
+**Why it is not CP-1.** It needs element references in the manifest, an ordering discipline between
+referenced and referencing elements, and cycle refusal at creation. CP-1 deliberately needs none of those
+(parent-relative placement is single-pass solvable and cannot cycle).
+
+**Why it is registered rather than dropped.** Experiment 3 measured the gap it fills: the one relation the
+current vocabulary cannot state is a relation to a *sibling*, and the workaround is flow order plus spacers.
+
+**Status.** `proposed`; not this line.
+
+### CP-6 — split the tone axes and make the role mapping data  *(unblocked by D5 = (a); D6/D7 recommended)*
+
+**Goal.** Fix the three conflations found while evaluating CP-4, without moving roles into the style
+document:
+
+1. **State leaves the authorable set.** `Disabled` and `Active` become states (derived from the bindings
+   and from interaction), not values an author writes. Migration for the one authored case: a page writing
+   `Tone="Disabled"` moves to its data side (`BindReadOnly` / `IsWritable`), or the library accepts the
+   old name for one minor and redirects it to the derived answer.
+2. **The role→surface mapping becomes data.** A style document may state which surfaces a tone resolves to,
+   so a skin can separate `Warning` from `Danger` — the L2 debt recorded in `docs/architecture.md` §6.3 —
+   without adding an enum member.
+3. **A dangling-role rule is stated once**: a role is code-owned and must resolve in every skin; a
+   `Scheme`/`Density` name is document-owned and may dangle with the existing recorded fallback.
+4. **One accent, and it is a value not a system.** The accent is today **two stored tokens**:
+   `AccentGold` and `HoverPoint`. `HoverPoint` has exactly one consumer in the whole tree — the line
+   chart's hovered point (`LineChartWidget.cs:262`) — while everything else that names it is a copy, a
+   token-list entry or a palette literal. `AccentWith(alpha)` already shows the derive-instead-of-store
+   path exists, so the single-accent position is cheap here: keep one stored accent, derive its steps.
+   Its contact with the tone system is also exactly one line: `SelectedSurface`'s default edge
+   (`UiTheme.cs:201`, `SelectedBorder ?? AccentGold`) — the tone system does not otherwise depend on the
+   accent, and the accent does not depend on the tone system.
+
+**Status.** `proposed`; **unblocked by D5 = (a)**, but not yet implementable as written — two
+sub-decisions are open (D6, D7) and **item 2 is blocked by CP-3**, because making the role→surface mapping
+data requires the document to be able to express a *surface*, which is CP-3's vocabulary extension. Items
+1, 3 and 4 are independent of CP-3 and can proceed first.
+
+## 8. Registered elsewhere
+
+The unclosed items in `docs/architecture.md` §6.3 stay there and are not this plan's: behaviour/painter
+separation, published interaction state, declared input contract, control parts, focus, the image outlet,
+per-part style keys, and the L1 closure lane.
+
+## 9. Status log
+
+| Date | Item | Change |
+|---|---|---|
+| 2026-09-18 | — | plan opened from the placement/alignment discussion; CP-0/CP-1/CP-2 `proposed`, nothing implemented |
+| 2026-09-19 | axis (re-confirmed) | The consumer's first live pass changed one fact — it has now pinned `[0.7.0,0.8.0)` and compiled, so the "no goalpost" argument is spent. The maintainer re-ruled to **keep everything inside `0.7.0` as coordinated in-flight development**: a range pin is not invalidated by growth under it, the consumer is local and can absorb a recompile per carrier, and the ruling lapses when a consumer is remote or the line is published. Batch 2's item list is fixed in `TODO.md` |
+| 2026-09-19 | verification | Independent verification closed: 18 probes by a member who implemented none of it, all confirmed. F1 (this repository's `docs/architecture.md` had gone stale against Batch 1) fixed in the same work; F2 recorded as a pre-existing lane-print convention and explicitly **not** a batch defect; the Lead's "one note per declaration per page" sentence corrected to **per runtime element**. Unverified items (cross-build A/B, pass instrumentation, attribute-name gate re-probe, the future refusal, `UiStatusTone` re-enumeration, in-game acceptance) are declared in `MEMORY.md` rather than glossed |
+| 2026-09-19 | CP-0, CP-1, CP-2, CP-6①③④ | **Batch 1 implemented and green.** Two new lanes (`KernelPlacementTests` 13 checks, `KernelToneVocabularyTests`); 42 existing expectations re-pinned, every one classified as the accepted break with the number kept exactly and none relaxed; gates 9/9. Two boundaries and one doc correction came out of review: `Narrow`'s declared-vs-effective kind leaves a placement inert (documented, no 7th refusal), template roots refuse all four names, and a flow container's child accepts a **pixel** nudge on the cross axis rather than no offset. Nothing kept is reported as verified beyond the harness |
+| 2026-09-18 | all six | **All Step-1 decisions settled** and Batch 1's scope fixed in §0b. D7 changed on the maintainer's instruction: `HoverPoint` is deleted outright rather than redirected, because the local consumer can absorb a break on request. One correction: CP-6① does **not** need the `Resolve` signature change that was predicted — the vocabulary shrink is enough, and `UiStatusTone` is stable, so its members stay |
+| 2026-09-18 | D1..D4, D6, D7 | Recommendations recorded for all six Step-1 decisions, and **D1 approved** by the maintainer (one minor, no opt-in mechanism). D4's recommendation registers CP-7 (sibling-relative placement, not this line) |
+| 2026-09-18 | D5 (resolved), CP-4 (closed), D6/D7 | **D5 = (a)** confirmed by the maintainer: vocabulary and meaning in code, mapping and colour in data. CP-4 is therefore closed with no work of its own. CP-6 is unblocked but not fully implementable: D6 (which members stay authorable) and D7 (the accent's derived steps) are open, and CP-6 item 2 waits on CP-3's vocabulary |
+| 2026-09-18 | D5, CP-6 | Sharpened by the maintainer's position ("the theme must not change this; the accent is one colour whose value is free"): vocabulary and meaning stay in code, mapping and colour move to data. Provenance recorded — `UiStatusTone` was born as a **drawing-outlet parameter** and promoted to a meaning, which is why it conflates state with role. CP-6 gains the accent item: two stored accent tokens today, one consumer for the second |
+| 2026-09-18 | CP-4, D5, CP-6 | CP-4 revised: the "role moves into the style document" half is **withdrawn** — `Tone` is the only appearance reference that cannot dangle, and the capability it would buy has no citation. The measurement (a role vocabulary that conflates state, interaction and meaning, with `Disabled` reachable from two directions) became D5, and its fixes became CP-6 |
+| 2026-09-18 | CP-3..CP-5 | registered from the "layout file + style file" discussion: the skin-source axis, moving the role half of appearance into the style document, and regional scope. All `proposed`; the maintainer allowed splitting and breaking changes in this fast-development window |
+| 2026-09-18 | CP-0..CP-2 | **version axis settled**: the work stays on the 0.7.x line (no minor move; range stays `[0.7.0,0.8.0)`), because the line has never shipped and nothing is consumer-compiled against it. The plan moved from `docs/development/0.8/` to `docs/development/0.7/10-change-plan.md`, and the round-README amendment became an obligation of CP-1 |

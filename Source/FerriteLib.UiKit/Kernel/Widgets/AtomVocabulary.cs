@@ -35,11 +35,22 @@ internal static class AtomVocabulary
 
     internal const string EmphasisAttribute = "Emphasis";
 
+    // What a retired authored tone name redirects to, as the appearance record spells it. There is no
+    // second channel for a deprecation: the note rides the existing appearance record, whose dedup key
+    // (element path, kind, attribute, authored text) already means "once per declaration, not once per
+    // frame". Both names are refused at the next minor boundary.
+    private const string ActiveRedirect = "the Active state (deprecated alias; the selected treatment)";
+
+    private const string DisabledRedirect = "the Disabled state (deprecated alias; derived from the bindings)";
+
     // The names the engine already reads on every widget regardless of kind (UiHost's common widget
     // vocabulary) plus the two identity names. Listed explicitly so an atom's schema reads as the
     // complete contract instead of "whatever the engine adds on the side" — the shape the six
     // pre-existing core kinds use as well.
-    private static readonly string[] EngineWideAttributes = { "Id", "Kind", "Tab", "Hidden" };
+    // Visible/VisibleKey are engine-wide like Hidden: the engine reads them for every kind, so an
+    // atom that refused them would reject a page its container accepted.
+    private static readonly string[] EngineWideAttributes =
+        { "Id", "Kind", "Tab", "Hidden", "Visible", "VisibleKey", "HelpKey", "SelectedKey", "WidthKey", "WideHidden" };
 
     /// <summary>
     /// The allowed-attribute array a core atom registers: the engine-wide names, the role names the kind
@@ -125,6 +136,63 @@ internal static class AtomVocabulary
     }
 
     /// <summary>
+    /// A fail-soft typed read for the kinds whose key may be item-local: an absent key and a key bound to
+    /// another type both answer <paramref name="fallback"/> and are recorded once through the appearance
+    /// channel, instead of reaching the tree's recovery band. That is the contract the collection kinds
+    /// publish - a data-driven row composes its key from the consumer's item key at instantiation, so
+    /// "the value is not there yet" and "the model hands back another type" are ordinary states of a page
+    /// that is still drawing, not a reason to replace the slot.
+    /// <para>
+    /// The bool read goes through <see cref="IUiBindings.TryGetBool"/>, the query P2 added for exactly this
+    /// shape, so it needs no exception at all. The generic one has to catch, because
+    /// <see cref="IUiBindings.TryGet{T}"/> reports a type mismatch as an <see cref="InvalidOperationException"/>
+    /// and the surface has no non-throwing typed read for anything else. The catch is narrowed to that one
+    /// exception type and the fallback is recorded, so a consumer getter that throws anything else still
+    /// reaches the tree's recovery path, and one that throws this type is answered - not silently.
+    /// </para>
+    /// <para>
+    /// Scope, stated because it is a boundary and not an accident: this is the collection kinds' value
+    /// contract. The pre-existing atoms keep their own read paths (a bound string atom draws an empty label
+    /// for an unresolvable key; a read that throws reaches the recovery band once per slot), and
+    /// <c>KernelRepeatTests</c> pins that split from both sides.
+    /// </para>
+    /// </summary>
+    internal static bool ReadBoolOr(UiWidgetContext ctx, string kind, string key, bool fallback)
+    {
+        if (ctx.Bindings.TryGetBool(key, out bool value)) return value;
+        ReportUnresolved(ctx, kind, key, fallback ? "true" : "false");
+        return fallback;
+    }
+
+    /// <summary>The generic half of <see cref="ReadBoolOr(UiWidgetContext, string, string, bool)"/>.</summary>
+    internal static T ReadOr<T>(UiWidgetContext ctx, string kind, string key, T fallback, string recordedDefault)
+    {
+        try
+        {
+            if (ctx.Bindings.TryGet<T>(key, out T value)) return value;
+        }
+        catch (InvalidOperationException)
+        {
+            // TryGet<T> reports a type mismatch this way; narrowed to that type so a consumer getter that
+            // throws anything else still reaches the tree's recovery path (see the summary above).
+        }
+
+        ReportUnresolved(ctx, kind, key, recordedDefault);
+        return fallback;
+    }
+
+    /// <summary>
+    /// Records one unresolved-binding answer on the bounded appearance channel, deduplicated by element, kind,
+    /// attribute and key. It is the single place this vocabulary spells that report, so a kind that answers an
+    /// unresolvable key with a default - a collection control or the wrapped-text atom - records the same
+    /// finding in the same shape, and "fail-soft must not mean silent" is one call rather than a convention.
+    /// </summary>
+    internal static void ReportUnresolved(UiWidgetContext ctx, string kind, string key, string resolved)
+    {
+        UiFitAudit.ReportStyleFallback(ctx.ElementPath, kind, "Bind", key, resolved);
+    }
+
+    /// <summary>
     /// The data side's writability for a value key, or null when the element carries no value binding.
     /// Null is "not known" and resolves by role alone; false is state, and state beats the author.
     /// </summary>
@@ -144,15 +212,57 @@ internal static class AtomVocabulary
     /// Host creation while a typo in the value still renders.
     /// </para>
     /// </summary>
-    internal static UiResolvedStyle ResolveRole(UiElementSpec spec, UiWidgetContext ctx, bool? writable)
+    /// <summary>
+    /// The emphasis a kind falls back to when the author declared none. Every atom reads the theme's
+    /// primary ink; <c>chrome/banner</c> is the one kind whose own look has always been the secondary ink,
+    /// so the banner declares <paramref name="defaultEmphasis"/> as Muted and keeps its colour while
+    /// gaining the role vocabulary (G5).
+    /// </summary>
+    internal static UiResolvedStyle ResolveRole(
+        UiElementSpec spec, UiWidgetContext ctx, bool? writable, UiEmphasis defaultEmphasis = UiEmphasis.Normal)
     {
-        return ctx.Theme.Styles.Resolve(ParseTone(spec, ctx), ParseEmphasis(spec, ctx), writable);
+        // SelectedKey (0.7.x) is the binding-driven SELECTED state, and state beats the author for the same
+        // reason writability does: a consumer that knows the element is selected must not have to re-author
+        // its Tone per state. Deliberately not a ToneKey - a binding that hands back "Active" would
+        // re-authorise a name this line retired, and the treatment is a state the library already owns.
+        if (Selected(spec, ctx))
+        {
+            return ctx.Theme.Styles.Resolve(UiStatusTone.Active, ParseEmphasis(spec, ctx, defaultEmphasis), writable);
+        }
+
+        return ctx.Theme.Styles.Resolve(ParseTone(spec, ctx), ParseEmphasis(spec, ctx, defaultEmphasis), writable);
+    }
+
+    /// <summary>
+    /// The element's bound selected state: true only when <c>SelectedKey</c> is declared and its bool
+    /// binding answers true. An unresolvable key is fail-soft (the authored role stands) and is reported
+    /// once through the appearance channel, exactly like <c>VisibleKey</c> - a misspelled key that silently
+    /// painted the unselected look would be the "accepted but did nothing" shape this contract refuses.
+    /// </summary>
+    internal static bool Selected(UiElementSpec spec, UiWidgetContext ctx)
+    {
+        string key = Read(spec, "SelectedKey").Trim();
+        if (key.Length == 0) return false;
+        if (ctx.Bindings.TryGetBool(key, out bool selected)) return selected;
+
+        ReportUnresolved(ctx, spec.Kind, key, "unselected");
+        return false;
     }
 
     /// <summary>
     /// The authored tone, or <see cref="UiStatusTone.Neutral"/> when none is declared. Names are matched
     /// case-insensitively, like every other attribute in this vocabulary, and only the declared names
     /// count: a numeric value is not a tone, which an <c>Enum.TryParse</c> would have silently accepted.
+    /// <para>
+    /// The authored vocabulary is the four <b>meanings</b> — <see cref="UiStatusTone.Neutral"/>,
+    /// <see cref="UiStatusTone.Success"/>, <see cref="UiStatusTone.Warning"/> and
+    /// <see cref="UiStatusTone.Danger"/>. <see cref="UiStatusTone.Active"/> and
+    /// <see cref="UiStatusTone.Disabled"/> are <b>states</b> (interaction, and the bindings' read side),
+    /// not values an author writes: for one minor each still resolves to the state it always meant and
+    /// records one deduplicated deprecation note on the appearance channel, so a page that writes it keeps
+    /// painting and is told where to move. The names are refused at the next minor boundary; the two enum
+    /// members stay regardless, because <see cref="UiStatusTone"/> is a stable type.
+    /// </para>
     /// </summary>
     private static UiStatusTone ParseTone(UiElementSpec spec, UiWidgetContext ctx)
     {
@@ -160,29 +270,49 @@ internal static class AtomVocabulary
         if (authored.Length == 0) return UiStatusTone.Neutral;
 
         if (string.Equals(authored, "Neutral", StringComparison.OrdinalIgnoreCase)) return UiStatusTone.Neutral;
-        if (string.Equals(authored, "Active", StringComparison.OrdinalIgnoreCase)) return UiStatusTone.Active;
         if (string.Equals(authored, "Success", StringComparison.OrdinalIgnoreCase)) return UiStatusTone.Success;
         if (string.Equals(authored, "Warning", StringComparison.OrdinalIgnoreCase)) return UiStatusTone.Warning;
         if (string.Equals(authored, "Danger", StringComparison.OrdinalIgnoreCase)) return UiStatusTone.Danger;
-        if (string.Equals(authored, "Disabled", StringComparison.OrdinalIgnoreCase)) return UiStatusTone.Disabled;
+
+        // Retired authored names, still redirecting for one minor. Deliberately after the four declared
+        // meanings and before the unknown-value fallback: a typo resolves to the default row and a retired
+        // name resolves to the state it names, and neither can be mistaken for the other. The value is the
+        // one the table already derived (Active = the selected treatment, Disabled = the disabled state),
+        // so the redirect is the existing answer, not a second mapping.
+        if (string.Equals(authored, "Active", StringComparison.OrdinalIgnoreCase))
+        {
+            ReportFallback(spec, ctx, ToneAttribute, authored, ActiveRedirect);
+            return UiStatusTone.Active;
+        }
+
+        if (string.Equals(authored, "Disabled", StringComparison.OrdinalIgnoreCase))
+        {
+            ReportFallback(spec, ctx, ToneAttribute, authored, DisabledRedirect);
+            return UiStatusTone.Disabled;
+        }
 
         ReportFallback(spec, ctx, ToneAttribute, authored, "Neutral");
         return UiStatusTone.Neutral;
     }
 
-    /// <summary>The authored emphasis, or <see cref="UiEmphasis.Normal"/> when none is declared.</summary>
-    private static UiEmphasis ParseEmphasis(UiElementSpec spec, UiWidgetContext ctx)
+    /// <summary>The authored emphasis, or the kind's declared default (see ResolveRole) when none is set.</summary>
+    private static UiEmphasis ParseEmphasis(UiElementSpec spec, UiWidgetContext ctx, UiEmphasis fallback)
     {
         string authored = Read(spec, EmphasisAttribute).Trim();
-        if (authored.Length == 0) return UiEmphasis.Normal;
+        if (authored.Length == 0) return fallback;
 
         if (string.Equals(authored, "Normal", StringComparison.OrdinalIgnoreCase)) return UiEmphasis.Normal;
         if (string.Equals(authored, "Muted", StringComparison.OrdinalIgnoreCase)) return UiEmphasis.Muted;
 
-        ReportFallback(spec, ctx, EmphasisAttribute, authored, "Normal");
-        return UiEmphasis.Normal;
+        ReportFallback(spec, ctx, EmphasisAttribute, authored, fallback == UiEmphasis.Muted ? "Muted" : "Normal");
+        return fallback;
     }
 
+    /// <summary>
+    /// Writes one appearance-class note for an authored role value the vocabulary does not declare: the
+    /// fallback an unknown value gets, and the deprecation a retired name gets. One write path, so the two
+    /// cannot drift apart.
+    /// </summary>
     private static void ReportFallback(UiElementSpec spec, UiWidgetContext ctx, string attribute, string authored, string resolved)
     {
         UiFitAudit.ReportStyleFallback(ctx.ElementPath, spec.Kind, attribute, authored, resolved);

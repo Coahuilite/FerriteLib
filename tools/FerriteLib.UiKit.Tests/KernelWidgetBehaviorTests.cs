@@ -208,7 +208,7 @@ internal static class KernelWidgetBehaviorTests
         ClearRecordedBoxes();
         widget.Draw(page, ctx);
         IList colors = RecordedBoxColors();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         Check(colors.Contains(theme.Selected) && colors.Contains(theme.AccentGold),
             "selected option uses the Selected fill and AccentGold border tokens");
 
@@ -254,7 +254,7 @@ internal static class KernelWidgetBehaviorTests
     private static UiWidgetContext MakeContext(UiSession session, IUiBindings bindings)
     {
         return new UiWidgetContext(
-            "test", session, new FixedMetrics(), UiTheme.DarkGold,
+            "test", session, new FixedMetrics(), UiTheme.Vanilla,
             new FixedTranslation(), bindings, TotalWidth, "root");
     }
 

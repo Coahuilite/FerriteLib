@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using UnityEngine;
 using Verse;
 
@@ -12,20 +13,61 @@ namespace FerriteLib.UiKit.Kernel;
 public sealed class UiHost : IDisposable
 {
     private readonly string source;
-    private readonly UiLayoutManifest manifest;
     private readonly IUiBindings bindings;
     private readonly UiTheme theme;
     private readonly ITextMetrics metrics;
     private readonly IUiTranslation translation;
-    private readonly UiLayoutEngine engine;
     private readonly UiSession session;
-    private readonly UiStyleResolver styleResolver;
+
+    // The three fields a document reload swaps. They are not readonly because a host is the thing a
+    // reload commits into: the manifest, the resolver built over the effective style document, and the
+    // engine that arranges those roots. Everything else - the session, the bindings, the theme identity -
+    // is deliberately untouched, which is what keeps state and the business model out of the swap.
+    private UiLayoutManifest manifest;
+    private UiLayoutEngine engine;
+    private UiStyleResolver styleResolver;
+
+    // The standalone style document handed to the constructor (null when the manifest's own <Styles>
+    // section is the origin), so a reload can replace appearance without touching the tree and a layout
+    // reload can keep the appearance it already had.
+    private UiStyleDocument? attachedStyleDocument;
+
+    // A layout commit's destructive half, held until the whole change batch has staged successfully. The
+    // tree, resolver, engine and theme are swapped first; the removed/kind-changed element state and the
+    // held interaction capture are only destroyed by SealDocumentCommit, which the service calls after every
+    // host in the batch committed. A rolled-back batch therefore loses nothing the user had not committed.
+    private UiLayoutManifest? pendingPrune;
+
+    // The theme's tokens as the consumer handed them in, captured before the first document is applied.
+    // Applying a document is a mutation of the injected theme, so committing the next version has to start
+    // from the pre-document values: without this, a declaration the new document no longer carries would
+    // keep applying forever.
+    private readonly UiTheme styleBaseline;
+
+    // The service this host reads documents through, so closing the host releases its dependency instead of
+    // leaving a closed session referenced by a live service.
+    private UiDocumentService? documentService;
+
     private int lastLayoutRevision;
 
     // How far the two issue records have been published on the fit audit's appearance channel. Each one
     // only ever moves forward, so an issue is reported exactly once however many frames follow it.
     private int publishedDocumentIssues;
     private int publishedResolutionIssues;
+
+    // Per-host diagnostics are opt-in: null until the consumer asks for them, which is what keeps the
+    // unsubscribed path a null check. Created through UiDiagnosticHub.Subscribe and released by Close.
+    private UiDiagnosticSubscription? diagnostics;
+
+    // Phase-timing accumulators. Timing is sampled, never logged per frame: a window of
+    // TimingSampleFrames frames closes into one aggregate event. They are plain numbers on the host, so a
+    // host whose subscription has timing off pays one boolean test per phase and nothing else.
+    private int arrangeTimingSamples;
+    private double arrangeTimingTotal;
+    private double arrangeTimingMax;
+    private int drawTimingSamples;
+    private double drawTimingTotal;
+    private double drawTimingMax;
 
     // Test seam: lets FerriteLib.UiKit.Tests capture the dropped-style warning without a real game log,
     // the same shape UiSessionGuard.LogWarningOverride already uses for recovery warnings.
@@ -50,13 +92,14 @@ public sealed class UiHost : IDisposable
         this.translation = translation ?? throw new ArgumentNullException(nameof(translation));
 
         UiWidgetRegistry.InitializeCore();
-        ValidateManifest();
+        ValidateManifest(manifest);
 
         // The style document enters here, and the host owns it: a caller hands in a standalone document
         // (the appearance-authoring origin) or, when it hands in none, the manifest's own <Styles>
         // section is the document. Nothing else about the page changes - an element's Scheme/Density
         // attributes are resolved per element, against the theme below.
         UiStyleDocument styleDocument = document ?? manifest.Styles;
+        attachedStyleDocument = document;
 
         // Two sources at once would mean one of them is ignored, and a library that quietly picks one is
         // exactly the silent fallback this one refuses. The document handed in wins - the caller named it
@@ -76,10 +119,11 @@ public sealed class UiHost : IDisposable
         // resolve-before-Measure: the page level lands on the injected theme before the first arrange, and
         // because applying a token moves the theme's own layout revision - the clock the band cache already
         // compares - the very first frame follows the document. No second clock is introduced anywhere.
+        styleBaseline = theme.Clone();
         styleResolver = new UiStyleResolver(theme, styleDocument);
         styleResolver.ApplyTo(theme);
 
-        engine = new UiLayoutEngine(source, styleResolver);
+        engine = new UiLayoutEngine(source, styleResolver, manifest.Templates);
         session = new UiSession();
 
         // A document that went wrong must not go quiet, and the consumer must not have to remember to ask:
@@ -101,6 +145,25 @@ public sealed class UiHost : IDisposable
     public UiLayoutManifest Manifest => manifest;
 
     /// <summary>
+    /// Opts this host in to per-host diagnostics and returns its bounded subscription. It is created on
+    /// first access, so a host that never asks pays nothing: without it the fit audit, the recovery guard
+    /// and the reload hook all take their pre-existing no-subscriber path. The subscription is released by
+    /// <see cref="Close"/> and therefore by <see cref="Dispose"/> as well; the session that owns it
+    /// releases it a second time, idempotently.
+    /// </summary>
+    public UiDiagnosticSubscription Diagnostics =>
+        diagnostics ?? UiDiagnosticHub.Subscribe(this, UiDiagnosticHub.DefaultBudget);
+
+    /// <summary>The subscription this host already holds, or null. The hub reads it to stay idempotent.</summary>
+    internal UiDiagnosticSubscription? CurrentDiagnostics => diagnostics;
+
+    /// <summary>Binds a subscription the hub created; one host owns at most one.</summary>
+    internal void AttachDiagnostics(UiDiagnosticSubscription subscription)
+    {
+        diagnostics = subscription ?? throw new ArgumentNullException(nameof(subscription));
+    }
+
+    /// <summary>
     /// The document resolver this host built: the document it resolved (the one handed to the constructor,
     /// otherwise the manifest's own <c>&lt;Styles&gt;</c> section) plus the drops it recorded while
     /// resolving. Never null - a page with no document still needs one to report that an element named a
@@ -115,46 +178,118 @@ public sealed class UiHost : IDisposable
 
     public UiLayoutSnapshot MeasureAndArrange(Vector2 available)
     {
-        // The band cache compares the available size and the content/definition/translation revisions,
-        // and it cannot see the theme. A density or font-size change would therefore keep the previous
-        // geometry while the draw resolves the new font - exactly the measure/draw disagreement a
-        // resolved-value store exists to prevent. The theme reports its own layout-bearing revision, and
-        // the host turns a change into the one cache clock the engine already understands rather than
-        // inventing a second one.
-        if (lastLayoutRevision != theme.LayoutRevision)
+        // The arrange runs inside this host's diagnostic scope: an appearance fallback the engine records
+        // while resolving a region is attributed to the host that is arranging, not to whichever host drew
+        // last. Null still opens the scope, so an unsubscribed host never inherits another host's routing.
+        UiDiagnosticSubscription? subscription = diagnostics;
+        bool timing = subscription != null && subscription.TimingEnabled;
+        long started = timing ? Stopwatch.GetTimestamp() : 0L;
+        UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription, metrics);
+        try
         {
-            lastLayoutRevision = theme.LayoutRevision;
-            session.BumpContentRevision();
+            // The band cache compares the available size and the content/definition/translation revisions,
+            // and it cannot see the theme. A density or font-size change would therefore keep the previous
+            // geometry while the draw resolves the new font - exactly the measure/draw disagreement a
+            // resolved-value store exists to prevent. The theme reports its own layout-bearing revision, and
+            // the host turns a change into the one cache clock the engine already understands rather than
+            // inventing a second one.
+            if (lastLayoutRevision != theme.LayoutRevision)
+            {
+                lastLayoutRevision = theme.LayoutRevision;
+                session.BumpContentRevision();
+            }
+
+            UiWidgetContext ctx = CreateContext(available.x);
+            UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, available, manifest.Roots);
+
+            // A region scope is resolved the first time the engine meets it, and that resolution can drop a
+            // name (a scheme or density nobody declared). Publishing here - on the same frame, right after the
+            // arrange that discovered it - is what keeps such a drop from waiting a frame to be visible. On a
+            // cached arrangement there is nothing new to publish and the call costs two integer comparisons.
+            PublishStyleIssues();
+            return snapshot;
         }
-
-        UiWidgetContext ctx = CreateContext(available.x);
-        UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, available, manifest.Roots);
-
-        // A region scope is resolved the first time the engine meets it, and that resolution can drop a
-        // name (a scheme or density nobody declared). Publishing here - on the same frame, right after the
-        // arrange that discovered it - is what keeps such a drop from waiting a frame to be visible. On a
-        // cached arrangement there is nothing new to publish and the call costs two integer comparisons.
-        PublishStyleIssues();
-        return snapshot;
+        finally
+        {
+            scope.Dispose();
+            if (timing)
+            {
+                SampleTiming("arrange", started, ref arrangeTimingSamples, ref arrangeTimingTotal, ref arrangeTimingMax);
+            }
+        }
     }
 
     public void Draw(Rect viewport, UiLayoutSnapshot snapshot)
     {
-        // Popups are drawn after content and must clamp themselves into the frame's usable window
-        // space; publish it here, the one place that knows both the viewport and the session.
-        session.SetHostViewport(viewport);
-        UiWidgetContext ctx = CreateContext(viewport.width);
-        engine.Draw(ctx, snapshot, viewport);
-
-        // Session-owned popups draw after normal content in the same OnGUI pass.
-        foreach (Action popupDraw in session.PopupDrawActions)
+        // The draw runs inside this host's diagnostic scope: a fit-audit finding comes out of a static text
+        // outlet with no session argument, and the scope is what says which host's text it was. Popups draw
+        // inside the same scope, so their findings are attributed here too.
+        UiDiagnosticSubscription? subscription = diagnostics;
+        bool timing = subscription != null && subscription.TimingEnabled;
+        long started = timing ? Stopwatch.GetTimestamp() : 0L;
+        UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription, metrics);
+        try
         {
-            popupDraw();
+            // Popups are drawn after content and must clamp themselves into the frame's usable window
+            // space; publish it here, the one place that knows both the viewport and the session.
+#if FER_DEV
+            subscription?.Geometry?.BeginPass(session.Frame);
+#endif
+            session.SetHostViewport(viewport);
+            UiWidgetContext ctx = CreateContext(viewport.width);
+            engine.Draw(ctx, snapshot, viewport);
+
+            // Session-owned popups draw after normal content in the same OnGUI pass.
+            foreach (Action popupDraw in session.PopupDrawActions)
+            {
+                popupDraw();
+            }
+        }
+        finally
+        {
+            scope.Dispose();
+            if (timing)
+            {
+                SampleTiming("draw", started, ref drawTimingSamples, ref drawTimingTotal, ref drawTimingMax);
+            }
         }
     }
 
+    /// <summary>
+    /// Folds one measured phase into its sampling window and publishes the aggregate when the window
+    /// closes, so a subscription gets a rate rather than a line per frame. A subscription with timing off
+    /// returns on the boolean test; an unsubscribed host never reaches here at all.
+    /// </summary>
+    private void SampleTiming(string name, long startTimestamp, ref int samples, ref double total, ref double max)
+    {
+        UiDiagnosticSubscription? subscription = diagnostics;
+        if (subscription == null || !subscription.TimingEnabled) return;
+
+        double milliseconds = (Stopwatch.GetTimestamp() - startTimestamp) * 1000.0 / Stopwatch.Frequency;
+        samples++;
+        total += milliseconds;
+        if (milliseconds > max) max = milliseconds;
+
+        int window = subscription.TimingSampleFrames;
+        if (window < 1) window = 1;
+        if (samples < window) return;
+
+        subscription.PublishTiming(name, samples, total, max);
+        samples = 0;
+        total = 0d;
+        max = 0d;
+    }
+
+    /// <summary>
+    /// Starts one frame. A host that reads documents takes the service's pending change signals here,
+    /// before the session's own frame starts and therefore before this pass arranges anything: the GUI pass
+    /// that just finished was never mutated under itself, and the pass about to run already follows the new
+    /// tree. <see cref="UiDocumentService.Pump"/> is idempotent, so a consumer that also pumps explicitly
+    /// pays nothing for doing so.
+    /// </summary>
     public void BeginFrame()
     {
+        documentService?.Pump();
         session.BeginFrame();
     }
 
@@ -184,8 +319,116 @@ public sealed class UiHost : IDisposable
         }
     }
 
+    /// <summary>
+    /// One Cancel press, one undone layer: the ladder the interaction contract asks for (§3.2, §3.5, §3.6).
+    /// It is tried in this order and stops at the first layer that answers, because each step undoes
+    /// something the player started MORE recently than the layer below it:
+    /// <list type="number">
+    /// <item>the session's open option menu closes — a menu is the topmost thing on screen and the cheapest
+    /// thing to have not wanted;</item>
+    /// <item>a pointer capture this session holds is released, which ends the drag owned by it (the chart
+    /// clears its own drag state when it finds it no longer holds the control, so releasing is the whole
+    /// action — the value already written during the drag stays, because a Cancel ends an interaction, it
+    /// does not roll back a result);</item>
+    /// <item>an open edit is marked <c>DiscardRequested</c>, which its own field applies at its next draw in
+    /// this same pass: the draft is dropped, the model is untouched, and unparseable text is discarded by the
+    /// same rule that refuses to write it;</item>
+    /// <item>otherwise the walk starts at the subject — the element a consumer named through
+    /// <see cref="UiSession.SetCancelTarget(string)"/>, else the last element that actually TOOK an
+    /// interaction — and climbs the tree to the nearest element whose <c>CancelBind</c> names a command that
+    /// can run now. A layer that declares nothing is passed through, which is what lets a section be a
+    /// return layer without being a control, and a layer whose command is currently vetoed is skipped rather
+    /// than run, so the walk finds the nearest layer that can actually answer.</item>
+    /// </list>
+    /// <para>
+    /// The key that drove this may be a business selection rather than a control: the contract's starting
+    /// point is the interaction subject, never the last node drawn, and a page whose rows are selected by
+    /// clicking a card has no control that "holds" that choice.
+    /// </para>
+    /// <para>
+    /// Returns false when there is nothing to cancel, and consumes nothing in that case: the caller —
+    /// <see cref="UiWindowHost.OnCancelKeyPressed"/> (which then asks its own
+    /// <see cref="UiWindowHost.TryHandleUnansweredCancel"/> extension point before Verse), or a consumer's own
+    /// window subclass — keeps Verse's meaning of the key, which is the layer that closes the window. The
+    /// preserved behaviour belongs to a window with NO library interaction open: declaring no
+    /// <c>CancelBind</c> is not sufficient on its own, because the menu, the held capture and the open edit
+    /// are answered by this ladder whether or not the page declares a single cancel layer.
+    /// </para>
+    /// </summary>
+    public bool TryHandleCancel()
+    {
+        if (!session.IsActive) return false;
+
+        if (session.OpenPopupId != null)
+        {
+            session.ClosePopup();
+            UiNative.ConsumeKeyEvent();
+            return true;
+        }
+
+        int? capture = session.OwnedHotControl;
+        if (capture.HasValue && session.OwnedHotControlOwner != null)
+        {
+            session.ReleaseHotControl(capture.Value);
+            UiNative.ConsumeKeyEvent();
+            return true;
+        }
+
+        UiValueState? edit = session.ActiveEditState;
+        if (edit != null)
+        {
+            edit.DiscardRequested = true;
+            UiNative.ConsumeKeyEvent();
+            return true;
+        }
+
+        for (UiNode? node = session.CancelTargetNode ?? session.LastInteractionNode;
+            node != null;
+            node = node.Parent)
+        {
+            string key = node.CancelBindingKey;
+            if (key.Length == 0) continue;
+            if (bindings.TryInvokeCommand(key))
+            {
+                UiNative.ConsumeKeyEvent();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The Accept half of the same rule: while an edit is open, Enter answers the EDIT and must not close the
+    /// window (§3.5). Marking the state is all this does — the field applies it at its own next draw, in the
+    /// same event pass, which is where the parse, the clamp and the binding write live. With no open edit the
+    /// caller keeps Verse's meaning, so a consumer's declared <c>closeOnAccept</c> convention is untouched.
+    /// </summary>
+    public bool TryHandleAccept()
+    {
+        if (!session.IsActive) return false;
+
+        UiValueState? edit = session.ActiveEditState;
+        if (edit == null) return false;
+
+        edit.CommitRequested = true;
+        UiNative.ConsumeKeyEvent();
+        return true;
+    }
+
     public void Close()
     {
+        // A closed host must not stay referenced by a live document service, and the service's documents
+        // must survive the host: the dependency is released, the last valid version is not.
+        UiDocumentService? service = documentService;
+        documentService = null;
+        service?.Detach(this);
+
+        // The host's own diagnostic subscription goes with the host, before the session the hub keyed it
+        // by is disposed: a torn-down window leaves no buffer, no registry entry and no ambient reference.
+        diagnostics?.Dispose();
+        diagnostics = null;
+
         session.Dispose();
     }
 
@@ -251,14 +494,483 @@ public sealed class UiHost : IDisposable
     /// </summary>
     private void PublishStyleIssue(UiStyleIssue issue)
     {
-        UiFitAudit.ReportStyleFallback(source + "#styles", "Styles", "Declaration", issue.ToString(), "defaults");
+        // The drop's own element when it belongs to one (an unknown scope name an element declared), the style
+        // origin otherwise: a document-level drop has no element to name, and reporting it under the element of
+        // whichever node happened to resolve first would be a worse lie than reporting the origin.
+        string path = issue.ElementPath ?? (source + "#styles");
+        UiFitAudit.ReportStyleFallback(path, "Styles", "Declaration", issue.ToString(), "defaults");
     }
 
-    private void ValidateManifest()
+    // --- document reload (P4) -------------------------------------------------------------------
+
+    /// <summary>The style document this host would resolve against right now.</summary>
+    internal UiStyleDocument EffectiveStyleDocument => attachedStyleDocument ?? manifest.Styles;
+
+    /// <summary>True once this host's session has been disposed by <see cref="Close"/>.</summary>
+    internal bool SessionDisposed => !session.IsActive;
+
+    /// <summary>
+    /// True while this host's session owns the IMGUI hot control - the library's own observable model of
+    /// "the user is dragging or editing right now", which is the signal
+    /// <see cref="UiDocumentService"/> defers a ready commit for.
+    /// <para>
+    /// The signal is the session's own capture (<see cref="UiSession.CaptureHotControl"/>), because that is
+    /// the one piece of interaction state the library owns end to end: <c>UiNative</c> grants the native hot
+    /// control and the session records the ownership, so a drag reports true for every frame the pointer is
+    /// held (the chart's point drag captures on pointer-down and releases on pointer-up).
+    /// </para>
+    /// <para>
+    /// <b>What it does not cover.</b> It is deliberately not a general "the user is busy" answer. A control
+    /// that is merely focused - a text field after a click, a keyboard-navigated control, an OS-level IME
+    /// composition in progress - holds no library-owned hot control and reports false here. There is no
+    /// per-element walk in this property either: a drag that never captured through the session is
+    /// invisible. A consumer that needs one of those shapes deferred must close its own capture; the
+    /// deferral ceiling is what keeps the missed cases bounded rather than a promise that this property is
+    /// a complete activity monitor.
+    /// </para>
+    /// </summary>
+    internal bool IsInteracting => session.IsActive && session.OwnedHotControl.HasValue;
+
+    /// <summary>
+    /// Attributes one document-service report to this host. The service calls it for every host a reload
+    /// batch affected, so a report reaches exactly the windows that read the document and never a window
+    /// that reads a different one. A host with no active subscription has nothing to record; unexpected
+    /// buffer failures propagate to the document service, which adds the host and reload context.
+    /// </summary>
+    internal void PublishReloadReport(UiReloadReport? report)
     {
-        foreach (UiElementSpec root in manifest.Roots)
+        UiDiagnosticSubscription? subscription = diagnostics;
+        if (subscription == null || !subscription.IsActive || report == null) return;
+        subscription.PublishReload(report);
+    }
+
+    /// <summary>
+    /// Validates a candidate layout in full - the same creation-time contract the constructor runs,
+    /// including every widget's own Configure/Validate against this host's bindings - without changing
+    /// anything. The document service calls this for every affected host before it commits any of them,
+    /// which is what makes one change batch all-or-nothing.
+    /// </summary>
+    internal bool TryPrepareLayoutCandidate(UiLayoutManifest candidate, out string element, out string reason)
+    {
+        element = "";
+        reason = "";
+        if (candidate == null)
         {
-            ValidateElement(root, root.Id.Length > 0 ? root.Id : root.Kind, parentNarrowCapable: false);
+            reason = "the candidate is null";
+            return false;
+        }
+
+        try
+        {
+            ValidateManifest(candidate);
+        }
+        catch (UiContractException ex)
+        {
+            element = ex.ElementPath.Length > 0 ? ex.ElementPath : ex.ElementId;
+            reason = ex.Message;
+            return false;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or FormatException)
+        {
+            reason = ex.Message;
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Stages a validated layout candidate: swaps the roots and rebuilds the style resolver and the engine
+    /// over the effective document. The session - and therefore the scroll positions, drafts, selection and
+    /// expansion of every identity that survives - is not touched here: state preservation is a property of
+    /// not replacing the session, and the destructive half (pruning what the new tree no longer carries)
+    /// waits for <see cref="SealDocumentCommit"/> so a batch that later rolls back loses nothing.
+    /// </summary>
+    internal void CommitLayoutCandidate(UiLayoutManifest candidate)
+    {
+        UiLayoutManifest previous = manifest;
+        manifest = candidate;
+        pendingPrune = previous;
+        RebuildTree();
+    }
+
+    /// <summary>
+    /// Stages a style-document candidate. Whether the document is structurally valid was decided by the
+    /// service (a whole-document refusal never reaches here); declaration-level drops inside it stay soft and
+    /// are published by the rebuilt resolver. A style change removes no element, so there is nothing to prune.
+    /// </summary>
+    internal void CommitStyleCandidate(UiStyleDocument candidate)
+    {
+        attachedStyleDocument = candidate ?? throw new ArgumentNullException(nameof(candidate));
+        pendingPrune = null;
+        RebuildTree();
+    }
+
+    /// <summary>
+    /// The destructive half of a document commit, run only once the whole change batch has staged
+    /// successfully: elements the new tree no longer carries lose their state, and a held interaction capture
+    /// is released. Keeping it out of the staging step is what makes a rolled-back batch a real rollback -
+    /// before this, a batch that failed on a later host had already cleared an earlier host's draft.
+    /// </summary>
+    internal void SealDocumentCommit()
+    {
+        UiLayoutManifest? previous = pendingPrune;
+        pendingPrune = null;
+        if (SessionDisposed) return;
+
+        if (previous != null)
+        {
+            PruneDetachedState(previous, manifest);
+        }
+
+        ReleaseHotControlForReload();
+    }
+
+    /// <summary>
+    /// Pre-flights a style-document candidate the same way a layout one is pre-flighted, and it can really
+    /// refuse one: the candidate's own page level must resolve inside the candidate, and the document is
+    /// then applied over a throwaway clone of this host's theme - the exact path a commit runs - without
+    /// mutating the host or the theme it holds.
+    /// <para>
+    /// The page-level rule is the page-wide half of "structure stays fail-closed, values fall soft": an
+    /// authored <c>Scheme</c>/<c>Density</c> naming something the document does not declare can never take
+    /// effect, and silently leaving the page on its previous values is the no-op this refuses. A per-element
+    /// unknown name still falls back softly (recorded on the resolver's issues); the page-level declaration
+    /// is either applied or the candidate version is refused and the last good appearance survives.
+    /// </para>
+    /// </summary>
+    internal bool TryPrepareStyleCandidate(UiStyleDocument candidate, out string element, out string reason)
+    {
+        element = "";
+        reason = "";
+        if (candidate == null)
+        {
+            reason = "the candidate is null";
+            return false;
+        }
+
+        if (candidate.DefaultScheme != null && !ContainsName(candidate.SchemeNames, candidate.DefaultScheme))
+        {
+            reason = "the page level names scheme '" + candidate.DefaultScheme
+                + "', which the document does not declare; the page level could never take effect";
+            return false;
+        }
+
+        if (candidate.DefaultDensity != null && !ContainsName(candidate.DensityNames, candidate.DefaultDensity))
+        {
+            reason = "the page level names density '" + candidate.DefaultDensity
+                + "', which the document does not declare; the page level could never take effect";
+            return false;
+        }
+
+        try
+        {
+            UiTheme probe = theme.Clone();
+            new UiStyleResolver(probe, candidate).ApplyTo(probe);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            reason = ex.Message;
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool ContainsName(IReadOnlyCollection<string> names, string name)
+    {
+        foreach (string declared in names)
+        {
+            if (string.Equals(declared, name, StringComparison.Ordinal)) return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Captures the state a document commit replaces, so the service can put it back if a later host in
+    /// the same batch refuses the candidate. The theme is captured by value: the page level is applied to
+    /// the injected theme in place, so undoing a commit has to undo that too.
+    /// </summary>
+    internal DocumentRollback CaptureDocumentRollback()
+    {
+        return new DocumentRollback(
+            manifest,
+            attachedStyleDocument,
+            styleResolver,
+            engine,
+            theme.Clone(),
+            publishedDocumentIssues,
+            publishedResolutionIssues,
+            warnedDroppedStyleDocument);
+    }
+
+    /// <summary>Puts a host back on the tree, document and theme state a commit was about to replace.</summary>
+    internal void RestoreDocumentRollback(DocumentRollback rollback)
+    {
+        // The capture always precedes a stage, so any pending prune belongs to the commit being undone and
+        // must not survive it: sealing a rolled-back batch would destroy state the rollback just preserved.
+        pendingPrune = null;
+        manifest = rollback.Manifest;
+        attachedStyleDocument = rollback.AttachedStyle;
+        styleResolver = rollback.StyleResolver;
+        engine = rollback.Engine;
+        publishedDocumentIssues = rollback.PublishedDocumentIssues;
+        publishedResolutionIssues = rollback.PublishedResolutionIssues;
+        warnedDroppedStyleDocument = rollback.WarnedDroppedStyleDocument;
+        CopyThemeTokens(theme, rollback.Theme);
+    }
+
+    /// <summary>
+    /// Records the service this host's documents come from; called by the service's Attach. A host binds to
+    /// one service, so re-binding releases the previous one: leaving the old service holding a host that no
+    /// longer answers to it would leak the dependency until the cap refuses later attaches. The reference
+    /// check matters - the calling service has just registered the host, and detaching from itself would
+    /// remove the dependency it is in the middle of creating.
+    /// </summary>
+    internal void AttachDocumentService(UiDocumentService service)
+    {
+        if (service == null) throw new ArgumentNullException(nameof(service));
+        UiDocumentService? previous = documentService;
+        documentService = service;
+        if (!ReferenceEquals(previous, service))
+        {
+            previous?.Detach(this);
+        }
+    }
+
+    /// <summary>
+    /// The non-destructive half of a commit: re-resolve the page level, rebuild the engine over the new
+    /// effective document and republish the appearance issues. It deliberately destroys no interaction
+    /// state - <see cref="SealDocumentCommit"/> owns that, one whole batch later.
+    /// </summary>
+    private void RebuildTree()
+    {
+        // Start from the pre-document tokens and then apply the new page level: a colour the new document no
+        // longer declares has to actually stop applying, or "remove the override and reload" silently keeps
+        // the old value and the reload is only half true.
+        RestoreStyleBaseline();
+        styleResolver = new UiStyleResolver(theme, EffectiveStyleDocument);
+        styleResolver.ApplyTo(theme);
+
+        // A fresh engine has no cached arrangement, so the next ArrangeRoots measures the new tree. This is
+        // the invalidation the reload needs and it is strictly local: no second revision counter is
+        // introduced anywhere - the engine instance itself is the invalidated thing.
+        engine = new UiLayoutEngine(source, styleResolver, manifest.Templates);
+
+        publishedDocumentIssues = 0;
+        publishedResolutionIssues = 0;
+        warnedDroppedStyleDocument = false;
+
+        PublishStyleIssues();
+    }
+
+    /// <summary>
+    /// Undoes the page-level application of the document currently in force, so the incoming document is
+    /// resolved against the consumer's own theme rather than on top of its predecessor's values.
+    /// <para>
+    /// The gate is the whole point: a document that declares neither a page scheme nor a page density
+    /// applied nothing, and restoring in that case would only discard a tint the consumer applied to the
+    /// theme it handed in. A reload is not an excuse to reset state a document never owned.
+    /// </para>
+    /// <para>
+    /// <b>The residual, stated exactly.</b> The restore is not tracked per token: once the outgoing document
+    /// applied <i>any</i> page-level scheme or density, the next reload restores <b>every</b>
+    /// document-settable token to the value the theme had at host construction. So a consumer that re-tints
+    /// any token in the bag - including a token the outgoing page level never declared - loses that tint on
+    /// that reload, even when the incoming document declares nothing. A per-token restore would need the
+    /// resolver to record which tokens it touched, and the name-to-property mapping exists once, privately,
+    /// in <see cref="UiStyleResolver"/>; it is not duplicated here. Consumer-visible consequence: re-apply a
+    /// re-tint after a reload, or declare the value in the document instead of tinting the theme.
+    /// </para>
+    /// </summary>
+    private void RestoreStyleBaseline()
+    {
+        UiStyleDocument applied = styleResolver.Document;
+        if (applied.DefaultScheme == null && applied.DefaultDensity == null) return;
+        CopyThemeTokens(theme, styleBaseline);
+    }
+
+    /// <summary>Copies every document-settable token from <paramref name="source"/> onto <paramref name="target"/>.</summary>
+    private static void CopyThemeTokens(UiTheme target, UiTheme source)
+    {
+        target.Base = source.Base;
+        target.Panel = source.Panel;
+        target.Raised = source.Raised;
+        target.Hover = source.Hover;
+        target.Selected = source.Selected;
+        target.Success = source.Success;
+        target.Danger = source.Danger;
+        target.WorkspacePlane = source.WorkspacePlane;
+        target.SectionBand = source.SectionBand;
+        target.TextPrimary = source.TextPrimary;
+        target.TextSecondary = source.TextSecondary;
+        target.TextOnGold = source.TextOnGold;
+        target.TextOnDanger = source.TextOnDanger;
+        target.TextDisabled = source.TextDisabled;
+        target.AccentGold = source.AccentGold;
+        // Batch 1 (CP-6④): there is no second stored accent to copy any more. The hover step is derived
+        // from the accent, so cloning the accent is enough - and a copied value would go stale the moment
+        // a region re-tinted the derived one.
+        target.Border = source.Border;
+        target.BorderStrong = source.BorderStrong;
+        target.Divider = source.Divider;
+        target.BaseBorder = source.BaseBorder;
+        target.PanelBorder = source.PanelBorder;
+        target.RaisedBorder = source.RaisedBorder;
+        target.HoverBorder = source.HoverBorder;
+        target.SelectedBorder = source.SelectedBorder;
+        target.SuccessBorder = source.SuccessBorder;
+        target.DangerBorder = source.DangerBorder;
+        target.DefaultFont = source.DefaultFont;
+        target.Geometry = source.Geometry;
+    }
+
+    /// <summary>
+    /// Everything a document commit changes, captured before the commit so the service can roll a batch
+    /// back when a later host in the same batch refuses. Deliberately internal and nested: it is the
+    /// service's transaction token, not a consumer surface.
+    /// </summary>
+    internal readonly struct DocumentRollback
+    {
+        internal DocumentRollback(
+            UiLayoutManifest manifest,
+            UiStyleDocument? attachedStyle,
+            UiStyleResolver styleResolver,
+            UiLayoutEngine engine,
+            UiTheme theme,
+            int publishedDocumentIssues,
+            int publishedResolutionIssues,
+            bool warnedDroppedStyleDocument)
+        {
+            Manifest = manifest;
+            AttachedStyle = attachedStyle;
+            StyleResolver = styleResolver;
+            Engine = engine;
+            Theme = theme;
+            PublishedDocumentIssues = publishedDocumentIssues;
+            PublishedResolutionIssues = publishedResolutionIssues;
+            WarnedDroppedStyleDocument = warnedDroppedStyleDocument;
+        }
+
+        internal UiLayoutManifest Manifest { get; }
+
+        internal UiStyleDocument? AttachedStyle { get; }
+
+        internal UiStyleResolver StyleResolver { get; }
+
+        internal UiLayoutEngine Engine { get; }
+
+        internal UiTheme Theme { get; }
+
+        internal int PublishedDocumentIssues { get; }
+
+        internal int PublishedResolutionIssues { get; }
+
+        internal bool WarnedDroppedStyleDocument { get; }
+    }
+
+    /// <summary>
+    /// A reload does not leave a global capture behind: the IMGUI hot control this session holds is
+    /// released, and whatever a drag or text edit had already typed stays where it was, in the node state
+    /// the surviving identity owns. Releasing is the "cancel the UI capture while keeping a compatible
+    /// draft" half of the contract; the draft is untouched here on purpose.
+    /// </summary>
+    private void ReleaseHotControlForReload()
+    {
+        int? held = session.OwnedHotControl;
+        if (held.HasValue)
+        {
+            session.ReleaseHotControl(held.Value);
+        }
+    }
+
+    /// <summary>
+    /// Cleans up the state of elements the new tree no longer keeps: an element whose identity is gone, or
+    /// whose kind changed under the same identity, must not hand its draft, selection or drag state to a
+    /// different control. A widget's own sub-nodes - minted under the element and absent from the element
+    /// map - go with their element. A node that survives both identity and kind keeps everything.
+    /// </summary>
+    private void PruneDetachedState(UiLayoutManifest previous, UiLayoutManifest next)
+    {
+        Dictionary<UiNodeId, string> before = ElementKinds(previous);
+        if (before.Count == 0) return;
+        Dictionary<UiNodeId, string> after = ElementKinds(next);
+
+        foreach (KeyValuePair<UiNodeId, string> entry in before)
+        {
+            bool survives = after.TryGetValue(entry.Key, out string? kind)
+                && string.Equals(kind, entry.Value, StringComparison.Ordinal);
+            if (survives) continue;
+
+            UiNode? node = session.GetNode(entry.Key);
+            if (node != null)
+            {
+                ResetDetachedState(node, after);
+            }
+        }
+    }
+
+    private void ResetDetachedState(UiNode node, Dictionary<UiNodeId, string> survivors)
+    {
+        ResetState(node.State);
+        foreach (KeyValuePair<string, UiValueState> slot in node.ValueStates)
+        {
+            ResetState(slot.Value);
+        }
+
+        // A scroll position is state too, and it is keyed by the node for exactly this reason: a removed
+        // scroll container must not leave a position behind for whatever identity claims that slot next.
+        if (session.ScrollPositions.ContainsKey(node))
+        {
+            session.SetScrollPosition(node, new Vector2(0f, 0f));
+        }
+
+        foreach (UiNode child in node.Children)
+        {
+            // An element child the new tree still carries keeps its own state; everything else under a
+            // removed or kind-changed element - sub-nodes included - is part of what has to be cleaned up.
+            if (survivors.ContainsKey(child.Id)) continue;
+            ResetDetachedState(child, survivors);
+        }
+    }
+
+    private static void ResetState(UiValueState state)
+    {
+        state.FloatValue = 0f;
+        state.EditText = "";
+        state.Dragging = false;
+        state.Focused = false;
+        state.Cursor = 0;
+    }
+
+    private static Dictionary<UiNodeId, string> ElementKinds(UiLayoutManifest value)
+    {
+        var kinds = new Dictionary<UiNodeId, string>();
+        for (int i = 0; i < value.Roots.Count; i++)
+        {
+            UiElementSpec root = value.Roots[i];
+            CollectElement(UiNodeId.Root(root, i), root, kinds);
+        }
+
+        return kinds;
+    }
+
+    private static void CollectElement(UiNodeId id, UiElementSpec spec, Dictionary<UiNodeId, string> kinds)
+    {
+        kinds[id] = spec.Kind;
+        for (int i = 0; i < spec.Children.Count; i++)
+        {
+            UiElementSpec child = spec.Children[i];
+            CollectElement(id.Child(child, i), child, kinds);
+        }
+    }
+
+    private void ValidateManifest(UiLayoutManifest candidate)
+    {
+        foreach (UiElementSpec root in candidate.Roots)
+        {
+            ValidateElement(root, root.Id.Length > 0 ? root.Id : root.Kind, parentNarrowCapable: false, parent: null);
         }
     }
 
@@ -273,18 +985,54 @@ public sealed class UiHost : IDisposable
     // name existed, so an author could not reach the document's schemes at all.
     private static readonly HashSet<string> CommonWidgetAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Id", "Kind", "Hidden", "Tab", "Width", "MinWidth", "MaxWidth", "NarrowHidden", "Scheme", "Density"
+        "Id", "Kind", "Hidden", "Tab", "Width", "WidthKey", "MinWidth", "MaxWidth", "NarrowHidden",
+        "WideHidden", "SelectedKey", "Scheme", "Density",
+        "Visible", "VisibleKey",
+        // The element's help identity (0.7.x): engine-wide like Visible/VisibleKey, because the ENGINE -
+        // not the kind - claims a hovered element's help. Deliberately NOT in the container list: only
+        // widgets are hit surfaces, so a declaration on a container or a template root could never claim,
+        // and the unknown-attribute gate refuses it there instead of leaving it silently inert. A
+        // binding-resolved sibling (a HelpBind) is CONTINGENT on the Route A decision and deliberately not
+        // built: the only two data-dependent sites live in a widget that will not be migrated
+        // declaratively unless Route A lands, so the need is not established yet (0.7 contract).
+        "HelpKey",
+        // CP-1 placement vocabulary (0.7.x, Batch 1): valid only for a child of a placement container.
+        // The engine refuses them elsewhere and refuses contradictory combinations; these two lists are
+        // the attribute-NAME gate, and UiLayoutEngine keeps a mirrored pair for template subtrees that a
+        // lane reflects against these, so the two must move together.
+        "AlignX", "OffsetX", "AlignY", "OffsetY",
+        // FL-IC2 (interaction contract §3.6): the tree's Cancel layer. Engine-wide like VisibleKey and HelpKey,
+        // because the ENGINE reads it and publishes it on the node for the ladder to walk - no widget kind owns
+        // it, so no kind's attribute schema has to grow for a page to declare a return layer. Unlike HelpKey it
+        // IS allowed on a container: a section that draws nothing of its own is still a layer a player can
+        // return from, which is the whole difference between a hit surface and a tree node.
+        "CancelBind"
     };
 
     private static readonly HashSet<string> ContainerAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Width", "Fill",
-        "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden",
-        "Scheme", "Density"
+        // Tab is here because the engine already reads it for every element it decides visibility for - the
+        // same IsHidden that reads NarrowHidden and Hidden, and RecordDeclaredKeys already registers the
+        // shared active-tab key for any declarer. Omitting it here forbade a capability the engine
+        // implemented; the 0.7 contract records the ruling (2026-09-20). A Tab-gated container hides its
+        // whole subtree, like every other hidden element.
+        "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Tab", "Width", "WidthKey",
+        "Fill", "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden", "WideHidden",
+        "VisibleRows",
+        "Scheme", "Density", "Visible", "VisibleKey",
+        "AlignX", "OffsetX", "AlignY", "OffsetY",
+        // FL-IC2: see the widget list; UiLayoutEngine's mirrored pair carries the same addition, and the drift
+        // lane refuses one-sided edits.
+        "CancelBind"
     };
 
-    private void ValidateElement(UiElementSpec spec, string path, bool parentNarrowCapable)
+    private void ValidateElement(UiElementSpec spec, string path, bool parentNarrowCapable, UiElementSpec? parent)
     {
+        // CP-1/CP-2 placement contract, checked here because this is the creation-time door: a placement
+        // attribute is valid only inside a placement container, and a flow container's child accepts the
+        // cross-axis subset without an offset. The rule lives in UiPlacement so the engine can share it.
+        UiPlacement.ValidateChild(spec, path, source, parent);
+
         bool isWidget = string.Equals(spec.Kind, "Widget", StringComparison.Ordinal)
             || !IsContainerKind(spec.Kind);
 
@@ -330,12 +1078,96 @@ public sealed class UiHost : IDisposable
 
         bool selfNarrowCapable = spec.TryGetAttribute("Breakpoint", out _);
         ValidateLayoutAttributes(spec, path, isContainer: !isWidget, selfNarrowCapable, parentNarrowCapable);
+        ValidateContentHeight(spec, path, parent);
+        ValidateViewportRows(spec, path, isWidget);
 
         foreach (UiElementSpec child in spec.Children)
         {
             string childPath = path + "/" + (child.Id.Length > 0 ? child.Id : child.Kind);
-            ValidateElement(child, childPath, selfNarrowCapable);
+            ValidateElement(child, childPath, selfNarrowCapable, spec);
         }
+    }
+
+    /// <summary>
+    /// Creation-time grammar for the D4 viewport count (same stance as the MatchContent matrix and the
+    /// closed <c>Height</c> vocabulary): <c>VisibleRows</c> is Scroll-only - a number another element
+    /// would silently ignore is an inert declaration this library refuses at creation, located - and it
+    /// must parse to a positive finite decimal (fractions are the point: 4.5 is a legal promise, "abc",
+    /// 0 and -1 are authoring errors). The engine's read stays fail-soft for programmatically built
+    /// specs; a MANIFEST that ships these is a contract error, caught here where element, attribute and
+    /// path are known.
+    /// </summary>
+    private void ValidateViewportRows(UiElementSpec spec, string path, bool isWidget)
+    {
+        if (!spec.TryGetAttribute("VisibleRows", out string raw)) return;
+
+        if (isWidget || !string.Equals(spec.Kind, "Scroll", StringComparison.Ordinal))
+        {
+            throw new UiContractException(
+                $"Element id=\"{spec.Id}\" at '{path}' declares VisibleRows on a <" + spec.Kind
+                + ">; the count sizes a SCROLL viewport from its measured rows, and every other element's"
+                + " height means something else. Declare it on the <Scroll>.",
+                source, spec.Id, spec.Kind, path);
+        }
+
+        string value = (raw ?? "").Trim();
+        if (value.Length == 0
+            || !float.TryParse(value, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float rows)
+            || rows <= 0f || float.IsNaN(rows) || float.IsInfinity(rows))
+        {
+            throw new UiContractException(
+                $"Element id=\"{spec.Id}\" at '{path}' declares VisibleRows='" + (raw ?? "")
+                + "'; expected a positive finite number of rows (fractions allowed, e.g. 4.5).",
+                source, spec.Id, spec.Kind, path);
+        }
+    }
+
+    /// <summary>
+    /// The content-relative height mode's creation-time matrix (0.7.x). The mode says "take the height my
+    /// parent's content resolved to", so it is accepted exactly where that reference exists <b>before</b> the
+    /// declaring element is measured and is not built from it: a child of a <c>Row</c> or an <c>Overlay</c> (both
+    /// take the MAXIMUM over their children) that has at least one sibling which does not declare the mode.
+    /// A parent that sums its children, a <c>Wrap</c>, a root, and a parent whose every child declares it are
+    /// refused here - the same fail-closed shape as the placement matrix, for the same reason: a declaration the
+    /// arrangement could never honour is the silent no-op this contract layer exists to stop.
+    /// <para>
+    /// This is the Host's walk, so it covers page elements. A template subtree is deliberately outside it (its
+    /// binding keys are item-scoped and cannot exist as page bindings), which is the known gap the 0.5 contract
+    /// records: inside a template the engine degrades the mode to the element's own measured content instead.
+    /// </para>
+    /// </summary>
+    private void ValidateContentHeight(UiElementSpec spec, string path, UiElementSpec? parent)
+    {
+        if (!UiPlacement.IsMatchContentHeight(spec)) return;
+
+        if (parent == null)
+        {
+            throw new UiContractException(
+                $"Element id=\"{spec.Id}\" at '{path}' declares Height=\"MatchContent\" with no parent container; "
+                + "the mode takes the height the parent's content resolved to, so it is valid only on a child of a Row or an Overlay.",
+                source, spec.Id, spec.Kind, path);
+        }
+
+        if (!UiPlacement.HasContentHeightReference(parent.Kind))
+        {
+            throw new UiContractException(
+                $"Element id=\"{spec.Id}\" at '{path}' declares Height=\"MatchContent\" inside a <" + parent.Kind + ">; "
+                + "that container's content height is built from its own children (this element included), so there is no "
+                + "reference to match. A Row or an Overlay takes the maximum over its children and can answer it.",
+                source, spec.Id, spec.Kind, path);
+        }
+
+        for (int i = 0; i < parent.Children.Count; i++)
+        {
+            if (!UiPlacement.IsMatchContentHeight(parent.Children[i])) return;
+        }
+
+        throw new UiContractException(
+            $"Element id=\"{spec.Id}\" at '{path}' declares Height=\"MatchContent\" in a <" + parent.Kind
+            + "> whose every child declares the same; the height it would match comes from a sibling, so at least one "
+            + "child must not declare it.",
+            source, spec.Id, spec.Kind, path);
     }
 
     /// <summary>
@@ -360,6 +1192,52 @@ public sealed class UiHost : IDisposable
             }
         }
 
+        // A2 (0.7): Height belongs to the same creation-time contract as Width. Until now a malformed
+        // value survived validation and only exploded at arrange time as an unattributable
+        // FormatException from deep inside the engine; the layout engine's own defensive checks stay,
+        // this just refuses the value where the element, attribute and path are all still known.
+        // Zero and negative finite numbers keep their existing clamp behavior - no new positive-only
+        // rule - but NaN and infinities are refused: ResolveHeight would take Math.Max(0f, NaN) down
+        // into every downstream rect.
+        if (spec.TryGetAttribute("Height", out string heightRaw))
+        {
+            string height = heightRaw.Trim();
+            bool heightAuto = string.Equals(height, "Auto", StringComparison.OrdinalIgnoreCase);
+            // The content-relative mode (0.7.x) is the third accepted value. Its own placement matrix - which
+            // parents can answer the reference it asks for - is checked in ValidateContentHeight below, where
+            // the parent element is in hand.
+            bool heightContent = UiPlacement.IsMatchContentHeight(spec);
+            bool heightNumber = float.TryParse(height, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float parsedHeight)
+                && !float.IsNaN(parsedHeight) && !float.IsInfinity(parsedHeight);
+            if (height.Length > 0 && !heightAuto && !heightContent && !heightNumber)
+            {
+                throw new UiContractException(
+                    $"Element id=\"{spec.Id}\" at '{path}' has invalid Height '{heightRaw}'; expected a number, Auto or MatchContent.",
+                    source, spec.Id, spec.Kind, path);
+            }
+        }
+
+        // Visible is engine-wide and static, so its value is part of the creation-time contract like
+        // Width: a malformed value would otherwise be interpreted per frame by the engine, and the one
+        // place that still knows the element, the attribute and the path is here. VisibleKey is
+        // deliberately NOT resolved against the injected bindings: a page must not fail to exist because
+        // a model key is missing or not yet bound. The engine keeps such an element visible and records
+        // one deduplicated appearance fallback instead - fail-soft, but not silent.
+        if (spec.TryGetAttribute("Visible", out string visibleRaw))
+        {
+            string visible = visibleRaw.Trim();
+            if (!string.Equals(visible, "true", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(visible, "false", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(visible, "1", StringComparison.Ordinal)
+                && !string.Equals(visible, "0", StringComparison.Ordinal))
+            {
+                throw new UiContractException(
+                    $"Element id=\"{spec.Id}\" at '{path}' has invalid Visible '{visibleRaw}'; expected true or false.",
+                    source, spec.Id, spec.Kind, path);
+            }
+        }
+
         ValidatePositiveNumber(spec, path, "MinWidth");
         ValidatePositiveNumber(spec, path, "MaxWidth");
         if (spec.TryGetAttribute("MinWidth", out string minRaw)
@@ -375,13 +1253,17 @@ public sealed class UiHost : IDisposable
                 source, spec.Id, spec.Kind, path);
         }
 
-        // A narrow-state attribute under no Breakpoint is the silent no-op this library's creation
+        // A responsive-state attribute under no Breakpoint is the silent no-op this library's creation
         // contract exists to stop: the author believes they declared a variant that can never fire.
-        if (spec.TryGetAttribute("NarrowHidden", out _) && !parentNarrowCapable)
+        // WideHidden is the mirror of NarrowHidden and needs the same parent, for the same reason.
+        foreach (string responsive in new[] { "NarrowHidden", "WideHidden" })
         {
-            throw new UiContractException(
-                $"Element id=\"{spec.Id}\" at '{path}' declares NarrowHidden but its parent carries no Breakpoint; nothing can ever make it narrow.",
-                source, spec.Id, spec.Kind, path);
+            if (spec.TryGetAttribute(responsive, out _) && !parentNarrowCapable)
+            {
+                throw new UiContractException(
+                    $"Element id=\"{spec.Id}\" at '{path}' declares {responsive} but its parent carries no Breakpoint; nothing can ever switch the state it depends on.",
+                    source, spec.Id, spec.Kind, path);
+            }
         }
 
         if (!isContainer)
@@ -397,6 +1279,23 @@ public sealed class UiHost : IDisposable
             }
 
             return;
+        }
+
+        // A3 (0.7): the grammar check above made Cols/NarrowCols well-formed numbers on every
+        // container, but only the Wrap path ever reads them — on any other kind they are an inert
+        // declaration of grid intent, which is exactly the silent no-op this contract layer exists
+        // to stop. Either remove the attribute or choose Wrap if grid flow was intended.
+        if (!string.Equals(spec.Kind, "Wrap", StringComparison.Ordinal))
+        {
+            foreach (string wrapOnly in new[] { "Cols", "NarrowCols" })
+            {
+                if (spec.TryGetAttribute(wrapOnly, out _))
+                {
+                    throw new UiContractException(
+                        $"'{wrapOnly}' at '{path}' is Wrap-only vocabulary; a {spec.Kind} never reads it, so the declaration would do nothing.",
+                        source, spec.Id, spec.Kind, path);
+                }
+            }
         }
 
         ValidatePositiveNumber(spec, path, "Breakpoint");

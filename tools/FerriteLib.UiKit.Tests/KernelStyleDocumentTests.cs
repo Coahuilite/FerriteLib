@@ -55,8 +55,8 @@ internal static class KernelStyleDocumentTests
         Check(standalone.SchemeNames.Contains("ice"), "the standalone document declares its scheme");
         Check(embedded.SchemeNames.Contains("ice"), "the embedded section declares the same scheme");
 
-        var standaloneResolver = new UiStyleResolver(UiTheme.DarkGold, standalone);
-        var embeddedResolver = new UiStyleResolver(UiTheme.DarkGold, embedded);
+        var standaloneResolver = new UiStyleResolver(UiTheme.Vanilla, standalone);
+        var embeddedResolver = new UiStyleResolver(UiTheme.Vanilla, embedded);
         Color standalonePanel = standaloneResolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "ice") }).Panel;
         Color embeddedPanel = embeddedResolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "ice") }).Panel;
         Check(
@@ -93,13 +93,13 @@ internal static class KernelStyleDocumentTests
             + "<Scheme Name=\"element\"><Color Token=\"Panel\" Value=\"#ff0000\"/></Scheme>";
 
         // default: nothing declared anywhere -> the library's own value.
-        Color libraryDefault = UiTheme.DarkGold.Panel;
+        Color libraryDefault = UiTheme.Vanilla.Panel;
         Check(
-            SameColor(new UiStyleResolver(UiTheme.DarkGold, UiStyleDocument.Empty).ThemeFor(null).Panel, libraryDefault),
+            SameColor(new UiStyleResolver(UiTheme.Vanilla, UiStyleDocument.Empty).ThemeFor(null).Panel, libraryDefault),
             "default: with no source at all the library value stands");
 
         // theme > default: the injected theme is the baseline under every document.
-        UiTheme tinted = UiTheme.DarkGold;
+        UiTheme tinted = UiTheme.Vanilla;
         tinted.Panel = new Color(0.01f, 0.02f, 0.03f, 1f);
         Check(
             SameColor(new UiStyleResolver(tinted, UiStyleDocument.Empty).ThemeFor(null).Panel, tinted.Panel),
@@ -124,7 +124,7 @@ internal static class KernelStyleDocumentTests
 
         // state > element: a value the player cannot write is painted disabled whatever was authored.
         var danger = new[] { new UiStyleDeclaration(tone: UiStatusTone.Danger) };
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         Check(
             SameColor(resolver.Resolve(theme, danger, writable: true).Fill, theme.Danger),
             "element: an authored tone decides when nothing overrides it");
@@ -138,7 +138,7 @@ internal static class KernelStyleDocumentTests
         const string scheme = "<Scheme Name=\"ice\"><Color Token=\"Panel\" Value=\"#0000ff\"/></Scheme>";
         const string density = "<Density Name=\"compact\"><Metric Token=\"RowHeight\" Value=\"20\"/></Density>";
         var document = UiStyleDocument.Parse("<Styles Schema=\"1\">" + scheme + density + "</Styles>");
-        var resolver = new UiStyleResolver(UiTheme.DarkGold, document);
+        var resolver = new UiStyleResolver(UiTheme.Vanilla, document);
 
         var container = new UiStyleDeclaration(scheme: "ice", density: "compact");
         var silentElement = default(UiStyleDeclaration);
@@ -151,7 +151,7 @@ internal static class KernelStyleDocumentTests
 
         // and the counter-example the ruling asks for: a region tagged danger does not tag its children.
         var dangerRegion = new UiStyleDeclaration(tone: UiStatusTone.Danger);
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         UiResolvedStyle child = resolver.Resolve(theme, new[] { silentElement, dangerRegion });
         Check(
             SameColor(child.Fill, theme.Raised) && !SameColor(child.Fill, theme.Danger),
@@ -175,7 +175,7 @@ internal static class KernelStyleDocumentTests
             + "</Styles>";
         UiStyleDocument document = UiStyleDocument.Parse(documentXml);
 
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         var resolver = new UiStyleResolver(theme, document);
 
         // The resolve-before-Measure slot: the document is applied before the first arrangement, and the
@@ -236,7 +236,7 @@ internal static class KernelStyleDocumentTests
             Check(dropped.Styles.IsEmpty,
                 "the section without Schema is still refused as a whole (schema semantics unchanged)");
 
-            using (UiHost host = new("dropped-styles", dropped, new UiBindings(), UiTheme.DarkGold,
+            using (UiHost host = new("dropped-styles", dropped, new UiBindings(), UiTheme.Vanilla,
                 new ModelMetrics(), new FixedTranslation()))
             {
                 host.MeasureAndArrange(new Vector2(240f, 200f));
@@ -263,7 +263,7 @@ internal static class KernelStyleDocumentTests
                 + "<Widget Id=\"banner\" Kind=\"chrome/banner\" Text=\"x\" Height=\"30\"/>"
                 + "</UiPage>");
 
-            using (UiHost host = new("good-styles", good, new UiBindings(), UiTheme.DarkGold,
+            using (UiHost host = new("good-styles", good, new UiBindings(), UiTheme.Vanilla,
                 new ModelMetrics(), new FixedTranslation()))
             {
                 host.MeasureAndArrange(new Vector2(240f, 200f));
@@ -296,20 +296,20 @@ internal static class KernelStyleDocumentTests
         Check(document.Issues.Count >= 5, "each dropped declaration is recorded (got " + document.Issues.Count + " issues)");
         Check(document.SchemeNames.Contains("partial"), "the rest of a partly-bad scheme still applies");
 
-        var resolver = new UiStyleResolver(UiTheme.DarkGold, document);
+        var resolver = new UiStyleResolver(UiTheme.Vanilla, document);
         UiTheme partial = resolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "partial") });
         Check(SameColor(partial.Panel, new Color(0f, 1f, 0f, 1f)), "the readable value in that scheme landed");
-        Check(SameColor(partial.Raised, UiTheme.DarkGold.Raised), "the unreadable one fell back to the default");
+        Check(SameColor(partial.Raised, UiTheme.Vanilla.Raised), "the unreadable one fell back to the default");
 
         resolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "nobody-declared-this") });
         Check(resolver.Issues.Count == 1, "a scope naming an unknown scheme is recorded at resolution time");
-        Check(SameColor(resolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "nobody-declared-this") }).Panel, UiTheme.DarkGold.Panel),
+        Check(SameColor(resolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "nobody-declared-this") }).Panel, UiTheme.Vanilla.Panel),
             "and the scope keeps the values it would have had without it (the page still renders)");
 
         // The other end: a correct document is silent on both records.
         UiStyleDocument good = UiStyleDocument.Parse(
             "<Styles Schema=\"1\"><Scheme Name=\"ice\"><Color Token=\"Panel\" Value=\"0.1,0.2,0.3\"/></Scheme></Styles>");
-        var goodResolver = new UiStyleResolver(UiTheme.DarkGold, good);
+        var goodResolver = new UiStyleResolver(UiTheme.Vanilla, good);
         goodResolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "ice") });
         Check(good.Issues.Count == 0 && goodResolver.Issues.Count == 0,
             "a correct document records nothing (fail-soft must not mean noisy)");
@@ -366,7 +366,7 @@ internal static class KernelStyleDocumentTests
 
     private static void VerifyCloneContract()
     {
-        UiTheme original = UiTheme.DarkGold;
+        UiTheme original = UiTheme.Vanilla;
         original.Panel = new Color(0.11f, 0.12f, 0.13f, 1f);
         original.Geometry = new UiGeometry(3f, 4f, 5f, 26f, 1f);
 

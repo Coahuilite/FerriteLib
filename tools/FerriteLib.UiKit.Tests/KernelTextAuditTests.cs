@@ -12,14 +12,27 @@ namespace FerriteLib.UiKit.Tests;
 /// only machinery that turns "this label might be clipped" into an addressable finding. These checks
 /// prove the wiring and the reporting policy through the real drawing outlet
 /// (<see cref="UiThemeDraw.Label"/>): that the audit is silent until enabled, that the vertical axis is
-/// the one that fires for wrapped text, that a paragraph which was given room for its wrapped lines is
-/// NOT reported, that the width axis only applies to declared-single-line labels, and that findings are
-/// deduplicated, scoped, and bounded. Absolute pixel truth still belongs to the real font engine.
+/// the one that fires for wrapped text, that a paragraph whose band holds its wrapped lines is NOT
+/// reported AND that one whose band does not is, that the width axis only applies to declared-single-line
+/// labels, and that findings are deduplicated, scoped, and bounded.
+///
+/// Two kinds of assertion live here, and the difference matters when reading a green run. The width-axis
+/// and wiring ones are PLUMBING: they hold under any ruler that reports a number larger than the rect. The
+/// wrapped-text pair is the only WRAPPING evidence, and it needs both halves - the silent case and the
+/// overflowing negative control - because a ruler that cannot count lines passes the silent case by
+/// construction. This lane carried a constant height ruler until 2026-09-24 and its paragraph fixture
+/// was sized from that ruler's return value; the sizes below are derived from the claim instead (§14.31).
+///
+/// Absolute pixel truth still belongs to the real font engine; the numbers here are the harness convention,
+/// calibrated from in-game ui.text.overflow need values.
 /// </summary>
 internal static class KernelTextAuditTests
 {
-    // Stub heights in ModelMetrics: Tiny 16, Small 24, Medium 32 (independent of the string).
-    private const float TinyBand = 16f;
+    // Only the declared-single-line draws use this band, and those consult the WIDTH axis - the audit returns
+    // before it looks at height, and skips rects of height <= 1 outright. This is therefore not a text
+    // measurement and must not be read as one; it used to be 16f, which happened to be the dead height
+    // ruler's constant (T27). Nothing here depends on its value beyond being > 1.
+    private const float SingleLineBand = 16f;
 
     private static int failures;
 
@@ -33,6 +46,9 @@ internal static class KernelTextAuditTests
         Run("An unscoped finding carries length and rect width", VerifyUnscopedDiscriminators);
         Run("Wrapped text taller than its band reports height", VerifyHeightFinding);
         Run("Paragraph given room for its lines is never reported", VerifyWrappedParagraphIsSilent);
+        Run("A paragraph the band cannot hold IS reported", VerifyWrappedParagraphOverflowIsReported);
+        Run("The lane's fixture arithmetic still matches the ruler", VerifyFixtureArithmeticMatchesTheRuler);
+        Run("The two harness width implementations agree", VerifyStubWidthModelMatchesTheSharedOne);
         Run("Fitting text reports nothing", VerifyFittingTextIsSilent);
         Run("Finding budget bounds the audit", VerifySaturation);
         Run("Detaching unbinds the sink", VerifyDetach);
@@ -63,7 +79,7 @@ internal static class KernelTextAuditTests
         List<UiOverflowReport> reports = Start();
 
         // A single-line label: 4 Latin units at Tiny (12px em, half-width advance) = 24px of need.
-        Draw(new Rect(0f, 0f, 10f, TinyBand), "abcd", UiFont.Tiny, singleLine: true);
+        Draw(new Rect(0f, 0f, 10f, SingleLineBand), "abcd", UiFont.Tiny, singleLine: true);
 
         Check(reports.Count == 1, "One width finding for an overflowing single-line label");
         if (reports.Count != 1)
@@ -86,7 +102,7 @@ internal static class KernelTextAuditTests
 
         for (int frame = 0; frame < 4; frame++)
         {
-            Draw(new Rect(0f, 0f, 10f, TinyBand), "same text every frame", UiFont.Tiny, singleLine: true);
+            Draw(new Rect(0f, 0f, 10f, SingleLineBand), "same text every frame", UiFont.Tiny, singleLine: true);
         }
 
         Check(reports.Count == 1, "A page redrawn 60 times per second reports one finding, not 60");
@@ -98,9 +114,9 @@ internal static class KernelTextAuditTests
         List<UiOverflowReport> reports = Start();
 
         UiFitAudit.BeginElement("page-root/body-row/nav-column/nav");
-        Draw(new Rect(0f, 0f, 10f, TinyBand), "scoped overflow", UiFont.Tiny, singleLine: true);
+        Draw(new Rect(0f, 0f, 10f, SingleLineBand), "scoped overflow", UiFont.Tiny, singleLine: true);
         UiFitAudit.EndElement();
-        Draw(new Rect(0f, 0f, 10f, TinyBand), "unscoped overflow", UiFont.Tiny, singleLine: true);
+        Draw(new Rect(0f, 0f, 10f, SingleLineBand), "unscoped overflow", UiFont.Tiny, singleLine: true);
 
         Check(reports.Count == 2, "Scoped and unscoped findings are distinct");
         Check(reports.Count == 2 && reports[0].ElementPath == "page-root/body-row/nav-column/nav",
@@ -123,8 +139,8 @@ internal static class KernelTextAuditTests
 
         // Two labels of different lengths in the same rect: one field must separate them.
         string longLabel = "a close affordance label that does not fit";
-        Draw(new Rect(0f, 0f, 12f, TinyBand), longLabel, UiFont.Tiny, singleLine: true);
-        Draw(new Rect(0f, 0f, 12f, TinyBand), "short", UiFont.Tiny, singleLine: true);
+        Draw(new Rect(0f, 0f, 12f, SingleLineBand), longLabel, UiFont.Tiny, singleLine: true);
+        Draw(new Rect(0f, 0f, 12f, SingleLineBand), "short", UiFont.Tiny, singleLine: true);
 
         Check(reports.Count == 2, "Both unscoped findings are reported (got " + reports.Count + ")");
         if (reports.Count != 2)
@@ -149,8 +165,10 @@ internal static class KernelTextAuditTests
     {
         List<UiOverflowReport> reports = Start();
 
-        // Wrapping label given an 10px band: the wrapped text still needs a full 16px line, so the tail
-        // of the string is never drawn. This is the defect class that a width check would miss entirely.
+        // PLUMBING, not wrapping evidence: "ab" in a 100px band is ONE line, so what this proves is that a
+        // ruler reporting need > available is routed to the Height axis with the band as Available. It stays
+        // green under a wrap-aware ruler for the same one-line reason (measured 2026-09-24, T27). The
+        // wrapping evidence is the paragraph pair below.
         Draw(new Rect(0f, 0f, 100f, 10f), "ab", UiFont.Tiny);
 
         Check(reports.Count == 1, "One height finding");
@@ -164,14 +182,58 @@ internal static class KernelTextAuditTests
         List<UiOverflowReport> reports = Start();
 
         // The guard against the obvious wrong design: Verse wraps labels, so a long paragraph's unwrapped
-        // width is enormous by construction. As long as the band holds its wrapped lines, this is not a
-        // defect and must never be reported.
+        // width is enormous by construction, and a band that HOLDS ITS WRAPPED LINES is not a defect. The
+        // band is therefore derived from that claim - the wrapped line count and the calibrated line height,
+        // written out in WrappedHeight - and deliberately not from the ruler: a fixture that asked the ruler
+        // how tall to be could never fail. It used to draw into a 40px band and SingleLineBand, sizes copied from
+        // the world of a ruler that answered one line for every string, which is why it was green for a
+        // reason unrelated to its claim (measured 2026-09-24, T27; §14.31).
+        const float width = 100f;
         string paragraph = new string('x', 400);
-        Draw(new Rect(0f, 0f, 100f, TinyBand), paragraph, UiFont.Tiny);
-        Draw(new Rect(0f, 0f, 100f, 40f), paragraph, UiFont.Small);
+        Draw(new Rect(0f, 0f, width, WrappedHeight(paragraph, UiFont.Tiny, width) + 1f), paragraph, UiFont.Tiny);
+        Draw(new Rect(0f, 0f, width, WrappedHeight(paragraph, UiFont.Small, width) + 1f), paragraph, UiFont.Small);
 
-        Check(reports.Count == 0, "A paragraph that was given room for its lines is not a finding");
+        Check(reports.Count == 0, "A paragraph whose band holds its wrapped lines is not a finding");
         Stop();
+    }
+
+    /// <summary>
+    /// NEGATIVE CONTROL for the fixture above, and the only reason this lane can see a dead ruler at all: a
+    /// ruler that answers one line's height no matter how long the string is fits any band of this size, so
+    /// without this case a constant ruler would pass the silent half forever. Both halves are needed - the
+    /// silent one states the claim, this one states that measuring still happens.
+    /// </summary>
+    private static void VerifyWrappedParagraphOverflowIsReported()
+    {
+        const float width = 100f;
+        string paragraph = new string('x', 400);
+        List<UiOverflowReport> reports = Start();
+
+        Draw(new Rect(0f, 0f, width, WrappedHeight(paragraph, UiFont.Small, width) * 0.5f), paragraph, UiFont.Small);
+
+        Check(reports.Count == 1, "A band half the paragraph's wrapped height is reported (got " + reports.Count + ")");
+        Check(reports.Count == 1 && reports[0].Axis == UiOverflowAxis.Height, "and it is the Height axis");
+        Stop();
+    }
+
+    /// <summary>
+    /// DIAGNOSTIC - it sizes nothing. The fixtures above derive their bands from <see cref="WrappedHeight"/>,
+    /// so if a future edit changes the ruler's height model without changing that arithmetic (or the
+    /// reverse), the fixtures would quietly start asserting something other than their claim. This makes that
+    /// drift noisy instead of silent. It is the counterpart of the negative control: that one catches a ruler
+    /// that cannot fail, this one catches a ruler that changed without its fixtures noticing.
+    /// </summary>
+    private static void VerifyFixtureArithmeticMatchesTheRuler()
+    {
+        var ruler = new ModelMetrics();
+        string paragraph = new string('x', 400);
+
+        float derived = WrappedHeight(paragraph, UiFont.Small, 100f);
+        float measured = ruler.MeasureText(paragraph, UiFont.Small, 100f);
+
+        Check(Math.Abs(derived - measured) < 0.01f,
+            "the fixture arithmetic and the ruler still agree (" + derived.ToString("0.##") + " vs "
+            + measured.ToString("0.##") + ")");
     }
 
     private static void VerifyFittingTextIsSilent()
@@ -245,13 +307,73 @@ internal static class KernelTextAuditTests
 
     private static void Draw(Rect rect, string text, UiFont font, bool singleLine = false)
     {
-        UiThemeDraw.Label(rect, text, UiTheme.DarkGold, null, font, TextAnchor.MiddleLeft, singleLine);
+        UiThemeDraw.Label(rect, text, UiTheme.Vanilla, null, font, TextAnchor.MiddleLeft, singleLine);
     }
 
     private static bool Near(float expected, float actual)
     {
         return Math.Abs(expected - actual) <= 0.001f;
     }
+
+    /// <summary>
+    /// The half-width convention exists TWICE: this project's <see cref="StubTextWidth"/>, and the inline
+    /// model the Verse stub's <c>Text.CalcSize</c> carries. The second one is what
+    /// <see cref="VerseFerriteTextMetrics"/> walks, so it is what a production host measures with - and until
+    /// now nothing compared them, which means an edit to either would have been a silent divergence between
+    /// what these lanes measure and what a game-side host measures. Same strings, same fonts, both paths, one
+    /// number. (The exact glyph advances exist only in the game, so this holds the two HARNESS models
+    /// together; it says nothing about the real font.)
+    /// </summary>
+    private static void VerifyStubWidthModelMatchesTheSharedOne()
+    {
+        var production = new VerseFerriteTextMetrics();
+        string[] samples = { "abcd", "中文字符", "mixed 中文 text", "\u2212+", new string('x', 40) };
+        UiFont[] fonts = { UiFont.Tiny, UiFont.Small, UiFont.Medium };
+
+        foreach (UiFont font in fonts)
+        {
+            foreach (string sample in samples)
+            {
+                float shared = StubTextWidth.Of(sample, font);
+                float stub = production.MeasureWidth(sample, font);
+                Check(Near(shared, stub),
+                    "the shared width model and the Verse stub agree for " + font + " on "
+                    + sample.Length + " char(s) (" + shared.ToString("0.###") + " vs " + stub.ToString("0.###") + ")");
+            }
+        }
+    }
+
+    /// <summary>
+    /// The wrapped height a fixture's CLAIM implies, computed in the lane: the half-width advance divided by
+    /// the width, rounded up, times the calibrated one-line height. What must never be copied from the
+    /// instrument under test is how TALL it thinks the text is, because then the fixture could not fail;
+    /// <see cref="VerifyFixtureArithmeticMatchesTheRuler"/> keeps that copy and the ruler from drifting apart
+    /// in silence.
+    ///
+    /// The ADVANCE comes from this project's half-width model, <see cref="StubTextWidth"/> - and that model
+    /// has a second implementation, the inline one inside the Verse stub's <c>Text.CalcSize</c>, which is the
+    /// one the consumer's production path walks. Two implementations of one convention is exactly the drift
+    /// this batch is about, so <see cref="VerifyStubWidthModelMatchesTheSharedOne"/> compares them rather
+    /// than trusting that they were written the same way.
+    /// </summary>
+    private static float WrappedHeight(string text, UiFont font, float width)
+    {
+        float advance = StubTextWidth.Of(text ?? "", font);
+        int lines = Math.Max(1, (int)Math.Ceiling(advance / Math.Max(1f, width)));
+        return lines * CalibratedLineHeight(font);
+    }
+
+    /// <summary>
+    /// The calibrated one-line heights, the claim's other half: from in-game <c>ui.text.overflow</c> need
+    /// values (Tiny 18.0, Small 21.33333, Medium 30.0). <b>Large is not measured</b> and borrows Small's
+    /// until someone calibrates it.
+    /// </summary>
+    private static float CalibratedLineHeight(UiFont font) => font switch
+    {
+        UiFont.Tiny => 18f,
+        UiFont.Medium => 30f,
+        _ => 21.33333f
+    };
 
     private static void Run(string name, Action action)
     {
@@ -266,17 +388,19 @@ internal static class KernelTextAuditTests
         }
     }
 
-    /// <summary>Font-constant heights (the lane convention) plus the shared half-width model.</summary>
+    /// <summary>
+    /// The harness text convention in BOTH axes: a line is <see cref="CalibratedLineHeight"/> tall, a CJK
+    /// ideograph or full-width punctuation is one em and anything else half an em - so the height a string
+    /// needs depends on the text, the font AND the width, never on the font alone. The font-constant version
+    /// this replaces could not tell a wrapped paragraph from a single line, which made every height assertion
+    /// in this lane a statement about the rect (measured 2026-09-24, T27).
+    /// </summary>
     private sealed class ModelMetrics : ITextMetrics
     {
         public float MeasureText(string text, UiFont font, float width)
         {
-            return font switch
-            {
-                UiFont.Tiny => 16f,
-                UiFont.Small => 24f,
-                _ => 32f
-            };
+            if (string.IsNullOrEmpty(text)) return 0f;
+            return WrappedHeight(text, font, width);
         }
 
         public float MeasureWidth(string text, UiFont font) => StubTextWidth.Of(text, font);

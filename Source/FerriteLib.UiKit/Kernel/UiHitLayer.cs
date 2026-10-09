@@ -13,14 +13,31 @@ namespace FerriteLib.UiKit.Kernel;
 public readonly struct UiHitLayer
 {
     public UiHitLayer(UiNode element, Rect rect, bool isPopup)
+        : this(element, rect, isPopup, null)
+    {
+    }
+
+    /// <summary>
+    /// A popup-aware layer. <paramref name="popupOwnerId"/> is the id of the dropdown that owns a popup
+    /// layer, so dispatch can tell "my own popup" from "somebody else's popup". Node identity cannot decide
+    /// that: every control a composite widget draws shares one <see cref="UiNode"/>.
+    /// </summary>
+    public UiHitLayer(UiNode element, Rect rect, bool isPopup, string? popupOwnerId)
     {
         Element = element;
         Rect = rect;
         IsPopup = isPopup;
+        PopupOwnerId = popupOwnerId;
     }
 
     /// <summary>The element this layer belongs to; dispatch compares node identity, never a path.</summary>
     public UiNode Element { get; }
+
+    /// <summary>
+    /// The owning dropdown's element id for a popup layer, null for a content layer. A popup never makes its
+    /// own owner yield; it makes every other control yield - including that owner element's own siblings.
+    /// </summary>
+    public string? PopupOwnerId { get; }
 
     /// <summary>The layer's rect in Host window space.</summary>
     public Rect Rect { get; }

@@ -33,6 +33,7 @@ internal static class KernelContractTests
         failures += Run("Translation revision invalidates the layout cache", VerifyTranslationRevisionInvalidatesLayout);
         failures += Run("Theme colour tokens cannot move geometry", VerifyThemeColorsDoNotAffectLayout);
         failures += Run("Visual core never depends on the page model", VerifyVisualCoreIsPageModelFree);
+        failures += Run("The stub tree keeps the paths and assembly names a consumer copies", VerifyStubSurfaceIsPublished);
         failures += Run("Engine recovers a throwing widget without ending the frame", VerifyEngineOwnsPerElementRecovery);
         failures += Run("Require names the page trees this process built", VerifyHostLedgerSurfacesInRequire);
         return failures;
@@ -68,7 +69,7 @@ internal static class KernelContractTests
 
         try
         {
-            using UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
             throw new Exception("Unknown widget attribute was not rejected");
         }
         catch (UiContractException ex)
@@ -93,7 +94,7 @@ internal static class KernelContractTests
         var bindings = new UiBindings();
         try
         {
-            using UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
             throw new Exception("Unknown container attribute was not rejected");
         }
         catch (UiContractException ex)
@@ -120,7 +121,7 @@ internal static class KernelContractTests
         bindings.BindValue("by-id", () => 0.1f, _ => { });
         bindings.BindValue("explicit-key", () => 0.9f, _ => { });
 
-        using UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.Close();
 
         // The reverse must fail: Bind pointing at an unregistered key.
@@ -128,7 +129,7 @@ internal static class KernelContractTests
         missing.BindValue("by-attr", () => 0.1f, _ => { });
         try
         {
-            using UiHost bad = new("test", manifest, missing, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            using UiHost bad = new("test", manifest, missing, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
             throw new Exception("Explicit Bind key mismatch was not rejected");
         }
         catch (UiContractException)
@@ -150,7 +151,7 @@ internal static class KernelContractTests
         var bindings = new UiBindings();
         try
         {
-            using UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
             throw new Exception("Missing binding was not rejected");
         }
         catch (UiContractException ex)
@@ -176,7 +177,7 @@ internal static class KernelContractTests
         missing.BindReadOnly<IReadOnlyList<Vector2>>("points", () => new List<Vector2> { new(0f, 1f), new(1f, 0f) });
         try
         {
-            using UiHost missingHost = new("test", manifest, missing, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            using UiHost missingHost = new("test", manifest, missing, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
             throw new Exception("Missing ActionBind was not rejected");
         }
         catch (UiContractException ex)
@@ -190,7 +191,7 @@ internal static class KernelContractTests
         wrongType.BindAction<string>("point-changed", _ => { });
         try
         {
-            using UiHost wrongHost = new("test", manifest, wrongType, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+            using UiHost wrongHost = new("test", manifest, wrongType, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
             throw new Exception("Wrong ActionBind payload type was not rejected");
         }
         catch (UiContractException)
@@ -202,7 +203,7 @@ internal static class KernelContractTests
         var good = new UiBindings();
         good.BindReadOnly<IReadOnlyList<Vector2>>("points", () => new List<Vector2> { new(0f, 1f), new(1f, 0f) });
         good.BindAction<UiChartPointChange>("point-changed", _ => { });
-        using UiHost host = new("test", manifest, good, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new("test", manifest, good, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.Close();
     }
 
@@ -229,7 +230,7 @@ internal static class KernelContractTests
         UiLayoutManifest manifest = UiLayoutManifest.Parse(xml);
         var bindings = new UiBindings();
 
-        using UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(800f, 300f));
 
         // Fill scroll viewport height = available height; content keeps its natural height.
@@ -266,7 +267,7 @@ internal static class KernelContractTests
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"test\">"
-            + "<Scroll Id=\"scroll\" Height=\"50\">"
+            + "<Scroll Id=\"scroll\" Padding=\"0\" Gap=\"0\" Height=\"50\">"
             + "<Widget Id=\"a\" Kind=\"chrome/banner\" Text=\"x\" Height=\"30\" />"
             + "<Widget Id=\"b\" Kind=\"chrome/banner\" Text=\"y\" Height=\"30\" />"
             + "<Widget Id=\"target\" Kind=\"chrome/banner\" Text=\"z\" Height=\"30\" />"
@@ -276,7 +277,7 @@ internal static class KernelContractTests
         UiLayoutManifest manifest = UiLayoutManifest.Parse(xml);
         var bindings = new UiBindings();
 
-        using UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
 
         host.Session.SetScrollTarget("target");
         host.DrawFrame(new Rect(0f, 0f, 200f, 200f));
@@ -320,7 +321,7 @@ internal static class KernelContractTests
         bindings.BindReadOnly<IReadOnlyList<Vector2>>("points", () => points);
         bindings.BindAction<UiChartPointChange>("point-changed", change => changes.Add(change));
 
-        using UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(300f, 100f));
         Rect chartRect = snapshot.RectById["chart"];
 
@@ -416,7 +417,7 @@ internal static class KernelContractTests
         float current = 10f;
         bindings.BindReadOnly("height", () => current);
 
-        using UiHost host = new("rev-test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new("rev-test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         UiLayoutSnapshot first = host.MeasureAndArrange(new Vector2(200f, 200f));
         if (Math.Abs(first.RectById["h"].height - 10f) > 0.01f)
         {
@@ -477,7 +478,7 @@ internal static class KernelContractTests
         bindings.BindReadOnly("height", () => current);
 
         StubTranslation translation = new StubTranslation();
-        using UiHost host = new("lang-test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), translation);
+        using UiHost host = new("lang-test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), translation);
         UiLayoutSnapshot first = host.MeasureAndArrange(new Vector2(200f, 200f));
         if (!ReferenceEquals(first, host.MeasureAndArrange(new Vector2(200f, 200f))))
         {
@@ -507,9 +508,9 @@ internal static class KernelContractTests
         // two themes differing in every colour token must yield identical geometry. Any colour that
         // ever leaks into a size or a rect fails here. DefaultFont is deliberately not perturbed - it
         // feeds text measurement, so it is a metric that happens to live on the theme.
-        if (ReferenceEquals(UiTheme.DarkGold, UiTheme.DarkGold))
+        if (ReferenceEquals(UiTheme.Vanilla, UiTheme.Vanilla))
         {
-            throw new Exception("UiTheme.DarkGold hands out a shared instance; consumers repaint each other");
+            throw new Exception("UiTheme.Vanilla hands out a shared instance; consumers repaint each other");
         }
 
         UiWidgetRegistry.Clear();
@@ -530,8 +531,8 @@ internal static class KernelContractTests
         var bindings = new UiBindings();
         bindings.BindReadOnly("height", () => 20f);
 
-        UiTheme plain = UiTheme.DarkGold;
-        UiTheme altered = UiTheme.DarkGold;
+        UiTheme plain = UiTheme.Vanilla;
+        UiTheme altered = UiTheme.Vanilla;
         altered.Base = new Color(1f, 0f, 0f, 1f);
         altered.Panel = new Color(0f, 1f, 0f, 0.5f);
         altered.Raised = new Color(0f, 0f, 1f, 1f);
@@ -547,7 +548,9 @@ internal static class KernelContractTests
         altered.TextOnDanger = new Color(0.7f, 0.7f, 0.7f, 1f);
         altered.TextDisabled = new Color(0.1f, 0.2f, 0.3f, 1f);
         altered.AccentGold = new Color(0.4f, 0.5f, 0.6f, 1f);
-        altered.HoverPoint = new Color(0.6f, 0.5f, 0.4f, 1f);
+        altered.SwitchThumbOff = new Color(0.7f, 0.2f, 0.6f, 1f); // SA1.1: a colour cannot move a rect either
+        // Batch 1 (CP-6④): no second accent token exists. The derived hover step moves with AccentGold by
+        // construction, so perturbing the accent is what perturbs it.
         altered.Border = new Color(0f, 0f, 0f, 0f);
         altered.BorderStrong = new Color(1f, 1f, 1f, 1f);
         altered.Divider = new Color(0.5f, 0f, 0.5f, 1f);
@@ -586,6 +589,107 @@ internal static class KernelContractTests
     }
 
 
+    /// <summary>
+    /// The stub tree is a published surface, and nothing else here pins its names. A consumer's harness
+    /// builds these four projects by relative path and copies their outputs out of the canonical
+    /// <c>bin/stubs/&lt;folder&gt;/</c> locations, so renaming a project, its output folder or its
+    /// <c>AssemblyName</c> breaks that consumer while every gate in this repository stays green - the
+    /// names here are literals on purpose, because a list read out of the files it is checking would move
+    /// with the rename it exists to catch.
+    /// <para>
+    /// Every set is <b>closed</b>, and that is the whole point of the shape. A per-path existence check
+    /// passes on a WARM tree: rename the output folder, and the old folder still holds the old assembly, so
+    /// the lane stays green while its own message says "missing or renamed". Asserting the exact folder set
+    /// and the exact <c>*.dll</c> set inside each folder reddens on the warm tree too, because a rename
+    /// leaves BOTH names behind. The per-folder set is a set and not "exactly one DLL" on purpose: three of
+    /// the four folders also receive the ProjectReference copies their stub depends on.
+    /// </para>
+    /// </summary>
+    private static void VerifyStubSurfaceIsPublished()
+    {
+        string tests = Path.Combine(RepoRoot(), "tools", "FerriteLib.UiKit.Tests");
+        string stubRoot = Path.Combine(tests, "bin", "stubs");
+        string[] projects =
+        {
+            "Stubs/UnityEngineStub/UnityEngineStub.csproj",
+            "Stubs/UnityEngineImGuiStub/UnityEngineImGuiStub.csproj",
+            "Stubs/UnityEngineTextRenderingModuleStub/UnityEngineTextRenderingModuleStub.csproj",
+            "Stubs/VerseStub/VerseStub.csproj"
+        };
+        string[] folders = { "unityengine", "unityengine-imgui", "unityengine-textrendering", "verse" };
+        string[][] assemblies =
+        {
+            new[] { "UnityEngine.CoreModule.dll" },
+            new[] { "UnityEngine.CoreModule.dll", "UnityEngine.IMGUIModule.dll" },
+            new[] { "UnityEngine.CoreModule.dll", "UnityEngine.TextRenderingModule.dll" },
+            new[] { "UnityEngine.CoreModule.dll", "UnityEngine.IMGUIModule.dll", "Assembly-CSharp.dll" }
+        };
+
+        for (int i = 0; i < projects.Length; i++)
+        {
+            string projectPath = Path.Combine(tests, projects[i].Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(projectPath))
+            {
+                throw new Exception("a stub project a consumer builds by relative path is gone: " + projects[i]
+                    + " (missing at " + projectPath + "); every gate here can stay green while that consumer's harness fails.");
+            }
+        }
+
+        if (!Directory.Exists(stubRoot))
+        {
+            throw new Exception("the harness's canonical stub output root is gone: " + stubRoot
+                + "; the build writes it, so this is a path change or a build that never ran, and either way nothing below can be measured.");
+        }
+
+        // Closed set one: the output FOLDERS. A renamed OutputPath leaves the old folder in place, so this
+        // is the assertion a warm tree cannot pass while the published name has moved.
+        string[] actualFolders = Directory.GetDirectories(stubRoot);
+        for (int i = 0; i < actualFolders.Length; i++) actualFolders[i] = Path.GetFileName(actualFolders[i]);
+        Array.Sort(actualFolders, StringComparer.Ordinal);
+        string[] expectedFolders = (string[])folders.Clone();
+        Array.Sort(expectedFolders, StringComparer.Ordinal);
+        if (!SameSet(actualFolders, expectedFolders))
+        {
+            throw new Exception("bin/stubs/ carries [" + string.Join(", ", actualFolders)
+                + "] where a consumer copies out of [" + string.Join(", ", expectedFolders)
+                + "] - a rename leaves both names behind, and a stale folder here is a published name that moved.");
+        }
+
+        // Closed set two: the assembly file names inside each folder, so a renamed AssemblyName is caught
+        // even while the old assembly is still sitting beside it.
+        for (int i = 0; i < folders.Length; i++)
+        {
+            string folder = Path.Combine(stubRoot, folders[i]);
+            string[] actualDlls = Directory.GetFiles(folder, "*.dll");
+            for (int j = 0; j < actualDlls.Length; j++) actualDlls[j] = Path.GetFileName(actualDlls[j]);
+            Array.Sort(actualDlls, StringComparer.Ordinal);
+            string[] expectedDlls = (string[])assemblies[i].Clone();
+            Array.Sort(expectedDlls, StringComparer.Ordinal);
+            if (!SameSet(actualDlls, expectedDlls))
+            {
+                throw new Exception("bin/stubs/" + folders[i] + "/ holds [" + string.Join(", ", actualDlls)
+                    + "] where a consumer copies out [" + string.Join(", ", expectedDlls)
+                    + "] - the harness build writes exactly the declared set, so this is an OutputPath or AssemblyName change.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Set equality over two already-sorted name arrays. Written out rather than taking a LINQ dependency:
+    /// this lane is about a published layout, and a `using System.Linq;` added for one comparison would be
+    /// the kind of quiet widening this repository keeps paying for.
+    /// </summary>
+    private static bool SameSet(string[] sortedLeft, string[] sortedRight)
+    {
+        if (sortedLeft.Length != sortedRight.Length) return false;
+        for (int i = 0; i < sortedLeft.Length; i++)
+        {
+            if (!string.Equals(sortedLeft[i], sortedRight[i], StringComparison.Ordinal)) return false;
+        }
+
+        return true;
+    }
+
     private static void VerifyVisualCoreIsPageModelFree()
     {
         // The library ships one assembly but serves two audiences: hosts that drive a declarative page
@@ -599,6 +703,8 @@ internal static class KernelContractTests
             "UiTheme.cs",
             "UiThemeDraw.cs",
             "UiResolvedStyle.cs",
+            "UiStyleDocument.cs",
+            "UiStyleResolver.cs",
             "UiFitAudit.cs",
             "UiKitFonts.cs",
             "UiFont.cs",
@@ -609,6 +715,10 @@ internal static class KernelContractTests
         {
             "UiHost",
             "UiWindowHost",
+            // UiPopup joined the tree after this guard was written and was in neither array, so
+            // UiThemeDraw -> UiPopup -> UiSession passed while breaking the "usable without a Host" claim.
+            // The guard is a name-list check, not a transitive one; this closes the one path it missed.
+            "UiPopup",
             "UiSession",
             "UiSessionGuard",
             "UiLayoutEngine",
@@ -665,7 +775,7 @@ internal static class KernelContractTests
             + "</UiPage>");
 
         var bindings = new UiBindings();
-        using (new UiHost(source, manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation()))
+        using (new UiHost(source, manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation()))
         {
         }
 
@@ -707,7 +817,7 @@ internal static class KernelContractTests
             + "</UiPage>");
 
         var bindings = new UiBindings();
-        using UiHost host = new("recover-test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new("recover-test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
 
         var viewport = new Rect(0f, 0f, 300f, 200f);
         RecordingWidget.Draws = 0;
@@ -970,7 +1080,7 @@ internal static class KernelContractTests
         bindings.BindReadOnly<IReadOnlyList<Vector2>>(elementId + "-points", () => points);
         bindings.BindAction<UiChartPointChange>(elementId + "-changed", _ => { });
 
-        UiHost host = new("test", manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(width, height));
         return (host, snapshot, snapshot.RectById[elementId]);
     }
@@ -992,16 +1102,16 @@ internal static class KernelContractTests
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + scope + "\">"
             + "<Column Id=\"page-root\" Gap=\"6\" Padding=\"12\">"
-            + "<Row Id=\"body-row\" Gap=\"12\">"
-            + "<Column Id=\"nav-column\" Width=\"176\" Fill=\"true\">"
+            + "<Row Id=\"body-row\" Padding=\"0\" Gap=\"12\">"
+            + "<Column Id=\"nav-column\" Padding=\"0\" Width=\"176\" Fill=\"true\">"
             + "<Widget Id=\"nav\" Kind=\"neutral/section\" />"
             + "</Column>"
-            + "<Scroll Id=\"content-scroll\" Fill=\"true\" Gap=\"10\">"
+            + "<Scroll Id=\"content-scroll\" Padding=\"0\" Fill=\"true\" Gap=\"10\">"
             + "<Widget Id=\"page-title\" Kind=\"neutral/section\" />"
             + "<Widget Id=\"section-a\" Kind=\"neutral/section\" Tab=\"GroupA\" />"
             + "<Widget Id=\"section-b\" Kind=\"neutral/section\" Tab=\"GroupB\" />"
             + "</Scroll>"
-            + "<Scroll Id=\"help-scroll\" Width=\"200\" Fill=\"true\">"
+            + "<Scroll Id=\"help-scroll\" Padding=\"0\" Width=\"200\" Fill=\"true\">"
             + "<Widget Id=\"help-panel\" Kind=\"neutral/section\" />"
             + "</Scroll>"
             + "</Row>"
@@ -1013,7 +1123,7 @@ internal static class KernelContractTests
         var bindings = new UiBindings();
         bindings.BindValue("active-tab", () => "GroupA", _ => { });
 
-        using UiHost host = new(scope, manifest, bindings, UiTheme.DarkGold, new StubMetrics(), new StubTranslation());
+        using UiHost host = new(scope, manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(800f, 600f));
 
         if (!snapshot.Viewports.TryGetValue("content-scroll", out Rect contentViewport)

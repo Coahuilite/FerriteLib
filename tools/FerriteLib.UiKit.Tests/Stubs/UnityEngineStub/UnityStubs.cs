@@ -285,6 +285,35 @@ public struct Color
 
     public static Color clear => new(0f, 0f, 0f, 0f);
 
+    // Equality is carried EXPLICITLY as exact component comparison rather than as Unity's Vector4 epsilon
+    // test. The stripped reference assembly declares the operator but not its body, so a harness that
+    // compiles against it must supply one at runtime or every `==` on a Color dies with a
+    // MissingMethodException. Exactness is the deliberate half: this stub exists so a change-detection
+    // branch ("did this colour actually change?") can be exercised, and an epsilon would let a near-equal
+    // assignment look unchanged - the silent-branch hazard, not a convenience. A lane that needs Unity's
+    // approximate behaviour must say so itself, through its own tolerance helper.
+    public static bool operator ==(Color lhs, Color rhs)
+    {
+        return lhs.r == rhs.r && lhs.g == rhs.g && lhs.b == rhs.b && lhs.a == rhs.a;
+    }
+
+    public static bool operator !=(Color lhs, Color rhs)
+    {
+        return !(lhs == rhs);
+    }
+
+    // The struct's own Equals/GetHashCode must agree with the operators above, or a dictionary keyed by
+    // Color would answer differently from `==` and the stub would be a second, disagreeing contract.
+    public override bool Equals(object? obj)
+    {
+        return obj is Color other && this == other;
+    }
+
+    public override int GetHashCode()
+    {
+        return r.GetHashCode() ^ (g.GetHashCode() << 2) ^ (b.GetHashCode() >> 2) ^ a.GetHashCode();
+    }
+
     // The named constants a consumer reads. Values are Unity's documented constants (the numeric yellow
     // is the HTML one the game uses); white and clear were already here. Color's arithmetic and equality
     // operators are NOT carried: equality compares through Vector4 with an epsilon that the stripped
@@ -506,10 +535,36 @@ public static class Time
     public static float realtimeSinceStartup => 0f;
 }
 
+/// <summary>
+/// A texture, at the two members the library reads from one: its natural width and height. The library
+/// never loads or creates a texture - a consumer binds one - so this stub stays constructible and holds the
+/// size it was made with, which is what lets a lane assert a fit against a known aspect ratio.
+/// </summary>
+public class Texture : Object
+{
+    public int width { get; set; }
+
+    public int height { get; set; }
+}
+
+/// <summary>The 2D form, which is what the bindings declare; a size is the only state a lane needs.</summary>
+public class Texture2D : Texture
+{
+    public Texture2D(int width, int height)
+    {
+        this.width = width;
+        this.height = height;
+    }
+}
+
 public enum KeyCode
 {
+    // The values are Unity's own (the game reads UnityEngine.KeyCode through the real assembly), and the
+    // double carries only what a lane names: Escape is the Cancel key the window stack dispatches on,
+    // Return/KeypadEnter the Accept key UiNative.IsEnterPressed already reads.
     None = 0,
     Return = 13,
+    Escape = 27,
     KeypadEnter = 271
 }
 

@@ -75,7 +75,7 @@ internal static class KernelRoleAttributeTests
             + "<Widget Id=\"rest\" Kind=\"chrome/rule\" Height=\"4\" />"
             + "</Row>"
             + "</UiPage>";
-        using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.DarkGold, new WrappingMetrics(), new StubTranslation());
+        using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.Vanilla, new WrappingMetrics(), new StubTranslation());
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(400f, 60f));
         CheckClose(32f, snapshot.RectById["cap"].width,
             "a role does not join the label set: Width=Auto still measures Text/TextKey (2 ideographs x 16)");
@@ -106,7 +106,7 @@ internal static class KernelRoleAttributeTests
         {
             UiFitAudit.Reset();
             using UiSession session = new();
-            UiTheme theme = UiTheme.DarkGold;
+            UiTheme theme = UiTheme.Vanilla;
 
             int fired = 0;
             var bindings = new UiBindings();
@@ -216,7 +216,7 @@ internal static class KernelRoleAttributeTests
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
         using UiSession session = new();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         var bindings = new UiBindings();
         float value = 0.5f;
         bindings.BindValue("v", () => value, written => value = written);
@@ -321,7 +321,7 @@ internal static class KernelRoleAttributeTests
         UiWidgetRegistry.InitializeCore();
         UiFitAudit.Reset();
         using UiSession session = new();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         float value = 0.5f;
         var bindings = new UiBindings();
         bindings.BindValue("editable", () => value, written => value = written);
@@ -380,7 +380,7 @@ internal static class KernelRoleAttributeTests
         using UiSession session = new();
 
         // 1) The density font: the band the atom reserves and the font the outlet receives move together.
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
         WrappedTextWidget leaf = new();
         leaf.Configure(new UiElementSpec("note", WrappedTextWidget.Kind, Attributes(("Text", LongCjk))));
         CheckClose(60f, leaf.Measure(Context(session, theme, new UiBindings(), 120f)),
@@ -423,7 +423,7 @@ internal static class KernelRoleAttributeTests
         }
 
         // 2) The density geometry: every band the atoms used to spell by hand now reads the bundle.
-        UiTheme dense = UiTheme.DarkGold;
+        UiTheme dense = UiTheme.Vanilla;
         dense.Geometry = new UiGeometry(10f, 8f, 12f, 40f, 3f);
         var bindings = new UiBindings();
         float value = 0.5f;
@@ -473,7 +473,7 @@ internal static class KernelRoleAttributeTests
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
         using UiSession session = new();
-        UiTheme theme = UiTheme.DarkGold;
+        UiTheme theme = UiTheme.Vanilla;
 
         float published = 0.5f;
         float editable = 0.5f;
@@ -595,7 +595,7 @@ internal static class KernelRoleAttributeTests
     {
         try
         {
-            using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.DarkGold, new WrappingMetrics(), new StubTranslation());
+            using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.Vanilla, new WrappingMetrics(), new StubTranslation());
             Check(false, what + " - but the host accepted it");
         }
         catch (UiContractException)

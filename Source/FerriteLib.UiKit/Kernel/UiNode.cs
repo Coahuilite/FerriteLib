@@ -45,10 +45,10 @@ public sealed class UiNode
     public string Path => Id.Path;
 
     /// <summary>The element's kind (a container's element name, a widget's registered kind, "" for a sub-node).</summary>
-    public string Kind { get; }
+    public string Kind { get; private set; }
 
     /// <summary>The element's declared ordinal among its siblings; -1 for a root, a sub-node or an orphan.</summary>
-    public int Ordinal { get; }
+    public int Ordinal { get; private set; }
 
     /// <summary>
     /// The element's declared <c>Id</c>, or "" when it has none. This is the one string a consumer
@@ -56,7 +56,7 @@ public sealed class UiNode
     /// what lets a caller bridge from a declared Id to a node (<see cref="UiSession.GetNodeByElementId"/>)
     /// without reintroducing a string identity key.
     /// </summary>
-    public string ElementId { get; }
+    public string ElementId { get; private set; }
 
     /// <summary>The node this one belongs to; null for a manifest root and for the session-level node.</summary>
     public UiNode? Parent { get; private set; }
@@ -90,6 +90,27 @@ public sealed class UiNode
     /// </summary>
     public bool IsDirty { get; private set; }
 
+    /// <summary>
+    /// True while this element is disabled for input: the command it declares answers
+    /// <see cref="IUiBindings.CanExecute"/> false. The engine resolves it once per element per draw and
+    /// publishes it here because the node is the identity carrier every arranged element owns; the
+    /// funnel's interactive entry points consult it, so a disabled element neither executes nor captures
+    /// the pointer - one rule for every kind instead of a per-widget branch. Always false for an element
+    /// that declares no command, which is why it cannot change the behaviour of a page that binds none.
+    /// </summary>
+    public bool IsDisabled { get; internal set; }
+
+    /// <summary>
+    /// The command key this element declared as its Cancel binding, already resolved through whatever scope
+    /// the element sits in (a row of a <c>Repeat</c> carries the item-scoped key, not the declared one), or
+    /// empty when it declared none. The engine publishes it once per arrange next to
+    /// <see cref="IsDisabled"/> because the node is the only carrier the Cancel ladder can walk: the ladder
+    /// runs from a window hook, before any widget's context exists, so a fact it needs has to be on the tree
+    /// rather than inside a kind. Executability is NOT cached here — the ladder asks the live binding, which
+    /// is the same reason a disabled element's grey-out is resolved per draw and not stored.
+    /// </summary>
+    public string CancelBindingKey { get; internal set; } = "";
+
     /// <summary>Marks this node's Measure as needed. Idempotent.</summary>
     public void MarkDirty()
     {
@@ -113,6 +134,19 @@ public sealed class UiNode
         }
 
         return state;
+    }
+
+    /// <summary>
+    /// Refreshes the definition-owned facts of an identity that survived a definition change: the same
+    /// declared Id can appear under a different kind after a reload, and the node - which belongs to the
+    /// identity, not to the definition - must not go on describing the kind it used to be. State is not
+    /// touched here: whoever decided the kind changed owns that decision.
+    /// </summary>
+    internal void RefreshIdentity(string kind, int ordinal, string elementId)
+    {
+        Kind = kind ?? "";
+        Ordinal = ordinal;
+        ElementId = elementId ?? "";
     }
 
     /// <summary>Clears the flag without notifying the session, which clears its whole dirty set in bulk.</summary>

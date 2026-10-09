@@ -1,0 +1,15 @@
+name: Privacy audit
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  privacy:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Audit tracked content and reachable history
+        shell: pwsh
+        run: ./scripts/privacy-audit.ps1 -FullHistory

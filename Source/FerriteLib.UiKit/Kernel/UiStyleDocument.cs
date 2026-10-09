@@ -15,10 +15,11 @@ namespace FerriteLib.UiKit.Kernel;
 /// </summary>
 public readonly struct UiStyleIssue
 {
-    public UiStyleIssue(string message, int line = 0)
+    public UiStyleIssue(string message, int line = 0, string? elementPath = null)
     {
         Message = message ?? "";
         Line = line;
+        ElementPath = string.IsNullOrEmpty(elementPath) ? null : elementPath;
     }
 
     /// <summary>What was dropped or replaced, in one sentence.</summary>
@@ -26,6 +27,15 @@ public readonly struct UiStyleIssue
 
     /// <summary>1-based line when the source reported one, otherwise 0.</summary>
     public int Line { get; }
+
+    /// <summary>
+    /// The element that DECLARED the dropped value, when the drop belongs to one element rather than to the
+    /// document (0.7.x): a scope naming a scheme or density the document does not define is recorded with its
+    /// declaring element's path, so the published finding can say <i>where</i> the name was written. A
+    /// document-level drop (a bad value inside <c>&lt;Styles&gt;</c>) has no element and stays null, and the
+    /// audit surface then attributes it to the style origin as it always has.
+    /// </summary>
+    public string? ElementPath { get; }
 
     public override string ToString()
     {
@@ -127,6 +137,18 @@ public sealed class UiStyleDocument
     /// <summary>Everything the document dropped, in the order it was found. Empty for a correct document.</summary>
     public IReadOnlyList<UiStyleIssue> Issues => issues;
 
+    /// <summary>
+    /// True when the document was refused as a whole - unreadable XML, a foreign root, a missing or foreign
+    /// <c>Schema</c>, or a file the loader could not read at all. The document service reads this to keep
+    /// the last valid version rather than committing an empty one.
+    /// <para>
+    /// A document that parsed and then dropped individual declarations is deliberately NOT structurally
+    /// invalid: that fail-soft path is the style policy, the readable rest still applies, and the drops are
+    /// already on <see cref="Issues"/>. Only the whole-document refusal is a version the service refuses.
+    /// </para>
+    /// </summary>
+    internal bool StructurallyInvalid { get; private set; }
+
     /// <summary>Declared scheme names, for diagnostics and authoring tools.</summary>
     public IReadOnlyCollection<string> SchemeNames => schemes.Keys;
 
@@ -166,12 +188,12 @@ public sealed class UiStyleDocument
                 "Invalid style XML at line " + ex.LineNumber.ToString(CultureInfo.InvariantCulture)
                 + ", position " + ex.LinePosition.ToString(CultureInfo.InvariantCulture) + ": " + ex.Message,
                 ex.LineNumber));
-            return new UiStyleDocument(null, null, new Dictionary<string, SchemeDefinition>(StringComparer.Ordinal), new Dictionary<string, DensityDefinition>(StringComparer.Ordinal), issues);
+            return Invalid(issues);
         }
         catch (InvalidOperationException ex)
         {
             issues.Add(new UiStyleIssue("Invalid style XML: " + ex.Message));
-            return new UiStyleDocument(null, null, new Dictionary<string, SchemeDefinition>(StringComparer.Ordinal), new Dictionary<string, DensityDefinition>(StringComparer.Ordinal), issues);
+            return Invalid(issues);
         }
 
         XmlElement? root = document.DocumentElement;
@@ -181,7 +203,7 @@ public sealed class UiStyleDocument
         if (root == null || !string.Equals(root.Name, "Styles", StringComparison.Ordinal))
         {
             issues.Add(new UiStyleIssue("The style document root must be <Styles>; found <" + (root == null ? "(none)" : root.Name) + ">."));
-            return new UiStyleDocument(null, null, emptySchemes, emptyDensities, issues);
+            return Invalid(emptySchemes, emptyDensities, issues);
         }
 
         string schema = root.GetAttribute("Schema") ?? "";
@@ -190,7 +212,7 @@ public sealed class UiStyleDocument
             issues.Add(new UiStyleIssue(schema.Length == 0
                 ? "The style document is missing the required Schema=\"1\" on <Styles>."
                 : "Unsupported <Styles> Schema '" + schema + "'; expected '1'."));
-            return new UiStyleDocument(null, null, emptySchemes, emptyDensities, issues);
+            return Invalid(emptySchemes, emptyDensities, issues);
         }
 
         var schemes = new Dictionary<string, SchemeDefinition>(StringComparer.Ordinal);
@@ -246,10 +268,35 @@ public sealed class UiStyleDocument
         {
             var issues = new List<UiStyleIssue>();
             Record(issues, "Style document '" + path + "' could not be read: " + ex.Message);
-            return new UiStyleDocument(null, null, new Dictionary<string, SchemeDefinition>(StringComparer.Ordinal), new Dictionary<string, DensityDefinition>(StringComparer.Ordinal), issues);
+            return Invalid(issues);
         }
 
         return Parse(xml);
+    }
+
+    /// <summary>
+    /// The one whole-document refusal, so every branch marks the same way and no caller has to guess which
+    /// issue text means "nothing applied" (the issue text is for a human; this flag is for the service).
+    /// </summary>
+    private static UiStyleDocument Invalid(List<UiStyleIssue> issues)
+    {
+        return new UiStyleDocument(
+            null,
+            null,
+            new Dictionary<string, SchemeDefinition>(StringComparer.Ordinal),
+            new Dictionary<string, DensityDefinition>(StringComparer.Ordinal),
+            issues)
+        {
+            StructurallyInvalid = true
+        };
+    }
+
+    private static UiStyleDocument Invalid(
+        Dictionary<string, SchemeDefinition> schemes,
+        Dictionary<string, DensityDefinition> densities,
+        List<UiStyleIssue> issues)
+    {
+        return new UiStyleDocument(null, null, schemes, densities, issues) { StructurallyInvalid = true };
     }
 
     internal bool TryGetScheme(string name, out SchemeDefinition definition)
@@ -296,6 +343,20 @@ public sealed class UiStyleDocument
                 case "Color":
                     ReadColor(name, entry, definition, issues);
                     break;
+                case "Metric":
+                    // A scheme may carry the DENSITY metric vocabulary, which is what makes the premeasure
+                    // style axis one vocabulary instead of two: the spacing numbers that move a rect are
+                    // declared the same way in a scheme and in a named density. The Font key is the one
+                    // exception, and it is separated here rather than inside ReadMetric because its value is
+                    // a typeface: it lands on the typography axis, never on a numeric metric.
+                    if (string.Equals(ReadOptionalName(entry, "Token"), FontMetricToken, StringComparison.Ordinal))
+                    {
+                        ReadFontMetric(name, entry, definition, issues);
+                        break;
+                    }
+
+                    ReadMetric("scheme '" + name + "'", entry, definition.Metrics, issues);
+                    break;
                 case "Font":
                     ReadFont(name, entry, definition, issues);
                     break;
@@ -304,6 +365,8 @@ public sealed class UiStyleDocument
                     break;
             }
         }
+
+        ApplyLegacyFont(name, definition, issues);
     }
 
     private static void ReadColor(string scheme, XmlElement element, SchemeDefinition definition, List<UiStyleIssue> issues)
@@ -338,6 +401,16 @@ public sealed class UiStyleDocument
         definition.Colours.Add(token, colour);
     }
 
+    /// <summary>
+    /// The legacy <c>&lt;Font Value="…"/&gt;</c> declaration: a FONT CLASS, and nothing else. It is stored so
+    /// the redirect can be reported after the whole scheme is read; the value it carries is a typeface, which
+    /// is what <see cref="SchemeDefinition.Font"/> applies, so the old spelling keeps its meaning rather than
+    /// being translated into some other axis.
+    /// <para>
+    /// An unknown Token is still refused - a historical spelling that names something this library never had
+    /// is not a legacy declaration - and an unreadable value is reported exactly as it always was.
+    /// </para>
+    /// </summary>
     private static void ReadFont(string scheme, XmlElement element, SchemeDefinition definition, List<UiStyleIssue> issues)
     {
         string raw = element.GetAttribute("Value") ?? "";
@@ -355,6 +428,40 @@ public sealed class UiStyleDocument
             return;
         }
 
+        if (definition.LegacyFont.HasValue)
+        {
+            Record(issues, "The font is set twice in scheme '" + scheme + "'; the first value is kept.");
+            return;
+        }
+
+        definition.LegacyFont = font;
+    }
+
+    /// <summary>The successor of the legacy <c>&lt;Font&gt;</c> declaration: one key of the scheme's metric
+    /// vocabulary whose VALUE is a font class rather than a number.</summary>
+    internal const string FontMetricToken = "Font";
+
+    /// <summary>
+    /// One <c>&lt;Metric Token="Font" Value="…"/&gt;</c>, the working spelling of a typography selection. Its
+    /// value goes through the same <see cref="TryParseFont"/> the legacy element uses, so the two spellings
+    /// cannot disagree about what a font class is.
+    /// </summary>
+    private static void ReadFontMetric(string scheme, XmlElement entry, SchemeDefinition definition, List<UiStyleIssue> issues)
+    {
+        string raw = entry.GetAttribute("Value") ?? "";
+        if (raw.Length == 0)
+        {
+            Record(issues, "A <Metric Token=\"Font\"> in scheme '" + scheme + "' needs a Value; the declaration is ignored.");
+            return;
+        }
+
+        if (!TryParseFont(raw, out UiFont font))
+        {
+            Record(issues, "Scheme '" + scheme + "' sets Font to an unknown size '" + raw
+                + "'; expected Tiny, Small or Medium. The declaration is ignored.");
+            return;
+        }
+
         if (definition.Font.HasValue)
         {
             Record(issues, "The font is set twice in scheme '" + scheme + "'; the first value is kept.");
@@ -362,6 +469,56 @@ public sealed class UiStyleDocument
         }
 
         definition.Font = font;
+    }
+
+    /// <summary>
+    /// Resolves the legacy font declaration into the typography it always meant, once per scheme, after every
+    /// child element has been read - so the answer does not depend on whether the author wrote
+    /// <c>&lt;Font&gt;</c> before or after a <c>Font</c> metric. The metric wins when both are declared, and
+    /// that is said out loud rather than resolved silently.
+    /// <para>
+    /// The redirect maps a font to a FONT, never to a row height: density is a separate axis, and translating
+    /// a typeface into spacing would have destroyed the declaration's meaning while appearing to honour it.
+    /// </para>
+    /// </summary>
+    private static void ApplyLegacyFont(string scheme, SchemeDefinition definition, List<UiStyleIssue> issues)
+    {
+        if (!definition.LegacyFont.HasValue) return;
+
+        UiFont font = definition.LegacyFont.Value;
+
+        if (definition.Font.HasValue)
+        {
+            Record(issues, "Scheme '" + scheme + "' declares both <Font Value=\"" + FontName(font)
+                + "\"/> and a Font metric; the metric wins and the legacy declaration is ignored.");
+            return;
+        }
+
+        definition.Font = font;
+        Record(issues, "Scheme '" + scheme + "' declares the legacy <Font Value=\"" + FontName(font)
+            + "\"/>; it is redirected to the typography metric <Metric Token=\"Font\" Value=\""
+            + FontName(font) + "\"/>, which is the supported successor. The selected font is what text "
+            + "measurement and painting both read, and density stays a separate axis.");
+
+        // Reported through the appearance channel as well, exactly once per declared scheme (the parser runs
+        // once per document, and the dedup key is the declaration itself): a redirect that only left a line in
+        // the document's issue list would be found by a reader of that list and by nobody else.
+        UiFitAudit.ReportStyleFallback(
+            "scheme:" + scheme, "styles", "Font", FontName(font), "Metric Token=\"Font\"");
+    }
+
+    /// <summary>The spelling an author used, for the redirect report.</summary>
+    private static string FontName(UiFont font)
+    {
+        switch (font)
+        {
+            case UiFont.Tiny:
+                return "Tiny";
+            case UiFont.Medium:
+                return "Medium";
+            default:
+                return "Small";
+        }
     }
 
     private static void ReadDensity(XmlElement element, Dictionary<string, DensityDefinition> densities, List<UiStyleIssue> issues)
@@ -399,35 +556,57 @@ public sealed class UiStyleDocument
                 continue;
             }
 
-            string token = ReadOptionalName(entry, "Token") ?? "";
-            string raw = entry.GetAttribute("Value") ?? "";
-            if (token.Length == 0 || raw.Length == 0)
-            {
-                Record(issues, "A <Metric> in density '" + name + "' needs both Token and Value; the declaration is ignored.");
-                continue;
-            }
-
-            if (!IsMetricToken(token))
-            {
-                Record(issues, "Unknown density token '" + token + "' in density '" + name + "'; the declaration is ignored.");
-                continue;
-            }
-
-            if (definition.Metrics.ContainsKey(token))
-            {
-                Record(issues, "Density token '" + token + "' is set twice in density '" + name + "'; the first value is kept.");
-                continue;
-            }
-
-            if (!float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float value) || value < 0f)
-            {
-                Record(issues, "Density '" + name + "' sets '" + token + "' to an unreadable value '" + raw
-                    + "'; expected a non-negative number. The declaration is ignored.");
-                continue;
-            }
-
-            definition.Metrics.Add(token, value);
+            ReadMetric("density '" + name + "'", entry, definition.Metrics, issues);
         }
+    }
+
+    /// <summary>
+    /// One <c>&lt;Metric Token="…" Value="…"/&gt;</c>, read identically for a scheme and for a density: the
+    /// two vocabularies are one, and the <paramref name="origin"/> only shapes the message a drop prints.
+    /// <para>
+    /// This reader handles NUMBERS only. The one metric key whose value is not a number - the typography
+    /// selection - is refused here with a message that names its own home, so a typeface can never be parsed
+    /// into a distance even when an author writes it under a named density, where there is no typography axis
+    /// to receive it.
+    /// </para>
+    /// </summary>
+    private static void ReadMetric(string origin, XmlElement entry, Dictionary<string, float> metrics, List<UiStyleIssue> issues)
+    {
+        string token = ReadOptionalName(entry, "Token") ?? "";
+        string raw = entry.GetAttribute("Value") ?? "";
+        if (token.Length == 0 || raw.Length == 0)
+        {
+            Record(issues, "A <Metric> in " + origin + " needs both Token and Value; the declaration is ignored.");
+            return;
+        }
+
+        if (string.Equals(token, FontMetricToken, StringComparison.Ordinal))
+        {
+            Record(issues, "Metric 'Font' in " + origin + " selects a typeface, which only a <Scheme> can carry; "
+                + "the declaration is ignored (density carries numbers, not fonts).");
+            return;
+        }
+
+        if (!IsMetricToken(token))
+        {
+            Record(issues, "Unknown density token '" + token + "' in " + origin + "; the declaration is ignored.");
+            return;
+        }
+
+        if (metrics.ContainsKey(token))
+        {
+            Record(issues, "Density token '" + token + "' is set twice in " + origin + "; the first value is kept.");
+            return;
+        }
+
+        if (!float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float value) || value < 0f)
+        {
+            Record(issues, origin + " sets '" + token + "' to an unreadable value '" + raw
+                + "'; expected a non-negative number. The declaration is ignored.");
+            return;
+        }
+
+        metrics.Add(token, value);
     }
 
     private static bool IsPageAttribute(string name)
@@ -456,7 +635,14 @@ public sealed class UiStyleDocument
             case "TextOnDanger":
             case "TextDisabled":
             case "AccentGold":
-            case "HoverPoint":
+            // SA1.1(r3): the switch thumb's OFF ink is declarable like every other colour role, so a
+            // consumer configures it through its single palette document instead of a C#-side assignment
+            // that would bypass the source and split scope consistency. Unset it still answers the theme's
+            // own TextPrimary at READ time (UiTheme.SwitchThumbOff) - this gate only recognises the name.
+            case "SwitchThumbOff":
+            // Batch 1 (CP-6④): HoverPoint is no longer a token. A scheme that still declares it is
+            // refused here - one recorded issue, never a silent no-op - and the hover step is derived
+            // from AccentGold.
             case "Border":
             case "BorderStrong":
             case "Divider":
@@ -630,7 +816,28 @@ public sealed class UiStyleDocument
     {
         internal Dictionary<string, Color> Colours { get; } = new(StringComparer.Ordinal);
 
+        /// <summary>
+        /// The premeasure half of a scheme: the metric vocabulary a named density carries too. These are
+        /// NUMBERS - spacing, including the row height - and they are applied through
+        /// <see cref="UiStyleResolver"/> before the first Measure, which is the one place a density fact can be
+        /// resolved and still reach the arrangement. A typeface is deliberately NOT in here: it belongs to
+        /// <see cref="Font"/>, so a font can never be expressed as, or confused with, a distance.
+        /// </summary>
+        internal Dictionary<string, float> Metrics { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// The scheme's typography selection, set by <c>&lt;Metric Token="Font" Value="…"/&gt;</c> and by the
+        /// legacy <c>&lt;Font Value="…"/&gt;</c> redirect. This is the value <see cref="UiTheme.DefaultFont"/>
+        /// receives, so it is the font every text measurement and every painted label in the scope resolves.
+        /// </summary>
         internal UiFont? Font { get; set; }
+
+        /// <summary>
+        /// The legacy <c>&lt;Font Value="…"/&gt;</c> declaration, kept only so the redirect can be reported
+        /// after the whole scheme is read. It is applied as a FONT - the same axis as <see cref="Font"/> -
+        /// never as a metric value.
+        /// </summary>
+        internal UiFont? LegacyFont { get; set; }
     }
 
     internal sealed class DensityDefinition

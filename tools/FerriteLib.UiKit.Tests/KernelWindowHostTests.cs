@@ -414,7 +414,7 @@ internal static class KernelWindowHostTests
         public bool LastFailureMentionsPlantedError
             => FailureText.IndexOf("planted window host failure", StringComparison.Ordinal) >= 0;
 
-        protected override UiTheme Theme => UiTheme.DarkGold;
+        protected override UiTheme Theme => UiTheme.Vanilla;
 
         /// <summary>The same ruler the lane hands the fit audit, so the shell and the audit cannot disagree.</summary>
         protected override ITextMetrics Metrics => Ruler;

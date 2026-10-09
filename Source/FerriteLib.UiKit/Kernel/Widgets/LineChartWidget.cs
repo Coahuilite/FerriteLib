@@ -11,11 +11,19 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Points come from a typed <c>Bind</c> value binding of <c>IReadOnlyList&lt;Vector2&gt;</c>
 /// (normalized 0..1) or from a static <c>Points</c> attribute. When <c>ActionBind</c> is present and
 /// <c>Editable="true"</c>, control points listed in <c>EditablePoints</c> are draggable:
-/// MouseDown hit-tests and captures <see cref="GUIUtility.hotControl"/> through
-/// <see cref="UiNative.CaptureHotControl"/>, MouseDrag updates the point while captured and emits a
-/// typed <see cref="UiChartPointChange"/> through the action binding, and MouseUp releases the hot
-/// control. Session state only remembers which point is being dragged; the native hot control is the
-/// capture authority.
+/// a NEW press asks the library's shared receive-eligibility rule
+/// (<see cref="UiNative.CanReceivePointerPress"/>) and only then hit-tests and captures, MouseDrag updates
+/// the point while the session owns the capture, and MouseUp releases it. Session state only remembers which
+/// point is being dragged; the native hot control is the capture authority.
+/// <para>
+/// <b>Why the press is gated and the drag is not.</b> This kind reads the pointer itself instead of handing
+/// the press to a native control, so nothing underneath it answers the window, the clip or the covering menu
+/// on its behalf: a chart that skipped the question captured and committed under an open option menu (the
+/// confirmed D2 witness, reachable from the consumer's distance page). Continuation is the opposite question
+/// - it is owned by the capture, not by where the pointer happens to be this frame - so a drag keeps moving
+/// past the plot edge and ends on its own release, and the pass-boundary release in <see cref="UiSession"/>
+/// is what ends it when the owner stops being drawn.
+/// </para>
 /// </summary>
 public sealed class LineChartWidget : IUiWidget
 {
@@ -24,7 +32,7 @@ public sealed class LineChartWidget : IUiWidget
     private const float DefaultHeight = 120f;
     private const float PlotPadding = 8f;
     private const float PointSize = 5f;
-    private const float HoverPointSize = 9f;
+    private const float HoveredPointSize = 9f;
     private const float HitRadius = 6f;
     private const float Epsilon = 0.0001f;
 
@@ -108,17 +116,30 @@ public sealed class LineChartWidget : IUiWidget
         int? hoveredPoint = null;
         if (editable)
         {
-            hoveredPoint = FindHoveredPoint(plotRect, points, UiNative.PointerPosition(), editablePoints);
-            HandleDrag(plotRect, points, editablePoints, ctx);
+            // The hover answer is the context-carrying one: a point under someone else's open menu is not
+            // hovered by anyone's reading, and the highlight must not promise a drag the press gate refuses.
+            // Disabled is deliberately not part of the hover question (help still explains an unavailable
+            // control); it IS part of the press question, in CanReceivePointerPress below.
+            if (UiNative.IsMouseOver(rect, ctx))
+            {
+                hoveredPoint = FindHoveredPoint(plotRect, points, UiNative.PointerPosition(), editablePoints);
+            }
+
+            HandleDrag(rect, plotRect, points, editablePoints, ctx);
         }
 
         DrawPoints(plotRect, points, hoveredPoint, ctx.Theme);
     }
 
-    /// IMGUI capture semantics). Capture ownership is recorded in the session so closing the host
-    /// releases exactly this session's hot control and no other session's.
+    /// <summary>
+    /// The chart's three pointer questions, kept separate because the contract separates them: a NEW capture
+    /// asks the shared receive-eligibility rule, a CONTINUED drag asks only whether this session still owns the
+    /// control it captured, and a release ends the hold this element holds - never one it does not, and never
+    /// another window's GUIUtility state (the release is owner-scoped inside <see cref="UiSession"/>).
+    /// Capture ownership is recorded in the session with the drawing element as its owner, so closing,
+    /// deactivating or removing the host releases exactly this session's capture and no other session's.
     /// </summary>
-    private void HandleDrag(Rect plotRect, List<Vector2> points, HashSet<int>? editablePoints, UiWidgetContext ctx)
+    private void HandleDrag(Rect elementRect, Rect plotRect, List<Vector2> points, HashSet<int>? editablePoints, UiWidgetContext ctx)
     {
         string elementId = spec.Id.Length > 0 ? spec.Id : spec.Kind;
         int controlId = UiNative.GetControlId(elementId);
@@ -126,7 +147,25 @@ public sealed class LineChartWidget : IUiWidget
         UiValueState state = ctx.Session.GetOrCreateValueState(elementId);
         Vector2 pointer = UiNative.PointerPosition();
 
-        if (UiNative.IsPointerDown() && !captured)
+        if (captured)
+        {
+            // Reporting the draw is what lets the pass boundary tell "this owner is still on screen and still
+            // holding the press" from "this owner vanished mid-drag and nobody else can release what it took".
+            ctx.Session.NoteHotControlOwnerDrawn(controlId);
+        }
+        else if (state.Dragging)
+        {
+            // A drag record with no capture is the leftover of an interaction that already ended - released by
+            // the owner, by the pass boundary, or by the close. Clear it here so no later frame can read a hold
+            // that does not exist; the capture stays the only authority for continuing a drag.
+            state.Dragging = false;
+            state.Cursor = -1;
+        }
+
+        // New press: the element's own rect (the padding band beside the plot still belongs to the chart, and
+        // a control point on the plot edge is grabbed from just outside it), then the radius test. Refusing
+        // here consumes nothing: the event survives for whatever is above or beneath, which is the point.
+        if (UiNative.IsPointerDown() && !captured && UiNative.CanReceivePointerPress(elementRect, ctx))
         {
             for (int i = 0; i < points.Count; i++)
             {
@@ -257,9 +296,9 @@ public sealed class LineChartWidget : IUiWidget
         {
             Vector2 pixel = ToRectPoint(points[i], plotRect);
             bool isHovered = i == hovered;
-            float size = isHovered ? HoverPointSize : PointSize;
+            float size = isHovered ? HoveredPointSize : PointSize;
             var pointRect = new Rect(pixel.x - size * 0.5f, pixel.y - size * 0.5f, size, size);
-            UiThemeDraw.Solid(pointRect, isHovered ? theme.HoverPoint : theme.AccentGold);
+            UiThemeDraw.Solid(pointRect, isHovered ? theme.AccentHover : theme.AccentGold);
         }
     }
 

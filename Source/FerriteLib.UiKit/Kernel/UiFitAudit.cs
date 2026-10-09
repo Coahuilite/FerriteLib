@@ -176,7 +176,15 @@ public static class UiFitAudit
     /// </summary>
     public static string? LastStyleFallbackDiagnostic => lastStyleFallback;
 
-    /// <summary>Binds the measuring implementation and the reporting callback. Does not enable the audit.</summary>
+    /// <summary>
+    /// Binds the measuring implementation and the reporting callback of the <b>legacy channel</b> - the
+    /// process-wide path a host that never subscribed uses. Does not enable the audit.
+    /// <para>
+    /// A host that has subscribed is measured with its own ruler, carried by its diagnostic scope, not with
+    /// this slot: two hosts with different measurement adapters used to contaminate each other's overflow
+    /// verdict through this one field, because subscribing wrote it. Nothing outside this method writes it.
+    /// </para>
+    /// </summary>
     public static void Attach(ITextMetrics textMetrics, Action<UiOverflowReport> reportSink)
     {
         metrics = textMetrics ?? throw new ArgumentNullException(nameof(textMetrics));
@@ -248,8 +256,25 @@ public static class UiFitAudit
     {
         if (!Enabled) return;
 
-        ITextMetrics? textMetrics = metrics;
-        if (textMetrics == null || Saturated) return;
+        // Routing and the ruler are decided together. One shared slot used to hold every host's findings
+        // AND the one ruler every label was measured with, so subscribing a host with a different adapter
+        // changed an unrelated host's overflow verdict. With a subscription live, both the destination and
+        // the ruler come from that host's own scope, and the process-wide ledger - its saturation check,
+        // its dedup set, its callback and its ruler - is not consulted at all. An unsubscribed host keeps
+        // exactly the legacy path it had.
+        UiDiagnosticSubscription? subscription = UiDiagnosticHub.ActiveSubscription;
+        ITextMetrics? textMetrics;
+        if (subscription != null)
+        {
+            textMetrics = UiDiagnosticHub.ActiveMetrics;
+        }
+        else
+        {
+            if (Saturated) return;
+            textMetrics = metrics;
+        }
+
+        if (textMetrics == null) return;
         if (string.IsNullOrEmpty(text) || rect.width <= 1f || rect.height <= 1f) return;
 
         if (singleLine)
@@ -257,7 +282,7 @@ public static class UiFitAudit
             float neededWidth = textMetrics.MeasureWidth(text, font);
             if (neededWidth > rect.width + Tolerance)
             {
-                Report(rect, text, font, UiOverflowAxis.Width, neededWidth, rect.width);
+                Report(rect, text, font, UiOverflowAxis.Width, neededWidth, rect.width, subscription);
             }
 
             return;
@@ -266,7 +291,7 @@ public static class UiFitAudit
         float neededHeight = textMetrics.MeasureText(text, font, rect.width);
         if (neededHeight > rect.height + Tolerance)
         {
-            Report(rect, text, font, UiOverflowAxis.Height, neededHeight, rect.height);
+            Report(rect, text, font, UiOverflowAxis.Height, neededHeight, rect.height, subscription);
         }
     }
 
@@ -276,19 +301,22 @@ public static class UiFitAudit
         UiFont font,
         UiOverflowAxis axis,
         float needed,
-        float available)
+        float available,
+        UiDiagnosticSubscription? subscription)
     {
         string key = currentPath + "|" + (int)axis + "|" + (int)font + "|" + Shorten(text);
+        string path = currentPath.Length == 0 ? "(unscoped)" : currentPath;
+
+        if (subscription != null)
+        {
+            subscription.PublishOverflow(
+                new UiOverflowReport(path, text, font, axis, needed, available, rect.width), key);
+            return;
+        }
+
         if (!Reported.Add(key)) return;
 
-        sink?.Invoke(new UiOverflowReport(
-            currentPath.Length == 0 ? "(unscoped)" : currentPath,
-            text,
-            font,
-            axis,
-            needed,
-            available,
-            rect.width));
+        sink?.Invoke(new UiOverflowReport(path, text, font, axis, needed, available, rect.width));
     }
 
     private static string Shorten(string text)
@@ -315,6 +343,16 @@ public static class UiFitAudit
         lastStyleFallback = report.Diagnostic;
 
         string key = report.ElementPath + "|" + report.Kind + "|" + report.Attribute + "|" + report.Authored;
+
+        // Same routing rule as the text half: a live subscription owns the finding, and the process-wide
+        // cap and dedup set stay out of it so one host's appearance noise cannot spend another's budget.
+        UiDiagnosticSubscription? subscription = UiDiagnosticHub.ActiveSubscription;
+        if (subscription != null)
+        {
+            subscription.PublishStyleFallback(report, key);
+            return;
+        }
+
         if (StyleFallbacks.Count >= MaxReports) return;
         if (!StyleFallbacks.Add(key)) return;
 
