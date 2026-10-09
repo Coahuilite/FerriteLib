@@ -25,9 +25,11 @@
   `dist/candidates/checkpoint-20261007`, `dist/candidates/sa1`) keep their bytes as retained history; they are
   not the current rehearsal. **A later source, docs or memory commit moves HEAD without changing any of those
   held bytes** — package identity is what the stager measured, not what HEAD points at.
-- **Nothing is installed, pushed, tagged or released.** The one open gate on this checkpoint is a single bounded
-  human pass (PM's `human-pass-20261009.md`, seven scenarios); PM acceptance of a slice is never a real-game
-  pass, and installation stays the developer's own step.
+- **Nothing is installed, pushed, tagged or released.** The single bounded human pass was accepted by the
+  maintainer on 2026-10-09 (`human-pass-20261009.md`, seven scenarios; the paired US diagnostics layout and a
+  quick kernel smoke were accepted in the same turn). No formal window-report artifact was captured - a
+  recorded supplementary gap, not by itself a new publication blocker. Installation stays the developer's own
+  step.
 - **FL-IC1 and FL-IC2 are PM-accepted at the source/stub boundary.** IC1 accepted 2026-10-08 08:28 UTC at
   `8dad3d5` + `11f1603`; IC2 accepted 2026-10-08 14:13 UTC over the chain `11f1603 → 84d1504 → 1d86ff8 →
   `d5af4d8`. Contracts: `docs/development/0.7/05-api-contract.md` §FL-IC1 and §FL-IC2; tiers in
@@ -144,17 +146,17 @@ Read `AGENTS.md` for invariants, this file for durable state, and `TODO.md` for 
 - **Priority:** long-term FL stability and extensibility for shared mod use, accepting a delay to US.
   Use the existing US ModSettings redesign as the real integration surface. Retain the page model over
   Verse IMGUI and advance through complete consumer slices with explicit library/consumer ownership.
-- **Popup anchoring (2026-09-28, still not game-accepted):** the maintainer passed both Packs and Tuning
-  click-arbitration scenarios (A/B). The follow-up scroll-anchor fix is built and is inside the current
-  rehearsal: a drawn trigger refreshes its window-space anchor, and leaving the effective nested clip or not
-  drawing that owner closes the popup and clears stale hit layers in the same pass
-  (`KernelPopupTests.VerifyOpenPopupFollowsTheTrigger`, reddened under separate faithful anchor, orphan-owner
-  and scroll-clip reverts). FL-IC1 later made popup coverage geometric and bounded the menu to whole rows, so
-  the open-then-scroll check must be re-walked in the same human pass as the IC1/IC2 items, not separately.
+- **Popup anchoring (2026-09-28; accepted in game 2026-10-09):** the maintainer passed both Packs and Tuning
+  click-arbitration scenarios (A/B). The scroll-anchor fix is inside the accepted rehearsal: a drawn trigger
+  refreshes its window-space anchor, and leaving the effective nested clip or not drawing that owner closes the
+  popup and clears stale hit layers in the same pass (`KernelPopupTests.VerifyOpenPopupFollowsTheTrigger`,
+  reddened under separate faithful anchor, orphan-owner and scroll-clip reverts). FL-IC1 later made popup
+  coverage geometric and bounded the menu to whole rows; the open-then-scroll check rode the same combined
+  pass as the IC1/IC2 items, which the maintainer accepted on 2026-10-09.
 - **Implemented foundation:** configuration-isolated builds, explicit compatibility export, per-host
   consumed-input diagnostics, and consumer compiler-reference/package hash checks. Commands and
   failure-sensitive evidence are in `docs/build-and-debug.md`; this does not establish overall architecture
-  stability or close the game defect.
+  stability. The anchoring game defect is closed by the 2026-10-09 acceptance.
 - **Evidence boundary:** automated contracts, artifact identity, and real-game E2E are separate results.
   Stub-based success cannot close an in-game input/layout defect. Multiple-mod coexistence has not been
   demonstrated merely by making the library referenceable; the shared `UiFitAudit.Enabled` switch remains

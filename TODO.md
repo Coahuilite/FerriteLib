@@ -18,7 +18,8 @@ handbook is `docs/development/0.7/next-stage-guide-zh.md`; build and instrument 
 `d5af4d820982`, payload `5b331379…`), paired with the US sibling of the same name at US source `562fc47`; the
 14-file identity source is the PM's `paired-candidate-manifest.json`. Retained older packages
 (`dist/dev/FerriteLib` at `0181268`, `dist/candidates/{checkpoint-20261007,sa1}`) keep their bytes and are not
-the current rehearsal. **One bounded human pass is the only open gate** (`human-pass-20261009.md`).
+the current rehearsal. **The bounded human pass was accepted by the maintainer on 2026-10-09**
+(`human-pass-20261009.md`; no re-run required).
 
 - [x] **Expose unexpected reload diagnostic-publication failures.** The internal-buffer path now propagates
       host/document context plus the original exception; 10 existing local checks pass. Runtime failure
@@ -29,24 +30,21 @@ the current rehearsal. **One bounded human pass is the only open gate** (`human-
       guards remain in place. **The owner-id isolation this line named is gone:** FL-IC1 retired it, because a
       menu drawn over its own trigger left that trigger's option rows unselectable (reported in game as F09,
       witnessed as D1). Popup coverage is geometric now, and the trigger keeps its toggle-to-close on the strip
-      the menu does not cover. That is a stub/lane result, not a game acceptance.
-- [ ] **P1 follow-up: game-accept live popup anchoring.** The anchor/clip/orphan-owner fix passed the full
-      verify/PackDev chain and three faithful reverts, and FL-IC1 later made popup coverage geometric and
-      bounded the menu to whole rows — so this check now rides the single human pass below rather than being
-      requested separately. Open a dropdown first, then scroll its containing page: it follows a visible owner
-      and closes when that owner leaves the effective clip or disappears; check Packs and Tuning plus input
-      recovery.
-- [ ] **FL-IC1 short human pass (stub passes do not close it).** In one short session: an option menu covering
-      its own trigger selects, a 40-item menu's first and last rows are reachable and the wheel moves the menu
-      rather than the page under it, a chart under an open menu writes nothing while a normal drag still
-      captures, moves and releases, and the typed menu answers the same way as the string one.
-- [ ] **FL-IC2 short human pass (stub passes do not close it).** In one short session, in a real consumer window:
-      a `Live="false"` number field keeps what was typed when focus leaves by a click on a control drawn earlier,
-      Enter commits the open edit without closing the window, Escape drops the draft without writing it and
-      without closing the window, and a second Escape undoes the next layer (menu, then the tree, then close).
-      The window-stack dispatch order and eligibility are the harness double's reading, and Verse only calls the
-      hooks for a window its `closeOnCancel`/`closeOnAccept` makes eligible - both are in-game facts this lane
-      set cannot establish.
+      the menu does not cover; that behavior rode the combined pass, accepted 2026-10-09.
+- [x] **P1 follow-up: live popup anchoring — ACCEPTED in game 2026-10-09.** Covered in the combined pass:
+      open a dropdown, then scroll its containing page — it follows a visible owner and closes when that owner
+      leaves the effective clip or disappears. Source evidence unchanged: the anchor/clip/orphan-owner fix
+      passed the full verify/PackDev chain and three faithful reverts; FL-IC1 later made popup coverage
+      geometric and bounded the menu to whole rows.
+- [x] **FL-IC1 short human pass — ACCEPTED in game 2026-10-09.** Covered in the combined pass: an option menu
+      covering its own trigger selects; a long menu's first and last rows are reachable and the wheel moves the
+      menu rather than the page under it; a chart under an open menu writes nothing while a normal drag still
+      captures, moves and releases; the typed menu answers like the string one.
+- [x] **FL-IC2 short human pass — ACCEPTED in game 2026-10-09.** Covered in the combined pass: a `Live="false"`
+      number field keeps what was typed when focus leaves by a click on a control drawn earlier; Enter commits
+      the open edit without closing the window; Escape drops the draft without writing it and without closing;
+      a second Escape undoes the next layer (menu, then the tree, then close). The window-stack dispatch order
+      and eligibility were in-game facts the lane set could not establish - the pass is their observation.
 - [ ] **Consumer-side consequence of FL-IC2.** `IUiBindings` gained `TryInvokeCommand`, a breaking addition for a
       hand-written implementation, so the wired consumer's harness needs the one-line forward before it compiles
       against this carrier. Its two diagnostic windows keep their own two-press Escape policy through the new
@@ -68,8 +66,8 @@ the current rehearsal. **One bounded human pass is the only open gate** (`human-
 
 These retain their previous conditions and deferrals. They are not prerequisites to finish the entire
 library before validating the real page, and their listing order does not override the queue above.
-They stay independent of the interaction checkpoint: FL-IC1 and FL-IC2 are now **source/stub-accepted**
-(2026-10-08) and their only open item is the human pass above, while the unrelated broader library backlog
+They stay independent of the interaction checkpoint: FL-IC1 and FL-IC2 are **source/stub-accepted**
+(2026-10-08) and **in-game accepted (2026-10-09)**, while the unrelated broader library backlog
 (task-11, FL-17, FL-18/B6, FL-13/B10) is not a blocker on it and must not be folded in as one.
 
 - [ ] **task-11 — no stroke / per-edge stroke with configurable edge width.** `Chrome` is currently the
@@ -158,7 +156,7 @@ They stay independent of the interaction checkpoint: FL-IC1 and FL-IC2 are now *
       executes in every harness run (Release 2940 / Dev 3208 ok at `d5af4d820982`), the legacy
       A4/FL-16/A5/popup lanes stayed green beside it, and Gate 10 is unchanged — `UiChoice<T>`,
       `IUiTypedChoices` and `UiPopup.DrawChoiceList` are covered by the same chain. What that run cannot do is
-      a real-game check, which belongs to the single human pass.
+      a real-game check; that half belongs to the checkpoint's game pass, accepted 2026-10-09.
 - [ ] **SA1 and DT1: consumption and human acceptance only.** Both are source-accepted with their contracts in
       `docs/development/0.7/05-api-contract.md` (§SA1, §DT1), tiers in `docs/api-tiers.md` and the consumer
       wiring in `docs/consumers/consume-from-0.7.0.md`; DT1 closed through r2 with faithfuls red-then-green
@@ -178,8 +176,8 @@ They stay independent of the interaction checkpoint: FL-IC1 and FL-IC2 are now *
       Contract: `docs/development/0.7/05-api-contract.md` §D4-Viewport +
       `docs/consumers/consume-from-0.7.0.md`. US source integration is delivered:
       `UsKernelSettingsHost.cs:83` and `Layout.Schema2.xml:459`/`:471` declare `VisibleRows=4.5`;
-      no `DomainListBudget` remains under US `Source`. Remaining: genuinely unmeasured human
-      in-game appearance only. No new FL product task. FL source for this item is already committed.
+      no `DomainListBudget` remains under US `Source`. The human in-game appearance rode the combined pass
+      accepted 2026-10-09. No new FL product task. FL source for this item is already committed.
 - [x] **Canonical consumer type-loading support (2026-10-07):** minimal definition/world/mod/Harmony
       type tokens and the dev-only Window field; no database/audio/patch simulation. 10 local checks
       pass. Checkpoint source identities and consumer verification belong to the PM handoff.
@@ -252,9 +250,9 @@ future-regression guard and not a mutation proof of in-game geometry. The proced
 form: **`docs/in-game-walkthrough.md`** — fill one row per check there and record the outcome here. A blank
 row is not a pass, and "no error" is not one either.
 
-- [ ] **Verify the current paired build in the game: `interaction-20261009-r1` (FL `d5af4d8` Dev bytes + US
-      `562fc47`).** Fill one row per scenario in `docs/in-game-walkthrough.md` for the PM's seven-scenario
-      sheet; earlier player observations do not constitute acceptance of the IC1/IC2 geometry and input changes.
+- [x] **The current paired build `interaction-20261009-r1` (FL `d5af4d8` Dev bytes + US `562fc47`) was
+      accepted in the game (2026-10-09).** Scenario definitions: `docs/in-game-walkthrough.md`. Do not re-run
+      the accepted matrices; observe regressions only.
 - [x] **PASSED BY THE USER (2026-09-28): the popup click-priority pair — (A) Packs and (B) Tuning.** Both entry
       points were explicitly passed in game, so the owner-arbitration defect (a covered control stealing the
       option click inside one composite element) is CLOSED by human acceptance. Its fix is the owner-id-keyed
@@ -262,18 +260,18 @@ row is not a pass, and "no error" is not one either.
       `UiPopup.DrawOptionList` publishing the owner id; `UiNative` threading its own id through both checks)
       plus the covered-popup refusal in the value primitives. Lanes: `KernelPopupTests` (same-node siblings,
       covered primitives, real event pump, scrolled/offset container).
-- [ ] **NEW, NOT yet human-verified: an open dropdown must not detach from its trigger when the parent
-      scrolls.** The anchor is now a per-frame fact — `UiSession.NotePopupOwnerDrawn` is the only writer after
-      the open, refreshed from the trigger's own window-space rect before the covered check, so rendering and
-      hit geometry read one number. Lifecycle: the popup is released when the owner's rect leaves the Host
-      viewport, and at the next `BeginHitPass` when the owner did not report at all. Lane:
-      `KernelPopupTests.VerifyOpenPopupFollowsTheTrigger` (popup opened BEFORE the scroll, non-zero origin,
-      owner gone ⇒ no orphan clickable menu, recovery after it returns).
+- [x] **An open dropdown does not detach from its trigger when the parent scrolls — ACCEPTED in game
+      2026-10-09** (rode the combined pass; see the P1 follow-up item above). The anchor is a per-frame fact —
+      `UiSession.NotePopupOwnerDrawn` is the only writer after the open, refreshed from the trigger's own
+      window-space rect before the covered check, so rendering and hit geometry read one number. Lifecycle:
+      the popup is released when the owner's rect leaves the Host viewport, and at the next `BeginHitPass` when
+      the owner did not report at all. Lane: `KernelPopupTests.VerifyOpenPopupFollowsTheTrigger` (popup opened
+      BEFORE the scroll, non-zero origin, owner gone ⇒ no orphan clickable menu, recovery after it returns).
 - [ ] **RESIDUAL, recorded not implemented: an owner clipped by an INNER `Scroll` but still inside the Host
       viewport still reports**, so its popup follows a clamped anchor instead of being dismissed. Closing it
       needs the engine to publish the element's effective clip rect into the context (one field) plus a lane.
-- [ ] **Verify in-game: open a dropdown, then scroll its parent — on BOTH the Packs and the Tuning page.**
-      This is the human gate for the anchor fix; a green harness does not close it.
+- [x] **Open a dropdown, then scroll its parent — on BOTH the Packs and the Tuning page — ACCEPTED in game
+      2026-10-09.** The human gate for the anchor fix; recorded closed by the combined pass.
 - [ ] **The carrier guard's duplicate branch.** Copy `FerriteLib.UiKit.dll` into the *installed*
       `Mods/UniversalSqueaker/1.6/Assemblies` (never the repo — three gates refuse it there) and restart.
       Record **which** of three outcomes occurs; all three are valid results: (1) `DUPLICATE CARRIER` naming
@@ -290,10 +288,11 @@ row is not a pass, and "no error" is not one either.
       restart, which destroys the settings window, and the host caches per window. `TranslationRevision` in
       the cache key is insurance against a future in-place switch, **not** a fix for an observable defect —
       do not describe it louder than that.)
-- [ ] **The window shell has never been opened in a game.** `UiWindowHost` is compile-verified against
-      `Krafs.Rimworld.Ref 1.6.4871` and lane-verified against the `Verse.Window` stub slice; that is not a
-      game run. The shell must be opened once through the real window stack, where `WindowOnGUI`'s actual
-      group/matrix plumbing, `layer = Dialog` ordering and the close-sound path are live. A signature the
+- [x] **The window shell has now been opened through the real window stack (accepted pass 2026-10-09).**
+      The settings window, the diagnostics panel and the confirmation dialogs ran in game, so `WindowOnGUI`'s
+      real group/matrix plumbing and `layer = Dialog`/`Super` ordering executed live; the close-sound path is
+      not separately recorded in the acceptance. `UiWindowHost` remains compile-verified against
+      `Krafs.Rimworld.Ref 1.6.4871` and lane-verified against the `Verse.Window` stub slice; a signature the
       reference assembly and the stub agree on and the executable disagrees with shows up here and nowhere else.
 - [ ] **Two text paths just came into the fit audit.** Container titles and the stepper-slider's label and
       `−`/`+` glyphs used to bypass `UiFitAudit.Check`; they now route through `UiThemeDraw.Label`, so they
