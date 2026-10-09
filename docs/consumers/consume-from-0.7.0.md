@@ -18,10 +18,11 @@
 | version.txt | `FerriteLib 0.7.0-dev / build=dev / commit=88095fb3cbed` — **a rehearsal identity of one working tree, not a target** |
 | DLL | `1.6/Assemblies/FerriteLib.UiKit.dll`, SHA-256 `271128299A9CFF…FC8F82F` — **the same rehearsal, quoted as history** |
 
-**This line has no Release asset, and none is created while it is in development (maintainer ruling 2026-09-24).**
-The 0.7 line is local development: the remote is an **off-site backup** only — no tag, no release — and local
-testing uses the **Dev** package above (`pack-release` / `pack-steam` are not run in this phase). So *in this phase*
-the Dev folder is what you take; the rule below is the one that applies the moment a line is published.
+**The 0.7 line is being published as RC pre-releases — the first is `v0.7.0-rc1` (publication decision 2026-10-09;
+an RC is a GitHub Pre-release, never the stable/latest release), cut from integrated `main` with the asset built by
+the release workflow.**
+Take the payload from the release page and verify it by the rule below; the Dev folder above remains a rehearsal
+(`pack-release` runs only through the publication flow).
 
 **Which payload is authoritative, because more than one exists (FL-11).** The **GitHub Release asset** published
 from `coahuilite.ferritelib` is the only payload identity a consumer can verify: each release body names the
