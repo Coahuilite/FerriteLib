@@ -5,21 +5,25 @@
 
 ## Current objective and execution order
 
-Branch `0.7.x`, API `0.7.0`, consumer range `[0.7.0,0.8.0)`. Historical event: privacy alignment
-`4d67b70` was pushed to `origin/0.7.x` and CI run `37714688341` succeeded. That SHA is not a live
-working-tree identity; documentation edits dirty the tree and a later docs commit moves HEAD without
-rebuilding held bytes. Prioritize long-term library contracts and shared-mod use, accepting consumer release
-delay. Use the existing consumer settings redesign as the integration surface. The execution handbook is
-`docs/development/0.7/next-stage-guide-zh.md`; build and instrument commands are in
+Branch `0.7.x`, API `0.7.0`, consumer range `[0.7.0,0.8.0)`. Source HEAD `d5af4d8209823bb19f7c112805fcb1b8caf56bbc`,
+clean; the compatibility carrier and the Release payload are both `648f5769…`, the Dev payload `5b331379…`.
+Historical event: privacy alignment `4d67b70` was pushed to `origin/0.7.x` and CI run `37714688341` succeeded.
+That SHA is not a live working-tree identity; documentation edits dirty the tree and a later docs commit moves
+HEAD without rebuilding held bytes. Prioritize long-term library contracts and shared-mod use, accepting
+consumer release delay. Use the existing consumer settings redesign as the integration surface. The execution
+handbook is `docs/development/0.7/next-stage-guide-zh.md`; build and instrument commands are in
 `docs/build-and-debug.md`. Completed foundations and evidence pointers live in `MEMORY.md`.
 
-**Held package: built at `0181268`** (`dist/dev/FerriteLib`, 5 files, payload DLL `c1371f623a3a…`; the PM's
-paired-package manifest is the per-file authority). Real-game acceptance is pending. A docs or memory commit
-moves HEAD without changing those held bytes.
+**Current paired rehearsal: `dist/checkpoints/interaction-20261009-r1/FerriteLib`** (5 files, Dev bytes, source
+`d5af4d820982`, payload `5b331379…`), paired with the US sibling of the same name at US source `562fc47`; the
+14-file identity source is the PM's `paired-candidate-manifest.json`. Retained older packages
+(`dist/dev/FerriteLib` at `0181268`, `dist/candidates/{checkpoint-20261007,sa1}`) keep their bytes and are not
+the current rehearsal. **One bounded human pass is the only open gate** (`human-pass-20261009.md`).
 
 - [x] **Expose unexpected reload diagnostic-publication failures.** The internal-buffer path now propagates
-      host/document context plus the original exception; 10 existing local checks pass. This commit IS the
-      held package's source (`0181268`). Runtime failure reproduction remains absent, not a claimed pass.
+      host/document context plus the original exception; 10 existing local checks pass. Runtime failure
+      reproduction remains absent, not a claimed pass. (Its source `0181268` is no longer the held package's
+      source — the current rehearsal is `d5af4d8` and includes this change.)
 
 - [x] **P1 composite popup arbitration:** maintainer passed Packs and Tuning A/B; session-bearing primitive
       guards remain in place. **The owner-id isolation this line named is gone:** FL-IC1 retired it, because a
@@ -27,9 +31,11 @@ moves HEAD without changing those held bytes.
       witnessed as D1). Popup coverage is geometric now, and the trigger keeps its toggle-to-close on the strip
       the menu does not cover. That is a stub/lane result, not a game acceptance.
 - [ ] **P1 follow-up: game-accept live popup anchoring.** The anchor/clip/orphan-owner fix passed the full
-      verify/PackDev chain and three faithful reverts. Open a dropdown first, then scroll its containing
-      page: it follows a visible owner and closes when that owner leaves the effective clip or disappears.
-      Check Packs and Tuning plus input recovery; do not repeat the old full diagnostic matrix.
+      verify/PackDev chain and three faithful reverts, and FL-IC1 later made popup coverage geometric and
+      bounded the menu to whole rows — so this check now rides the single human pass below rather than being
+      requested separately. Open a dropdown first, then scroll its containing page: it follows a visible owner
+      and closes when that owner leaves the effective clip or disappears; check Packs and Tuning plus input
+      recovery.
 - [ ] **FL-IC1 short human pass (stub passes do not close it).** In one short session: an option menu covering
       its own trigger selects, a 40-item menu's first and last rows are reachable and the wheel moves the menu
       rather than the page under it, a chart under an open menu writes nothing while a normal drag still
@@ -62,9 +68,9 @@ moves HEAD without changing those held bytes.
 
 These retain their previous conditions and deferrals. They are not prerequisites to finish the entire
 library before validating the real page, and their listing order does not override the queue above.
-They also stay independent of the US checkpoint except FL-IC1/2: do not fold the unrelated broader
-library backlog (task-11, FL-17, FL-18/B6, FL-13/B10) into that archive as extra blockers. FL-IC1/2
-remain agreed dependencies after the FL/US archive.
+They stay independent of the interaction checkpoint: FL-IC1 and FL-IC2 are now **source/stub-accepted**
+(2026-10-08) and their only open item is the human pass above, while the unrelated broader library backlog
+(task-11, FL-17, FL-18/B6, FL-13/B10) is not a blocker on it and must not be folded in as one.
 
 - [ ] **task-11 — no stroke / per-edge stroke with configurable edge width.** `Chrome` is currently the
       default or `none`, and a border is all four edges or none. The consumer's flat scope and selected
@@ -103,6 +109,17 @@ remain agreed dependencies after the FL/US archive.
 
 ## Library-side items that are real and unblocked
 
+- [ ] **Give the harness double the two-level window/content coordinate transform** (from the 2026-10-09 focus
+      audit, PM-accepted as a verification-capability gap, not a product defect). `GUI.BeginGroup(windowRect.AtZero())`
+      can express neither a non-zero screen origin nor the real `Margin` content group, so an occlusion or
+      key-routing verdict measured at the origin says nothing about the game. Shape: a screen-space group plus a
+      `GUI.Window(windowRect)`-local content group matching `InnerWindowOnGUI` inside `rect.ContractedBy(Margin)`,
+      then re-observe with a non-zero origin and a multi-window scenario. **No product behaviour may be changed
+      to match the double**, and the native facts the audit lists are in `MEMORY.md` "Current state".
+- [ ] **B8's schema half is still the maintainer's call.** `Description1..8` remain legal attributes on
+      `input/mode-row` that the widget reads but does not paint — they are the per-option hover-help identity the
+      publication carries, so the question is "keep the help identity or drop the capability", not "delete an
+      orphan name". Pure library hygiene, no consumer evidence either way, and not a reason to raise the minor.
 - [ ] **Run the R12 faithful-revert batch.** `tools/mutation/batches/r12-2026-09-28.ps1` lands with the
       correction round (**tracked, not run** — the shell sandbox fails OS-side `SetNamedSecurityInfoW Win32 5`, so
       `dotnet` cannot run and the PM/Codex owns every build, test and mutation command). Validate the anchors
@@ -113,71 +130,41 @@ remain agreed dependencies after the FL/US archive.
       **mutation-target** assertion and the **guards** that hold on both sides — a guard is regression
       protection, never evidence. **Every old anchor in that file is deliberately single-line**: a multi-line
       anchor is line-ending sensitive and would refuse on a checkout with the other convention.
-- [ ] **The R12-FL surfaces still need a real run.** Nothing in this line has been compiled since the R12
-      corrections: `KernelResolvedStyleTests` (the corridor lanes: `VerifyLegacySchemeFontRedirect`,
-      `VerifySelectedFontReachesHostMeasure`, `VerifyScopedPaletteRefresh`, `VerifyPartialBagFallsBackToVanilla`,
-      `VerifyPartialBagEdgeFallback`, `VerifyPerSurfaceEdgeCoverage`, `VerifyColourRevisionIsThePaintClock`),
-      `KernelControlKindTests` (`VerifyBooleanAppearanceSeam`, `VerifySwitchThumbTokens`),
-      `KernelToneVocabularyTests.VerifyDanglingRule`, and the parser lanes whose issue counts a readable legacy
-      `<Font>` must not change. Contract and migration record: `docs/development/0.7/05-api-contract.md` §R1/§R2.
+- [x] **The R12-FL surfaces have been compiled and run.** Every lane named in that item — the
+      `KernelResolvedStyleTests` corridor lanes, `KernelControlKindTests.VerifyBooleanAppearanceSeam` /
+      `VerifySwitchThumbTokens`, `KernelToneVocabularyTests.VerifyDanglingRule` and the parser lanes a readable
+      legacy `<Font>` must not disturb — executes inside the committed harness: at `d5af4d820982` the chain ran
+      1 setup + 10 gates green with Release 2940 ok and Dev 3208 ok, 0 FAIL. The **faithful-revert batch is a
+      separate open item above** (tracked, not run); this item claimed only compilation and execution, and the
+      earlier "nothing has been compiled since" sentence had gone stale.
 - [ ] **Run the R3-A instrument batch.** `tools/mutation/batches/r3a-2026-09-29.ps1` lands with the R3-A slice
-      and its correction (**tracked, not run**). Eight cases, each naming its mutation-target assertion and its
-      guards: the text rendering and the data rendering disagreeing on the clip, the clip read from the element's
-      own rect instead of the session's effective one, an unobservable boundary filled with a plausible rect, the
-      node identity taken from the display path instead of the canonical key, the dropped-node counter not kept,
-      the overlay painting entries the bounded capture dropped, the declared look reported as the kind's default,
-      and the collector **reusing one snapshot instance** so an already-handed-out snapshot follows a later draw
-      (the batch's only **two-anchor** case — one edit cannot express it; the production `Fill` seam is what makes
-      the reuse a refresh in place rather than a stale cache). **It must run in the DEV configuration**
-      (`run-fl-harness-dev.cmd`) because the whole instrument is inside `#if FER_DEV`; the batch's own default
-      does that. Validate the anchors first (`-ValidateOnly`).
-- [ ] **The R3-A surfaces still need a real run, on the corrected baseline.** The PM-measured run failed gate 10
-      with three R3 fixture errors (two wrong `Page` paths and a bounded fixture the manifest validator refused
-      before capture); all three are corrected, but **nothing has been compiled since**, so the corrected lanes
-      are unverified. Five R3 lanes in `KernelDevGeometryTests` are **Dev-only**
+      and its correction (**tracked, not run**): eight cases, each naming its mutation-target assertion and its
+      guards, and **it must run in the DEV configuration** (`run-fl-harness-dev.cmd`) because the whole
+      instrument is inside `#if FER_DEV`; the batch's own default does that. Validate the anchors first
+      (`-ValidateOnly`) — the PM measured **one pre-existing anchor mismatch** in that file during the FL-IC1
+      round, so expect to re-cut that single anchor before the run rather than treating the refusal as a defect
+      in the current slice.
+- [x] **The R3-A surfaces run in both configurations.** The five Dev-only `KernelDevGeometryTests` lanes
       (`VerifyStructuredSnapshotMatchesTheDump`, `VerifyEffectiveAppearance`, `VerifyBoundariesAndUnknowns`,
-      `VerifyBoundedCaptureAndDroppedCount`, `VerifySnapshotIsACopyAndHostsAreSeparate`), so a Release-only pass
-      is not instrument coverage — that is the Gate 10 Dev-instrument rule in `AGENTS.md` "Build and
-      verification" — and the release half's new assertion (`TryGetGeometrySnapshot`
-      answering `false`) only runs in Release. Both configurations are required for this slice.
-      `scripts/verify-dev-instrument.ps1` now names the R3-A assertions (forty names in the list, the renamed
-      ones REPLACED rather than left stale), so deleting or compiling out one of those lanes reddens Gate 10
-      instead of leaving it green; the t2 batch case that pins that counter's red message was re-cut to the new
-      numbers. One residual to eyeball in that run: the
-      instrument file was rewritten wholesale in this slice, so `UiDevGeometryProbe.Outline`'s exact ink and
-      hairline geometry are a faithful-intent reconstruction inside the same funnel (`UiThemeDraw.Solid`, the
-      only solid outlet the containment lane allows there) rather than a byte-preserved original — no lane and
-      no document pins the overlay's pixels. Contract and tier record:
-      `docs/development/0.7/05-api-contract.md` §R3-A and `docs/api-tiers.md`.
-- [ ] **R4-A's typed value/options path needs a real run** (tracked, **not compiled, not run**). Landed: the
-      public carrier `UiChoice<T>`, the optional companion interface `IUiTypedChoices` (five members:
-      `TryGetValueType`, `TryGetTypedValue`, `AcceptsValue`, `TrySetTypedValue`, `TryGetChoices`), implemented by
-      `UiBindings` and probed by `input/dropdown` and `input/mode-row` whenever the value binding's declared
-      type is not `string`; `UiPopup.DrawChoiceList` is the typed sibling of `DrawOptionList`, and both lists
-      now paint/publish through shared private helpers so the hit-layer rule still exists once. `IUiBindings`
-      gained **no** member, so every existing implementation keeps compiling; the new lane
-      `KernelCoreWidgetTests.VerifyTypedChoices` is the evidence (label-vs-value, the real instance by type and
-      by reference, a refused mismatch with no write, the two legacy option shapes staying non-typed, and a
-      seam-less `IUiBindings` implementation still working string-only). No version bump and no tier change
-      beyond the `docs/api-tiers.md` entries (the recorded 0.7.x public-addition exemption applies). What the
-      run must show: the new lane green, the legacy A4/FL-16/A5/popup lanes untouched, Gate 10 unchanged.
-- [ ] **SA1 (selector look, SwitchThumbOff, independent outline): source technical pass through r3; pending
-      consumption and human acceptance.** Interfaces and contracts are the authority:
-      `docs/development/0.7/05-api-contract.md` §SA1, `docs/api-tiers.md`,
-      `docs/consumers/consume-from-0.7.0.md` (grammar/resolver/cloned-scope wiring for
-      `<Color Token="SwitchThumbOff"/>`; `UiThemeDraw.SelectorField` as the single shared selector paint;
-      `GeometryOverlay` independent of the capture (its scoped-viewport coverage limit was CLOSED by the
-      DT1 fix below; the r3-era lane wording was re-cut in that batch). Local evidence: 10 gates green in
-      the r2/r3 build slots with named faithful reverts each side. Open: paired integration, US
-      palette-document and composite adoption, Demo showcase, real-font/in-game appearance. Not in the
-      held package.
-- [ ] **DT1 outline coverage: TECHNICALLY CLOSED through r2 (2026-10-07).** Named faithfuls red-then-green
-      through the GAME-SHAPED entrant (`DoWindowContents(windowRect.AtZero())` per the InnerWindowOnGUI
-      reading; stub entrant kept for older lanes), draw-local->screen chain plus order/record/paint/scoped
-      reverts re-observed with raw logs under the relay `fl-tech-r2-logs/`, cross-frame copy guard checked
-      across frames, stub gap (`GenUI.AtZero`) fixed, final `verify-local` 10 gates green, frozen Dev/
-      Release DLL hashes byte-identical to slot 1 (r2 changed no product code). Committed; consumer
-      integration is tracked by the PM checkpoint. Open: real-game appearance/pointer (human).
+      `VerifyBoundedCaptureAndDroppedCount`, `VerifySnapshotIsACopyAndHostsAreSeparate`) and the Release-only
+      `TryGetGeometrySnapshot` answers all execute in the committed chain: Gate 10 runs the Dev harness and
+      requires the named dev-only assertions as passing `ok:` lines, so at `d5af4d820982` the instrument half is
+      covered (Dev 3208 ok, 0 FAIL) and a Release-only pass is no longer the only evidence. The three R3 fixture
+      errors the PM measured (two wrong `Page` paths, one refused bounded fixture) are corrected and have run
+      green since. **Residual, still open and unchanged:** `UiDevGeometryProbe.Outline`'s exact ink and hairline
+      geometry is a faithful-intent reconstruction inside `UiThemeDraw.Solid` — the file was rewritten wholesale
+      in that slice, and no lane or document pins the overlay's pixels.
+- [x] **R4-A's typed value/options path has been compiled and run.** `KernelCoreWidgetTests.VerifyTypedChoices`
+      executes in every harness run (Release 2940 / Dev 3208 ok at `d5af4d820982`), the legacy
+      A4/FL-16/A5/popup lanes stayed green beside it, and Gate 10 is unchanged — `UiChoice<T>`,
+      `IUiTypedChoices` and `UiPopup.DrawChoiceList` are covered by the same chain. What that run cannot do is
+      a real-game check, which belongs to the single human pass.
+- [ ] **SA1 and DT1: consumption and human acceptance only.** Both are source-accepted with their contracts in
+      `docs/development/0.7/05-api-contract.md` (§SA1, §DT1), tiers in `docs/api-tiers.md` and the consumer
+      wiring in `docs/consumers/consume-from-0.7.0.md`; DT1 closed through r2 with faithfuls red-then-green
+      through the game-shaped entrant (`DoWindowContents(windowRect.AtZero())`) and frozen Dev/Release hashes
+      identical across the correction. **Open:** the consumer's palette-document and composite adoption, the
+      Demo showcase, and real-font in-game appearance — none of which FL can measure from here.
 - [x] **D4-Viewport `VisibleRows` (source, 2026-10-07): BUILT, Dev harness ALL PASS, 10 gates green**
       (PM held the shared-stubs slot; carrier unchanged). Scroll-only positive `VisibleRows` budgets the
       viewport from the SAME round's measured rows (floor(k) bottoms + the fraction of the next row's own
@@ -265,7 +252,9 @@ future-regression guard and not a mutation proof of in-game geometry. The proced
 form: **`docs/in-game-walkthrough.md`** — fill one row per check there and record the outcome here. A blank
 row is not a pass, and "no error" is not one either.
 
-- [ ] **Verify the current paired build in the game.** Earlier player observations do not constitute acceptance of the current geometry/input changes; the row-click case above remains open.
+- [ ] **Verify the current paired build in the game: `interaction-20261009-r1` (FL `d5af4d8` Dev bytes + US
+      `562fc47`).** Fill one row per scenario in `docs/in-game-walkthrough.md` for the PM's seven-scenario
+      sheet; earlier player observations do not constitute acceptance of the IC1/IC2 geometry and input changes.
 - [x] **PASSED BY THE USER (2026-09-28): the popup click-priority pair — (A) Packs and (B) Tuning.** Both entry
       points were explicitly passed in game, so the owner-arbitration defect (a covered control stealing the
       option click inside one composite element) is CLOSED by human acceptance. Its fix is the owner-id-keyed
