@@ -28,6 +28,7 @@ public sealed class UiEditSession<T> : IUiEditState
     private T model = default !;
     private string basisText = "";
     private string? publishedText;
+    private bool automaticSuspended;
     public UiEditSession(Func<T, string> format, UiEditParser<T> parse)
     {
         this.format = format ?? throw new ArgumentNullException(nameof(format));
@@ -36,7 +37,7 @@ public sealed class UiEditSession<T> : IUiEditState
 
     public string Draft { get; private set; } = "";
     public bool Focused { get; private set; }
-    public bool Modified => !string.Equals(Draft, basisText, StringComparison.Ordinal);
+    public bool Modified => publishedText != null || !string.Equals(Draft, basisText, StringComparison.Ordinal);
     public bool Conflict { get; private set; }
     public bool Valid => parse(Draft, out _);
     public bool HasDraft => Modified || Conflict;
@@ -71,8 +72,11 @@ public sealed class UiEditSession<T> : IUiEditState
     {
         if (!writable)
             return;
+        bool changed = !string.Equals(Draft, text, StringComparison.Ordinal);
         Draft = text ?? "";
-        if (live && !composing && !Conflict)
+        if (changed)
+            automaticSuspended = false;
+        if (live && !composing && !Conflict && !automaticSuspended)
             Publish(false, request, readModel);
     }
 
@@ -92,6 +96,7 @@ public sealed class UiEditSession<T> : IUiEditState
         observed = true;
         Draft = basisText = format(latestModel);
         publishedText = null;
+        automaticSuspended = false;
         Conflict = false;
         Focused = false;
     }
@@ -99,8 +104,9 @@ public sealed class UiEditSession<T> : IUiEditState
     /// <summary>A local combination's explicit selection replaces only this editor, after one request.</summary>
     public void TakeOver(T value, Action<T> request, Func<T> readModel)
     {
-        // Mark before calling business code: an exception can include partial side effects and is not retryable.
-        publishedText = Draft;
+        // The attempted takeover value is not the old draft. Suppress automatic work after failure,
+        // but leave the draft's own publication history intact for a later explicit confirmation.
+        automaticSuspended = true;
         request(value);
         Cancel(readModel());
     }
@@ -115,15 +121,17 @@ public sealed class UiEditSession<T> : IUiEditState
 
     private void Publish(bool end, Action<T> request, Func<T> readModel)
     {
-        bool pending = Modified && (Conflict || !string.Equals(publishedText, Draft, StringComparison.Ordinal));
+        bool pending = (Modified || Conflict) && (Conflict || !string.Equals(publishedText, Draft, StringComparison.Ordinal));
         if (pending && parse(Draft, out T candidate))
         {
             publishedText = Draft;
+            automaticSuspended = true;
             request(candidate);
             // A normal return is not acknowledgement. Read actual model without replacing a Live draft.
             model = readModel();
             observed = true;
             Conflict = false;
+            automaticSuspended = false;
         }
 
         if (end)

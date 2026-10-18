@@ -33,6 +33,8 @@ The no-platform contract target compiles these actual production sources without
 * Implicit `Live` changes from `true` to `false` for all three wrappers. A focused edit keeps its draft;
   use explicit `Live="true"` to retain per-qualified-candidate publication. Intermediate IME text does
   not publish. A native change arriving without a held edit preserves the old immediate-return condition.
+  Returning to the initial text after a Live publication is another candidate: `10 → 20 → 10` requests
+  both `20` and `10`, rather than mistaking the last input for an untouched edit.
 * Single-line Return confirms; multiline Return remains native newline and Ctrl+Return confirms.
   Unchanged text, or an already-published Live candidate without a new observed basis, does not resend.
 * Confirmation sends one valid pending candidate and, after normal return, shows the actual model.
@@ -78,6 +80,8 @@ Established requests dispatch before subsequent native painting and wrapper labe
 stops normal drawing. A setter may partially change the model before throwing: the request boundary
 retains its original cause/target, never retries or rolls back. Lifecycle focus projections are updated
 even when a request or subsequent native rendering throws.
+After a failed takeover, the attempted new value is not recorded as publication of the old draft.
+Automatic publication pauses; a later distinct explicit confirmation can still request that valid draft.
 
 Automated evidence: `KernelSharedEditingTests` compares standard/custom/nonrendering trajectories,
 native multiline/read-only/composition protocols, actual combination takeover, same-Bind isolation,

@@ -93,6 +93,27 @@ internal static class Program
         Check(selected == 21 && model == 10 && !local.HasDraft, "N1 shared numeric step requests 21 even when business keeps 10");
         numeric.Step(local, model, 1, value => selected = value, () => model);
         Check(selected == 11, "N1 next no-draft step begins at actual model, not last requested 21");
+        model = 10;
+        var roundtrip = new UiEditSession<float>(numeric.Format, numeric.Parse);
+        roundtrip.Observe(model);
+        roundtrip.Focus();
+        int liveWrites = 0;
+        void LiveSet(float value) { liveWrites++; model = value; }
+        roundtrip.Input("20", true, false, true, LiveSet, () => model);
+        roundtrip.Input("10", true, false, true, LiveSet, () => model);
+        roundtrip.Observe(model);
+        Check(liveWrites == 2 && model == 10 && roundtrip.Draft == "10", "E1 Live return to initial text is a new candidate, not an unmodified edit");
+        var recovery = new UiEditSession<float>(numeric.Format, numeric.Parse);
+        recovery.Observe(model);
+        recovery.Focus();
+        recovery.Input("20", true, false, false, LiveSet, () => model);
+        try { numeric.Step(recovery, model, 1, _ => throw new InvalidOperationException("before write"), () => model); }
+        catch (InvalidOperationException) { }
+        recovery.Observe(model);
+        recovery.Input("20", true, false, true, LiveSet, () => model);
+        Check(liveWrites == 2 && model == 10 && recovery.Draft == "20", "N1 failed step is not automatically retried or mistaken for publishing old draft");
+        recovery.Confirm(true, LiveSet, () => model);
+        Check(liveWrites == 3 && model == 20, "E2 explicit draft confirmation after failed 21 still requests 20");
     }
 
     private static void Properties()

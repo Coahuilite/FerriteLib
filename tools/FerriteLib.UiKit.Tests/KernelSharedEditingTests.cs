@@ -26,6 +26,7 @@ internal static class KernelSharedEditingTests
             Combination();
             FailureAndIsolation();
             CompositionAndHost();
+            PublicationRecovery();
             return 0;
         }
         catch (Exception ex)
@@ -220,6 +221,81 @@ internal static class KernelSharedEditingTests
         UiNative.DebugFocusLost = false;
         Event.current = null;
         typeof(Input).GetProperty("compositionString")!.SetValue(null, "");
+    }
+
+    private static void PublicationRecovery()
+    {
+        foreach (bool combination in new[]
+        {
+            false,
+            true
+        }
+
+        )
+        {
+            Reset();
+            using var session = new UiSession();
+            float model = 10;
+            var requests = new List<float>();
+            bool fail = false;
+            var bindings = new UiBindings();
+            bindings.BindValue("value", () => model, value =>
+            {
+                requests.Add(value);
+                if (fail)
+                    throw new InvalidOperationException("before write");
+                model = value;
+            });
+            var ctx = new UiWidgetContext("edit", session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 400, "value");
+            IUiWidget widget = combination ? new StepperSliderWidget() : new NumberFieldWidget();
+            var attributes = new Dictionary<string, string>
+            {
+                ["Bind"] = "value",
+                ["Max"] = "100",
+                ["Live"] = "true"
+            };
+            widget.Configure(new UiElementSpec("value", combination ? StepperSliderWidget.Kind : NumberFieldWidget.Kind, attributes));
+            UiNative.DebugMousePositionEnabled = true;
+            UiNative.DebugMousePosition = new Vector2(combination ? 330 : 20, 14);
+            UiNative.DebugMouseDown = true;
+            UiNative.TextFieldOverride = (_, _) => "20";
+            widget.Draw(new Rect(0, 0, 400, 28), ctx);
+            UiNative.DebugMouseDown = false;
+            UiNative.TextFieldOverride = (_, _) => "10";
+            widget.Draw(new Rect(0, 0, 400, 28), ctx);
+            UiNative.TextFieldOverride = (_, text) => text;
+            widget.Draw(new Rect(0, 0, 400, 28), ctx);
+            Check(requests.SequenceEqual(new[] { 20f, 10f }) && model == 10 && session.GetOrCreateValueState("value").EditText == "10", "real Live wrapper publishes 10→20→10 without losing the return input: combination=" + combination);
+            if (!combination)
+                continue;
+            attributes["Live"] = "false";
+            widget.Configure(new UiElementSpec("value", StepperSliderWidget.Kind, attributes));
+            UiNative.DebugMouseDown = true;
+            UiNative.TextFieldOverride = (_, _) => "20";
+            widget.Draw(new Rect(0, 0, 400, 28), ctx);
+            UiNative.DebugMouseDown = false;
+            UiNative.TextFieldOverride = (_, text) => text;
+            UiNative.ButtonOverride = rect => rect.x > 370;
+            fail = true;
+            Exception? observed = null;
+            try
+            {
+                widget.Draw(new Rect(0, 0, 400, 28), ctx);
+            }
+            catch (Exception ex)
+            {
+                observed = ex;
+            }
+
+            Check(observed?.InnerException != null && requests.Last() == 21 && model == 10, "real combination failed step attempted 21, not its held draft20");
+            fail = false;
+            UiNative.ButtonOverride = null;
+            widget.Draw(new Rect(0, 0, 400, 28), ctx);
+            Check(requests.Count == 3 && session.GetOrCreateValueState("value").EditText == "20", "failed combination does not automatically retry or discard the old draft");
+            UiNative.DebugEnter = true;
+            widget.Draw(new Rect(0, 0, 400, 28), ctx);
+            Check(requests.SequenceEqual(new[] { 20f, 10f, 21f, 20f }) && model == 20, "a distinct explicit confirmation still publishes20 after the failed21");
+        }
     }
 
     private static void CompositionAndHost()
