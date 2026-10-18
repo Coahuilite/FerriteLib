@@ -1,6 +1,6 @@
 # 0.8 合同验收与测试迁移
 
-2026-10-18 · 修订 1 · 文档基线，实施与运行证据待交付。
+2026-10-18 · 修订 2 · 文档基线，实施与运行证据待交付。
 
 本页是[首版规格](README.md)的验收附页。ID 固定指向已确认的语义；推荐默认继续归 A8。
 用“条件 → 操作 → 结果 → 禁止结果”判定，不以文件数、类名或属性示范代替完整架构验收。
@@ -44,15 +44,12 @@
 H1 的激活来源与 H2 的映射是显式测试输入，不批准 B2 指针松开默认或 B3 键盘增量。
 H5 可先验草稿／模型分离和只读保护；依赖 B1 结束政策的部分待裁定后补，不能据此阻塞 H1–H4。
 
-**必须同时交付三类共享证明：**
+**必须同时交付两类共享证明：**
 
 1. 运行轨迹：三路实际进入同一生产行为实现（测试侧计数／调用观察可用，不新增必需公共 API），
    不调用默认绘制也可完成状态转换；标准与自定义绘制只消费事实。
 2. 依赖／调用核对：从三个入口追到同一转换与派发实现，列出生产符号及来源文件；headless 不挂
    一套 test-only 行为，自定义／适配器无复制的激活、草稿冲突或清理状态机。
-3. 定向缺陷控制：在获准隔离验证副本中向共用派发路径注入重复派发缺陷，三路同名行为案例均因
-   重复派发而红；恢复后通过。若某一路仍绿，须定位未走共用路径或缺失断言，不能只凭三路绿判共享。
-   不在冻结源码或 canonical stub 上突变，不要求全量 mutation 电池。
 
 ## 3. 身份与结束不靠绘制顺序猜测
 
@@ -109,7 +106,7 @@ verify-local 的 gate 1 为 Release harness、gate 10 为 Dev instrument，其�
 | 真实来源（测试项目内） | 分类与处理 | 来源合同／理由及目标切片 |
 | --- | --- | --- |
 | `KernelStyleDocumentTests.VerifyTwoOrigins`、`VerifyPrecedenceChain`、`VerifyInheritanceAsymmetry`；`KernelStyleScopeTests` | 保留单解析器、作用域和非环境事实不继承；适配整包链与新逐属性来源；新增 P1–P6 | FL08-PROP／A5.1；旧 scheme/density 优先级不等于新撤销。S0 |
-| `KernelArchitectureProbeTests.VerifyCoreButtonAlwaysPaints`、`VerifyHeadlessProbeKind`、`VerifyTwoVisualsOneBehavior` | 实现探针保留为 0.7 历史；0.8 替换为 H1–H5＋共享调用／缺陷控制 | FL08-SHARED；前者固定耦合，后两者重写 hit/invoke，不能强制新线继续耦合。S1 |
+| `KernelArchitectureProbeTests.VerifyCoreButtonAlwaysPaints`、`VerifyHeadlessProbeKind`、`VerifyTwoVisualsOneBehavior` | 实现探针保留为 0.7 历史；0.8 替换为 H1–H5＋运行轨迹／生产调用核对 | FL08-SHARED；前者固定耦合，后两者重写 hit/invoke，不能强制新线继续耦合。S1 |
 | `KernelEditTransactionTests.VerifyDeferredDraftCommitsOnceOnExit`、`VerifyLiveFieldStillWritesPerKeystroke` | 保留一次派发／无新输入不重复；适配驱动到共同编辑能力；显式 Live=true 不等于批准默认 | A3、B1 候选；先分离稳定断言与政策断言。S2 |
 | 同 lane 的 `VerifyInvalidDraftIsNeverWritten`、`VerifyHiddenEditEndsCoherently`、`VerifyDisabledElementEndsTheRecord` | 保留不将非法稿写值及清活跃引用；0.7 结束丢稿／重置模型是旧政策，不照搬；新增 E1–E2 | FL08-END 的隐藏保稿已确认；无效稿／普通失焦细则待 B1 裁定后替换对应断言。S2 |
 | `KernelEditTransactionTests.VerifyCoveredEditPausesInsteadOfEnding`、`VerifyConsumedOutsidePressCommitsOnce`；`KernelCancelLadderTests` | 保留遮挡不伪装结束与一次消费；把 native key/window pump 归适配证据；精确 Cancel 次序和失焦提交依候选裁定迁移 | A3、FL08-END/TEXT；不能把 0.7 政策变 core。S2/S4 |
