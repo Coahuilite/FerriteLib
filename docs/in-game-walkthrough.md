@@ -1,41 +1,40 @@
-# In-game walkthrough — the checklist §1 cannot substitute for
+# In-game walkthrough — observe the selected candidate
 
-Why this file exists: every geometry claim in this library rests on `StubTextWidth`, a linear
-character-count model, and the game's real glyph advance exists only inside the game (`MEMORY.md`,
-"Text fit"). The harness lanes are future-regression guards. Nothing below is answered by a test, a build
-or a code read — the answers are only observable on screen, and the branch is already built.
+Use this form when a task requires real-game evidence. The modelled text metrics and window stack in the
+harness cannot establish exact game geometry, IME or all input attribution. **Do not rebuild or rerun an
+accepted frozen candidate merely because this procedure exists.** The bounded 2026-10-09 observations are
+recorded in [0.7 verification](development/0.7/40-verification.md).
 
 ## Before you launch
 
-1. `pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev`
-   Stages `dist/dev/FerriteLib/`. Stop if any of the seven checks fails — that means the bytes you are about
-   to test are not the bytes the lanes just passed.
-2. Copy `dist/dev/FerriteLib/` **and** the consumer's migrated build into your own `Mods/` directory by
-   hand. No script does this and no link or junction stands in for it (`AGENTS.md`, Boundaries).
-3. Read `dist/dev/FerriteLib/version.txt`: the `carrier=` line must say `Release 0.3.x+…` and `commit=`
-   must name a commit you recognise from `git log --oneline -3`.
-4. Enable detailed UI logging in the consumer (`usdiag`), so `evt=ui.text.overflow` can be silent *and
-   provably armed*.
-5. Predicate for "you are testing what we tested": `git diff --name-only main 0.3.x` returns `.md` files
-   only. If it names a source file, run step 1 again on that tree before you trust anything below.
+1. Name the candidate, its source/build configuration and the matching consumer build. Read the candidate's
+   own `version.txt`; do not substitute current HEAD or an arbitrary `dist/dev` folder.
+2. If a new build is authorized, use [build-and-debug.md](build-and-debug.md). Verification and staging do not
+   install into the game. Installation is an explicit operator action, and the consumer must not carry a
+   second UiKit DLL.
+3. Record RimWorld build, UI scale, language, window size and the relevant page/state. Use an isolated
+   test setup for deliberate failure injection or dependency removal; preserve the user's normal setup.
+4. Enable the relevant per-host diagnostic subscription when needed. A silent report is meaningful only
+   when the observation path was active; do not require unrelated instruments for every check.
 
-## The seven live checks
+## Select the checks that determine acceptance
 
-Record one line each: **observed / surprised-what / changed-nothing**. A blank row is not a pass.
+| Capability | Observe |
+| --- | --- |
+| Text and automatic sizing | Long/localized labels at the actual width, wrapping, fitting and valid hit area; compare the label band rather than calling it the whole element. |
+| Responsive layout and scrolling | Cross the page's breakpoint in both directions; verify reflow, visibility, scroll reachability and current—not previous-pass—hit geometry. |
+| Popup/input arbitration | Open a menu over its trigger and other controls; select an option, scroll to both ends, then scroll the parent. The covered control must not also execute. |
+| Editing and cancellation | Exercise the declared Live/deferred policy, Enter/Escape and blur after an earlier-drawn control consumes the press. Observe model writes and whether the window remains open. |
+| Window shell | Open, move/resize and close through the real stack; record close sound separately if it is part of acceptance. Use multiple windows only when attribution is the claim being tested. |
+| Recovery | In an authorized disposable test setup, make one known widget fail. Check the scoped recovery display, unaffected neighbors and attributable diagnostic—not merely absence of a crash. |
+| Carrier failure presentation | In an isolated setup, observe missing and duplicate carrier cases. Record readable refusal, silent load, or engine error; “no error” alone is not proof of duplicate detection. |
 
-| # | Check | What you do | What you are looking at | If it surprises you |
-|---|---|---|---|---|
-| 1 | Auto width in real glyphs | Open the consumer's mood-tuning card, both Chinese and English | Factor labels hug their translated names — no clipped tail, no wide gap before the control run | Round 3's `Width="Auto"` measurement path is wrong in a way the model cannot show; re-shape the label-set budget, not the manifest |
-| 2 | No degenerate interval survives | Drag every slider in the mood card to both ends, then to a value between two steps | The slider track never collapses to zero usable width; the stepper's `−`/`+` stay clickable | US's threshold deletion or our clamp arithmetic is at fault; re-derive from the shipped rect before touching either |
-| 3 | Narrow → wide re-arrange | Drag the window's edge across the declared `Breakpoint`, both directions, while the page is open | Columns re-flow without a reopen, without flicker into a dead frame, and `NarrowHidden` items disappear/reappear rather than overlapping | `Breakpoint` state is not re-evaluated per pass; the engine owns the fix, not the consumer |
-| 4 | Shell in the real window stack | Open the consumer's settings window once and close it with the shell's `CloseText` button | It opens above the map, takes the drag, plays the close sound, and the game's own windows still behave | A signature the ref assembly and the stub both agreed on is lying; this is the only lane that can catch it (`TODO.md` §1) |
-| 5 | Fit audit's two new paths | Walk all five workspaces plus the overlay in both languages, logging on | `usdiag evt=ui.text.overflow` stays silent; no container title sits misaligned vertically | Either an overflow the audit could not see before is real (fix the layout), or the routing changed an anchor (fix the outlet); record which |
-| 6 | Recovery band trip | Temporarily make one core widget throw at Draw (a test build of the consumer, not the repo), open the page | A warning-toned band naming that element's path, the rest of the page still drawing, exactly one log line per slot | The band's paint or the session slot key is wrong; the engine's recovery contract is what is on trial, not the demo widget |
-| 7 | Carrier absent, and carrier duplicated | (a) Disable FerriteLib, restart, look at the consumer. (b) Re-enable, then copy `FerriteLib.UiKit.dll` into the *installed* consumer's `1.6/Assemblies` and restart | (a) what the player actually sees: a readable message, a silent absence, or an exception wall. (b) which of the three outcomes in `TODO.md` §1 happens | (a) is the first failure a real user meets, so its wording is a product decision; (b) outcome 2 means the duplicate guard counts names where it must compare identity |
+Only run the rows relevant to the changed contract. A historical stub pass cannot close a game failure, and
+one game pass cannot close every unobserved capability.
 
-## After
+## Record the result
 
-Write the seven results into `TODO.md` §1 — the section is the ledger, this file is only the form. Anything
-that surprises you changes code in the branch that owns the mistake, and `MEMORY.md` records what was
-learned together with which lane now guards it. Nothing here blocks a local commit; only the `v0.3.0`
-trial decision waits on this page being filled in.
+For each selected scenario, retain the candidate identity, action, expected result, observed result and
+supporting user feedback or diagnostic. Mark unobserved cases as unobserved. Store the durable result in the
+line's verification record; a blank checklist row is not a pass. Route an actual discrepancy to the owner
+of the failed boundary before changing either product behavior or the test model.

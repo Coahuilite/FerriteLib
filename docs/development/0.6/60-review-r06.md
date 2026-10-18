@@ -1,6 +1,8 @@
 # R06 — disposition of the independent review
 
-Date: 2026-09-16. Input: modding_documents/team-mode/ferritelib-0.6-independent-review-zh.md (**Request changes**).
+Date: 2026-09-16. Input: the external independent 0.6 review (**Request changes**).
+Its seven findings and independent reproduction are transcribed in this document and
+[r06-1-independent-reproduction.md](verification/r06-1-independent-reproduction.md).
 Every one of the seven must-fix items was reproduced independently before being fixed — by the Lead on the
 reviewer's own probe, and by this round's verifier with its own fixtures (never by re-running the reviewer's
 probe): verification/r06-1-independent-reproduction.md.

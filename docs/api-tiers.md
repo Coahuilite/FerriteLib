@@ -10,9 +10,9 @@ assembly. Three tiers, one home for the promise:
 - **Public-unstable** — usable today, and expected to change shape. Compile against the version you tested
   against; expect to recompile at a minor bump. This classification records unresolved contract or
   verification decisions; a second consumer is not a prerequisite for stabilizing a surface.
-- **Internalize-candidate** — public today and needed by nobody outside the assembly. A minor window removes
-  them from the surface; the 0.4 line shipped without finishing that sweep, so it continues in the open 0.5
-  window. Until then a consumer that names one is on its own.
+- **Internalize-candidate** — public today but not offered as a dependable extension surface. A future
+  breaking window may internalize it with a documented migration. The label is a disposition, not a
+  claim that all possible consumers have been surveyed.
 
 Enforcement is a harness lane (`tools/FerriteLib.UiKit.Tests/FerriteLibApiTierTests.cs`): every public type
 in the payload must be listed here exactly once, no entry may name a type that no longer exists, and the
@@ -20,20 +20,10 @@ stable list is additionally pinned inside the test, so promoting or demoting a t
 edits. `UiWidgetRegistry.Clear` is the precedent for what an unlisted change does: it went internal in 0.3.0
 (item D) and no lane here would have noticed.
 
-**Why the stable tier is thin, and that is the point.** Known debts each block a specific group of types
-from stability; they are why the 0.4 line existed and they are what the open 0.5 window is paying down:
-
-| Debt (see `TODO.md`) | Blocks from stable |
-|---|---|
-| Per-surface theme tokens (`§4`) | `UiTheme`, `UiThemeDraw`, `UiFitAudit` |
-| Element identity layer (`§3`) | `UiElementSpec`, `UiValueState`, `UiSession`, `UiSessionGuard`, `UiWidgetContext`, `UiLayoutSnapshot` |
-| Bindings announce / invalidation (`§3`) | `IUiBindings`, `UiBindings` |
-| Owned hit stack, popup as a stack (`§3`) | `UiNative`, `UiPopup` |
-| Window shell provisional (`MEMORY.md` round-1 P2) | `UiWindowHost`, `UiWindowNotice` |
-
-`IUiWidget` is called stable *with that constraint visible*: the identity work may want to hand a widget a
-node object instead of a spec plus a context path, and if it does, this file changes first and the breaking
-consequence is paid in the open rather than discovered by a stranger.
+The classifications below describe the frozen 0.7 source. Earlier debt lists are not current missing-feature
+inventories: identity, notifications, style surfaces and window support have evolved since the 0.4/0.5
+planning rounds. Promotion still requires an explicit contract and a deliberate tier decision; the
+[0.8 design](development/0.8/README.md) changes none of these memberships.
 
 ## Stable
 
@@ -52,15 +42,9 @@ consequence is paid in the open rather than discovered by a stranger.
   library cannot see a consumer's language files, so the dev-only check ("resolve the keys my chrome uses,
   log the ones that come back equal to the key") is the host's to run, and a host that prefers a
   placeholder or an empty string is free to answer that way.
-- `IUiWidget` — the custom-kind interface; **seventeen core kinds** implement it (counted 2026-09-20: the
-  classes in `Source/FerriteLib.UiKit/Kernel/Widgets/` that declare `IUiWidget`, internal ones included — it was
-  sixteen until `input/text-field` arrived), which is the only proven extension point the library has. The count
-  is of the LIBRARY's own kinds: a consumer's widget count is a different number answering a different question.
-  **The 17/13/12 relation, stated because three counts of one fact read as a disagreement:** four of the
-  seventeen classes are `internal` (`RepeatTemplateWidget`, `CheckboxWidget`, `ProgressWidget`, `TreeWidget`), so
-  **thirteen** widget classes are exported; of those, **twelve** are classified `internalize-candidate` below and
-  the thirteenth, `LineChartWidget`, is `public-unstable`. A count of the internalize list is therefore not a
-  count of the library's kinds, and neither is a count of its exported classes.
+- `IUiWidget` — the custom-kind interface. A consumer implements the declared Configure/Validate/Measure/Draw
+  contract and registers its own kind through `UiWidgetRegistry`. Counts of built-in classes, exported
+  types and registered kinds are different inventories; none defines this interface's compatibility promise.
 - `UiWidgetRegistry` — kind registration carrying the per-kind attribute schema and label set; consumers
   register their own scope through it. **Member-level additions to a `stable` type are part of this promise
   too, so they are listed here rather than left to the type name.** Two `Register` overloads have been added

@@ -1,12 +1,8 @@
 # Consume FerriteLib from another mod — 0.6.0
 
-**Read this first if you are wiring another project against FerriteLib.** It is the permanent, always-updated
-home for consumer integration (kept current inside the FL repository). It works together with two docs that
-describe the surface itself:
-
-- `docs/api-tiers.md` — the compat promise (stable / public-unstable / internalize-candidate).
-- `docs/development/0.6/20-api-and-xml.md` — how each capability is used (XML + C#), incl. vocabulary traps.
-- `docs/development/0.6/30-consumer-handoff.md` — the round's handoff and known limits (kept in sync).
+This guide is versioned **0.6** history. For the frozen current line, start with
+[the 0.7 guide](consume-from-0.7.0.md). Sections 3–4 remain the shared reference-setup and registry-scope
+instructions; the old package identity below is not a request to find today's DLL at that path.
 
 ## 1. Which artefact to take
 
@@ -34,7 +30,9 @@ the artifact from the Release page.
 
 ```csharp
 // Mod constructor, before touching any UiKit type:
-FerriteLibVersion.Require(new Version(0, 6, 0), new Version(0, 7, 0));
+bool compatible = FerriteLibVersion.Require(
+    new Version(0, 6, 0), new Version(0, 7, 0), "your.mod.packageid", out string diagnostic);
+// If false, report diagnostic and do not construct the UiKit page.
 ```
 
 The game cannot express a prerequisite version, so the range is yours to assert; it is also the only detector
@@ -52,12 +50,12 @@ of a second carrier. Axes: `FerriteLibVersion.Api` = `About.xml <modVersion>` = 
 </ItemGroup>
 ```
 
-Configure `FerriteLibArtifactDir` once, machine-locally, with a committed example and a relative-sibling
-fallback — never a machine-absolute path in a publishable file:
+Configure `FerriteLibArtifactDir` to the selected extracted package. Keep machine-specific locations in an
+ignored local props file, not in tracked source:
 
 ```powershell
 # committed file: FerriteLib.local.props.example    (a copy named FerriteLib.local.props is gitignored)
-#   <FerriteLibArtifactDir>..\ferritelib\dist\dev\FerriteLib\1.6\Assemblies</FerriteLibArtifactDir>
+#   <FerriteLibArtifactDir>$(SelectedPackageRoot)\1.6\Assemblies</FerriteLibArtifactDir>
 # gitignore: FerriteLib.local.props
 ```
 

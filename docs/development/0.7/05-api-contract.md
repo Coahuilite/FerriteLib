@@ -1,44 +1,25 @@
-# 0.7 — the supported contract for the subtraction-and-stabilization line
+# 0.7 — the frozen supported contract
 
-Written before any behavior change on this branch, per the 0.7 plan. This file records what 0.7.x commits
-to; `docs/api-tiers.md` keeps the per-type tier membership, which this line does not change. The consumer
-assertion range for the line is `[0.7.0, 0.8.0)`.
+This is the contract record for the existing 0.7 source, consumer range `[0.7.0, 0.8.0)`.
+[API tiers](../../api-tiers.md) remain the sole type-membership promise. The [0.8 specification](../0.8/README.md)
+is a separate design review and does not retroactively redefine this line.
 
 ## Public surface
 
-No new public types, widget kinds, or XML vocabulary land in 0.7. No signature changes on existing
-members. The API-tier *type* list stays the 0.6 pin.
+The original no-additions plan was superseded during coordinated development. Additions and documented
+breaks landed inside API 0.7.0 under the temporary line-specific ruling; the exemption's expiry was the first
+release/tag or end of lockstep, and it does not carry into 0.8. The line is now frozen, not an open amendment
+window. Earlier prose saying there were no new kinds/types, no delivered consumer, or no interface migration
+is not a current inventory.
 
-**Amendment 3 (2026-09-20) — additions are allowed inside `0.7.0` for this coordination phase.** The
-maintainer ruled that the axis keeps the **number** `0.7.0` and that no minor is opened while the local
-consumer is mid-development: additions land inside the line, each one still owing its contract entry (recorded
-here before the code), its failure-sensitive lane, its `docs/api-tiers.md` classification in the same commit,
-and its consumer-guide line. This supersedes the "no new public types, widget kinds or XML vocabulary"
-sentence above **for the duration of that phase only**; it declares no surface stable, waives no gate, and the
-normal pre-1.0 rule (an addition moves the minor) returns when the phase ends.
+Use the later contract for an explicitly superseded subject: R2 replaces the early C palette decision;
+R3-A/DT1/SA1 refine the geometry instrument; FL-IC1/IC2 define the later input/edit behavior. Member-level
+additions to `IUiBindings` require handwritten implementations to migrate even when the API number did not
+change. The [consumer guide](../../consumers/consume-from-0.7.0.md) collects those actions.
 
-**The phase's end is defined rather than open-ended, and the line stays `0.7.x` (maintainer ruling 2026-09-24).**
-The exemption lapses at the **first** of: the `0.7.x` line's first release/tag, or the end of the cross-repository
-lockstep development. Until then the line is in **development**: no minor is raised and no next line is opened.
-The exemption is **temporary and not inheritable** — it belongs to this line and this stage only, and it must not
-be carried into a later line or into any published state by analogy. The API-tier *type* list is no
-longer the 0.6 pin: it gains one internalize-candidate entry (`TextFieldWidget`) and one member on the
-public-unstable `UiNative`.
-
-**Amendment (2026-09-18):** `UiTheme` gains one public static factory, `Vanilla`, so the two built-in
-palettes are named peers. The addition is recorded here before the member ships.
-
-**Amendment 2 (2026-09-18), and it is a break, not an addition.** The same package makes `new UiTheme()`
-an unpainted token bag, so a theme built that way no longer inherits a recommended skin for the tokens it
-does not set. A consumer that relied on the constructor default is repainted. The pre-1.0 rule is
-unconditional for *additions*; a behavioural break is a fortiori a break, and recording it as an addition
-because no signature moved would be exactly the silent growth the 0.6 window rejected in writing. It is
-affordable here for one measured reason and no other: **the 0.7 line has never been delivered** — not
-published, not compiled against by any consumer, used locally only — so there is no pinned number and no
-migration for a stranger. The migration for a local consumer is one line, stated under C below. This
-paragraph is the amendment the 0.7 README's "no public type, kind or XML vocabulary" sentence takes
-with it.
-
+Evidence paragraphs describe their own revision and test environment. The later bounded 2026-10-09 game
+pass and the remaining gaps are summarized in [40-verification.md](40-verification.md); a historical
+“not run” statement below describes that batch's observation time, not the absence of all later runs.
 ## Behavior changes, in contract terms
 
 ### A1 — Row `Width="Auto"` falls back to unsized, not to a 1-unit stub
@@ -85,39 +66,16 @@ unchanged (`InvalidOperationException` from the validation seam). A truly missin
 message; a key that legitimately carries both a value and an options registration is not rejected.
 Diagnosis only: no binding category is ever coerced into another.
 
-### C — two peer built-in palettes; the constructor is a bag, not a product
+### C — palette contract superseded by R2
 
-> **SUPERSEDED on the 0.7.x line by §R2 (below).** The library ships **one** look (`Vanilla`), the warm-gold
-> factory is removed with no alias, and `new UiTheme()` is a **partial bag whose unset tokens answer
-> `Vanilla`** — explicitly transparent included, which must stay transparent. The text below is the 2026-09-18
-> decision and its reasoning at the time; it is kept because the accent-identity ruling inside it still
-> stands, and because a removed promise is more useful with its history attached than without it.
+The 2026-09-18 two-peer-palette/unpainted-bag decision was replaced by **R2** below: `Vanilla` is the sole
+shipped look, the product `DarkGold` factory is removed, and a partial `new UiTheme()` uses Vanilla for
+unassigned colour tokens. Explicit transparency remains a value. Keep host theme injection; migrate calls
+to the removed factory or provide the desired token values in a consumer-owned palette.
 
-`UiTheme.Vanilla` and `UiTheme.DarkGold` are the two built-in palettes. They are peers: neither is
-the default, neither is history of the other, and neither is selected by constructing the bag.
-Each factory returns a fresh independent instance. Token names, geometry, fonts, spacing, and the
-renderer do not move in this package.
-
-- **Vanilla** — neutral-surface, yellow-accent palette aligned to vanilla window/section substrates
-  and edges (provenance and the role table live in the C lane; derived values are marked derived).
-- **DarkGold** — the warm-gold palette (near-black planes, shared-border-only edges). Same token
-  names; a different look, not a compatibility alias for `new()` and not a frozen 0.6 escape hatch.
-
-`new UiTheme()` constructs an empty token bag (style table, density, font) with no product palette.
-A host still requires an explicit non-null theme; pass `Vanilla` or `DarkGold`, or start from one of
-them and apply overrides. A custom `new UiTheme() { … }` no longer inherits a recommended skin for
-unspecified tokens.
-
-Migration: pick a named factory at the existing required theme parameter. There is no constructor
-default to keep, and no ranking between the two palettes.
-
-**Accent identity — decided, and no longer an open item (maintainer ruling 2026-09-24).** The library's accent
-identity is the **series gold already carried by `UiTheme.DarkGold` / `AccentGold`**, and it is unchanged: no token
-moves and neither factory is re-tinted. An alternative accent hex (`#EBAD4D`) came up during the appearance work
-as part of an **external product's** look; that product is an appearance reference, not a consumer of this library,
-and its palette is **not** adopted here — a product's colours are not a library default (`AGENTS.md`,
-"Neutrality"). Nothing in this line's palettes is pending a decision after this note.
-
+The historical accent ruling rejected adopting an external product's `#EBAD4D` as a library default.
+It does not restore the removed factory. Current accent behavior is the stored `AccentGold` plus derived
+`AccentHover`; treatment and palette details are in Batch 1 and R2 rather than a second copy here.
 ### Batch 1 (2026-09-18) — placement vocabulary, density reach, tone/accent tightening
 
 The 0.7 line is in its fast-development window (maintainer ruling 2026-09-18): nothing is pushed, nothing is
@@ -756,14 +714,14 @@ prose guide in `docs/consumers/ordinary-settings.md`.
 
 ## Dependable-surface entries (stage 3) — the template, and three worked examples
 
-`TODO.md` §"Stabilize the demonstrated contract surface" and `next-stage-guide-zh.md` §3 ask for the same
+The historical stabilization work asked for the same
 thing: before a demonstrated capability is depended on, write down its legal inputs, ownership, layout and input
 behavior, errors and fallback, compatibility promise, and a consumer example. This section is the **form** for
 those entries plus the first three worked examples, so the next session does not invent a fourth shape. It is
 deliberately a section of an existing file rather than a new document.
 
 **Writing an entry is not a promotion.** An entry records what is already true and cites the evidence for it;
-the tier decision stays per item and belongs to the session/maintainer (`next-stage-guide-zh.md` §3: a single
+the tier decision stays per item and belongs to the session/maintainer (a single
 page passing does not promote every public member to stable). A filled entry with an empty evidence field is not
 an entry — write **UNRUN**.
 
@@ -1547,8 +1505,7 @@ as a primary press at all, before anything drew. The consequence a reader has to
 and the published popup layers are read at the same moment, one event ahead of the controls that consult them.
 
 **What these lanes do not show, kept explicit.** The window stack is the harness double: its Accept/Cancel dispatch
-order and eligibility test are the plan's reading made executable (documented as such in `VerseStubs.cs`), the game's
-real `GetsInput` also consults obscuring and mouse position, and the key is read as the default Escape/Return rather
+order and eligibility test are the plan's reading made executable (documented as such in `VerseStubs.cs`), the real stack's eligibility and separate pointer-obscuring rules are not fully modeled, and the key is read as the default Escape/Return rather
 than through a rebindable `KeyBindingDefOf`. Which window a real stack hands the key to with several mod windows open,
 what a rebind does to that hook, real IME text entry, and a native `HorizontalSlider` drag remain the short human
 pass. The vanilla precondition is a real boundary too, and it is the wiring note a migrating consumer needs: Verse

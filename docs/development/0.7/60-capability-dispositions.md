@@ -1,13 +1,14 @@
 # Capability dispositions — the P1-E batch (2026-09-20)
 
-**What this file is.** One written disposition per item the review batch raised, so the maintainer/PM can rule
-before anything is built. It is a **checklist, not prose**: each row carries its disposition, the source anchors
-that decide it, the consumer citation if one exists, the four promotion gates, and what implementing it would
-touch. Nothing here is implemented, and this round deliberately does not build or touch the carrier (a sibling
-checkout is verifying against it). **Added 2026-09-24:** §C is a later, separate review batch — an audit of two
-`docs/api-tiers.md` *reasons* rather than a capability request — and uses the same disposition vocabulary. It
-changes no tier by itself.
+**Historical scope:** the table preserves the 2026-09-20 proposal/disposition and the 2026-09-24 tier-reason
+review. ACCEPT meant accepted for that coordinated batch, not “still unimplemented” or a live work order.
+The 0.7 line is frozen. Actual landed behavior is in [05-api-contract.md](05-api-contract.md); current
+consumer actions are in [the 0.7 guide](../../consumers/consume-from-0.7.0.md). Section C changes no tier
+by itself, and no proposed example name here is a promised API.
 
+Some accepted items later landed (including payload, chrome-free hit areas, typed options and layout keys);
+other proposals remained deferred. The dated outcome paragraphs preserve why an initial attempt was
+withdrawn or revised. Use [0.8](../0.8/README.md) for the next design, not this batch's implementation order.
 **The four promotion gates** (AGENTS.md, "Ecosystem protocol"), stated once and abbreviated per row: **P**
 provenance cited (a real consumer was forced to hand-roll it — a request is not evidence); **N** neutral (no
 consumer's product vocabulary, no consumer's numbers as library defaults); **S** no new process-wide mutable

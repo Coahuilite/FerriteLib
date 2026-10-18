@@ -12,86 +12,60 @@
 
 ## 1. Which artefact to take
 
-| | |
-| --- | --- |
-| Dev package folder | `dist/dev/FerriteLib/` (5 files) — staged by `scripts/verify-local.ps1 -PackDev` |
-| version.txt | `FerriteLib 0.7.0-dev / build=dev / commit=88095fb3cbed` — **a rehearsal identity of one working tree, not a target** |
-| DLL | `1.6/Assemblies/FerriteLib.UiKit.dll`, SHA-256 `271128299A9CFF…FC8F82F` — **the same rehearsal, quoted as history** |
+**0.7.x is frozen.** Select an explicitly identified package, not an arbitrary DLL whose API number is
+0.7.0. A published GitHub Release asset is the public distribution; a named Dev rehearsal is suitable for
+its agreed local validation only. The conditional `v0.7.0-rc1` route was decided on 2026-10-09; the
+[historical record](../development/0.7/README.md) is not proof that an asset has been published.
 
-**The 0.7 line is being published as RC pre-releases — the first is `v0.7.0-rc1` (publication decision 2026-10-09;
-an RC is a GitHub Pre-release, never the stable/latest release), cut from integrated `main` with the asset built by
-the release workflow.**
-Take the payload from the release page and verify it by the rule below; the Dev folder above remains a rehearsal
-(`pack-release` runs only through the publication flow).
+The installable payload is `1.6/Assemblies/FerriteLib.UiKit.dll` inside the selected package. Its
+`version.txt`, configuration and embedded source identify that build. Dev and Release can share the API
+number and still be different builds. Source HEAD, a held package and the root compatibility carrier are
+not interchangeable. Build/export commands are in [build-and-debug.md](../build-and-debug.md).
 
-**Which payload is authoritative, because more than one exists (FL-11).** The **GitHub Release asset** published
-from `coahuilite.ferritelib` is the only payload identity a consumer can verify: each release body names the
-commit it was built from and the asset's SHA-256. The dev folder above, a **sibling checkout's copy**, and
-whatever happens to sit in `1.6/Assemblies/` after a build are all rehearsals: their identity is a property of
-one machine's tree at one moment, and two of them are *not* two identities for one artifact. Concretely, the 0.6
-docs recorded a **Dev-channel** rehearsal (`build=dev`, one commit) while a consumer's `<HintPath>` bound a
-**Release** build of a different commit — the byte difference is the configuration and the commit, not a
-different artifact. So: **once a line is published**, take the artifact from its Release page — and in every
-phase, **verify what you actually bound at runtime** — the assembly's `AssemblyConfiguration`, its embedded
-commit, and the `Require` verdict — rather
-than matching a hash written in a document. **Do not copy the DLL into your package** — `<HintPath>` +
-`<Private>false</Private>`; only `coahuilite.ferritelib` ships it. Registry-scope, stale-build and
-machine-path traps are unchanged from 0.6 (§3–4 of `consume-from-0.6.0.md` still apply verbatim).
-
-**A hash and an mtime answer different questions.** A frozen carrier is identified by its **hash** — the same bytes
-are the same artifact however many times they were written — while its **mtime** only says it was written. A notice
-that quotes a hash alone therefore settles nothing for a verifier who watches mtime: ask for the hash when the
-question is identity, and expect the mtime to move on **any** rebuild, including one that reproduces identical
-bytes (that is not a new identity and needs no re-verification from you).
+Reference the chosen DLL with `<Private>false</Private>` and never copy it into the consumer package.
+After replacing a path-resolved DLL, rebuild the consumer with `--no-incremental`. Reference setup and
+registry scope are described in [the 0.6 guide](consume-from-0.6.0.md) §3–4 and remain applicable.
 
 ## 2. Assert the version range
 
+At the consumer's early initialization boundary, inspect the result before constructing the page:
+
 ```csharp
-// Mod constructor, before touching any UiKit type:
-FerriteLibVersion.Require(new Version(0, 7, 0), new Version(0, 8, 0));
+bool compatible = FerriteLibVersion.Require(
+    new Version(0, 7, 0), new Version(0, 8, 0), "your.mod.packageid", out string diagnostic);
+// If false, report diagnostic and do not construct the UiKit page.
 ```
 
-Axes: `FerriteLibVersion.Api` = `<modVersion>` = `<VersionPrefix>` = 0.7.0. Pre-1.0, a minor bump is the
-breaking signal; 0.7.x will not move a public signature or a documented behavior again without the next
-appropriate minor.
+`Require` returns a verdict; it is not a two-parameter assertion that throws on mismatch. The game cannot
+express this dependency range. API tiers are the compatibility promise; the coordinated 0.7 development
+window allowed documented additions without moving the minor and does not transfer that exemption to 0.8.
 
-## 3. What actually changed for you at 0.7.0
+## 3. Absorb the changes that affect existing consumers
 
-- **Public surface:** one kind was **added** inside `0.7.0` (B7): `input/text-field`, the single-line
-  string sibling of `input/number-field`, carried by a new public-unstable funnel member
-  `UiNative.TextField(rect, key, session, value, out committed)`; and the **help vocabulary** grew: the
-  engine-wide element attribute `HelpKey`, the option-level `HoverHelpKey` (now on `input/dropdown` as well
-  as `input/mode-row`), `input/mode-row`'s `TitleKey1..8`, and `UiNative.IsMouseOver(rect, ctx)`. Nothing was
-  removed and no existing member signature changed. `UiTheme` (public-unstable) gained one named factory,
-  `Vanilla`, so the two built-in palettes are peers.
-  **Added XML vocabulary (Batch 1, §4b):** the four placement attribute names `AlignX`, `OffsetX`,
-  `AlignY`, `OffsetY`. **Removed:** the stored token `UiTheme.HoverPoint`, replaced by the derived
-  `UiTheme.AccentHover`.
-- **Two peer palettes, no constructor default.** Pass `UiTheme.Vanilla` (neutral surfaces, reserved
-  yellow) or `UiTheme.DarkGold` (warm gold, shared-border edges) at the existing required theme
-  parameter. They are two looks, not a default and its history. `new UiTheme()` is an unpainted token
-  bag — do not use it as a product skin. Start from a named factory and apply overrides.
-- **Two validations tightened**: a malformed/non-finite `Height` now throws an attributable
-  `UiContractException` at host creation and at reload-candidate validation instead of a `FormatException`
-  at arrange time; `Cols`/`NarrowCols` on a non-`Wrap` container are refused at creation (they never did
-  anything there — remove the attribute or switch to `wrap`).
-- **Four behavior fixes**: a Row child with `Width="Auto"` that cannot be label-measured now shares space
-  like an unsized child instead of collapsing to a 1-unit stub;
-  **the migration for that one, stated properly because the obvious advice is wrong** — if what you relied on
-  was not the stub but the fact that *the same element behaves differently in the two container shapes*
-  (a collapsed filler in the wide `Row` that becomes full width once `Narrow="Column"` swaps the container),
-  then giving it a fixed `Width` pins the narrow state too and does **not** reproduce it. The supported route
-  is **two mutually exclusive presentations plus `VisibleKey`** — one child for the wide shape, one for the
-  narrow, each visible under its own binding. A narrow-only *child* has no single-attribute form today; that
-  gap is registered as `WideHidden` (symmetric with the existing `NarrowHidden`) and is not in this line;
-  a dropdown shows the option whose **value**
-  equals the bound value even when an earlier option's display text matched; a dropdown whose options
-  key was registered as a value (`BindReadOnly<IReadOnlyList<T>>`) says so and names `BindOptions<T>`;
-  and a `input/mode-row` with `Width="Auto"` now measures its **titles only** — `Description1..8` stay legal
-  attributes that still create, but they left the kind's *label set* (never its schema) because nothing draws
-  them, so they no longer widen the column. If an Auto mode-row was relying on a description for its width,
-  declare the width explicitly.
-  Migration detail for each: `docs/development/0.7/05-api-contract.md`.
+- **Theme:** `new UiTheme()` now falls back per unassigned token to `UiTheme.Vanilla`. Explicit transparent
+  colours stay transparent. The earlier unpainted-bag/two-peer-factory contract was superseded: the product
+  `UiTheme.DarkGold` factory was removed; a consumer wanting that palette supplies its own token values.
+  `AccentHover` replaces the removed `HoverPoint`. See contract §R2.
+- **Bindings:** a hand-written `IUiBindings` implementation must implement `TryInvokeCommand`; adding that
+  interface member is a source compatibility change. The library's `UiBindings` implements it. See §FL-IC2.
+- **Input:** popup coverage is geometric, including over the popup's own trigger. The window's Accept answers
+  an active edit; Cancel answers menu, capture, edit, then the nearest executable `CancelBind`, one layer per
+  press. No `CancelBind` declaration does not mean native close wins while a library interaction is open.
+  Custom shell cancel policy uses `TryHandleUnansweredCancel()` after the page declines. A shell with
+  `closeOnCancel=false` must opt into Verse's `forceCatchAcceptAndCancelEventEvenIfUnfocused` if it needs those
+  hooks. Multi-window attribution remains subject to the real window stack. See §FL-IC1/FL-IC2.
+- **Deferred editing:** `Live="false"` fields publish a valid draft on the edit-ending pass; an invalid
+  numeric draft is not coerced into a value. The frozen 0.7 behavior is not the 0.8 proposal for retaining
+  invalid drafts or handling multiline/IME composition.
+- **Layout and vocabulary:** the table below retains the migration details for spacing, authored tones,
+  placement and measured sizing. Invalid `Height` is rejected at creation; `Cols`/`NarrowCols` are Wrap-only.
+  A Row Auto child without a measurable label now shares space rather than collapsing to a 1-unit stub.
+  A fixed width cannot reproduce separate wide/narrow behavior: use visibility variants when that is required.
+- **Options and labels:** exact option value beats display-text fallback; wrong-kind options registration
+  names `BindOptions<T>`. Mode-row `Description1..8` carry help identity, not measured title width.
+  `SelectedKey` inside a repeated template resolves in the item's scope, not against a page-level decoy.
+
+Details and refusal rules: [0.7 contract](../development/0.7/05-api-contract.md).
 
 ## 4. The recommended way to author a settings page
 
@@ -102,22 +76,22 @@ optional, not prerequisites.
 
 ## 4b. Batch 1 — the breaks to absorb before you test
 
-Recorded in `docs/development/0.7/05-api-contract.md` under "Batch 1", all inside `0.7.0`. Batch 1's three
-were one visual review, one page edit and one member swap; the added kind below is an addition, so it needs no
-migration at all.
+The table collects optional vocabulary and the migration-sensitive changes across the line. Exact refusal
+rules live in [the contract](../development/0.7/05-api-contract.md); later corrections in §3 take precedence
+over earlier batch descriptions.
 
 | Change | What you do |
 |---|---|
-| Container `Padding` **and** `Gap` now default to the theme's geometry instead of 0 | Review every page's spacing. Both built-in palettes carry `Padding = Gap = 6`, so an undeclared container moves from 0 to 6. An attribute you already declare keeps winning — a container with an explicit `Gap` is unaffected by the `Padding` fallback and vice versa. Add `Padding="0"` / `Gap="0"` where you want the previous result exactly. **Only those two tokens participate**: `Spacing`, `RowHeight` and `Hairline` stay widget-internal and never become a container default. |
+| Container `Padding` **and** `Gap` now default to the theme's geometry instead of 0 | Review every page's spacing. The default geometry carries `Padding = Gap = 6`, so an undeclared container moves from 0 to 6. An attribute you already declare keeps winning — a container with an explicit `Gap` is unaffected by the `Padding` fallback and vice versa. Add `Padding="0"` / `Gap="0"` where you want the previous result exactly. **Only those two tokens participate**: `Spacing`, `RowHeight` and `Hairline` stay widget-internal and never become a container default. |
 | `Tone` accepts only `Neutral`/`Success`/`Warning`/`Danger` | If a page wrote `Tone="Active"` or `Tone="Disabled"`, express the **state** instead: a read-only value binding for disabled, the control's own selected state for active. Both old names still work **for this minor only** and are refused at the next minor boundary (0.8). The only observable consequence today is **one appearance record per runtime element** (a collection row is its own element) — never one per frame, and the rendered treatment is unchanged. |
 | `UiTheme.HoverPoint` removed, replaced by `UiTheme.AccentHover` | Read `UiTheme.AccentHover` (read-only, derived from `AccentGold`). A scheme that declared `HoverPoint` now reports it as an unknown token instead of applying it. |
-| New: `input/text-field` | Optional, no migration — an addition, not a break. A single-line string field whose focus, draft and commit rule belong to the element: `Bind` (required), `Live` (default `true`; `false` defers the write until focus leaves), `Placeholder`/`PlaceholderKey`, `Label`/`LabelKey`, `Height`. A read-only binding refuses the write and the engine's disabled rule refuses the input, exactly as on `input/number-field`. If you hand-rolled one over `UiNative.TextField(rect, text)`, this is the supported shape now. |
+| New: `input/text-field` | Optional, no migration — an addition, not a break. A single-line string field whose focus, draft and commit rule belong to the element: `Bind` (required), `Live` (default `true`; `false` defers the write until focus leaves), `Placeholder`/`PlaceholderKey`, `Label`/`LabelKey`, `Height`. A read-only binding prevents model writes; the current wrapper checks this after native editing, so it does not guarantee a non-editable but selectable draft. If you hand-rolled one over `UiNative.TextField(rect, text)`, this is the supported shape now. |
 | New: `HoverHelpKey` on `input/mode-row` | Optional, no migration — and no tooltip: declare `HoverHelpKey="my-help"`, bind it with `BindValue<string>`, and the row writes **which option is hovered** there — the option's `DescriptionN`, or its `ValueN` when it declares none — clearing it (empty string) when the pointer leaves. You render the help yourself, wherever your page wants it; the row publishes only when the answer changes. One tightening to know: a `TitleN`/`DescriptionN` whose index has no `ValueN` used to be ignored and is now refused at creation. |
 | New: `HelpKey` on any widget element | Optional, no migration. Declare the identity your help catalog is keyed by (a literal, never translated) and the **engine** claims it while the pointer is over that element: read `Session.HoverClaim` for the identity and `Session.HoverClaimElement` for which element claimed it — the same pair you already read. Refused on containers and template roots, which are not hit surfaces. A disabled element still claims: the help explains why it is unavailable. |
 | New: `input/mode-row` `TitleKey1..8` | Optional, no migration. The translated sibling of `Title1..8` (key wins), and `Width="Auto"` now measures the translated title. An orphan `TitleKeyN`/`TitleN`/`DescriptionN` (no `ValueN`) is refused at creation. |
 | `HoverHelpKey` now works on `input/dropdown` too | Optional, no migration. Same attribute, same rule, applied to the popup's rows: the hovered row's **value** is published, cleared when nothing is hovered. |
 | `Tab` now works on containers | Optional, no migration — a coherence fix, not new surface: the engine always read `Tab` when deciding visibility, and only the container contract left the name out. A container can now be declared to appear on one tab, and it takes its whole subtree with it when the tab is inactive (a hidden element keeps its node and state, as with `Visible`/`Hidden`). Per-row `Tab` inside a template stays inexpressible by design — a tab is a page-level answer. |
-| New: `UiOption` pairs on `input/dropdown` | Optional, no migration. `BindOptions<UiOption>` gives each dynamic option a display text and a committed value (`new UiOption(text, value)`); `BindOptions<string>` keeps working with display == value. A binding of any other element type is refused at creation, naming both accepted shapes. |
+| New: `UiOption` pairs on `input/dropdown` | Optional, no migration. `BindOptions<UiOption>` gives each dynamic option a display text and a committed value (`new UiOption(text, value)`); `BindOptions<string>` keeps working with display == value. The later typed-choice path also accepts `UiChoice<T>` options beside a matching `T` value binding; see `api-tiers.md` for `UiChoice` and `IUiTypedChoices`. |
 | New: `PayloadKey` on `input/button` | Optional, no migration. Hands the command the bound payload (inside a template it is scoped per item, so a row reports its own key). With it, bind the command as `BindAction<string>`; without it everything is unchanged. |
 | New: `Chrome="none"` + `Height="Auto"` on `input/button` | Optional, no migration. A bare hit area: no surface is painted, the hit test still fires, and `Auto` takes the measured content band. Any other `Chrome` value is refused at creation. |
 | New: `WideHidden` | Optional, no migration. The mirror of `NarrowHidden`: the element is arranged only while the state is wide. Refused at creation when its parent carries no `Breakpoint`, exactly like `NarrowHidden`. |
@@ -135,9 +109,8 @@ migration at all.
 | New (development builds only): the geometry instrument | Optional, no migration, and nothing to adopt in a release build. In a development build, `host.Diagnostics.GeometryEnabled = true` makes `host.Diagnostics.DumpGeometry()` return a diffable text dump: one line per arranged node with its arranged rect, the rect its widget was handed, that rect in the pointer's window space, the origin between those two spaces, its height mode (`Fixed`/`Auto`/`MatchContent`) and the height that mode resolved to, plus a `Scroll`/`Clip` viewport and its real content extent — then one line per sampled press (`hit`/`miss`/`covered`/`disabled`, with the element's path, the pointer and the queried rect). `host.Diagnostics.GeometryOverlay = true` outlines the drawn rect of every element that reaches the engine's per-entry draw step — since DT1 including scoped viewports' own bands and the shell's own chrome (see the DT1 row above). Since SA1.5 the switch is **independent**: with no capture it paints those draw-step entries while storing nothing (the dump and snapshot reader keep honestly reporting nothing), with a capture live it paints exactly the retained entries, and switching the capture off afterwards does not silence the picture. **On a release payload `GeometryEnabled` throws** rather than accepting the opt-in and then reporting nothing. |
 | `Scheme`/`Density` names resolve from the document, and a missing name is now a located finding | No behaviour change; one new member (`UiStyleIssue.ElementPath`). A scheme is defined by the style document the Host was built with — a standalone `<Styles>` file or the manifest's `<Styles>` section. A palette applied to a theme *instance* is **not** a definition site: a scope naming a scheme only that palette defines looks applied while the resolver never sees it. An unknown name still falls back (fail-soft) and the finding now names the element that declared it, not just the document. |
 
-Nothing else in the compiled surface moved: no type or kind was **removed**, no existing member signature changed,
-and **no `UiStatusTone` member was removed** (that type is stable — `Active` and `Disabled` remain members the
-library uses internally as states).
+The stable `UiStatusTone` enum retains `Active` and `Disabled`; the authored vocabulary and the enum are
+separate contracts. Later interface and palette migrations are listed in §3.
 
 **One theming coupling worth a line, because a track measurement has already tripped on it.**
 `UiTheme.SelectedSurface.Border` is `SelectedBorder ?? AccentGold` — an *outline* whose fallback is the accent — so
@@ -172,13 +145,16 @@ valid, and the only symptom is state that resets — which is exactly why this s
 **(c) How to detect it in your own page.** Compare node/state on either side of the removal with
 `session.GetNodeByElementId("your-id")`: it answers **non-null while the element is still declared** (including
 while `Visible`/`VisibleKey`/`Tab` hides it) and **null once the identity is gone from the definition** — the
-lookup is about identity, not arrangement (`UiSession.cs:405-419`). If you need the state to survive, (c) is
-where you find out that it will not.
+lookup is about identity, not arrangement. A surviving node proves that its storage was not pruned;
+it does not prove that an edit or another live interaction continues unchanged.
 
 **(d) The supported paths.**
-- **Temporarily hiding an element** — use `Visible`, `VisibleKey` or `Tab`. A declared-but-hidden element keeps
-  its node and its state on purpose, so a draft or a scroll position stays reachable (`UiSession.cs:463-468`,
-  `UiSession.cs:411-413`).
+- **Temporarily hiding an element** — use `Visible`, `VisibleKey` or `Tab`. Its declared identity, value slots
+  and scroll-position storage are not pruned. **This is not a 0.7 draft-preservation guarantee:**
+  `UiSession.ReconcileInteractionRecords` ends the hidden field's active edit without committing it, and
+  `UiNative` resets an unfocused field's edit text from the model when it is drawn again. The same node can
+  therefore return with a reset draft. Preserving an unfinished draft across temporary hiding is a
+  **0.8 target contract**, not existing 0.7 behavior.
 - **Really removing an element** — accept the release: that *is* the semantic, and the prune exists because the
   old behaviour leaked a stale node and orphaned state on every reload (`UiSession.cs:457-462`). Do not restore
   the leak to preserve state.
@@ -188,9 +164,8 @@ where you find out that it will not.
 
 ## 5. What is still open (do not over-claim)
 
-- **In-game and consumer acceptance for 0.7 is pending** — the four checks in
-  `docs/development/0.7/README.md` §External acceptance are owned by the maintainer/consumer operator and
-  include one comparable Vanilla/DarkGold/custom state sheet. Library evidence is automated only.
+- **A bounded 2026-10-09 candidate received a maintainer game pass.** This is not blanket acceptance of
+  every capability; see [the verification record](../development/0.7/40-verification.md) for scope and gaps.
 - Known limits inherited from 0.6: main-thread-only notification delivery; IME composition outside the
   input deferral; no cross-sibling-window atomicity for consumer hooks; catalogue is a snapshot.
 - **Reading an overflow verdict (FL-21).** `UiOverflowReport.Available` is the **inset label rect** the widget
@@ -205,5 +180,7 @@ where you find out that it will not.
   needed, available), capped at `MaxReports = 48` with `Saturated` published when the cap is hit, and
   `Reset()` starts a new collection. Log lines count **distinct findings**, never elements, so an "xN" you print
   is a count of distinct reports and nothing else.
-- If the public surface forces you to hand-roll something, report it — a cited consumer need is what earns
-  a capability; a request is not.
+- Report gaps in the public surface. General capabilities can proceed from a confirmed contract;
+  stabilization requires defined behavior, verification and a compatibility commitment, not a consumer
+  count. Promoting a **new specialized widget kind** still requires cited real-consumer use and the kind's
+  promotion checks. Missing integration evidence remains explicit; it is not a blanket veto on general APIs.

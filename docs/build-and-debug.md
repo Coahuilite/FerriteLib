@@ -1,7 +1,8 @@
 # Build inputs, diagnostics, and development slices
 
-This is the operational guide. Development priorities, slice order, ownership decisions, and completion
-criteria live in the [next-stage development handbook](development/0.7/next-stage-guide-zh.md).
+This is the operational guide for the existing toolchain. **0.7.x is frozen.** These commands describe
+mechanisms; running a build, export, install or publication still needs task authorization. The next design
+is [the 0.8 specification](development/0.8/README.md).
 
 ## Build once, select the input explicitly
 
@@ -21,10 +22,9 @@ The second command builds Dev and stages `dist/dev/FerriteLib`. Its installable 
 Staging records `payload-sha256` in `version.txt` and verifies the copied DLL before replacing the previous package.
 Do not build and pack the same configuration concurrently.
 
-**This phase runs the dev channel only (maintainer ruling 2026-09-24).** `pack-release` and `pack-steam` are not
-run, no tag and no release are created, and the remote is an **off-site backup**. Local testing uses the Dev
-package. The release/steam packers and their stricter checks stay in the tree for the published line they belong
-to; they are not an action of this phase.
+The conditional RC route recorded on 2026-10-09 uses integrated main and the existing release workflow;
+the earlier backup-only phase is historical. No documentation edit authorizes publication or refreshes a
+held payload. For a bounded local rehearsal, select its named candidate rather than rebuilding by habit.
 
 The repository-root `1.6/Assemblies/FerriteLib.UiKit.dll` is a compatibility delivery, independent of build
 outputs. Existing consumers can continue reading it. Updating it is deliberate:
@@ -67,9 +67,9 @@ Failure-sensitivity was checked by temporarily removing entry-phase sampling: th
 failed. Export fixtures exercise first delivery, replacement, stale-PDB removal, and refusal of Dev bytes
 without changing the held delivery. These checks belong to the existing build/diagnostic gates.
 
-## Development direction
+## Evidence boundaries
 
-Follow the [next-stage handbook](development/0.7/next-stage-guide-zh.md) and the active queue in `TODO.md`.
-The immediate game scenario remains row selection inside scroll/overlay composition. Automated contracts,
-package identity, and real-game acceptance are separate claims; the in-game defect remains open until its
-own real-game acceptance passes.
+The bounded 2026-10-09 input/popup candidate was accepted in game; see the
+[0.7 verification record](development/0.7/40-verification.md). That pass is not an acceptance of every
+current source path. Automated contracts, artifact identity, and real-game observations answer different
+questions. Development priorities for the next line belong to the [0.8 specification](development/0.8/README.md).

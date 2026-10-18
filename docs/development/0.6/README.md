@@ -1,38 +1,24 @@
-# FerriteLib 0.6 round — lightweight MVVM, reload scheduling, and an independent demo mod
+# FerriteLib 0.6 — versioned contract and evidence
 
-Round started 2026-09-16. Branch `0.6.x`, contract axis `0.6.0`. Maintainer plan:
-`modding_documents/team-mode/ferritelib-mvvm-hotreload-demo-plan-zh.md` (this round's product contract) and
-`.../ferritelib-mvvm-demo-team-start-zh.md` (the instruction that opened it).
+This completed round began on 2026-09-16, branch `0.6.x`, contract axis `0.6.0`. It added lifecycle hooks,
+notification adaptation, reload scheduling and a read-only widget catalog. Its independent demo was a
+reference consumer, not evidence of a second real consumer. Current integration starts at the
+[0.7 guide](../../consumers/consume-from-0.7.0.md); the next design is [0.8](../0.8/README.md).
 
-**This directory is the round's only live status home.** Nothing here is a claim that code is implemented or
-has been accepted in game; every entry states which evidence class it carries.
-
-| Document | What it holds |
+| Document | Purpose |
 | --- | --- |
-| `00-baseline.md` | What the round inherited, the version ruling, scope in and out, risks |
-| `05-api-contract.md` | **Frozen** cross-package public API. Read this before writing any of it |
-| `10-work-packages.md` | T0–T5, owners, write scopes, dependencies, acceptance |
-| `20-api-and-xml.md` | Consumer-facing XML and C# usage of the new surface (written as packages land) |
-| `30-consumer-handoff.md` | Version range, migration, known limits for a real consumer |
-| `40-verification.md` | Commands, results, everything unfinished, and who owns it |
-| `50-dev-package.md` | Where the (R06-fixed) dev package is, its hash and the source revision behind it |
-| `60-review-r06.md` | Disposition of the independent review: R06-1..R06-7 and the two risk items |
-| `verification/` | Per-package adversarial records, including what a lane does **not** pin |
+| [20-api-and-xml.md](20-api-and-xml.md) | Usage of the additions; still referenced by current consumer guidance |
+| [05-api-contract.md](05-api-contract.md) | Versioned public contract, not a new implementation assignment |
+| [30-consumer-handoff.md](30-consumer-handoff.md) | 0.6 range, migration and limits |
+| [40-verification.md](40-verification.md) | Recorded results and external evidence gaps |
+| [60-review-r06.md](60-review-r06.md) | R06-1..R06-7 and risk dispositions |
+| [verification/r06-2-final-verification.md](verification/r06-2-final-verification.md) | Final independent checks after the review fixes |
+| [00-baseline.md](00-baseline.md) | Historical rationale, scope and known risks |
+| [10-work-packages.md](10-work-packages.md) | Package identifiers and evidence map |
+| [50-dev-package.md](50-dev-package.md) | The historical R06-fixed candidate identity, not today's artifact |
 
-The **permanent consumer pointer** is `docs/consumers/consume-from-0.6.0.md` (artefact to take, version
-assertion, reference setup, the registry-scope trap, what is still open) — a consumer session should be handed
-that, not this directory.
-
-Two records outside this directory also belong to the round: the demo mod lives in its own local repository
-beside this one (`ferritelib_uikit_demo`, `README.md` there), and the coordination surface is
-`modding_documents/team-mode/ferritelib-0.6-round-coordination-zh.md`.
-
-Evidence classes used throughout, and the rule they exist for (never collapse them):
-
-1. **已实现** — the code exists in the payload.
-2. **已自动化验证** — a lane in `tools/FerriteLib.UiKit.Tests` asserts the behaviour, and the record says
-   which half is mutation-proven and which is only a future-regression guard.
-3. **已由真实消费者接入** — another repository a player uses compiles against this surface. Our own demo is
-   **not** this: `AGENTS.md` ("Our own demo is not consumption").
-4. **已实机验证** — observed in a running game session, with the session's shape recorded.
-5. **尚待外部团队验证** — named, owned elsewhere, and never recorded as done from here.
+The R06 review exposed real defects, including demo payload reachability and pending-document refresh on
+reopen. Their reproduction and corrected outcomes are retained in the evidence reports. A successful build,
+public-API probe or demo package inspection is not an in-game pass. The recorded 0.6 game/operator checklist
+and real-consumer gaps retain their original status; later version observations do not retroactively verify
+this candidate.
