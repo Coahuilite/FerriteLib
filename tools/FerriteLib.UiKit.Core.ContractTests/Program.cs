@@ -24,6 +24,7 @@ internal static class Program
         try
         {
             Properties();
+            Observations();
             SharedBehavior();
             IdentityAndEnd();
             BooleanSelectionExpansion();
@@ -206,6 +207,21 @@ internal static class Program
         }
     }
 
+    private static void Observations()
+    {
+        var budget = new UiObservationBudget(nodes: 2, depth: 1, text: 3, items: 2);
+        Check(budget.Limit("abcdef") == "abc" && budget.Limit("a") == "a", "neutral observation text budget");
+        bool refused = false;
+        try { _ = new UiObservationBudget(nodes: 513); }
+        catch (ArgumentOutOfRangeException) { refused = true; }
+        Check(refused, "neutral observation output budget is finite");
+        var fact = new UiObservedFact("value", "abc", UiObservationStatus.Stale, "last-layout", "new-definition", true);
+        Check(fact.Truncated && fact.Status == UiObservationStatus.Stale && fact.Reason == "new-definition", "sampling state and truncation remain separate facts");
+        var observation = new UiHostObservation(1, "page", 7, 3, 2, DateTime.UtcNow, UiObservationStatus.Stale,
+            "definition-newer-than-layout", false, Array.Empty<UiObservedNode>());
+        Check(observation.Definition == 3 && observation.LayoutDefinition == 2 && observation.Frame == 7,
+            "neutral observation preserves distinct current and layout revisions");
+    }
     private static void Properties()
     {
         var own = new UiPropertyDeclaration<UiFont>();

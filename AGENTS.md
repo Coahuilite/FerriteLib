@@ -119,6 +119,14 @@ Consumer ladder when the library lacks something:
 Promotion gate — all four or it stays consumer-side: provenance cited; neutral, and no consumer's
 numbers as library defaults; no new process-wide mutable statics; a harness-drivable lane exists.
 
+**R9 bounded discovery exception (PM engineering decision, 2026-10-19):** live-host discovery may keep
+at most 512 weak references, using the existing Host/Session identity. Successful construction registers;
+Close/Dispose removes; queries may discard dead entries. No permanent strong host references, model/node
+copies, business state or second identity authority are permitted. Capacity refusals and incomplete
+results are explicit. This is the narrow lifecycle index needed to locate real hosts without an author
+registration prerequisite; all other process-wide-static restrictions remain. See
+`docs/development/0.8/host-observation-contract.md`. The R9 read surface and budgets remain Dev candidates.
+
 **The gate governs *new specialized kinds*, not confirmed public capabilities** (2026-09-15, superseding
 the broader reading of the rule above). Registering a kind freezes vocabulary, which is why it waits for a
 citation. A capability a page model structurally cannot express — window-instance identity, binding

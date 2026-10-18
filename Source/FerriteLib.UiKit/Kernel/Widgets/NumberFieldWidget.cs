@@ -68,7 +68,7 @@ public sealed class NumberFieldWidget : IUiWidget, IUiLabelledWidget
         UiNative.Edit(field, ctx, bindKey, current, numeric.Format, numeric.Parse,
             live, false, value => ctx.Bindings.Set(bindKey, value), () => ctx.Bindings.Get<float>(bindKey));
         if (!ctx.Session.IsActive) return;
-        UiValueState state = ctx.Session.GetOrCreateValueState(bindKey);
+        UiValueState state = ctx.Session.GetOrCreateValueState((ctx.Node ?? ctx.Session.ActiveNode).Id, bindKey);
         if (numeric.Parse(state.EditText, out float parsed)) state.FloatValue = parsed;
         AtomVocabulary.PaintEditFeedback(field, ctx, UiNative.Editor<float>(ctx, bindKey, numeric.Format, numeric.Parse));
         DrawLabel(rect, ctx, style);

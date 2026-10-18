@@ -64,6 +64,7 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
     {
         public abstract Type ItemType { get; }
         public abstract object GetListBoxed();
+        public abstract IReadOnlyList<object?> ReadPrefix(int maximum, out int count);
 
         /// <summary>
         /// True when the item type is a <see cref="UiChoice{T}"/>: the list carries typed choices rather than
@@ -88,6 +89,14 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
         public override Type ItemType => typeof(T);
 
         public override object GetListBoxed() => get();
+        public override IReadOnlyList<object?> ReadPrefix(int maximum, out int count)
+        {
+            IReadOnlyList<T> current = get();
+            count = current.Count;
+            var prefix = new List<object?>(Math.Min(maximum, count));
+            for (int i = 0; i < Math.Min(maximum, count); i++) prefix.Add(current[i]);
+            return prefix.AsReadOnly();
+        }
 
         // The shape is answered WITHOUT reflection and without an instance of the list: default(T) is a boxed
         // UiChoice<U> exactly when T is one (a struct, so it implements the erased face on its own), and a
@@ -355,6 +364,19 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
         if (!Accepts(descriptor.ValueType, value)) return false;
         descriptor.SetBoxed(value);
         return true;
+    }
+
+    /// <summary>Copies only the requested actual options prefix, without erasing or walking the entire list.</summary>
+    internal bool TryReadObservationOptions(string key, int maximum, out IReadOnlyList<object?> prefix, out int count)
+    {
+        if (options.TryGetValue(key, out OptionsDescriptor? descriptor))
+        {
+            prefix = descriptor.ReadPrefix(maximum, out count);
+            return true;
+        }
+        prefix = Array.Empty<object?>();
+        count = 0;
+        return false;
     }
 
     /// <summary>

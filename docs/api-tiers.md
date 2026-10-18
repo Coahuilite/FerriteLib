@@ -67,6 +67,13 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
 
 ## Public-unstable
 
+- `UiObservationStatus` — bounded semantic read sampling states; public-unstable.
+- `UiObservationBudget` — bounded read budgets; public-unstable.
+- `UiObservedFact` — detached read value with source, status and truncation; public-unstable.
+- `UiObservedNode` — detached stable-node read facts; public-unstable.
+- `UiHostDiscovery` — bounded live-instance discovery and completeness metadata; public-unstable.
+- `UiHostObservation` — read timestamp and last-layout revision alongside current facts; public-unstable.
+
 - `UiInteractionTarget` — 0.8 S0/S1 shared contract; shape may change within the development line.
 - `UiHitGeometry` — 0.8 S0/S1 shared contract; shape may change within the development line.
 - `UiPointerPhase` — 0.8 S0/S1 shared contract; shape may change within the development line.

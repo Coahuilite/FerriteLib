@@ -138,6 +138,7 @@ internal static class Program
         Console.WriteLine("Kernel keyed repeater (item scope, key reuse, removal cleanup, template contract)...");
         failures += KernelRepeatTests.RunAll();
         failures += KernelAssemblyTests.RunAll();
+        failures += KernelObservationTests.RunAll();
 
         Console.WriteLine("Kernel common controls (checkbox / progress / tree contracts)...");
         failures += KernelControlKindTests.RunAll();

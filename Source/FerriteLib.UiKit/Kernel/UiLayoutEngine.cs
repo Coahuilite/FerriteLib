@@ -15,7 +15,7 @@ namespace FerriteLib.UiKit.Kernel;
 /// height passed down from the arrange call, so a root Scroll fills the window while its content
 /// keeps its natural height.
 /// </summary>
-public sealed class UiLayoutEngine
+public sealed partial class UiLayoutEngine
 {
     private sealed class PlacedEntry
     {
@@ -382,6 +382,8 @@ public sealed class UiLayoutEngine
             cachedTranslationRevision = ctx.Translation.TranslationRevision;
             cachedSnapshot = new UiLayoutSnapshot(new Vector2(width, box.Height), rects, visible, viewports, scrollContents, cachedDefinitionRevision, Array.AsReadOnly(layoutDiagnostics.ToArray()));
             lastEntries = box.Entries;
+            observationLayoutFrame = ctx.Session.Frame;
+            observationLayoutAtUtc = DateTime.UtcNow;
             ctx.Session.ClearDirtyNodes();
             return cachedSnapshot;
         }

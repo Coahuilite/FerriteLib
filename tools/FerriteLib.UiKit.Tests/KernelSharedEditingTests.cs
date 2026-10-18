@@ -28,6 +28,7 @@ internal static class KernelSharedEditingTests
             CompositionAndHost();
             PublicationRecovery();
             ExplicitRetryAfterFailure();
+            ExplicitContextOwnsEditor();
             return 0;
         }
         catch (Exception ex)
@@ -41,6 +42,41 @@ internal static class KernelSharedEditingTests
         }
     }
 
+    private static void ExplicitContextOwnsEditor()
+    {
+        Reset();
+        using var session = new UiSession();
+        var bindings = new UiBindings();
+        bindings.BindValue("text", () => "model", _ => { });
+        UiNode Node(string id) => session.GetOrCreateNode(UiNodeId.Root(
+            new UiElementSpec(id, TextFieldWidget.Kind, new Dictionary<string, string>()), 0), TextFieldWidget.Kind, 0);
+        UiNode first = Node("first");
+        UiNode second = Node("second");
+        UiWidgetContext Context(UiNode node) => new("edit", session, new StubMetrics(), UiTheme.Vanilla,
+            new StubTranslation(), bindings, 200, node.Id.Key, node: node);
+        bool Parse(string text, out string value) { value = text; return true; }
+        var a = UiNative.Editor<string>(Context(first), "text", value => value, Parse);
+        var b = UiNative.Editor<string>(Context(second), "text", value => value, Parse);
+        a.Observe("model");
+        a.Input("first draft", true, false, false, _ => { }, () => "model");
+        b.Observe("model");
+        Check(!ReferenceEquals(a, b) && a.Draft == "first draft" && b.Draft == "model",
+            "explicit contexts own distinct same-binding drafts without an ambient EnterNode");
+        UiNative.DebugMousePositionEnabled = true;
+        UiNative.DebugMousePosition = new Vector2(20, 14);
+        UiNative.DebugMouseDown = true;
+        UiNative.Edit(new Rect(0, 0, 200, 28), Context(first), "text", "model", value => value, Parse,
+            false, false, _ => { }, () => "model");
+        Check(ReferenceEquals(session.ActiveEditState, session.GetOrCreateValueState(first.Id, "text"))
+            && ReferenceEquals(first.EditingState, session.ActiveEditState)
+            && !ReferenceEquals(second.EditingState, session.ActiveEditState),
+            "explicit-context drive records the actual owner rather than the ambient session node");
+        first.InteractionScope = "replacement";
+        var replacement = UiNative.Editor<string>(Context(first), "text", value => value, Parse);
+        Check(!ReferenceEquals(a, replacement) && !a.Focused && session.ActiveEditState == null
+            && ReferenceEquals(b, UiNative.Editor<string>(Context(second), "text", value => value, Parse)),
+            "real explicit owner retarget suspends only the replaced core editor");
+    }
     private static List<string> Trace(int route)
     {
         Reset();

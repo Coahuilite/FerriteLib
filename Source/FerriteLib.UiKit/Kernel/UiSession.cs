@@ -501,13 +501,15 @@ public sealed class UiSession : IDisposable
     /// funnel is the one place that knows a native control was actually handed the keyboard, which is the
     /// same evidence rule that makes it the only place the disabled and covered refusals can be enforced.
     /// </summary>
-    internal void NoteEditOpened(UiValueState state)
+    internal void NoteEditOpened(UiValueState state) => NoteEditOpened(state, activeNode);
+
+    internal void NoteEditOpened(UiValueState state, UiNode node)
     {
         EnsureActive();
         if (state == null) throw new ArgumentNullException(nameof(state));
-        activeEditNode = activeNode;
+        activeEditNode = node;
         activeEditState = state;
-        lastInteractionNode = activeNode;
+        lastInteractionNode = node;
     }
 
     /// <summary>
@@ -857,6 +859,14 @@ public sealed class UiSession : IDisposable
     public IReadOnlyDictionary<string, UiValueState> GetValueStates(UiNodeId element)
     {
         return nodes.TryGetValue(element, out UiNode? node) ? node.ValueStates : NoValueStates;
+    }
+
+    /// <summary>Finds an already owned runtime node by its canonical observation key; never creates it.</summary>
+    internal UiNode? FindObservationNode(string key)
+    {
+        foreach (var pair in nodes)
+            if (pair.Key.Key == key) return pair.Value;
+        return null;
     }
 
     /// <summary>

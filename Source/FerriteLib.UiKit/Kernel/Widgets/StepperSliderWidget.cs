@@ -129,7 +129,7 @@ public sealed class StepperSliderWidget : IUiWidget, IUiLabelledWidget
             UiNative.Edit(fieldRect, ctx, bindKey, ReadModel(), numeric.Format, numeric.Parse, live, false, Set, ReadModel);
         if (!ctx.Session.IsActive)
             return;
-        UiValueState state = ctx.Session.GetOrCreateValueState(bindKey);
+        UiValueState state = ctx.Session.GetOrCreateValueState((ctx.Node ?? ctx.Session.ActiveNode).Id, bindKey);
         state.EditText = editor.Draft;
         state.Focused = editor.Focused;
         if (numeric.Parse(editor.Draft, out float parsed))

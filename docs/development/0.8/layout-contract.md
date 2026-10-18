@@ -63,5 +63,5 @@ The pure target tests production flow, width allocation, finite dependencies, cy
 scroll bounds without engine references. Platform fixtures exercise all nine existing containers,
 actual five-wrapper shared labels/narrow measurement/font invalidation, and real arrange cycle/missing
 failure recovery. Native RimWorld1.6 font pixels, clipping, scroll coordinates and input remain pending.
-Per-property authoring/source completion, assembly/update, full host semantics and R9 are subsequent
-parts of the same complete-first-version task; this layout checkpoint is not full acceptance.
+Per-property sources, assembly/update and hosts/R9 are now connected; see their companion contracts
+and the complete `migration-status.md`. This automated checkpoint does not replace native acceptance.

@@ -37,31 +37,32 @@ that a row's new capability has been migrated.
 
 | Retained use | Exists / owner | 0.8 migration and evidence | Native |
 | --- | --- | --- | --- |
-| Stack | Engine measure/arrange | Shared production neutral vertical flow; Layout + pure Layout; final observation pending | Pending |
+| Stack | Engine measure/arrange | Shared production neutral vertical flow; Layout + pure Layout; bounded runtime observation connected | Pending |
 | Row | Engine measure/arrange | Shared production neutral row allocation/cross sizing + optional shared label column; Layout/Placement + pure Layout | Pending |
 | Column | Engine measure/arrange | Shared production neutral vertical flow + optional shared label column; Layout + pure Layout | Pending |
 | Wrap | Engine responsive wrapping | Shared production neutral width/column wrapping; Layout + pure Layout | Pending |
 | Overlay | Engine stacking | Shared production neutral Overlay + finite same-parent anchors; Layout/Placement/atomic-failure + pure Layout | Pending |
 | Section | Engine grouping/chrome | Shared neutral vertical geometry with retained title/chrome; Layout/SectionHeader + pure Layout | Pending |
 | Surface | Engine grouping/chrome | Shared neutral vertical geometry; per-property environment sources/removal connected; Layout/StyleScope + pure Layout | Pending |
-| Scroll | Engine viewport + session scroll position | Shared neutral content/viewport rows/clamping + real native adapter; full host scroll tests pending | Pending |
-| Clip | Engine effective clip/native groups | Shared neutral effective child geometry + existing balanced native clip; full host evidence pending | Pending |
+| Scroll | Engine viewport + session scroll position | Shared neutral content/viewport rows/clamping + real native adapter; actual nested-scroll/offset-event + existing viewport/popup fixtures | Pending |
+| Clip | Engine effective clip/native groups | Shared neutral effective child geometry + existing balanced native clip; actual nested native scope/callback-close + existing clip fixtures | Pending |
 | Conditional/dynamic content | Engine Visible/Hidden/VisibleKey and structure reconciliation | Immutable replacement + visibility/structure reconciliation retained; actual authoring/update and capture cleanup tested | Pending |
 | Limited same-parent positioning / shared label columns | Confirmed first-version additions | Implemented finite axis dependency + five-wrapper actual label demand/stacking; pure + actual Layout C3 cases | Pending |
-| Standard window / embedded host | UiWindowHost / UiHost, session lifecycle | S1 native eligibility/capture and BSE popup cleanup connected; complete public host contract pending | Pending |
-| Window chrome / return / business close | UiWindowChrome, shell and explicit commands | Retained; no new keyboard/global Cancel defaults; complete migration pending | Pending |
-| Tooltip / help / option-help output | Session hover and OptionHelp bindings | Retained; popup close clears help; full descriptive/observation migration pending | Pending |
+| Standard window / embedded host | UiWindowHost / UiHost, session lifecycle | Common owner-qualified DrawFrame adapter; explicit-context owner cleanup; ordinary concrete PageWindow and embedded edit/modal/Close fixtures; existing stack/dual-host/callback failure paths | Pending |
+| Window chrome / return / business close | UiWindowChrome, shell and explicit commands | Existing shell/options/return commands retained on shared frame/capture/edit lifecycle; WindowHost/WindowCatalog/CancelLadder fixtures; no new keyboard/global Cancel defaults | Pending |
+| Tooltip / help / option-help output | Session hover and OptionHelp bindings | Retained real hover owner/help and option-help outputs; popup close clears help; bounded R9 last-frame facts + typed/help/Popup fixtures | Pending |
 | Bindings / change notifications / subscriptions | Model + UiBindings/UiNotifyAdapter | Retained; model remains authority, existing lifecycle tests; shared editor observes actual model independently of announcements; Assembly update preserves compatible drafts | Pending |
 | XML/program assembly / document update | UiHost/UiDocumentService/engine | Shared XML/program Create+Host UpdateDefinition validation/stage/seal, exact current theme declaration rollback, keyed Repeat; Assembly/DocumentReload evidence | Pending |
-| Diagnostics / layout snapshots / agent observation | Existing diagnostics and development geometry probe | Retained; complete R9 bounded semantic read surface/roles/unknown states pending | Pending |
+| Diagnostics / layout snapshots / agent observation | Existing diagnostics and development geometry probe | Bounded detached host/node/model/editor/source/last-geometry read surface; weak discovery lifecycle; Observation + pure DTO/budget contracts; unsupported/unsampled/stale/failure/truncation explicit | Pending |
 | Visual core / text metrics / styles | Theme/draw/metrics and platform font service | Per-property font/density metrics/all26 semantic colour sources and sparse styles/removal connected; actual wrapper paint respects effective font; native pending | Pending |
 
-## Completion still requires the remaining uses
+## Technical candidate complete; product/native acceptance separate
 
-Common editing/numeric composition and basic plain-text multiline are implemented under the reversible E1–E5/N1–N3 candidates; target native input/IME acceptance remains open. Layout/assembly, complete hosts and bounded observation
-remain first-version work. All completed slices still need target 1.6 acceptance with the actual selected
-Dev package. Complete first-version acceptance is not inferred from the 18-entry inventory or a green full harness.
-
-Implementation contracts: [S0/S1](s01-contract.md), [boolean/selection/expansion](bse-contract.md), [editing/numeric composition](editing-contract.md), [descriptive wrappers and chart](wrappers-contract.md), [shared layout](layout-contract.md), [property sources](property-contract.md), [assembly/update](assembly-contract.md).
+All retained registered uses, nine containers, assembly/update, standard/embedded hosts and bounded R9
+have applicable production contracts and automated coverage. E1–E5/N1–N3, L1, P1 and R9 surface/budgets
+remain reversible Dev candidates for concentrated closeout; F1/F2/F3 remain approved. Target 1.6 native
+input/IME, font pixels, window stack, clipping/scroll/popup geometry and image correlation remain pending.
+A green harness is automated evidence for the selected source, not final product or native acceptance.
+Implementation contracts: [S0/S1](s01-contract.md), [boolean/selection/expansion](bse-contract.md), [editing/numeric composition](editing-contract.md), [descriptive wrappers and chart](wrappers-contract.md), [shared layout](layout-contract.md), [property sources](property-contract.md), [assembly/update](assembly-contract.md), [hosts/observation](host-observation-contract.md).
 The product requirements and remaining policy decisions live in [the specification](README.md),
 with the [contract-to-test migration](acceptance-and-test-migration.md) defining evidence classes.

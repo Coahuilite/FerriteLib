@@ -102,7 +102,7 @@ public sealed class TextFieldWidget : IUiWidget, IUiLabelledWidget
     {
         if (writable == false) return;
         if (typed.Length != 0) return;
-        if (ctx.Session.GetOrCreateValueState(AtomVocabulary.ReadBindKey(spec)).Focused) return;
+        if (ctx.Session.GetOrCreateValueState((ctx.Node ?? ctx.Session.ActiveNode).Id, AtomVocabulary.ReadBindKey(spec)).Focused) return;
 
         string placeholder = AtomVocabulary.ResolveText(spec, ctx, "Placeholder", "PlaceholderKey");
         if (placeholder.Length == 0) return;

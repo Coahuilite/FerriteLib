@@ -10,7 +10,7 @@ namespace FerriteLib.UiKit.Kernel;
 /// Greenfield Host. Owns one manifest, one session, typed bindings/theme/metrics/translation and a
 /// layout engine. Closing the host disposes the session; reopening creates a new Host/session.
 /// </summary>
-public sealed class UiHost : IDisposable
+public sealed partial class UiHost : IDisposable
 {
     private readonly string source;
     private readonly IUiBindings bindings;
@@ -130,11 +130,28 @@ public sealed class UiHost : IDisposable
         // The runtime half of the dependency-reality rule: building a tree is what makes this mod a
         // live consumer rather than a declared one, and Require reports who has done it.
         UiHostLedger.Record(source);
+        TrackObservationHost(this);
     }
 
     public IUiBindings Bindings => bindings;
 
     public UiSession Session => session;
+
+    /// <summary>Reads current model facts and the last committed layout; never arranges or paints.</summary>
+    public UiHostObservation Observe(UiObservationBudget? budget = null, string? nodeKey = null)
+    {
+        try
+        {
+            return engine.Observe(CreateContext(0), budget ?? new UiObservationBudget(), nodeKey,
+                lastLayoutRevision != theme.LayoutRevision);
+        }
+        catch (Exception ex)
+        {
+            return new UiHostObservation(session.Identity, source, session.Frame, session.DefinitionRevision, null,
+                DateTime.UtcNow, UiObservationStatus.Failed, "observation-read:" + ex.GetType().Name, false,
+                Array.AsReadOnly(Array.Empty<UiObservedNode>()));
+        }
+    }
 
     public string Source => source;
 
@@ -298,6 +315,14 @@ public sealed class UiHost : IDisposable
         session.EndFrame();
     }
 
+    /// <summary>Standard and embedded window adapter: the real native owner supplies input qualification.</summary>
+    public void DrawFrame(Rect viewport, Window owner)
+    {
+        if (owner == null) throw new ArgumentNullException(nameof(owner));
+        session.PointerInputAllowed = !owner.IsOpen || Find.WindowStack.GetsInput(owner);
+        DrawFrame(viewport);
+    }
+
     /// <summary>
     /// Runs one complete synchronous IMGUI frame for this host. The host owns frame boundaries so a
     /// consumer cannot accidentally leave a session mid-frame when drawing throws.
@@ -426,6 +451,7 @@ public sealed class UiHost : IDisposable
 
     public void Close()
     {
+        ForgetObservationHost(this);
         // A closed host must not stay referenced by a live document service, and the service's documents
         // must survive the host: the dependency is released, the last valid version is not.
         UiDocumentService? service = documentService;

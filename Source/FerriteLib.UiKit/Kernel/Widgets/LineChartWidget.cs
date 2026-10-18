@@ -107,7 +107,7 @@ public sealed class LineChartWidget : IUiWidget, IUiDescriptiveWidget
     private void HandleDrag(Rect plotRect, List<Vector2> points, HashSet<int>? editablePoints, UiWidgetContext ctx)
     {
         UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
-        UiValueState state = ctx.Session.GetOrCreateValueState("chart-identity");
+        UiValueState state = ctx.Session.GetOrCreateValueState((ctx.Node ?? ctx.Session.ActiveNode).Id, "chart-identity");
         UiChartIdentity identity = state.ChartIdentity ??= new UiChartIdentity();
         string keysBinding = spec.TryGetAttribute("PointKeysBind", out string keysKey) ? keysKey : "";
         IReadOnlyList<string>? keys;

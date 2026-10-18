@@ -10,14 +10,14 @@ public static partial class UiNative
         UiNode node = session.ActiveNode;
         var target = new UiInteractionTarget(node.Id.Key, binding + "\u001f" + node.InteractionScope, "editor", null, node.InteractionScope);
         UiEditSession<T> editor = Editor(session, node, binding, target, format, parse);
-        UiValueState state = session.GetOrCreateValueState(binding);
+        UiValueState state = session.GetOrCreateValueState(node.Id, binding);
         bool disabled = IsElementDisabled(session, binding);
         // The historical return-value primitive explicitly discarded on disable. Preserve that entry's policy.
         if (disabled)
             editor.Cancel(model);
         bool requested = false;
         T result = model;
-        DriveEditor(rect, session, state, editor, model, !disabled, IsCoveredByPopup(session), true, IsMouseDownOver(rect), true, false, value =>
+        DriveEditor(rect, session, node, state, editor, model, !disabled, IsCoveredByPopup(session), true, IsMouseDownOver(rect), true, false, value =>
         {
             requested = true;
             result = value;
@@ -35,11 +35,12 @@ public static partial class UiNative
 
     private static UiEditSession<T> Editor<T>(UiSession session, UiNode node, string binding, UiInteractionTarget target, Func<T, string> format, UiEditParser<T> parse)
     {
-        UiValueState state = session.GetOrCreateValueState(binding);
+        UiValueState state = session.GetOrCreateValueState(node.Id, binding);
         if (node.EditingState != null && !ReferenceEquals(node.EditingState, state))
         {
             UiValueState previous = node.EditingState;
             previous.Focused = previous.CommitRequested = previous.DiscardRequested = false;
+            if (previous.Editor is IUiEditState previousEditor) previousEditor.Suspend();
             previous.Editor = null;
             ReleaseEditFocus(previous, session);
             session.NoteEditClosed(previous);
@@ -50,6 +51,7 @@ public static partial class UiNative
         {
             session.NoteEditClosed(state);
             ReleaseEditFocus(state, session);
+            if (state.Editor is IUiEditState priorEditor) priorEditor.Suspend();
             editor = new UiEditSession<T>(format, parse);
             state.Editor = editor;
             state.EditorTarget = target;
@@ -63,10 +65,10 @@ public static partial class UiNative
     public static void Edit<T>(Rect rect, UiWidgetContext ctx, string binding, T model, Func<T, string> format, UiEditParser<T> parse, bool live, bool multiline, Action<T> request, Func<T> readModel)
     {
         UiSession session = ctx.Session;
-        UiValueState state = session.GetOrCreateValueState(binding);
+        UiNode node = ctx.Node ?? session.ActiveNode;
+        UiValueState state = session.GetOrCreateValueState(node.Id, binding);
         UiEditSession<T> editor = Editor(ctx, binding, format, parse);
         bool writable = ctx.Bindings.IsWritable(binding);
-        UiNode node = ctx.Node ?? session.ActiveNode;
         bool available = !IsInputDisabled(node) && session.PointerInputAllowed && session.IsInputGeometryReliable;
         bool covered = IsCoveredByPopup(session);
         void Request(T candidate)
@@ -79,7 +81,7 @@ public static partial class UiNative
         try
         {
             Text.Font = UiKitFonts.ToGameFont(ctx.Theme.Styles.Font);
-            DriveEditor(rect, session, state, editor, model, available, covered, writable, CanReceivePointerPress(rect, ctx) && IsPointerDown(), live, multiline, Request, readModel);
+            DriveEditor(rect, session, node, state, editor, model, available, covered, writable, CanReceivePointerPress(rect, ctx) && IsPointerDown(), live, multiline, Request, readModel);
         }
         finally
         {
@@ -87,7 +89,7 @@ public static partial class UiNative
         }
     }
 
-    private static void DriveEditor<T>(Rect rect, UiSession session, UiValueState state, UiEditSession<T> editor, T model, bool available, bool covered, bool writable, bool focus, bool live, bool multiline, Action<T> request, Func<T> readModel)
+    private static void DriveEditor<T>(Rect rect, UiSession session, UiNode node, UiValueState state, UiEditSession<T> editor, T model, bool available, bool covered, bool writable, bool focus, bool live, bool multiline, Action<T> request, Func<T> readModel)
     {
         state.EditorMultiline = multiline;
         editor.Observe(model);
@@ -161,7 +163,7 @@ public static partial class UiNative
                 state.EditText = editor.Draft;
                 state.Focused = editor.Focused;
                 if (editor.Focused)
-                    session.NoteEditOpened(state);
+                    session.NoteEditOpened(state, node);
                 else
                     session.NoteEditClosed(state);
             }

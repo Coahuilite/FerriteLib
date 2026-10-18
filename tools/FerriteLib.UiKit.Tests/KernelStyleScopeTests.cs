@@ -41,6 +41,7 @@ internal static class KernelStyleScopeTests
     {
         failures = 0;
         Run("Per-property authored/local/ancestor intent survives sparse styles and removal", VerifyPerPropertySources);
+        Run("Page colour overlays yield to effective child declarations", VerifyPageColourOverrides);
         Run("A region scopes its subtree to the region's own theme", VerifyRegionScope);
         Run("One scope keeps one theme instance across frames", VerifyScopeInstanceIsStable);
         Run("A region theme expires on the baseline layout clock", VerifyScopeFollowsLayoutClock);
@@ -109,6 +110,55 @@ internal static class KernelStyleScopeTests
         Check(SameColor(LastTheme(DrawnPaths, DrawnThemes, "/child")!.TextPrimary, new Color(0, 1, 0, 1))
             && SameColor(LastTheme(DrawnPaths, DrawnThemes, "/follow")!.TextPrimary, new Color(1, 1, 0, 1)),
             "removal reveals inline intent while an unoverridden sibling keeps following the current ancestor");
+    }
+    private static void VerifyPageColourOverrides()
+    {
+        PrepareRegistry();
+        string xml = "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Styles Schema=\"1\" Scheme=\"page\">"
+            + "<Scheme Name=\"page\"><Color Token=\"Panel\" Value=\"#0000FF\"/></Scheme></Styles>"
+            + "<Stack Id=\"parent\"><Widget Id=\"inline\" Kind=\"" + ProbeKind + "\" Color.Panel=\"#FF0000\"/>"
+            + "<Widget Id=\"child\" Kind=\"" + ProbeKind + "\"/></Stack></UiPage>";
+        using var host = new UiHost(Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.Vanilla,
+            new StubMetrics(), new StubTranslation());
+        Color red = new(1, 0, 0, 1);
+        Color green = new(0, 1, 0, 1);
+        Color yellow = new(1, 1, 0, 1);
+        Frame(host, 400, 400);
+        UiNode parent = host.Session.GetNodeByElementId("parent")!;
+        UiNode child = host.Session.GetNodeByElementId("child")!;
+        AssertPanel(host.Session.GetNodeByElementId("inline")!, red, UiPropertyOrigin.Instance,
+            "inline declaration beats page overlay in measure and draw");
+        AssertPanel(child, IcePanel, UiPropertyOrigin.Ancestor, "unoverridden child retains page colour");
+        parent.Properties.Colour("Panel").Set(red);
+        Frame(host, 401, 400);
+        AssertPanel(child, red, UiPropertyOrigin.Ancestor, "ancestor declaration beats page overlay");
+        child.Properties.LocalColour("Panel").Set(green);
+        Frame(host, 402, 400);
+        AssertPanel(child, green, UiPropertyOrigin.LocalStyle, "local declaration beats ancestor and page");
+        child.Properties.Colour("Panel").Set(yellow);
+        Frame(host, 403, 400);
+        AssertPanel(child, yellow, UiPropertyOrigin.Instance, "runtime instance beats local declaration");
+        child.Properties.Colour("Panel").Remove();
+        Frame(host, 404, 400);
+        AssertPanel(child, green, UiPropertyOrigin.LocalStyle, "instance removal reveals current local declaration");
+        child.Properties.LocalColour("Panel").Remove();
+        parent.Properties.Colour("Panel").Set(yellow);
+        Frame(host, 405, 400);
+        AssertPanel(child, yellow, UiPropertyOrigin.Ancestor, "local removal follows current ancestor value");
+        parent.Properties.Colour("Panel").Remove();
+        Frame(host, 406, 400);
+        AssertPanel(child, IcePanel, UiPropertyOrigin.Ancestor, "ancestor removal reveals unchanged page overlay");
+    }
+
+    private static void AssertPanel(UiNode node, Color expected, UiPropertyOrigin origin, string name)
+    {
+        UiResolvedProperty<Color?> fact = node.Properties.ResolvedColours["Panel"];
+        string suffix = "/" + node.ElementId;
+        UiTheme? measured = LastTheme(MeasuredPaths, MeasuredThemes, suffix);
+        UiTheme? drawn = LastTheme(DrawnPaths, DrawnThemes, suffix);
+        Check(fact.Origin == origin && fact.Value.HasValue && SameColor(fact.Value.Value, expected)
+            && measured != null && SameColor(measured.Panel, expected)
+            && drawn != null && SameColor(drawn.Panel, expected), name);
     }
     // --- a region scopes its subtree ---------------------------------------------------------------
 

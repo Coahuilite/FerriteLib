@@ -67,4 +67,4 @@ Evidence: KernelAssemblyTests exercises XML/program geometry, immutable program 
 prepare/stage failure and editor cleanup, and actual two-item Tree/check/disclosure/chart-key/Dropdown
 help/width/anchor behavior through reorder. KernelDocumentReloadTests covers real document-service
 Gap-only removal with current host values/sources and the existing multi-host atomicity/cleanup cases.
-Native RimWorld1.6 acceptance remains pending; complete host integration and bounded R9 follow.
+Host integration and bounded R9 are documented in `host-observation-contract.md`. Native RimWorld1.6 acceptance remains pending.
