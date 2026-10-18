@@ -201,6 +201,7 @@ public sealed class UiSession : IDisposable
 
     /// <summary>Id of the popup currently owned by this session, if any.</summary>
     public string? OpenPopupId => openPopupId;
+    internal UiInteractionTarget? PopupTarget => popupTarget;
 
     /// <summary>Anchor rect of the popup currently owned by this session, if any.</summary>
     public Rect? OpenPopupAnchor => openPopupAnchor;

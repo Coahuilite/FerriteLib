@@ -92,8 +92,15 @@ new registration or reflection requirements.
 - Tree row keys/text/check/selection/expansion, Dropdown and ModeRow options, and chart point/key
   prefixes are bounded reads. They do not select the first option or repair a missing current value.
   Static/string versus explicitly typed choices preserve their actual wrapper entry conditions.
+  Option captions, actual scalar typed value/type and shared selectability are separate facts; equal
+  captions do not merge typed values. Opaque typed objects without a detached key seam are explicitly
+  Unsupported, never identified by caption or leaked as mutable model handles. Existing node.Selection
+  Missing/Index/Selectable are labelled last-wrapper-selection, distinct from the current model read.
+  Static options count actual nonempty entries (not slot numbers), preserve the declared slot and report
+  omitted entries even when the first nonempty slot occurs after the item budget number.
 - Seven descriptive wrappers use their actual description seam. Images distinguish known availability
-  from unknown; decorative content has no invented input capability. Chart observation does not copy
+  from unknown, including known-null versus available; Progress retains Min/Max/Finite/Fraction separately
+  from the actual model. Decorative content has no invented input capability. Chart observation does not copy
   an entire series just to answer a bounded prefix read.
 - Geometry is **last-arrangement page-local**, with scroll-local content/viewport ancestry labelled.
   Last layout frame/time and definition revision remain separate from query time/current definition.
@@ -101,7 +108,8 @@ new registration or reflection requirements.
 - Font/metric/colour sources are labelled **last-property-resolution**. These are not a pixel capture.
   A current window origin, native focus/selection, current point hit/occlusion or old screenshot pixels
   are NotSampled when unavailable; a page rectangle does not pretend to prove them.
-- Popup owner and hover-help owner/text are actual session/last-frame facts. Current runtime reads do
+- Popup owner node/part/scope/item are the actual session popup target, separately from its binding;
+  same-Bind instances remain distinguishable. Hover-help owner/text are actual last-frame facts. Current runtime reads do
   not claim to reproduce an earlier image; correlate identity, version, time and the caller's viewport.
 
 `Sampled`, `NotFound`, `Unsupported`, `NotSampled`, `Stale` and `Failed` are distinct. Getter/parser
@@ -140,3 +148,29 @@ the full local gate runs them with the changed candidate. These platform fixture
 production contract target are automated evidence, not RimWorld1.6 acceptance. The developer's target
 1.6 pass remains pending for native stacking, font/IME/selection/clipboard, scrolling/popup geometry and
 image-to-runtime correlation. No game install, execution, screenshot automation or release is implied.
+
+## A8 scope closeout: implemented versus recommended deferral
+
+The current candidate preserves native editing keys/selection/copy/IME plus existing Host hooks.
+It does **not** implement the earlier recommended library-wide structural focus traversal or explicit
+focus-order declarations (A3), Button Enter/Space and Checkbox Space mappings (B2), or Slider declared
+keyboard increment / default1%-span / Home/End mappings (B3). These are concrete unimplemented recommended
+items, not implied by pointer F1/F2 or by the shared headless activation seam. Recommended reversible
+first-version disposition: retain the native editor and existing hooks, defer the additional library
+focus/key system together. This narrows the earlier recommended keyboard scope and needs concentrated
+product closeout; it is not silently counted as delivered or already approved.
+
+The existing Cancel hook is implemented, not a new global key router: native composition first keeps
+its key; otherwise open popup → owned pointer capture → active editor discard → nearest executable
+CancelBind from the explicit/last-interaction subject up the tree → unanswered shell extension/host
+native close convention. Each handled layer consumes once. Accept reaches only the applicable active
+editor (multiline newline/composition retain their own rules); with no editor the native owner keeps its
+own meaning. Business save/close/veto stays separate from UI Cancel.
+
+B5 retained uses remain in the complete inventory: Dropdown/ModeRow missing values and typed identities,
+Tree part priority, editable chart points, seven descriptive uses, keyed Repeat/conditional updates,
+Tooltip/help, return commands and native window options are implemented with their applicable shared
+contracts. Automatic popup refocus, a new tree template shortcut or a new keyboard/global Cancel system
+is not supplied. Existing standard/embedded entry conditions remain; new owner-qualified embedding and
+the R9 read-only field/budget surface are the concrete public consumption candidates for A8. Public type
+tiers remain public-unstable until closeout. Native acceptance and stable publication are separate steps.

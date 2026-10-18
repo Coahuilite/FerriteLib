@@ -56,12 +56,16 @@ that a row's new capability has been migrated.
 | Diagnostics / layout snapshots / agent observation | Existing diagnostics and development geometry probe | Bounded detached host/node/model/editor/source/last-geometry read surface; weak discovery lifecycle; Observation + pure DTO/budget contracts; unsupported/unsampled/stale/failure/truncation explicit | Pending |
 | Visual core / text metrics / styles | Theme/draw/metrics and platform font service | Per-property font/density metrics/all26 semantic colour sources and sparse styles/removal connected; actual wrapper paint respects effective font; native pending | Pending |
 
-## Technical candidate complete; product/native acceptance separate
+## Retained/confirmed technical candidate connected; A8/native acceptance separate
 
 All retained registered uses, nine containers, assembly/update, standard/embedded hosts and bounded R9
 have applicable production contracts and automated coverage. E1–E5/N1–N3, L1, P1 and R9 surface/budgets
 remain reversible Dev candidates for concentrated closeout; F1/F2/F3 remain approved. Target 1.6 native
 input/IME, font pixels, window stack, clipping/scroll/popup geometry and image correlation remain pending.
+A3 structural focus traversal, B2 Enter/Space and B3 Slider keyboard increment/Home/End remain concrete
+unimplemented recommendations. The proposed first-version deferral keeps native editor keys and existing
+Cancel/Accept hooks, and needs product closeout; these items are not counted as implemented. See the
+A8 section of `host-observation-contract.md` for the exact difference from the earlier recommendation.
 A green harness is automated evidence for the selected source, not final product or native acceptance.
 Implementation contracts: [S0/S1](s01-contract.md), [boolean/selection/expansion](bse-contract.md), [editing/numeric composition](editing-contract.md), [descriptive wrappers and chart](wrappers-contract.md), [shared layout](layout-contract.md), [property sources](property-contract.md), [assembly/update](assembly-contract.md), [hosts/observation](host-observation-contract.md).
 The product requirements and remaining policy decisions live in [the specification](README.md),

@@ -333,6 +333,8 @@ Unity 官方 [GUI 实现](https://raw.githubusercontent.com/Unity-Technologies/U
 上述决定完成后，再冻结相应公开类型、声明和迁移清单。接口设计不得改变已确认的语义边界，
 也不把这里的推荐包装政策升级为 core 不变量。
 
+当前技术候选未实现A3结构焦点遍历、B2 Button Enter/Space及Checkbox Space、B3 Slider键盘增量/Home/End。推荐首版保原生编辑键位与现有Cancel/Accept hooks，把新增库级焦点/键盘系统一并延后；这是相对原推荐的明确未实现范围选择，待集中裁定，不计为已交。B5保留用途、标准/嵌入入口及R9具体公共候选现况见 [宿主/观察合同A8](host-observation-contract.md#a8-scope-closeout-implemented-versus-recommended-deferral)。
+
 ## 第二部分：默认包装合同
 
 ### B1. 共同编辑推荐

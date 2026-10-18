@@ -58,6 +58,9 @@ public sealed class LineChartWidget : IUiWidget, IUiDescriptiveWidget
         return ReadHeight();
     }
 
+    internal bool AllowsPointEditing => ReadBool("Editable", true)
+        && spec.TryGetAttribute("ActionBind", out string actionKey) && actionKey.Length > 0;
+
     public UiDescription Describe(UiWidgetContext ctx) => new UiDescription(UiDescriptionRole.Chart, count: ResolvePoints(ctx).Count);
     public void Draw(Rect rect, UiWidgetContext ctx)
     {
@@ -70,7 +73,7 @@ public sealed class LineChartWidget : IUiWidget, IUiDescriptiveWidget
             return;
         }
 
-        bool editable = ReadBool("Editable", true) && spec.TryGetAttribute("ActionBind", out string actionKey) && actionKey.Length > 0;
+        bool editable = AllowsPointEditing;
         Rect plotRect = new(rect.x + PlotPadding, rect.y + PlotPadding, Math.Max(1f, rect.width - PlotPadding * 2f), Math.Max(1f, rect.height - PlotPadding * 2f));
         HashSet<int>? editablePoints = null;
         if (editable && spec.TryGetAttribute("EditablePoints", out string editableRaw) && editableRaw.Trim().Length > 0)

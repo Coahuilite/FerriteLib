@@ -14,6 +14,7 @@ internal static class KernelObservationTests
             ReadFactsWithoutDraw();
             BoundedCollections();
             StandardAndEmbeddedEditors();
+            RepairedProjectionFacts();
             NestedScrollHost();
             DiscoveryLifetimeAndCapacity();
             return 0;
@@ -187,6 +188,86 @@ internal static class KernelObservationTests
         }
     }
 
+    private enum SelectionValue { First, Second, Missing }
+
+    private static void RepairedProjectionFacts()
+    {
+        SelectionValue current = SelectionValue.Missing;
+        float progress = 3;
+        bool progressUnavailable = false;
+        Texture2D? texture = null;
+        int writes = 0;
+        var bindings = new UiBindings();
+        var choices = new[] { new UiChoice<SelectionValue>("same label", SelectionValue.First), new UiChoice<SelectionValue>("same label", SelectionValue.Second) };
+        bindings.BindValue("typed", () => current, value => { current = value; writes++; });
+        bindings.BindOptions("choices", () => (IReadOnlyList<UiChoice<SelectionValue>>)choices);
+        bindings.BindReadOnly("mode", () => SelectionValue.Second);
+        bindings.BindOptions("mode", () => (IReadOnlyList<UiChoice<SelectionValue>>)choices);
+        bindings.BindValue("sparse", () => "later", _ => writes++);
+        bindings.BindValue("sparse-mode", () => "later", _ => writes++);
+        bindings.BindReadOnly<Texture2D>("picture", () => texture!);
+        bindings.BindReadOnly("progress", () => progressUnavailable ? throw new InvalidOperationException("unavailable") : progress);
+        bindings.BindAction<UiChartPointChange>("point", _ => writes++);
+        var manifest = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"r9-facts\"><Stack Id=\"root\" Padding=\"0\" Gap=\"0\">"
+            + "<Widget Id=\"first\" Kind=\"input/dropdown\" Bind=\"typed\" OptionsBind=\"choices\"/>"
+            + "<Widget Id=\"second\" Kind=\"input/dropdown\" Bind=\"typed\" OptionsBind=\"choices\"/>"
+            + "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\"/>"
+            + "<Widget Id=\"sparse\" Kind=\"input/dropdown\" Bind=\"sparse\" Option2=\"later label\" Value2=\"later\" Option4=\"fourth\"/>"
+            + "<Widget Id=\"sparse-mode\" Kind=\"input/mode-row\" Bind=\"sparse-mode\" Value2=\"later\" Title2=\"later label\" Value4=\"fourth\"/>"
+            + "<Widget Id=\"image\" Kind=\"display/image\" Bind=\"picture\" Height=\"28\"/>"
+            + "<Widget Id=\"progress\" Kind=\"display/progress\" Bind=\"progress\" Max=\"2\"/>"
+            + "<Widget Id=\"chart\" Kind=\"chart/line\" Points=\"0,0;1,1\" Editable=\"0\" ActionBind=\"point\"/>"
+            + "</Stack></UiPage>");
+        using var host = new UiHost("r9-facts", manifest, bindings, UiTheme.Vanilla, new Metrics(), new Translation());
+        Event previousEvent = Event.current;
+        UiNative.DebugMousePositionEnabled = false;
+        try
+        {
+            Event.current = new Event { type = EventType.Repaint };
+            host.DrawFrame(new Rect(0, 0, 400, 800));
+            UiHostObservation sample = host.Observe(new UiObservationBudget(items: 1));
+            IReadOnlyList<UiObservedFact> Facts(string id) => sample.Nodes.Single(node => node.Path == "root/" + id).Facts;
+            bool Has(string id, string name, string value) => Facts(id).Any(f => f.Name == name && f.Value == value);
+            Check(Has("image", "available", "False") && Has("progress", "min", "0") && Has("progress", "max", "2")
+                && Has("progress", "finite", "True") && Has("progress", "fraction", "1") && Has("progress", "value", "3"),
+                "description projection preserves known-null Image and full actual Progress range versus clamped fraction");
+            Check(Has("first", "option.0.text", "same label") && Has("first", "option.0.value", "First")
+                && Has("first", "option.0.selectable", "True") && Has("first", "selection.missing", "True")
+                && Has("mode", "selection.missing", "False") && Has("mode", "option.0.selectable", "False"),
+                "typed option values and selectability remain distinct from duplicate labels and actual wrapper Missing");
+            foreach (string id in new[] { "sparse", "sparse-mode" })
+                Check(Has(id, "option-count", "2") && Has(id, "option.0.slot", "2") && Has(id, "option.0.value", "later")
+                    && Facts(id).Any(f => f.Name == "options" && f.Truncated),
+                    "sparse static " + id + " counts real entries, reads slot2 under Items1 and reports omitted slot4");
+            Check(Has("chart", "editable", "False"), "Editable0 observation uses the exact production chart capability");
+            sample = host.Observe(new UiObservationBudget(items: 2));
+            Check(Has("first", "option.1.text", "same label") && Has("first", "option.1.value", "Second"),
+                "duplicate typed labels do not merge distinct stable values");
+            texture = new Texture2D(2, 2);
+            progress = float.NaN;
+            sample = host.Observe();
+            Check(Has("image", "available", "True") && Has("progress", "finite", "False") && Has("progress", "value", "NaN"),
+                "fresh description facts keep available image and nonfinite actual model distinct from a fill answer");
+            progressUnavailable = true;
+            sample = host.Observe();
+            Check(Facts("progress").Any(f => f.Name == "description" && f.Status == UiObservationStatus.NotSampled)
+                && !Facts("progress").Any(f => f.Name == "value"), "unavailable progress remains unknown, not zero");
+            UiNode second = host.Session.GetNodeByElementId("second")!;
+            Rect trigger = second.Rect!.Value;
+            Vector2 point = new(trigger.x + 5, trigger.y + 5);
+            Event.current = new Event { type = EventType.MouseDown, button = 0, mousePosition = point };
+            host.DrawFrame(new Rect(0, 0, 400, 800));
+            Event.current = new Event { type = EventType.MouseUp, button = 0, mousePosition = point };
+            host.DrawFrame(new Rect(0, 0, 400, 800));
+            UiHostObservation popup = host.Observe();
+            Check(popup.Facts.Any(f => f.Name == "popup-owner-node" && f.Value == second.Id.Key)
+                && popup.Facts.Any(f => f.Name == "popup-owner-part" && f.Value == "trigger")
+                && !popup.Facts.Any(f => f.Name == "popup-owner-node" && f.Value == host.Session.GetNodeByElementId("first")!.Id.Key),
+                "same-Bind popup observation identifies its real stable target owner, not the shared binding");
+            Check(writes == 0, "all projection and popup-owner checks perform no business write");
+        }
+        finally { Event.current = previousEvent; }
+    }
     private static void NestedScrollHost()
     {
         int requests = 0;
@@ -279,10 +360,10 @@ internal static class KernelObservationTests
         options.MaximumRead = 2;
         UiHostObservation snapshot = host.Observe(new UiObservationBudget(items: 2));
         var facts = snapshot.Nodes.Single(node => node.Path == "choice").Facts;
-        Check(facts.Any(f => f.Name == "option-count" && f.Value == "3") && facts.Any(f => f.Name == "option.1" && f.Value.Contains("two")) && facts.Any(f => f.Name == "options" && f.Truncated) && !facts.Any(f => f.Status == UiObservationStatus.Failed), "dynamic option projection reads only its budgeted prefix, with exact count and explicit truncation");
+        Check(facts.Any(f => f.Name == "option-count" && f.Value == "3") && facts.Any(f => f.Name == "option.1.text" && f.Value == "two") && facts.Any(f => f.Name == "options" && f.Truncated) && !facts.Any(f => f.Status == UiObservationStatus.Failed), "dynamic option projection reads only its budgeted prefix, with exact count and explicit truncation");
         Check(facts.Any(f => f.Name == "value" && f.Value == "2"), "option reads do not replace current selection with the first item");
         var staticFacts = snapshot.Nodes.Single(node => node.Path == "static").Facts;
-        Check(staticFacts.Any(f => f.Name == "option.0" && f.Value == "static label|value=static label")
+        Check(staticFacts.Any(f => f.Name == "option.0.value" && f.Value == "static label")
             && !staticFacts.Any(f => f.Value.Contains("ignored decoy")),
             "string dropdown observation preserves static option conditions instead of adopting an unrelated same-key option binding");
         bool refused = false;

@@ -5,7 +5,7 @@
 - [ ] Run the native 1.6 S0/S1 acceptance in docs/development/0.8/s01-contract.md after the developer installs the selected isolated Dev package.
 - [ ] Run the native BSE acceptance in `docs/development/0.8/bse-contract.md` using the selected isolated Dev package.
 - [x] Complete the first-version production inventory in `docs/development/0.8/migration-status.md`, including shared owner-qualified hosts and bounded R9. Automated evidence is separate from native/product acceptance.
-- [ ] Close out E1–E5/N1–N3, L1, P1 and the R9 read surface/budgets as product candidates; run the target native host/observation pass in `docs/development/0.8/host-observation-contract.md`.
+- [ ] Close out E1–E5/N1–N3, L1, P1, R9 and the explicit proposed A3/B2/B3 focus/keyboard deferral as product candidates; run the target native host/observation pass in `docs/development/0.8/host-observation-contract.md`.
 - [ ] Collect native editing/IME acceptance and final E1–E5/N1–N3 candidate decisions against `docs/development/0.8/editing-contract.md`.
 
 
