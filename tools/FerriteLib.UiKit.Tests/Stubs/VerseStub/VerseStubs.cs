@@ -465,8 +465,11 @@ public static class Widgets
         LabelColors.Add(GUI.color);
     }
 
+    public static Exception? DrawBoxSolidFailure;
+
     public static void DrawBoxSolid(Rect rect, Color color)
     {
+        if (DrawBoxSolidFailure != null) throw DrawBoxSolidFailure;
         DrawBoxSolidRects.Add(rect);
         DrawBoxSolidColors.Add(color);
     }

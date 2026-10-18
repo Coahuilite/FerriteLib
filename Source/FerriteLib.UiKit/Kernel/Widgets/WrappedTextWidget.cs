@@ -23,7 +23,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// widget — which is the author's explicit override of this contract, not a second contract.
 /// </para>
 /// </summary>
-public sealed class WrappedTextWidget : IUiWidget
+public sealed class WrappedTextWidget : IUiWidget, IUiDescriptiveWidget
 {
     public const string Kind = "text/wrapped";
 
@@ -91,6 +91,8 @@ public sealed class WrappedTextWidget : IUiWidget
         return Math.Max(1f, wrapped) + verticalLead;
     }
 
+    public UiDescription Describe(UiWidgetContext ctx) => AtomVocabulary.DescribeText(spec, ctx, UiDescriptionRole.Text, "Text", "TextKey");
+
     public void Draw(Rect rect, UiWidgetContext ctx)
     {
         if (rect.width <= 1f || rect.height <= 1f) return;
@@ -140,19 +142,6 @@ public sealed class WrappedTextWidget : IUiWidget
     /// fail-soft rule is about keys that can be unresolved at runtime, not about tolerating a manifest typo.
     /// </para>
     /// </summary>
-    private string ResolveText(UiWidgetContext ctx)
-    {
-        if (spec.TryGetAttribute("Bind", out string bindKey) && bindKey.Length > 0)
-        {
-            if (ctx.Bindings.TryGet(bindKey, out string bound))
-            {
-                return bound ?? "";
-            }
-
-            AtomVocabulary.ReportUnresolved(ctx, Kind, bindKey, "empty text");
-            return "";
-        }
-
-        return AtomVocabulary.ResolveText(spec, ctx, "Text", "TextKey");
-    }
+    private string ResolveText(UiWidgetContext ctx) =>
+        AtomVocabulary.DescribeText(spec, ctx, UiDescriptionRole.Text, "Text", "TextKey", reportMissing: true).Text;
 }

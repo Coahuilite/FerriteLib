@@ -25,7 +25,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// frame inside a repeater template.
 /// </para>
 /// </summary>
-internal sealed class ProgressWidget : IUiWidget
+internal sealed class ProgressWidget : IUiWidget, IUiDescriptiveWidget
 {
     internal const string Kind = "display/progress";
 
@@ -73,7 +73,7 @@ internal sealed class ProgressWidget : IUiWidget
 
         if (spec.TryGetAttribute("Max", out string raw) && raw.Trim().Length > 0
             && (!float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float declared)
-                || declared <= 0f))
+                || float.IsNaN(declared) || float.IsInfinity(declared) || declared <= 0f))
         {
             throw new InvalidOperationException(
                 "ProgressWidget at '" + elementPath + "' declares Max '" + raw + "'; expected a positive number.");
@@ -91,9 +91,9 @@ internal sealed class ProgressWidget : IUiWidget
     {
         if (rect.width <= 1f || rect.height <= 1f) return;
 
-        float value = ReadValue(ctx, ReadBindKey());
-        float max = ReadMax();
-        float fraction = Math.Max(0f, Math.Min(1f, value / max));
+        UiDescription description = Describe(ctx);
+        if (!description.Range.HasValue) AtomVocabulary.ReportUnresolved(ctx, Kind, ReadBindKey(), "0");
+        float fraction = description.Range?.Fraction ?? 0;
 
         UiTheme theme = ctx.Theme;
         float edge = Math.Max(1f, theme.Geometry.Hairline);
@@ -109,6 +109,20 @@ internal sealed class ProgressWidget : IUiWidget
         UiThemeDraw.Solid(new Rect(rect.x + edge, rect.y + edge, fillWidth, innerHeight), style.Fill);
     }
 
+    public UiDescription Describe(UiWidgetContext ctx)
+    {
+        try
+        {
+            if (!ctx.Bindings.TryGet(ReadBindKey(), out float value))
+                return new UiDescription(UiDescriptionRole.Progress, unknownReason: "MissingBinding");
+            return new UiDescription(UiDescriptionRole.Progress, range: new UiRangeObservation(value, 0, ReadMax()));
+        }
+        catch (InvalidOperationException)
+        {
+            return new UiDescription(UiDescriptionRole.Progress, unknownReason: "BindingReadUnavailable");
+        }
+    }
+
     private float ReadMax()
     {
         if (spec.TryGetAttribute("Max", out string raw)
@@ -119,16 +133,6 @@ internal sealed class ProgressWidget : IUiWidget
         }
 
         return DefaultMax;
-    }
-
-    /// <summary>
-    /// The proportion read, under the same contract as the checkbox: an absent key and a key bound to another
-    /// type both paint the empty track and are recorded once (<see cref="AtomVocabulary.ReadOr{T}"/>), so an
-    /// item-local value that is not there yet cannot take the page down.
-    /// </summary>
-    private float ReadValue(UiWidgetContext ctx, string key)
-    {
-        return AtomVocabulary.ReadOr(ctx, Kind, key, 0f, "0");
     }
 
     private string ReadBindKey()

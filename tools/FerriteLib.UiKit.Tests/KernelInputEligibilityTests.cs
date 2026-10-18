@@ -689,8 +689,9 @@ internal static class KernelInputEligibilityTests
                 "the capture records the element that took it, not an anonymous id");
             // The chart keeps its drag in the state slot its own element id names, and the capture names the
             // node, so "this element is the owner" is readable from both sides of the session.
-            Check(chartNode.GetOrCreateState("chart").Dragging,
-                "and the element's own state says a drag is in progress");
+            Check(page.Session.Interactions.CaptureOwner?.Node == chartNode.Id.Key &&
+                page.Session.Interactions.CaptureOwner?.Part == "chart-point",
+                "the common interaction owner, not a second chart drag bit, records the point capture");
 
             int held = page.Session.OwnedHotControl!.Value;
 

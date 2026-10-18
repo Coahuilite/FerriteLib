@@ -163,6 +163,9 @@ public static partial class UiNative
     /// </para>
     /// </summary>
     public static bool CanReceivePointerPress(Rect rect, UiWidgetContext ctx)
+        => CanReceivePointer(ctx) && IsMouseOver(rect);
+
+    private static bool CanReceivePointer(UiWidgetContext ctx)
     {
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
         UiSession session = ctx.Session;
@@ -171,7 +174,6 @@ public static partial class UiNative
 
         if (IsInputDisabled(element)) return false;
         if (session.IsPointerOverHigherLayer(element, windowPoint)) return false;
-        if (!IsMouseOver(rect)) return false;
         return session.IsPointInEffectiveClip(windowPoint);
     }
 

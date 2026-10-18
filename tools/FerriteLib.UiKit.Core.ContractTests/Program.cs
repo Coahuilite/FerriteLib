@@ -29,6 +29,7 @@ internal static class Program
             BooleanSelectionExpansion();
             Isolation();
             Editing();
+            PointInteraction();
             Console.WriteLine($"ALL PASS {checks} neutral checks");
             return 0;
         }
@@ -37,6 +38,32 @@ internal static class Program
             Console.Error.WriteLine(ex);
             return 1;
         }
+    }
+
+    private static void PointInteraction()
+    {
+        using var session = new UiInteractionSession();
+        var target = new UiInteractionTarget("chart", "series", "chart-point", "B");
+        var sibling = new UiInteractionTarget("chart", "series", "chart-point", "A");
+        var geometry = new UiHitGeometry(44, 44, 12, 12, 0, 100, 0, 100, true);
+        UiInteractionResult Drive(UiPointerPhase phase, float x, float y, bool used = false) =>
+            session.PointerPoint(target, Sample(phase, x, y, used), geometry, Eligible, .5f, .5f);
+        Check(!Drive(UiPointerPhase.Press, 55, 55).Captured, "POINT square corner outside the existing circular radius is not a hit");
+        Check(!Drive(UiPointerPhase.Press, 50, 50).Request && session.CaptureOwner?.Equals(target) == true,
+            "POINT press captures without publishing a value");
+        session.PointerPoint(sibling, Sample(UiPointerPhase.None), geometry, Eligible, 0, 1);
+        Check(session.CaptureOwner?.Equals(target) == true, "POINT nonowner sibling visit cannot end capture");
+        var moved = Drive(UiPointerPhase.Drag, 50, 20);
+        Check(moved.Request && moved.Value == .5f && moved.Y == .8f, "POINT Y-only change is a shared normalized request");
+        Check(!Drive(UiPointerPhase.Drag, 50, 20).Request, "POINT unchanged sample never retries business rejection");
+        moved = Drive(UiPointerPhase.Drag, 120, -10);
+        Check(moved.Request && moved.Value == 1 && moved.Y == 1, "POINT both coordinates are clamped by common mapping");
+        Check(!Drive(UiPointerPhase.Release, 120, -10, true).Request && !session.CaptureOwner.HasValue,
+            "POINT consumed release ends only the hold without another request");
+        var range = new UiRangeObservation(15, 0, 10);
+        Check(range.Value == 15 && range.Finite && range.Fraction == 1, "DESCRIPTION actual out-of-range model remains distinct from clamped fill");
+        range = new UiRangeObservation(float.NaN, 0, 10);
+        Check(!range.Finite && range.Fraction == 0, "DESCRIPTION invalid model is an explicit unknown, not a repair");
     }
 
     private static void Editing()

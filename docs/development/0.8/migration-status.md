@@ -19,14 +19,14 @@ pending. Earlier 0.7 human acceptance stays attached to its own package and does
 | `input/number-field` | Yes | Shared editor/finite numeric codec/read-only-before-edit; E1–E5 candidate | SharedEditing three routes/failure/I2/isolation; pure editor and migrated Atom/EditTransaction guards | Pending |
 | `input/text-field` | Single-line and basic plain-text multiline | Shared editor, native selection/copy/composition protocol and width-aware multiline measure; E1–E5 candidate | SharedEditing three routes/multiline/native composition/read-only; TextField/EditTransaction guards | Pending |
 | `input/stepper-slider` | Numeric editor + range + ± | Shared editing/range/activation; explicit local takeover, N1–N3 candidate | SharedEditing actual composite and pure E/N cases; WidgetBehavior guards | Pending |
-| `chart/line` | Read-only points **and editable control points** | Pending stable editable-point behavior/capture/end migration; not reduced to read-only | Existing InputEligibility/ControlKind chart guards | Pending |
-| `text/wrapped` | Yes | Pending complete descriptive facts and per-wrapper font/width contract | Existing CoreWidget/TextAudit/Style guards | Pending |
-| `section/header` | Yes | Pending descriptive/group and complete font/width migration | Existing SectionHeader/Layout guards | Pending |
-| `chrome/banner` | Yes | Pending complete descriptive/measure migration | Existing CoreWidget/Atom guards | Pending |
-| `state/empty` | Yes | Pending complete descriptive/measure migration | Existing ControlKind/Atom guards | Pending |
-| `display/image` | Natural size/letterbox/missing slot | Pending meaningful-image description vs decoration read surface | Existing ControlKind/image guards | Pending |
-| `chrome/rule` | Decoration | Pending complete geometry/observation migration; no invented input state | Existing Atom/ControlKind guards | Pending |
-| `display/progress` | Model value/range display | Pending descriptive value/range facts; no write capability | Existing ControlKind guards | Pending |
+| `chart/line` | Read-only and editable points retained | Shared point capture/mapping/request; optional stable PointKeysBind with current Index/Key, conservative legacy ambiguity end | SharedChart three routes/keyed reorder/echo/Used/failure/Close + pure point; InputEligibility/ControlKind | Pending |
+| `text/wrapped` | Yes | Shared read-only Text description and actual width/font facts | DescriptiveFacts read-only/font/geometry; CoreWidget/TextAudit/Style guards | Pending |
+| `section/header` | Yes | Heading description and width-aware effective-font title | DescriptiveFacts effective-font/width; SectionHeader/Layout guards | Pending |
+| `chrome/banner` | Yes | Shared descriptive read seam and effective-font measurement | DescriptiveFacts; CoreWidget/Atom guards | Pending |
+| `state/empty` | Yes | Shared descriptive read seam and effective-font measurement | DescriptiveFacts; ControlKind/Atom guards | Pending |
+| `display/image` | Natural size/letterbox/missing slot | Meaningful/decorative description and known/unknown texture availability | DescriptiveFacts meaningful/decorative/missing; ControlKind/image guards | Pending |
+| `chrome/rule` | Decoration | Decoration description and retained shared paint geometry; no input state | DescriptiveFacts nonoperative paint; Atom/ControlKind guards | Pending |
+| `display/progress` | Model value/range display | Actual value/range versus clamped fill and explicit nonfinite/missing facts; no write capability | DescriptiveFacts current/nonfinite/missing model; ControlKind guards | Pending |
 | `Repeat` | Registered template schema and engine keyed assembly | Pending complete assembly/update migration; stable item identity retained | Existing Repeat/Identity/DocumentReload guards | Pending |
 
 The seven descriptive uses are wrappers too. They need their appropriate descriptive, measure and
@@ -58,11 +58,10 @@ that a row's new capability has been migrated.
 
 ## Completion still requires the remaining uses
 
-Common editing/numeric composition and basic plain-text multiline are implemented under the reversible E1–E5/N1–N3 candidates; target native input/IME acceptance remains open. Editable chart-point identity/capture, descriptive wrappers, layout/assembly, hosts and observation
+Common editing/numeric composition and basic plain-text multiline are implemented under the reversible E1–E5/N1–N3 candidates; target native input/IME acceptance remains open. Layout/assembly, complete hosts and bounded observation
 remain first-version work. All completed slices still need target 1.6 acceptance with the actual selected
-Dev package. Complete first-version acceptance is not inferred from six migrated registered wrappers,
-the 18-entry inventory, or a green full harness.
+Dev package. Complete first-version acceptance is not inferred from the 18-entry inventory or a green full harness.
 
-Implementation contracts: [S0/S1](s01-contract.md), [boolean/selection/expansion](bse-contract.md), [editing/numeric composition](editing-contract.md).
+Implementation contracts: [S0/S1](s01-contract.md), [boolean/selection/expansion](bse-contract.md), [editing/numeric composition](editing-contract.md), [descriptive wrappers and chart](wrappers-contract.md).
 The product requirements and remaining policy decisions live in [the specification](README.md),
 with the [contract-to-test migration](acceptance-and-test-migration.md) defining evidence classes.

@@ -135,6 +135,22 @@ internal static class AtomVocabulary
         return ctx.Theme.Styles.Font;
     }
 
+    internal static UiFont TextFont(UiWidgetContext ctx, UiFont fallback)
+    {
+        if (ctx.Node?.Properties.ResolvedFont.Source == null && !ctx.Theme.HasFontOverride) return fallback;
+        return TextFont(ctx);
+    }
+
+    internal static UiDescription DescribeText(UiElementSpec spec, UiWidgetContext ctx, UiDescriptionRole role,
+        string literal, string translation, bool reportMissing = false)
+    {
+        string key = Read(spec, "Bind");
+        if (key.Length == 0) return new UiDescription(role, text: ResolveText(spec, ctx, literal, translation));
+        if (ctx.Bindings.TryGet(key, out string text)) return new UiDescription(role, text: text ?? "");
+        if (reportMissing) ReportUnresolved(ctx, spec.Kind, key, "empty text");
+        return new UiDescription(role, unknownReason: "MissingBinding");
+    }
+
     /// <summary>
     /// A fail-soft typed read for the kinds whose key may be item-local: an absent key and a key bound to
     /// another type both answer <paramref name="fallback"/> and are recorded once through the appearance

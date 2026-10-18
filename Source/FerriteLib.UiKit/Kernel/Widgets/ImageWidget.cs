@@ -23,7 +23,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// the row's click. A caller that wants an interactive picture puts it inside a kind that owns the hit.
 /// </para>
 /// </summary>
-internal sealed class ImageWidget : IUiWidget
+internal sealed class ImageWidget : IUiWidget, IUiDescriptiveWidget
 {
     internal const string Kind = "display/image";
 
@@ -37,7 +37,7 @@ internal sealed class ImageWidget : IUiWidget
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new ImageWidget(),
-            AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "Height"));
+            AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "Height", "Description", "DescriptionKey", "Decorative"));
         // Deliberately no label set: the kind paints no text, so Width="Auto" has nothing honest to measure.
     }
 
@@ -87,6 +87,22 @@ internal sealed class ImageWidget : IUiWidget
         // The empty slot, in the element's own resolved style: the same plane and hairline the checkbox box
         // and the tree's marker use, so a missing picture reads as a placeholder rather than as a broken glyph.
         UiThemeDraw.Surface(rect, style.Surface, ctx.Theme.Geometry.Hairline);
+    }
+
+    public UiDescription Describe(UiWidgetContext ctx)
+    {
+        UiDescriptionRole role = AtomVocabulary.ReadBool(spec, "Decorative", false) ? UiDescriptionRole.Decoration : UiDescriptionRole.Image;
+        string name = AtomVocabulary.ResolveText(spec, ctx, "Description", "DescriptionKey");
+        try
+        {
+            if (!ctx.Bindings.TryGet(ReadBindKey(), out Texture2D texture))
+                return new UiDescription(role, name: name, unknownReason: "MissingBinding");
+            return new UiDescription(role, name: name, available: texture != null);
+        }
+        catch (InvalidOperationException)
+        {
+            return new UiDescription(role, name: name, unknownReason: "BindingReadUnavailable");
+        }
     }
 
     private string ReadBindKey()

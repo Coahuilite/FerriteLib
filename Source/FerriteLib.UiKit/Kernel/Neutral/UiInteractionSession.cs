@@ -35,7 +35,15 @@ public readonly struct UiHitGeometry
     {
     }
 
-    public UiHitGeometry(float x, float y, float width, float height, float travelStart, float travelLength)
+    public UiHitGeometry(float x, float y, float width, float height, float travelStart, float travelLength) : this(x, y, width, height, travelStart, travelLength, y, height)
+    {
+    }
+
+    public UiHitGeometry(float x, float y, float width, float height, float travelStart, float travelLength, float verticalStart, float verticalLength) : this(x, y, width, height, travelStart, travelLength, verticalStart, verticalLength, false)
+    {
+    }
+
+    public UiHitGeometry(float x, float y, float width, float height, float travelStart, float travelLength, float verticalStart, float verticalLength, bool circularHit)
     {
         X = x;
         Y = y;
@@ -43,6 +51,9 @@ public readonly struct UiHitGeometry
         Height = height;
         TravelStart = travelStart;
         TravelLength = travelLength;
+        VerticalStart = verticalStart;
+        VerticalLength = verticalLength;
+        CircularHit = circularHit;
     }
 
     public float X { get; }
@@ -51,9 +62,22 @@ public readonly struct UiHitGeometry
     public float Height { get; }
     public float TravelStart { get; }
     public float TravelLength { get; }
+    public float VerticalStart { get; }
+    public float VerticalLength { get; }
+    public bool CircularHit { get; }
     public bool IsValid => Width > 0 && Height > 0 && TravelLength > 0 && !float.IsNaN(X + Y + Width + Height + TravelStart + TravelLength) && !float.IsInfinity(X + Y + Width + Height + TravelStart + TravelLength);
 
-    public bool Contains(float x, float y) => IsValid && x >= X && x < X + Width && y >= Y && y < Y + Height;
+    public bool Contains(float x, float y)
+    {
+        if (!IsValid)
+            return false;
+        if (!CircularHit)
+            return x >= X && x < X + Width && y >= Y && y < Y + Height;
+        float dx = x - X - Width / 2;
+        float dy = y - Y - Height / 2;
+        float radius = Math.Min(Width, Height) / 2;
+        return dx * dx + dy * dy <= radius * radius;
+    }
 }
 
 public enum UiPointerPhase
@@ -130,17 +154,20 @@ public readonly struct UiRange
 /// <summary>Request is an operation, not business acceptance. Rendering reads this immutable result.</summary>
 public readonly struct UiInteractionResult
 {
-    internal UiInteractionResult(bool request, float value, bool consume, bool captured, UiInteractionEnd ended)
+    internal UiInteractionResult(bool request, float value, bool consume, bool captured, UiInteractionEnd ended, float y = 0)
     {
         Request = request;
         Value = value;
         Consume = consume;
         Captured = captured;
         Ended = ended;
+        Y = y;
     }
 
     public bool Request { get; }
     public float Value { get; }
+    /// <summary>Second normalized coordinate for a point operation; Value is its X coordinate.</summary>
+    public float Y { get; }
     public bool Consume { get; }
     public bool Captured { get; }
     public UiInteractionEnd Ended { get; }
@@ -153,9 +180,18 @@ public readonly struct UiInteractionResult
 /// </summary>
 public sealed class UiInteractionSession : IDisposable
 {
+    private const float PointSampleTolerance = 0.0001f;
     private UiInteractionTarget? owner;
-    private bool rangeCapture;
+    private enum PointerKind
+    {
+        Activation,
+        Range,
+        Point
+    }
+
+    private PointerKind captureKind;
     private float lastSelection;
+    private float lastY;
     private bool closed;
     public UiInteractionTarget? CaptureOwner => owner;
     public UiInteractionEnd LastEnd { get; private set; }
@@ -176,9 +212,10 @@ public sealed class UiInteractionSession : IDisposable
         return new UiInteractionResult(eligibility.CanOperate, range.Clamp(candidate), false, owner?.Equals(target) == true, LastEnd);
     }
 
-    public UiInteractionResult PointerActivation(UiInteractionTarget target, UiPointerSample input, UiHitGeometry geometry, UiInputEligibility eligibility) => Pointer(target, input, geometry, eligibility, false, default, 0);
-    public UiInteractionResult PointerRange(UiInteractionTarget target, UiPointerSample input, UiHitGeometry geometry, UiInputEligibility eligibility, UiRange range, float current) => Pointer(target, input, geometry, eligibility, true, range, current);
-    private UiInteractionResult Pointer(UiInteractionTarget target, UiPointerSample input, UiHitGeometry geometry, UiInputEligibility eligibility, bool isRange, UiRange range, float current)
+    public UiInteractionResult PointerActivation(UiInteractionTarget target, UiPointerSample input, UiHitGeometry geometry, UiInputEligibility eligibility) => Pointer(target, input, geometry, eligibility, PointerKind.Activation, default, 0);
+    public UiInteractionResult PointerRange(UiInteractionTarget target, UiPointerSample input, UiHitGeometry geometry, UiInputEligibility eligibility, UiRange range, float current) => Pointer(target, input, geometry, eligibility, PointerKind.Range, range, current);
+    public UiInteractionResult PointerPoint(UiInteractionTarget target, UiPointerSample input, UiHitGeometry geometry, UiInputEligibility eligibility, float currentX, float currentY) => Pointer(target, input, geometry, eligibility, PointerKind.Point, new UiRange(0, 1), currentX, currentY);
+    private UiInteractionResult Pointer(UiInteractionTarget target, UiPointerSample input, UiHitGeometry geometry, UiInputEligibility eligibility, PointerKind kind, UiRange range, float current, float currentY = 0)
     {
         EnsureOpen();
         LastEnd = UiInteractionEnd.None;
@@ -186,20 +223,19 @@ public sealed class UiInteractionSession : IDisposable
         UiInteractionTarget heldTarget = owner.GetValueOrDefault();
         bool sameNode = owner.HasValue && heldTarget.Node == target.Node;
         bool businessTargetChanged = sameNode && heldTarget.BusinessScope != target.BusinessScope;
-        bool samePartItem = sameNode && !businessTargetChanged
-            && heldTarget.Part == target.Part && Equals(heldTarget.ItemKey, target.ItemKey);
-        bool partTargetChanged = samePartItem
-            && (heldTarget.TargetScope != target.TargetScope || rangeCapture != isRange);
+        bool samePartItem = sameNode && !businessTargetChanged && heldTarget.Part == target.Part && Equals(heldTarget.ItemKey, target.ItemKey);
+        bool partTargetChanged = samePartItem && (heldTarget.TargetScope != target.TargetScope || captureKind != kind);
         if (businessTargetChanged || partTargetChanged)
             End(UiInteractionEnd.TargetChanged);
         bool owns = owner.HasValue && owner.Value.Equals(target);
         if (owns && (!eligibility.CanOperate || input.Phase == UiPointerPhase.Lost))
         {
             End(eligibility.CanOperate ? UiInteractionEnd.CaptureLost : UiInteractionEnd.Ineligible);
-            return Result(false, current);
+            return Result(false, current, y: currentY);
         }
 
-        if (!geometry.IsValid)
+        bool validVertical = geometry.VerticalLength > 0 && !float.IsNaN(geometry.VerticalStart + geometry.VerticalLength) && !float.IsInfinity(geometry.VerticalStart + geometry.VerticalLength);
+        if (!geometry.IsValid || (kind == PointerKind.Point && !validVertical))
         {
             if (owns)
                 End(UiInteractionEnd.Aborted);
@@ -209,25 +245,43 @@ public sealed class UiInteractionSession : IDisposable
         if (input.Phase == UiPointerPhase.Press && !input.Consumed && !owner.HasValue && eligibility.CanOperate && eligibility.CanReceive && geometry.Contains(input.X, input.Y))
         {
             owner = target;
-            rangeCapture = isRange;
+            captureKind = kind;
             lastSelection = range.Clamp(current);
-            if (!isRange)
-                return Result(false, current, true);
+            lastY = currentY;
+            if (kind != PointerKind.Range)
+                return Result(false, current, true, currentY);
             return RangeSample(range.At(input.X, geometry), true);
         }
 
         if (!owns)
-            return new UiInteractionResult(false, current, false, false, LastEnd);
+            return new UiInteractionResult(false, current, false, false, LastEnd, currentY);
         if (input.Phase == UiPointerPhase.Release)
         {
-            bool activate = !input.Consumed && !isRange && eligibility.CanReceive && geometry.Contains(input.X, input.Y);
+            bool activate = !input.Consumed && kind == PointerKind.Activation && eligibility.CanReceive && geometry.Contains(input.X, input.Y);
             End(UiInteractionEnd.Released);
-            return Result(activate, current, true);
+            return Result(activate, current, true, currentY);
         }
 
-        if (!input.Consumed && isRange && input.Phase == UiPointerPhase.Drag)
-            return RangeSample(range.At(input.X, geometry), true);
-        return Result(false, current);
+        if (!input.Consumed && input.Phase == UiPointerPhase.Drag)
+        {
+            if (kind == PointerKind.Range)
+                return RangeSample(range.At(input.X, geometry), true);
+            if (kind == PointerKind.Point)
+            {
+                float x = range.At(input.X, geometry);
+                float y = range.Clamp(1 - (input.Y - geometry.VerticalStart) / geometry.VerticalLength);
+                bool changed = Math.Abs(x - lastSelection) > PointSampleTolerance || Math.Abs(y - lastY) > PointSampleTolerance;
+                if (changed)
+                {
+                    lastSelection = x;
+                    lastY = y;
+                }
+
+                return new UiInteractionResult(changed, x, true, true, LastEnd, y);
+            }
+        }
+
+        return Result(false, current, y: currentY);
     }
 
     private UiInteractionResult RangeSample(float candidate, bool consume)
@@ -237,7 +291,7 @@ public sealed class UiInteractionSession : IDisposable
         return Result(changed, candidate, consume);
     }
 
-    private UiInteractionResult Result(bool request, float value, bool consume = false) => new UiInteractionResult(request, value, consume, owner.HasValue, LastEnd);
+    private UiInteractionResult Result(bool request, float value, bool consume = false, float y = 0) => new UiInteractionResult(request, value, consume, owner.HasValue, LastEnd, y);
     public void End(UiInteractionEnd reason)
     {
         if (!owner.HasValue)

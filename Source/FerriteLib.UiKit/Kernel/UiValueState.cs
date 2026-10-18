@@ -1,33 +1,16 @@
 namespace FerriteLib.UiKit.Kernel;
 
 /// <summary>
-/// Per-control value state for value widgets: edit buffer, focus, and (for the chart) which control
-/// point a drag is manipulating. One instance belongs to one element's <see cref="UiNode"/> per named
-/// slot, and the node table belongs to the Host's <see cref="UiSession"/> - so state is keyed by
-/// identity rather than by a path string, and disposing the session still clears everything: nothing
-/// here leaks across windows or between hosts (0.4.0 identity layer).
-/// <para>
-/// <c>Open</c> and <c>StringValue</c> were deleted in 0.3.0. Dropdown openness is owned by
-/// <see cref="UiSession"/> (one popup per session), and a grep across the library, its harness and the
-/// wired consumer found no reader of either field. An unused state axis is not spare inventory, it is a
-/// second source of truth waiting to drift (US→FL round 1, P5).
-/// </para>
-/// <para>
-/// <c>CommitRequested</c> and <c>DiscardRequested</c> are the two ways an edit can be ended by something
-/// other than its own control (FL-IC2, interaction contract §3.4). A window's native Accept and Cancel
-/// hooks run BEFORE the page is drawn, so neither can reach into the field; each sets one flag on the
-/// state of the edit the session records as active, and the funnel applies it at that field's next draw -
-/// which is the same event pass, because the hook and the contents are one window pass. The flags are
-/// library plumbing and are deliberately <c>internal</c>: a consumer observes an open edit through
-/// <see cref="UiSession.ActiveEditNode"/>, not by polling a state bit, and a custom widget that drives
-/// <see cref="UiNative"/> directly has the funnel apply the transaction for it.
-/// </para>
+/// One named node-local compatibility slot. Native editors reference their sole neutral draft owner;
+/// chart identity stores observed series evidence only, with capture owned by UiInteractionSession.
+/// Public value/focus fields remain for older custom primitives, not as a second editor or chart state machine.
 /// </summary>
 public sealed class UiValueState
 {
     internal object? Editor;
     internal UiInteractionTarget? EditorTarget;
     internal bool EditorMultiline;
+    internal UiChartIdentity? ChartIdentity;
     // Compatibility projections of Editor for native editors; not read as draft authority.
     // Non-editor legacy range/chart callers retain their original fields and entry conditions.
     public float FloatValue;

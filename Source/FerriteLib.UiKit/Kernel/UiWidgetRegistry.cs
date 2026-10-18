@@ -37,6 +37,7 @@ public static class UiWidgetRegistry
     private static readonly Dictionary<string, Dictionary<string, UiAppearanceResolver>> SupportedLooks =
         new(StringComparer.Ordinal);
     private static bool coreInitialized;
+    private static readonly Dictionary<string, Dictionary<string, UiFont>> FallbackFonts = new(StringComparer.Ordinal);
 
     public static void InitializeCore()
     {
@@ -122,6 +123,16 @@ public static class UiWidgetRegistry
         IReadOnlyCollection<string>? labelAttributes,
         Func<UiElementSpec, UiWidgetContext, float>? naturalBody,
         UiAppearanceResolver? supportedLooks)
+        => Register(scope, kind, factory, allowedAttributes, labelAttributes, naturalBody, supportedLooks, UiFont.Small);
+
+    public static void Register(string scope, string kind, Func<IUiWidget> factory,
+        IReadOnlyCollection<string>? allowedAttributes, IReadOnlyCollection<string>? labelAttributes,
+        Func<UiElementSpec, UiWidgetContext, float>? naturalBody, UiFont fallbackFont)
+        => Register(scope, kind, factory, allowedAttributes, labelAttributes, naturalBody, null, fallbackFont);
+
+    private static void Register(string scope, string kind, Func<IUiWidget> factory,
+        IReadOnlyCollection<string>? allowedAttributes, IReadOnlyCollection<string>? labelAttributes,
+        Func<UiElementSpec, UiWidgetContext, float>? naturalBody, UiAppearanceResolver? supportedLooks, UiFont fallbackFont)
     {
         if (scope == null) throw new ArgumentNullException(nameof(scope));
         if (kind == null) throw new ArgumentNullException(nameof(kind));
@@ -143,6 +154,9 @@ public static class UiWidgetRegistry
             }
 
             registry.Add(kind, factory);
+            if (!FallbackFonts.TryGetValue(scope, out Dictionary<string, UiFont>? fonts))
+                FallbackFonts.Add(scope, fonts = new Dictionary<string, UiFont>(StringComparer.Ordinal));
+            fonts.Add(kind, fallbackFont);
 
             if (allowedAttributes != null)
             {
@@ -213,6 +227,16 @@ public static class UiWidgetRegistry
         }
 
         return null;
+    }
+
+    public static UiFont GetFallbackFont(string scope, string kind)
+    {
+        lock (Gate)
+        {
+            if (FallbackFonts.TryGetValue(scope, out Dictionary<string, UiFont>? local) && local.TryGetValue(kind, out UiFont font)) return font;
+            if (FallbackFonts.TryGetValue(CoreScope, out Dictionary<string, UiFont>? core) && core.TryGetValue(kind, out font)) return font;
+            return UiFont.Small;
+        }
     }
 
     /// <summary>
@@ -513,6 +537,7 @@ public static class UiWidgetRegistry
             LabelAttributes.Clear();
             NaturalBodies.Clear();
             SupportedLooks.Clear();
+            FallbackFonts.Clear();
             coreInitialized = false;
         }
     }

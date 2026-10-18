@@ -406,15 +406,14 @@ internal static class KernelRoleAttributeTests
                 "the font the outlet was handed is the density font the band was measured with (reports: "
                 + reports.Count + ")");
 
-            // The pinned boundary, written down rather than discovered: the two composites keep the type
-            // size they are named for, so a density font change deliberately does not move their bands.
+            // 0.8 keeps each kind's undeclared fallback, but an explicit environment font reaches every wrapper.
             reports.Clear();
             UiFitAudit.Reset();
             ChromeBannerWidget banner = new();
             banner.Configure(new UiElementSpec("b", ChromeBannerWidget.Kind, Attributes(("Text", LongCjk))));
             banner.Draw(new Rect(0f, 0f, 20f, 20f), Context(session, theme, new UiBindings(), 20f));
-            Check(reports.Count == 1 && reports[0].Font == UiFont.Tiny,
-                "chrome/banner keeps its own type size under a density font change (pinned band, documented)");
+            Check(reports.Count == 1 && reports[0].Font == UiFont.Medium,
+                "chrome/banner now paints the explicit environment font that its band measures");
         }
         finally
         {

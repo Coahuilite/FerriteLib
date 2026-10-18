@@ -15,6 +15,7 @@ S0/S1 的开发实现与调用入口见 [S0/S1 contract](s01-contract.md)。其�
 布尔／离散选择／展开的生产入口见 [BSE contract](bse-contract.md)；全部保留用途的唯一迁移状态表见
 [完整首版迁移状态](migration-status.md)。
 共同编辑／单行及基础多行／数值组合的生产入口与可逆候选政策见 [Editing contract](editing-contract.md)。
+可编辑图表点及七种描述包装的生产读面见 [Wrappers contract](wrappers-contract.md)。
 
 ## 第一部分：架构规格
 

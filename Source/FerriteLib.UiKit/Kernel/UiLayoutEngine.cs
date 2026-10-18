@@ -903,12 +903,13 @@ public sealed class UiLayoutEngine
     private UiTheme ScopeTheme(UiWidgetContext ctx, UiNode node)
     {
         IReadOnlyList<UiStyleDeclaration>? chain = ctx.StyleChain;
-        if (styleResolver == null || chain == null || chain.Count == 0) return node.Properties.Apply(node, styleResolver?.Baseline ?? ctx.Theme);
+        UiFont fallbackFont = UiWidgetRegistry.GetFallbackFont(ctx.Source, node.Kind);
+        if (styleResolver == null || chain == null || chain.Count == 0) return node.Properties.Apply(node, styleResolver?.Baseline ?? ctx.Theme, fallbackFont);
 
         // The scope NAME is the resolver's to read, and only the tree knows where it was written: handing the
         // element's path down is what makes an unknown name a located finding instead of "some scheme is
         // missing somewhere in this document".
-        return node.Properties.Apply(node, styleResolver.ThemeFor(chain, node.Id.Path));
+        return node.Properties.Apply(node, styleResolver.ThemeFor(chain, node.Id.Path), fallbackFont);
     }
 
     /// <summary>
@@ -1222,11 +1223,13 @@ public sealed class UiLayoutEngine
         var alignsX = new UiPlacement.Alignment[visible.Count];
         for (int i = 0; i < visible.Count; i++)
         {
+            UiNode childNode = ChildNode(ctx, node, visible[i].Spec, visible[i].DeclaredIndex);
+            UiWidgetContext childCtx = ElementScope(ctx.WithNode(childNode), visible[i].Spec, childNode);
             alignsX[i] = UiPlacement.ParseAlign(
                 visible[i].Spec, UiPlacement.AlignXAttribute, UiPlacement.Axis.Horizontal);
             childWidths[i] = alignsX[i].IsStretch
-                ? ResolveStackChildWidth(visible[i].Spec, innerWidth, ctx)
-                : ResolveWrapWidth(visible[i].Spec, innerWidth, ctx);
+                ? ResolveStackChildWidth(visible[i].Spec, innerWidth, childCtx)
+                : ResolveWrapWidth(visible[i].Spec, innerWidth, childCtx);
         }
 
         // Fill-aware vertical allocation. A pre-pass measures the flow height of every non-Fill
@@ -1329,7 +1332,7 @@ public sealed class UiLayoutEngine
     {
         List<ChildSlot> visible = VisibleChildren(spec, ctx, narrow, node);
 
-        float[] widths = ResolveColumnWidths(visible, innerWidth, gap, ctx);
+        float[] widths = ResolveColumnWidths(visible, innerWidth, gap, ctx, node);
         var box = new MeasuredBox { Width = width, Height = 0f };
 
         // CP-2: the cross axis of a row is vertical, so a child may name AlignY against this row's inner
@@ -1444,8 +1447,9 @@ public sealed class UiLayoutEngine
                 continue;
             }
 
-            float childWidth = cols > 0 ? cellWidth : ResolveWrapWidth(child, innerWidth, ctx);
             UiNode childNode = ChildNode(ctx, node, child, i);
+            UiWidgetContext childCtx = ElementScope(ctx.WithNode(childNode), child, childNode);
+            float childWidth = cols > 0 ? cellWidth : ResolveWrapWidth(child, innerWidth, childCtx);
 
             bool lineFull = cols > 0 ? placedInLine >= cols : x + childWidth > padding.Left + innerWidth;
             if (!firstInLine && lineFull)
@@ -1597,8 +1601,10 @@ public sealed class UiLayoutEngine
                 child, UiPlacement.AlignXAttribute, UiPlacement.Axis.Horizontal);
 
             children.Add(child);
-            childWidths.Add(alignX.IsStretch ? innerWidth : ResolveWrapWidth(child, innerWidth, ctx));
-            childNodes.Add(ChildNode(ctx, node, child, i));
+            UiNode childNode = ChildNode(ctx, node, child, i);
+            UiWidgetContext childCtx = ElementScope(ctx.WithNode(childNode), child, childNode);
+            childWidths.Add(alignX.IsStretch ? innerWidth : ResolveWrapWidth(child, innerWidth, childCtx));
+            childNodes.Add(childNode);
             alignsX.Add(alignX);
             alignsY.Add(UiPlacement.ParseAlign(child, UiPlacement.AlignYAttribute, UiPlacement.Axis.Vertical));
             nudgesX.Add(UiPlacement.ParseOffset(child, UiPlacement.OffsetXAttribute, innerWidth));
@@ -1775,11 +1781,12 @@ public sealed class UiLayoutEngine
             UiNode childNode = ChildNode(ctx, node, child, i);
 
             // CP-2: a Scroll flows vertically, so its cross axis is horizontal and the same rule applies.
+            UiWidgetContext childCtx = ElementScope(ctx.WithNode(childNode), child, childNode);
             UiPlacement.Alignment alignX = UiPlacement.ParseAlign(
                 child, UiPlacement.AlignXAttribute, UiPlacement.Axis.Horizontal);
             float childWidth = alignX.IsStretch
-                ? ResolveStackChildWidth(child, contentInnerWidth, ctx)
-                : ResolveWrapWidth(child, contentInnerWidth, ctx);
+                ? ResolveStackChildWidth(child, contentInnerWidth, childCtx)
+                : ResolveWrapWidth(child, contentInnerWidth, childCtx);
 
             MeasuredBox childBox = MeasureElement(
                 ctx,
@@ -1992,7 +1999,7 @@ public sealed class UiLayoutEngine
             MeasuredBox rowBox = MeasureElement(
                 ctx,
                 row.Spec,
-                ResolveStackChildWidth(row.Spec, innerWidth, ctx),
+                ResolveStackChildWidth(row.Spec, innerWidth, ElementScope(ctx.WithNode(rowNode), row.Spec, rowNode)),
                 Math.Max(0f, availableHeight - (y - innerY)),
                 rowNode);
             rowBox = OffsetBox(rowBox, padding.Left, y);
@@ -2811,8 +2818,8 @@ public sealed class UiLayoutEngine
             || spec.TryGetAttribute("TitleKey", out string key) && key.Trim().Length > 0;
     }
 
-    private static float[] ResolveColumnWidths(
-        IReadOnlyList<ChildSlot> children, float innerWidth, float gap, UiWidgetContext ctx)
+    private float[] ResolveColumnWidths(
+        IReadOnlyList<ChildSlot> children, float innerWidth, float gap, UiWidgetContext ctx, UiNode node)
     {
         var widths = new float[children.Count];
         float fixedSum = 0f;
@@ -2822,7 +2829,9 @@ public sealed class UiLayoutEngine
 
         for (int i = 0; i < children.Count; i++)
         {
-            if (TryFixedWidth(children[i].Spec, ctx, out float fixedWidth))
+            UiNode childNode = ChildNode(ctx, node, children[i].Spec, children[i].DeclaredIndex);
+            UiWidgetContext childCtx = ElementScope(ctx.WithNode(childNode), children[i].Spec, childNode);
+            if (TryFixedWidth(children[i].Spec, childCtx, out float fixedWidth))
             {
                 widths[i] = fixedWidth;
                 fixedSum += fixedWidth;
@@ -2837,7 +2846,7 @@ public sealed class UiLayoutEngine
             if (IsAutoWidth(children[i].Spec))
             {
                 float natural = ClampDeclaredWidth(
-                    children[i].Spec, MeasureLabelWidth(children[i].Spec, ctx));
+                    children[i].Spec, MeasureLabelWidth(children[i].Spec, childCtx));
                 if (natural > 0f)
                 {
                     autoSlots.Add(i);

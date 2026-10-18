@@ -23,7 +23,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// no-op creation-time validation exists to refuse.
 /// </para>
 /// </summary>
-public sealed class RuleWidget : IUiWidget
+public sealed class RuleWidget : IUiWidget, IUiDescriptiveWidget
 {
     public const string Kind = "chrome/rule";
 
@@ -57,6 +57,8 @@ public sealed class RuleWidget : IUiWidget
     {
         return ReadThickness(ctx);
     }
+
+    public UiDescription Describe(UiWidgetContext ctx) => new UiDescription(UiDescriptionRole.Decoration);
 
     public void Draw(Rect rect, UiWidgetContext ctx)
     {

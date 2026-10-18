@@ -1019,6 +1019,9 @@ internal static class KernelContractTests
             hostA.Draw(new Rect(0f, 0f, 300f, 100f), snapshotA);
             hostA.EndFrame();
 
+            // The platform relinquishes A's native slot before B receives a new press. A may still have
+            // stale logical ownership until its next pass; B must not steal a genuinely held native slot.
+            UiNative.DebugHotControl = 0;
             UiNative.DebugMousePosition = new Vector2(chartRectB.x + 93.2f, chartRectB.y + 8f);
             hostB.BeginFrame();
             hostB.Draw(new Rect(0f, 0f, 300f, 100f), snapshotB);

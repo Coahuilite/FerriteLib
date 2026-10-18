@@ -15,7 +15,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// the line (transparent included) instead of switching it off.
 /// </para>
 /// </summary>
-public sealed class SectionHeaderWidget : IUiWidget
+public sealed class SectionHeaderWidget : IUiWidget, IUiDescriptiveWidget
 {
     public const string Kind = "section/header";
 
@@ -56,18 +56,19 @@ public sealed class SectionHeaderWidget : IUiWidget
 
     public float Measure(UiWidgetContext ctx)
     {
-        return ReadHeight();
+        float declared = AtomVocabulary.ReadHeight(spec, 0);
+        if (declared > 0) return declared;
+        return Math.Max(ReadHeight(), ctx.Metrics.MeasureText(Describe(ctx).Text, AtomVocabulary.TextFont(ctx), Math.Max(1, ctx.ViewWidth)));
     }
+
+    public UiDescription Describe(UiWidgetContext ctx) => new UiDescription(UiDescriptionRole.Heading, text: Title(ctx));
 
     public void Draw(Rect rect, UiWidgetContext ctx)
     {
         if (rect.width <= 1f || rect.height <= 1f) return;
 
-        string title = spec.TryGetAttribute("TitleKey", out string key) && key.Length > 0
-            ? ctx.Translation.Translate(key)
-            : spec.TryGetAttribute("Title", out string literal) ? literal : "";
-
-        UiThemeDraw.Label(rect, title, ctx.Theme, ctx.Theme.TextPrimary, UiFont.Small, TextAnchor.MiddleLeft);
+        string title = Describe(ctx).Text;
+        UiThemeDraw.Label(rect, title, ctx.Theme, ctx.Theme.TextPrimary, AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft);
 
         // Chrome="none": the title without the rule under it. Read here rather than cached in Configure so the
         // decision sits next to the paint it suppresses and a reloaded spec needs no second path.
@@ -94,4 +95,6 @@ public sealed class SectionHeaderWidget : IUiWidget
 
         return DefaultHeight;
     }
+
+    private string Title(UiWidgetContext ctx) => AtomVocabulary.ResolveText(spec, ctx, "Title", "TitleKey");
 }

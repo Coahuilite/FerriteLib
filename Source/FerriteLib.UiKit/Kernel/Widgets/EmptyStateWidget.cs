@@ -4,22 +4,15 @@ using UnityEngine;
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
 /// <summary>
-/// Greenfield empty state placeholder.
-/// <para>
-/// Rebuilt over the <c>text/wrapped</c> atom (0.4.x leaf set): the wrapped-height rule is the atom's
-/// <see cref="WrappedTextWidget.MeasureBand"/>, and this kind contributes only its own font, its own
-/// leading and its own floor. The kind string, the attribute schema, the label set and the painted
-/// result stay as they were. Its leading follows the theme's density and its type size stays the one
-/// this kind is named for — the same pinned-font boundary the banner carries.
-/// </para>
+/// Empty-state status text sharing native width measurement and effective environment typography.
 /// </summary>
-public sealed class EmptyStateWidget : IUiWidget
+public sealed class EmptyStateWidget : IUiWidget, IUiDescriptiveWidget
 {
     public const string Kind = "state/empty";
 
     private const float DefaultHeight = 48f;
 
-    /// <summary>This kind's own type size, read by both Measure and Draw so they cannot drift apart.</summary>
+    /// <summary>This kind's undeclared fallback type size, read by both Measure and Draw so they cannot drift apart.</summary>
     private const UiFont BandFont = UiFont.Small;
 
     private UiElementSpec spec = UiElementSpec.Empty;
@@ -51,14 +44,16 @@ public sealed class EmptyStateWidget : IUiWidget
         // The atom's band at this kind's font and leading, floored by this kind's own default band.
         return Math.Max(
             ReadHeight(),
-            WrappedTextWidget.MeasureBand(ctx, ResolveText(ctx), BandFont, ctx.Theme.Geometry.Padding * 2f));
+            WrappedTextWidget.MeasureBand(ctx, Describe(ctx).Text, AtomVocabulary.TextFont(ctx, BandFont), ctx.Theme.Geometry.Padding * 2f));
     }
+
+    public UiDescription Describe(UiWidgetContext ctx) => new UiDescription(UiDescriptionRole.Status, text: ResolveText(ctx));
 
     public void Draw(Rect rect, UiWidgetContext ctx)
     {
         if (rect.width <= 1f || rect.height <= 1f) return;
 
-        UiThemeDraw.Label(rect, ResolveText(ctx), ctx.Theme, ctx.Theme.TextSecondary, BandFont, TextAnchor.MiddleCenter);
+        UiThemeDraw.Label(rect, Describe(ctx).Text, ctx.Theme, ctx.Theme.TextSecondary, AtomVocabulary.TextFont(ctx, BandFont), TextAnchor.MiddleCenter);
     }
 
     /// <summary>Shared by Measure and Draw so the allocated band always matches the drawn string.</summary>

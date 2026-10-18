@@ -81,6 +81,10 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
 - `UiEditParser` — neutral value parsing seam; public-unstable.
 - `IUiEditState` — bounded editor facts and lifecycle suspension; public-unstable.
 - `UiNumericEdit` — shared finite numeric parsing, range and local combination step; public-unstable.
+- `UiDescriptionRole` — neutral descriptive-role vocabulary; public-unstable.
+- `UiRangeObservation` — read-only numeric/range presentation facts; public-unstable.
+- `UiDescription` — actual descriptive input projection; public-unstable.
+- `IUiDescriptiveWidget` — platform-wrapper read seam, does not draw or operate; public-unstable.
 - `UiSelectionObservation` — model-derived missing/selectable facts; public-unstable.
 - `UiValueBehavior` — shared boolean/selection/expansion request boundary; public-unstable.
 - `UiInteractionRequests` — 0.8 S0/S1 shared contract; shape may change within the development line.

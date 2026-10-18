@@ -42,6 +42,25 @@ public static partial class UiNative
         return PointerInteraction(rect, ctx, true, new UiRange(min, max), value, writable, binding);
     }
 
+    public static UiInteractionResult Point(Rect hit, Rect plot, UiWidgetContext ctx, string binding, object key, float x, float y, bool writable = true)
+    {
+        UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
+        var geometry = new UiHitGeometry(hit.x, hit.y, hit.width, hit.height, plot.x, plot.width, plot.y, plot.height, true);
+        return PointerInteraction(hit, ctx.Session, node, InteractionTarget(ctx, binding, "chart-point", key),
+            CanReceivePointer(ctx), !IsInputDisabled(node) && writable, false, default, x, ctx, true, y, geometry);
+    }
+
+    internal static void EndPointCapture(UiWidgetContext ctx, UiInteractionEnd reason)
+    {
+        UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
+        UiInteractionTarget? owner = ctx.Session.Interactions.CaptureOwner;
+        if (owner?.Node != node.Id.Key || owner?.Part != "chart-point") return;
+        ctx.Session.Interactions.End(reason);
+        bool ownNative = ReferenceEquals(ctx.Session.OwnedHotControlOwner, node) || (node.Id.IsNone && ctx.Session.OwnedHotControlOwner == null);
+        if (ownNative && ctx.Session.OwnedHotControl.HasValue)
+            ctx.Session.ReleaseHotControl(ctx.Session.OwnedHotControl.Value);
+    }
+
     private static UiInteractionResult PointerInteraction(Rect rect, UiWidgetContext ctx, bool range, UiRange limits, float value, bool writable, string binding)
     {
         UiSession session = ctx.Session;
@@ -49,7 +68,8 @@ public static partial class UiNative
         return PointerInteraction(rect, session, node, InteractionTarget(ctx, binding), CanReceivePointerPress(rect, ctx), !IsInputDisabled(node) && writable, range, limits, value, ctx);
     }
 
-    private static UiInteractionResult PointerInteraction(Rect rect, UiSession session, UiNode node, UiInteractionTarget target, bool canReceive, bool canOperate, bool range, UiRange limits, float value, UiWidgetContext? ctx = null)
+    private static UiInteractionResult PointerInteraction(Rect rect, UiSession session, UiNode node, UiInteractionTarget target, bool canReceive, bool canOperate, bool range, UiRange limits, float value, UiWidgetContext? ctx = null,
+        bool pointOperation = false, float currentY = 0, UiHitGeometry? pointGeometry = null)
     {
 #if FER_DEV
         string eventBefore = DiagnosticEventName();
@@ -67,11 +87,13 @@ public static partial class UiNative
         int nativeCapture = DebugMousePositionEnabled ? DebugHotControl : GUIUtility.hotControl;
         var eligibility = new UiInputEligibility(canOperate && session.PointerInputAllowed && session.IsInputGeometryReliable, true, canReceive && (nativeCapture == 0 || owns));
         float thumb = Math.Min(12, rect.width / 2);
-        var geometry = range ? new UiHitGeometry(rect.x, rect.y, rect.width, rect.height, rect.x + thumb / 2, rect.width - thumb) : new UiHitGeometry(rect.x, rect.y, rect.width, rect.height);
+        var geometry = pointGeometry ?? (range ? new UiHitGeometry(rect.x, rect.y, rect.width, rect.height, rect.x + thumb / 2, rect.width - thumb) : new UiHitGeometry(rect.x, rect.y, rect.width, rect.height));
         UiInteractionResult result;
         try
         {
-            result = range ? session.Interactions.PointerRange(target, input, geometry, eligibility, limits, value) : session.Interactions.PointerActivation(target, input, geometry, eligibility);
+            if (pointOperation) result = session.Interactions.PointerPoint(target, input, geometry, eligibility, value, currentY);
+            else if (range) result = session.Interactions.PointerRange(target, input, geometry, eligibility, limits, value);
+            else result = session.Interactions.PointerActivation(target, input, geometry, eligibility);
         }
         catch
         {
