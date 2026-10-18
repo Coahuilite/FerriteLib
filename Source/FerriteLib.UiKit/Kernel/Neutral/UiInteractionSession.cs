@@ -183,7 +183,14 @@ public sealed class UiInteractionSession : IDisposable
         EnsureOpen();
         LastEnd = UiInteractionEnd.None;
         // Changing a business target or capability cannot inherit the previous press on this node.
-        if (owner.HasValue && owner.Value.Node == target.Node && (owner.Value.BusinessScope != target.BusinessScope || (owner.Value.Part == target.Part && Equals(owner.Value.ItemKey, target.ItemKey) && (owner.Value.TargetScope != target.TargetScope || rangeCapture != isRange))))
+        UiInteractionTarget heldTarget = owner.GetValueOrDefault();
+        bool sameNode = owner.HasValue && heldTarget.Node == target.Node;
+        bool businessTargetChanged = sameNode && heldTarget.BusinessScope != target.BusinessScope;
+        bool samePartItem = sameNode && !businessTargetChanged
+            && heldTarget.Part == target.Part && Equals(heldTarget.ItemKey, target.ItemKey);
+        bool partTargetChanged = samePartItem
+            && (heldTarget.TargetScope != target.TargetScope || rangeCapture != isRange);
+        if (businessTargetChanged || partTargetChanged)
             End(UiInteractionEnd.TargetChanged);
         bool owns = owner.HasValue && owner.Value.Equals(target);
         if (owns && (!eligibility.CanOperate || input.Phase == UiPointerPhase.Lost))
