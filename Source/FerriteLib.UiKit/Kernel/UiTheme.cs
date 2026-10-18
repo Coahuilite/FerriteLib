@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
@@ -157,9 +158,9 @@ public sealed class UiTheme
     /// tokens, and the uint budget named in the block comment above has room for it.</summary>
     private const uint SwitchThumbOffBit = 1u << 25;
 
-    internal bool HasColourOverride(string token)
+    private static uint ColourBit(string token)
     {
-        uint bit = token switch
+        return token switch
         {
             "Base" => BaseBit,
             "Panel" => PanelBit,
@@ -189,8 +190,11 @@ public sealed class UiTheme
             "DangerBorder" => DangerBorderBit,
             _ => 0
         };
-        return (claimed & bit) != 0;
     }
+    internal bool HasColourOverride(string token) => (claimed & ColourBit(token)) != 0;
+    private readonly Dictionary<uint, Color?> styleColours = new();
+    private readonly Dictionary<string, float> styleMetrics = new(StringComparer.Ordinal);
+    private UiFont? styleFont;
     private uint claimed;
     private Color baseColour, panel, raised, hover, selected, success, danger;
     private Color workspacePlane, sectionBand;
@@ -292,6 +296,9 @@ public sealed class UiTheme
         densityDeclared = source.densityDeclared;
         PropertyRevision = source.PropertyRevision;
         geometry = source.geometry;
+        styleFont = source.styleFont;
+        foreach (var pair in source.styleColours) styleColours.Add(pair.Key, pair.Value);
+        foreach (var pair in source.styleMetrics) styleMetrics.Add(pair.Key, pair.Value);
         Styles = new UiStyleTable(this);
     }
 
@@ -325,7 +332,7 @@ public sealed class UiTheme
     /// </summary>
     public Color SwitchThumbOff
     {
-        get => (claimed & SwitchThumbOffBit) != 0 ? switchThumbOff : TextPrimary;
+        get => styleColours.TryGetValue(SwitchThumbOffBit, out Color? styled) ? styled!.Value : (claimed & SwitchThumbOffBit) != 0 ? switchThumbOff : TextPrimary;
         set => SetColour(SwitchThumbOffBit, ref switchThumbOff, value);
     }
 
@@ -449,7 +456,7 @@ public sealed class UiTheme
     // tokens that move a rect, which is what LayoutRevision reports.
     public UiFont DefaultFont
     {
-        get => defaultFont;
+        get => styleFont ?? defaultFont;
         set
         {
             if (!fontDeclared) { fontDeclared = true; PropertyRevision++; }
@@ -462,7 +469,8 @@ public sealed class UiTheme
     /// <summary>The density bundle a widget reads instead of holding its own literals.</summary>
     public UiGeometry Geometry
     {
-        get => geometry;
+        get => new UiGeometry(StyleMetric("Padding", geometry.Padding), StyleMetric("Spacing", geometry.Spacing),
+            StyleMetric("Gap", geometry.Gap), StyleMetric("RowHeight", geometry.RowHeight), StyleMetric("Hairline", geometry.Hairline));
         set
         {
             if (!densityDeclared) { densityDeclared = true; PropertyRevision++; }
@@ -472,18 +480,49 @@ public sealed class UiTheme
         }
     }
 
-    // Applying a style changes the effective bag, not the host's declaration intent.
+    private float StyleMetric(string token, float fallback) => styleMetrics.TryGetValue(token, out float value) ? value : fallback;
+
+    // Effective applications never assign to the host's written declaration store.
     internal void ApplyStyleFont(UiFont value)
     {
-        if (value == defaultFont) return;
-        defaultFont = value;
-        LayoutRevision++;
+        UiFont prior = DefaultFont;
+        styleFont = value;
+        if (DefaultFont != prior) LayoutRevision++;
+    }
+    internal void ApplyStyleMetric(string token, float value)
+    {
+        UiGeometry prior = Geometry;
+        styleMetrics[token] = value;
+        if (Geometry != prior) LayoutRevision++;
     }
     internal void ApplyStyleGeometry(UiGeometry value)
     {
-        if (value == geometry) return;
-        geometry = value;
-        LayoutRevision++;
+        UiGeometry prior = Geometry;
+        styleMetrics["Padding"] = value.Padding;
+        styleMetrics["Spacing"] = value.Spacing;
+        styleMetrics["Gap"] = value.Gap;
+        styleMetrics["RowHeight"] = value.RowHeight;
+        styleMetrics["Hairline"] = value.Hairline;
+        if (Geometry != prior) LayoutRevision++;
+    }
+    internal void ApplyStyleColour(string token, Color? value)
+    {
+        uint bit = ColourBit(token);
+        if (bit == 0) throw new ArgumentException("Unknown colour token '" + token + "'.");
+        if (styleColours.TryGetValue(bit, out Color? prior) && Nullable.Equals(prior, value)) return;
+        styleColours[bit] = value;
+        ColourRevision++;
+    }
+    internal void ClearStyleApplications()
+    {
+        UiFont priorFont = DefaultFont;
+        UiGeometry priorGeometry = Geometry;
+        bool hadColours = styleColours.Count > 0;
+        styleFont = null;
+        styleMetrics.Clear();
+        styleColours.Clear();
+        if (DefaultFont != priorFont || Geometry != priorGeometry) LayoutRevision++;
+        if (hadColours) ColourRevision++;
     }
     /// <summary>Remove the host declaration, revealing the library font; no creation snapshot is restored.</summary>
     public void RemoveFontOverride()
@@ -574,13 +613,63 @@ public sealed class UiTheme
         PanelBorder = VanillaTemplate.Defaults.PanelBorder,
     };
 
+    internal void RestoreFrom(UiTheme source)
+    {
+        UiFont priorFont = DefaultFont;
+        UiGeometry priorGeometry = Geometry;
+        bool intentChanged = fontDeclared != source.fontDeclared || densityDeclared != source.densityDeclared;
+        bool colourChanged = claimed != source.claimed;
+        foreach (string token in UiAppearanceProperties.Colours)
+            colourChanged |= !Nullable.Equals(UiAppearanceProperties.ReadColour(this, token), UiAppearanceProperties.ReadColour(source, token));
+        styleColours.Clear();
+        styleMetrics.Clear();
+        claimed = source.claimed;
+        baseColour = source.baseColour;
+        panel = source.panel;
+        raised = source.raised;
+        hover = source.hover;
+        selected = source.selected;
+        success = source.success;
+        danger = source.danger;
+        workspacePlane = source.workspacePlane;
+        sectionBand = source.sectionBand;
+        textPrimary = source.textPrimary;
+        textSecondary = source.textSecondary;
+        textOnGold = source.textOnGold;
+        textOnDanger = source.textOnDanger;
+        textDisabled = source.textDisabled;
+        accentGold = source.accentGold;
+        switchThumbOff = source.switchThumbOff;
+        border = source.border;
+        borderStrong = source.borderStrong;
+        divider = source.divider;
+        baseBorder = source.baseBorder;
+        panelBorder = source.panelBorder;
+        raisedBorder = source.raisedBorder;
+        hoverBorder = source.hoverBorder;
+        selectedBorder = source.selectedBorder;
+        successBorder = source.successBorder;
+        dangerBorder = source.dangerBorder;
+        defaultFont = source.defaultFont;
+        fontDeclared = source.fontDeclared;
+        densityDeclared = source.densityDeclared;
+        geometry = source.geometry;
+        styleFont = source.styleFont;
+        foreach (var pair in source.styleColours) styleColours.Add(pair.Key, pair.Value);
+        foreach (var pair in source.styleMetrics) styleMetrics.Add(pair.Key, pair.Value);
+        if (DefaultFont != priorFont || Geometry != priorGeometry) LayoutRevision++;
+        if (colourChanged) ColourRevision++;
+        if (intentChanged) PropertyRevision++;
+    }
     private Color ColourOf(uint bit, Color stored, Color fallback)
     {
+        if (styleColours.TryGetValue(bit, out Color? styled)) return styled!.Value;
         return (claimed & bit) != 0 ? stored : fallback;
     }
 
     private Color? EdgeOf(uint bit, Color? stored, Color? fallback)
     {
+        if (styleColours.TryGetValue(bit, out Color? styled)) return styled;
         return (claimed & bit) != 0 ? stored : fallback;
     }
 

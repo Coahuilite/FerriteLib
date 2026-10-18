@@ -1006,6 +1006,8 @@ public sealed class UiLayoutEngine
         // content, exactly as Auto does, so a programmatic spec cannot take a frame down.
         bool matchContent = UiPlacement.IsMatchContentHeight(spec);
         float? reference = contentHeightReference >= 0f ? contentHeightReference : null;
+        if (matchContent && !reference.HasValue)
+            ReportLayout(node, "ContentHeightUnavailable", "The retained raw/template entry uses natural height because this parent supplies no independent content-height reference.");
         if (matchContent && reference.HasValue)
         {
             // The element's own content is not the geometry here, and for a container the reference is also the
@@ -1392,41 +1394,12 @@ public sealed class UiLayoutEngine
     /// exactly where flow put it.
     /// </para>
     /// </summary>
-    private static UiLayoutAnchor? [] ReadAnchors(IReadOnlyList<ChildSlot> children, UiPlacement.Axis axis)
+    private static UiLayoutAnchor?[] ReadAnchors(IReadOnlyList<ChildSlot> children, UiPlacement.Axis axis)
     {
-        string attribute = axis == UiPlacement.Axis.Horizontal ? "AnchorX" : "AnchorY";
-        string align = axis == UiPlacement.Axis.Horizontal ? "AlignX" : "AlignY";
-        string offset = axis == UiPlacement.Axis.Horizontal ? "OffsetX" : "OffsetY";
-        var anchors = new UiLayoutAnchor? [children.Count];
-        for (int i = 0; i < children.Count; i++)
-        {
-            UiElementSpec child = children[i].Spec;
-            if (!child.TryGetAttribute(attribute, out string raw))
-                continue;
-            UiPlacement.ParseAnchor(raw, axis, out string target, out float fraction);
-            int targetIndex = -1;
-            if (!string.Equals(target, "parent", StringComparison.Ordinal))
-            {
-                targetIndex = -2;
-                for (int j = 0; j < children.Count; j++)
-                {
-                    if (!string.Equals(children[j].Spec.Id, target, StringComparison.Ordinal))
-                        continue;
-                    if (targetIndex >= 0)
-                        throw new FormatException("Ambiguous " + attribute + " target '" + target + "' on '" + child.Id + "'.");
-                    targetIndex = j;
-                }
-
-                if (targetIndex < 0)
-                    throw new FormatException("Missing visible direct sibling '" + target + "' for " + attribute + " on '" + child.Id + "'.");
-            }
-
-            anchors[i] = new UiLayoutAnchor(targetIndex, fraction, UiPlacement.ParseAlign(child, align, axis).Fraction, UiPlacement.ParseOffsetValue(child, offset));
-        }
-
-        return anchors;
+        var definitions = new UiElementSpec[children.Count];
+        for (int i = 0; i < definitions.Length; i++) definitions[i] = children[i].Spec;
+        return UiPlacement.ReadAnchors(definitions, axis);
     }
-
     private MeasuredBox MeasureOverlay(UiWidgetContext ctx, UiElementSpec spec, string kind, float width, Padding padding, float titleHeight, float innerWidth, float innerY, float availableHeight, UiNode node, bool narrow)
     {
         List<ChildSlot> visible = VisibleChildren(spec, ctx, narrow, node);
@@ -1920,7 +1893,12 @@ public sealed class UiLayoutEngine
             // FL-IC2: "return from this row" is an answer about one row for exactly the same reason, and the
             // contract asks for the tree walk to reuse the existing scope resolution rather than invent a
             // second one - a Cancel declared inside a row template names the row's own command.
-            && !string.Equals(attribute, CancelBindAttribute, StringComparison.OrdinalIgnoreCase))
+            && !string.Equals(attribute, CancelBindAttribute, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(attribute, "PointKeysBind", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(attribute, "DisclosureBind", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(attribute, "CheckBind", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(attribute, "WidthKey", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(attribute, Widgets.OptionHelp.Attribute, StringComparison.OrdinalIgnoreCase))
         {
             return value;
         }
@@ -2058,6 +2036,7 @@ public sealed class UiLayoutEngine
         // subtree is outside that walk. Element, attribute and path are all still known, which is what makes
         // the located error possible.
         UiPlacement.ValidateChild(spec, path, scope, parent);
+        UiPlacement.ValidateSiblingAnchors(spec, path, scope);
 
         if (IsContainerElementName(spec.Kind))
         {
@@ -2709,8 +2688,7 @@ public sealed class UiLayoutEngine
 
     private static int DefinitionRevision(UiWidgetContext ctx)
     {
-        // The host can bump this later; for now the layout definition is immutable per engine.
-        return 0;
+        return ctx.Session.DefinitionRevision;
     }
 
     private static float Normalize(float value, float fallback)

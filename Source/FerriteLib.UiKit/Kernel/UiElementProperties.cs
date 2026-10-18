@@ -242,7 +242,7 @@ public sealed class UiElementProperties
             {
                 lastColours[colour.Key] = colour.Value.Value;
                 if (colour.Value.Origin != UiPropertyOrigin.Fallback)
-                    UiAppearanceProperties.ApplyColour(theme, colour.Key, colour.Value.Value);
+                    theme.ApplyStyleColour(colour.Key, colour.Value.Value);
             }
             appliedTheme = theme;
             lastHost = host;

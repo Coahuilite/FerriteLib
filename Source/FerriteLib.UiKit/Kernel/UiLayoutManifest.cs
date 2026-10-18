@@ -47,9 +47,6 @@ public sealed class UiLayoutManifest
     /// <summary>Longest <c>&lt;Styles&gt;</c> section accepted, in characters. The style parser has its own bounds.</summary>
     private const int MaxStylesChars = 32768;
 
-    /// <summary>The template table of a manifest that declares no <c>&lt;Templates&gt;</c> section.</summary>
-    private static readonly IReadOnlyDictionary<string, UiElementSpec> NoTemplates =
-        new Dictionary<string, UiElementSpec>(StringComparer.Ordinal);
 
     private static readonly HashSet<string> SupportedElementNames = new(StringComparer.Ordinal)
     {
@@ -107,6 +104,56 @@ public sealed class UiLayoutManifest
         Templates = templates;
     }
 
+    /// <summary>Assembles immutable C# component definitions through the same host contract as XML.</summary>
+    public static UiLayoutManifest Create(string source, IReadOnlyList<UiElementSpec> roots,
+        UiStyleDocument? styles = null, IReadOnlyDictionary<string, UiElementSpec>? templates = null)
+    {
+        if (source == null) throw new ArgumentNullException(nameof(source));
+        if (source.Length == 0) throw new ArgumentException("A definition needs its Source identity.", nameof(source));
+        if (roots == null) throw new ArgumentNullException(nameof(roots));
+        var rootCopy = new UiElementSpec[roots.Count];
+        var templateCopy = new Dictionary<string, UiElementSpec>(StringComparer.Ordinal);
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        int count = 0;
+        for (int i = 0; i < roots.Count; i++)
+        {
+            rootCopy[i] = roots[i] ?? throw new ArgumentException("A root definition cannot be null.", nameof(roots));
+            ValidateDefinition(rootCopy[i], 1, ids, ref count);
+        }
+        if (templates != null)
+            foreach (KeyValuePair<string, UiElementSpec> entry in templates)
+            {
+                if (entry.Key.Length == 0 || entry.Key.IndexOf('/') >= 0 || entry.Key.IndexOf(ItemKeySeparator) >= 0)
+                    throw new FormatException("Invalid template name '" + entry.Key + "'.");
+                if (entry.Value == null || entry.Value.Id != entry.Key)
+                    throw new FormatException("Template '" + entry.Key + "' must name its definition's Id.");
+                ValidateDefinition(entry.Value, 2, ids, ref count);
+                ValidateTemplateIdentityGrammar(entry.Value, entry.Key);
+                templateCopy.Add(entry.Key, entry.Value);
+            }
+        ValidateIdentitySegments(rootCopy, 0);
+        ValidateTemplateReferences(rootCopy, templateCopy);
+        return new UiLayoutManifest(source, "2", Array.AsReadOnly(rootCopy), styles ?? UiStyleDocument.Empty,
+            new System.Collections.ObjectModel.ReadOnlyDictionary<string, UiElementSpec>(templateCopy));
+    }
+
+    private static void ValidateDefinition(UiElementSpec spec, int depth, HashSet<string> ids, ref int count)
+    {
+        if (++count > MaxNodeCount || depth > MaxDepth)
+            throw new FormatException("UI definition exceeds the bounded node/depth limit (" + MaxNodeCount + "/" + MaxDepth + ").");
+        if (spec.Id.IndexOf('/') >= 0) throw new FormatException("Element Id '" + spec.Id + "' contains the path separator '/'.");
+        if (spec.Id.Length > 0 && !ids.Add(spec.Id)) throw new FormatException("Duplicate element Id '" + spec.Id + "'.");
+        if (spec.Kind.Length == 0) throw new FormatException("A component definition needs its Kind.");
+        bool container = SupportedElementNames.Contains(spec.Kind) && spec.Kind != "Widget" && spec.Kind != "UiPage";
+        if (spec.Children.Count > 0 && !container)
+            throw new FormatException("Widget definition '" + spec.Id + "' cannot consume nested element definitions.");
+        foreach (UiElementSpec child in spec.Children)
+        {
+            if (child == null) throw new FormatException("Element '" + spec.Id + "' has a null child definition.");
+            ValidateDefinition(child, depth + 1, ids, ref count);
+        }
+        ValidateIdentitySegments(spec.Children, 0);
+    }
     public static UiLayoutManifest Parse(string xml)
     {
         if (xml == null) throw new ArgumentNullException(nameof(xml));
@@ -184,8 +231,7 @@ public sealed class UiLayoutManifest
 
             if (reader.IsEmptyElement)
             {
-                return new UiLayoutManifest(
-                    source, schema, Array.Empty<UiElementSpec>(), UiStyleDocument.Empty, NoTemplates);
+                return Create(source, Array.Empty<UiElementSpec>());
             }
 
             break;
@@ -260,7 +306,7 @@ public sealed class UiLayoutManifest
                     {
                         ValidateIdentitySegments(roots, pageLine);
                         ValidateTemplateReferences(roots, templates);
-                        return new UiLayoutManifest(source, schema, roots, styles, templates);
+                        return Create(source, roots, styles, templates);
                     }
 
                     throw ParseError(lineInfo, $"Unexpected end element </{reader.Name}>.");

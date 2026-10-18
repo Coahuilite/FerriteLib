@@ -110,6 +110,7 @@ public sealed class UiStyleResolver
     {
         if (theme == null) throw new ArgumentNullException(nameof(theme));
 
+        theme.ClearStyleApplications();
         ApplyNamedScopes(theme, document.DefaultScheme, document.DefaultDensity, null);
     }
 
@@ -157,6 +158,7 @@ public sealed class UiStyleResolver
         if (regionThemes.TryGetValue(key, out UiTheme? cached)) return cached;
 
         UiTheme theme = baseline.Clone();
+        theme.ClearStyleApplications();
         ApplyNamedScopes(theme, document.DefaultScheme, document.DefaultDensity, elementPath);
         if (nearestFirst != null)
             for (int i = nearestFirst.Count - 1; i >= 0; i--)
@@ -207,7 +209,8 @@ public sealed class UiStyleResolver
             {
                 foreach (KeyValuePair<string, Color> pair in definition.Colours)
                 {
-                    ApplyColour(theme, pair.Key, pair.Value);
+                    if (preserveHostDeclarations) theme.ApplyStyleColour(pair.Key, pair.Value);
+                    else ApplyColour(theme, pair.Key, pair.Value);
                 }
 
                 if (definition.Font.HasValue) ApplyFont(theme, definition.Font.Value, preserveHostDeclarations);
@@ -324,7 +327,7 @@ public sealed class UiStyleResolver
             "Hairline" => new UiGeometry(current.Padding, current.Spacing, current.Gap, current.RowHeight, value),
             _ => current
         };
-        if (preserveHostDeclarations) theme.ApplyStyleGeometry(next);
+        if (preserveHostDeclarations) theme.ApplyStyleMetric(token, value);
         else theme.Geometry = next;
     }
     private void Record(string message, int line = 0, string? elementPath = null)

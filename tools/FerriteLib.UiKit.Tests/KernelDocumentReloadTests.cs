@@ -753,10 +753,7 @@ internal static class KernelDocumentReloadTests
     /// on the theme the consumer handed in survives; a document that does apply one is still undone when
     /// the next version stops declaring it.
     /// <para>
-    /// The last check pins the documented residual so the comment cannot drift from the code: the restore is
-    /// not per-token, so a re-tint of a token the outgoing page level never declared is discarded by that
-    /// reload too. Narrowing that would be a behaviour change - and would have to update this check.
-    /// </para>
+    /// Current host declarations remain separate from the outgoing page's effective application.
     /// </summary>
     private static void VerifyConsumerRetintAcrossReload(string sandbox)
     {
@@ -794,7 +791,7 @@ internal static class KernelDocumentReloadTests
         styleService.Add(new UiDocumentSource("tint-style", UiDocumentKind.Style, stylePath), styleV1);
         UiTheme themed = UiTheme.Vanilla.Clone();
         Color panelBaseline = themed.Panel;
-        Color baseBaseline = themed.Base;
+
         using var styled = NewHost("scope-retint-style", UiLayoutManifest.Parse(KeepPage("scope-retint-style")), new UiBindings(), themed);
         styleService.Attach(styled, null, "tint-style");
         Check(SameColor(themed.Panel, new Color(0f, 0f, 1f, 1f)),
@@ -808,17 +805,41 @@ internal static class KernelDocumentReloadTests
         Check(SameColor(themed.Panel, panelBaseline),
             "and a page level the new document no longer declares is undone");
 
-        // The documented residual, pinned. A page level is present again, a token it never declares is
-        // re-tinted, and the next reload - to a document with no page level at all - still discards the tint:
-        // the restore is not tracked per token.
+        // A current host tint outside the outgoing page declaration survives removal.
         File.WriteAllText(stylePath, PageSchemeStyle("ice", "#00ff00"));
         Check(styleService.Reload("tint-style")?.Accepted == true, "a page level is applied again");
         Color residualTint = new Color(0.2f, 0.4f, 0.6f, 1f);
         themed.Base = residualTint;
         File.WriteAllText(stylePath, "<Styles Schema=\"1\"></Styles>");
         Check(styleService.Reload("tint-style")?.Accepted == true, "and the next reload drops the page level");
-        Check(!SameColor(themed.Base, residualTint) && SameColor(themed.Base, baseBaseline),
-            "RESIDUAL (documented): a re-tint of a token the outgoing page level never declared is discarded");
+        Check(SameColor(themed.Base, residualTint),
+            "A4 removing a page application preserves current unrelated host tint");
+        File.WriteAllText(stylePath, "<Styles Schema=\"1\" Density=\"gap\"><Density Name=\"gap\"><Metric Token=\"Gap\" Value=\"3\"/></Density></Styles>");
+        Check(styleService.Reload("tint-style")?.Accepted == true && themed.Geometry.Gap == 3, "A4 real Host applies only page Gap3");
+        themed.TextPrimary = new Color(0, 1, 1, 1);
+        themed.DefaultFont = UiFont.Medium;
+        themed.Geometry = new UiGeometry(12, 8, 9, 45, 2);
+        themed.SwitchThumbOff = new Color(.4f, .2f, .7f, 1);
+        Check(themed.Geometry.Gap == 3 && themed.Geometry.RowHeight == 45,
+            "A4 current host metrics remain distinct beneath the one explicitly applied page metric");
+        File.WriteAllText(stylePath, "<Styles Schema=\"1\"></Styles>");
+        Check(styleService.Reload("tint-style")?.Accepted == true, "A4 real document route removes the sparse density");
+        styled.MeasureAndArrange(new Vector2(400, 400));
+        UiNode keep = styled.Session.GetNodeByElementId("keep")!;
+        Check(themed.DefaultFont == UiFont.Medium && themed.Geometry.Gap == 9 && themed.Geometry.RowHeight == 45
+            && SameColor(themed.TextPrimary, new Color(0, 1, 1, 1)) && SameColor(themed.SwitchThumbOff, new Color(.4f, .2f, .7f, 1)),
+            "A4 removing Gap3 preserves current font, other metric, colour and dedicated thumb declaration values");
+        Check(keep.Properties.ResolvedFont.Origin == UiPropertyOrigin.Host
+            && keep.Properties.ResolvedMetrics["RowHeight"].Origin == UiPropertyOrigin.Host
+            && keep.Properties.ResolvedColours["TextPrimary"].Origin == UiPropertyOrigin.Host,
+            "A4 actual node sources remain current host declarations, not a copied creation snapshot");
+        themed.RemoveFontOverride();
+        themed.RemoveDensityOverride();
+        styled.MeasureAndArrange(new Vector2(400, 400));
+        Check(keep.Properties.ResolvedFont.Origin == UiPropertyOrigin.Fallback
+            && keep.Properties.ResolvedMetrics["RowHeight"].Origin == UiPropertyOrigin.Fallback
+            && SameColor(themed.TextPrimary, new Color(0, 1, 1, 1)),
+            "A4 later declaration removal still reveals live fallback and never clears unrelated colour intent");
     }
 
     // --- rollback restores interaction state, not only the tree (P4 R1) -------------------------

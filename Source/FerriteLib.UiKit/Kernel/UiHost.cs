@@ -37,12 +37,9 @@ public sealed class UiHost : IDisposable
     // held interaction capture are only destroyed by SealDocumentCommit, which the service calls after every
     // host in the batch committed. A rolled-back batch therefore loses nothing the user had not committed.
     private UiLayoutManifest? pendingPrune;
+    private bool pendingDocumentCommit;
 
-    // The theme's tokens as the consumer handed them in, captured before the first document is applied.
-    // Applying a document is a mutation of the injected theme, so committing the next version has to start
-    // from the pre-document values: without this, a declaration the new document no longer carries would
-    // keep applying forever.
-    private readonly UiTheme styleBaseline;
+
 
     // The service this host reads documents through, so closing the host releases its dependency instead of
     // leaving a closed session referenced by a live service.
@@ -119,7 +116,6 @@ public sealed class UiHost : IDisposable
         // resolve-before-Measure: the page level lands on the injected theme before the first arrange, and
         // because applying a token moves the theme's own layout revision - the clock the band cache already
         // compares - the very first frame follows the document. No second clock is introduced anywhere.
-        styleBaseline = theme.Clone();
         styleResolver = new UiStyleResolver(theme, styleDocument);
         styleResolver.ApplyPageTo(theme);
 
@@ -143,6 +139,7 @@ public sealed class UiHost : IDisposable
     public string Source => source;
 
     public UiLayoutManifest Manifest => manifest;
+    public int DefinitionRevision => session.DefinitionRevision;
 
     /// <summary>
     /// Opts this host in to per-host diagnostics and returns its bounded subscription. It is created on
@@ -555,6 +552,24 @@ public sealed class UiHost : IDisposable
         subscription.PublishReload(report);
     }
 
+    /// <summary>Replace an immutable XML/program definition through the existing prepare/stage/seal boundary.</summary>
+    public void UpdateDefinition(UiLayoutManifest candidate)
+    {
+        if (candidate == null) throw new ArgumentNullException(nameof(candidate));
+        if (SessionDisposed) throw new ObjectDisposedException(nameof(UiHost));
+        ValidateManifest(candidate);
+        DocumentRollback rollback = CaptureDocumentRollback();
+        try
+        {
+            CommitLayoutCandidate(candidate);
+            SealDocumentCommit();
+        }
+        catch
+        {
+            RestoreDocumentRollback(rollback);
+            throw;
+        }
+    }
     /// <summary>
     /// Validates a candidate layout in full - the same creation-time contract the constructor runs,
     /// including every widget's own Configure/Validate against this host's bindings - without changing
@@ -601,6 +616,7 @@ public sealed class UiHost : IDisposable
     {
         UiLayoutManifest previous = manifest;
         manifest = candidate;
+        pendingDocumentCommit = true;
         pendingPrune = previous;
         RebuildTree();
     }
@@ -613,6 +629,7 @@ public sealed class UiHost : IDisposable
     internal void CommitStyleCandidate(UiStyleDocument candidate)
     {
         attachedStyleDocument = candidate ?? throw new ArgumentNullException(nameof(candidate));
+        pendingDocumentCommit = true;
         pendingPrune = null;
         RebuildTree();
     }
@@ -627,7 +644,10 @@ public sealed class UiHost : IDisposable
     {
         UiLayoutManifest? previous = pendingPrune;
         pendingPrune = null;
+        bool committed = pendingDocumentCommit;
+        pendingDocumentCommit = false;
         if (SessionDisposed) return;
+        if (committed) session.DefinitionRevision++;
 
         if (previous != null)
         {
@@ -722,6 +742,7 @@ public sealed class UiHost : IDisposable
         // The capture always precedes a stage, so any pending prune belongs to the commit being undone and
         // must not survive it: sealing a rolled-back batch would destroy state the rollback just preserved.
         pendingPrune = null;
+        pendingDocumentCommit = false;
         manifest = rollback.Manifest;
         attachedStyleDocument = rollback.AttachedStyle;
         styleResolver = rollback.StyleResolver;
@@ -776,67 +797,10 @@ public sealed class UiHost : IDisposable
         PublishStyleIssues();
     }
 
-    /// <summary>
-    /// Undoes the page-level application of the document currently in force, so the incoming document is
-    /// resolved against the consumer's own theme rather than on top of its predecessor's values.
-    /// <para>
-    /// The gate is the whole point: a document that declares neither a page scheme nor a page density
-    /// applied nothing, and restoring in that case would only discard a tint the consumer applied to the
-    /// theme it handed in. A reload is not an excuse to reset state a document never owned.
-    /// </para>
-    /// <para>
-    /// <b>The residual, stated exactly.</b> The restore is not tracked per token: once the outgoing document
-    /// applied <i>any</i> page-level scheme or density, the next reload restores <b>every</b>
-    /// document-settable token to the value the theme had at host construction. So a consumer that re-tints
-    /// any token in the bag - including a token the outgoing page level never declared - loses that tint on
-    /// that reload, even when the incoming document declares nothing. A per-token restore would need the
-    /// resolver to record which tokens it touched, and the name-to-property mapping exists once, privately,
-    /// in <see cref="UiStyleResolver"/>; it is not duplicated here. Consumer-visible consequence: re-apply a
-    /// re-tint after a reload, or declare the value in the document instead of tinting the theme.
-    /// </para>
-    /// </summary>
-    private void RestoreStyleBaseline()
-    {
-        UiStyleDocument applied = styleResolver.Document;
-        if (applied.DefaultScheme == null && applied.DefaultDensity == null) return;
-        CopyThemeTokens(theme, styleBaseline);
-    }
+    /// <summary>Remove only the prior page application; current host declarations stay live.</summary>
+    private void RestoreStyleBaseline() => theme.ClearStyleApplications();
 
-    /// <summary>Copies every document-settable token from <paramref name="source"/> onto <paramref name="target"/>.</summary>
-    private static void CopyThemeTokens(UiTheme target, UiTheme source)
-    {
-        target.Base = source.Base;
-        target.Panel = source.Panel;
-        target.Raised = source.Raised;
-        target.Hover = source.Hover;
-        target.Selected = source.Selected;
-        target.Success = source.Success;
-        target.Danger = source.Danger;
-        target.WorkspacePlane = source.WorkspacePlane;
-        target.SectionBand = source.SectionBand;
-        target.TextPrimary = source.TextPrimary;
-        target.TextSecondary = source.TextSecondary;
-        target.TextOnGold = source.TextOnGold;
-        target.TextOnDanger = source.TextOnDanger;
-        target.TextDisabled = source.TextDisabled;
-        target.AccentGold = source.AccentGold;
-        // Batch 1 (CP-6④): there is no second stored accent to copy any more. The hover step is derived
-        // from the accent, so cloning the accent is enough - and a copied value would go stale the moment
-        // a region re-tinted the derived one.
-        target.Border = source.Border;
-        target.BorderStrong = source.BorderStrong;
-        target.Divider = source.Divider;
-        target.BaseBorder = source.BaseBorder;
-        target.PanelBorder = source.PanelBorder;
-        target.RaisedBorder = source.RaisedBorder;
-        target.HoverBorder = source.HoverBorder;
-        target.SelectedBorder = source.SelectedBorder;
-        target.SuccessBorder = source.SuccessBorder;
-        target.DangerBorder = source.DangerBorder;
-        target.DefaultFont = source.DefaultFont;
-        target.Geometry = source.Geometry;
-    }
-
+    private static void CopyThemeTokens(UiTheme target, UiTheme source) => target.RestoreFrom(source);
     /// <summary>
     /// Everything a document commit changes, captured before the commit so the service can roll a batch
     /// back when a later host in the same batch refuses. Deliberately internal and nested: it is the
@@ -924,6 +888,7 @@ public sealed class UiHost : IDisposable
 
     private void ResetDetachedState(UiNode node, Dictionary<UiNodeId, string> survivors)
     {
+        node.EditingState = null;
         ResetState(node.State);
         foreach (KeyValuePair<string, UiValueState> slot in node.ValueStates)
         {
@@ -946,8 +911,16 @@ public sealed class UiHost : IDisposable
         }
     }
 
-    private static void ResetState(UiValueState state)
+    private void ResetState(UiValueState state)
     {
+        UiNative.ReleaseEditFocus(state, session);
+        session.NoteEditClosed(state);
+        if (state.Editor is IUiEditState editor) editor.Suspend();
+        state.Editor = null;
+        state.EditorTarget = null;
+        state.ChartIdentity = null;
+        state.CommitRequested = false;
+        state.DiscardRequested = false;
         state.FloatValue = 0f;
         state.EditText = "";
         state.Dragging = false;
@@ -1051,6 +1024,7 @@ public sealed class UiHost : IDisposable
         // attribute is valid only inside a placement container, and a flow container's child accepts the
         // cross-axis subset without an offset. The rule lives in UiPlacement so the engine can share it.
         UiPlacement.ValidateChild(spec, path, source, parent);
+        UiPlacement.ValidateSiblingAnchors(spec, path, source);
 
         bool isWidget = string.Equals(spec.Kind, "Widget", StringComparison.Ordinal)
             || !IsContainerKind(spec.Kind);

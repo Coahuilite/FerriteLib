@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 
 namespace FerriteLib.UiKit.Kernel;
@@ -243,6 +244,57 @@ internal static class UiPlacement
         }
     }
 
+    internal static UiLayoutAnchor?[] ReadAnchors(IReadOnlyList<UiElementSpec> children, Axis axis)
+    {
+        string attribute = axis == Axis.Horizontal ? "AnchorX" : "AnchorY";
+        string align = axis == Axis.Horizontal ? "AlignX" : "AlignY";
+        string offset = axis == Axis.Horizontal ? "OffsetX" : "OffsetY";
+        var anchors = new UiLayoutAnchor? [children.Count];
+        for (int i = 0; i < children.Count; i++)
+        {
+            UiElementSpec child = children[i];
+            if (!child.TryGetAttribute(attribute, out string raw))
+                continue;
+            ParseAnchor(raw, axis, out string target, out float fraction);
+            int targetIndex = -1;
+            if (!string.Equals(target, "parent", StringComparison.Ordinal))
+            {
+                targetIndex = -2;
+                for (int j = 0; j < children.Count; j++)
+                {
+                    if (!string.Equals(children[j].Id, target, StringComparison.Ordinal))
+                        continue;
+                    if (targetIndex >= 0)
+                        throw new FormatException("Ambiguous " + attribute + " target '" + target + "' on '" + child.Id + "'.");
+                    targetIndex = j;
+                }
+
+                if (targetIndex < 0)
+                    throw new FormatException("Missing direct sibling '" + target + "' for " + attribute + " on '" + child.Id + "'.");
+            }
+
+            anchors[i] = new UiLayoutAnchor(targetIndex, fraction, ParseAlign(child, align, axis).Fraction, ParseOffsetValue(child, offset));
+        }
+
+        return anchors;
+    }
+
+    internal static void ValidateSiblingAnchors(UiElementSpec parent, string path, string scope)
+    {
+        if (!IsPlacementContainer(parent.Kind)) return;
+        try
+        {
+            var slots = new UiLayoutRect[parent.Children.Count];
+            for (int i = 0; i < slots.Length; i++) slots[i] = new UiLayoutRect(0, 0, 1, 1);
+            var plan = new UiLayoutPlan(new UiLayoutSize(1, 1), slots, 1);
+            var frame = new UiLayoutFrame(1, 1, 0, 0, 0, 0, 0, 0, new UiLayoutHeight(1, false));
+            UiLayout.Anchored(plan, frame, ReadAnchors(parent.Children, Axis.Horizontal), ReadAnchors(parent.Children, Axis.Vertical));
+        }
+        catch (Exception ex) when (ex is FormatException or ArgumentException)
+        {
+            throw Contract(parent, path, scope, ex.Message);
+        }
+    }
     private static void ValidateAnchorDeclaration(UiElementSpec spec, string path, string scope,
         string? ownerKind, string attribute, string alignmentAttribute, Axis axis)
     {

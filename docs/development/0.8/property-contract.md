@@ -9,7 +9,7 @@ Declare a font or semantic colour directly, or apply one named Scheme and Densit
 </Stack>
 ```
 
-The first-version environment covers typography, the five existing density metrics, and all26 existing
+P1 is a reversible Dev candidate under FL08-DEFERRED-DEFAULTS r3, pending final product decision: the proposed first-version environment covers typography, the five existing density metrics, and all26 existing
 colour tokens (including nullable per-surface edges). It does not inherit business values, bindings,
 roles, drafts, interaction policy, capture, final geometry or container-specific layout declarations.
 `Color.Token` uses the existing document colour parser; invalid fonts/colours at the host/manifest
@@ -27,7 +27,7 @@ inline declaration if the current component definition still contains it. Removi
 uses the normal immutable definition/update path. A resolved parent theme is never copied into the
 child's declaration store. Sparse named styles leave missing properties open to the remaining sources.
 
-One Scheme supplies its declared colours/font/metrics. One named Density applies after that Scheme on
+P1 also proposes one Scheme and one Density at the same level. One Scheme supplies its declared colours/font/metrics. One named Density applies after that Scheme on
 a metric both explicitly define, preserving the old deterministic same-level ordering. A runtime local
 property takes precedence over the named local property. No arbitrary style-list combination is built.
 Font is independent of all density metrics. A local Gap does not replace an ancestor RowHeight with a
@@ -69,6 +69,6 @@ Checkbox whole-content labels and descriptive headings are not misrepresented as
 Evidence: actual host sparse-style/programmatic-ancestor/inline/equal-value/removal/source/paint-only
 and derived-ink regressions in KernelStyleScopeTests; five-wrapper actual labels/font/narrow geometry,
 failed-authoring recovery and real Event/paint-failing Dropdown in KernelLayoutTests. Existing full
-style/layout/input contracts remain tested. E1–E5/N1–N3 and L1 are reversible Dev candidates; these
+style/layout/input contracts remain tested. E1–E5/N1–N3, L1 and P1 are reversible Dev candidates; these
 engineering source-resolution rules do not reopen approved F1/F2/F3. Native1.6 appearance acceptance
 is still pending.

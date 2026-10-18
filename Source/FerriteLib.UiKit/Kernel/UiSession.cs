@@ -39,6 +39,7 @@ public sealed class UiSession : IDisposable
     // in pass N still wins the click in pass N+1 while no element has to know that popups exist.
     private readonly List<UiHitLayer> hitLayers = new();
     private bool hitPassOpen;
+    public int DefinitionRevision { get; internal set; }
     internal bool IsInputGeometryReliable { get; private set; } = true;
     private readonly List<UiHitLayer> dispatchLayers = new();
     private Vector2 currentWindowOrigin;

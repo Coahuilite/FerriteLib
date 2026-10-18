@@ -27,7 +27,7 @@ pending. Earlier 0.7 human acceptance stays attached to its own package and does
 | `display/image` | Natural size/letterbox/missing slot | Meaningful/decorative description and known/unknown texture availability | DescriptiveFacts meaningful/decorative/missing; ControlKind/image guards | Pending |
 | `chrome/rule` | Decoration | Decoration description and retained shared paint geometry; no input state | DescriptiveFacts nonoperative paint; Atom/ControlKind guards | Pending |
 | `display/progress` | Model value/range display | Actual value/range versus clamped fill and explicit nonfinite/missing facts; no write capability | DescriptiveFacts current/nonfinite/missing model; ControlKind guards | Pending |
-| `Repeat` | Registered template schema and engine keyed assembly | Pending complete assembly/update migration; stable item identity retained | Existing Repeat/Identity/DocumentReload guards | Pending |
+| `Repeat` | Registered template schema and engine keyed assembly | Actual immutable assembly/update contract connected; exact scoped binding roles, same-item anchors and stable item identity retained | Assembly keyed real-wrapper reorder + Repeat/Identity/DocumentReload guards | Pending |
 
 The seven descriptive uses are wrappers too. They need their appropriate descriptive, measure and
 appearance contracts, not artificial activation state machines. A passing legacy lane is not a claim
@@ -46,13 +46,13 @@ that a row's new capability has been migrated.
 | Surface | Engine grouping/chrome | Shared neutral vertical geometry; per-property environment sources/removal connected; Layout/StyleScope + pure Layout | Pending |
 | Scroll | Engine viewport + session scroll position | Shared neutral content/viewport rows/clamping + real native adapter; full host scroll tests pending | Pending |
 | Clip | Engine effective clip/native groups | Shared neutral effective child geometry + existing balanced native clip; full host evidence pending | Pending |
-| Conditional/dynamic content | Engine Visible/Hidden/VisibleKey and structure reconciliation | Retained; applicable capture cleanup tested; complete authoring/update contract pending | Pending |
+| Conditional/dynamic content | Engine Visible/Hidden/VisibleKey and structure reconciliation | Immutable replacement + visibility/structure reconciliation retained; actual authoring/update and capture cleanup tested | Pending |
 | Limited same-parent positioning / shared label columns | Confirmed first-version additions | Implemented finite axis dependency + five-wrapper actual label demand/stacking; pure + actual Layout C3 cases | Pending |
 | Standard window / embedded host | UiWindowHost / UiHost, session lifecycle | S1 native eligibility/capture and BSE popup cleanup connected; complete public host contract pending | Pending |
 | Window chrome / return / business close | UiWindowChrome, shell and explicit commands | Retained; no new keyboard/global Cancel defaults; complete migration pending | Pending |
 | Tooltip / help / option-help output | Session hover and OptionHelp bindings | Retained; popup close clears help; full descriptive/observation migration pending | Pending |
-| Bindings / change notifications / subscriptions | Model + UiBindings/UiNotifyAdapter | Retained; model remains authority, existing lifecycle tests; shared edit coordination pending | Pending |
-| XML/program assembly / document update | UiHost/UiDocumentService/engine | Retained validation, keyed Repeat, failed-update old-tree recovery; complete A5 migration pending | Pending |
+| Bindings / change notifications / subscriptions | Model + UiBindings/UiNotifyAdapter | Retained; model remains authority, existing lifecycle tests; shared editor observes actual model independently of announcements; Assembly update preserves compatible drafts | Pending |
+| XML/program assembly / document update | UiHost/UiDocumentService/engine | Shared XML/program Create+Host UpdateDefinition validation/stage/seal, exact current theme declaration rollback, keyed Repeat; Assembly/DocumentReload evidence | Pending |
 | Diagnostics / layout snapshots / agent observation | Existing diagnostics and development geometry probe | Retained; complete R9 bounded semantic read surface/roles/unknown states pending | Pending |
 | Visual core / text metrics / styles | Theme/draw/metrics and platform font service | Per-property font/density metrics/all26 semantic colour sources and sparse styles/removal connected; actual wrapper paint respects effective font; native pending | Pending |
 
@@ -62,6 +62,6 @@ Common editing/numeric composition and basic plain-text multiline are implemente
 remain first-version work. All completed slices still need target 1.6 acceptance with the actual selected
 Dev package. Complete first-version acceptance is not inferred from the 18-entry inventory or a green full harness.
 
-Implementation contracts: [S0/S1](s01-contract.md), [boolean/selection/expansion](bse-contract.md), [editing/numeric composition](editing-contract.md), [descriptive wrappers and chart](wrappers-contract.md), [shared layout](layout-contract.md), [property sources](property-contract.md).
+Implementation contracts: [S0/S1](s01-contract.md), [boolean/selection/expansion](bse-contract.md), [editing/numeric composition](editing-contract.md), [descriptive wrappers and chart](wrappers-contract.md), [shared layout](layout-contract.md), [property sources](property-contract.md), [assembly/update](assembly-contract.md).
 The product requirements and remaining policy decisions live in [the specification](README.md),
 with the [contract-to-test migration](acceptance-and-test-migration.md) defining evidence classes.
