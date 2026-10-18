@@ -57,6 +57,7 @@ internal static class KernelBooleanSelectionExpansionTests
             UiNative.ButtonOverride = null;
             UiNative.DebugMousePositionEnabled = false;
             UiNative.Trace = null;
+            EstablishedRequestsSurvivePaintFailure();
             SharedBindingPopupOwners();
             PressedPresentationFacts();
             CheckboxRoutes();
@@ -191,8 +192,7 @@ internal static class KernelBooleanSelectionExpansionTests
         Vector2 second = Centre(RectOf(host, "second"));
         Pump(host, EventType.MouseDown, second);
         Pump(host, EventType.MouseUp, second);
-        Check(host.Session.IsPopupOpen("shared") && host.Session.OpenPopupAnchor?.y == RectOf(host, "second").y,
-            "same-Bind second popup keeps its own anchor while the earlier sibling draws");
+        Check(host.Session.IsPopupOpen("shared") && host.Session.OpenPopupAnchor?.y == RectOf(host, "second").y, "same-Bind second popup keeps its own anchor while the earlier sibling draws");
         Pump(host, EventType.Repaint, second);
         host.Session.ClosePopup();
         Rect modeRect = RectOf(host, "mode");
@@ -215,6 +215,126 @@ internal static class KernelBooleanSelectionExpansionTests
     }
 
     private static IList Recorded(string field) => (IList)typeof(Verse.Widgets).GetField(field)!.GetValue(null)!;
+    private static void EstablishedRequestsSurvivePaintFailure()
+    {
+        foreach (string operation in new[]
+        {
+            "switch",
+            "checkbox",
+            "disclosure",
+            "check",
+            "body"
+        }
+
+        )
+            foreach (bool close in new[]
+            {
+                false,
+                true
+            }
+
+            )
+            {
+                using var session = new UiSession();
+                var translation = new PaintFailureTranslation();
+                var bindings = new UiBindings();
+                var calls = new List<string>();
+                bool model = false;
+                bindings.BindValue("flag", () => model, value =>
+                {
+                    calls.Add("Set");
+                    model = value;
+                    if (close)
+                        session.Dispose();
+                });
+                bindings.BindCommand("after", () => calls.Add("Invoke"));
+                bindings.BindReadOnly<IReadOnlyList<UiTreeRow>>("rows", () => new[] { new UiTreeRow("row", 0, "Row", expandable: true, checkable: true, textKey: "paint-only"), new UiTreeRow("row-2", 0, "Second", expandable: true, checkable: true, textKey: "paint-only") });
+                bindings.BindAction<string>("row", key =>
+                {
+                    calls.Add(operation + ":" + key);
+                    if (close)
+                        session.Dispose();
+                });
+                bool boolean = operation == "switch" || operation == "checkbox";
+                string kind = boolean ? "input/checkbox" : "container/tree";
+                var attributes = new Dictionary<string, string>
+                {
+                    ["Bind"] = boolean ? "flag" : "rows",
+                    ["Appearance"] = operation,
+                    ["LabelKey"] = "paint-only",
+                    ["RowHeight"] = "28"
+                };
+                attributes[boolean ? "ActionBind" : operation == "disclosure" ? "DisclosureBind" : operation == "check" ? "CheckBind" : "ActionBind"] = boolean ? "after" : "row";
+                IUiWidget widget = boolean ? new CheckboxWidget() : new TreeWidget();
+                widget.Configure(new UiElementSpec("actual-wrapper", kind, attributes));
+                var ctx = new UiWidgetContext(Scope, session, new Metrics(), UiTheme.Vanilla, translation, bindings, 200, "actual-wrapper");
+                var rect = new Rect(0, 0, 200, boolean ? 28 : 56);
+                float pad = UiTheme.Vanilla.Geometry.Padding;
+                float side = Math.Max(6, 28 - pad * 2);
+                float x = boolean || operation == "body" ? 180 : pad + side / 2 + (operation == "check" ? side + pad : 0);
+                Event.current = new Event
+                {
+                    type = EventType.MouseDown,
+                    button = 0,
+                    mousePosition = new Vector2(x, 14)
+                };
+                widget.Draw(rect, ctx);
+                Check(calls.Count == 0 && session.Interactions.CaptureOwner.HasValue, operation + " paint-failure fixture holds an actual native press");
+                translation.Throw = true;
+                translation.Attempts = 0;
+                Event.current = new Event
+                {
+                    type = EventType.MouseUp,
+                    button = 0,
+                    mousePosition = new Vector2(x, 14)
+                };
+                bool paintFailed = false;
+                try
+                {
+                    widget.Draw(rect, ctx);
+                }
+                catch (ApplicationException ex)when (ex.Message == "paint-only")
+                {
+                    paintFailed = true;
+                }
+
+                Check(boolean ? model && calls.SequenceEqual(new[] { "Set", "Invoke" }) : calls.SequenceEqual(new[] { operation + ":row" }), operation + " established release request is independent of pure paint success, close=" + close);
+                Check(session.Interactions.CaptureOwner == null && session.OwnedHotControl == null, operation + " request/paint boundary retains native release");
+                if (close)
+                {
+                    Check(!paintFailed && !session.IsActive && translation.Attempts == 0, operation + " callback close prevents subsequent paint/normal traversal");
+                }
+                else
+                {
+                    Check(paintFailed && translation.Attempts == 1, operation + " actual paint exception remains visible after one established request");
+                    translation.Throw = false;
+                    int before = calls.Count;
+                    Event.current = new Event
+                    {
+                        type = EventType.Repaint,
+                        mousePosition = new Vector2(x, 14)
+                    };
+                    widget.Draw(rect, ctx);
+                    Check(calls.Count == before, operation + " paint recovery does not retry business request");
+                }
+            }
+    }
+
+    private sealed class PaintFailureTranslation : IUiTranslation
+    {
+        public bool Throw;
+        public int Attempts;
+        public string Translate(string key)
+        {
+            Attempts++;
+            if (Throw)
+                throw new ApplicationException("paint-only");
+            return key;
+        }
+
+        public int TranslationRevision => 0;
+    }
+
     private static bool SameColor(Color left, Color right) => Math.Abs(left.r - right.r) < 0.001f && Math.Abs(left.g - right.g) < 0.001f && Math.Abs(left.b - right.b) < 0.001f && Math.Abs(left.a - right.a) < 0.001f;
     private static void PressedPresentationFacts()
     {

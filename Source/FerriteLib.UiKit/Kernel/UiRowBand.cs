@@ -89,6 +89,21 @@ public static class UiRowBand
         UiInteractionResult disclosure = row.Expandable ? UiNative.Activation(marker, ctx, actions.DisclosureTarget, "disclosure", row.Key, actions.Disclosure != null) : default;
         UiInteractionResult check = row.Checkable && !disclosure.Request ? UiNative.Activation(box, ctx, actions.CheckboxTarget, "check", row.Key, actions.Checkbox != null) : default;
         UiInteractionResult body = !disclosure.Request && !check.Request && actions.Body != null ? UiNative.Activation(band, ctx, actions.BodyTarget, "body", row.Key) : default;
+        if (actions.Disclosure != null && disclosure.Request)
+        {
+            UiValueBehavior.Request(UiNative.InteractionTarget(ctx, actions.DisclosureTarget, "disclosure", row.Key), UiValueBehavior.Expansion(disclosure, !row.Expanded, row.Expandable), _ => actions.Disclosure(row.Key));
+        }
+        else if (actions.Checkbox != null && check.Request)
+        {
+            UiValueBehavior.Request(UiNative.InteractionTarget(ctx, actions.CheckboxTarget, "check", row.Key), UiValueBehavior.Boolean(check, !row.Checked), _ => actions.Checkbox(row.Key));
+        }
+        else if (actions.Body != null)
+        {
+            UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx, actions.BodyTarget, "body", row.Key), body, () => actions.Body(row.Key));
+        }
+
+        if (!ctx.Session.IsActive)
+            return;
         bool armed = disclosure.Captured || check.Captured || body.Captured;
         if (armed)
             UiThemeDraw.Solid(band, theme.SelectedSurface.Fill);
@@ -134,19 +149,6 @@ public static class UiRowBand
         if (labelWidth > 1f)
         {
             UiThemeDraw.Label(new Rect(x, band.y, labelWidth, band.height), ReadText(row, ctx), theme, ink.Text, AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft, singleLine: true);
-        }
-
-        if (actions.Disclosure != null && disclosure.Request)
-        {
-            UiValueBehavior.Request(UiNative.InteractionTarget(ctx, actions.DisclosureTarget, "disclosure", row.Key), UiValueBehavior.Expansion(disclosure, !row.Expanded, row.Expandable), _ => actions.Disclosure(row.Key));
-        }
-        else if (actions.Checkbox != null && check.Request)
-        {
-            UiValueBehavior.Request(UiNative.InteractionTarget(ctx, actions.CheckboxTarget, "check", row.Key), UiValueBehavior.Boolean(check, !row.Checked), _ => actions.Checkbox(row.Key));
-        }
-        else if (actions.Body != null)
-        {
-            UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx, actions.BodyTarget, "body", row.Key), body, () => actions.Body(row.Key));
         }
     }
 

@@ -273,6 +273,8 @@ internal sealed class CheckboxWidget : IUiWidget
         // Armed wins over hover, exactly as the button atom orders its ladder: live state beats the
         // pointer's proximity.
         UiInteractionResult interaction = UiNative.Activation(rect, ctx, key, "", writable: writable != false);
+        TakeInput(ctx, key, state, interaction);
+        if (!ctx.Session.IsActive) return;
         bool armed = interaction.Captured;
         bool hovered = !armed && UiNative.IsMouseOver(rect, ctx);
 
@@ -291,8 +293,6 @@ internal sealed class CheckboxWidget : IUiWidget
         // below reads this value and never re-parses the attribute.
         string look = Looks.Resolve(spec).Value;
         Paint(rect, shown, state, look, ctx);
-
-        TakeInput(ctx, key, state, interaction);
     }
 
     /// <summary>

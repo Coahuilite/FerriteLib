@@ -96,6 +96,11 @@ its menu inspected; it does not permit an option request.
 - Checkbox's two looks paint the shared interaction result. Tree's row-band highlight reads its
   disclosure/check/body results before painting; raw MouseDown or hover cannot manufacture pressed
   state. A valid held capture remains visible during repaint, and lost eligibility clears it.
+- An established operation crosses the common request boundary before pure presentation. A later
+  translation/drawing exception cannot swallow its already-qualified release request. There is no
+  business retry on paint recovery. If the request callback closes the session, Checkbox/Tree stop
+  before normal painting or further row traversal. Explicit Checkbox Set-before-Invoke and partial
+  setter-side-effect failures retain their existing request contract.
 - Selection closes the menu before requesting; callback close stops remaining popup traversal.
   Closing does not undo already-published model changes. Passive IMGUI triggers do not become
   focusable, and no synthetic focus restoration is performed.
