@@ -367,6 +367,8 @@ public sealed class UiHost : IDisposable
     {
         if (!session.IsActive) return false;
 
+        if (session.ActiveEditState != null && UiNative.NativeCompositionActive) return true;
+
         if (session.OpenPopupId != null)
         {
             session.ClosePopup();
@@ -418,6 +420,7 @@ public sealed class UiHost : IDisposable
 
         UiValueState? edit = session.ActiveEditState;
         if (edit == null) return false;
+        if (UiNative.NativeCompositionActive || UiNative.NativeMultilineReturn(edit)) return true;
 
         edit.CommitRequested = true;
         UiNative.ConsumeKeyEvent();

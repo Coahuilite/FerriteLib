@@ -313,6 +313,14 @@ internal static class AtomVocabulary
     /// fallback an unknown value gets, and the deprecation a retired name gets. One write path, so the two
     /// cannot drift apart.
     /// </summary>
+    internal static void PaintEditFeedback(Rect field, UiWidgetContext ctx, IUiEditState editor)
+    {
+        if (editor.Valid && !editor.Conflict) return;
+        // Feedback reads the shared facts; it never parses, repairs or writes a draft.
+        Color color = !editor.Valid ? ctx.Theme.Danger : ctx.Theme.Selected;
+        UiThemeDraw.Solid(new Rect(field.x, field.yMax - 2, field.width, 2), color);
+    }
+
     private static void ReportFallback(UiElementSpec spec, UiWidgetContext ctx, string attribute, string authored, string resolved)
     {
         UiFitAudit.ReportStyleFallback(ctx.ElementPath, spec.Kind, attribute, authored, resolved);

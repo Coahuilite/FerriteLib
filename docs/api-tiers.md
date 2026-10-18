@@ -77,6 +77,10 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
 - `UiInteractionResult` — 0.8 S0/S1 shared contract; shape may change within the development line.
 - `UiInteractionSession` — 0.8 S0/S1 shared contract; shape may change within the development line.
 - `UiValueOperation` — 0.8 shared target-value intent; public-unstable.
+- `UiEditSession` — 0.8 shared editor draft/model observation; public-unstable, candidate default policies.
+- `UiEditParser` — neutral value parsing seam; public-unstable.
+- `IUiEditState` — bounded editor facts and lifecycle suspension; public-unstable.
+- `UiNumericEdit` — shared finite numeric parsing, range and local combination step; public-unstable.
 - `UiSelectionObservation` — model-derived missing/selectable facts; public-unstable.
 - `UiValueBehavior` — shared boolean/selection/expansion request boundary; public-unstable.
 - `UiInteractionRequests` — 0.8 S0/S1 shared contract; shape may change within the development line.

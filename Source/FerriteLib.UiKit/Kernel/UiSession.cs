@@ -573,6 +573,8 @@ public sealed class UiSession : IDisposable
             if (dropped != null)
             {
                 dropped.Focused = false;
+                if (dropped.Editor is IUiEditState editor) editor.Suspend();
+                UiNative.ReleaseEditFocus(dropped, this);
                 dropped.CommitRequested = false;
                 dropped.DiscardRequested = false;
             }
@@ -1284,6 +1286,7 @@ public sealed class UiSession : IDisposable
     {
         if (!IsActive) return;
         Interactions.Dispose();
+        if (activeEditState != null) UiNative.ReleaseEditFocus(activeEditState, this);
         IsActive = false;
 
         // The session is the subscription's owner: disposing it releases the subscription, its bounded

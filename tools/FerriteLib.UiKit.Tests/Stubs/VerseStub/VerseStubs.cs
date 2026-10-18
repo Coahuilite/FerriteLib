@@ -528,6 +528,8 @@ public static class Widgets
         return value;
     }
 
+    public static string TextArea(Rect rect, string text, bool readOnly = false) => text;
+
     public static string TextField(Rect rect, string text)
     {
         return text ?? "";

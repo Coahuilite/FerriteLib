@@ -614,14 +614,16 @@ internal static class KernelContractTests
             "Stubs/UnityEngineStub/UnityEngineStub.csproj",
             "Stubs/UnityEngineImGuiStub/UnityEngineImGuiStub.csproj",
             "Stubs/UnityEngineTextRenderingModuleStub/UnityEngineTextRenderingModuleStub.csproj",
+            "Stubs/UnityEngineInputLegacyModuleStub/UnityEngineInputLegacyModuleStub.csproj",
             "Stubs/VerseStub/VerseStub.csproj"
         };
-        string[] folders = { "unityengine", "unityengine-imgui", "unityengine-textrendering", "verse" };
+        string[] folders = { "unityengine", "unityengine-imgui", "unityengine-textrendering", "unityengine-input", "verse" };
         string[][] assemblies =
         {
             new[] { "UnityEngine.CoreModule.dll" },
             new[] { "UnityEngine.CoreModule.dll", "UnityEngine.IMGUIModule.dll" },
             new[] { "UnityEngine.CoreModule.dll", "UnityEngine.TextRenderingModule.dll" },
+            new[] { "UnityEngine.InputLegacyModule.dll" },
             new[] { "UnityEngine.CoreModule.dll", "UnityEngine.IMGUIModule.dll", "Assembly-CSharp.dll" }
         };
 

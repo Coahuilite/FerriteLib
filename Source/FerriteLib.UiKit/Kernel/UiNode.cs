@@ -85,6 +85,7 @@ public sealed class UiNode
 
     /// <summary>Explicit business identity; change when a getter switches logical objects.</summary>
     public string InteractionScope { get; set; } = "";
+    internal UiValueState? EditingState;
 
     /// <summary>Every named state slot this node owns, keyed by the name the widget used.</summary>
     public IReadOnlyDictionary<string, UiValueState> ValueStates => slots;

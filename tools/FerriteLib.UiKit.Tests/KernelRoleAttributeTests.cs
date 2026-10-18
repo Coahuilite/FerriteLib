@@ -536,7 +536,7 @@ internal static class KernelRoleAttributeTests
 
             NumberFieldWidget writableField = new();
             writableField.Configure(new UiElementSpec("editable", NumberFieldWidget.Kind,
-                Attributes(("Bind", "editable"), ("Min", "0"), ("Max", "10"))));
+                Attributes(("Bind", "editable"), ("Min", "0"), ("Max", "10"), ("Live", "true"))));
             writableField.Draw(new Rect(0f, 0f, 120f, 28f), Context(session, theme, bindings, 120f));
             CheckClose(0.7f, editable, "the same edit on a writable binding commits");
         }

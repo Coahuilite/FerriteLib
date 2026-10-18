@@ -4,22 +4,8 @@ using UnityEngine;
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
 /// <summary>
-/// Core leaf atom <c>input/text-field</c>: one string, edited in place, committed under a rule.
-/// <para>
-/// <b>Why this earns a kind</b> — the same reason its numeric sibling does, and nothing wider: per-element
-/// interaction state no manifest attribute can carry. Focus, the in-progress draft, the placeholder's
-/// visibility, and the moment an edit becomes a value all belong to the element rather than to the page,
-/// and they live in the session's value bag, which is why this atom sharing a binding key with anything
-/// else sees one value instead of two. A page that hand-rolls a text box outside the tree loses the
-/// disabled refusal, the recovery slot and the fit audit along with it.
-/// </para>
-/// <para>
-/// Scope, stated because it is a boundary rather than an omission: this is a <b>single-line</b> field. It
-/// draws no label band of its own choosing, no selection model, no clipboard behaviour and no multiline
-/// wrapping — those are the backend's text field, which this kind drives through the one funnel primitive.
-/// What it adds is identity: the draft and the focus are the element's, and a read-only binding stops the
-/// write at the same funnel every other interactive kind uses.
-/// </para>
+/// Single-line or basic plain-text multiline native editing, with one instance-local neutral draft.
+/// Selection, clipboard and character composition belong to Verse/Unity, not to this wrapper.
 /// </summary>
 public sealed class TextFieldWidget : IUiWidget
 {
@@ -41,7 +27,7 @@ public sealed class TextFieldWidget : IUiWidget
             // not "every string it can paint").
             AtomVocabulary.Schema(
                 AtomRoles.ToneAndEmphasis,
-                "Bind", "Live", "Placeholder", "PlaceholderKey", "Label", "LabelKey", "Height"),
+                "Bind", "Live", "Multiline", "Placeholder", "PlaceholderKey", "Label", "LabelKey", "Height"),
             new[] { "Label", "LabelKey" });
     }
 
@@ -64,7 +50,17 @@ public sealed class TextFieldWidget : IUiWidget
 
     public float Measure(UiWidgetContext ctx)
     {
-        return AtomVocabulary.ReadHeight(spec, ctx.Theme.Geometry.RowHeight);
+        float declared = AtomVocabulary.ReadHeight(spec, 0);
+        if (declared > 0) return declared;
+        if (!AtomVocabulary.ReadBool(spec, "Multiline", false)) return ctx.Theme.Geometry.RowHeight;
+        string binding = AtomVocabulary.ReadBindKey(spec);
+        string text = ctx.Bindings.Get<string>(binding) ?? "";
+        UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
+        if (node.ValueStates.TryGetValue(binding, out UiValueState? state) && state.Editor is IUiEditState edit)
+            text = edit.Draft;
+        ResolveLabelBand(new Rect(0, 0, ctx.ViewWidth, 1), ctx, out Rect field);
+        return Math.Max(ctx.Theme.Geometry.RowHeight,
+            ctx.Metrics.MeasureText(text, AtomVocabulary.TextFont(ctx), field.width) + ctx.Theme.Geometry.Spacing * 2);
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)
@@ -72,38 +68,28 @@ public sealed class TextFieldWidget : IUiWidget
         if (rect.width <= 1f || rect.height <= 1f) return;
 
         string bindKey = AtomVocabulary.ReadBindKey(spec);
-        bool live = AtomVocabulary.ReadBool(spec, "Live", true);
+        bool live = AtomVocabulary.ReadBool(spec, "Live", false);
+        bool multiline = AtomVocabulary.ReadBool(spec, "Multiline", false);
         string current = ctx.Bindings.TryGet(bindKey, out string bound) ? bound ?? "" : "";
 
         Rect field = rect;
         ResolveLabelBand(rect, ctx, out field);
         bool? writable = AtomVocabulary.WritableOf(ctx, bindKey);
         UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, writable);
-        DrawLabel(rect, ctx, style);
 
         // One funnel call carries the whole interaction: the disabled refusal, focus, the draft, and the
         // commit rule. The returned string is what the field is actually showing, so the placeholder test
         // below reads the truth rather than the model.
-        string typed = UiNative.TextField(field, bindKey, ctx.Session, current, out bool committed);
-
-        DrawPlaceholder(field, typed, ctx, writable);
-
-        if (!committed) return;
-
-        // A read-only binding stops here, exactly as it does on the numeric sibling: the draft keeps what
-        // was typed, nothing is written, and the field still draws. The recovery band is not the fallback
-        // for a read-only key.
-        if (writable == false) return;
-
-        // Live=false defers the write while the field holds focus, because an editor that writes on every
-        // keystroke cannot be typed into. The deferred write lands when focus leaves - the funnel reports
-        // that frame as a commit - which is why the rule is read from the session's focus, not guessed
-        // from the returned text.
-        if (live || !ctx.Session.GetOrCreateValueState(bindKey).Focused)
-        {
-            ctx.Bindings.Set(bindKey, typed);
-        }
+        UiNative.Edit(field, ctx, bindKey, current, value => value, Parse, live, multiline,
+            value => ctx.Bindings.Set(bindKey, value), () => ctx.Bindings.Get<string>(bindKey));
+        if (!ctx.Session.IsActive) return;
+        DrawLabel(rect, ctx, style);
+        UiEditSession<string> editor = UiNative.Editor<string>(ctx, bindKey, value => value, Parse);
+        AtomVocabulary.PaintEditFeedback(field, ctx, editor);
+        DrawPlaceholder(field, editor.Draft, ctx, writable);
     }
+
+    private static bool Parse(string text, out string value) { value = text; return true; }
 
     /// <summary>
     /// The hint painted inside an empty, unfocused field. Deliberately <c>TextSecondary</c>: a placeholder

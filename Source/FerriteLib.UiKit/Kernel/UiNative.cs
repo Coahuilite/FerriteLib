@@ -393,205 +393,29 @@ public static partial class UiNative
     }
 
     /// <summary>
-    /// The identity-bearing text field: the string sibling of <see cref="NumberField"/>, and the form every
-    /// page-model kind uses. Same funnel contract as the numeric one — a disabled element never reaches the
-    /// native control and never focuses; a focused field keeps its draft in the session while the model holds
-    /// the committed value; and the disabled refusal happens before the native control so no click is
-    /// consumed.
-    /// <para>
-    /// The commit rule is stated once here so its two halves cannot drift: <paramref name="committed"/> is
-    /// true when the buffer changed this frame, <b>or</b> when focus just left with a buffer that differs
-    /// from the model. The first half is a live editor's keystroke; the second is a deferred editor's only
-    /// chance to write, because the frame that leaves focus is otherwise indistinguishable from a frame that
-    /// typed nothing. A caller that ignores the second half would leave the draft in the session and never
-    /// move the model.
-    /// </para>
+    /// Compatibility return-value adapter over the shared editor. The caller still dispatches a
+    /// reported candidate; no tree registration is required. For callback-based Live/deferred policy,
+    /// multiline and actual model readback use Edit with the widget context.
     /// </summary>
     public static string TextField(
-        Rect rect,
-        string elementId,
-        UiSession session,
-        string value,
-        out bool committed)
+        Rect rect, string elementId, UiSession session, string value, out bool committed)
     {
         if (session == null) throw new ArgumentNullException(nameof(session));
-        UiValueState state = session.GetOrCreateValueState(elementId);
-        string model = value ?? "";
-        if (state.DiscardRequested)
-        {
-            // The window's Cancel hook ended this edit one step before the page was drawn. Restore the buffer
-            // from the model and write nothing: discarding means restoring, never coercing an unparseable
-            // draft into some default (§3.4/§3.6).
-            state.DiscardRequested = false;
-            state.CommitRequested = false;
-            state.Focused = false;
-            state.EditText = model;
-            session.NoteEditClosed(state);
-            committed = false;
-            return model;
-        }
-
-        if (IsCoveredByPopup(session))
-        {
-            // Covered: the edit PAUSES. The native control is never reached, so the field consumes no click
-            // and the option row under the popup keeps its press — but the draft and the focus stay where the
-            // player left them, because a menu opening over a field is not an answer to the edit in it. Only
-            // the field's own Enter/blur or the window's two hooks end an edit (§3.4).
-            committed = false;
-            return state.Focused ? state.EditText : model;
-        }
-
-        if (IsElementDisabled(session, elementId))
-        {
-            // Disabled: the field never takes focus, never reaches the native control and never commits, so
-            // no click is consumed and no text is edited. The draft is dropped back onto the model so a
-            // re-enabled field resumes there instead of on a dead edit, and a request the hooks left behind
-            // addresses a dead edit and dies with it.
-            state.DiscardRequested = false;
-            state.CommitRequested = false;
-            state.Focused = false;
-            state.EditText = model;
-            session.NoteEditClosed(state);
-            committed = false;
-            return model;
-        }
-
-        if (!state.Focused)
-        {
-            state.EditText = model;
-        }
-
-        if (IsMouseDownOver(rect))
-        {
-            state.Focused = true;
-            session.NoteEditOpened(state);
-        }
-
-        string displayText = state.Focused ? state.EditText : model;
-        string text = NativeTextField(rect, displayText) ?? "";
-        bool changed = !string.Equals(text, displayText, StringComparison.Ordinal);
-        state.EditText = text;
-
-        // An edit ends three ways and only three ways: the field's own Enter, its own loss of focus, or the
-        // window's Accept hook marking the state. The third is the same event pass as the other two, because
-        // the hook runs at the top of the window's pass and the contents are drawn right after it.
-        bool left = state.Focused && (state.CommitRequested || IsEnterPressed() || IsFocusLost(rect, session));
-        if (left)
-        {
-            state.CommitRequested = false;
-            state.Focused = false;
-            session.NoteEditClosed(state);
-        }
-
-        committed = changed || (left && !string.Equals(state.EditText, model, StringComparison.Ordinal));
-        if (committed) return state.EditText;
-        return state.Focused ? state.EditText : model;
+        bool Parse(string text, out string candidate) { candidate = text; return true; }
+        return LegacyEditor<string>(rect, elementId, session, value ?? "", text => text, Parse, out committed, out _);
     }
 
     public static string NumberField(
-        Rect rect,
-        string elementId,
-        UiSession session,
-        float value,
-        float min,
-        float max,
-        string format,
-        out bool committed)
+        Rect rect, string elementId, UiSession session, float value,
+        float min, float max, string format, out bool committed)
     {
-        if (session == null) throw new ArgumentNullException(nameof(session));
+        var numeric = new UiNumericEdit(min, max, format);
+        string shown = LegacyEditor(rect, elementId, session, value, numeric.Format, numeric.Parse,
+            out committed, out float candidate);
         UiValueState state = session.GetOrCreateValueState(elementId);
-        if (state.DiscardRequested)
-        {
-            // The window's Cancel hook ended this edit before the field was reached: the buffer is restored
-            // from the model and nothing is written, which is also how unparseable text leaves — a discarded
-            // draft is not a value, and the library never invents one to write (§3.4/§3.6).
-            state.DiscardRequested = false;
-            state.CommitRequested = false;
-            state.Focused = false;
-            state.FloatValue = ClampValue(value, min, max);
-            state.EditText = FormatValue(state.FloatValue, format);
-            session.NoteEditClosed(state);
-            committed = false;
-            return state.EditText;
-        }
-
-        if (IsCoveredByPopup(session))
-        {
-            // Covered: the edit pauses rather than ending. No native control is reached, so the field consumes
-            // no click and parses nothing, and the option row the popup is drawing over this field still gets
-            // its press. The draft and the focus survive: a menu opening over a number the player is halfway
-            // through typing does not answer that edit, in either direction (§3.4).
-            committed = false;
-            return state.Focused ? state.EditText : FormatValue(ClampValue(value, min, max), format);
-        }
-
-        if (IsElementDisabled(session, elementId))
-        {
-            // Disabled: the field never takes focus, never parses and never commits, and the native control
-            // is never reached - so no click is consumed and no text is edited. The buffer is reset to the
-            // model's value so a re-enabled field resumes there instead of on a dead edit, and a hook request
-            // addressed to that dead edit dies with it.
-            state.DiscardRequested = false;
-            state.CommitRequested = false;
-            state.Focused = false;
-            state.FloatValue = ClampValue(value, min, max);
-            state.EditText = FormatValue(state.FloatValue, format);
-            session.NoteEditClosed(state);
-            committed = false;
-            return state.EditText;
-        }
-
-        if (!state.Focused)
-        {
-            state.FloatValue = value;
-            state.EditText = FormatValue(value, format);
-        }
-
-        if (IsMouseDownOver(rect))
-        {
-            state.Focused = true;
-            session.NoteEditOpened(state);
-        }
-
-        string displayText = state.Focused ? state.EditText : FormatValue(state.FloatValue, format);
-        string text = NativeTextField(rect, displayText);
-        float previousValue = state.FloatValue;
-        committed = false;
-
-        bool parsed = TryParseNumber(text, out float parsedValue);
-        if (parsed)
-        {
-            parsedValue = ClampValue(parsedValue, min, max);
-            bool textChanged = !string.Equals(text, displayText, StringComparison.Ordinal);
-            bool valueChanged = Math.Abs(parsedValue - previousValue) > 0.0001f;
-            state.FloatValue = parsedValue;
-            state.EditText = text;
-            committed = textChanged || valueChanged;
-        }
-        else
-        {
-            state.EditText = text;
-        }
-
-        // The commit rule, stated once so the two field kinds cannot drift (and so a deferred editor cannot
-        // lose its draft): a keystroke commits for a live editor, and the frame that ENDS the edit commits for
-        // a deferred one, because that frame is otherwise indistinguishable from a frame that typed nothing.
-        // Witness 2 was exactly this half missing — the parsed draft was still in the session when the model
-        // was reset to itself on the next frame, so a Live=false field silently swallowed what the player
-        // typed. An unparseable draft never earns that commit; it is dropped by the reset below.
-        bool ending = state.Focused && (state.CommitRequested || IsEnterPressed() || IsFocusLost(rect, session));
-        if (ending)
-        {
-            state.CommitRequested = false;
-            if (parsed && Math.Abs(state.FloatValue - value) > 0.0001f) committed = true;
-            state.EditText = FormatValue(state.FloatValue, format);
-            state.Focused = false;
-            session.NoteEditClosed(state);
-        }
-
-        return state.Focused ? state.EditText : FormatValue(state.FloatValue, format);
+        if (committed || numeric.Parse(shown, out candidate)) state.FloatValue = candidate;
+        return shown;
     }
-
     public static Vector2 PointerPosition()
     {
         if (DebugMousePositionEnabled) return DebugMousePosition;

@@ -25,11 +25,16 @@ namespace FerriteLib.UiKit.Kernel;
 /// </summary>
 public sealed class UiValueState
 {
+    internal object? Editor;
+    internal UiInteractionTarget? EditorTarget;
+    internal bool EditorMultiline;
+    // Compatibility projections of Editor for native editors; not read as draft authority.
+    // Non-editor legacy range/chart callers retain their original fields and entry conditions.
     public float FloatValue;
     public string EditText = "";
     public bool Dragging;
 
-    /// <summary>True while this control holds an open edit: the buffer is the truth, the model is not.</summary>
+    /// <summary>Compatibility focus projection. UiEditSession owns the draft; the model owns business value.</summary>
     public bool Focused;
 
     public int Cursor;

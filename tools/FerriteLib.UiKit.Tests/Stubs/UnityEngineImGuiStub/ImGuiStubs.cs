@@ -14,11 +14,16 @@ public enum EventType
     ScrollWheel = 6,
     Repaint = 7,
     Layout = 8,
-    Used = 12
+    Used = 12,
+    ValidateCommand = 13,
+    ExecuteCommand = 14
 }
 
 public sealed class Event
 {
+    public bool control { get; set; }
+    public bool command { get; set; }
+    public string commandName { get; set; } = "";
     public static Event? current { get; set; }
 
     private EventType _type;
@@ -176,6 +181,8 @@ public static class GUI
     {
         return "";
     }
+
+    public static void FocusControl(string? name) { }
 
     private static readonly System.Collections.Generic.Stack<Vector2> groupOrigins = new();
     private static readonly System.Collections.Generic.Stack<Rect> groupClips = new();

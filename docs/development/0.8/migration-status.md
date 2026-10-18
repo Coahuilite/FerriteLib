@@ -16,9 +16,9 @@ pending. Earlier 0.7 human acceptance stays attached to its own package and does
 | `input/mode-row` | String/typed options | Shared discrete selection, stable option targets, model-derived Missing; F2 | BooleanSelectionExpansion; WidgetBehavior/CoreWidget typed/help guards | Pending |
 | `input/dropdown` | String/pairs/typed options and both looks | Shared selection/trigger expansion; per-instance popup ownership even with same Bind; F2/F3; retained popup geometry/scroll owner | BooleanSelectionExpansion same-Bind owners/three routes/raw release/outside/close; Popup/InputEligibility/CoreWidget | Pending |
 | `container/tree` | Flattened keyed rows, disclosure/check/body/image | Shared expansion/boolean, owner-derived pressed facts and independent row operation identities; F2 | BooleanSelectionExpansion render eligibility/held facts/reorder/parts/removal/I2; ControlKind row/geometry guards | Pending |
-| `input/number-field` | Yes | Pending shared editing/parsing, read-only-before-edit and end policies | Existing Atom/EditTransaction/Writability regressions only | Pending |
-| `input/text-field` | Existing single-line | Pending common editing and basic plain-text multiline/IME | Existing TextField/EditTransaction regressions only | Pending |
-| `input/stepper-slider` | Numeric editor + range + ± | Range subpath bridged only; whole numeric composition/takeover pending | Existing widget/atom regressions; not whole-composite 0.8 proof | Pending |
+| `input/number-field` | Yes | Shared editor/finite numeric codec/read-only-before-edit; E1–E5 candidate | SharedEditing three routes/failure/I2/isolation; pure editor and migrated Atom/EditTransaction guards | Pending |
+| `input/text-field` | Single-line and basic plain-text multiline | Shared editor, native selection/copy/composition protocol and width-aware multiline measure; E1–E5 candidate | SharedEditing three routes/multiline/native composition/read-only; TextField/EditTransaction guards | Pending |
+| `input/stepper-slider` | Numeric editor + range + ± | Shared editing/range/activation; explicit local takeover, N1–N3 candidate | SharedEditing actual composite and pure E/N cases; WidgetBehavior guards | Pending |
 | `chart/line` | Read-only points **and editable control points** | Pending stable editable-point behavior/capture/end migration; not reduced to read-only | Existing InputEligibility/ControlKind chart guards | Pending |
 | `text/wrapped` | Yes | Pending complete descriptive facts and per-wrapper font/width contract | Existing CoreWidget/TextAudit/Style guards | Pending |
 | `section/header` | Yes | Pending descriptive/group and complete font/width migration | Existing SectionHeader/Layout guards | Pending |
@@ -58,14 +58,11 @@ that a row's new capability has been migrated.
 
 ## Completion still requires the remaining uses
 
-The next coherent work is common editing and numeric composition, including basic single-line **and
-plain-text multiline**, native read-only/selection/clipboard/IME, explicit draft/model coordination,
-and StepperSlider takeover. B1/B3 defaults need their own decision; they do not remove these deliverables.
-Editable chart-point identity/capture, descriptive wrappers, layout/assembly, hosts and observation
+Common editing/numeric composition and basic plain-text multiline are implemented under the reversible E1–E5/N1–N3 candidates; target native input/IME acceptance remains open. Editable chart-point identity/capture, descriptive wrappers, layout/assembly, hosts and observation
 remain first-version work. All completed slices still need target 1.6 acceptance with the actual selected
 Dev package. Complete first-version acceptance is not inferred from six migrated registered wrappers,
 the 18-entry inventory, or a green full harness.
 
-Implementation contracts: [S0/S1](s01-contract.md), [boolean/selection/expansion](bse-contract.md).
+Implementation contracts: [S0/S1](s01-contract.md), [boolean/selection/expansion](bse-contract.md), [editing/numeric composition](editing-contract.md).
 The product requirements and remaining policy decisions live in [the specification](README.md),
 with the [contract-to-test migration](acceptance-and-test-migration.md) defining evidence classes.

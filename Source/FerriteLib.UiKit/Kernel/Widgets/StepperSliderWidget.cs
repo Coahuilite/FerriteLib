@@ -70,13 +70,15 @@ public sealed class StepperSliderWidget : IUiWidget
         float step = Math.Max(0.0001f, ReadFloat("Step", 1f));
         string format = Read("Format");
         if (format.Length == 0) format = "0.##";
-        bool live = ReadBool("Live", true);
+        bool live = ReadBool("Live", false);
         float buttonWidth = Math.Max(1f, ReadFloat("ButtonWidth", DefaultButtonWidth));
         float fieldWidth = Math.Max(1f, ReadFloat("FieldWidth", DefaultFieldWidth));
 
         string bindKey = ReadBindKey();
         float current = ctx.Bindings.TryGet(bindKey, out float bound) ? bound : min;
-        string elementId = bindKey;
+        var numeric = new UiNumericEdit(min, max, format);
+        UiEditSession<float> editor = UiNative.Editor<float>(ctx, bindKey, numeric.Format, numeric.Parse);
+        editor.Observe(current);
 
         float x = rect.x;
         float y = rect.y;
@@ -86,8 +88,8 @@ public sealed class StepperSliderWidget : IUiWidget
         {
             // Through the theme's text outlet, so this label is covered by the fit audit like every
             // other string the kernel draws (its private copy was one of the audit's blind spots).
-            float labelWidth = Math.Max(1f, ctx.Metrics.MeasureWidth(label, ctx.Theme.DefaultFont) + LabelPad);
-            UiThemeDraw.Label(new Rect(x, y, labelWidth, height), label, ctx.Theme, ctx.Theme.TextPrimary);
+            float labelWidth = Math.Max(1f, ctx.Metrics.MeasureWidth(label, AtomVocabulary.TextFont(ctx)) + LabelPad);
+
             x += labelWidth + Gap;
         }
 
@@ -103,32 +105,47 @@ public sealed class StepperSliderWidget : IUiWidget
 
         Rect plusRect = new(x, y, buttonWidth, height);
 
+        bool writable = ctx.Bindings.IsWritable(bindKey);
+        UiInteractionResult minus = UiNative.Activation(minusRect, ctx, bindKey, "decrement", writable: writable);
+        UiInteractionResult plus = UiNative.Activation(plusRect, ctx, bindKey, "increment", writable: writable);
+        UiInteractionResult range = UiNative.Range(sliderRect, ctx, bindKey, current, min, max, writable);
+        bool takeover = false;
+        void Set(float value) => ctx.Bindings.Set(bindKey, value);
+        float ReadModel() => ctx.Bindings.Get<float>(bindKey);
+        if (minus.Request || plus.Request)
+        {
+            UiInteractionResult operation = minus.Request ? minus : plus;
+            string part = minus.Request ? "decrement" : "increment";
+            UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx, bindKey, part), operation,
+                () => numeric.Step(editor, ReadModel(), minus.Request ? -step : step, Set, ReadModel));
+            takeover = true;
+        }
+        else if (range.Request && range.Value != numeric.Clamp(current))
+        {
+            UiInteractionRequests.Range(UiNative.InteractionTarget(ctx, bindKey), range,
+                value => editor.TakeOver(value, Set, ReadModel));
+            takeover = true;
+        }
+        if (!ctx.Session.IsActive) return;
+        if (!takeover)
+            UiNative.Edit(fieldRect, ctx, bindKey, ReadModel(), numeric.Format, numeric.Parse,
+                live, false, Set, ReadModel);
+        if (!ctx.Session.IsActive) return;
+        UiValueState state = ctx.Session.GetOrCreateValueState(bindKey);
+        state.EditText = editor.Draft;
+        state.Focused = editor.Focused;
+        if (numeric.Parse(editor.Draft, out float parsed)) state.FloatValue = parsed;
+        // Only presentation follows established requests; a label failure cannot swallow an operation.
+        if (label.Length > 0)
+        {
+            float labelWidth = Math.Max(1f, ctx.Metrics.MeasureWidth(label, AtomVocabulary.TextFont(ctx)) + LabelPad);
+            UiThemeDraw.Label(new Rect(rect.x, y, labelWidth, height), label, ctx.Theme, ctx.Theme.TextPrimary,
+                AtomVocabulary.TextFont(ctx));
+        }
         DrawButton(minusRect, "−", ctx.Theme);
         DrawButton(plusRect, "+", ctx.Theme);
-
-        float sliderValue = UiNative.Slider(sliderRect, elementId, ctx.Session, current, min, max, out bool sliderChanged);
-        if (sliderChanged)
-        {
-            ctx.Bindings.Set(elementId, sliderValue);
-        }
-
-        UiNative.NumberField(fieldRect, elementId, ctx.Session, sliderValue, min, max, format, out bool committed);
-        if (committed && (live || !ctx.Session.GetOrCreateValueState(elementId).Focused))
-        {
-            ctx.Bindings.Set(elementId, ctx.Session.GetOrCreateValueState(elementId).FloatValue);
-        }
-
-        if (UiNative.Button(minusRect, ctx))
-        {
-            float next = UiNative.ClampValue(current - step, min, max);
-            ctx.Bindings.Set(elementId, next);
-        }
-
-        if (UiNative.Button(plusRect, ctx))
-        {
-            float next = UiNative.ClampValue(current + step, min, max);
-            ctx.Bindings.Set(elementId, next);
-        }
+        UiNative.PaintRange(sliderRect, ctx.Theme, ReadModel(), min, max);
+        AtomVocabulary.PaintEditFeedback(fieldRect, ctx, editor);
     }
 
     private string ReadBindKey()

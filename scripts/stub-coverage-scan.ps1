@@ -168,6 +168,7 @@ $CanonicalStubFiles = [ordered]@{
     'UnityEngine.CoreModule'          = 'unityengine/UnityEngine.CoreModule.dll'
     'UnityEngine.IMGUIModule'         = 'unityengine-imgui/UnityEngine.IMGUIModule.dll'
     'UnityEngine.TextRenderingModule' = 'unityengine-textrendering/UnityEngine.TextRenderingModule.dll'
+    'UnityEngine.InputLegacyModule'   = 'unityengine-input/UnityEngine.InputLegacyModule.dll'
 }
 
 # The assemblies this harness replaces with a stub. This list is the RULE, deliberately not derived from

@@ -63,7 +63,7 @@ internal static class KernelEditTransactionTests
 
         failures += Run("A deferred number field writes its parsed draft once, on the frame that ends the edit",
             VerifyDeferredDraftCommitsOnceOnExit);
-        failures += Run("Unparseable text is never written and leaves no value behind when the edit ends",
+        failures += Run("Unparseable text is never written and is retained after invalid confirmation",
             VerifyInvalidDraftIsNeverWritten);
         failures += Run("A live number field still writes on the keystroke frame, as it always did",
             VerifyLiveFieldStillWritesPerKeystroke);
@@ -135,7 +135,7 @@ internal static class KernelEditTransactionTests
 
             page.PressEnter();
             Check(page.Num == 0.5f && page.NumWrites == 0, "ending the edit on an invalid draft writes nothing");
-            Check(page.Shown("num") == "0.5", "and the field falls back to the model, not to a made-up value");
+            Check(page.Shown("num") == "abc", "E3 retains invalid text rather than inventing a value");
         }
         finally
         {
@@ -355,8 +355,8 @@ internal static class KernelEditTransactionTests
 
             bool handled = page.Host.TryHandleAccept();
             Check(!handled, "with no edit open, Accept is not swallowed by the page");
-            Check(page.NumWrites == 0, "and the returned field shows the model, not the abandoned draft");
-            Check(page.Shown("num") == "0.5", "the buffer is the model's text again: " + page.Shown("num"));
+            Check(page.NumWrites == 0, "hidden drafts do not manufacture normal confirmation");
+            Check(page.Shown("num") == "0.7", "the uncommitted draft survives hide/show: " + page.Shown("num"));
         }
         finally
         {

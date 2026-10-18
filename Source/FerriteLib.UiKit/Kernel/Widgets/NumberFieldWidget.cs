@@ -4,14 +4,8 @@ using UnityEngine;
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
 /// <summary>
-/// Core leaf atom <c>input/number-field</c>: one float, edited as text, committed under a rule.
-/// <para>
-/// <b>Why this earns a kind</b> — per-element interaction state that no attribute can carry: focus,
-/// the in-progress edit buffer, and the commit rule (a parse writes through the typed binding and
-/// clamps into the declared window; unparseable text is kept in the buffer and never written; Enter or
-/// losing focus restores the formatted value). That state lives in the session's value bag, which is
-/// why the atom and <c>input/slider</c> sharing one binding key see one value instead of two.
-/// </para>
+/// Native numeric text editing over the common draft/model observation and finite numeric codec.
+/// Invalid or conflicting drafts remain local; accepted requests are not assumed business acceptance.
 /// </summary>
 public sealed class NumberFieldWidget : IUiWidget
 {
@@ -64,32 +58,21 @@ public sealed class NumberFieldWidget : IUiWidget
         float max = AtomVocabulary.ReadFloat(spec, "Max", 1f);
         string format = AtomVocabulary.Read(spec, "Format");
         if (format.Length == 0) format = DefaultFormat;
-        bool live = AtomVocabulary.ReadBool(spec, "Live", true);
+        bool live = AtomVocabulary.ReadBool(spec, "Live", false);
         float current = ctx.Bindings.TryGet(bindKey, out float bound) ? bound : min;
 
         Rect field = rect;
         ResolveLabelBand(rect, ctx, out field);
         bool? writable = AtomVocabulary.WritableOf(ctx, bindKey);
         UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, writable);
-        DrawLabel(rect, ctx, style);
-
-        UiNative.NumberField(field, bindKey, ctx.Session, current, min, max, format, out bool committed);
-        if (!committed) return;
-
-        // A read-only binding stops here: the buffer keeps what was typed, nothing is written, and the
-        // field never reaches the Set a read-only binding would refuse. The field still draws and the
-        // page still runs — the recovery band is not the fallback for this.
-        if (writable == false) return;
-
-        // Live=false defers the write while the control holds focus: an editor that writes every
-        // keystroke cannot be typed into, so the deferred form is the one the consumer asked for.
-        // Read the session value, not the returned display string — the committed value is the
-        // parsed and clamped one, and the field returns whatever text is currently in the buffer.
+        var numeric = new UiNumericEdit(min, max, format);
+        UiNative.Edit(field, ctx, bindKey, current, numeric.Format, numeric.Parse,
+            live, false, value => ctx.Bindings.Set(bindKey, value), () => ctx.Bindings.Get<float>(bindKey));
+        if (!ctx.Session.IsActive) return;
         UiValueState state = ctx.Session.GetOrCreateValueState(bindKey);
-        if (live || !state.Focused)
-        {
-            ctx.Bindings.Set(bindKey, state.FloatValue);
-        }
+        if (numeric.Parse(state.EditText, out float parsed)) state.FloatValue = parsed;
+        AtomVocabulary.PaintEditFeedback(field, ctx, UiNative.Editor<float>(ctx, bindKey, numeric.Format, numeric.Parse));
+        DrawLabel(rect, ctx, style);
     }
 
     /// <summary>

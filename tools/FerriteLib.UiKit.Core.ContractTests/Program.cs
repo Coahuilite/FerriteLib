@@ -28,6 +28,7 @@ internal static class Program
             IdentityAndEnd();
             BooleanSelectionExpansion();
             Isolation();
+            Editing();
             Console.WriteLine($"ALL PASS {checks} neutral checks");
             return 0;
         }
@@ -36,6 +37,62 @@ internal static class Program
             Console.Error.WriteLine(ex);
             return 1;
         }
+    }
+
+    private static void Editing()
+    {
+        float model = 10;
+        int requests = 0;
+        bool Parse(string text, out float value) => float.TryParse(text, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out value) && !float.IsNaN(value) && !float.IsInfinity(value);
+        UiEditSession<float> Editor() => new(v => v.ToString(System.Globalization.CultureInfo.InvariantCulture), Parse);
+        void Set(float value) { requests++; model = value; }
+        var edit = Editor();
+        edit.Observe(model);
+        edit.Focus();
+        edit.Input("20", true, false, false, Set, () => model);
+        Check(model == 10 && edit.Modified && edit.Valid, "E1 deferred qualified draft is not a business value");
+        Check(edit.TryStepBase(model, out float basis) && basis == 20, "N1 step takes valid local draft");
+        edit.TakeOver(basis + 1, Set, () => model);
+        Check(model == 21 && requests == 1 && !edit.HasDraft, "N1 one request without intermediate draft publication");
+        edit.Input("-", true, false, false, Set, () => model);
+        Check(!edit.TryStepBase(model, out _) && !edit.Confirm(false, Set, () => model) && edit.Draft == "-", "E3 N3 invalid blur retains draft and cannot step");
+        edit.TakeOver(30, Set, () => model);
+        Check(model == 30 && requests == 2 && !edit.HasDraft, "N2 slider takes over invalid draft with one request");
+        edit.Input("40", true, false, false, Set, () => model);
+        model = 35;
+        edit.Observe(model);
+        Check(edit.Conflict && edit.Draft == "40" && !edit.Confirm(false, Set, () => model), "E4 external model conflict preserves draft and prevents blur publish");
+        edit.Confirm(true, Set, () => model);
+        Check(model == 40 && requests == 3 && !edit.HasDraft, "E2 explicit confirmation can replace known changed basis");
+        edit.Input("50", true, true, true, Set, () => model);
+        Check(requests == 3, "IME intermediate never publishes");
+        edit.Input("50", true, false, true, Set, () => model);
+        edit.Confirm(true, Set, () => model);
+        Check(requests == 4 && model == 50, "E2 composition completed Live candidate does not publish twice on confirm");
+        edit.Input("60", false, false, true, Set, () => model);
+        Check(edit.Draft == "50" && requests == 4, "readonly prevents draft mutation");
+        edit.Input("70", true, false, false, Set, () => model);
+        model = 65;
+        edit.Cancel(model);
+        Check(edit.Draft == "65" && model == 65 && requests == 4, "E5 cancel uses latest model without rollback");
+        edit.Input("80", true, false, false, Set, () => model);
+        edit.Confirm(true, _ => requests++, () => model);
+        Check(edit.Draft == "65" && !edit.HasDraft && model == 65, "E2 successful request is not assumed business acceptance");
+        var numeric = new UiNumericEdit(0, 100);
+        Check(!numeric.Parse("NaN", out _) && !numeric.Parse("Infinity", out _) && !numeric.Parse("-", out _) &&
+            !numeric.Parse("", out _), "NUMERIC nonfinite and temporary invalid strings are not candidates");
+        Check(numeric.Parse("120", out float clamped) && clamped == 100, "NUMERIC range constrains a request candidate");
+        var local = new UiEditSession<float>(numeric.Format, numeric.Parse);
+        model = 10;
+        local.Observe(model);
+        local.Focus();
+        local.Input("20", true, false, false, Set, () => model);
+        float selected = -1;
+        numeric.Step(local, model, 1, value => selected = value, () => model);
+        Check(selected == 21 && model == 10 && !local.HasDraft, "N1 shared numeric step requests 21 even when business keeps 10");
+        numeric.Step(local, model, 1, value => selected = value, () => model);
+        Check(selected == 11, "N1 next no-draft step begins at actual model, not last requested 21");
     }
 
     private static void Properties()

@@ -567,7 +567,17 @@ public enum KeyCode
     None = 0,
     Return = 13,
     Escape = 27,
-    KeypadEnter = 271
+    KeypadEnter = 271,
+    A = 97,
+    C = 99,
+    UpArrow = 273,
+    DownArrow = 274,
+    RightArrow = 275,
+    LeftArrow = 276,
+    Home = 278,
+    End = 279,
+    PageUp = 280,
+    PageDown = 281
 }
 
 public enum TextAnchor

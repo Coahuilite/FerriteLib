@@ -164,6 +164,7 @@ internal static class KernelTextFieldTests
 
         // Now the deferred case: restore the model, focus the field, and type again.
         model = "start";
+        ((UiEditSession<string>)state.Editor!).Cancel(model);
         UiNative.DebugMousePosition = Center(rect);
         UiNative.TextFieldOverride = (r, text) => "typed";
         widget.Draw(rect, ctx);
@@ -231,7 +232,7 @@ internal static class KernelTextFieldTests
         EnablePointer(Center(rect));
         UiNative.TextFieldOverride = (r, text) => "draft";
         liveWidget.Draw(rect, liveCtx);
-        Check(live == "draft", "the same keystroke reaches the model immediately when Live is left at its default");
+        Check(live == "draft", "explicit Live=true keeps immediate publication");
         DisablePointer();
     }
 
@@ -401,7 +402,7 @@ internal static class KernelTextFieldTests
     private static Dictionary<string, string> Attrs(string bind, bool live = true, string? placeholder = null)
     {
         var attrs = new Dictionary<string, string> { ["Bind"] = bind };
-        if (!live) attrs["Live"] = "false";
+        attrs["Live"] = live ? "true" : "false";
         if (placeholder != null) attrs["Placeholder"] = placeholder;
         return attrs;
     }
