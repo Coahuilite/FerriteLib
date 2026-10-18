@@ -151,6 +151,10 @@ public sealed class UiLayoutEngine
         "OffsetY",
         "AnchorX",
         "AnchorY",
+        "Font", "Color.Base", "Color.Panel", "Color.Raised", "Color.Hover", "Color.Selected", "Color.Success", "Color.Danger",
+        "Color.WorkspacePlane", "Color.SectionBand", "Color.TextPrimary", "Color.TextSecondary", "Color.TextOnGold", "Color.TextOnDanger", "Color.TextDisabled",
+        "Color.AccentGold", "Color.SwitchThumbOff", "Color.Border", "Color.BorderStrong", "Color.Divider", "Color.BaseBorder", "Color.PanelBorder",
+        "Color.RaisedBorder", "Color.HoverBorder", "Color.SelectedBorder", "Color.SuccessBorder", "Color.DangerBorder",
         "SharedLabels",
         // FL-IC2: the Cancel layer of the tree walk. Engine-wide on a container as well as a widget, because
         // the ladder walks the TREE and a section is a legitimate layer to return from — the element that
@@ -182,6 +186,10 @@ public sealed class UiLayoutEngine
         "OffsetY",
         "AnchorX",
         "AnchorY",
+        "Font", "Color.Base", "Color.Panel", "Color.Raised", "Color.Hover", "Color.Selected", "Color.Success", "Color.Danger",
+        "Color.WorkspacePlane", "Color.SectionBand", "Color.TextPrimary", "Color.TextSecondary", "Color.TextOnGold", "Color.TextOnDanger", "Color.TextDisabled",
+        "Color.AccentGold", "Color.SwitchThumbOff", "Color.Border", "Color.BorderStrong", "Color.Divider", "Color.BaseBorder", "Color.PanelBorder",
+        "Color.RaisedBorder", "Color.HoverBorder", "Color.SelectedBorder", "Color.SuccessBorder", "Color.DangerBorder",
         // FL-IC2: see the container list above; the two move together or the drift lane fails.
         "CancelBind"
     };
@@ -932,6 +940,7 @@ public sealed class UiLayoutEngine
     /// </summary>
     private UiWidgetContext ElementScope(UiWidgetContext ctx, UiElementSpec spec, UiNode node)
     {
+        node.Properties.Authoring(spec, styleResolver?.Document);
         UiWidgetContext scoped = ctx.WithStyleDeclaration(DeclarationOf(spec));
         return scoped.WithTheme(ScopeTheme(scoped, node));
     }
@@ -952,7 +961,8 @@ public sealed class UiLayoutEngine
         // The scope NAME is the resolver's to read, and only the tree knows where it was written: handing the
         // element's path down is what makes an unknown name a located finding instead of "some scheme is
         // missing somewhere in this document".
-        return node.Properties.Apply(node, styleResolver.ThemeFor(chain, node.Id.Path), fallbackFont);
+        styleResolver.ThemeFor(chain, node.Id.Path); // Preserve located unknown-name diagnostics.
+        return node.Properties.Apply(node, styleResolver.Baseline, fallbackFont);
     }
 
     /// <summary>

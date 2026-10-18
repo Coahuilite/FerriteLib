@@ -1020,12 +1020,7 @@ public sealed class UiSession : IDisposable
         }
     }
 
-    /// <summary>
-    /// Opens a fresh arrange: every node forgets its children and its geometry, and the arrange that
-    /// follows publishes them again for the elements it visits. That is what makes "not arranged in this
-    /// tree" a state a caller can read (<see cref = "UiNode.IsArranged"/>) instead of a stale rect, and it
-    /// keeps a Tab-hidden element's node and state alive while its rect is gone.
-    /// </summary>
+    // Capture derived arrangement facts; recovery never restores business state or ended capture.
     internal Action CaptureArrangement()
     {
         var priorNodes = new Dictionary<UiNodeId, UiNode>(nodes);
@@ -1039,6 +1034,7 @@ public sealed class UiSession : IDisposable
             nodes.Clear();
             foreach (KeyValuePair<UiNodeId, UiNode> entry in priorNodes)
                 nodes.Add(entry.Key, entry.Value);
+            dirtyNodes.RemoveWhere(node => !priorNodes.TryGetValue(node.Id, out UiNode? prior) || !ReferenceEquals(node, prior));
             foreach (Action restore in restoreNodes)
                 restore();
             AbortHitPass();

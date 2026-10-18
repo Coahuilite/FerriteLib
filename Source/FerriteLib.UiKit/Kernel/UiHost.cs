@@ -121,7 +121,7 @@ public sealed class UiHost : IDisposable
         // compares - the very first frame follows the document. No second clock is introduced anywhere.
         styleBaseline = theme.Clone();
         styleResolver = new UiStyleResolver(theme, styleDocument);
-        styleResolver.ApplyTo(theme);
+        styleResolver.ApplyPageTo(theme);
 
         engine = new UiLayoutEngine(source, styleResolver, manifest.Templates);
         session = new UiSession();
@@ -677,7 +677,7 @@ public sealed class UiHost : IDisposable
         try
         {
             UiTheme probe = theme.Clone();
-            new UiStyleResolver(probe, candidate).ApplyTo(probe);
+            new UiStyleResolver(probe, candidate).ApplyPageTo(probe);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -762,7 +762,7 @@ public sealed class UiHost : IDisposable
         // the old value and the reload is only half true.
         RestoreStyleBaseline();
         styleResolver = new UiStyleResolver(theme, EffectiveStyleDocument);
-        styleResolver.ApplyTo(theme);
+        styleResolver.ApplyPageTo(theme);
 
         // A fresh engine has no cached arrangement, so the next ArrangeRoots measures the new tree. This is
         // the invalidation the reload needs and it is strictly local: no second revision counter is
@@ -1012,6 +1012,10 @@ public sealed class UiHost : IDisposable
         // the attribute-NAME gate, and UiLayoutEngine keeps a mirrored pair for template subtrees that a
         // lane reflects against these, so the two must move together.
         "AlignX", "OffsetX", "AlignY", "OffsetY", "AnchorX", "AnchorY",
+        "Font", "Color.Base", "Color.Panel", "Color.Raised", "Color.Hover", "Color.Selected", "Color.Success", "Color.Danger",
+        "Color.WorkspacePlane", "Color.SectionBand", "Color.TextPrimary", "Color.TextSecondary", "Color.TextOnGold", "Color.TextOnDanger", "Color.TextDisabled",
+        "Color.AccentGold", "Color.SwitchThumbOff", "Color.Border", "Color.BorderStrong", "Color.Divider", "Color.BaseBorder", "Color.PanelBorder",
+        "Color.RaisedBorder", "Color.HoverBorder", "Color.SelectedBorder", "Color.SuccessBorder", "Color.DangerBorder",
         // FL-IC2 (interaction contract §3.6): the tree's Cancel layer. Engine-wide like VisibleKey and HelpKey,
         // because the ENGINE reads it and publishes it on the node for the ladder to walk - no widget kind owns
         // it, so no kind's attribute schema has to grow for a page to declare a return layer. Unlike HelpKey it
@@ -1031,7 +1035,11 @@ public sealed class UiHost : IDisposable
         "Fill", "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden", "WideHidden",
         "VisibleRows",
         "Scheme", "Density", "Visible", "VisibleKey",
-        "AlignX", "OffsetX", "AlignY", "OffsetY", "AnchorX", "AnchorY", "SharedLabels",
+        "AlignX", "OffsetX", "AlignY", "OffsetY", "AnchorX", "AnchorY",
+        "Font", "Color.Base", "Color.Panel", "Color.Raised", "Color.Hover", "Color.Selected", "Color.Success", "Color.Danger",
+        "Color.WorkspacePlane", "Color.SectionBand", "Color.TextPrimary", "Color.TextSecondary", "Color.TextOnGold", "Color.TextOnDanger", "Color.TextDisabled",
+        "Color.AccentGold", "Color.SwitchThumbOff", "Color.Border", "Color.BorderStrong", "Color.Divider", "Color.BaseBorder", "Color.PanelBorder",
+        "Color.RaisedBorder", "Color.HoverBorder", "Color.SelectedBorder", "Color.SuccessBorder", "Color.DangerBorder", "SharedLabels",
         // FL-IC2: see the widget list; UiLayoutEngine's mirrored pair carries the same addition, and the drift
         // lane refuses one-sided edits.
         "CancelBind"

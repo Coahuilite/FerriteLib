@@ -146,37 +146,17 @@ internal static class UiPlacement
     /// <param name = "parentKind">An explicit parent kind, for a caller whose parent is not an element.</param>
     internal static void ValidateChild(UiElementSpec spec, string path, string scope, UiElementSpec? parent, string? parentKind = null)
     {
+        if (spec.TryGetAttribute("Font", out string declaredFont)
+            && (!Enum.TryParse(declaredFont, true, out UiFont font) || !Enum.IsDefined(typeof(UiFont), font)))
+            throw Contract(spec, path, scope, "Font must name Tiny, Small or Medium.");
+        foreach (string token in UiAppearanceProperties.Colours)
+            if (spec.TryGetAttribute("Color." + token, out string raw) && !UiStyleDocument.TryParseColour(raw, out _))
+                throw Contract(spec, path, scope, "Color." + token + " must be a valid colour (#RRGGBB/#RRGGBBAA or RGB/RGBA channels).");
         if (spec.TryGetAttribute("SharedLabels", out string sharedLabels) && !bool.TryParse(sharedLabels, out _))
             throw Contract(spec, path, scope, "SharedLabels must be true or false.");
-        foreach (string attribute in new[]
-        {
-            "AnchorX",
-            "AnchorY"
-        }
-
-        )
-        {
-            if (!spec.TryGetAttribute(attribute, out string anchor))
-                continue;
-            string? ownerKind = parent == null ? parentKind : parent.Kind;
-            if (!IsPlacementContainer(ownerKind))
-                throw Contract(spec, path, scope, attribute + " requires a direct Overlay parent.");
-            try
-            {
-                ParseAnchor(anchor, attribute == "AnchorX" ? Axis.Horizontal : Axis.Vertical, out _, out _);
-            }
-            catch (FormatException ex)
-            {
-                throw Contract(spec, path, scope, ex.Message);
-            }
-
-            string alignAttribute = attribute == "AnchorX" ? AlignXAttribute : AlignYAttribute;
-            if (spec.TryGetAttribute(alignAttribute, out string align) && IsStretch(align))
-                throw Contract(spec, path, scope, attribute + " cannot also stretch the same axis.");
-            if (IsFill(spec))
-                throw Contract(spec, path, scope, attribute + " cannot also claim Fill.");
-        }
-
+        string? anchorOwner = parent == null ? parentKind : parent.Kind;
+        ValidateAnchorDeclaration(spec, path, scope, anchorOwner, "AnchorX", AlignXAttribute, Axis.Horizontal);
+        ValidateAnchorDeclaration(spec, path, scope, anchorOwner, "AnchorY", AlignYAttribute, Axis.Vertical);
         bool hasAlignX = spec.TryGetAttribute(AlignXAttribute, out string alignXRaw);
         bool hasAlignY = spec.TryGetAttribute(AlignYAttribute, out string alignYRaw);
         bool hasOffsetX = spec.TryGetAttribute(OffsetXAttribute, out string offsetXRaw);
@@ -263,6 +243,20 @@ internal static class UiPlacement
         }
     }
 
+    private static void ValidateAnchorDeclaration(UiElementSpec spec, string path, string scope,
+        string? ownerKind, string attribute, string alignmentAttribute, Axis axis)
+    {
+        if (!spec.TryGetAttribute(attribute, out string anchor)) return;
+        if (!IsPlacementContainer(ownerKind))
+            throw Contract(spec, path, scope, attribute + " requires a direct Overlay parent.");
+        try { ParseAnchor(anchor, axis, out _, out _); }
+        catch (FormatException ex) { throw Contract(spec, path, scope, ex.Message); }
+        bool stretchesSameAxis = spec.TryGetAttribute(alignmentAttribute, out string align) && IsStretch(align);
+        if (stretchesSameAxis)
+            throw Contract(spec, path, scope, attribute + " cannot also stretch the same axis.");
+        if (IsFill(spec))
+            throw Contract(spec, path, scope, attribute + " cannot also claim Fill.");
+    }
     internal static void ParseAnchor(string raw, Axis axis, out string target, out float fraction)
     {
         string value = raw.Trim();

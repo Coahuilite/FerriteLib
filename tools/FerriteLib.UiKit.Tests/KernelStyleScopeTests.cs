@@ -40,6 +40,7 @@ internal static class KernelStyleScopeTests
     public static int RunAll()
     {
         failures = 0;
+        Run("Per-property authored/local/ancestor intent survives sparse styles and removal", VerifyPerPropertySources);
         Run("A region scopes its subtree to the region's own theme", VerifyRegionScope);
         Run("One scope keeps one theme instance across frames", VerifyScopeInstanceIsStable);
         Run("A region theme expires on the baseline layout clock", VerifyScopeFollowsLayoutClock);
@@ -53,6 +54,62 @@ internal static class KernelStyleScopeTests
         return failures;
     }
 
+    private static void VerifyPerPropertySources()
+    {
+        PrepareRegistry();
+        ResetProbe();
+        string xml = "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Styles Schema=\"1\" Density=\"page\">"
+            + "<Density Name=\"page\"><Metric Token=\"Gap\" Value=\"3\"/></Density>"
+            + "<Scheme Name=\"local\"><Metric Token=\"Font\" Value=\"Tiny\"/><Metric Token=\"Gap\" Value=\"2\"/><Color Token=\"Panel\" Value=\"#0000FF\"/></Scheme>"
+            + "<Scheme Name=\"sparse\"><Color Token=\"Panel\" Value=\"#0000FF\"/></Scheme></Styles>"
+            + "<Stack Id=\"parent\" Padding=\"0\"><Widget Id=\"child\" Kind=\"" + ProbeKind + "\" Scheme=\"local\" Color.TextPrimary=\"#00FF00\"/>"
+            + "<Widget Id=\"follow\" Kind=\"" + ProbeKind + "\" Scheme=\"sparse\"/></Stack></UiPage>";
+        using var host = new UiHost(Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
+        host.MeasureAndArrange(new Vector2(400, 400));
+        UiNode parent = host.Session.GetNodeByElementId("parent")!;
+        UiNode child = host.Session.GetNodeByElementId("child")!;
+        UiNode follow = host.Session.GetNodeByElementId("follow")!;
+        parent.Properties.Font.Set(UiFont.Medium);
+        parent.Properties.Density.Set(new UiDensity(10, 8, 9, 44, 1));
+        parent.Properties.Colour("TextPrimary").Set(new Color(1, 0, 0, 1));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(400, 400));
+        Check(child.Properties.ResolvedFont.Value == UiFont.Tiny && child.Properties.ResolvedFont.Origin == UiPropertyOrigin.LocalStyle,
+            "a real explicitly applied local font beats a programmatic ancestor declaration");
+        Check(follow.Properties.ResolvedFont.Value == UiFont.Medium && follow.Properties.ResolvedFont.Origin == UiPropertyOrigin.Ancestor,
+            "a sparse local style does not promote its host fallback into an authored font override");
+        Check(child.Properties.ResolvedMetrics["Gap"].Value == 2 && child.Properties.ResolvedMetrics["Gap"].Origin == UiPropertyOrigin.LocalStyle
+            && child.Properties.ResolvedMetrics["RowHeight"].Value == 44 && child.Properties.ResolvedMetrics["RowHeight"].Origin == UiPropertyOrigin.Ancestor,
+            "named style omissions continue per density metric instead of inheriting a resolved bundle");
+        child.Properties.Font.Set(UiFont.Tiny);
+        child.Properties.LocalFont.Set(UiFont.Small);
+        host.MeasureAndArrange(new Vector2(400, 400));
+        Check(child.Properties.ResolvedFont.Origin == UiPropertyOrigin.Instance && child.Properties.ResolvedFont.Value == UiFont.Tiny,
+            "an explicit value equal to the old effective value retains its own declaration intent");
+        child.Properties.Font.Remove();
+        host.MeasureAndArrange(new Vector2(400, 400));
+        Check(child.Properties.ResolvedFont.Value == UiFont.Small, "removing the instance reveals the still-declared local wrapper style");
+        child.Properties.LocalFont.Remove();
+        host.MeasureAndArrange(new Vector2(400, 400));
+        Check(child.Properties.ResolvedFont.Value == UiFont.Tiny && child.Properties.ResolvedMetrics["Gap"].Value == 2,
+            "removing only local font reveals named typography without resetting independent density");
+        Check(child.Properties.ResolvedColours["TextPrimary"].Origin == UiPropertyOrigin.Instance
+            && SameColor(child.Properties.ResolvedColours["TextPrimary"].Value!.Value, new Color(0, 1, 0, 1)),
+            "inline semantic colour is its own per-property instance declaration");
+        snapshot = host.MeasureAndArrange(new Vector2(400, 400));
+        child.Properties.Colour("TextPrimary").Set(new Color(0, 0, 1, 1));
+        UiLayoutSnapshot afterColour = host.MeasureAndArrange(new Vector2(400, 400));
+        Check(ReferenceEquals(snapshot, afterColour), "colour-only intent changes do not invalidate measured geometry");
+        host.DrawFrame(new Rect(0, 0, 400, 400));
+        UiTheme childTheme = LastTheme(DrawnPaths, DrawnThemes, "/child")!;
+        Check(SameColor(childTheme.TextPrimary, new Color(0, 0, 1, 1)) && SameColor(childTheme.SwitchThumbOff, childTheme.TextPrimary),
+            "paint reads current semantic colour and derived fallback ink, without a frozen fallback bag");
+        child.Properties.Colour("TextPrimary").Remove();
+        parent.Properties.Colour("TextPrimary").Set(new Color(1, 1, 0, 1));
+        host.DrawFrame(new Rect(0, 0, 400, 400));
+        Check(SameColor(LastTheme(DrawnPaths, DrawnThemes, "/child")!.TextPrimary, new Color(0, 1, 0, 1))
+            && SameColor(LastTheme(DrawnPaths, DrawnThemes, "/follow")!.TextPrimary, new Color(1, 1, 0, 1)),
+            "removal reveals inline intent while an unoverridden sibling keeps following the current ancestor");
+    }
     // --- a region scopes its subtree ---------------------------------------------------------------
 
     private static void VerifyRegionScope()

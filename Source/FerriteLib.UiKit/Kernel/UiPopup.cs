@@ -303,7 +303,7 @@ public static class UiPopup
             label,
             theme,
             style.Text,
-            UiFont.Small,
+            theme.Styles.Font,
             TextAnchor.MiddleLeft,
             singleLine: true);
     }

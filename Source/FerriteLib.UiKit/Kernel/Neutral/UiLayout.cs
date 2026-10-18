@@ -260,8 +260,14 @@ public static class UiLayout
                 if (target >= 0 && !resolved[target])
                     continue;
                 UiLayoutRect self = slots[i];
-                float origin = target < 0 ? parentOrigin : horizontal ? slots[target].X : slots[target].Y;
-                float span = target < 0 ? parentSpan : horizontal ? slots[target].Width : slots[target].Height;
+                float origin = parentOrigin;
+                float span = parentSpan;
+                if (target >= 0)
+                {
+                    UiLayoutRect sibling = slots[target];
+                    origin = horizontal ? sibling.X : sibling.Y;
+                    span = horizontal ? sibling.Width : sibling.Height;
+                }
                 float ownSpan = horizontal ? self.Width : self.Height;
                 float position = origin + span * anchor.TargetFraction - ownSpan * anchor.OwnFraction + anchor.Offset.At(parentSpan);
                 if (float.IsNaN(position) || float.IsInfinity(position))

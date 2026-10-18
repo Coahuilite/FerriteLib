@@ -113,6 +113,10 @@ public sealed class UiStyleResolver
         ApplyNamedScopes(theme, document.DefaultScheme, document.DefaultDensity, null);
     }
 
+    internal void ApplyPageTo(UiTheme theme)
+    {
+        ApplyNamedScopes(theme, document.DefaultScheme, document.DefaultDensity, null, preserveHostDeclarations: true);
+    }
     /// <summary>
     /// The theme a scope draws with, built once per effective (scheme, density) pair and reused - the same
     /// instance on every later frame, until either of the baseline's revisions moves and the cached instances
@@ -195,7 +199,7 @@ public sealed class UiStyleResolver
         return key.ToString();
     }
 
-    private void ApplyNamedScopes(UiTheme theme, string? scheme, string? density, string? elementPath)
+    private void ApplyNamedScopes(UiTheme theme, string? scheme, string? density, string? elementPath, bool preserveHostDeclarations = false)
     {
         if (scheme != null && scheme.Length > 0)
         {
@@ -206,11 +210,11 @@ public sealed class UiStyleResolver
                     ApplyColour(theme, pair.Key, pair.Value);
                 }
 
-                if (definition.Font.HasValue) ApplyFont(theme, definition.Font.Value);
+                if (definition.Font.HasValue) ApplyFont(theme, definition.Font.Value, preserveHostDeclarations);
 
                 foreach (KeyValuePair<string, float> pair in definition.Metrics)
                 {
-                    ApplyMetric(theme, pair.Key, pair.Value);
+                    ApplyMetric(theme, pair.Key, pair.Value, preserveHostDeclarations);
                 }
             }
             else
@@ -232,7 +236,7 @@ public sealed class UiStyleResolver
 
         foreach (KeyValuePair<string, float> pair in densityDefinition.Metrics)
         {
-            ApplyMetric(theme, pair.Key, pair.Value);
+            ApplyMetric(theme, pair.Key, pair.Value, preserveHostDeclarations);
         }
     }
 
@@ -244,9 +248,10 @@ public sealed class UiStyleResolver
     /// measurement and paint. The theme's own setter moves the layout clock, which is correct: a different
     /// typeface measures differently.
     /// </summary>
-    private static void ApplyFont(UiTheme theme, UiFont font)
+    private static void ApplyFont(UiTheme theme, UiFont font, bool preserveHostDeclarations = false)
     {
-        theme.DefaultFont = font;
+        if (preserveHostDeclarations) theme.ApplyStyleFont(font);
+        else theme.DefaultFont = font;
     }
 
     /// <summary>
@@ -306,64 +311,22 @@ public sealed class UiStyleResolver
     }
 
     private static void ApplyColour(UiTheme theme, string token, Color value)
-    {
-        switch (token)
-        {
-            case "Base": theme.Base = value; break;
-            case "Panel": theme.Panel = value; break;
-            case "Raised": theme.Raised = value; break;
-            case "Hover": theme.Hover = value; break;
-            case "Selected": theme.Selected = value; break;
-            case "Success": theme.Success = value; break;
-            case "Danger": theme.Danger = value; break;
-            case "WorkspacePlane": theme.WorkspacePlane = value; break;
-            case "SectionBand": theme.SectionBand = value; break;
-            case "TextPrimary": theme.TextPrimary = value; break;
-            case "TextSecondary": theme.TextSecondary = value; break;
-            case "TextOnGold": theme.TextOnGold = value; break;
-            case "TextOnDanger": theme.TextOnDanger = value; break;
-            case "TextDisabled": theme.TextDisabled = value; break;
-            case "AccentGold": theme.AccentGold = value; break;
-            case "SwitchThumbOff": theme.SwitchThumbOff = value; break;
-            // Batch 1 (CP-6④): there is no second accent token. A document that declares HoverPoint is
-            // reported as an unknown token by UiStyleDocument, so it never reaches this switch; the hover
-            // step is read from the accent through UiTheme.AccentHover.
-            case "Border": theme.Border = value; break;
-            case "BorderStrong": theme.BorderStrong = value; break;
-            case "Divider": theme.Divider = value; break;
-            case "BaseBorder": theme.BaseBorder = value; break;
-            case "PanelBorder": theme.PanelBorder = value; break;
-            case "RaisedBorder": theme.RaisedBorder = value; break;
-            case "HoverBorder": theme.HoverBorder = value; break;
-            case "SelectedBorder": theme.SelectedBorder = value; break;
-            case "SuccessBorder": theme.SuccessBorder = value; break;
-            case "DangerBorder": theme.DangerBorder = value; break;
-        }
-    }
-
-    private static void ApplyMetric(UiTheme theme, string token, float value)
+        => UiAppearanceProperties.ApplyColour(theme, token, value);
+    private static void ApplyMetric(UiTheme theme, string token, float value, bool preserveHostDeclarations = false)
     {
         UiGeometry current = theme.Geometry;
-        switch (token)
+        UiGeometry next = token switch
         {
-            case "Padding":
-                theme.Geometry = new UiGeometry(value, current.Spacing, current.Gap, current.RowHeight, current.Hairline);
-                break;
-            case "Spacing":
-                theme.Geometry = new UiGeometry(current.Padding, value, current.Gap, current.RowHeight, current.Hairline);
-                break;
-            case "Gap":
-                theme.Geometry = new UiGeometry(current.Padding, current.Spacing, value, current.RowHeight, current.Hairline);
-                break;
-            case "RowHeight":
-                theme.Geometry = new UiGeometry(current.Padding, current.Spacing, current.Gap, value, current.Hairline);
-                break;
-            case "Hairline":
-                theme.Geometry = new UiGeometry(current.Padding, current.Spacing, current.Gap, current.RowHeight, value);
-                break;
-        }
+            "Padding" => new UiGeometry(value, current.Spacing, current.Gap, current.RowHeight, current.Hairline),
+            "Spacing" => new UiGeometry(current.Padding, value, current.Gap, current.RowHeight, current.Hairline),
+            "Gap" => new UiGeometry(current.Padding, current.Spacing, value, current.RowHeight, current.Hairline),
+            "RowHeight" => new UiGeometry(current.Padding, current.Spacing, current.Gap, value, current.Hairline),
+            "Hairline" => new UiGeometry(current.Padding, current.Spacing, current.Gap, current.RowHeight, value),
+            _ => current
+        };
+        if (preserveHostDeclarations) theme.ApplyStyleGeometry(next);
+        else theme.Geometry = next;
     }
-
     private void Record(string message, int line = 0, string? elementPath = null)
     {
         if (issues.Count >= MaxIssues) return;

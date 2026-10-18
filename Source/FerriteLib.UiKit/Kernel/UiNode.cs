@@ -162,6 +162,7 @@ public sealed class UiNode
     // Restore derived layout facts only, never business state or ended interactions.
     internal Action CaptureArrangement()
     {
+        Action restoreAuthoring = Properties.CaptureAuthoring();
         UiNode? parent = Parent;
         UiNode[] priorChildren = children.ToArray();
         Rect? rect = Rect;
@@ -173,6 +174,7 @@ public sealed class UiNode
         float sharedLabelWidth = SharedLabelWidth;
         return () =>
         {
+            restoreAuthoring();
             Parent = parent;
             children.Clear();
             children.AddRange(priorChildren);
@@ -184,7 +186,6 @@ public sealed class UiNode
         };
     }
 
-    /// <summary>Clears the flag without notifying the session, which clears its whole dirty set in bulk.</summary>
     /// <summary>Clears the flag without notifying the session, which clears its whole dirty set in bulk.</summary>
     internal void ClearDirtyFlag()
     {

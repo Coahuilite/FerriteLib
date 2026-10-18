@@ -26,7 +26,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// attribute already carries; a reserved help slot is deliberately NOT part of either look.
 /// </para>
 /// </summary>
-public sealed class DropdownWidget : IUiWidget
+public sealed class DropdownWidget : IUiWidget, IUiLabelledWidget
 {
     public const string Kind = "input/dropdown";
 
@@ -176,7 +176,8 @@ public sealed class DropdownWidget : IUiWidget
 
     public float Measure(UiWidgetContext ctx)
     {
-        return ReadHeight(ctx.Theme.Geometry.RowHeight);
+        float natural = SharedLabelLayout(ctx, ctx.ViewWidth)?.Height ?? ctx.Theme.Geometry.RowHeight;
+        return ReadHeight(natural);
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)
@@ -201,12 +202,14 @@ public sealed class DropdownWidget : IUiWidget
         string display = FindDisplayText(options, current);
         UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
         bool open = ctx.Session.IsPopupOpen(bindKey, node);
-        Rect fieldRect = DrawLabelledField(rect, ReadLabel(ctx), display, open || current.Length > 0, ctx);
+        Rect fieldRect = ResolveField(rect, ctx);
 
         // The trigger click stores the popup anchor in Host window space (the engine translates
         // draw rects inside scrolls/groups); the popup pass draws and hit-tests in that same
         // stored space, so both share one anchor source.
         UiNative.DropdownButton(fieldRect, bindKey, ctx, (ctx.Node ?? ctx.Session.ActiveNode).Id.Key);
+        if (!ctx.Session.IsActive) return;
+        PaintLabelledField(rect, fieldRect, display, open || current.Length > 0, ctx);
 
         string helpSink = OptionHelp.SinkKey(spec);
         if (ctx.Session.IsPopupOpen(bindKey, node))
@@ -226,27 +229,54 @@ public sealed class DropdownWidget : IUiWidget
     }
 
     /// <summary>
-    /// The element's field, for both draw paths: the optional single-line label in its fixed column, the value
+    /// The element's field, for both draw paths: the optional label in its allocated column, the value
     /// plane and the text outlet, with the layout arithmetic in one place. Returns the field rect, which is what
     /// the trigger's hit test and the popup anchor are taken from. The look is resolved HERE - once per frame,
     /// through the same seam the creation contract and the natural-body entry point use - so the field that
     /// was refused at creation is never a different field at draw.
     /// </summary>
-    private Rect DrawLabelledField(Rect rect, string label, string display, bool selected, UiWidgetContext ctx)
+    public float MeasureLabel(UiWidgetContext ctx)
     {
-        float labelWidth = label.Length > 0 ? LabelWidth : 0f;
-        Rect fieldRect = new(rect.x + labelWidth, rect.y, Math.Max(1f, rect.width - labelWidth), rect.height);
-        if (labelWidth > 0f)
-        {
-            // The field label lives in a fixed LabelWidth column: it is a single line by design, so the
-            // fitting audit must measure its width rather than assume wrapping will rescue a long word.
-            UiThemeDraw.Label(new Rect(rect.x, rect.y, labelWidth, rect.height), label, ctx.Theme, ctx.Theme.TextPrimary, UiFont.Small, TextAnchor.MiddleLeft, singleLine: true);
-        }
-
-        DrawField(fieldRect, display, selected, ctx.Theme, Looks.Resolve(spec).Value);
-        return fieldRect;
+        string label = ReadLabel(ctx);
+        return label.Length == 0 ? 0 : ctx.Metrics.MeasureWidth(label, AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing;
     }
 
+    private UiSliderLayout? SharedLabelLayout(UiWidgetContext ctx, float width)
+        => ctx.Node?.SharedLabelWidth > 0
+            ? UiSliderLayout.Measure(ReadLabel(ctx), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme),
+                ctx.Metrics, ctx.Node.SharedLabelWidth)
+            : null;
+
+    private Rect ResolveField(Rect rect, UiWidgetContext ctx)
+    {
+        UiSliderLayout? shared = SharedLabelLayout(ctx, rect.width);
+        if (shared.HasValue)
+        {
+            UiSliderLayout layout = shared.Value;
+            if (layout.LabelWidth <= 0) return rect;
+            float gap = ctx.Theme.Geometry.Gap;
+            return layout.Stacked
+                ? new Rect(rect.x, rect.y + layout.LabelHeight + gap, rect.width, Math.Max(1, rect.height - layout.LabelHeight - gap))
+                : new Rect(rect.x + layout.LabelWidth + gap, rect.y, Math.Max(1, rect.width - layout.LabelWidth - gap), rect.height);
+        }
+        // No group opt-in keeps the established fixed-column entry geometry.
+        float labelWidth = ReadLabel(ctx).Length > 0 ? LabelWidth : 0;
+        return new Rect(rect.x + labelWidth, rect.y, Math.Max(1, rect.width - labelWidth), rect.height);
+    }
+
+    private void PaintLabelledField(Rect rect, Rect field, string display, bool selected, UiWidgetContext ctx)
+    {
+        string label = ReadLabel(ctx);
+        if (label.Length > 0)
+        {
+            UiSliderLayout? shared = SharedLabelLayout(ctx, rect.width);
+            float width = shared?.LabelWidth ?? LabelWidth;
+            float height = shared?.Stacked == true ? shared.Value.LabelHeight : rect.height;
+            UiThemeDraw.Label(new Rect(rect.x, rect.y, width, height), label, ctx.Theme, ctx.Theme.TextPrimary,
+                AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft, singleLine: !shared.HasValue);
+        }
+        DrawField(field, display, selected, ctx.Theme, Looks.Resolve(spec).Value, AtomVocabulary.TextFont(ctx));
+    }
     /// <summary>True when the resolved look is the selector field; the name is matched case-insensitively.</summary>
     private static bool IsSelector(string look)
     {
@@ -286,11 +316,13 @@ public sealed class DropdownWidget : IUiWidget
         string display = hasCurrent ? FindChoiceText(choices, current) : "";
         UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
         bool open = ctx.Session.IsPopupOpen(bindKey, node);
-        Rect fieldRect = DrawLabelledField(rect, ReadLabel(ctx), display, open || hasCurrent, ctx);
+        Rect fieldRect = ResolveField(rect, ctx);
 
         // The trigger click stores the popup anchor in Host window space, exactly as the string path does: the
         // anchor source is the primitive, not this path's choice.
         UiNative.DropdownButton(fieldRect, bindKey, ctx, (ctx.Node ?? ctx.Session.ActiveNode).Id.Key);
+        if (!ctx.Session.IsActive) return;
+        PaintLabelledField(rect, fieldRect, display, open || hasCurrent, ctx);
 
         string helpSink = OptionHelp.SinkKey(spec);
         if (ctx.Session.IsPopupOpen(bindKey, node))
@@ -384,7 +416,7 @@ public sealed class DropdownWidget : IUiWidget
         OptionHelp.Publish(ctx, OptionHelp.SinkKey(spec), hovered);
     }
 
-    private static void DrawField(Rect rect, string display, bool selected, UiTheme theme, string look)
+    private static void DrawField(Rect rect, string display, bool selected, UiTheme theme, string look, UiFont font)
     {
         // The mapping is a table query, not a second copy of it: this method used to re-derive the
         // three tokens the status outlet already computes, which is how the two drifted apart. The style
@@ -393,7 +425,7 @@ public sealed class DropdownWidget : IUiWidget
         UiResolvedStyle style = theme.Styles.Resolve(selected ? UiStatusTone.Active : UiStatusTone.Neutral);
         if (IsSelector(look))
         {
-            DrawSelectorField(rect, display, style, theme);
+            DrawSelectorField(rect, display, style, theme, font);
             return;
         }
 
@@ -404,7 +436,7 @@ public sealed class DropdownWidget : IUiWidget
             display,
             theme,
             style.Text,
-            UiFont.Small,
+            font,
             TextAnchor.MiddleLeft,
             singleLine: true);
     }
@@ -414,9 +446,9 @@ public sealed class DropdownWidget : IUiWidget
     /// composes through the very method a consumer composite calls, so "the same outlets" means the same
     /// CODE, not two spellings of the same arithmetic. No question-mark slot exists in either look.
     /// </summary>
-    private static void DrawSelectorField(Rect rect, string display, UiResolvedStyle style, UiTheme theme)
+    private static void DrawSelectorField(Rect rect, string display, UiResolvedStyle style, UiTheme theme, UiFont font)
     {
-        UiThemeDraw.SelectorField(rect, display, theme, style);
+        UiThemeDraw.SelectorField(rect, display, theme, style, font);
     }
 
     private string ReadBindKey()

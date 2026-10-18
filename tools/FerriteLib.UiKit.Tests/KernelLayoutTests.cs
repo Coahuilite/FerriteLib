@@ -20,6 +20,7 @@ internal static class KernelLayoutTests
     public static int RunAll()
     {
         failures = 0;
+        Run("Dropdown established trigger does not depend on pure paint", VerifyDropdownPaintBoundary);
         Run("Shared columns use actual participating labels and narrow stacking", VerifySharedLabels);
         Run("Shared anchors preserve complete prior arrangement on failure", VerifyAnchorsAndAtomicFailure);
         Run("Row/Column/Stack measure", VerifyRowColumnStackMeasure);
@@ -70,6 +71,41 @@ internal static class KernelLayoutTests
         }
     }
 
+    private static void VerifyDropdownPaintBoundary()
+    {
+        var widget = new FerriteLib.UiKit.Kernel.Widgets.DropdownWidget();
+        widget.Configure(new UiElementSpec("drop", "input/dropdown", new Dictionary<string, string>
+        { ["Bind"] = "choice", ["Label"] = "Choice", ["Option1"] = "A" }, Array.Empty<UiElementSpec>()));
+        var bindings = new UiBindings();
+        bindings.BindValue("choice", () => "A", _ => { });
+        using var session = new UiSession();
+        var ctx = new UiWidgetContext(Scope, session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 200, "drop");
+        var paintFailure = typeof(Verse.Widgets).GetField("DrawBoxSolidFailure")!;
+        UiNative.DebugMousePositionEnabled = false;
+        GUIUtility.hotControl = 0;
+        var cause = new InvalidOperationException("dropdown pure paint");
+        try
+        {
+            Event.current = new Event { type = EventType.MouseDown, button = 0, mousePosition = new Vector2(120, 14) };
+            widget.Draw(new Rect(0, 0, 200, 28), ctx);
+            paintFailure.SetValue(null, cause);
+            Exception? observed = null;
+            try
+            {
+                Event.current = new Event { type = EventType.MouseUp, button = 0, mousePosition = new Vector2(120, 14) };
+                widget.Draw(new Rect(0, 0, 200, 28), ctx);
+            }
+            catch (Exception ex) { observed = ex; }
+            Check(ReferenceEquals(observed, cause) && session.OpenPopupId != null && !session.Interactions.CaptureOwner.HasValue,
+                "L real Dropdown qualified release opens before a pure field paint exception, without repeating capture");
+        }
+        finally
+        {
+            paintFailure.SetValue(null, null);
+            Event.current = null;
+            GUIUtility.hotControl = 0;
+        }
+    }
     private static void VerifySharedLabels()
     {
         UiWidgetRegistry.Clear();
@@ -90,7 +126,7 @@ internal static class KernelLayoutTests
             "c"
         }.Select(id => host.Session.GetNodeByElementId(id)!).ToArray();
         float column = nodes[0].SharedLabelWidth;
-        Check(column > 0 && nodes.All(node => node.SharedLabelWidth == column), "L all four real wrappers share the measured longest effective label, without private-part authoring");
+        Check(column > 0 && nodes.All(node => node.SharedLabelWidth == column), "L all five real label-field wrappers share the measured longest effective label, without private-part authoring");
         float previous = column;
         nodes[1].Properties.Font.Set(UiFont.Medium);
         host.MeasureAndArrange(new Vector2(600, 600));
@@ -116,10 +152,11 @@ internal static class KernelLayoutTests
         UiNode parent = a.Parent!;
         Rect? oldRect = a.Rect;
         UiNode[] oldChildren = parent.Children.ToArray();
+        UiResolvedProperty<Color?> priorColour = a.Properties.ResolvedColours["TextPrimary"];
         bool rejected = false;
         try
         {
-            engine.ArrangeRoots(ctx, new Vector2(201, 100), Parse(Page("AnchorX=\"b.Right\"", "AnchorX=\"a.Right\"")).Roots);
+            engine.ArrangeRoots(ctx, new Vector2(201, 100), Parse(Page("AnchorX=\"b.Right\" Font=\"Tiny\" Color.TextPrimary=\"#FF0000\"", "AnchorX=\"a.Right\"")).Roots);
         }
         catch (FormatException ex)
         {
@@ -128,6 +165,9 @@ internal static class KernelLayoutTests
 
         Check(rejected, "L cycle reports the actual Overlay path instead of partial placement");
         Check(a.Rect.Equals(oldRect) && ReferenceEquals(a.Parent, parent) && parent.Children.SequenceEqual(oldChildren), "L failed arrange preserves complete previous node geometry and relationships");
+        Check(a.Properties.ResolvedFont.Value == UiFont.Small && a.Properties.ResolvedColours["TextPrimary"].Origin == priorColour.Origin
+            && Nullable.Equals(a.Properties.ResolvedColours["TextPrimary"].Value, priorColour.Value),
+            "L failed candidate restores derived authoring facts as well as previous geometry");
         Check(!ctx.Session.IsInputGeometryReliable, "L failed arrange suspends input against unreliable new geometry");
         UiLayoutSnapshot cached = engine.ArrangeRoots(ctx, new Vector2(200, 100), roots);
         Check(ReferenceEquals(cached, before) && Near(cached.RectById["a"].x, 120), "L failed candidate never replaces the committed snapshot or entries");

@@ -3,17 +3,29 @@ using System.Collections.Generic;
 
 namespace FerriteLib.UiKit.Kernel;
 
-public enum UiPropertyOrigin { Instance, LocalStyle, Ancestor, Host, Fallback }
+public enum UiPropertyOrigin { Instance, LocalStyle, Ancestor, Host, Fallback, Mixed }
 
 /// <summary>Written intent, separate from effective values; Remove never copies a parent value.</summary>
 public sealed class UiPropertyDeclaration<T>
 {
     private readonly Action? changed;
+    private readonly Action<T>? validate;
     private T value = default!;
     public UiPropertyDeclaration(Action? changed = null) { this.changed = changed; }
+    internal UiPropertyDeclaration(Action? changed, Action<T> validate)
+    {
+        this.changed = changed;
+        this.validate = validate;
+    }
     public bool IsDeclared { get; private set; }
     public T Value => IsDeclared ? value : throw new InvalidOperationException("Property is not declared.");
-    public void Set(T newValue) { value = newValue; IsDeclared = true; changed?.Invoke(); }
+    public void Set(T newValue)
+    {
+        validate?.Invoke(newValue);
+        value = newValue;
+        IsDeclared = true;
+        changed?.Invoke();
+    }
     public void Remove() { if (!IsDeclared) return; IsDeclared = false; value = default!; changed?.Invoke(); }
 }
 

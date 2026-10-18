@@ -271,7 +271,7 @@ public sealed class InputModeRowWidget : IUiWidget
             option.Title,
             theme,
             style.Text,
-            UiFont.Small,
+            theme.Styles.Font,
             TextAnchor.MiddleLeft);
     }
 

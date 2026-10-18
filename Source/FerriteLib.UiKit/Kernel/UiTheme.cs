@@ -157,6 +157,40 @@ public sealed class UiTheme
     /// tokens, and the uint budget named in the block comment above has room for it.</summary>
     private const uint SwitchThumbOffBit = 1u << 25;
 
+    internal bool HasColourOverride(string token)
+    {
+        uint bit = token switch
+        {
+            "Base" => BaseBit,
+            "Panel" => PanelBit,
+            "Raised" => RaisedBit,
+            "Hover" => HoverBit,
+            "Selected" => SelectedBit,
+            "Success" => SuccessBit,
+            "Danger" => DangerBit,
+            "WorkspacePlane" => WorkspacePlaneBit,
+            "SectionBand" => SectionBandBit,
+            "TextPrimary" => TextPrimaryBit,
+            "TextSecondary" => TextSecondaryBit,
+            "TextOnGold" => TextOnGoldBit,
+            "TextOnDanger" => TextOnDangerBit,
+            "TextDisabled" => TextDisabledBit,
+            "AccentGold" => AccentGoldBit,
+            "SwitchThumbOff" => SwitchThumbOffBit,
+            "Border" => BorderBit,
+            "BorderStrong" => BorderStrongBit,
+            "Divider" => DividerBit,
+            "BaseBorder" => BaseBorderBit,
+            "PanelBorder" => PanelBorderBit,
+            "RaisedBorder" => RaisedBorderBit,
+            "HoverBorder" => HoverBorderBit,
+            "SelectedBorder" => SelectedBorderBit,
+            "SuccessBorder" => SuccessBorderBit,
+            "DangerBorder" => DangerBorderBit,
+            _ => 0
+        };
+        return (claimed & bit) != 0;
+    }
     private uint claimed;
     private Color baseColour, panel, raised, hover, selected, success, danger;
     private Color workspacePlane, sectionBand;
@@ -438,6 +472,19 @@ public sealed class UiTheme
         }
     }
 
+    // Applying a style changes the effective bag, not the host's declaration intent.
+    internal void ApplyStyleFont(UiFont value)
+    {
+        if (value == defaultFont) return;
+        defaultFont = value;
+        LayoutRevision++;
+    }
+    internal void ApplyStyleGeometry(UiGeometry value)
+    {
+        if (value == geometry) return;
+        geometry = value;
+        LayoutRevision++;
+    }
     /// <summary>Remove the host declaration, revealing the library font; no creation snapshot is restored.</summary>
     public void RemoveFontOverride()
     {

@@ -616,49 +616,7 @@ public sealed class UiStyleDocument
             || string.Equals(name, "Density", StringComparison.Ordinal);
     }
 
-    private static bool IsColourToken(string token)
-    {
-        switch (token)
-        {
-            case "Base":
-            case "Panel":
-            case "Raised":
-            case "Hover":
-            case "Selected":
-            case "Success":
-            case "Danger":
-            case "WorkspacePlane":
-            case "SectionBand":
-            case "TextPrimary":
-            case "TextSecondary":
-            case "TextOnGold":
-            case "TextOnDanger":
-            case "TextDisabled":
-            case "AccentGold":
-            // SA1.1(r3): the switch thumb's OFF ink is declarable like every other colour role, so a
-            // consumer configures it through its single palette document instead of a C#-side assignment
-            // that would bypass the source and split scope consistency. Unset it still answers the theme's
-            // own TextPrimary at READ time (UiTheme.SwitchThumbOff) - this gate only recognises the name.
-            case "SwitchThumbOff":
-            // Batch 1 (CP-6④): HoverPoint is no longer a token. A scheme that still declares it is
-            // refused here - one recorded issue, never a silent no-op - and the hover step is derived
-            // from AccentGold.
-            case "Border":
-            case "BorderStrong":
-            case "Divider":
-            case "BaseBorder":
-            case "PanelBorder":
-            case "RaisedBorder":
-            case "HoverBorder":
-            case "SelectedBorder":
-            case "SuccessBorder":
-            case "DangerBorder":
-                return true;
-            default:
-                return false;
-        }
-    }
-
+    private static bool IsColourToken(string token) => UiAppearanceProperties.IsColour(token);
     private static bool IsMetricToken(string token)
     {
         switch (token)
@@ -698,7 +656,7 @@ public sealed class UiStyleDocument
     /// <c>r,g,b[,a]</c> in 0..1 - the float form is the one the theme's own colours are written in, and the
     /// hex form is the one an author reaches for first.
     /// </summary>
-    private static bool TryParseColour(string raw, out Color colour)
+    internal static bool TryParseColour(string raw, out Color colour)
     {
         colour = default;
         string text = raw.Trim();
@@ -719,7 +677,7 @@ public sealed class UiStyleDocument
             if (index > 3) return false;
 
             if (!float.TryParse(text.Substring(start, i - start).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float value)
-                || value < 0f || value > 1f)
+                || float.IsNaN(value) || float.IsInfinity(value) || value < 0f || value > 1f)
             {
                 return false;
             }
