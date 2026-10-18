@@ -112,8 +112,9 @@ public static partial class UiNative
     {
         UiSession session = ctx.Session;
         UiNode node = ctx.Node ?? session.ActiveNode;
-        var target = InteractionTarget(ctx, elementId, "option", key);
+        var target = InteractionTarget(ctx, elementId, "popup-option", key);
         UiInteractionResult result = PopupPointer(rect, elementId, session, target, true, selectable, node);
+        session.NotePopupOptionCapture(target, result.Captured);
         if (result.Request)
             Trace?.Invoke("option fired id=" + elementId + " row=" + Describe(rect));
         return result;
@@ -122,7 +123,7 @@ public static partial class UiNative
     private static UiInteractionResult PopupPointer(Rect rect, string elementId, UiSession session, UiInteractionTarget target, bool option, bool selectable = true, UiNode? ownerNode = null)
     {
         UiNode node = ownerNode ?? session.ActiveNode;
-        bool enabled = selectable && !IsInputDisabled(node) && (!option || session.IsPopupOpen(elementId));
+        bool enabled = selectable && !IsInputDisabled(node) && (!option || session.IsPopupOpen(elementId, node));
         if (ButtonOverride != null)
             return session.Interactions.Activate(target, new UiInputEligibility(enabled && ButtonOverride(rect)));
         return PointerInteraction(rect, session, node, target, enabled && IsMouseOver(rect), enabled, false, default, 0);

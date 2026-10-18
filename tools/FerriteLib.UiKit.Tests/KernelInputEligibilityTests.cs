@@ -428,7 +428,7 @@ internal static class KernelInputEligibilityTests
         // well, and an assertion that holds on both sides of the fix is a guard, not the proof.
         page.Pump(EventType.Layout, point);
         page.Pump(EventType.MouseDown, point);
-        Check(page.Session.OwnedHotControlOwner?.ElementId != "chart" && page.Session.Interactions.CaptureOwner?.Part == "option",
+        Check(page.Session.OwnedHotControlOwner?.ElementId != "chart" && page.Session.Interactions.CaptureOwner?.Part == "popup-option",
             "the covered chart captured nothing into its session");
 
         page.Pump(EventType.MouseDrag, point + new Vector2(12f, 8f));

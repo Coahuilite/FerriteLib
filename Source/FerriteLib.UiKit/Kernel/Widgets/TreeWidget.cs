@@ -157,19 +157,6 @@ internal sealed class TreeWidget : IUiWidget
             y += bandHeight;
             if (band.y >= rect.yMax) break;
 
-            // The element's own interaction state, read from the funnel: armed beats hover, exactly as the
-            // leaf atoms order it.
-            bool armed = UiNative.IsMouseDownOver(band);
-            bool hovered = !armed && UiNative.IsMouseOver(band);
-            if (armed)
-            {
-                UiThemeDraw.Solid(band, theme.SelectedSurface.Fill);
-            }
-            else if (hovered)
-            {
-                UiThemeDraw.Solid(band, theme.HoverSurface.Fill);
-            }
-
             // The band itself is the shared public primitive (R4-B): this kind is its first driver, and a
             // consumer's own composite calls the identical entry point for its rows.
             UiRowBand.Draw(row, band, ctx, rowHeight, style, actions);

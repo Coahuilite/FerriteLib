@@ -276,7 +276,7 @@ public static partial class UiNative
         UiNode triggerNode = ctx?.Node ?? session.ActiveNode;
         var triggerTarget = new UiInteractionTarget(triggerNode.Id.Key, elementId + "\u001f" + triggerNode.InteractionScope, "trigger", triggerKey, triggerNode.InteractionScope);
         session.RefreshPopupTarget(elementId, triggerTarget);
-        session.NotePopupOwnerDrawn(elementId, anchor);
+        if (session.IsPopupOpen(elementId, triggerTarget)) session.NotePopupOwnerDrawn(elementId, anchor);
 
         // The hit stack decides, and it decides geometrically: a popup layer whose rect contains the pointer
         // is a layer above the trigger, so the trigger must not take the click - the option row under that
@@ -303,7 +303,7 @@ public static partial class UiNative
         UiInteractionResult input = ctx != null
             ? Activation(rect, ctx, elementId, "trigger", triggerKey)
             : PopupPointer(rect, elementId, session, triggerTarget, false);
-        UiValueOperation<bool> expansion = UiValueBehavior.Expansion(input, !session.IsPopupOpen(elementId), true);
+        UiValueOperation<bool> expansion = UiValueBehavior.Expansion(input, !session.IsPopupOpen(elementId, triggerTarget), true);
         if (!expansion.Request) return false;
 
         UiValueBehavior.Request(triggerTarget, expansion, expanded =>

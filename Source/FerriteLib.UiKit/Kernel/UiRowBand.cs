@@ -67,88 +67,62 @@ public static class UiRowBand
             return;
         UiTheme theme = ctx.Theme;
         float pad = theme.Geometry.Padding;
+        float partSide = layout.ControlSize.HasValue ? Math.Max(1f, Math.Min(band.height, layout.ControlSize.Value)) : Math.Max(6f, Math.Min(band.height, rowHeight) - pad * 2f);
+        float indentStep = layout.IndentStep ?? theme.Geometry.Spacing;
+        float x = band.x + pad + Math.Max(0f, row.Depth * indentStep);
+        float labelRight = band.xMax;
+        var marker = new Rect(x, band.y + (band.height - partSide) * 0.5f, partSide, partSide);
+        if (row.Expandable)
+            x = marker.xMax + pad;
+        float boxX = layout.CheckboxRightInset.HasValue ? Math.Max(band.x, band.xMax - Math.Max(0f, layout.CheckboxRightInset.Value) - partSide) : x;
+        var box = new Rect(boxX, band.y + (band.height - partSide) * 0.5f, partSide, partSide);
+        if (row.Checkable)
+        {
+            if (layout.CheckboxRightInset.HasValue)
+                labelRight = Math.Max(x, box.x - pad);
+            else
+                x = box.xMax + pad;
+        }
+
+        // Geometry feeds the shared behavior before paint. Only the actual part owner is pressed;
+        // raw MouseDown, hover, or a sibling's capture cannot manufacture a pressed row.
+        UiInteractionResult disclosure = row.Expandable ? UiNative.Activation(marker, ctx, actions.DisclosureTarget, "disclosure", row.Key, actions.Disclosure != null) : default;
+        UiInteractionResult check = row.Checkable && !disclosure.Request ? UiNative.Activation(box, ctx, actions.CheckboxTarget, "check", row.Key, actions.Checkbox != null) : default;
+        UiInteractionResult body = !disclosure.Request && !check.Request && actions.Body != null ? UiNative.Activation(band, ctx, actions.BodyTarget, "body", row.Key) : default;
+        bool armed = disclosure.Captured || check.Captured || body.Captured;
+        if (armed)
+            UiThemeDraw.Solid(band, theme.SelectedSurface.Fill);
+        else if (UiNative.IsMouseOver(band, ctx))
+            UiThemeDraw.Solid(band, theme.HoverSurface.Fill);
         UiResolvedStyle ink = style;
         if (row.Selected)
         {
-            // The row's own selection answer paints the resolved Active tone, and everything the row paints -
-            // marker, box, label - takes its ink from that same answer.
             ink = theme.Styles.Resolve(UiStatusTone.Active);
             UiThemeDraw.Surface(band, ink.Surface, theme.Geometry.Hairline);
         }
 
-        // A part is sized by the ROW's own height, not by the band: a row made taller by its picture keeps the
-        // same marker and box it would have had, so an icon never inflates the controls beside it.
-        float partSide = layout.ControlSize.HasValue ? Math.Max(1f, Math.Min(band.height, layout.ControlSize.Value)) : Math.Max(6f, Math.Min(band.height, rowHeight) - pad * 2f);
-        float indentStep = layout.IndentStep ?? theme.Geometry.Spacing;
-        float x = band.x + pad + Math.Max(0f, row.Depth * indentStep);
-        // The label's room. A right-aligned box is placed from the band's far edge and takes its width out of
-        // this, so nothing the row draws can run under it.
-        float labelRight = band.xMax;
-        bool partFired = false;
         if (row.Expandable)
         {
-            var marker = new Rect(x, band.y + (band.height - partSide) * 0.5f, partSide, partSide);
+            UiThemeDraw.Surface(marker, row.Expanded ? ink.Surface : new UiSurfaceStyle(theme.Base, ink.Text), theme.Geometry.Hairline);
             if (row.Expanded)
             {
-                // Filled and outlined both come from the resolved answer, so a tone move carries the marker
-                // with the label instead of leaving a second colour literal here.
-                UiThemeDraw.Surface(marker, ink.Surface, theme.Geometry.Hairline);
                 float inset = Math.Max(2f, partSide * 0.25f);
                 UiThemeDraw.Solid(new Rect(marker.x + inset, marker.y + inset, Math.Max(1f, partSide - inset * 2f), Math.Max(1f, partSide - inset * 2f)), ink.Text);
-            }
-            else
-            {
-                UiThemeDraw.Surface(marker, new UiSurfaceStyle(theme.Base, ink.Text), theme.Geometry.Hairline);
-            }
-
-            x = marker.xMax + pad;
-            UiInteractionResult disclosure = UiNative.Activation(marker, ctx, actions.DisclosureTarget, "disclosure", row.Key, actions.Disclosure != null);
-            if (actions.Disclosure != null && disclosure.Request)
-            {
-                UiValueBehavior.Request(UiNative.InteractionTarget(ctx, actions.DisclosureTarget, "disclosure", row.Key), UiValueBehavior.Expansion(disclosure, !row.Expanded, row.Expandable), _ => actions.Disclosure(row.Key));
-                partFired = true;
-                if (!ctx.Session.IsActive)
-                    return;
             }
         }
 
         if (row.Checkable)
         {
-            // Right-aligned when the caller asked for it - the box's own rect, its own hit, the same per-part
-            // contract as the left placement - and otherwise exactly where it has always been: after the indent.
-            float boxX = layout.CheckboxRightInset.HasValue ? Math.Max(band.x, band.xMax - Math.Max(0f, layout.CheckboxRightInset.Value) - partSide) : x;
-            var box = new Rect(boxX, band.y + (band.height - partSide) * 0.5f, partSide, partSide);
             UiThemeDraw.Surface(box, row.Checked ? ink.Surface : new UiSurfaceStyle(theme.Base, ink.Text), theme.Geometry.Hairline);
             if (row.Checked)
             {
                 float inset = Math.Max(2f, partSide * 0.25f);
                 UiThemeDraw.Solid(new Rect(box.x + inset, box.y + inset, Math.Max(1f, partSide - inset * 2f), Math.Max(1f, partSide - inset * 2f)), ink.Text);
             }
-
-            if (layout.CheckboxRightInset.HasValue)
-            {
-                labelRight = Math.Max(x, box.x - pad);
-            }
-            else
-            {
-                x = box.xMax + pad;
-            }
-
-            UiInteractionResult check = UiNative.Activation(box, ctx, actions.CheckboxTarget, "check", row.Key, actions.Checkbox != null);
-            if (actions.Checkbox != null && check.Request)
-            {
-                UiValueBehavior.Request(UiNative.InteractionTarget(ctx, actions.CheckboxTarget, "check", row.Key), UiValueBehavior.Boolean(check, !row.Checked), _ => actions.Checkbox(row.Key));
-                partFired = true;
-                if (!ctx.Session.IsActive)
-                    return;
-            }
         }
 
         if (row.Image != null)
         {
-            // The consumer's own picture, in its own slot: the explicit size when one was stated, else the
-            // texture's natural width, and the band's inner height. The outlet letterboxes inside that slot, so
-            // the drawn rect can never leave it.
             float naturalWidth = row.ImageSize.x > 0f ? row.ImageSize.x : row.Image.width;
             float slotWidth = Math.Max(1f, Math.Min(naturalWidth, labelRight - x - pad));
             var slot = new Rect(x, band.y + pad, slotWidth, Math.Max(1f, band.height - pad * 2f));
@@ -162,11 +136,16 @@ public static class UiRowBand
             UiThemeDraw.Label(new Rect(x, band.y, labelWidth, band.height), ReadText(row, ctx), theme, ink.Text, AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft, singleLine: true);
         }
 
-        // One band, one body target: the funnel owns whether the element may take it, and a click a part
-        // already took is not offered to the band as well.
-        if (!partFired && actions.Body != null)
+        if (actions.Disclosure != null && disclosure.Request)
         {
-            UiInteractionResult body = UiNative.Activation(band, ctx, actions.BodyTarget, "body", row.Key);
+            UiValueBehavior.Request(UiNative.InteractionTarget(ctx, actions.DisclosureTarget, "disclosure", row.Key), UiValueBehavior.Expansion(disclosure, !row.Expanded, row.Expandable), _ => actions.Disclosure(row.Key));
+        }
+        else if (actions.Checkbox != null && check.Request)
+        {
+            UiValueBehavior.Request(UiNative.InteractionTarget(ctx, actions.CheckboxTarget, "check", row.Key), UiValueBehavior.Boolean(check, !row.Checked), _ => actions.Checkbox(row.Key));
+        }
+        else if (actions.Body != null)
+        {
             UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx, actions.BodyTarget, "body", row.Key), body, () => actions.Body(row.Key));
         }
     }

@@ -199,7 +199,8 @@ public sealed class DropdownWidget : IUiWidget
         (ctx.Node ?? ctx.Session.ActiveNode).Selection = UiValueBehavior.Observe(values, current, _ => AtomVocabulary.WritableOf(ctx, bindKey) != false);
         if (options.Count == 0) return;
         string display = FindDisplayText(options, current);
-        bool open = ctx.Session.IsPopupOpen(bindKey);
+        UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
+        bool open = ctx.Session.IsPopupOpen(bindKey, node);
         Rect fieldRect = DrawLabelledField(rect, ReadLabel(ctx), display, open || current.Length > 0, ctx);
 
         // The trigger click stores the popup anchor in Host window space (the engine translates
@@ -208,7 +209,7 @@ public sealed class DropdownWidget : IUiWidget
         UiNative.DropdownButton(fieldRect, bindKey, ctx, (ctx.Node ?? ctx.Session.ActiveNode).Id.Key);
 
         string helpSink = OptionHelp.SinkKey(spec);
-        if (ctx.Session.IsPopupOpen(bindKey))
+        if (ctx.Session.IsPopupOpen(bindKey, node))
         {
             Rect? anchor = ctx.Session.OpenPopupAnchor;
             if (anchor.HasValue)
@@ -283,7 +284,8 @@ public sealed class DropdownWidget : IUiWidget
             ? UiValueBehavior.Observe(values, current, _ => AtomVocabulary.WritableOf(ctx, bindKey) != false)
             : new UiSelectionObservation(-1, false);
         string display = hasCurrent ? FindChoiceText(choices, current) : "";
-        bool open = ctx.Session.IsPopupOpen(bindKey);
+        UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
+        bool open = ctx.Session.IsPopupOpen(bindKey, node);
         Rect fieldRect = DrawLabelledField(rect, ReadLabel(ctx), display, open || hasCurrent, ctx);
 
         // The trigger click stores the popup anchor in Host window space, exactly as the string path does: the
@@ -291,7 +293,7 @@ public sealed class DropdownWidget : IUiWidget
         UiNative.DropdownButton(fieldRect, bindKey, ctx, (ctx.Node ?? ctx.Session.ActiveNode).Id.Key);
 
         string helpSink = OptionHelp.SinkKey(spec);
-        if (ctx.Session.IsPopupOpen(bindKey))
+        if (ctx.Session.IsPopupOpen(bindKey, node))
         {
             Rect? anchor = ctx.Session.OpenPopupAnchor;
             if (anchor.HasValue)

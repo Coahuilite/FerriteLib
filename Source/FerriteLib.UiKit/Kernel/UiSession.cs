@@ -52,6 +52,7 @@ public sealed class UiSession : IDisposable
     private readonly List<Action> popupDrawActions = new();
     private string? openPopupId;
     private UiInteractionTarget? popupTarget;
+    private UiInteractionTarget? popupCaptureTarget;
     private Rect? openPopupAnchor;
     // Whether the open popup's owner reported itself drawn in the pass in progress. Reset at every pass
     // boundary, where a false value releases the popup (see EndHitPass) - that is the half a call-site
@@ -424,9 +425,14 @@ public sealed class UiSession : IDisposable
         ReconcileInteractionRecords();
     }
 
-    private bool HasPopupOptionCapture => openPopupId != null
-        && Interactions.CaptureOwner is UiInteractionTarget target && target.Part == "option"
-        && target.TargetScope.StartsWith(openPopupId + "\u001f", StringComparison.Ordinal);
+    private bool HasPopupOptionCapture => openPopupId != null && popupCaptureTarget.HasValue
+        && Interactions.CaptureOwner?.Equals(popupCaptureTarget.Value) == true;
+
+    internal void NotePopupOptionCapture(UiInteractionTarget target, bool captured)
+    {
+        if (captured) popupCaptureTarget = target;
+        else if (popupCaptureTarget?.Equals(target) == true) popupCaptureTarget = null;
+    }
 
     internal void EndPopupPass()
     {
@@ -695,12 +701,21 @@ public sealed class UiSession : IDisposable
             && string.Equals(openPopupId, ownerId, StringComparison.Ordinal);
     }
 
+    internal bool IsPopupOpen(string ownerId, UiInteractionTarget target)
+        => IsPopupOpen(ownerId) && (!popupTarget.HasValue || popupTarget.Value.Equals(target));
+
+    internal bool IsPopupOpen(string ownerId, UiNode node)
+        => IsPopupOpen(ownerId) && (!popupTarget.HasValue
+            || (popupTarget.Value.Node == node.Id.Key && popupTarget.Value.BusinessScope == node.InteractionScope));
+
     /// <summary>
     /// Reconciles the open menu with its actual trigger target; a replacement cannot inherit its popup.
     /// </summary>
     internal void RefreshPopupTarget(string ownerId, UiInteractionTarget target)
     {
         if (!IsPopupOpen(ownerId)) return;
+        if (popupTarget.HasValue && (popupTarget.Value.Node != target.Node
+            || popupTarget.Value.Part != target.Part || !Equals(popupTarget.Value.ItemKey, target.ItemKey))) return;
         if (popupTarget.HasValue && !popupTarget.Value.Equals(target))
         {
             ClosePopup();
@@ -714,7 +729,9 @@ public sealed class UiSession : IDisposable
     {
         if (ownerId == null) throw new ArgumentNullException(nameof(ownerId));
         EnsureActive();
+        if (openPopupId != null) ClosePopup();
         popupTarget = null;
+        popupCaptureTarget = null;
         openPopupId = ownerId;
         openPopupAnchor = anchor;
         // A menu that opens is at its top: the scroll belongs to this open, not to the element, so a second
@@ -739,6 +756,7 @@ public sealed class UiSession : IDisposable
             if (ownedHotControl.HasValue) ReleaseHotControl(ownedHotControl.Value);
         }
         popupTarget = null;
+        popupCaptureTarget = null;
         openPopupId = null;
         openPopupAnchor = null;
         openPopupScrollRows = 0;
@@ -1302,6 +1320,7 @@ public sealed class UiSession : IDisposable
         trippedLogs.Clear();
         popupDrawActions.Clear();
         popupTarget = null;
+        popupCaptureTarget = null;
         openPopupId = null;
         openPopupAnchor = null;
         openPopupScrollRows = 0;

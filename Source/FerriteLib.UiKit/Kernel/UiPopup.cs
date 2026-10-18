@@ -151,7 +151,7 @@ public static class UiPopup
             if (input.Request)
             {
                 ctx.Session.ClosePopup();
-                UiInteractionTarget target = UiNative.InteractionTarget(ctx, elementId, "option", options[index].Value);
+                UiInteractionTarget target = UiNative.InteractionTarget(ctx, elementId, "popup-option", options[index].Value);
                 UiValueBehavior.Request(target, UiValueBehavior.Selection(input, options[index].Value), onSelected);
                 return hovered;
             }
@@ -210,7 +210,7 @@ public static class UiPopup
             if (input.Request)
             {
                 ctx.Session.ClosePopup();
-                UiInteractionTarget target = UiNative.InteractionTarget(ctx, elementId, "option", options[index].Value);
+                UiInteractionTarget target = UiNative.InteractionTarget(ctx, elementId, "popup-option", options[index].Value);
                 UiValueBehavior.Request(target, UiValueBehavior.Selection(input, options[index].Value), onSelected);
                 return hovered;
             }

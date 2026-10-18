@@ -272,8 +272,9 @@ internal sealed class CheckboxWidget : IUiWidget
 
         // Armed wins over hover, exactly as the button atom orders its ladder: live state beats the
         // pointer's proximity.
-        bool armed = UiNative.IsMouseDownOver(rect);
-        bool hovered = !armed && UiNative.IsMouseOver(rect);
+        UiInteractionResult interaction = UiNative.Activation(rect, ctx, key, "", writable: writable != false);
+        bool armed = interaction.Captured;
+        bool hovered = !armed && UiNative.IsMouseOver(rect, ctx);
 
         UiResolvedStyle idle = AtomVocabulary.ResolveRole(spec, ctx, writable);
         UiResolvedStyle shown = idle;
@@ -291,7 +292,7 @@ internal sealed class CheckboxWidget : IUiWidget
         string look = Looks.Resolve(spec).Value;
         Paint(rect, shown, state, look, ctx);
 
-        TakeInput(rect, ctx, writable, key, state);
+        TakeInput(ctx, key, state, interaction);
     }
 
     /// <summary>
@@ -299,11 +300,11 @@ internal sealed class CheckboxWidget : IUiWidget
     /// them: the two-state read-back, the whole-band hit rule and the command funnel are identical, so an
     /// appearance can never change what a click MEANS or how many writes it makes.
     /// </summary>
-    private void TakeInput(Rect rect, UiWidgetContext ctx, bool? writable, string key, bool state)
+    private void TakeInput(UiWidgetContext ctx, string key, bool state, UiInteractionResult interaction)
     {
         UiInteractionTarget target = UiNative.InteractionTarget(ctx, key);
         UiValueOperation<bool> operation = UiValueBehavior.Boolean(
-            UiNative.Activation(rect, ctx, key, "", writable: writable != false), !state);
+            interaction, !state);
         UiValueBehavior.Request(target, operation, value =>
         {
             ctx.Bindings.Set(key, value);

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using FerriteLib.UiKit.Kernel;
@@ -56,6 +57,8 @@ internal static class KernelBooleanSelectionExpansionTests
             UiNative.ButtonOverride = null;
             UiNative.DebugMousePositionEnabled = false;
             UiNative.Trace = null;
+            SharedBindingPopupOwners();
+            PressedPresentationFacts();
             CheckboxRoutes();
             SelectionExpansionRoutes();
             ModeRowIdentity();
@@ -162,6 +165,159 @@ internal static class KernelBooleanSelectionExpansionTests
         Check(traces.All(trace => trace == traces[0]), "both Checkbox looks / independent presentation / headless share trajectories");
     }
 
+    private static void SharedBindingPopupOwners()
+    {
+        string current = "a";
+        int writes = 0;
+        var bindings = new UiBindings();
+        bindings.BindValue("shared", () => current, value =>
+        {
+            current = value;
+            writes++;
+        });
+        bindings.BindOptions("items", () => new[] { "a", "b" });
+        using var host = Host("<Widget Id=\"first\" Kind=\"input/dropdown\" Bind=\"shared\" OptionsBind=\"items\" /><Widget Id=\"second\" Kind=\"input/dropdown\" Bind=\"shared\" OptionsBind=\"items\" /><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"shared\" Value1=\"a\" Value2=\"b\" />", bindings);
+        Vector2 first = Centre(RectOf(host, "first"));
+        Pump(host, EventType.MouseDown, first);
+        Pump(host, EventType.MouseUp, first);
+        Check(host.Session.IsPopupOpen("shared") && host.Session.OpenPopupAnchor?.y == RectOf(host, "first").y, "two real Dropdown instances sharing Bind do not close or reanchor the first menu during sibling traversal");
+        Pump(host, EventType.Repaint, first);
+        Check(host.Session.IsPopupOpen("shared"), "same-Bind sibling repaint preserves actual popup instance");
+        Rect anchor = host.Session.OpenPopupAnchor!.Value;
+        Vector2 option = new(anchor.x + 10, anchor.yMax + UiPopup.OptionHeight * 1.5f);
+        Pump(host, EventType.MouseDown, option);
+        Pump(host, EventType.MouseUp, option);
+        Check(current == "b" && writes == 1 && host.Session.OpenPopupId == null, "same-Bind first popup selects once through its own option target");
+        Vector2 second = Centre(RectOf(host, "second"));
+        Pump(host, EventType.MouseDown, second);
+        Pump(host, EventType.MouseUp, second);
+        Check(host.Session.IsPopupOpen("shared") && host.Session.OpenPopupAnchor?.y == RectOf(host, "second").y,
+            "same-Bind second popup keeps its own anchor while the earlier sibling draws");
+        Pump(host, EventType.Repaint, second);
+        host.Session.ClosePopup();
+        Rect modeRect = RectOf(host, "mode");
+        Vector2 mode = new(modeRect.x + 15, modeRect.y + modeRect.height / 2);
+        Pump(host, EventType.MouseDown, mode);
+        UiInteractionTarget? held = host.Session.Interactions.CaptureOwner;
+        Check(held?.Node == host.Session.GetNodeByElementId("mode")!.Id.Key, "real ModeRow starts a same-Bind non-popup capture");
+        host.Session.OpenPopup("shared", RectOf(host, "first"));
+        var modeNode = host.Session.GetNodeByElementId("mode")!;
+        var composite = new UiWidgetContext(Scope, host.Session, new Metrics(), UiTheme.Vanilla, new Translation(), bindings, View.width, "same-node-composite", node: modeNode);
+        Event.current = new Event
+        {
+            type = EventType.Repaint,
+            mousePosition = mode
+        };
+        UiNative.PopupOption(modeRect, "shared", composite, "a");
+        host.Session.ClosePopup();
+        Check(host.Session.Interactions.CaptureOwner?.Equals(held!.Value) == true && host.Session.OwnedHotControl.HasValue, "closing a raw same-Bind popup does not release ModeRow capture by prefix inference");
+        Pump(host, EventType.MouseUp, mode);
+    }
+
+    private static IList Recorded(string field) => (IList)typeof(Verse.Widgets).GetField(field)!.GetValue(null)!;
+    private static bool SameColor(Color left, Color right) => Math.Abs(left.r - right.r) < 0.001f && Math.Abs(left.g - right.g) < 0.001f && Math.Abs(left.b - right.b) < 0.001f && Math.Abs(left.a - right.a) < 0.001f;
+    private static void PressedPresentationFacts()
+    {
+        foreach (string kind in new[]
+        {
+            "switch",
+            "checkbox",
+            "tree"
+        }
+
+        )
+            foreach (string eligibility in new[]
+            {
+                "eligible",
+                "disabled",
+                "readonly",
+                "covered",
+                "window",
+                "consumed"
+            }
+
+            )
+            {
+                // Tree row operations are commands, not writable value bindings.
+                if (kind == "tree" && eligibility == "readonly")
+                    continue;
+                using var session = new UiSession();
+                var theme = UiTheme.Vanilla.Clone();
+                theme.TextOnGold = new Color(0.93f, 0.14f, 0.27f, 1);
+                var bindings = new UiBindings();
+                int requests = 0;
+                if (eligibility == "readonly")
+                    bindings.BindReadOnly("flag", () => false);
+                else
+                    bindings.BindValue("flag", () => false, _ => requests++);
+                bindings.BindReadOnly<IReadOnlyList<UiTreeRow>>("rows", () => new[] { new UiTreeRow("row", 0, "Row", expandable: true, checkable: true) });
+                bindings.BindAction<string>("row", _ => requests++);
+                string widgetKind = kind == "tree" ? "container/tree" : "input/checkbox";
+                var spec = new UiElementSpec("visual", widgetKind, new Dictionary<string, string> { ["Bind"] = kind == "tree" ? "rows" : "flag", ["Label"] = "Flag", ["Appearance"] = kind, ["ActionBind"] = kind == "tree" ? "row" : "", ["RowHeight"] = "28" });
+                var node = session.GetOrCreateNode(UiNodeId.Root(spec, 0), widgetKind, 0);
+                node.IsDisabled = eligibility == "disabled";
+                session.PointerInputAllowed = eligibility != "window";
+                var ctx = new UiWidgetContext(Scope, session, new Metrics(), theme, new Translation(), bindings, 200, "visual", node: node);
+                IUiWidget widget = kind == "tree" ? new TreeWidget() : new CheckboxWidget();
+                widget.Configure(spec);
+                var rect = new Rect(0, 0, 200, 28);
+                if (eligibility == "covered")
+                {
+                    session.BeginHitPass();
+                    session.PushHitLayer(node, rect, isPopup: true);
+                    session.BeginHitPass();
+                }
+
+                bool PaintedPressed()
+                {
+                    if (kind != "tree")
+                    {
+                        IList colors = Recorded("LabelColors");
+                        return colors.Count > 0 && SameColor((Color)colors[colors.Count - 1]!, theme.Styles.Resolve(UiStatusTone.Active).Text);
+                    }
+
+                    IList rects = Recorded("DrawBoxSolidRects");
+                    IList fills = Recorded("DrawBoxSolidColors");
+                    for (int i = 0; i < rects.Count; i++)
+                    {
+                        Rect painted = (Rect)rects[i]!;
+                        if (painted.x == rect.x && painted.y == rect.y && painted.width == rect.width && painted.height == rect.height && SameColor((Color)fills[i]!, theme.SelectedSurface.Fill))
+                            return true;
+                    }
+
+                    return false;
+                }
+
+                void Draw(EventType phase, bool used = false)
+                {
+                    Recorded("LabelColors").Clear();
+                    Recorded("DrawBoxSolidRects").Clear();
+                    Recorded("DrawBoxSolidColors").Clear();
+                    Event.current = new Event
+                    {
+                        type = phase,
+                        button = 0,
+                        mousePosition = new Vector2(180, 14)
+                    };
+                    if (used)
+                        Event.current.Use();
+                    widget.Draw(rect, ctx);
+                }
+
+                bool eligible = eligibility == "eligible";
+                Draw(EventType.MouseDown, eligibility == "consumed");
+                Check(PaintedPressed() == eligible && session.Interactions.CaptureOwner.HasValue == eligible, kind + " " + eligibility + " pressed paint matches shared capture, not raw down");
+                Draw(EventType.Repaint);
+                Check(PaintedPressed() == eligible, kind + " " + eligibility + " repaint uses held owner facts");
+                if (eligible)
+                {
+                    node.IsDisabled = true;
+                    Draw(EventType.Repaint);
+                    Check(!PaintedPressed() && session.Interactions.CaptureOwner == null && requests == 0, kind + " invalidated held owner stops pressed paint without request");
+                }
+            }
+    }
+
     private static void ModeRowIdentity()
     {
         string selected = "b";
@@ -244,7 +400,7 @@ internal static class KernelBooleanSelectionExpansionTests
                         for (int i = 0; i < 2; i++)
                         {
                             string value = i == 0 ? "a" : "b";
-                            target = new UiInteractionTarget("headless", "pick", "option", value, "model");
+                            target = new UiInteractionTarget("headless", "pick", "popup-option", value, "model");
                             interaction = neutral.PointerActivation(target, input, new UiHitGeometry(menu.x, menu.y + i * UiPopup.OptionHeight, menu.width, UiPopup.OptionHeight), new(true));
                             UiValueBehavior.Request(target, UiValueBehavior.Selection(interaction, value), candidate =>
                             {
@@ -259,7 +415,7 @@ internal static class KernelBooleanSelectionExpansionTests
                 if (route < 2)
                     expanded = host.Session.IsPopupOpen("pick");
                 UiInteractionTarget? owner = route < 2 ? host.Session.Interactions.CaptureOwner : neutral.CaptureOwner;
-                trace.Add(writes + ":" + selected + ":" + expanded + ":" + owner?.Part + ":" + (owner?.Part == "option" ? owner?.ItemKey : owner.HasValue ? "trigger" : null));
+                trace.Add(writes + ":" + selected + ":" + expanded + ":" + owner?.Part + ":" + (owner?.Part == "popup-option" ? owner?.ItemKey : owner.HasValue ? "trigger" : null));
             }
 
             foreach (bool option in new[]
