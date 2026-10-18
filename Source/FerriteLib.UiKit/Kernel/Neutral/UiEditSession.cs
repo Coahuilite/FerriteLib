@@ -84,9 +84,9 @@ public sealed class UiEditSession<T> : IUiEditState
     public bool Confirm(bool explicitConfirmation, Action<T> request, Func<T> readModel)
     {
         Focused = false;
-        if (!Valid || (Conflict && !explicitConfirmation))
+        if (!Valid || (!explicitConfirmation && (Conflict || automaticSuspended)))
             return false;
-        Publish(true, request, readModel);
+        Publish(true, request, readModel, explicitConfirmation && automaticSuspended);
         return true;
     }
 
@@ -119,9 +119,9 @@ public sealed class UiEditSession<T> : IUiEditState
         return true;
     }
 
-    private void Publish(bool end, Action<T> request, Func<T> readModel)
+    private void Publish(bool end, Action<T> request, Func<T> readModel, bool explicitNewAttempt = false)
     {
-        bool pending = (Modified || Conflict) && (Conflict || !string.Equals(publishedText, Draft, StringComparison.Ordinal));
+        bool pending = explicitNewAttempt || ((Modified || Conflict) && (Conflict || !string.Equals(publishedText, Draft, StringComparison.Ordinal)));
         if (pending && parse(Draft, out T candidate))
         {
             publishedText = Draft;

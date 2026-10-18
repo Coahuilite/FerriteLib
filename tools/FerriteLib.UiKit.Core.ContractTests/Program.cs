@@ -112,8 +112,31 @@ internal static class Program
         recovery.Observe(model);
         recovery.Input("20", true, false, true, LiveSet, () => model);
         Check(liveWrites == 2 && model == 10 && recovery.Draft == "20", "N1 failed step is not automatically retried or mistaken for publishing old draft");
+        Check(!recovery.Confirm(false, LiveSet, () => model) && liveWrites == 2 && recovery.Draft == "20",
+            "E3 ordinary blur after failed takeover retains the draft and does not publish automatically");
         recovery.Confirm(true, LiveSet, () => model);
         Check(liveWrites == 3 && model == 20, "E2 explicit draft confirmation after failed 21 still requests 20");
+        foreach (bool live in new[] { false, true })
+        {
+            model = 10;
+            var failed = new UiEditSession<float>(numeric.Format, numeric.Parse);
+            failed.Observe(model);
+            failed.Focus();
+            int attempts = 0;
+            void Fail(float value) { attempts++; throw new InvalidOperationException("before write"); }
+            try
+            {
+                failed.Input("20", true, false, live, Fail, () => model);
+                if (!live) failed.Confirm(true, Fail, () => model);
+            }
+            catch (InvalidOperationException) { }
+            failed.Input("20", true, false, true, Fail, () => model);
+            Check(!failed.Confirm(false, Fail, () => model) && attempts == 1,
+                "failed publication has no automatic Live/blur retry: live=" + live);
+            failed.Confirm(true, value => { attempts++; model = value; }, () => model);
+            Check(attempts == 2 && model == 20 && !failed.HasDraft,
+                "explicit confirmation is a new attempt after a failed same-draft publication: live=" + live);
+        }
     }
 
     private static void Properties()

@@ -27,6 +27,7 @@ internal static class KernelSharedEditingTests
             FailureAndIsolation();
             CompositionAndHost();
             PublicationRecovery();
+            ExplicitRetryAfterFailure();
             return 0;
         }
         catch (Exception ex)
@@ -295,6 +296,72 @@ internal static class KernelSharedEditingTests
             UiNative.DebugEnter = true;
             widget.Draw(new Rect(0, 0, 400, 28), ctx);
             Check(requests.SequenceEqual(new[] { 20f, 10f, 21f, 20f }) && model == 20, "a distinct explicit confirmation still publishes20 after the failed21");
+        }
+    }
+
+    private static void ExplicitRetryAfterFailure()
+    {
+        foreach (bool live in new[]
+        {
+            false,
+            true
+        }
+
+        )
+        {
+            Reset();
+            using var session = new UiSession();
+            float model = 10;
+            int attempts = 0;
+            bool fail = true;
+            var cause = new InvalidOperationException("before write");
+            var bindings = new UiBindings();
+            bindings.BindValue("value", () => model, value =>
+            {
+                attempts++;
+                if (fail)
+                    throw cause;
+                model = value;
+            });
+            var ctx = new UiWidgetContext("edit", session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 200, "value");
+            var widget = new NumberFieldWidget();
+            widget.Configure(new UiElementSpec("value", NumberFieldWidget.Kind, new Dictionary<string, string> { ["Bind"] = "value", ["Max"] = "100", ["Live"] = live ? "true" : "false" }));
+            UiNative.DebugMousePositionEnabled = true;
+            UiNative.DebugMousePosition = new Vector2(20, 14);
+            UiNative.DebugMouseDown = true;
+            UiNative.TextFieldOverride = (_, _) => "20";
+            Exception? observed = null;
+            try
+            {
+                widget.Draw(new Rect(0, 0, 200, 28), ctx);
+                if (!live)
+                {
+                    UiNative.DebugMouseDown = false;
+                    UiNative.DebugEnter = true;
+                    UiNative.TextFieldOverride = (_, text) => text;
+                    widget.Draw(new Rect(0, 0, 200, 28), ctx);
+                }
+            }
+            catch (Exception ex)
+            {
+                observed = ex;
+            }
+
+            Check(ReferenceEquals(observed?.InnerException, cause) && attempts == 1 && model == 10, "real editor retains a failed original request: Live=" + live);
+            UiNative.DebugEnter = UiNative.DebugMouseDown = false;
+            UiNative.TextFieldOverride = (_, text) => text;
+            widget.Draw(new Rect(0, 0, 200, 28), ctx);
+            UiNative.DebugFocusLost = true;
+            widget.Draw(new Rect(0, 0, 200, 28), ctx);
+            Check(attempts == 1 && session.GetOrCreateValueState("value").EditText == "20", "real passive repaint and blur retain failed text without retry: Live=" + live);
+            UiNative.DebugFocusLost = false;
+            UiNative.DebugMouseDown = true;
+            widget.Draw(new Rect(0, 0, 200, 28), ctx);
+            UiNative.DebugMouseDown = false;
+            UiNative.DebugEnter = true;
+            fail = false;
+            widget.Draw(new Rect(0, 0, 200, 28), ctx);
+            Check(attempts == 2 && model == 20 && !session.GetOrCreateValueState("value").Focused, "real explicit confirmation starts one new same-draft attempt: Live=" + live);
         }
     }
 

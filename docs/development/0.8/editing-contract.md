@@ -82,6 +82,8 @@ retains its original cause/target, never retries or rolls back. Lifecycle focus 
 even when a request or subsequent native rendering throws.
 After a failed takeover, the attempted new value is not recorded as publication of the old draft.
 Automatic publication pauses; a later distinct explicit confirmation can still request that valid draft.
+The same distinction applies to a failed Live or Confirm request: passive repaint/Live/blur cannot
+retry or silently end it, while another explicit confirmation is a new request, even for the same text.
 
 Automated evidence: `KernelSharedEditingTests` compares standard/custom/nonrendering trajectories,
 native multiline/read-only/composition protocols, actual combination takeover, same-Bind isolation,
