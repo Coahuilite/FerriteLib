@@ -116,6 +116,13 @@ internal static class KernelSharedBehaviorTests
             Pointer(UiPointerPhase.Release); Check(!UiNative.Activation(Bounds, ctx).Request && !session.Interactions.CaptureOwner.HasValue, "disabled after press ends without request"); node.IsDisabled = false;
             Pointer(UiPointerPhase.Press); UiNative.Activation(Bounds, ctx); UiNative.DebugHotControl = 12345;
             Pointer(UiPointerPhase.Release); Check(!UiNative.Activation(Bounds, ctx).Request && UiNative.DebugHotControl == 12345, "native capture loss does not release another owner"); UiNative.DebugHotControl = 0;
+            Pointer(UiPointerPhase.Press); UiNative.Activation(Bounds, ctx);
+            UiNode replacementOwner = session.GetOrCreateNode(UiNodeId.Root(new UiElementSpec("replacement", ButtonWidget.Kind, new Dictionary<string, string>()), 1), ButtonWidget.Kind, 1);
+            UiNode old = session.EnterNode(replacementOwner); session.CaptureHotControl(12345); session.ExitNode(old);
+            Pointer(UiPointerPhase.Release);
+            Check(!UiNative.Activation(Bounds, ctx).Request && UiNative.DebugHotControl == 12345
+                && ReferenceEquals(session.OwnedHotControlOwner, replacementOwner), "same-session capture takeover ends the old operation without releasing its new owner");
+            session.ReleaseHotControl(12345);
             session.PointerInputAllowed = false; Pointer(UiPointerPhase.Press); Check(!UiNative.Activation(Bounds, ctx).Captured, "native window qualification rejects press"); session.PointerInputAllowed = true;
             Pointer(UiPointerPhase.Press); UiNative.Range(Bounds, ctx, "level", 0, 0, 10); node.InteractionScope = "new-target";
             Pointer(UiPointerPhase.Release); Check(!UiNative.Range(Bounds, ctx, "level", 0, 0, 10).Request && !session.OwnedHotControl.HasValue, "I2 target replacement clears logical/native capture");

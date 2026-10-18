@@ -57,10 +57,12 @@ public static partial class UiNative
 #endif
         int allocatedControl = GetControlId(target.Node + "\u001f" + target.TargetScope);
         bool owns = session.Interactions.CaptureOwner?.Equals(target) == true;
-        int control = owns && session.OwnedHotControl.HasValue ? session.OwnedHotControl.Value : allocatedControl;
+        bool sameNativeOwner = ReferenceEquals(session.OwnedHotControlOwner, node)
+            || (node.Id.IsNone && session.OwnedHotControlOwner == null);
+        int control = owns && sameNativeOwner && session.OwnedHotControl.HasValue ? session.OwnedHotControl.Value : allocatedControl;
         bool hadNodeCapture = session.Interactions.CaptureOwner?.Node == target.Node;
         UiPointerPhase phase = PointerPhase();
-        if (owns && !HasHotControl(control)) phase = UiPointerPhase.Lost;
+        if (owns && (!sameNativeOwner || !HasHotControl(control))) phase = UiPointerPhase.Lost;
         var point = PointerPosition();
         var input = new UiPointerSample(phase, point.x, point.y, Event.current?.type == EventType.Used);
         int nativeCapture = DebugMousePositionEnabled ? DebugHotControl : GUIUtility.hotControl;
@@ -78,7 +80,7 @@ public static partial class UiNative
         catch
         {
             // Invalid geometry ends this operation in the core; apply that release even when no result is returned.
-            if (hadNodeCapture && !session.Interactions.CaptureOwner.HasValue && session.OwnedHotControl.HasValue)
+            if (hadNodeCapture && sameNativeOwner && !session.Interactions.CaptureOwner.HasValue && session.OwnedHotControl.HasValue)
                 session.ReleaseHotControl(session.OwnedHotControl.Value);
             throw;
         }
@@ -88,7 +90,7 @@ public static partial class UiNative
             if (!session.IsHotControlOwned(control)) session.CaptureHotControlForNode(control, node);
             session.NoteHotControlOwnerDrawn(control);
         }
-        else if (hadNodeCapture && session.OwnedHotControl.HasValue) session.ReleaseHotControl(session.OwnedHotControl.Value);
+        else if (hadNodeCapture && sameNativeOwner && session.OwnedHotControl.HasValue) session.ReleaseHotControl(session.OwnedHotControl.Value);
         if (result.Consume) ConsumePointerEvent();
         if (result.Consume || result.Request) session.NoteInteractionTarget(node);
 #if FER_DEV
