@@ -80,7 +80,8 @@ exception and target context. It is neither retried nor rolled back. Subsequent 
   the next input. A different binding/command key is already a different target. Reordering stable nodes or
   replacing only presentation does not change target identity.
 - A successful pass reconciles omitted capture owners. An aborted traversal releases unreliable capture
-  without classifying unvisited nodes as removed. Callback close stops further traversal and normal frame
+  without classifying unvisited nodes as removed. An aborted hit pass restores the previous complete hit list and
+  suspends pointer input until a new complete pass establishes geometry. Callback close stops further traversal and normal frame
   cleanup; Dispose is idempotent. Pure presentation failure does not automatically clear reliable behavior.
 
 `UiWindowHost` maps the native `WindowStack.GetsInput` answer. Embedded `UiHost` usage retains its existing

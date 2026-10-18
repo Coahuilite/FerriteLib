@@ -28,7 +28,7 @@ internal static class KernelSharedBehaviorTests
     }
     public static int RunAll()
     {
-        try { Reset(); ThreeRoutes(); PointerFailures(); PropertiesInRealSlider(); Lifecycle(); CallbackClose(); SetterFailure(); return 0; }
+        try { Reset(); ThreeRoutes(); PointerFailures(); PropertiesInRealSlider(); Lifecycle(); CallbackClose(); SetterFailure(); AbortedHitPass(); return 0; }
         catch (Exception ex) { Console.Error.WriteLine("  FAIL: S01 " + ex); return 1; }
         finally { Reset(); }
     }
@@ -205,6 +205,21 @@ internal static class KernelSharedBehaviorTests
         Pointer(UiPointerPhase.None); slider.Draw(Bounds, ctx);
         Check(contextual && requests == 1 && model == 5, "E5 real Slider keeps partial effect and original cause; repaint never retries");
         Pointer(UiPointerPhase.Release); slider.Draw(Bounds, ctx);
+    }    private static void AbortedHitPass()
+    {
+        using var session = new UiSession();
+        var node = session.GetOrCreateNode(UiNodeId.Root(new UiElementSpec("a", ButtonWidget.Kind, new Dictionary<string, string>()), 0), ButtonWidget.Kind, 0);
+        var other = session.GetOrCreateNode(UiNodeId.Root(new UiElementSpec("b", ButtonWidget.Kind, new Dictionary<string, string>()), 1), ButtonWidget.Kind, 1);
+        session.SetHostViewport(Bounds); session.BeginHitPass();
+        session.PushHitLayer(node, Bounds, false); session.PushHitLayer(other, Bounds, false); session.EndHitPass();
+        session.BeginHitPass(); session.PushHitLayer(node, new Rect(0, 0, 10, 10), false); session.AbortHitPass();
+        Check(session.HitLayers.Count == 2 && session.GetNode(other.Id) != null && !session.IsInputGeometryReliable,
+            "E4 aborted traversal restores complete hit list and keeps unvisited identities");
+        var ctx = new UiWidgetContext("s01", session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), new UiBindings(), 100, "a", node: node);
+        session.BeginHitPass(); Pointer(UiPointerPhase.Press);
+        Check(!UiNative.Activation(Bounds, ctx).Captured, "E4 recovery pass suspends pointer input until geometry completes");
+        session.PushHitLayer(node, Bounds, false); session.EndHitPass(); Pointer(UiPointerPhase.Press);
+        Check(UiNative.Activation(Bounds, ctx).Captured, "E4 a new press works after a complete recovery pass");
     }    private sealed class StubMetrics : ITextMetrics
     {
         public float MeasureWidth(string text, UiFont font) => text.Length * (font == UiFont.Medium ? 12 : font == UiFont.Tiny ? 5 : 8);

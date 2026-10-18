@@ -564,9 +564,7 @@ public sealed class UiLayoutEngine
         }
         catch
         {
-            ctx.Session.Interactions.End(UiInteractionEnd.Aborted);
-            if (ctx.Session.IsActive && ctx.Session.OwnedHotControl.HasValue)
-                ctx.Session.ReleaseHotControl(ctx.Session.OwnedHotControl.Value);
+            ctx.Session.AbortHitPass();
             throw;
         }
     }

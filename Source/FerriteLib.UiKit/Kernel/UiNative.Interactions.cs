@@ -64,7 +64,7 @@ public static partial class UiNative
         var point = PointerPosition();
         var input = new UiPointerSample(phase, point.x, point.y, Event.current?.type == EventType.Used);
         int nativeCapture = DebugMousePositionEnabled ? DebugHotControl : GUIUtility.hotControl;
-        var eligibility = new UiInputEligibility(canOperate && session.PointerInputAllowed, true, canReceive && (nativeCapture == 0 || owns));
+        var eligibility = new UiInputEligibility(canOperate && session.PointerInputAllowed && session.IsInputGeometryReliable, true, canReceive && (nativeCapture == 0 || owns));
         float thumb = Math.Min(12, rect.width / 2);
         var geometry = range ? new UiHitGeometry(rect.x, rect.y, rect.width, rect.height, rect.x + thumb / 2, rect.width - thumb)
             : new UiHitGeometry(rect.x, rect.y, rect.width, rect.height);

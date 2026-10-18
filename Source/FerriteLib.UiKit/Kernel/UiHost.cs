@@ -316,8 +316,7 @@ public sealed class UiHost : IDisposable
         }
         catch
         {
-            session.Interactions.End(UiInteractionEnd.Aborted);
-            if (session.IsActive && session.OwnedHotControl.HasValue) session.ReleaseHotControl(session.OwnedHotControl.Value);
+            session.AbortHitPass();
             throw;
         }
         finally

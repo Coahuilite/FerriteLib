@@ -39,6 +39,8 @@ public sealed class UiSession : IDisposable
     // in progress is building. Dispatch reads the published list, which is why a popup drawn after content
     // in pass N still wins the click in pass N+1 while no element has to know that popups exist.
     private readonly List<UiHitLayer> hitLayers = new();
+    private bool hitPassOpen;
+    internal bool IsInputGeometryReliable { get; private set; } = true;
     private readonly List<UiHitLayer> dispatchLayers = new();
     private Vector2 currentWindowOrigin;
 
@@ -228,6 +230,7 @@ public sealed class UiSession : IDisposable
     internal void BeginHitPass()
     {
         EnsureActive();
+        hitPassOpen = true;
         popupOwnerDrawn = false;
         captureOwnerDrawn = false;
 
@@ -388,8 +391,24 @@ public sealed class UiSession : IDisposable
         return true;
     }
 
+    // An aborted traversal must not publish its partial hit list or reconcile unvisited identities.
+    internal void AbortHitPass()
+    {
+        if (!IsActive) return;
+        if (hitPassOpen)
+        {
+            hitLayers.Clear();
+            hitLayers.AddRange(dispatchLayers);
+        }
+        hitPassOpen = false;
+        IsInputGeometryReliable = false;
+        Interactions.End(UiInteractionEnd.Aborted);
+        if (ownedHotControl.HasValue) ReleaseHotControl(ownedHotControl.Value);
+    }
     internal void EndHitPass()
     {
+        hitPassOpen = false;
+        IsInputGeometryReliable = true;
         if (openPopupId != null && !popupOwnerDrawn) ClosePopup();
 
         // An owner that stopped being drawn owns no live interaction. Release THIS session's capture and no
@@ -1256,6 +1275,7 @@ public sealed class UiSession : IDisposable
         openPopupScrollRows = 0;
         openPopupMaxScrollRows = 0;
         captureOwnerDrawn = false;
+        hitPassOpen = false;
         hitLayers.Clear();
         dispatchLayers.Clear();
         currentWindowOrigin = default;
