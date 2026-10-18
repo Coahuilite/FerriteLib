@@ -37,17 +37,17 @@ that a row's new capability has been migrated.
 
 | Retained use | Exists / owner | 0.8 migration and evidence | Native |
 | --- | --- | --- | --- |
-| Stack | Engine measure/arrange | Retained; complete neutral layout/observation pending; Layout guards | Pending |
-| Row | Engine measure/arrange | Retained; complete layout/shared-label-column work pending; Layout/Placement guards | Pending |
-| Column | Engine measure/arrange | Retained; complete layout/shared-label-column work pending; Layout guards | Pending |
-| Wrap | Engine responsive wrapping | Retained; complete neutral layout migration pending; Layout guards | Pending |
-| Overlay | Engine stacking | Retained; complete geometry/overlap migration pending; Layout/Placement guards | Pending |
-| Section | Engine grouping/chrome | Retained; descriptive/layout completion pending; Layout/SectionHeader guards | Pending |
-| Surface | Engine grouping/chrome | Retained; complete property/measure migration pending; Layout/Style guards | Pending |
-| Scroll | Engine viewport + session scroll position | Retained; popup wheel/coordinate and callback-close tests apply; full scrolling contract pending | Pending |
-| Clip | Engine effective clip/native groups | Retained; partial-pass/callback-close guards apply; complete clipping migration pending | Pending |
+| Stack | Engine measure/arrange | Shared production neutral vertical flow; Layout + pure Layout; final observation pending | Pending |
+| Row | Engine measure/arrange | Shared production neutral row allocation/cross sizing + optional shared label column; Layout/Placement + pure Layout | Pending |
+| Column | Engine measure/arrange | Shared production neutral vertical flow + optional shared label column; Layout + pure Layout | Pending |
+| Wrap | Engine responsive wrapping | Shared production neutral width/column wrapping; Layout + pure Layout | Pending |
+| Overlay | Engine stacking | Shared production neutral Overlay + finite same-parent anchors; Layout/Placement/atomic-failure + pure Layout | Pending |
+| Section | Engine grouping/chrome | Shared neutral vertical geometry with retained title/chrome; Layout/SectionHeader + pure Layout | Pending |
+| Surface | Engine grouping/chrome | Shared neutral vertical geometry; property completion pending; Layout/Style + pure Layout | Pending |
+| Scroll | Engine viewport + session scroll position | Shared neutral content/viewport rows/clamping + real native adapter; full host scroll tests pending | Pending |
+| Clip | Engine effective clip/native groups | Shared neutral effective child geometry + existing balanced native clip; full host evidence pending | Pending |
 | Conditional/dynamic content | Engine Visible/Hidden/VisibleKey and structure reconciliation | Retained; applicable capture cleanup tested; complete authoring/update contract pending | Pending |
-| Limited same-parent positioning / shared label columns | Confirmed first-version additions | Pending implementation and C3 cases; not dropped by this slice | Pending |
+| Limited same-parent positioning / shared label columns | Confirmed first-version additions | Implemented finite axis dependency + four-wrapper actual label demand/stacking; pure + actual Layout C3 cases | Pending |
 | Standard window / embedded host | UiWindowHost / UiHost, session lifecycle | S1 native eligibility/capture and BSE popup cleanup connected; complete public host contract pending | Pending |
 | Window chrome / return / business close | UiWindowChrome, shell and explicit commands | Retained; no new keyboard/global Cancel defaults; complete migration pending | Pending |
 | Tooltip / help / option-help output | Session hover and OptionHelp bindings | Retained; popup close clears help; full descriptive/observation migration pending | Pending |
@@ -62,6 +62,6 @@ Common editing/numeric composition and basic plain-text multiline are implemente
 remain first-version work. All completed slices still need target 1.6 acceptance with the actual selected
 Dev package. Complete first-version acceptance is not inferred from the 18-entry inventory or a green full harness.
 
-Implementation contracts: [S0/S1](s01-contract.md), [boolean/selection/expansion](bse-contract.md), [editing/numeric composition](editing-contract.md), [descriptive wrappers and chart](wrappers-contract.md).
+Implementation contracts: [S0/S1](s01-contract.md), [boolean/selection/expansion](bse-contract.md), [editing/numeric composition](editing-contract.md), [descriptive wrappers and chart](wrappers-contract.md), [shared layout](layout-contract.md).
 The product requirements and remaining policy decisions live in [the specification](README.md),
 with the [contract-to-test migration](acceptance-and-test-migration.md) defining evidence classes.

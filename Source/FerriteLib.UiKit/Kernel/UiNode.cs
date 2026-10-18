@@ -3,15 +3,14 @@ using System.Collections.Generic;
 using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
-
 /// <summary>
 /// One arranged element's identity carrier: the object that owns the element's per-element state, its
 /// place in the tree and the dirty flag that says its Measure must run again (0.4.0 identity layer).
-/// The layout engine creates a node for every arranged entry during arrange, and <see cref="UiSession"/>
-/// caches it under <see cref="Id"/> - so the same element reports the same node across passes, its state
+/// The layout engine creates a node for every arranged entry during arrange, and <see cref = "UiSession"/>
+/// caches it under <see cref = "Id"/> - so the same element reports the same node across passes, its state
 /// survives a re-arrange, and nothing here is keyed by a path string.
 /// <para>
-/// Geometry lands here too now: <see cref="Rect"/> is the arranged rect and <see cref="ContentRect"/> the
+/// Geometry lands here too now: <see cref = "Rect"/> is the arranged rect and <see cref = "ContentRect"/> the
 /// scroll content rect, both published once per successful arrange, null for a node that was not arranged
 /// in the current tree (a Tab-hidden element keeps its node and state and loses its geometry). The
 /// engine's flat entry table is still what draws; the node is what everything else keys on.
@@ -86,6 +85,7 @@ public sealed class UiNode
     /// <summary>Explicit business identity; change when a getter switches logical objects.</summary>
     public string InteractionScope { get; set; } = "";
     internal UiValueState? EditingState;
+    public float SharedLabelWidth { get; internal set; }
 
     /// <summary>Every named state slot this node owns, keyed by the name the widget used.</summary>
     public IReadOnlyDictionary<string, UiValueState> ValueStates => slots;
@@ -159,6 +159,32 @@ public sealed class UiNode
         ElementId = elementId ?? "";
     }
 
+    // Restore derived layout facts only, never business state or ended interactions.
+    internal Action CaptureArrangement()
+    {
+        UiNode? parent = Parent;
+        UiNode[] priorChildren = children.ToArray();
+        Rect? rect = Rect;
+        Rect? content = ContentRect;
+        string kind = Kind;
+        int ordinal = Ordinal;
+        string elementId = ElementId;
+        string cancelBinding = CancelBindingKey;
+        float sharedLabelWidth = SharedLabelWidth;
+        return () =>
+        {
+            Parent = parent;
+            children.Clear();
+            children.AddRange(priorChildren);
+            Rect = rect;
+            ContentRect = content;
+            RefreshIdentity(kind, ordinal, elementId);
+            CancelBindingKey = cancelBinding;
+            SharedLabelWidth = sharedLabelWidth;
+        };
+    }
+
+    /// <summary>Clears the flag without notifying the session, which clears its whole dirty set in bulk.</summary>
     /// <summary>Clears the flag without notifying the session, which clears its whole dirty set in bulk.</summary>
     internal void ClearDirtyFlag()
     {
@@ -184,6 +210,7 @@ public sealed class UiNode
     /// <summary>Drops this pass's geometry so "not arranged" is a state and not a leftover rect.</summary>
     internal void ClearGeometry()
     {
+        SharedLabelWidth = 0;
         Rect = null;
         ContentRect = null;
     }

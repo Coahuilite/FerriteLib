@@ -8,7 +8,6 @@ using FerriteLib.UiKit.Kernel;
 using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
-
 /// <summary>
 /// Greenfield kernel layout tests for Schema=2 containers: Stack/Column/Row/Wrap/Overlay/Scroll/
 /// Clip hidden-element behavior, scroll clamp and structural scope cleanup.
@@ -18,10 +17,11 @@ internal static class KernelLayoutTests
     private const string Scope = "layout-test";
     private const string TestWidgetKind = "test/widget";
     private static int failures;
-
     public static int RunAll()
     {
         failures = 0;
+        Run("Shared columns use actual participating labels and narrow stacking", VerifySharedLabels);
+        Run("Shared anchors preserve complete prior arrangement on failure", VerifyAnchorsAndAtomicFailure);
         Run("Row/Column/Stack measure", VerifyRowColumnStackMeasure);
         Run("Wrap line breaking", VerifyWrapLineBreaking);
         Run("Overlay stacking", VerifyOverlayStacking);
@@ -68,6 +68,82 @@ internal static class KernelLayoutTests
             failures++;
             Console.Error.WriteLine("  FAIL: " + name + " :: " + ex.GetType().Name + ": " + ex.Message);
         }
+    }
+
+    private static void VerifySharedLabels()
+    {
+        UiWidgetRegistry.Clear();
+        UiWidgetRegistry.InitializeCore();
+        var bindings = new UiBindings();
+        float number = .5f;
+        string text = "plain";
+        bindings.BindValue("number", () => number, value => number = value);
+        bindings.BindValue("text", () => text, value => text = value);
+        string xml = "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Stack Id=\"group\" SharedLabels=\"true\" Padding=\"0\" Gap=\"0\">" + "<Widget Id=\"s\" Kind=\"input/slider\" Bind=\"number\" Label=\"A\" />" + "<Widget Id=\"n\" Kind=\"input/number-field\" Bind=\"number\" Label=\"Longest label\" />" + "<Widget Id=\"t\" Kind=\"input/text-field\" Bind=\"text\" Label=\"Text\" />" + "<Widget Id=\"c\" Kind=\"input/stepper-slider\" Bind=\"number\" Label=\"Step\" />" + "</Stack></UiPage>";
+        using var host = new UiHost(Scope, Parse(xml), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
+        UiLayoutSnapshot wide = host.MeasureAndArrange(new Vector2(600, 600));
+        UiNode[] nodes = new[]
+        {
+            "s",
+            "n",
+            "t",
+            "c"
+        }.Select(id => host.Session.GetNodeByElementId(id)!).ToArray();
+        float column = nodes[0].SharedLabelWidth;
+        Check(column > 0 && nodes.All(node => node.SharedLabelWidth == column), "L all four real wrappers share the measured longest effective label, without private-part authoring");
+        float previous = column;
+        nodes[1].Properties.Font.Set(UiFont.Medium);
+        host.MeasureAndArrange(new Vector2(600, 600));
+        Check(nodes.All(node => node.SharedLabelWidth > previous), "L actual participant font invalidation recalculates the whole label group");
+        UiLayoutSnapshot narrow = host.MeasureAndArrange(new Vector2(80, 600));
+        Check(nodes.All(node => narrow.RectById[node.ElementId].height > UiTheme.Vanilla.Geometry.RowHeight), "L narrow allocation makes each participating wrapper report its stacked label and control demand");
+        host.Draw(new Rect(0, 0, 80, 600), narrow);
+        Check(number == .5f && text == "plain", "L shared-label measurement and repaint do not request business changes");
+        UiLayoutSnapshot overflow = Arrange("<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Row Id=\"row\" Padding=\"0\" Gap=\"0\"><Widget Id=\"x\" Kind=\"input/slider\" Bind=\"number\" MinWidth=\"40\" />" + "<Widget Id=\"y\" Kind=\"input/slider\" Bind=\"number\" MinWidth=\"30\" /></Row></UiPage>", 50, 100).Snapshot;
+        Check(overflow.Diagnostics.Any(item => item.Code == "WidthInsufficient" && item.Path.Contains("row")), "L insufficient width has a bounded located fact rather than silently breaking minima");
+    }
+
+    private static void VerifyAnchorsAndAtomicFailure()
+    {
+        RegisterTestWidget(10, null, false);
+        string Page(string a, string b) => "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Overlay Id=\"overlay\" Padding=\"0\" Height=\"100\">" + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Width=\"20\" " + a + " />" + "<Widget Id=\"b\" Kind=\"" + TestWidgetKind + "\" Width=\"30\" " + b + " />" + "</Overlay></UiPage>";
+        var engine = new UiLayoutEngine(Scope);
+        UiWidgetContext ctx = CreateContext();
+        var roots = Parse(Page("AnchorX=\"b.Right\" OffsetX=\"5\"", "AnchorX=\"parent.Center\" AlignX=\"Center\"")).Roots;
+        UiLayoutSnapshot before = engine.ArrangeRoots(ctx, new Vector2(200, 100), roots);
+        Check(Near(before.RectById["b"].x, 85) && Near(before.RectById["a"].x, 120), "L finite dependencies resolve sibling declared later and parent center in the production geometry");
+        UiNode a = ctx.Session.GetNodeByElementId("a")!;
+        UiNode parent = a.Parent!;
+        Rect? oldRect = a.Rect;
+        UiNode[] oldChildren = parent.Children.ToArray();
+        bool rejected = false;
+        try
+        {
+            engine.ArrangeRoots(ctx, new Vector2(201, 100), Parse(Page("AnchorX=\"b.Right\"", "AnchorX=\"a.Right\"")).Roots);
+        }
+        catch (FormatException ex)
+        {
+            rejected = ex.Message.Contains("Cyclic") && ex.Message.Contains("overlay");
+        }
+
+        Check(rejected, "L cycle reports the actual Overlay path instead of partial placement");
+        Check(a.Rect.Equals(oldRect) && ReferenceEquals(a.Parent, parent) && parent.Children.SequenceEqual(oldChildren), "L failed arrange preserves complete previous node geometry and relationships");
+        Check(!ctx.Session.IsInputGeometryReliable, "L failed arrange suspends input against unreliable new geometry");
+        UiLayoutSnapshot cached = engine.ArrangeRoots(ctx, new Vector2(200, 100), roots);
+        Check(ReferenceEquals(cached, before) && Near(cached.RectById["a"].x, 120), "L failed candidate never replaces the committed snapshot or entries");
+        rejected = false;
+        try
+        {
+            engine.ArrangeRoots(ctx, new Vector2(202, 100), Parse(Page("AnchorY=\"missing.Bottom\"", "")).Roots);
+        }
+        catch (FormatException ex)
+        {
+            rejected = ex.Message.Contains("missing") && ex.Message.Contains("a");
+        }
+
+        Check(rejected && a.Rect.Equals(oldRect), "L missing visible sibling is located and preserves old arrangement");
+        UiLayoutSnapshot recovered = engine.ArrangeRoots(ctx, new Vector2(210, 100), roots);
+        Check(Near(recovered.RectById["b"].x, 90), "L a subsequent valid arrange replaces the previous geometry normally");
     }
 
     private static void VerifyRowColumnStackMeasure()

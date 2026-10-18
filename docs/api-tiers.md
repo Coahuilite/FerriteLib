@@ -85,6 +85,22 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
 - `UiRangeObservation` — read-only numeric/range presentation facts; public-unstable.
 - `UiDescription` — actual descriptive input projection; public-unstable.
 - `IUiDescriptiveWidget` — platform-wrapper read seam, does not draw or operate; public-unstable.
+- `IUiLabelledWidget` — actual wrapper label demand for shared columns; public-unstable.
+- `UiLayoutDiagnostic` — located successful layout fact; public-unstable.
+- `UiLayoutSize` — neutral measured demand; public-unstable.
+- `UiLayoutPoint` — neutral geometry position; public-unstable.
+- `UiLayoutRect` — neutral effective geometry; public-unstable.
+- `UiLayoutHeight` — explicit height constraint input; public-unstable.
+- `UiLayoutFrame` — parent allocation/environment input; public-unstable.
+- `UiLayoutChild` — child demand/alignment input; public-unstable.
+- `UiLayoutOffset` — pixel/parent-relative offset declaration; public-unstable.
+- `UiLayoutAnchor` — finite same-parent position reference; public-unstable.
+- `UiLayoutPlan` — shared effective child layout; public-unstable.
+- `UiLayoutMeasure` — width-dependent neutral measure service; public-unstable.
+- `UiLayout` — actual shared flow/placement rules; public-unstable.
+- `UiWidthMode` — fixed/automatic/flexible width demand; public-unstable.
+- `UiWidthDemand` — neutral width and bound inputs; public-unstable.
+- `UiWidthPlan` — effective widths and insufficiency facts; public-unstable.
 - `UiSelectionObservation` — model-derived missing/selectable facts; public-unstable.
 - `UiValueBehavior` — shared boolean/selection/expansion request boundary; public-unstable.
 - `UiInteractionRequests` — 0.8 S0/S1 shared contract; shape may change within the development line.

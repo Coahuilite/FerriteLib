@@ -2,12 +2,11 @@ using System;
 using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
-
 /// <summary>
 /// Single-line or basic plain-text multiline native editing, with one instance-local neutral draft.
 /// Selection, clipboard and character composition belong to Verse/Unity, not to this wrapper.
 /// </summary>
-public sealed class TextFieldWidget : IUiWidget
+public sealed class TextFieldWidget : IUiWidget, IUiLabelledWidget
 {
     public const string Kind = "input/text-field";
 
@@ -51,16 +50,18 @@ public sealed class TextFieldWidget : IUiWidget
     public float Measure(UiWidgetContext ctx)
     {
         float declared = AtomVocabulary.ReadHeight(spec, 0);
-        if (declared > 0) return declared;
-        if (!AtomVocabulary.ReadBool(spec, "Multiline", false)) return ctx.Theme.Geometry.RowHeight;
+        if (declared > 0)
+            return declared;
+        UiSliderLayout labelLayout = LabelLayout(ctx, ctx.ViewWidth);
+        if (!AtomVocabulary.ReadBool(spec, "Multiline", false))
+            return labelLayout.Height;
         string binding = AtomVocabulary.ReadBindKey(spec);
         string text = ctx.Bindings.Get<string>(binding) ?? "";
         UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
         if (node.ValueStates.TryGetValue(binding, out UiValueState? state) && state.Editor is IUiEditState edit)
             text = edit.Draft;
         ResolveLabelBand(new Rect(0, 0, ctx.ViewWidth, 1), ctx, out Rect field);
-        return Math.Max(ctx.Theme.Geometry.RowHeight,
-            ctx.Metrics.MeasureText(text, AtomVocabulary.TextFont(ctx), field.width) + ctx.Theme.Geometry.Spacing * 2);
+        return (labelLayout.Stacked ? labelLayout.LabelHeight + ctx.Theme.Geometry.Gap : 0) + Math.Max(ctx.Theme.Geometry.RowHeight, ctx.Metrics.MeasureText(text, AtomVocabulary.TextFont(ctx), field.width) + ctx.Theme.Geometry.Spacing * 2);
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)
@@ -121,34 +122,32 @@ public sealed class TextFieldWidget : IUiWidget
     /// label is drawn in. The same geometry rule the slider and the number field own; this kind keeps what
     /// the band leaves, so a labelled text field and a labelled number field line up on one page.
     /// </summary>
-    private void ResolveLabelBand(Rect rect, UiWidgetContext ctx, out Rect field)
+    public float MeasureLabel(UiWidgetContext ctx)
     {
-        field = rect;
         string label = AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
-        if (label.Length == 0) return;
-
-        float fieldX = rect.x + BandWidth(label, ctx) + ctx.Theme.Geometry.Gap;
-        field = new Rect(fieldX, rect.y, Math.Max(1f, rect.xMax - fieldX), rect.height);
+        return label.Length == 0 ? 0 : ctx.Metrics.MeasureWidth(label, AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing;
     }
 
-    /// <summary>Paints the measured label band in the role's text colour, before the field is drawn.</summary>
+    private UiSliderLayout LabelLayout(UiWidgetContext ctx, float width) => UiSliderLayout.Measure(AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey"), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0);
+    private void ResolveLabelBand(Rect rect, UiWidgetContext ctx, out Rect field)
+    {
+        UiSliderLayout layout = LabelLayout(ctx, rect.width);
+        if (layout.LabelWidth <= 0)
+        {
+            field = rect;
+            return;
+        }
+
+        float gap = ctx.Theme.Geometry.Gap;
+        field = layout.Stacked ? new Rect(rect.x, rect.y + layout.LabelHeight + gap, rect.width, Math.Max(1, rect.height - layout.LabelHeight - gap)) : new Rect(rect.x + layout.LabelWidth + gap, rect.y, Math.Max(1, rect.width - layout.LabelWidth - gap), rect.height);
+    }
+
     private void DrawLabel(Rect rect, UiWidgetContext ctx, UiResolvedStyle style)
     {
         string label = AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
-        if (label.Length == 0) return;
-
-        UiThemeDraw.Label(
-            new Rect(rect.x, rect.y, BandWidth(label, ctx), rect.height),
-            label,
-            ctx.Theme,
-            style.Text,
-            AtomVocabulary.TextFont(ctx),
-            TextAnchor.MiddleLeft);
-    }
-
-    /// <summary>One label width, shared by the measure and the paint so the band cannot disagree with itself.</summary>
-    private static float BandWidth(string label, UiWidgetContext ctx)
-    {
-        return Math.Max(1f, ctx.Metrics.MeasureWidth(label, AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing);
+        if (label.Length == 0)
+            return;
+        UiSliderLayout layout = LabelLayout(ctx, rect.width);
+        UiThemeDraw.Label(new Rect(rect.x, rect.y, layout.LabelWidth, layout.Stacked ? layout.LabelHeight : rect.height), label, ctx.Theme, style.Text, AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft);
     }
 }

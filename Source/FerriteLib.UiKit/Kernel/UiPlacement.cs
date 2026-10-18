@@ -2,7 +2,6 @@ using System;
 using System.Globalization;
 
 namespace FerriteLib.UiKit.Kernel;
-
 /// <summary>
 /// The placement vocabulary (CP-1/CP-2, 0.7.x Batch 1): where one element sits inside its parent's inner
 /// box. The whole rule is one line and both axes use it:
@@ -60,7 +59,7 @@ internal static class UiPlacement
 
     /// <summary>
     /// One resolved alignment: the fraction of the parent's inner span that is shared by the reference point
-    /// and the element's own pivot. <see cref="Stretch"/> is fraction zero plus the flag that says "keep the
+    /// and the element's own pivot. <see cref = "Stretch"/> is fraction zero plus the flag that says "keep the
     /// slot the flow already produced", which is why it is the default rather than a fifth edge.
     /// </summary>
     internal readonly struct Alignment
@@ -85,7 +84,7 @@ internal static class UiPlacement
     /// </summary>
     internal static float Origin(float parentOrigin, float parentSpan, float selfSpan, Alignment alignment, float offset)
     {
-        return parentOrigin + alignment.Fraction * (parentSpan - selfSpan) + offset;
+        return UiLayout.Origin(parentOrigin, parentSpan, selfSpan, alignment.Fraction, offset);
     }
 
     /// <summary>
@@ -109,24 +108,22 @@ internal static class UiPlacement
     /// the axis the attribute belongs to); a bare number is a pixel nudge. An absent (or empty) attribute is
     /// zero, so the placement rule collapses to the reference point.
     /// </summary>
-    internal static float ParseOffset(UiElementSpec spec, string attribute, float parentSpan)
+    internal static float ParseOffset(UiElementSpec spec, string attribute, float parentSpan) => ParseOffsetValue(spec, attribute).At(parentSpan);
+    internal static UiLayoutOffset ParseOffsetValue(UiElementSpec spec, string attribute)
     {
-        if (!spec.TryGetAttribute(attribute, out string raw)) return 0f;
-
+        if (!spec.TryGetAttribute(attribute, out string raw))
+            return default;
         string value = raw.Trim();
-        if (value.Length == 0) return 0f;
-
+        if (value.Length == 0)
+            return default;
         bool percentage = value.EndsWith("%", StringComparison.Ordinal);
         string number = percentage ? value.Substring(0, value.Length - 1).Trim() : value;
-        if (!float.TryParse(number, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsed)
-            || float.IsNaN(parsed) || float.IsInfinity(parsed))
+        if (!float.TryParse(number, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsed) || float.IsNaN(parsed) || float.IsInfinity(parsed))
         {
-            throw new FormatException(
-                "Element id=\"" + spec.Id + "\" (Kind=\"" + spec.Kind + "\") has invalid " + attribute
-                + " '" + raw + "'; expected a number or a percentage (N%).");
+            throw new FormatException("Element id=\"" + spec.Id + "\" (Kind=\"" + spec.Kind + "\") has invalid " + attribute + " '" + raw + "'; expected a number or a percentage (N%).");
         }
 
-        return percentage ? parsed / 100f * parentSpan : parsed;
+        return percentage ? new UiLayoutOffset(0, parsed / 100f) : new UiLayoutOffset(parsed);
     }
 
     /// <summary>
@@ -135,56 +132,80 @@ internal static class UiPlacement
     /// are all still known. Fail-closed, the A2/A3 precedent: an accepted declaration that the arrangement
     /// would then ignore is the silent no-op this contract layer exists to stop.
     /// <para>
-    /// The refusals, each one thrown as a located <see cref="UiContractException"/>: an unknown alignment
+    /// The refusals, each one thrown as a located <see cref = "UiContractException"/>: an unknown alignment
     /// value; an edge name from the other axis; a ratio outside 0..100%; a malformed or non-finite offset;
     /// a percentage offset on a child of a flow container; an explicit <c>Stretch</c> together with a
     /// numeric <c>Width</c>; placement together with <c>Fill</c> on the same element; placement on an
     /// element no container owns; and the main-axis or main-axis-offset subset on a flow container's child.
     /// </para>
     /// </summary>
-    /// <param name="spec">The element being validated.</param>
-    /// <param name="path">Its layout path, which every message carries.</param>
-    /// <param name="scope">The manifest source the located error reports as its scope.</param>
-    /// <param name="parent">Its parent element, or null for a root (and for a template root).</param>
-    /// <param name="parentKind">An explicit parent kind, for a caller whose parent is not an element.</param>
-    internal static void ValidateChild(
-        UiElementSpec spec, string path, string scope, UiElementSpec? parent, string? parentKind = null)
+    /// <param name = "spec">The element being validated.</param>
+    /// <param name = "path">Its layout path, which every message carries.</param>
+    /// <param name = "scope">The manifest source the located error reports as its scope.</param>
+    /// <param name = "parent">Its parent element, or null for a root (and for a template root).</param>
+    /// <param name = "parentKind">An explicit parent kind, for a caller whose parent is not an element.</param>
+    internal static void ValidateChild(UiElementSpec spec, string path, string scope, UiElementSpec? parent, string? parentKind = null)
     {
+        if (spec.TryGetAttribute("SharedLabels", out string sharedLabels) && !bool.TryParse(sharedLabels, out _))
+            throw Contract(spec, path, scope, "SharedLabels must be true or false.");
+        foreach (string attribute in new[]
+        {
+            "AnchorX",
+            "AnchorY"
+        }
+
+        )
+        {
+            if (!spec.TryGetAttribute(attribute, out string anchor))
+                continue;
+            string? ownerKind = parent == null ? parentKind : parent.Kind;
+            if (!IsPlacementContainer(ownerKind))
+                throw Contract(spec, path, scope, attribute + " requires a direct Overlay parent.");
+            try
+            {
+                ParseAnchor(anchor, attribute == "AnchorX" ? Axis.Horizontal : Axis.Vertical, out _, out _);
+            }
+            catch (FormatException ex)
+            {
+                throw Contract(spec, path, scope, ex.Message);
+            }
+
+            string alignAttribute = attribute == "AnchorX" ? AlignXAttribute : AlignYAttribute;
+            if (spec.TryGetAttribute(alignAttribute, out string align) && IsStretch(align))
+                throw Contract(spec, path, scope, attribute + " cannot also stretch the same axis.");
+            if (IsFill(spec))
+                throw Contract(spec, path, scope, attribute + " cannot also claim Fill.");
+        }
+
         bool hasAlignX = spec.TryGetAttribute(AlignXAttribute, out string alignXRaw);
         bool hasAlignY = spec.TryGetAttribute(AlignYAttribute, out string alignYRaw);
         bool hasOffsetX = spec.TryGetAttribute(OffsetXAttribute, out string offsetXRaw);
         bool hasOffsetY = spec.TryGetAttribute(OffsetYAttribute, out string offsetYRaw);
-        if (!hasAlignX && !hasAlignY && !hasOffsetX && !hasOffsetY) return;
-
+        if (!hasAlignX && !hasAlignY && !hasOffsetX && !hasOffsetY)
+            return;
         string? kind = parent == null ? parentKind : parent.Kind;
         bool placementContainer = IsPlacementContainer(kind);
         Axis crossAxis = Axis.Horizontal;
         bool flow = !placementContainer && TryCrossAxis(kind, out crossAxis);
-
         if (!placementContainer && !flow)
         {
-            throw Contract(spec, path, scope,
-                "Element id=\"" + spec.Id + "\" at '" + path + "' declares placement vocabulary but no container owns it; "
-                + "AlignX/OffsetX/AlignY/OffsetY are valid on a child of an Overlay, or on the cross axis of a flow container.");
+            throw Contract(spec, path, scope, "Element id=\"" + spec.Id + "\" at '" + path + "' declares placement vocabulary but no container owns it; " + "AlignX/OffsetX/AlignY/OffsetY are valid on a child of an Overlay, or on the cross axis of a flow container.");
         }
 
         if (hasAlignX && !TryAlignmentOf(alignXRaw, Axis.Horizontal, out _))
         {
-            throw Contract(spec, path, scope,
-                "Element id=\"" + spec.Id + "\" at '" + path + "' has invalid " + AlignXAttribute + " '" + alignXRaw
-                + "'; expected " + AcceptedNames(Axis.Horizontal) + ".");
+            throw Contract(spec, path, scope, "Element id=\"" + spec.Id + "\" at '" + path + "' has invalid " + AlignXAttribute + " '" + alignXRaw + "'; expected " + AcceptedNames(Axis.Horizontal) + ".");
         }
 
         if (hasAlignY && !TryAlignmentOf(alignYRaw, Axis.Vertical, out _))
         {
-            throw Contract(spec, path, scope,
-                "Element id=\"" + spec.Id + "\" at '" + path + "' has invalid " + AlignYAttribute + " '" + alignYRaw
-                + "'; expected " + AcceptedNames(Axis.Vertical) + ".");
+            throw Contract(spec, path, scope, "Element id=\"" + spec.Id + "\" at '" + path + "' has invalid " + AlignYAttribute + " '" + alignYRaw + "'; expected " + AcceptedNames(Axis.Vertical) + ".");
         }
 
-        if (hasOffsetX) ValidateOffset(spec, path, scope, OffsetXAttribute, offsetXRaw);
-        if (hasOffsetY) ValidateOffset(spec, path, scope, OffsetYAttribute, offsetYRaw);
-
+        if (hasOffsetX)
+            ValidateOffset(spec, path, scope, OffsetXAttribute, offsetXRaw);
+        if (hasOffsetY)
+            ValidateOffset(spec, path, scope, OffsetYAttribute, offsetYRaw);
         if (flow)
         {
             // R1: a flow container's child accepts the cross-axis subset only - the main axis already has an
@@ -193,36 +214,24 @@ internal static class UiPlacement
             {
                 if (hasAlignY)
                 {
-                    throw Contract(spec, path, scope,
-                        "Element id=\"" + spec.Id + "\" at '" + path + "' declares " + AlignYAttribute + " '" + alignYRaw
-                        + "', which is the main axis of a " + kind + "; a flow container's child accepts the cross-axis "
-                        + "subset only (" + AlignXAttribute + " here).");
+                    throw Contract(spec, path, scope, "Element id=\"" + spec.Id + "\" at '" + path + "' declares " + AlignYAttribute + " '" + alignYRaw + "', which is the main axis of a " + kind + "; a flow container's child accepts the cross-axis " + "subset only (" + AlignXAttribute + " here).");
                 }
 
                 if (hasOffsetY)
                 {
-                    throw Contract(spec, path, scope,
-                        "Element id=\"" + spec.Id + "\" at '" + path + "' declares " + OffsetYAttribute + " '" + offsetYRaw
-                        + "' on the main axis of a " + kind + ", where the flow decides the position; an offset is valid on "
-                        + "the cross axis only.");
+                    throw Contract(spec, path, scope, "Element id=\"" + spec.Id + "\" at '" + path + "' declares " + OffsetYAttribute + " '" + offsetYRaw + "' on the main axis of a " + kind + ", where the flow decides the position; an offset is valid on " + "the cross axis only.");
                 }
             }
             else
             {
                 if (hasAlignX)
                 {
-                    throw Contract(spec, path, scope,
-                        "Element id=\"" + spec.Id + "\" at '" + path + "' declares " + AlignXAttribute + " '" + alignXRaw
-                        + "', which is the main axis of a " + kind + "; a flow container's child accepts the cross-axis "
-                        + "subset only (" + AlignYAttribute + " here).");
+                    throw Contract(spec, path, scope, "Element id=\"" + spec.Id + "\" at '" + path + "' declares " + AlignXAttribute + " '" + alignXRaw + "', which is the main axis of a " + kind + "; a flow container's child accepts the cross-axis " + "subset only (" + AlignYAttribute + " here).");
                 }
 
                 if (hasOffsetX)
                 {
-                    throw Contract(spec, path, scope,
-                        "Element id=\"" + spec.Id + "\" at '" + path + "' declares " + OffsetXAttribute + " '" + offsetXRaw
-                        + "' on the main axis of a " + kind + ", where the flow decides the position; an offset is valid on "
-                        + "the cross axis only.");
+                    throw Contract(spec, path, scope, "Element id=\"" + spec.Id + "\" at '" + path + "' declares " + OffsetXAttribute + " '" + offsetXRaw + "' on the main axis of a " + kind + ", where the flow decides the position; an offset is valid on " + "the cross axis only.");
                 }
             }
 
@@ -230,18 +239,12 @@ internal static class UiPlacement
             // and inside a flow container that span is the flow's own main axis - which stays the flow's.
             if (hasOffsetX && IsPercentage(offsetXRaw))
             {
-                throw Contract(spec, path, scope,
-                    "Element id=\"" + spec.Id + "\" at '" + path + "' declares " + OffsetXAttribute + " '" + offsetXRaw
-                    + "', a percentage placement on a child of a flow container; a percentage is a fraction of the "
-                    + "parent's span, which the flow owns, so only a pixel nudge is accepted here.");
+                throw Contract(spec, path, scope, "Element id=\"" + spec.Id + "\" at '" + path + "' declares " + OffsetXAttribute + " '" + offsetXRaw + "', a percentage placement on a child of a flow container; a percentage is a fraction of the " + "parent's span, which the flow owns, so only a pixel nudge is accepted here.");
             }
 
             if (hasOffsetY && IsPercentage(offsetYRaw))
             {
-                throw Contract(spec, path, scope,
-                    "Element id=\"" + spec.Id + "\" at '" + path + "' declares " + OffsetYAttribute + " '" + offsetYRaw
-                    + "', a percentage placement on a child of a flow container; a percentage is a fraction of the "
-                    + "parent's span, which the flow owns, so only a pixel nudge is accepted here.");
+                throw Contract(spec, path, scope, "Element id=\"" + spec.Id + "\" at '" + path + "' declares " + OffsetYAttribute + " '" + offsetYRaw + "', a percentage placement on a child of a flow container; a percentage is a fraction of the " + "parent's span, which the flow owns, so only a pixel nudge is accepted here.");
             }
         }
 
@@ -250,20 +253,27 @@ internal static class UiPlacement
         // existing page already carries, and R2 promises that page does not migrate.
         if (hasAlignX && IsStretch(alignXRaw) && TryNumericWidth(spec, out float declaredWidth))
         {
-            throw Contract(spec, path, scope,
-                "Element id=\"" + spec.Id + "\" at '" + path + "' declares " + AlignXAttribute + "=\"Stretch\" together "
-                + "with Width=\"" + declaredWidth + "\"; Stretch means the parent's whole inner width, so the declared "
-                + "width could never be honoured.");
+            throw Contract(spec, path, scope, "Element id=\"" + spec.Id + "\" at '" + path + "' declares " + AlignXAttribute + "=\"Stretch\" together " + "with Width=\"" + declaredWidth + "\"; Stretch means the parent's whole inner width, so the declared " + "width could never be honoured.");
         }
 
         // R6: Fill claims the flow's remaining space and placement claims a reference point. One owner.
         if (IsFill(spec))
         {
-            throw Contract(spec, path, scope,
-                "Element id=\"" + spec.Id + "\" at '" + path + "' declares placement vocabulary together with "
-                + "Fill=\"true\"; Fill takes the flow's remaining space and placement names a reference point, so the "
-                + "two cannot both own this element's box.");
+            throw Contract(spec, path, scope, "Element id=\"" + spec.Id + "\" at '" + path + "' declares placement vocabulary together with " + "Fill=\"true\"; Fill takes the flow's remaining space and placement names a reference point, so the " + "two cannot both own this element's box.");
         }
+    }
+
+    internal static void ParseAnchor(string raw, Axis axis, out string target, out float fraction)
+    {
+        string value = raw.Trim();
+        int separator = value.LastIndexOf('.');
+        if (separator <= 0 || separator == value.Length - 1)
+            throw new FormatException("Anchor must name parent.Edge or a direct sibling Id.Edge.");
+        target = value.Substring(0, separator);
+        string edge = value.Substring(separator + 1);
+        if (!TryAlignmentOf(edge, axis, out Alignment alignment) || alignment.IsStretch)
+            throw new FormatException("Invalid anchor edge '" + edge + "' for " + axis + ".");
+        fraction = alignment.Fraction;
     }
 
     /// <summary>The one container whose inner box is a two-axis placement frame.</summary>

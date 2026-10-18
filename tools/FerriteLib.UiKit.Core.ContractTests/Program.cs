@@ -30,6 +30,7 @@ internal static class Program
             Isolation();
             Editing();
             PointInteraction();
+            Layout();
             Console.WriteLine($"ALL PASS {checks} neutral checks");
             return 0;
         }
@@ -38,6 +39,45 @@ internal static class Program
             Console.Error.WriteLine(ex);
             return 1;
         }
+    }
+
+    private static void Layout()
+    {
+        var frame = new UiLayoutFrame(200, 100, 5, 5, 5, 5, 0, 2, new UiLayoutHeight(100, false));
+        var children = new[]
+        {
+            new UiLayoutChild(20),
+            new UiLayoutChild(30)
+        };
+        UiLayoutSize Measure(int i, float width, float height, float? reference) => new(width, i == 0 ? 10 : 20);
+        UiLayoutPlan stack = UiLayout.Stack(frame, children, Measure);
+        Check(stack.Slots[0].Y == 5 && stack.Slots[1].Y == 17 && stack.NaturalHeight == 42, "LAYOUT Stack Column Section Surface and Clip consume the same padded vertical flow");
+        UiLayoutPlan row = UiLayout.Row(frame, children, Measure);
+        Check(row.Slots[1].X == 27 && row.NaturalHeight == 30, "LAYOUT Row consumes actual child widths and maximum measured height");
+        UiLayoutPlan wrap = UiLayout.Wrap(frame, children, 1, Measure);
+        Check(wrap.Slots[1].X == 5 && wrap.Slots[1].Y == 17, "LAYOUT Wrap column break uses measured line height");
+        UiLayoutPlan content = UiLayout.VerticalContent(frame, children, Measure);
+        Check(content.NaturalHeight == stack.NaturalHeight && content.Slots[1].Y == stack.Slots[1].Y, "LAYOUT Scroll and Repeat content consume the same production vertical geometry");
+        Check(UiLayout.ScrollContentWidth(100, 101, 100, 16) == 84 && UiLayout.ScrollContentWidth(100, 100, 100, 16) == 100, "LAYOUT real full natural height alone decides scrollbar width reservation");
+        UiLayoutPoint scroll = UiLayout.ClampScroll(new UiLayoutPoint(-10, 500), new UiLayoutSize(100, 300), new UiLayoutSize(100, 100));
+        Check(scroll.X == 0 && scroll.Y == 200, "LAYOUT only actual content/viewport geometry bounds the single scroll authority");
+        Check(UiLayout.SharedLabelColumn(new float[] { 10, 70, 20 }) == 70, "LAYOUT shared columns are an effective demand maximum, not copied author declarations");
+        UiLayoutPlan overlay = UiLayout.Overlay(frame, children, Measure);
+        UiLayoutPlan anchored = UiLayout.Anchored(overlay, frame, new UiLayoutAnchor? [] { new(1, 1, 0, new UiLayoutOffset(5)), new(-1, .5f, .5f, default) }, new UiLayoutAnchor? [2]);
+        Check(anchored.Slots[1].X == 85 && anchored.Slots[0].X == 120, "LAYOUT actual neutral parent and sibling position geometry resolves forward references");
+        bool cyclic = false;
+        try
+        {
+            UiLayout.Anchored(overlay, frame, new UiLayoutAnchor? [] { new(1, 0, 0, default), new(0, 0, 0, default) }, new UiLayoutAnchor? [2]);
+        }
+        catch (ArgumentException)
+        {
+            cyclic = true;
+        }
+
+        Check(cyclic, "LAYOUT neutral cycle refusal cannot publish partial slots");
+        UiWidthPlan widths = UiLayout.Columns(new[] { new UiWidthDemand(UiWidthMode.Auto, 100, 40), new UiWidthDemand(UiWidthMode.Flexible, 0, 30) }, 50, 0);
+        Check(widths.Widths[0] == 40 && widths.Widths[1] == 30 && widths.Overflow, "LAYOUT insufficient parent budget retains declared minima and exposes overflow");
     }
 
     private static void PointInteraction()

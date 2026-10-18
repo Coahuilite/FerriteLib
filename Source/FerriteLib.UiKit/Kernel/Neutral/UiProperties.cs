@@ -63,13 +63,15 @@ public readonly struct UiSliderLayout
     public float LabelHeight { get; }
     public float Height { get; }
     public bool Stacked { get; }
-    public static UiSliderLayout Measure(string label, float width, UiFont font, UiDensity density, ITextMetrics metrics)
+
+    public static UiSliderLayout Measure(string label, float width, UiFont font, UiDensity density, ITextMetrics metrics) => Measure(label, width, font, density, metrics, 0);
+    public static UiSliderLayout Measure(string label, float width, UiFont font, UiDensity density, ITextMetrics metrics, float sharedLabelWidth, float minimumControlWidth = 0)
     {
-        if (label.Length == 0) return new UiSliderLayout(0, 0, density.RowHeight, false);
-        float natural = metrics.MeasureWidth(label, font) + density.Spacing;
-        bool stacked = natural + density.Gap + density.RowHeight * 2 > width;
+        if (label.Length == 0)
+            return new UiSliderLayout(0, 0, density.RowHeight, false);
+        float natural = Math.Max(sharedLabelWidth, metrics.MeasureWidth(label, font) + density.Spacing);
+        bool stacked = natural + density.Gap + Math.Max(minimumControlWidth, density.RowHeight * 2) > width;
         float labelHeight = metrics.MeasureText(label, font, Math.Max(1, stacked ? width : natural));
-        return new UiSliderLayout(stacked ? width : natural, labelHeight,
-            stacked ? labelHeight + density.Gap + density.RowHeight : Math.Max(labelHeight, density.RowHeight), stacked);
+        return new UiSliderLayout(stacked ? width : natural, labelHeight, stacked ? labelHeight + density.Gap + density.RowHeight : Math.Max(labelHeight, density.RowHeight), stacked);
     }
 }

@@ -1011,7 +1011,7 @@ public sealed class UiHost : IDisposable
         // The engine refuses them elsewhere and refuses contradictory combinations; these two lists are
         // the attribute-NAME gate, and UiLayoutEngine keeps a mirrored pair for template subtrees that a
         // lane reflects against these, so the two must move together.
-        "AlignX", "OffsetX", "AlignY", "OffsetY",
+        "AlignX", "OffsetX", "AlignY", "OffsetY", "AnchorX", "AnchorY",
         // FL-IC2 (interaction contract §3.6): the tree's Cancel layer. Engine-wide like VisibleKey and HelpKey,
         // because the ENGINE reads it and publishes it on the node for the ladder to walk - no widget kind owns
         // it, so no kind's attribute schema has to grow for a page to declare a return layer. Unlike HelpKey it
@@ -1031,7 +1031,7 @@ public sealed class UiHost : IDisposable
         "Fill", "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden", "WideHidden",
         "VisibleRows",
         "Scheme", "Density", "Visible", "VisibleKey",
-        "AlignX", "OffsetX", "AlignY", "OffsetY",
+        "AlignX", "OffsetX", "AlignY", "OffsetY", "AnchorX", "AnchorY", "SharedLabels",
         // FL-IC2: see the widget list; UiLayoutEngine's mirrored pair carries the same addition, and the drift
         // lane refuses one-sided edits.
         "CancelBind"

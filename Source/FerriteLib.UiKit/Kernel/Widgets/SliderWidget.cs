@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>Default range wrapper: shared behavior, measured label/track, typed request binding.</summary>
-public sealed class SliderWidget : IUiWidget
+public sealed class SliderWidget : IUiWidget, IUiLabelledWidget
 {
     public const string Kind = "input/slider";
     private UiElementSpec spec = UiElementSpec.Empty;
@@ -30,7 +30,8 @@ public sealed class SliderWidget : IUiWidget
 
     private UiRange Limits() => new UiRange(AtomVocabulary.ReadFloat(spec, "Min", 0), AtomVocabulary.ReadFloat(spec, "Max", 1));
     private string Label(UiWidgetContext ctx) => AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
-    private UiSliderLayout Layout(UiWidgetContext ctx, float width) => UiSliderLayout.Measure(Label(ctx), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics);
+    private UiSliderLayout Layout(UiWidgetContext ctx, float width) => UiSliderLayout.Measure(Label(ctx), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0);
+    public float MeasureLabel(UiWidgetContext ctx) => Label(ctx).Length == 0 ? 0 : ctx.Metrics.MeasureWidth(Label(ctx), AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing;
     public float Measure(UiWidgetContext ctx) => AtomVocabulary.ReadHeight(spec, Layout(ctx, ctx.ViewWidth).Height);
     public void Draw(Rect rect, UiWidgetContext ctx)
     {

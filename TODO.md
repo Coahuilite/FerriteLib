@@ -4,7 +4,7 @@
 
 - [ ] Run the native 1.6 S0/S1 acceptance in docs/development/0.8/s01-contract.md after the developer installs the selected isolated Dev package.
 - [ ] Run the native BSE acceptance in `docs/development/0.8/bse-contract.md` using the selected isolated Dev package.
-- [ ] Complete the remaining first-version inventory in `docs/development/0.8/migration-status.md`: neutral layout, finite relations/shared labels, assembly/full hosts/observation and native acceptance remain open.
+- [ ] Complete the remaining first-version inventory in `docs/development/0.8/migration-status.md`: per-property completion, assembly/full hosts/observation and native acceptance remain open; neutral layout, finite relations and shared labels now have production/pure/platform evidence.
 - [ ] Collect native editing/IME acceptance and final E1–E5/N1–N3 candidate decisions against `docs/development/0.8/editing-contract.md`.
 
 

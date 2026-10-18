@@ -4,10 +4,9 @@ using System.Threading;
 using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
-
 /// <summary>
 /// Per-Host transient interaction state. One Settings Window / Overlay owns exactly one
-/// <see cref="UiSession"/>; closing the host disposes the session and all transient state is lost.
+/// <see cref = "UiSession"/>; closing the host disposes the session and all transient state is lost.
 /// This type intentionally replaces the old process-wide <c>UiValueStore</c>/<c>UiPageState</c>.
 /// </summary>
 public sealed class UiSession : IDisposable
@@ -1019,6 +1018,31 @@ public sealed class UiSession : IDisposable
         {
             if (released.Contains(layers[i].Element)) layers.RemoveAt(i);
         }
+    }
+
+    /// <summary>
+    /// Opens a fresh arrange: every node forgets its children and its geometry, and the arrange that
+    /// follows publishes them again for the elements it visits. That is what makes "not arranged in this
+    /// tree" a state a caller can read (<see cref = "UiNode.IsArranged"/>) instead of a stale rect, and it
+    /// keeps a Tab-hidden element's node and state alive while its rect is gone.
+    /// </summary>
+    internal Action CaptureArrangement()
+    {
+        var priorNodes = new Dictionary<UiNodeId, UiNode>(nodes);
+        var restoreNodes = new List<Action>();
+        foreach (UiNode node in nodes.Values)
+            restoreNodes.Add(node.CaptureArrangement());
+        return () =>
+        {
+            if (!IsActive)
+                return;
+            nodes.Clear();
+            foreach (KeyValuePair<UiNodeId, UiNode> entry in priorNodes)
+                nodes.Add(entry.Key, entry.Value);
+            foreach (Action restore in restoreNodes)
+                restore();
+            AbortHitPass();
+        };
     }
 
     /// <summary>

@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
-
 /// <summary>
 /// Stable output of a Measure/Arrange pass. Hosts and tests can locate any element rect, iterate
 /// visible ids, and read scroll viewport/content rects without depending on internal engine state.
@@ -26,6 +25,7 @@ public sealed class UiLayoutSnapshot
     public IReadOnlyDictionary<string, Rect> ScrollContents { get; }
 
     public int DefinitionRevision { get; }
+    public IReadOnlyList<UiLayoutDiagnostic> Diagnostics { get; }
 
     public UiLayoutSnapshot(
         Vector2 contentSize,
@@ -43,14 +43,20 @@ public sealed class UiLayoutSnapshot
     {
     }
 
-    public UiLayoutSnapshot(
-        Vector2 contentSize,
-        IReadOnlyDictionary<string, Rect> rectById,
-        IReadOnlyList<string> visibleIds,
-        IReadOnlyDictionary<string, Rect> viewports,
-        IReadOnlyDictionary<string, Rect> scrollContents,
-        int definitionRevision)
+    public UiLayoutSnapshot(Vector2 contentSize, IReadOnlyDictionary<string, Rect> rectById, IReadOnlyList<string> visibleIds, IReadOnlyDictionary<string, Rect> viewports, IReadOnlyDictionary<string, Rect> scrollContents, int definitionRevision)
     {
+        ContentSize = contentSize;
+        RectById = rectById;
+        VisibleIds = visibleIds;
+        Viewports = viewports;
+        ScrollContents = scrollContents;
+        DefinitionRevision = definitionRevision;
+        Diagnostics = System.Array.Empty<UiLayoutDiagnostic>();
+    }
+
+    public UiLayoutSnapshot(Vector2 contentSize, IReadOnlyDictionary<string, Rect> rectById, IReadOnlyList<string> visibleIds, IReadOnlyDictionary<string, Rect> viewports, IReadOnlyDictionary<string, Rect> scrollContents, int definitionRevision, IReadOnlyList<UiLayoutDiagnostic> diagnostics)
+    {
+        Diagnostics = diagnostics;
         ContentSize = contentSize;
         RectById = rectById;
         VisibleIds = visibleIds;
