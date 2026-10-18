@@ -127,8 +127,9 @@ internal static class KernelCancelLadderTests
         LadderShell shell = page.AttachShell();
         try
         {
-            page.OpenMenu();
             page.PressRow("b");
+            page.OpenMenu();
+            Check(page.Session.SetCancelTarget("pick#b"), "the selected row is the explicit tree-return subject beneath the menu");
 
             shell.PumpKey(KeyCode.Escape);
             Check(page.Session.OpenPopupId == null, "the first press closed the menu");

@@ -39,6 +39,7 @@ internal static class Program
     {
         Console.WriteLine("0.8 S0/S1 production shared behavior...");
         failures += KernelSharedBehaviorTests.RunAll();
+        failures += KernelBooleanSelectionExpansionTests.RunAll();
 
         Console.WriteLine("Kernel registry + manifest contracts...");
         failures += KernelRegistryManifestTests.RunAll();

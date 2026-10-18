@@ -160,7 +160,11 @@ public sealed class InputModeRowWidget : IUiWidget
         if (rect.width <= 1f || rect.height <= 1f) return;
 
         List<Option> options = OptionsFor(ctx);
-        if (options.Count == 0) return;
+        if (options.Count == 0)
+        {
+            (ctx.Node ?? ctx.Session.ActiveNode).Selection = new UiSelectionObservation(-1, false);
+            return;
+        }
 
         string bindKey = ReadBindKey();
         // The typed mode reads its current value through the seam - TryGet<string> would refuse a binding of
@@ -178,6 +182,10 @@ public sealed class InputModeRowWidget : IUiWidget
         }
 
         UiGeometry geometry = ctx.Theme.Geometry;
+        var values = new List<object?>(options.Count);
+        foreach (Option option in options) values.Add(option.Typed ? option.TypedValue : option.Value);
+        (ctx.Node ?? ctx.Session.ActiveNode).Selection = UiValueBehavior.Observe(values, typed ? currentTyped : current,
+            _ => AtomVocabulary.WritableOf(ctx, bindKey) != false);
         int columns = ColumnsFor(rect.width);
         int rows = (options.Count + columns - 1) / columns;
         float rowHeight = ReadFloat("Height", geometry.RowHeight);
@@ -213,19 +221,16 @@ public sealed class InputModeRowWidget : IUiWidget
                 }
             }
 
-            if (UiNative.Button(optionRect, ctx))
+            object? identity = options[i].Typed ? options[i].TypedValue : options[i].Value;
+            UiInteractionTarget target = UiNative.InteractionTarget(ctx, bindKey, "option", identity);
+            bool writable = AtomVocabulary.WritableOf(ctx, bindKey) != false;
+            UiInteractionResult input = UiNative.Activation(optionRect, ctx, bindKey, "option", identity, writable);
+            UiValueBehavior.Request(target, UiValueBehavior.Selection(input, identity), value =>
             {
-                if (options[i].Typed)
-                {
-                    // A refused write (a value of the wrong type) changes nothing: the refusal is reported and
-                    // the cell simply does not move the model.
-                    seam!.TrySetTypedValue(bindKey, options[i].TypedValue);
-                }
-                else
-                {
-                    ctx.Bindings.Set(bindKey, options[i].Value);
-                }
-            }
+                if (typed) seam!.TrySetTypedValue(bindKey, value);
+                else ctx.Bindings.Set(bindKey, (string)value!);
+            });
+            if (!ctx.Session.IsActive) return;
         }
 
         OptionHelp.Publish(ctx, OptionHelp.SinkKey(spec), hoveredHelp);

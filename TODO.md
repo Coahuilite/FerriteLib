@@ -1,9 +1,10 @@
 # TODO
 
-## 0.8 S0/S1 continuation
+## 0.8 continuation
 
 - [ ] Run the native 1.6 S0/S1 acceptance in docs/development/0.8/s01-contract.md after the developer installs the selected isolated Dev package.
-- [ ] Continue S2-S4 from the 0.8 specification; S0/S1 does not close editing/IME, remaining layout, authoring or complete first-version acceptance.
+- [ ] Run the native BSE acceptance in `docs/development/0.8/bse-contract.md` using the selected isolated Dev package.
+- [ ] Continue the complete first-version inventory in `docs/development/0.8/migration-status.md`: common editing/numeric composition, basic multiline/IME, editable chart points, description/layout/assembly/hosts/observation and native acceptance remain open.
 
 
 > The action surface only. Settled rulings, done work and the release/round history live in `MEMORY.md`

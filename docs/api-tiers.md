@@ -76,6 +76,9 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
 - `UiRange` — 0.8 S0/S1 shared contract; shape may change within the development line.
 - `UiInteractionResult` — 0.8 S0/S1 shared contract; shape may change within the development line.
 - `UiInteractionSession` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiValueOperation` — 0.8 shared target-value intent; public-unstable.
+- `UiSelectionObservation` — model-derived missing/selectable facts; public-unstable.
+- `UiValueBehavior` — shared boolean/selection/expansion request boundary; public-unstable.
 - `UiInteractionRequests` — 0.8 S0/S1 shared contract; shape may change within the development line.
 - `UiPropertyOrigin` — 0.8 S0/S1 shared contract; shape may change within the development line.
 - `UiPropertyDeclaration` — 0.8 S0/S1 shared contract; shape may change within the development line.

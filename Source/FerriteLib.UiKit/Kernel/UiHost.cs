@@ -244,7 +244,9 @@ public sealed class UiHost : IDisposable
             foreach (Action popupDraw in session.PopupDrawActions)
             {
                 popupDraw();
+                if (!session.IsActive) return;
             }
+            session.EndPopupPass();
         }
         finally
         {

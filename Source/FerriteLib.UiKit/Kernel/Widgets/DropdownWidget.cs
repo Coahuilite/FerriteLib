@@ -194,8 +194,10 @@ public sealed class DropdownWidget : IUiWidget
 
         ctx.Bindings.TryGet(bindKey, out string current);
         List<Option> options = BuildOptions(ctx);
+        var values = new List<string>(options.Count);
+        foreach (Option option in options) values.Add(option.Value);
+        (ctx.Node ?? ctx.Session.ActiveNode).Selection = UiValueBehavior.Observe(values, current, _ => AtomVocabulary.WritableOf(ctx, bindKey) != false);
         if (options.Count == 0) return;
-
         string display = FindDisplayText(options, current);
         bool open = ctx.Session.IsPopupOpen(bindKey);
         Rect fieldRect = DrawLabelledField(rect, ReadLabel(ctx), display, open || current.Length > 0, ctx);
@@ -203,7 +205,7 @@ public sealed class DropdownWidget : IUiWidget
         // The trigger click stores the popup anchor in Host window space (the engine translates
         // draw rects inside scrolls/groups); the popup pass draws and hit-tests in that same
         // stored space, so both share one anchor source.
-        UiNative.DropdownButton(fieldRect, bindKey, ctx);
+        UiNative.DropdownButton(fieldRect, bindKey, ctx, (ctx.Node ?? ctx.Session.ActiveNode).Id.Key);
 
         string helpSink = OptionHelp.SinkKey(spec);
         if (ctx.Session.IsPopupOpen(bindKey))
@@ -270,17 +272,23 @@ public sealed class DropdownWidget : IUiWidget
     {
         if (!seam.TryGetChoices(ReadOptionsKey(bindKey), out IReadOnlyList<UiChoice<object?>> choices) || choices.Count == 0)
         {
+            (ctx.Node ?? ctx.Session.ActiveNode).Selection = new UiSelectionObservation(-1, false);
             return;
         }
 
         bool hasCurrent = seam.TryGetTypedValue(bindKey, out object? current);
+        var values = new List<object?>(choices.Count);
+        foreach (UiChoice<object?> choice in choices) values.Add(choice.Value);
+        (ctx.Node ?? ctx.Session.ActiveNode).Selection = hasCurrent
+            ? UiValueBehavior.Observe(values, current, _ => AtomVocabulary.WritableOf(ctx, bindKey) != false)
+            : new UiSelectionObservation(-1, false);
         string display = hasCurrent ? FindChoiceText(choices, current) : "";
         bool open = ctx.Session.IsPopupOpen(bindKey);
         Rect fieldRect = DrawLabelledField(rect, ReadLabel(ctx), display, open || hasCurrent, ctx);
 
         // The trigger click stores the popup anchor in Host window space, exactly as the string path does: the
         // anchor source is the primitive, not this path's choice.
-        UiNative.DropdownButton(fieldRect, bindKey, ctx);
+        UiNative.DropdownButton(fieldRect, bindKey, ctx, (ctx.Node ?? ctx.Session.ActiveNode).Id.Key);
 
         string helpSink = OptionHelp.SinkKey(spec);
         if (ctx.Session.IsPopupOpen(bindKey))
@@ -316,7 +324,7 @@ public sealed class DropdownWidget : IUiWidget
                 // A refused write (a value of the wrong type, or a read-only binding) changes nothing at all:
                 // TrySetTypedValue reports the refusal instead of throwing or coercing.
                 seam.TrySetTypedValue(bindKey, value);
-            });
+            }, AtomVocabulary.WritableOf(ctx, bindKey) != false);
 
         // A typed option's option-level identity is its LABEL: the value is not a string, so the popup cannot
         // report one, and the label is the only string the author gave this option.
@@ -366,7 +374,7 @@ public sealed class DropdownWidget : IUiWidget
             ctx,
             pairs,
             current,
-            value => ctx.Bindings.Set(bindKey, value));
+            value => ctx.Bindings.Set(bindKey, value), AtomVocabulary.WritableOf(ctx, bindKey) != false);
 
         // The option-level identity is the option's VALUE: a dropdown's options come from the consumer's data
         // (an options binding or the static OptionN/ValueN pairs), so the value is the machine token its help

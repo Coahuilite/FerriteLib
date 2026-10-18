@@ -237,7 +237,7 @@ public static partial class UiNative
     /// </summary>
     public static bool DropdownButton(Rect rect, string elementId, UiSession session)
     {
-        return DropdownButtonCore(rect, elementId, session, rect, null);
+        return DropdownButtonCore(rect, elementId, session, rect, null, elementId);
     }
 
     /// <summary>
@@ -248,12 +248,16 @@ public static partial class UiNative
     /// outside those scopes, so anchor, draw and hit-test must share window space.
     /// </summary>
     public static bool DropdownButton(Rect rect, string elementId, UiWidgetContext ctx)
+        => DropdownButton(rect, elementId, ctx, elementId);
+
+    /// <summary>A stable trigger key distinguishes logical components from their replaceable binding target.</summary>
+    public static bool DropdownButton(Rect rect, string elementId, UiWidgetContext ctx, string triggerKey)
     {
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
-        return DropdownButtonCore(rect, elementId, ctx.Session, ctx.ToWindowRect(rect), ctx);
+        return DropdownButtonCore(rect, elementId, ctx.Session, ctx.ToWindowRect(rect), ctx, triggerKey);
     }
 
-    private static bool DropdownButtonCore(Rect rect, string elementId, UiSession session, Rect anchor, UiWidgetContext? ctx)
+    private static bool DropdownButtonCore(Rect rect, string elementId, UiSession session, Rect anchor, UiWidgetContext? ctx, string triggerKey)
     {
         if (session == null) throw new ArgumentNullException(nameof(session));
         if (string.IsNullOrEmpty(elementId)) throw new ArgumentException("Dropdown element id is required.", nameof(elementId));
@@ -269,6 +273,9 @@ public static partial class UiNative
         // fresh at the call site) while the open-time store would otherwise freeze the menu where it was
         // opened. A no-op unless this element owns the open popup; a disabled trigger never reaches here, so
         // its popup is released by the pass-boundary reconcile instead of being refreshed.
+        UiNode triggerNode = ctx?.Node ?? session.ActiveNode;
+        var triggerTarget = new UiInteractionTarget(triggerNode.Id.Key, elementId + "\u001f" + triggerNode.InteractionScope, "trigger", triggerKey, triggerNode.InteractionScope);
+        session.RefreshPopupTarget(elementId, triggerTarget);
         session.NotePopupOwnerDrawn(elementId, anchor);
 
         // The hit stack decides, and it decides geometrically: a popup layer whose rect contains the pointer
@@ -293,16 +300,21 @@ public static partial class UiNative
         }
 
         if (covered) return false;
-        if (ctx != null ? !Button(rect, ctx) : !Button(rect)) return false;
+        UiInteractionResult input = ctx != null
+            ? Activation(rect, ctx, elementId, "trigger", triggerKey)
+            : PopupPointer(rect, elementId, session, triggerTarget, false);
+        UiValueOperation<bool> expansion = UiValueBehavior.Expansion(input, !session.IsPopupOpen(elementId), true);
+        if (!expansion.Request) return false;
 
-        if (session.IsPopupOpen(elementId))
+        UiValueBehavior.Request(triggerTarget, expansion, expanded =>
         {
-            session.ClosePopup();
-        }
-        else
-        {
-            session.OpenPopup(elementId, anchor);
-        }
+            if (!expanded) session.ClosePopup();
+            else
+            {
+                session.OpenPopup(elementId, anchor);
+                session.RefreshPopupTarget(elementId, triggerTarget);
+            }
+        });
 
         // The trigger is the interaction subject now: a Cancel from here walks the tree starting at this
         // element, which is what the contract means by a starting point taken from the actual interaction
@@ -315,6 +327,8 @@ public static partial class UiNative
     /// <summary>
     /// Hit-tests one dropdown option row. Rows are only interactive while the same session owns a
     /// popup for <paramref name="elementId"/>; this keeps popup interaction session-local.
+    /// This legacy raw-hit entry has no stable option key. Use UiPopup or PopupOption for F2 behavior;
+    /// their value/key identity survives reordered options without deriving identity from a rect.
     /// </summary>
     public static bool DropdownOptionRow(Rect rowRect, string elementId, UiSession session)
     {
@@ -672,6 +686,16 @@ public static partial class UiNative
 
         // The return value is not the condition for consuming: the menu owns the event wherever its scroll stands.
         session.ScrollPopupByRows(rows);
+        ConsumePointerEvent();
+    }
+
+    /// <summary>F3: dismiss before content dispatch so the gesture cannot activate what was beneath it.</summary>
+    internal static void DismissPopupOnOutsidePress(UiSession session)
+    {
+        if (!session.PointerInputAllowed || session.OpenPopupId == null || !IsPointerDown()) return;
+        Vector2 point = PointerPosition();
+        if (session.OpenPopupCoversPointer(point) || session.OpenPopupAnchor?.Contains(point) == true) return;
+        session.ClosePopup();
         ConsumePointerEvent();
     }
 

@@ -301,22 +301,16 @@ internal sealed class CheckboxWidget : IUiWidget
     /// </summary>
     private void TakeInput(Rect rect, UiWidgetContext ctx, bool? writable, string key, bool state)
     {
-        // The hit rule: the whole arranged band is the target, and the funnel decides whether the element may
-        // take it (disabled elements and covered layers never do). Writability only gates the write - a
-        // read-only control still reports the click it cannot honour by painting nothing different.
-        if (writable == false) return;
-
-        if (UiNative.Button(rect, ctx))
+        UiInteractionTarget target = UiNative.InteractionTarget(ctx, key);
+        UiValueOperation<bool> operation = UiValueBehavior.Boolean(
+            UiNative.Activation(rect, ctx, key, "", writable: writable != false), !state);
+        UiValueBehavior.Request(target, operation, value =>
         {
-            ctx.Bindings.Set<bool>(key, !state);
+            ctx.Bindings.Set(key, value);
             string actionKey = ReadActionKey();
-            if (actionKey.Length > 0)
-            {
-                ctx.Bindings.Invoke(actionKey);
-            }
-        }
+            if (actionKey.Length > 0) ctx.Bindings.Invoke(actionKey);
+        });
     }
-
     private void Paint(Rect rect, UiResolvedStyle style, bool state, string look, UiWidgetContext ctx)
     {
         UiTheme theme = ctx.Theme;

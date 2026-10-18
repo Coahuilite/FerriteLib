@@ -51,6 +51,7 @@ public sealed class UiSession : IDisposable
     private int? ownedHotControl;
     private readonly List<Action> popupDrawActions = new();
     private string? openPopupId;
+    private UiInteractionTarget? popupTarget;
     private Rect? openPopupAnchor;
     // Whether the open popup's owner reported itself drawn in the pass in progress. Reset at every pass
     // boundary, where a false value releases the popup (see EndHitPass) - that is the half a call-site
@@ -414,7 +415,7 @@ public sealed class UiSession : IDisposable
         // An owner that stopped being drawn owns no live interaction. Release THIS session's capture and no
         // other's, and never touch a native control the session never recorded: the native slider's own drag
         // identity stays Verse's, which is why only a capture with a recorded element owner is reconciled.
-        if (ownedHotControl.HasValue && ownedHotControlOwner != null && !captureOwnerDrawn)
+        if (ownedHotControl.HasValue && ownedHotControlOwner != null && !captureOwnerDrawn && !HasPopupOptionCapture)
         {
             Interactions.End(UiInteractionEnd.Hidden);
             ReleaseHotControl(ownedHotControl.Value);
@@ -423,6 +424,18 @@ public sealed class UiSession : IDisposable
         ReconcileInteractionRecords();
     }
 
+    private bool HasPopupOptionCapture => openPopupId != null
+        && Interactions.CaptureOwner is UiInteractionTarget target && target.Part == "option"
+        && target.TargetScope.StartsWith(openPopupId + "\u001f", StringComparison.Ordinal);
+
+    internal void EndPopupPass()
+    {
+        if (ownedHotControl.HasValue && HasPopupOptionCapture && !captureOwnerDrawn)
+        {
+            Interactions.End(UiInteractionEnd.Hidden);
+            ReleaseHotControl(ownedHotControl.Value);
+        }
+    }
     /// <summary>
     /// The node holding this session's open edit, or null when no field is being edited. This is the record
     /// the window's Accept and Cancel hooks act through (FL-IC2): the hooks run before the page is drawn, so
@@ -683,13 +696,25 @@ public sealed class UiSession : IDisposable
     }
 
     /// <summary>
-    /// Opens (or replaces) the session-owned popup for <paramref name="ownerId"/>.
-    /// This is per-session state, not a process-global popup queue.
+    /// Reconciles the open menu with its actual trigger target; a replacement cannot inherit its popup.
     /// </summary>
+    internal void RefreshPopupTarget(string ownerId, UiInteractionTarget target)
+    {
+        if (!IsPopupOpen(ownerId)) return;
+        if (popupTarget.HasValue && !popupTarget.Value.Equals(target))
+        {
+            ClosePopup();
+            return;
+        }
+        popupTarget = target;
+    }
+
+    /// <summary>Opens or replaces this session's popup. No process-global popup state is created.</summary>
     public void OpenPopup(string ownerId, Rect anchor)
     {
         if (ownerId == null) throw new ArgumentNullException(nameof(ownerId));
         EnsureActive();
+        popupTarget = null;
         openPopupId = ownerId;
         openPopupAnchor = anchor;
         // A menu that opens is at its top: the scroll belongs to this open, not to the element, so a second
@@ -708,6 +733,12 @@ public sealed class UiSession : IDisposable
     public void ClosePopup()
     {
         EnsureActive();
+        if (HasPopupOptionCapture)
+        {
+            Interactions.End(UiInteractionEnd.Hidden);
+            if (ownedHotControl.HasValue) ReleaseHotControl(ownedHotControl.Value);
+        }
+        popupTarget = null;
         openPopupId = null;
         openPopupAnchor = null;
         openPopupScrollRows = 0;
@@ -1270,6 +1301,7 @@ public sealed class UiSession : IDisposable
         hoverGraceLeft = 0;
         trippedLogs.Clear();
         popupDrawActions.Clear();
+        popupTarget = null;
         openPopupId = null;
         openPopupAnchor = null;
         openPopupScrollRows = 0;

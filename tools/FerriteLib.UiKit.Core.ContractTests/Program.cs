@@ -26,6 +26,7 @@ internal static class Program
             Properties();
             SharedBehavior();
             IdentityAndEnd();
+            BooleanSelectionExpansion();
             Isolation();
             Console.WriteLine($"ALL PASS {checks} neutral checks");
             return 0;
@@ -206,6 +207,44 @@ internal static class Program
         session.Dispose();
         session.Dispose();
         Check(sibling.CaptureOwner.HasValue, "E3 idempotent close isolates sibling");
+    }
+
+    private static void BooleanSelectionExpansion()
+    {
+        using var session = new UiInteractionSession();
+        var first = new UiInteractionTarget("composite", "binding", "option", "a", "business");
+        var second = new UiInteractionTarget("composite", "binding", "option", "b", "business");
+        session.PointerActivation(second, Sample(UiPointerPhase.Press), Geometry, Eligible);
+        session.PointerActivation(first, Sample(UiPointerPhase.None), Geometry, Eligible);
+        Check(session.CaptureOwner?.Equals(second) == true, "BSE earlier sibling does not cancel captured selection");
+        int requests = 0;
+        string current = "b";
+        var release = session.PointerActivation(second, Sample(UiPointerPhase.Release), Geometry, Eligible);
+        UiValueBehavior.Request(second, UiValueBehavior.Selection(release, "b"), value =>
+        {
+            current = value;
+            requests++;
+        });
+        UiValueBehavior.Request(second, UiValueBehavior.Selection(session.Activate(second, Eligible), "b"), value => requests++);
+        Check(current == "b" && requests == 2, "BSE each established same-value selection requests once");
+        UiValueBehavior.Request(second, UiValueBehavior.Selection(session.PointerActivation(second, Sample(UiPointerPhase.None), Geometry, Eligible), "b"), value => requests++);
+        Check(requests == 2, "BSE repaint never repeats selection");
+        Check(UiValueBehavior.Observe(new[] { "a", "b" }, "missing").Missing, "BSE missing current is fact, not first-item repair");
+        Check(!UiValueBehavior.Observe(new[] { "a", "b" }, "b", value => false).Selectable, "BSE selected disabled option remains observable");
+        Check(!UiValueBehavior.Boolean(session.Activate(second, new(false)), true).Request, "BSE disabled boolean refuses operation");
+        Check(!UiValueBehavior.Selection(session.Activate(second, new(true, false)), "a").Request, "BSE read-only selection refuses operation");
+        Check(!UiValueBehavior.Expansion(session.Activate(second, Eligible), true, false).Request, "BSE leaf cannot expand");
+        bool expanded = false;
+        UiValueBehavior.Request(second, UiValueBehavior.Expansion(session.Activate(second, Eligible), true, true), value => expanded = value);
+        Check(expanded, "BSE expansion requests target state without owning model");
+        session.PointerActivation(second, Sample(UiPointerPhase.Press), Geometry, Eligible);
+        var replacement = new UiInteractionTarget("composite", "binding", "option", "b", "replacement");
+        Check(!session.PointerActivation(replacement, Sample(UiPointerPhase.Release), Geometry, Eligible).Request && session.CaptureOwner == null, "BSE true business replacement ends capture despite same part/key");
+        session.PointerActivation(second, Sample(UiPointerPhase.Press), Geometry, Eligible);
+        var rebound = new UiInteractionTarget("composite", "other-binding", "option", "b", "business");
+        Check(!session.PointerActivation(rebound, Sample(UiPointerPhase.Release), Geometry, Eligible).Request && session.LastEnd == UiInteractionEnd.TargetChanged && session.CaptureOwner == null, "BSE same part/item binding replacement ends capture without sibling cancellation");
+        session.PointerActivation(second, Sample(UiPointerPhase.Press), Geometry, Eligible);
+        Check(!UiValueBehavior.Boolean(session.PointerActivation(second, Sample(UiPointerPhase.Release, used: true), Geometry, Eligible), true).Request && session.CaptureOwner == null, "BSE consumed release ends capture without boolean request");
     }
 
     private static void Isolation()

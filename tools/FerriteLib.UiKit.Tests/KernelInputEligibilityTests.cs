@@ -383,17 +383,17 @@ internal static class KernelInputEligibilityTests
         Check(page.Session.OpenPopupScrollRows > 0,
             "and the menu moved, which is the priority the ruling asks for");
 
-        int moved = page.Session.OpenPopupScrollRows;
         Check(!page.Wheel(outside, down: true),
             "and a notch that lands outside the menu leaves both the scroll and the event alone");
         page.Click(outside);
-        Check(page.Session.OpenPopupId != null && page.Session.OpenPopupScrollRows == moved,
-            "a click outside the menu neither dismissed it nor moved it: only a row or the trigger acts");
+        Check(page.Session.OpenPopupId == null && page.Session.OpenPopupScrollRows == 0,
+            "F3 outside primary gesture closes the menu without selecting");
 
         // The end of the list is not a release of the priority: a notch that cannot move the menu is still
         // owned by it, or the page under the menu starts scrolling under the player's eyes. The menu is closed
         // here the way a row closes it - a forty-item menu covers its own trigger completely, so the
         // uncovered-strip route belongs to the short-menu lane above and not to this one.
+        page.OpenMenuAt(trigger);
         page.Click(inside);
         Check(page.Session.OpenPopupId == null, "the bottom row closed the menu by selecting, as every row does");
         page.OpenMenuAt(trigger);
@@ -428,7 +428,7 @@ internal static class KernelInputEligibilityTests
         // well, and an assertion that holds on both sides of the fix is a guard, not the proof.
         page.Pump(EventType.Layout, point);
         page.Pump(EventType.MouseDown, point);
-        Check(page.Session.OwnedHotControl == null && page.Session.OwnedHotControlOwner == null,
+        Check(page.Session.OwnedHotControlOwner?.ElementId != "chart" && page.Session.Interactions.CaptureOwner?.Part == "option",
             "the covered chart captured nothing into its session");
 
         page.Pump(EventType.MouseDrag, point + new Vector2(12f, 8f));

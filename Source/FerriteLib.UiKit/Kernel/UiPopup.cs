@@ -105,8 +105,8 @@ public static class UiPopup
     /// Returns the <b>hovered</b> option's value, or an empty string when no visible row is hovered, so the
     /// caller can publish an option-level fact - the dropdown's <c>HoverHelpKey</c> identity - without
     /// re-deriving this helper's row geometry. The hover test is the raw rect form on purpose: the popup is the
-    /// topmost layer and these rows are its own, which is the same reason <see cref="UiNative.DropdownOptionRow"/>
-    /// is the context-free hit. Nothing is consumed by the test, so the row's click below is unaffected.
+    /// topmost layer and these rows are its own. <see cref="UiNative.PopupOption"/> applies the shared
+    /// capture protocol with that row's stable value identity. Hover consumes nothing.
     /// </para>
     /// <para>
     /// A row that the scroll has moved out of the menu is not drawn, not hovered and not hit-tested: the answer
@@ -115,13 +115,17 @@ public static class UiPopup
     /// <see cref="UiNative.TakePopupWheelIfCovering"/>.
     /// </para>
     /// </summary>
+    public static string DrawOptionList(Rect popupRect, string elementId, UiWidgetContext ctx,
+        IReadOnlyList<KeyValuePair<string, string>> options, string current, Action<string> onSelected)
+        => DrawOptionList(popupRect, elementId, ctx, options, current, onSelected, true);
+
     public static string DrawOptionList(
         Rect popupRect,
         string elementId,
         UiWidgetContext ctx,
         IReadOnlyList<KeyValuePair<string, string>> options,
         string current,
-        Action<string> onSelected)
+        Action<string> onSelected, bool selectable)
     {
         if (string.IsNullOrEmpty(elementId)) throw new ArgumentException("Popup element id is required.", nameof(elementId));
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
@@ -143,11 +147,13 @@ public static class UiPopup
 
             DrawRow(rowRect, options[index].Key,
                 string.Equals(options[index].Value, current, StringComparison.Ordinal), ctx.Theme);
-            if (UiNative.DropdownOptionRow(rowRect, elementId, ctx.Session))
+            UiInteractionResult input = UiNative.PopupOption(rowRect, elementId, ctx, options[index].Value, selectable);
+            if (input.Request)
             {
-                UiNative.ConsumePointerEvent();
                 ctx.Session.ClosePopup();
-                onSelected(options[index].Value);
+                UiInteractionTarget target = UiNative.InteractionTarget(ctx, elementId, "option", options[index].Value);
+                UiValueBehavior.Request(target, UiValueBehavior.Selection(input, options[index].Value), onSelected);
+                return hovered;
             }
         }
 
@@ -169,13 +175,17 @@ public static class UiPopup
     /// and the two list forms stay one contract rather than two habits.
     /// </para>
     /// </summary>
+    public static int DrawChoiceList(Rect popupRect, string elementId, UiWidgetContext ctx,
+        IReadOnlyList<UiChoice<object?>> options, object? current, Action<object?> onSelected)
+        => DrawChoiceList(popupRect, elementId, ctx, options, current, onSelected, true);
+
     public static int DrawChoiceList(
         Rect popupRect,
         string elementId,
         UiWidgetContext ctx,
         IReadOnlyList<UiChoice<object?>> options,
         object? current,
-        Action<object?> onSelected)
+        Action<object?> onSelected, bool selectable)
     {
         if (string.IsNullOrEmpty(elementId)) throw new ArgumentException("Popup element id is required.", nameof(elementId));
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
@@ -196,11 +206,13 @@ public static class UiPopup
             }
 
             DrawRow(rowRect, options[index].Text, Equals(options[index].Value, current), ctx.Theme);
-            if (UiNative.DropdownOptionRow(rowRect, elementId, ctx.Session))
+            UiInteractionResult input = UiNative.PopupOption(rowRect, elementId, ctx, options[index].Value, selectable);
+            if (input.Request)
             {
-                UiNative.ConsumePointerEvent();
                 ctx.Session.ClosePopup();
-                onSelected(options[index].Value);
+                UiInteractionTarget target = UiNative.InteractionTarget(ctx, elementId, "option", options[index].Value);
+                UiValueBehavior.Request(target, UiValueBehavior.Selection(input, options[index].Value), onSelected);
+                return hovered;
             }
         }
 

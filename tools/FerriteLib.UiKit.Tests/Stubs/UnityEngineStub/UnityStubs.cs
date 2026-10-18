@@ -235,6 +235,8 @@ public struct Rect
 
     public float yMax => _y + _height;
 
+    public bool Contains(Vector2 point) => point.x >= x && point.x < xMax && point.y >= y && point.y < yMax;
+
     public Vector2 position => new(_x, _y);
 
     // The rest of the value family (task-105): pure reads of the four stored numbers, so each rule is the

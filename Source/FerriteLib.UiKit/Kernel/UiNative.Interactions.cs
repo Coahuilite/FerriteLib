@@ -2,16 +2,18 @@ using System;
 using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
-
 // Platform facts and native effects only. Activation/range transitions live in UiInteractionSession.
 public static partial class UiNative
 {
-    public static UiInteractionTarget InteractionTarget(UiWidgetContext ctx, string binding)
+    public static UiInteractionTarget InteractionTarget(UiWidgetContext ctx, string binding) => InteractionTarget(ctx, binding, "", null);
+    public static UiInteractionTarget InteractionTarget(UiWidgetContext ctx, string binding, string part, object? itemKey = null)
     {
         UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
-        return new UiInteractionTarget(node.Id.Key, binding + "\u001f" + node.InteractionScope);
+        return new UiInteractionTarget(node.Id.Key, binding + "\u001f" + node.InteractionScope, part, itemKey, node.InteractionScope);
     }
-    public static UiInteractionResult Activation(Rect rect, UiWidgetContext ctx, string binding = "activation")
+
+    public static UiInteractionResult Activation(Rect rect, UiWidgetContext ctx, string binding = "activation") => Activation(rect, ctx, binding, "", null, true);
+    public static UiInteractionResult Activation(Rect rect, UiWidgetContext ctx, string binding, string part, object? itemKey = null, bool writable = true)
     {
         // Existing harness seam represents an already-established logical activation, not native pointer timing.
         if (ButtonOverride != null)
@@ -22,22 +24,21 @@ public static partial class UiNative
             UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
             bool enabled = !IsInputDisabled(node);
             bool covered = ctx.Session.IsPointerOverHigherLayer(node, WindowPointer(ctx));
-            bool established = enabled && !covered && ButtonOverride(rect);
-            UiInteractionResult result = ctx.Session.Interactions.Activate(InteractionTarget(ctx, binding), new UiInputEligibility(established));
+            bool established = enabled && writable && !covered && ButtonOverride(rect);
+            UiInteractionResult result = ctx.Session.Interactions.Activate(InteractionTarget(ctx, binding, part, itemKey), new UiInputEligibility(established));
 #if FER_DEV
             UiDevGeometryProbe.NoteInput(ctx, node, rect, !enabled ? "disabled" : covered ? "covered" : established ? "hit" : "miss", before);
 #endif
             return result;
         }
-        return PointerInteraction(rect, ctx, false, default, 0, true, binding);
+
+        return PointerInteraction(rect, ctx.Session, ctx.Node ?? ctx.Session.ActiveNode, InteractionTarget(ctx, binding, part, itemKey), CanReceivePointerPress(rect, ctx), !IsInputDisabled(ctx.Node ?? ctx.Session.ActiveNode) && writable, false, default, 0, ctx);
     }
 
     public static UiInteractionResult Range(Rect rect, UiWidgetContext ctx, string binding, float value, float min, float max, bool writable = true)
     {
         if (SliderOverride != null && writable && !IsInputDisabled(ctx.Node ?? ctx.Session.ActiveNode) && !ctx.Session.IsPointerOverHigherLayer(ctx.Node ?? ctx.Session.ActiveNode, WindowPointer(ctx)))
-            return ctx.Session.Interactions.Select(InteractionTarget(ctx, binding), new UiRange(min, max), SliderOverride(rect, value, min, max),
-                new UiInputEligibility(!IsInputDisabled(ctx.Node ?? ctx.Session.ActiveNode), writable,
-                    !ctx.Session.IsPointerOverHigherLayer(ctx.Node ?? ctx.Session.ActiveNode, WindowPointer(ctx))));
+            return ctx.Session.Interactions.Select(InteractionTarget(ctx, binding), new UiRange(min, max), SliderOverride(rect, value, min, max), new UiInputEligibility(!IsInputDisabled(ctx.Node ?? ctx.Session.ActiveNode), writable, !ctx.Session.IsPointerOverHigherLayer(ctx.Node ?? ctx.Session.ActiveNode, WindowPointer(ctx))));
         return PointerInteraction(rect, ctx, true, new UiRange(min, max), value, writable, binding);
     }
 
@@ -45,37 +46,32 @@ public static partial class UiNative
     {
         UiSession session = ctx.Session;
         UiNode node = ctx.Node ?? session.ActiveNode;
-        return PointerInteraction(rect, session, node, InteractionTarget(ctx, binding),
-            CanReceivePointerPress(rect, ctx), !IsInputDisabled(node) && writable, range, limits, value, ctx);
+        return PointerInteraction(rect, session, node, InteractionTarget(ctx, binding), CanReceivePointerPress(rect, ctx), !IsInputDisabled(node) && writable, range, limits, value, ctx);
     }
 
-    private static UiInteractionResult PointerInteraction(Rect rect, UiSession session, UiNode node, UiInteractionTarget target,
-        bool canReceive, bool canOperate, bool range, UiRange limits, float value, UiWidgetContext? ctx = null)
+    private static UiInteractionResult PointerInteraction(Rect rect, UiSession session, UiNode node, UiInteractionTarget target, bool canReceive, bool canOperate, bool range, UiRange limits, float value, UiWidgetContext? ctx = null)
     {
 #if FER_DEV
         string eventBefore = DiagnosticEventName();
 #endif
-        int allocatedControl = GetControlId(target.Node + "\u001f" + target.TargetScope);
+        int allocatedControl = GetControlId(target.Node + "\u001f" + target.TargetScope + "\u001f" + target.Part + "\u001f" + target.GetHashCode());
         bool owns = session.Interactions.CaptureOwner?.Equals(target) == true;
-        bool sameNativeOwner = ReferenceEquals(session.OwnedHotControlOwner, node)
-            || (node.Id.IsNone && session.OwnedHotControlOwner == null);
+        bool sameNativeOwner = ReferenceEquals(session.OwnedHotControlOwner, node) || (node.Id.IsNone && session.OwnedHotControlOwner == null);
         int control = owns && sameNativeOwner && session.OwnedHotControl.HasValue ? session.OwnedHotControl.Value : allocatedControl;
         bool hadNodeCapture = session.Interactions.CaptureOwner?.Node == target.Node;
         UiPointerPhase phase = PointerPhase();
-        if (owns && (!sameNativeOwner || !HasHotControl(control))) phase = UiPointerPhase.Lost;
+        if (owns && (!sameNativeOwner || !HasHotControl(control)))
+            phase = UiPointerPhase.Lost;
         var point = PointerPosition();
         var input = new UiPointerSample(phase, point.x, point.y, Event.current?.type == EventType.Used);
         int nativeCapture = DebugMousePositionEnabled ? DebugHotControl : GUIUtility.hotControl;
         var eligibility = new UiInputEligibility(canOperate && session.PointerInputAllowed && session.IsInputGeometryReliable, true, canReceive && (nativeCapture == 0 || owns));
         float thumb = Math.Min(12, rect.width / 2);
-        var geometry = range ? new UiHitGeometry(rect.x, rect.y, rect.width, rect.height, rect.x + thumb / 2, rect.width - thumb)
-            : new UiHitGeometry(rect.x, rect.y, rect.width, rect.height);
+        var geometry = range ? new UiHitGeometry(rect.x, rect.y, rect.width, rect.height, rect.x + thumb / 2, rect.width - thumb) : new UiHitGeometry(rect.x, rect.y, rect.width, rect.height);
         UiInteractionResult result;
         try
         {
-            result = range
-                ? session.Interactions.PointerRange(target, input, geometry, eligibility, limits, value)
-                : session.Interactions.PointerActivation(target, input, geometry, eligibility);
+            result = range ? session.Interactions.PointerRange(target, input, geometry, eligibility, limits, value) : session.Interactions.PointerActivation(target, input, geometry, eligibility);
         }
         catch
         {
@@ -84,15 +80,22 @@ public static partial class UiNative
                 session.ReleaseHotControl(session.OwnedHotControl.Value);
             throw;
         }
+
         bool captured = session.Interactions.CaptureOwner?.Equals(target) == true;
         if (captured)
         {
-            if (!session.IsHotControlOwned(control)) session.CaptureHotControlForNode(control, node);
+            if (!session.IsHotControlOwned(control))
+                session.CaptureHotControlForNode(control, node);
             session.NoteHotControlOwnerDrawn(control);
         }
-        else if (hadNodeCapture && sameNativeOwner && session.OwnedHotControl.HasValue) session.ReleaseHotControl(session.OwnedHotControl.Value);
-        if (result.Consume) ConsumePointerEvent();
-        if (result.Consume || result.Request) session.NoteInteractionTarget(node);
+        else if (hadNodeCapture && sameNativeOwner && !session.Interactions.CaptureOwner.HasValue && session.OwnedHotControl.HasValue)
+            session.ReleaseHotControl(session.OwnedHotControl.Value);
+        if (result.Consume)
+            ConsumePointerEvent();
+        if (result.Consume || result.Request)
+            session.NoteInteractionTarget(node);
+        if (result.Ended != UiInteractionEnd.None)
+            Trace?.Invoke("interaction end node=" + target.Node + " part=" + target.Part + " reason=" + result.Ended);
 #if FER_DEV
         if (ctx != null)
         {
@@ -103,11 +106,36 @@ public static partial class UiNative
 #endif
         return result;
     }
+
+    /// <summary>Popup rows are already in window space and belong to the open menu, not its covered trigger.</summary>
+    public static UiInteractionResult PopupOption(Rect rect, string elementId, UiWidgetContext ctx, object? key, bool selectable = true)
+    {
+        UiSession session = ctx.Session;
+        UiNode node = ctx.Node ?? session.ActiveNode;
+        var target = InteractionTarget(ctx, elementId, "option", key);
+        UiInteractionResult result = PopupPointer(rect, elementId, session, target, true, selectable, node);
+        if (result.Request)
+            Trace?.Invoke("option fired id=" + elementId + " row=" + Describe(rect));
+        return result;
+    }
+
+    private static UiInteractionResult PopupPointer(Rect rect, string elementId, UiSession session, UiInteractionTarget target, bool option, bool selectable = true, UiNode? ownerNode = null)
+    {
+        UiNode node = ownerNode ?? session.ActiveNode;
+        bool enabled = selectable && !IsInputDisabled(node) && (!option || session.IsPopupOpen(elementId));
+        if (ButtonOverride != null)
+            return session.Interactions.Activate(target, new UiInputEligibility(enabled && ButtonOverride(rect)));
+        return PointerInteraction(rect, session, node, target, enabled && IsMouseOver(rect), enabled, false, default, 0);
+    }
+
     private static UiPointerPhase PointerPhase()
     {
-        if (IsPointerDown()) return UiPointerPhase.Press;
-        if (IsPointerDragging()) return UiPointerPhase.Drag;
-        if (IsPointerUp()) return UiPointerPhase.Release;
+        if (IsPointerDown())
+            return UiPointerPhase.Press;
+        if (IsPointerDragging())
+            return UiPointerPhase.Drag;
+        if (IsPointerUp())
+            return UiPointerPhase.Release;
         // Used preserves the original release in rawType. It ends ownership, but remains consumed.
         Event? current = Event.current;
         if (!DebugMousePositionEnabled && current?.rawType == EventType.MouseUp && current.button == 0)

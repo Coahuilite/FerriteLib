@@ -555,6 +555,7 @@ public sealed class UiLayoutEngine
         // notch yet - is what makes that priority real instead of aspirational: the popup pass runs AFTER
         // content, and a menu over a scrolled page would otherwise never see a wheel event at all. When the
         // menu moves, the event is consumed and this frame's scroll containers keep their position.
+        UiNative.DismissPopupOnOutsidePress(ctx.Session);
         UiNative.TakePopupWheelIfCovering(ctx.Session);
 
         try

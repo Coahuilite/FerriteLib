@@ -2,7 +2,7 @@
 
 The 0.8 development line implements per-property font/density resolution and shared activation/range
 behavior. It still ships one `FerriteLib.UiKit.dll`. Editing, IME, shared label columns, relative placement,
-and the remaining 0.8 slices are not delivered by this slice. Real 1.6 acceptance remains separate.
+and the remaining 0.8 slices are not delivered by S0/S1. The subsequent [BSE package](bse-contract.md) migrates boolean/selection/expansion wrappers; [migration status](migration-status.md) tracks the full retained inventory. Real 1.6 acceptance remains separate.
 
 ## Configure an instance, then remove only its override
 

@@ -106,6 +106,9 @@ public sealed class UiNode
     /// </summary>
     public bool IsDisabled { get; internal set; }
 
+    /// <summary>Latest model-derived discrete-selection facts; never a second selected-value authority.</summary>
+    public UiSelectionObservation? Selection { get; internal set; }
+
     /// <summary>
     /// The command key this element declared as its Cancel binding, already resolved through whatever scope
     /// the element sits in (a row of a <c>Repeat</c> carries the item-scoped key, not the declared one), or

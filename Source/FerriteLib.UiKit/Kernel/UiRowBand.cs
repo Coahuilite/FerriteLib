@@ -3,7 +3,6 @@ using FerriteLib.UiKit.Kernel.Widgets;
 using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
-
 /// <summary>
 /// One composed tree-row band, as a reusable PUBLIC primitive (R4-B). <c>container/tree</c> is its first
 /// driver, and a consumer's own composite calls the same two members per row, so there is exactly one
@@ -12,10 +11,10 @@ namespace FerriteLib.UiKit.Kernel;
 /// <b>What it owns.</b> The indent one level resolves to, the marker's and the box's geometry, the picture's
 /// slot and its letterbox fit, the label that takes the remainder, and the rule that a part which took the
 /// click is not offered to the band body as well. The row's selection, expansion and checkbox answers are
-/// <see cref="UiTreeRow"/>'s own, re-read on every call - this primitive holds no state at all.
+/// <see cref = "UiTreeRow"/>'s own, re-read on every call - this primitive holds no state at all.
 /// </para>
 /// <para>
-/// <b>Clip.</b> Everything it paints is clamped into <paramref name="band"/>: the label is given the band's
+/// <b>Clip.</b> Everything it paints is clamped into <paramref name = "band"/>: the label is given the band's
 /// remainder, the picture is fitted inside its own slot. The session's effective clip is the engine's, applied
 /// on top by whoever draws the container.
 /// </para>
@@ -29,7 +28,8 @@ public static class UiRowBand
     /// </summary>
     public static float Measure(UiTreeRow row, UiTheme theme, float rowHeight)
     {
-        if (theme == null) throw new ArgumentNullException(nameof(theme));
+        if (theme == null)
+            throw new ArgumentNullException(nameof(theme));
         float band = rowHeight;
         if (row.Image != null)
         {
@@ -44,36 +44,29 @@ public static class UiRowBand
     }
 
     /// <summary>
-    /// Draws one band into <paramref name="band"/>: indent, disclosure marker, checkbox, image and label, in
+    /// Draws one band into <paramref name = "band"/>: indent, disclosure marker, checkbox, image and label, in
     /// that order, each part present only when the row asks for it. Every part's click is reported to
-    /// <paramref name="actions"/> with the row's stable <see cref="UiTreeRow.Key"/> - the body, the marker and
+    /// <paramref name = "actions"/> with the row's stable <see cref = "UiTreeRow.Key"/> - the body, the marker and
     /// the box are separate targets, and one click is delivered once.
     /// </summary>
-    /// <param name="style">
+    /// <param name = "style">
     /// The resolved style of the element the band belongs to. A selected row resolves the Active tone from
-    /// <paramref name="ctx"/>'s theme instead, which is the same tone a chosen mode-row cell and a chosen
+    /// <paramref name = "ctx"/>'s theme instead, which is the same tone a chosen mode-row cell and a chosen
     /// dropdown option use.
     /// </param>
-    /// <param name="layout">
+    /// <param name = "layout">
     /// The two placement inputs a caller may override: the per-level indent step and the checkbox's
-    /// right-alignment inset. The default (<see cref="UiRowBandLayout"/>'s own) is the library's behaviour:
+    /// right-alignment inset. The default (<see cref = "UiRowBandLayout"/>'s own) is the library's behaviour:
     /// the theme's spacing per level and the box immediately after the indent.
     /// </param>
-    public static void Draw(
-        UiTreeRow row,
-        Rect band,
-        UiWidgetContext ctx,
-        float rowHeight,
-        UiResolvedStyle style,
-        UiRowBandActions actions,
-        UiRowBandLayout layout = default)
+    public static void Draw(UiTreeRow row, Rect band, UiWidgetContext ctx, float rowHeight, UiResolvedStyle style, UiRowBandActions actions, UiRowBandLayout layout = default)
     {
-        if (ctx == null) throw new ArgumentNullException(nameof(ctx));
-        if (band.width <= 1f || band.height <= 1f) return;
-
+        if (ctx == null)
+            throw new ArgumentNullException(nameof(ctx));
+        if (band.width <= 1f || band.height <= 1f)
+            return;
         UiTheme theme = ctx.Theme;
         float pad = theme.Geometry.Padding;
-
         UiResolvedStyle ink = style;
         if (row.Selected)
         {
@@ -85,12 +78,9 @@ public static class UiRowBand
 
         // A part is sized by the ROW's own height, not by the band: a row made taller by its picture keeps the
         // same marker and box it would have had, so an icon never inflates the controls beside it.
-        float partSide = layout.ControlSize.HasValue
-            ? Math.Max(1f, Math.Min(band.height, layout.ControlSize.Value))
-            : Math.Max(6f, Math.Min(band.height, rowHeight) - pad * 2f);
+        float partSide = layout.ControlSize.HasValue ? Math.Max(1f, Math.Min(band.height, layout.ControlSize.Value)) : Math.Max(6f, Math.Min(band.height, rowHeight) - pad * 2f);
         float indentStep = layout.IndentStep ?? theme.Geometry.Spacing;
         float x = band.x + pad + Math.Max(0f, row.Depth * indentStep);
-
         // The label's room. A right-aligned box is placed from the band's far edge and takes its width out of
         // this, so nothing the row draws can run under it.
         float labelRight = band.xMax;
@@ -104,9 +94,7 @@ public static class UiRowBand
                 // with the label instead of leaving a second colour literal here.
                 UiThemeDraw.Surface(marker, ink.Surface, theme.Geometry.Hairline);
                 float inset = Math.Max(2f, partSide * 0.25f);
-                UiThemeDraw.Solid(
-                    new Rect(marker.x + inset, marker.y + inset, Math.Max(1f, partSide - inset * 2f), Math.Max(1f, partSide - inset * 2f)),
-                    ink.Text);
+                UiThemeDraw.Solid(new Rect(marker.x + inset, marker.y + inset, Math.Max(1f, partSide - inset * 2f), Math.Max(1f, partSide - inset * 2f)), ink.Text);
             }
             else
             {
@@ -114,10 +102,13 @@ public static class UiRowBand
             }
 
             x = marker.xMax + pad;
-            if (actions.Disclosure != null && UiNative.Button(marker, ctx))
+            UiInteractionResult disclosure = UiNative.Activation(marker, ctx, actions.DisclosureTarget, "disclosure", row.Key, actions.Disclosure != null);
+            if (actions.Disclosure != null && disclosure.Request)
             {
-                actions.Disclosure(row.Key);
+                UiValueBehavior.Request(UiNative.InteractionTarget(ctx, actions.DisclosureTarget, "disclosure", row.Key), UiValueBehavior.Expansion(disclosure, !row.Expanded, row.Expandable), _ => actions.Disclosure(row.Key));
                 partFired = true;
+                if (!ctx.Session.IsActive)
+                    return;
             }
         }
 
@@ -125,17 +116,13 @@ public static class UiRowBand
         {
             // Right-aligned when the caller asked for it - the box's own rect, its own hit, the same per-part
             // contract as the left placement - and otherwise exactly where it has always been: after the indent.
-            float boxX = layout.CheckboxRightInset.HasValue
-                ? Math.Max(band.x, band.xMax - Math.Max(0f, layout.CheckboxRightInset.Value) - partSide)
-                : x;
+            float boxX = layout.CheckboxRightInset.HasValue ? Math.Max(band.x, band.xMax - Math.Max(0f, layout.CheckboxRightInset.Value) - partSide) : x;
             var box = new Rect(boxX, band.y + (band.height - partSide) * 0.5f, partSide, partSide);
             UiThemeDraw.Surface(box, row.Checked ? ink.Surface : new UiSurfaceStyle(theme.Base, ink.Text), theme.Geometry.Hairline);
             if (row.Checked)
             {
                 float inset = Math.Max(2f, partSide * 0.25f);
-                UiThemeDraw.Solid(
-                    new Rect(box.x + inset, box.y + inset, Math.Max(1f, partSide - inset * 2f), Math.Max(1f, partSide - inset * 2f)),
-                    ink.Text);
+                UiThemeDraw.Solid(new Rect(box.x + inset, box.y + inset, Math.Max(1f, partSide - inset * 2f), Math.Max(1f, partSide - inset * 2f)), ink.Text);
             }
 
             if (layout.CheckboxRightInset.HasValue)
@@ -147,10 +134,13 @@ public static class UiRowBand
                 x = box.xMax + pad;
             }
 
-            if (actions.Checkbox != null && UiNative.Button(box, ctx))
+            UiInteractionResult check = UiNative.Activation(box, ctx, actions.CheckboxTarget, "check", row.Key, actions.Checkbox != null);
+            if (actions.Checkbox != null && check.Request)
             {
-                actions.Checkbox(row.Key);
+                UiValueBehavior.Request(UiNative.InteractionTarget(ctx, actions.CheckboxTarget, "check", row.Key), UiValueBehavior.Boolean(check, !row.Checked), _ => actions.Checkbox(row.Key));
                 partFired = true;
+                if (!ctx.Session.IsActive)
+                    return;
             }
         }
 
@@ -169,21 +159,15 @@ public static class UiRowBand
         float labelWidth = labelRight - x;
         if (labelWidth > 1f)
         {
-            UiThemeDraw.Label(
-                new Rect(x, band.y, labelWidth, band.height),
-                ReadText(row, ctx),
-                theme,
-                ink.Text,
-                AtomVocabulary.TextFont(ctx),
-                TextAnchor.MiddleLeft,
-                singleLine: true);
+            UiThemeDraw.Label(new Rect(x, band.y, labelWidth, band.height), ReadText(row, ctx), theme, ink.Text, AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft, singleLine: true);
         }
 
         // One band, one body target: the funnel owns whether the element may take it, and a click a part
         // already took is not offered to the band as well.
-        if (!partFired && actions.Body != null && UiNative.Button(band, ctx))
+        if (!partFired && actions.Body != null)
         {
-            actions.Body(row.Key);
+            UiInteractionResult body = UiNative.Activation(band, ctx, actions.BodyTarget, "body", row.Key);
+            UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx, actions.BodyTarget, "body", row.Key), body, () => actions.Body(row.Key));
         }
     }
 
@@ -194,7 +178,7 @@ public static class UiRowBand
 }
 
 /// <summary>
-/// The two placement inputs <see cref="UiRowBand.Draw"/> lets a caller override (R4-B). The default value -
+/// The two placement inputs <see cref = "UiRowBand.Draw"/> lets a caller override (R4-B). The default value -
 /// <c>default(UiRowBandLayout)</c> - is the library's own behaviour, so a caller that has no convention of its
 /// own passes nothing and gets exactly what <c>container/tree</c> gets: the theme's spacing per level, and the
 /// checkbox immediately after the indent.
@@ -213,18 +197,16 @@ public readonly struct UiRowBandLayout
     }
 
     /// <summary>
-    /// The distance one level of <see cref="UiTreeRow.Depth"/> indents by. Null keeps the theme's
+    /// The distance one level of <see cref = "UiTreeRow.Depth"/> indents by. Null keeps the theme's
     /// <c>Geometry.Spacing</c> — the library's own step — and zero is a real answer: a flat list states it.
     /// </summary>
     public float? IndentStep { get; }
-
     /// <summary>
     /// When set, the checkbox is right-aligned: its far edge sits this far inside <c>band.xMax</c>, and the
     /// label's room ends before it. Null keeps the box immediately after the indent, which is what every
     /// existing page has. A negative value is read as zero (clamped into the band, never refused at runtime).
     /// </summary>
     public float? CheckboxRightInset { get; }
-
     /// <summary>Optional visual side for disclosure and checkbox; null keeps the theme-derived size.</summary>
     public float? ControlSize { get; }
 }
@@ -232,27 +214,33 @@ public readonly struct UiRowBandLayout
 /// <summary>
 /// The per-part targets one composed row band reports through (R4-B). A null part is not a target at all:
 /// its control is still painted (a row can show its state without being togglable), and the click falls
-/// through to the body. Each callback receives the row's stable <see cref="UiTreeRow.Key"/> - never an index
+/// through to the body. Each callback receives the row's stable <see cref = "UiTreeRow.Key"/> - never an index
 /// and never a part name to parse, so a consumer dispatches to its own typed action with its own data.
 /// </summary>
 public readonly struct UiRowBandActions
 {
-    public UiRowBandActions(
-        Action<string>? body = null,
-        Action<string>? disclosure = null,
-        Action<string>? checkbox = null)
+    public UiRowBandActions(Action<string>? body = null, Action<string>? disclosure = null, Action<string>? checkbox = null) : this(body, disclosure, checkbox, "row-band", "row-band", "row-band")
+    {
+    }
+
+    public UiRowBandActions(Action<string>? body, Action<string>? disclosure, Action<string>? checkbox, string bodyTarget, string disclosureTarget, string checkboxTarget)
     {
         Body = body;
         Disclosure = disclosure;
         Checkbox = checkbox;
+        BodyTarget = bodyTarget ?? throw new ArgumentNullException(nameof(bodyTarget));
+        DisclosureTarget = disclosureTarget ?? throw new ArgumentNullException(nameof(disclosureTarget));
+        CheckboxTarget = checkboxTarget ?? throw new ArgumentNullException(nameof(checkboxTarget));
     }
 
     /// <summary>The row's body, or null when the band is not itself a target.</summary>
     public Action<string>? Body { get; }
-
     /// <summary>The disclosure marker, or null when expanding is the consumer's business elsewhere.</summary>
     public Action<string>? Disclosure { get; }
-
     /// <summary>The checkbox, or null when the row shows its checked state without offering to change it.</summary>
     public Action<string>? Checkbox { get; }
+    /// <summary>Replaceable business targets, independent of the stable row and part identities.</summary>
+    public string BodyTarget { get; }
+    public string DisclosureTarget { get; }
+    public string CheckboxTarget { get; }
 }

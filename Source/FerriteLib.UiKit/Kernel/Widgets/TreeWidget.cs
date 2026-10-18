@@ -145,7 +145,8 @@ internal sealed class TreeWidget : IUiWidget
         var actions = new UiRowBandActions(
             actionKey.Length > 0 ? key => ctx.Bindings.Invoke<string>(actionKey, key) : null,
             disclosureKey.Length > 0 ? key => ctx.Bindings.Invoke<string>(disclosureKey, key) : null,
-            checkKey.Length > 0 ? key => ctx.Bindings.Invoke<string>(checkKey, key) : null);
+            checkKey.Length > 0 ? key => ctx.Bindings.Invoke<string>(checkKey, key) : null,
+            key + "\u001f" + actionKey, key + "\u001f" + disclosureKey, key + "\u001f" + checkKey);
 
         float y = rect.y;
         for (int i = 0; i < rows.Count; i++)
@@ -172,6 +173,7 @@ internal sealed class TreeWidget : IUiWidget
             // The band itself is the shared public primitive (R4-B): this kind is its first driver, and a
             // consumer's own composite calls the identical entry point for its rows.
             UiRowBand.Draw(row, band, ctx, rowHeight, style, actions);
+            if (!ctx.Session.IsActive) return;
 
             if (band.yMax >= rect.yMax) break;
         }
