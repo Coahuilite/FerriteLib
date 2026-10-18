@@ -22,10 +22,16 @@ public sealed class Event
     public static Event? current { get; set; }
 
     private EventType _type;
+    private EventType _rawType;
+    public EventType rawType => _rawType;
     public EventType type
     {
         get => _type;
-        set => _type = value;
+        set
+        {
+            _type = value;
+            _rawType = value;
+        }
     }
 
     private int _button;
@@ -77,7 +83,7 @@ public sealed class Event
     public void Use()
     {
         used = true;
-        type = EventType.Used;
+        _type = EventType.Used;
     }
 
     // The real UnityEngine.Event exposes this factory and no public constructor; the lanes compile

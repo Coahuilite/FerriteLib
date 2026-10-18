@@ -108,6 +108,10 @@ public static partial class UiNative
         if (IsPointerDown()) return UiPointerPhase.Press;
         if (IsPointerDragging()) return UiPointerPhase.Drag;
         if (IsPointerUp()) return UiPointerPhase.Release;
+        // Used preserves the original release in rawType. It ends ownership, but remains consumed.
+        Event? current = Event.current;
+        if (!DebugMousePositionEnabled && current?.rawType == EventType.MouseUp && current.button == 0)
+            return UiPointerPhase.Release;
         return UiPointerPhase.None;
     }
 

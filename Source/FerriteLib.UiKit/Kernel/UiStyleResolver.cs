@@ -148,8 +148,6 @@ public sealed class UiStyleResolver
             regionThemes.Clear();
         }
 
-        string? scheme = ResolveScheme(nearestFirst);
-        string? density = ResolveDensity(nearestFirst);
         string key = ScopeKey(nearestFirst);
 
         if (regionThemes.TryGetValue(key, out UiTheme? cached)) return cached;

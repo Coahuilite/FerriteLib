@@ -74,6 +74,7 @@ exception and target context. It is neither retried nor rolled back. Subsequent 
   Pointer travel outside the control clamps to the range and retains ownership until release or invalidation.
 - Start eligibility and continuation differ. Leaving the control/clip is not itself capture loss. Disabled,
   unwritable, hidden, removed, replaced-target and closed states cannot replay an old operation.
+- A consumed native primary release is read from `Event.rawType` even after `Event.Use()` changes `type` to Used. It remains consumed: release ends owned capture without activating Button or selecting another Slider value. Raw consumed presses and secondary-button releases do not acquire or end a primary operation.
 - Native capture is owned by the logical session and node. A compatible reflow keeps the recorded native
   capture identifier rather than treating an allocation-order change as a new logical operation.
 - `UiNode.InteractionScope` identifies a changed business object when a getter retargets. Change it before
