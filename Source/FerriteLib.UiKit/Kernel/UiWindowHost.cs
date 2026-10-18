@@ -490,6 +490,7 @@ public abstract class UiWindowHost : Window
                 return;
             }
 
+            host.Session.PointerInputAllowed = !IsOpen || Find.WindowStack.GetsInput(this);
             host.DrawFrame(content);
 #if FER_DEV
             // The host can be created on this first pass, or released by a close during DrawFrame.

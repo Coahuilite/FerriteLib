@@ -1,0 +1,9 @@
+<Project>
+  <!-- Shared explicit production source set: runtime and no-platform contract target consume this list. -->
+  <ItemGroup>
+    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\Neutral\*.cs" />
+    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiFont.cs" />
+    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\ITextMetrics.cs" />
+    <Compile Include="@(NeutralProductionSource)" />
+  </ItemGroup>
+</Project>

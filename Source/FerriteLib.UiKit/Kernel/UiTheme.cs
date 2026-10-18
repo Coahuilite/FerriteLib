@@ -165,6 +165,11 @@ public sealed class UiTheme
     private Color switchThumbOff;
     private Color border, borderStrong, divider;
     private Color? baseBorder, panelBorder, raisedBorder, hoverBorder, selectedBorder, successBorder, dangerBorder;
+    private bool fontDeclared;
+    private bool densityDeclared;
+    internal int PropertyRevision { get; private set; }
+    public bool HasFontOverride => fontDeclared;
+    public bool HasDensityOverride => densityDeclared;
     private UiFont defaultFont = UiFont.Small;
     private UiGeometry geometry = UiGeometry.Default;
 
@@ -249,6 +254,9 @@ public sealed class UiTheme
         successBorder = source.successBorder;
         dangerBorder = source.dangerBorder;
         defaultFont = source.defaultFont;
+        fontDeclared = source.fontDeclared;
+        densityDeclared = source.densityDeclared;
+        PropertyRevision = source.PropertyRevision;
         geometry = source.geometry;
         Styles = new UiStyleTable(this);
     }
@@ -410,6 +418,7 @@ public sealed class UiTheme
         get => defaultFont;
         set
         {
+            if (!fontDeclared) { fontDeclared = true; PropertyRevision++; }
             if (value == defaultFont) return;
             defaultFont = value;
             LayoutRevision++;
@@ -422,12 +431,27 @@ public sealed class UiTheme
         get => geometry;
         set
         {
+            if (!densityDeclared) { densityDeclared = true; PropertyRevision++; }
             if (value == geometry) return;
             geometry = value;
             LayoutRevision++;
         }
     }
 
+    /// <summary>Remove the host declaration, revealing the library font; no creation snapshot is restored.</summary>
+    public void RemoveFontOverride()
+    {
+        if (!fontDeclared) return;
+        fontDeclared = false; PropertyRevision++;
+        if (defaultFont != UiFont.Small) { defaultFont = UiFont.Small; LayoutRevision++; }
+    }
+    /// <summary>Remove only the host density declaration.</summary>
+    public void RemoveDensityOverride()
+    {
+        if (!densityDeclared) return;
+        densityDeclared = false; PropertyRevision++;
+        if (geometry != UiGeometry.Default) { geometry = UiGeometry.Default; LayoutRevision++; }
+    }
     /// <summary>
     /// Bumped whenever a layout-bearing token moves: the font size or the density. Colour tokens
     /// deliberately do not bump it — a lane holds that no colour can move a rect, and re-measuring a

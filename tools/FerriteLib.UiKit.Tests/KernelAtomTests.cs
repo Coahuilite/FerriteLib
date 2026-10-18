@@ -241,23 +241,25 @@ internal static class KernelAtomTests
         UiWidgetContext ctx = MakeContext(session, bindings, theme);
         var rect = new Rect(0f, 0f, 120f, 28f);
 
-        // The appearance ladder first, with the activation seam held closed: each colour reading is
-        // then the state machine's own and cannot be a click's side effect.
+        // F1: a real press arms, but does not activate; an outside release abandons it.
         EnablePointer(new Vector2(60f, 14f));
-        UiNative.ButtonOverride = _ => false;
+        UiNative.ButtonOverride = null;
         UiNative.DebugMouseDown = true;
         ClearRecordedBoxes();
         widget.Draw(rect, ctx);
         Check(HasColor(RecordedBoxColors(), theme.Selected) && HasColor(RecordedBoxColors(), theme.AccentGold),
-            "a held pointer inside the rect paints the active treatment");
-        Check(fired == 0, "a state pass with the activation seam closed fires nothing");
-
+            "a held valid press paints the shared capture's active treatment");
+        Check(fired == 0, "press alone does not activate");
         UiNative.DebugMouseDown = false;
+        UiNative.DebugMouseUp = true;
+        UiNative.DebugMousePosition = new Vector2(-5000f, -5000f);
+        widget.Draw(rect, ctx);
+        UiNative.DebugMouseUp = false;
+        UiNative.DebugMousePosition = new Vector2(60f, 14f);
         ClearRecordedBoxes();
         widget.Draw(rect, ctx);
         Check(HasColor(RecordedBoxColors(), theme.Hover) && HasColor(RecordedBoxColors(), theme.BorderStrong),
-            "hover paints the theme's hover token, not the active treatment");
-
+            "hover after abandoned activation paints hover, not active");
         UiNative.DebugMousePosition = new Vector2(-5000f, -5000f);
         ClearRecordedBoxes();
         widget.Draw(rect, ctx);

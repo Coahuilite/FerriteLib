@@ -238,6 +238,7 @@ public sealed class UiHost : IDisposable
             session.SetHostViewport(viewport);
             UiWidgetContext ctx = CreateContext(viewport.width);
             engine.Draw(ctx, snapshot, viewport);
+            if (!session.IsActive) return;
 
             // Session-owned popups draw after normal content in the same OnGUI pass.
             foreach (Action popupDraw in session.PopupDrawActions)
@@ -313,9 +314,15 @@ public sealed class UiHost : IDisposable
             UiLayoutSnapshot snapshot = MeasureAndArrange(new Vector2(viewport.width, viewport.height));
             Draw(viewport, snapshot);
         }
+        catch
+        {
+            session.Interactions.End(UiInteractionEnd.Aborted);
+            if (session.IsActive && session.OwnedHotControl.HasValue) session.ReleaseHotControl(session.OwnedHotControl.Value);
+            throw;
+        }
         finally
         {
-            EndFrame();
+            if (session.IsActive) EndFrame();
         }
     }
 

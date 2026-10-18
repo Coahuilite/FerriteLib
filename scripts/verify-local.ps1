@@ -60,6 +60,9 @@ $testsProject = Join-Path $root 'tools\FerriteLib.UiKit.Tests\FerriteLib.UiKit.T
 $assembliesDir = Join-Path $root 'dist\build\Release'
 $tempLog = Join-Path ([System.IO.Path]::GetTempPath()) ("fl-verify-" + [guid]::NewGuid().ToString('N') + '.log')
 
+# C1: same production source set, only standard .NET runtime references, no game or runtime stubs.
+& dotnet run --project (Join-Path $root 'tools/FerriteLib.UiKit.Core.ContractTests/FerriteLib.UiKit.Core.ContractTests.csproj') -c Release --nologo
+if ($LASTEXITCODE -ne 0) { throw 'No-platform production contract tests failed.' }
 # Observe the compatibility delivery without opening it for writing. It may be loaded by a consumer.
 $deliveredPath = Join-Path $root '1.6\Assemblies\FerriteLib.UiKit.dll'
 $deliveredBefore = if (Test-Path -LiteralPath $deliveredPath) {

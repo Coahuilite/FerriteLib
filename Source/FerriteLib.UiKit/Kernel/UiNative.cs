@@ -10,7 +10,7 @@ namespace FerriteLib.UiKit.Kernel;
 /// Thin wrappers around native IMGUI/Verse controls. All transient state is read/written through
 /// <see cref="UiSession"/>; this type has no process-global registries or deferred dispatch.
 /// </summary>
-public static class UiNative
+public static partial class UiNative
 {
     // Test seams, same pattern as the old UiInteract but scoped to the greenfield kernel.
     internal static bool DebugMousePositionEnabled;
@@ -348,49 +348,23 @@ public static class UiNative
     public static float Slider(Rect rect, string elementId, UiSession session, float value, float min, float max, out bool changed)
     {
         if (session == null) throw new ArgumentNullException(nameof(session));
+        UiNode node = session.ActiveNode;
+        var target = new UiInteractionTarget(node.Id.Key, elementId + "\u001f" + node.InteractionScope);
+        var limits = new UiRange(min, max);
+        bool enabled = !IsElementDisabled(session, elementId) && !IsCoveredByPopup(session);
+        UiInteractionResult result = SliderOverride != null && enabled
+            ? session.Interactions.Select(target, limits, SliderOverride(rect, value, min, max), new UiInputEligibility(enabled))
+            : PointerInteraction(rect, session, node, target,
+                enabled && IsMouseOver(rect) && session.IsPointInEffectiveClip(PointerPosition() + session.CurrentWindowOrigin),
+                !IsElementDisabled(session, elementId), true, limits, value);
+        changed = result.Request && result.Value != value;
+        // Preserve the legacy session-plus-key editor bridge. It is not read by range behavior.
         UiValueState state = session.GetOrCreateValueState(elementId);
-        if (IsCoveredByPopup(session))
-        {
-            // Covered: mirror the disabled branch's contract exactly - the native control is never reached,
-            // no drag can start and nothing takes the hot control from the option row under the popup.
-            state.FloatValue = ClampValue(value, min, max);
-            if (!state.Focused)
-            {
-                state.EditText = FormatValue(state.FloatValue, "0.##");
-            }
-
-            changed = false;
-            return state.FloatValue;
-        }
-
-        if (IsElementDisabled(session, elementId))
-        {
-            // Disabled: the native control is never reached, so no drag can start and nothing can take the
-            // hot control away from what sits under the pointer - the funnel owns that rule for every kind,
-            // exactly as Button does. The state keeps the value the caller handed in, so re-enabling resumes
-            // on the model rather than on a drag that never happened.
-            state.FloatValue = ClampValue(value, min, max);
-            if (!state.Focused)
-            {
-                state.EditText = FormatValue(state.FloatValue, "0.##");
-            }
-
-            changed = false;
-            return state.FloatValue;
-        }
-
-        float newValue = NativeHorizontalSlider(rect, value, min, max);
-        newValue = ClampValue(newValue, min, max);
-        changed = Math.Abs(newValue - value) > 0.0001f;
-        state.FloatValue = newValue;
-        if (changed || !state.Focused)
-        {
-            state.EditText = FormatValue(newValue, "0.##");
-        }
-
-        return newValue;
+        state.FloatValue = changed ? result.Value : limits.Clamp(value);
+        if (changed || !state.Focused) state.EditText = FormatValue(state.FloatValue, "0.##");
+        PaintRange(rect, UiTheme.Vanilla, limits.Clamp(value), min, max);
+        return changed ? result.Value : limits.Clamp(value);
     }
-
     /// <summary>
     /// The raw text field, carrying no element identity: there is no session and no key to resolve, so it
     /// cannot consult the element's disabled state, cannot hold a draft and cannot report a commit. A caller
@@ -882,11 +856,7 @@ public static class UiNative
         return session.PassBeganWithPrimaryPress && !IsMouseOver(rect);
     }
 
-    private static float NativeHorizontalSlider(Rect rect, float value, float min, float max)
-    {
-        if (SliderOverride != null) return SliderOverride(rect, value, min, max);
-        return VerseWidgets.HorizontalSlider(rect, value, min, max, middleAlignment: true);
-    }
+
 
     private static string NativeTextField(Rect rect, string text)
     {

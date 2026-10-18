@@ -67,6 +67,25 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
 
 ## Public-unstable
 
+- `UiInteractionTarget` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiHitGeometry` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiPointerPhase` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiInteractionEnd` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiInputEligibility` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiPointerSample` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiRange` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiInteractionResult` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiInteractionSession` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiInteractionRequests` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiPropertyOrigin` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiPropertyDeclaration` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiResolvedProperty` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiPropertyResolver` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiDensity` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiSliderLayout` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiElementProperties` — 0.8 S0/S1 shared contract; shape may change within the development line.
+
+
 - `UiOption` — one option of a dynamic options binding: the display text and the value to commit (0.7.x, FL-16).
   Plain strings on purpose, and the same separation the static `OptionN`/`ValueN` pairs always had;
   `BindOptions<string>` keeps working with display == value, so this is an addition, not a reshape.
@@ -194,7 +213,7 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
   `DropdownButton` refuse the pointer for an element the engine published disabled, and the
   session-plus-key primitives now do the same — `Slider`, `NumberField` and the identity-bearing
   `TextField(Rect, string, UiSession, string, out bool)` resolve the element through the
-  declared-Id bridge and never reach the native control while it is disabled, so a command-bound slider or
+  declared-Id bridge and never start interaction while disabled (0.8 Slider uses the shared neutral range rather than a native composite), so a command-bound slider or
   field takes no drag, no edit and no focus, while a key that names no arranged element keeps the
   pre-guard behaviour exactly. The identity-free `TextField(Rect, string)` remains for a caller with no
   element to name, and the gap this entry used to record — "the one interactive primitive that cannot

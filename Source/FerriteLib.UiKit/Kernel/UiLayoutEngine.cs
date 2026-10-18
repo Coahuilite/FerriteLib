@@ -557,8 +557,18 @@ public sealed class UiLayoutEngine
         // menu moves, the event is consumed and this frame's scroll containers keep their position.
         UiNative.TakePopupWheelIfCovering(ctx.Session);
 
-        DrawEntries(lastEntries, 0, lastEntries.Count, ctx, new Vector2(viewport.x, viewport.y), null, Vector2.zero);
-        ctx.Session.EndHitPass();
+        try
+        {
+            DrawEntries(lastEntries, 0, lastEntries.Count, ctx, new Vector2(viewport.x, viewport.y), null, Vector2.zero);
+            if (ctx.Session.IsActive) ctx.Session.EndHitPass();
+        }
+        catch
+        {
+            ctx.Session.Interactions.End(UiInteractionEnd.Aborted);
+            if (ctx.Session.IsActive && ctx.Session.OwnedHotControl.HasValue)
+                ctx.Session.ReleaseHotControl(ctx.Session.OwnedHotControl.Value);
+            throw;
+        }
     }
 
     private void DrawEntries(
@@ -650,6 +660,7 @@ public sealed class UiLayoutEngine
                     viewportPosition,
                     nativeOrigin,
                     windowOrigin);
+                if (!ctx.Session.IsActive) return;
 #if FER_DEV
                 // DT1: the viewport's OWN band is outlined here, after its content has drawn and in this
                 // scope's own draw-local space - the same rect, the same entry, the same `sampled` answer
@@ -708,6 +719,7 @@ public sealed class UiLayoutEngine
                             }
 
                             UiSessionGuard.DrawWidget(entry.Widget, drawRect, entryCtx, entry.Node);
+                            if (!ctx.Session.IsActive) return;
                         }
                         finally
                         {
@@ -770,8 +782,11 @@ public sealed class UiLayoutEngine
             }
             finally
             {
-                ctx.Session.CurrentClip = parentClip;
-                ctx.Session.SetScrollPosition(entry.Node, scrollPosition);
+                if (ctx.Session.IsActive)
+                {
+                    ctx.Session.CurrentClip = parentClip;
+                    ctx.Session.SetScrollPosition(entry.Node, scrollPosition);
+                }
                 VerseWidgets.EndScrollView();
             }
 
@@ -793,7 +808,7 @@ public sealed class UiLayoutEngine
         }
         finally
         {
-            ctx.Session.CurrentClip = outerClip;
+            if (ctx.Session.IsActive) ctx.Session.CurrentClip = outerClip;
             GUI.EndGroup();
         }
     }
@@ -889,12 +904,12 @@ public sealed class UiLayoutEngine
     private UiTheme ScopeTheme(UiWidgetContext ctx, UiNode node)
     {
         IReadOnlyList<UiStyleDeclaration>? chain = ctx.StyleChain;
-        if (styleResolver == null || chain == null || chain.Count == 0) return ctx.Theme;
+        if (styleResolver == null || chain == null || chain.Count == 0) return node.Properties.Apply(node, styleResolver?.Baseline ?? ctx.Theme);
 
         // The scope NAME is the resolver's to read, and only the tree knows where it was written: handing the
         // element's path down is what makes an unknown name a located finding instead of "some scheme is
         // missing somewhere in this document".
-        return styleResolver.ThemeFor(chain, node.Id.Path);
+        return node.Properties.Apply(node, styleResolver.ThemeFor(chain, node.Id.Path));
     }
 
     /// <summary>

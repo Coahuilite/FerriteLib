@@ -1,5 +1,9 @@
 # MEMORY
 
+## 0.8 development line (2026-10-18)
+
+The isolated 0.8.0 line implements S0/S1 only: per-property font/density removal and shared activation/range behavior, including F1 default pointer wrappers. Source, caller and verification boundaries live in "docs/development/0.8/s01-contract.md" and "docs/consumers/consume-from-0.8.0-dev.md". Other 0.8 slices and native 1.6 acceptance remain open. The 0.7 checkpoint below retains its own identity and acceptance scope.
+
 ## Current state (2026-10-09)
 
 - **Build and delivery identity.** The line's last **source** commit is

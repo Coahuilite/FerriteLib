@@ -1,5 +1,11 @@
 # TODO
 
+## 0.8 S0/S1 continuation
+
+- [ ] Run the native 1.6 S0/S1 acceptance in docs/development/0.8/s01-contract.md after the developer installs the selected isolated Dev package.
+- [ ] Continue S2-S4 from the 0.8 specification; S0/S1 does not close editing/IME, remaining layout, authoring or complete first-version acceptance.
+
+
 > The action surface only. Settled rulings, done work and the release/round history live in `MEMORY.md`
 > and `OBLIVIONIS.md`; a closed item is a pointer here, not a paragraph.
 

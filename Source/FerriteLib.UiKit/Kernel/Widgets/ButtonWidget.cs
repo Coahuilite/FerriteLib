@@ -4,21 +4,10 @@ using UnityEngine;
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
 /// <summary>
-/// Core leaf atom <c>input/button</c>: one caption, one command, and the element's own hover and
-/// armed appearance.
-/// <para>
-/// <b>Why this earns a kind</b> — per-element interaction state plus the hit rule behind it. The
-/// library draws no game texture (<see cref="UiNative.Button"/> is <c>Widgets.ButtonInvisible</c>), so
-/// vanilla's free hover/pressed chrome does not exist here: the three appearances below are paint this
-/// element owns, chosen from a hit test against its own arranged rect. The manifest can express
-/// neither "this leaf is the click target" nor "show me armed while the pointer holds me down", and
-/// the funnel seam is what keeps that hit test drivable by the kernel-host lane.
-/// </para>
-/// <para>
-/// The command is required, not optional. A button with no action would be a control that can never
-/// fire — the silent-no-op shape this library's creation-time contract exists to refuse — so a missing
-/// <c>ActionBind</c> fails at Host creation instead of drawing a dead rect.
-/// </para>
+/// Default activation wrapper: caption, optional surface and typed command binding.
+/// Pointer timing/qualification/capture come from UiInteractionSession through UiNative.Activation;
+/// presentation observes that result and never recreates the activation rule.
+/// A missing command is diagnosed at host creation, not rendered as a dead control.
 /// </summary>
 public sealed class ButtonWidget : IUiWidget
 {
@@ -102,10 +91,11 @@ public sealed class ButtonWidget : IUiWidget
     {
         if (rect.width <= 1f || rect.height <= 1f) return;
 
-        // Armed wins over hover: while the pointer is down inside the rect the element is doing the
-        // thing it exists for, and that is the state worth painting. Both readings come from the
-        // funnel seam, so a lane can drive the whole three-state ladder without a live event.
-        bool armed = UiNative.IsMouseDownOver(rect);
+        // A held operation wins over hover. Capture comes from shared behavior rather than raw
+        // MouseDown geometry; painting neither infers an established activation nor requests it.
+        // The same state is available to independent and non-rendering clients.
+        UiInteractionResult interaction = UiNative.Activation(rect, ctx, ReadActionKey());
+        bool armed = interaction.Captured && ctx.Session.Interactions.CaptureOwner?.Node == (ctx.Node ?? ctx.Session.ActiveNode).Id.Key;
         bool hovered = !armed && UiNative.IsMouseOver(rect);
 
         // No writability question here, deliberately: this atom's binding is a command, and the data
@@ -113,9 +103,8 @@ public sealed class ButtonWidget : IUiWidget
         // asking would paint every bound button disabled. Command presence is a creation-time contract
         // instead (a missing ActionBind fails the host).
         UiResolvedStyle idle = AtomVocabulary.ResolveRole(spec, ctx, writable: null);
-        Paint(rect, armed, hovered, idle, ctx);
 
-        if (UiNative.Button(rect, ctx))
+        UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx, ReadActionKey()), interaction, () =>
         {
             // G2: with a PayloadKey the command receives the bound payload - the row's own key, which is what
             // a repeated row needs to say which item it is. Without one the call is exactly what it was.
@@ -144,7 +133,8 @@ public sealed class ButtonWidget : IUiWidget
             {
                 ctx.Bindings.Invoke(ReadActionKey());
             }
-        }
+        });
+        if (ctx.Session.IsActive) Paint(rect, armed, hovered, idle, ctx);
     }
 
     /// <summary>

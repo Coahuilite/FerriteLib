@@ -22,7 +22,7 @@ internal static class Program
         catch (Exception ex)
         {
             failures++;
-            Console.Error.WriteLine("UNHANDLED: " + ex.GetType().FullName + " :: " + ex.Message);
+            Console.Error.WriteLine("UNHANDLED: " + ex);
         }
 
         if (failures == 0)
@@ -37,6 +37,9 @@ internal static class Program
 
     private static void RunAll()
     {
+        Console.WriteLine("0.8 S0/S1 production shared behavior...");
+        failures += KernelSharedBehaviorTests.RunAll();
+
         Console.WriteLine("Kernel registry + manifest contracts...");
         failures += KernelRegistryManifestTests.RunAll();
 

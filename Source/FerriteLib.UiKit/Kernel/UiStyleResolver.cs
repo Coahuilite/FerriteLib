@@ -71,12 +71,14 @@ public sealed class UiStyleResolver
     // The baseline's layout revision as this resolver last saw it. Deliberately not a clock of its own: it
     // is a read head over the revision the engine's band cache compares, so a move expires both caches.
     private int observedBaselineRevision;
+    private int observedPropertyRevision;
 
     public UiStyleResolver(UiTheme baseline, UiStyleDocument document)
     {
         this.baseline = baseline ?? throw new ArgumentNullException(nameof(baseline));
         this.document = document ?? throw new ArgumentNullException(nameof(document));
         observedBaselineRevision = this.baseline.LayoutRevision;
+        observedPropertyRevision = this.baseline.PropertyRevision;
         observedBaselineColourRevision = this.baseline.ColourRevision;
     }
 
@@ -138,21 +140,25 @@ public sealed class UiStyleResolver
         // palette they were built under, are dropped and rebuilt on the next lookup.
         int baselineRevision = baseline.LayoutRevision;
         int baselineColourRevision = baseline.ColourRevision;
-        if (baselineRevision != observedBaselineRevision || baselineColourRevision != observedBaselineColourRevision)
+        if (baselineRevision != observedBaselineRevision || baselineColourRevision != observedBaselineColourRevision || baseline.PropertyRevision != observedPropertyRevision)
         {
             observedBaselineRevision = baselineRevision;
             observedBaselineColourRevision = baselineColourRevision;
+            observedPropertyRevision = baseline.PropertyRevision;
             regionThemes.Clear();
         }
 
         string? scheme = ResolveScheme(nearestFirst);
         string? density = ResolveDensity(nearestFirst);
-        string key = (scheme ?? "") + "\u0001" + (density ?? "");
+        string key = ScopeKey(nearestFirst);
 
         if (regionThemes.TryGetValue(key, out UiTheme? cached)) return cached;
 
         UiTheme theme = baseline.Clone();
-        ApplyNamedScopes(theme, scheme, density, elementPath);
+        ApplyNamedScopes(theme, document.DefaultScheme, document.DefaultDensity, elementPath);
+        if (nearestFirst != null)
+            for (int i = nearestFirst.Count - 1; i >= 0; i--)
+                ApplyNamedScopes(theme, nearestFirst[i].Scheme, nearestFirst[i].Density, elementPath);
 
         if (regionThemes.Count >= MaxScopes)
         {
@@ -180,6 +186,17 @@ public sealed class UiStyleResolver
     /// axes are independent, and neither is implemented in terms of the other.
     /// </para>
     /// </summary>
+    private static string ScopeKey(IReadOnlyList<UiStyleDeclaration>? chain)
+    {
+        if (chain == null) return "";
+        var key = new System.Text.StringBuilder();
+        foreach (var declaration in chain)
+        {
+            key.Append(declaration.Scheme).Append('\u0001').Append(declaration.Density).Append('\u0002');
+        }
+        return key.ToString();
+    }
+
     private void ApplyNamedScopes(UiTheme theme, string? scheme, string? density, string? elementPath)
     {
         if (scheme != null && scheme.Length > 0)

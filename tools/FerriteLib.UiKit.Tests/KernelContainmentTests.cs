@@ -72,9 +72,10 @@ internal static class KernelContainmentTests
             "GUIUtility.hotControl",
             "Mouse.IsOver",
             "VerseWidgets.ButtonInvisible",
-            "VerseWidgets.HorizontalSlider",
             "VerseWidgets.TextField",
         },
+        // Pointer fact translation and native capture observation; no state transitions here.
+        ["UiNative.Interactions.cs"] = new[] { "Event.current", "GUIUtility.hotControl" },
         // The drawing outlet: everything that paints or writes a string goes through here.
         // Text.WordWrap is granted beside Anchor and Font because here it is the same kind of state, not
         // a second backend: the outlet's own singleLine parameter has to turn the wrap off for the draw,

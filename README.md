@@ -8,6 +8,8 @@ no patches, no languages, no textures: enabling it alone changes nothing in the 
 your mod list without a consumer installed, that consumer was uninstalled or disabled; the mod is safe
 to disable only when no enabled mod depends on it.
 
+**Development line: 0.8.0 S0/S1.** See [candidate usage](docs/consumers/consume-from-0.8.0-dev.md) and [implemented contract](docs/development/0.8/s01-contract.md). Remaining 0.8 slices and native 1.6 acceptance are open.
+
 ## What the library provides
 
 Two layers, kept separable on purpose:
@@ -20,7 +22,7 @@ Two layers, kept separable on purpose:
    contract. Reachable *without* adopting the page model.
 
 Both boundaries are gates, not conventions: no visual-core file may name a page-model type, and every
-call into the game's immediate-mode surface must live in one of the five named funnel files. Outside
+call into the game's immediate-mode surface must live in the named funnel files. Outside
 them, raw IMGUI is unsupported and unmeasurable rather than forbidden — it is invisible to the harness,
 the fit audit and session recovery, which is the whole point of the tree.
 

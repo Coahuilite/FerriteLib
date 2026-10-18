@@ -12,6 +12,10 @@ namespace FerriteLib.UiKit.Kernel;
 /// </summary>
 public sealed class UiSession : IDisposable
 {
+    public UiInteractionSession Interactions { get; } = new UiInteractionSession();
+
+    /// <summary>Native window qualification. Embedded hosts default to their existing input scope.</summary>
+    public bool PointerInputAllowed { get; set; } = true;
     private static readonly IReadOnlyDictionary<string, UiValueState> NoValueStates =
         new Dictionary<string, UiValueState>(StringComparer.Ordinal);
 
@@ -393,6 +397,7 @@ public sealed class UiSession : IDisposable
         // identity stays Verse's, which is why only a capture with a recorded element owner is reconciled.
         if (ownedHotControl.HasValue && ownedHotControlOwner != null && !captureOwnerDrawn)
         {
+            Interactions.End(UiInteractionEnd.Hidden);
             ReleaseHotControl(ownedHotControl.Value);
         }
 
@@ -908,6 +913,7 @@ public sealed class UiSession : IDisposable
         // capture and another window's GUIUtility state stay exactly as they were.
         if (ownedHotControl.HasValue && ownedHotControlOwner != null && released.Contains(ownedHotControlOwner))
         {
+            Interactions.End(UiInteractionEnd.Removed);
             ReleaseHotControl(ownedHotControl.Value);
         }
 
@@ -1033,7 +1039,7 @@ public sealed class UiSession : IDisposable
     /// <summary>Restores the node returned by <see cref="EnterNode"/>.</summary>
     internal void ExitNode(UiNode previous)
     {
-        activeNode = previous;
+        activeNode = IsActive ? previous : unscopedNode;
     }
 
     /// <summary>The scroll position one scroll container's node holds; zero when it holds none.</summary>
@@ -1167,11 +1173,13 @@ public sealed class UiSession : IDisposable
     /// beside the element that is drawing. Only the owning session may release it; closing/disposing the
     /// host releases exactly this session's capture and never another session's.
     /// </summary>
-    public void CaptureHotControl(int controlId)
+    public void CaptureHotControl(int controlId) => CaptureHotControlForNode(controlId, activeNode);
+
+    internal void CaptureHotControlForNode(int controlId, UiNode owner)
     {
         EnsureActive();
         ownedHotControl = controlId;
-        ownedHotControlOwner = ReferenceEquals(activeNode, unscopedNode) ? null : activeNode;
+        ownedHotControlOwner = ReferenceEquals(owner, unscopedNode) ? null : owner;
         // Taking the capture is itself a report that the owner is drawing right now.
         captureOwnerDrawn = true;
         UiNative.CaptureHotControl(controlId);
@@ -1197,6 +1205,7 @@ public sealed class UiSession : IDisposable
         EnsureActive();
         if (ownedHotControl.HasValue && ownedHotControl.Value == controlId)
         {
+            Interactions.End(UiInteractionEnd.CaptureLost);
             UiNative.ReleaseHotControl(controlId);
             ownedHotControl = null;
             ownedHotControlOwner = null;
@@ -1206,6 +1215,7 @@ public sealed class UiSession : IDisposable
     public void Dispose()
     {
         if (!IsActive) return;
+        Interactions.Dispose();
         IsActive = false;
 
         // The session is the subscription's owner: disposing it releases the subscription, its bounded

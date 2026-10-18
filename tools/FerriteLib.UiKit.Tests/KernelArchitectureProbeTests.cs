@@ -103,14 +103,15 @@ internal static class KernelArchitectureProbeTests
 
         public void Draw(Rect rect, UiWidgetContext ctx)
         {
-            if (UiNative.Button(rect, ctx)) ctx.Bindings.Invoke(Read(spec, "ActionBind"));
+            string command = Read(spec, "ActionBind");
+            UiInteractionResult operation = UiNative.Activation(rect, ctx, command);
+            UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx, command), operation, () => ctx.Bindings.Invoke(command));
         }
     }
 
     /// <summary>
     /// Probe 2's second renderer: the same behavior, a completely different visual structure - one 3px
-    /// rail on the bottom edge, no surface, no caption. The behavior statements are retyped because there
-    /// is nothing to reuse them from.
+    /// rail on the bottom edge, no surface, no caption. Both presentations now call the same shared activation contract.
     /// </summary>
     private sealed class RailButtonProbe : IUiWidget
     {
@@ -142,13 +143,14 @@ internal static class KernelArchitectureProbeTests
 
         public void Draw(Rect rect, UiWidgetContext ctx)
         {
+            string command = Read(spec, "ActionBind");
+            UiInteractionResult operation = UiNative.Activation(rect, ctx, command);
             UiTheme theme = ctx.Theme;
-            bool armed = UiNative.IsMouseDownOver(rect);
+            bool armed = operation.Captured;
             bool hovered = !armed && UiNative.IsMouseOver(rect);
             Color rail = armed ? theme.Selected : hovered ? theme.AccentHover : theme.BorderStrong;
             UiThemeDraw.Solid(new Rect(rect.x, rect.yMax - 3f, rect.width, 3f), rail);
-
-            if (UiNative.Button(rect, ctx)) ctx.Bindings.Invoke(Read(spec, "ActionBind"));
+            UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx, command), operation, () => ctx.Bindings.Invoke(command));
         }
     }
 

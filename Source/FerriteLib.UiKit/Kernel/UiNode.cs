@@ -30,6 +30,7 @@ public sealed class UiNode
         Kind = kind ?? "";
         Ordinal = ordinal;
         ElementId = elementId ?? "";
+        Properties = new UiElementProperties(MarkDirty);
         State = new UiValueState();
         slots.Add("", State);
 
@@ -79,6 +80,11 @@ public sealed class UiNode
 
     /// <summary>The element's own value state - the unnamed slot every node has.</summary>
     public UiValueState State { get; }
+
+    public UiElementProperties Properties { get; }
+
+    /// <summary>Explicit business identity; change when a getter switches logical objects.</summary>
+    public string InteractionScope { get; set; } = "";
 
     /// <summary>Every named state slot this node owns, keyed by the name the widget used.</summary>
     public IReadOnlyDictionary<string, UiValueState> ValueStates => slots;

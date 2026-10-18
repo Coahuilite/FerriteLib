@@ -70,7 +70,7 @@ public static class FerriteLibVersion
     /// move, every addition still records its contract entry and lane first, and the normal pre-1.0 rule
     /// returns when that phase ends.
     /// </summary>
-    public static readonly Version Api = new Version(0, 7, 0);
+    public static readonly Version Api = new Version(0, 8, 0);
 
     /// <summary>Human-readable identity for logs.</summary>
     public static string Describe()
