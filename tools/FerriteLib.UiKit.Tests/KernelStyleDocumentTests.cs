@@ -24,6 +24,7 @@ internal static class KernelStyleDocumentTests
     public static int RunAll()
     {
         failures = 0;
+        Run("Metric and Palette diagnostics name their own required field", VerifyRequiredFields);
         Run("The two text origins share one parser and one vocabulary", VerifyTwoOrigins);
         Run("The precedence chain resolves level by level", VerifyPrecedenceChain);
         Run("Inheritance is asymmetric: scheme/density inherit, roles do not", VerifyInheritanceAsymmetry);
@@ -36,6 +37,18 @@ internal static class KernelStyleDocumentTests
         return failures;
     }
 
+    private static void VerifyRequiredFields()
+    {
+        UiStyleDocument document = UiStyleDocument.Parse(
+            "<Styles Schema=\"1\"><Scheme Name=\"fields\"><Metric Value=\"4\"/><Palette Value=\"#FFFFFF\"/></Scheme></Styles>");
+        Check(document.Issues.Count == 2, "both missing-field declarations are diagnosed");
+        Check(document.Issues.Any(issue => issue.Message.Contains("<Metric>")
+                && issue.Message.Contains("Token and Value") && !issue.Message.Contains("Role")),
+            "Metric missing-field diagnostic names Token, not Palette's Role");
+        Check(document.Issues.Any(issue => issue.Message.Contains("<Palette>")
+                && issue.Message.Contains("Role and Value") && !issue.Message.Contains("Token")),
+            "Palette missing-field diagnostic names Role, not Metric's Token");
+    }
     private static void VerifyTwoOrigins()
     {
         const string body =

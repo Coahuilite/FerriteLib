@@ -576,7 +576,7 @@ public sealed class UiStyleDocument
         string raw = entry.GetAttribute("Value") ?? "";
         if (token.Length == 0 || raw.Length == 0)
         {
-            Record(issues, "A <Metric> in " + origin + " needs both Role and Value; the declaration is ignored.");
+            Record(issues, "A <Metric> in " + origin + " needs both Token and Value; the declaration is ignored.");
             return;
         }
 
