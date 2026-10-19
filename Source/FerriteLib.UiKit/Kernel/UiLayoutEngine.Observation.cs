@@ -194,7 +194,7 @@ public sealed partial class UiLayoutEngine
     }
 
     private static string RectText(Rect rect) => string.Format(CultureInfo.InvariantCulture, "{0},{1},{2},{3}", rect.x, rect.y, rect.width, rect.height);
-    private static string ColourText(Color colour) => string.Format(CultureInfo.InvariantCulture, "{0},{1},{2},{3}", colour.r, colour.g, colour.b, colour.a);
+    private static string ColourText(UiColour colour) => string.Format(CultureInfo.InvariantCulture, "{0},{1},{2},{3}", colour.Red, colour.Green, colour.Blue, colour.Alpha);
     private static void ObserveWidget(PlacedEntry entry, UiWidgetContext ctx, UiObservationBudget budget, List<UiObservedFact> facts)
     {
         void Add(string name, string value, string source = "current-model", UiObservationStatus status = UiObservationStatus.Sampled, string reason = "")

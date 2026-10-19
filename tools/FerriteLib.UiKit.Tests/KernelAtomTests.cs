@@ -247,7 +247,7 @@ internal static class KernelAtomTests
         UiNative.DebugMouseDown = true;
         ClearRecordedBoxes();
         widget.Draw(rect, ctx);
-        Check(HasColor(RecordedBoxColors(), theme.Selected) && HasColor(RecordedBoxColors(), theme.AccentGold),
+        Check(HasColor(RecordedBoxColors(), theme[UiPaletteRole.SelectedSurface]) && HasColor(RecordedBoxColors(), theme[UiPaletteRole.Accent]),
             "a held valid press paints the shared capture's active treatment");
         Check(fired == 0, "press alone does not activate");
         UiNative.DebugMouseDown = false;
@@ -258,14 +258,14 @@ internal static class KernelAtomTests
         UiNative.DebugMousePosition = new Vector2(60f, 14f);
         ClearRecordedBoxes();
         widget.Draw(rect, ctx);
-        Check(HasColor(RecordedBoxColors(), theme.Hover) && HasColor(RecordedBoxColors(), theme.BorderStrong),
+        Check(HasColor(RecordedBoxColors(), theme[UiPaletteRole.HoverSurface]) && HasColor(RecordedBoxColors(), theme[UiPaletteRole.StrongBorder]),
             "hover after abandoned activation paints hover, not active");
         UiNative.DebugMousePosition = new Vector2(-5000f, -5000f);
         ClearRecordedBoxes();
         widget.Draw(rect, ctx);
-        Check(HasColor(RecordedBoxColors(), theme.Raised) && HasColor(RecordedBoxColors(), theme.Border),
+        Check(HasColor(RecordedBoxColors(), theme[UiPaletteRole.ControlSurface]) && HasColor(RecordedBoxColors(), theme[UiPaletteRole.Border]),
             "the idle treatment is the neutral row of the tone table");
-        Check(!HasColor(RecordedBoxColors(), theme.Hover), "an idle button emits no hover token");
+        Check(!HasColor(RecordedBoxColors(), theme[UiPaletteRole.HoverSurface]), "an idle button emits no hover token");
 
         // The hit rule: activation arrives with exactly the arranged rect, and only while the pointer
         // is inside it. The override stands in for the native control, so the rect it is handed is the

@@ -5,18 +5,40 @@ Declare a font or semantic colour directly, or apply one named Scheme and Densit
 ```xml
 <Stack Id="form" Scheme="muted" Density="compact" Font="Medium">
   <Widget Id="title" Kind="text/wrapped" Text="Settings" Font="Tiny" />
-  <Widget Id="name" Kind="input/text-field" Bind="name" Label="Name" Color.TextPrimary="#FFFFFF" />
+  <Widget Id="name" Kind="input/text-field" Bind="name" Label="Name" Palette.Foreground="#FFFFFF" />
 </Stack>
 ```
 
-P1 implementation remains a Dev candidate. The latest product direction requires a new theme decoupled from the legacy26 slots, with compatibility adapters preserving old entry points and data meaning; that redesign is not implemented or frozen by this candidate. The current implementation covers typography, the five existing density metrics, and all26 existing
-colour tokens (including nullable per-surface edges). It does not inherit business values, bindings,
-roles, drafts, interaction policy, capture, final geometry or container-specific layout declarations.
-`Color.Token` uses the existing document colour parser; invalid fonts/colours at the host/manifest
-creation boundary are located declarations, not ignored input. Named appearance documents keep their
-existing fail-soft recorded-issue policy. No selectors, style-expression language or general policy
-registry is introduced.
+The default wrappers need no palette configuration. An ordinary author can change one semantic colour
+on the host, or use `Palette.Role` on one declaration, without subclassing or finding a private part:
 
+```csharp
+var theme = new UiTheme();
+theme.Palette[UiPaletteRole.Accent] = new UiColour(.25f, .6f, .9f);
+// Pass theme through the existing UiHost / UiPageWindow constructor.
+```
+
+`UiColour`, `UiPaletteRole` and `UiPalette` are neutral production contracts compiled unchanged by the
+runtime and engine-free target. Thirty finite paint meanings cover window/panel/control/hover/selected,
+workspace/section, foregrounds, edges, accent, switch-off, success, warning and danger. Warning and danger
+have independent surface/foreground/border declarations; success text is independent of selection text.
+The shipped defaults deliberately preserve the previous rendered colours, font and geometry. Equal default
+colours do not alias declarations. Defaults are returned as immutable values, never a mutable shared theme.
+`UiTheme` adapts that palette to platform paint and retains existing font/density settings; it has no old
+26-bit colour bag. Its platform colour indexer and surface queries read the same palette result.
+
+Named styles use `<Palette Role="WarningSurface" Value="#802010"/>` inside the existing Scheme. The neutral
+parser accepts #RGB/#RGBA/#RRGGBB/#RRGGBBAA and invariant r,g,b[,a], with finite channels in0..1. Transparent
+is an explicit colour; null is not an edge-fallback command. Unknown roles are reported rather than
+translated from old names. `Color.Token`, `<Color Token="...">` and old colour properties are removed in
+this 0.8 development change; see [the exact migration](theme-migration.md). Standalone styles retain their
+recorded fail-soft policy; inline manifest attributes retain located creation-time validation.
+
+P1's colour direction and ordinary-author access are approved. This change does not open new internal
+RowHeight/Density/structure configuration. The previously available font/five-metric inputs and same-level
+Scheme/Density ordering are preserved, with their unapproved opening-set details still separate. Business
+values, bindings, tone, drafts, interaction policy, capture and final geometry do not inherit as colours.
+No selector, expression language, second component system or theme compatibility path is introduced.
 ## Keep written intent separate from resolved values
 
 For each property, resolution is: runtime instance declaration, explicit inline instance declaration;
@@ -37,9 +59,9 @@ blanket inherited geometry declarations.
 ```csharp
 UiNode field = host.Session.GetNodeByElementId("name")!;
 field.Properties.Font.Set(UiFont.Tiny);
-field.Properties.Colour("TextPrimary").Set(new Color(1, 0.9f, 0.7f, 1));
+field.Properties.Palette(UiPaletteRole.Foreground).Set(new UiColour(1, .9f, .7f));
 field.Properties.Font.Remove();                 // reveal the current remaining font source
-field.Properties.Colour("TextPrimary").Remove(); // remove just this colour override
+field.Properties.Palette(UiPaletteRole.Foreground).Remove(); // remove just this colour override
 ```
 
 `ResolvedFont`, `ResolvedMetrics` and `ResolvedColours` expose the current effective source and value;
@@ -47,8 +69,7 @@ individual metrics can come from different sources, in which case ResolvedDensit
 the metric facts carry the details. Named-source facts identify Scheme/Density; ancestor facts identify
 the actual node. Equal-valued explicit declarations retain their source/following intent.
 Colours affect paint and do not dirty measurement. Font/density changes dirty measurement. Draw resolves
-paint from current declarations even when the layout snapshot remains cached. Derived ink such as an
-undeclared SwitchThumbOff follows the effective TextPrimary instead of a frozen copied fallback.
+paint from current declarations even when the layout snapshot remains cached. Each unassigned role reads its own immutable default; shared default values do not imply coupled overrides.
 
 Host page-style application preserves declaration intent: a sparse document metric is not promoted to
 a host declaration for the rest of its density bundle. The retained public UiStyleResolver.ApplyTo API
@@ -67,8 +88,8 @@ release. Dropdown/ModeRow/popup text consumes the effective font, including both
 Checkbox whole-content labels and descriptive headings are not misrepresented as label+field pairs.
 
 Evidence: actual host sparse-style/programmatic-ancestor/inline/equal-value/removal/source/paint-only
-and derived-ink regressions in KernelStyleScopeTests; five-wrapper actual labels/font/narrow geometry,
+and independent-role regressions in KernelStyleScopeTests; five-wrapper actual labels/font/narrow geometry,
 failed-authoring recovery and real Event/paint-failing Dropdown in KernelLayoutTests. Existing full
-style/layout/input contracts remain tested. Unapproved E/N details and P1 remain reversible Dev candidates (see editing-contract.md for B1/N1 approvals); these
+style/layout/input contracts remain tested. Unapproved E/N and typography/density opening-set details remain reversible Dev candidates (see editing-contract.md for B1/N1 approvals); these
 engineering source-resolution rules do not reopen approved F1/F2/F3. Native1.6 appearance acceptance
 is still pending.

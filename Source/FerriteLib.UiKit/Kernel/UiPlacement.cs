@@ -151,8 +151,8 @@ internal static class UiPlacement
             && (!Enum.TryParse(declaredFont, true, out UiFont font) || !Enum.IsDefined(typeof(UiFont), font)))
             throw Contract(spec, path, scope, "Font must name Tiny, Small or Medium.");
         foreach (string token in UiAppearanceProperties.Colours)
-            if (spec.TryGetAttribute("Color." + token, out string raw) && !UiStyleDocument.TryParseColour(raw, out _))
-                throw Contract(spec, path, scope, "Color." + token + " must be a valid colour (#RRGGBB/#RRGGBBAA or RGB/RGBA channels).");
+            if (spec.TryGetAttribute("Palette." + token, out string raw) && !UiStyleDocument.TryParseColour(raw, out _))
+                throw Contract(spec, path, scope, "Palette." + token + " must be a valid colour (#RRGGBB/#RRGGBBAA or RGB/RGBA channels).");
         if (spec.TryGetAttribute("SharedLabels", out string sharedLabels) && !bool.TryParse(sharedLabels, out _))
             throw Contract(spec, path, scope, "SharedLabels must be true or false.");
         string? anchorOwner = parent == null ? parentKind : parent.Kind;

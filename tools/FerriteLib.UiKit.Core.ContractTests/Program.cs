@@ -23,6 +23,7 @@ internal static class Program
     {
         try
         {
+            Palette();
             Properties();
             Observations();
             StepperGeometry();
@@ -43,6 +44,29 @@ internal static class Program
         }
     }
 
+    private static void Palette()
+    {
+        var palette = new UiPalette();
+        var peer = new UiPalette();
+        foreach (UiPaletteRole role in Enum.GetValues(typeof(UiPaletteRole)))
+            Check(palette[role] == UiPalette.Default(role) && !palette.IsDeclared(role), "palette complete readonly default: " + role);
+        palette[UiPaletteRole.WarningSurface] = new UiColour(.1f,.2f,.3f);
+        Check(palette[UiPaletteRole.DangerSurface] == peer[UiPaletteRole.DangerSurface], "warning and danger independent");
+        palette[UiPaletteRole.SuccessForeground] = new UiColour(.2f,.3f,.4f);
+        Check(palette[UiPaletteRole.SelectedForeground] == peer[UiPaletteRole.SelectedForeground], "success and selection foreground independent");
+        palette[UiPaletteRole.Accent] = peer[UiPaletteRole.Accent];
+        Check(palette.IsDeclared(UiPaletteRole.Accent), "explicit default-equal declaration retains intent");
+        var clone = palette.Clone();
+        clone[UiPaletteRole.WarningSurface] = new UiColour(.8f,.7f,.6f);
+        Check(palette[UiPaletteRole.WarningSurface] != clone[UiPaletteRole.WarningSurface], "clone declarations are isolated");
+        palette.Remove(UiPaletteRole.WarningSurface);
+        Check(!palette.IsDeclared(UiPaletteRole.WarningSurface) && palette[UiPaletteRole.WarningSurface] == peer[UiPaletteRole.WarningSurface], "remove reveals readonly default");
+        foreach (string text in new[] { "#123", "#1234", "#112233", "#11223344", ".1,.2,.3", ".1,.2,.3,.4" })
+            Check(UiColour.TryParse(text, out _), "neutral colour lexeme: " + text);
+        foreach (string text in new[] { "#12", "#GGG", "NaN,0,0", "1.1,0,0", "1,2", "0,0,0,1,1" })
+            Check(!UiColour.TryParse(text, out _), "neutral malformed colour refused: " + text);
+        Check(!UiPalette.TryRole("1", out _) && !UiPalette.TryRole("TextOnGold", out _), "no numeric or legacy role aliases");
+    }
     private static void Layout()
     {
         var frame = new UiLayoutFrame(200, 100, 5, 5, 5, 5, 0, 2, new UiLayoutHeight(100, false));

@@ -122,20 +122,20 @@ internal static class KernelCommandStateTests
 
         ClearRecordedBoxes();
         UiThemeDraw.StatusTreatment(rect, theme, UiStatusTone.Active, writable: bindings.CanExecute("gated"));
-        CheckPaint(0, theme.Base, theme.Divider, "a disabled command paints the disabled plane whatever tone was authored");
+        CheckPaint(0, theme[UiPaletteRole.WindowSurface], theme[UiPaletteRole.Divider], "a disabled command paints the disabled plane whatever tone was authored");
 
         ClearRecordedBoxes();
         UiThemeDraw.StatusTreatment(rect, theme, UiStatusTone.Active, writable: bindings.CanExecute("open"));
-        CheckPaint(0, theme.Selected, theme.AccentGold, "an executable command keeps the authored tone");
+        CheckPaint(0, theme[UiPaletteRole.SelectedSurface], theme[UiPaletteRole.Accent], "an executable command keeps the authored tone");
 
         Check(
-            !SameColor(theme.Base, theme.Selected) && !SameColor(theme.Divider, theme.AccentGold),
+            !SameColor(theme[UiPaletteRole.WindowSurface], theme[UiPaletteRole.SelectedSurface]) && !SameColor(theme[UiPaletteRole.Divider], theme[UiPaletteRole.Accent]),
             "and the two treatments differ in every colour, so neither check above can pass by accident");
 
         ClearRecordedBoxes();
         UiThemeDraw.StatusBadge(rect, "value", theme, UiStatusTone.Danger, null, writable: bindings.CanExecute("gated"));
-        CheckPaint(0, theme.Base, theme.Divider, "the badge plane follows the same single rule");
-        CheckLastLabel(theme.TextDisabled, "and the badge writes the disabled text colour");
+        CheckPaint(0, theme[UiPaletteRole.WindowSurface], theme[UiPaletteRole.Divider], "the badge plane follows the same single rule");
+        CheckLastLabel(theme[UiPaletteRole.DisabledForeground], "and the badge writes the disabled text colour");
     }
 
     private static void VerifyDisabledElementTakesNoInput()

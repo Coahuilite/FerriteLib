@@ -236,8 +236,8 @@ internal static class KernelBatch1VerificationTests
 
         UiStyleDocument ghost = UiStyleDocument.Parse(
             "<Styles Schema=\"1\"><Scheme Name=\"ghost\">"
-            + "<Color Token=\"HoverPoint\" Value=\"#FF0000FF\" />"
-            + "<Color Token=\"AccentGold\" Value=\"#00FF00FF\" />"
+            + "<Palette Role=\"HoverPoint\" Value=\"#FF0000FF\" />"
+            + "<Palette Role=\"Accent\" Value=\"#00FF00FF\" />"
             + "</Scheme></Styles>");
         Check(ghost.Issues.Count == 1,
             "a scheme declaring HoverPoint records exactly one issue (got " + ghost.Issues.Count + ")");
@@ -245,14 +245,14 @@ internal static class KernelBatch1VerificationTests
             "and the issue names the dropped token");
 
         bool hasScheme = ghost.TryGetScheme("ghost", out UiStyleDocument.SchemeDefinition scheme);
-        Check(hasScheme && !scheme.Colours.ContainsKey("HoverPoint") && scheme.Colours.ContainsKey("AccentGold"),
+        Check(hasScheme && !scheme.Colours.ContainsKey("HoverPoint") && scheme.Colours.ContainsKey("Accent"),
             "the dropped declaration never reaches the scheme while the rest still does");
 
         // Independent: it is treated like any other unknown token, not specially handled.
         UiStyleDocument twoUnknown = UiStyleDocument.Parse(
             "<Styles Schema=\"1\"><Scheme Name=\"s\">"
-            + "<Color Token=\"HoverPoint\" Value=\"#FF0000FF\" />"
-            + "<Color Token=\"NotAToken\" Value=\"#FF0000FF\" />"
+            + "<Palette Role=\"HoverPoint\" Value=\"#FF0000FF\" />"
+            + "<Palette Role=\"NotAToken\" Value=\"#FF0000FF\" />"
             + "</Scheme></Styles>");
         Check(twoUnknown.Issues.Count == 2,
             "HoverPoint is refused exactly like an arbitrary unknown token (got " + twoUnknown.Issues.Count + " issues)");
@@ -261,7 +261,7 @@ internal static class KernelBatch1VerificationTests
         // accent - so a red HoverPoint declaration cannot leak into the theme.
         var resolver = new UiStyleResolver(UiTheme.Vanilla, ghost);
         UiTheme scoped = resolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "ghost") });
-        Check(SameColor(scoped.AccentGold, new Color(0f, 1f, 0f, 1f)),
+        Check(SameColor(scoped[UiPaletteRole.Accent], new Color(0f, 1f, 0f, 1f)),
             "the rest of the scheme still applies (AccentGold is the scheme's green)");
         Check(SameColor(scoped.AccentHover, Lift(new Color(0f, 1f, 0f, 1f))),
             "and the derived hover step follows the applied accent");
@@ -282,14 +282,14 @@ internal static class KernelBatch1VerificationTests
             "and it is read-only: a caller cannot assign the derived step");
 
         UiTheme probe = UiTheme.Vanilla;
-        probe.AccentGold = new Color(0.10f, 0.50f, 0.90f, 0.25f);
+        probe[UiPaletteRole.Accent] = new Color(0.10f, 0.50f, 0.90f, 0.25f);
         Color first = probe.AccentHover;
         CheckNear(0.37f, first.r, "the red channel travels 30% of its remaining distance to white");
         CheckNear(0.65f, first.g, "the green channel does too");
         CheckNear(0.93f, first.b, "so does the blue channel");
         CheckNear(0.25f, first.a, "and alpha is carried unchanged");
 
-        probe.AccentGold = new Color(0.90f, 0.10f, 0.30f, 1f);
+        probe[UiPaletteRole.Accent] = new Color(0.90f, 0.10f, 0.30f, 1f);
         Color second = probe.AccentHover;
         CheckNear(0.93f, second.r, "re-tinting the accent recomputes red");
         CheckNear(0.37f, second.g, "recomputes green");
@@ -297,10 +297,10 @@ internal static class KernelBatch1VerificationTests
         Check(!SameColor(first, second), "reading AccentHover after moving AccentGold returns a moved value");
         Check(SameColor(probe.AccentHover, second), "and reading it twice in a row is deterministic");
 
-        probe.AccentGold = new Color(0.20f, 0.40f, 0.60f, 0f);
+        probe[UiPaletteRole.Accent] = new Color(0.20f, 0.40f, 0.60f, 0f);
         CheckNear(0f, probe.AccentHover.a, "a zero-alpha accent gets a zero-alpha hover step, never an opaque one");
 
-        probe.AccentGold = new Color(1f, 1f, 1f, 1f);
+        probe[UiPaletteRole.Accent] = new Color(1f, 1f, 1f, 1f);
         Check(SameColor(probe.AccentHover, new Color(1f, 1f, 1f, 1f)), "white is a fixed point of the derivation");
     }
 

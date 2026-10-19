@@ -3,14 +3,7 @@ using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
 
-/// <summary>
-/// The second axis of a treatment, next to the tone. It carries exactly the difference the tone cannot
-/// express and nothing wider: on a badge's neutral plane the label is <c>TextSecondary</c>, on a form
-/// control's neutral plane it is <c>TextPrimary</c> — the two measured coordinates are a consumer's
-/// status badge and this library's own dropdown field and mode-row option. Only the neutral cell differs;
-/// every saturated tone paints the same text under either value, and that agreement is the shipped
-/// look rather than a claim about a general emphasis scale.
-/// </summary>
+/// <summary>Neutral text emphasis. Saturated treatments use their own semantic foreground role.</summary>
 public enum UiEmphasis
 {
     /// <summary>Form-control text: the value the page exists to show. Neutral resolves to TextPrimary.</summary>
@@ -115,17 +108,15 @@ public sealed class UiStyleTable
         switch (tone)
         {
             case UiStatusTone.Active:
-                return From(theme.SelectedSurface, theme.TextOnGold);
+                return From(theme.SelectedSurface, theme[UiPaletteRole.SelectedForeground]);
             case UiStatusTone.Success:
-                return From(theme.SuccessSurface, theme.TextOnGold);
+                return From(theme.SuccessSurface, theme[UiPaletteRole.SuccessForeground]);
             case UiStatusTone.Warning:
+                return From(theme.WarningSurface, theme[UiPaletteRole.WarningForeground]);
             case UiStatusTone.Danger:
-                // One treatment for two tone names on purpose: the bag carried them as one RGB with no
-                // user in either repository, and a name nobody shapes apart is debt, so one went. A
-                // citation that needs them distinguishable adds a surface here and the rows divide.
-                return From(theme.DangerSurface, theme.TextOnDanger);
+                return From(theme.DangerSurface, theme[UiPaletteRole.DangerForeground]);
             case UiStatusTone.Disabled:
-                return new UiResolvedStyle(theme.BaseSurface.Fill, theme.Divider, theme.TextDisabled);
+                return new UiResolvedStyle(theme.BaseSurface.Fill, theme[UiPaletteRole.Divider], theme[UiPaletteRole.DisabledForeground]);
             case UiStatusTone.Neutral:
                 return Neutral(emphasis);
             default:
@@ -140,7 +131,7 @@ public sealed class UiStyleTable
         return new UiResolvedStyle(
             surface.Fill,
             surface.Border,
-            emphasis == UiEmphasis.Muted ? theme.TextSecondary : theme.TextPrimary);
+            emphasis == UiEmphasis.Muted ? theme[UiPaletteRole.SecondaryForeground] : theme[UiPaletteRole.Foreground]);
     }
 
     private static UiResolvedStyle From(UiSurfaceStyle surface, Color text)

@@ -533,27 +533,27 @@ internal static class KernelContractTests
 
         UiTheme plain = UiTheme.Vanilla;
         UiTheme altered = UiTheme.Vanilla;
-        altered.Base = new Color(1f, 0f, 0f, 1f);
-        altered.Panel = new Color(0f, 1f, 0f, 0.5f);
-        altered.Raised = new Color(0f, 0f, 1f, 1f);
-        altered.Hover = new Color(1f, 1f, 0f, 1f);
-        altered.Selected = new Color(0f, 1f, 1f, 1f);
-        altered.Success = new Color(0.5f, 0.5f, 0.5f, 1f);
-        altered.Danger = new Color(0.2f, 0.9f, 0.1f, 1f);
-        altered.WorkspacePlane = new Color(0.9f, 0.1f, 0.1f, 1f);
-        altered.SectionBand = new Color(0.1f, 0.9f, 0.9f, 1f);
-        altered.TextPrimary = new Color(0f, 0f, 0f, 1f);
-        altered.TextSecondary = new Color(1f, 1f, 1f, 1f);
-        altered.TextOnGold = new Color(0.3f, 0.3f, 0.3f, 1f);
-        altered.TextOnDanger = new Color(0.7f, 0.7f, 0.7f, 1f);
-        altered.TextDisabled = new Color(0.1f, 0.2f, 0.3f, 1f);
-        altered.AccentGold = new Color(0.4f, 0.5f, 0.6f, 1f);
-        altered.SwitchThumbOff = new Color(0.7f, 0.2f, 0.6f, 1f); // SA1.1: a colour cannot move a rect either
+        altered[UiPaletteRole.WindowSurface] = new Color(1f, 0f, 0f, 1f);
+        altered[UiPaletteRole.PanelSurface] = new Color(0f, 1f, 0f, 0.5f);
+        altered[UiPaletteRole.ControlSurface] = new Color(0f, 0f, 1f, 1f);
+        altered[UiPaletteRole.HoverSurface] = new Color(1f, 1f, 0f, 1f);
+        altered[UiPaletteRole.SelectedSurface] = new Color(0f, 1f, 1f, 1f);
+        altered[UiPaletteRole.SuccessSurface] = new Color(0.5f, 0.5f, 0.5f, 1f);
+        altered[UiPaletteRole.DangerSurface] = new Color(0.2f, 0.9f, 0.1f, 1f);
+        altered[UiPaletteRole.WorkspaceSurface] = new Color(0.9f, 0.1f, 0.1f, 1f);
+        altered[UiPaletteRole.SectionSurface] = new Color(0.1f, 0.9f, 0.9f, 1f);
+        altered[UiPaletteRole.Foreground] = new Color(0f, 0f, 0f, 1f);
+        altered[UiPaletteRole.SecondaryForeground] = new Color(1f, 1f, 1f, 1f);
+        altered[UiPaletteRole.SelectedForeground] = new Color(0.3f, 0.3f, 0.3f, 1f);
+        altered[UiPaletteRole.DangerForeground] = new Color(0.7f, 0.7f, 0.7f, 1f);
+        altered[UiPaletteRole.DisabledForeground] = new Color(0.1f, 0.2f, 0.3f, 1f);
+        altered[UiPaletteRole.Accent] = new Color(0.4f, 0.5f, 0.6f, 1f);
+        altered[UiPaletteRole.SwitchOff] = new Color(0.7f, 0.2f, 0.6f, 1f); // SA1.1: a colour cannot move a rect either
         // Batch 1 (CP-6④): no second accent token exists. The derived hover step moves with AccentGold by
         // construction, so perturbing the accent is what perturbs it.
-        altered.Border = new Color(0f, 0f, 0f, 0f);
-        altered.BorderStrong = new Color(1f, 1f, 1f, 1f);
-        altered.Divider = new Color(0.5f, 0f, 0.5f, 1f);
+        altered[UiPaletteRole.Border] = new Color(0f, 0f, 0f, 0f);
+        altered[UiPaletteRole.StrongBorder] = new Color(1f, 1f, 1f, 1f);
+        altered[UiPaletteRole.Divider] = new Color(0.5f, 0f, 0.5f, 1f);
 
         using UiHost a = new("theme-test", manifest, bindings, plain, new StubMetrics(), new StubTranslation());
         using UiHost b = new("theme-test", manifest, bindings, altered, new StubMetrics(), new StubTranslation());

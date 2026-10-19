@@ -100,10 +100,10 @@ public sealed class LineChartWidget : IUiWidget, IUiDescriptiveWidget
         if (!ctx.Session.IsActive)
             return;
         points = ResolvePoints(ctx);
-        UiThemeDraw.Surface(plotRect, ctx.Theme, ctx.Theme.Panel, ctx.Theme.Border);
+        UiThemeDraw.Surface(plotRect, ctx.Theme, ctx.Theme[UiPaletteRole.PanelSurface], ctx.Theme[UiPaletteRole.Border]);
         DrawGrid(plotRect, ctx.Theme);
         for (int i = 1; i < points.Count; i++)
-            DrawLine(ToRectPoint(points[i - 1], plotRect), ToRectPoint(points[i], plotRect), ctx.Theme.AccentGold);
+            DrawLine(ToRectPoint(points[i - 1], plotRect), ToRectPoint(points[i], plotRect), ctx.Theme[UiPaletteRole.Accent]);
         DrawPoints(plotRect, points, hoveredPoint, ctx.Theme);
     }
 
@@ -233,9 +233,9 @@ public sealed class LineChartWidget : IUiWidget, IUiDescriptiveWidget
         for (int i = 1; i <= 3; i++)
         {
             float fx = plotRect.x + plotRect.width * i / 4f;
-            UiThemeDraw.Solid(new Rect(fx, plotRect.y, 1f, plotRect.height), theme.Divider);
+            UiThemeDraw.Solid(new Rect(fx, plotRect.y, 1f, plotRect.height), theme[UiPaletteRole.Divider]);
             float fy = plotRect.y + plotRect.height * i / 4f;
-            UiThemeDraw.Solid(new Rect(plotRect.x, fy, plotRect.width, 1f), theme.Divider);
+            UiThemeDraw.Solid(new Rect(plotRect.x, fy, plotRect.width, 1f), theme[UiPaletteRole.Divider]);
         }
     }
 
@@ -248,7 +248,7 @@ public sealed class LineChartWidget : IUiWidget, IUiDescriptiveWidget
             bool isHovered = i == hovered;
             float size = isHovered ? HoveredPointSize : PointSize;
             var pointRect = new Rect(pixel.x - size * 0.5f, pixel.y - size * 0.5f, size, size);
-            UiThemeDraw.Solid(pointRect, isHovered ? theme.AccentHover : theme.AccentGold);
+            UiThemeDraw.Solid(pointRect, isHovered ? theme.AccentHover : theme[UiPaletteRole.Accent]);
         }
     }
 

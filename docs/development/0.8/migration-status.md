@@ -54,14 +54,14 @@ that a row's new capability has been migrated.
 | Bindings / change notifications / subscriptions | Model + UiBindings/UiNotifyAdapter | Retained; model remains authority, existing lifecycle tests; shared editor observes actual model independently of announcements; Assembly update preserves compatible drafts | Pending |
 | XML/program assembly / document update | UiHost/UiDocumentService/engine | Shared XML/program Create+Host UpdateDefinition validation/stage/seal, exact current theme declaration rollback, keyed Repeat; Assembly/DocumentReload evidence | Pending |
 | Diagnostics / layout snapshots / agent observation | Existing diagnostics and development geometry probe | Bounded detached host/node/model/editor/source/last-geometry read surface; weak discovery lifecycle; Observation + pure DTO/budget contracts; unsupported/unsampled/stale/failure/truncation explicit | Pending |
-| Visual core / text metrics / styles | Theme/draw/metrics and platform font service | Per-property font/density metrics/all26 semantic colour sources and sparse styles/removal connected; actual wrapper paint respects effective font; native pending | Pending |
+| Visual core / text metrics / styles | Theme/draw/metrics and platform font service | Neutral30-role palette and same-source parser replace old26 bag/API/XML; all default and retained visual paint reads the palette adapter; font/density/source/removal retained, no new geometry rights; native pending | Pending |
 
 ## Retained/confirmed technical candidate connected; A8/native acceptance separate
 
 All retained registered uses, nine containers, assembly/update, standard/embedded hosts and bounded R9
 have applicable production contracts and automated coverage. B1 defaultfalse/invalid-conflict retention/
 Cancel-draft-only and the N1 immediate21/end example are user-approved. E2/valid blur, remaining N2/N3,
-P1 and R9 public surface remain candidates; L1 no-implicit-change principle is agreed, not every size algorithm; F1/F2/F3 remain approved. Target 1.6 native
+P1 colour/default-authoring direction is implemented; typography/density opening-set details and R9 public surface remain candidates; L1 no-implicit-change principle is agreed, not every size algorithm; F1/F2/F3 remain approved. Target 1.6 native
 input/IME, font pixels, window stack, clipping/scroll/popup geometry and image correlation remain pending.
 K1 is now approved for grouped deferral; H1 continues as approved. A3 structural focus traversal, B2 Enter/Space and B3 Slider keyboard increment/Home/End remain concrete
 unimplemented recommendations. The approved first-version deferral keeps native editor keys and existing
@@ -71,3 +71,5 @@ A green harness is automated evidence for the selected source, not final product
 Implementation contracts: [S0/S1](s01-contract.md), [boolean/selection/expansion](bse-contract.md), [editing/numeric composition](editing-contract.md), [descriptive wrappers and chart](wrappers-contract.md), [shared layout](layout-contract.md), [property sources](property-contract.md), [assembly/update](assembly-contract.md), [hosts/observation](host-observation-contract.md).
 The product requirements and remaining policy decisions live in [the specification](README.md),
 with the [contract-to-test migration](acceptance-and-test-migration.md) defining evidence classes.
+
+Palette authoring and exact intentional theme migration: [theme-migration.md](theme-migration.md). All18 default uses above retain their full-purpose checks; style-table outlets, surface/text helpers, native range/checkbox/row/image/chart paints read the same neutral palette through UiTheme. No new interaction owner or palette-specific business tree is introduced.

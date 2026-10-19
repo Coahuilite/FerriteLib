@@ -1154,7 +1154,7 @@ internal static class KernelDevGeometryTests
     private const string ScopedPage =
         "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
         + "<Styles Schema=\"1\">"
-        + "<Scheme Name=\"tinted\"><Color Token=\"Panel\" Value=\"#112233ff\"/>"
+        + "<Scheme Name=\"tinted\"><Palette Role=\"PanelSurface\" Value=\"#112233ff\"/>"
         + "<Metric Token=\"Font\" Value=\"Medium\" /></Scheme>"
         + "<Density Name=\"cozy\"><Metric Token=\"RowHeight\" Value=\"40\" /></Density>"
         + "</Styles>"

@@ -1011,10 +1011,7 @@ public sealed partial class UiHost : IDisposable
         // the attribute-NAME gate, and UiLayoutEngine keeps a mirrored pair for template subtrees that a
         // lane reflects against these, so the two must move together.
         "AlignX", "OffsetX", "AlignY", "OffsetY", "AnchorX", "AnchorY",
-        "Font", "Color.Base", "Color.Panel", "Color.Raised", "Color.Hover", "Color.Selected", "Color.Success", "Color.Danger",
-        "Color.WorkspacePlane", "Color.SectionBand", "Color.TextPrimary", "Color.TextSecondary", "Color.TextOnGold", "Color.TextOnDanger", "Color.TextDisabled",
-        "Color.AccentGold", "Color.SwitchThumbOff", "Color.Border", "Color.BorderStrong", "Color.Divider", "Color.BaseBorder", "Color.PanelBorder",
-        "Color.RaisedBorder", "Color.HoverBorder", "Color.SelectedBorder", "Color.SuccessBorder", "Color.DangerBorder",
+        "Font",
         // FL-IC2 (interaction contract §3.6): the tree's Cancel layer. Engine-wide like VisibleKey and HelpKey,
         // because the ENGINE reads it and publishes it on the node for the ladder to walk - no widget kind owns
         // it, so no kind's attribute schema has to grow for a page to declare a return layer. Unlike HelpKey it
@@ -1035,10 +1032,7 @@ public sealed partial class UiHost : IDisposable
         "VisibleRows",
         "Scheme", "Density", "Visible", "VisibleKey",
         "AlignX", "OffsetX", "AlignY", "OffsetY", "AnchorX", "AnchorY",
-        "Font", "Color.Base", "Color.Panel", "Color.Raised", "Color.Hover", "Color.Selected", "Color.Success", "Color.Danger",
-        "Color.WorkspacePlane", "Color.SectionBand", "Color.TextPrimary", "Color.TextSecondary", "Color.TextOnGold", "Color.TextOnDanger", "Color.TextDisabled",
-        "Color.AccentGold", "Color.SwitchThumbOff", "Color.Border", "Color.BorderStrong", "Color.Divider", "Color.BaseBorder", "Color.PanelBorder",
-        "Color.RaisedBorder", "Color.HoverBorder", "Color.SelectedBorder", "Color.SuccessBorder", "Color.DangerBorder", "SharedLabels",
+        "Font", "SharedLabels",
         // FL-IC2: see the widget list; UiLayoutEngine's mirrored pair carries the same addition, and the drift
         // lane refuses one-sided edits.
         "CancelBind"
@@ -1414,7 +1408,7 @@ public sealed partial class UiHost : IDisposable
                 }
             }
 
-            if (allowedAttribute) continue;
+            if (allowedAttribute || UiAppearanceProperties.IsPaletteAttribute(pair.Key)) continue;
             if (!isContainer && CommonWidgetAttributes.Contains(pair.Key)) continue;
 
             throw new UiContractException(

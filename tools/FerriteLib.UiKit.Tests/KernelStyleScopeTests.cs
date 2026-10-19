@@ -61,9 +61,9 @@ internal static class KernelStyleScopeTests
         ResetProbe();
         string xml = "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Styles Schema=\"1\" Density=\"page\">"
             + "<Density Name=\"page\"><Metric Token=\"Gap\" Value=\"3\"/></Density>"
-            + "<Scheme Name=\"local\"><Metric Token=\"Font\" Value=\"Tiny\"/><Metric Token=\"Gap\" Value=\"2\"/><Color Token=\"Panel\" Value=\"#0000FF\"/></Scheme>"
-            + "<Scheme Name=\"sparse\"><Color Token=\"Panel\" Value=\"#0000FF\"/></Scheme></Styles>"
-            + "<Stack Id=\"parent\" Padding=\"0\"><Widget Id=\"child\" Kind=\"" + ProbeKind + "\" Scheme=\"local\" Color.TextPrimary=\"#00FF00\"/>"
+            + "<Scheme Name=\"local\"><Metric Token=\"Font\" Value=\"Tiny\"/><Metric Token=\"Gap\" Value=\"2\"/><Palette Role=\"PanelSurface\" Value=\"#0000FF\"/></Scheme>"
+            + "<Scheme Name=\"sparse\"><Palette Role=\"PanelSurface\" Value=\"#0000FF\"/></Scheme></Styles>"
+            + "<Stack Id=\"parent\" Padding=\"0\"><Widget Id=\"child\" Kind=\"" + ProbeKind + "\" Scheme=\"local\" Palette.Foreground=\"#00FF00\"/>"
             + "<Widget Id=\"follow\" Kind=\"" + ProbeKind + "\" Scheme=\"sparse\"/></Stack></UiPage>";
         using var host = new UiHost(Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.MeasureAndArrange(new Vector2(400, 400));
@@ -72,7 +72,7 @@ internal static class KernelStyleScopeTests
         UiNode follow = host.Session.GetNodeByElementId("follow")!;
         parent.Properties.Font.Set(UiFont.Medium);
         parent.Properties.Density.Set(new UiDensity(10, 8, 9, 44, 1));
-        parent.Properties.Colour("TextPrimary").Set(new Color(1, 0, 0, 1));
+        parent.Properties.Palette(UiPaletteRole.Foreground).Set(new UiColour(1, 0, 0, 1));
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(400, 400));
         Check(child.Properties.ResolvedFont.Value == UiFont.Tiny && child.Properties.ResolvedFont.Origin == UiPropertyOrigin.LocalStyle,
             "a real explicitly applied local font beats a programmatic ancestor declaration");
@@ -93,30 +93,30 @@ internal static class KernelStyleScopeTests
         host.MeasureAndArrange(new Vector2(400, 400));
         Check(child.Properties.ResolvedFont.Value == UiFont.Tiny && child.Properties.ResolvedMetrics["Gap"].Value == 2,
             "removing only local font reveals named typography without resetting independent density");
-        Check(child.Properties.ResolvedColours["TextPrimary"].Origin == UiPropertyOrigin.Instance
-            && SameColor(child.Properties.ResolvedColours["TextPrimary"].Value!.Value, new Color(0, 1, 0, 1)),
+        Check(child.Properties.ResolvedColours["Foreground"].Origin == UiPropertyOrigin.Instance
+            && SameColor(child.Properties.ResolvedColours["Foreground"].Value!.Value, new Color(0, 1, 0, 1)),
             "inline semantic colour is its own per-property instance declaration");
         snapshot = host.MeasureAndArrange(new Vector2(400, 400));
-        child.Properties.Colour("TextPrimary").Set(new Color(0, 0, 1, 1));
+        child.Properties.Palette(UiPaletteRole.Foreground).Set(new UiColour(0, 0, 1, 1));
         UiLayoutSnapshot afterColour = host.MeasureAndArrange(new Vector2(400, 400));
         Check(ReferenceEquals(snapshot, afterColour), "colour-only intent changes do not invalidate measured geometry");
         host.DrawFrame(new Rect(0, 0, 400, 400));
         UiTheme childTheme = LastTheme(DrawnPaths, DrawnThemes, "/child")!;
-        Check(SameColor(childTheme.TextPrimary, new Color(0, 0, 1, 1)) && SameColor(childTheme.SwitchThumbOff, childTheme.TextPrimary),
+        Check(SameColor(childTheme[UiPaletteRole.Foreground], new Color(0, 0, 1, 1)) && SameColor(childTheme[UiPaletteRole.SwitchOff], UiTheme.ToPlatform(UiPalette.Default(UiPaletteRole.SwitchOff))),
             "paint reads current semantic colour and derived fallback ink, without a frozen fallback bag");
-        child.Properties.Colour("TextPrimary").Remove();
-        parent.Properties.Colour("TextPrimary").Set(new Color(1, 1, 0, 1));
+        child.Properties.Palette(UiPaletteRole.Foreground).Remove();
+        parent.Properties.Palette(UiPaletteRole.Foreground).Set(new UiColour(1, 1, 0, 1));
         host.DrawFrame(new Rect(0, 0, 400, 400));
-        Check(SameColor(LastTheme(DrawnPaths, DrawnThemes, "/child")!.TextPrimary, new Color(0, 1, 0, 1))
-            && SameColor(LastTheme(DrawnPaths, DrawnThemes, "/follow")!.TextPrimary, new Color(1, 1, 0, 1)),
+        Check(SameColor(LastTheme(DrawnPaths, DrawnThemes, "/child")![UiPaletteRole.Foreground], new Color(0, 1, 0, 1))
+            && SameColor(LastTheme(DrawnPaths, DrawnThemes, "/follow")![UiPaletteRole.Foreground], new Color(1, 1, 0, 1)),
             "removal reveals inline intent while an unoverridden sibling keeps following the current ancestor");
     }
     private static void VerifyPageColourOverrides()
     {
         PrepareRegistry();
         string xml = "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Styles Schema=\"1\" Scheme=\"page\">"
-            + "<Scheme Name=\"page\"><Color Token=\"Panel\" Value=\"#0000FF\"/></Scheme></Styles>"
-            + "<Stack Id=\"parent\"><Widget Id=\"inline\" Kind=\"" + ProbeKind + "\" Color.Panel=\"#FF0000\"/>"
+            + "<Scheme Name=\"page\"><Palette Role=\"PanelSurface\" Value=\"#0000FF\"/></Scheme></Styles>"
+            + "<Stack Id=\"parent\"><Widget Id=\"inline\" Kind=\"" + ProbeKind + "\" Palette.PanelSurface=\"#FF0000\"/>"
             + "<Widget Id=\"child\" Kind=\"" + ProbeKind + "\"/></Stack></UiPage>";
         using var host = new UiHost(Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.Vanilla,
             new StubMetrics(), new StubTranslation());
@@ -129,36 +129,36 @@ internal static class KernelStyleScopeTests
         AssertPanel(host.Session.GetNodeByElementId("inline")!, red, UiPropertyOrigin.Instance,
             "inline declaration beats page overlay in measure and draw");
         AssertPanel(child, IcePanel, UiPropertyOrigin.Ancestor, "unoverridden child retains page colour");
-        parent.Properties.Colour("Panel").Set(red);
+        parent.Properties.Palette(UiPaletteRole.PanelSurface).Set(UiTheme.FromPlatform(red));
         Frame(host, 401, 400);
         AssertPanel(child, red, UiPropertyOrigin.Ancestor, "ancestor declaration beats page overlay");
-        child.Properties.LocalColour("Panel").Set(green);
+        child.Properties.LocalPalette(UiPaletteRole.PanelSurface).Set(UiTheme.FromPlatform(green));
         Frame(host, 402, 400);
         AssertPanel(child, green, UiPropertyOrigin.LocalStyle, "local declaration beats ancestor and page");
-        child.Properties.Colour("Panel").Set(yellow);
+        child.Properties.Palette(UiPaletteRole.PanelSurface).Set(UiTheme.FromPlatform(yellow));
         Frame(host, 403, 400);
         AssertPanel(child, yellow, UiPropertyOrigin.Instance, "runtime instance beats local declaration");
-        child.Properties.Colour("Panel").Remove();
+        child.Properties.Palette(UiPaletteRole.PanelSurface).Remove();
         Frame(host, 404, 400);
         AssertPanel(child, green, UiPropertyOrigin.LocalStyle, "instance removal reveals current local declaration");
-        child.Properties.LocalColour("Panel").Remove();
-        parent.Properties.Colour("Panel").Set(yellow);
+        child.Properties.LocalPalette(UiPaletteRole.PanelSurface).Remove();
+        parent.Properties.Palette(UiPaletteRole.PanelSurface).Set(UiTheme.FromPlatform(yellow));
         Frame(host, 405, 400);
         AssertPanel(child, yellow, UiPropertyOrigin.Ancestor, "local removal follows current ancestor value");
-        parent.Properties.Colour("Panel").Remove();
+        parent.Properties.Palette(UiPaletteRole.PanelSurface).Remove();
         Frame(host, 406, 400);
         AssertPanel(child, IcePanel, UiPropertyOrigin.Ancestor, "ancestor removal reveals unchanged page overlay");
     }
 
     private static void AssertPanel(UiNode node, Color expected, UiPropertyOrigin origin, string name)
     {
-        UiResolvedProperty<Color?> fact = node.Properties.ResolvedColours["Panel"];
+        UiResolvedProperty<UiColour?> fact = node.Properties.ResolvedColours["PanelSurface"];
         string suffix = "/" + node.ElementId;
         UiTheme? measured = LastTheme(MeasuredPaths, MeasuredThemes, suffix);
         UiTheme? drawn = LastTheme(DrawnPaths, DrawnThemes, suffix);
         Check(fact.Origin == origin && fact.Value.HasValue && SameColor(fact.Value.Value, expected)
-            && measured != null && SameColor(measured.Panel, expected)
-            && drawn != null && SameColor(drawn.Panel, expected), name);
+            && measured != null && SameColor(measured[UiPaletteRole.PanelSurface], expected)
+            && drawn != null && SameColor(drawn[UiPaletteRole.PanelSurface], expected), name);
     }
     // --- a region scopes its subtree ---------------------------------------------------------------
 
@@ -176,7 +176,7 @@ internal static class KernelStyleScopeTests
         UiTheme? inside = LastTheme(MeasuredPaths, MeasuredThemes, "/inside");
         UiTheme? outside = LastTheme(MeasuredPaths, MeasuredThemes, "/outside");
 
-        Check(inside != null && SameColor(inside.Panel, IcePanel),
+        Check(inside != null && SameColor(inside[UiPaletteRole.PanelSurface], IcePanel),
             "the region's scheme reaches the element inside it");
         Check(inside != null && !ReferenceEquals(inside, theme),
             "and that theme is the region's own bag, not the injected instance");
@@ -323,9 +323,9 @@ internal static class KernelStyleScopeTests
             UiStyleDocument broken = UiStyleDocument.Parse(
                 "<Styles Schema=\"1\" Scheme=\"missing\" Bogus=\"1\">"
                 + "<Scheme Name=\"partial\">"
-                + "<Color Token=\"Panel\" Value=\"#00ff00\"/>"
-                + "<Color Token=\"Raised\" Value=\"not-a-colour\"/>"
-                + "<Color Token=\"Nope\" Value=\"#ffffff\"/>"
+                + "<Palette Role=\"PanelSurface\" Value=\"#00ff00\"/>"
+                + "<Palette Role=\"ControlSurface\" Value=\"not-a-colour\"/>"
+                + "<Palette Token=\"Nope\" Value=\"#ffffff\"/>"
                 + "<Font Value=\"Huge\"/>"
                 + "</Scheme>"
                 + "</Styles>");
@@ -347,7 +347,7 @@ internal static class KernelStyleScopeTests
             Check(snapshot.RectById.ContainsKey("inside"),
                 "the page still arranges - appearance never takes a page down");
             UiTheme? inside = LastTheme(MeasuredPaths, MeasuredThemes, "/inside");
-            Check(inside != null && SameColor(inside.Panel, new Color(0f, 1f, 0f, 1f)),
+            Check(inside != null && SameColor(inside[UiPaletteRole.PanelSurface], new Color(0f, 1f, 0f, 1f)),
                 "and the readable declaration beside the dropped ones still landed");
         }
         finally
@@ -552,7 +552,7 @@ internal static class KernelStyleScopeTests
 
     private const string IceAndCompactSection =
         "<Styles Schema=\"1\">"
-        + "<Scheme Name=\"ice\"><Color Token=\"Panel\" Value=\"#0000ff\"/></Scheme>"
+        + "<Scheme Name=\"ice\"><Palette Role=\"PanelSurface\" Value=\"#0000ff\"/></Scheme>"
         + "<Density Name=\"compact\"><Metric Token=\"RowHeight\" Value=\"20\"/></Density>"
         + "</Styles>";
 
@@ -704,6 +704,7 @@ internal static class KernelStyleScopeTests
         return false;
     }
 
+    private static bool SameColor(UiColour actual, Color expected) => SameColor(UiTheme.ToPlatform(actual), expected);
     private static bool SameColor(Color left, Color right)
     {
         return Near(left.r, right.r) && Near(left.g, right.g) && Near(left.b, right.b) && Near(left.a, right.a);

@@ -543,7 +543,7 @@ internal static class KernelReloadSchedulingTests
         UiTheme theme = UiTheme.Vanilla.Clone();
         using var host = NewHost("sched-pair", UiLayoutManifest.Parse(layout1), new UiBindings(), theme);
         service.Attach(host, "lay", "sty");
-        Check(SameColor(theme.Panel, new Color(0f, 0f, 1f, 1f)), "the first style version applied on attach");
+        Check(SameColor(theme[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)), "the first style version applied on attach");
 
         // Two files saved in quick succession inside one quiet window: each document is its own batch and its
         // own report, and the one settle commits both.
@@ -559,7 +559,7 @@ internal static class KernelReloadSchedulingTests
         Check(service.Pump(), "both documents commit in the settle after their shared quiet window");
 
         Check(HasElement(host.Manifest, "added"), "the layout version reached the host");
-        Check(SameColor(theme.Panel, new Color(0f, 1f, 0f, 1f)), "and the style version reached the same host");
+        Check(SameColor(theme[UiPaletteRole.PanelSurface], new Color(0f, 1f, 0f, 1f)), "and the style version reached the same host");
         Check(service.Reports.Count >= 2,
             "each document is its own batch and its own report (reports=" + service.Reports.Count + ")");
     }
@@ -945,7 +945,7 @@ internal static class KernelReloadSchedulingTests
         service.Attach(host, "lay", "sty");
         PendingTrigger = null;
         Draw(host);
-        Check(SameColor(theme.Panel, new Color(0f, 0f, 1f, 1f)), "the first style version applied on attach");
+        Check(SameColor(theme[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)), "the first style version applied on attach");
 
         string layout2 = Page("sched-inpass-all",
             "<Column Id=\"root\">"
@@ -974,7 +974,7 @@ internal static class KernelReloadSchedulingTests
         Check(PassTrace.Count == 2 && PassTrace[0] == "trigger:free" && PassTrace[1] == "tail:free",
             "the running pass still finishes on the pre-reload snapshot ([" + trace + "])");
         Check(HasElement(host.Manifest, "added"), "the layout half committed synchronously");
-        Check(SameColor(theme.Panel, new Color(0f, 1f, 0f, 1f)),
+        Check(SameColor(theme[UiPaletteRole.PanelSurface], new Color(0f, 1f, 0f, 1f)),
             "and the style half was applied to the theme inside the same pass");
 
         PendingTrigger = null;
@@ -1077,7 +1077,7 @@ internal static class KernelReloadSchedulingTests
     {
         return "<Styles Schema=\"1\" Scheme=\"" + schemeName + "\">"
             + "<Scheme Name=\"" + schemeName + "\">"
-            + "<Color Token=\"Panel\" Value=\"" + panelValue + "\"/>"
+            + "<Palette Role=\"PanelSurface\" Value=\"" + panelValue + "\"/>"
             + "</Scheme>"
             + "</Styles>";
     }

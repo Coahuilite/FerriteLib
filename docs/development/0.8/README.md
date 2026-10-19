@@ -441,3 +441,14 @@ Home／End 取端点，零跨度不产生无效步进。
 | 窗口、Tooltip、帮助与返回 | 共享 A5 运行能力；Tooltip 可只提供描述。业务保存／关闭与 UI Cancel 分开，未处理的输入交回宿主。 |
 
 这些用途不要求全部内部类型进入 stable API，也不把历史注册名当作新的 core 语义清单。
+
+## P1 已实施颜色合同：默认即用，普通作者直接覆盖palette
+
+完整默认包装不要求配置palette；默认颜色、字体和几何保持当前表现。普通作者可用
+`theme.Palette[UiPaletteRole.Accent] = new UiColour(.25f, .6f, .9f)`，或在普通组件上声明
+`Palette.Foreground="#FFFFFF"`；无需派生、找内部部件或装配行为合同。30项有限中性语义色
+含独立表面/前景/边框及强调、选中、成功、警告、危险；预设可同色，覆盖不再相互别名。
+旧26槽bit bag、旧颜色属性与Color XML专用路径已直接替换，没有兼容双轨。
+完整用法、词法及旧→新实际迁移见 [主题迁移](theme-migration.md)，逐项来源/撤销见
+[属性合同](property-contract.md)。字体/密度承载保持既有输入与候选政策；本包不新增内部
+RowHeight/Density/结构定制权限。颜色实现通过自动证据不代表目标1.6原生画面已验收。

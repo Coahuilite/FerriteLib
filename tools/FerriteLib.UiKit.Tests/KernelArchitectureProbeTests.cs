@@ -38,17 +38,11 @@ internal static class KernelArchitectureProbeTests
     /// </summary>
     private static readonly string GhostStyleDocument =
         "<Styles Schema=\"1\"><Scheme Name=\"" + GhostScheme + "\">"
-        + Colour("Base") + Colour("Panel") + Colour("Raised") + Colour("Hover") + Colour("Selected")
-        + Colour("Success") + Colour("Danger") + Colour("WorkspacePlane") + Colour("SectionBand")
-        + Colour("TextPrimary") + Colour("TextSecondary") + Colour("TextOnGold") + Colour("TextOnDanger")
-        + Colour("TextDisabled") + Colour("AccentGold")
-        + Colour("Border") + Colour("BorderStrong") + Colour("Divider")
-        + Colour("BaseBorder") + Colour("PanelBorder") + Colour("RaisedBorder") + Colour("HoverBorder")
-        + Colour("SelectedBorder") + Colour("SuccessBorder") + Colour("DangerBorder")
+        + string.Concat(Array.ConvertAll((UiPaletteRole[])Enum.GetValues(typeof(UiPaletteRole)), role => Colour(role.ToString())))
         + "</Scheme></Styles>";
 
     private static string Colour(string token) =>
-        "<Color Token=\"" + token + "\" Value=\"#00000000\" />";
+        "<Palette Role=\"" + token + "\" Value=\"#00000000\" />";
 
     private static int failures;
 
@@ -148,7 +142,7 @@ internal static class KernelArchitectureProbeTests
             UiTheme theme = ctx.Theme;
             bool armed = operation.Captured;
             bool hovered = !armed && UiNative.IsMouseOver(rect);
-            Color rail = armed ? theme.Selected : hovered ? theme.AccentHover : theme.BorderStrong;
+            Color rail = armed ? theme[UiPaletteRole.SelectedSurface] : hovered ? theme.AccentHover : theme[UiPaletteRole.StrongBorder];
             UiThemeDraw.Solid(new Rect(rect.x, rect.yMax - 3f, rect.width, 3f), rail);
             UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx, command), operation, () => ctx.Bindings.Invoke(command));
         }

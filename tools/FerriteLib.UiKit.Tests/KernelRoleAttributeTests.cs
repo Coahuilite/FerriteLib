@@ -119,7 +119,7 @@ internal static class KernelRoleAttributeTests
             UiWidgetContext ctx = Context(session, theme, bindings, 120f);
             ClearBoxes();
             button.Draw(new Rect(0f, 0f, 120f, 28f), ctx);
-            CheckPainted(theme.Raised, theme.Border, "a tone outside the vocabulary paints the default row");
+            CheckPainted(theme[UiPaletteRole.ControlSurface], theme[UiPaletteRole.Border], "a tone outside the vocabulary paints the default row");
             Check(fired == 0, "painting is not activating: the seam was never armed");
 
             Check(records.Count == 1, "the unknown tone was reported through the fitting audit's appearance half");
@@ -149,7 +149,7 @@ internal static class KernelRoleAttributeTests
                 Attributes(("ActionBind", "go"), ("Text", "Apply"), ("Tone", "Danger"))));
             ClearBoxes();
             toned.Draw(new Rect(0f, 0f, 120f, 28f), ctx);
-            CheckPainted(theme.Danger, theme.Danger, "a declared tone paints that row");
+            CheckPainted(theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerSurface], "a declared tone paints that row");
             Check(records.Count == 1, "a declared tone records nothing: it is a rule, not a fallback");
 
             // An unknown emphasis on a text leaf: fallback to Normal, and the drawn colour proves it.
@@ -158,7 +158,7 @@ internal static class KernelRoleAttributeTests
                 Attributes(("Text", "hello"), ("Emphasis", "shouty"))));
             int before = LabelCount();
             leaf.Draw(new Rect(0f, 0f, 200f, 40f), Context(session, theme, new UiBindings(), 200f));
-            Check(SameColor(LastLabelColor(before), theme.TextPrimary),
+            Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.Foreground]),
                 "an emphasis outside the vocabulary paints the Normal text colour");
             Check(records.Count == 2 && records[1].Attribute == "Emphasis" && records[1].Resolved == "Normal",
                 "the unknown emphasis is recorded too, with the value it fell back to");
@@ -169,7 +169,7 @@ internal static class KernelRoleAttributeTests
                 Attributes(("Text", "hello"), ("Emphasis", "Muted"))));
             before = LabelCount();
             muted.Draw(new Rect(0f, 0f, 200f, 40f), Context(session, theme, new UiBindings(), 200f));
-            Check(SameColor(LastLabelColor(before), theme.TextSecondary), "Emphasis=Muted paints the secondary text");
+            Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.SecondaryForeground]), "Emphasis=Muted paints the secondary text");
             Check(records.Count == 2, "a declared emphasis records nothing");
 
             // The engine path: the record carries the element path the tree arranged.
@@ -261,22 +261,22 @@ internal static class KernelRoleAttributeTests
         ClearBoxes();
         int before = LabelCount();
         button.Draw(new Rect(0f, 0f, 120f, 28f), ctx);
-        CheckPainted(theme.Danger, theme.Danger, "a Danger button fills and edges with the alarm row");
-        Check(SameColor(LastLabelColor(before), theme.TextOnDanger), "and writes that row's text colour");
+        CheckPainted(theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerSurface], "a Danger button fills and edges with the alarm row");
+        Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DangerForeground]), "and writes that row's text colour");
 
         ButtonWidget success = new();
         success.Configure(new UiElementSpec("apply", ButtonWidget.Kind, Attributes(("ActionBind", "go"), ("Text", "ok"), ("Tone", "Success"), ("Emphasis", "Muted"))));
         ClearBoxes();
         before = LabelCount();
         success.Draw(new Rect(0f, 0f, 120f, 28f), ctx);
-        CheckPainted(theme.Success, theme.BorderStrong, "a Success button fills with the success row");
-        Check(SameColor(LastLabelColor(before), theme.TextOnGold), "a saturated tone's text ignores emphasis, as the table says");
+        CheckPainted(theme[UiPaletteRole.SuccessSurface], theme[UiPaletteRole.StrongBorder], "a Success button fills with the success row");
+        Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.SelectedForeground]), "a saturated tone's text ignores emphasis, as the table says");
 
         WrappedTextWidget leaf = new();
         leaf.Configure(new UiElementSpec("note", WrappedTextWidget.Kind, Attributes(("Text", "hello"), ("Tone", "Danger"))));
         before = LabelCount();
         leaf.Draw(new Rect(0f, 0f, 200f, 40f), ctx);
-        Check(SameColor(LastLabelColor(before), theme.TextOnDanger), "text/wrapped writes the role's text colour");
+        Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DangerForeground]), "text/wrapped writes the role's text colour");
 
         // The rule's three coordinates must be one pixel: fail-soft renders what "no declaration" renders,
         // never a promotion to the neutral treatment the author did not ask for.
@@ -297,20 +297,20 @@ internal static class KernelRoleAttributeTests
 
         rule.Configure(new UiElementSpec("sep", RuleWidget.Kind, Attributes(("Thickness", "2"), ("Tone", "Danger"))));
         Color dangerRule = Painted(rule, ctx);
-        Check(SameColor(dangerRule, theme.Danger), "a toned rule opts into that treatment's edge colour");
+        Check(SameColor(dangerRule, theme[UiPaletteRole.DangerSurface]), "a toned rule opts into that treatment's edge colour");
         Check(!SameColor(dangerRule, untold), "and a real tone is still visibly a declaration");
 
         SliderWidget slider = new();
         slider.Configure(new UiElementSpec("v", SliderWidget.Kind, Attributes(("Bind", "v"), ("Label", "Vol"), ("Tone", "Danger"))));
         before = LabelCount();
         slider.Draw(new Rect(0f, 0f, 200f, 28f), ctx);
-        Check(SameColor(LastLabelColor(before), theme.TextOnDanger), "input/slider paints its label in the role's text colour");
+        Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DangerForeground]), "input/slider paints its label in the role's text colour");
 
         NumberFieldWidget field = new();
         field.Configure(new UiElementSpec("v", NumberFieldWidget.Kind, Attributes(("Bind", "v"), ("Label", "Vol"), ("Tone", "Danger"))));
         before = LabelCount();
         field.Draw(new Rect(0f, 0f, 200f, 28f), ctx);
-        Check(SameColor(LastLabelColor(before), theme.TextOnDanger), "input/number-field paints its label in the role's text colour");
+        Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DangerForeground]), "input/number-field paints its label in the role's text colour");
     }
 
     // --- state beats author ---------------------------------------------------------------------
@@ -334,7 +334,7 @@ internal static class KernelRoleAttributeTests
             Attributes(("Bind", "published"), ("Min", "0"), ("Max", "1"), ("Label", "Vol"), ("Tone", "Danger"))));
         int before = LabelCount();
         readOnly.Draw(new Rect(0f, 0f, 200f, 28f), Context(session, theme, bindings, 200f));
-        Check(SameColor(LastLabelColor(before), theme.TextDisabled),
+        Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DisabledForeground]),
             "a read-only slider paints disabled whatever tone the author wrote (state beats author)");
 
         SliderWidget writable = new();
@@ -342,21 +342,21 @@ internal static class KernelRoleAttributeTests
             Attributes(("Bind", "editable"), ("Min", "0"), ("Max", "1"), ("Label", "Vol"), ("Tone", "Danger"))));
         before = LabelCount();
         writable.Draw(new Rect(0f, 0f, 200f, 28f), Context(session, theme, bindings, 200f));
-        Check(SameColor(LastLabelColor(before), theme.TextOnDanger), "a writable slider keeps the authored tone");
+        Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DangerForeground]), "a writable slider keeps the authored tone");
 
         WrappedTextWidget bound = new();
         bound.Configure(new UiElementSpec("note", WrappedTextWidget.Kind,
             Attributes(("Bind", "publishedText"), ("Text", "x"), ("Tone", "Danger"))));
         before = LabelCount();
         bound.Draw(new Rect(0f, 0f, 200f, 40f), Context(session, theme, bindings, 200f));
-        Check(SameColor(LastLabelColor(before), theme.TextDisabled),
+        Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DisabledForeground]),
             "a text leaf reading a read-only binding is disabled too");
 
         WrappedTextWidget literal = new();
         literal.Configure(new UiElementSpec("note", WrappedTextWidget.Kind, Attributes(("Text", "x"), ("Tone", "Danger"))));
         before = LabelCount();
         literal.Draw(new Rect(0f, 0f, 200f, 40f), Context(session, theme, bindings, 200f));
-        Check(SameColor(LastLabelColor(before), theme.TextOnDanger),
+        Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DangerForeground]),
             "an unbound leaf has no data side to ask, so the role decides");
 
         // A command binding is not a value binding: asking would answer "not writable" and paint every
@@ -366,7 +366,7 @@ internal static class KernelRoleAttributeTests
             Attributes(("ActionBind", "go"), ("Text", "ok"), ("Tone", "Danger"))));
         ClearBoxes();
         button.Draw(new Rect(0f, 0f, 120f, 28f), Context(session, theme, bindings, 120f));
-        CheckPainted(theme.Danger, theme.Danger, "a command-bound button keeps its authored tone (no writability question)");
+        CheckPainted(theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerSurface], "a command-bound button keeps its authored tone (no writability question)");
 
         Check(UiFitAudit.StyleFallbackCount == 0, "state beating author is a rule, not a fallback");
     }

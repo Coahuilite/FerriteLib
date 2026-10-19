@@ -53,7 +53,7 @@ public sealed class EmptyStateWidget : IUiWidget, IUiDescriptiveWidget
     {
         if (rect.width <= 1f || rect.height <= 1f) return;
 
-        UiThemeDraw.Label(rect, Describe(ctx).Text, ctx.Theme, ctx.Theme.TextSecondary, AtomVocabulary.TextFont(ctx, BandFont), TextAnchor.MiddleCenter);
+        UiThemeDraw.Label(rect, Describe(ctx).Text, ctx.Theme, ctx.Theme[UiPaletteRole.SecondaryForeground], AtomVocabulary.TextFont(ctx, BandFont), TextAnchor.MiddleCenter);
     }
 
     /// <summary>Shared by Measure and Draw so the allocated band always matches the drawn string.</summary>

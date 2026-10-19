@@ -61,7 +61,7 @@ internal static class KernelSectionHeaderTests
         List<Rect> painted = RecordedSolidRects();
         Check(painted.Count > 0, "the default header paints its divider (" + painted.Count + " surface call(s))");
         Check(AllInside(painted, head), "and every call lands inside the element's own rect");
-        Check(AnyRecordedBoxColor(theme.Divider), "in the theme's Divider token rather than a literal colour");
+        Check(AnyRecordedBoxColor(theme[UiPaletteRole.Divider]), "in the theme's Divider token rather than a literal colour");
     }
 
     /// <summary>
@@ -79,7 +79,7 @@ internal static class KernelSectionHeaderTests
         int painted = RecordedSolidRects().Count;
         Check(painted == 0, "Chrome=none paints nothing in the element's rect (" + painted + " surface call(s))");
         Check(AnyLabelInside(head), "while the title is still drawn: the switch removes the chrome, not the content");
-        Check(!AnyRecordedBoxColor(theme.Divider), "and no Divider-coloured call sneaks in by another path");
+        Check(!AnyRecordedBoxColor(theme[UiPaletteRole.Divider]), "and no Divider-coloured call sneaks in by another path");
     }
 
     /// <summary>
@@ -105,7 +105,7 @@ internal static class KernelSectionHeaderTests
 
         Check(AnyRecordedBoxColorNear(ProbeDivider),
             "the scope's scheme moved the divider colour off the baseline token");
-        Check(!AnyRecordedBoxColor(theme.Divider),
+        Check(!AnyRecordedBoxColor(theme[UiPaletteRole.Divider]),
             "so the line is themed through the one token, not painted from the injected theme");
     }
 
@@ -121,7 +121,7 @@ internal static class KernelSectionHeaderTests
     private const string QuietScheme =
         "<Styles Schema=\"1\">"
         + "<Scheme Name=\"quiet\">"
-        + "<Color Token=\"Divider\" Value=\"#21924A\"/>"
+        + "<Palette Role=\"Divider\" Value=\"#21924A\"/>"
         + "</Scheme>"
         + "</Styles>";
 

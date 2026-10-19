@@ -115,6 +115,9 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
 - `UiPropertyDeclaration` — 0.8 S0/S1 shared contract; shape may change within the development line.
 - `UiResolvedProperty` — 0.8 S0/S1 shared contract; shape may change within the development line.
 - `UiPropertyResolver` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `UiPaletteRole` — 0.8 finite neutral paint roles; public-unstable.
+- `UiColour` — 0.8 neutral RGBA and parser; public-unstable.
+- `UiPalette` — 0.8 sparse palette declarations/read-only defaults; public-unstable.
 - `UiDensity` — 0.8 S0/S1 shared contract; shape may change within the development line.
 - `UiSliderLayout` — 0.8 S0/S1 shared contract; shape may change within the development line.
 - `UiElementProperties` — 0.8 S0/S1 shared contract; shape may change within the development line.
@@ -277,28 +280,12 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
   old signature always promised. The escape hatch is unchanged: a viewport the host never published (zero
   height) bounds nothing. `OptionHeight` stays the shared row constant the fitting audit reads.
 - `UiSessionGuard` — the recovery wrapper; the recovery key is an arranged path today.
-- `UiTheme` — per-surface (fill, border) pairs and a density bundle landed (`BaseSurface` through
-  `DangerSurface`, `Geometry`, `LayoutRevision`, `Styles`); the table's third key slot now carries the
-  bindings' read side (`IUiBindings.IsWritable`, landed with the disabled treatment's first producer),
-  and the density tokens reach every core widget that used to hold its own numbers — the dropdown, the
-  mode row, the two text composites and the five leaf atoms — while `chrome/banner` and `state/empty`
-  keep their own type size by design, so a density font change moves the atoms and not those bands. The
-  region/page carriers the scheme and density classes waited for landed in batch B (`Scheme`/`Density` as
-  engine vocabulary on every kind, plus the per-element style chain the engine carries and resolves), so
-  what is left of that debt is the type size those two pinned composites would need before density can
-  reach them. **0.7 amendment:** one named peer factory, `Vanilla`; `new UiTheme()` is a PARTIAL bag whose
-  every unset colour token answers `Vanilla`, and an explicitly assigned colour — including a transparent
-  one — is a value the fallback must not replace. **Batch 1 amendment:** the accent is one stored colour,
-  `AccentGold`, plus the read-only derived `AccentHover`; the stored `HoverPoint` member is removed.
-  **R2 amendment (0.7.x):** `Vanilla` is the only shipped look (the peer `DarkGold` factory is **removed**,
-  with no alias and no shim), and a second clock joins `LayoutRevision`: `ColourRevision` moves on any colour
-  assignment that changes a value and on nothing else. The pair is the point — a colour token must be able to
-  invalidate a cache of cloned themes without re-arranging the page, and `LayoutRevision` still means "a rect
-  moved". A consumer that re-tints a theme it handed to a `UiHost` gets refreshed region/scoped themes; a
-  consumer that wants the retired warm-gold look assigns the tokens on its own bag. SA1.1 adds one
-  assignable colour token: `SwitchThumbOff` - the switch thumb's OFF ink, which answers the theme's own
-  `TextPrimary` until assigned (the historical thumb, unchanged for every unset bag), so a consumer can grey
-  the thumb without darkening any label, and the assignment cannot reach the ON half (`AccentGold`).
+- `UiTheme` — 0.8 platform paint adapter over the neutral `Palette`, plus the retained font/density settings.
+  `new UiTheme()` and `Vanilla` provide fresh complete default looks; no shared mutable default instance.
+  The old26 colour-property bag and nullable edge aliases are removed. Palette/indexer/surface queries read
+  one result; `Styles` maps tone/emphasis to independent selected/success/warning/danger meanings.
+  Colour-only changes leave LayoutRevision unchanged. See `development/0.8/theme-migration.md` for the
+  intentional theme API/XML break and exact old-to-new mapping. This does not promote the adapter stable.
 - `UiThemeDraw` — the single text and panel outlet; per-surface tokens change what it takes to draw. R4-B adds
   the library's only image outlet beside it: `Image(Rect rect, Texture? texture, Color tint)` draws one bound
   texture tinted through `GUI.color` exactly as a label is, and answers false when there is nothing to paint

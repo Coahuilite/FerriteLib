@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using UnityEngine;
+
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -207,7 +207,7 @@ public sealed class UiStyleResolver
         {
             if (document.TryGetScheme(scheme, out UiStyleDocument.SchemeDefinition definition))
             {
-                foreach (KeyValuePair<string, Color> pair in definition.Colours)
+                foreach (KeyValuePair<string, UiColour> pair in definition.Colours)
                 {
                     if (preserveHostDeclarations) theme.ApplyStyleColour(pair.Key, pair.Value);
                     else ApplyColour(theme, pair.Key, pair.Value);
@@ -313,7 +313,7 @@ public sealed class UiStyleResolver
         return document.DefaultDensity;
     }
 
-    private static void ApplyColour(UiTheme theme, string token, Color value)
+    private static void ApplyColour(UiTheme theme, string token, UiColour value)
         => UiAppearanceProperties.ApplyColour(theme, token, value);
     private static void ApplyMetric(UiTheme theme, string token, float value, bool preserveHostDeclarations = false)
     {

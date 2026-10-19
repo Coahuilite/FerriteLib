@@ -246,8 +246,7 @@ internal static class KernelToneVocabularyTests
         Check(leftovers == 0,
             "and no other type in the payload carries the name either: it is gone, not moved (found " + leftovers + ")");
 
-        PropertyInfo? stored = typeof(UiTheme).GetProperty("AccentGold", BindingFlags.Public | BindingFlags.Instance);
-        Check(stored != null && stored.CanRead && stored.CanWrite, "the accent stays the one stored colour");
+        Check(Enum.IsDefined(typeof(UiPaletteRole), UiPaletteRole.Accent), "the accent is a neutral palette role");
 
         PropertyInfo? derived = typeof(UiTheme).GetProperty("AccentHover", BindingFlags.Public | BindingFlags.Instance);
         Check(derived != null, "the hover step is a computed member of UiTheme (AccentHover)");
@@ -257,7 +256,7 @@ internal static class KernelToneVocabularyTests
 
         UiTheme probe = UiTheme.Vanilla;
         var accent = new Color(0.2f, 0.4f, 0.6f, 0.5f);
-        probe.AccentGold = accent;
+        probe[UiPaletteRole.Accent] = accent;
         Color hover = (Color)derived.GetValue(probe)!;
 
         Check(hover.r > accent.r && hover.g > accent.g && hover.b > accent.b,
@@ -272,7 +271,7 @@ internal static class KernelToneVocabularyTests
             "one fixed fraction toward white on every channel, not an adaptive lighten (got "
             + liftR + ", " + liftG + ", " + liftB + ")");
 
-        probe.AccentGold = new Color(0.9f, 0.1f, 0.3f, 1f);
+        probe[UiPaletteRole.Accent] = new Color(0.9f, 0.1f, 0.3f, 1f);
         Color moved = (Color)derived.GetValue(probe)!;
         Check(!SameColor(moved, hover),
             "re-tinting the accent moves the derived step: nothing stored beside it went stale");
@@ -283,8 +282,8 @@ internal static class KernelToneVocabularyTests
         // silently ignored - the one failure mode the maintainer's ruling exists to prevent.
         UiStyleDocument document = UiStyleDocument.Parse(
             "<Styles Schema=\"1\"><Scheme Name=\"ghost\">"
-            + "<Color Token=\"HoverPoint\" Value=\"#FF0000FF\" />"
-            + "<Color Token=\"AccentGold\" Value=\"#00FF00FF\" />"
+            + "<Palette Role=\"HoverPoint\" Value=\"#FF0000FF\" />"
+            + "<Palette Role=\"Accent\" Value=\"#00FF00FF\" />"
             + "</Scheme></Styles>");
         Check(document.Issues.Count == 1,
             "a scheme declaring HoverPoint records one issue instead of silently doing nothing (got "
@@ -292,7 +291,7 @@ internal static class KernelToneVocabularyTests
         Check(document.Issues.Count == 1 && document.Issues[0].Message.IndexOf("HoverPoint", StringComparison.Ordinal) >= 0,
             "and the message names the dropped token");
         Check(document.TryGetScheme("ghost", out UiStyleDocument.SchemeDefinition definition)
-            && !definition.Colours.ContainsKey("HoverPoint") && definition.Colours.ContainsKey("AccentGold"),
+            && !definition.Colours.ContainsKey("HoverPoint") && definition.Colours.ContainsKey("Accent"),
             "the dropped declaration never reaches the theme while the rest of the scheme still does");
     }
 
@@ -313,14 +312,14 @@ internal static class KernelToneVocabularyTests
                 "the role " + tone + " resolves to a paintable treatment on a partial bag, not to nothing");
         }
 
-        Check(SameColor(bag.Styles.Resolve(UiStatusTone.Neutral).Fill, bag.Raised)
+        Check(SameColor(bag.Styles.Resolve(UiStatusTone.Neutral).Fill, bag[UiPaletteRole.ControlSurface])
                 && SameColor(bag.Styles.Resolve(UiStatusTone.Neutral).Border, bag.RaisedSurface.Border),
             "the neutral role reads the raised plane and that plane's effective edge, both inherited");
-        Check(SameColor(bag.Styles.Resolve(UiStatusTone.Active).Fill, bag.Selected)
-                && SameColor(bag.Styles.Resolve(UiStatusTone.Active).Border, bag.AccentGold),
+        Check(SameColor(bag.Styles.Resolve(UiStatusTone.Active).Fill, bag[UiPaletteRole.SelectedSurface])
+                && SameColor(bag.Styles.Resolve(UiStatusTone.Active).Border, bag[UiPaletteRole.Accent]),
             "the active role reads the selected plane and the accent edge");
-        Check(SameColor(bag.Styles.Resolve(UiStatusTone.Disabled).Fill, bag.Base)
-                && SameColor(bag.Styles.Resolve(UiStatusTone.Disabled).Text, bag.TextDisabled),
+        Check(SameColor(bag.Styles.Resolve(UiStatusTone.Disabled).Fill, bag[UiPaletteRole.WindowSurface])
+                && SameColor(bag.Styles.Resolve(UiStatusTone.Disabled).Text, bag[UiPaletteRole.DisabledForeground]),
             "and the disabled role reads the substrate and the disabled ink");
         Check(bag.Styles.FallbackCount == 0,
             "answering a declared role is a rule, never a recorded fallback");
@@ -329,7 +328,7 @@ internal static class KernelToneVocabularyTests
         var own = new Color(0.11f, 0.22f, 0.33f, 1f);
         UiTheme overridden = new()
         {
-            Selected = own
+            [UiPaletteRole.SelectedSurface] = own
         };
         Check(SameColor(overridden.Styles.Resolve(UiStatusTone.Active).Fill, own),
             "an explicit token override reaches the role that reads it, and no fallback is recorded for it");
@@ -351,7 +350,7 @@ internal static class KernelToneVocabularyTests
         var resolver = new UiStyleResolver(UiTheme.Vanilla, document);
         UiTheme scope = resolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "nobody-declares-this") });
         Check(resolver.Issues.Count == 1, "a dangling scheme name is recorded at resolution time");
-        Check(SameColor(scope.Panel, UiTheme.Vanilla.Panel),
+        Check(SameColor(scope[UiPaletteRole.PanelSurface], UiTheme.Vanilla[UiPaletteRole.PanelSurface]),
             "and the scope keeps the values it would have had without it: the page still renders");
     }
 

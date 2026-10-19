@@ -68,7 +68,7 @@ public sealed class SectionHeaderWidget : IUiWidget, IUiDescriptiveWidget
         if (rect.width <= 1f || rect.height <= 1f) return;
 
         string title = Describe(ctx).Text;
-        UiThemeDraw.Label(rect, title, ctx.Theme, ctx.Theme.TextPrimary, AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft);
+        UiThemeDraw.Label(rect, title, ctx.Theme, ctx.Theme[UiPaletteRole.Foreground], AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft);
 
         // Chrome="none": the title without the rule under it. Read here rather than cached in Configure so the
         // decision sits next to the paint it suppresses and a reloaded spec needs no second path.
@@ -80,8 +80,8 @@ public sealed class SectionHeaderWidget : IUiWidget, IUiDescriptiveWidget
         UiThemeDraw.Surface(
             new Rect(rect.x, rect.yMax - 1f, rect.width, 1f),
             ctx.Theme,
-            ctx.Theme.Divider,
-            ctx.Theme.Divider);
+            ctx.Theme[UiPaletteRole.Divider],
+            ctx.Theme[UiPaletteRole.Divider]);
     }
 
     private float ReadHeight()

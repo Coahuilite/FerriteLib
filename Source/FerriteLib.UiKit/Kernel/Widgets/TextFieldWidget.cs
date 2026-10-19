@@ -112,7 +112,7 @@ public sealed class TextFieldWidget : IUiWidget, IUiLabelledWidget
             new Rect(field.x + inset, field.y, Math.Max(1f, field.width - inset * 2f), field.height),
             placeholder,
             ctx.Theme,
-            ctx.Theme.TextSecondary,
+            ctx.Theme[UiPaletteRole.SecondaryForeground],
             AtomVocabulary.TextFont(ctx),
             TextAnchor.MiddleLeft);
     }

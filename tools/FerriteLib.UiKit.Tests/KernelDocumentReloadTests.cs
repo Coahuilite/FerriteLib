@@ -158,7 +158,7 @@ internal static class KernelDocumentReloadTests
     {
         string dir = NewDir(sandbox, "lkg-style");
         string path = Path.Combine(dir, "theme.xml");
-        const string good = "<Styles Schema=\"1\"><Scheme Name=\"ice\"><Color Token=\"Panel\" Value=\"#0000ff\"/></Scheme></Styles>";
+        const string good = "<Styles Schema=\"1\"><Scheme Name=\"ice\"><Palette Role=\"PanelSurface\" Value=\"#0000ff\"/></Scheme></Styles>";
         File.WriteAllText(path, good);
 
         using var service = NewService(false);
@@ -688,16 +688,16 @@ internal static class KernelDocumentReloadTests
 
         UiStyleDocument beforeA = hostA.StyleResolver.Document;
         UiStyleDocument beforeB = hostB.StyleResolver.Document;
-        Check(SameColor(themeA.Panel, new Color(0f, 0f, 1f, 1f)),
+        Check(SameColor(themeA[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)),
             "the first style document's page level reached host A");
-        Check(SameColor(themeB.Panel, new Color(0f, 0f, 1f, 1f)),
+        Check(SameColor(themeB[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)),
             "and reached host B");
 
         // The real pre-check, driven directly with candidates that really fail: a page level naming a name
         // the document never declares can never take effect, so the version is refused instead of being
         // applied as a silent no-op. No seam stands in front of this call.
         const string unknownScheme =
-            "<Styles Schema=\"1\" Scheme=\"ghost\"><Scheme Name=\"ice\"><Color Token=\"Panel\" Value=\"#00ff00\"/></Scheme></Styles>";
+            "<Styles Schema=\"1\" Scheme=\"ghost\"><Scheme Name=\"ice\"><Palette Role=\"PanelSurface\" Value=\"#00ff00\"/></Scheme></Styles>";
         const string unknownDensity =
             "<Styles Schema=\"1\" Density=\"ghost\"><Density Name=\"compact\"><Metric Token=\"Gap\" Value=\"2\"/></Density></Styles>";
         Check(!hostA.TryPrepareStyleCandidate(UiStyleDocument.Parse(unknownScheme), out _, out string schemeReason)
@@ -740,8 +740,8 @@ internal static class KernelDocumentReloadTests
             "once no host fails, the same style batch commits to both");
         Check(!ReferenceEquals(hostA.StyleResolver.Document, beforeA)
             && !ReferenceEquals(hostB.StyleResolver.Document, beforeB)
-            && SameColor(themeA.Panel, new Color(0f, 1f, 0f, 1f))
-            && SameColor(themeB.Panel, new Color(0f, 1f, 0f, 1f)),
+            && SameColor(themeA[UiPaletteRole.PanelSurface], new Color(0f, 1f, 0f, 1f))
+            && SameColor(themeB[UiPaletteRole.PanelSurface], new Color(0f, 1f, 0f, 1f)),
             "and both hosts resolve the new page level together");
     }
 
@@ -769,7 +769,7 @@ internal static class KernelDocumentReloadTests
         service.Attach(host, "tint");
 
         Color tint = new Color(0.5f, 0.1f, 0.1f, 1f);
-        theme.Base = tint;
+        theme[UiPaletteRole.WindowSurface] = tint;
 
         File.WriteAllText(path, Page("scope-retint",
             "<Column Id=\"root\">"
@@ -780,7 +780,7 @@ internal static class KernelDocumentReloadTests
         Settle(service);
 
         Check(service.LastReport?.Accepted == true, "the layout reload committed");
-        Check(SameColor(theme.Base, tint),
+        Check(SameColor(theme[UiPaletteRole.WindowSurface], tint),
             "a consumer re-tint survives a reload whose document applies no page level");
 
         string stylePath = Path.Combine(dir, "theme.xml");
@@ -790,36 +790,36 @@ internal static class KernelDocumentReloadTests
         using var styleService = NewService(false);
         styleService.Add(new UiDocumentSource("tint-style", UiDocumentKind.Style, stylePath), styleV1);
         UiTheme themed = UiTheme.Vanilla.Clone();
-        Color panelBaseline = themed.Panel;
+        Color panelBaseline = themed[UiPaletteRole.PanelSurface];
 
         using var styled = NewHost("scope-retint-style", UiLayoutManifest.Parse(KeepPage("scope-retint-style")), new UiBindings(), themed);
         styleService.Attach(styled, null, "tint-style");
-        Check(SameColor(themed.Panel, new Color(0f, 0f, 1f, 1f)),
+        Check(SameColor(themed[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)),
             "a page-level document is applied on the first commit");
 
         File.WriteAllText(stylePath,
-            "<Styles Schema=\"1\"><Scheme Name=\"ice\"><Color Token=\"Panel\" Value=\"#00ff00\"/></Scheme></Styles>");
+            "<Styles Schema=\"1\"><Scheme Name=\"ice\"><Palette Role=\"PanelSurface\" Value=\"#00ff00\"/></Scheme></Styles>");
         styleService.Signal("tint-style");
         Settle(styleService);
         Check(styleService.LastReport?.Accepted == true, "the style reload committed");
-        Check(SameColor(themed.Panel, panelBaseline),
+        Check(SameColor(themed[UiPaletteRole.PanelSurface], panelBaseline),
             "and a page level the new document no longer declares is undone");
 
         // A current host tint outside the outgoing page declaration survives removal.
         File.WriteAllText(stylePath, PageSchemeStyle("ice", "#00ff00"));
         Check(styleService.Reload("tint-style")?.Accepted == true, "a page level is applied again");
         Color residualTint = new Color(0.2f, 0.4f, 0.6f, 1f);
-        themed.Base = residualTint;
+        themed[UiPaletteRole.WindowSurface] = residualTint;
         File.WriteAllText(stylePath, "<Styles Schema=\"1\"></Styles>");
         Check(styleService.Reload("tint-style")?.Accepted == true, "and the next reload drops the page level");
-        Check(SameColor(themed.Base, residualTint),
+        Check(SameColor(themed[UiPaletteRole.WindowSurface], residualTint),
             "A4 removing a page application preserves current unrelated host tint");
         File.WriteAllText(stylePath, "<Styles Schema=\"1\" Density=\"gap\"><Density Name=\"gap\"><Metric Token=\"Gap\" Value=\"3\"/></Density></Styles>");
         Check(styleService.Reload("tint-style")?.Accepted == true && themed.Geometry.Gap == 3, "A4 real Host applies only page Gap3");
-        themed.TextPrimary = new Color(0, 1, 1, 1);
+        themed[UiPaletteRole.Foreground] = new Color(0, 1, 1, 1);
         themed.DefaultFont = UiFont.Medium;
         themed.Geometry = new UiGeometry(12, 8, 9, 45, 2);
-        themed.SwitchThumbOff = new Color(.4f, .2f, .7f, 1);
+        themed[UiPaletteRole.SwitchOff] = new Color(.4f, .2f, .7f, 1);
         Check(themed.Geometry.Gap == 3 && themed.Geometry.RowHeight == 45,
             "A4 current host metrics remain distinct beneath the one explicitly applied page metric");
         File.WriteAllText(stylePath, "<Styles Schema=\"1\"></Styles>");
@@ -827,18 +827,18 @@ internal static class KernelDocumentReloadTests
         styled.MeasureAndArrange(new Vector2(400, 400));
         UiNode keep = styled.Session.GetNodeByElementId("keep")!;
         Check(themed.DefaultFont == UiFont.Medium && themed.Geometry.Gap == 9 && themed.Geometry.RowHeight == 45
-            && SameColor(themed.TextPrimary, new Color(0, 1, 1, 1)) && SameColor(themed.SwitchThumbOff, new Color(.4f, .2f, .7f, 1)),
+            && SameColor(themed[UiPaletteRole.Foreground], new Color(0, 1, 1, 1)) && SameColor(themed[UiPaletteRole.SwitchOff], new Color(.4f, .2f, .7f, 1)),
             "A4 removing Gap3 preserves current font, other metric, colour and dedicated thumb declaration values");
         Check(keep.Properties.ResolvedFont.Origin == UiPropertyOrigin.Host
             && keep.Properties.ResolvedMetrics["RowHeight"].Origin == UiPropertyOrigin.Host
-            && keep.Properties.ResolvedColours["TextPrimary"].Origin == UiPropertyOrigin.Host,
+            && keep.Properties.ResolvedColours["Foreground"].Origin == UiPropertyOrigin.Host,
             "A4 actual node sources remain current host declarations, not a copied creation snapshot");
         themed.RemoveFontOverride();
         themed.RemoveDensityOverride();
         styled.MeasureAndArrange(new Vector2(400, 400));
         Check(keep.Properties.ResolvedFont.Origin == UiPropertyOrigin.Fallback
             && keep.Properties.ResolvedMetrics["RowHeight"].Origin == UiPropertyOrigin.Fallback
-            && SameColor(themed.TextPrimary, new Color(0, 1, 1, 1)),
+            && SameColor(themed[UiPaletteRole.Foreground], new Color(0, 1, 1, 1)),
             "A4 later declaration removal still reveals live fallback and never clears unrelated colour intent");
     }
 
@@ -1006,7 +1006,7 @@ internal static class KernelDocumentReloadTests
         using var validHost = NewHost(
             "style-first-valid", UiLayoutManifest.Parse(KeepPage("style-first-valid")), new UiBindings(), theme);
         Check(validService.Attach(validHost, null, "s5v"), "a valid style document still attaches");
-        Check(SameColor(theme.Panel, new Color(0f, 0f, 1f, 1f)), "and its page level is applied on first attach");
+        Check(SameColor(theme[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)), "and its page level is applied on first attach");
     }
 
     // --- rebinding releases the old service (P4 R6) ----------------------------------------------
@@ -1517,7 +1517,7 @@ internal static class KernelDocumentReloadTests
     {
         return "<Styles Schema=\"1\" Scheme=\"" + schemeName + "\">"
             + "<Scheme Name=\"" + schemeName + "\">"
-            + "<Color Token=\"Panel\" Value=\"" + panelValue + "\"/>"
+            + "<Palette Role=\"PanelSurface\" Value=\"" + panelValue + "\"/>"
             + "</Scheme>"
             + "</Styles>";
     }

@@ -121,7 +121,7 @@ internal static class KernelSharedBehaviorTests
                     });
                 else
                     UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx, "go"), result, () => activations++);
-                UiThemeDraw.Solid(new Rect(0, 26, 100, 2), ctx.Theme.AccentGold);
+                UiThemeDraw.Solid(new Rect(0, 26, 100, 2), ctx.Theme[UiPaletteRole.Accent]);
             }
             else
             {
@@ -309,9 +309,9 @@ internal static class KernelSharedBehaviorTests
         UiTheme palette = UiTheme.Vanilla;
         _ = slider.Properties.Apply(slider, palette);
         int revision = palette.LayoutRevision;
-        palette.Panel = new Color(1, 0, 0, 1);
+        palette[UiPaletteRole.PanelSurface] = new Color(1, 0, 0, 1);
         UiTheme recolored = slider.Properties.Apply(slider, palette);
-        Check(recolored.Panel.r == 1 && recolored.Panel.g == 0 && palette.LayoutRevision == revision, "property overlay follows host color-only changes without forcing layout");
+        Check(recolored[UiPaletteRole.PanelSurface].r == 1 && recolored[UiPaletteRole.PanelSurface].g == 0 && palette.LayoutRevision == revision, "property overlay follows host color-only changes without forcing layout");
     }
 
     private static void Lifecycle()

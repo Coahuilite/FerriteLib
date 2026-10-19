@@ -76,9 +76,10 @@ gaps have already been implemented.
 
 ### Appearance and diagnostics
 
-- `UiTheme.Vanilla` is the sole shipped palette. `new UiTheme()` is a partial bag whose unassigned colour
-  tokens answer Vanilla; explicitly transparent values remain values. The removed `UiTheme.DarkGold`
-  factory survives only as a test palette, not as a consumer API.
+- `UiPalette` owns sparse neutral colour declarations over immutable per-role defaults. `UiTheme` is its
+  platform paint adapter and retains existing typography/density settings. Ordinary authors can configure
+  the palette directly; selected/success and warning/danger meanings are independent. See the0.8 theme
+  migration guide for the removed historical colour bag and XML syntax; no compatibility double path remains.
 - Colour and layout invalidation are distinct (`ColourRevision` / `LayoutRevision`). Font selection and
   density are separate inputs. Style resolution refreshes scoped clones when either relevant baseline
   revision changes.

@@ -272,7 +272,7 @@ public sealed class DropdownWidget : IUiWidget, IUiLabelledWidget
             UiSliderLayout? shared = SharedLabelLayout(ctx, rect.width);
             float width = shared?.LabelWidth ?? LabelWidth;
             float height = shared?.Stacked == true ? shared.Value.LabelHeight : rect.height;
-            UiThemeDraw.Label(new Rect(rect.x, rect.y, width, height), label, ctx.Theme, ctx.Theme.TextPrimary,
+            UiThemeDraw.Label(new Rect(rect.x, rect.y, width, height), label, ctx.Theme, ctx.Theme[UiPaletteRole.Foreground],
                 AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft, singleLine: !shared.HasValue);
         }
         DrawField(field, display, selected, ctx.Theme, Looks.Resolve(spec).Value, AtomVocabulary.TextFont(ctx));

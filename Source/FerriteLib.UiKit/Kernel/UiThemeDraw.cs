@@ -39,7 +39,7 @@ public static class UiThemeDraw
             // in-game author-credit popup row): a wrapping row is what the declaration exists to refuse.
             // The save/restore is the same process-global dance the font and anchor get above.
             if (singleLine) Text.WordWrap = false;
-            GUI.color = color ?? theme.TextPrimary;
+            GUI.color = color ?? theme[UiPaletteRole.Foreground];
             VerseWidgets.Label(rect, text);
         }
         finally
@@ -79,7 +79,7 @@ public static class UiThemeDraw
     /// <summary>Paints an explicit fill with an explicit edge colour, or the theme's shared border.</summary>
     public static void Surface(Rect rect, UiTheme theme, Color fill, Color? border = null)
     {
-        Surface(rect, new UiSurfaceStyle(fill, border ?? theme.Border), theme.Geometry.Hairline);
+        Surface(rect, new UiSurfaceStyle(fill, border ?? theme[UiPaletteRole.Border]), theme.Geometry.Hairline);
     }
 
     public static void Panel(Rect rect, UiTheme theme)
@@ -99,7 +99,7 @@ public static class UiThemeDraw
         Color oldColor = GUI.color;
         try
         {
-            Solid(rect, theme.WorkspacePlane);
+            Solid(rect, theme[UiPaletteRole.WorkspaceSurface]);
         }
         finally
         {
@@ -121,8 +121,8 @@ public static class UiThemeDraw
         try
         {
             float edge = Math.Max(1f, theme.Geometry.Hairline);
-            Solid(rect, fill ?? theme.SectionBand);
-            Solid(new Rect(rect.x, rect.yMax - edge, rect.width, edge), rule ?? theme.Divider);
+            Solid(rect, fill ?? theme[UiPaletteRole.SectionSurface]);
+            Solid(new Rect(rect.x, rect.yMax - edge, rect.width, edge), rule ?? theme[UiPaletteRole.Divider]);
         }
         finally
         {
@@ -136,7 +136,7 @@ public static class UiThemeDraw
         SectionBand(rect, theme);
         if (!string.IsNullOrEmpty(title))
         {
-            Label(rect, title, theme, color ?? theme.TextPrimary, font ?? UiFont.Small);
+            Label(rect, title, theme, color ?? theme[UiPaletteRole.Foreground], font ?? UiFont.Small);
         }
     }
 
@@ -147,7 +147,7 @@ public static class UiThemeDraw
         Color oldColor = GUI.color;
         try
         {
-            Solid(new Rect(rect.x, rect.y, Mathf.Clamp(width, 1f, rect.width), rect.height), color ?? theme.AccentGold);
+            Solid(new Rect(rect.x, rect.y, Mathf.Clamp(width, 1f, rect.width), rect.height), color ?? theme[UiPaletteRole.Accent]);
         }
         finally
         {
@@ -215,7 +215,7 @@ public static class UiThemeDraw
     public static void SelectorArrow(Rect zone, UiTheme theme, Color? color = null)
     {
         if (zone.width <= 0f || zone.height <= 0f) return;
-        Color ink = color ?? theme.TextPrimary;
+        Color ink = color ?? theme[UiPaletteRole.Foreground];
 
         float baseWidth = Math.Min(SelectorArrowWidth, Math.Max(1f, zone.width));
         float height = Math.Min(SelectorArrowHeight, Math.Max(1f, zone.height));
@@ -290,12 +290,12 @@ public static class UiThemeDraw
     {
         if (rect.width <= 1f || rect.height <= 1f) return;
 
-        Surface(rect, theme, theme.Danger, theme.Border);
+        Surface(rect, theme, theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.Border]);
         Label(
             new Rect(rect.x + 6f, rect.y, Math.Max(1f, rect.width - 12f), rect.height),
             elementPath ?? "",
             theme,
-            theme.TextOnDanger,
+            theme[UiPaletteRole.DangerForeground],
             UiFont.Tiny,
             singleLine: true);
     }

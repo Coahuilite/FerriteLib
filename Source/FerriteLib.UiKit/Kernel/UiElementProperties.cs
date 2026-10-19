@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
+
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -19,43 +19,35 @@ public sealed class UiElementProperties
     public UiPropertyDeclaration<UiFont> LocalFont { get; }
     public UiPropertyDeclaration<UiDensity> Density { get; }
     public UiPropertyDeclaration<UiDensity> LocalDensity { get; }
-    private readonly Dictionary<string, UiPropertyDeclaration<Color?>> colours = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, UiPropertyDeclaration<Color?>> localColours = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, UiResolvedProperty<Color?>> resolvedColours = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, UiPropertyDeclaration<UiColour?>> colours = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, UiPropertyDeclaration<UiColour?>> localColours = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, UiResolvedProperty<UiColour?>> resolvedColours = new(StringComparer.Ordinal);
     private readonly Dictionary<string, UiResolvedProperty<float>> resolvedMetrics = new(StringComparer.Ordinal);
     public IReadOnlyList<string> ColourNames => Array.AsReadOnly(UiAppearanceProperties.Colours);
-    public IReadOnlyDictionary<string, UiResolvedProperty<Color?>> ResolvedColours => resolvedColours;
+    public IReadOnlyDictionary<string, UiResolvedProperty<UiColour?>> ResolvedColours => resolvedColours;
     public IReadOnlyDictionary<string, UiResolvedProperty<float>> ResolvedMetrics => resolvedMetrics;
-    public UiPropertyDeclaration<Color?> Colour(string token) => ColourDeclaration(colours, token);
-    public UiPropertyDeclaration<Color?> LocalColour(string token) => ColourDeclaration(localColours, token);
+    public UiPropertyDeclaration<UiColour?> Palette(UiPaletteRole role) => ColourDeclaration(colours, role.ToString());
+    public UiPropertyDeclaration<UiColour?> LocalPalette(UiPaletteRole role) => ColourDeclaration(localColours, role.ToString());
 
-    private static UiPropertyDeclaration<Color?> ColourDeclaration(Dictionary<string, UiPropertyDeclaration<Color?>> declarations, string token)
+    private static UiPropertyDeclaration<UiColour?> ColourDeclaration(Dictionary<string, UiPropertyDeclaration<UiColour?>> declarations, string token)
     {
         if (!UiAppearanceProperties.IsColour(token)) throw new ArgumentException("Unknown colour token '" + token + "'.", nameof(token));
-        if (!declarations.TryGetValue(token, out UiPropertyDeclaration<Color?>? declaration))
+        if (!declarations.TryGetValue(token, out UiPropertyDeclaration<UiColour?>? declaration))
         {
-            declaration = new UiPropertyDeclaration<Color?>(null, value =>
+            declaration = new UiPropertyDeclaration<UiColour?>(null, value =>
             {
-                bool nullableEdge = token.EndsWith("Border", StringComparison.Ordinal) && token != "Border";
-                if (!value.HasValue && !nullableEdge) throw new ArgumentException(token + " cannot be null.");
-                if (value.HasValue)
-                {
-                    Color c = value.Value;
-                    if (!Finite(c.r) || !Finite(c.g) || !Finite(c.b) || !Finite(c.a))
-                        throw new ArgumentException(token + " requires finite colour channels.");
-                }
+                if (!value.HasValue) throw new ArgumentException(token + " cannot be null.");
             });
             declarations.Add(token, declaration);
         }
         return declaration;
     }
 
-    private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 
     private readonly UiPropertyDeclaration<UiFont> inlineFont = new();
     private readonly UiPropertyDeclaration<UiFont> namedFont = new();
-    private readonly Dictionary<string, UiPropertyDeclaration<Color?>> inlineColours = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, UiPropertyDeclaration<Color?>> namedColours = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, UiPropertyDeclaration<UiColour?>> inlineColours = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, UiPropertyDeclaration<UiColour?>> namedColours = new(StringComparer.Ordinal);
     private readonly Dictionary<string, UiPropertyDeclaration<float>> namedMetrics = new(StringComparer.Ordinal);
     private UiElementSpec? authoredSpec;
     private UiStyleDocument? authoredDocument;
@@ -66,7 +58,7 @@ public sealed class UiElementProperties
         UiStyleDocument? priorDocument = authoredDocument;
         UiResolvedProperty<UiFont> priorFont = ResolvedFont;
         UiResolvedProperty<UiDensity> priorDensity = ResolvedDensity;
-        var priorColours = new Dictionary<string, UiResolvedProperty<Color?>>(resolvedColours, StringComparer.Ordinal);
+        var priorColours = new Dictionary<string, UiResolvedProperty<UiColour?>>(resolvedColours, StringComparer.Ordinal);
         var priorMetrics = new Dictionary<string, UiResolvedProperty<float>>(resolvedMetrics, StringComparer.Ordinal);
         return () =>
         {
@@ -102,13 +94,13 @@ public sealed class UiElementProperties
         namedMetrics.Clear();
         if (spec.TryGetAttribute("Font", out string font) && Enum.TryParse(font, true, out UiFont parsed)) inlineFont.Set(parsed);
         foreach (string token in UiAppearanceProperties.Colours)
-            if (spec.TryGetAttribute("Color." + token, out string raw) && UiStyleDocument.TryParseColour(raw, out Color color))
+            if (spec.TryGetAttribute("Palette." + token, out string raw) && UiStyleDocument.TryParseColour(raw, out UiColour color))
                 ColourDeclaration(inlineColours, token).Set(color);
         if (document == null) return;
         if (spec.TryGetAttribute("Scheme", out string scheme) && document.TryGetScheme(scheme.Trim(), out UiStyleDocument.SchemeDefinition definition))
         {
             if (definition.Font.HasValue) namedFont.Set(definition.Font.Value);
-            foreach (KeyValuePair<string, Color> pair in definition.Colours) ColourDeclaration(namedColours, pair.Key).Set(pair.Value);
+            foreach (KeyValuePair<string, UiColour> pair in definition.Colours) ColourDeclaration(namedColours, pair.Key).Set(pair.Value);
             foreach (KeyValuePair<string, float> pair in definition.Metrics) namedMetrics[pair.Key] = Declared(pair.Value);
         }
         if (spec.TryGetAttribute("Density", out string density) && document.TryGetDensity(density.Trim(), out UiStyleDocument.DensityDefinition dense))
@@ -166,8 +158,8 @@ public sealed class UiElementProperties
             && density.Metrics.TryGetValue(token, out value)) return Declared(value);
         return PageScheme?.Metrics.TryGetValue(token, out value) == true ? Declared(value) : null;
     }
-    private UiPropertyDeclaration<Color?>? PageColour(string token)
-        => PageScheme?.Colours.TryGetValue(token, out Color value) == true ? Declared<Color?>(value) : null;
+    private UiPropertyDeclaration<UiColour?>? PageColour(string token)
+        => PageScheme?.Colours.TryGetValue(token, out UiColour value) == true ? Declared<UiColour?>(value) : null;
 
     private UiTheme? lastHost;
     private UiTheme? appliedTheme;
@@ -176,7 +168,7 @@ public sealed class UiElementProperties
     private int hostPropertyRevision;
     private UiFont lastFont;
     private UiDensity lastDensity;
-    private readonly Dictionary<string, Color?> lastColours = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, UiColour?> lastColours = new(StringComparer.Ordinal);
 
     internal UiTheme Apply(UiNode node, UiTheme host, UiFont fallbackFont = UiFont.Small)
     {
@@ -207,7 +199,7 @@ public sealed class UiElementProperties
         bool paletteChanged = false;
         foreach (string token in UiAppearanceProperties.Colours)
         {
-            UiResolvedProperty<Color?> resolved = UiPropertyResolver.Resolve(Prefer(Find(colours, token), Find(inlineColours, token)),
+            UiResolvedProperty<UiColour?> resolved = UiPropertyResolver.Resolve(Prefer(Find(colours, token), Find(inlineColours, token)),
                 Prefer(Find(localColours, token), Find(namedColours, token)),
                 WithPage(Ancestors(node, p => Prefer(Find(p.colours, token), Find(p.inlineColours, token)),
                     p => Prefer(Find(p.localColours, token), Find(p.namedColours, token)),
@@ -215,9 +207,9 @@ public sealed class UiElementProperties
                 host.HasColourOverride(token) ? Declared(UiAppearanceProperties.ReadColour(host, token)) : null,
                 UiAppearanceProperties.ReadColour(host, token));
             if (resolved.Origin == UiPropertyOrigin.LocalStyle && Find(localColours, token)?.IsDeclared != true)
-                resolved = new UiResolvedProperty<Color?>(resolved.Value, resolved.Origin, NamedSource(token));
+                resolved = new UiResolvedProperty<UiColour?>(resolved.Value, resolved.Origin, NamedSource(token));
             resolvedColours[token] = resolved;
-            if (!lastColours.TryGetValue(token, out Color? prior) || !Nullable.Equals(prior, resolved.Value)) paletteChanged = true;
+            if (!lastColours.TryGetValue(token, out UiColour? prior) || !Nullable.Equals(prior, resolved.Value)) paletteChanged = true;
         }
         bool equalsHost = ResolvedFont.Value == host.DefaultFont && d.Equals(defaults);
         foreach (var colour in resolvedColours)
@@ -252,10 +244,6 @@ public sealed class UiElementProperties
             lastFont = ResolvedFont.Value;
             lastDensity = d;
         }
-        // Derived fallback inks (e.g. SwitchThumbOff -> TextPrimary) read the effective bag, not a frozen baseline value.
-        foreach (string token in UiAppearanceProperties.Colours)
-            if (resolvedColours[token].Origin == UiPropertyOrigin.Fallback)
-                resolvedColours[token] = new UiResolvedProperty<Color?>(UiAppearanceProperties.ReadColour(appliedTheme!, token), UiPropertyOrigin.Fallback, "theme-fallback");
         return appliedTheme!;
     }
 

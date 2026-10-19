@@ -84,17 +84,17 @@ internal static class KernelAssemblyTests
         Check(refused && ReferenceEquals(host.Manifest, program) && ReferenceEquals(state.Editor, edit),
             "new finite relation cycles are preflighted by the shared production graph before replacing a live definition");
         theme.DefaultFont = UiFont.Medium;
-        theme.TextPrimary = new Color(0, 1, 1, 1);
+        theme[UiPaletteRole.Foreground] = new Color(0, 1, 1, 1);
         var badTemplate = Spec("bad-template", "unregistered/atom");
         var candidate = UiLayoutManifest.Create("assembly", program.Roots,
-            UiStyleDocument.Parse("<Styles Schema=\"1\" Scheme=\"blue\"><Scheme Name=\"blue\"><Color Token=\"Panel\" Value=\"#0000FF\"/></Scheme></Styles>"),
+            UiStyleDocument.Parse("<Styles Schema=\"1\" Scheme=\"blue\"><Scheme Name=\"blue\"><Palette Role=\"PanelSurface\" Value=\"#0000FF\"/></Scheme></Styles>"),
             new Dictionary<string, UiElementSpec> { ["bad-template"] = badTemplate });
         refused = false;
         try { host.UpdateDefinition(candidate); }
         catch (UiContractException) { refused = true; }
         Check(refused && ReferenceEquals(host.Manifest, program) && host.DefinitionRevision == 0
             && theme.DefaultFont == UiFont.Medium && theme.HasFontOverride && !theme.HasDensityOverride
-            && theme.TextPrimary == new Color(0, 1, 1, 1) && ReferenceEquals(state.Editor, edit),
+            && theme[UiPaletteRole.Foreground] == new Color(0, 1, 1, 1) && ReferenceEquals(state.Editor, edit),
             "failed real staging restores exact current theme claims and old tree, without promoting density or destroying draft");
         host.UpdateDefinition(Definition("Changed"));
         UiLayoutSnapshot updated = host.MeasureAndArrange(new Vector2(300, 300));

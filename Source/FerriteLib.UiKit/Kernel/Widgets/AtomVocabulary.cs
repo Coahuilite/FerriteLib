@@ -333,7 +333,7 @@ internal static class AtomVocabulary
     {
         if (editor.Valid && !editor.Conflict) return;
         // Feedback reads the shared facts; it never parses, repairs or writes a draft.
-        Color color = !editor.Valid ? ctx.Theme.Danger : ctx.Theme.Selected;
+        Color color = !editor.Valid ? ctx.Theme[UiPaletteRole.DangerSurface] : ctx.Theme[UiPaletteRole.SelectedSurface];
         UiThemeDraw.Solid(new Rect(field.x, field.yMax - 2, field.width, 2), color);
     }
 

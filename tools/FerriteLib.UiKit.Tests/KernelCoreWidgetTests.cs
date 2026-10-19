@@ -684,7 +684,7 @@ internal static class KernelCoreWidgetTests
         }
 
         Color plain = BannerInk("Tone=\"\"");
-        if (!SameColor(plain, UiTheme.Vanilla.TextSecondary))
+        if (!SameColor(plain, UiTheme.Vanilla[UiPaletteRole.SecondaryForeground]))
         {
             throw new Exception("an untone banner no longer paints its documented secondary ink: " + Describe(plain));
         }

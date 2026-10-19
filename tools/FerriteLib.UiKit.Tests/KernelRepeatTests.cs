@@ -128,7 +128,7 @@ internal static class KernelRepeatTests
         var activeEdge = new Color(0.91f, 0.11f, 0.17f, 1f);
         // The Active cell's border is theme.AccentGold and a rule paints exactly that border, so the probe
         // colour counts whole rows without depending on the order the rows were drawn in.
-        theme.AccentGold = activeEdge;
+        theme[UiPaletteRole.SelectedBorder] = activeEdge;
 
         var keys = new List<string> { "a", "b", "c" };
         var selected = new Dictionary<string, bool>(StringComparer.Ordinal)

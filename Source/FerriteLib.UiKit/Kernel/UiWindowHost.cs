@@ -740,7 +740,7 @@ public abstract class UiWindowHost : Window
     {
         UiTheme theme = Theme;
         UiThemeDraw.Workspace(rect, theme);
-        UiThemeDraw.Solid(new Rect(rect.x, rect.y, rect.width, AccentBarHeight), theme.AccentGold);
+        UiThemeDraw.Solid(new Rect(rect.x, rect.y, rect.width, AccentBarHeight), theme[UiPaletteRole.Accent]);
 
         if (Title.Length > 0)
         {
@@ -748,7 +748,7 @@ public abstract class UiWindowHost : Window
                 new Rect(rect.x + SidePadding, rect.y + 6f, Math.Max(1f, rect.width * 0.6f), 30f),
                 Title,
                 theme,
-                theme.TextPrimary,
+                theme[UiPaletteRole.Foreground],
                 TitleFont,
                 singleLine: true);
         }
@@ -759,7 +759,7 @@ public abstract class UiWindowHost : Window
                 new Rect(rect.x + SidePadding, rect.y + 36f, Math.Max(1f, rect.width * 0.6f), 18f),
                 Subtitle,
                 theme,
-                theme.TextSecondary,
+                theme[UiPaletteRole.SecondaryForeground],
                 SubtitleFont,
                 singleLine: true);
         }
@@ -775,13 +775,13 @@ public abstract class UiWindowHost : Window
         UiThemeDraw.Surface(
             button,
             theme,
-            hovered ? theme.Hover : theme.Panel,
-            hovered ? theme.BorderStrong : theme.Border);
+            hovered ? theme[UiPaletteRole.HoverSurface] : theme[UiPaletteRole.PanelSurface],
+            hovered ? theme[UiPaletteRole.StrongBorder] : theme[UiPaletteRole.Border]);
         UiThemeDraw.Label(
             button,
             CloseText,
             theme,
-            hovered ? theme.TextPrimary : theme.TextSecondary,
+            hovered ? theme[UiPaletteRole.Foreground] : theme[UiPaletteRole.SecondaryForeground],
             CloseFont,
             TextAnchor.MiddleCenter,
             singleLine: true);

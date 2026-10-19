@@ -151,10 +151,7 @@ public sealed partial class UiLayoutEngine
         "OffsetY",
         "AnchorX",
         "AnchorY",
-        "Font", "Color.Base", "Color.Panel", "Color.Raised", "Color.Hover", "Color.Selected", "Color.Success", "Color.Danger",
-        "Color.WorkspacePlane", "Color.SectionBand", "Color.TextPrimary", "Color.TextSecondary", "Color.TextOnGold", "Color.TextOnDanger", "Color.TextDisabled",
-        "Color.AccentGold", "Color.SwitchThumbOff", "Color.Border", "Color.BorderStrong", "Color.Divider", "Color.BaseBorder", "Color.PanelBorder",
-        "Color.RaisedBorder", "Color.HoverBorder", "Color.SelectedBorder", "Color.SuccessBorder", "Color.DangerBorder",
+        "Font",
         "SharedLabels",
         // FL-IC2: the Cancel layer of the tree walk. Engine-wide on a container as well as a widget, because
         // the ladder walks the TREE and a section is a legitimate layer to return from — the element that
@@ -186,10 +183,7 @@ public sealed partial class UiLayoutEngine
         "OffsetY",
         "AnchorX",
         "AnchorY",
-        "Font", "Color.Base", "Color.Panel", "Color.Raised", "Color.Hover", "Color.Selected", "Color.Success", "Color.Danger",
-        "Color.WorkspacePlane", "Color.SectionBand", "Color.TextPrimary", "Color.TextSecondary", "Color.TextOnGold", "Color.TextOnDanger", "Color.TextDisabled",
-        "Color.AccentGold", "Color.SwitchThumbOff", "Color.Border", "Color.BorderStrong", "Color.Divider", "Color.BaseBorder", "Color.PanelBorder",
-        "Color.RaisedBorder", "Color.HoverBorder", "Color.SelectedBorder", "Color.SuccessBorder", "Color.DangerBorder",
+        "Font",
         // FL-IC2: see the container list above; the two move together or the drift lane fails.
         "CancelBind"
     };
@@ -2084,7 +2078,7 @@ public sealed partial class UiLayoutEngine
     {
         foreach (KeyValuePair<string, string> pair in spec.Attributes)
         {
-            if (ContainsAttribute(allowed, pair.Key)) continue;
+            if (ContainsAttribute(allowed, pair.Key) || UiAppearanceProperties.IsPaletteAttribute(pair.Key)) continue;
             if (engineWide && EngineWideWidgetAttributes.Contains(pair.Key)) continue;
 
             throw TemplateContract(
@@ -2739,7 +2733,7 @@ public sealed partial class UiLayoutEngine
             // One text outlet: routing the container title through UiThemeDraw.Label is what makes it
             // visible to the fit audit (BeginElement above already attributes by path), which the
             // engine's own private Label copy could never do.
-            UiThemeDraw.Label(headerRect, ReadTitle(entry.Spec, ctx), ctx.Theme, ctx.Theme.TextPrimary);
+            UiThemeDraw.Label(headerRect, ReadTitle(entry.Spec, ctx), ctx.Theme, ctx.Theme[UiPaletteRole.Foreground]);
         }
     }
 

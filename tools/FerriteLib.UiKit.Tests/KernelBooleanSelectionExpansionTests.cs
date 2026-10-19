@@ -139,7 +139,7 @@ internal static class KernelBooleanSelectionExpansionTests
                         writes++;
                         commands++;
                     });
-                    UiThemeDraw.Solid(new Rect(hit.x, hit.y, 3, hit.height), ctx.Theme.AccentGold);
+                    UiThemeDraw.Solid(new Rect(hit.x, hit.y, 3, hit.height), ctx.Theme[UiPaletteRole.Accent]);
                 }
                 else
                 {
@@ -363,7 +363,7 @@ internal static class KernelBooleanSelectionExpansionTests
                     continue;
                 using var session = new UiSession();
                 var theme = UiTheme.Vanilla.Clone();
-                theme.TextOnGold = new Color(0.93f, 0.14f, 0.27f, 1);
+                theme[UiPaletteRole.SelectedForeground] = new Color(0.93f, 0.14f, 0.27f, 1);
                 var bindings = new UiBindings();
                 int requests = 0;
                 if (eligibility == "readonly")

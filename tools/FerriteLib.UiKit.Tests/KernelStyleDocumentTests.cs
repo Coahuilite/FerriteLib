@@ -40,8 +40,8 @@ internal static class KernelStyleDocumentTests
     {
         const string body =
             "<Scheme Name=\"ice\">"
-            + "<Color Token=\"Panel\" Value=\"#0000ff\"/>"
-            + "<Color Token=\"Bogus\" Value=\"#ffffff\"/>"
+            + "<Palette Role=\"PanelSurface\" Value=\"#0000ff\"/>"
+            + "<Palette Role=\"Bogus\" Value=\"#ffffff\"/>"
             + "</Scheme>";
 
         UiStyleDocument standalone = UiStyleDocument.Parse("<Styles Schema=\"1\">" + body + "</Styles>");
@@ -57,8 +57,8 @@ internal static class KernelStyleDocumentTests
 
         var standaloneResolver = new UiStyleResolver(UiTheme.Vanilla, standalone);
         var embeddedResolver = new UiStyleResolver(UiTheme.Vanilla, embedded);
-        Color standalonePanel = standaloneResolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "ice") }).Panel;
-        Color embeddedPanel = embeddedResolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "ice") }).Panel;
+        Color standalonePanel = standaloneResolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "ice") })[UiPaletteRole.PanelSurface];
+        Color embeddedPanel = embeddedResolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "ice") })[UiPaletteRole.PanelSurface];
         Check(
             SameColor(standalonePanel, embeddedPanel) && SameColor(standalonePanel, new Color(0f, 0f, 1f, 1f)),
             "the same content through either origin lands on the same value (one parser, one vocabulary)");
@@ -88,54 +88,54 @@ internal static class KernelStyleDocumentTests
     private static void VerifyPrecedenceChain()
     {
         const string schemes =
-            "<Scheme Name=\"page\"><Color Token=\"Panel\" Value=\"#0000ff\"/></Scheme>"
-            + "<Scheme Name=\"container\"><Color Token=\"Panel\" Value=\"#00ff00\"/></Scheme>"
-            + "<Scheme Name=\"element\"><Color Token=\"Panel\" Value=\"#ff0000\"/></Scheme>";
+            "<Scheme Name=\"page\"><Palette Role=\"PanelSurface\" Value=\"#0000ff\"/></Scheme>"
+            + "<Scheme Name=\"container\"><Palette Role=\"PanelSurface\" Value=\"#00ff00\"/></Scheme>"
+            + "<Scheme Name=\"element\"><Palette Role=\"PanelSurface\" Value=\"#ff0000\"/></Scheme>";
 
         // default: nothing declared anywhere -> the library's own value.
-        Color libraryDefault = UiTheme.Vanilla.Panel;
+        Color libraryDefault = UiTheme.Vanilla[UiPaletteRole.PanelSurface];
         Check(
-            SameColor(new UiStyleResolver(UiTheme.Vanilla, UiStyleDocument.Empty).ThemeFor(null).Panel, libraryDefault),
+            SameColor(new UiStyleResolver(UiTheme.Vanilla, UiStyleDocument.Empty).ThemeFor(null)[UiPaletteRole.PanelSurface], libraryDefault),
             "default: with no source at all the library value stands");
 
         // theme > default: the injected theme is the baseline under every document.
         UiTheme tinted = UiTheme.Vanilla;
-        tinted.Panel = new Color(0.01f, 0.02f, 0.03f, 1f);
+        tinted[UiPaletteRole.PanelSurface] = new Color(0.01f, 0.02f, 0.03f, 1f);
         Check(
-            SameColor(new UiStyleResolver(tinted, UiStyleDocument.Empty).ThemeFor(null).Panel, tinted.Panel),
+            SameColor(new UiStyleResolver(tinted, UiStyleDocument.Empty).ThemeFor(null)[UiPaletteRole.PanelSurface], tinted[UiPaletteRole.PanelSurface]),
             "theme > default: the consumer's token wins over the library one");
 
         var document = UiStyleDocument.Parse("<Styles Schema=\"1\" Scheme=\"page\">" + schemes + "</Styles>");
         var resolver = new UiStyleResolver(tinted, document);
 
         Check(
-            SameColor(resolver.ThemeFor(null).Panel, new Color(0f, 0f, 1f, 1f)),
+            SameColor(resolver.ThemeFor(null)[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)),
             "page > theme: the page-level scheme overrides the injected theme");
 
         var container = new UiStyleDeclaration(scheme: "container");
         Check(
-            SameColor(resolver.ThemeFor(new[] { default(UiStyleDeclaration), container }).Panel, new Color(0f, 1f, 0f, 1f)),
+            SameColor(resolver.ThemeFor(new[] { default(UiStyleDeclaration), container })[UiPaletteRole.PanelSurface], new Color(0f, 1f, 0f, 1f)),
             "container > page: a container's scheme beats the page-level one");
 
         var element = new UiStyleDeclaration(scheme: "element");
         Check(
-            SameColor(resolver.ThemeFor(new[] { element, container }).Panel, new Color(1f, 0f, 0f, 1f)),
+            SameColor(resolver.ThemeFor(new[] { element, container })[UiPaletteRole.PanelSurface], new Color(1f, 0f, 0f, 1f)),
             "element > container: the nearest declaration wins");
 
         // state > element: a value the player cannot write is painted disabled whatever was authored.
         var danger = new[] { new UiStyleDeclaration(tone: UiStatusTone.Danger) };
         UiTheme theme = UiTheme.Vanilla;
         Check(
-            SameColor(resolver.Resolve(theme, danger, writable: true).Fill, theme.Danger),
+            SameColor(resolver.Resolve(theme, danger, writable: true).Fill, theme[UiPaletteRole.DangerSurface]),
             "element: an authored tone decides when nothing overrides it");
         Check(
-            SameColor(resolver.Resolve(theme, danger, writable: false).Fill, theme.Base),
+            SameColor(resolver.Resolve(theme, danger, writable: false).Fill, theme[UiPaletteRole.WindowSurface]),
             "state > element: a read-only value is painted disabled whatever tone was authored");
     }
 
     private static void VerifyInheritanceAsymmetry()
     {
-        const string scheme = "<Scheme Name=\"ice\"><Color Token=\"Panel\" Value=\"#0000ff\"/></Scheme>";
+        const string scheme = "<Scheme Name=\"ice\"><Palette Role=\"PanelSurface\" Value=\"#0000ff\"/></Scheme>";
         const string density = "<Density Name=\"compact\"><Metric Token=\"RowHeight\" Value=\"20\"/></Density>";
         var document = UiStyleDocument.Parse("<Styles Schema=\"1\">" + scheme + density + "</Styles>");
         var resolver = new UiStyleResolver(UiTheme.Vanilla, document);
@@ -144,7 +144,7 @@ internal static class KernelStyleDocumentTests
         var silentElement = default(UiStyleDeclaration);
         UiTheme inherited = resolver.ThemeFor(new[] { silentElement, container });
 
-        Check(SameColor(inherited.Panel, new Color(0f, 0f, 1f, 1f)),
+        Check(SameColor(inherited[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)),
             "scheme inherits: an element that declares nothing takes its container's palette");
         Check(Math.Abs(inherited.Geometry.RowHeight - 20f) <= 0.0001f,
             "density inherits the same way");
@@ -154,11 +154,11 @@ internal static class KernelStyleDocumentTests
         UiTheme theme = UiTheme.Vanilla;
         UiResolvedStyle child = resolver.Resolve(theme, new[] { silentElement, dangerRegion });
         Check(
-            SameColor(child.Fill, theme.Raised) && !SameColor(child.Fill, theme.Danger),
+            SameColor(child.Fill, theme[UiPaletteRole.ControlSurface]) && !SameColor(child.Fill, theme[UiPaletteRole.DangerSurface]),
             "roles do not inherit: a danger-tagged region leaves its children on the neutral treatment");
 
         UiResolvedStyle regionChrome = resolver.Resolve(theme, new[] { dangerRegion });
-        Check(SameColor(regionChrome.Fill, theme.Danger),
+        Check(SameColor(regionChrome.Fill, theme[UiPaletteRole.DangerSurface]),
             "while the region's own chrome does carry the tag");
     }
 
@@ -283,9 +283,9 @@ internal static class KernelStyleDocumentTests
         const string broken =
             "<Styles Schema=\"1\" Bogus=\"1\">"
             + "<Scheme Name=\"partial\">"
-            + "<Color Token=\"Panel\" Value=\"#00ff00\"/>"
-            + "<Color Token=\"Raised\" Value=\"not-a-colour\"/>"
-            + "<Color Token=\"Nope\" Value=\"#ffffff\"/>"
+            + "<Palette Role=\"PanelSurface\" Value=\"#00ff00\"/>"
+            + "<Palette Role=\"ControlSurface\" Value=\"not-a-colour\"/>"
+            + "<Palette Role=\"Nope\" Value=\"#ffffff\"/>"
             + "<Font Value=\"Huge\"/>"
             + "</Scheme>"
             + "<Density Name=\"bad\"><Metric Token=\"RowHeight\" Value=\"-4\"/></Density>"
@@ -298,17 +298,17 @@ internal static class KernelStyleDocumentTests
 
         var resolver = new UiStyleResolver(UiTheme.Vanilla, document);
         UiTheme partial = resolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "partial") });
-        Check(SameColor(partial.Panel, new Color(0f, 1f, 0f, 1f)), "the readable value in that scheme landed");
-        Check(SameColor(partial.Raised, UiTheme.Vanilla.Raised), "the unreadable one fell back to the default");
+        Check(SameColor(partial[UiPaletteRole.PanelSurface], new Color(0f, 1f, 0f, 1f)), "the readable value in that scheme landed");
+        Check(SameColor(partial[UiPaletteRole.ControlSurface], UiTheme.Vanilla[UiPaletteRole.ControlSurface]), "the unreadable one fell back to the default");
 
         resolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "nobody-declared-this") });
         Check(resolver.Issues.Count == 1, "a scope naming an unknown scheme is recorded at resolution time");
-        Check(SameColor(resolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "nobody-declared-this") }).Panel, UiTheme.Vanilla.Panel),
+        Check(SameColor(resolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "nobody-declared-this") })[UiPaletteRole.PanelSurface], UiTheme.Vanilla[UiPaletteRole.PanelSurface]),
             "and the scope keeps the values it would have had without it (the page still renders)");
 
         // The other end: a correct document is silent on both records.
         UiStyleDocument good = UiStyleDocument.Parse(
-            "<Styles Schema=\"1\"><Scheme Name=\"ice\"><Color Token=\"Panel\" Value=\"0.1,0.2,0.3\"/></Scheme></Styles>");
+            "<Styles Schema=\"1\"><Scheme Name=\"ice\"><Palette Role=\"PanelSurface\" Value=\"0.1,0.2,0.3\"/></Scheme></Styles>");
         var goodResolver = new UiStyleResolver(UiTheme.Vanilla, good);
         goodResolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "ice") });
         Check(good.Issues.Count == 0 && goodResolver.Issues.Count == 0,
@@ -336,7 +336,7 @@ internal static class KernelStyleDocumentTests
         {
             string stylePath = Path.Combine(directory, "style.xml");
             File.WriteAllText(stylePath,
-                "<Styles Schema=\"1\"><Scheme Name=\"ice\"><Color Token=\"Panel\" Value=\"#0000ff\"/></Scheme></Styles>");
+                "<Styles Schema=\"1\"><Scheme Name=\"ice\"><Palette Role=\"PanelSurface\" Value=\"#0000ff\"/></Scheme></Styles>");
             UiStyleDocument fromFile = UiStyleDocument.ParseFile(stylePath);
             Check(fromFile.SchemeNames.Contains("ice"), "the standalone file entry reads a real file");
 
@@ -367,18 +367,18 @@ internal static class KernelStyleDocumentTests
     private static void VerifyCloneContract()
     {
         UiTheme original = UiTheme.Vanilla;
-        original.Panel = new Color(0.11f, 0.12f, 0.13f, 1f);
+        original[UiPaletteRole.PanelSurface] = new Color(0.11f, 0.12f, 0.13f, 1f);
         original.Geometry = new UiGeometry(3f, 4f, 5f, 26f, 1f);
 
         UiTheme copy = original.Clone();
-        Check(SameColor(copy.Panel, original.Panel), "clone copies token values");
+        Check(SameColor(copy[UiPaletteRole.PanelSurface], original[UiPaletteRole.PanelSurface]), "clone copies token values");
         Check(copy.Geometry == original.Geometry, "clone copies the density bundle");
         Check(!ReferenceEquals(copy.Styles, original.Styles), "clone has its own resolved-value store");
         Check(copy.Styles.Resolve(UiStatusTone.Neutral).Text.r == original.Styles.Resolve(UiStatusTone.Neutral).Text.r,
             "both stores answer from their own theme");
 
-        copy.Panel = new Color(0.9f, 0.9f, 0.9f, 1f);
-        Check(!SameColor(copy.Panel, original.Panel), "moving a token on the copy leaves the original alone");
+        copy[UiPaletteRole.PanelSurface] = new Color(0.9f, 0.9f, 0.9f, 1f);
+        Check(!SameColor(copy[UiPaletteRole.PanelSurface], original[UiPaletteRole.PanelSurface]), "moving a token on the copy leaves the original alone");
     }
 
     private static void ResetAudit()

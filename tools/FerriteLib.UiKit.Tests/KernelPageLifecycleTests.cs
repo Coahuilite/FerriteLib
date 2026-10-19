@@ -253,7 +253,7 @@ internal static class KernelPageLifecycleTests
             + "<Widget Id=\"added\" Kind=\"chrome/rule\" Height=\"4\"/></Column>");
         const string styleOne = "<Styles Schema=\"1\"></Styles>";
         const string styleTwo = "<Styles Schema=\"1\"><Scheme Name=\"ice\">"
-            + "<Color Token=\"Panel\" Value=\"#00ff00\"/></Scheme></Styles>";
+            + "<Palette Role=\"PanelSurface\" Value=\"#00ff00\"/></Scheme></Styles>";
         File.WriteAllText(layoutPath, layoutOne);
         File.WriteAllText(stylePath, styleOne);
 

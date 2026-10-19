@@ -119,7 +119,7 @@ public sealed class StepperSliderWidget : IUiWidget, IUiLabelledWidget, IUiLayou
         if (label.Length > 0)
         {
             float labelWidth = labelLayout.LabelWidth;
-            UiThemeDraw.Label(new Rect(rect.x, rect.y, labelWidth, labelLayout.Stacked ? labelLayout.LabelHeight : layout.Minus.Height), label, ctx.Theme, ctx.Theme.TextPrimary, AtomVocabulary.TextFont(ctx));
+            UiThemeDraw.Label(new Rect(rect.x, rect.y, labelWidth, labelLayout.Stacked ? labelLayout.LabelHeight : layout.Minus.Height), label, ctx.Theme, ctx.Theme[UiPaletteRole.Foreground], AtomVocabulary.TextFont(ctx));
         }
 
         DrawButton(minusRect, "−", ctx.Theme);
@@ -176,8 +176,8 @@ public sealed class StepperSliderWidget : IUiWidget, IUiLabelledWidget, IUiLayou
 
     private static void DrawButton(Rect rect, string text, UiTheme theme)
     {
-        UiThemeDraw.Solid(rect, theme.Raised);
-        UiThemeDraw.Label(rect, text, theme, theme.TextPrimary, anchor: TextAnchor.MiddleCenter);
+        UiThemeDraw.Solid(rect, theme[UiPaletteRole.ControlSurface]);
+        UiThemeDraw.Label(rect, text, theme, theme[UiPaletteRole.Foreground], anchor: TextAnchor.MiddleCenter);
     }
 
 

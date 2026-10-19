@@ -232,9 +232,9 @@ internal static class KernelControlKindTests
         var flat = new Color(0.10f, 0.09f, 0.07f, 1f);
         var controlEdge = new Color(0.55f, 0.55f, 0.55f, 1f);
         UiTheme flattened = UiTheme.Vanilla;
-        flattened.Raised = flat;
-        flattened.RaisedBorder = flat;
-        flattened.BorderStrong = controlEdge;
+        flattened[UiPaletteRole.ControlSurface] = flat;
+        flattened[UiPaletteRole.ControlBorder] = flat;
+        flattened[UiPaletteRole.StrongBorder] = controlEdge;
 
         flagValue = false;
         using (UiHost host = Host(BoolAutoPage(""), CheckboxBindings(), flattened))
@@ -266,7 +266,7 @@ internal static class KernelControlKindTests
     /// <item><b>GUARD</b> - an OFF switch paints its thumb in the neutral ink and no accent at all. It holds
     /// on both sides of the ON mutation, so it is a regression guard, not the failure-sensitive half.</item>
     /// <item><b>MUTATION-TARGET (SA1.1, production path since r3)</b> - the OFF thumb is its OWN colour
-    /// role: declarable in the palette document (<c>&lt;Color Token="SwitchThumbOff"/&gt;</c> in the grammar,
+    /// role: declarable in the palette document (<c>&lt;Color Role="SwitchOff"/&gt;</c> in the grammar,
     /// applied by the resolver onto the scoped clone), unset it answers the theme's TextPrimary. The grey
     /// paints the thumb WITHOUT touching the label ink (a grey thumb may not darken every important text),
     /// the ON half keeps answering the accent, and a scope that declares no role under the SAME document
@@ -282,9 +282,9 @@ internal static class KernelControlKindTests
         {
             ClearDraws();
             on.DrawFrame(new Rect(0f, 0f, 200f, 60f));
-            Check(SameColor(KnobColour(), UiTheme.Vanilla.AccentGold),
+            Check(SameColor(KnobColour(), UiTheme.Vanilla[UiPaletteRole.Accent]),
                 "an ON switch paints its THUMB in the accent token, not in the selected plane's text colour: got "
-                + Describe(KnobColour()) + ", accent is " + Describe(UiTheme.Vanilla.AccentGold));
+                + Describe(KnobColour()) + ", accent is " + Describe(UiTheme.Vanilla[UiPaletteRole.Accent]));
         }
 
         flagValue = false;
@@ -292,12 +292,12 @@ internal static class KernelControlKindTests
         {
             ClearDraws();
             off.DrawFrame(new Rect(0f, 0f, 200f, 60f));
-            Check(SameColor(KnobColour(), UiTheme.Vanilla.TextPrimary),
+            Check(SameColor(KnobColour(), UiTheme.Vanilla[UiPaletteRole.Foreground]),
                 "while an OFF switch paints its thumb in the neutral ink - the UNSET fallback of the token");
             bool accent = false;
             foreach (object color in RecordedColors())
             {
-                accent |= SameColor((Color)color, UiTheme.Vanilla.AccentGold);
+                accent |= SameColor((Color)color, UiTheme.Vanilla[UiPaletteRole.Accent]);
             }
 
             Check(!accent, "and an OFF switch paints no accent at all");
@@ -312,7 +312,7 @@ internal static class KernelControlKindTests
         // no Scheme on the column, checked here so "default compatible" is a production fact, not a claim.
         UiStyleDocument slate = UiStyleDocument.Parse(
             "<Styles Schema=\"1\">"
-            + "<Scheme Name=\"slate\"><Color Token=\"SwitchThumbOff\" Value=\"0.32,0.33,0.35,1\"/></Scheme>"
+            + "<Scheme Name=\"slate\"><Palette Role=\"SwitchOff\" Value=\"0.32,0.33,0.35,1\"/></Scheme>"
             + "</Styles>");
         Check(slate.Issues.Count == 0,
             "the palette document accepts SwitchThumbOff as a colour role: " + slate.Issues.Count + " issue(s)");
@@ -327,7 +327,7 @@ internal static class KernelControlKindTests
                 "the declared OFF-thumb colour paints the thumb through the real document->resolver->clone path: got "
                 + Describe(KnobColour()));
             IList inks = (IList)Field(typeof(Verse.Widgets), "LabelColors", null);
-            Check(inks.Count > 0 && SameColor((Color)inks[inks.Count - 1], UiTheme.Vanilla.TextPrimary)
+            Check(inks.Count > 0 && SameColor((Color)inks[inks.Count - 1], UiTheme.Vanilla[UiPaletteRole.Foreground])
                     && !SameColor((Color)inks[inks.Count - 1], thumbGrey),
                 "and the label keeps its bright ink - the grey thumb never rides on important text");
         }
@@ -337,7 +337,7 @@ internal static class KernelControlKindTests
         {
             ClearDraws();
             onGrey.DrawFrame(new Rect(0f, 0f, 200f, 60f));
-            Check(SameColor(KnobColour(), UiTheme.Vanilla.AccentGold),
+            Check(SameColor(KnobColour(), UiTheme.Vanilla[UiPaletteRole.Accent]),
                 "the ON thumb still answers the accent under the same scope declaration");
         }
 
@@ -346,7 +346,7 @@ internal static class KernelControlKindTests
         {
             ClearDraws();
             unslated.DrawFrame(new Rect(0f, 0f, 200f, 60f));
-            Check(SameColor(KnobColour(), UiTheme.Vanilla.TextPrimary),
+            Check(SameColor(KnobColour(), UiTheme.Vanilla[UiPaletteRole.Foreground]),
                 "a scope that declares no OFF-thumb keeps the historical bright thumb even with the document in hand");
         }
     }
@@ -462,7 +462,7 @@ internal static class KernelControlKindTests
         Check(RecordedColors().Count >= 5, "the checkbox painted its box");
         UiTheme theme = UiTheme.Vanilla;
         Check(
-            SameColor((Color)RecordedColors()[0], theme.Base) && SameColor((Color)RecordedColors()[1], theme.Divider),
+            SameColor((Color)RecordedColors()[0], theme[UiPaletteRole.WindowSurface]) && SameColor((Color)RecordedColors()[1], theme[UiPaletteRole.Divider]),
             "and the plane is the one disabled treatment the resolved-value table owns");
 
         // Capture is observed on the MouseDown itself: after a full click the hot control is released again

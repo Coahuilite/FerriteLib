@@ -54,47 +54,41 @@ internal static class KernelResolvedStyleTests
     {
         UiTheme theme = TestPalettes.DarkGold;
 
-        ExpectCell(theme, UiStatusTone.Neutral, UiEmphasis.Normal, theme.Raised, theme.Border, theme.TextPrimary,
+        ExpectCell(theme, UiStatusTone.Neutral, UiEmphasis.Normal, theme[UiPaletteRole.ControlSurface], theme[UiPaletteRole.Border], theme[UiPaletteRole.Foreground],
             "Neutral/Normal (a form control's value)");
-        ExpectCell(theme, UiStatusTone.Neutral, UiEmphasis.Muted, theme.Raised, theme.Border, theme.TextSecondary,
+        ExpectCell(theme, UiStatusTone.Neutral, UiEmphasis.Muted, theme[UiPaletteRole.ControlSurface], theme[UiPaletteRole.Border], theme[UiPaletteRole.SecondaryForeground],
             "Neutral/Muted (a badge's compact text)");
-        ExpectCell(theme, UiStatusTone.Active, UiEmphasis.Normal, theme.Selected, theme.AccentGold, theme.TextOnGold,
+        ExpectCell(theme, UiStatusTone.Active, UiEmphasis.Normal, theme[UiPaletteRole.SelectedSurface], theme[UiPaletteRole.Accent], theme[UiPaletteRole.SelectedForeground],
             "Active/Normal");
-        ExpectCell(theme, UiStatusTone.Active, UiEmphasis.Muted, theme.Selected, theme.AccentGold, theme.TextOnGold,
+        ExpectCell(theme, UiStatusTone.Active, UiEmphasis.Muted, theme[UiPaletteRole.SelectedSurface], theme[UiPaletteRole.Accent], theme[UiPaletteRole.SelectedForeground],
             "Active/Muted");
-        ExpectCell(theme, UiStatusTone.Success, UiEmphasis.Normal, theme.Success, theme.BorderStrong, theme.TextOnGold,
+        ExpectCell(theme, UiStatusTone.Success, UiEmphasis.Normal, theme[UiPaletteRole.SuccessSurface], theme[UiPaletteRole.StrongBorder], theme[UiPaletteRole.SelectedForeground],
             "Success/Normal");
-        ExpectCell(theme, UiStatusTone.Success, UiEmphasis.Muted, theme.Success, theme.BorderStrong, theme.TextOnGold,
+        ExpectCell(theme, UiStatusTone.Success, UiEmphasis.Muted, theme[UiPaletteRole.SuccessSurface], theme[UiPaletteRole.StrongBorder], theme[UiPaletteRole.SelectedForeground],
             "Success/Muted");
-        ExpectCell(theme, UiStatusTone.Warning, UiEmphasis.Normal, theme.Danger, theme.Danger, theme.TextOnDanger,
+        ExpectCell(theme, UiStatusTone.Warning, UiEmphasis.Normal, theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerForeground],
             "Warning/Normal");
-        ExpectCell(theme, UiStatusTone.Warning, UiEmphasis.Muted, theme.Danger, theme.Danger, theme.TextOnDanger,
+        ExpectCell(theme, UiStatusTone.Warning, UiEmphasis.Muted, theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerForeground],
             "Warning/Muted");
-        ExpectCell(theme, UiStatusTone.Danger, UiEmphasis.Normal, theme.Danger, theme.Danger, theme.TextOnDanger,
+        ExpectCell(theme, UiStatusTone.Danger, UiEmphasis.Normal, theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerForeground],
             "Danger/Normal");
-        ExpectCell(theme, UiStatusTone.Danger, UiEmphasis.Muted, theme.Danger, theme.Danger, theme.TextOnDanger,
+        ExpectCell(theme, UiStatusTone.Danger, UiEmphasis.Muted, theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerForeground],
             "Danger/Muted");
-        ExpectCell(theme, UiStatusTone.Disabled, UiEmphasis.Normal, theme.Base, theme.Divider, theme.TextDisabled,
+        ExpectCell(theme, UiStatusTone.Disabled, UiEmphasis.Normal, theme[UiPaletteRole.WindowSurface], theme[UiPaletteRole.Divider], theme[UiPaletteRole.DisabledForeground],
             "Disabled/Normal");
-        ExpectCell(theme, UiStatusTone.Disabled, UiEmphasis.Muted, theme.Base, theme.Divider, theme.TextDisabled,
+        ExpectCell(theme, UiStatusTone.Disabled, UiEmphasis.Muted, theme[UiPaletteRole.WindowSurface], theme[UiPaletteRole.Divider], theme[UiPaletteRole.DisabledForeground],
             "Disabled/Muted");
 
         Check(
             SameStyle(theme.Styles.Resolve(UiStatusTone.Active, UiEmphasis.Normal), theme.Styles.Resolve(UiStatusTone.Active, UiEmphasis.Muted)),
             "a saturated tone paints the same text under either emphasis (the axis carries one measured difference, not a scale)");
 
-        // The 0.4 window first collapsed the two names and then put one back as a redirect, once a
-        // consumer's build proved it was used. So the property exists -- and it is a view onto Danger,
-        // which is the claim that matters: a redirect is a name, not a second token.
-        Check(typeof(UiTheme).GetProperty("Warning") != null,
-            "the pre-0.4 alarm name survives as a redirect for one minor");
-        UiTheme redirectProbe = TestPalettes.DarkGold;
-        redirectProbe.Warning = new Color(0.11f, 0.22f, 0.33f, 1f);
-        Check(SameColor(redirectProbe.Danger, redirectProbe.Warning),
-            "assigning the pre-0.4 name assigns the alarm surface it redirects to");
-        Check(SameStyle(redirectProbe.Styles.Resolve(UiStatusTone.Warning), redirectProbe.Styles.Resolve(UiStatusTone.Danger)),
-            "both tone names resolve to one surface: the redirect is a name, not a second token");
-
+        UiTheme independent = TestPalettes.DarkGold;
+        Color dangerBefore = independent[UiPaletteRole.DangerSurface];
+        independent.Palette[UiPaletteRole.WarningSurface] = new UiColour(.11f,.22f,.33f);
+        Check(SameColor(independent[UiPaletteRole.DangerSurface], dangerBefore), "warning declaration does not change danger");
+        Check(!SameStyle(independent.Styles.Resolve(UiStatusTone.Warning), independent.Styles.Resolve(UiStatusTone.Danger)),
+            "warning and danger resolve independent semantic treatments");
         UiTheme other = TestPalettes.DarkGold;
         Check(!ReferenceEquals(theme.Styles, other.Styles), "two themes never share one resolved-value store");
         Check(!typeof(UiTheme).GetProperty("Styles")!.CanWrite, "the store cannot be swapped out for another one");
@@ -104,9 +98,9 @@ internal static class KernelResolvedStyleTests
         // a copy taken at construction would silently freeze every token the old bag let them move.
         UiTheme retinted = TestPalettes.DarkGold;
         Color before = retinted.Styles.Resolve(UiStatusTone.Active).Fill;
-        retinted.Selected = new Color(0.9f, 0.1f, 0.2f, 1f);
+        retinted[UiPaletteRole.SelectedSurface] = new Color(0.9f, 0.1f, 0.2f, 1f);
         Check(
-            SameColor(retinted.Styles.Resolve(UiStatusTone.Active).Fill, retinted.Selected) && !SameColor(before, retinted.Selected),
+            SameColor(retinted.Styles.Resolve(UiStatusTone.Active).Fill, retinted[UiPaletteRole.SelectedSurface]) && !SameColor(before, retinted[UiPaletteRole.SelectedSurface]),
             "a re-tint moves the table's answer instead of leaving a stale copy behind");
     }
 
@@ -122,9 +116,9 @@ internal static class KernelResolvedStyleTests
         var decoyAccent = new Color(0.77f, 0.88f, 0.99f, 1f);
 
         UiTheme active = TestPalettes.DarkGold;
-        active.Selected = fill;
-        active.SelectedBorder = edge;
-        active.AccentGold = decoyAccent;
+        active[UiPaletteRole.SelectedSurface] = fill;
+        active[UiPaletteRole.SelectedBorder] = edge;
+        active[UiPaletteRole.Accent] = decoyAccent;
 
         DrawStatusTreatment(active);
         CheckPaint(0, fill, edge, "StatusTreatment(Active)");
@@ -146,9 +140,9 @@ internal static class KernelResolvedStyleTests
         var decoyShared = new Color(0.31f, 0.32f, 0.33f, 1f);
 
         UiTheme neutral = TestPalettes.DarkGold;
-        neutral.Raised = raised;
-        neutral.RaisedBorder = raisedEdge;
-        neutral.Border = decoyShared;
+        neutral[UiPaletteRole.ControlSurface] = raised;
+        neutral[UiPaletteRole.ControlBorder] = raisedEdge;
+        neutral[UiPaletteRole.Border] = decoyShared;
 
         DrawStatusTreatment(neutral, UiStatusTone.Neutral);
         CheckPaint(0, raised, raisedEdge, "StatusTreatment(Neutral)");
@@ -181,7 +175,7 @@ internal static class KernelResolvedStyleTests
             "the diagnostic names the undeclared value (got: " + (table.LastFallbackDiagnostic ?? "(null)") + ")");
 
         UiResolvedStyle mutedFallback = table.Resolve(UiStatusTone.Neutral, (UiEmphasis)9);
-        Check(SameColor(mutedFallback.Text, theme.TextPrimary),
+        Check(SameColor(mutedFallback.Text, theme[UiPaletteRole.Foreground]),
             "an undeclared emphasis falls back to Normal");
         Check(table.FallbackCount == 2, "the emphasis fallback was recorded too");
     }
@@ -192,17 +186,17 @@ internal static class KernelResolvedStyleTests
         UiStyleTable table = theme.Styles;
 
         UiResolvedStyle writable = table.Resolve(UiStatusTone.Danger, UiEmphasis.Normal, writable: true);
-        Check(SameColor(writable.Fill, theme.Danger), "a writable element keeps its authored tone");
+        Check(SameColor(writable.Fill, theme[UiPaletteRole.DangerSurface]), "a writable element keeps its authored tone");
 
         UiResolvedStyle readOnly = table.Resolve(UiStatusTone.Danger, UiEmphasis.Normal, writable: false);
         Check(
-            SameColor(readOnly.Fill, theme.Base)
-                && SameColor(readOnly.Border, theme.Divider)
-                && SameColor(readOnly.Text, theme.TextDisabled),
+            SameColor(readOnly.Fill, theme[UiPaletteRole.WindowSurface])
+                && SameColor(readOnly.Border, theme[UiPaletteRole.Divider])
+                && SameColor(readOnly.Text, theme[UiPaletteRole.DisabledForeground]),
             "a read-only element is painted disabled whatever tone it was authored with (state beats author)");
 
         UiResolvedStyle unknown = table.Resolve(UiStatusTone.Active, UiEmphasis.Normal, writable: null);
-        Check(SameColor(unknown.Fill, theme.Selected), "an unknown writability resolves by tone alone");
+        Check(SameColor(unknown.Fill, theme[UiPaletteRole.SelectedSurface]), "an unknown writability resolves by tone alone");
 
         Check(table.FallbackCount == 0, "the writability rule is a rule, not a fallback: nothing was recorded");
     }
@@ -213,22 +207,23 @@ internal static class KernelResolvedStyleTests
         var own = new Color(0.41f, 0.42f, 0.43f, 1f);
 
         UiTheme sharedEdge = TestPalettes.DarkGold;
-        sharedEdge.Border = shared;
+        sharedEdge[UiPaletteRole.PanelBorder] = shared;
         ClearRecordedBoxes();
         UiThemeDraw.Panel(new Rect(0f, 0f, 40f, 40f), sharedEdge);
-        CheckPaint(0, sharedEdge.Panel, shared, "Panel() still uses the shared border when no surface overrides it");
+        CheckPaint(0, sharedEdge[UiPaletteRole.PanelSurface], shared, "Panel() still uses the shared border when no surface overrides it");
 
         UiTheme perSurface = TestPalettes.DarkGold;
-        perSurface.Border = shared;
-        perSurface.PanelBorder = own;
+        perSurface[UiPaletteRole.Border] = shared;
+        perSurface[UiPaletteRole.PanelBorder] = own;
         ClearRecordedBoxes();
         UiThemeDraw.Panel(new Rect(0f, 0f, 40f, 40f), perSurface);
-        CheckPaint(0, perSurface.Panel, own, "Panel() uses its own edge override instead of the shared border");
+        CheckPaint(0, perSurface[UiPaletteRole.PanelSurface], own, "Panel() uses its own edge override instead of the shared border");
 
         var pairFill = new Color(0.51f, 0.52f, 0.53f, 1f);
         var pairEdge = new Color(0.61f, 0.62f, 0.63f, 1f);
         UiTheme assigned = TestPalettes.DarkGold;
-        assigned.SelectedSurface = new UiSurfaceStyle(pairFill, pairEdge);
+        assigned[UiPaletteRole.SelectedSurface] = pairFill;
+        assigned[UiPaletteRole.SelectedBorder] = pairEdge;
 
         UiResolvedStyle active = assigned.Styles.Resolve(UiStatusTone.Active);
         Check(
@@ -249,72 +244,69 @@ internal static class KernelResolvedStyleTests
     private static void VerifyDarkGoldPalette()
     {
         UiTheme t = TestPalettes.DarkGold;
-        Check(SameColor(new Color(0.065f, 0.065f, 0.063f, 1f), t.Base), "DarkGold Base");
-        Check(SameColor(new Color(0.095f, 0.095f, 0.090f, 1f), t.Panel), "DarkGold Panel");
-        Check(SameColor(new Color(0.135f, 0.135f, 0.128f, 1f), t.Raised), "DarkGold Raised");
-        Check(SameColor(new Color(0.17f, 0.17f, 0.16f, 1f), t.Hover), "DarkGold Hover");
-        Check(SameColor(new Color(0.17f, 0.14f, 0.08f, 1f), t.Selected), "DarkGold Selected");
-        Check(SameColor(new Color(0.11f, 0.24f, 0.15f, 1f), t.Success), "DarkGold Success");
-        Check(SameColor(new Color(0.38f, 0.14f, 0.11f, 1f), t.Danger), "DarkGold Danger");
-        Check(SameColor(new Color(0.045f, 0.045f, 0.044f, 1f), t.WorkspacePlane), "DarkGold WorkspacePlane");
-        Check(SameColor(new Color(0.085f, 0.085f, 0.080f, 1f), t.SectionBand), "DarkGold SectionBand");
-        Check(SameColor(new Color(0.88f, 0.88f, 0.84f, 1f), t.TextPrimary), "DarkGold TextPrimary");
-        Check(SameColor(new Color(0.58f, 0.58f, 0.55f, 1f), t.TextSecondary), "DarkGold TextSecondary");
-        Check(SameColor(new Color(1f, 0.84f, 0.55f, 1f), t.TextOnGold), "DarkGold TextOnGold");
-        Check(SameColor(new Color(1f, 0.65f, 0.46f, 1f), t.TextOnDanger), "DarkGold TextOnDanger");
-        Check(SameColor(new Color(0.42f, 0.42f, 0.40f, 1f), t.TextDisabled), "DarkGold TextDisabled");
-        Check(SameColor(new Color(0.82f, 0.60f, 0.22f, 1f), t.AccentGold), "DarkGold AccentGold");
+        Check(SameColor(new Color(0.065f, 0.065f, 0.063f, 1f), t[UiPaletteRole.WindowSurface]), "DarkGold Base");
+        Check(SameColor(new Color(0.095f, 0.095f, 0.090f, 1f), t[UiPaletteRole.PanelSurface]), "DarkGold Panel");
+        Check(SameColor(new Color(0.135f, 0.135f, 0.128f, 1f), t[UiPaletteRole.ControlSurface]), "DarkGold Raised");
+        Check(SameColor(new Color(0.17f, 0.17f, 0.16f, 1f), t[UiPaletteRole.HoverSurface]), "DarkGold Hover");
+        Check(SameColor(new Color(0.17f, 0.14f, 0.08f, 1f), t[UiPaletteRole.SelectedSurface]), "DarkGold Selected");
+        Check(SameColor(new Color(0.11f, 0.24f, 0.15f, 1f), t[UiPaletteRole.SuccessSurface]), "DarkGold Success");
+        Check(SameColor(new Color(0.38f, 0.14f, 0.11f, 1f), t[UiPaletteRole.DangerSurface]), "DarkGold Danger");
+        Check(SameColor(new Color(0.045f, 0.045f, 0.044f, 1f), t[UiPaletteRole.WorkspaceSurface]), "DarkGold WorkspacePlane");
+        Check(SameColor(new Color(0.085f, 0.085f, 0.080f, 1f), t[UiPaletteRole.SectionSurface]), "DarkGold SectionBand");
+        Check(SameColor(new Color(0.88f, 0.88f, 0.84f, 1f), t[UiPaletteRole.Foreground]), "DarkGold TextPrimary");
+        Check(SameColor(new Color(0.58f, 0.58f, 0.55f, 1f), t[UiPaletteRole.SecondaryForeground]), "DarkGold TextSecondary");
+        Check(SameColor(new Color(1f, 0.84f, 0.55f, 1f), t[UiPaletteRole.SelectedForeground]), "DarkGold TextOnGold");
+        Check(SameColor(new Color(1f, 0.65f, 0.46f, 1f), t[UiPaletteRole.DangerForeground]), "DarkGold TextOnDanger");
+        Check(SameColor(new Color(0.42f, 0.42f, 0.40f, 1f), t[UiPaletteRole.DisabledForeground]), "DarkGold TextDisabled");
+        Check(SameColor(new Color(0.82f, 0.60f, 0.22f, 1f), t[UiPaletteRole.Accent]), "DarkGold AccentGold");
         // Batch 1 (CP-6④): one stored accent. The hover step is computed from it - 30% of the remaining
         // distance toward white on every channel, alpha kept - so there is no second token to assert.
         Check(SameColor(new Color(0.874f, 0.72f, 0.454f, 1f), t.AccentHover),
             "DarkGold's hover step is the accent lifted toward white, not a second stored colour");
-        Check(SameColor(new Color(0.21f, 0.21f, 0.20f, 1f), t.Border), "DarkGold Border");
-        Check(SameColor(new Color(0.32f, 0.32f, 0.30f, 1f), t.BorderStrong), "DarkGold BorderStrong");
-        Check(SameColor(new Color(0.14f, 0.14f, 0.13f, 1f), t.Divider), "DarkGold Divider");
-        Check(t.BaseBorder == null && t.PanelBorder == null && t.RaisedBorder == null
-            && t.HoverBorder == null && t.SelectedBorder == null && t.SuccessBorder == null
-            && t.DangerBorder == null,
-            "DarkGold leaves per-surface edges unclaimed");
+        Check(SameColor(new Color(0.21f, 0.21f, 0.20f, 1f), t[UiPaletteRole.Border]), "DarkGold Border");
+        Check(SameColor(new Color(0.32f, 0.32f, 0.30f, 1f), t[UiPaletteRole.StrongBorder]), "DarkGold BorderStrong");
+        Check(SameColor(new Color(0.14f, 0.14f, 0.13f, 1f), t[UiPaletteRole.Divider]), "DarkGold Divider");
+        Check(SameColor(t[UiPaletteRole.ControlBorder], t[UiPaletteRole.Border]), "fixture declares matching control/shared borders explicitly");
         Check(t.DefaultFont == UiFont.Small && t.Geometry == UiGeometry.Default,
             "DarkGold keeps the shipped font and density");
 
         UiTheme again = TestPalettes.DarkGold;
         Check(!ReferenceEquals(t, again), "DarkGold hands out a fresh instance, never one shared object");
-        t.Base = new Color(0.5f, 0.5f, 0.5f, 1f);
-        Check(!SameColor(t.Base, again.Base), "and re-tinting one DarkGold instance cannot repaint the next");
+        t[UiPaletteRole.WindowSurface] = new Color(0.5f, 0.5f, 0.5f, 1f);
+        Check(!SameColor(t[UiPaletteRole.WindowSurface], again[UiPaletteRole.WindowSurface]), "and re-tinting one DarkGold instance cannot repaint the next");
 
         UiTheme vanilla = UiTheme.Vanilla;
-        Check(!SameColor(again.Base, vanilla.Base) && !SameColor(again.AccentGold, vanilla.AccentGold),
+        Check(!SameColor(again[UiPaletteRole.WindowSurface], vanilla[UiPaletteRole.WindowSurface]) && !SameColor(again[UiPaletteRole.Accent], vanilla[UiPaletteRole.Accent]),
             "DarkGold and Vanilla are different looks, not two names for one bag");
     }
 
     private static void VerifyVanillaPaletteAndBag()
     {
         UiTheme d = UiTheme.Vanilla;
-        Check(SameColor(new Color(21f / 255f, 25f / 255f, 29f / 255f, 1f), d.Base),
+        Check(SameColor(new Color(21f / 255f, 25f / 255f, 29f / 255f, 1f), d[UiPaletteRole.WindowSurface]),
             "Vanilla Base = the vanilla window substrate RGB(21,25,29)");
-        Check(SameColor(new Color(42f / 255f, 43f / 255f, 44f / 255f, 1f), d.Panel),
+        Check(SameColor(new Color(42f / 255f, 43f / 255f, 44f / 255f, 1f), d[UiPaletteRole.PanelSurface]),
             "Vanilla Panel = the vanilla section substrate RGB(42,43,44)");
-        Check(d.BaseBorder.HasValue && SameColor(new Color(97f / 255f, 108f / 255f, 122f / 255f, 1f), d.BaseBorder.GetValueOrDefault()),
+        Check(SameColor(new Color(97f / 255f, 108f / 255f, 122f / 255f, 1f), d[UiPaletteRole.WindowBorder]),
             "Vanilla BaseBorder = the vanilla window edge RGB(97,108,122)");
-        Check(d.PanelBorder.HasValue && SameColor(new Color(135f / 255f, 135f / 255f, 135f / 255f, 1f), d.PanelBorder.GetValueOrDefault()),
+        Check(SameColor(new Color(135f / 255f, 135f / 255f, 135f / 255f, 1f), d[UiPaletteRole.PanelBorder]),
             "Vanilla PanelBorder = the vanilla section edge RGB(135,135,135)");
-        Check(SameColor(new Color(0.21f, 0.21f, 0.21f, 1f), d.Raised),
+        Check(SameColor(new Color(0.21f, 0.21f, 0.21f, 1f), d[UiPaletteRole.ControlSurface]),
             "Vanilla Raised = the vanilla unselected option reference RGB(0.21,0.21,0.21)");
-        Check(SameColor(new Color(0.32f, 0.28f, 0.21f, 1f), d.Selected),
+        Check(SameColor(new Color(0.32f, 0.28f, 0.21f, 1f), d[UiPaletteRole.SelectedSurface]),
             "Vanilla Selected = the vanilla selected option reference RGB(0.32,0.28,0.21)");
 
-        Check(SameColor(new Color(0.27f, 0.27f, 0.27f, 1f), d.Hover), "Vanilla Hover is derived one step above Raised");
-        Check(SameColor(new Color(0.13f, 0.30f, 0.18f, 1f), d.Success), "Vanilla Success is derived legible on neutral");
-        Check(SameColor(new Color(0.42f, 0.15f, 0.12f, 1f), d.Danger), "Vanilla Danger is derived legible on neutral");
-        Check(SameColor(new Color(0.93f, 0.77f, 0.22f, 1f), d.AccentGold), "Vanilla accent is the stated yellow candidate");
+        Check(SameColor(new Color(0.27f, 0.27f, 0.27f, 1f), d[UiPaletteRole.HoverSurface]), "Vanilla Hover is derived one step above Raised");
+        Check(SameColor(new Color(0.13f, 0.30f, 0.18f, 1f), d[UiPaletteRole.SuccessSurface]), "Vanilla Success is derived legible on neutral");
+        Check(SameColor(new Color(0.42f, 0.15f, 0.12f, 1f), d[UiPaletteRole.DangerSurface]), "Vanilla Danger is derived legible on neutral");
+        Check(SameColor(new Color(0.93f, 0.77f, 0.22f, 1f), d[UiPaletteRole.Accent]), "Vanilla accent is the stated yellow candidate");
         Check(SameColor(new Color(0.951f, 0.839f, 0.454f, 1f), d.AccentHover),
             "Vanilla's hover step is derived from that one accent, not stored beside it");
-        Check(d.AccentGold.r == d.AccentWith(0.5f).r && d.AccentGold.g == d.AccentWith(0.5f).g,
+        Check(d[UiPaletteRole.Accent].r == d.AccentWith(0.5f).r && d[UiPaletteRole.Accent].g == d.AccentWith(0.5f).g,
             "AccentWith still derives from the accent hue");
 
-        Check(d.Base.b > d.Base.r && d.Panel.g >= d.Panel.r, "Vanilla substrate planes stay neutral/cool, not gold");
-        Check(!SameColor(d.PanelBorder.GetValueOrDefault(), d.AccentGold) && !SameColor(d.Border, d.AccentGold),
+        Check(d[UiPaletteRole.WindowSurface].b > d[UiPaletteRole.WindowSurface].r && d[UiPaletteRole.PanelSurface].g >= d[UiPaletteRole.PanelSurface].r, "Vanilla substrate planes stay neutral/cool, not gold");
+        Check(!SameColor(d[UiPaletteRole.PanelBorder], d[UiPaletteRole.Accent]) && !SameColor(d[UiPaletteRole.Border], d[UiPaletteRole.Accent]),
             "Vanilla shared edges are not painted in the accent");
 
         Check(d.DefaultFont == UiFont.Small && d.Geometry == UiGeometry.Default,
@@ -323,42 +315,41 @@ internal static class KernelResolvedStyleTests
         UiTheme a = UiTheme.Vanilla;
         UiTheme b = UiTheme.Vanilla;
         Check(!ReferenceEquals(a, b), "two Vanilla factories are two objects");
-        a.TextPrimary = new Color(0.1f, 0.2f, 0.3f, 1f);
-        Check(!SameColor(a.TextPrimary, b.TextPrimary), "and re-tinting one cannot repaint the other");
+        a[UiPaletteRole.Foreground] = new Color(0.1f, 0.2f, 0.3f, 1f);
+        Check(!SameColor(a[UiPaletteRole.Foreground], b[UiPaletteRole.Foreground]), "and re-tinting one cannot repaint the other");
 
         UiTheme original = UiTheme.Vanilla;
         UiTheme copy = original.Clone();
         Check(!ReferenceEquals(original, copy), "Clone returns a fresh bag");
-        Check(SameColor(original.Base, copy.Base) && SameColor(original.Panel, copy.Panel)
-            && SameColor(original.AccentGold, copy.AccentGold) && SameColor(original.TextPrimary, copy.TextPrimary)
-            && SameColor(original.Border, copy.Border)
-            && copy.BaseBorder.HasValue && SameColor(original.BaseBorder.GetValueOrDefault(), copy.BaseBorder.GetValueOrDefault())
-            && copy.SelectedBorder == null && original.SelectedBorder == null,
+        Check(SameColor(original[UiPaletteRole.WindowSurface], copy[UiPaletteRole.WindowSurface]) && SameColor(original[UiPaletteRole.PanelSurface], copy[UiPaletteRole.PanelSurface])
+            && SameColor(original[UiPaletteRole.Accent], copy[UiPaletteRole.Accent]) && SameColor(original[UiPaletteRole.Foreground], copy[UiPaletteRole.Foreground])
+            && SameColor(original[UiPaletteRole.Border], copy[UiPaletteRole.Border])
+            && SameColor(original[UiPaletteRole.WindowBorder], copy[UiPaletteRole.WindowBorder])
+            && copy[UiPaletteRole.SelectedBorder] == original[UiPaletteRole.SelectedBorder] && original[UiPaletteRole.SelectedBorder] == original[UiPaletteRole.SelectedBorder],
             "Clone copies every token, the claimed per-surface edges included");
-        copy.AccentGold = new Color(0.05f, 0.9f, 0.05f, 1f);
-        Check(!SameColor(original.AccentGold, copy.AccentGold),
+        copy[UiPaletteRole.Accent] = new Color(0.05f, 0.9f, 0.05f, 1f);
+        Check(!SameColor(original[UiPaletteRole.Accent], copy[UiPaletteRole.Accent]),
             "and moving a token on the clone leaves the original untouched");
 
         UiTheme bag = new();
-        Check(SameColor(bag.Base, d.Base) && SameColor(bag.Panel, d.Panel) && SameColor(bag.Border, d.Border)
-            && SameColor(bag.AccentGold, d.AccentGold),
+        Check(SameColor(bag[UiPaletteRole.WindowSurface], d[UiPaletteRole.WindowSurface]) && SameColor(bag[UiPaletteRole.PanelSurface], d[UiPaletteRole.PanelSurface]) && SameColor(bag[UiPaletteRole.Border], d[UiPaletteRole.Border])
+            && SameColor(bag[UiPaletteRole.Accent], d[UiPaletteRole.Accent]),
             "new UiTheme() answers the Vanilla palette for every token it never assigned");
-        Check(bag.BaseBorder.HasValue
-            && SameColor(bag.BaseBorder.GetValueOrDefault(), d.BaseBorder.GetValueOrDefault())
-            && bag.PanelBorder.HasValue,
+        Check(SameColor(bag[UiPaletteRole.WindowBorder], d[UiPaletteRole.WindowBorder])
+            && SameColor(bag[UiPaletteRole.PanelBorder], d[UiPaletteRole.PanelBorder]),
             "including the per-surface edges Vanilla claims, so a partial bag is a complete look");
         Check(!ReferenceEquals(bag.Styles, d.Styles),
             "while the bag still owns its resolved-value store: two themes never share one");
-        bag.Hover = new Color(0.5f, 0.1f, 0.1f, 1f);
-        Check(SameColor(bag.Hover, new Color(0.5f, 0.1f, 0.1f, 1f)) && SameColor(bag.Base, d.Base),
+        bag[UiPaletteRole.HoverSurface] = new Color(0.5f, 0.1f, 0.1f, 1f);
+        Check(SameColor(bag[UiPaletteRole.HoverSurface], new Color(0.5f, 0.1f, 0.1f, 1f)) && SameColor(bag[UiPaletteRole.WindowSurface], d[UiPaletteRole.WindowSurface]),
             "an override on a partial bag moves that token and leaves the inherited ones alone");
 
         UiTheme vanillaCustom = UiTheme.Vanilla;
-        vanillaCustom.Hover = new Color(0.5f, 0.1f, 0.1f, 1f);
-        Check(SameColor(vanillaCustom.Base, d.Base), "Vanilla + overrides keeps the Vanilla substrate");
+        vanillaCustom[UiPaletteRole.HoverSurface] = new Color(0.5f, 0.1f, 0.1f, 1f);
+        Check(SameColor(vanillaCustom[UiPaletteRole.WindowSurface], d[UiPaletteRole.WindowSurface]), "Vanilla + overrides keeps the Vanilla substrate");
         UiTheme darkCustom = TestPalettes.DarkGold;
-        darkCustom.Hover = new Color(0.5f, 0.1f, 0.1f, 1f);
-        Check(SameColor(darkCustom.Base, new Color(0.065f, 0.065f, 0.063f, 1f)),
+        darkCustom[UiPaletteRole.HoverSurface] = new Color(0.5f, 0.1f, 0.1f, 1f);
+        Check(SameColor(darkCustom[UiPaletteRole.WindowSurface], new Color(0.065f, 0.065f, 0.063f, 1f)),
             "DarkGold + overrides keeps the DarkGold substrate — a peer start, not a fallback");
 
         UiTheme windowOne = UiTheme.Vanilla;
@@ -366,13 +357,13 @@ internal static class KernelResolvedStyleTests
         Check(!ReferenceEquals(windowOne.Styles, windowTwo.Styles), "the two themes hold separate stores");
         ClearRecordedBoxes();
         UiThemeDraw.Panel(new Rect(0f, 0f, 40f, 40f), windowOne);
-        CheckPaint(0, windowOne.Panel, windowOne.PanelSurface.Border, "one window paints the Vanilla plane");
+        CheckPaint(0, windowOne[UiPaletteRole.PanelSurface], windowOne.PanelSurface.Border, "one window paints the Vanilla plane");
         ClearRecordedBoxes();
         UiThemeDraw.Panel(new Rect(0f, 0f, 40f, 40f), windowTwo);
-        CheckPaint(0, windowTwo.Panel, windowTwo.Border, "the other paints the DarkGold plane");
+        CheckPaint(0, windowTwo[UiPaletteRole.PanelSurface], windowTwo[UiPaletteRole.Border], "the other paints the DarkGold plane");
 
         UiResolvedStyle active = windowOne.Styles.Resolve(UiStatusTone.Active);
-        Check(SameColor(active.Border, windowOne.AccentGold) && SameColor(active.Fill, windowOne.Selected),
+        Check(SameColor(active.Border, windowOne[UiPaletteRole.Accent]) && SameColor(active.Fill, windowOne[UiPaletteRole.SelectedSurface]),
             "Vanilla Active resolves to the selected plane outlined in the accent, not a filled-yellow plane");
     }
 
@@ -455,16 +446,16 @@ internal static class KernelResolvedStyleTests
         var secondary = new Color(0.31f, 0.32f, 0.33f, 1f);
 
         UiTheme theme = TestPalettes.DarkGold;
-        theme.TextOnGold = onGold;
-        theme.TextPrimary = primary;
-        theme.TextSecondary = secondary;
+        theme[UiPaletteRole.SelectedForeground] = onGold;
+        theme[UiPaletteRole.Foreground] = primary;
+        theme[UiPaletteRole.SecondaryForeground] = secondary;
 
         DrawStatusBadge(theme, UiStatusTone.Active);
         CheckLastLabel(onGold, "StatusBadge(Active) writes the table's Active text colour");
         DrawStatusBadge(theme, UiStatusTone.Neutral);
         CheckLastLabel(secondary, "StatusBadge(Neutral) writes the Muted text colour (the measured coordinate)");
         DrawStatusBadge(theme, UiStatusTone.Danger);
-        CheckLastLabel(theme.TextOnDanger, "StatusBadge(Danger) writes the alarm text colour");
+        CheckLastLabel(theme[UiPaletteRole.DangerForeground], "StatusBadge(Danger) writes the alarm text colour");
 
         DrawDropdown(theme, "B");
         CheckLastLabel(onGold, "DropdownWidget field (selected) writes the Active text colour");
@@ -508,7 +499,7 @@ internal static class KernelResolvedStyleTests
         UiLayoutSnapshot remeasured = host.MeasureAndArrange(new Vector2(240f, 200f));
         Check(!ReferenceEquals(dense, remeasured), "a font-size change re-arranges too: Measure sees the resolved font");
 
-        theme.Panel = new Color(0.2f, 0.3f, 0.4f, 1f);
+        theme[UiPaletteRole.PanelSurface] = new Color(0.2f, 0.3f, 0.4f, 1f);
         UiLayoutSnapshot retinted = host.MeasureAndArrange(new Vector2(240f, 200f));
         Check(ReferenceEquals(remeasured, retinted), "a re-tint reuses the bands: colour is not layout-bearing");
     }
@@ -524,19 +515,19 @@ internal static class KernelResolvedStyleTests
         int layout = theme.LayoutRevision;
         int colour = theme.ColourRevision;
 
-        theme.Panel = new Color(0.2f, 0.3f, 0.4f, 1f);
+        theme[UiPaletteRole.PanelSurface] = new Color(0.2f, 0.3f, 0.4f, 1f);
         Check(theme.ColourRevision == colour + 1,
             "assigning a colour moves the paint clock (was " + colour + ", now " + theme.ColourRevision + ")");
         Check(theme.LayoutRevision == layout,
             "and leaves the layout clock exactly where it was: no rect depends on a fill");
 
-        theme.BorderStrong = new Color(0.9f, 0.9f, 0.2f, 1f);
-        theme.SelectedBorder = new Color(0.1f, 0.1f, 0.1f, 1f);
+        theme[UiPaletteRole.StrongBorder] = new Color(0.9f, 0.9f, 0.2f, 1f);
+        theme[UiPaletteRole.SelectedBorder] = new Color(0.1f, 0.1f, 0.1f, 1f);
         Check(theme.ColourRevision == colour + 3, "a shared edge and a per-surface edge each move it too");
         Check(theme.LayoutRevision == layout, "while the layout clock is still untouched");
 
         int settled = theme.ColourRevision;
-        theme.Panel = new Color(0.2f, 0.3f, 0.4f, 1f);
+        theme[UiPaletteRole.PanelSurface] = new Color(0.2f, 0.3f, 0.4f, 1f);
         Check(theme.ColourRevision == settled,
             "and re-assigning the value a token already holds is not a change: nothing is invalidated");
         Check(theme.LayoutRevision == layout, "with the layout clock still untouched");
@@ -588,7 +579,7 @@ internal static class KernelResolvedStyleTests
         UiLayoutSnapshot before = host.MeasureAndArrange(new Vector2(240f, 200f));
         Rect beforeRect = before.RectById["dd"];
         UiTheme scope = ScopeThemeOf(host, "tint");
-        Check(SameColor(scope.Selected, baseline.Selected),
+        Check(SameColor(scope[UiPaletteRole.SelectedSurface], baseline[UiPaletteRole.SelectedSurface]),
             "the selected scope starts from the injected palette (its own scheme declares no colours)");
         Check(host.StyleResolver.ScopeCount >= 1 && !ReferenceEquals(scope, baseline),
             "and it is a real cached clone of its own, not the injected theme handed back");
@@ -622,14 +613,14 @@ internal static class KernelResolvedStyleTests
         IList beforeColors = RecordedBoxColors();
         Check(beforeColors.Count >= 5, "the field painted its surface before the re-tint: " + beforeColors.Count);
         Check(beforeColors.Count >= 5 && SameRect((Rect)RecordedBoxRects()[0], beforeRect)
-                && SameColor((Color)beforeColors[0], baseline.Selected),
+                && SameColor((Color)beforeColors[0], baseline[UiPaletteRole.SelectedSurface]),
             "with the SELECTED plane the valued, open field actually reads at its drawn rect");
         Rect? popupAnchor = host.Session.OpenPopupAnchor;
         Check(host.Session.IsPopupOpen("dd") && popupAnchor.HasValue,
             "the drawn, scrolled owner keeps its popup registered");
 
-        baseline.Selected = repaint;
-        Check(SameColor(host.StyleResolver.ThemeFor(ScopeChain("tint")).Selected, repaint),
+        baseline[UiPaletteRole.SelectedSurface] = repaint;
+        Check(SameColor(host.StyleResolver.ThemeFor(ScopeChain("tint"))[UiPaletteRole.SelectedSurface], repaint),
             "after a re-tint the scope resolves the new colour: the cached clone was dropped, not kept stale");
 
         ClearRecordedBoxes();
@@ -698,7 +689,7 @@ internal static class KernelResolvedStyleTests
             UiNative.DebugMouseDown = false;
             UiNative.TextFieldOverride = (_, text) => text;
             host.Session.CaptureHotControl(731);
-            theme.Raised = new Color(0.77f, 0.11f, 0.22f, 1f);
+            theme[UiPaletteRole.ControlSurface] = new Color(0.77f, 0.11f, 0.22f, 1f);
             host.DrawFrame(new Rect(0f, 0f, 240f, 200f));
             Check(ReferenceEquals(state, host.Session.GetOrCreateValueState(node.Id, "edit"))
                     && state.Focused && state.EditText == "draft" && model == "committed",
@@ -739,38 +730,38 @@ internal static class KernelResolvedStyleTests
         UiTheme vanilla = UiTheme.Vanilla;
         UiTheme bag = new();
 
-        Check(SameColor(bag.Panel, vanilla.Panel) && SameColor(bag.AccentGold, vanilla.AccentGold)
-            && SameColor(bag.TextPrimary, vanilla.TextPrimary) && bag.Geometry == vanilla.Geometry
+        Check(SameColor(bag[UiPaletteRole.PanelSurface], vanilla[UiPaletteRole.PanelSurface]) && SameColor(bag[UiPaletteRole.Accent], vanilla[UiPaletteRole.Accent])
+            && SameColor(bag[UiPaletteRole.Foreground], vanilla[UiPaletteRole.Foreground]) && bag.Geometry == vanilla.Geometry
             && bag.DefaultFont == vanilla.DefaultFont,
             "a bag that assigns nothing is the shipped look, not an empty one");
 
         var mine = new Color(0.12f, 0.34f, 0.56f, 1f);
-        bag.Raised = mine;
-        Check(SameColor(bag.Raised, mine) && SameColor(bag.Panel, vanilla.Panel),
+        bag[UiPaletteRole.ControlSurface] = mine;
+        Check(SameColor(bag[UiPaletteRole.ControlSurface], mine) && SameColor(bag[UiPaletteRole.PanelSurface], vanilla[UiPaletteRole.PanelSurface]),
             "assigning one token moves one token and leaves the rest on the fallback");
 
         // The transparent claim, checked on the token the derived pair actually READS: BaseSurface is
         // (Base, BaseBorder ?? Border), so a transparent Base is what has to survive - asserting it through
         // Panel would compare two unrelated tokens.
-        bag.Base = new Color(0f, 0f, 0f, 0f);
-        Check(bag.Base.a == 0f && bag.Base.r == 0f && bag.Base.g == 0f && bag.Base.b == 0f,
+        bag[UiPaletteRole.WindowSurface] = new Color(0f, 0f, 0f, 0f);
+        Check(bag[UiPaletteRole.WindowSurface].a == 0f && bag[UiPaletteRole.WindowSurface].r == 0f && bag[UiPaletteRole.WindowSurface].g == 0f && bag[UiPaletteRole.WindowSurface].b == 0f,
             "an explicitly transparent colour is a VALUE: the fallback must not repaint it");
-        Check(!SameColor(bag.Base, vanilla.Base),
+        Check(!SameColor(bag[UiPaletteRole.WindowSurface], vanilla[UiPaletteRole.WindowSurface]),
             "and it is distinguishable from the Vanilla token it would otherwise have answered");
 
         UiTheme edges = new();
-        Check(edges.BorderStrong.a > 0f, "an unset shared edge answers the Vanilla value");
-        edges.BorderStrong = new Color(0f, 0f, 0f, 0f);
-        Check(edges.BorderStrong.a == 0f, "and a transparent shared edge is a claimed transparent edge");
+        Check(edges[UiPaletteRole.StrongBorder].a > 0f, "an unset shared edge answers the Vanilla value");
+        edges[UiPaletteRole.StrongBorder] = new Color(0f, 0f, 0f, 0f);
+        Check(edges[UiPaletteRole.StrongBorder].a == 0f, "and a transparent shared edge is a claimed transparent edge");
 
         // The derived read: a surface pair is its fill plus (its own edge, else the shared edge), and neither
         // half is a special case of the other. This is the same rule the other half of this lane reads on the
         // nullable tokens - stated once here through the pair the painting outlets actually use.
-        Check(SameColor(edges.RaisedSurface.Fill, UiTheme.Vanilla.Raised)
-                && SameColor(edges.RaisedSurface.Border, edges.Border),
+        Check(SameColor(edges.RaisedSurface.Fill, UiTheme.Vanilla[UiPaletteRole.ControlSurface])
+                && SameColor(edges.RaisedSurface.Border, edges[UiPaletteRole.Border]),
             "RaisedSurface reads the inherited fill and the shared edge, with no second copy of either");
-        Check(SameColor(bag.BaseSurface.Fill, bag.Base) && bag.BaseSurface.Fill.a == 0f
-                && SameColor(bag.BaseSurface.Border, bag.BaseBorder.GetValueOrDefault()),
+        Check(SameColor(bag.BaseSurface.Fill, bag[UiPaletteRole.WindowSurface]) && bag.BaseSurface.Fill.a == 0f
+                && SameColor(bag.BaseSurface.Border, bag[UiPaletteRole.WindowBorder]),
             "and the transparent fill stays transparent through the derived pair while its edge is inherited");
     }
 
@@ -785,17 +776,16 @@ internal static class KernelResolvedStyleTests
         UiTheme vanilla = UiTheme.Vanilla;
         UiTheme partial = new();
 
-        Check(vanilla.BaseBorder.HasValue && vanilla.PanelBorder.HasValue && !vanilla.RaisedBorder.HasValue,
+        Check(!vanilla.Palette.IsDeclared(UiPaletteRole.ControlBorder),
             "Vanilla claims its window and section edges and leaves the raised one to the shared token");
-        Check(partial.BaseBorder.HasValue
-            && SameColor(partial.BaseBorder.GetValueOrDefault(), vanilla.BaseBorder.GetValueOrDefault()),
+        Check(SameColor(partial[UiPaletteRole.WindowBorder], vanilla[UiPaletteRole.WindowBorder]),
             "an unclaimed window edge on a partial bag falls back to Vanilla's, not to null");
-        Check(!partial.RaisedBorder.HasValue,
+        Check(!partial.Palette.IsDeclared(UiPaletteRole.ControlBorder),
             "and an edge Vanilla itself leaves unclaimed stays unclaimed, so the shared token still answers");
 
         var own = new Color(0.61f, 0.62f, 0.63f, 1f);
-        partial.BaseBorder = own;
-        Check(partial.BaseBorder.HasValue && SameColor(partial.BaseBorder.GetValueOrDefault(), own),
+        partial[UiPaletteRole.WindowBorder] = own;
+        Check(SameColor(partial[UiPaletteRole.WindowBorder], own),
             "claiming the edge answers the claim");
         Check(SameColor(partial.BaseSurface.Border, own),
             "and the surface pair reads the claim instead of the shared token");
@@ -821,75 +811,39 @@ internal static class KernelResolvedStyleTests
     /// </summary>
     private static void VerifyPerSurfaceEdgeCoverage()
     {
-        UiTheme vanilla = UiTheme.Vanilla;
-        var edges = new (string Name, Color? VanillaValue)[]
-        {
-            ("BaseBorder", vanilla.BaseBorder),
-            ("PanelBorder", vanilla.PanelBorder),
-            ("RaisedBorder", vanilla.RaisedBorder),
-            ("HoverBorder", vanilla.HoverBorder),
-            ("SelectedBorder", vanilla.SelectedBorder),
-            ("SuccessBorder", vanilla.SuccessBorder),
-            // The one the hand-written sweep omitted, which is why this lane exists; it is also the edge
-            // whose unclaimed fallback is the SURFACE ITSELF (DangerBorder ?? Danger), so a null here is not
-            // "no edge" and the claim half below has to show the difference.
-            ("DangerBorder", vanilla.DangerBorder),
+        var pairs = new[] {
+            (UiPaletteRole.WindowSurface, UiPaletteRole.WindowBorder),
+            (UiPaletteRole.PanelSurface, UiPaletteRole.PanelBorder),
+            (UiPaletteRole.ControlSurface, UiPaletteRole.ControlBorder),
+            (UiPaletteRole.HoverSurface, UiPaletteRole.HoverBorder),
+            (UiPaletteRole.SelectedSurface, UiPaletteRole.SelectedBorder),
+            (UiPaletteRole.SuccessSurface, UiPaletteRole.SuccessBorder),
+            (UiPaletteRole.WarningSurface, UiPaletteRole.WarningBorder),
+            (UiPaletteRole.DangerSurface, UiPaletteRole.DangerBorder)
         };
-
-        foreach ((string name, Color? vanillaValue) in edges)
+        foreach (var pair in pairs)
         {
-            PropertyInfo? property = typeof(UiTheme).GetProperty(name);
-            Check(property != null && property.CanRead && property.CanWrite
-                    && property.PropertyType == typeof(Color?),
-                name + " is a readable/writable nullable colour token on UiTheme");
-            if (property == null) continue;
-
-            // Fallback: an untouched bag answers the template's value for this token.
-            UiTheme untouched = new();
-            Check(Nullable.Equals((Color?)property.GetValue(untouched), vanillaValue),
-                name + " on a partial bag answers the template's value ("
-                + Describe(vanillaValue) + ")");
-
-            // Claim: an assigned value is what the token reads.
-            var claimed = new Color(0.31f, 0.42f, 0.53f, 1f);
-            UiTheme bag = new();
-            property.SetValue(bag, claimed);
-            Check(Nullable.Equals((Color?)property.GetValue(bag), claimed),
-                name + " answers an explicit claim instead of the template");
-
-            // And the claim reaches the surface pair that reads it, so the token is wired, not just stored.
-            (string surfaceName, Color unclaimedEdge) = SurfaceFor(name);
-            PropertyInfo? surface = typeof(UiTheme).GetProperty(surfaceName);
-            UiSurfaceStyle pair = (UiSurfaceStyle)surface!.GetValue(bag)!;
-            Check(SameColor(pair.Border, claimed),
-                name + " reaches " + surfaceName + ".Border, the pair the painting outlets read");
-            UiSurfaceStyle unclaimedPair = (UiSurfaceStyle)surface.GetValue(new UiTheme())!;
-            Check(SameColor(unclaimedPair.Border, vanillaValue ?? unclaimedEdge),
-                "while an unclaimed " + name + " leaves " + surfaceName + ".Border on its fallback ("
-                + Describe(vanillaValue ?? unclaimedEdge) + ")");
-            property.SetValue(bag, null);
-            Check(SameColor(((UiSurfaceStyle)surface.GetValue(bag)!).Border, unclaimedEdge),
-                "an explicitly null " + name + " uses the shared fallback instead of Vanilla's own edge");
-            var transparent = new Color(0f, 0f, 0f, 0f);
-            property.SetValue(bag, transparent);
-            Check(SameColor(((UiSurfaceStyle)surface.GetValue(bag)!).Border, transparent),
-                "an explicitly transparent " + name + " remains transparent through its surface pair");
+            UiTheme theme = new();
+            UiColour baseline = UiPalette.Default(pair.Item2);
+            Check(theme.Palette[pair.Item2] == baseline && !theme.Palette.IsDeclared(pair.Item2), "untouched border uses readonly default: " + pair.Item2);
+            theme.Palette[pair.Item2] = new UiColour(.31f,.42f,.53f);
+            Check(SameColor(theme.Surface(pair.Item1,pair.Item2).Border, new Color(.31f,.42f,.53f,1)), "declared border reaches real surface: " + pair.Item2);
+            theme.Palette.Remove(pair.Item2);
+            Check(theme.Palette[pair.Item2] == baseline, "border removal reveals current default: " + pair.Item2);
         }
     }
-
-    /// <summary>The surface pair and shared fallback used by an explicitly null edge.</summary>
     private static (string Surface, Color FallbackEdge) SurfaceFor(string borderToken)
     {
         UiTheme v = UiTheme.Vanilla;
         switch (borderToken)
         {
-            case "BaseBorder": return ("BaseSurface", v.Border);
-            case "PanelBorder": return ("PanelSurface", v.Border);
-            case "RaisedBorder": return ("RaisedSurface", v.Border);
-            case "HoverBorder": return ("HoverSurface", v.BorderStrong);
-            case "SelectedBorder": return ("SelectedSurface", v.AccentGold);
-            case "SuccessBorder": return ("SuccessSurface", v.BorderStrong);
-            default: return ("DangerSurface", v.Danger);
+            case "BaseBorder": return ("BaseSurface", v[UiPaletteRole.Border]);
+            case "PanelBorder": return ("PanelSurface", v[UiPaletteRole.Border]);
+            case "RaisedBorder": return ("RaisedSurface", v[UiPaletteRole.Border]);
+            case "HoverBorder": return ("HoverSurface", v[UiPaletteRole.StrongBorder]);
+            case "SelectedBorder": return ("SelectedSurface", v[UiPaletteRole.Accent]);
+            case "SuccessBorder": return ("SuccessSurface", v[UiPaletteRole.StrongBorder]);
+            default: return ("DangerSurface", v[UiPaletteRole.DangerSurface]);
         }
     }
 
@@ -915,7 +869,7 @@ internal static class KernelResolvedStyleTests
         // (1) A page-level scheme, SELECTED through the same entry point a host uses.
         UiStyleDocument legacy = UiStyleDocument.Parse(
             "<Styles Schema=\"1\" Scheme=\"legacy\"><Scheme Name=\"legacy\">"
-            + "<Color Token=\"Panel\" Value=\"#0000ffff\"/>"
+            + "<Palette Role=\"PanelSurface\" Value=\"#0000ffff\"/>"
             + "<Font Value=\"Medium\" />"
             + "</Scheme></Styles>");
         Check(legacy.Issues.Count == 1,
@@ -936,7 +890,7 @@ internal static class KernelResolvedStyleTests
         Check(legacyTheme.Geometry == UiGeometry.Default,
             "and the legacy font moved NO distance: density is a separate axis (got "
             + legacyTheme.Geometry.RowHeight + ")");
-        Check(SameColor(legacyTheme.Panel, new Color(0f, 0f, 1f, 1f)),
+        Check(SameColor(legacyTheme[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)),
             "the rest of the same scheme still applies, so the redirect is not a whole-scheme bail-out");
         Check(legacyTheme.LayoutRevision > 0,
             "and it moved the layout clock before the first Measure, because a typeface measures differently");
@@ -948,7 +902,7 @@ internal static class KernelResolvedStyleTests
         Check(legacyResolver.Issues.Count == 0, "the selected scheme exists, so nothing is dropped at resolution");
         Check(legacyScope.DefaultFont == UiFont.Medium && legacyScope.Geometry == UiGeometry.Default,
             "a per-element selection reaches the same font axis and leaves density alone");
-        Check(SameColor(legacyScope.Panel, new Color(0f, 0f, 1f, 1f)),
+        Check(SameColor(legacyScope[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)),
             "and it carries the scheme's other tokens, being a clone of the baseline");
 
         // (2) The selection drives PAINT: the fit audit records the font the outlet drew with.

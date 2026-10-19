@@ -252,7 +252,7 @@ internal sealed class CheckboxWidget : IUiWidget
     /// </summary>
     private static Color ControlEdge(UiTheme theme)
     {
-        return theme.BorderStrong.a > 0f ? theme.BorderStrong : theme.Border;
+        return theme[UiPaletteRole.StrongBorder].a > 0f ? theme[UiPaletteRole.StrongBorder] : theme[UiPaletteRole.Border];
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)
@@ -379,15 +379,8 @@ internal sealed class CheckboxWidget : IUiWidget
         float knobX = track.x + SwitchKnobInset + (state ? throwWidth : 0f);
         var knobRect = new Rect(knobX, track.y + SwitchKnobInset, knob, knob);
 
-        // The two halves of the thumb are DIFFERENT KINDS OF TOKEN, and that is the point: OFF is a neutral
-        // ink on a neutral track, ON is the ACCENT, because "this is on" is what the accent means here. The
-        // accent is deliberately not the selected surface's text colour (<c>TextOnGold</c>, which is ink FOR
-        // a gold plane): a thumb painted in the plane's text colour would read as a label rather than as the
-        // control's own state, and on a palette whose selected plane is light the two coincide.
-        // SA1.1: the OFF half reads theme.SwitchThumbOff, whose unset fallback IS this TextPrimary read -
-        // not assigning the token keeps the historical neutral ink, and assigning it greys the thumb
-        // without touching any label.
-        UiThemeDraw.Solid(knobRect, state ? theme.AccentGold : theme.SwitchThumbOff);
+        // The neutral OFF thumb and accent ON thumb are independent palette meanings, not label inks.
+        UiThemeDraw.Solid(knobRect, state ? theme[UiPaletteRole.Accent] : theme[UiPaletteRole.SwitchOff]);
 
         return trackWidth;
     }

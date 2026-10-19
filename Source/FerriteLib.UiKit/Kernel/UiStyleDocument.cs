@@ -4,7 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Xml;
-using UnityEngine;
+
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -340,8 +340,8 @@ public sealed class UiStyleDocument
             if (child is not XmlElement entry) continue;
             switch (entry.Name)
             {
-                case "Color":
-                    ReadColor(name, entry, definition, issues);
+                case "Palette":
+                    ReadPalette(name, entry, definition, issues);
                     break;
                 case "Metric":
                     // A scheme may carry the DENSITY metric vocabulary, which is what makes the premeasure
@@ -369,29 +369,29 @@ public sealed class UiStyleDocument
         ApplyLegacyFont(name, definition, issues);
     }
 
-    private static void ReadColor(string scheme, XmlElement element, SchemeDefinition definition, List<UiStyleIssue> issues)
+    private static void ReadPalette(string scheme, XmlElement element, SchemeDefinition definition, List<UiStyleIssue> issues)
     {
-        string token = ReadOptionalName(element, "Token") ?? "";
+        string token = ReadOptionalName(element, "Role") ?? "";
         string raw = element.GetAttribute("Value") ?? "";
         if (token.Length == 0 || raw.Length == 0)
         {
-            Record(issues, "A <Color> in scheme '" + scheme + "' needs both Token and Value; the declaration is ignored.");
+            Record(issues, "A <Palette> in scheme '" + scheme + "' needs both Role and Value; the declaration is ignored.");
             return;
         }
 
         if (!IsColourToken(token))
         {
-            Record(issues, "Unknown colour token '" + token + "' in scheme '" + scheme + "'; the declaration is ignored.");
+            Record(issues, "Unknown palette role '" + token + "' in scheme '" + scheme + "'; the declaration is ignored.");
             return;
         }
 
         if (definition.Colours.ContainsKey(token))
         {
-            Record(issues, "Colour token '" + token + "' is set twice in scheme '" + scheme + "'; the first value is kept.");
+            Record(issues, "Palette role '" + token + "' is set twice in scheme '" + scheme + "'; the first value is kept.");
             return;
         }
 
-        if (!TryParseColour(raw, out Color colour))
+        if (!TryParseColour(raw, out UiColour colour))
         {
             Record(issues, "Scheme '" + scheme + "' sets '" + token + "' to an unreadable colour '" + raw
                 + "'; expected #RRGGBB, #RRGGBBAA or r,g,b[,a] in 0..1. The declaration is ignored.");
@@ -576,7 +576,7 @@ public sealed class UiStyleDocument
         string raw = entry.GetAttribute("Value") ?? "";
         if (token.Length == 0 || raw.Length == 0)
         {
-            Record(issues, "A <Metric> in " + origin + " needs both Token and Value; the declaration is ignored.");
+            Record(issues, "A <Metric> in " + origin + " needs both Role and Value; the declaration is ignored.");
             return;
         }
 
@@ -656,107 +656,7 @@ public sealed class UiStyleDocument
     /// <c>r,g,b[,a]</c> in 0..1 - the float form is the one the theme's own colours are written in, and the
     /// hex form is the one an author reaches for first.
     /// </summary>
-    internal static bool TryParseColour(string raw, out Color colour)
-    {
-        colour = default;
-        string text = raw.Trim();
-        if (text.Length == 0) return false;
-
-        if (text[0] == '#') return TryParseHexColour(text.Substring(1), out colour);
-
-        // Hand-scanned rather than String.Split: net472 advertises Split(char, StringSplitOptions) to the
-        // compiler and then throws MissingMethodException at run time, the reference-assembly trap this
-        // repo has recorded twice (MEMORY.md, "net472 reference-assembly traps").
-        var channels = new float[4];
-        channels[3] = 1f;
-        int start = 0;
-        int index = 0;
-        for (int i = 0; i <= text.Length; i++)
-        {
-            if (i != text.Length && text[i] != ',') continue;
-            if (index > 3) return false;
-
-            if (!float.TryParse(text.Substring(start, i - start).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float value)
-                || float.IsNaN(value) || float.IsInfinity(value) || value < 0f || value > 1f)
-            {
-                return false;
-            }
-
-            channels[index] = value;
-            index++;
-            start = i + 1;
-        }
-
-        if (index is < 3 or > 4) return false;
-
-        colour = new Color(channels[0], channels[1], channels[2], channels[3]);
-        return true;
-    }
-
-    private static bool TryParseHexColour(string hex, out Color colour)
-    {
-        colour = default;
-        if (!IsHex(hex)) return false;
-
-        float a = 1f;
-        string r;
-        string g;
-        string b;
-        switch (hex.Length)
-        {
-            case 3:
-                r = Duplicate(hex, 0);
-                g = Duplicate(hex, 1);
-                b = Duplicate(hex, 2);
-                break;
-            case 4:
-                r = Duplicate(hex, 0);
-                g = Duplicate(hex, 1);
-                b = Duplicate(hex, 2);
-                a = ByteOf(Duplicate(hex, 3));
-                break;
-            case 6:
-                r = hex.Substring(0, 2);
-                g = hex.Substring(2, 2);
-                b = hex.Substring(4, 2);
-                break;
-            case 8:
-                r = hex.Substring(0, 2);
-                g = hex.Substring(2, 2);
-                b = hex.Substring(4, 2);
-                a = ByteOf(hex.Substring(6, 2));
-                break;
-            default:
-                return false;
-        }
-
-        colour = new Color(ByteOf(r), ByteOf(g), ByteOf(b), a);
-        return true;
-    }
-
-    private static bool IsHex(string text)
-    {
-        if (text.Length == 0) return false;
-        for (int i = 0; i < text.Length; i++)
-        {
-            char c = text[i];
-            bool digit = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-            if (!digit) return false;
-        }
-
-        return true;
-    }
-
-    private static string Duplicate(string text, int index)
-    {
-        char c = text[index];
-        return new string(new[] { c, c });
-    }
-
-    private static float ByteOf(string hex)
-    {
-        return int.Parse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture) / 255f;
-    }
+    internal static bool TryParseColour(string raw, out UiColour colour) => UiColour.TryParse(raw, out colour);
 
     private static string? ReadOptionalName(XmlElement element, string attribute)
     {
@@ -772,7 +672,7 @@ public sealed class UiStyleDocument
 
     internal sealed class SchemeDefinition
     {
-        internal Dictionary<string, Color> Colours { get; } = new(StringComparer.Ordinal);
+        internal Dictionary<string, UiColour> Colours { get; } = new(StringComparer.Ordinal);
 
         /// <summary>
         /// The premeasure half of a scheme: the metric vocabulary a named density carries too. These are

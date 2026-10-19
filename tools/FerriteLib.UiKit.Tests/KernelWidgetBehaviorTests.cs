@@ -209,14 +209,14 @@ internal static class KernelWidgetBehaviorTests
         widget.Draw(page, ctx);
         IList colors = RecordedBoxColors();
         UiTheme theme = UiTheme.Vanilla;
-        Check(colors.Contains(theme.Selected) && colors.Contains(theme.AccentGold),
+        Check(colors.Contains(theme[UiPaletteRole.SelectedSurface]) && colors.Contains(theme[UiPaletteRole.Accent]),
             "selected option uses the Selected fill and AccentGold border tokens");
 
         mode = "unset";
         ClearRecordedBoxes();
         widget.Draw(page, ctx);
         colors = RecordedBoxColors();
-        Check(!colors.Contains(theme.Selected) && !colors.Contains(theme.AccentGold),
+        Check(!colors.Contains(theme[UiPaletteRole.SelectedSurface]) && !colors.Contains(theme[UiPaletteRole.Accent]),
             "unselected options emit neither selected token");
     }
 

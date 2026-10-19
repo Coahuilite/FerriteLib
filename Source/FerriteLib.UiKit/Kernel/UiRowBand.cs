@@ -118,7 +118,7 @@ public static class UiRowBand
 
         if (row.Expandable)
         {
-            UiThemeDraw.Surface(marker, row.Expanded ? ink.Surface : new UiSurfaceStyle(theme.Base, ink.Text), theme.Geometry.Hairline);
+            UiThemeDraw.Surface(marker, row.Expanded ? ink.Surface : new UiSurfaceStyle(theme[UiPaletteRole.WindowSurface], ink.Text), theme.Geometry.Hairline);
             if (row.Expanded)
             {
                 float inset = Math.Max(2f, partSide * 0.25f);
@@ -128,7 +128,7 @@ public static class UiRowBand
 
         if (row.Checkable)
         {
-            UiThemeDraw.Surface(box, row.Checked ? ink.Surface : new UiSurfaceStyle(theme.Base, ink.Text), theme.Geometry.Hairline);
+            UiThemeDraw.Surface(box, row.Checked ? ink.Surface : new UiSurfaceStyle(theme[UiPaletteRole.WindowSurface], ink.Text), theme.Geometry.Hairline);
             if (row.Checked)
             {
                 float inset = Math.Max(2f, partSide * 0.25f);

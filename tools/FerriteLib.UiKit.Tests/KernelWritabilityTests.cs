@@ -104,22 +104,22 @@ internal static class KernelWritabilityTests
         ClearRecordedBoxes();
         UiThemeDraw.StatusTreatment(
             new Rect(0f, 0f, 60f, 20f), theme, UiStatusTone.Active, writable: bindings.IsWritable("published"));
-        CheckPaint(0, theme.Base, theme.Divider, "a read-only binding paints the disabled plane whatever tone was authored");
+        CheckPaint(0, theme[UiPaletteRole.WindowSurface], theme[UiPaletteRole.Divider], "a read-only binding paints the disabled plane whatever tone was authored");
 
         ClearRecordedBoxes();
         UiThemeDraw.StatusTreatment(
             new Rect(0f, 0f, 60f, 20f), theme, UiStatusTone.Active, writable: bindings.IsWritable("editable"));
-        CheckPaint(0, theme.Selected, theme.AccentGold, "a writable binding keeps the authored tone");
+        CheckPaint(0, theme[UiPaletteRole.SelectedSurface], theme[UiPaletteRole.Accent], "a writable binding keeps the authored tone");
 
         Check(
-            !SameColor(theme.Base, theme.Selected) && !SameColor(theme.Divider, theme.AccentGold),
+            !SameColor(theme[UiPaletteRole.WindowSurface], theme[UiPaletteRole.SelectedSurface]) && !SameColor(theme[UiPaletteRole.Divider], theme[UiPaletteRole.Accent]),
             "the two treatments differ in every colour, so the two checks above cannot both pass by accident");
 
         ClearRecordedBoxes();
         UiThemeDraw.StatusBadge(
             new Rect(0f, 0f, 60f, 20f), "value", theme, UiStatusTone.Danger, null, writable: bindings.IsWritable("published"));
-        CheckPaint(0, theme.Base, theme.Divider, "the badge plane follows the same rule");
-        CheckLastLabel(theme.TextDisabled, "and the badge writes the disabled text colour");
+        CheckPaint(0, theme[UiPaletteRole.WindowSurface], theme[UiPaletteRole.Divider], "the badge plane follows the same rule");
+        CheckLastLabel(theme[UiPaletteRole.DisabledForeground], "and the badge writes the disabled text colour");
     }
 
     private static void VerifyUnknownWritabilityKeepsTone()
@@ -128,11 +128,11 @@ internal static class KernelWritabilityTests
 
         ClearRecordedBoxes();
         UiThemeDraw.StatusTreatment(new Rect(0f, 0f, 60f, 20f), theme, UiStatusTone.Danger);
-        CheckPaint(0, theme.Danger, theme.Danger, "no writability argument means the tone decides alone");
+        CheckPaint(0, theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerSurface], "no writability argument means the tone decides alone");
 
         ClearRecordedBoxes();
         UiThemeDraw.StatusBadge(new Rect(0f, 0f, 60f, 20f), "value", theme, UiStatusTone.Danger);
-        CheckPaint(0, theme.Danger, theme.Danger, "and the same holds for the badge");
+        CheckPaint(0, theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerSurface], "and the same holds for the badge");
     }
 
     /// <summary>

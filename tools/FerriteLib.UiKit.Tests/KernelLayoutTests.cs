@@ -212,11 +212,11 @@ internal static class KernelLayoutTests
         UiNode parent = a.Parent!;
         Rect? oldRect = a.Rect;
         UiNode[] oldChildren = parent.Children.ToArray();
-        UiResolvedProperty<Color?> priorColour = a.Properties.ResolvedColours["TextPrimary"];
+        UiResolvedProperty<UiColour?> priorColour = a.Properties.ResolvedColours["Foreground"];
         bool rejected = false;
         try
         {
-            engine.ArrangeRoots(ctx, new Vector2(201, 100), Parse(Page("AnchorX=\"b.Right\" Font=\"Tiny\" Color.TextPrimary=\"#FF0000\"", "AnchorX=\"a.Right\"")).Roots);
+            engine.ArrangeRoots(ctx, new Vector2(201, 100), Parse(Page("AnchorX=\"b.Right\" Font=\"Tiny\" Palette.Foreground=\"#FF0000\"", "AnchorX=\"a.Right\"")).Roots);
         }
         catch (FormatException ex)
         {
@@ -225,8 +225,8 @@ internal static class KernelLayoutTests
 
         Check(rejected, "L cycle reports the actual Overlay path instead of partial placement");
         Check(a.Rect.Equals(oldRect) && ReferenceEquals(a.Parent, parent) && parent.Children.SequenceEqual(oldChildren), "L failed arrange preserves complete previous node geometry and relationships");
-        Check(a.Properties.ResolvedFont.Value == UiFont.Small && a.Properties.ResolvedColours["TextPrimary"].Origin == priorColour.Origin
-            && Nullable.Equals(a.Properties.ResolvedColours["TextPrimary"].Value, priorColour.Value),
+        Check(a.Properties.ResolvedFont.Value == UiFont.Small && a.Properties.ResolvedColours["Foreground"].Origin == priorColour.Origin
+            && Nullable.Equals(a.Properties.ResolvedColours["Foreground"].Value, priorColour.Value),
             "L failed candidate restores derived authoring facts as well as previous geometry");
         Check(!ctx.Session.IsInputGeometryReliable, "L failed arrange suspends input against unreliable new geometry");
         UiLayoutSnapshot cached = engine.ArrangeRoots(ctx, new Vector2(200, 100), roots);
