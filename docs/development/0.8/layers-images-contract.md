@@ -88,8 +88,7 @@ The equivalent ordinary declaration is:
 its allocated rectangle, not the widget in its parent. Defaults remain Contain/Center/Center. Unsupported
 names, including numeric enum aliases, are authoring errors. `AspectHeight=true` measures exactly
 `allocated width × source height / source width`, with no added padding; explicit `Height` wins. Without
-this opt-in the old source-height-plus-two-padding measure remains. Missing/invalid-size sources use the
-old density row fallback. Explicit Height still reserves its authored slot regardless of source state.
+this opt-in the old source-height-plus-two-padding measure remains. AspectHeight uses the density row fallback for a missing or invalid-size source; the legacy measure still follows a positive source height (even when its width is invalid). Explicit Height reserves its authored slot regardless of source state.
 
 `UiImageLayout` is the actual platform-free geometry used by `UiThemeDraw.Image`, not a fixture copy.
 Custom visuals may use the same `UiImageOptions` overload; the retained three-argument Image and FitImage
