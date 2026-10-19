@@ -16,6 +16,7 @@ S0/S1 的开发实现与调用入口见 [S0/S1 contract](s01-contract.md)。其�
 [完整首版迁移状态](migration-status.md)。
 共同编辑／单行及基础多行／数值组合的生产入口与可逆候选政策见 [Editing contract](editing-contract.md)。
 可编辑图表点及七种描述包装的生产读面见 [Wrappers contract](wrappers-contract.md)。
+层叠／图片／整窗背景的单处生产合同见 [Layers/images contract](layers-images-contract.md)：默认包装精确几何由库提供，高级custom用可选几何接缝；已配置但禁用的操作区域仍遮挡下层、自身不执行（L2已批）。图片未配置仍Contain/居中/源高；AspectHeight显式启用。标准背景显式配置，缺省Contain/居中/露底色（BG1已批），保chrome且不输入。
 
 ## 第一部分：架构规格
 

@@ -56,6 +56,7 @@ public sealed class UiPageWindow : UiWindowHost
         this.noticeText = noticeText ?? throw new ArgumentNullException(nameof(noticeText));
         this.metrics = metrics ?? VerseFerriteTextMetrics.Instance;
         this.document = document;
+        Background = manifest.Background;
 
         // Set here as well as by the catalog so a shell built outside one still names itself in the fit
         // audit; the catalog overwrites it only with the same value (a mismatched factory is refused).
@@ -82,6 +83,31 @@ public sealed class UiPageWindow : UiWindowHost
     /// </para>
     /// </summary>
     public UiHost? PageHost => Host;
+
+    private UiWindowBackground? background;
+    /// <summary>Per-window configuration. Setting null restores the original shell; resources remain supplier-owned.</summary>
+    public UiWindowBackground? Background
+    {
+        get => background;
+        set
+        {
+            if (value != null) UiTextureBinding.Validate(bindings, value.Bind, "window/background");
+            background = value;
+        }
+    }
+
+    protected override void DrawBackground(Rect rect)
+    {
+        UiWindowBackground? current = background;
+        if (current == null) return;
+        Texture? texture;
+        try
+        {
+            if (!UiTextureBinding.TryRead(bindings, current.Bind, out texture)) return;
+        }
+        catch (InvalidOperationException) { return; }
+        UiThemeDraw.Image(rect, texture, Color.white, current.Options);
+    }
 
     protected override UiTheme Theme => theme;
 

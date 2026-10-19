@@ -171,7 +171,9 @@ internal static class KernelLayerDispatchTests
             Frame(host, EventType.MouseUp);
             Check(large == 2 && small == 2, "changed scroll offset cannot leave stale upper coverage");
         }
-    }    private static void EditorCoverage()
+    }
+
+    private static void EditorCoverage()
     {
         int lockRequests = 0;
         int writes = 0;
@@ -207,7 +209,9 @@ internal static class KernelLayerDispatchTests
             }
         }
         finally { UiNative.TextFieldOverride = null; }
-    }    private static void CompositeEligibility()
+    }
+
+    private static void CompositeEligibility()
     {
         int large = 0;
         var bindings = new UiBindings();
@@ -249,7 +253,9 @@ internal static class KernelLayerDispatchTests
             Frame(host, EventType.MouseUp);
             Check(bodyRequests == 1 && expanded == 1 && large == 1, "removing the disclosure operation reveals the existing body target");
         }
-    }    private static void ChildGeometryOwner()
+    }
+
+    private static void ChildGeometryOwner()
     {
         UiWidgetRegistry.Register("layer-child", "test/child", () => new ChildControl(), new[] { "Id", "Kind", "Width", "Height" });
         int lower = 0;
@@ -287,7 +293,9 @@ internal static class KernelLayerDispatchTests
             UiInteractionResult result = UiNative.Activation(rect, child, "child");
             UiInteractionRequests.Activation(UiNative.InteractionTarget(child,"child"), result, () => child.Bindings.Invoke("child"));
         }
-    }    private sealed class Precise : IUiWidget, IUiPointerLayout
+    }
+
+    private sealed class Precise : IUiWidget, IUiPointerLayout
     {
         public string Kind => "test/precise";
         public void Configure(UiElementSpec spec) { }
@@ -304,7 +312,9 @@ internal static class KernelLayerDispatchTests
             UiInteractionResult result = UiNative.Activation(Region(rect.x,rect.y), ctx, "custom");
             UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx,"custom"), result, () => ctx.Bindings.Invoke("custom"));
         }
-    }    private sealed class Metrics : ITextMetrics
+    }
+
+    private sealed class Metrics : ITextMetrics
     {
         public float MeasureText(string text, UiFont font, float width) => 16;
         public float MeasureWidth(string text, UiFont font) => text.Length * 7;

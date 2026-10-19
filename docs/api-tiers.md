@@ -116,9 +116,15 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
 - `UiResolvedProperty` — 0.8 S0/S1 shared contract; shape may change within the development line.
 - `UiPropertyResolver` — 0.8 S0/S1 shared contract; shape may change within the development line.
 - `IUiPointerLayout` — optional0.8 precise overlap input geometry capability; public-unstable.
-- `UiPointerRegion` — neutral local region/eligibility fact; public-unstable.
+- `UiPointerRegion` — neutral local configured operation region fact; public-unstable.
 - `UiPointerLayer` — neutral current paint-order/clip fact; public-unstable.
 - `UiPointerLayers` — stateless shared content coverage decision; public-unstable.
+- `UiImageFit` — finite image fitting vocabulary; public-unstable.
+- `UiImageAlignX` — image-local horizontal alignment; public-unstable.
+- `UiImageAlignY` — image-local vertical alignment; public-unstable.
+- `UiImageOptions` — immutable image-local placement configuration; public-unstable.
+- `UiImageLayout` — neutral image geometry shared by adapters and headless callers; public-unstable.
+- `UiWindowBackground` — immutable supplier binding and image placement configuration; public-unstable.
 - `UiPaletteRole` — 0.8 finite neutral paint roles; public-unstable.
 - `UiColour` — 0.8 neutral RGBA and parser; public-unstable.
 - `UiPalette` — 0.8 sparse palette declarations/read-only defaults; public-unstable.

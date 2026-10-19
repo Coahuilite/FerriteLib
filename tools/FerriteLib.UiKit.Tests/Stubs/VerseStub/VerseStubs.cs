@@ -460,6 +460,7 @@ public static class Widgets
 
     public static void Label(Rect rect, string text)
     {
+        GUI.PaintTrace.Add("label:" + text);
         LabelRects.Add(rect);
         LabelTexts.Add(text ?? "");
         LabelColors.Add(GUI.color);
@@ -470,6 +471,7 @@ public static class Widgets
     public static void DrawBoxSolid(Rect rect, Color color)
     {
         if (DrawBoxSolidFailure != null) throw DrawBoxSolidFailure;
+        GUI.PaintTrace.Add("solid");
         DrawBoxSolidRects.Add(rect);
         DrawBoxSolidColors.Add(color);
     }

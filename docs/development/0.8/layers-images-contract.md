@@ -50,3 +50,99 @@ decoration pass-through, shared custom geometry, release/cancel/removal/Close, n
 scroll offsets, native-editor coverage/Repaint and ordinary outside-click publication. Existing full
 popup/F3 and all control regressions remain. Pure tests compile the actual neutral decision source.
 Native1.6 paint/input acceptance remains separate; fixture geometry and event records do not certify pixels.
+
+## Use the default image before writing a custom renderer
+
+Bind a supplier-owned `Texture2D`, `RenderTexture` or declared `Texture` value. The supplier creates,
+updates and destroys the resource; UiKit neither clones nor retains a second resource reference. A live
+render target can update its pixels without a layout change. When replacing a source with different
+natural dimensions, notify the ordinary binding/content revision if its dimensions affect measurement.
+Draw always reads the current value. Null/unbound runtime reads leave the existing image placeholder;
+a non-positive source size does not draw. Known-null description remains `Available=false`, while a
+present source is `Available=true` (presence, not a promise of valid dimensions or native pixels).
+Missing/read-unavailable descriptions retain their explicit unknown reason. The read-only definition
+carries the placement options; measured/arranged bounds are the same bounds the image outlet receives.
+
+```csharp
+Texture? portrait = suppliedRenderTarget;
+var bindings = new UiBindings();
+bindings.BindReadOnly<Texture?>("portrait", () => portrait);
+var image = new UiElementSpec("portrait-view", "display/image", new Dictionary<string, string>
+{
+    ["Bind"] = "portrait", ["AspectHeight"] = "true", ["Fit"] = "Contain"
+});
+var page = UiLayoutManifest.Create("consumer/portraits", new[] { image });
+```
+
+The equivalent ordinary declaration is:
+
+```xml
+<UiPage Schema="2" Source="consumer/portraits">
+  <Widget Id="portrait-view" Kind="display/image" Bind="portrait"
+          AspectHeight="true" Fit="Contain" ImageAlignX="Center" ImageAlignY="Top" />
+</UiPage>
+```
+
+`Fit` is `Contain` (complete image), `Cover` (fill and clip to slot), or `Stretch` (explicit distortion).
+`ImageAlignX` is `Left|Center|Right`; `ImageAlignY` is `Top|Center|Bottom`. These align the picture **inside**
+its allocated rectangle, not the widget in its parent. Defaults remain Contain/Center/Center. Unsupported
+names, including numeric enum aliases, are authoring errors. `AspectHeight=true` measures exactly
+`allocated width × source height / source width`, with no added padding; explicit `Height` wins. Without
+this opt-in the old source-height-plus-two-padding measure remains. Missing/invalid-size sources use the
+old density row fallback. Explicit Height still reserves its authored slot regardless of source state.
+
+`UiImageLayout` is the actual platform-free geometry used by `UiThemeDraw.Image`, not a fixture copy.
+Custom visuals may use the same `UiImageOptions` overload; the retained three-argument Image and FitImage
+entry points preserve their Contain/Center meaning. Cover uses a balanced paint-only GUI group and
+restores the tint even if drawing throws. The image is decoration: no input region or capture is added.
+Old custom bindings without the optional typed seam keep the original Texture2D binding route.
+
+## Add a background to the standard window
+
+The normal sealed `UiPageWindow` accepts immutable configuration, without replacing its structure:
+
+```csharp
+var backdrop = new UiWindowBackground("backdrop"); // approved Contain + Center
+var page = UiLayoutManifest.CreateWithBackground("consumer/page", roots, backdrop);
+var window = new UiPageWindow(key, page, bindings, theme, translation,
+    title, closeText, noticeText);
+window.Background = new UiWindowBackground("backdrop", new UiImageOptions(UiImageFit.Cover));
+window.Background = null; // restore the original shell, not the manifest's backdrop
+```
+
+```xml
+<UiPage Schema="2" Source="consumer/page" BackgroundBind="backdrop"
+        BackgroundFit="Contain" BackgroundAlignX="Center" BackgroundAlignY="Center">
+  <!-- ordinary content -->
+</UiPage>
+```
+
+Bind `backdrop` through the same typed value binding as the image above. The instance Background setter overrides the definition's initial configuration. Subsequent instance changes do not
+mutate that immutable definition or another window. The supplier can replace or clear the bound value;
+no texture is destroyed on swap, unbind, host recovery, or window Close. An unavailable source leaves the
+original base and chrome visible. Application animation/resource scheduling remains application-owned.
+
+BG1 is user-approved: **Contain, centered, expose the existing base colour when aspect ratios differ**.
+Cover is explicit. The shell paints workspace base → image → accent/title/subtitle/close chrome → page
+content → popup. No later opaque whole-window base hides the image. Ordinary content surfaces may still
+cover their own areas. The image covers the whole zero-margin window face, is clipped there for Cover,
+and never adds an input target; the existing title, close, content and popup keep their behavior.
+Unconfigured windows are unchanged. Subclass authors can override the narrow `DrawBackground` paint hook;
+they do not replace default definitions or acquire a new layout/input authority.
+
+## Added versus retained entry points
+
+| Use | This package | Caller responsibility |
+| --- | --- | --- |
+| Default controls overlap | Shared precise geometry and topmost arbitration; L2 approved unavailable-operation obstruction | Ordinary declarations unchanged |
+| Custom private hit parts | Optional IUiPointerLayout, shared neutral arbitration, Child-owner resolution | Describe actual regions; keep input on shared interaction |
+| Existing Image | Same defaults, source-height measure, empty slot, Texture2D custom-binding route | Existing bindings remain legal |
+| Image variants | Fit, inner alignment, explicit width-aspect measure; Texture/RenderTexture values | Supply a current resource and normal invalidation |
+| Standard window background | Manifest/program/instance configuration, approved Contain default | Supply texture; own its lifetime |
+| Animation/media/whole-skin replacement | Not introduced | Application/existing extension boundary |
+
+The actual Host/native-outlet fixture asserts fit/clip/group cleanup, old versus explicit measurement,
+RenderTexture identity, swap/null/invalid size, standard-window instance isolation, base→image→chrome
+order, real content input, popup paint order and normal Close. These records validate calls and geometry,
+not a screenshot. Native 1.6 pixels, texture material behavior and IMGUI clipping remain pending an
+authorized render/game acceptance surface; this task does not launch the game to obtain one.

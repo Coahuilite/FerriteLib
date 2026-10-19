@@ -144,6 +144,7 @@ public static class GUI
 {
     // Recording hooks for structural scope cleanup tests. The test assembly compiles against the
     // Krafs ref assembly, so these are only accessible through reflection at runtime.
+    public static readonly System.Collections.Generic.List<string> PaintTrace = new();
     public static int GroupDepth;
     public static int BeginGroupCalls;
     public static int EndGroupCalls;
@@ -163,8 +164,12 @@ public static class GUI
         DrawTextureModes.Clear();
     }
 
+    public static System.Exception? DrawTextureFailure;
+
     public static void DrawTexture(Rect rect, Texture texture, ScaleMode mode, bool alphaBlend)
     {
+        if (DrawTextureFailure != null) throw DrawTextureFailure;
+        PaintTrace.Add("image");
         DrawTextureRects.Add(rect);
         DrawTextureTextures.Add(texture);
         DrawTextureColors.Add(color);

@@ -13,7 +13,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// </para>
 /// <para>
 /// <b>What it does not do.</b> It loads nothing, caches nothing and resolves no path: the consumer binds a
-/// <see cref="Texture2D"/> through the ordinary value binding (<c>BindReadOnly</c> or <c>BindValue</c>), which
+/// <see cref="Texture"/> (including a supplier RenderTexture) through the ordinary value binding (<c>BindReadOnly</c> or <c>BindValue</c>), which
 /// is the same generic base every other value uses. A null texture is not an error - the element paints its
 /// own empty slot in the resolved style, so "there is no picture here" is visible and distinguishable from an
 /// element that was hidden and therefore not drawn at all.
@@ -37,7 +37,7 @@ internal sealed class ImageWidget : IUiWidget, IUiDescriptiveWidget
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new ImageWidget(),
-            AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "Height", "Description", "DescriptionKey", "Decorative"));
+            AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "Height", "Description", "DescriptionKey", "Decorative", "Fit", "ImageAlignX", "ImageAlignY", "AspectHeight"));
         // Deliberately no label set: the kind paints no text, so Width="Auto" has nothing honest to measure.
     }
 
@@ -56,7 +56,8 @@ internal sealed class ImageWidget : IUiWidget, IUiDescriptiveWidget
                 + "texture; an image with no source draws only its empty slot.");
         }
 
-        bindings.ValidateValue<Texture2D>(key, elementPath);
+        UiTextureBinding.Validate(bindings, key, elementPath);
+        ReadOptions();
     }
 
     public float Measure(UiWidgetContext ctx)
@@ -69,7 +70,12 @@ internal sealed class ImageWidget : IUiWidget, IUiDescriptiveWidget
             return AtomVocabulary.ReadFloat(spec, "Height", ctx.Theme.Geometry.RowHeight);
         }
 
-        Texture2D? texture = ReadTexture(ctx);
+        Texture? texture = ReadTexture(ctx);
+        if (texture != null && AtomVocabulary.ReadBool(spec, "AspectHeight", false))
+        {
+            float aspect = UiImageLayout.AspectHeight(ctx.ViewWidth, texture.width, texture.height);
+            return aspect > 0f ? aspect : ctx.Theme.Geometry.RowHeight;
+        }
         float natural = texture == null ? 0f : texture.height;
         return natural > 0f ? natural + ctx.Theme.Geometry.Padding * 2f : ctx.Theme.Geometry.RowHeight;
     }
@@ -79,7 +85,7 @@ internal sealed class ImageWidget : IUiWidget, IUiDescriptiveWidget
         if (rect.width <= 1f || rect.height <= 1f) return;
 
         UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, writable: null);
-        if (UiThemeDraw.Image(rect, ReadTexture(ctx), style.Text))
+        if (UiThemeDraw.Image(rect, ReadTexture(ctx), style.Text, ReadOptions()))
         {
             return;
         }
@@ -95,7 +101,7 @@ internal sealed class ImageWidget : IUiWidget, IUiDescriptiveWidget
         string name = AtomVocabulary.ResolveText(spec, ctx, "Description", "DescriptionKey");
         try
         {
-            if (!ctx.Bindings.TryGet(ReadBindKey(), out Texture2D texture))
+            if (!UiTextureBinding.TryRead(ctx.Bindings, ReadBindKey(), out Texture? texture))
                 return new UiDescription(role, name: name, unknownReason: "MissingBinding");
             return new UiDescription(role, name: name, available: texture != null);
         }
@@ -110,13 +116,27 @@ internal sealed class ImageWidget : IUiWidget, IUiDescriptiveWidget
         return AtomVocabulary.ReadBindKey(spec);
     }
 
+    private UiImageOptions ReadOptions()
+    {
+        spec.TryGetAttribute("Fit", out string fit);
+        spec.TryGetAttribute("ImageAlignX", out string x);
+        spec.TryGetAttribute("ImageAlignY", out string y);
+        return UiImageOptions.Parse(fit, x, y);
+    }
+
     /// <summary>
     /// The bound texture, read under the collection kinds' fail-soft contract: an absent or mistyped binding
     /// answers null and records one report, so a page with no picture source paints its empty slot instead of
     /// tripping the slot. <c>Validate</c> still refuses the authoring mistake at creation time.
     /// </summary>
-    private Texture2D? ReadTexture(UiWidgetContext ctx)
+    private Texture? ReadTexture(UiWidgetContext ctx)
     {
-        return AtomVocabulary.ReadOr<Texture2D?>(ctx, Kind, ReadBindKey(), null, "no texture");
+        try
+        {
+            if (UiTextureBinding.TryRead(ctx.Bindings, ReadBindKey(), out Texture? texture)) return texture;
+        }
+        catch (InvalidOperationException) { }
+        AtomVocabulary.ReportUnresolved(ctx, Kind, ReadBindKey(), "no texture");
+        return null;
     }
 }

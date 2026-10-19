@@ -67,6 +67,8 @@ public sealed class UiLayoutManifest
 
     public string SchemaVersion { get; }
 
+    public UiWindowBackground? Background { get; }
+
     public IReadOnlyList<UiElementSpec> Roots { get; }
 
     /// <summary>
@@ -95,9 +97,10 @@ public sealed class UiLayoutManifest
         string schemaVersion,
         IReadOnlyList<UiElementSpec> roots,
         UiStyleDocument styles,
-        IReadOnlyDictionary<string, UiElementSpec> templates)
+        IReadOnlyDictionary<string, UiElementSpec> templates, UiWindowBackground? background)
     {
         Source = source;
+        Background = background;
         SchemaVersion = schemaVersion;
         Roots = roots;
         Styles = styles;
@@ -107,6 +110,15 @@ public sealed class UiLayoutManifest
     /// <summary>Assembles immutable C# component definitions through the same host contract as XML.</summary>
     public static UiLayoutManifest Create(string source, IReadOnlyList<UiElementSpec> roots,
         UiStyleDocument? styles = null, IReadOnlyDictionary<string, UiElementSpec>? templates = null)
+        => Create(source, roots, styles, templates, null);
+
+    /// <summary>Creates a page with a supplier binding for its standard window background.</summary>
+    public static UiLayoutManifest CreateWithBackground(string source, IReadOnlyList<UiElementSpec> roots,
+        UiWindowBackground background, UiStyleDocument? styles = null, IReadOnlyDictionary<string, UiElementSpec>? templates = null)
+        => Create(source, roots, styles, templates, background);
+
+    public static UiLayoutManifest Create(string source, IReadOnlyList<UiElementSpec> roots,
+        UiStyleDocument? styles, IReadOnlyDictionary<string, UiElementSpec>? templates, UiWindowBackground? background)
     {
         if (source == null) throw new ArgumentNullException(nameof(source));
         if (source.Length == 0) throw new ArgumentException("A definition needs its Source identity.", nameof(source));
@@ -134,7 +146,7 @@ public sealed class UiLayoutManifest
         ValidateIdentitySegments(rootCopy, 0);
         ValidateTemplateReferences(rootCopy, templateCopy);
         return new UiLayoutManifest(source, "2", Array.AsReadOnly(rootCopy), styles ?? UiStyleDocument.Empty,
-            new System.Collections.ObjectModel.ReadOnlyDictionary<string, UiElementSpec>(templateCopy));
+            new System.Collections.ObjectModel.ReadOnlyDictionary<string, UiElementSpec>(templateCopy), background);
     }
 
     private static void ValidateDefinition(UiElementSpec spec, int depth, HashSet<string> ids, ref int count)
@@ -194,6 +206,7 @@ public sealed class UiLayoutManifest
         int pageLine = 0;
         string source = "";
         string schema = "";
+        UiWindowBackground? background = null;
 
         while (reader.Read())
         {
@@ -213,6 +226,10 @@ public sealed class UiLayoutManifest
             schema = reader.GetAttribute("Schema") ?? "";
             source = reader.GetAttribute("Source") ?? "";
             pageLine = lineInfo.LineNumber;
+            string backgroundBind = reader.GetAttribute("BackgroundBind") ?? "";
+            UiImageOptions backgroundOptions = UiImageOptions.Parse(reader.GetAttribute("BackgroundFit"),
+                reader.GetAttribute("BackgroundAlignX"), reader.GetAttribute("BackgroundAlignY"));
+            if (backgroundBind.Trim().Length > 0) background = new UiWindowBackground(backgroundBind, backgroundOptions);
 
             if (schema.Length == 0)
             {
@@ -231,7 +248,7 @@ public sealed class UiLayoutManifest
 
             if (reader.IsEmptyElement)
             {
-                return Create(source, Array.Empty<UiElementSpec>());
+                return Create(source, Array.Empty<UiElementSpec>(), null, null, background);
             }
 
             break;
@@ -306,7 +323,7 @@ public sealed class UiLayoutManifest
                     {
                         ValidateIdentitySegments(roots, pageLine);
                         ValidateTemplateReferences(roots, templates);
-                        return Create(source, roots, styles, templates);
+                        return Create(source, roots, styles, templates, background);
                     }
 
                     throw ParseError(lineInfo, $"Unexpected end element </{reader.Name}>.");

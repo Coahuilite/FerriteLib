@@ -736,10 +736,14 @@ public abstract class UiWindowHost : Window
         return new Vector2(windowRect.x + contentLocal.x, windowRect.y + contentLocal.y);
     }
 
+    /// <summary>Optional bottom image, above the shell base and below all chrome/content. It must not take input.</summary>
+    protected virtual void DrawBackground(Rect rect) { }
+
     private void DrawChromeCore(Rect rect)
     {
         UiTheme theme = Theme;
         UiThemeDraw.Workspace(rect, theme);
+        DrawBackground(rect);
         UiThemeDraw.Solid(new Rect(rect.x, rect.y, rect.width, AccentBarHeight), theme[UiPaletteRole.Accent]);
 
         if (Title.Length > 0)

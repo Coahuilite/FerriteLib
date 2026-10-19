@@ -559,6 +559,16 @@ public class Texture2D : Texture
     }
 }
 
+/// <summary>Supplier-created render target fixture; no rendering or ownership simulation.</summary>
+public class RenderTexture : Texture
+{
+    public RenderTexture(int width, int height, int depth)
+    {
+        this.width = width;
+        this.height = height;
+    }
+}
+
 public enum KeyCode
 {
     // The values are Unity's own (the game reads UnityEngine.KeyCode through the real assembly), and the

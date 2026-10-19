@@ -87,6 +87,9 @@ internal static class KernelContainmentTests
         {
             "GUI.color",
             "GUI.DrawTexture",
+            // Cover image fitting clips only its paint slot, not structural layout or input.
+            "GUI.BeginGroup",
+            "GUI.EndGroup",
             "Text.Anchor",
             "Text.Font",
             "Text.WordWrap",

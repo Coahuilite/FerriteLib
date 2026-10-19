@@ -337,15 +337,8 @@ public static class UiThemeDraw
     /// </summary>
     public static Rect FitImage(Rect slot, Vector2 naturalSize)
     {
-        if (naturalSize.x <= 0f || naturalSize.y <= 0f || slot.width <= 0f || slot.height <= 0f)
-        {
-            return default;
-        }
-
-        float scale = Math.Min(slot.width / naturalSize.x, slot.height / naturalSize.y);
-        float width = naturalSize.x * scale;
-        float height = naturalSize.y * scale;
-        return new Rect(slot.x + (slot.width - width) * 0.5f, slot.y + (slot.height - height) * 0.5f, width, height);
+        UiLayoutRect fitted = UiImageLayout.Arrange(new UiLayoutRect(slot.x, slot.y, slot.width, slot.height), naturalSize.x, naturalSize.y);
+        return new Rect(fitted.X, fitted.Y, fitted.Width, fitted.Height);
     }
 
     /// <summary>
@@ -357,13 +350,18 @@ public static class UiThemeDraw
     /// a null texture is an answer rather than a fault.
     /// </summary>
     public static bool Image(Rect rect, Texture? texture, Color tint)
+        => Image(rect, texture, tint, default);
+
+    /// <summary>Draws a supplier-owned texture with explicit fit and inner alignment. Cover clips to the slot.</summary>
+    public static bool Image(Rect rect, Texture? texture, Color tint, UiImageOptions options)
     {
         if (texture == null)
         {
             return false;
         }
 
-        Rect fitted = FitImage(rect, new Vector2(texture.width, texture.height));
+        UiLayoutRect plan = UiImageLayout.Arrange(new UiLayoutRect(rect.x, rect.y, rect.width, rect.height), texture.width, texture.height, options);
+        Rect fitted = new Rect(plan.X, plan.Y, plan.Width, plan.Height);
         if (fitted.width <= 1f || fitted.height <= 1f)
         {
             return false;
@@ -373,7 +371,16 @@ public static class UiThemeDraw
         try
         {
             GUI.color = tint;
-            GUI.DrawTexture(fitted, texture, ScaleMode.StretchToFill, true);
+            if (options.Fit == UiImageFit.Cover)
+            {
+                GUI.BeginGroup(rect);
+                try
+                {
+                    GUI.DrawTexture(new Rect(fitted.x - rect.x, fitted.y - rect.y, fitted.width, fitted.height), texture, ScaleMode.StretchToFill, true);
+                }
+                finally { GUI.EndGroup(); }
+            }
+            else GUI.DrawTexture(fitted, texture, ScaleMode.StretchToFill, true);
         }
         finally
         {

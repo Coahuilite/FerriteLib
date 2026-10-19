@@ -24,6 +24,7 @@ internal static class Program
         try
         {
             PointerLayers();
+            ImageGeometry();
             Palette();
             Properties();
             Observations();
@@ -45,6 +46,25 @@ internal static class Program
         }
     }
 
+    private static void ImageGeometry()
+    {
+        var slot = new UiLayoutRect(10, 20, 100, 100);
+        UiLayoutRect contain = UiImageLayout.Arrange(slot, 200, 100);
+        Check(contain.X == 10 && contain.Y == 45 && contain.Width == 100 && contain.Height == 50, "image default contain center");
+        UiLayoutRect cover = UiImageLayout.Arrange(slot, 200, 100, new UiImageOptions(UiImageFit.Cover));
+        Check(cover.X == -40 && cover.Y == 20 && cover.Width == 200 && cover.Height == 100, "image cover preserves aspect beyond clip slot");
+        UiLayoutRect aligned = UiImageLayout.Arrange(slot, 200, 100, new UiImageOptions(alignY: UiImageAlignY.Bottom));
+        Check(aligned.Y == 70, "image alignment stays inside allocated slot");
+        UiLayoutRect stretch = UiImageLayout.Arrange(slot, 200, 100, new UiImageOptions(UiImageFit.Stretch));
+        Check(stretch.Width == 100 && stretch.Height == 100, "image explicit stretch");
+        Check(UiImageLayout.Arrange(slot, 0, 100).Width == 0 && UiImageLayout.Arrange(slot, float.NaN, 100).Width == 0,
+            "invalid source geometry is empty");
+        Check(UiImageLayout.AspectHeight(80, 200, 100) == 40 && UiImageLayout.AspectHeight(float.PositiveInfinity, 200, 100) == 0,
+            "width based aspect measure is finite");
+        bool rejected = false;
+        try { UiImageOptions.Parse("1", null, null); } catch (FormatException) { rejected = true; }
+        Check(rejected, "image vocabulary rejects numeric enum aliases");
+    }
     private static void PointerLayers()
     {
         var layers = new List<UiPointerLayer> {
