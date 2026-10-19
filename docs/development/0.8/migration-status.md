@@ -16,9 +16,9 @@ pending. Earlier 0.7 human acceptance stays attached to its own package and does
 | `input/mode-row` | String/typed options | Shared discrete selection, stable option targets, model-derived Missing; F2 | BooleanSelectionExpansion; WidgetBehavior/CoreWidget typed/help guards | Pending |
 | `input/dropdown` | String/pairs/typed options and both looks | Shared selection/trigger expansion; per-instance popup ownership even with same Bind; F2/F3; retained popup geometry/scroll owner | BooleanSelectionExpansion same-Bind owners/three routes/raw release/outside/close; Popup/InputEligibility/CoreWidget | Pending |
 | `container/tree` | Flattened keyed rows, disclosure/check/body/image | Shared expansion/boolean, owner-derived pressed facts and independent row operation identities; F2 | BooleanSelectionExpansion render eligibility/held facts/reorder/parts/removal/I2; ControlKind row/geometry guards | Pending |
-| `input/number-field` | Yes | Shared editor/finite numeric codec/read-only-before-edit; E1–E5 candidate | SharedEditing three routes/failure/I2/isolation; pure editor and migrated Atom/EditTransaction guards | Pending |
-| `input/text-field` | Single-line and basic plain-text multiline | Shared editor, native selection/copy/composition protocol and width-aware multiline measure; E1–E5 candidate | SharedEditing three routes/multiline/native composition/read-only; TextField/EditTransaction guards | Pending |
-| `input/stepper-slider` | Numeric editor + range + ± | Shared editing/range/activation; explicit local takeover, N1–N3 candidate | SharedEditing actual composite and pure E/N cases; WidgetBehavior guards | Pending |
+| `input/number-field` | Yes | Shared editor/finite numeric codec/read-only-before-edit; B1 default/invalid-conflict retention/Cancel approved; E2/valid blur still candidate | SharedEditing three routes/failure/I2/isolation; pure editor and migrated Atom/EditTransaction guards | Pending |
+| `input/text-field` | Single-line and basic plain-text multiline | Shared editor, native selection/copy/composition protocol and width-aware multiline measure; B1 default/invalid-conflict retention/Cancel approved; E2/valid blur still candidate | SharedEditing three routes/multiline/native composition/read-only; TextField/EditTransaction guards | Pending |
+| `input/stepper-slider` | Numeric editor + range + ± | Shared editing/range/activation; explicit local takeover, N1 immediate21/end example approved; N2/N3 still candidate | SharedEditing actual composite and pure E/N cases; WidgetBehavior guards | Pending |
 | `chart/line` | Read-only and editable points retained | Shared point capture/mapping/request; optional stable PointKeysBind with current Index/Key, conservative legacy ambiguity end | SharedChart three routes/keyed reorder/echo/Used/failure/Close + pure point; InputEligibility/ControlKind | Pending |
 | `text/wrapped` | Yes | Shared read-only Text description and actual width/font facts | DescriptiveFacts read-only/font/geometry; CoreWidget/TextAudit/Style guards | Pending |
 | `section/header` | Yes | Heading description and width-aware effective-font title | DescriptiveFacts effective-font/width; SectionHeader/Layout guards | Pending |
@@ -59,12 +59,13 @@ that a row's new capability has been migrated.
 ## Retained/confirmed technical candidate connected; A8/native acceptance separate
 
 All retained registered uses, nine containers, assembly/update, standard/embedded hosts and bounded R9
-have applicable production contracts and automated coverage. E1–E5/N1–N3, L1, P1 and R9 surface/budgets
-remain reversible Dev candidates for concentrated closeout; F1/F2/F3 remain approved. Target 1.6 native
+have applicable production contracts and automated coverage. B1 defaultfalse/invalid-conflict retention/
+Cancel-draft-only and the N1 immediate21/end example are user-approved. E2/valid blur, remaining N2/N3,
+P1 and R9 public surface remain candidates; L1 no-implicit-change principle is agreed, not every size algorithm; F1/F2/F3 remain approved. Target 1.6 native
 input/IME, font pixels, window stack, clipping/scroll/popup geometry and image correlation remain pending.
-A3 structural focus traversal, B2 Enter/Space and B3 Slider keyboard increment/Home/End remain concrete
-unimplemented recommendations. The proposed first-version deferral keeps native editor keys and existing
-Cancel/Accept hooks, and needs product closeout; these items are not counted as implemented. See the
+K1 is now approved for grouped deferral; H1 continues as approved. A3 structural focus traversal, B2 Enter/Space and B3 Slider keyboard increment/Home/End remain concrete
+unimplemented recommendations. The approved first-version deferral keeps native editor keys and existing
+Cancel/Accept hooks; these items are not counted as implemented. See the
 A8 section of `host-observation-contract.md` for the exact difference from the earlier recommendation.
 A green harness is automated evidence for the selected source, not final product or native acceptance.
 Implementation contracts: [S0/S1](s01-contract.md), [boolean/selection/expansion](bse-contract.md), [editing/numeric composition](editing-contract.md), [descriptive wrappers and chart](wrappers-contract.md), [shared layout](layout-contract.md), [property sources](property-contract.md), [assembly/update](assembly-contract.md), [hosts/observation](host-observation-contract.md).

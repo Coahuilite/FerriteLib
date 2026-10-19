@@ -1034,6 +1034,15 @@ public sealed partial class UiLayoutEngine
             try
             {
                 height = ResolveHeight(spec, widget, measureCtx, width, node, matchContent ? reference : null);
+                if (!ctx.Session.IsTripped(node) && widget is IUiLayoutDiagnosticSource diagnosticSource)
+                {
+                    UiSessionGuard.MeasureOrFallback(ctx.Session, node.Path, widget.Kind, node.Path, 0, () =>
+                    {
+                        UiLayoutDiagnostic? diagnostic = diagnosticSource.DiagnoseLayout(measureCtx, height);
+                        if (diagnostic.HasValue) ReportLayout(node, diagnostic.Value.Code, diagnostic.Value.Message);
+                        return 0;
+                    });
+                }
             }
             finally
             {

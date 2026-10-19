@@ -8,7 +8,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// and writes through the typed <see cref = "IUiBindings"/>; no neutral command bridge.
 /// The typed value-binding key is the <c>Bind</c> attribute when present, otherwise the element Id.
 /// </summary>
-public sealed class StepperSliderWidget : IUiWidget, IUiLabelledWidget
+public sealed class StepperSliderWidget : IUiWidget, IUiLabelledWidget, IUiLayoutDiagnosticSource
 {
     public const string Kind = "input/stepper-slider";
 
@@ -72,37 +72,18 @@ public sealed class StepperSliderWidget : IUiWidget, IUiLabelledWidget
         if (format.Length == 0)
             format = "0.##";
         bool live = ReadBool("Live", false);
-        float buttonWidth = Math.Max(1f, ReadFloat("ButtonWidth", DefaultButtonWidth));
-        float fieldWidth = Math.Max(1f, ReadFloat("FieldWidth", DefaultFieldWidth));
         string bindKey = ReadBindKey();
         float current = ctx.Bindings.TryGet(bindKey, out float bound) ? bound : min;
         var numeric = new UiNumericEdit(min, max, format);
         UiEditSession<float> editor = UiNative.Editor<float>(ctx, bindKey, numeric.Format, numeric.Parse);
         editor.Observe(current);
-        float x = rect.x;
-        float y = rect.y;
-        float height = rect.height;
         string label = ReadLabel(ctx);
         UiSliderLayout labelLayout = LabelLayout(ctx, rect.width);
-        if (labelLayout.LabelWidth > 0)
-        {
-            if (labelLayout.Stacked)
-            {
-                y += labelLayout.LabelHeight + ctx.Theme.Geometry.Gap;
-                height = Math.Max(1, rect.yMax - y);
-            }
-            else
-                x += labelLayout.LabelWidth + Gap;
-        }
-
-        Rect minusRect = new(x, y, buttonWidth, height);
-        x += buttonWidth + Gap;
-        float remainingWidth = Math.Max(1f, rect.xMax - x - fieldWidth - Gap * 2f - buttonWidth);
-        Rect sliderRect = new(x, y, remainingWidth, height);
-        x += remainingWidth + Gap;
-        Rect fieldRect = new(x, y, fieldWidth, height);
-        x += fieldWidth + Gap;
-        Rect plusRect = new(x, y, buttonWidth, height);
+        UiStepperLayout layout = ControlLayout(ctx, rect.width, rect.height, labelLayout);
+        Rect minusRect = Place(layout.Minus, rect);
+        Rect sliderRect = Place(layout.Range, rect);
+        Rect fieldRect = Place(layout.Field, rect);
+        Rect plusRect = Place(layout.Plus, rect);
         bool writable = ctx.Bindings.IsWritable(bindKey);
         UiInteractionResult minus = UiNative.Activation(minusRect, ctx, bindKey, "decrement", writable: writable);
         UiInteractionResult plus = UiNative.Activation(plusRect, ctx, bindKey, "increment", writable: writable);
@@ -138,7 +119,7 @@ public sealed class StepperSliderWidget : IUiWidget, IUiLabelledWidget
         if (label.Length > 0)
         {
             float labelWidth = labelLayout.LabelWidth;
-            UiThemeDraw.Label(new Rect(rect.x, rect.y, labelWidth, labelLayout.Stacked ? labelLayout.LabelHeight : height), label, ctx.Theme, ctx.Theme.TextPrimary, AtomVocabulary.TextFont(ctx));
+            UiThemeDraw.Label(new Rect(rect.x, rect.y, labelWidth, labelLayout.Stacked ? labelLayout.LabelHeight : layout.Minus.Height), label, ctx.Theme, ctx.Theme.TextPrimary, AtomVocabulary.TextFont(ctx));
         }
 
         DrawButton(minusRect, "−", ctx.Theme);
@@ -147,6 +128,24 @@ public sealed class StepperSliderWidget : IUiWidget, IUiLabelledWidget
         AtomVocabulary.PaintEditFeedback(fieldRect, ctx, editor);
     }
 
+    UiLayoutDiagnostic? IUiLayoutDiagnosticSource.DiagnoseLayout(UiWidgetContext ctx, float allocatedHeight)
+    {
+        UiSliderLayout label = LabelLayout(ctx, ctx.ViewWidth);
+        UiStepperLayout layout = ControlLayout(ctx, ctx.ViewWidth, allocatedHeight, label);
+        if (layout.Shortage <= 0) return null;
+        string message = string.Format(CultureInfo.InvariantCulture,
+            "Internal parts require {0} but allocation is {1}; shortage {2}. Explicit part widths and the outer allocation remain unchanged; choose more space or explicit part widths.",
+            layout.RequiredWidth, layout.AvailableWidth, layout.Shortage);
+        return new UiLayoutDiagnostic(ctx.ElementPath, "InternalWidthInsufficient", message);
+    }
+
+    private UiStepperLayout ControlLayout(UiWidgetContext ctx, float width, float height, UiSliderLayout label)
+        => UiStepperLayout.Arrange(width, height, label,
+            Math.Max(1, ReadFloat("ButtonWidth", DefaultButtonWidth)),
+            Math.Max(1, ReadFloat("FieldWidth", DefaultFieldWidth)), Gap, ctx.Theme.Geometry.Gap);
+
+    private static Rect Place(UiLayoutRect local, Rect outer)
+        => new(outer.x + local.X, outer.y + local.Y, local.Width, local.Height);
     public float MeasureLabel(UiWidgetContext ctx)
     {
         string label = ReadLabel(ctx);

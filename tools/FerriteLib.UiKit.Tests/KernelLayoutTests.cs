@@ -20,6 +20,8 @@ internal static class KernelLayoutTests
     public static int RunAll()
     {
         failures = 0;
+        Run("Stepper internal bounds shortage is located without changing outer allocation", VerifyStepperInternalWidth);
+        Run("Stepper diagnostic measurement failure stays within the existing wrapper guard", VerifyStepperDiagnosticFailure);
         Run("Dropdown established trigger does not depend on pure paint", VerifyDropdownPaintBoundary);
         Run("Shared columns use actual participating labels and narrow stacking", VerifySharedLabels);
         Run("Shared anchors preserve complete prior arrangement on failure", VerifyAnchorsAndAtomicFailure);
@@ -71,6 +73,64 @@ internal static class KernelLayoutTests
         }
     }
 
+    private static void VerifyStepperDiagnosticFailure()
+    {
+        var bindings = new UiBindings();
+        bindings.BindValue("value", () => .5f, _ => throw new Exception("unexpected request"));
+        using var host = new UiHost(Scope, UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"layout-test\"><Stack Id=\"root\">"
+            + "<Widget Id=\"stepper\" Kind=\"input/stepper-slider\" Bind=\"value\" LabelKey=\"label\" Height=\"28\"/>"
+            + "<Widget Id=\"after\" Kind=\"text/wrapped\" Text=\"still measured\"/></Stack></UiPage>"),
+            bindings, UiTheme.Vanilla, new StubMetrics(), new DiagnosticFailureTranslation());
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(80, 100));
+        UiNode node = host.Session.GetNodeByElementId("stepper")!;
+        Check(snapshot.RectById.ContainsKey("after") && host.Session.IsTripped(node)
+            && host.Session.TryGetTripLog(node, out string log) && log.Contains("diagnostic measure cause"),
+            "diagnostic measurement preserves the actual cause, recovers only its wrapper and still measures the sibling");
+        KernelTripGuard.ExpectNoTrips(host.Session, "deliberate stepper diagnostic failure", deliberateTrips: true);
+    }
+
+    private sealed class DiagnosticFailureTranslation : IUiTranslation
+    {
+        public string Translate(string key) => throw new InvalidOperationException("diagnostic measure cause");
+        public int TranslationRevision => 0;
+    }
+    private static void VerifyStepperInternalWidth()
+    {
+        UiWidgetRegistry.InitializeCore();
+        float model = .5f;
+        int requests = 0;
+        var bindings = new UiBindings();
+        bindings.BindValue("value", () => model, value => { model = value; requests++; });
+        using var host = new UiHost(Scope, UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"layout-test\">"
+            + "<Widget Id=\"stepper\" Kind=\"input/stepper-slider\" Bind=\"value\"/></UiPage>"),
+            bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(80, 100));
+        Rect field = default;
+        Event prior = Event.current;
+        UiNative.DebugMousePositionEnabled = false;
+        UiNative.TextFieldOverride = (rect, text) => { field = rect; return text; };
+        try
+        {
+            Event.current = new Event { type = EventType.Repaint };
+            host.DrawFrame(new Rect(0, 0, 80, 100));
+            Check(snapshot.RectById["stepper"].width == 80 && field.x == 37 && field.width == 64,
+                "80px outer allocation retains actual field[37,101] rather than quietly shrinking authored widths");
+            Event.current = new Event { type = EventType.MouseDown, button = 0, mousePosition = new Vector2(115, 14) };
+            host.DrawFrame(new Rect(0, 0, 80, 100));
+            Event.current = new Event { type = EventType.MouseUp, button = 0, mousePosition = new Vector2(115, 14) };
+            host.DrawFrame(new Rect(0, 0, 80, 100));
+            Check(requests == 0, "plus[107,131] beyond the effective viewport cannot activate under an 80px host");
+            Event.current = new Event { type = EventType.MouseDown, button = 0, mousePosition = new Vector2(12, 14) };
+            host.DrawFrame(new Rect(0, 0, 80, 100));
+            Event.current = new Event { type = EventType.MouseUp, button = 0, mousePosition = new Vector2(12, 14) };
+            host.DrawFrame(new Rect(0, 0, 80, 100));
+            Check(requests == 1, "the in-bounds minus keeps its existing qualified request path");
+            Check(snapshot.Diagnostics.Any(d => d.Path == "stepper" && d.Code == "InternalWidthInsufficient"
+                && d.Message.Contains("131") && d.Message.Contains("80") && d.Message.Contains("51")),
+                "real measure snapshot locates required131 versus allocated80 and shortage51");
+        }
+        finally { UiNative.TextFieldOverride = null; Event.current = prior; }
+    }
     private static void VerifyDropdownPaintBoundary()
     {
         var widget = new FerriteLib.UiKit.Kernel.Widgets.DropdownWidget();

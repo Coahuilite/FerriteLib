@@ -25,6 +25,7 @@ internal static class Program
         {
             Properties();
             Observations();
+            StepperGeometry();
             SharedBehavior();
             IdentityAndEnd();
             BooleanSelectionExpansion();
@@ -207,6 +208,28 @@ internal static class Program
         }
     }
 
+    private static void StepperGeometry()
+    {
+        var density = new UiDensity(0, 0, 6, 28);
+        var metrics = new Recorder();
+        UiSliderLayout label = UiSliderLayout.Measure("", 80, UiFont.Small, density, metrics);
+        UiStepperLayout narrow = UiStepperLayout.Arrange(80, 28, label, 24, 64, 6, 6);
+        Check(narrow.RequiredWidth == 131 && narrow.Shortage == 51 && narrow.AvailableWidth == 80,
+            "STEPPER internal required width is distinct from the authoritative outer allocation");
+        Check(narrow.Minus.X == 0 && narrow.Range.X == 30 && narrow.Range.Width == 1
+            && narrow.Field.X == 37 && narrow.Field.Width == 64 && narrow.Plus.X == 107,
+            "STEPPER same neutral geometry defines actual private parts and diagnosed shortage");
+        UiStepperLayout exact = UiStepperLayout.Arrange(131, 28, label, 24, 64, 6, 6);
+        Check(exact.Shortage == 0 && exact.Plus.X + exact.Plus.Width == 131,
+            "STEPPER exact fit does not report a false shortage");
+        UiStepperLayout configured = UiStepperLayout.Arrange(80, 28, label, 10, 20, 6, 6);
+        Check(configured.Shortage == 0 && configured.Range.Width == 22,
+            "STEPPER explicit existing part width configuration can fit without a new MinWidth prerequisite");
+        UiSliderLayout stacked = UiSliderLayout.Measure("label", 80, UiFont.Small, density, metrics, 0, 186);
+        UiStepperLayout labelled = UiStepperLayout.Arrange(80, stacked.Height, stacked, 24, 64, 6, 6);
+        Check(stacked.Stacked && labelled.Minus.Y == stacked.LabelHeight + 6 && labelled.Shortage == 51,
+            "STEPPER stacking a label does not silently satisfy an independent internal width shortage");
+    }
     private static void Observations()
     {
         var budget = new UiObservationBudget(nodes: 2, depth: 1, text: 3, items: 2);

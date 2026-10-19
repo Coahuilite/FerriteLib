@@ -47,7 +47,11 @@ two-dimensional grid are required.
 L1 is a reversible Dev candidate pending final product decision: natural growth, fixed constraints, retained minima plus located diagnostics, and no automatic Scroll/Clip. Column allocation retains effective MinWidth/MaxWidth instead of reducing a valid minimum below its
 declaration to fit the parent. An infeasible budget appears in the successful snapshot's bounded
 `Diagnostics` (WidthInsufficient, HeightOverflow, ChildOverflow; at most128 facts plus Truncated).
-These are geometry facts, not requests to change business values or automatic scrolling/clipping.
+`input/stepper-slider` also reports `InternalWidthInsufficient` at its own path when its private part bounds exceed the allocated outer width. At default part widths, an unlabelled80px allocation retains minus24, range1, field64, plus24 and three6px gaps: the enclosing extent is131px and the reported shortage is51px. The field remains x37..101 and plus x107..131; the diagnostic does not enlarge the parent, shrink explicit parts, or add scrolling/clipping. Existing viewport qualification still rejects pointer presses outside the effective parent viewport.
+
+131px is the enclosing geometry under the existing1px range floor, not a validated usability minimum. That range still has positive travel (thumb0.5, travel0.5); no new response threshold is introduced. The label layout's minimumControlWidth (186px at default density) only decides label stacking and is not an enforced minimum width. Native usability remains unverified. Authors can allocate more space or explicitly choose part widths without a new MinWidth prerequisite.
+
+These are author/tool runtime diagnostics, not automatic player popups, repeated log output, requests to change business values, or automatic scrolling/clipping.
 Fixed dimensions constrain natural growth; existing container clipping/scrolling remains explicit.
 Scrollbar reservation uses full natural content height, including padding/title, not just child height.
 

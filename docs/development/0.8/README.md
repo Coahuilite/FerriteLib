@@ -299,7 +299,7 @@ Tree 专用行模板快捷 API；不为凑控件数注册 ToggleButton、Switch 
 | 行为／呈现 | 当前 IUiWidget.Draw 同时处理事件与绘制；目标需要真实行为接缝，不能复制 Draw 再套 headless。 |
 | 内部布局 | 当前 Slider 单行需求和 Draw 内部左标签安排不足以表达上方换行标签；包装内部须参与测量／排列。已有 Row、Wrap、Overlay 等基础继续复用。 |
 | 编辑 | 当前 TextField 是单行；通用 Accept 未区分多行／IME，原生调用后的可写检查不足以保证草稿只读。需要共同接入和真实平台验证。 |
-| 组合 | 当前 StepperSlider 是减号＋Slider＋NumberField＋加号，Step 用于按钮；沿草稿步进及接替是候选行为变更，不是对现状改名。 |
+| 组合 | 当前 StepperSlider 是减号＋Slider＋NumberField＋加号，Step 用于按钮；N1沿有效稿20立即请求21并结束稿已批准；其他接替边界仍候选，不是对现状改名。 |
 | 身份／结束 | 隐藏保稿、失效引用清理和正常完成／异常中止需要完整接入。局部故障与标准窗口外层销毁不能混作一种恢复路径。 |
 | 属性 | 当前命名 Scheme／Density 及整包基线恢复不等于逐属性继承和撤销；须说明行为迁移。 |
 | Live 缺省 | 当前为 true；B1 推荐 false，尚待裁定。若采用，依赖即时发布的消费者须显式配置 true。 |
@@ -333,13 +333,13 @@ Unity 官方 [GUI 实现](https://raw.githubusercontent.com/Unity-Technologies/U
 上述决定完成后，再冻结相应公开类型、声明和迁移清单。接口设计不得改变已确认的语义边界，
 也不把这里的推荐包装政策升级为 core 不变量。
 
-当前技术候选未实现A3结构焦点遍历、B2 Button Enter/Space及Checkbox Space、B3 Slider键盘增量/Home/End。推荐首版保原生编辑键位与现有Cancel/Accept hooks，把新增库级焦点/键盘系统一并延后；这是相对原推荐的明确未实现范围选择，待集中裁定，不计为已交。B5保留用途、标准/嵌入入口及R9具体公共候选现况见 [宿主/观察合同A8](host-observation-contract.md#a8-scope-closeout-implemented-versus-recommended-deferral)。
+K1已获用户批准整组延后；它指库级焦点导航和聚焦控件按键，不是全局业务热键。当前技术候选未实现A3结构焦点遍历、B2 Button Enter/Space及Checkbox Space、B3 Slider键盘增量/Home/End。推荐首版保原生编辑键位与现有Cancel/Accept hooks，把新增库级焦点/键盘系统一并延后；这是相对原推荐已批准的首版范围选择，不计为已实现。H1继续执行已获批准。B5保留用途、标准/嵌入入口及R9具体公共候选现况见 [宿主/观察合同A8](host-observation-contract.md#a8-scope-closeout-implemented-versus-recommended-deferral)。
 
 ## 第二部分：默认包装合同
 
 ### B1. 共同编辑推荐
 
-**本节为推荐，待裁定。** NumberField、单行和基础多行共用编辑能力及协调实现；
+**分项批准，未点名细则仍候选。** 已批准默认Live=false、无效/冲突保稿、取消只动草稿；E2确认/正常结束和有效自动blur等不扩大批准。当前唯一消费者US未来迁新FL须显式Live=true，现未消费本Dev，也未修改US。NumberField、单行和基础多行共用编辑能力及协调实现；
 包装选择政策，不各自维护 dirty／冲突状态机。实时发布到绑定目标，与业务应用／持久化分开。
 Live=false 不是整页事务，也不延后 Slider 直接选值或 Button 明确操作。
 
@@ -390,7 +390,7 @@ ToggleButton／Switch 若提供，复用布尔规则，外观不决定语义。
 **键盘默认仍待裁定：** 键盘用声明增量，无声明时建议范围跨度的 1%，
 Home／End 取端点，零跨度不产生无效步进。
 
-**推荐组合默认，待裁定：** 业务 10、有效已修改草稿 20、Live=false、Step=1：
+**N1精确例子已批准；N2/N3仍候选：** 业务 10、有效已修改草稿 20、Live=false、Step=1，按+立即请求业务值21并结束稿，不是仅改稿待确认。其余边界继续依原推荐说明：
 
 - 组合增减沿有效草稿直接请求 21／19，立即发布并结束旧稿；无草稿时取当前业务值，不先提交 20。
 - Slider 明确选择 30 时直接请求 30 并接替旧稿；无需解析旧稿，仅捕获不接替。

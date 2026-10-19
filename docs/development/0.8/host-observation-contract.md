@@ -151,14 +151,14 @@ image-to-runtime correlation. No game install, execution, screenshot automation 
 
 ## A8 scope closeout: implemented versus recommended deferral
 
+The user approved deferring K1 as a group and continuing H1. It concerns library
+focus navigation and focused-control keys, not a new global business-hotkey system.
 The current candidate preserves native editing keys/selection/copy/IME plus existing Host hooks.
 It does **not** implement the earlier recommended library-wide structural focus traversal or explicit
 focus-order declarations (A3), Button Enter/Space and Checkbox Space mappings (B2), or Slider declared
 keyboard increment / default1%-span / Home/End mappings (B3). These are concrete unimplemented recommended
-items, not implied by pointer F1/F2 or by the shared headless activation seam. Recommended reversible
-first-version disposition: retain the native editor and existing hooks, defer the additional library
-focus/key system together. This narrows the earlier recommended keyboard scope and needs concentrated
-product closeout; it is not silently counted as delivered or already approved.
+items, not implied by pointer F1/F2 or by the shared headless activation seam. Approved first-version disposition: retain the native editor and existing hooks, defer the additional library
+focus/key system together. This narrows the earlier recommended keyboard scope and is approved for this first version; the deferred capabilities are not counted as implemented.
 
 The existing Cancel hook is implemented, not a new global key router: native composition first keeps
 its key; otherwise open popup → owned pointer capture → active editor discard → nearest executable

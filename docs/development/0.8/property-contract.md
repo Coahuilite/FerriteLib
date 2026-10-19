@@ -9,7 +9,7 @@ Declare a font or semantic colour directly, or apply one named Scheme and Densit
 </Stack>
 ```
 
-P1 is a reversible Dev candidate under FL08-DEFERRED-DEFAULTS r3, pending final product decision: the proposed first-version environment covers typography, the five existing density metrics, and all26 existing
+P1 implementation remains a Dev candidate. The latest product direction requires a new theme decoupled from the legacy26 slots, with compatibility adapters preserving old entry points and data meaning; that redesign is not implemented or frozen by this candidate. The current implementation covers typography, the five existing density metrics, and all26 existing
 colour tokens (including nullable per-surface edges). It does not inherit business values, bindings,
 roles, drafts, interaction policy, capture, final geometry or container-specific layout declarations.
 `Color.Token` uses the existing document colour parser; invalid fonts/colours at the host/manifest
@@ -69,6 +69,6 @@ Checkbox whole-content labels and descriptive headings are not misrepresented as
 Evidence: actual host sparse-style/programmatic-ancestor/inline/equal-value/removal/source/paint-only
 and derived-ink regressions in KernelStyleScopeTests; five-wrapper actual labels/font/narrow geometry,
 failed-authoring recovery and real Event/paint-failing Dropdown in KernelLayoutTests. Existing full
-style/layout/input contracts remain tested. E1–E5/N1–N3, L1 and P1 are reversible Dev candidates; these
+style/layout/input contracts remain tested. Unapproved E/N details and P1 remain reversible Dev candidates (see editing-contract.md for B1/N1 approvals); these
 engineering source-resolution rules do not reopen approved F1/F2/F3. Native1.6 appearance acceptance
 is still pending.

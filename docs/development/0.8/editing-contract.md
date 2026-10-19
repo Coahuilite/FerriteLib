@@ -10,9 +10,16 @@ a new kind or an author-wired private text engine:
 <Widget Id="level" Kind="input/stepper-slider" Bind="Level" Min="0" Max="100" Step="1" />
 ```
 
-The current Dev implements E1–E5 and N1–N3 as **recommended reversible candidates**, not approved
-stable defaults. Approved F1/F2/F3 remain unchanged. The full remaining inventory is maintained only
+User-approved subitems: default `Live=false`, retention of invalid/conflicting drafts, and Cancel
+changing only the draft (no business rollback). The N1 example model10/draft20/Step1/Live=false is also
+approved: plus immediately requests21 and ends the draft, not merely changing the draft to21.
+E2 confirmation/normal draft ending, valid automatic blur and other unapproved E/N details remain
+reversible candidates; N2/N3 are not promoted by the N1 answer. Approved F1/F2/F3 remain unchanged. The full remaining inventory is maintained only
 in [migration status](migration-status.md).
+
+The current sole consumer US requires `Live=true` when it later migrates to this FL line, so that
+consumer must declare it explicitly. US has not adopted this Dev and is not changed here. Explicit
+`Live=true` remains legal for every author; the approved default does not forbid it.
 
 ## Draft and model are different facts
 
@@ -28,23 +35,23 @@ and actual-model getter to `UiNative.Edit`; `UiNative.Editor<T>` accesses their 
 Use the widget's normal context/node scope, just as for the other session-owned native primitives.
 The no-platform contract target compiles these actual production sources without Unity/Verse stubs.
 
-## Candidate behavior and existing entry conditions
+## Approved subitems, candidate details and existing entry conditions
 
-* Implicit `Live` changes from `true` to `false` for all three wrappers. A focused edit keeps its draft;
+* **Approved default:** implicit `Live` changes from `true` to `false` for all three wrappers. A focused edit keeps its draft;
   use explicit `Live="true"` to retain per-qualified-candidate publication. Intermediate IME text does
   not publish. A native change arriving without a held edit preserves the old immediate-return condition.
   Returning to the initial text after a Live publication is another candidate: `10 → 20 → 10` requests
   both `20` and `10`, rather than mistaking the last input for an untouched edit.
 * Single-line Return confirms; multiline Return remains native newline and Ctrl+Return confirms.
   Unchanged text, or an already-published Live candidate without a new observed basis, does not resend.
-* Confirmation sends one valid pending candidate and, after normal return, shows the actual model.
+* **E2 candidate:** confirmation sends one valid pending candidate and, after normal return, shows the actual model.
   Rejection by business code is not repaired by repeated Set calls.
-* Ordinary blur confirms a valid nonconflicting draft. Invalid or conflicting text remains visible
+* **Valid automatic blur remains candidate:** ordinary blur confirms a valid nonconflicting draft. Invalid or conflicting text remains visible
   without trapping focus. An invalid draft gets the danger underline; an observed model conflict gets
   the selected-tone underline. These treatments read shared facts rather than reparsing in paint.
 * Unmodified text follows observed model changes. Modified text remains local, acquires `Conflict`,
   and pauses Live/blur publication. Explicit confirmation can replace that known changed basis.
-* Cancel shows the latest actual model without rolling back earlier Live requests. Hidden drafts
+* **Approved Cancel boundary:** Cancel shows the latest actual model without rolling back earlier Live requests. Hidden drafts
   survive; hide/disable releases the active-edit record. Retarget/remove/dispose do not invent a commit.
 
 The old raw `TextField(rect,text)` and session/key `TextField`/`NumberField` signatures remain usable
@@ -56,7 +63,7 @@ focus. No old entry silently acquires a binding registration prerequisite.
 ## One explicit numeric operation
 
 With model `10`, local valid draft `20` and Step `1`, the combination's plus operation requests `21`
-once; it never first requests `20`. An invalid draft cannot be the step base. A real range selection
+once and ends the draft; it never first requests `20`. This N1 example is user-approved, not draft-only increment. N2/N3 remain candidates: an invalid draft cannot be the step base. A real range selection
 requests its selected value once and replaces only this combination's draft; capture without a new
 selection does not replace it. Another instance sharing the same Bind keeps its own draft and observes
 the resulting model change. A following no-draft step starts from the actual model, not a rejected request.
