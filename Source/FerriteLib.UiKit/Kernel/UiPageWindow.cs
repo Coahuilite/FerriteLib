@@ -56,7 +56,7 @@ public sealed class UiPageWindow : UiWindowHost
         this.noticeText = noticeText ?? throw new ArgumentNullException(nameof(noticeText));
         this.metrics = metrics ?? VerseFerriteTextMetrics.Instance;
         this.document = document;
-        Background = manifest.Background;
+        if (manifest.Background != null) UiTextureBinding.Validate(bindings, manifest.Background.Bind, "window/background");
 
         // Set here as well as by the catalog so a shell built outside one still names itself in the fit
         // audit; the catalog overwrites it only with the same value (a mismatched factory is refused).
@@ -85,27 +85,24 @@ public sealed class UiPageWindow : UiWindowHost
     public UiHost? PageHost => Host;
 
     private UiWindowBackground? background;
+    private bool hasBackgroundOverride;
     /// <summary>Per-window configuration. Setting null restores the original shell; resources remain supplier-owned.</summary>
     public UiWindowBackground? Background
     {
-        get => background;
+        get => hasBackgroundOverride ? background : (Host?.Manifest ?? manifest).Background;
         set
         {
             if (value != null) UiTextureBinding.Validate(bindings, value.Bind, "window/background");
             background = value;
+            hasBackgroundOverride = true;
         }
     }
 
     protected override void DrawBackground(Rect rect)
     {
-        UiWindowBackground? current = background;
+        UiWindowBackground? current = Background;
         if (current == null) return;
-        Texture? texture;
-        try
-        {
-            if (!UiTextureBinding.TryRead(bindings, current.Bind, out texture)) return;
-        }
-        catch (InvalidOperationException) { return; }
+        if (!UiTextureBinding.TryRead(bindings, current.Bind, out Texture? texture)) return;
         UiThemeDraw.Image(rect, texture, Color.white, current.Options);
     }
 

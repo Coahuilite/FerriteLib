@@ -20,6 +20,8 @@ internal static class KernelImagePlacementTests
             RenderTargetAndReplacement();
             Background();
             BackgroundContentAndPopup();
+            BackgroundUpdates();
+            BackgroundGetterFailure();
             return 0;
         }
         catch (Exception error)
@@ -199,6 +201,132 @@ internal static class KernelImagePlacementTests
         window.PreClose();
         Check(window.Session == null, "closing background window releases normal host/session without a texture owner");
     }
+    private static void BackgroundUpdates()
+    {
+        var first = new Texture2D(200,100);
+        var second = new Texture2D(100,200);
+        var bindings = new UiBindings();
+        bindings.BindReadOnly("first", () => first);
+        bindings.BindReadOnly("second", () => second);
+        UiLayoutManifest Definition(string key, string fit = "Contain") => UiLayoutManifest.Parse(
+            "<UiPage Schema=\"2\" Source=\"background-update\" BackgroundBind=\"" + key + "\" BackgroundFit=\"" + fit + "\"/>");
+        var window = new UiPageWindow(new UiWindowKey("image-test", "update", "one"), Definition("first"), bindings,
+            new UiTheme(), new Translation(), "title", "close", _ => "notice", new Metrics());
+        window.windowRect = new Rect(0,0,300,300);
+        Event.current = new Event { type = EventType.Repaint };
+        window.WindowOnGUI();
+        window.PageHost!.UpdateDefinition(Definition("second", "Cover"));
+        Clear();
+        window.WindowOnGUI();
+        Check(ReferenceEquals(Recorded("DrawTextureTextures")[0], second)
+            && ((Rect)Recorded("DrawTextureRects")[0]!).height == 600,
+            "standard window follows committed definition background binding and fit");
+        bindings.BindReadOnly("not-texture", () => "wrong type");
+        UiLayoutManifest accepted = window.PageHost.Manifest;
+        bool refused = false;
+        try { window.PageHost.UpdateDefinition(Definition("not-texture")); }
+        catch (InvalidOperationException) { refused = true; }
+        Check(refused && ReferenceEquals(window.PageHost.Manifest, accepted), "invalid background binding is refused at UpdateDefinition prepare without replacing committed definition");
+        BackgroundDocumentReload(window, bindings);
+        window.PageHost.UpdateDefinition(UiLayoutManifest.Create("removed", Array.Empty<UiElementSpec>()));
+        Clear();
+        window.WindowOnGUI();
+        Check(Recorded("DrawTextureTextures").Count == 0, "committed background removal restores standard shell");
+        window.Background = new UiWindowBackground("first");
+        window.PageHost.UpdateDefinition(Definition("second"));
+        Clear();
+        window.WindowOnGUI();
+        Check(ReferenceEquals(Recorded("DrawTextureTextures")[0], first), "explicit instance override outranks committed definition");
+        window.Background = null;
+        window.PageHost.UpdateDefinition(Definition("second"));
+        Clear();
+        window.WindowOnGUI();
+        Check(Recorded("DrawTextureTextures").Count == 0, "explicit instance null remains closed after definition replacement");
+        window.PreClose();
+    }
+    private static void BackgroundDocumentReload(UiPageWindow window, UiBindings bindings)
+    {
+        string directory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "fl-background-" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(directory);
+        try
+        {
+            string path = System.IO.Path.Combine(directory, "page.xml");
+            string Definition(string binding) => "<UiPage Schema=\"2\" Source=\"background-update\" BackgroundBind=\"" + binding + "\"/>";
+            System.IO.File.WriteAllText(path, Definition("second"));
+            using var service = new UiDocumentService(autoWatch: false);
+            Check(service.Add(new UiDocumentSource("background", UiDocumentKind.Layout, path), Definition("second")), "background document registers through ordinary service");
+            Check(service.Attach(window.PageHost!, "background"), "standard window actual Host attaches to ordinary document reload");
+            using var peer = Host(UiLayoutManifest.Parse(Definition("second")), bindings);
+            service.Attach(peer, "background");
+            UiLayoutManifest committed = window.PageHost!.Manifest;
+            System.IO.File.WriteAllText(path, Definition("first"));
+            service.DocumentCommitFaultOverride = host =>
+            {
+                if (!ReferenceEquals(host, peer)) return "";
+                Check(ReferenceEquals(window.PageHost.Manifest, committed) && window.Background!.Bind == "second",
+                    "later batch failure cannot expose staged background before seal");
+                return "planted later background host commit failure";
+            };
+            UiReloadReport? rollback = service.Reload("background");
+            service.DocumentCommitFaultOverride = null;
+            Check(rollback != null && rollback.Rejected && ReferenceEquals(window.PageHost.Manifest, committed), "actual document batch rollback keeps prior background manifest");
+            Clear();
+            window.WindowOnGUI();
+            Check(Recorded("DrawTextureTextures").Count == 1 && window.Background!.Bind == "second", "rolled-back candidate never reaches standard-window background paint");
+            UiReloadReport? changed = service.Reload("background");
+            Check(changed != null && changed.Accepted && window.Background!.Bind == "first", "accepted document reload updates standard window background without synchronization state");
+            Clear();
+            window.WindowOnGUI();
+            Check(Recorded("DrawTextureTextures").Count == 1, "accepted reloaded background actually paints");
+            System.IO.File.WriteAllText(path, Definition("not-texture"));
+            UiReloadReport? bad = service.Reload("background");
+            Check(bad != null && bad.Rejected && bad.Reason.Contains("Texture") && window.Background!.Bind == "first",
+                "document prepare reports invalid background type and keeps accepted background");
+        }
+        finally { System.IO.Directory.Delete(directory, recursive: true); }
+    }
+    private static void BackgroundGetterFailure()
+    {
+        int reads = 0;
+        int notices = 0;
+        Color previousColour = GUI.color;
+        Verse.GameFont previousFont = Verse.Text.Font;
+        var failure = new InvalidOperationException("supplier background getter exploded");
+        var bindings = new UiBindings();
+        bindings.BindReadOnly<Texture>("throwing", () =>
+        {
+            reads++;
+            GUI.color = new Color(.2f,.3f,.4f);
+            Verse.Text.Font = previousFont == Verse.GameFont.Tiny ? Verse.GameFont.Medium : Verse.GameFont.Tiny;
+            throw failure;
+        });
+        var page = UiLayoutManifest.CreateWithBackground("background-failure", Array.Empty<UiElementSpec>(), new UiWindowBackground("throwing"));
+        var window = new UiPageWindow(new UiWindowKey("image-test", "failure", "one"), page, bindings,
+            new UiTheme(), new Translation(), "title", "close", _ => { notices++; return "notice"; }, new Metrics());
+        window.windowRect = new Rect(0,0,300,300);
+        try
+        {
+            Event.current = new Event { type = EventType.Repaint };
+            Recorded("PaintTrace").Clear();
+            window.WindowOnGUI();
+            object? recorded = typeof(UiWindowHost).GetProperty("LastFailure", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window);
+            Check(ReferenceEquals(recorded, failure), "supplier exception is retained as actual shell failure, not silent missing image");
+            Check(notices == 0 && window.Session == null, "background failure defers notice and leaves no active page in the failed pass");
+            Check(GUI.color.r == previousColour.r && GUI.color.g == previousColour.g && GUI.color.b == previousColour.b
+                && Verse.Text.Font == previousFont, "supplier failure restores font and colour before continuing chrome");
+            Check(Recorded("PaintTrace").IndexOf("label:close") >= 0, "background failure preserves close chrome");
+            window.WindowOnGUI();
+            Check(reads == 1 && notices == 1, "next pass displays terminal notice without retrying supplier getter");
+            window.PreClose();
+            Check(window.Session == null && reads == 1, "failed background window closes without resource retry or lingering host");
+        }
+        finally
+        {
+            GUI.color = previousColour;
+            Verse.Text.Font = previousFont;
+            window.PreClose();
+        }
+    }
     private sealed class Metrics : ITextMetrics
     {
         public float MeasureText(string text, UiFont font, float width) => 16;
@@ -210,4 +338,3 @@ internal static class KernelImagePlacementTests
         public string Translate(string key) => key;
     }
 }
-

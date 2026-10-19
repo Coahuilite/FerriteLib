@@ -23,6 +23,19 @@ public static class UiSessionGuard
     // Test seam: lets FerriteLib.UiKit.Tests capture warning text without a real game log.
     internal static Action<string>? LogWarningOverride;
 
+    /// <summary>Restores native paint state while leaving a shell-background failure to the existing window recovery boundary.</summary>
+    internal static void DrawWindowBackground(Rect rect, Action<Rect> draw)
+    {
+        GameFont previousFont = Text.Font;
+        Color previousColor = GUI.color;
+        try { draw(rect); }
+        finally
+        {
+            Text.Font = previousFont;
+            GUI.color = previousColor;
+        }
+    }
+
     /// <summary>
     /// Draws one widget, recovering into the standard band if it throws. The engine passes the element's
     /// node, so the recovery slot is the element - not a display path, which two elements can share.

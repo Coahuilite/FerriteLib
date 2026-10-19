@@ -155,7 +155,8 @@ public sealed partial class UiHost : IDisposable
 
     public string Source => source;
 
-    public UiLayoutManifest Manifest => manifest;
+    /// <summary>The committed definition; a staged layout remains private until the existing seal boundary.</summary>
+    public UiLayoutManifest Manifest => pendingPrune ?? manifest;
     public int DefinitionRevision => session.DefinitionRevision;
 
     /// <summary>
@@ -596,6 +597,7 @@ public sealed partial class UiHost : IDisposable
             throw;
         }
     }
+
     /// <summary>
     /// Validates a candidate layout in full - the same creation-time contract the constructor runs,
     /// including every widget's own Configure/Validate against this host's bindings - without changing
@@ -978,6 +980,8 @@ public sealed partial class UiHost : IDisposable
 
     private void ValidateManifest(UiLayoutManifest candidate)
     {
+        if (candidate.Background != null)
+            UiTextureBinding.Validate(bindings, candidate.Background.Bind, "window/background");
         foreach (UiElementSpec root in candidate.Roots)
         {
             ValidateElement(root, root.Id.Length > 0 ? root.Id : root.Kind, parentNarrowCapable: false, parent: null);

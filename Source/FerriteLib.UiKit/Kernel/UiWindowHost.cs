@@ -432,7 +432,7 @@ public abstract class UiWindowHost : Window
     private void DrawShell(Rect inRect)
     {
         ResolvePointerDown();
-        DrawChrome(inRect);
+        if (!DrawChrome(inRect)) return;
 #if FER_DEV
         // DT1 (r2 reading): the shell's chrome joins the instrument's TWO channels from this one place.
         // Keep the geometry the chrome just drew. BeforeDraw may publish the PREVIOUS completed pass;
@@ -503,11 +503,16 @@ public abstract class UiWindowHost : Window
         }
         catch (Exception ex)
         {
-            noticeDueNextFrame = true;
-            lastFailure = ex;
-            ReleaseHost();
-            OnDrawFailure(ex);
+            RecordDrawFailure(ex);
         }
+    }
+
+    private void RecordDrawFailure(Exception error)
+    {
+        noticeDueNextFrame = true;
+        lastFailure = error;
+        ReleaseHost();
+        OnDrawFailure(error);
     }
 
     /// <summary>
@@ -639,12 +644,12 @@ public abstract class UiWindowHost : Window
     /// <c>/notice</c> suffixes keep the two bands apart.
     /// </para>
     /// </summary>
-    private void DrawChrome(Rect rect)
+    private bool DrawChrome(Rect rect)
     {
         UiFitAudit.BeginElement(ChromeScope);
         try
         {
-            DrawChromeCore(rect);
+            return DrawChromeCore(rect);
         }
         finally
         {
@@ -739,11 +744,20 @@ public abstract class UiWindowHost : Window
     /// <summary>Optional bottom image, above the shell base and below all chrome/content. It must not take input.</summary>
     protected virtual void DrawBackground(Rect rect) { }
 
-    private void DrawChromeCore(Rect rect)
+    private bool DrawChromeCore(Rect rect)
     {
         UiTheme theme = Theme;
         UiThemeDraw.Workspace(rect, theme);
-        DrawBackground(rect);
+        bool backgroundSucceeded = true;
+        if (!pageUnavailable && !noticeDueNextFrame)
+        {
+            try { UiSessionGuard.DrawWindowBackground(rect, DrawBackground); }
+            catch (Exception error)
+            {
+                RecordDrawFailure(error);
+                backgroundSucceeded = false;
+            }
+        }
         UiThemeDraw.Solid(new Rect(rect.x, rect.y, rect.width, AccentBarHeight), theme[UiPaletteRole.Accent]);
 
         if (Title.Length > 0)
@@ -769,6 +783,7 @@ public abstract class UiWindowHost : Window
         }
 
         DrawCloseButton(rect);
+        return backgroundSucceeded;
     }
 
     private void DrawCloseButton(Rect rect)

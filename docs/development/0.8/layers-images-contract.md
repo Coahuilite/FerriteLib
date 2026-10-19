@@ -116,7 +116,7 @@ window.Background = null; // restore the original shell, not the manifest's back
 </UiPage>
 ```
 
-Bind `backdrop` through the same typed value binding as the image above. The instance Background setter overrides the definition's initial configuration. Subsequent instance changes do not
+Bind `backdrop` through the same typed value binding as the image above. Without an instance override, Background reads the Host's current committed definition: successful UpdateDefinition and document reload replace or remove it. Prepare validates its binding type; a refused or rolled-back candidate never becomes the effective background. The instance Background setter overrides the definition, including explicit null to close it; subsequent definition updates do not undo that override. Instance changes do not
 mutate that immutable definition or another window. The supplier can replace or clear the bound value;
 no texture is destroyed on swap, unbind, host recovery, or window Close. An unavailable source leaves the
 original base and chrome visible. Application animation/resource scheduling remains application-owned.
@@ -145,3 +145,5 @@ RenderTexture identity, swap/null/invalid size, standard-window instance isolati
 order, real content input, popup paint order and normal Close. These records validate calls and geometry,
 not a screenshot. Native 1.6 pixels, texture material behavior and IMGUI clipping remain pending an
 authorized render/game acceptance surface; this task does not launch the game to obtain one.
+
+A supplier getter exception is not a missing image. It enters the existing shell failure boundary with its original exception retained, releases the page host, restores GUI font/colour and preserves chrome/close. The failed pass does not draw a notice or continue page content; the next pass shows the existing terminal page-unavailable notice without retrying the getter. TryRead=false or a null source remains the normal no-image case. Cover's local group is balanced even when native drawing throws.
