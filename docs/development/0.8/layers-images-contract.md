@@ -4,8 +4,7 @@
 
 Put a large ordinary button and a smaller button later in an Overlay. The later button is visually above
 and receives a qualified primary gesture where its actual input region overlaps. No declaration-order
-workaround, custom subclass or input registration is needed. Disabled/unavailable regions and pure
-image/text decoration do not acquire opaque hit boxes. Existing capture is never handed to an underlying
+workaround, custom subclass or input registration is needed. Pure image/text decoration does not acquire an opaque hit box. Disabled-operation obstruction is the L2 product decision: current pass-through behavior is only a reversible candidate until that decision, not an approved default. Existing capture is never handed to an underlying
 target; release outside its own region, lost eligibility, removal or Close follows the common end rules.
 
 The engine projects current declared input geometry through the same arranged scope/scroll transform and
@@ -33,7 +32,7 @@ public IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayout
 }
 ```
 
-Draw uses ButtonBounds with its allocated origin and invokes the existing UiNative activation/shared
+A ctx.Child keeps its independent interaction/capture identity; layer queries resolve its owning widget through the real Parent chain rather than treating the child as a new paint layer. Draw uses ButtonBounds with its allocated origin and invokes the existing UiNative activation/shared
 request path. It does not implement topmost selection or capture. An empty sequence means decoration;
 UiRowBand.PointerRegions exposes the same part geometry used by the retained row visual for custom row
 wrappers. All default interactive wrappers provide their real field/track/option/row/point geometry.

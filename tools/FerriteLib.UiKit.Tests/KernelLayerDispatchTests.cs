@@ -41,6 +41,7 @@ internal static class KernelLayerDispatchTests
             ClipAndScroll();
             EditorCoverage();
             CompositeEligibility();
+            ChildGeometryOwner();
             return 0;
         }
         catch (Exception error)
@@ -234,6 +235,44 @@ internal static class KernelLayerDispatchTests
             Frame(host, EventType.MouseDown);
             Frame(host, EventType.MouseUp);
             Check(large == 1 && expanded == 1, "eligible Tree part uses its actual shared marker geometry");
+        }
+    }    private static void ChildGeometryOwner()
+    {
+        UiWidgetRegistry.Register("layer-child", "test/child", () => new ChildControl(), new[] { "Id", "Kind", "Width", "Height" });
+        int lower = 0;
+        int upper = 0;
+        var bindings = new UiBindings();
+        bindings.BindCommand("child", () => lower++);
+        bindings.BindCommand("lock", () => upper++);
+        using var host = new UiHost("layer-child", UiLayoutManifest.Parse(
+            "<UiPage Schema=\"2\" Source=\"layer-child\"><Overlay Padding=\"0\" Height=\"100\">"
+            + "<Widget Id=\"lower\" Kind=\"test/child\" Width=\"160\" Height=\"80\" AlignX=\"Left\" AlignY=\"Top\"/>" + Lock + "</Overlay></UiPage>"),
+            bindings, new UiTheme(), new Metrics(), new Translation());
+        Frame(host, EventType.MouseDown);
+        string captured = host.Session.Interactions.CaptureOwner?.Node ?? "none";
+        Frame(host, EventType.MouseUp);
+        Console.WriteLine("  observed: Child lower=" + lower + " upper=" + upper + " owner=" + captured);
+        Check(lower == 0 && upper == 1, "ctx.Child retains its identity while yielding through its described widget's layer order");
+        Frame(host, EventType.MouseDown,20,60);
+        string? childOwner = host.Session.Interactions.CaptureOwner?.Node;
+        Check(childOwner != null && childOwner != host.Session.GetNodeByElementId("lower")!.Id.Key,
+            "uncovered child keeps an independent capture identity, not its parent's identity");
+        Frame(host, EventType.MouseUp,20,60);
+        Check(lower == 1 && upper == 1, "child-owned operation still requests once outside the upper region");
+    }
+    private sealed class ChildControl : IUiWidget, IUiPointerLayout
+    {
+        public string Kind => "test/child";
+        public void Configure(UiElementSpec spec) { }
+        public void Validate(IUiBindings bindings, string path) => bindings.ValidateCommand("child", path);
+        public float Measure(UiWidgetContext ctx) => 80;
+        public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
+        { yield return new UiPointerRegion(bounds); }
+        public void Draw(Rect rect, UiWidgetContext ctx)
+        {
+            UiWidgetContext child = ctx.Child("private-button");
+            UiInteractionResult result = UiNative.Activation(rect, child, "child");
+            UiInteractionRequests.Activation(UiNative.InteractionTarget(child,"child"), result, () => child.Bindings.Invoke("child"));
         }
     }    private sealed class Precise : IUiWidget, IUiPointerLayout
     {

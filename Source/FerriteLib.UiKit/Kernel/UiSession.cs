@@ -295,8 +295,16 @@ public sealed class UiSession : IDisposable
     /// </para>
     /// </summary>
     public bool IsPointerOverHigherLayer(UiNode element, Vector2 windowPoint)
-        => IsPointerOverPopup(windowPoint) || UiPointerLayers.IsCovered(contentInputLayers, element.Id.Key, windowPoint.x, windowPoint.y);
+        => IsPointerOverPopup(windowPoint) || UiPointerLayers.IsCovered(contentInputLayers, ContentLayerOwner(element), windowPoint.x, windowPoint.y);
 
+    private string ContentLayerOwner(UiNode element)
+    {
+        // A ctx.Child has its own interaction identity, but draws inside its owning widget's layer.
+        for (UiNode? candidate = element; candidate != null; candidate = candidate.Parent)
+            for (int i = contentInputLayers.Count - 1; i >= 0; i--)
+                if (contentInputLayers[i].Owner == candidate.Id.Key) return candidate.Id.Key;
+        return element.Id.Key;
+    }
     internal bool IsPointerOverPopup(Vector2 windowPoint)
     {
         for (int i = dispatchLayers.Count - 1; i >= 0; i--)
