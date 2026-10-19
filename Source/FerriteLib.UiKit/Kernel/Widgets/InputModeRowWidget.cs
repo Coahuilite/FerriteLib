@@ -28,7 +28,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// stands while the pointer is over it.
 /// </para>
 /// </summary>
-public sealed class InputModeRowWidget : IUiWidget
+public sealed class InputModeRowWidget : IUiWidget, IUiPointerLayout
 {
     public const string Kind = "input/mode-row";
 
@@ -155,6 +155,29 @@ public sealed class InputModeRowWidget : IUiWidget
         return Math.Max(1f, rows * rowHeight + Math.Max(0, rows - 1) * geometry.Gap + geometry.Spacing * 2f);
     }
 
+    public IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
+    {
+        List<Option> options = OptionsFor(ctx);
+        bool writable = AtomVocabulary.WritableOf(ctx, ReadBindKey()) != false;
+        for (int i = 0; i < options.Count; i++)
+        {
+            Rect cell = OptionRect(new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height), ctx, i);
+            yield return new UiPointerRegion(new UiLayoutRect(cell.x, cell.y, cell.width, cell.height), writable);
+        }
+    }
+
+    private Rect OptionRect(Rect rect, UiWidgetContext ctx, int index)
+    {
+        UiGeometry geometry = ctx.Theme.Geometry;
+        int columns = ColumnsFor(rect.width);
+        float rowHeight = ReadFloat("Height", geometry.RowHeight);
+        float innerWidth = Math.Max(1, rect.width - geometry.Spacing * 2);
+        float columnWidth = (innerWidth - (columns - 1) * geometry.Gap) / columns;
+        int row = index / columns;
+        int column = index % columns;
+        return new Rect(rect.x + geometry.Spacing + column * (columnWidth + geometry.Gap),
+            rect.y + geometry.Spacing + row * (rowHeight + geometry.Gap), columnWidth, rowHeight);
+    }
     public void Draw(Rect rect, UiWidgetContext ctx)
     {
         if (rect.width <= 1f || rect.height <= 1f) return;
@@ -181,25 +204,14 @@ public sealed class InputModeRowWidget : IUiWidget
             ctx.Bindings.TryGet(bindKey, out current);
         }
 
-        UiGeometry geometry = ctx.Theme.Geometry;
         var values = new List<object?>(options.Count);
         foreach (Option option in options) values.Add(option.Typed ? option.TypedValue : option.Value);
         (ctx.Node ?? ctx.Session.ActiveNode).Selection = UiValueBehavior.Observe(values, typed ? currentTyped : current,
             _ => AtomVocabulary.WritableOf(ctx, bindKey) != false);
-        int columns = ColumnsFor(rect.width);
-        int rows = (options.Count + columns - 1) / columns;
-        float rowHeight = ReadFloat("Height", geometry.RowHeight);
-        float innerWidth = Math.Max(1f, rect.width - geometry.Spacing * 2f);
-        float columnWidth = (innerWidth - (columns - 1) * geometry.Gap) / columns;
-
         string hoveredHelp = "";
         for (int i = 0; i < options.Count; i++)
         {
-            int row = i / columns;
-            int col = i % columns;
-            float x = rect.x + geometry.Spacing + col * (columnWidth + geometry.Gap);
-            float y = rect.y + geometry.Spacing + row * (rowHeight + geometry.Gap);
-            var optionRect = new Rect(x, y, columnWidth, rowHeight);
+            Rect optionRect = OptionRect(rect, ctx, i);
             bool selected = options[i].Typed
                 ? Equals(options[i].TypedValue, currentTyped)
                 : string.Equals(options[i].Value, current, StringComparison.Ordinal);

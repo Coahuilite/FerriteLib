@@ -611,6 +611,9 @@ public sealed partial class UiLayoutEngine
 
         try
         {
+            var contentLayers = new List<UiPointerLayer>();
+            CollectPointerLayers(lastEntries, 0, lastEntries.Count, ctx, new Vector2(viewport.x, viewport.y), null, Vector2.zero, ctx.Session.CurrentClip, contentLayers);
+            ctx.Session.SetContentInputLayers(contentLayers);
             DrawEntries(lastEntries, 0, lastEntries.Count, ctx, new Vector2(viewport.x, viewport.y), null, Vector2.zero);
             if (ctx.Session.IsActive) ctx.Session.EndHitPass();
         }
@@ -621,6 +624,86 @@ public sealed partial class UiLayoutEngine
         }
     }
 
+    private void CollectPointerLayers(List<PlacedEntry> entries, int start, int end, UiWidgetContext ctx,
+        Vector2 viewportPosition, Vector2? nativeOrigin, Vector2 windowOrigin, Rect? clip, List<UiPointerLayer> layers)
+    {
+        for (int index = start; index < end; index++)
+        {
+            PlacedEntry entry = entries[index];
+            Rect rect = ToDrawRect(entry.Rect, viewportPosition, nativeOrigin);
+            UiWidgetContext local = ContextForEntry(entry, ctx, windowOrigin);
+            entry.Node.IsDisabled = ResolveDisabled(entry.Spec, local);
+            if (entry.Widget != null)
+            {
+                // Even an undescribed node has a paint-order marker; it does not acquire an opaque hit box.
+                layers.Add(new UiPointerLayer(entry.Node.Id.Key, default, eligible: false));
+                if (entry.Widget is IUiPointerLayout layout && !ctx.Session.IsTripped(entry.Node))
+                {
+                    var regions = new List<UiPointerRegion>();
+                    UiNode previous = ctx.Session.EnterNode(entry.Node);
+                    try
+                    {
+                        UiSessionGuard.MeasureOrFallback(ctx.Session, entry.Node.Path, entry.Widget.Kind,
+                            entry.Node.Path, 0, () =>
+                            {
+                                regions.AddRange(layout.PointerRegions(local, new UiLayoutRect(0, 0, rect.width, rect.height)));
+                                return 0;
+                            });
+                    }
+                    finally
+                    {
+                        ctx.Session.ExitNode(previous);
+                    }
+                    if (ctx.Session.IsTripped(entry.Node)) regions.Clear();
+                    foreach (UiPointerRegion region in regions)
+                    {
+                        UiLayoutRect bounds = region.Bounds;
+                        var windowBounds = new UiLayoutRect(rect.x + windowOrigin.x + bounds.X,
+                            rect.y + windowOrigin.y + bounds.Y, bounds.Width, bounds.Height);
+                        UiLayoutRect? effectiveClip = clip.HasValue
+                            ? new UiLayoutRect(clip.Value.x, clip.Value.y, clip.Value.width, clip.Value.height) : null;
+                        layers.Add(new UiPointerLayer(entry.Node.Id.Key, windowBounds, effectiveClip,
+                            region.Eligible && !UiNative.IsInputDisabled(entry.Node)));
+                    }
+                }
+            }
+            if (!IsScopedContainer(entry.ContainerKind)) continue;
+            Vector2 scopeOrigin = ScopeWindowOrigin(rect, nativeOrigin, windowOrigin);
+            Rect scopeRect = new(scopeOrigin.x, scopeOrigin.y, rect.width, rect.height);
+            Rect childClip = IntersectClip(clip, scopeRect);
+            Vector2 childOrigin = scopeOrigin;
+            if (entry.ContainerKind == "Scroll")
+            {
+                Rect content = entry.ContentRect ?? new Rect(0, 0, rect.width, rect.height);
+                Vector2 scroll = ClampScroll(ctx.Session.GetScrollPosition(entry.Node), content, rect);
+                childOrigin -= scroll;
+            }
+            CollectPointerLayers(entries, index + 1, index + entry.SubtreeCount, local,
+                viewportPosition, entry.Rect.position, childOrigin, childClip, layers);
+            index += entry.SubtreeCount - 1;
+        }
+    }
+
+    private UiWidgetContext ContextForEntry(PlacedEntry entry, UiWidgetContext ctx, Vector2 windowOrigin)
+    {
+        UiWidgetContext local = ctx.WithStyleChain(entry.StyleChain);
+        local = local.WithTheme(ScopeTheme(local, entry.Node));
+        if (entry.MeasureWidth > 0) local = local.WithViewWidth(entry.MeasureWidth);
+        return local.WithWindowOrigin(windowOrigin).WithNode(entry.Node);
+    }
+
+    private static Vector2 ScopeWindowOrigin(Rect rect, Vector2? nativeOrigin, Vector2 windowOrigin)
+        => nativeOrigin.HasValue ? new Vector2(windowOrigin.x + rect.x, windowOrigin.y + rect.y) : rect.position;
+
+    private static Rect IntersectClip(Rect? outer, Rect inner)
+    {
+        if (!outer.HasValue) return inner;
+        float left = Math.Max(outer.Value.x, inner.x);
+        float top = Math.Max(outer.Value.y, inner.y);
+        float right = Math.Min(outer.Value.xMax, inner.xMax);
+        float bottom = Math.Min(outer.Value.yMax, inner.yMax);
+        return new Rect(left, top, Math.Max(0, right - left), Math.Max(0, bottom - top));
+    }
     private void DrawEntries(
         List<PlacedEntry> entries,
         int start,
@@ -641,10 +724,7 @@ public sealed partial class UiLayoutEngine
             // the same theme instance the Measure half used. The chain is set before the theme because
             // the theme is what the chain resolves to, and the page level (an empty chain) keeps the
             // injected theme rather than a clone of it.
-            UiWidgetContext entryCtx = ctx.WithStyleChain(entry.StyleChain);
-            entryCtx = entryCtx.WithTheme(ScopeTheme(entryCtx, entry.Node));
-            entryCtx = entry.MeasureWidth > 0f ? entryCtx.WithViewWidth(entry.MeasureWidth) : entryCtx;
-            entryCtx = entryCtx.WithWindowOrigin(windowOrigin).WithNode(entry.Node);
+            UiWidgetContext entryCtx = ContextForEntry(entry, ctx, windowOrigin);
 
             // Publish the element's disabled state before anything paints or hit-tests: the funnel's
             // interactive entry points read it, so a disabled element neither executes nor captures the
@@ -817,9 +897,7 @@ public sealed partial class UiLayoutEngine
 
             // Children draw in scroll-content-local coordinates; the popup/overlay pass later
             // draws outside BeginScrollView, so anchors must be converted to Host window space.
-            Vector2 scopeWindowOrigin = nativeOrigin.HasValue
-                ? new Vector2(windowOrigin.x + outRect.x, windowOrigin.y + outRect.y)
-                : outRect.position;
+            Vector2 scopeWindowOrigin = ScopeWindowOrigin(outRect, nativeOrigin, windowOrigin);
             Rect? parentClip = ctx.Session.CurrentClip;
             ctx.Session.ConstrainClip(new Rect(scopeWindowOrigin.x, scopeWindowOrigin.y, outRect.width, outRect.height));
 
@@ -846,9 +924,7 @@ public sealed partial class UiLayoutEngine
         // Clip and Overlay are structural groups. The engine owns Begin/EndGroup so leaf widgets
         // never create native structure scopes. Children draw relative to the group origin, so
         // their window-space offset is the group's draw position on top of the parent origin.
-        Vector2 groupWindowOrigin = nativeOrigin.HasValue
-            ? new Vector2(windowOrigin.x + outRect.x, windowOrigin.y + outRect.y)
-            : outRect.position;
+        Vector2 groupWindowOrigin = ScopeWindowOrigin(outRect, nativeOrigin, windowOrigin);
         Rect? outerClip = ctx.Session.CurrentClip;
         ctx.Session.ConstrainClip(new Rect(groupWindowOrigin.x, groupWindowOrigin.y, outRect.width, outRect.height));
         try

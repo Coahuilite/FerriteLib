@@ -73,3 +73,5 @@ The product requirements and remaining policy decisions live in [the specificati
 with the [contract-to-test migration](acceptance-and-test-migration.md) defining evidence classes.
 
 Palette authoring and exact intentional theme migration: [theme-migration.md](theme-migration.md). All18 default uses above retain their full-purpose checks; style-table outlets, surface/text helpers, native range/checkbox/row/image/chart paints read the same neutral palette through UiTheme. No new interaction owner or palette-specific business tree is introduced.
+
+Content overlap now uses current shared input geometry and neutral layer decisions. Default controls participate without extra author configuration; precise custom overlap uses the optional capability with the explicit old-custom boundary in [layers-images-contract.md](layers-images-contract.md).

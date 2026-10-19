@@ -23,6 +23,7 @@ internal static class Program
     {
         try
         {
+            PointerLayers();
             Palette();
             Properties();
             Observations();
@@ -44,6 +45,21 @@ internal static class Program
         }
     }
 
+    private static void PointerLayers()
+    {
+        var layers = new List<UiPointerLayer> {
+            new("large", new UiLayoutRect(0,0,160,80)),
+            new("lock", new UiLayoutRect(100,10,30,30))
+        };
+        Check(UiPointerLayers.IsCovered(layers,"large",115,25) && !UiPointerLayers.IsCovered(layers,"lock",115,25), "same production core resolves topmost content");
+        Check(!UiPointerLayers.IsCovered(layers,"large",20,60), "nonoverlapping part stays available");
+        layers[1] = new UiPointerLayer("lock",new UiLayoutRect(100,10,30,30),eligible:false);
+        Check(!UiPointerLayers.IsCovered(layers,"large",115,25), "ineligible upper region passes through");
+        layers[1] = new UiPointerLayer("lock",new UiLayoutRect(100,10,30,30),new UiLayoutRect(0,0,105,100));
+        Check(!UiPointerLayers.IsCovered(layers,"large",115,25) && UiPointerLayers.IsCovered(layers,"large",103,25), "effective clip participates in the same decision");
+        layers.RemoveAt(1);
+        Check(!UiPointerLayers.IsCovered(layers,"large",115,25), "removed layer has no stale coverage");
+    }
     private static void Palette()
     {
         var palette = new UiPalette();

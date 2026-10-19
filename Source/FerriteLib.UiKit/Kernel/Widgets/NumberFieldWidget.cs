@@ -6,7 +6,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Native numeric text editing over the common draft/model observation and finite numeric codec.
 /// Invalid or conflicting drafts remain local; accepted requests are not assumed business acceptance.
 /// </summary>
-public sealed class NumberFieldWidget : IUiWidget, IUiLabelledWidget
+public sealed class NumberFieldWidget : IUiWidget, IUiLabelledWidget, IUiPointerLayout
 {
     public const string Kind = "input/number-field";
 
@@ -46,6 +46,12 @@ public sealed class NumberFieldWidget : IUiWidget, IUiLabelledWidget
     public float Measure(UiWidgetContext ctx)
     {
         return AtomVocabulary.ReadHeight(spec, LabelLayout(ctx, ctx.ViewWidth).Height);
+    }
+
+    public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
+    {
+        ResolveLabelBand(new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height), ctx, out Rect field);
+        yield return new UiPointerRegion(new UiLayoutRect(field.x, field.y, field.width, field.height));
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)

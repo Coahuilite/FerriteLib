@@ -8,7 +8,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Normalized line data and optional editable points. Capture and 2D sampling use the common pointer
 /// owner; optional explicit keys permit stable dynamic reordering while legacy index usage remains.
 /// </summary>
-public sealed class LineChartWidget : IUiWidget, IUiDescriptiveWidget
+public sealed class LineChartWidget : IUiWidget, IUiDescriptiveWidget, IUiPointerLayout
 {
     public const string Kind = "chart/line";
     private const float DefaultHeight = 120f;
@@ -62,6 +62,31 @@ public sealed class LineChartWidget : IUiWidget, IUiDescriptiveWidget
         && spec.TryGetAttribute("ActionBind", out string actionKey) && actionKey.Length > 0;
 
     public UiDescription Describe(UiWidgetContext ctx) => new UiDescription(UiDescriptionRole.Chart, count: ResolvePoints(ctx).Count);
+    public IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
+    {
+        if (!AllowsPointEditing) yield break;
+        List<Vector2> points = ResolvePoints(ctx);
+        if (points.Count < 2) yield break;
+        spec.TryGetAttribute("ActionBind", out string action);
+        if (!ctx.Bindings.CanExecute(action)) yield break;
+        HashSet<int>? editablePoints = null;
+        if (spec.TryGetAttribute("EditablePoints", out string raw) && raw.Trim().Length > 0)
+            editablePoints = ParseEditablePoints(raw);
+        Rect plot = PlotRect(new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height));
+        for (int i = 0; i < points.Count; i++)
+        {
+            if (editablePoints != null && !editablePoints.Contains(i)) continue;
+            Rect hit = PointHit(points[i], plot);
+            yield return new UiPointerRegion(new UiLayoutRect(hit.x, hit.y, hit.width, hit.height));
+        }
+    }
+    private static Rect PlotRect(Rect rect) => new(rect.x + PlotPadding, rect.y + PlotPadding,
+        Math.Max(1, rect.width - PlotPadding * 2), Math.Max(1, rect.height - PlotPadding * 2));
+    private static Rect PointHit(Vector2 point, Rect plot)
+    {
+        Vector2 pixel = ToRectPoint(point, plot);
+        return new Rect(pixel.x - HitRadius, pixel.y - HitRadius, HitRadius * 2, HitRadius * 2);
+    }
     public void Draw(Rect rect, UiWidgetContext ctx)
     {
         if (rect.width <= 1f || rect.height <= 1f)
@@ -74,7 +99,7 @@ public sealed class LineChartWidget : IUiWidget, IUiDescriptiveWidget
         }
 
         bool editable = AllowsPointEditing;
-        Rect plotRect = new(rect.x + PlotPadding, rect.y + PlotPadding, Math.Max(1f, rect.width - PlotPadding * 2f), Math.Max(1f, rect.height - PlotPadding * 2f));
+        Rect plotRect = PlotRect(rect);
         HashSet<int>? editablePoints = null;
         if (editable && spec.TryGetAttribute("EditablePoints", out string editableRaw) && editableRaw.Trim().Length > 0)
         {
@@ -137,8 +162,7 @@ public sealed class LineChartWidget : IUiWidget, IUiDescriptiveWidget
         {
             object key = keys == null ? i : keys[i];
             bool allowed = editablePoints == null || editablePoints.Contains(i);
-            Vector2 pixel = ToRectPoint(points[i], plotRect);
-            var hit = new Rect(pixel.x - HitRadius, pixel.y - HitRadius, HitRadius * 2, HitRadius * 2);
+            Rect hit = PointHit(points[i], plotRect);
             UiInteractionResult operation = UiNative.Point(hit, plotRect, ctx, targetBinding, key, points[i].x, points[i].y, allowed && ctx.Bindings.CanExecute(actionKey));
             if (!operation.Request)
                 continue;

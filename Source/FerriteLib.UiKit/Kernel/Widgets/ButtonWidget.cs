@@ -9,7 +9,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// presentation observes that result and never recreates the activation rule.
 /// A missing command is diagnosed at host creation, not rendered as a dead control.
 /// </summary>
-public sealed class ButtonWidget : IUiWidget
+public sealed class ButtonWidget : IUiWidget, IUiPointerLayout
 {
     public const string Kind = "input/button";
 
@@ -87,6 +87,10 @@ public sealed class ButtonWidget : IUiWidget
         return AtomVocabulary.ReadHeight(spec, ctx.Theme.Geometry.RowHeight);
     }
 
+    public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
+    {
+        yield return new UiPointerRegion(bounds, ctx.Bindings.CanExecute(ReadActionKey()));
+    }
     public void Draw(Rect rect, UiWidgetContext ctx)
     {
         if (rect.width <= 1f || rect.height <= 1f) return;

@@ -8,7 +8,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// and writes through the typed <see cref = "IUiBindings"/>; no neutral command bridge.
 /// The typed value-binding key is the <c>Bind</c> attribute when present, otherwise the element Id.
 /// </summary>
-public sealed class StepperSliderWidget : IUiWidget, IUiLabelledWidget, IUiLayoutDiagnosticSource
+public sealed class StepperSliderWidget : IUiWidget, IUiLabelledWidget, IUiLayoutDiagnosticSource, IUiPointerLayout
 {
     public const string Kind = "input/stepper-slider";
 
@@ -59,6 +59,16 @@ public sealed class StepperSliderWidget : IUiWidget, IUiLabelledWidget, IUiLayou
     {
         float height = ReadHeight();
         return spec.TryGetAttribute("Height", out _) ? height : Math.Max(height, LabelLayout(ctx, ctx.ViewWidth).Height);
+    }
+
+    public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
+    {
+        UiStepperLayout layout = ControlLayout(ctx, bounds.Width, bounds.Height, LabelLayout(ctx, bounds.Width));
+        bool writable = ctx.Bindings.IsWritable(ReadBindKey());
+        yield return new UiPointerRegion(layout.Minus, writable);
+        yield return new UiPointerRegion(layout.Range, writable);
+        yield return new UiPointerRegion(layout.Field);
+        yield return new UiPointerRegion(layout.Plus, writable);
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)

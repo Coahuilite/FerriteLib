@@ -209,7 +209,7 @@ public static partial class UiNative
     /// <see cref="UiWidgetContext.Child"/> mints a sub-node under the element, so the two are one control
     /// for input purposes.
     /// </summary>
-    private static bool IsInputDisabled(UiNode? node)
+    internal static bool IsInputDisabled(UiNode? node)
     {
         for (UiNode? cursor = node; cursor != null; cursor = cursor.Parent)
         {
@@ -358,7 +358,7 @@ public static partial class UiNative
     private static bool IsCoveredByPopup(UiSession session)
     {
         // No element identity: a value-state-keyed primitive owns no popup, so ANY covering popup covers it.
-        return session.IsPointerOverHigherLayer(session.ActiveNode, PointerPosition() + session.CurrentWindowOrigin);
+        return session.IsPointerOverPopup(PointerPosition() + session.CurrentWindowOrigin);
     }
 
     public static float Slider(Rect rect, string elementId, UiSession session, float value, float min, float max, out bool changed)

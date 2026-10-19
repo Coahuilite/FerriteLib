@@ -43,6 +43,55 @@ public static class UiRowBand
         return Math.Max(1f, band);
     }
 
+    /// <summary>Exact operation regions for a custom row wrapper's IUiPointerLayout capability.</summary>
+    public static System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiTreeRow row, Rect band,
+        UiTheme theme, float rowHeight, UiRowBandActions actions, UiRowBandLayout layout = default)
+    {
+        Parts parts = ResolveParts(row, band, theme, rowHeight, layout);
+        if (row.Expandable && actions.Disclosure != null) yield return Region(parts.Marker);
+        if (row.Checkable && actions.Checkbox != null) yield return Region(parts.Box);
+        if (actions.Body != null) yield return Region(band);
+    }
+    private static UiPointerRegion Region(Rect rect) => new(new UiLayoutRect(rect.x, rect.y, rect.width, rect.height));
+    private readonly struct Parts
+    {
+        public Parts(Rect marker, Rect box, float contentX, float labelRight, float side)
+        {
+            Marker = marker;
+            Box = box;
+            ContentX = contentX;
+            LabelRight = labelRight;
+            Side = side;
+        }
+        public Rect Marker { get; }
+        public Rect Box { get; }
+        public float ContentX { get; }
+        public float LabelRight { get; }
+        public float Side { get; }
+    }
+    private static Parts ResolveParts(UiTreeRow row, Rect band, UiTheme theme, float rowHeight, UiRowBandLayout layout)
+    {
+        float pad = theme.Geometry.Padding;
+        float partSide = layout.ControlSize.HasValue ? Math.Max(1f, Math.Min(band.height, layout.ControlSize.Value)) : Math.Max(6f, Math.Min(band.height, rowHeight) - pad * 2f);
+        float indentStep = layout.IndentStep ?? theme.Geometry.Spacing;
+        float x = band.x + pad + Math.Max(0f, row.Depth * indentStep);
+        float labelRight = band.xMax;
+        var marker = new Rect(x, band.y + (band.height - partSide) * 0.5f, partSide, partSide);
+        if (row.Expandable)
+            x = marker.xMax + pad;
+        float boxX = layout.CheckboxRightInset.HasValue ? Math.Max(band.x, band.xMax - Math.Max(0f, layout.CheckboxRightInset.Value) - partSide) : x;
+        var box = new Rect(boxX, band.y + (band.height - partSide) * 0.5f, partSide, partSide);
+        if (row.Checkable)
+        {
+            if (layout.CheckboxRightInset.HasValue)
+                labelRight = Math.Max(x, box.x - pad);
+            else
+                x = box.xMax + pad;
+        }
+
+        return new Parts(marker, box, x, labelRight, partSide);
+    }
+
     /// <summary>
     /// Draws one band into <paramref name = "band"/>: indent, disclosure marker, checkbox, image and label, in
     /// that order, each part present only when the row asks for it. Every part's click is reported to
@@ -67,23 +116,12 @@ public static class UiRowBand
             return;
         UiTheme theme = ctx.Theme;
         float pad = theme.Geometry.Padding;
-        float partSide = layout.ControlSize.HasValue ? Math.Max(1f, Math.Min(band.height, layout.ControlSize.Value)) : Math.Max(6f, Math.Min(band.height, rowHeight) - pad * 2f);
-        float indentStep = layout.IndentStep ?? theme.Geometry.Spacing;
-        float x = band.x + pad + Math.Max(0f, row.Depth * indentStep);
-        float labelRight = band.xMax;
-        var marker = new Rect(x, band.y + (band.height - partSide) * 0.5f, partSide, partSide);
-        if (row.Expandable)
-            x = marker.xMax + pad;
-        float boxX = layout.CheckboxRightInset.HasValue ? Math.Max(band.x, band.xMax - Math.Max(0f, layout.CheckboxRightInset.Value) - partSide) : x;
-        var box = new Rect(boxX, band.y + (band.height - partSide) * 0.5f, partSide, partSide);
-        if (row.Checkable)
-        {
-            if (layout.CheckboxRightInset.HasValue)
-                labelRight = Math.Max(x, box.x - pad);
-            else
-                x = box.xMax + pad;
-        }
-
+        Parts parts = ResolveParts(row, band, theme, rowHeight, layout);
+        float partSide = parts.Side;
+        float x = parts.ContentX;
+        float labelRight = parts.LabelRight;
+        Rect marker = parts.Marker;
+        Rect box = parts.Box;
         // Geometry feeds the shared behavior before paint. Only the actual part owner is pressed;
         // raw MouseDown, hover, or a sibling's capture cannot manufacture a pressed row.
         UiInteractionResult disclosure = row.Expandable ? UiNative.Activation(marker, ctx, actions.DisclosureTarget, "disclosure", row.Key, actions.Disclosure != null) : default;

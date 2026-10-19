@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>Default range wrapper: shared behavior, measured label/track, typed request binding.</summary>
-public sealed class SliderWidget : IUiWidget, IUiLabelledWidget
+public sealed class SliderWidget : IUiWidget, IUiLabelledWidget, IUiPointerLayout
 {
     public const string Kind = "input/slider";
     private UiElementSpec spec = UiElementSpec.Empty;
@@ -33,14 +33,15 @@ public sealed class SliderWidget : IUiWidget, IUiLabelledWidget
     private UiSliderLayout Layout(UiWidgetContext ctx, float width) => UiSliderLayout.Measure(Label(ctx), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0);
     public float MeasureLabel(UiWidgetContext ctx) => Label(ctx).Length == 0 ? 0 : ctx.Metrics.MeasureWidth(Label(ctx), AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing;
     public float Measure(UiWidgetContext ctx) => AtomVocabulary.ReadHeight(spec, Layout(ctx, ctx.ViewWidth).Height);
-    public void Draw(Rect rect, UiWidgetContext ctx)
+    public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
     {
-        if (rect.width <= 1 || rect.height <= 1)
-            return;
-        string key = AtomVocabulary.ReadBindKey(spec);
-        UiRange range = Limits();
-        float current = ctx.Bindings.TryGet(key, out float bound) ? bound : range.Min;
-        UiSliderLayout layout = Layout(ctx, rect.width);
+        Rect track = TrackRect(new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height), ctx, Layout(ctx, bounds.Width));
+        yield return new UiPointerRegion(new UiLayoutRect(track.x, track.y, track.width, track.height),
+            AtomVocabulary.WritableOf(ctx, AtomVocabulary.ReadBindKey(spec)) != false);
+    }
+
+    private static Rect TrackRect(Rect rect, UiWidgetContext ctx, UiSliderLayout layout)
+    {
         float gap = ctx.Theme.Geometry.Gap;
         Rect track = rect;
         if (layout.LabelWidth > 0)
@@ -59,6 +60,18 @@ public sealed class SliderWidget : IUiWidget, IUiLabelledWidget
             }
         }
 
+        return track;
+    }
+
+    public void Draw(Rect rect, UiWidgetContext ctx)
+    {
+        if (rect.width <= 1 || rect.height <= 1)
+            return;
+        string key = AtomVocabulary.ReadBindKey(spec);
+        UiRange range = Limits();
+        float current = ctx.Bindings.TryGet(key, out float bound) ? bound : range.Min;
+        UiSliderLayout layout = Layout(ctx, rect.width);
+        Rect track = TrackRect(rect, ctx, layout);
         bool? writable = AtomVocabulary.WritableOf(ctx, key);
         UiInteractionResult interaction = UiNative.Range(track, ctx, key, range.Clamp(current), range.Min, range.Max, writable != false);
         // Only an actual selection makes a request. Repaint and out-of-range model values do not repair the model.

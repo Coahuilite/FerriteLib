@@ -7,8 +7,8 @@ namespace FerriteLib.UiKit.Kernel;
 /// window space, plus whether that layer is a popup. The stack is stored bottom-to-top in paint order, and
 /// input dispatch walks it topmost-first (<see cref="UiSession.IsPointerOverHigherLayer"/>) - that single
 /// rule decides whether an element may take a click, in place of the per-element yield branch the funnel
-/// used to carry. Content layers are recorded and ordered but do not arbitrate each other yet; the
-/// recovery condition for that boundary is written in <c>docs/api-tiers.md</c>'s <c>UiHitLayer</c> entry.
+/// used to carry. Precise content input regions are prepared separately from the same current layout through
+/// IUiPointerLayout and the neutral UiPointerLayers decision; this record remains the paint/popup audit.
 /// </summary>
 public readonly struct UiHitLayer
 {

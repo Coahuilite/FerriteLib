@@ -115,6 +115,10 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
 - `UiPropertyDeclaration` — 0.8 S0/S1 shared contract; shape may change within the development line.
 - `UiResolvedProperty` — 0.8 S0/S1 shared contract; shape may change within the development line.
 - `UiPropertyResolver` — 0.8 S0/S1 shared contract; shape may change within the development line.
+- `IUiPointerLayout` — optional0.8 precise overlap input geometry capability; public-unstable.
+- `UiPointerRegion` — neutral local region/eligibility fact; public-unstable.
+- `UiPointerLayer` — neutral current paint-order/clip fact; public-unstable.
+- `UiPointerLayers` — stateless shared content coverage decision; public-unstable.
 - `UiPaletteRole` — 0.8 finite neutral paint roles; public-unstable.
 - `UiColour` — 0.8 neutral RGBA and parser; public-unstable.
 - `UiPalette` — 0.8 sparse palette declarations/read-only defaults; public-unstable.
@@ -465,12 +469,12 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
   The window shell's own chrome button is the one library call site left raw, because the chrome draws
   outside the tree; that count is measured rather than asserted - the containment lane allowlists this
   call site by name and fails if a second raw call site appears or if this sentence stops saying so.
-  **Recorded boundary and its recovery condition:** content layers are in the stack and ordered by paint,
-  but two content layers do not arbitrate each other yet - only popup-over-content does, because IMGUI
-  already serialises content input by draw order and a rect lookup cannot tell a real pointer from an
-  injected one. Recover it the moment a consumer needs topmost-content dispatch inside an `Overlay`: the
-  data is already here, so the work is a consumption rule (which layer wins on the pointer, and what the
-  loser does), not a new structure.
+  **0.8 content dispatch:** current IUiPointerLayout geometry is projected through the actual scope/scroll
+  transform and clip before native Draw, in final paint order. UiPointerLayers provides the one neutral
+  coverage decision. Default wrappers supply this geometry; custom precise-overlap use adds the optional
+  capability, not a new registration or IUiWidget member. Undescribed custom keeps its old entry conditions,
+  including nonoverlap and popup behavior; arbitrary private/native hit areas cannot be inferred. See
+  `development/0.8/layers-images-contract.md` for a concrete custom example and the exact guarantee.
 - `UiStyleFallbackReport` — one appearance fallback: an authored `Tone`/`Emphasis` value outside the
   vocabulary, carrying the element path, the kind, the attribute, the authored text and the value it
   resolved to. Produced by the atom vocabulary, and since batch B by `UiHost` too — one report per dropped

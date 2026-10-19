@@ -42,6 +42,12 @@ public sealed class UiSession : IDisposable
     public int DefinitionRevision { get; internal set; }
     internal bool IsInputGeometryReliable { get; private set; } = true;
     private readonly List<UiHitLayer> dispatchLayers = new();
+    private readonly List<UiPointerLayer> contentInputLayers = new();
+    internal void SetContentInputLayers(IEnumerable<UiPointerLayer> layers)
+    {
+        contentInputLayers.Clear();
+        contentInputLayers.AddRange(layers);
+    }
     private Vector2 currentWindowOrigin;
 
     // Recovery slots are keyed by the node that tripped, so two elements that print the same display
@@ -245,6 +251,7 @@ public sealed class UiSession : IDisposable
         passBeganWithPrimaryPress = UiNative.IsPointerDown();
 
         CurrentClip = hostViewport.width > 0f && hostViewport.height > 0f ? hostViewport : (Rect?)null;
+        contentInputLayers.Clear();
         dispatchLayers.Clear();
         dispatchLayers.AddRange(hitLayers);
         hitLayers.Clear();
@@ -282,25 +289,20 @@ public sealed class UiSession : IDisposable
     /// composite element, and geometry does not need one for the owner either.
     /// </para>
     /// <para>
-    /// Content layers are recorded in the stack in paint order but do not arbitrate one another yet: IMGUI
-    /// already serialises content input by draw order, and a rect lookup cannot tell a real pointer from an
-    /// injected one. The overlay decision that matters today - and the one the old per-element yield branch
-    /// got wrong for every primitive outside its funnel - is popup-over-content.
+    /// Current content regions are prepared from declared input geometry in final paint order before any
+    /// native widget runs. The neutral UiPointerLayers decision handles content coverage without reversing
+    /// IMGUI calls; unknown custom outer rectangles never become guessed opaque input layers.
     /// </para>
     /// </summary>
     public bool IsPointerOverHigherLayer(UiNode element, Vector2 windowPoint)
+        => IsPointerOverPopup(windowPoint) || UiPointerLayers.IsCovered(contentInputLayers, element.Id.Key, windowPoint.x, windowPoint.y);
+
+    internal bool IsPointerOverPopup(Vector2 windowPoint)
     {
         for (int i = dispatchLayers.Count - 1; i >= 0; i--)
-        {
-            UiHitLayer layer = dispatchLayers[i];
-            if (!layer.IsPopup) continue;
-            if (!Contains(layer.Rect, windowPoint)) continue;
-            return true;
-        }
-
+            if (dispatchLayers[i].IsPopup && Contains(dispatchLayers[i].Rect, windowPoint)) return true;
         return false;
     }
-
     /// <summary>
     /// Same dispatch as <see cref="IsPointerOverHigherLayer(UiNode,Vector2)"/>, with the caller's own popup id
     /// beside it. The id is a RECORD, not a licence: coverage is geometric for every caller, including the
@@ -397,6 +399,7 @@ public sealed class UiSession : IDisposable
     // An aborted traversal must not publish its partial hit list or reconcile unvisited identities.
     internal void AbortHitPass()
     {
+        contentInputLayers.Clear();
         if (!IsActive) return;
         if (hitPassOpen)
         {
@@ -1364,6 +1367,7 @@ public sealed class UiSession : IDisposable
         hitPassOpen = false;
         hitLayers.Clear();
         dispatchLayers.Clear();
+        contentInputLayers.Clear();
         currentWindowOrigin = default;
         scrollTargetElementId = null;
     }

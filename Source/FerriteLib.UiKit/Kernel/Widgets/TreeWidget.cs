@@ -39,7 +39,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <see cref="UiTreeRow.Expanded"/>: both are the model's answers, re-read every pass.
 /// </para>
 /// </summary>
-internal sealed class TreeWidget : IUiWidget
+internal sealed class TreeWidget : IUiWidget, IUiPointerLayout
 {
     internal const string Kind = "container/tree";
 
@@ -125,6 +125,39 @@ internal sealed class TreeWidget : IUiWidget
         return total;
     }
 
+    public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
+    {
+        string key = ReadBindKey();
+        List<UiTreeRow> rows = CollectRows(ctx, key);
+        float rowHeight = ReadRowHeight(ctx);
+        UiRowBandActions actions = Actions(ctx, key);
+        float y = bounds.Y;
+        foreach (UiTreeRow row in rows)
+        {
+            float height = UiRowBand.Measure(row, ctx.Theme, rowHeight);
+            var band = new Rect(bounds.X, y, bounds.Width, height);
+            y += height;
+            if (band.y >= bounds.Y + bounds.Height) break;
+            foreach (UiPointerRegion region in UiRowBand.PointerRegions(row, band, ctx.Theme, rowHeight, actions)) yield return region;
+            if (band.yMax >= bounds.Y + bounds.Height) break;
+        }
+    }
+    private UiRowBandActions Actions(UiWidgetContext ctx, string key)
+    {
+        string actionKey = AtomVocabulary.Read(spec, "ActionBind").Trim();
+        string disclosureKey = AtomVocabulary.Read(spec, "DisclosureBind").Trim();
+        string checkKey = AtomVocabulary.Read(spec, "CheckBind").Trim();
+
+        // One actions instance per pass, not per row: the callbacks are keyed by the row the PRIMITIVE hands
+        // them, so the band's own routing stays the primitive's and the kind only decides what a part does.
+        return new UiRowBandActions(
+            actionKey.Length > 0 && ctx.Bindings.CanExecute(actionKey) ? key => ctx.Bindings.Invoke<string>(actionKey, key) : null,
+            disclosureKey.Length > 0 && ctx.Bindings.CanExecute(disclosureKey) ? key => ctx.Bindings.Invoke<string>(disclosureKey, key) : null,
+            checkKey.Length > 0 && ctx.Bindings.CanExecute(checkKey) ? key => ctx.Bindings.Invoke<string>(checkKey, key) : null,
+            key + "\u001f" + actionKey, key + "\u001f" + disclosureKey, key + "\u001f" + checkKey);
+
+    }
+
     public void Draw(Rect rect, UiWidgetContext ctx)
     {
         if (rect.width <= 1f || rect.height <= 1f) return;
@@ -136,17 +169,7 @@ internal sealed class TreeWidget : IUiWidget
         UiTheme theme = ctx.Theme;
         float rowHeight = ReadRowHeight(ctx);
         UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, writable: null);
-        string actionKey = AtomVocabulary.Read(spec, "ActionBind").Trim();
-        string disclosureKey = AtomVocabulary.Read(spec, "DisclosureBind").Trim();
-        string checkKey = AtomVocabulary.Read(spec, "CheckBind").Trim();
-
-        // One actions instance per pass, not per row: the callbacks are keyed by the row the PRIMITIVE hands
-        // them, so the band's own routing stays the primitive's and the kind only decides what a part does.
-        var actions = new UiRowBandActions(
-            actionKey.Length > 0 ? key => ctx.Bindings.Invoke<string>(actionKey, key) : null,
-            disclosureKey.Length > 0 ? key => ctx.Bindings.Invoke<string>(disclosureKey, key) : null,
-            checkKey.Length > 0 ? key => ctx.Bindings.Invoke<string>(checkKey, key) : null,
-            key + "\u001f" + actionKey, key + "\u001f" + disclosureKey, key + "\u001f" + checkKey);
+        UiRowBandActions actions = Actions(ctx, key);
 
         float y = rect.y;
         for (int i = 0; i < rows.Count; i++)

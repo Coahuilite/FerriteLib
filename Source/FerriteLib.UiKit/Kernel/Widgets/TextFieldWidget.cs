@@ -6,7 +6,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Single-line or basic plain-text multiline native editing, with one instance-local neutral draft.
 /// Selection, clipboard and character composition belong to Verse/Unity, not to this wrapper.
 /// </summary>
-public sealed class TextFieldWidget : IUiWidget, IUiLabelledWidget
+public sealed class TextFieldWidget : IUiWidget, IUiLabelledWidget, IUiPointerLayout
 {
     public const string Kind = "input/text-field";
 
@@ -62,6 +62,12 @@ public sealed class TextFieldWidget : IUiWidget, IUiLabelledWidget
             text = edit.Draft;
         ResolveLabelBand(new Rect(0, 0, ctx.ViewWidth, 1), ctx, out Rect field);
         return (labelLayout.Stacked ? labelLayout.LabelHeight + ctx.Theme.Geometry.Gap : 0) + Math.Max(ctx.Theme.Geometry.RowHeight, ctx.Metrics.MeasureText(text, AtomVocabulary.TextFont(ctx), field.width) + ctx.Theme.Geometry.Spacing * 2);
+    }
+
+    public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
+    {
+        ResolveLabelBand(new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height), ctx, out Rect field);
+        yield return new UiPointerRegion(new UiLayoutRect(field.x, field.y, field.width, field.height));
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)

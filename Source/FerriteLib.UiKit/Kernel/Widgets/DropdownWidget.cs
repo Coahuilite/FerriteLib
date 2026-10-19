@@ -26,7 +26,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// attribute already carries; a reserved help slot is deliberately NOT part of either look.
 /// </para>
 /// </summary>
-public sealed class DropdownWidget : IUiWidget, IUiLabelledWidget
+public sealed class DropdownWidget : IUiWidget, IUiLabelledWidget, IUiPointerLayout
 {
     public const string Kind = "input/dropdown";
 
@@ -178,6 +178,18 @@ public sealed class DropdownWidget : IUiWidget, IUiLabelledWidget
     {
         float natural = SharedLabelLayout(ctx, ctx.ViewWidth)?.Height ?? ctx.Theme.Geometry.RowHeight;
         return ReadHeight(natural);
+    }
+
+    public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
+    {
+        string key = ReadBindKey();
+        bool hasOptions;
+        if (ctx.Bindings is IUiTypedChoices seam && seam.TryGetValueType(key, out Type type) && type != typeof(string))
+            hasOptions = seam.TryGetChoices(ReadOptionsKey(key), out IReadOnlyList<UiChoice<object?>> choices) && choices.Count > 0;
+        else
+            hasOptions = BuildOptions(ctx).Count > 0;
+        Rect field = ResolveField(new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height), ctx);
+        yield return new UiPointerRegion(new UiLayoutRect(field.x, field.y, field.width, field.height), hasOptions);
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)

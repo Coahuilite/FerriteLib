@@ -5,6 +5,9 @@ using Verse;
 namespace FerriteLib.UiKit.Kernel;
 public static partial class UiNative
 {
+    private static bool ContentCoversEditor(Rect rect, UiSession session, UiNode node, Vector2 windowPoint)
+        => (session.PassBeganWithPrimaryPress || PointerPhase() != UiPointerPhase.None)
+            && IsMouseOver(rect) && session.IsPointerOverHigherLayer(node, windowPoint);
     private static string LegacyEditor<T>(Rect rect, string binding, UiSession session, T model, Func<T, string> format, UiEditParser<T> parse, out bool committed, out T candidate)
     {
         UiNode node = session.ActiveNode;
@@ -17,7 +20,7 @@ public static partial class UiNative
             editor.Cancel(model);
         bool requested = false;
         T result = model;
-        DriveEditor(rect, session, node, state, editor, model, !disabled, IsCoveredByPopup(session), true, IsMouseDownOver(rect), true, false, value =>
+        DriveEditor(rect, session, node, state, editor, model, !disabled, IsCoveredByPopup(session) || ContentCoversEditor(rect, session, node, PointerPosition() + session.CurrentWindowOrigin), true, IsMouseDownOver(rect), true, false, value =>
         {
             requested = true;
             result = value;
@@ -70,7 +73,7 @@ public static partial class UiNative
         UiEditSession<T> editor = Editor(ctx, binding, format, parse);
         bool writable = ctx.Bindings.IsWritable(binding);
         bool available = !IsInputDisabled(node) && session.PointerInputAllowed && session.IsInputGeometryReliable;
-        bool covered = IsCoveredByPopup(session);
+        bool covered = IsCoveredByPopup(session) || ContentCoversEditor(rect, session, node, WindowPointer(ctx));
         void Request(T candidate)
         {
             UiInteractionResult operation = session.Interactions.Activate(InteractionTarget(ctx, binding, "editor"), new UiInputEligibility(available, writable));

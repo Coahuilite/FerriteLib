@@ -38,6 +38,7 @@ internal static class Program
     private static void RunAll()
     {
         Console.WriteLine("0.8 S0/S1 production shared behavior...");
+        failures += KernelLayerDispatchTests.RunAll();
         failures += KernelPaletteTests.RunAll();
         failures += KernelSharedBehaviorTests.RunAll();
         failures += KernelSharedEditingTests.RunAll();

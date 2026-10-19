@@ -67,7 +67,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// per-item binding scope, so "not yet bound" is a legal frame there and must not take the page down.
 /// </para>
 /// </summary>
-internal sealed class CheckboxWidget : IUiWidget
+internal sealed class CheckboxWidget : IUiWidget, IUiPointerLayout
 {
     internal const string Kind = "input/checkbox";
 
@@ -253,6 +253,11 @@ internal sealed class CheckboxWidget : IUiWidget
     private static Color ControlEdge(UiTheme theme)
     {
         return theme[UiPaletteRole.StrongBorder].a > 0f ? theme[UiPaletteRole.StrongBorder] : theme[UiPaletteRole.Border];
+    }
+
+    public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
+    {
+        yield return new UiPointerRegion(bounds, AtomVocabulary.WritableOf(ctx, ReadBindKey()) != false);
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)
