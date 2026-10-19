@@ -82,11 +82,11 @@ internal static class KernelLayerDispatchTests
         {
             Frame(host, EventType.MouseDown);
             Frame(host, EventType.MouseUp);
-            Check(large == 1 && small == 0, "disabled upper target passes through even on first input frame");
+            Check(large == 0 && small == 0 && !host.Session.Interactions.CaptureOwner.HasValue, "approved L2 disabled upper target blocks lower without capture on first input frame");
             enabled = true;
             Frame(host, EventType.MouseDown);
             Frame(host, EventType.MouseUp);
-            Check(large == 1 && small == 1, "live eligibility change takes effect without changing declaration order");
+            Check(large == 0 && small == 1, "live eligibility change takes effect without changing declaration order");
         }
         const string decoration = "<Widget Id=\"decoration\" Kind=\"display/image\" Bind=\"picture\" Width=\"30\" Height=\"30\" AlignX=\"Left\" AlignY=\"Top\" OffsetX=\"100\" OffsetY=\"10\"/>";
         bindings.BindReadOnly<Texture2D>("picture", () => null!);
@@ -94,7 +94,7 @@ internal static class KernelLayerDispatchTests
         {
             Frame(host, EventType.MouseDown);
             Frame(host, EventType.MouseUp);
-            Check(large == 2 && small == 1, "painted missing-image decoration is not an opaque input layer");
+            Check(large == 1 && small == 1, "painted missing-image decoration is not an opaque input layer");
         }
     }
     private static void CaptureAndRemoval()
@@ -230,11 +230,24 @@ internal static class KernelLayerDispatchTests
         {
             Frame(host, EventType.MouseDown);
             Frame(host, EventType.MouseUp);
-            Check(large == 1 && expanded == 0, "gated independent Tree part is not an opaque input layer");
+            Check(large == 0 && expanded == 0 && !host.Session.Interactions.CaptureOwner.HasValue, "approved L2 configured unavailable Tree part blocks lower but cannot capture");
             enabled = true;
             Frame(host, EventType.MouseDown);
             Frame(host, EventType.MouseUp);
-            Check(large == 1 && expanded == 1, "eligible Tree part uses its actual shared marker geometry");
+            Check(large == 0 && expanded == 1, "eligible Tree part uses its actual shared marker geometry");            host.UpdateDefinition(Page(upper.Replace(" DisclosureBind=\"expand\"", "")));
+            Frame(host, EventType.MouseDown);
+            Frame(host, EventType.MouseUp);
+            Check(large == 1 && expanded == 1, "unconfigured Tree marker is decoration rather than a disabled operation");            int bodyRequests = 0;
+            bindings.BindAction<string>("body", _ => bodyRequests++);
+            enabled = false;
+            host.UpdateDefinition(Page(upper.Replace(" DisclosureBind=\"expand\"", " DisclosureBind=\"expand\" ActionBind=\"body\"")));
+            Frame(host, EventType.MouseDown);
+            Frame(host, EventType.MouseUp);
+            Check(bodyRequests == 0 && expanded == 1 && large == 1, "disabled configured disclosure blocks its own underlying Tree body as well");
+            host.UpdateDefinition(Page(upper.Replace(" DisclosureBind=\"expand\"", " ActionBind=\"body\"")));
+            Frame(host, EventType.MouseDown);
+            Frame(host, EventType.MouseUp);
+            Check(bodyRequests == 1 && expanded == 1 && large == 1, "removing the disclosure operation reveals the existing body target");
         }
     }    private static void ChildGeometryOwner()
     {

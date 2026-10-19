@@ -151,10 +151,11 @@ internal sealed class TreeWidget : IUiWidget, IUiPointerLayout
         // One actions instance per pass, not per row: the callbacks are keyed by the row the PRIMITIVE hands
         // them, so the band's own routing stays the primitive's and the kind only decides what a part does.
         return new UiRowBandActions(
-            actionKey.Length > 0 && ctx.Bindings.CanExecute(actionKey) ? key => ctx.Bindings.Invoke<string>(actionKey, key) : null,
-            disclosureKey.Length > 0 && ctx.Bindings.CanExecute(disclosureKey) ? key => ctx.Bindings.Invoke<string>(disclosureKey, key) : null,
-            checkKey.Length > 0 && ctx.Bindings.CanExecute(checkKey) ? key => ctx.Bindings.Invoke<string>(checkKey, key) : null,
-            key + "\u001f" + actionKey, key + "\u001f" + disclosureKey, key + "\u001f" + checkKey);
+            actionKey.Length > 0 ? key => ctx.Bindings.Invoke<string>(actionKey, key) : null,
+            disclosureKey.Length > 0 ? key => ctx.Bindings.Invoke<string>(disclosureKey, key) : null,
+            checkKey.Length > 0 ? key => ctx.Bindings.Invoke<string>(checkKey, key) : null,
+            key + "\u001f" + actionKey, key + "\u001f" + disclosureKey, key + "\u001f" + checkKey,
+            ctx.Bindings.CanExecute(actionKey), ctx.Bindings.CanExecute(disclosureKey), ctx.Bindings.CanExecute(checkKey));
 
     }
 

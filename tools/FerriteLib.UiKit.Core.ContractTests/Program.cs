@@ -53,8 +53,8 @@ internal static class Program
         };
         Check(UiPointerLayers.IsCovered(layers,"large",115,25) && !UiPointerLayers.IsCovered(layers,"lock",115,25), "same production core resolves topmost content");
         Check(!UiPointerLayers.IsCovered(layers,"large",20,60), "nonoverlapping part stays available");
-        layers[1] = new UiPointerLayer("lock",new UiLayoutRect(100,10,30,30),eligible:false);
-        Check(!UiPointerLayers.IsCovered(layers,"large",115,25), "ineligible upper region passes through");
+        layers[1] = new UiPointerLayer("lock",new UiLayoutRect(100,10,30,30),hasOperation:false);
+        Check(!UiPointerLayers.IsCovered(layers,"large",115,25), "unconfigured upper region passes through");
         layers[1] = new UiPointerLayer("lock",new UiLayoutRect(100,10,30,30),new UiLayoutRect(0,0,105,100));
         Check(!UiPointerLayers.IsCovered(layers,"large",115,25) && UiPointerLayers.IsCovered(layers,"large",103,25), "effective clip participates in the same decision");
         layers.RemoveAt(1);

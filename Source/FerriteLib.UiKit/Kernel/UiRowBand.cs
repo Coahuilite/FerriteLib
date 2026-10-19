@@ -124,9 +124,13 @@ public static class UiRowBand
         Rect box = parts.Box;
         // Geometry feeds the shared behavior before paint. Only the actual part owner is pressed;
         // raw MouseDown, hover, or a sibling's capture cannot manufacture a pressed row.
-        UiInteractionResult disclosure = row.Expandable ? UiNative.Activation(marker, ctx, actions.DisclosureTarget, "disclosure", row.Key, actions.Disclosure != null) : default;
-        UiInteractionResult check = row.Checkable && !disclosure.Request ? UiNative.Activation(box, ctx, actions.CheckboxTarget, "check", row.Key, actions.Checkbox != null) : default;
-        UiInteractionResult body = !disclosure.Request && !check.Request && actions.Body != null ? UiNative.Activation(band, ctx, actions.BodyTarget, "body", row.Key) : default;
+        UiInteractionResult disclosure = row.Expandable ? UiNative.Activation(marker, ctx, actions.DisclosureTarget, "disclosure", row.Key, actions.Disclosure != null && actions.DisclosureEnabled) : default;
+        bool overDisclosure = row.Expandable && actions.Disclosure != null && UiNative.IsMouseOver(marker, ctx);
+        bool ownsCheck = ctx.Session.Interactions.CaptureOwner?.Equals(UiNative.InteractionTarget(ctx, actions.CheckboxTarget, "check", row.Key)) == true;
+        UiInteractionResult check = row.Checkable && !disclosure.Request ? UiNative.Activation(box, ctx, actions.CheckboxTarget, "check", row.Key, actions.Checkbox != null && actions.CheckboxEnabled && (!overDisclosure || ownsCheck)) : default;
+        bool overCheck = row.Checkable && actions.Checkbox != null && UiNative.IsMouseOver(box, ctx);
+        bool ownsBody = ctx.Session.Interactions.CaptureOwner?.Equals(UiNative.InteractionTarget(ctx, actions.BodyTarget, "body", row.Key)) == true;
+        UiInteractionResult body = !disclosure.Request && !check.Request && actions.Body != null ? UiNative.Activation(band, ctx, actions.BodyTarget, "body", row.Key, actions.BodyEnabled && ((!overDisclosure && !overCheck) || ownsBody)) : default;
         if (actions.Disclosure != null && disclosure.Request)
         {
             UiValueBehavior.Request(UiNative.InteractionTarget(ctx, actions.DisclosureTarget, "disclosure", row.Key), UiValueBehavior.Expansion(disclosure, !row.Expanded, row.Expandable), _ => actions.Disclosure(row.Key));
@@ -243,7 +247,17 @@ public readonly struct UiRowBandActions
     }
 
     public UiRowBandActions(Action<string>? body, Action<string>? disclosure, Action<string>? checkbox, string bodyTarget, string disclosureTarget, string checkboxTarget)
+        : this(body, disclosure, checkbox, bodyTarget, disclosureTarget, checkboxTarget, true, true, true)
     {
+    }
+
+    public UiRowBandActions(Action<string>? body, Action<string>? disclosure, Action<string>? checkbox,
+        string bodyTarget, string disclosureTarget, string checkboxTarget,
+        bool bodyEnabled, bool disclosureEnabled, bool checkboxEnabled)
+    {
+        BodyEnabled = bodyEnabled;
+        DisclosureEnabled = disclosureEnabled;
+        CheckboxEnabled = checkboxEnabled;
         Body = body;
         Disclosure = disclosure;
         Checkbox = checkbox;
@@ -254,6 +268,9 @@ public readonly struct UiRowBandActions
 
     /// <summary>The row's body, or null when the band is not itself a target.</summary>
     public Action<string>? Body { get; }
+    public bool BodyEnabled { get; }
+    public bool DisclosureEnabled { get; }
+    public bool CheckboxEnabled { get; }
     /// <summary>The disclosure marker, or null when expanding is the consumer's business elsewhere.</summary>
     public Action<string>? Disclosure { get; }
     /// <summary>The checkbox, or null when the row shows its checked state without offering to change it.</summary>

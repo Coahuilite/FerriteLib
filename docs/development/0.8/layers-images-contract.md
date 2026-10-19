@@ -4,7 +4,7 @@
 
 Put a large ordinary button and a smaller button later in an Overlay. The later button is visually above
 and receives a qualified primary gesture where its actual input region overlaps. No declaration-order
-workaround, custom subclass or input registration is needed. Pure image/text decoration does not acquire an opaque hit box. Disabled-operation obstruction is the L2 product decision: current pass-through behavior is only a reversible candidate until that decision, not an approved default. Existing capture is never handed to an underlying
+workaround, custom subclass or input registration is needed. Pure image/text decoration does not acquire an opaque hit box. L2 is approved: a visible configured operation keeps its actual region as an obstruction while disabled/unavailable, but cannot activate or begin capture. Removing/hiding it or omitting an operation does not add obstruction. Existing capture is never handed to an underlying
 target; release outside its own region, lost eligibility, removal or Close follows the common end rules.
 
 The engine projects current declared input geometry through the same arranged scope/scroll transform and
@@ -19,8 +19,7 @@ steal that pointer input, but still paints on Repaint and retains its existing k
 
 IUiWidget still has only its existing required members. A custom that wants the new precise content
 coverage guarantee implements optional IUiPointerLayout and returns its actual operation regions in
-local coordinates. Reuse the same geometry in Draw; eligibility is a current fact, not another behavior
-state machine. For example, if a custom has one30px control100px from its left edge:
+local coordinates. Reuse the same geometry in Draw; configured operation geometry remains present during temporary disable. Execution eligibility goes separately to the shared interaction, not into a second behavior state machine. For example, if a custom has one30px control100px from its left edge:
 
 ```csharp
 private static UiLayoutRect ButtonBounds(UiLayoutRect outer)
@@ -28,11 +27,11 @@ private static UiLayoutRect ButtonBounds(UiLayoutRect outer)
 
 public IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
 {
-    yield return new UiPointerRegion(ButtonBounds(bounds), ctx.Bindings.CanExecute("apply"));
+    yield return new UiPointerRegion(ButtonBounds(bounds));
 }
 ```
 
-A ctx.Child keeps its independent interaction/capture identity; layer queries resolve its owning widget through the real Parent chain rather than treating the child as a new paint layer. Draw uses ButtonBounds with its allocated origin and invokes the existing UiNative activation/shared
+A ctx.Child keeps its independent interaction/capture identity; layer queries resolve its owning widget through the real Parent chain rather than treating the child as a new paint layer. Draw uses ButtonBounds with its allocated origin and supplies current execution eligibility to the existing UiNative activation/shared
 request path. It does not implement topmost selection or capture. An empty sequence means decoration;
 UiRowBand.PointerRegions exposes the same part geometry used by the retained row visual for custom row
 wrappers. All default interactive wrappers provide their real field/track/option/row/point geometry.

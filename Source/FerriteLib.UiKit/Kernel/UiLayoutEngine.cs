@@ -636,7 +636,7 @@ public sealed partial class UiLayoutEngine
             if (entry.Widget != null)
             {
                 // Even an undescribed node has a paint-order marker; it does not acquire an opaque hit box.
-                layers.Add(new UiPointerLayer(entry.Node.Id.Key, default, eligible: false));
+                layers.Add(new UiPointerLayer(entry.Node.Id.Key, default, hasOperation: false));
                 if (entry.Widget is IUiPointerLayout layout && !ctx.Session.IsTripped(entry.Node))
                 {
                     var regions = new List<UiPointerRegion>();
@@ -663,7 +663,7 @@ public sealed partial class UiLayoutEngine
                         UiLayoutRect? effectiveClip = clip.HasValue
                             ? new UiLayoutRect(clip.Value.x, clip.Value.y, clip.Value.width, clip.Value.height) : null;
                         layers.Add(new UiPointerLayer(entry.Node.Id.Key, windowBounds, effectiveClip,
-                            region.Eligible && !UiNative.IsInputDisabled(entry.Node)));
+                            region.HasOperation));
                     }
                 }
             }

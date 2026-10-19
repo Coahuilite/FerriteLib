@@ -89,7 +89,7 @@ public sealed class ButtonWidget : IUiWidget, IUiPointerLayout
 
     public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
     {
-        yield return new UiPointerRegion(bounds, ctx.Bindings.CanExecute(ReadActionKey()));
+        yield return new UiPointerRegion(bounds);
     }
     public void Draw(Rect rect, UiWidgetContext ctx)
     {

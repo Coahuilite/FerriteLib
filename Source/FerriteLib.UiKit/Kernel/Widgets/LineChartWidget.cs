@@ -67,8 +67,6 @@ public sealed class LineChartWidget : IUiWidget, IUiDescriptiveWidget, IUiPointe
         if (!AllowsPointEditing) yield break;
         List<Vector2> points = ResolvePoints(ctx);
         if (points.Count < 2) yield break;
-        spec.TryGetAttribute("ActionBind", out string action);
-        if (!ctx.Bindings.CanExecute(action)) yield break;
         HashSet<int>? editablePoints = null;
         if (spec.TryGetAttribute("EditablePoints", out string raw) && raw.Trim().Length > 0)
             editablePoints = ParseEditablePoints(raw);

@@ -257,7 +257,7 @@ internal sealed class CheckboxWidget : IUiWidget, IUiPointerLayout
 
     public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
     {
-        yield return new UiPointerRegion(bounds, AtomVocabulary.WritableOf(ctx, ReadBindKey()) != false);
+        yield return new UiPointerRegion(bounds);
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)

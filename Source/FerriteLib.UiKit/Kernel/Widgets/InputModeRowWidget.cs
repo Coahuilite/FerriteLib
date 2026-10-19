@@ -158,11 +158,10 @@ public sealed class InputModeRowWidget : IUiWidget, IUiPointerLayout
     public IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
     {
         List<Option> options = OptionsFor(ctx);
-        bool writable = AtomVocabulary.WritableOf(ctx, ReadBindKey()) != false;
         for (int i = 0; i < options.Count; i++)
         {
             Rect cell = OptionRect(new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height), ctx, i);
-            yield return new UiPointerRegion(new UiLayoutRect(cell.x, cell.y, cell.width, cell.height), writable);
+            yield return new UiPointerRegion(new UiLayoutRect(cell.x, cell.y, cell.width, cell.height));
         }
     }
 

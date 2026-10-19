@@ -36,8 +36,7 @@ public sealed class SliderWidget : IUiWidget, IUiLabelledWidget, IUiPointerLayou
     public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
     {
         Rect track = TrackRect(new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height), ctx, Layout(ctx, bounds.Width));
-        yield return new UiPointerRegion(new UiLayoutRect(track.x, track.y, track.width, track.height),
-            AtomVocabulary.WritableOf(ctx, AtomVocabulary.ReadBindKey(spec)) != false);
+        yield return new UiPointerRegion(new UiLayoutRect(track.x, track.y, track.width, track.height));
     }
 
     private static Rect TrackRect(Rect rect, UiWidgetContext ctx, UiSliderLayout layout)

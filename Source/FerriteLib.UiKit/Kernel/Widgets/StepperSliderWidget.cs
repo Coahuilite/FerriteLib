@@ -64,11 +64,10 @@ public sealed class StepperSliderWidget : IUiWidget, IUiLabelledWidget, IUiLayou
     public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
     {
         UiStepperLayout layout = ControlLayout(ctx, bounds.Width, bounds.Height, LabelLayout(ctx, bounds.Width));
-        bool writable = ctx.Bindings.IsWritable(ReadBindKey());
-        yield return new UiPointerRegion(layout.Minus, writable);
-        yield return new UiPointerRegion(layout.Range, writable);
+        yield return new UiPointerRegion(layout.Minus);
+        yield return new UiPointerRegion(layout.Range);
         yield return new UiPointerRegion(layout.Field);
-        yield return new UiPointerRegion(layout.Plus, writable);
+        yield return new UiPointerRegion(layout.Plus);
     }
 
     public void Draw(Rect rect, UiWidgetContext ctx)

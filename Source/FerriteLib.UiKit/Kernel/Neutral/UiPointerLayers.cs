@@ -6,29 +6,29 @@ namespace FerriteLib.UiKit.Kernel;
 /// <summary>A local input region. Decoration is represented by no regions, not an opaque outer box.</summary>
 public readonly struct UiPointerRegion
 {
-    public UiPointerRegion(UiLayoutRect bounds, bool eligible = true)
+    public UiPointerRegion(UiLayoutRect bounds, bool hasOperation = true)
     {
         Bounds = bounds;
-        Eligible = eligible;
+        HasOperation = hasOperation;
     }
     public UiLayoutRect Bounds { get; }
-    public bool Eligible { get; }
+    public bool HasOperation { get; }
 }
 
-/// <summary>One current draw-order fact, in a common host coordinate space.</summary>
+/// <summary>One current draw-order fact, in a common host coordinate space. Unavailable operations still obstruct.</summary>
 public readonly struct UiPointerLayer
 {
-    public UiPointerLayer(string owner, UiLayoutRect bounds, UiLayoutRect? clip = null, bool eligible = true)
+    public UiPointerLayer(string owner, UiLayoutRect bounds, UiLayoutRect? clip = null, bool hasOperation = true)
     {
         Owner = owner ?? throw new ArgumentNullException(nameof(owner));
         Bounds = bounds;
         Clip = clip;
-        Eligible = eligible;
+        HasOperation = hasOperation;
     }
     public string Owner { get; }
     public UiLayoutRect Bounds { get; }
     public UiLayoutRect? Clip { get; }
-    public bool Eligible { get; }
+    public bool HasOperation { get; }
 }
 
 /// <summary>Stateless topmost input decision. The existing interaction session remains the capture owner.</summary>
@@ -43,7 +43,7 @@ public static class UiPointerLayers
         for (int i = bottomToTop.Count - 1; i > ownOrder; i--)
         {
             UiPointerLayer layer = bottomToTop[i];
-            if (layer.Owner == owner || !layer.Eligible || !Contains(layer.Bounds, x, y)) continue;
+            if (layer.Owner == owner || !layer.HasOperation || !Contains(layer.Bounds, x, y)) continue;
             if (!layer.Clip.HasValue || Contains(layer.Clip.Value, x, y)) return true;
         }
         return false;
