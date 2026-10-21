@@ -53,8 +53,10 @@ choice setter temporarily leave the presentation read scope. Their binding reads
 completion restores the current presentation view. Outside a presentation scope `Get<T>` is also an
 immediate business read. Direct source/derived reads are always business reads, not presentation reads.
 Input handling in the same native Draw stack remains legal; hover, pressed and capture feedback are not
-frozen. `CanExecute`/the command predicate remain the existing live qualification path, and execution
-rechecks it. Business code keeps the right to reject independently of the UI projection.
+frozen. `CanExecute` and execution qualification temporarily leave only the presentation scope, so predicates
+using `bindings.Get<T>` read latest business input too. This read boundary does not start/end a business
+batch, drain responses or publish presentation input; success and predicate failure both restore the scope.
+Execution rechecks qualification. Business code keeps the right to reject independently of the UI projection.
 
 A custom new pure measurement/draw routine can use `using (runtime.ReadPhase()) { ... }` to enforce
 no reactive writes/commands. Tracked getters enforce this themselves. The Host does **not** put old
@@ -118,7 +120,8 @@ The compilable examples are `tools/FerriteLib.UiKit.Core.ContractTests/ReactiveE
 `ReactiveFoundationTests` runs counter/shared operation → value/invalidation/derived/batch/response →
 presentation → production neutral geometry, and the separate safe business projection through the same
 chain. `KernelReactiveFoundationTests` exercises actual `UiBindings → UiHost.DrawFrame →
-MeasureAndArrange → Draw`, Checkbox release/compound batching, legacy/new purity boundaries, latest
+MeasureAndArrange → Draw`, default Button press/release and wrapped-text paint/content-dependent geometry
+for both examples, Checkbox release/compound batching, legacy/new purity boundaries, latest
 qualification, failure and Close. Existing wrapper/editor/layout/document/observation regressions remain
 separate evidence. No alternate test core or same-named platform stub implements the reactive graph.
 

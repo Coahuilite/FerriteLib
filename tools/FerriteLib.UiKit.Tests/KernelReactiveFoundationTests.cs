@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using FerriteLib.UiKit.Kernel;
 using UnityEngine;
 
@@ -17,13 +19,14 @@ internal static class KernelReactiveFoundationTests
         Event.current = new Event { type=phase, button=0, mousePosition=point };
         host.DrawFrame(View);
     }
-    private static UiHost Host(string content, UiBindings bindings)
-        => new("reactive", UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"reactive\"><Column Padding=\"0\" Gap=\"0\">"+content+"</Column></UiPage>"), bindings, UiTheme.Vanilla, new Metrics(), new Translation());
+    private static UiHost Host(string content, UiBindings bindings, ITextMetrics? metrics = null)
+        => new("reactive", UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"reactive\"><Column Padding=\"0\" Gap=\"0\">"+content+"</Column></UiPage>"), bindings, UiTheme.Vanilla, metrics ?? new Metrics(), new Translation());
     internal static int RunAll()
     {
         try
         {
             UiWidgetRegistry.Clear(); UiWidgetRegistry.InitializeCore();
+            DefaultCounterAndWorkshop();
             CounterAndCheckbox();
             LegacyPurityBoundary();
             SameRoundInputs();
@@ -32,6 +35,43 @@ internal static class KernelReactiveFoundationTests
         }
         catch(Exception ex) { Console.Error.WriteLine("  FAIL: REACTIVE-HOST "+ex); return 1; }
         finally { Event.current=null; UiNative.DebugMousePositionEnabled=false; UiNative.DebugMouseDown=false; UiNative.DebugMouseUp=false; UiNative.DebugHotControl=0; }
+    }
+    private static void DefaultCounterAndWorkshop()
+    {
+        using(var counter=new CounterPageExample())
+        {
+            counter.Bindings.Set("count",9);
+            DefaultWidgetsRoundTrip(counter.Bindings,"increment",()=>counter.Count.Value,()=>counter.Operations,"Count ","counter");
+        }
+        var service=new WorkshopService();for(int i=0;i<9;i++)service.Complete();
+        using var projection=new WorkshopProjectionExample(service);
+        DefaultWidgetsRoundTrip(projection.Bindings,"complete",()=>projection.Completed.Value,()=>service.Requests,"Completed ","safe workshop projection");
+    }
+    private static void DefaultWidgetsRoundTrip(UiBindings bindings,string command,Func<int> value,Func<int> requests,string prefix,string example)
+    {
+        var metrics=new ContentMetrics();
+        using var host=Host("<Widget Kind=\"input/button\" Id=\"add\" ActionBind=\""+command+"\" Text=\"Add\" /><Widget Kind=\"text/wrapped\" Id=\"caption\" Bind=\"text\" />",bindings,metrics);
+        IList labels=(IList)(typeof(Verse.Widgets).GetField("LabelTexts",BindingFlags.Public|BindingFlags.Static)?.GetValue(null)
+            ?? throw new Exception("Verse stub label recorder missing"));
+        bool PaintedSince(int start,string text) { for(int i=start;i<labels.Count;i++)if((string)labels[i]! == text)return true;return false; }
+        int first=labels.Count;
+        Pump(host,EventType.Repaint,new Vector2(-10,-10));
+        float height=host.Session.GetNodeByElementId("caption")!.Rect!.Value.height;
+        Check(PaintedSince(first,prefix+"9") && metrics.LastText==prefix+"9",example+" default wrapped text paints the synchronized value used by actual measurement");
+        Rect button=host.Session.GetNodeByElementId("add")!.Rect!.Value;
+        var point=new Vector2(View.x+button.x+button.width/2,View.y+button.y+button.height/2);
+        int before=requests();
+        Pump(host,EventType.MouseDown,point);
+        Check(value()==9 && requests()==before,example+" default Button press captures without executing the command");
+        int releaseLabels=labels.Count;
+        Pump(host,EventType.MouseUp,point);
+        Check(value()==10 && requests()==before+1 && PaintedSince(releaseLabels,prefix+"9"),example+" default Button qualified release dispatches once while current text keeps its synchronized input");
+        int nextLabels=labels.Count;
+        Pump(host,EventType.Repaint,point);
+        Check(PaintedSince(nextLabels,prefix+"10") && metrics.LastText==prefix+"10" && host.Session.GetNodeByElementId("caption")!.Rect!.Value.height==height+2,
+            example+" next legal Host synchronization updates real wrapped text and content-dependent geometry without notification");
+        Pump(host,EventType.Repaint,point);
+        Check(requests()==before+1,example+" repaint does not repeat the established business operation");
     }
     private static void CounterAndCheckbox()
     {
@@ -128,6 +168,12 @@ internal static class KernelReactiveFoundationTests
         public void Validate(IUiBindings bindings,string path)=>bindings.ValidateValue<int>("completed",path);
         public float Measure(UiWidgetContext ctx)=>ctx.Bindings.Get<string>("text").Length;
         public void Draw(Rect rect,UiWidgetContext ctx) { Completed=ctx.Bindings.Get<int>("completed");Height=rect.height; }
+    }
+    private sealed class ContentMetrics:ITextMetrics
+    {
+        internal string LastText="";
+        public float MeasureText(string text,UiFont font,float width) { LastText=text;return text.Length*2; }
+        public float MeasureWidth(string text,UiFont font)=>text.Length*8;
     }
     private sealed class Metrics:ITextMetrics
     {

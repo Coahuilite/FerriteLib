@@ -12,6 +12,7 @@ internal static class ReactiveFoundationTests
         {
             try { action(); return false; } catch (Exception ex) { return ex.ToString().Contains(contains); }
         }
+        ImmediateQualification(Check, Throws);
         using var counter = new CounterPageExample();
         var runtime = counter.Runtime;
         var b = counter.Bindings;
@@ -199,5 +200,28 @@ internal static class ReactiveFoundationTests
         projection.Dispose(); service.Complete();
         Check(service.ReadSnapshot().Completed==5, "disposing projection does not dispose or roll back external service");
     }
-}
+    private static void ImmediateQualification(Action<bool,string> check, Func<Action,string,bool> throws)
+    {
+        var runtime=new UiReactiveRuntime();var count=runtime.Int(1);var bindings=new UiBindings(runtime);
+        bindings.BindTracked("count",()=>count.Value,v=>count.Value=v);
+        int dispatched=0,predicateValue=0,responses=0;
+        bindings.BindCommand("qualified",()=>dispatched++,()=>bindings.Get<int>("count")<100);
+        bindings.BindCommand("failing-qualification",()=>dispatched++,()=>{predicateValue=bindings.Get<int>("count");throw new Exception("qualification-cause");});
+        using var owner=runtime.CreateOwner("qualification-business");
+        owner.Respond("count",()=>{_=count.Value;responses++;});
+        using var view=bindings.CreatePresentation();view.Synchronize();
+        using(view.Enter())
+        {
+            check(bindings.CanExecute("qualified") && bindings.Get<int>("count")==1,"successful qualification restores the current presentation read scope");
+            using(runtime.Batch())
+            {
+                bindings.Set("count",159);
+                check(!bindings.CanExecute("qualified") && bindings.Get<int>("count")==1 && responses==1,"qualification reads latest binding data without flushing a pending business batch");
+                check(!bindings.TryInvokeCommand("qualified") && dispatched==0 && bindings.Get<int>("count")==1,"latest binding-based qualification refuses dispatch and preserves presentation input");
+                check(throws(()=>bindings.CanExecute("failing-qualification"),"qualification-cause") && predicateValue==159 && bindings.Get<int>("count")==1 && responses==1,"throwing qualification reads latest data then restores presentation without draining responses");
+            }
+            check(responses==2 && !bindings.CanExecute("qualified") && bindings.Get<int>("count")==1,"qualification never publishes a new presentation after outer response drain");
+        }
+    }
 
+}

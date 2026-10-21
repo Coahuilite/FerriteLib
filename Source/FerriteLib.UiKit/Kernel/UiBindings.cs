@@ -567,9 +567,13 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
         return true;
     }
 
-    private static bool CanRun(CommandDescriptor descriptor)
+    private bool CanRun(CommandDescriptor descriptor)
     {
-        return descriptor.CanExecute == null || descriptor.CanExecute();
+        // Qualification is an immediate read, not a business operation or a presentation refresh.
+        UiBindingPresentation? previous = presentation;
+        presentation = null;
+        try { return descriptor.CanExecute == null || descriptor.CanExecute(); }
+        finally { presentation = previous; }
     }
 
     public int GetRevision(string key)
