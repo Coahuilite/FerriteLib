@@ -18,6 +18,10 @@
     <!-- The real Assembly-CSharp references UnityEngine.IMGUIModule; the faithful ButtonInvisible
          model needs Event/GUIUtility from the IMGUI stub. -->
     <ProjectReference Include="..\UnityEngineImGuiStub\UnityEngineImGuiStub.csproj" />
+    <!-- GUIStyle's font dependency is supplied from the separate text-rendering copy surface.
+         Mark it explicitly non-private here too: transitive assembly resolution otherwise copies
+         it into Verse's established three-assembly output set. -->
+    <ProjectReference Include="..\UnityEngineTextRenderingModuleStub\UnityEngineTextRenderingModuleStub.csproj" Private="false" />
   </ItemGroup>
 
 </Project>
