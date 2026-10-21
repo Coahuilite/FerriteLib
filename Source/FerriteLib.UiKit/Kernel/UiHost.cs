@@ -14,6 +14,8 @@ public sealed partial class UiHost : IDisposable
 {
     private readonly string source;
     private readonly IUiBindings bindings;
+    private readonly UiBindingPresentation? reactivePresentation;
+    private int presentationRevision;
     private readonly UiTheme theme;
     private readonly ITextMetrics metrics;
     private readonly IUiTranslation translation;
@@ -121,6 +123,7 @@ public sealed partial class UiHost : IDisposable
 
         engine = new UiLayoutEngine(source, styleResolver, manifest.Templates);
         session = new UiSession();
+        reactivePresentation = (bindings as UiBindings)?.CreatePresentation();
 
         // A document that went wrong must not go quiet, and the consumer must not have to remember to ask:
         // every drop the parser or the resolver recorded is published on the fit audit's appearance
@@ -193,6 +196,14 @@ public sealed partial class UiHost : IDisposable
 
     public UiLayoutSnapshot MeasureAndArrange(Vector2 available)
     {
+        reactivePresentation?.Synchronize();
+        if (reactivePresentation != null && presentationRevision != reactivePresentation.Revision)
+        {
+            presentationRevision = reactivePresentation.Revision;
+            session.BumpContentRevision();
+        }
+        using IDisposable? inputs = reactivePresentation?.Enter();
+        using IDisposable? pure = (bindings as UiBindings)?.Reactive.Pure();
         // The arrange runs inside this host's diagnostic scope: an appearance fallback the engine records
         // while resolving a region is attributed to the host that is arranging, not to whichever host drew
         // last. Null still opens the scope, so an unsubscribed host never inherits another host's routing.
@@ -236,6 +247,7 @@ public sealed partial class UiHost : IDisposable
 
     public void Draw(Rect viewport, UiLayoutSnapshot snapshot)
     {
+        using IDisposable? inputs = reactivePresentation?.Enter();
         // The draw runs inside this host's diagnostic scope: a fit-audit finding comes out of a static text
         // outlet with no session argument, and the scope is what says which host's text it was. Popups draw
         // inside the same scope, so their findings are attributed here too.
@@ -452,6 +464,7 @@ public sealed partial class UiHost : IDisposable
 
     public void Close()
     {
+        reactivePresentation?.Dispose();
         ForgetObservationHost(this);
         // A closed host must not stay referenced by a live document service, and the service's documents
         // must survive the host: the dependency is released, the last valid version is not.
@@ -1437,3 +1450,4 @@ public sealed partial class UiHost : IDisposable
             || string.Equals(kind, "Clip", StringComparison.Ordinal);
     }
 }
+

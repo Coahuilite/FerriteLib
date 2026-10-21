@@ -4,6 +4,12 @@
     <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\Neutral\*.cs" />
     <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiFont.cs" />
     <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\ITextMetrics.cs" />
+    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiBindings.cs" />
+    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\IUiBindings.cs" />
+    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\IUiTypedChoices.cs" />
+    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiChoice.cs" />
+    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiInvalidation.cs" />
     <Compile Include="@(NeutralProductionSource)" />
   </ItemGroup>
 </Project>
+

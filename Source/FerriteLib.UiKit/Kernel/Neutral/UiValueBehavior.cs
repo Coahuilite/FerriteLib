@@ -52,6 +52,13 @@ public static class UiValueBehavior
     }
 
     /// <summary>Dispatch once per established operation, including explicit same-value selection.</summary>
+    public static void Request<T>(UiInteractionTarget target, UiValueOperation<T> operation, UiBindings bindings, Action<T> request)
+    {
+        if (!operation.Request) return;
+        using IDisposable batch = bindings.BeginOperation();
+        Request(target, operation, request);
+    }
+
     public static void Request<T>(UiInteractionTarget target, UiValueOperation<T> operation, Action<T> request)
     {
         if (!operation.Request)

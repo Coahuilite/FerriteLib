@@ -13,7 +13,7 @@ namespace FerriteLib.UiKit.Kernel;
 /// the engine folds the announcements into one commit at the next arrangement boundary.
 /// </para>
 /// </summary>
-public sealed class UiBindings : IUiBindings, IUiTypedChoices
+public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
 {
 
     /// <summary>
@@ -28,6 +28,7 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
     {
         public abstract Type ValueType { get; }
         public abstract bool CanWrite { get; }
+        public bool Tracked;
         public abstract object? GetBoxed();
         public abstract void SetBoxed(object? value);
     }
@@ -214,6 +215,50 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
         DeclareInvalidation(actionId, invalidates);
     }
 
+    public UiReactiveRuntime Reactive { get; }
+
+    public UiBindings() : this(new UiReactiveRuntime()) { }
+    public UiBindings(UiReactiveRuntime runtime) { Reactive = runtime ?? throw new ArgumentNullException(nameof(runtime)); }
+
+    partial void ReportStyleFallback(string path, string kind, string attribute, string supplied, string fallback);
+
+    /// <summary>Explicit opt-in; ordinary bindings retain their original live getter contract.</summary>
+    public void BindTracked<T>(string key, Func<T> get, Action<T>? set = null)
+    {
+        if (key == null) throw new ArgumentNullException(nameof(key));
+        AddValue(key, new ValueDescriptor<T>(get, set) { Tracked = true }, UiInvalidation.Everything);
+    }
+
+    public IDisposable BeginOperation()
+    {
+        IDisposable batch = Reactive.Batch();
+        UiBindingPresentation? previous = presentation;
+        presentation = null;
+        return new UiReactiveScope(() => { try { batch.Dispose(); } finally { presentation = previous; } });
+    }
+    public UiBindingPresentation CreatePresentation() => new(this);
+    private UiBindingPresentation? presentation;
+    internal IDisposable UsePresentation(UiBindingPresentation value)
+    {
+        UiBindingPresentation? previous = presentation;
+        presentation = value;
+        return new UiReactiveScope(() => presentation = previous);
+    }
+    internal Dictionary<string, Func<object?>> TrackedReads()
+    {
+        var reads = new Dictionary<string, Func<object?>>(StringComparer.Ordinal);
+        foreach (var item in values) if (item.Value.Tracked) reads.Add(item.Key, item.Value.GetBoxed);
+        return reads;
+    }
+    private object? ReadValue(string key, ValueDescriptor descriptor)
+        {
+        if (!descriptor.Tracked) return descriptor.GetBoxed();
+        Reactive.VerifyAccess();
+        if (presentation != null) return presentation.Read(key);
+        using IDisposable pure = Reactive.Pure();
+        return descriptor.GetBoxed();
+    }
+
     public T Get<T>(string elementId)
     {
         if (!TryGetValueDescriptor(elementId, out ValueDescriptor? descriptor))
@@ -222,7 +267,7 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
         }
 
         EnsureType<T>(descriptor!.ValueType, elementId, "value");
-        return (T)descriptor.GetBoxed()!;
+        return (T)ReadValue(elementId, descriptor)!;
     }
 
     public bool TryGet<T>(string elementId, out T value)
@@ -234,7 +279,7 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
         }
 
         EnsureType<T>(descriptor!.ValueType, elementId, "value");
-        value = (T)descriptor.GetBoxed()!;
+        value = (T)ReadValue(elementId, descriptor)!;
         return true;
     }
 
@@ -248,7 +293,7 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
         if (key == null) throw new ArgumentNullException(nameof(key));
         if (values.TryGetValue(key, out ValueDescriptor? descriptor) && descriptor!.ValueType == typeof(bool))
         {
-            value = (bool)descriptor.GetBoxed()!;
+            value = (bool)ReadValue(key, descriptor)!;
             return true;
         }
 
@@ -258,6 +303,7 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
 
     public void Set<T>(string elementId, T value)
     {
+        using IDisposable operation = BeginOperation();
         if (!TryGetValueDescriptor(elementId, out ValueDescriptor? descriptor))
         {
             throw new KeyNotFoundException($"No value binding registered for '{elementId}'.");
@@ -291,7 +337,7 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
             // rendering a degraded control with nothing on the library's audit surface to explain why. The
             // refusal is unchanged; what is added is that it is REPORTED, once per distinct mismatch, on the
             // same fail-soft channel the appearance and overflow findings use (FL-21/FL-22).
-            UiFitAudit.ReportStyleFallback(
+            ReportStyleFallback(
                 elementId, "binding", "OptionsBind", descriptor.ItemType.Name, typeof(T).Name);
             throw new InvalidOperationException(
                 $"Options binding '{elementId}' is '{descriptor.ItemType.Name}', not '{typeof(T).Name}'.");
@@ -332,7 +378,7 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
         if (key == null) throw new ArgumentNullException(nameof(key));
         if (values.TryGetValue(key, out ValueDescriptor? descriptor))
         {
-            value = descriptor!.GetBoxed();
+            value = ReadValue(key, descriptor!);
             return true;
         }
 
@@ -359,6 +405,7 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
     /// </summary>
     public bool TrySetTypedValue(string key, object? value)
     {
+        using IDisposable operation = BeginOperation();
         if (key == null) throw new ArgumentNullException(nameof(key));
         if (!values.TryGetValue(key, out ValueDescriptor? descriptor) || !descriptor!.CanWrite) return false;
         if (!Accepts(descriptor.ValueType, value)) return false;
@@ -422,6 +469,7 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
 
     public void Invoke<T>(string actionId, T payload)
     {
+        using IDisposable operation = BeginOperation();
         if (!actions.TryGetValue(actionId, out ActionDescriptor? descriptor))
         {
             throw new KeyNotFoundException($"No action binding registered for '{actionId}'.");
@@ -431,7 +479,7 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
         {
             // FL-23, the same silence one member over: an action payload read as the wrong type is refused
             // and now also reported, so a caught exception is still visible to whoever reads the audit.
-            UiFitAudit.ReportStyleFallback(
+            ReportStyleFallback(
                 actionId, "binding", "ActionBind", descriptor.PayloadType.Name, typeof(T).Name);
             throw new InvalidOperationException(
                 $"Action binding '{actionId}' expects '{descriptor.PayloadType.Name}', not '{typeof(T).Name}'.");
@@ -447,6 +495,7 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
     /// </summary>
     public void Invoke(string actionId)
     {
+        using IDisposable operation = BeginOperation();
         if (!commands.TryGetValue(actionId, out CommandDescriptor? descriptor))
         {
             throw new KeyNotFoundException($"No command binding registered for '{actionId}'.");
@@ -476,6 +525,7 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
     /// </summary>
     public bool TryInvokeCommand(string actionId)
     {
+        using IDisposable operation = BeginOperation();
         if (actionId == null) throw new ArgumentNullException(nameof(actionId));
         if (!commands.TryGetValue(actionId, out CommandDescriptor? descriptor)) return false;
         if (!CanRun(descriptor!)) return false;
@@ -611,3 +661,4 @@ public sealed class UiBindings : IUiBindings, IUiTypedChoices
         }
     }
 }
+

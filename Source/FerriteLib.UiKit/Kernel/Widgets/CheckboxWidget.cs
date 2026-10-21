@@ -312,6 +312,7 @@ internal sealed class CheckboxWidget : IUiWidget, IUiPointerLayout
             interaction, !state);
         UiValueBehavior.Request(target, operation, value =>
         {
+            using IDisposable? operation = (ctx.Bindings as UiBindings)?.BeginOperation();
             ctx.Bindings.Set(key, value);
             string actionKey = ReadActionKey();
             if (actionKey.Length > 0) ctx.Bindings.Invoke(actionKey);
@@ -434,3 +435,4 @@ internal sealed class CheckboxWidget : IUiWidget, IUiPointerLayout
         return AtomVocabulary.ReadBindKey(spec);
     }
 }
+

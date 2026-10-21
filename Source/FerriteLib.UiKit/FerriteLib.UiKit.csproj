@@ -55,7 +55,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="Kernel\Neutral\*.cs;Kernel\UiFont.cs;Kernel\ITextMetrics.cs" />
+    <Compile Remove="Kernel\Neutral\*.cs;Kernel\UiFont.cs;Kernel\ITextMetrics.cs;Kernel\UiBindings.cs;Kernel\IUiBindings.cs;Kernel\IUiTypedChoices.cs;Kernel\UiChoice.cs;Kernel\UiInvalidation.cs" />
   </ItemGroup>
   <Import Project="NeutralSources.props" />
 </Project>
+

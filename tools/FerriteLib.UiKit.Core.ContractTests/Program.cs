@@ -23,6 +23,7 @@ internal static class Program
     {
         try
         {
+            ReactiveFoundationTests.Run(Check);
             PointerLayers();
             ImageGeometry();
             Palette();
@@ -534,3 +535,4 @@ internal static class Program
         }
     }
 }
+

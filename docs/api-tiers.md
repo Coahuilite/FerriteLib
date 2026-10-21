@@ -67,6 +67,13 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
 
 ## Public-unstable
 
+- `UiReactiveRuntime` — serial reactive graph and nested operation batching (0.8 candidate).
+- `UiReactiveValue` — explicitly connected scalar storage; factories currently int/string/bool only.
+- `UiReactiveComputed` — owned lazy tracked read.
+- `UiReactiveOwner` — computation/reaction subscription lifetime, independent from business model lifetime.
+- `UiBindingPresentation` — host-owned synchronized read view.
+
+
 - `UiObservationStatus` — bounded semantic read sampling states; public-unstable.
 - `UiObservationBudget` — bounded read budgets; public-unstable.
 - `UiObservedFact` — detached read value with source, status and truncation; public-unstable.
