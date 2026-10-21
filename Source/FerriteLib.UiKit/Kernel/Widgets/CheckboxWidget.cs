@@ -310,13 +310,14 @@ internal sealed class CheckboxWidget : IUiWidget, IUiPointerLayout
         UiInteractionTarget target = UiNative.InteractionTarget(ctx, key);
         UiValueOperation<bool> operation = UiValueBehavior.Boolean(
             interaction, !state);
-        UiValueBehavior.Request(target, operation, value =>
+        Action<bool> request = value =>
         {
-            using IDisposable? operation = (ctx.Bindings as UiBindings)?.BeginOperation();
             ctx.Bindings.Set(key, value);
             string actionKey = ReadActionKey();
             if (actionKey.Length > 0) ctx.Bindings.Invoke(actionKey);
-        });
+        };
+        if (ctx.Bindings is UiBindings reactive) UiValueBehavior.Request(target, operation, reactive, request);
+        else UiValueBehavior.Request(target, operation, request);
     }
     private void Paint(Rect rect, UiResolvedStyle style, bool state, string look, UiWidgetContext ctx)
     {

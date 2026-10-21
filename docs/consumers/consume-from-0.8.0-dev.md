@@ -29,3 +29,14 @@ for all remaining first-version work.
 See [S0/S1 contract](../development/0.8/s01-contract.md) for per-property remove/following, independent
 composition, headless entry points, capture ownership and error handling. New types are public-unstable;
 keep the exact selected source/configuration/package identity with your development evidence.
+
+## Explicit reactive binding (first foundation)
+
+Use `UiReactiveRuntime.Int/Text/Boolean` and `UiBindings.BindTracked` for explicitly connected
+scalar inputs. Four actual operation entries share nested batches; Host owns the presentation read
+view, not your business owner/service. Declare tracked bindings before constructing the Host.
+Ordinary getters/options retain their existing conditions. Start with the
+[counter walkthrough](../development/0.8/counter-walkthrough-zh.md) and the
+[actual runtime/host contract](../development/0.8/reactive-foundation-contract.md); the
+[complete inventory](../development/0.8/migration-status.md) distinguishes connected uses from
+remaining editor/collection/custom/native work. No RU2 layout cache or native acceptance is implied.

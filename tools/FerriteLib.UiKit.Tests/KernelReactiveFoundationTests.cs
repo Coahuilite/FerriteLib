@@ -25,6 +25,7 @@ internal static class KernelReactiveFoundationTests
         {
             UiWidgetRegistry.Clear(); UiWidgetRegistry.InitializeCore();
             CounterAndCheckbox();
+            LegacyPurityBoundary();
             SameRoundInputs();
             IndependentProjection();
             return 0;
@@ -55,6 +56,26 @@ internal static class KernelReactiveFoundationTests
         Check(!b.TryInvokeCommand("increment") && example.Operations==operations,"execution rechecks latest command qualification");
         host.Close(); host.Close(); b.Set("count",7);
         Check(example.Observed==7 && seenCount==7,"Host Close twice releases view only and independent business responses continue");
+    }
+    private static void LegacyPurityBoundary()
+    {
+        var b=new UiBindings(); int operations=0;
+        b.BindCommand("legacy-write",()=>operations++);
+        b.BindReadOnly("value",()=>{ b.Invoke("legacy-write"); return 1; });
+        var probe=new Probe { OnMeasure=()=>b.Invoke("legacy-write") };
+        UiWidgetRegistry.Register("reactive","legacy-probe",()=>probe,Array.Empty<string>());
+        using(var host=Host("<Widget Kind=\"legacy-probe\" Id=\"legacy\" />",b))
+            Pump(host,EventType.Repaint,new Vector2(-10,-10));
+        Check(operations>1,"legacy getter and custom Measure keep original operation conditions");
+        var runtime=new UiReactiveRuntime(); var source=runtime.Int(); var tracked=new UiBindings(runtime);
+        tracked.BindTracked("value",()=>{ source.Value++; return source.Value; });
+        bool refused=false;
+        using(var host=Host("<Widget Kind=\"legacy-probe\" Id=\"new\" />",tracked))
+        {
+            try { Pump(host,EventType.Repaint,new Vector2(-10,-10)); }
+            catch(InvalidOperationException ex) { refused=ex.ToString().Contains("forbidden"); }
+        }
+        Check(refused && source.Value==0,"new BindTracked getter refuses writes without retrofitting legacy purity");
     }
     private static void SameRoundInputs()
     {
@@ -94,10 +115,10 @@ internal static class KernelReactiveFoundationTests
     private sealed class Probe:IUiWidget
     {
         public string Kind=>"probe";
-        internal int Measured,Drawn; internal float Height; internal Action? OnDraw;
+        internal int Measured,Drawn; internal float Height; internal Action? OnDraw; internal Action? OnMeasure;
         public void Configure(UiElementSpec spec) { }
         public void Validate(IUiBindings bindings,string path)=>bindings.ValidateValue<int>("value",path);
-        public float Measure(UiWidgetContext ctx) { Measured=ctx.Bindings.Get<int>("value");return Measured*10; }
+        public float Measure(UiWidgetContext ctx) { OnMeasure?.Invoke(); Measured=ctx.Bindings.Get<int>("value");return Measured*10; }
         public void Draw(Rect rect,UiWidgetContext ctx) { OnDraw?.Invoke(); Drawn=ctx.Bindings.Get<int>("value"); Height=rect.height; }
     }
     private sealed class WorkshopProbe:IUiWidget

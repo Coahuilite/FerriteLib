@@ -123,7 +123,7 @@ public sealed partial class UiHost : IDisposable
 
         engine = new UiLayoutEngine(source, styleResolver, manifest.Templates);
         session = new UiSession();
-        reactivePresentation = (bindings as UiBindings)?.CreatePresentation();
+        reactivePresentation = (bindings as UiBindings)?.CreateHostPresentation();
 
         // A document that went wrong must not go quiet, and the consumer must not have to remember to ask:
         // every drop the parser or the resolver recorded is published on the fit audit's appearance
@@ -203,7 +203,6 @@ public sealed partial class UiHost : IDisposable
             session.BumpContentRevision();
         }
         using IDisposable? inputs = reactivePresentation?.Enter();
-        using IDisposable? pure = (bindings as UiBindings)?.Reactive.Pure();
         // The arrange runs inside this host's diagnostic scope: an appearance fallback the engine records
         // while resolving a region is attributed to the host that is arranging, not to whichever host drew
         // last. Null still opens the scope, so an unsubscribed host never inherits another host's routing.

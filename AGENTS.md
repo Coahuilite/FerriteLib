@@ -123,6 +123,13 @@ Consumer ladder when the library lacks something:
 Promotion gate — all four or it stays consumer-side: provenance cited; neutral, and no consumer's
 numbers as library defaults; no new process-wide mutable statics; a harness-drivable lane exists.
 
+**Reactive dynamic-context exception (2026-10-21).** One `[ThreadStatic]` current-runtime marker may
+exist only during dynamic tracked/pure-read calls. Nested calls save the previous marker and restore it in
+`finally`; the outermost exit retains nothing. It may diagnose cross-runtime reads/writes and enforce the
+new pure-read contract, not retain business data/services/subscriptions, a static graph/queue/cache, or
+thread scheduling authority. Unenrolled legacy calls gain no new prerequisite. This is the narrow exception
+to the mutable-static rule for the reactive foundation; other ownership constraints remain.
+
 **R9 bounded discovery exception (PM engineering decision, 2026-10-19):** live-host discovery may keep
 at most 512 weak references, using the existing Host/Session identity. Successful construction registers;
 Close/Dispose removes; queries may discard dead entries. No permanent strong host references, model/node

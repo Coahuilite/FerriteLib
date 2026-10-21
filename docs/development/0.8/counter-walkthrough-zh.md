@@ -1,103 +1,70 @@
 # 计数器：从手工通知到自动更新
 
-数字、说明、加号按钮：作者表达内容和业务操作，库负责依赖与展示更新。本页是[主规格](README.md)
-的教学附页；目标轨迹是可观察预期，**不是运行或测试结果**。
+0.8 Dev 已提供下面的实际入口。计数器用于看清一条链，不代表全部 FL 用途已迁完；
+[完整用途表](migration-status.md)分别记录新响应接入、自动证据和原生状态。
 
-## 1. 当前真实入口：读值不等于订阅
-
-以下 UiBindings 调用已存在；片段省略页面、宿主及 using，count 由示例业务拥有：
+## 先连接一次，之后普通赋值
 
 ```csharp
-int count = 0;
-var bindings = new UiBindings();
-bindings.BindReadOnly<string>("caption", () => "Count: " + count);
-bindings.BindCommand("increment", () =>
+var runtime = new UiReactiveRuntime();
+var count = runtime.Int();
+var bindings = new UiBindings(runtime);
+bindings.BindTracked("caption", () => "Count: " + count.Value);
+bindings.BindTracked("count", () => count.Value, value => count.Value = value);
+bindings.BindCommand("increment", () => count.Value++);
+```
+
+`text/wrapped` 的 Bind 接 `caption`，按钮 ActionBind 接 `increment`，按既有 XML/Host 入口装配。
+getter 实际读取 count，库自动建边；不手写依赖列表、NotifyChanged 或缓存键。
+`Int`／`Text`／`Boolean` 明确使用整数相等／ordinal 字符串相等／布尔相等；相同存储值跳过失效。
+普通 C# 字段、任意引用对象和集合原地修改不因此自动可观察。
+
+旧 `BindReadOnly("caption", () => "Count: " + plainCount)` 仍是普通 getter；业务改 plainCount 后仍需
+`NotifyChanged("caption")`。新纯度条件不倒灌旧 getter／自定义测量。
+
+## 一次操作，三个读时点
+
+1. 指针按已有有效几何命中，合格松开成立一次请求；执行重查最新资格，业务仍可拒绝。
+2. 命令进入隐式批次，赋值立即可读，依赖先失效；最外层结束再运行自动响应。
+3. Host 在允许的呈现机会先同步展示输入，再测排／绘制。同轮沿用这一份输入；处理中新增业务值
+   留待下个合法同步点。不固定为 tick、Repaint 或一帧，hover／pressed 等即时反馈仍可变化。
+
+```csharp
+using var business = runtime.CreateOwner("counter-business");
+var caption = business.Compute("caption", () => "Count: " + count.Value);
+business.Respond("observe", () => Console.WriteLine(count.Value));
+using (bindings.BeginOperation())
 {
-    count++;
-    bindings.NotifyChanged("caption");
-});
+    bindings.Set("count", 1);
+    Console.WriteLine(bindings.Get<int>("count")); // 1，业务即时读
+    Console.WriteLine(caption.Value);             // Count: 1，显式派生读不旧
+    bindings.Set("count", 2);
+}
+// 自动响应随后见 2；展示也可以只采用最终 2。
 ```
 
-text/wrapped 的 Bind 接 caption，按钮 ActionBind 接 increment。Get 连接读值，命令连接操作，
-NotifyChanged 提供变化事实。普通字段自身不通知；默认 Everything 失效也不是自动追踪。
-生产签名位于 `Source/FerriteLib.UiKit/Kernel/IUiBindings.cs`、`UiBindings.cs`。
-外部改值仍由作者接通知；本轮不改变旧入口的合法条件。
-缺少 NotifyChanged 不等于 getter 永远读不到新的 count：绘制路径再次读值时可能已显示新文字，
-但缓存的测量／几何仍可能是旧结果。通知缺口是失效接线缺失，不是停止读取。
+自动响应不依赖窗口存在；需要逐次保存时放在业务命令／事件中，不挂在文字 getter 或 Draw 上。
+两次加 0 仍是两次业务操作；存储同值跳过不能吞掉请求。异常不回滚或重放已发生的业务写入。
+Checkbox 的 Set→Invoke 已接同一共享逻辑操作，自动响应不插进两者之间。
 
-## 2. 候选设计：追踪实际读取的来源
+## 独立业务保留自己的权威
 
-**UiSignal／BindTracked／Command／Batch／Computed 均为候选示意，不是现有 API；拼写与兼容策略未批准。**
+可编译双例在 `tools/FerriteLib.UiKit.Core.ContractTests/`：`ReactiveExamples.cs` 是简单计数器；
+`WorkshopService.cs` 是无 FL 依赖的工坊服务，自己持锁和业务规则；`WorkshopProjectionExample.cs`
+把它提供的不可变安全快照送到 FL 投影的所属上下文，再用一次 Batch 更新 Completed／Accepting。
+UI getter 只读投影，不因为通知已送达 UI 就无保护地读取后台可变对象。命令回送业务，业务决定是否接受。
+任务调度、跨线程投递和新旧结果取舍属于消费者／接入层，不由 FL 接管。
 
-```csharp
-// 候选伪代码，不可用于当前产品编译。
-count = UiSignal(0);
-BindTracked("caption", () => "Count: " + count.Value);
-Command("increment", () => count.Value++);
-Command("reset", () => count.Value = 0);
-```
+关闭 Host 只清自己的展示计算／订阅。独立业务 owner 和服务继续工作；最终由各自 owner 释放，
+Dispose 不保存、不回滚、不销毁外部模型。换分支会撤旧依赖；失败构建不发布半份展示／几何，不重放操作。
 
-计算实际读取 count，库追踪依赖；作者不再重复写依赖列表、通知或缓存键。条件计算追踪实际读取，
-不扫描任意 C# 字段。默认包装接好文字对测量／呈现的常规影响，特殊扩展仍表达真实影响。
-集合原地修改等观察表面待主规格 A8 RU1。
+## 本包已证明什么
 
-## 3. 一次点击的五步
+无引擎 E2E 使用同一生产 `NeutralSources.props`：实际业务操作／共享布尔请求 →
+值与依赖 → 批次与响应 → 展示同步 → 中立布局几何；计数器和独立安全业务投影都覆盖。
+可控适配测试另走真实 UiHost/Checkbox；原生输入、字体、IME 和合成仍需实机。
 
-1. 命中有效呈现几何，Button 按 F1 在有效松开成立一次操作，不按 Draw 次数派发。
-2. 执行时按最新业务状态重查资格；enabled 即使暂时仍亮，业务也可拒绝（FL08-U4）。
-3. 命令是隐式批次，count 立即从 0 变 1、依赖及时失效，业务主动读即 1（U1/U2）。
-4. 最外层结束后自动响应可合并；先完成失效再读取，不靠窗口刷新驱动（U5）。
-5. 宿主合法呈现机会先同步展示输入，再测排、绘制 Count: 1，同轮输入一致（U3）。
-
-保存若需逐次处理，交业务命令／事件，不挂在 caption 计算或绘制上（U6）。业务响应的 owner
-不应依赖窗口存在或重绘。
-
-## 4. 批中可读中间值，展示不必画出它
-
-本节另用可选派生计算演示显式读取；Computed 不是每个绑定都必需的中间层。
-
-```csharp
-// 候选伪代码；Batch 入口尚未批准。
-caption = Computed(() => "Count: " + count.Value);
-Batch(() => {
-    count.Value = 1;
-    Read(count.Value);   // 1
-    Read(caption.Value); // Count: 1，不能给已知过期缓存
-    count.Value = 2;
-});
-// 自动响应不插入两次写入之间；随后展示可只同步 Count: 2。
-```
-
-嵌套批次并到最外层。显式读取不同于自动观察，惰性不是允许读旧缓存。写到 1 后异常，批次
-不自动回滚成 0；恢复政策待 RU3。两次业务操作不能因展示只见最终值而丢失。响应中再写入形成
-后续调度，不递归订阅调用链；测排／绘制中新变化到下个合法同步点，不固定为 tick、Repaint 或下一帧。
-
-## 5. 字变了，不必重排整页
-
-假定计数器位于明确更新范围、父宽度与字体等输入不变，内部仍完成所需重新求值、测量、排列与绘制。
-完整对外布局结果不变，不需由此使外部布局失效；外框不变不等于内部不用重排。
-数字变长造成自然宽度、换行高度或其他对外结果变化时，向消费它的
-父级／共享列传播。父约束或共享环境变化又可使范围重算。尺寸不一定是唯一输出，完整输出与缓存
-有效条件待 RU2；范围不能硬截断合法依赖。
-
-作者用 Row／Column 关系对齐数字与按钮，不手算普通像素。特殊偏移须区分占位调整、整体呈现移动、
-内部装饰；既有 Overlay 偏移不自动扩大自然占位，不借此引入通用变换。
-
-## 6. 关闭与换后端
-
-实际 Close／Dispose 幂等释放窗口自己的订阅、依赖与会话，不保存、不回滚、不销毁外部 count
-模型或共享服务。隐藏不是销毁，隐藏观察政策仍待 RU3。
-
-同一生产核心保留绑定、批次、行为、依赖与布局；宿主接真实输入／资格／焦点／IME／寿命，绘制
-后端执行中立意图并管理资源。文字测量须匹配实际绘制，命中、裁剪、偏移、弹层锚点共用坐标合同。
-1.6／1.7 各验真实接入，GPU 接缝不是已实现支持；复用已有中性生产源集，不抄教学或测试核心。
-
-## 可观察预期
-
-| 场景 | 应观察到 | 不应观察到 |
-| --- | --- | --- |
-| 一次有效点击再重绘 | 一次业务操作，最终展示 1 | 每次绘制再加一 |
-| 批内写 1、读、写 2 | 主动读 1，最终展示可为 2 | 过期缓存、丢业务事件 |
-| 完整对外结果不变／变化 | 内部完成必要测排绘制，不因同一结果使外部布局失效／按真实依赖传播 | 外框不变便跳过内部重排、一律整页重排、范围硬截断 |
-| 实际关闭两次 | 释放一次，模型保留 | Dispose 保存／销毁模型 |
-| 换宿主／绘制 | 同一核心合同，独立原生证据 | stub 成功即 1.7 完成 |
+**局部布局缓存尚未实现。** 本包新展示输入变动沿既有完整测排，不把“外框未变”当作内部不用测排。
+RU2 将决定范围输出／跨范围协作／缓存有效条件；引用比较、集合表面、详细失败／隐藏、
+剩余旧入口迁移与平台承诺仍分项待定。实际接口、阶段及故障边界见
+[生产合同](reactive-foundation-contract.md)。

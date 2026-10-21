@@ -217,8 +217,9 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
 
     public UiReactiveRuntime Reactive { get; }
 
-    public UiBindings() : this(new UiReactiveRuntime()) { }
-    public UiBindings(UiReactiveRuntime runtime) { Reactive = runtime ?? throw new ArgumentNullException(nameof(runtime)); }
+    private bool reactiveEnabled;
+    public UiBindings() { Reactive = new UiReactiveRuntime(); }
+    public UiBindings(UiReactiveRuntime runtime) { Reactive = runtime ?? throw new ArgumentNullException(nameof(runtime)); reactiveEnabled = true; }
 
     partial void ReportStyleFallback(string path, string kind, string attribute, string supplied, string fallback);
 
@@ -226,17 +227,44 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
     public void BindTracked<T>(string key, Func<T> get, Action<T>? set = null)
     {
         if (key == null) throw new ArgumentNullException(nameof(key));
+        Reactive.VerifyAccess(); reactiveEnabled = true;
         AddValue(key, new ValueDescriptor<T>(get, set) { Tracked = true }, UiInvalidation.Everything);
     }
 
     public IDisposable BeginOperation()
     {
+        reactiveEnabled = true;
         IDisposable batch = Reactive.Batch();
         UiBindingPresentation? previous = presentation;
         presentation = null;
         return new UiReactiveScope(() => { try { batch.Dispose(); } finally { presentation = previous; } });
     }
-    public UiBindingPresentation CreatePresentation() => new(this);
+    internal void RunOperation(Action action) => RunOperation(() => { action(); return true; });
+    private T RunOperation<T>(Func<T> action)
+    {
+        if (!reactiveEnabled)
+        {
+            UiReactiveRuntime.Current?.AssertWritable();
+            return action();
+        }
+        IDisposable scope = BeginOperation();
+        T result;
+        try { result = action(); }
+        catch (Exception businessFailure)
+        {
+            try { scope.Dispose(); }
+            catch (Exception responseFailure)
+            {
+                throw new AggregateException("Business operation and its response drain both failed. Neither is retried.", businessFailure, responseFailure);
+            }
+            throw;
+        }
+        scope.Dispose();
+        return result;
+    }
+
+    public UiBindingPresentation CreatePresentation() { reactiveEnabled = true; return new(this); }
+    internal UiBindingPresentation? CreateHostPresentation() => reactiveEnabled ? CreatePresentation() : null;
     private UiBindingPresentation? presentation;
     internal IDisposable UsePresentation(UiBindingPresentation value)
     {
@@ -251,7 +279,7 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
         return reads;
     }
     private object? ReadValue(string key, ValueDescriptor descriptor)
-        {
+    {
         if (!descriptor.Tracked) return descriptor.GetBoxed();
         Reactive.VerifyAccess();
         if (presentation != null) return presentation.Read(key);
@@ -301,9 +329,10 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
         return false;
     }
 
-    public void Set<T>(string elementId, T value)
+    public void Set<T>(string elementId, T value) => RunOperation(() => SetCore(elementId, value));
+
+    private void SetCore<T>(string elementId, T value)
     {
-        using IDisposable operation = BeginOperation();
         if (!TryGetValueDescriptor(elementId, out ValueDescriptor? descriptor))
         {
             throw new KeyNotFoundException($"No value binding registered for '{elementId}'.");
@@ -403,9 +432,10 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
     /// writing anything: the decorated <c>(T)value</c> cast would otherwise throw inside the setter (or, worse,
     /// coerce), so the type check happens here, before any write, and a refusal is reported as false.
     /// </summary>
-    public bool TrySetTypedValue(string key, object? value)
+    public bool TrySetTypedValue(string key, object? value) => RunOperation(() => TrySetTypedValueCore(key, value));
+
+    private bool TrySetTypedValueCore(string key, object? value)
     {
-        using IDisposable operation = BeginOperation();
         if (key == null) throw new ArgumentNullException(nameof(key));
         if (!values.TryGetValue(key, out ValueDescriptor? descriptor) || !descriptor!.CanWrite) return false;
         if (!Accepts(descriptor.ValueType, value)) return false;
@@ -467,9 +497,10 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
         return (underlying ?? declared).IsInstanceOfType(value);
     }
 
-    public void Invoke<T>(string actionId, T payload)
+    public void Invoke<T>(string actionId, T payload) => RunOperation(() => InvokeCore(actionId, payload));
+
+    private void InvokeCore<T>(string actionId, T payload)
     {
-        using IDisposable operation = BeginOperation();
         if (!actions.TryGetValue(actionId, out ActionDescriptor? descriptor))
         {
             throw new KeyNotFoundException($"No action binding registered for '{actionId}'.");
@@ -493,9 +524,10 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
     /// no-op here and not an exception - but it is enforced on the execution path, which is what keeps a
     /// control that forgot to ask from firing a command its owner has taken away.
     /// </summary>
-    public void Invoke(string actionId)
+    public void Invoke(string actionId) => RunOperation(() => InvokeCore(actionId));
+
+    private void InvokeCore(string actionId)
     {
-        using IDisposable operation = BeginOperation();
         if (!commands.TryGetValue(actionId, out CommandDescriptor? descriptor))
         {
             throw new KeyNotFoundException($"No command binding registered for '{actionId}'.");
@@ -523,9 +555,10 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
     /// because it answers true for an unbound key on purpose, and <see cref="Invoke(string)"/> cannot because
     /// it throws for one.
     /// </summary>
-    public bool TryInvokeCommand(string actionId)
+    public bool TryInvokeCommand(string actionId) => RunOperation(() => TryInvokeCommandCore(actionId));
+
+    private bool TryInvokeCommandCore(string actionId)
     {
-        using IDisposable operation = BeginOperation();
         if (actionId == null) throw new ArgumentNullException(nameof(actionId));
         if (!commands.TryGetValue(actionId, out CommandDescriptor? descriptor)) return false;
         if (!CanRun(descriptor!)) return false;

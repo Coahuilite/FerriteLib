@@ -8,6 +8,8 @@ namespace FerriteLib.UiKit.Kernel;
 /// this object neither owns a business scheduler nor marshals arbitrary external models.</summary>
 public sealed class UiReactiveRuntime
 {
+    // WO foundation r2 exception: dynamic call context only; never an owner of graph/business state.
+    [ThreadStatic] internal static UiReactiveRuntime? Current;
     private readonly int thread = Thread.CurrentThread.ManagedThreadId;
     private readonly List<UiReactiveReaction> pending = new();
     private readonly HashSet<UiReactiveReaction> queued = new();
@@ -16,9 +18,12 @@ public sealed class UiReactiveRuntime
     private int pureDepth;
     internal UiReactiveObserver? Observer;
     internal HashSet<UiReactiveSource>? Reads;
+    internal Dictionary<UiReactiveSource, int>? ReadVersions;
 
     public void VerifyAccess()
     {
+        if (Current != null && Current != this)
+            throw new InvalidOperationException("Cross-runtime reactive access during a tracked/read phase. Project a safe result into the active runtime instead.");
         if (Thread.CurrentThread.ManagedThreadId != thread)
             throw new InvalidOperationException("Reactive access belongs to its creating serial context. Deliver a safe result through the host adapter first.");
     }
@@ -35,10 +40,15 @@ public sealed class UiReactiveRuntime
         return new UiReactiveScope(() => { VerifyAccess(); if (--batchDepth == 0) Drain(); });
     }
 
+    /// <summary>Opt-in pure measurement/drawing; legacy mixed Draw/input and ordinary getters are not enrolled.</summary>
+    public IDisposable ReadPhase() => Pure();
+
     internal IDisposable Pure()
     {
-        VerifyAccess(); pureDepth++;
-        return new UiReactiveScope(() => pureDepth--);
+        VerifyAccess();
+        UiReactiveRuntime? previous = Current;
+        Current = this; pureDepth++;
+        return new UiReactiveScope(() => { try { pureDepth--; } finally { Current = previous; } });
     }
 
     internal void AssertWritable()
@@ -50,15 +60,21 @@ public sealed class UiReactiveRuntime
     internal T Track<T>(UiReactiveObserver observer, Func<T> read, bool pure)
     {
         VerifyAccess();
+        UiReactiveRuntime? previousRuntime = Current;
+        Current = this;
         UiReactiveObserver? previous = Observer;
         HashSet<UiReactiveSource>? previousReads = Reads;
+        Dictionary<UiReactiveSource, int>? previousVersions = ReadVersions;
         var found = new HashSet<UiReactiveSource>();
         Observer = observer; Reads = found;
+        var versions = new Dictionary<UiReactiveSource, int>();
+        ReadVersions = versions;
         IDisposable? scope = pure ? Pure() : null;
         try
         {
             T result = read();
             observer.ReplaceDependencies(found);
+            foreach (var entry in versions) if (entry.Key.Revision != entry.Value) { observer.MarkDirty(); break; }
             return result;
         }
         catch (Exception ex)
@@ -66,7 +82,7 @@ public sealed class UiReactiveRuntime
             // A failed evaluation does not retain provisional edges, publish a value or replay an operation.
             throw new InvalidOperationException("Reactive evaluation failed at '" + observer.Name + "'.", ex);
         }
-        finally { scope?.Dispose(); Observer = previous; Reads = previousReads; }
+        finally { scope?.Dispose(); Observer = previous; Reads = previousReads; ReadVersions = previousVersions; Current = previousRuntime; }
     }
 
     internal void Schedule(UiReactiveReaction reaction)
@@ -78,14 +94,16 @@ public sealed class UiReactiveRuntime
     {
         if (batchDepth != 0 || draining) return;
         draining = true;
-        int steps = 0;
+        var executions = new Dictionary<UiReactiveReaction, int>();
         try
         {
             while (pending.Count != 0)
             {
                 UiReactiveReaction next = pending[0]; pending.RemoveAt(0); queued.Remove(next);
                 if (next.Disposed) continue;
-                if (++steps > 100) throw new InvalidOperationException("Reactive response cycle near '" + next.Name + "' (100 scheduled evaluations). Queue discarded; business writes remain applied.");
+                int steps = executions.TryGetValue(next, out int previous) ? previous + 1 : 1;
+                executions[next] = steps;
+                if (steps > 100) throw new InvalidOperationException("Reactive response cycle near '" + next.Name + "' (100 repeated evaluations of this response). Queue discarded; business writes remain applied.");
                 next.Run();
             }
         }
@@ -104,17 +122,20 @@ internal sealed class UiReactiveScope : IDisposable
 internal abstract class UiReactiveSource
 {
     protected readonly UiReactiveRuntime Runtime;
+    internal int Revision;
     private readonly HashSet<UiReactiveObserver> observers = new();
     protected UiReactiveSource(UiReactiveRuntime runtime) { Runtime = runtime; }
     internal void Read()
     {
         Runtime.VerifyAccess();
         Runtime.Reads?.Add(this);
+        if (Runtime.ReadVersions != null && !Runtime.ReadVersions.ContainsKey(this)) Runtime.ReadVersions.Add(this, Revision);
     }
     internal void Subscribe(UiReactiveObserver observer) => observers.Add(observer);
     internal void Unsubscribe(UiReactiveObserver observer) => observers.Remove(observer);
     internal void Invalidate()
     {
+        Revision++;
         // Finish the entire invalidation graph before running any scheduled response.
         foreach (UiReactiveObserver observer in new List<UiReactiveObserver>(observers)) observer.MarkDirty();
     }
@@ -179,7 +200,7 @@ public sealed class UiReactiveComputed<T> : IDisposable
         private T value = default!;
         private bool dirty = true;
         private bool evaluating;
-        internal int Revision;
+        internal int EvaluationRevision;
         public override void Dispose() { base.Dispose(); read = null; value = default!; }
         internal Calculation(UiReactiveRuntime runtime, string name, Func<T> read) : base(runtime, name) { this.read = read; }
         internal T Value
@@ -192,7 +213,7 @@ public sealed class UiReactiveComputed<T> : IDisposable
                 if (dirty)
                 {
                     evaluating = true;
-                    try { value = Runtime.Track(this, read!, true); dirty = false; Revision++; }
+                    try { value = Runtime.Track(this, read!, true); dirty = false; EvaluationRevision++; }
                     finally { evaluating = false; }
                 }
                 Read(); return value;
@@ -203,17 +224,23 @@ public sealed class UiReactiveComputed<T> : IDisposable
     private readonly Calculation calculation;
     internal UiReactiveComputed(UiReactiveRuntime runtime, string name, Func<T> read) { calculation = new Calculation(runtime, name, read); }
     public T Value => calculation.Value;
-    internal int Revision => calculation.Revision;
+    internal int Revision => calculation.EvaluationRevision;
     public void Dispose() => calculation.Dispose();
 }
 
 internal sealed class UiReactiveReaction : UiReactiveObserver
 {
     private Action? respond;
+    private bool initialized;
     internal UiReactiveReaction(UiReactiveRuntime runtime, string name, Action respond) : base(runtime, name) { this.respond = respond; }
     internal override void MarkDirty() { if (!Disposed) Runtime.Schedule(this); }
     public override void Dispose() { base.Dispose(); respond = null; }
-    internal void Run() { if (!Disposed) Runtime.Track(this, () => { respond!(); return true; }, false); }
+    internal void Run()
+    {
+        if (Disposed) return;
+        try { Runtime.Track(this, () => { respond!(); return true; }, false); initialized = true; }
+        catch { if (!initialized) Dispose(); throw; }
+    }
 }
 
 /// <summary>Owns only graph subscriptions/calculations, never the external model or its service.</summary>
@@ -238,8 +265,10 @@ public sealed class UiReactiveOwner : IDisposable
     {
         Check(); if (respond == null) throw new ArgumentNullException(nameof(respond));
         var reaction = new UiReactiveReaction(runtime, name + "/" + key, respond);
-        try { reaction.Run(); children.Add(reaction); return reaction; }
-        catch { reaction.Dispose(); throw; }
+        children.Add(reaction);
+        runtime.Schedule(reaction);
+        try { runtime.Drain(); return reaction; }
+        catch { reaction.Dispose(); children.Remove(reaction); throw; }
     }
     public void Dispose()
     {

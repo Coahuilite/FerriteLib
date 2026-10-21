@@ -2,10 +2,10 @@
 
 ## 0.8 continuation
 
-- [ ] Obtain decisions for the five new A8 groups in `docs/development/0.8/README.md`: observable
-      surface, scope/cache outputs, failure/hidden observation, legacy migration and 1.6/1.7 delivery.
-      Documentation delivery is the current stopping point. Implementation, builds, product tests,
-      commits and US migration need new authorization; native actions below are pending, not permission.
+- [ ] Close the remaining A8 subitems: RU1 reference/collection surfaces, RU2 scope/cache outputs,
+      RU3 detailed failure/hidden observation, RU4 remaining use migrations and RU5 platform delivery.
+      The first reactive foundation is implemented; its complete use-by-use migration limits are in
+      `docs/development/0.8/migration-status.md`. Native actions below remain pending, not permission.
 
 - [ ] Run the native 1.6 S0/S1 acceptance in docs/development/0.8/s01-contract.md after the developer installs the selected isolated Dev package.
 - [ ] Run the native BSE acceptance in `docs/development/0.8/bse-contract.md` using the selected isolated Dev package.

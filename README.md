@@ -8,7 +8,7 @@ no patches, no languages, no textures: enabling it alone changes nothing in the 
 your mod list without a consumer installed, that consumer was uninstalled or disabled; the mod is safe
 to disable only when no enabled mod depends on it.
 
-**Development line: 0.8.0 technical candidate.** See the [active specification](docs/development/0.8/README.md), [complete migration inventory](docs/development/0.8/migration-status.md) and [candidate usage](docs/consumers/consume-from-0.8.0-dev.md). Automatic tracking/local caching and neutral core/1.7 are confirmed targets, not implemented support. Native 1.6 acceptance and US consumption of 0.8 remain open.
+**Development line: 0.8.0 technical candidate.** See the [active specification](docs/development/0.8/README.md), [complete migration inventory](docs/development/0.8/migration-status.md) and [candidate usage](docs/consumers/consume-from-0.8.0-dev.md). The first same-source neutral reactive binding/operation/Host foundation is implemented; local layout caching, complete use migration and 1.7 support remain open. Native 1.6 acceptance and US consumption of 0.8 remain open.
 
 ## What the library provides
 

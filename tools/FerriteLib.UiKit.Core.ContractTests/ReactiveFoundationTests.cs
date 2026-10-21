@@ -30,6 +30,23 @@ internal static class ReactiveFoundationTests
         }
         view.Synchronize();
         using (view.Enter()) Check(b.Get<int>("count") == 2, "next legal synchronization adopts pending input");
+        var interactions = new UiInteractionSession();
+        var target = new UiInteractionTarget("neutral-checkbox", "counter");
+        var operation = UiValueBehavior.Boolean(interactions.Activate(target, new UiInputEligibility(true)), true);
+        int bothSeen = 0; bool selectedSeen = false;
+        using (var both = runtime.CreateOwner("neutral-checkbox-business"))
+        {
+            both.Respond("both", () => { selectedSeen = counter.Selected.Value; _ = counter.Count.Value; bothSeen++; });
+            UiValueBehavior.Request(target, operation, b, value => { b.Set("selected", value); b.Invoke("changed"); });
+            Check(bothSeen == 2 && selectedSeen && counter.Count.Value == 3, "neutral shared behavior Set-to-Invoke uses one logical operation before presentation geometry");
+            view.Synchronize();
+            using(view.Enter())
+            {
+                var plan=UiLayout.Stack(new UiLayoutFrame(100,100,0,0,0,0,0,0,default),new[]{new UiLayoutChild(100)},
+                    (i,w,h,c)=>new UiLayoutSize(w,b.Get<int>("count")*10));
+                Check(plan.Slots[0].Height==30,"established neutral behavior request reaches synchronized geometry in one production chain");
+            }
+        }
         int reactions = 0;
         using var observer = runtime.CreateOwner("test-business");
         observer.Respond("count", () => { _ = counter.Count.Value; reactions++; });
@@ -42,6 +59,11 @@ internal static class ReactiveFoundationTests
             Check(counter.Count.Value == 8 && reactions == 1, "typed and try command nest into the same outer logical batch");
         }
         Check(reactions == 2 && counter.Observed == 8, "outer batch drains automatic response once");
+        int selectionRequests=0;
+        var sameSelection=UiValueBehavior.Selection(interactions.Activate(target,new UiInputEligibility(true)),8);
+        UiValueBehavior.Request(target,sameSelection,b,v=>{selectionRequests++;b.Set("count",v);});
+        UiValueBehavior.Request(target,sameSelection,b,v=>{selectionRequests++;b.Set("count",v);});
+        Check(selectionRequests==2 && reactions==2,"same-value selection still makes each request while scalar storage skips notification");
         int before = reactions;
         b.Set("count", 8);
         Check(reactions == before, "same scalar storage skips invalidation");
@@ -67,6 +89,59 @@ internal static class ReactiveFoundationTests
         int zSeen = 0; observer.Respond("follow-read", () => zSeen=z.Value);
         a.Value = 3;
         Check(zSeen == 3 && max == 1, "response writes schedule subsequent work without recursive subscriptions");
+        var manySource = runtime.Int(); int manyReads=0;
+        using(var many=runtime.CreateOwner("many-independent"))
+        {
+            for(int i=0;i<150;i++) many.Respond("response-"+i,()=>{ _=manySource.Value; manyReads++; });
+            manySource.Value=1;
+            Check(manyReads==300,"more than 100 independent responses are not misdiagnosed as a cycle");
+        }
+        using(runtime.ReadPhase()) Check(Throws(()=>a.Value=9,"forbidden"),"explicit new pure measurement or draw scope refuses writes");
+        int provisionalRuns=0;
+        Check(Throws(()=>observer.Respond("initial-failure",()=>{ provisionalRuns++; _=a.Value; throw new Exception("initial"); }),"initial-failure"),"initial response failure clears provisional tracking");
+        a.Value=4;
+        Check(provisionalRuns==1,"failed response registration retains no temporary subscription");
+        var registrationValue=runtime.Int(); var order=new List<string>();
+        observer.Respond("existing-registration-target",()=>{ _=registrationValue.Value; order.Add("B"); });
+        order.Clear();
+        observer.Respond("new-registration-writer",()=>{ order.Add("A-start");registrationValue.Value=1;order.Add("A-end"); });
+        Check(string.Join(",",order)=="A-start,A-end,B","initial response writes use scheduled follow-up rather than recursively invoking an existing observer");
+        int initialInBatch=0;
+        using(runtime.Batch())
+        {
+            observer.Respond("deferred-registration",()=>{ _=registrationValue.Value;initialInBatch++; });
+            registrationValue.Value=2;
+            Check(initialInBatch==0,"response registration inside a batch cannot insert initial observation halfway through it");
+        }
+        Check(initialInBatch==1,"first response evaluation runs at the outer legal boundary");
+        var legacy=new UiBindings();int legacyValue=0,legacyCalls=0;
+        legacy.BindValue("value",()=>legacyValue,v=>legacyValue=v);
+        legacy.BindCommand("call",()=>legacyCalls++);
+        legacy.BindAction<int>("add",v=>legacyValue+=v);
+        Exception? legacyFailure=null;
+        var legacyThread=new Thread(()=>{try{legacy.Set("value",1);legacy.Invoke("call");legacy.Invoke<int>("add",2);legacy.TryInvokeCommand("call");}catch(Exception ex){legacyFailure=ex;}});
+        legacyThread.Start();legacyThread.Join();
+        Check(legacyFailure==null && legacyValue==3 && legacyCalls==2,"untracked legacy registry preserves serial cross-thread operation conditions rather than inheriting reactive ownership");
+        var otherRuntime=new UiReactiveRuntime();var otherValue=otherRuntime.Int(10);
+        var cross=observer.Compute("cross-owner",()=>otherValue.Value);
+        Check(Throws(()=>_=cross.Value,"Cross-runtime"),"cross-runtime tracked reads diagnose the missing-edge boundary instead of silently caching");
+        var crossWrite=observer.Compute("cross-write",()=>{otherValue.Value=11;return 0;});
+        Check(Throws(()=>_=crossWrite.Value,"Cross-runtime") && otherValue.Value==10,"cross-runtime write cannot bypass the active pure read contract");
+        using(runtime.ReadPhase())
+        {
+            using(runtime.ReadPhase()) Check(a.Value==4,"nested same-runtime pure read is legal");
+            Check(Throws(()=>otherValue.Value=12,"Cross-runtime"),"nested scope exit restores the enclosing active runtime");
+            var same=observer.Compute("same-owner",()=>a.Value);
+            Check(same.Value==4,"same-runtime nested tracked computation remains legal");
+        }
+        otherValue.Value=12;
+        Check(otherValue.Value==12,"outermost pure-read exit leaves no thread marker behind");
+        var throwsRead=observer.Compute<int>("nested-failure",()=>{using(runtime.ReadPhase()){throw new Exception("scope-failure");}});
+        Check(Throws(()=>_=throwsRead.Value,"scope-failure"),"nested tracked-read failure retains the original cause");
+        otherValue.Value=13;legacy.Set("value",5);
+        Check(otherValue.Value==13 && legacyValue==5,"failed nested read restores context for another runtime and untracked legacy calls");
+        var legacyMutation=observer.Compute("legacy-in-pure",()=>{legacy.Set("value",6);return 0;});
+        Check(Throws(()=>_=legacyMutation.Value,"forbidden") && legacyValue==5,"new tracked purity cannot be bypassed through an otherwise legacy binding setter");
         var failSwitch = runtime.Boolean(); int failRuns=0;
         var fail = observer.Compute("failing", () => { failRuns++; int v=right.Value; if(failSwitch.Value) { _=left.Value; throw new Exception("intentional"); } return v; });
         _=fail.Value; failSwitch.Value=true;
@@ -76,6 +151,11 @@ internal static class ReactiveFoundationTests
         Check(Throws(() => _=bad.Value, "forbidden"), "tracked read cannot mutate business state");
         b.BindCommand("throw-after-write", () => { counter.Count.Value=30; throw new Exception("after-write"); });
         Check(Throws(() => b.Invoke("throw-after-write"), "after-write") && counter.Count.Value==30 && counter.Observed==30, "exception neither rolls back nor replays already written business");
+        var twinSource=runtime.Int();using var twinOwner=runtime.CreateOwner("twin-failure");
+        twinOwner.Respond("response",()=>{if(twinSource.Value>0)throw new Exception("response-cause");});
+        b.BindCommand("twin-fail",()=>{twinSource.Value=1;throw new Exception("business-cause");});
+        Exception? twin=null;try{b.Invoke("twin-fail");}catch(Exception ex){twin=ex;}
+        Check(twin is AggregateException && twin.ToString().Contains("business-cause") && twin.ToString().Contains("response-cause"),"simultaneous business and response errors retain both original causes");
         view.Synchronize(); int stable = b.Get<int>("count");
         bool failRead = true;
         b.BindTracked<int>("broken", () => failRead ? throw new Exception("sync-failure") : 12);
@@ -110,6 +190,10 @@ internal static class ReactiveFoundationTests
         service.SetAccepting(true); service.Complete(); var safeSnapshot=service.ReadSnapshot();
         service.Complete(); projection.Apply(safeSnapshot);
         Check(projection.Completed.Value==2 && service.ReadSnapshot().Completed==3, "projection never reads mutable external state through a UI getter");
+        service.SetAccepting(false); int serviceBefore=service.ReadSnapshot().Completed;
+        bool commandRan=projection.Bindings.TryInvokeCommand("complete");
+        Check(commandRan && service.ReadSnapshot().Completed==serviceBefore && !projection.Accepting.Value,"business may reject a command even when the last safe UI qualification permitted dispatch");
+        service.SetAccepting(true);
         workshopView.Dispose(); workshopView.Dispose(); service.Complete(); projection.Apply(service.ReadSnapshot());
         Check(projection.LastBusinessObservation==4, "independent authoritative service and response continue after view disposal");
         projection.Dispose(); service.Complete();

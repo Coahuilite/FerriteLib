@@ -55,8 +55,7 @@ public static class UiValueBehavior
     public static void Request<T>(UiInteractionTarget target, UiValueOperation<T> operation, UiBindings bindings, Action<T> request)
     {
         if (!operation.Request) return;
-        using IDisposable batch = bindings.BeginOperation();
-        Request(target, operation, request);
+        bindings.RunOperation(() => Request(target, operation, request));
     }
 
     public static void Request<T>(UiInteractionTarget target, UiValueOperation<T> operation, Action<T> request)
