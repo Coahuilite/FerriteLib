@@ -9,8 +9,9 @@ namespace FerriteLib.UiKit.Kernel;
 /// <para>
 /// This is also the notification side: every key carries a monotonic revision and an invalidation class,
 /// and <see cref="NotifyChanged"/> is the one entry point a consumer calls when its authoritative model
-/// moved. The registry never polls, diffs or wraps the model - it records that a key was announced, and
-/// the engine folds the announcements into one commit at the next arrangement boundary.
+/// moved. Ordinary getters retain that announcement contract; explicit tracked registrations additionally
+/// derive dependencies from connected sources and synchronize projected presentation values/options.
+/// Neither path polls arbitrary business objects. The engine folds announcements at arrangement boundaries.
 /// </para>
 /// </summary>
 public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
@@ -68,6 +69,7 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
         public Func<object?, object?, bool>? Equal;
         public abstract Type ItemType { get; }
         public abstract object GetListBoxed();
+        public abstract object CaptureBoxed();
         public abstract IReadOnlyList<object?> ReadPrefix(object list, int maximum, out int count);
 
         /// <summary>
@@ -93,6 +95,7 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
         public override Type ItemType => typeof(T);
 
         public override object GetListBoxed() => get();
+        public override object CaptureBoxed() => new List<T>(get()).AsReadOnly();
         public override IReadOnlyList<object?> ReadPrefix(object list, int maximum, out int count)
         {
             IReadOnlyList<T> current = (IReadOnlyList<T>)list;
@@ -253,7 +256,7 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
         if (equal == null) throw new ArgumentNullException(nameof(equal));
         Reactive.VerifyAccess();
         if (options.ContainsKey(key)) throw new InvalidOperationException($"Duplicate options binding '{key}'.");
-        var descriptor = new OptionsDescriptor<T>(() => new List<T>(get()).AsReadOnly()) { Tracked = true };
+        var descriptor = new OptionsDescriptor<T>(get) { Tracked = true };
         descriptor.Equal = (a, b) =>
         {
             var left = (IReadOnlyList<T>)a!; var right = (IReadOnlyList<T>)b!;
@@ -300,6 +303,9 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
     public UiBindingPresentation CreatePresentation() { reactiveEnabled = true; return new(this); }
     internal UiBindingPresentation? CreateHostPresentation() => reactiveEnabled ? CreatePresentation() : null;
     private UiBindingPresentation? presentation;
+    // A graph evaluation is a business/derived read even if external application occurs inside Draw.
+    // Only ordinary presentation consumers use the frozen view; responses never observe stale UI input.
+    private bool UsesPresentation => presentation != null && Reactive.Observer == null;
     internal IDisposable UsePresentation(UiBindingPresentation value)
     {
         UiBindingPresentation? previous = presentation;
@@ -312,14 +318,14 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
         foreach (var item in values) if (item.Value.Tracked)
             reads.Add("value:" + item.Key, new UiTrackedBindingRead(item.Key, item.Value.GetBoxed, item.Value.Equal));
         foreach (var item in options) if (item.Value.Tracked)
-            reads.Add("options:" + item.Key, new UiTrackedBindingRead(item.Key, () => item.Value.GetListBoxed(), item.Value.Equal));
+            reads.Add("options:" + item.Key, new UiTrackedBindingRead(item.Key, () => item.Value.CaptureBoxed(), item.Value.Equal));
         return reads;
     }
     private object? ReadValue(string key, ValueDescriptor descriptor)
     {
         if (!descriptor.Tracked) return descriptor.GetBoxed();
         Reactive.VerifyAccess();
-        if (presentation != null) return presentation.Read("value:" + key);
+        if (UsesPresentation) return presentation!.Read("value:" + key);
         using IDisposable pure = Reactive.Pure();
         return descriptor.GetBoxed();
     }
@@ -328,9 +334,9 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
     {
         if (!descriptor.Tracked) return descriptor.GetListBoxed();
         Reactive.VerifyAccess();
-        if (presentation != null) return presentation.Read("options:" + key)!;
+        if (UsesPresentation) return presentation!.Read("options:" + key)!;
         using IDisposable pure = Reactive.Pure();
-        return descriptor.GetListBoxed();
+        return descriptor.CaptureBoxed();
     }
 
     public T Get<T>(string elementId)
@@ -494,7 +500,12 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
     {
         if (options.TryGetValue(key, out OptionsDescriptor? descriptor))
         {
-            prefix = descriptor.ReadPrefix(ReadOptions(key, descriptor), maximum, out count);
+            // Bounded observation must not copy/erase an entire current list merely to read its prefix.
+            // Inside a presentation use the already frozen list; outside it evaluate the same pure getter
+            // and read only Count plus the requested indices. Getter-side projection work belongs to its author.
+            using IDisposable? pure = descriptor.Tracked && !UsesPresentation ? Reactive.Pure() : null;
+            object list = descriptor.Tracked && UsesPresentation ? ReadOptions(key, descriptor) : descriptor.GetListBoxed();
+            prefix = descriptor.ReadPrefix(list, maximum, out count);
             return true;
         }
         prefix = Array.Empty<object?>();

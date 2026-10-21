@@ -28,7 +28,8 @@ internal static class KernelReactiveInventoryTests
     }
     private static IList Labels => (IList)typeof(Verse.Widgets).GetField("LabelTexts", BindingFlags.Public | BindingFlags.Static)!.GetValue(null)!;
     private static bool Painted(int start, string text) { for (int i = start; i < Labels.Count; i++) if ((string)Labels[i]! == text) return true; return false; }
-    private static UiHost Host(UiBindings bindings) => new("inventory", UiLayoutManifest.Parse(Page), bindings, UiTheme.Vanilla, new Metrics(), new Translation());
+    private static UiHost Host(UiBindings bindings, bool service = false) => new("inventory", UiLayoutManifest.Parse(service
+        ? Page.Replace("<Widget Id=\"total\"", "<Widget Id=\"complete\" Kind=\"input/button\" ActionBind=\"complete\" Text=\"Complete\"/><Widget Id=\"total\"") : Page), bindings, UiTheme.Vanilla, new Metrics(), new Translation());
     private static UiNode Node(UiHost host, string id) => host.Session.GetNodeByElementId(id) ?? throw new Exception("Missing node " + id);
     private static Vector2 Centre(UiHost host, string id) { Rect rect = Node(host, id).Rect!.Value; return new Vector2(View.x + rect.x + rect.width / 2, View.y + rect.y + rect.height / 2); }
     private static void Pump(UiHost host, EventType phase, Vector2? point = null)
@@ -121,13 +122,18 @@ internal static class KernelReactiveInventoryTests
     private static void External()
     {
         var service = new OrderBoardService(); using var projection = new OrderBoardProjectionExample(service); var page = projection.Page;
-        using var host = Host(page.Bindings); Pump(host, EventType.Repaint);
+        using var host = Host(page.Bindings, service: true); Pump(host, EventType.Repaint);
+        Vector2 button = Centre(host, "complete");
+        Pump(host, EventType.MouseDown, button);
+        Check(service.Requests == 0, "independent multi-item business command is not dispatched on default Button press");
+        Pump(host, EventType.MouseUp, button); int afterCommand = Labels.Count; Pump(host, EventType.Repaint);
+        Check(service.Requests == 1 && page.ObservedTotal == 4 && Painted(afterCommand, "Total 4"), "actual default Button command returns safe multi-item result through batch graph response and Host presentation");
         UiNode kept = Node(host, "row#b");
         service.Replace(new OrderBoardService.Row("b", 2, 12), new OrderBoardService.Row("a", 1, 1), new OrderBoardService.Row("c", 3, 3));
         projection.Apply(service.ReadSnapshot()); int labels = Labels.Count; Pump(host, EventType.Repaint);
         Check(ReferenceEquals(kept, Node(host, "row#b")) && Painted(labels, "b: 12") && Painted(labels, "Total 16"), "independent safe multi-item service projection drives actual default Repeat options and wrapped Host geometry");
         host.Close(); host.Close(); service.Increment(); projection.Apply(service.ReadSnapshot());
-        Check(page.ObservedTotal == 17 && service.Requests == 1, "closed external Host releases view only while independent service projection keeps working");
+        Check(page.ObservedTotal == 17 && service.Requests == 2, "closed external Host releases view only while independent service projection keeps working");
     }
     private static void Failure()
     {

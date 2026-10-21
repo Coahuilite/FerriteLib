@@ -20,10 +20,11 @@ stable list is additionally pinned inside the test, so promoting or demoting a t
 edits. `UiWidgetRegistry.Clear` is the precedent for what an unlisted change does: it went internal in 0.3.0
 (item D) and no lane here would have noticed.
 
-The classifications below describe the frozen 0.7 source. Earlier debt lists are not current missing-feature
+The classifications below cover the current 0.8 Dev source; stable memberships retain the frozen 0.7
+promise, while new RU1 entries are explicitly public-unstable. Earlier debt lists are not current missing-feature
 inventories: identity, notifications, style surfaces and window support have evolved since the 0.4/0.5
 planning rounds. Promotion still requires an explicit contract and a deliberate tier decision; the
-[0.8 design](development/0.8/README.md) changes none of these memberships.
+[0.8 design](development/0.8/README.md) does not itself promote a candidate type.
 
 ## Stable
 

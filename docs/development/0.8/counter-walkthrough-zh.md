@@ -47,6 +47,31 @@ using (bindings.BeginOperation())
 两次加 0 仍是两次业务操作；存储同值跳过不能吞掉请求。异常不回滚或重放已发生的业务写入。
 Checkbox 的 Set→Invoke 已接同一共享逻辑操作，自动响应不插进两者之间。
 
+## 从一个数扩展到普通对象和列表
+
+`InventoryItem` 是普通 C# 类，Count 属性里读写一次接好的 `runtime.Int`，不继承 FL 基类。
+集合明确接入结构，项属性独立接入；作者不用重复列依赖：
+
+```csharp
+var list = runtime.List(new[] { first, second }, (a, b) => ReferenceEquals(a, b));
+var current = runtime.Value(list, (a, b) => ReferenceEquals(a, b));
+var total = business.Compute("total", () => current.Value.Sum(item => item.Count));
+bindings.BindTracked("caption", () => "Total " + total.Value);
+bindings.BindTrackedOptions("selected", () => current.Value
+    .Select(item => new UiChoice<int>(item.Key + ": " + item.Count, item.Code))
+    .ToList().AsReadOnly(), (a, b) => a.Text == b.Text && a.Value == b.Value);
+```
+
+`Add`／`Remove`／`Move` 改结构；`item.Count = 10` 只改该属性源。计算总计会读结构和 Count，
+只生成 Repeat key 的计算不读 Count。集合／对象换源后，下一次成功计算撤掉旧边，即使显示结果相同。
+其他值和引用用 `runtime.Value(initial, equal)` 明确选择相等；不自动深观察普通字段。
+比较为相等意味着保留旧存储值，不能拿两个对象恰好相同的 Count 当作目标身份相等。
+
+options 投影在受追踪读取中把 Count 变成不可变文字；只复制外层列表后留着可变 item，不能保证同轮一致。
+实际 Dropdown／ModeRow 读这份投影，Repeat 用原稳定 key 和同一节点树。列表例中的逐项文字及数值绑定
+按 key 解析当前对象，不捕获已移除的对象；新增 key 只注册一次自身绑定。完整可编译代码是
+`InventoryPageExample.cs`，同源中立和实际 Host 测试共用它。
+
 ## 独立业务保留自己的权威
 
 可编译双例在 `tools/FerriteLib.UiKit.Core.ContractTests/`：`ReactiveExamples.cs` 是简单计数器；
@@ -54,6 +79,11 @@ Checkbox 的 Set→Invoke 已接同一共享逻辑操作，自动响应不插进
 把它提供的不可变安全快照送到 FL 投影的所属上下文，再用一次 Batch 更新 Completed／Accepting。
 UI getter 只读投影，不因为通知已送达 UI 就无保护地读取后台可变对象。命令回送业务，业务决定是否接受。
 任务调度、跨线程投递和新旧结果取舍属于消费者／接入层，不由 FL 接管。
+
+多项版本是 `OrderBoardService.cs`＋`OrderBoardProjectionExample.cs`：服务在自己的锁内取得不可变行快照；
+接入层将安全结果交付到 FL 所属上下文，再 Batch 更新保留项的 Count／Accepting，以及真正变化的结构。
+相同完整快照不会让全部来源失效；只改 a 时，b 的独立属性计算不重算。Batch 不是跨线程投递，也不是事务。
+UI 不在 getter 里读取后台服务的可变列表；业务仍可拒绝最后一次投影认为合格的命令。
 
 关闭 Host 只清自己的展示计算／订阅。独立业务 owner 和服务继续工作；最终由各自 owner 释放，
 Dispose 不保存、不回滚、不销毁外部模型。换分支会撤旧依赖；失败构建不发布半份展示／几何，不重放操作。
@@ -66,7 +96,11 @@ Dispose 不保存、不回滚、不销毁外部模型。换分支会撤旧依赖
 下个合法同步点实际文字和内容相关几何更新，并覆盖 Checkbox。资格谓词即使用 bindings.Get
 也读最新业务值，不改变本轮普通展示读；异常恢复相同。原生输入、字体、IME 和合成仍需实机。
 
+RU1 另用默认 Dropdown／ModeRow／Repeat／NumberField 验证对象列表、typed options、同值选择、
+增删重排及同 key 节点／草稿／捕获；同步后修改 Count 和结构，本轮仍绘旧投影，下轮才一起采用。
+独立多项安全投影走同一生产图、真实包装及有界 Host 观察。数据计算与实际订阅数量见本轮验证记录。
+
 **局部布局缓存尚未实现。** 本包新展示输入变动沿既有完整测排，不把“外框未变”当作内部不用测排。
-RU2 将决定范围输出／跨范围协作／缓存有效条件；引用比较、集合表面、详细失败／隐藏、
+RU2 将决定范围输出／跨范围协作／缓存有效条件；任意引用隐式缺省、最终集合 API／粒度、详细失败／隐藏、
 剩余旧入口迁移与平台承诺仍分项待定。实际接口、阶段及故障边界见
 [生产合同](reactive-foundation-contract.md)。

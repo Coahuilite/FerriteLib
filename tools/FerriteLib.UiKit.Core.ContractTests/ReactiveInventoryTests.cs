@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -39,7 +40,11 @@ internal static class ReactiveInventoryTests
         using (view.Enter())
         {
             IReadOnlyList<UiChoice<int>> shown = b.GetOptions<UiChoice<int>>("selected");
+            int responseTotal = 0; string responseLabel = "";
+            using var responseOwner = owner.CreateChild("binding-response");
+            responseOwner.Respond("current", () => { responseTotal = b.Get<int>("total"); responseLabel = b.GetOptions<UiChoice<int>>("selected")[0].Text; });
             page.Add("c", 3, 7); a.Count = 10;
+            Check(responseTotal == 22 && responseLabel == "a: 10", "automatic response reads latest binding values and options while ordinary Draw input stays frozen");
             Check(shown.Count == 2 && shown[0].Text == "a: 6" && b.Get<int>("total") == 11 && b.GetOptions<UiChoice<int>>("selected")[0].Text == "a: 6", "same-round collection and item projection remain frozen after structural and property writes");
             b.TryGetChoices("selected", out var erased);
             b.TryReadObservationOptions("selected", 1, out var prefix, out int count);
@@ -76,7 +81,9 @@ internal static class ReactiveInventoryTests
         previous.Add(new InventoryItem(runtime, "old", 7, 7)); totalRuns = page.TotalRuns; view.Synchronize();
         Check(page.TotalRuns == totalRuns && page.Items.Value.Count == 2, "replaced old collection is disconnected");
         var focus = new InventoryItem(runtime, "focus", 8, a.Count);
+        int unchangedFocus = b.GetRevision("focus");
         page.Focus.Value = focus; view.Synchronize(); int focusRevision = b.GetRevision("focus");
+        Check(focusRevision == unchangedFocus, "equal-result object-source replacement updates following without false value announcement");
         a.Count++; view.Synchronize();
         Check(b.GetRevision("focus") == focusRevision && b.Get<int>("focus") == focus.Count, "same-value ordinary object replacement detaches old property edge");
         focus.Count++; view.Synchronize();
@@ -101,6 +108,18 @@ internal static class ReactiveInventoryTests
         var amount = owner.Compute("decimal", () => { moneyRuns++; return money.Value; }); _ = amount.Value; money.Value = 1m;
         Check(amount.Value == 1m && moneyRuns == 1, "other value types use caller-chosen equality and equal writes skip");
         Check(Throws(() => { using (runtime.ReadPhase()) page.Items.Value.Clear(); }, "forbidden"), "controlled structure cannot mutate in new pure phase");
+        var guarded = new PrefixOnlyList();
+        var boundedBindings = new UiBindings(runtime);
+        boundedBindings.BindTrackedOptions<int>("bounded", () => guarded, (x, y) => x == y);
+        boundedBindings.TryReadObservationOptions("bounded", 1, out var bounded, out int boundedCount);
+        Check(boundedCount == 1000000 && bounded.Count == 1 && (int)bounded[0]! == 7 && guarded.IndexReads == 1, "current tracked options prefix reads only requested indices without enumerating or copying the whole list");
+        var compareRuntime = new UiReactiveRuntime(); var comparisonValue = compareRuntime.Int(1); var comparisonBindings = new UiBindings(compareRuntime);
+        comparisonBindings.BindTracked("value", () => comparisonValue.Value, equal: (x, y) => { comparisonValue.Value++; return x == y; });
+        using (var compareView = comparisonBindings.CreatePresentation())
+        {
+            compareView.Synchronize(); comparisonValue.Value = 2;
+            Check(Throws(compareView.Synchronize, "forbidden") && comparisonValue.Value == 2, "new presentation equality cannot perform reactive writes");
+        }
         var other = new UiReactiveRuntime(); var otherList = other.List(new[] { 1 }, (x, y) => x == y);
         var foreign = owner.Compute("foreign-list", () => otherList.Count);
         Check(Throws(() => _ = foreign.Value, "Cross-runtime"), "collection reads enforce same-graph access");
@@ -123,6 +142,12 @@ internal static class ReactiveInventoryTests
     {
         var service = new OrderBoardService(); using var projection = new OrderBoardProjectionExample(service);
         var page = projection.Page; using var view = page.Bindings.CreatePresentation(); view.Synchronize();
+        page.Bindings.Invoke("complete"); view.Synchronize();
+        using (view.Enter())
+        {
+            var commandGeometry = UiLayout.Stack(new UiLayoutFrame(100, 100, 0, 0, 0, 0, 0, 0, default), new[] { new UiLayoutChild(100) }, (i, w, h, c) => new UiLayoutSize(w, page.Bindings.Get<int>("total")));
+            check(service.Requests == 1 && page.ObservedTotal == 4 && commandGeometry.Slots[0].Height == 4, "accepted independent multi-item command returns through safe result batch dependencies response bindings and neutral geometry");
+        }
         using var owner = page.Runtime.CreateOwner("external-independent-read"); int aRuns = 0, bRuns = 0;
         var aOnly = owner.Compute("a", () => { aRuns++; return page.Find("a")!.Count; });
         var bOnly = owner.Compute("b", () => { bRuns++; return page.Find("b")!.Count; });
@@ -134,7 +159,7 @@ internal static class ReactiveInventoryTests
         var producer = new Thread(() => { service.Replace(new OrderBoardService.Row("a", 1, 9), new OrderBoardService.Row("b", 2, 2)); delivered = service.ReadSnapshot(); service.Increment(); });
         producer.Start(); producer.Join();
         Exception? access = null; var wrong = new Thread(() => { try { projection.Apply(delivered!); } catch (Exception ex) { access = ex; } }); wrong.Start(); wrong.Join();
-        check(access is InvalidOperationException && page.Total.Value == 3, "external result must first be delivered onto projection serial context, not merely wrapped in Batch");
+        check(access is InvalidOperationException && page.Total.Value == 4, "external result must first be delivered onto projection serial context, not merely wrapped in Batch");
         InventoryItem b = page.Find("b")!; int bReads = b.Reads;
         projection.Apply(delivered!); view.Synchronize();
         _ = aOnly.Value; _ = bOnly.Value;
@@ -154,4 +179,12 @@ internal static class ReactiveInventoryTests
         projection.Dispose(); check(service.Increment(), "closing projection does not dispose external business service");
     }
     private sealed class Mutable { internal int Number; }
+    private sealed class PrefixOnlyList : IReadOnlyList<int>
+    {
+        internal int IndexReads;
+        public int Count => 1000000;
+        public int this[int index] { get { if (index != 0) throw new Exception("read past prefix"); IndexReads++; return 7; } }
+        public IEnumerator<int> GetEnumerator() => throw new Exception("must not enumerate prefix-only list");
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
 }

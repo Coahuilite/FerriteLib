@@ -90,6 +90,10 @@ The getter must read each mutable property needed by this presentation while tra
 An ordinary string-options list and `UiChoice<T>` use the same registry; actual `GetOptions<T>`,
 `TryGetChoices` and bounded observation prefixes all select the same synchronized options channel.
 Value and options can share the same key, as real typed mode rows require, without channel collision.
+Outside a presentation, full options/choice reads project the current business values. A bounded observation
+calls that same pure getter and copies only Count plus the requested indices, without a library-added full
+list walk; getter-side projection work remains the author's responsibility. During presentation it reads
+the already captured list. Ordinary options retain their original bounded-prefix path and conditions.
 
 `BindTracked` also accepts an optional `equal:` function for presentation output. Int/string/bool reuse
 their approved scalar policies; other output types without an explicit policy conservatively announce
@@ -115,6 +119,8 @@ Business operations through `Set<T>`, `Invoke(string)`, `TryInvokeCommand`, `Inv
 choice setter temporarily leave the presentation read scope. Their binding reads are immediate; their
 completion restores the current presentation view. Outside a presentation scope `Get<T>` is also an
 immediate business read. Direct source/derived reads are always business reads, not presentation reads.
+Reactive computations/responses also read current bindings/options, including when a safe external result
+is applied during a Draw stack; the surrounding ordinary presentation consumer still sees its frozen input.
 Input handling in the same native Draw stack remains legal; hover, pressed and capture feedback are not
 frozen. This consistency covers collection structure and projected item properties, not just an outer list copy.
 `CanExecute` and execution qualification temporarily leave only the presentation scope, so predicates
@@ -170,8 +176,8 @@ located and bounded. Layout/input cleanup continues to use the existing Host/ses
 
 ## External business: deliver a safe result
 
-The compilable `WorkshopService.cs` fixture contains no FL types. Its lock-protected snapshot is copied
-by `WorkshopProjectionExample.Apply` onto the projection runtime's owning context, inside a batch.
+The compilable `WorkshopService.cs` fixture contains no FL types. After application-owned delivery to the
+projection runtime's context, `WorkshopProjectionExample.Apply` applies its lock-protected snapshot in a batch.
 Tracked getters read only the projection scalars, never the mutable service. Commands go back to the
 service, which decides whether to accept; the projection is refreshed from its safe result. The caller
 owns tasks, dispatch and result freshness. FL supplies no application work queue or latest-result policy.
