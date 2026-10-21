@@ -1,7 +1,7 @@
 using System;
 using FerriteLib.UiKit.Kernel;
 
-// Two compilable author examples. WorkshopService deliberately has no FL dependency.
+// Compilable author examples. WorkshopService deliberately has no FL dependency.
 internal sealed class CounterPageExample : IDisposable
 {
     public readonly UiReactiveRuntime Runtime = new();
@@ -25,4 +25,26 @@ internal sealed class CounterPageExample : IDisposable
         Bindings.BindAction<int>("add", amount => { Operations++; Count.Value += amount; });
     }
     public void Dispose() => BusinessOwner.Dispose();
+}
+
+// A response produces a list; presentation consumes it without making it the producer's input.
+internal sealed class ResponseListPageExample : IDisposable
+{
+    internal readonly UiReactiveRuntime Runtime = new();
+    internal readonly UiBindings Bindings;
+    internal readonly UiReactiveValue<int> Input;
+    internal readonly UiReactiveList<int> Output;
+    private readonly UiReactiveOwner owner;
+    internal int Runs;
+    internal ResponseListPageExample()
+    {
+        Input = Runtime.Int(1);
+        Output = Runtime.List(Array.Empty<int>(), (a, b) => a == b);
+        owner = Runtime.CreateOwner("response-list-business");
+        owner.Respond("append-input", () => { Runs++; Output.Add(Input.Value); });
+        Bindings = new UiBindings(Runtime);
+        Bindings.BindCommand("increment", () => Input.Value++);
+        Bindings.BindTracked("text", () => string.Join(",", Output));
+    }
+    public void Dispose() => owner.Dispose();
 }

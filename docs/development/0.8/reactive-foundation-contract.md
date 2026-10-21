@@ -53,6 +53,12 @@ replacement, empty Clear, absent Remove and Move-to-self do not invalidate. Elem
 not computations that read only the structure. Removing an item or replacing a collection disconnects
 its old property/structure edges when the affected calculation next successfully evaluates.
 
+Writes do not implicitly observe the output list: `owner.Respond("append", () => items.Add(item))`
+runs once unless its callback actually reads a reactive input. Public `Snapshot`, `Count`, index and
+enumeration reads still track, including an explicit read before a write, observable input enumeration
+in `ReplaceAll`, and reactive reads inside caller equality functions. Reading and then changing the same
+list can therefore form a real response cycle; the normal located cycle limit still applies.
+
 Structural snapshots do **not** deep-copy items. A business reader can intentionally access current item
 properties through that structural version. Presentation must instead project all used item properties to
 immutable values during tracking; retaining a mutable item reference and reading it later is not a

@@ -42,11 +42,33 @@ internal static class KernelReactiveInventoryTests
         try
         {
             UiWidgetRegistry.Clear(); UiWidgetRegistry.InitializeCore();
-            SnapshotAndSelection(); RepeatIdentity(); External(); Failure();
+            ResponseOutput(); SnapshotAndSelection(); RepeatIdentity(); External(); Failure();
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine("  FAIL: RU1-HOST " + ex); return 1; }
         finally { Event.current = null; GUIUtility.hotControl = 0; UiNative.DebugHotControl = 0; UiNative.DebugMousePositionEnabled = false; }
+    }
+    private static void ResponseOutput()
+    {
+        using var page = new ResponseListPageExample();
+        using var host = new UiHost("response-list", UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"response-list\"><Column Padding=\"0\" Gap=\"0\"><Widget Id=\"increment\" Kind=\"input/button\" ActionBind=\"increment\" Text=\"Add\"/><Widget Id=\"output\" Kind=\"text/wrapped\" Bind=\"text\"/></Column></UiPage>"),
+            page.Bindings, UiTheme.Vanilla, new Metrics(), new Translation());
+        int labels = Labels.Count;
+        Pump(host, EventType.Repaint);
+        float leading = UiTheme.Vanilla.Geometry.Padding * 2;
+        Check(page.Runs == 1 && Painted(labels, "1") && Node(host, "output").Rect!.Value.height == 2 + leading,
+            "response-produced list reaches real wrapped Host presentation without self-subscription");
+        Vector2 button = Centre(host, "increment");
+        Pump(host, EventType.MouseDown, button);
+        Check(page.Runs == 1, "default Button press does not prematurely run list producer");
+        Pump(host, EventType.MouseUp, button);
+        labels = Labels.Count; Pump(host, EventType.Repaint);
+        Check(page.Input.Value == 2 && page.Runs == 2 && Painted(labels, "1,2") && Node(host, "output").Rect!.Value.height == 6 + leading,
+            "default Button release drives explicit input response output list and content-dependent Host geometry once");
+        page.Output.Add(9);
+        labels = Labels.Count; Pump(host, EventType.Repaint);
+        Check(page.Runs == 2 && Painted(labels, "1,2,9") && Node(host, "output").Rect!.Value.height == 10 + leading,
+            "external output change reaches actual Host consumer without recalling producer");
     }
     private static void SnapshotAndSelection()
     {

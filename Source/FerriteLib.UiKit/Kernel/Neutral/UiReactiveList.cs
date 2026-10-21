@@ -34,19 +34,19 @@ public sealed class UiReactiveList<T> : IReadOnlyList<T>
     public void Add(T item)
     {
         runtime.AssertWritable();
-        var next = new List<T>(Snapshot) { item };
+        var next = new List<T>(structure.ReadCurrent()) { item };
         structure.Value = next.AsReadOnly();
     }
     public void RemoveAt(int index)
     {
         runtime.AssertWritable();
-        var next = new List<T>(Snapshot); next.RemoveAt(index);
+        var next = new List<T>(structure.ReadCurrent()); next.RemoveAt(index);
         structure.Value = next.AsReadOnly();
     }
     public bool Remove(T item)
     {
         runtime.AssertWritable();
-        IReadOnlyList<T> current = Snapshot;
+        IReadOnlyList<T> current = structure.ReadCurrent();
         for (int i = 0; i < current.Count; i++)
             if (equal(current[i], item)) { RemoveAt(i); return true; }
         return false;
@@ -55,7 +55,7 @@ public sealed class UiReactiveList<T> : IReadOnlyList<T>
     public void Move(int from, int to)
     {
         runtime.AssertWritable();
-        var next = new List<T>(Snapshot);
+        var next = new List<T>(structure.ReadCurrent());
         if (from < 0 || from >= next.Count) throw new ArgumentOutOfRangeException(nameof(from));
         if (to < 0 || to >= next.Count) throw new ArgumentOutOfRangeException(nameof(to));
         if (from == to) return;

@@ -168,6 +168,8 @@ public sealed class UiReactiveValue<T>
     internal int SubscriberCount => source.SubscriberCount;
     internal UiReactiveValue(UiReactiveRuntime runtime, T value, Func<T, T, bool> equal)
     { this.runtime = runtime; this.value = value; this.equal = equal; source = new Source(runtime); }
+    // Mutation implementations need the current storage, not an implicit input dependency.
+    internal T ReadCurrent() { runtime.VerifyAccess(); return value; }
     public T Value
     {
         get { source.Read(); return value; }
