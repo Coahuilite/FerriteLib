@@ -1,8 +1,9 @@
 # Reactive sources: values, collections, presentation and ownership
 
 The 0.8 Dev foundation and RU1 connect the **same production** `UiBindings`, reactive graph and presentation
-read view to both `NeutralSources.props` and the actual `UiHost`. It does not implement RU2 local layout
-caching or complete the migration of every registered use. See the per-use [inventory](migration-status.md).
+read view to both `NeutralSources.props` and the actual `UiHost`. RU2 now retains measurement/local
+arrangement work on this chain; its single contract is [layout reuse](layout-reuse-contract.md).
+Full new-reactivity migration is still tracked per use in the [inventory](migration-status.md).
 
 ## Connect a scalar once
 
@@ -15,8 +16,9 @@ bindings.BindCommand("increment", () => count.Value++);
 ```
 
 Declare tracked bindings before constructing the Host. A `text/wrapped` bound to `caption` follows the actual reads without `NotifyChanged`. Changing the
-caption invalidates the existing full page arrangement before the next legal presentation opportunity.
-No local-cache or per-node-layout performance claim follows from this implementation.
+caption selects its measurement capture before the next legal presentation opportunity. RU2 compares
+actual stage inputs/results, retaining unrelated calculations and local plans while publishing current
+effective positions. Source synchronization still completes before layout reuse is considered.
 
 `Int`, `Text` and `Boolean` use integer equality, ordinal string equality and boolean equality. Equal
 storage writes do not invalidate; command invocations and selection requests still happen separately,
@@ -220,5 +222,6 @@ fault-before-layout and independent external service lifetime. Custom probes do 
 
 These tests do not establish native input, real font pixels, IME, window-stack composition or 1.7 support.
 RU1 A–E are implemented with public-unstable explicit policies. Final reference/deep defaults and the final
-collection API/granularity remain open, separately from this usable engineering surface. RU2 local-cache outputs, RU3 detailed recovery/hidden policy, RU4
-remaining old-entry migration and RU5 platform delivery commitments remain open in the main specification.
+collection API/granularity remain open, separately from this usable engineering surface. Approved RU2
+is connected through the layout reuse contract and its neutral/Host evidence; RU3 detailed recovery/hidden
+policy, RU4 remaining old-entry migration and RU5 platform commitments remain separate.

@@ -50,4 +50,23 @@ Ordinary getters/options retain their existing conditions. Start with the
 remaining full editor/tree/chart/custom/native migration. The compiled `InventoryPageExample` and
 `OrderBoardProjectionExample` demonstrate local object/list composition and externally owned safe results.
 Application code owns external delivery, tasks and result freshness; Batch does not marshal a result.
-No RU2 layout cache or native acceptance is implied.
+
+## Scoped layout reuse without changing business ownership
+
+Declare `UpdateScope="true"` at meaningful composition roots, including a custom subtree or Repeat
+row template. Roots and default Section/Surface/Scroll/Clip/Repeat are already connected; nesting does
+not rebuild node/editor/capture identity. The library captures its default wrappers' real measurement
+inputs and retains unchanged leaf calculations and local container plans. Actual parent size,
+Scroll content/range and shared-column consumers still propagate changes across scopes. Effective
+positions/clip/hit/popup anchors are republished when a subtree moves.
+
+Ordinary getters keep their original notification conditions. Old custom `IUiWidget` is revalidated at
+its original legal synchronization before dependent parent reuse; no new purity prerequisite is
+inferred. New custom `IUiMeasureParticipant` supplies complete actual values and a calculation over
+those captured values. Optional `IUiTextMetricsEnvironment` supplies truthful per-font metric validity,
+without adding members to `ITextMetrics`. Unknown legacy metrics receive no new text-cache guarantee.
+
+Use the [single reuse contract](../development/0.8/layout-reuse-contract.md) for a compilable custom
+method and exact inputs/diagnostics, and the [inventory](../development/0.8/migration-status.md) for
+all18 uses/nine containers and retained old conditions. These public-unstable engineering entries do
+not freeze XML/ABI or complete RU3–RU5/native acceptance.

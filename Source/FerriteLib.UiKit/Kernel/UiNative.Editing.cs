@@ -95,6 +95,7 @@ public static partial class UiNative
     private static void DriveEditor<T>(Rect rect, UiSession session, UiNode node, UiValueState state, UiEditSession<T> editor, T model, bool available, bool covered, bool writable, bool focus, bool live, bool multiline, Action<T> request, Func<T> readModel)
     {
         state.EditorMultiline = multiline;
+        string previousDraft = editor.Draft;
         editor.Observe(model);
         string controlName = EditControlName(session, state);
         if (GUI.GetNameOfFocusedControl() == controlName)
@@ -163,6 +164,7 @@ public static partial class UiNative
                 ReleaseEditFocus(state, session);
             if (session.IsActive)
             {
+                if (multiline && !string.Equals(previousDraft, editor.Draft, StringComparison.Ordinal)) node.MarkDirty();
                 state.EditText = editor.Draft;
                 state.Focused = editor.Focused;
                 if (editor.Focused)

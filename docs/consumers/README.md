@@ -1,7 +1,7 @@
 # Consumers — choose the version you use
 
 Start with the [0.7 consumer guide](consume-from-0.7.0.md) for the frozen implementation. The
-[0.8 development guide](consume-from-0.8.0-dev.md) covers the isolated S0/S1 candidate; it does not replace the frozen guide for 0.7 consumers.
+[0.8 development guide](consume-from-0.8.0-dev.md) covers the isolated 0.8 candidate, including shared behavior, RU1 sources and RU2 scoped stage reuse; it does not replace the frozen guide for 0.7 consumers.
 
 | Need | Document |
 | --- | --- |

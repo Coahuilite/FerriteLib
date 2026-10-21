@@ -59,7 +59,7 @@ public sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabel
             string binding = AtomVocabulary.ReadBindKey(spec);
             text = ctx.Bindings.Get<string>(binding) ?? "";
             UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
-            if (node.ValueStates.TryGetValue(binding, out UiValueState? state) && state.Editor is IUiEditState edit) text = edit.Draft;
+            if (node.ValueStates.TryGetValue(binding, out UiValueState? state) && state.Editor is IUiEditState edit && (edit.Focused || edit.Modified || edit.Conflict)) text = edit.Draft;
         }
         return new UiMeasurement(new UiMeasureInputs(new[] { label, text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx), ctx.Theme.Geometry.Spacing, ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.RowHeight, ctx.Node?.SharedLabelWidth ?? 0 }, multiline || label.Length > 0), () =>
         {

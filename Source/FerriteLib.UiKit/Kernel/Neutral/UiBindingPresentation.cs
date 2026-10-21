@@ -43,7 +43,7 @@ public sealed class UiBindingPresentation : IDisposable
             }
             var staged = new Dictionary<string, object?>(StringComparer.Ordinal);
             foreach (var entry in calculations) staged.Add(entry.Key, entry.Value.Value);
-            // The engine already owns full measure/arrange. No RU2 local-cache promise is introduced.
+            // Refresh actual dependencies before comparing the values consumed by presentation/layout stages.
             var changed = new HashSet<string>(StringComparer.Ordinal);
             using (bindings.Reactive.ReadPhase())
             {

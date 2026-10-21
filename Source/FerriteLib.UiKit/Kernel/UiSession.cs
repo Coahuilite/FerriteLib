@@ -938,6 +938,7 @@ public sealed class UiSession : IDisposable
             nodes.Add(id, node);
         }
 
+        node.SetUpdateScope(parent.UpdateScopeRoot);
         parent.AddChild(node);
         return node;
     }

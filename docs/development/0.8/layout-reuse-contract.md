@@ -72,7 +72,9 @@ relations; there is no arbitrary cross-tree solver.
 ## Use the default wrappers, or opt a custom measurement into complete inputs
 
 All18 registered defaults participate: Repeat uses its container path; the other17 own their ordinary
-measurement dependencies. Text/value/option changes that affect only paint do not invalidate their
+measurement dependencies. Changed declared source revisions select their capture even when the source
+classifies the change as Paint; the actual consumer inputs decide whether calculation is needed.
+Text/value/option changes that affect only paint do not invalidate their
 measured band. Library wrappers capture their own label/text/draft/options-count/image-size or fixed-band
 inputs; authors do not declare their private parts or mark each child dirty.
 
@@ -130,7 +132,7 @@ text calculation memo is bounded per font, not invalidated by an unrelated font 
 
 `KernelLayoutReuseTests` reports actual per-node measure/arrange counters with numeric geometry,
 current scopes, Scroll range and shared columns. It covers the default counter, an independent safe
-multi-item service projection, scope nesting, same-output changes, real growth/movement/hit, Scroll80→140,
+multi-item service projection, scope nesting, same-output changes, real growth/movement/hit, native multiline draft invalidation, supplier image/tree/option impacts, Scroll80→140,
 shared60→70→120, width/font/colour distinctions, source replacement, Add/Remove/Move, popup anchors,
 editor/capture identity and failed definition attempts. The existing purpose-specific wrapper,
 assembly, standard/embedded Host, observation and transaction lanes remain applicable.

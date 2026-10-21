@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using FerriteLib.UiKit.Kernel;
+using FerriteLib.UiKit.Kernel.Widgets;
 using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
@@ -29,11 +30,11 @@ internal static class KernelLayoutReuseTests
         try
         {
             UiWidgetRegistry.Clear(); UiWidgetRegistry.InitializeCore();
-            CounterAndMovement(); ScrollResults(); SharedResults(); EnvironmentAndLegacy(); WorkshopAndIdentity(); SourceSwitch(); CustomAndFailure(); PopupAndDraft(); AllUses();
+            CounterAndMovement(); ScrollResults(); SharedResults(); EnvironmentAndLegacy(); WorkshopAndIdentity(); SourceSwitch(); CustomAndFailure(); PopupAndDraft(); WrapperInputs(); NativeMetricFacts(); LegacyLayoutInputs(); AllUses();
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine("  FAIL: RU2-HOST " + ex); return 1; }
-        finally { Event.current = null; GUIUtility.hotControl = 0; UiNative.DebugHotControl = 0; UiNative.DebugMousePositionEnabled = false; }
+        finally { Event.current = null; GUIUtility.hotControl = 0; UiNative.DebugHotControl = 0; UiNative.DebugMousePositionEnabled = false; UiNative.TextFieldOverride = null; }
     }
     private static void CounterAndMovement()
     {
@@ -175,13 +176,86 @@ internal static class KernelLayoutReuseTests
         using var page = new InventoryPageExample();
         using var rows = Host("<Templates><Column Id=\"row\" Padding=\"0\"><Widget Id=\"field\" Kind=\"input/number-field\" Bind=\"count\" Max=\"100\"/></Column></Templates><Repeat Id=\"rows\" Items=\"items\" Template=\"row\" Padding=\"0\"/>", page.Bindings);
         Arrange(rows); UiNode field = Node(rows, "field#a"); var numeric = new UiNumericEdit(0, 100);
+        UiNode privatePart = rows.CreateContext(240).WithNode(field).Child("retained").Node!;
         UiEditSession<float> edit = UiNative.Editor<float>(rows.CreateContext(240).WithNode(field), "items.a.count", numeric.Format, numeric.Parse);
         edit.Observe(1); edit.Focus(); edit.Input("20", true, false, false, _ => throw new Exception("Draft committed"), () => 1);
         int measured = field.LayoutMeasureCount; page.Items.Value.Move(0, 1); Arrange(rows);
-        Check(ReferenceEquals(field, Node(rows, "field#a")) && edit.Draft == "20" && field.LayoutMeasureCount == measured,
+        Check(ReferenceEquals(field, Node(rows, "field#a")) && edit.Draft == "20" && field.LayoutMeasureCount == measured
+            && privatePart.Parent == field && privatePart.UpdateScopeRoot.Equals(field.UpdateScopeRoot),
             "a moved cached numeric wrapper retains its real editor and uncommitted draft without remeasurement");
         page.Items.Value.Remove(page.Find("a")!); Pump(rows, EventType.Repaint);
         Check(rows.Session.GetNodeByElementId("field#a") == null && !edit.Focused, "removing the cached editor releases its actual draft ownership without committing");
+    }
+    private static void WrapperInputs()
+    {
+        IReadOnlyList<UiTreeRow> tree = new[] { new UiTreeRow("a", 0, "a") };
+        Texture image = new Texture2D(40, 30);
+        IReadOnlyList<UiChoice<int>> options = new[] { new UiChoice<int>("one", 1), new UiChoice<int>("two", 2) };
+        int selected = 1; float progress = .5f; var bindings = new UiBindings();
+        bindings.BindReadOnly("tree", () => tree); bindings.BindReadOnly("image", () => image);
+        bindings.BindValue("mode", () => selected, v => selected = v); bindings.BindOptions("mode", () => options);
+        bindings.BindReadOnly("progress", () => progress);
+        using var host = Host("<Column Id=\"root\" Padding=\"0\" Gap=\"0\"><Widget Id=\"tree\" Kind=\"container/tree\" Bind=\"tree\"/><Widget Id=\"image\" Kind=\"display/image\" Bind=\"image\"/><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\"/><Widget Id=\"progress\" Kind=\"display/progress\" Bind=\"progress\"/></Column>", bindings);
+        Arrange(host); UiNode t = Node(host, "tree"), i = Node(host, "image"), m = Node(host, "mode"), p = Node(host, "progress");
+        int tc = t.LayoutMeasureCount, ic = i.LayoutMeasureCount, mc = m.LayoutMeasureCount, pc = p.LayoutMeasureCount;
+        tree = new[] { new UiTreeRow("a", 0, "renamed", selected: true) }; progress = .8f; bindings.NotifyChanged("tree", "progress"); Arrange(host);
+        Check(t.LayoutMeasureCount == tc && p.LayoutMeasureCount == pc && i.LayoutMeasureCount == ic && m.LayoutMeasureCount == mc,
+            "default tree presentation-only row facts and progress values do not recalculate unchanged bands or unrelated wrappers");
+        tree = new[] { new UiTreeRow("a", 0, "a"), new UiTreeRow("b", 0, "b") }; image = new Texture2D(40, 50);
+        options = new[] { new UiChoice<int>("one", 1), new UiChoice<int>("two", 2), new UiChoice<int>("three", 3) };
+        bindings.NotifyChanged("tree", "image", "mode"); Arrange(host);
+        Check(t.Rect!.Value.height == 40 && i.Rect!.Value.height == 50 && m.Rect!.Value.height == 60 && p.LayoutMeasureCount == pc,
+            "actual default tree row count, supplier image size and typed option count reach measurement while fixed progress is reused");
+        string text = "one"; int requests = 0; var edits = new UiBindings(); edits.BindValue("text", () => text, value => { text = value; requests++; });
+        using var editorHost = Host("<Column Id=\"root\" Padding=\"0\" Gap=\"0\"><Widget Id=\"edit\" Kind=\"input/text-field\" Bind=\"text\" Multiline=\"true\"/><Widget Id=\"after\" Kind=\"text/wrapped\" Text=\"after\"/></Column>", edits);
+        Pump(editorHost, EventType.Repaint); UiNode edit = Node(editorHost, "edit"), after = Node(editorHost, "after"); int previous = edit.LayoutMeasureCount, unaffected = after.LayoutMeasureCount;
+        UiNative.TextFieldOverride = (_, _) => "one\ntwo"; Pump(editorHost, EventType.MouseDown, Centre(editorHost, "edit")); UiNative.TextFieldOverride = null;
+        Arrange(editorHost);
+        Check(requests == 0 && text == "one" && edit.Rect!.Value.height == 40 && edit.LayoutMeasureCount == previous + 1 && after.LayoutMeasureCount == unaffected && after.Rect!.Value.y == 40,
+            "native multiline draft change invalidates its default measurement without author dirty calls, keeps business uncommitted and moves the reused following text");
+        string caption = "one"; var paint = new UiBindings(); paint.BindReadOnly("caption", () => caption, UiInvalidation.Paint);
+        using var measured = Host("<Widget Id=\"text\" Kind=\"text/wrapped\" Bind=\"caption\"/>", paint);
+        Arrange(measured); caption = "one\ntwo"; paint.NotifyChanged("caption"); Arrange(measured);
+        Check(Node(measured, "text").Rect!.Value.height == 40, "default content-sized wrapper validates real changed input even when its source classifies the announcement as Paint");
+        Trace("wrapper-inputs", t, i, m, p, edit, after);
+    }
+    private static void NativeMetricFacts()
+    {
+        Verse.GameFont previous = Verse.Text.Font; bool wrap = Verse.Text.WordWrap; TextAnchor anchor = Verse.Text.Anchor;
+        Verse.Text.Font = Verse.GameFont.Small; GUIStyle style = Verse.Text.CurFontStyle; int size = style.fontSize;
+        try
+        {
+            UiMeasureInputs first = ((IUiTextMetricsEnvironment)VerseFerriteTextMetrics.Instance).CaptureEnvironment(UiFont.Small)!;
+            style.fontSize = size + 1;
+            Check(!first.Equals(((IUiTextMetricsEnvironment)VerseFerriteTextMetrics.Instance).CaptureEnvironment(UiFont.Small)), "default Verse adapter reports actual changed font-style metric facts through the optional environment seam");
+            Verse.Text.WordWrap = false; Verse.Text.Anchor = TextAnchor.MiddleRight;
+            VerseFerriteTextMetrics.Instance.MeasureText("native adapter fixture", UiFont.Medium, 100);
+            Check(!Verse.Text.WordWrap && Verse.Text.Anchor == TextAnchor.MiddleRight && Verse.Text.Font == Verse.GameFont.Small,
+                "default metric calculation restores caller font/wrap/anchor after using its known measurement environment");
+        }
+        finally { style.fontSize = size; Verse.Text.Font = previous; Verse.Text.WordWrap = wrap; Verse.Text.Anchor = anchor; }
+    }
+    private static void LegacyLayoutInputs()
+    {
+        bool visible = true; float width = 80; int visibleReads = 0, widthReads = 0, naturalReads = 0; float natural = 70;
+        var bindings = new UiBindings(); bindings.BindReadOnly("visible", () => { visibleReads++; return visible; });
+        bindings.BindReadOnly("width", () => { widthReads++; return width; });
+        UiWidgetRegistry.Register("ru2", "legacy", () => new LegacyWidget(), Array.Empty<string>(), Array.Empty<string>(), (_, _) => { naturalReads++; return natural; });
+        using var host = Host("<Column Id=\"root\" Padding=\"0\" Gap=\"0\"><Widget Id=\"conditional\" Kind=\"text/wrapped\" Text=\"visible\" VisibleKey=\"visible\" WidthKey=\"width\" AlignX=\"Left\"/><Widget Id=\"auto\" Kind=\"legacy\" Width=\"Auto\"/></Column>", bindings);
+        Arrange(host); int vr = visibleReads, wr = widthReads, nr = naturalReads;
+        visible = false; width = 100; natural = 90; Arrange(host);
+        Check(Node(host, "conditional").Rect!.Value.width == 80 && Node(host, "auto").Rect!.Value.width == 70 && visibleReads == vr && widthReads == wr && naturalReads == nr,
+            "idle stage validation does not poll ordinary visibility/width getters or the old custom natural-width callback without their original synchronization");
+        bindings.NotifyChanged("visible", "width"); Arrange(host); Check(Node(host, "conditional").Rect == null && Node(host, "auto").Rect!.Value.width == 90,
+            "ordinary notified structure and the original legal full-sync custom width update still reach current geometry");
+        visible = true; bindings.NotifyChanged("visible"); Arrange(host);
+        Check(Node(host, "conditional").Rect!.Value.width == 100 && Node(host, "conditional").LayoutMeasureCount > 0, "notified return adopts the actual current ordinary width and retained identity");
+        Console.WriteLine($"RU2-EVALUATION ordinary-layout visible={visibleReads} width={widthReads} natural={naturalReads}");
+    }
+    private sealed class LegacyWidget : IUiWidget
+    {
+        public string Kind => "legacy"; public void Configure(UiElementSpec s) { } public void Validate(IUiBindings b, string p) { }
+        public float Measure(UiWidgetContext ctx) => 20; public void Draw(Rect rect, UiWidgetContext ctx) { }
     }
     private static void AllUses()
     {

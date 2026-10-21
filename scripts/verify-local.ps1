@@ -207,6 +207,8 @@ Invoke-Check 'runtime-resolvability traps: net472 surface + harness stub surface
         # a default argument). The scan reads the argument shape instead of the enum name, which is the
         # only form that finds it: a seven-gate-green tree shipped exactly this failure until a lane ran
         # it (2026-09-11).
+        & pwsh -NoProfile -File (Join-Path $root 'scripts\net472-trap-scan.ps1') -SelfTest
+        if ($LASTEXITCODE -ne 0) { throw 'net472 trap classifier self-test failed.' }
         & pwsh -NoProfile -File (Join-Path $root 'scripts\net472-trap-scan.ps1') -Path $root
 
         # Same family, the other surface. The harness compiles against the game's reference assemblies

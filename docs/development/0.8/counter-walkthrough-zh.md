@@ -88,6 +88,31 @@ UI 不在 getter 里读取后台服务的可变列表；业务仍可拒绝最后
 关闭 Host 只清自己的展示计算／订阅。独立业务 owner 和服务继续工作；最终由各自 owner 释放，
 Dispose 不保存、不回滚、不销毁外部模型。换分支会撤旧依赖；失败构建不发布半份展示／几何，不重放操作。
 
+## 声明范围，复用未变的工作
+
+`UpdateScope="true"`可在组合根声明并嵌套；Section／Surface／Scroll／Clip／Repeat和页面根已有默认接入：
+
+```xml
+<Column Id="page" UpdateScope="true" Padding="0" Gap="0">
+  <Column Id="counter" UpdateScope="true" Padding="0" Gap="0">
+    <Widget Id="caption" Kind="text/wrapped" Bind="caption" />
+    <Widget Id="add" Kind="input/button" ActionBind="increment" Text="Add" />
+  </Column>
+  <Surface Id="details" Padding="0">
+    <Widget Id="help" Kind="text/wrapped" Text="Details" />
+  </Surface>
+</Column>
+```
+
+Count:0→Count:1仍是一行时，只验证变化的真实输入并计算该文字，父级尺寸相同便可保留局部排列。
+内容新增一行时，父级推进后区位置；后区不因搬动重测原文字。绘制／命中／裁剪与弹层锚点仍用新位置。
+固定Scroll外框不代表内容范围没变，共享标签组也比较实际最大值；这些角色由库接好，不需页面罗列输出。
+
+工坊的每个Repeat行可在模板组合根声明范围，Add／Remove／Move继续用业务key和原节点／草稿／捕获。
+只改a时，b的属性求值和测量／局部排列可分别复用；服务仍独立运行，范围不取得业务调度权。
+新自定义控件通过可选`IUiMeasureParticipant`提供完整捕获输入；旧getter／IUiWidget保原通知和合法同步条件。
+具体有效性及作者示例见[布局局部复用合同](layout-reuse-contract.md)。
+
 ## 本包已证明什么
 
 无引擎 E2E 使用同一生产 `NeutralSources.props`：实际业务操作／共享布尔请求 →
@@ -100,7 +125,8 @@ RU1 另用默认 Dropdown／ModeRow／Repeat／NumberField 验证对象列表、
 增删重排及同 key 节点／草稿／捕获；同步后修改 Count 和结构，本轮仍绘旧投影，下轮才一起采用。
 独立多项安全投影走同一生产图、真实包装及有界 Host 观察。数据计算与实际订阅数量见本轮验证记录。
 
-**局部布局缓存尚未实现。** 本包新展示输入变动沿既有完整测排，不把“外框未变”当作内部不用测排。
-RU2 将决定范围输出／跨范围协作／缓存有效条件；任意引用隐式缺省、最终集合 API／粒度、详细失败／隐藏、
-剩余旧入口迁移与平台承诺仍分项待定。实际接口、阶段及故障边界见
-[生产合同](reactive-foundation-contract.md)。
+RU2的同源`LayoutReuseTests`与真实`KernelLayoutReuseTests`另报每个实际对象的求值／测量／排列次数和有效几何，
+覆盖同结果换源、计数同尺寸／新增行、独立安全多项投影、Scroll80→140且视口100、共享60→70→120、
+宽度／字体环境／纯颜色／整体搬动、增删重排、草稿／捕获／弹层及失败不发布半份。
+18用途／9容器的具体新缓存等级与未变旧条件仍以唯一用途表为准，不用双例替代整库覆盖。
+任意引用隐式缺省、最终集合API／粒度、RU3详细失败／隐藏、RU4剩余迁移和RU5平台承诺仍分项保留。

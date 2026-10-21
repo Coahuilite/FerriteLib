@@ -33,7 +33,8 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
 - `ITextMetrics` — the injected measurement seam; proven by the wired consumer's pages and by round 3's
   text-natural `Width="Auto"`.
 - `VerseFerriteTextMetrics` — the production seam, shipped so measurement and drawing cannot disagree about a
-  font size.
+  font size. Its RU2 environment capability is implemented explicitly through the separate
+  public-unstable `IUiTextMetricsEnvironment`; the original two measure methods retain their stable signatures.
 - `UiFont` — the font vocabulary every other seam names.
 - `UiKitFonts` — the one `UiFont` to `GameFont` mapping in the series.
 - `IUiTranslation` — the translation seam; the library owns no strings, and this is how it says so. A

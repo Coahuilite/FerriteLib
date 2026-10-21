@@ -25,7 +25,8 @@
   'TrimStart(new[] { ' ' })', 'string.Join(string, ...)', 'IndexOf(char)'.
 
   Conservative by design: a single-argument Split whose argument is not written as an array
-  ('Split(separator)' with a variable) is reported, because its declared type cannot be known statically;
+  ('Split(separator)' with an unknown or ambiguous variable) is reported. An unambiguous explicitly
+  declared char[]/string[] identifier is recognized; scalar/var shadowing retains the finding;
   a hit is a prompt to check the call, not a proof. A clean scan is not proof of runtime health either -
   only running the harness proves that half.
 
@@ -45,6 +46,7 @@
         (measured 2026-09-11, the same day gate 8 was wired). Every one of those paths now fails loudly.
 #>
 param(
+    [switch]$SelfTest,
     [string]$Sha = 'HEAD',
     [string]$Path,
     [string]$RepoRoot = (Split-Path -Parent $PSScriptRoot),
@@ -88,6 +90,15 @@ function Get-Normalized([string]$arg) {
 $hits = New-Object System.Collections.Generic.List[string]
 
 function Scan-Text([string]$name, [string[]]$lines) {
+    # Resolve only unambiguous explicitly typed array identifiers. A scalar/var declaration with the
+    # same name anywhere in this file is ambiguous and retains the conservative original finding.
+    $code = ($lines | ForEach-Object { ($_ -split '//', 2)[0] }) -join [Environment]::NewLine
+    $knownArrays = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    foreach ($declaration in [regex]::Matches($code, '\b(?:char|string)\s*\[\s*\]\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)')) {
+        $identifier = $declaration.Groups['name'].Value
+        $otherDeclaration = '\b[A-Za-z_][A-Za-z0-9_.<>?]*\s+' + [regex]::Escape($identifier) + '\b'
+        if (-not [regex]::IsMatch($code, $otherDeclaration)) { [void]$knownArrays.Add($identifier) }
+    }
     foreach ($statement in (Get-Statements $lines)) {
         $text = $statement.Text
 
@@ -96,6 +107,7 @@ function Scan-Text([string]$name, [string[]]$lines) {
             if ($normalized.Trim().Length -eq 0) { continue }
             if ($normalized -match 'new\b|\[') { continue }
             $parts = $normalized -split ','
+            if ($knownArrays.Contains($parts[0].Trim())) { continue }
             if ($parts.Count -eq 1) {
                 $hits.Add(("{0}:{1}: Split(single element) binds the optional-options overload net472 lacks :: {2}" -f $name, $statement.Line, $text.Trim()))
             }
@@ -134,6 +146,22 @@ function Scan-Text([string]$name, [string[]]$lines) {
             $hits.Add(("{0}:{1}: TrimStart()/TrimEnd() with no arguments :: {2}" -f $name, $statement.Line, $text.Trim()))
         }
     }
+}
+
+if ($SelfTest) {
+    $cases = @(
+        @{ Name='explicit array'; Code="class C { void M(string s) { s.Split(new[] { ',' }, StringSplitOptions.None); } }"; Hits=0 },
+        @{ Name='typed array variable'; Code="class C { static readonly char[] Lines = new[] { ',',';' }; void M(string s) { s.Split(Lines, StringSplitOptions.None); } }"; Hits=0 },
+        @{ Name='scalar overload'; Code="class C { void M(string s) { s.Split(',', StringSplitOptions.None); } }"; Hits=1 },
+        @{ Name='unknown variable'; Code="class C { void M(string s) { s.Split(separators, StringSplitOptions.None); } }"; Hits=1 },
+        @{ Name='shadowed scalar'; Code="class C { static readonly char[] Lines = new[] { ',' }; void M(string s) { char Lines = ','; s.Split(Lines, StringSplitOptions.None); } }"; Hits=1 }
+    )
+    foreach ($case in $cases) {
+        $hits.Clear(); Scan-Text $case.Name @($case.Code)
+        if ($hits.Count -ne $case.Hits) { throw "net472 trap fixture failed: $($case.Name), hits=$($hits.Count), expected=$($case.Hits)" }
+        Write-Output "[net472-traps] fixture $($case.Name): hits=$($hits.Count) expected=$($case.Hits)"
+    }
+    exit 0
 }
 
 if ($Path) {

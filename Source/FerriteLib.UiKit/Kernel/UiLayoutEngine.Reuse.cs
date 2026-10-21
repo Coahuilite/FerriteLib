@@ -9,12 +9,15 @@ public sealed partial class UiLayoutEngine
 {
     private sealed class LeafMeasure
     {
-        internal UiElementSpec Spec = UiElementSpec.Empty;
-        internal ITextMetrics Metrics = null!;
-        internal UiMeasureInputs Context = null!, Inputs = null!;
-        internal UiMeasureInputs? Environment;
-        internal float Height;
-        internal int Pass;
+        internal readonly UiElementSpec Spec;
+        internal readonly ITextMetrics Metrics;
+        internal readonly UiMeasureInputs Context, Inputs, Sources;
+        internal readonly UiMeasureInputs? Environment;
+        internal readonly float Height;
+        internal readonly int Pass;
+        internal LeafMeasure(UiElementSpec spec, ITextMetrics metrics, UiMeasureInputs context, UiMeasureInputs sources,
+            UiMeasureInputs inputs, UiMeasureInputs? environment, float height, int pass)
+        { Spec = spec; Metrics = metrics; Context = context; Sources = sources; Inputs = inputs; Environment = environment; Height = height; Pass = pass; }
     }
     private sealed class LayoutScope
     {
@@ -36,6 +39,7 @@ public sealed partial class UiLayoutEngine
         layoutScopes.Clear(); textMetricsCache = null; activeLayoutScope = null;
         cachedSnapshot = null; lastEntries.Clear(); widgetInstances.Clear(); repeatStates.Clear();
         materializedRepeats.Clear(); keyNodes.Clear(); committedRevisions.Clear();
+        visibleInputs.Clear(); widthInputs.Clear(); tabInputs.Clear(); autoWidths.Clear(); labelContributions.Clear();
     }
     private UiNodeId activeUpdateScope;
     private LayoutScope? activeLayoutScope;
@@ -60,7 +64,7 @@ public sealed partial class UiLayoutEngine
             if (!layoutScopes.TryGetValue(node.Id, out activeLayoutScope))
                 layoutScopes.Add(node.Id, activeLayoutScope = new LayoutScope());
         }
-        node.UpdateScopeRoot = activeUpdateScope;
+        node.SetUpdateScope(activeUpdateScope);
         try
         {
             // Natural flow without Fill does not consume a parent's remaining height. A position change
@@ -82,6 +86,15 @@ public sealed partial class UiLayoutEngine
         ctx.ViewWidth, (float)ctx.Theme.DefaultFont, ctx.Theme.Geometry.Padding, ctx.Theme.Geometry.Spacing,
         ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.RowHeight, ctx.Theme.Geometry.Hairline, ctx.Node?.SharedLabelWidth ?? 0
     });
+    private static UiMeasureInputs MeasureSources(UiElementSpec spec, IUiBindings bindings)
+    {
+        string[] keys = { ReadDeclaredBindKey(spec), ReadAttribute(spec, ActionBindAttribute), ReadAttribute(spec, OptionsBindAttribute),
+            ReadAttribute(spec, WidthKeyAttribute), ReadAttribute(spec, VisibleKeyAttribute), ReadAttribute(spec, "SelectedKey"),
+            ReadAttribute(spec, TabAttribute).Length > 0 ? UiBindings.ActiveTabKey : "" };
+        var values = new List<string>();
+        foreach (string key in keys) if (key.Length > 0) { values.Add(key); values.Add(bindings.GetRevision(key).ToString(CultureInfo.InvariantCulture)); }
+        return new UiMeasureInputs(values.ToArray());
+    }
     private float MeasureWidgetWithReuse(UiElementSpec spec, IUiWidget widget, UiWidgetContext ctx, UiNode node)
     {
         LayoutScope scope = activeLayoutScope!;
@@ -91,15 +104,16 @@ public sealed partial class UiLayoutEngine
         LeafMeasure? prior = records.FindLast(value => ReferenceEquals(value.Spec, spec) && ReferenceEquals(value.Metrics, textMetricsCache!.Source) && context.Equals(value.Context));
         bool enrolled = widget is IUiMeasureParticipant;
         bool contextEqual = prior != null;
+        UiMeasureInputs sources = MeasureSources(spec, ctx.Bindings);
         if (prior == null && enrolled) prior = records.FindLast(value => ReferenceEquals(value.Spec, spec) && ReferenceEquals(value.Metrics, textMetricsCache!.Source));
         if (prior != null && !ctx.Session.IsTripped(node) && !enrolled && prior.Pass == layoutPass) return prior.Height;
         UiMeasureInputs? environment = (ctx.Metrics as IUiTextMetricsEnvironment)?.CaptureEnvironment(ctx.Theme.DefaultFont);
         bool environmentEqual = prior != null && (!prior.Inputs.UsesTextMetrics || environment != null && environment.Equals(prior.Environment));
-        bool validation = ctx.Session.IsTripped(node) || forceMeasurement || node.IsDirty || prior == null || !contextEqual || !environmentEqual;
+        bool validation = ctx.Session.IsTripped(node) || forceMeasurement || node.IsDirty || prior == null || !contextEqual || !environmentEqual || enrolled && !sources.Equals(prior.Sources);
         if (prior != null && !validation && (enrolled || !layoutRequested)) return prior.Height;
         // An old metrics implementation keeps its original idle-snapshot condition, not a new promise
         // that its unknown mutable environment is cacheable at a subsequent synchronization point.
-        if (contextEqual && prior != null && !ctx.Session.IsTripped(node) && !layoutRequested && !forceMeasurement && !node.IsDirty && prior.Environment == null && environment == null) return prior.Height;
+        if (contextEqual && prior != null && !ctx.Session.IsTripped(node) && !layoutRequested && !forceMeasurement && !node.IsDirty && (!enrolled || sources.Equals(prior.Sources)) && prior.Environment == null && environment == null) return prior.Height;
 
         UiMeasurement? request = enrolled ? ((IUiMeasureParticipant)widget).CaptureMeasurement(ctx) : null;
         if (request == null && enrolled) throw new InvalidOperationException("CaptureMeasurement returned null at " + node.Path + ".");
@@ -107,7 +121,7 @@ public sealed partial class UiLayoutEngine
         if (prior != null && !ctx.Session.IsTripped(node) && enrolled && UiMeasureValidity.CanReuse(prior.Inputs, inputs, prior.Environment, environment))
         {
             if (contextEqual) records.Remove(prior);
-            records.Add(new LeafMeasure { Spec = spec, Metrics = textMetricsCache!.Source, Context = context, Inputs = inputs, Environment = environment, Height = prior.Height, Pass = layoutPass });
+            records.Add(new LeafMeasure(spec, textMetricsCache!.Source, context, sources, inputs, environment, prior.Height, layoutPass));
             if (records.Count > 4) records.RemoveAt(0);
             return prior.Height;
         }
@@ -118,8 +132,7 @@ public sealed partial class UiLayoutEngine
         if (!ctx.Session.IsTripped(node))
         {
             if (contextEqual && prior != null) records.Remove(prior);
-            records.Add(new LeafMeasure { Spec = spec, Metrics = textMetricsCache!.Source, Context = context, Inputs = inputs, Environment = environment,
-                Height = height, Pass = layoutPass });
+            records.Add(new LeafMeasure(spec, textMetricsCache!.Source, context, sources, inputs, environment, height, layoutPass));
             if (records.Count > 4) records.RemoveAt(0);
         }
         return height;

@@ -23,7 +23,7 @@ public sealed class VerseFerriteTextMetrics : ITextMetrics, IUiTextMetricsEnviro
     /// </summary>
     public static readonly VerseFerriteTextMetrics Instance = new();
 
-    public UiMeasureInputs? CaptureEnvironment(UiFont font)
+    UiMeasureInputs? IUiTextMetricsEnvironment.CaptureEnvironment(UiFont font)
     {
         GameFont previous = Text.Font;
         try

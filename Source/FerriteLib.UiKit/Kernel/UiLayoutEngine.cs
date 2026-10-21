@@ -269,6 +269,13 @@ public sealed partial class UiLayoutEngine
             || cachedTranslationRevision != ctx.Translation.TranslationRevision || cachedHostLayoutRevision != ctx.Theme.LayoutRevision;
         forceMeasurement = cachedSnapshot != null && (externalContentChanged || cachedDefinitionRevision != DefinitionRevision(ctx)
             || cachedTranslationRevision != ctx.Translation.TranslationRevision);
+        var priorVisibleInputs = visibleInputs; var priorWidthInputs = widthInputs; var priorTabInputs = tabInputs;
+        visibleInputs = new Dictionary<string, BoundInput<bool>>(visibleInputs, StringComparer.Ordinal);
+        widthInputs = new Dictionary<string, BoundInput<float>>(widthInputs, StringComparer.Ordinal);
+        tabInputs = new Dictionary<string, BoundInput<string>>(tabInputs, StringComparer.Ordinal);
+        var priorAutoWidths = autoWidths; var priorContributions = labelContributions;
+        autoWidths = new Dictionary<UiNodeId, RoleInput>(autoWidths);
+        labelContributions = new Dictionary<UiNodeId, RoleInput>(labelContributions);
         var priorScopes = layoutScopes;
         layoutScopes = new Dictionary<UiNodeId, LayoutScope>();
         foreach (var pair in priorScopes) layoutScopes.Add(pair.Key, pair.Value.Copy());
@@ -382,6 +389,8 @@ public sealed partial class UiLayoutEngine
                 foreach (var pair in cache.PlanNodes) if (ctx.Session.GetNode(pair.Value) == null) gonePlans.Add(pair.Key);
                 foreach (string key in gonePlans) { cache.PlanNodes.Remove(key); cache.Plans.Remove(key); }
             }
+            PruneBindingInputs(visibleInputs); PruneBindingInputs(widthInputs); PruneBindingInputs(tabInputs);
+            PruneRoleInputs(ctx.Session, autoWidths); PruneRoleInputs(ctx.Session, labelContributions);
             var deadScopes = new List<UiNodeId>();
             foreach (UiNodeId id in layoutScopes.Keys) if (ctx.Session.GetNode(id) == null) deadScopes.Add(id);
             foreach (UiNodeId id in deadScopes) layoutScopes.Remove(id);
@@ -401,6 +410,8 @@ public sealed partial class UiLayoutEngine
         }
         catch
         {
+            visibleInputs = priorVisibleInputs; widthInputs = priorWidthInputs; tabInputs = priorTabInputs;
+            autoWidths = priorAutoWidths; labelContributions = priorContributions;
             textMetricsCache = priorTextMetrics;
             layoutScopes = priorScopes;
             activeLayoutScope = null;
@@ -1371,7 +1382,7 @@ public sealed partial class UiLayoutEngine
                 if (widget is not IUiLabelledWidget labelled)
                     continue;
                 UiWidgetContext childContext = ElementScope(ctx.WithNode(nodes[i]), child, nodes[i]);
-                demands.Add(labelled.MeasureLabel(childContext));
+                demands.Add(ReadLayoutRole(labelContributions, child, childContext, false, () => labelled.MeasureLabel(childContext)));
                 participants.Add(nodes[i]);
             }
 
@@ -1713,7 +1724,7 @@ public sealed partial class UiLayoutEngine
         internal string ItemsKey = "";
         internal string TemplateName = "";
         internal bool Initialized;
-        internal int MaterializedPass;
+        internal int MaterializedPass, ItemsRevision;
         internal readonly List<ItemRow> Rows = new();
         internal readonly Dictionary<string, UiElementSpec> DerivedByKey = new(StringComparer.Ordinal);
         internal RepeatState Copy()
@@ -1722,7 +1733,7 @@ public sealed partial class UiLayoutEngine
             {
                 ItemsKey = ItemsKey,
                 TemplateName = TemplateName,
-                Initialized = Initialized, MaterializedPass = MaterializedPass
+                Initialized = Initialized, MaterializedPass = MaterializedPass, ItemsRevision = ItemsRevision
             };
             copy.Rows.AddRange(Rows);
             foreach (KeyValuePair<string, UiElementSpec> entry in DerivedByKey)
@@ -1783,11 +1794,11 @@ public sealed partial class UiLayoutEngine
             state.Initialized = false;
         }
 
-        if (!state.Initialized || (layoutRequested || node.IsDirty) && state.MaterializedPass != layoutPass)
+        if (!state.Initialized || (layoutRequested || node.IsDirty || state.ItemsRevision != ctx.Bindings.GetRevision(itemsKey)) && state.MaterializedPass != layoutPass)
         {
             state.Rows.Clear();
             MaterializeRows(ctx, node, state, itemsKey, templateName);
-            state.Initialized = true; state.MaterializedPass = layoutPass;
+            state.Initialized = true; state.MaterializedPass = layoutPass; state.ItemsRevision = ctx.Bindings.GetRevision(itemsKey);
         }
         var rows = new List<ChildSlot>(state.Rows.Count);
         var children = new UiLayoutChild[state.Rows.Count];
@@ -2327,7 +2338,7 @@ public sealed partial class UiLayoutEngine
     /// first, exactly like Visible/VisibleKey: <c>WidthKey</c> is consulted only when no usable Width is
     /// written, and it answers the same question through a float value binding (B5).
     /// </summary>
-    private static bool TryFixedWidth(UiElementSpec spec, UiWidgetContext ctx, out float width)
+    private bool TryFixedWidth(UiElementSpec spec, UiWidgetContext ctx, out float width)
     {
         width = 0f;
         if (spec.TryGetAttribute("Width", out string raw)
@@ -2345,7 +2356,7 @@ public sealed partial class UiLayoutEngine
     /// and loud, like <c>VisibleKey</c> - a key that is missing or bound to another type leaves the static
     /// answer in place and records one deduplicated appearance note, so a typo cannot silently size a column.
     /// </summary>
-    private static bool TryBoundWidth(UiElementSpec spec, UiWidgetContext ctx, out float width)
+    private bool TryBoundWidth(UiElementSpec spec, UiWidgetContext ctx, out float width)
     {
         width = 0f;
         string key = ReadAttribute(spec, WidthKeyAttribute);
@@ -2353,7 +2364,7 @@ public sealed partial class UiLayoutEngine
 
         try
         {
-            if (ctx.Bindings.TryGet(key, out float bound) && !float.IsNaN(bound) && !float.IsInfinity(bound) && bound > 0f)
+            if (TryLayoutFloat(ctx.Bindings, key, out float bound) && !float.IsNaN(bound) && !float.IsInfinity(bound) && bound > 0f)
             {
                 width = bound;
                 return true;
@@ -2383,7 +2394,10 @@ public sealed partial class UiLayoutEngine
     /// answer. Zero still means "not Auto-measurable" — no label set, no body, or neither filled — and the
     /// caller falls back to the unsized distribution.
     /// </summary>
-    private static float MeasureLabelWidth(UiElementSpec spec, UiWidgetContext ctx)
+    private float MeasureLabelWidth(UiElementSpec spec, UiWidgetContext ctx)
+        => ReadLayoutRole(autoWidths, spec, ctx, true, () => MeasureLabelWidthCore(spec, ctx));
+
+    private static float MeasureLabelWidthCore(UiElementSpec spec, UiWidgetContext ctx)
     {
         float body = 0f;
         Func<UiElementSpec, UiWidgetContext, float>? naturalBody = UiWidgetRegistry.GetNaturalBody(ctx.Source, spec.Kind);
@@ -2436,7 +2450,7 @@ public sealed partial class UiLayoutEngine
     }
 
     private static float ReadWidthBound(UiElementSpec spec, string attribute, float fallback) => spec.TryGetAttribute(attribute, out string raw) && float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float value) && value > 0 ? value : fallback;
-    private static float ResolveWrapWidth(UiElementSpec spec, float innerWidth, UiWidgetContext ctx)
+    private float ResolveWrapWidth(UiElementSpec spec, float innerWidth, UiWidgetContext ctx)
     {
         if (TryFixedWidth(spec, ctx, out float fixedWidth))
         {
@@ -2458,7 +2472,7 @@ public sealed partial class UiLayoutEngine
     /// A vertical-stack child's slot width: full inner width, except a child that declares
     /// Width="Auto" and measures a positive label width hugs that width instead.
     /// </summary>
-    private static float ResolveStackChildWidth(UiElementSpec spec, float innerWidth, UiWidgetContext ctx)
+    private float ResolveStackChildWidth(UiElementSpec spec, float innerWidth, UiWidgetContext ctx)
     {
         if (IsAutoWidth(spec))
         {
@@ -2688,7 +2702,7 @@ public sealed partial class UiLayoutEngine
     /// <paramref name="declaredIndex"/> exist only to name the element in the one diagnostic
     /// <see cref="VisibleKeyAttribute"/> can produce, and are not part of the decision.
     /// </summary>
-    private static bool IsHidden(
+    private bool IsHidden(
         UiElementSpec spec, UiWidgetContext ctx, bool narrow, UiNode? parent, int declaredIndex)
     {
         if (narrow
@@ -2731,7 +2745,7 @@ public sealed partial class UiLayoutEngine
             return false;
         }
 
-        string activeTab = ctx.Bindings.TryGet(UiBindings.ActiveTabKey, out string current) ? current : "";
+        string activeTab = TryLayoutTab(ctx.Bindings, out string current) ? current : "";
         return !string.Equals(tab.Trim(), activeTab, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -2745,7 +2759,7 @@ public sealed partial class UiLayoutEngine
     /// and key, so a page drawn at 60 fps records one finding rather than sixty.
     /// </para>
     /// </summary>
-    private static bool IsVisibleDeclaration(
+    private bool IsVisibleDeclaration(
         UiElementSpec spec, UiWidgetContext ctx, UiNode? parent, int declaredIndex)
     {
         if (spec.TryGetAttribute("Visible", out string visibleRaw))
@@ -2760,7 +2774,7 @@ public sealed partial class UiLayoutEngine
 
         string key = ReadAttribute(spec, VisibleKeyAttribute);
         if (key.Length == 0) return true;
-        if (ctx.Bindings.TryGetBool(key, out bool boundVisible)) return boundVisible;
+        if (TryLayoutBool(ctx.Bindings, key, out bool boundVisible)) return boundVisible;
 
         UiNodeId id = parent == null ? UiNodeId.Root(spec, declaredIndex) : parent.Id.Child(spec, declaredIndex);
         UiFitAudit.ReportStyleFallback(id.Path, spec.Kind, VisibleKeyAttribute, key, "visible");

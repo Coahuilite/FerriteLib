@@ -18,7 +18,10 @@ namespace FerriteLib.UiKit.Kernel;
 /// <para>
 /// The flags combine because a page may need more than one. A binding that declares nothing gets
 /// <see cref="Everything"/>: under-invalidating leaves stale geometry on screen while over-invalidating
-/// costs one arrangement, and only the author knows which side their value is on.
+/// costs one arrangement. Enrolled measurement participants validate their actual captured inputs when a
+/// declared source revision changes, including Paint: fixed-band results stay reusable while a default
+/// content-sized wrapper cannot retain a stale measure solely because the source declared Paint. Legacy
+/// IUiWidget keeps the original classification/synchronization conditions.
 /// </para>
 /// </summary>
 [Flags]

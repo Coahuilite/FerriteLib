@@ -63,8 +63,8 @@ public sealed class UiNode
 
     /// <summary>
     /// This node's children: the elements arranged inside it, plus any sub-node a widget minted with
-    /// <see cref="UiWidgetContext.Child"/>. Rebuilt on every arrange; a sub-node is re-linked the next
-    /// time its widget asks for it, which is what keeps its identity (and state) stable across passes.
+    /// <see cref="UiWidgetContext.Child"/>. Declared elements are rebuilt on every arrange; private
+    /// sub-nodes remain linked when their owner's measurement is reused.
     /// </summary>
     public IReadOnlyList<UiNode> Children => children;
 
@@ -85,6 +85,13 @@ public sealed class UiNode
     /// <summary>Nearest effective update-scope owner, without changing this node identity.</summary>
     public UiNodeId UpdateScopeRoot { get; internal set; }
     internal int LayoutMeasureCount, LayoutArrangeCount;
+
+    internal void SetUpdateScope(UiNodeId scope)
+    {
+        UpdateScopeRoot = scope;
+        foreach (UiNode child in children)
+            if (child.Id.Key.IndexOf(UiNodeId.SubNodeMarker) >= 0) child.SetUpdateScope(scope);
+    }
 
     /// <summary>Explicit business identity; change when a getter switches logical objects.</summary>
     public string InteractionScope { get; set; } = "";
@@ -208,7 +215,7 @@ public sealed class UiNode
         }
     }
 
-    /// <summary>Forgets the arranged children; an arrange rebuilds them (and re-links sub-nodes on use).</summary>
+    /// <summary>Forgets declared element links, retaining the owner's private sub-nodes.</summary>
     internal void ClearElementChildren()
     {
         children.RemoveAll(child => child.Id.Key.IndexOf(UiNodeId.SubNodeMarker) < 0);
