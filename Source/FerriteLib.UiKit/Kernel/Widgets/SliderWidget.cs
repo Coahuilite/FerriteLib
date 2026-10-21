@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>Default range wrapper: shared behavior, measured label/track, typed request binding.</summary>
-public sealed class SliderWidget : IUiWidget, IUiLabelledWidget, IUiPointerLayout
+public sealed class SliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout
 {
     public const string Kind = "input/slider";
     private UiElementSpec spec = UiElementSpec.Empty;
@@ -32,7 +32,14 @@ public sealed class SliderWidget : IUiWidget, IUiLabelledWidget, IUiPointerLayou
     private string Label(UiWidgetContext ctx) => AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
     private UiSliderLayout Layout(UiWidgetContext ctx, float width) => UiSliderLayout.Measure(Label(ctx), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0);
     public float MeasureLabel(UiWidgetContext ctx) => Label(ctx).Length == 0 ? 0 : ctx.Metrics.MeasureWidth(Label(ctx), AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing;
-    public float Measure(UiWidgetContext ctx) => AtomVocabulary.ReadHeight(spec, Layout(ctx, ctx.ViewWidth).Height);
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
+    {
+        string label = Label(ctx);
+        return new UiMeasurement(AtomVocabulary.LabelMeasureInputs(ctx, label), () => AtomVocabulary.ReadHeight(spec,
+            UiSliderLayout.Measure(label, ctx.ViewWidth, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0).Height));
+    }
+
+    public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
     public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
     {
         Rect track = TrackRect(new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height), ctx, Layout(ctx, bounds.Width));

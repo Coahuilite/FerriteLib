@@ -23,7 +23,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// no-op creation-time validation exists to refuse.
 /// </para>
 /// </summary>
-public sealed class RuleWidget : IUiWidget, IUiDescriptiveWidget
+public sealed class RuleWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget
 {
     public const string Kind = "chrome/rule";
 
@@ -51,6 +51,11 @@ public sealed class RuleWidget : IUiWidget, IUiDescriptiveWidget
     public void Validate(IUiBindings bindings, string elementPath)
     {
         // No binding: a rule is not interactive and carries no value.
+    }
+
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
+    {
+        return new UiMeasurement(new UiMeasureInputs(numbers: new[] { ctx.Theme.Geometry.Hairline }), () => Measure(ctx));
     }
 
     public float Measure(UiWidgetContext ctx)

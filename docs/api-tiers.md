@@ -68,6 +68,11 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
 
 ## Public-unstable
 
+- `UiMeasureInputs` — detached exact per-stage input values (RU2).
+- `UiMeasurement` — captured measure request with a calculation over those values (RU2).
+- `IUiTextMetricsEnvironment` — optional per-font measurement-environment validity, leaving ITextMetrics unchanged.
+- `IUiMeasureParticipant` — explicit complete custom measurement participation; old IUiWidget retains its conditions.
+
 - `UiReactiveRuntime` — serial reactive graph and nested operation batching (0.8 candidate).
 - `UiReactiveValue` — connected value storage; int/string/bool policies or an explicitly supplied equality function.
 - `UiReactiveList` — controlled, serial structural observation and read-only snapshots; items are independently connected (RU1 candidate).

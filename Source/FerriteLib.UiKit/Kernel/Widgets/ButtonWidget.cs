@@ -9,7 +9,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// presentation observes that result and never recreates the activation rule.
 /// A missing command is diagnosed at host creation, not rendered as a dead control.
 /// </summary>
-public sealed class ButtonWidget : IUiWidget, IUiPointerLayout
+public sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout
 {
     public const string Kind = "input/button";
 
@@ -70,22 +70,17 @@ public sealed class ButtonWidget : IUiWidget, IUiPointerLayout
         }
     }
 
-    public float Measure(UiWidgetContext ctx)
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
-        // G3: Height="Auto" measures the content, which is what a bare hit area needs; an empty caption has
-        // nothing to measure and falls back to the band every kind uses.
-        string declared = AtomVocabulary.Read(spec, "Height").Trim();
-        if (string.Equals(declared, "Auto", StringComparison.OrdinalIgnoreCase))
-        {
-            string text = AtomVocabulary.ResolveText(spec, ctx, "Text", "TextKey");
-            if (text.Length == 0) return ctx.Theme.Geometry.RowHeight;
-
-            float width = Math.Max(1f, ctx.ViewWidth - ctx.Theme.Geometry.Padding * 2f);
-            return Math.Max(1f, ctx.Metrics.MeasureText(text, AtomVocabulary.TextFont(ctx), width));
-        }
-
-        return AtomVocabulary.ReadHeight(spec, ctx.Theme.Geometry.RowHeight);
+        bool automatic = string.Equals(AtomVocabulary.Read(spec, "Height").Trim(), "Auto", StringComparison.OrdinalIgnoreCase);
+        string text = automatic ? AtomVocabulary.ResolveText(spec, ctx, "Text", "TextKey") : "";
+        return new UiMeasurement(new UiMeasureInputs(new[] { text }, automatic && text.Length > 0 ? new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx), ctx.Theme.Geometry.Padding } : new[] { ctx.Theme.Geometry.RowHeight }, automatic && text.Length > 0), () =>
+            automatic && text.Length > 0
+                ? Math.Max(1, ctx.Metrics.MeasureText(text, AtomVocabulary.TextFont(ctx), Math.Max(1, ctx.ViewWidth - ctx.Theme.Geometry.Padding * 2)))
+                : AtomVocabulary.ReadHeight(spec, ctx.Theme.Geometry.RowHeight));
     }
+
+    public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
 
     public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
     {

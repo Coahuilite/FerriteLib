@@ -23,7 +23,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// (<c>&lt;Items&gt;.&lt;itemKey&gt;.&lt;declaredKey&gt;</c>).
 /// </para>
 /// </summary>
-internal sealed class RepeatTemplateWidget : IUiWidget
+internal sealed class RepeatTemplateWidget : IUiWidget, IUiMeasureParticipant
 {
     internal const string Kind = "Repeat";
 
@@ -72,6 +72,11 @@ internal sealed class RepeatTemplateWidget : IUiWidget
     }
 
     /// <summary>Never reached: the engine arranges a Repeat through its own container path.</summary>
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
+    {
+        return new UiMeasurement(new UiMeasureInputs(), () => Measure(ctx));
+    }
+
     public float Measure(UiWidgetContext ctx)
     {
         return 0f;

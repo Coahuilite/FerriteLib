@@ -39,7 +39,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <see cref="UiTreeRow.Expanded"/>: both are the model's answers, re-read every pass.
 /// </para>
 /// </summary>
-internal sealed class TreeWidget : IUiWidget, IUiPointerLayout
+internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout
 {
     internal const string Kind = "container/tree";
 
@@ -108,22 +108,20 @@ internal sealed class TreeWidget : IUiWidget, IUiPointerLayout
         }
     }
 
-    public float Measure(UiWidgetContext ctx)
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
-        // One band per accepted row, each measured from its own content: a row carrying an image reserves at
-        // least the picture's natural height plus padding, and every other row keeps the declared or
-        // density-derived height this kind has always used. The label is single-line, so no row's text can
-        // move the measurement.
         List<UiTreeRow> rows = CollectRows(ctx, ReadBindKey());
-        float rowHeight = ReadRowHeight(ctx);
-        float total = 0f;
-        for (int i = 0; i < rows.Count; i++)
+        var images = new float[rows.Count];
+        for (int i = 0; i < rows.Count; i++) images[i] = rows[i].Image == null ? 0 : rows[i].ImageSize.y > 0 ? rows[i].ImageSize.y : rows[i].Image!.height;
+        return new UiMeasurement(new UiMeasureInputs(numbers: new List<float>(images) { ReadRowHeight(ctx), ctx.Theme.Geometry.Padding }.ToArray()), () =>
         {
-            total += UiRowBand.Measure(rows[i], ctx.Theme, rowHeight);
-        }
-
-        return total;
+            float total = 0, rowHeight = ReadRowHeight(ctx);
+            foreach (float image in images) total += Math.Max(1, image > 0 ? Math.Max(rowHeight, image + ctx.Theme.Geometry.Padding * 2) : rowHeight);
+            return total;
+        });
     }
+
+    public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
 
     public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
     {

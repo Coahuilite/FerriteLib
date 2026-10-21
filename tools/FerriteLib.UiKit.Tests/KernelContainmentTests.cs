@@ -116,6 +116,7 @@ internal static class KernelContainmentTests
             "Text.Anchor",
             "Text.CalcHeight",
             "Text.CalcSize",
+            "Text.CurFontStyle", // RU2: capture the actual per-font measurement environment.
             "Text.Font",
             "Text.WordWrap",
         },

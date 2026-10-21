@@ -28,7 +28,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// stands while the pointer is over it.
 /// </para>
 /// </summary>
-public sealed class InputModeRowWidget : IUiWidget, IUiPointerLayout
+public sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout
 {
     public const string Kind = "input/mode-row";
 
@@ -146,14 +146,19 @@ public sealed class InputModeRowWidget : IUiWidget, IUiPointerLayout
         OptionHelp.Validate(bindings, spec, elementPath, "InputModeRowWidget");
     }
 
-    public float Measure(UiWidgetContext ctx)
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
-        UiGeometry geometry = ctx.Theme.Geometry;
+        int count = OptionsFor(ctx).Count;
         int columns = ColumnsFor(ctx.ViewWidth);
-        int rows = (OptionsFor(ctx).Count + columns - 1) / columns;
-        float rowHeight = ReadFloat("Height", geometry.RowHeight);
-        return Math.Max(1f, rows * rowHeight + Math.Max(0, rows - 1) * geometry.Gap + geometry.Spacing * 2f);
+        return new UiMeasurement(new UiMeasureInputs(numbers: new[] { (float)count, columns, ctx.Theme.Geometry.RowHeight, ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.Spacing }), () =>
+        {
+            int rows = (count + columns - 1) / columns;
+            UiGeometry geometry = ctx.Theme.Geometry;
+            return Math.Max(1, rows * ReadFloat("Height", geometry.RowHeight) + Math.Max(0, rows - 1) * geometry.Gap + geometry.Spacing * 2);
+        });
     }
+
+    public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
 
     public IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
     {

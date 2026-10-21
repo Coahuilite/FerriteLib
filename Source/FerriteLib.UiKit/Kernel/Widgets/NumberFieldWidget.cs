@@ -6,7 +6,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Native numeric text editing over the common draft/model observation and finite numeric codec.
 /// Invalid or conflicting drafts remain local; accepted requests are not assumed business acceptance.
 /// </summary>
-public sealed class NumberFieldWidget : IUiWidget, IUiLabelledWidget, IUiPointerLayout
+public sealed class NumberFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout
 {
     public const string Kind = "input/number-field";
 
@@ -43,10 +43,14 @@ public sealed class NumberFieldWidget : IUiWidget, IUiLabelledWidget, IUiPointer
         bindings.ValidateValue<float>(bindKey, elementPath);
     }
 
-    public float Measure(UiWidgetContext ctx)
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
-        return AtomVocabulary.ReadHeight(spec, LabelLayout(ctx, ctx.ViewWidth).Height);
+        string label = AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
+        return new UiMeasurement(AtomVocabulary.LabelMeasureInputs(ctx, label), () => AtomVocabulary.ReadHeight(spec,
+            UiSliderLayout.Measure(label, ctx.ViewWidth, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0).Height));
     }
+
+    public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
 
     public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
     {

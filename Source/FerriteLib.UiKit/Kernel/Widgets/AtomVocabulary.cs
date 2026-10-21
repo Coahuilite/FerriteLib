@@ -130,6 +130,9 @@ internal static class AtomVocabulary
     /// fitting audit measures with, together — there is no second size to keep in sync, and a kind that
     /// pinned its own font would simply stop following density.
     /// </summary>
+    internal static UiMeasureInputs LabelMeasureInputs(UiWidgetContext ctx, string label) => new(new[] { label }, new[]
+    { ctx.ViewWidth, (float)TextFont(ctx), ctx.Theme.Geometry.Spacing, ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.RowHeight, ctx.Node?.SharedLabelWidth ?? 0 }, label.Length > 0);
+
     internal static UiFont TextFont(UiWidgetContext ctx)
     {
         return ctx.Theme.Styles.Font;

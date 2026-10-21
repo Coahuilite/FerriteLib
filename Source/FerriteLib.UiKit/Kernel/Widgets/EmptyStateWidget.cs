@@ -6,7 +6,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>
 /// Empty-state status text sharing native width measurement and effective environment typography.
 /// </summary>
-public sealed class EmptyStateWidget : IUiWidget, IUiDescriptiveWidget
+public sealed class EmptyStateWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget
 {
     public const string Kind = "state/empty";
 
@@ -39,13 +39,13 @@ public sealed class EmptyStateWidget : IUiWidget, IUiDescriptiveWidget
         // No required binding.
     }
 
-    public float Measure(UiWidgetContext ctx)
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
-        // The atom's band at this kind's font and leading, floored by this kind's own default band.
-        return Math.Max(
-            ReadHeight(),
-            WrappedTextWidget.MeasureBand(ctx, Describe(ctx).Text, AtomVocabulary.TextFont(ctx, BandFont), ctx.Theme.Geometry.Padding * 2f));
+        string text = ResolveText(ctx);
+        return new UiMeasurement(new UiMeasureInputs(new[] { text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx, BandFont), ctx.Theme.Geometry.Padding }, text.Length > 0), () => Math.Max(ReadHeight(), WrappedTextWidget.MeasureBand(ctx, text, AtomVocabulary.TextFont(ctx, BandFont), ctx.Theme.Geometry.Padding * 2)));
     }
+
+    public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
 
     public UiDescription Describe(UiWidgetContext ctx) => new UiDescription(UiDescriptionRole.Status, text: ResolveText(ctx));
 

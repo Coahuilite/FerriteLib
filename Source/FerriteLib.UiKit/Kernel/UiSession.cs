@@ -992,6 +992,7 @@ public sealed class UiSession : IDisposable
         foreach (UiNode node in doomed)
         {
             released.Add(node);
+            SuspendNodeEditors(node);
             nodes.Remove(node.Id);
             dirtyNodes.Remove(node);
             trippedNodes.Remove(node);
@@ -1075,7 +1076,7 @@ public sealed class UiSession : IDisposable
         EnsureActive();
         foreach (UiNode node in nodes.Values)
         {
-            node.ClearChildren();
+            node.ClearElementChildren();
             node.ClearGeometry();
         }
     }
@@ -1325,6 +1326,17 @@ public sealed class UiSession : IDisposable
         }
     }
 
+    private static void SuspendNodeEditors(UiNode node)
+    {
+        foreach (UiValueState state in node.ValueStates.Values)
+        {
+            if (state.Editor is IUiEditState editor) editor.Suspend();
+            state.Focused = false;
+            state.CommitRequested = state.DiscardRequested = false;
+        }
+        node.EditingState = null;
+    }
+
     public void Dispose()
     {
         if (!IsActive) return;
@@ -1347,6 +1359,7 @@ public sealed class UiSession : IDisposable
         }
 
         scrollPositions.Clear();
+        foreach (UiNode node in nodes.Values) SuspendNodeEditors(node);
         nodes.Clear();
         dirtyNodes.Clear();
         trippedNodes.Clear();

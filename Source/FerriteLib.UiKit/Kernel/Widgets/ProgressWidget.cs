@@ -25,7 +25,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// frame inside a repeater template.
 /// </para>
 /// </summary>
-internal sealed class ProgressWidget : IUiWidget, IUiDescriptiveWidget
+internal sealed class ProgressWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget
 {
     internal const string Kind = "display/progress";
 
@@ -78,6 +78,11 @@ internal sealed class ProgressWidget : IUiWidget, IUiDescriptiveWidget
             throw new InvalidOperationException(
                 "ProgressWidget at '" + elementPath + "' declares Max '" + raw + "'; expected a positive number.");
         }
+    }
+
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
+    {
+        return new UiMeasurement(new UiMeasureInputs(numbers: new[] { ctx.Theme.Geometry.RowHeight }), () => Measure(ctx));
     }
 
     public float Measure(UiWidgetContext ctx)

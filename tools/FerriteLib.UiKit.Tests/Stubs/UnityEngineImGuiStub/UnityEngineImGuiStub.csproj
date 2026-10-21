@@ -17,4 +17,5 @@
     <ProjectReference Include="..\UnityEngineStub\UnityEngineStub.csproj" />
   </ItemGroup>
 
+  <ItemGroup><ProjectReference Include="..\UnityEngineTextRenderingModuleStub\UnityEngineTextRenderingModuleStub.csproj" Private="false" /></ItemGroup>
 </Project>

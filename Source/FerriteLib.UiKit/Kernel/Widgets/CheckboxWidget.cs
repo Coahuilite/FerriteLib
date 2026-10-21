@@ -67,7 +67,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// per-item binding scope, so "not yet bound" is a legal frame there and must not take the page down.
 /// </para>
 /// </summary>
-internal sealed class CheckboxWidget : IUiWidget, IUiPointerLayout
+internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout
 {
     internal const string Kind = "input/checkbox";
 
@@ -171,6 +171,11 @@ internal sealed class CheckboxWidget : IUiWidget, IUiPointerLayout
     /// plus the band's own padding, the checkbox reserves at least its box floor. A declared <c>Height</c>
     /// still wins, so a page that sizes the band keeps doing so.
     /// </summary>
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
+    {
+        return new UiMeasurement(new UiMeasureInputs(numbers: new[] { ctx.Theme.Geometry.Padding, ctx.Theme.Geometry.RowHeight }), () => Measure(ctx));
+    }
+
     public float Measure(UiWidgetContext ctx)
     {
         return AtomVocabulary.ReadHeight(spec, NaturalHeight(ctx));

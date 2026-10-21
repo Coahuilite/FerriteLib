@@ -8,7 +8,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Normalized line data and optional editable points. Capture and 2D sampling use the common pointer
 /// owner; optional explicit keys permit stable dynamic reordering while legacy index usage remains.
 /// </summary>
-public sealed class LineChartWidget : IUiWidget, IUiDescriptiveWidget, IUiPointerLayout
+public sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiPointerLayout
 {
     public const string Kind = "chart/line";
     private const float DefaultHeight = 120f;
@@ -51,6 +51,11 @@ public sealed class LineChartWidget : IUiWidget, IUiDescriptiveWidget, IUiPointe
         {
             throw new InvalidOperationException($"LineChartWidget at '{elementPath}' requires either a 'Bind' value binding or a static 'Points' attribute.");
         }
+    }
+
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
+    {
+        return new UiMeasurement(new UiMeasureInputs(), () => Measure(ctx));
     }
 
     public float Measure(UiWidgetContext ctx)

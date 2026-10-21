@@ -23,7 +23,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// widget — which is the author's explicit override of this contract, not a second contract.
 /// </para>
 /// </summary>
-public sealed class WrappedTextWidget : IUiWidget, IUiDescriptiveWidget
+public sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget
 {
     public const string Kind = "text/wrapped";
 
@@ -60,14 +60,17 @@ public sealed class WrappedTextWidget : IUiWidget, IUiDescriptiveWidget
         }
     }
 
-    public float Measure(UiWidgetContext ctx)
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
-        // The font and the leading come from the theme, so density moves this band: a kind that pinned
-        // its own size would keep measuring the old one while the rest of the page moved.
-        float band = MeasureBand(
-            ctx, ResolveText(ctx), AtomVocabulary.TextFont(ctx), ctx.Theme.Geometry.Padding * 2f);
-        return band > 0f ? band : EmptyBandHeight;
+        string text = ResolveText(ctx);
+        return new UiMeasurement(new UiMeasureInputs(new[] { text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx), ctx.Theme.Geometry.Padding }, text.Length > 0), () =>
+        {
+            float band = MeasureBand(ctx, text, AtomVocabulary.TextFont(ctx), ctx.Theme.Geometry.Padding * 2f);
+            return band > 0 ? band : EmptyBandHeight;
+        });
     }
+
+    public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
 
     /// <summary>
     /// The atom's band contract, and the only copy of it: the height a string needs when wrapped at

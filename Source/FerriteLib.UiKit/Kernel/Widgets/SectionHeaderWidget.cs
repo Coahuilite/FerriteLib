@@ -15,7 +15,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// the line (transparent included) instead of switching it off.
 /// </para>
 /// </summary>
-public sealed class SectionHeaderWidget : IUiWidget, IUiDescriptiveWidget
+public sealed class SectionHeaderWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget
 {
     public const string Kind = "section/header";
 
@@ -54,12 +54,19 @@ public sealed class SectionHeaderWidget : IUiWidget, IUiDescriptiveWidget
         }
     }
 
-    public float Measure(UiWidgetContext ctx)
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
-        float declared = AtomVocabulary.ReadHeight(spec, 0);
-        if (declared > 0) return declared;
-        return Math.Max(ReadHeight(), ctx.Metrics.MeasureText(Describe(ctx).Text, AtomVocabulary.TextFont(ctx), Math.Max(1, ctx.ViewWidth)));
+        float fixedHeight = AtomVocabulary.ReadHeight(spec, 0);
+        if (fixedHeight > 0) return new UiMeasurement(new UiMeasureInputs(numbers: new[] { fixedHeight }), () => fixedHeight);
+        string text = Describe(ctx).Text;
+        return new UiMeasurement(new UiMeasureInputs(new[] { text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx) }, true), () =>
+        {
+            float declared = AtomVocabulary.ReadHeight(spec, 0);
+            return declared > 0 ? declared : Math.Max(ReadHeight(), ctx.Metrics.MeasureText(text, AtomVocabulary.TextFont(ctx), Math.Max(1, ctx.ViewWidth)));
+        });
     }
+
+    public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
 
     public UiDescription Describe(UiWidgetContext ctx) => new UiDescription(UiDescriptionRole.Heading, text: Title(ctx));
 

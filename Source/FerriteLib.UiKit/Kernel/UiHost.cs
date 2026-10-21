@@ -15,7 +15,6 @@ public sealed partial class UiHost : IDisposable
     private readonly string source;
     private readonly IUiBindings bindings;
     private readonly UiBindingPresentation? reactivePresentation;
-    private int presentationRevision;
     private readonly UiTheme theme;
     private readonly ITextMetrics metrics;
     private readonly IUiTranslation translation;
@@ -47,7 +46,6 @@ public sealed partial class UiHost : IDisposable
     // leaving a closed session referenced by a live service.
     private UiDocumentService? documentService;
 
-    private int lastLayoutRevision;
 
     // How far the two issue records have been published on the fit audit's appearance channel. Each one
     // only ever moves forward, so an issue is reported exactly once however many frames follow it.
@@ -73,6 +71,8 @@ public sealed partial class UiHost : IDisposable
     internal static Action<string>? StyleWarningOverride;
 
     private bool warnedDroppedStyleDocument;
+    private int lastLayoutRevision = -1;
+    private int presentationRevision;
 
     public UiHost(
         string source,
@@ -200,7 +200,7 @@ public sealed partial class UiHost : IDisposable
         if (reactivePresentation != null && presentationRevision != reactivePresentation.Revision)
         {
             presentationRevision = reactivePresentation.Revision;
-            session.BumpContentRevision();
+            engine.ValidateLegacyPresentation();
         }
         using IDisposable? inputs = reactivePresentation?.Enter();
         // The arrange runs inside this host's diagnostic scope: an appearance fallback the engine records
@@ -212,18 +212,8 @@ public sealed partial class UiHost : IDisposable
         UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription, metrics);
         try
         {
-            // The band cache compares the available size and the content/definition/translation revisions,
-            // and it cannot see the theme. A density or font-size change would therefore keep the previous
-            // geometry while the draw resolves the new font - exactly the measure/draw disagreement a
-            // resolved-value store exists to prevent. The theme reports its own layout-bearing revision, and
-            // the host turns a change into the one cache clock the engine already understands rather than
-            // inventing a second one.
-            if (lastLayoutRevision != theme.LayoutRevision)
-            {
-                lastLayoutRevision = theme.LayoutRevision;
-                session.BumpContentRevision();
-            }
-
+            // The engine validates effective inputs per stage; presentation changes no longer bump
+            // a global cache key. Unknown legacy Measure still receives its original synchronization.
             UiWidgetContext ctx = CreateContext(available.x);
             UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, available, manifest.Roots);
 
@@ -232,6 +222,7 @@ public sealed partial class UiHost : IDisposable
             // arrange that discovered it - is what keeps such a drop from waiting a frame to be visible. On a
             // cached arrangement there is nothing new to publish and the call costs two integer comparisons.
             PublishStyleIssues();
+            lastLayoutRevision = theme.LayoutRevision;
             return snapshot;
         }
         finally
@@ -477,6 +468,7 @@ public sealed partial class UiHost : IDisposable
         diagnostics = null;
 
         session.Dispose();
+        engine.ReleaseLayoutCaches();
     }
 
     public void Dispose()
@@ -1033,7 +1025,8 @@ public sealed partial class UiHost : IDisposable
         // it, so no kind's attribute schema has to grow for a page to declare a return layer. Unlike HelpKey it
         // IS allowed on a container: a section that draws nothing of its own is still a layer a player can
         // return from, which is the whole difference between a hit surface and a tree node.
-        "CancelBind"
+        "CancelBind",
+        "UpdateScope"
     };
 
     private static readonly HashSet<string> ContainerAttributes = new(StringComparer.OrdinalIgnoreCase)
@@ -1051,7 +1044,8 @@ public sealed partial class UiHost : IDisposable
         "Font", "SharedLabels",
         // FL-IC2: see the widget list; UiLayoutEngine's mirrored pair carries the same addition, and the drift
         // lane refuses one-sided edits.
-        "CancelBind"
+        "CancelBind",
+        "UpdateScope"
     };
 
     private void ValidateElement(UiElementSpec spec, string path, bool parentNarrowCapable, UiElementSpec? parent)
@@ -1059,6 +1053,8 @@ public sealed partial class UiHost : IDisposable
         // CP-1/CP-2 placement contract, checked here because this is the creation-time door: a placement
         // attribute is valid only inside a placement container, and a flow container's child accepts the
         // cross-axis subset without an offset. The rule lives in UiPlacement so the engine can share it.
+        if (spec.TryGetAttribute("UpdateScope", out string updateScope) && !bool.TryParse(updateScope.Trim(), out _))
+            throw new UiContractException("UpdateScope must be true or false.", source, spec.Id, spec.Kind, path);
         UiPlacement.ValidateChild(spec, path, source, parent);
         UiPlacement.ValidateSiblingAnchors(spec, path, source);
 
@@ -1449,4 +1445,3 @@ public sealed partial class UiHost : IDisposable
             || string.Equals(kind, "Clip", StringComparison.Ordinal);
     }
 }
-

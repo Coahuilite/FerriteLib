@@ -175,6 +175,8 @@ public sealed class UiWidgetContext
     /// Returns a context with a different view width. The layout engine uses this so widgets nested
     /// in columns measure and draw against their arranged column width instead of the page width.
     /// </summary>
+    internal UiWidgetContext WithMetrics(ITextMetrics metrics) => new(Source, Session, metrics, Theme, Translation, Bindings, ViewWidth, ElementPath, WindowOrigin, ElementId, Node, StyleChain);
+
     public UiWidgetContext WithViewWidth(float viewWidth)
     {
         return new UiWidgetContext(Source, Session, Metrics, Theme, Translation, Bindings, viewWidth, ElementPath, WindowOrigin, ElementId, Node, StyleChain);

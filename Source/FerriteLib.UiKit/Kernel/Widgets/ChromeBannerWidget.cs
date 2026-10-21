@@ -6,7 +6,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>
 /// Descriptive status text with a Tiny undeclared fallback; explicit font declarations override it.
 /// </summary>
-public sealed class ChromeBannerWidget : IUiWidget, IUiDescriptiveWidget
+public sealed class ChromeBannerWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget
 {
     public const string Kind = "chrome/banner";
 
@@ -50,13 +50,13 @@ public sealed class ChromeBannerWidget : IUiWidget, IUiDescriptiveWidget
         }
     }
 
-    public float Measure(UiWidgetContext ctx)
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
-        // The atom's band at this kind's font and leading, floored by this kind's own default band.
-        return Math.Max(
-            ReadHeight(),
-            WrappedTextWidget.MeasureBand(ctx, Describe(ctx).Text, AtomVocabulary.TextFont(ctx, BandFont), ctx.Theme.Geometry.Padding));
+        string text = Describe(ctx).Text;
+        return new UiMeasurement(new UiMeasureInputs(new[] { text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx, BandFont), ctx.Theme.Geometry.Padding }, text.Length > 0), () => Math.Max(ReadHeight(), WrappedTextWidget.MeasureBand(ctx, text, AtomVocabulary.TextFont(ctx, BandFont), ctx.Theme.Geometry.Padding)));
     }
+
+    public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
 
     public UiDescription Describe(UiWidgetContext ctx) => AtomVocabulary.DescribeText(spec, ctx, UiDescriptionRole.Status, "Text", "TextKey");
 

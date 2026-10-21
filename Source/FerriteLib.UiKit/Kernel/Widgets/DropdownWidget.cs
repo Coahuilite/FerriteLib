@@ -26,7 +26,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// attribute already carries; a reserved help slot is deliberately NOT part of either look.
 /// </para>
 /// </summary>
-public sealed class DropdownWidget : IUiWidget, IUiLabelledWidget, IUiPointerLayout
+public sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout
 {
     public const string Kind = "input/dropdown";
 
@@ -174,11 +174,16 @@ public sealed class DropdownWidget : IUiWidget, IUiLabelledWidget, IUiPointerLay
         }
     }
 
-    public float Measure(UiWidgetContext ctx)
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
-        float natural = SharedLabelLayout(ctx, ctx.ViewWidth)?.Height ?? ctx.Theme.Geometry.RowHeight;
-        return ReadHeight(natural);
+        string label = ReadLabel(ctx);
+        return new UiMeasurement(ctx.Node?.SharedLabelWidth > 0 ? AtomVocabulary.LabelMeasureInputs(ctx, label) : new UiMeasureInputs(numbers: new[] { ctx.Theme.Geometry.RowHeight }), () =>
+            ReadHeight(ctx.Node?.SharedLabelWidth > 0
+                ? UiSliderLayout.Measure(label, ctx.ViewWidth, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node.SharedLabelWidth).Height
+                : ctx.Theme.Geometry.RowHeight));
     }
+
+    public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
 
     public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
     {

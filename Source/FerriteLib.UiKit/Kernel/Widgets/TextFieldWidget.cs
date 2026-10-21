@@ -6,7 +6,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Single-line or basic plain-text multiline native editing, with one instance-local neutral draft.
 /// Selection, clipboard and character composition belong to Verse/Unity, not to this wrapper.
 /// </summary>
-public sealed class TextFieldWidget : IUiWidget, IUiLabelledWidget, IUiPointerLayout
+public sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout
 {
     public const string Kind = "input/text-field";
 
@@ -47,22 +47,32 @@ public sealed class TextFieldWidget : IUiWidget, IUiLabelledWidget, IUiPointerLa
         bindings.ValidateValue<string>(bindKey, elementPath);
     }
 
-    public float Measure(UiWidgetContext ctx)
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
-        float declared = AtomVocabulary.ReadHeight(spec, 0);
-        if (declared > 0)
-            return declared;
-        UiSliderLayout labelLayout = LabelLayout(ctx, ctx.ViewWidth);
-        if (!AtomVocabulary.ReadBool(spec, "Multiline", false))
-            return labelLayout.Height;
-        string binding = AtomVocabulary.ReadBindKey(spec);
-        string text = ctx.Bindings.Get<string>(binding) ?? "";
-        UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
-        if (node.ValueStates.TryGetValue(binding, out UiValueState? state) && state.Editor is IUiEditState edit)
-            text = edit.Draft;
-        ResolveLabelBand(new Rect(0, 0, ctx.ViewWidth, 1), ctx, out Rect field);
-        return (labelLayout.Stacked ? labelLayout.LabelHeight + ctx.Theme.Geometry.Gap : 0) + Math.Max(ctx.Theme.Geometry.RowHeight, ctx.Metrics.MeasureText(text, AtomVocabulary.TextFont(ctx), field.width) + ctx.Theme.Geometry.Spacing * 2);
+        float fixedHeight = AtomVocabulary.ReadHeight(spec, 0);
+        if (fixedHeight > 0) return new UiMeasurement(new UiMeasureInputs(numbers: new[] { fixedHeight }), () => fixedHeight);
+        string label = AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
+        bool multiline = AtomVocabulary.ReadBool(spec, "Multiline", false);
+        string text = "";
+        if (multiline)
+        {
+            string binding = AtomVocabulary.ReadBindKey(spec);
+            text = ctx.Bindings.Get<string>(binding) ?? "";
+            UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
+            if (node.ValueStates.TryGetValue(binding, out UiValueState? state) && state.Editor is IUiEditState edit) text = edit.Draft;
+        }
+        return new UiMeasurement(new UiMeasureInputs(new[] { label, text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx), ctx.Theme.Geometry.Spacing, ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.RowHeight, ctx.Node?.SharedLabelWidth ?? 0 }, multiline || label.Length > 0), () =>
+        {
+            float declared = AtomVocabulary.ReadHeight(spec, 0);
+            if (declared > 0) return declared;
+            UiSliderLayout layout = UiSliderLayout.Measure(label, ctx.ViewWidth, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0);
+            if (!multiline) return layout.Height;
+            float fieldWidth = layout.Stacked || layout.LabelWidth <= 0 ? ctx.ViewWidth : Math.Max(1, ctx.ViewWidth - layout.LabelWidth - ctx.Theme.Geometry.Gap);
+            return (layout.Stacked ? layout.LabelHeight + ctx.Theme.Geometry.Gap : 0) + Math.Max(ctx.Theme.Geometry.RowHeight, ctx.Metrics.MeasureText(text, AtomVocabulary.TextFont(ctx), fieldWidth) + ctx.Theme.Geometry.Spacing * 2);
+        });
     }
+
+    public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
 
     public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
     {

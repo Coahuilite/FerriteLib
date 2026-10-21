@@ -8,7 +8,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// and writes through the typed <see cref = "IUiBindings"/>; no neutral command bridge.
 /// The typed value-binding key is the <c>Bind</c> attribute when present, otherwise the element Id.
 /// </summary>
-public sealed class StepperSliderWidget : IUiWidget, IUiLabelledWidget, IUiLayoutDiagnosticSource, IUiPointerLayout
+public sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiLayoutDiagnosticSource, IUiPointerLayout
 {
     public const string Kind = "input/stepper-slider";
 
@@ -55,11 +55,19 @@ public sealed class StepperSliderWidget : IUiWidget, IUiLabelledWidget, IUiLayou
         bindings.ValidateValue<float>(bindKey, elementPath);
     }
 
-    public float Measure(UiWidgetContext ctx)
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
-        float height = ReadHeight();
-        return spec.TryGetAttribute("Height", out _) ? height : Math.Max(height, LabelLayout(ctx, ctx.ViewWidth).Height);
+        string label = ReadLabel(ctx);
+        return new UiMeasurement(AtomVocabulary.LabelMeasureInputs(ctx, label), () =>
+        {
+            float height = ReadHeight();
+            return spec.TryGetAttribute("Height", out _) ? height : Math.Max(height,
+                UiSliderLayout.Measure(label, ctx.ViewWidth, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0,
+                    Math.Max(1, ReadFloat("ButtonWidth", DefaultButtonWidth)) * 2 + Math.Max(1, ReadFloat("FieldWidth", DefaultFieldWidth)) + Gap * 3 + ctx.Theme.Geometry.RowHeight * 2).Height);
+        });
     }
+
+    public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
 
     public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
     {

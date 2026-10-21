@@ -356,6 +356,8 @@ public static class TranslatorFormattedStringExtensions
 
 public static class Text
 {
+    public static readonly GUIStyle[] fontStyles = { new(), new(), new() };
+    public static GUIStyle CurFontStyle => fontStyles[(int)Font];
     public static GameFont Font { get; set; }
 
     public static TextAnchor Anchor { get; set; }

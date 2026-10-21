@@ -515,6 +515,7 @@ public static class Mathf
 /// </summary>
 public class Object
 {
+    public int GetInstanceID() => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this);
     public static bool operator ==(Object? a, Object? b) => ReferenceEquals(a, b);
 
     public static bool operator !=(Object? a, Object? b) => !ReferenceEquals(a, b);
@@ -601,4 +602,12 @@ public enum TextAnchor
     LowerLeft = 6,
     LowerCenter = 7,
     LowerRight = 8
+}
+
+public sealed class RectOffset
+{
+    public int left { get; set; }
+    public int right { get; set; }
+    public int top { get; set; }
+    public int bottom { get; set; }
 }

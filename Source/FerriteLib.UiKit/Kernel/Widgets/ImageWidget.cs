@@ -23,7 +23,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// the row's click. A caller that wants an interactive picture puts it inside a kind that owns the hit.
 /// </para>
 /// </summary>
-internal sealed class ImageWidget : IUiWidget, IUiDescriptiveWidget
+internal sealed class ImageWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget
 {
     internal const string Kind = "display/image";
 
@@ -60,25 +60,25 @@ internal sealed class ImageWidget : IUiWidget, IUiDescriptiveWidget
         ReadOptions();
     }
 
-    public float Measure(UiWidgetContext ctx)
+    public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
-        // The declared height wins when a page sets one; otherwise the bound texture's own height plus the
-        // theme's padding is the band, so the row a picture sits in is measured rather than assumed. A missing
-        // texture keeps one density-derived row, which is the same band an empty slot paints into.
-        if (spec.TryGetAttribute("Height", out string raw) && raw.Trim().Length > 0)
-        {
-            return AtomVocabulary.ReadFloat(spec, "Height", ctx.Theme.Geometry.RowHeight);
-        }
-
+        if (spec.TryGetAttribute("Height", out string declaredHeight) && declaredHeight.Trim().Length > 0)
+            return new UiMeasurement(new UiMeasureInputs(), () => AtomVocabulary.ReadFloat(spec, "Height", ctx.Theme.Geometry.RowHeight));
         Texture? texture = ReadTexture(ctx);
-        if (texture != null && AtomVocabulary.ReadBool(spec, "AspectHeight", false))
+        float width = texture == null ? 0 : texture.width, height = texture == null ? 0 : texture.height;
+        return new UiMeasurement(new UiMeasureInputs(numbers: new[] { width, height, AtomVocabulary.ReadBool(spec, "AspectHeight", false) ? ctx.ViewWidth : 0, ctx.Theme.Geometry.Padding, ctx.Theme.Geometry.RowHeight }), () =>
         {
-            float aspect = UiImageLayout.AspectHeight(ctx.ViewWidth, texture.width, texture.height);
-            return aspect > 0f ? aspect : ctx.Theme.Geometry.RowHeight;
-        }
-        float natural = texture == null ? 0f : texture.height;
-        return natural > 0f ? natural + ctx.Theme.Geometry.Padding * 2f : ctx.Theme.Geometry.RowHeight;
+            if (spec.TryGetAttribute("Height", out string raw) && raw.Trim().Length > 0) return AtomVocabulary.ReadFloat(spec, "Height", ctx.Theme.Geometry.RowHeight);
+            if (texture != null && AtomVocabulary.ReadBool(spec, "AspectHeight", false))
+            {
+                float aspect = UiImageLayout.AspectHeight(ctx.ViewWidth, width, height);
+                return aspect > 0 ? aspect : ctx.Theme.Geometry.RowHeight;
+            }
+            return height > 0 ? height + ctx.Theme.Geometry.Padding * 2 : ctx.Theme.Geometry.RowHeight;
+        });
     }
+
+    public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
 
     public void Draw(Rect rect, UiWidgetContext ctx)
     {

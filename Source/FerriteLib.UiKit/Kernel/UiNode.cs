@@ -82,6 +82,10 @@ public sealed class UiNode
 
     public UiElementProperties Properties { get; }
 
+    /// <summary>Nearest effective update-scope owner, without changing this node identity.</summary>
+    public UiNodeId UpdateScopeRoot { get; internal set; }
+    internal int LayoutMeasureCount, LayoutArrangeCount;
+
     /// <summary>Explicit business identity; change when a getter switches logical objects.</summary>
     public string InteractionScope { get; set; } = "";
     internal UiValueState? EditingState;
@@ -172,6 +176,7 @@ public sealed class UiNode
         string elementId = ElementId;
         string cancelBinding = CancelBindingKey;
         float sharedLabelWidth = SharedLabelWidth;
+        UiNodeId updateScope = UpdateScopeRoot;
         return () =>
         {
             restoreAuthoring();
@@ -183,6 +188,7 @@ public sealed class UiNode
             RefreshIdentity(kind, ordinal, elementId);
             CancelBindingKey = cancelBinding;
             SharedLabelWidth = sharedLabelWidth;
+            UpdateScopeRoot = updateScope;
         };
     }
 
@@ -203,6 +209,11 @@ public sealed class UiNode
     }
 
     /// <summary>Forgets the arranged children; an arrange rebuilds them (and re-links sub-nodes on use).</summary>
+    internal void ClearElementChildren()
+    {
+        children.RemoveAll(child => child.Id.Key.IndexOf(UiNodeId.SubNodeMarker) < 0);
+    }
+
     internal void ClearChildren()
     {
         children.Clear();

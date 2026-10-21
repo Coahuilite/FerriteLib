@@ -228,3 +228,22 @@ public static class GUI
         if (groupClips.Count > 0) groupClips.Pop();
     }
 }
+
+public enum ImagePosition { ImageLeft, ImageAbove, ImageOnly, TextOnly }
+public enum TextClipping { Overflow, Clip }
+public sealed class GUIStyle
+{
+    public Font font { get; set; } = new();
+    public int fontSize { get; set; }
+    public FontStyle fontStyle { get; set; }
+    public bool richText { get; set; }
+    public float fixedWidth { get; set; }
+    public float fixedHeight { get; set; }
+    public bool stretchWidth { get; set; }
+    public bool stretchHeight { get; set; }
+    public ImagePosition imagePosition { get; set; }
+    public TextClipping clipping { get; set; }
+    public Vector2 contentOffset { get; set; }
+    public RectOffset padding { get; set; } = new();
+    public RectOffset border { get; set; } = new();
+}

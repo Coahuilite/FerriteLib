@@ -23,6 +23,7 @@ internal static class Program
     {
         try
         {
+            LayoutReuseTests.Run(Check);
             ReactiveFoundationTests.Run(Check);
             ReactiveInventoryTests.Run(Check);
             ReactiveListWriteTests.Run(Check);
