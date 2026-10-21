@@ -3,6 +3,15 @@ using System.Collections.Generic;
 
 namespace FerriteLib.UiKit.Kernel;
 
+internal sealed class UiTrackedBindingRead
+{
+    internal readonly string Key;
+    internal readonly Func<object?> Read;
+    internal readonly Func<object?, object?, bool>? Equal;
+    internal UiTrackedBindingRead(string key, Func<object?> read, Func<object?, object?, bool>? equal)
+    { Key = key; Read = read; Equal = equal; }
+}
+
 /// <summary>A host-owned, atomically synchronized read view. Business reads outside Enter stay immediate.</summary>
 public sealed class UiBindingPresentation : IDisposable
 {
@@ -26,20 +35,31 @@ public sealed class UiBindingPresentation : IDisposable
         var added = new List<string>();
         try
         {
-            foreach (var entry in bindings.TrackedReads())
+            Dictionary<string, UiTrackedBindingRead> reads = bindings.TrackedReads();
+            foreach (var entry in reads)
             {
                 if (calculations.ContainsKey(entry.Key)) continue;
-                calculations.Add(entry.Key, owner.Compute(entry.Key, entry.Value)); added.Add(entry.Key);
+                calculations.Add(entry.Key, owner.Compute(entry.Value.Key, entry.Value.Read)); added.Add(entry.Key);
             }
             var staged = new Dictionary<string, object?>(StringComparer.Ordinal);
             foreach (var entry in calculations) staged.Add(entry.Key, entry.Value.Value);
             // The engine already owns full measure/arrange. No RU2 local-cache promise is introduced.
-            bool changed = false;
-            foreach (var entry in staged)
-                if (!revisions.TryGetValue(entry.Key, out int old) || old != calculations[entry.Key].Revision) { bindings.NotifyChanged(entry.Key); changed = true; }
+            var changed = new HashSet<string>(StringComparer.Ordinal);
+            using (bindings.Reactive.ReadPhase())
+            {
+                foreach (var entry in staged)
+                {
+                    if (revisions.TryGetValue(entry.Key, out int old) && old == calculations[entry.Key].Revision) continue;
+                    UiTrackedBindingRead read = reads[entry.Key];
+                    if (!current.TryGetValue(entry.Key, out object? prior) || read.Equal == null || !read.Equal(prior, entry.Value))
+                        changed.Add(read.Key);
+                }
+            }
+            // Comparisons and every getter succeed before any public revision or read view changes.
+            foreach (string key in changed) bindings.NotifyChanged(key);
             foreach (var entry in calculations) revisions[entry.Key] = entry.Value.Revision;
             current = staged;
-            if (changed) Revision++;
+            if (changed.Count != 0) Revision++;
         }
         catch
         {

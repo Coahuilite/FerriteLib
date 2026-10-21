@@ -33,6 +33,9 @@
     <Compile Include="../FerriteLib.UiKit.Core.ContractTests/ReactiveExamples.cs" Link="ReactiveExamples.cs" />
     <Compile Include="../FerriteLib.UiKit.Core.ContractTests/WorkshopService.cs" Link="WorkshopService.cs" />
     <Compile Include="../FerriteLib.UiKit.Core.ContractTests/WorkshopProjectionExample.cs" Link="WorkshopProjectionExample.cs" />
+    <Compile Include="../FerriteLib.UiKit.Core.ContractTests/InventoryPageExample.cs" Link="InventoryPageExample.cs" />
+    <Compile Include="../FerriteLib.UiKit.Core.ContractTests/OrderBoardService.cs" Link="OrderBoardService.cs" />
+    <Compile Include="../FerriteLib.UiKit.Core.ContractTests/OrderBoardProjectionExample.cs" Link="OrderBoardProjectionExample.cs" />
   </ItemGroup>
 
   <!-- Krafs.Rimworld.Ref 只提供编译期 ref 程序集（不可执行）。测试运行时需要可执行的最小

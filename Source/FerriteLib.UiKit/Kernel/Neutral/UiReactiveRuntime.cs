@@ -28,9 +28,21 @@ public sealed class UiReactiveRuntime
             throw new InvalidOperationException("Reactive access belongs to its creating serial context. Deliver a safe result through the host adapter first.");
     }
 
-    public UiReactiveValue<int> Int(int value = 0) => new(this, value, (a, b) => a == b);
-    public UiReactiveValue<string> Text(string value = "") => new(this, value, (a, b) => string.Equals(a, b, StringComparison.Ordinal));
-    public UiReactiveValue<bool> Boolean(bool value = false) => new(this, value, (a, b) => a == b);
+    public UiReactiveValue<int> Int(int value = 0) => Value(value, (a, b) => a == b);
+    public UiReactiveValue<string> Text(string value = "") => Value(value, (a, b) => string.Equals(a, b, StringComparison.Ordinal));
+    public UiReactiveValue<bool> Boolean(bool value = false) => Value(value, (a, b) => a == b);
+    /// <summary>Connect any value with an explicitly chosen equality policy. No reference/deep default is inferred.</summary>
+    public UiReactiveValue<T> Value<T>(T value, Func<T, T, bool> equal)
+    {
+        VerifyAccess();
+        return new UiReactiveValue<T>(this, value, equal ?? throw new ArgumentNullException(nameof(equal)));
+    }
+    /// <summary>Controlled structure; item properties must be connected separately.</summary>
+    public UiReactiveList<T> List<T>(IEnumerable<T> items, Func<T, T, bool> equal)
+    {
+        VerifyAccess();
+        return new UiReactiveList<T>(this, items, equal);
+    }
     public UiReactiveOwner CreateOwner(string name) { VerifyAccess(); return new UiReactiveOwner(this, name); }
 
     /// <summary>Nested batches defer automatic responses, not assignment, invalidation or explicit reads.</summary>
@@ -124,6 +136,7 @@ internal abstract class UiReactiveSource
     protected readonly UiReactiveRuntime Runtime;
     internal int Revision;
     private readonly HashSet<UiReactiveObserver> observers = new();
+    internal int SubscriberCount => observers.Count;
     protected UiReactiveSource(UiReactiveRuntime runtime) { Runtime = runtime; }
     internal void Read()
     {
@@ -152,6 +165,7 @@ public sealed class UiReactiveValue<T>
     private readonly Source source;
     private readonly Func<T, T, bool> equal;
     private T value;
+    internal int SubscriberCount => source.SubscriberCount;
     internal UiReactiveValue(UiReactiveRuntime runtime, T value, Func<T, T, bool> equal)
     { this.runtime = runtime; this.value = value; this.equal = equal; source = new Source(runtime); }
     public T Value

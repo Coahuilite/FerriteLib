@@ -29,6 +29,7 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
         public abstract Type ValueType { get; }
         public abstract bool CanWrite { get; }
         public bool Tracked;
+        public Func<object?, object?, bool>? Equal;
         public abstract object? GetBoxed();
         public abstract void SetBoxed(object? value);
     }
@@ -63,9 +64,11 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
 
     private abstract class OptionsDescriptor
     {
+        public bool Tracked;
+        public Func<object?, object?, bool>? Equal;
         public abstract Type ItemType { get; }
         public abstract object GetListBoxed();
-        public abstract IReadOnlyList<object?> ReadPrefix(int maximum, out int count);
+        public abstract IReadOnlyList<object?> ReadPrefix(object list, int maximum, out int count);
 
         /// <summary>
         /// True when the item type is a <see cref="UiChoice{T}"/>: the list carries typed choices rather than
@@ -90,9 +93,9 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
         public override Type ItemType => typeof(T);
 
         public override object GetListBoxed() => get();
-        public override IReadOnlyList<object?> ReadPrefix(int maximum, out int count)
+        public override IReadOnlyList<object?> ReadPrefix(object list, int maximum, out int count)
         {
-            IReadOnlyList<T> current = get();
+            IReadOnlyList<T> current = (IReadOnlyList<T>)list;
             count = current.Count;
             var prefix = new List<object?>(Math.Min(maximum, count));
             for (int i = 0; i < Math.Min(maximum, count); i++) prefix.Add(current[i]);
@@ -224,11 +227,42 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
     partial void ReportStyleFallback(string path, string kind, string attribute, string supplied, string fallback);
 
     /// <summary>Explicit opt-in; ordinary bindings retain their original live getter contract.</summary>
-    public void BindTracked<T>(string key, Func<T> get, Action<T>? set = null)
+    public void BindTracked<T>(string key, Func<T> get, Action<T>? set = null, Func<T, T, bool>? equal = null)
     {
         if (key == null) throw new ArgumentNullException(nameof(key));
         Reactive.VerifyAccess(); reactiveEnabled = true;
-        AddValue(key, new ValueDescriptor<T>(get, set) { Tracked = true }, UiInvalidation.Everything);
+        Func<object?, object?, bool>? compare = equal == null ? ScalarEquality<T>() : (a, b) => equal((T)a!, (T)b!);
+        AddValue(key, new ValueDescriptor<T>(get, set) { Tracked = true, Equal = compare }, UiInvalidation.Everything);
+    }
+
+    private static Func<object?, object?, bool>? ScalarEquality<T>()
+    {
+        // Only the already-approved scalar policies; arbitrary Equals/reference/deep defaults remain undecided.
+        if (typeof(T) == typeof(int)) return (a, b) => (int)a! == (int)b!;
+        if (typeof(T) == typeof(bool)) return (a, b) => (bool)a! == (bool)b!;
+        if (typeof(T) == typeof(string)) return (a, b) => string.Equals((string?)a, (string?)b, StringComparison.Ordinal);
+        return null;
+    }
+
+    /// <summary>Pure options projection. Copies the outer list during tracking; projected items must be
+    /// immutable presentation values, not live mutable business objects. Item equality is explicit.</summary>
+    public void BindTrackedOptions<T>(string key, Func<IReadOnlyList<T>> get, Func<T, T, bool> equal)
+    {
+        if (key == null) throw new ArgumentNullException(nameof(key));
+        if (get == null) throw new ArgumentNullException(nameof(get));
+        if (equal == null) throw new ArgumentNullException(nameof(equal));
+        Reactive.VerifyAccess();
+        if (options.ContainsKey(key)) throw new InvalidOperationException($"Duplicate options binding '{key}'.");
+        var descriptor = new OptionsDescriptor<T>(() => new List<T>(get()).AsReadOnly()) { Tracked = true };
+        descriptor.Equal = (a, b) =>
+        {
+            var left = (IReadOnlyList<T>)a!; var right = (IReadOnlyList<T>)b!;
+            if (left.Count != right.Count) return false;
+            for (int i = 0; i < left.Count; i++) if (!equal(left[i], right[i])) return false;
+            return true;
+        };
+        options.Add(key, descriptor); reactiveEnabled = true;
+        DeclareInvalidation(key, UiInvalidation.Everything);
     }
 
     public IDisposable BeginOperation()
@@ -272,19 +306,31 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
         presentation = value;
         return new UiReactiveScope(() => presentation = previous);
     }
-    internal Dictionary<string, Func<object?>> TrackedReads()
+    internal Dictionary<string, UiTrackedBindingRead> TrackedReads()
     {
-        var reads = new Dictionary<string, Func<object?>>(StringComparer.Ordinal);
-        foreach (var item in values) if (item.Value.Tracked) reads.Add(item.Key, item.Value.GetBoxed);
+        var reads = new Dictionary<string, UiTrackedBindingRead>(StringComparer.Ordinal);
+        foreach (var item in values) if (item.Value.Tracked)
+            reads.Add("value:" + item.Key, new UiTrackedBindingRead(item.Key, item.Value.GetBoxed, item.Value.Equal));
+        foreach (var item in options) if (item.Value.Tracked)
+            reads.Add("options:" + item.Key, new UiTrackedBindingRead(item.Key, () => item.Value.GetListBoxed(), item.Value.Equal));
         return reads;
     }
     private object? ReadValue(string key, ValueDescriptor descriptor)
     {
         if (!descriptor.Tracked) return descriptor.GetBoxed();
         Reactive.VerifyAccess();
-        if (presentation != null) return presentation.Read(key);
+        if (presentation != null) return presentation.Read("value:" + key);
         using IDisposable pure = Reactive.Pure();
         return descriptor.GetBoxed();
+    }
+
+    private object ReadOptions(string key, OptionsDescriptor descriptor)
+    {
+        if (!descriptor.Tracked) return descriptor.GetListBoxed();
+        Reactive.VerifyAccess();
+        if (presentation != null) return presentation.Read("options:" + key)!;
+        using IDisposable pure = Reactive.Pure();
+        return descriptor.GetListBoxed();
     }
 
     public T Get<T>(string elementId)
@@ -372,7 +418,7 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
                 $"Options binding '{elementId}' is '{descriptor.ItemType.Name}', not '{typeof(T).Name}'.");
         }
 
-        return (IReadOnlyList<T>)descriptor.GetListBoxed();
+        return (IReadOnlyList<T>)ReadOptions(elementId, descriptor);
     }
 
     // --- IUiTypedChoices: the additive, type-erased half the non-generic widgets probe (R4-A, 0.7.x) -------
@@ -448,7 +494,7 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
     {
         if (options.TryGetValue(key, out OptionsDescriptor? descriptor))
         {
-            prefix = descriptor.ReadPrefix(maximum, out count);
+            prefix = descriptor.ReadPrefix(ReadOptions(key, descriptor), maximum, out count);
             return true;
         }
         prefix = Array.Empty<object?>();
@@ -466,7 +512,7 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
         if (key == null) throw new ArgumentNullException(nameof(key));
         if (options.TryGetValue(key, out OptionsDescriptor? descriptor)
             && descriptor!.IsChoiceList
-            && descriptor.GetListBoxed() is System.Collections.IEnumerable items)
+            && ReadOptions(key, descriptor) is System.Collections.IEnumerable items)
         {
             var erased = new List<UiChoice<object?>>();
             foreach (object? item in items)

@@ -1,6 +1,6 @@
-# Reactive foundation: operations, presentation and ownership
+# Reactive sources: values, collections, presentation and ownership
 
-The 0.8 Dev foundation connects the **same production** `UiBindings`, reactive graph and presentation
+The 0.8 Dev foundation and RU1 connect the **same production** `UiBindings`, reactive graph and presentation
 read view to both `NeutralSources.props` and the actual `UiHost`. It does not implement RU2 local layout
 caching or complete the migration of every registered use. See the per-use [inventory](migration-status.md).
 
@@ -21,8 +21,48 @@ No local-cache or per-node-layout performance claim follows from this implementa
 `Int`, `Text` and `Boolean` use integer equality, ordinal string equality and boolean equality. Equal
 storage writes do not invalidate; command invocations and selection requests still happen separately,
 even when their final stored values are equal. Ordinary objects can expose these sources through C#
-properties; no base model class or automatic deep observation is required. There is no public generic
-reference comparer, collection observer or automatic in-place mutation interception in this package.
+properties; no base model class or automatic deep observation is required. `Value<T>(initial, equal)`
+connects other value/reference types with a required caller-selected equality function. A mutable-object
+source normally explicitly chooses `(a, b) => ReferenceEquals(a, b)` so replacement changes following
+relationships; connecting a reference does not observe ordinary fields inside it. No implicit reference,
+`Default.Equals` or deep-comparison policy is introduced.
+
+Equality functions are pure and define **stored state**, not business-operation identity. If equality
+returns true the old stored value remains: do not compare two distinct observation targets only by their
+current displayed count. Put replaceable target identity in its own reference source, then read its connected
+properties inside the calculation. That reevaluation replaces dependencies even when the result is equal.
+Same-final-result commands and valid same-value selections are still separate requests.
+
+## Control structure; connect item properties separately
+
+```csharp
+var items = runtime.List(new[] { first, second }, (a, b) => ReferenceEquals(a, b));
+var current = runtime.Value(items, (a, b) => ReferenceEquals(a, b));
+var total = business.Compute("total", () => current.Value.Sum(item => item.Count));
+items.Add(third);
+items.Move(0, 2); // destination is the final index
+items.Remove(second);
+```
+
+`UiReactiveList<T>` exposes `IReadOnlyList<T>` plus `Snapshot`, `Add`, `Remove`, `RemoveAt`, `Move`,
+`Clear` and `ReplaceAll`. Reads observe **one structural source**; no per-index/Count optimization is
+promised. Every accepted structural mutation publishes a new read-only outer snapshot, retaining the old
+version for existing readers. No mutable backing list escapes. Element equality is required; equal ordered
+replacement, empty Clear, absent Remove and Move-to-self do not invalidate. Element properties such as
+`InventoryItem.Count` have their own sources: changing Count invalidates total/labels/options that read it,
+not computations that read only the structure. Removing an item or replacing a collection disconnects
+its old property/structure edges when the affected calculation next successfully evaluates.
+
+Structural snapshots do **not** deep-copy items. A business reader can intentionally access current item
+properties through that structural version. Presentation must instead project all used item properties to
+immutable values during tracking; retaining a mutable item reference and reading it later is not a
+consistent presentation projection.
+
+`InventoryPageExample.cs` compiles this complete path without a model base class. Its Repeat key getter
+reads structure, each scoped field/label resolves the current item by stable business key, and total/options
+read connected Count properties. A new key gets its row bindings once via `RegisterKey`, before the next
+synchronization. A key denotes the same logical business target; a different target must use a different key
+or an explicit interaction scope. Collection replacement does not create a second Repeat/control tree.
 
 `BindTracked<T>` is an explicit new getter contract: a pure calculation over explicitly connected
 sources in **one runtime**. The runtime owns one graph and serial access context; do not compose graphs
@@ -34,6 +74,29 @@ Ordinary `BindValue`, `BindReadOnly`, `BindOptions`, hand-written
 without a new creation-thread prerequisite. Explicit runtime/BindTracked/BeginOperation use activates the
 new serial-access contract. The platform-only audit
 partial forwards existing binding type-mismatch diagnostics; the neutral source has no platform reference.
+
+## Project actual options, not live item objects
+
+```csharp
+bindings.BindTrackedOptions("selected", () => current.Value
+    .Select(item => new UiChoice<int>(item.Key + ": " + item.Count, item.Code))
+    .ToList().AsReadOnly(), (a, b) => a.Text == b.Text && a.Value == b.Value);
+```
+
+`BindTrackedOptions<T>` is a new pure getter contract with required item equality. It copies the outer
+list **inside** the tracked calculation. Labels and typed values must themselves be immutable presentation
+values (or explicitly frozen projections); no automatic copying of arbitrary business object graphs occurs.
+The getter must read each mutable property needed by this presentation while tracking, not defer it to Draw.
+An ordinary string-options list and `UiChoice<T>` use the same registry; actual `GetOptions<T>`,
+`TryGetChoices` and bounded observation prefixes all select the same synchronized options channel.
+Value and options can share the same key, as real typed mode rows require, without channel collision.
+
+`BindTracked` also accepts an optional `equal:` function for presentation output. Int/string/bool reuse
+their approved scalar policies; other output types without an explicit policy conservatively announce
+successful reevaluation rather than silently choosing reference/deep equality. For Repeat keys, supply an
+ordered ordinal-string comparison and return an immutable list. Comparisons run in the new pure phase.
+Successful same-result reevaluation still updates graph edges but does not announce a data change when
+the selected equality says equal. Computation invalidation and published value change are distinct.
 
 ## Read now; present one consistent version
 
@@ -53,7 +116,8 @@ choice setter temporarily leave the presentation read scope. Their binding reads
 completion restores the current presentation view. Outside a presentation scope `Get<T>` is also an
 immediate business read. Direct source/derived reads are always business reads, not presentation reads.
 Input handling in the same native Draw stack remains legal; hover, pressed and capture feedback are not
-frozen. `CanExecute` and execution qualification temporarily leave only the presentation scope, so predicates
+frozen. This consistency covers collection structure and projected item properties, not just an outer list copy.
+`CanExecute` and execution qualification temporarily leave only the presentation scope, so predicates
 using `bindings.Get<T>` read latest business input too. This read boundary does not start/end a business
 batch, drain responses or publish presentation input; success and predicate failure both restore the scope.
 Execution rechecks qualification. Business code keeps the right to reject independently of the UI projection.
@@ -112,8 +176,17 @@ Tracked getters read only the projection scalars, never the mutable service. Com
 service, which decides whether to accept; the projection is refreshed from its safe result. The caller
 owns tasks, dispatch and result freshness. FL supplies no application work queue or latest-result policy.
 
-The compilable examples are `tools/FerriteLib.UiKit.Core.ContractTests/ReactiveExamples.cs`,
-`WorkshopService.cs` and `WorkshopProjectionExample.cs`. The adapter harness links the same files.
+For multiple items, `OrderBoardService.cs` owns its own lock and returns immutable detached rows.
+`OrderBoardProjectionExample.Apply` is called only after application-owned delivery to the page runtime.
+It reuses projection objects by stable key, writes only changed Count/Accepting sources, and replaces the
+ordered structure only when element identity/order changes. An unchanged full result does not invalidate
+all computations; changing one row does not invalidate another row's independent property calculation.
+Totals/options may legitimately read several rows again. Batch neither delivers across threads nor makes
+application writes transactional. Old-result acceptance policy remains the caller's decision.
+
+The compilable examples are under `tools/FerriteLib.UiKit.Core.ContractTests/`: `ReactiveExamples.cs`,
+`WorkshopService.cs`, `WorkshopProjectionExample.cs`, `InventoryPageExample.cs`, `OrderBoardService.cs`
+and `OrderBoardProjectionExample.cs`. The real Host adapter harness links those same author files.
 
 ## Evidence and remaining scope
 
@@ -125,6 +198,15 @@ for both examples, Checkbox release/compound batching, legacy/new purity boundar
 qualification, failure and Close. Existing wrapper/editor/layout/document/observation regressions remain
 separate evidence. No alternate test core or same-named platform stub implements the reactive graph.
 
+`ReactiveInventoryTests` adds object/reference equality, controlled structure versus Count dependencies,
+same-result source replacement, item removal, safe multi-item results, failed options synchronization,
+serial/pure access, actual typed/prefix options and production neutral per-item layout. Evaluation counters
+and detached-result values are recorded in its log. `KernelReactiveInventoryTests` uses actual default
+typed Dropdown/ModeRow, wrapped labels, numeric editors and keyed Repeat: Add/Remove/Move/source replacement,
+same-round item/structure snapshots, stable drafts/capture, same-value requests, bounded real Host reads,
+fault-before-layout and independent external service lifetime. Custom probes do not supply these proofs.
+
 These tests do not establish native input, real font pixels, IME, window-stack composition or 1.7 support.
-RU1 reference/collection surfaces, RU2 local-cache outputs, RU3 detailed recovery/hidden policy, RU4
+RU1 A–E are implemented with public-unstable explicit policies. Final reference/deep defaults and the final
+collection API/granularity remain open, separately from this usable engineering surface. RU2 local-cache outputs, RU3 detailed recovery/hidden policy, RU4
 remaining old-entry migration and RU5 platform delivery commitments remain open in the main specification.

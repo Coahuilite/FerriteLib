@@ -24,6 +24,7 @@ internal static class Program
         try
         {
             ReactiveFoundationTests.Run(Check);
+            ReactiveInventoryTests.Run(Check);
             PointerLayers();
             ImageGeometry();
             Palette();

@@ -68,7 +68,8 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
 ## Public-unstable
 
 - `UiReactiveRuntime` — serial reactive graph and nested operation batching (0.8 candidate).
-- `UiReactiveValue` — explicitly connected scalar storage; factories currently int/string/bool only.
+- `UiReactiveValue` — connected value storage; int/string/bool policies or an explicitly supplied equality function.
+- `UiReactiveList` — controlled, serial structural observation and read-only snapshots; items are independently connected (RU1 candidate).
 - `UiReactiveComputed` — owned lazy tracked read.
 - `UiReactiveOwner` — computation/reaction subscription lifetime, independent from business model lifetime.
 - `UiBindingPresentation` — host-owned synchronized read view.
