@@ -1,5 +1,20 @@
 # Standard hosts, embedded hosts and bounded observation
 
+## Current 1.6 adapter and neutral target
+
+The APIs below describe the current Verse/Unity host, not permanent core requirements. The
+[active specification](README.md) separates neutral core, real host input/lifecycle and drawing backend,
+preserving 1.6 compatibility while targeting 1.7. Native input qualification and composition remain
+adapter authority. Direct/GPU drawing is a seam, not a delivered backend or a RenderTexture-only rule;
+1.7 delivery/implementation remains A8 RU5, without assuming internal Waylith APIs are Mod-facing.
+Measurement and drawing must agree; hit, clip, offset and popup anchors share coordinates. Native
+resources and neutral references have explicit ownership/release; platform services are not business
+authority. FL08-U3 defines a legal presentation synchronization point, not a fixed native callback,
+tick or frame delay. FL08-U4 retains latest business eligibility checks. FL08-U6 applies purity to new
+tracked/read stages, not silently to legacy Draw input/getters. New automatic responses are not the
+existing R9 query API: they may run independently of paint/window existence; hidden observation and
+legacy migration remain RU3/RU4. No such new runtime capability is claimed by this document.
+
 Use `UiPageWindow` for an ordinary page. Use `UiHost.DrawFrame` inside an existing window. Both own
 one real `UiSession` and run the same wrappers, neutral interactions, editing and arrangement; neither
 requires an author to reproduce Begin/End, capture release or callback-close ordering.

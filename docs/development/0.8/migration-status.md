@@ -1,5 +1,16 @@
 # Complete first-version migration status
 
+## 2026-10-21 documentation boundary
+
+Baseline 904404b retains the implemented uses below and their original evidence. Partial neutral
+behavior/geometry exists; complete page orchestration remains platform-coupled. The [active
+specification](README.md) adds confirmed FL08-U1–U6, automatic tracking/derived caching/local scopes
+and neutral core/host/drawing boundaries. These new capabilities are **not implemented** and are not
+included in the completed inventory below. 1.7 is a direction, not supported delivery. Native 1.6 and
+US consumption of 0.8 remain pending. A8 RU1–RU5 hold the new decisions; E/N/L1/P1/R9 keep their
+existing subitem status, with approved F1/F2/F3, B1 subitems, N1 exact example, K1/H1, palette and BG1/L2
+unchanged. No old binding/getter/custom-widget entry gains a tracking/purity prerequisite by this edit.
+
 This is the maintained inventory for the complete 0.8 first version, not a list of only the latest
 slice. **Exists** means the retained production use is present. **Migrated** names the applicable 0.8
 capability already connected. **Automated** distinguishes new shared-contract tests from legacy

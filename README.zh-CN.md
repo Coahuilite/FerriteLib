@@ -6,7 +6,7 @@ RimWorld 1.6 的**无内容前置模组**。FerriteLib 只携带一个程序集�
 模组编译与运行时绑定。它不添加任何 Def、补丁、语言、贴图：单独启用它对游戏零影响。如果你的模组列表里
 出现了它而没有任何依赖它的模组，说明消费者已被卸载或禁用；只有在没有已启用模组依赖它时，才可以禁用本模组。
 
-**开发线：0.8.0 S0/S1。** 见[候选消费指南](docs/consumers/consume-from-0.8.0-dev.md)与[已实现合同](docs/development/0.8/s01-contract.md)。其余0.8切片及真实1.6验收仍待完成。
+**开发线：0.8.0 技术候选。** 见[活动规格](docs/development/0.8/README.md)、[完整迁移状态](docs/development/0.8/migration-status.md)与[候选消费指南](docs/consumers/consume-from-0.8.0-dev.md)。自动依赖追踪／局部缓存及中立核心／1.7 是已确认目标，不是已实现支持。真实1.6验收与US消费0.8仍待完成。
 
 ## 库提供什么
 

@@ -1,5 +1,17 @@
 # Shared layout and effective geometry
 
+## Confirmed target versus this implementation
+
+The [active specification](README.md) A3.4/FL08-U1–U6 confirms automatic dependency tracking and
+explicit update scopes with local reuse; these are not implemented by the current layout algorithm.
+Default wrappers own ordinary measure/paint impacts, not each page author. Propagation follows actual
+external layout results; unchanged outputs need not invalidate ancestors. Parent constraints, shared
+environment and cross-scope shared labels may still invalidate a scope. Exact outputs/cache validity
+remain A8 RU2 decisions. Scopes do not cut dependencies or create another event loop.
+Occupancy adjustments, whole-presentation movement and internal decoration offsets require distinct
+coordinate meanings. Existing Overlay natural-size/offset rules below remain unchanged; no general
+transform system is added. See the [counter walkthrough](counter-walkthrough-zh.md).
+
 `UiLayout` is the production, engine-independent flow/placement implementation. The actual runtime
 engine and the engine-free contract target compile these same sources. Platform adapters parse
 attributes, resolve the effective font/density, invoke the real width-dependent measurement service,

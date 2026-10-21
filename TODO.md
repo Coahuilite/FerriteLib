@@ -2,6 +2,11 @@
 
 ## 0.8 continuation
 
+- [ ] Obtain decisions for the five new A8 groups in `docs/development/0.8/README.md`: observable
+      surface, scope/cache outputs, failure/hidden observation, legacy migration and 1.6/1.7 delivery.
+      Documentation delivery is the current stopping point. Implementation, builds, product tests,
+      commits and US migration need new authorization; native actions below are pending, not permission.
+
 - [ ] Run the native 1.6 S0/S1 acceptance in docs/development/0.8/s01-contract.md after the developer installs the selected isolated Dev package.
 - [ ] Run the native BSE acceptance in `docs/development/0.8/bse-contract.md` using the selected isolated Dev package.
 - [x] Complete the first-version production inventory in `docs/development/0.8/migration-status.md`, including shared owner-qualified hosts and bounded R9. Automated evidence is separate from native/product acceptance.

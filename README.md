@@ -8,7 +8,7 @@ no patches, no languages, no textures: enabling it alone changes nothing in the 
 your mod list without a consumer installed, that consumer was uninstalled or disabled; the mod is safe
 to disable only when no enabled mod depends on it.
 
-**Development line: 0.8.0 S0/S1.** See [candidate usage](docs/consumers/consume-from-0.8.0-dev.md) and [implemented contract](docs/development/0.8/s01-contract.md). Remaining 0.8 slices and native 1.6 acceptance are open.
+**Development line: 0.8.0 technical candidate.** See the [active specification](docs/development/0.8/README.md), [complete migration inventory](docs/development/0.8/migration-status.md) and [candidate usage](docs/consumers/consume-from-0.8.0-dev.md). Automatic tracking/local caching and neutral core/1.7 are confirmed targets, not implemented support. Native 1.6 acceptance and US consumption of 0.8 remain open.
 
 ## What the library provides
 

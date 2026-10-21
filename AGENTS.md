@@ -18,7 +18,7 @@
 
 ## Purpose and non-goals
 
-The product is a **retained UI layer over RimWorld's immediate-mode `Verse` GUI**: structure lives in data
+The current 1.6 adapter is a **retained UI layer over RimWorld's immediate-mode `Verse` GUI**: structure lives in data
 (an XML manifest plus typed bindings), and the five things a consumer cannot hand-roll safely — identity,
 state, invalidation, recovery, and one audit surface — are owned here. The library is worth what a
 consumer's tree keeps inside it, not what it ships in controls. Non-goals (no uGUI backend, no reflection,
@@ -47,8 +47,8 @@ one mechanism that lets the library say "compile against what you tested" withou
 2. **Visual core** — theme tokens, drawing helpers, text measurement, fit audit, version contract;
    reachable without adopting the page model.
 
-The split is enforced (`KernelContractTests.VerifyVisualCoreIsPageModelFree`), which is why there is one
-assembly and no `FerriteLib.Core`; re-open only if a consumer needs the visual core without the whole DLL.
+The split is enforced (`KernelContractTests.VerifyVisualCoreIsPageModelFree`). The current payload has one
+assembly and no `FerriteLib.Core`; the 0.8 target does not predefine physical assembly count.
 
 ## Invariants (stop and ask before violating)
 
@@ -80,9 +80,13 @@ assembly and no `FerriteLib.Core`; re-open only if a consumer needs the visual c
 - **The game cannot express a prerequisite version** (`ModRequirement` parses only `packageId`,
   `alternativePackageIds`, `displayName`); every consumer asserts the API range in its own constructor.
 
-- **IMGUI is RimWorld's only input and compositing authority.** The kernel renders through Verse IMGUI
-  by design; a Canvas/uGUI surface cannot sort above the game's IMGUI, so any future non-IMGUI backend
-  composites through a RenderTexture blit, never "above the HUD".
+- **Platform authority is adapter-specific.** The current 1.6 host uses Verse IMGUI for native input and
+  compositing, not a path above the native HUD. The 0.8 target separates neutral core, host and drawing
+  backend, preserving 1.6 compatibility while targeting 1.7. Core contracts and transitive dependencies
+  must not expose Unity, UnityStubs, Verse, RimWorld, Waylith or Harmony types, including via object or
+  reflection. Native callback counts do not define business update timing. Direct/GPU drawing seams do
+  not commit to a backend, RenderTexture-only composition, assembly count or completed 1.7 support.
+  Target contracts and pending delivery choices live in `docs/development/0.8/README.md`.
 - **Map-layer rendering is permanently outside UiKit.** `GenMapUI` and its family carry no session and
   no hit-test semantics to bind to, so world-space text (pawn-head marks and friends) is something this
   library cannot provide — a non-goal, not a backlog item. A consumer's whitelist entry for it is
