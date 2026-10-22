@@ -109,11 +109,13 @@ public static class UiRowBand
     /// the theme's spacing per level and the box immediately after the indent.
     /// </param>
     public static void Draw(UiTreeRow row, Rect band, UiWidgetContext ctx, float rowHeight, UiResolvedStyle style, UiRowBandActions actions, UiRowBandLayout layout = default)
+        => DrawResolved(row,band,ctx,rowHeight,style,actions,null,layout);
+    internal static string? DrawResolved(UiTreeRow row, Rect band, UiWidgetContext ctx, float rowHeight, UiResolvedStyle style, UiRowBandActions actions, string? text, UiRowBandLayout layout = default)
     {
         if (ctx == null)
             throw new ArgumentNullException(nameof(ctx));
         if (band.width <= 1f || band.height <= 1f)
-            return;
+            return null;
         UiTheme theme = ctx.Theme;
         Parts parts = ResolveParts(row, band, theme, rowHeight, layout);
         Rect marker = parts.Marker;
@@ -141,10 +143,10 @@ public static class UiRowBand
         }
 
         if (!ctx.Session.IsActive)
-            return;
-        Paint(row,band,ctx,rowHeight,style,disclosure.Captured || check.Captured || body.Captured,UiNative.IsMouseOver(band,ctx),layout);
+            return null;
+        return Paint(row,band,ctx,rowHeight,style,disclosure.Captured || check.Captured || body.Captured,UiNative.IsMouseOver(band,ctx),layout,text);
     }
-    internal static void Paint(UiTreeRow row,Rect band,UiWidgetContext ctx,float rowHeight,UiResolvedStyle style,bool armed=false,bool hovered=false,UiRowBandLayout layout=default)
+    internal static string Paint(UiTreeRow row,Rect band,UiWidgetContext ctx,float rowHeight,UiResolvedStyle style,bool armed=false,bool hovered=false,UiRowBandLayout layout=default,string? capturedText=null)
     {
         UiTheme theme=ctx.Theme;
         float pad=theme.Geometry.Padding;
@@ -194,8 +196,11 @@ public static class UiRowBand
         float labelWidth = labelRight - x;
         if (labelWidth > 1f)
         {
-            UiThemeDraw.Label(new Rect(x, band.y, labelWidth, band.height), ReadText(row, ctx), theme, ink.Text, AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft, singleLine: true);
+            string paintedText=capturedText ?? ReadText(row,ctx);
+            UiThemeDraw.Label(new Rect(x, band.y, labelWidth, band.height), paintedText, theme, ink.Text, AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft, singleLine: true);
+            return paintedText;
         }
+        return "";
     }
 
     private static string ReadText(UiTreeRow row, UiWidgetContext ctx)

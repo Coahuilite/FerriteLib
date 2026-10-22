@@ -119,8 +119,7 @@ changing a branch to an equal-valued source still updates subsequent following r
 `UiHost.MeasureAndArrange` synchronizes its own `UiBindingPresentation` before entering the existing
 engine. `Draw` consumes that same published read view. A tracked binding read from this presentation
 scope sees the synchronized input, including when an earlier input callback has just changed the model.
-A failure while gathering inputs publishes no partial read view or layout. A later explicit frame can
-attempt synchronization again; no operation is replayed. Direct split-phase users must keep the
+RU3 synchronizes independent complete binding results and records invalid keys separately. Default/explicit consumer demand is prepared before that consumer measures and before Draw issues requests; unknown old custom consumers retain conservative all-key service. A failed current read throws; only dedicated display paths may use retained old paint. Geometry publication remains transactional. Retry requires related input or an explicit pure request; another frame is not a retry. Direct split-phase users must keep the
 `MeasureAndArrange` result and its corresponding `Draw` together, without another arrangement in between.
 
 Business operations through `Set<T>`, `Invoke(string)`, `TryInvokeCommand`, `Invoke<T>` and the boxed
@@ -164,11 +163,7 @@ new automatic-response boundary. Neither window repaint nor native callback coun
 `owner.Respond("audit", callback)` schedules its initial dependency-discovery run through the same
 drain as later invalidation. Outside a batch it runs before registration returns; inside a batch the initial
 run waits for the outer boundary, never observing a half-applied operation. Responses may write, scheduling subsequent work rather than recursively executing a
-subscription chain. At most 100 repeats of the **same response** are allowed in one drain; independent
-responses are not subject to that total-count cap. A loop/fault reports the owner/key and discards the
-remaining drain, retaining applied business writes. Detailed retry/recovery and hidden-node observation
-policies remain RU3 decisions. Normal failures are not silently retried or turned into successful saves.
-The binding entry points retain both business and drain failures if both fail.
+subscription chain. RU3 allows 256 executions of each same response in one Drain. Budget exhaustion pauses that response with a located diagnostic, not a claim that the entire business cycle was proved. Independent queued responses continue. `RespondManaged` returns an inspectable `UiReactiveResponse`, including after initial failure; only owner `Resume()` runs it again from current state. Applied business writes remain applied. See the [failure/lifetime contract](failure-lifetime-contract.md) for exact R1/R2 entrances and scope.
 
 ## Close the view, not the service
 
@@ -178,9 +173,7 @@ and never saves, rolls back or destroys an external model. A Host owns its prese
 not the bindings' runtime, independent business owners or external services. Closing a Host twice leaves
 those services running. Manually disposed calculations/reactions stop following their sources.
 
-A failed initial evaluation leaves no temporary edges/context. A failed reevaluation retains the last
-successful dependency set and no provisional additions. Calculation cycles and response cycles are
-located and bounded. Layout/input cleanup continues to use the existing Host/session failure path.
+A failed attempt records its actual reads, including first/new branches and failed children, and removes obsolete successful-branch edges. Dynamic context is restored in finally. Its current result is invalid while any last successful value is retained separately for display. Pure cycles and repeated-response budget failures have distinct cached diagnostics. Managed Host failures remain below the fatal shell-release boundary; unclassified structure/adapter exceptions keep that protection.
 
 ## External business: deliver a safe result
 
@@ -223,5 +216,4 @@ fault-before-layout and independent external service lifetime. Custom probes do 
 These tests do not establish native input, real font pixels, IME, window-stack composition or 1.7 support.
 RU1 A–E are implemented with public-unstable explicit policies. Final reference/deep defaults and the final
 collection API/granularity remain open, separately from this usable engineering surface. Approved RU2
-is connected through the layout reuse contract and its neutral/Host evidence; RU3 detailed recovery/hidden
-policy, RU4 remaining old-entry migration and RU5 platform commitments remain separate.
+is connected through the layout reuse contract and its neutral/Host evidence; RU3 confirmed recovery/demand/lifetime behavior is connected through the [single contract](failure-lifetime-contract.md). RU4 remaining old-entry migration and RU5 platform commitments remain separate.

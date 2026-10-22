@@ -23,7 +23,7 @@ internal static class KernelFailureLifetimeTests
         try
         {
             UiWidgetRegistry.Clear();UiWidgetRegistry.InitializeCore();
-            CounterFault();InteractiveRetained();RetainedCollections();BranchFailureDraw();FirstFailure();SharedGeometry();DemandAndDraft();UnknownCustom();MultiHost();RequestFailure();
+            CounterFault();InteractiveRetained();RetainedCollections();RetainedLabelFault();RetainedDescriptiveLabels();BranchFailureDraw();FirstFailure();SharedGeometry();DemandAndDraft();UnknownCustom();MultiHost();RequestFailure();
             return 0;
         }
         catch(Exception ex){Console.Error.WriteLine("  FAIL: RU3-HOST "+ex);return 1;}
@@ -34,7 +34,8 @@ internal static class KernelFailureLifetimeTests
     {
         using var example=new FailureCounterExample();using var host=Host(CounterBody,example.Bindings);
         Pump(host);UiNode caption=Node(host,"caption");float height=caption.Rect!.Value.height;
-        example.Broken.Value=true;int start=Labels.Count;Pump(host);
+        example.Broken.Value=true;int start=Labels.Count;int fillStart=Fills.Count;Pump(host);
+        ExportPaint("counter",start,fillStart);
         C(Painted(start,"Count 4") && Painted(start,"!") && caption.ReactiveFault?.Identity=="counter/format" && caption.Rect!.Value.height==height,"default wrapped output retains last measured text and explicit theme fault marker");
         C(!host.Session.IsTripped(caption) && host.Session.IsActive && !Node(host,"reset").IsDisabled,"managed display fault does not trip legacy node or disable independent reset");
         int formats=example.Formats;for(int i=0;i<8;i++)Pump(host);
@@ -79,6 +80,9 @@ internal static class KernelFailureLifetimeTests
         C(textRuns==hidden && hidden==1 && Node(host,"independent").IsArranged && !field.IsArranged,"true hidden panel delays exclusive pure display and measure while independent content continues");
         C(editor.Draft=="uncommitted" && text.Value=="model","hidden same-target draft stays uncommitted and retained");
         visible.Value=true;int start=Labels.Count;Pump(host);C(textRuns==2 && Painted(start,"Value 4") && ReferenceEquals(field,Node(host,"field")) && editor.Draft=="uncommitted","show takes latest input once and keeps same-target editor identity and draft");
+        editor.Focus();Pump(host);host.SetDisplayDemand(false);
+        C(!host.TryHandleAccept() && !host.TryHandleCancel() && !editor.Focused && editor.Draft=="uncommitted","whole retained Host hide suspends pending editor input without discarding or queuing hidden Accept");
+        host.SetDisplayDemand(true);Pump(host);C(text.Value=="model" && editor.Draft=="uncommitted","whole Host show cannot replay hidden key submission");
         Console.WriteLine("RU3-HOST-FACT hidden-runs="+hidden+" shown-runs="+textRuns+" draft="+editor.Draft);
     }
     private sealed class OldCustom:IUiWidget
@@ -145,7 +149,8 @@ internal static class KernelFailureLifetimeTests
         var boolean=owner.Compute("boolean",()=>{reads++;bool v=flag.Value;if(broken.Value)throw new Exception("bool render");return v;});
         var b=new UiBindings(rt);b.BindTracked("flag",()=>boolean.Value,v=>{writes++;flag.Value=v;});b.BindCommand("reset",()=>resets++);
         using var host=Host("<Column Padding=\"0\" Gap=\"0\"><Widget Kind=\"input/checkbox\" Id=\"check\" Bind=\"flag\" Label=\"Checked\"/><Widget Kind=\"input/button\" Id=\"reset\" ActionBind=\"reset\" Text=\"Reset\"/></Column>",b);
-        Pump(host);broken.Value=true;int start=Labels.Count;Pump(host);
+        Pump(host);broken.Value=true;int start=Labels.Count;int fillStart=Fills.Count;Pump(host);
+        ExportPaint("checkbox",start,fillStart);
         C(Painted(start,"Checked") && Painted(start,"!") && !Painted(start,"interactive/boolean") && Node(host,"check").PresentationUnavailable,"Checkbox retains its last checked control paint with fault, not a recovery replacement");
         for(int i=0;i<5;i++)Pump(host);Click(host,"check");Click(host,"reset");
         bool invalid=false;try{_=boolean.Value;}catch(UiReactiveFault){invalid=true;}
@@ -169,7 +174,8 @@ internal static class KernelFailureLifetimeTests
             else if(kind!="input/slider")
             {var n=new UiNumericEdit(0,100,"0.##");var e=UiNative.Editor<float>(editHost.CreateContext(320).WithNode(node),"edit",n.Format,n.Parse);e.Observe(1);e.Focus();e.Input("20",true,false,false,_=>throw new Exception("commit"),()=>1);retainedEditor=e;}
             Pump(editHost);string draft=retainedEditor?.Draft??"";float oldHeight=node.Rect!.Value.height;
-            fail.Value=true;start=Labels.Count;Pump(editHost);
+            fail.Value=true;start=Labels.Count;int editFillStart=Fills.Count;Pump(editHost);
+            if(kind=="input/text-field")ExportPaint("editor",start,editFillStart);
             C(Painted(start,"Value") && Painted(start,"!") && node.PresentationUnavailable && node.Rect!.Value.height==oldHeight,kind+" retains dedicated pure control paint and validated last-display measurement");
             if(retainedEditor!=null)C(retainedEditor.Draft==draft && Painted(start,draft) && setters==0 && !retainedEditor.Focused,kind+" retained same-target draft paints without Observe, native editing, submission or rollback");
             int before=resets;Click(editHost,"reset");Pump(editHost);C(setters==0 && resets==before+1,kind+" failure blocks dependent edits but leaves independent real operation available");
@@ -191,11 +197,56 @@ internal static class KernelFailureLifetimeTests
             {extra=" OptionsBind=\"data\"";b.BindTracked("data",()=>"alpha",_=>writes++);var options=owner.Compute<IReadOnlyList<string>>("options",()=>{reads++;if(fail.Value)throw new Exception("options");return new[]{"alpha","beta"};});b.BindTrackedOptions("data",()=>options.Value,(a,c)=>a==c);}
             using var host=Host("<Widget Kind=\""+kind+"\" Id=\"value\" Bind=\"data\""+extra+"/>",b);Pump(host);float height=Node(host,"value").Rect!.Value.height;
             if(kind=="input/dropdown"){Click(host,"value");Pump(host);}
-            fail.Value=true;int start=Labels.Count;Pump(host);
+            fail.Value=true;int start=Labels.Count;int fillStart=Fills.Count;Pump(host);
+            if(kind=="input/dropdown")ExportPaint("dropdown",start,fillStart);
             C(Painted(start,"!") && !Painted(start,kind+"/options") && Node(host,"value").PresentationUnavailable && Node(host,"value").Rect!.Value.height==height,kind+" preserves last control output and complete geometry after tracked collection failure");
             if(kind!="chart/line")C(Painted(start,kind=="input/dropdown"?"alpha":kind=="input/mode-row"?"Retained choice":"Retained row"),kind+" still paints the last selected or row label");
             for(int i=0;i<4;i++)Pump(host);Click(host,"value");C(writes==0 && reads==2 && host.Session.OpenPopupAnchor==null,kind+" retained paint cannot publish selection, request, popup input or repeat failed work");
             fail.Value=false;Pump(host);C(Node(host,"value").ReactiveFault==null && writes==0,kind+" actual related recovery resumes current read without replay");
+        }
+    }
+
+    private sealed class ManagedTranslation:IUiTranslation
+    {
+        internal Func<string> Read=()=>"";internal int Version;
+        public int TranslationRevision=>Version;
+        public string Translate(string key)=>key=="label"?Read():key;
+    }
+    private static void RetainedLabelFault()
+    {
+        foreach(string kind in new[]{"input/text-field","input/dropdown"})
+        {
+            var rt=new UiReactiveRuntime();using var owner=rt.CreateOwner("label-test");var broken=rt.Boolean();int reads=0,writes=0,resets=0;
+            var label=owner.Compute("label",()=>{reads++;if(broken.Value)throw new Exception("label unavailable");return "Resolved label";});
+            var translation=new ManagedTranslation{Read=()=>label.Value};var b=new UiBindings(rt);b.BindTracked("value",()=>"alpha",_=>writes++);b.BindOptions("value",()=>new[]{"alpha","beta"});b.BindCommand("reset",()=>resets++);
+            string extra=kind=="input/dropdown"?" OptionsBind=\"value\"":" Multiline=\"true\"";
+            string body="<Column Padding=\"0\" Gap=\"0\"><Widget Kind=\""+kind+"\" Id=\"value\" Bind=\"value\" LabelKey=\"label\""+extra+"/><Widget Kind=\"input/button\" Id=\"reset\" ActionBind=\"reset\" Text=\"Reset\"/></Column>";
+            using var host=new UiHost("failure",UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"failure\">"+body+"</UiPage>"),b,UiTheme.Vanilla,new Metrics(),translation);Pump(host);
+            UiEditSession<string>? edit=null;
+            if(kind=="input/text-field")
+            {bool Parse(string t,out string v){v=t;return true;}edit=UiNative.Editor<string>(host.CreateContext(320).WithNode(Node(host,"value")),"value",v=>v,Parse);edit.Observe("alpha");edit.Focus();edit.Input("reliable draft",true,false,false,_=>throw new Exception("commit"),()=>"alpha");Pump(host);}
+            broken.Value=true;translation.Version++;int start=Labels.Count;Pump(host);
+            C(host.LayoutFault==null && Painted(start,"Resolved label") && Painted(start,"!") && !host.Session.IsTripped(Node(host,"value")),kind+" retained label facts do not re-read a failing managed LabelKey or escalate to Host failure");
+            if(edit!=null)C(edit.Draft=="reliable draft" && Painted(start,"reliable draft") && writes==0,kind+" label failure retains reliable same-target draft without Observe or submission");
+            for(int i=0;i<5;i++)Pump(host);Click(host,"reset");bool failed=false;try{_=label.Value;}catch(UiReactiveFault){failed=true;}
+            C(reads==2 && writes==0 && resets==1 && failed,kind+" label fault stays current-invalid across draws while independent reset remains available");
+            using var first=new UiHost("failure",UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"failure\">"+body+"</UiPage>"),b,UiTheme.Vanilla,new Metrics(),translation);start=Labels.Count;Pump(first);
+            C(!Painted(start,"Resolved label") && Painted(start,"label-test/label"),kind+" first failed label cannot fabricate retained successful label facts");
+        }
+    }
+
+    private static void RetainedDescriptiveLabels()
+    {
+        foreach(string kind in new[]{"text/wrapped","chrome/banner","state/empty","section/header","input/button"})
+        {
+            var rt=new UiReactiveRuntime();using var owner=rt.CreateOwner("descriptive-label");var broken=rt.Boolean();int reads=0;
+            var label=owner.Compute("label",()=>{reads++;if(broken.Value)throw new Exception("label");return "Retained resolved text";});
+            var t=new ManagedTranslation{Read=()=>label.Value};var b=new UiBindings(rt);b.BindCommand("act",()=>{});
+            string attribute=kind=="section/header"?"TitleKey":"TextKey";
+            string xml="<UiPage Schema=\"2\" Source=\"failure\"><Widget Id=\"value\" Kind=\""+kind+"\" "+attribute+"=\"label\""+(kind=="input/button"?" ActionBind=\"act\" Height=\"Auto\"":"")+"/></UiPage>";
+            using var host=new UiHost("failure",UiLayoutManifest.Parse(xml),b,UiTheme.Vanilla,new Metrics(),t);Pump(host);float height=Node(host,"value").Rect!.Value.height;
+            broken.Value=true;t.Version++;int start=Labels.Count;Pump(host);Pump(host);
+            C(host.LayoutFault==null && Painted(start,"Retained resolved text") && Painted(start,"!") && Node(host,"value").Rect!.Value.height==height && reads==2,kind+" retains resolved text paint and remeasures known content without rereading failed translation");
         }
     }
     private static void BranchFailureDraw()
@@ -204,6 +255,23 @@ internal static class KernelFailureLifetimeTests
         var value=owner.Compute("value",()=>{runs++;if(!branch.Value)return left.Value.ToString();int n=right.Value;if(n<5)throw new Exception("right");return n.ToString();});
         var b=new UiBindings(rt);b.BindTracked("text",()=>value.Value);using var host=Host("<Widget Kind=\"text/wrapped\" Bind=\"text\"/>",b);Pump(host);branch.Value=true;Pump(host);left.Value=99;for(int i=0;i<5;i++)Pump(host);
         C(runs==2,"failed current branch ignores obsolete successful source across actual repeated Host draws");right.Value=5;Pump(host);C(runs==3,"actual failed branch input restores Host presentation once");
+    }
+
+    private static IList Fills=>(IList)typeof(Verse.Widgets).GetField("DrawBoxSolidRects",BindingFlags.Public|BindingFlags.Static)!.GetValue(null)!;
+    // Optional actual draw-command projection for visual inspection; it is not native font-pixel evidence.
+    private static void ExportPaint(string name,int labelsStart,int fillsStart)
+    {
+        string? directory=Environment.GetEnvironmentVariable("FL_RU3_PAINT_CAPTURE");if(string.IsNullOrEmpty(directory))return;
+        var rects=(IList)typeof(Verse.Widgets).GetField("LabelRects",BindingFlags.Public|BindingFlags.Static)!.GetValue(null)!;
+        var colors=(IList)typeof(Verse.Widgets).GetField("LabelColors",BindingFlags.Public|BindingFlags.Static)!.GetValue(null)!;
+        var fillColors=(IList)typeof(Verse.Widgets).GetField("DrawBoxSolidColors",BindingFlags.Public|BindingFlags.Static)!.GetValue(null)!;
+        string N(float n)=>n.ToString("0.###",System.Globalization.CultureInfo.InvariantCulture);
+        string ColorOf(Color c)=>"rgb("+(int)(c.r*255)+","+(int)(c.g*255)+","+(int)(c.b*255)+")";
+        var svg=new System.Text.StringBuilder("<svg xmlns='http://www.w3.org/2000/svg' width='320' height='150' viewBox='0 0 320 150'><rect width='320' height='150' fill='#202020'/>");
+        for(int i=fillsStart;i<Fills.Count;i++){Rect r=(Rect)Fills[i]!;Color c=(Color)fillColors[i]!;svg.Append("<rect x='"+N(r.x)+"' y='"+N(r.y)+"' width='"+N(r.width)+"' height='"+N(r.height)+"' fill='"+ColorOf(c)+"' fill-opacity='"+N(c.a)+"'/>");}
+        for(int i=labelsStart;i<Labels.Count;i++){Rect r=(Rect)rects[i]!;Color c=(Color)colors[i]!;string text=System.Security.SecurityElement.Escape((string)Labels[i]!)??"";svg.Append("<text x='"+N(r.x+2)+"' y='"+N(r.y+Math.Min(16,r.height-2))+"' font-family='sans-serif' font-size='14' fill='"+ColorOf(c)+"'>"+text+"</text>");}
+        svg.Append("</svg>");System.IO.Directory.CreateDirectory(directory);System.IO.File.WriteAllText(System.IO.Path.Combine(directory,name+".svg"),svg.ToString());
+        Console.WriteLine("RU3-PAINT name="+name+" labels="+(Labels.Count-labelsStart)+" fills="+(Fills.Count-fillsStart));
     }
     private sealed class Metrics:ITextMetrics{public float MeasureText(string t,UiFont f,float w)=>Math.Max(18,t.Length*2);public float MeasureWidth(string t,UiFont f)=>t.Length*8;}
     private sealed class Translation:IUiTranslation{public string Translate(string k)=>k;public int TranslationRevision=>0;}

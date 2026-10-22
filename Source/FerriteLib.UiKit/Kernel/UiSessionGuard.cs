@@ -48,7 +48,7 @@ public static class UiSessionGuard
 
         GameFont previousFont = Text.Font;
         Color previousColor = GUI.color;
-        using UiBindings.DisplayScope? display = widget is IUiDescriptiveWidget && widget is not IUiPointerLayout ? (ctx.Bindings as UiBindings)?.DisplayOnly() : null;
+        using UiBindings.DisplayScope? display = KernelCoreWidgetRegistrar.HasKnownPresentation(widget) && widget is IUiDescriptiveWidget && widget is not IUiPointerLayout ? (ctx.Bindings as UiBindings)?.DisplayOnly() : null;
         try
         {
             widget.Draw(rect, ctx);

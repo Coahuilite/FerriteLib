@@ -178,6 +178,7 @@ internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
         UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, writable: null);
         UiRowBandActions actions = Actions(ctx, key);
 
+        var retainedRows=new List<KeyValuePair<UiTreeRow,string>>();
         float y = rect.y;
         for (int i = 0; i < rows.Count; i++)
         {
@@ -189,7 +190,8 @@ internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
 
             // The band itself is the shared public primitive (R4-B): this kind is its first driver, and a
             // consumer's own composite calls the identical entry point for its rows.
-            UiRowBand.Draw(row, band, ctx, rowHeight, style, actions);
+            string? rowText=UiRowBand.DrawResolved(row, band, ctx, rowHeight, style, actions,null);
+            if(rowText!=null) retainedRows.Add(new KeyValuePair<UiTreeRow,string>(row,rowText));
             if (!ctx.Session.IsActive) return;
 
             if (band.yMax >= rect.yMax) break;
@@ -197,13 +199,14 @@ internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
         retained.Capture(ctx,(r,c)=>
         {
             float paintY=r.y;
-            foreach(UiTreeRow row in rows)
+            foreach(var rowDisplay in retainedRows)
             {
+                UiTreeRow row=rowDisplay.Key;
                 float currentRowHeight=ReadRowHeight(c);
                 float h=UiRowBand.Measure(row,c.Theme,currentRowHeight);
                 Rect band=new(r.x,paintY,r.width,h);paintY+=h;
                 if(band.y>=r.yMax)break;
-                UiRowBand.Paint(row,band,c,currentRowHeight,style);
+                UiRowBand.Paint(row,band,c,currentRowHeight,style,capturedText:rowDisplay.Value);
                 if(band.yMax>=r.yMax)break;
             }
         });

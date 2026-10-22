@@ -52,7 +52,7 @@ private sub-nodes remain linked when their owner measurement is reused. Removed 
 suspend owned editors without committing; capture/popup cleanup remains the existing owner path.
 Leaf/plan/text calculation records are staged and committed with the complete arrangement. A failed
 candidate restores the prior complete geometry and caches, ends unreliable input and never replays a
-business request. Detailed new recovery/hidden policies remain RU3.
+business request. RU3 adds per-node retained display and current-invalid facts; required shared layout failure restores the complete prior arrangement and stops that Host input until a successful hit pass. See the [failure/lifetime contract](failure-lifetime-contract.md).
 
 ## Follow the output its consumer actually uses
 
@@ -148,4 +148,4 @@ the FL-owned context and batches UI changes. Scopes never stop or schedule that 
 
 These are retained calculation/layout results. The engine still validates the current composition and
 publishes effective geometry; drawing is not a partial-GPU/subtree-texture cache. Native1.6 input,
-font pixels, IME and compositor acceptance, 1.7 and RU3–RU5 remain separately scoped.
+font pixels, IME and compositor acceptance, 1.7 and RU4/RU5 remain separately scoped; RU3 managed failure/demand behavior is described in the linked contract.

@@ -9,11 +9,14 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// presentation observes that result and never recreates the activation rule.
 /// A missing command is diagnosed at host creation, not rendered as a dead control.
 /// </summary>
-public sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout
+public sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/button";
 
     private UiElementSpec spec = UiElementSpec.Empty;
+    private readonly UiRetainedPaint retained = new();
+    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect,ctx);
+    UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
 
@@ -74,6 +77,11 @@ public sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
     {
         bool automatic = string.Equals(AtomVocabulary.Read(spec, "Height").Trim(), "Auto", StringComparison.OrdinalIgnoreCase);
         string text = automatic ? AtomVocabulary.ResolveText(spec, ctx, "Text", "TextKey") : "";
+        retained.SetMeasure(c=>CaptureCaption(c,text,automatic));
+        return CaptureCaption(ctx,text,automatic);
+    }
+    private UiMeasurement CaptureCaption(UiWidgetContext ctx,string text,bool automatic)
+    {
         return new UiMeasurement(new UiMeasureInputs(new[] { text }, automatic && text.Length > 0 ? new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx), ctx.Theme.Geometry.Padding } : new[] { ctx.Theme.Geometry.RowHeight }, automatic && text.Length > 0), () =>
             automatic && text.Length > 0
                 ? Math.Max(1, ctx.Metrics.MeasureText(text, AtomVocabulary.TextFont(ctx), Math.Max(1, ctx.ViewWidth - ctx.Theme.Geometry.Padding * 2)))
@@ -133,7 +141,14 @@ public sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
                 ctx.Bindings.Invoke(ReadActionKey());
             }
         });
-        if (ctx.Session.IsActive) Paint(rect, armed, hovered, idle, ctx);
+        if (ctx.Session.IsActive)
+        {
+            string caption=AtomVocabulary.ResolveText(spec,ctx,"Text","TextKey");
+            Paint(rect, armed, hovered, idle, ctx,caption);
+            bool automatic=string.Equals(AtomVocabulary.Read(spec,"Height").Trim(),"Auto",StringComparison.OrdinalIgnoreCase);
+            retained.SetMeasure(c=>CaptureCaption(c,caption,automatic));
+            retained.Capture(ctx,(r,c)=>Paint(r,false,false,idle,c,caption));
+        }
     }
 
     /// <summary>
@@ -142,7 +157,7 @@ public sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
     /// text, and armed takes the active treatment outright because live state beats the author. All
     /// three paint through the one surface outlet at the theme's hairline.
     /// </summary>
-    private void Paint(Rect rect, bool armed, bool hovered, UiResolvedStyle idle, UiWidgetContext ctx)
+    private void Paint(Rect rect, bool armed, bool hovered, UiResolvedStyle idle, UiWidgetContext ctx,string caption)
     {
         UiTheme theme = ctx.Theme;
         UiResolvedStyle shown = idle;
@@ -164,7 +179,7 @@ public sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
 
         UiThemeDraw.Label(
             new Rect(rect.x + theme.Geometry.Padding, rect.y, Math.Max(1f, rect.width - theme.Geometry.Padding * 2f), rect.height),
-            AtomVocabulary.ResolveText(spec, ctx, "Text", "TextKey"),
+            caption,
             theme,
             shown.Text,
             AtomVocabulary.TextFont(ctx),

@@ -222,15 +222,16 @@ public sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabell
         string display = FindDisplayText(options, current);
         UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
         bool open = ctx.Session.IsPopupOpen(bindKey, node);
-        Rect fieldRect = ResolveField(rect, ctx);
+        string retainedLabel=ReadLabel(ctx);
+        Rect fieldRect = ResolveField(rect, ctx,retainedLabel);
 
         // The trigger click stores the popup anchor in Host window space (the engine translates
         // draw rects inside scrolls/groups); the popup pass draws and hit-tests in that same
         // stored space, so both share one anchor source.
         UiNative.DropdownButton(fieldRect, bindKey, ctx, (ctx.Node ?? ctx.Session.ActiveNode).Id.Key);
         if (!ctx.Session.IsActive) return;
-        PaintLabelledField(rect, fieldRect, display, open || current.Length > 0, ctx);
-        retained.Capture(ctx, (r,c) => PaintLabelledField(r, ResolveField(r,c), display, open || current.Length > 0, c));
+        PaintLabelledField(rect, fieldRect, display, open || current.Length > 0, ctx,retainedLabel);
+        retained.Capture(ctx, (r,c) => PaintLabelledField(r, ResolveField(r,c,retainedLabel), display, open || current.Length > 0, c,retainedLabel));
 
         string helpSink = OptionHelp.SinkKey(spec);
         if (ctx.Session.IsPopupOpen(bindKey, node))
@@ -262,15 +263,15 @@ public sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabell
         return label.Length == 0 ? 0 : ctx.Metrics.MeasureWidth(label, AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing;
     }
 
-    private UiSliderLayout? SharedLabelLayout(UiWidgetContext ctx, float width)
+    private UiSliderLayout? SharedLabelLayout(UiWidgetContext ctx, float width, string? capturedLabel = null)
         => ctx.Node?.SharedLabelWidth > 0
-            ? UiSliderLayout.Measure(ReadLabel(ctx), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme),
+            ? UiSliderLayout.Measure(capturedLabel ?? ReadLabel(ctx), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme),
                 ctx.Metrics, ctx.Node.SharedLabelWidth)
             : null;
 
-    private Rect ResolveField(Rect rect, UiWidgetContext ctx)
+    private Rect ResolveField(Rect rect, UiWidgetContext ctx, string? capturedLabel = null)
     {
-        UiSliderLayout? shared = SharedLabelLayout(ctx, rect.width);
+        UiSliderLayout? shared = SharedLabelLayout(ctx, rect.width, capturedLabel);
         if (shared.HasValue)
         {
             UiSliderLayout layout = shared.Value;
@@ -281,16 +282,16 @@ public sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabell
                 : new Rect(rect.x + layout.LabelWidth + gap, rect.y, Math.Max(1, rect.width - layout.LabelWidth - gap), rect.height);
         }
         // No group opt-in keeps the established fixed-column entry geometry.
-        float labelWidth = ReadLabel(ctx).Length > 0 ? LabelWidth : 0;
+        float labelWidth = (capturedLabel ?? ReadLabel(ctx)).Length > 0 ? LabelWidth : 0;
         return new Rect(rect.x + labelWidth, rect.y, Math.Max(1, rect.width - labelWidth), rect.height);
     }
 
-    private void PaintLabelledField(Rect rect, Rect field, string display, bool selected, UiWidgetContext ctx)
+    private void PaintLabelledField(Rect rect, Rect field, string display, bool selected, UiWidgetContext ctx, string? capturedLabel = null)
     {
-        string label = ReadLabel(ctx);
+        string label = capturedLabel ?? ReadLabel(ctx);
         if (label.Length > 0)
         {
-            UiSliderLayout? shared = SharedLabelLayout(ctx, rect.width);
+            UiSliderLayout? shared = SharedLabelLayout(ctx, rect.width, capturedLabel);
             float width = shared?.LabelWidth ?? LabelWidth;
             float height = shared?.Stacked == true ? shared.Value.LabelHeight : rect.height;
             UiThemeDraw.Label(new Rect(rect.x, rect.y, width, height), label, ctx.Theme, ctx.Theme[UiPaletteRole.Foreground],
@@ -338,14 +339,15 @@ public sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabell
         string display = hasCurrent ? FindChoiceText(choices, current) : "";
         UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
         bool open = ctx.Session.IsPopupOpen(bindKey, node);
-        Rect fieldRect = ResolveField(rect, ctx);
+        string retainedLabel=ReadLabel(ctx);
+        Rect fieldRect = ResolveField(rect, ctx,retainedLabel);
 
         // The trigger click stores the popup anchor in Host window space, exactly as the string path does: the
         // anchor source is the primitive, not this path's choice.
         UiNative.DropdownButton(fieldRect, bindKey, ctx, (ctx.Node ?? ctx.Session.ActiveNode).Id.Key);
         if (!ctx.Session.IsActive) return;
-        PaintLabelledField(rect, fieldRect, display, open || hasCurrent, ctx);
-        retained.Capture(ctx, (r,c) => PaintLabelledField(r, ResolveField(r,c), display, open || hasCurrent, c));
+        PaintLabelledField(rect, fieldRect, display, open || hasCurrent, ctx,retainedLabel);
+        retained.Capture(ctx, (r,c) => PaintLabelledField(r, ResolveField(r,c,retainedLabel), display, open || hasCurrent, c,retainedLabel));
 
         string helpSink = OptionHelp.SinkKey(spec);
         if (ctx.Session.IsPopupOpen(bindKey, node))

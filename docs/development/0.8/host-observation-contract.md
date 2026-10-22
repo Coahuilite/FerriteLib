@@ -12,8 +12,7 @@ resources and neutral references have explicit ownership/release; platform servi
 authority. FL08-U3 defines a legal presentation synchronization point, not a fixed native callback,
 tick or frame delay. FL08-U4 retains latest business eligibility checks. FL08-U6 applies purity to new
 tracked/read stages, not silently to legacy Draw input/getters. New automatic responses are not the
-existing R9 query API: they may run independently of paint/window existence; hidden observation and
-legacy migration remain RU3/RU4. No such new runtime capability is claimed by this document.
+existing R9 query API: they may run independently of paint/window existence. RU3 managed faults, explicit display demand and shared-owner lifetime are connected through the [failure/lifetime contract](failure-lifetime-contract.md); final legacy migration remains RU4.
 
 Use `UiPageWindow` for an ordinary page. Use `UiHost.DrawFrame` inside an existing window. Both own
 one real `UiSession` and run the same wrappers, neutral interactions, editing and arrangement; neither
@@ -55,8 +54,7 @@ The surrounding native window supplies itself, the real content rectangle and li
 owner overload obtains native stack qualification once for both standard and embedded routes. The
 original `DrawFrame(Rect)` remains legal for non-window/test/custom embedding and preserves its existing
 explicit Session qualification conditions. `DrawFrame` owns its frame
-boundary, measurement, drawing, hit pass, popup pass and failure cleanup. It does not swallow an outer
-failure or require the author to guess a `Dispose`/`EndFrame` ordering. A callback that closes the host
+boundary, measurement, drawing, hit pass, popup pass and failure cleanup. Managed `UiReactiveFault` is isolated before fatal shell release and exposed through the node/presentation or `LayoutFault`; unclassified outer failure retains the existing fatal protection. Authors do not guess a `Dispose`/`EndFrame` ordering. A callback that closes the host
 ends normal drawing/traversal. One host's Close leaves another host's session and shared business model
 alone. Nested Scroll/Clip geometry and popup coverage continue through the same engine/native adapter.
 F3 outside primary dismissal consumes that input and cannot replay its later release into underlying

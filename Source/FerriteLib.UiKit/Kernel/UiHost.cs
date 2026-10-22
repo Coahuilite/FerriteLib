@@ -150,6 +150,7 @@ public sealed partial class UiHost : IDisposable
         if (DisplayRequired == required) return;
         DisplayRequired = required;
         session.AbortHitPass();
+        if (!required) session.SuspendDisplayInput();
     }
 
     /// <summary>Reads current model facts and the last committed layout; never arranges or paints.</summary>
@@ -423,7 +424,7 @@ public sealed partial class UiHost : IDisposable
     /// </summary>
     public bool TryHandleCancel()
     {
-        if (!session.IsActive) return false;
+        if (!session.IsActive || !DisplayRequired) return false;
 
         if (session.ActiveEditState != null && UiNative.NativeCompositionActive) return true;
 
@@ -474,7 +475,7 @@ public sealed partial class UiHost : IDisposable
     /// </summary>
     public bool TryHandleAccept()
     {
-        if (!session.IsActive) return false;
+        if (!session.IsActive || !DisplayRequired) return false;
 
         UiValueState? edit = session.ActiveEditState;
         if (edit == null) return false;

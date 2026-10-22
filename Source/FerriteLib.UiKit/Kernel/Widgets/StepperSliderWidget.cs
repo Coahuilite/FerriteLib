@@ -149,7 +149,7 @@ public sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IUiL
         AtomVocabulary.PaintEditFeedback(fieldRect, ctx, editor);
         retained.Capture(ctx,(r,c)=>
         {
-            UiSliderLayout lastLabel=LabelLayout(c,r.width);
+            UiSliderLayout lastLabel=LabelLayout(c,r.width,label);
             UiStepperLayout lastLayout=ControlLayout(c,r.width,r.height,lastLabel);
             if(label.Length>0) UiThemeDraw.Label(new Rect(r.x,r.y,lastLabel.LabelWidth,lastLabel.Stacked?lastLabel.LabelHeight:lastLayout.Minus.Height),label,c.Theme,c.Theme[UiPaletteRole.Foreground],AtomVocabulary.TextFont(c));
             DrawButton(Place(lastLayout.Minus,r),"−",c.Theme);DrawButton(Place(lastLayout.Plus,r),"+",c.Theme);
@@ -182,7 +182,7 @@ public sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IUiL
         return label.Length == 0 ? 0 : ctx.Metrics.MeasureWidth(label, AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing;
     }
 
-    private UiSliderLayout LabelLayout(UiWidgetContext ctx, float width) => UiSliderLayout.Measure(ReadLabel(ctx), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0, Math.Max(1, ReadFloat("ButtonWidth", DefaultButtonWidth)) * 2 + Math.Max(1, ReadFloat("FieldWidth", DefaultFieldWidth)) + Gap * 3 + ctx.Theme.Geometry.RowHeight * 2);
+    private UiSliderLayout LabelLayout(UiWidgetContext ctx, float width, string? capturedLabel = null) => UiSliderLayout.Measure(capturedLabel ?? ReadLabel(ctx), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0, Math.Max(1, ReadFloat("ButtonWidth", DefaultButtonWidth)) * 2 + Math.Max(1, ReadFloat("FieldWidth", DefaultFieldWidth)) + Gap * 3 + ctx.Theme.Geometry.RowHeight * 2);
 
     private string ReadBindKey()
     {

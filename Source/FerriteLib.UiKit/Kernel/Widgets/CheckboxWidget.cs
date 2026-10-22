@@ -305,8 +305,10 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
         // One resolved look for the whole frame, through the same shared seam measurement used: the paint
         // below reads this value and never re-parses the attribute.
         string look = Looks.Resolve(spec).Value;
-        Paint(rect, shown, state, look, ctx);
-        retained.Capture(ctx, (r,c) => Paint(r, shown, state, look, c));
+        string retainedLabel=AtomVocabulary.ResolveText(spec,ctx,"Label","LabelKey");
+        float retainedBand=AtomVocabulary.ReadHeight(spec,NaturalHeight(ctx));
+        Paint(rect, shown, state, look, ctx,retainedLabel,retainedBand);
+        retained.Capture(ctx, (r,c) => Paint(r, shown, state, look, c,retainedLabel,retainedBand));
     }
 
     /// <summary>
@@ -328,7 +330,7 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
         if (ctx.Bindings is UiBindings reactive) UiValueBehavior.Request(target, operation, reactive, request);
         else UiValueBehavior.Request(target, operation, request);
     }
-    private void Paint(Rect rect, UiResolvedStyle style, bool state, string look, UiWidgetContext ctx)
+    private void Paint(Rect rect, UiResolvedStyle style, bool state, string look, UiWidgetContext ctx, string label, float band)
     {
         UiTheme theme = ctx.Theme;
 
@@ -336,8 +338,6 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
         // resolved look's own natural band. Reading the measured band here - rather than the arranged rect -
         // is what makes the drawn body the same number the natural width reserved, and it is what lets an
         // explicit Height still win over the look's band: the body grows with the band the page asked for.
-        float band = AtomVocabulary.ReadHeight(spec, NaturalHeight(ctx));
-
         float body;
         if (IsSwitch(look))
         {
@@ -348,7 +348,6 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
             body = PaintCheckbox(rect, style, state, theme, band);
         }
 
-        string label = AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
         if (label.Length == 0) return;
 
         // The SAME gap the measurement reserved, from the one helper both call.

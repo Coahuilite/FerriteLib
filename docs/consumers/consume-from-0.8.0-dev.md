@@ -69,4 +69,10 @@ without adding members to `ITextMetrics`. Unknown legacy metrics receive no new 
 Use the [single reuse contract](../development/0.8/layout-reuse-contract.md) for a compilable custom
 method and exact inputs/diagnostics, and the [inventory](../development/0.8/migration-status.md) for
 all18 uses/nine containers and retained old conditions. These public-unstable engineering entries do
-not freeze XML/ABI or complete RU3–RU5/native acceptance.
+not freeze XML/ABI or complete RU4/RU5/native acceptance.
+
+## Managed faults and retained views
+
+Use `computed.Fault/Retry()` for pure R1 work and `owner.RespondManaged(...)` with `IsPaused/Fault/Resume()` for consumer R2 callbacks. Related inputs can retry pure work; source changes cannot resume a paused callback. Default wrappers retain successful control paint with fault feedback, while current derived reads still fail and dependent input stops. A first failure is unavailable, not zero/empty.
+
+For reliably hidden retained views call `UiHost.SetDisplayDemand` or `UiWindowHost.SetDisplayDemand`; focus is not visibility. Keep shared computations under a shared owner. Old custom readers keep conservative service; optional `IUiPresentationDemand` declares complete tracked-key demand without changing old interfaces or ordinary getters. The [failure/lifetime contract](../development/0.8/failure-lifetime-contract.md) has recovery, draft, two-host and captured-target confirmation examples and the actual fixture/native limits.

@@ -390,6 +390,7 @@ public abstract class UiWindowHost : Window
     /// </summary>
     public override void OnCancelKeyPressed()
     {
+        if (!displayRequired) return;
         UiHost? page = host;
         if (page != null && page.TryHandleCancel()) return;
 
@@ -431,6 +432,7 @@ public abstract class UiWindowHost : Window
     /// </summary>
     public sealed override void OnAcceptKeyPressed()
     {
+        if (!displayRequired) return;
         UiHost? page = host;
         if (page != null && page.TryHandleAccept()) return;
 

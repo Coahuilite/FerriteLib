@@ -15,13 +15,16 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// the line (transparent included) instead of switching it off.
 /// </para>
 /// </summary>
-public sealed class SectionHeaderWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget
+public sealed class SectionHeaderWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiRetainedDisplay
 {
     public const string Kind = "section/header";
 
     private const float DefaultHeight = 24f;
 
     private UiElementSpec spec = UiElementSpec.Empty;
+    private readonly UiRetainedPaint retained = new();
+    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect,ctx);
+    UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
 
@@ -59,6 +62,11 @@ public sealed class SectionHeaderWidget : IUiWidget, IUiMeasureParticipant, IUiD
         float fixedHeight = AtomVocabulary.ReadHeight(spec, 0);
         if (fixedHeight > 0) return new UiMeasurement(new UiMeasureInputs(numbers: new[] { fixedHeight }), () => fixedHeight);
         string text = Describe(ctx).Text;
+        retained.SetMeasure(c=>CaptureText(c,text));
+        return CaptureText(ctx,text);
+    }
+    private UiMeasurement CaptureText(UiWidgetContext ctx,string text)
+    {
         return new UiMeasurement(new UiMeasureInputs(new[] { text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx) }, true), () =>
         {
             float declared = AtomVocabulary.ReadHeight(spec, 0);
@@ -75,6 +83,11 @@ public sealed class SectionHeaderWidget : IUiWidget, IUiMeasureParticipant, IUiD
         if (rect.width <= 1f || rect.height <= 1f) return;
 
         string title = Describe(ctx).Text;
+        PaintText(rect,ctx,title);
+        retained.Capture(ctx,(r,c)=>PaintText(r,c,title));
+    }
+    private void PaintText(Rect rect,UiWidgetContext ctx,string title)
+    {
         UiThemeDraw.Label(rect, title, ctx.Theme, ctx.Theme[UiPaletteRole.Foreground], AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft);
 
         // Chrome="none": the title without the rule under it. Read here rather than cached in Configure so the

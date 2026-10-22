@@ -2583,7 +2583,7 @@ public sealed partial class UiLayoutEngine
         // arrange pass with it, and the tree — not the control — owns whether the page survives that.
         // The fallback keeps the element's slot instead of collapsing it, so a trip cannot reshuffle
         // the rest of the page.
-        using UiBindings.DisplayScope? display = widget is IUiDescriptiveWidget && widget is not IUiPointerLayout ? (ctx.Bindings as UiBindings)?.DisplayOnly() : null;
+        using UiBindings.DisplayScope? display = KernelCoreWidgetRegistrar.HasKnownPresentation(widget) && widget is IUiDescriptiveWidget && widget is not IUiPointerLayout ? (ctx.Bindings as UiBindings)?.DisplayOnly() : null;
         try
         {
             float height = Math.Max(0f, UiSessionGuard.MeasureOrFallback(ctx.Session, node.Path, widget.Kind, node.Path, RecoveryBandHeight, () => MeasureWidgetWithReuse(spec, widget, ctx, node)));

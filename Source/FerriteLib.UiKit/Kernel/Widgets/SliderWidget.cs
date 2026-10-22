@@ -33,7 +33,7 @@ public sealed class SliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelled
 
     private UiRange Limits() => new UiRange(AtomVocabulary.ReadFloat(spec, "Min", 0), AtomVocabulary.ReadFloat(spec, "Max", 1));
     private string Label(UiWidgetContext ctx) => AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
-    private UiSliderLayout Layout(UiWidgetContext ctx, float width) => UiSliderLayout.Measure(Label(ctx), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0);
+    private UiSliderLayout Layout(UiWidgetContext ctx, float width, string? capturedLabel = null) => UiSliderLayout.Measure(capturedLabel ?? Label(ctx), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0);
     public float MeasureLabel(UiWidgetContext ctx) => Label(ctx).Length == 0 ? 0 : ctx.Metrics.MeasureWidth(Label(ctx), AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing;
     public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
@@ -79,7 +79,8 @@ public sealed class SliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelled
         string key = AtomVocabulary.ReadBindKey(spec);
         UiRange range = Limits();
         float current = ctx.Bindings.TryGet(key, out float bound) ? bound : range.Min;
-        UiSliderLayout layout = Layout(ctx, rect.width);
+        string retainedLabel=Label(ctx);
+        UiSliderLayout layout = Layout(ctx, rect.width,retainedLabel);
         Rect track = TrackRect(rect, ctx, layout);
         bool? writable = AtomVocabulary.WritableOf(ctx, key);
         UiInteractionResult interaction = UiNative.Range(track, ctx, key, range.Clamp(current), range.Min, range.Max, writable != false);
@@ -93,8 +94,8 @@ public sealed class SliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelled
         UiNative.PaintRange(track, ctx.Theme, range.Clamp(current), range.Min, range.Max);
         retained.Capture(ctx, (r,c) =>
         {
-            UiSliderLayout lastLayout=Layout(c,r.width);
-            if(lastLayout.LabelWidth>0) UiThemeDraw.Label(new Rect(r.x,r.y,lastLayout.LabelWidth,lastLayout.Stacked?lastLayout.LabelHeight:r.height),Label(c),c.Theme,style.Text,AtomVocabulary.TextFont(c),TextAnchor.MiddleLeft);
+            UiSliderLayout lastLayout=Layout(c,r.width,retainedLabel);
+            if(lastLayout.LabelWidth>0) UiThemeDraw.Label(new Rect(r.x,r.y,lastLayout.LabelWidth,lastLayout.Stacked?lastLayout.LabelHeight:r.height),retainedLabel,c.Theme,style.Text,AtomVocabulary.TextFont(c),TextAnchor.MiddleLeft);
             UiNative.PaintRange(TrackRect(r,c,lastLayout),c.Theme,range.Clamp(current),range.Min,range.Max);
         });
     }

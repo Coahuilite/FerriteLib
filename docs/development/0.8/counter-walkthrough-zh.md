@@ -86,7 +86,7 @@ UI getter 只读投影，不因为通知已送达 UI 就无保护地读取后台
 UI 不在 getter 里读取后台服务的可变列表；业务仍可拒绝最后一次投影认为合格的命令。
 
 关闭 Host 只清自己的展示计算／订阅。独立业务 owner 和服务继续工作；最终由各自 owner 释放，
-Dispose 不保存、不回滚、不销毁外部模型。换分支会撤旧依赖；失败构建不发布半份展示／几何，不重放操作。
+Dispose 不保存、不回滚、不销毁外部模型。换分支会撤旧依赖；失败计算保留旧展示但当前派生读取仍失败；几何不发布半份，不重放操作。
 
 ## 声明范围，复用未变的工作
 
@@ -113,6 +113,17 @@ Count:0→Count:1仍是一行时，只验证变化的真实输入并计算该文
 新自定义控件通过可选`IUiMeasureParticipant`提供完整捕获输入；旧getter／IUiWidget保原通知和合法同步条件。
 具体有效性及作者示例见[布局局部复用合同](layout-reuse-contract.md)。
 
+## 失败时重试显示，不重放业务
+
+可编译的 `FailureLifetimeExamples.cs` 补充两个普通入口：`FailureCounterExample` 的 Count 是业务值，Caption 是纯计算，Host 持自己的展示；`FailureWorkshopExample` 的服务持业务结果，Notification 是独立消费者自动回调。
+
+- 计数器格式失败后保留旧文字并标 `!`，首次失败是不可用；`Caption.Value` 仍抛可定位故障。无关值和旧分支不触发再试，相关 Count／格式输入变化或 `Caption.Retry()` 才允许。绑定 `retry-display` 可直接调用这个纯入口，不要求重做业务命令。
+- 工坊回调写入后抛错，`Notification.IsPaused/Fault` 告知停止范围；owner 核对结果、修正接入，再 `Resume()` 只读当前快照。新快照／绘制／显隐不恢复它，已生效业务不回滚。
+- 默认 Checkbox、编辑／选择／Tree／Chart 的旧控件展示通过专用纯 paint 入口保留，不重跑 Draw、Observe 或请求。编辑草稿仍属于同一目标；故障期间停止不可靠操作，独立 reset 仍可用。
+- `host.SetDisplayDemand(false/true)` 或标准 shell 同名入口表达可靠隐藏／复显，不是失焦。共享 owner 让 A／B 各按需求读同一计算；关 B 不释放 A 或服务。确认在打开时捕获 A17，不能在确认时读取后来选择的 B23；业务入口仍核最新资格。
+
+完整作者用法、实际停止范围、循环诊断和旧 custom 等级见[失败与寿命合同](failure-lifetime-contract.md)。
+
 ## 本包已证明什么
 
 无引擎 E2E 使用同一生产 `NeutralSources.props`：实际业务操作／共享布尔请求 →
@@ -129,4 +140,4 @@ RU2的同源`LayoutReuseTests`与真实`KernelLayoutReuseTests`另报每个实�
 覆盖同结果换源、计数同尺寸／新增行、独立安全多项投影、Scroll80→140且视口100、共享60→70→120、
 宽度／字体环境／纯颜色／整体搬动、增删重排、草稿／捕获／弹层及失败不发布半份。
 18用途／9容器的具体新缓存等级与未变旧条件仍以唯一用途表为准，不用双例替代整库覆盖。
-任意引用隐式缺省、最终集合API／粒度、RU3详细失败／隐藏、RU4剩余迁移和RU5平台承诺仍分项保留。
+任意引用隐式缺省、最终集合API／粒度、RU3 的 `FailureLifetimeTests`／`KernelFailureLifetimeTests` 另证首次／新分支／标签失败、纯重试、回调 owner 恢复、有限及超限反馈、旧展示／草稿／资格、真实隐藏及双 Host 所有权。RU4剩余迁移和RU5平台承诺仍分项保留。

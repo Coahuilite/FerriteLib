@@ -6,7 +6,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>
 /// Empty-state status text sharing native width measurement and effective environment typography.
 /// </summary>
-public sealed class EmptyStateWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget
+public sealed class EmptyStateWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiRetainedDisplay
 {
     public const string Kind = "state/empty";
 
@@ -16,6 +16,9 @@ public sealed class EmptyStateWidget : IUiWidget, IUiMeasureParticipant, IUiDesc
     private const UiFont BandFont = UiFont.Small;
 
     private UiElementSpec spec = UiElementSpec.Empty;
+    private readonly UiRetainedPaint retained = new();
+    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect,ctx);
+    UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
 
@@ -42,6 +45,11 @@ public sealed class EmptyStateWidget : IUiWidget, IUiMeasureParticipant, IUiDesc
     public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
         string text = ResolveText(ctx);
+        retained.SetMeasure(c=>CaptureText(c,text));
+        return CaptureText(ctx,text);
+    }
+    private UiMeasurement CaptureText(UiWidgetContext ctx,string text)
+    {
         return new UiMeasurement(new UiMeasureInputs(new[] { text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx, BandFont), ctx.Theme.Geometry.Padding }, text.Length > 0), () => Math.Max(ReadHeight(), WrappedTextWidget.MeasureBand(ctx, text, AtomVocabulary.TextFont(ctx, BandFont), ctx.Theme.Geometry.Padding * 2)));
     }
 
@@ -53,7 +61,13 @@ public sealed class EmptyStateWidget : IUiWidget, IUiMeasureParticipant, IUiDesc
     {
         if (rect.width <= 1f || rect.height <= 1f) return;
 
-        UiThemeDraw.Label(rect, Describe(ctx).Text, ctx.Theme, ctx.Theme[UiPaletteRole.SecondaryForeground], AtomVocabulary.TextFont(ctx, BandFont), TextAnchor.MiddleCenter);
+        string text=Describe(ctx).Text;
+        PaintText(rect,ctx,text);
+        retained.Capture(ctx,(r,c)=>PaintText(r,c,text));
+    }
+    private void PaintText(Rect rect,UiWidgetContext ctx,string text)
+    {
+        UiThemeDraw.Label(rect, text, ctx.Theme, ctx.Theme[UiPaletteRole.SecondaryForeground], AtomVocabulary.TextFont(ctx, BandFont), TextAnchor.MiddleCenter);
     }
 
     /// <summary>Shared by Measure and Draw so the allocated band always matches the drawn string.</summary>

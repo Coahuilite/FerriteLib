@@ -23,7 +23,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// widget — which is the author's explicit override of this contract, not a second contract.
 /// </para>
 /// </summary>
-public sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget
+public sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiRetainedDisplay
 {
     public const string Kind = "text/wrapped";
 
@@ -34,6 +34,9 @@ public sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiDes
     private const float VerticalPadding = 6f;
 
     private UiElementSpec spec = UiElementSpec.Empty;
+    private readonly UiRetainedPaint retained = new();
+    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect,ctx);
+    UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
 
@@ -63,6 +66,11 @@ public sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiDes
     public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
         string text = ResolveText(ctx);
+        retained.SetMeasure(c=>CaptureText(c,text));
+        return CaptureText(ctx,text);
+    }
+    private UiMeasurement CaptureText(UiWidgetContext ctx,string text)
+    {
         return new UiMeasurement(new UiMeasureInputs(new[] { text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx), ctx.Theme.Geometry.Padding }, text.Length > 0), () =>
         {
             float band = MeasureBand(ctx, text, AtomVocabulary.TextFont(ctx), ctx.Theme.Geometry.Padding * 2f);
@@ -106,7 +114,11 @@ public sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiDes
 
         string text = ResolveText(ctx);
         if (text.Length == 0) return;
-
+        PaintText(rect,ctx,text,style);
+        retained.Capture(ctx,(r,c)=>PaintText(r,c,text,style));
+    }
+    private void PaintText(Rect rect,UiWidgetContext ctx,string text,UiResolvedStyle style)
+    {
         // Upper-left anchored and inset by the same padding Measure added, so the rect handed to the
         // single text outlet is the rect the wrapped height was computed for. The fit audit then
         // reports a real defect only, never this atom's own padding.

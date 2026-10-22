@@ -1349,6 +1349,13 @@ public sealed class UiSession : IDisposable
         if(ReferenceEquals(ownedHotControlOwner,node) && ownedHotControl.HasValue) ReleaseHotControl(ownedHotControl.Value);
         if(popupTarget?.Node==node.Id.Key) ClosePopup();
     }
+    internal void SuspendDisplayInput()
+    {
+        if(activeEditState!=null) UiNative.ReleaseEditFocus(activeEditState,this);
+        foreach(UiNode node in nodes.Values) SuspendNodeEditors(node);
+        activeEditNode=null;activeEditState=null;
+        ClosePopup();
+    }
 
     public void Dispose()
     {

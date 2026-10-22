@@ -3,8 +3,8 @@
 ## 0.8 continuation
 
 - [ ] Close the remaining A8 subitems: RU1 final reference/deep defaults and collection API/granularity,
-      RU3 detailed failure/hidden observation, RU4 remaining use migrations and RU5 platform delivery.
-      The reactive foundation, explicit-policy RU1 A–E and approved RU2 scope/stage reuse are implemented; complete use-by-use migration limits are in
+      RU4 remaining use migrations and RU5 platform delivery.
+      The reactive foundation, explicit-policy RU1 A–E, approved RU2 scope/stage reuse and RU3 managed failure/demand/lifetime are implemented; complete use-by-use migration limits are in
       `docs/development/0.8/migration-status.md`. Native actions below remain pending, not permission.
 
 - [ ] Run the native 1.6 S0/S1 acceptance in docs/development/0.8/s01-contract.md after the developer installs the selected isolated Dev package.

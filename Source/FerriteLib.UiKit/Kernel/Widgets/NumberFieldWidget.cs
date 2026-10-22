@@ -85,12 +85,13 @@ public sealed class NumberFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLab
         if (numeric.Parse(state.EditText, out float parsed)) state.FloatValue = parsed;
         UiEditSession<float> retainedEditor = UiNative.Editor<float>(ctx,bindKey,numeric.Format,numeric.Parse);
         AtomVocabulary.PaintEditFeedback(field, ctx, retainedEditor);
-        DrawLabel(rect, ctx, style);
+        string retainedLabel=AtomVocabulary.ResolveText(spec,ctx,"Label","LabelKey");
+        DrawLabel(rect, ctx, style,retainedLabel);
         retained.Capture(ctx, (r,c) =>
         {
-            ResolveLabelBand(r,c,out Rect slot);
+            ResolveLabelBand(r,c,out Rect slot,retainedLabel);
             UiRetainedPaint.Field(slot,c,retainedEditor.Draft);
-            DrawLabel(r,c,style);
+            DrawLabel(r,c,style,retainedLabel);
         });
     }
 
@@ -104,10 +105,10 @@ public sealed class NumberFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLab
         return label.Length == 0 ? 0 : ctx.Metrics.MeasureWidth(label, AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing;
     }
 
-    private UiSliderLayout LabelLayout(UiWidgetContext ctx, float width) => UiSliderLayout.Measure(AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey"), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0);
-    private void ResolveLabelBand(Rect rect, UiWidgetContext ctx, out Rect field)
+    private UiSliderLayout LabelLayout(UiWidgetContext ctx, float width, string? capturedLabel = null) => UiSliderLayout.Measure(capturedLabel ?? AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey"), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0);
+    private void ResolveLabelBand(Rect rect, UiWidgetContext ctx, out Rect field, string? capturedLabel = null)
     {
-        UiSliderLayout layout = LabelLayout(ctx, rect.width);
+        UiSliderLayout layout = LabelLayout(ctx, rect.width, capturedLabel);
         if (layout.LabelWidth <= 0)
         {
             field = rect;
@@ -118,12 +119,12 @@ public sealed class NumberFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLab
         field = layout.Stacked ? new Rect(rect.x, rect.y + layout.LabelHeight + gap, rect.width, Math.Max(1, rect.height - layout.LabelHeight - gap)) : new Rect(rect.x + layout.LabelWidth + gap, rect.y, Math.Max(1, rect.width - layout.LabelWidth - gap), rect.height);
     }
 
-    private void DrawLabel(Rect rect, UiWidgetContext ctx, UiResolvedStyle style)
+    private void DrawLabel(Rect rect, UiWidgetContext ctx, UiResolvedStyle style, string? capturedLabel = null)
     {
-        string label = AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
+        string label = capturedLabel ?? AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
         if (label.Length == 0)
             return;
-        UiSliderLayout layout = LabelLayout(ctx, rect.width);
+        UiSliderLayout layout = LabelLayout(ctx, rect.width, capturedLabel);
         UiThemeDraw.Label(new Rect(rect.x, rect.y, layout.LabelWidth, layout.Stacked ? layout.LabelHeight : rect.height), label, ctx.Theme, style.Text, AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft);
     }
 }

@@ -6,7 +6,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>
 /// Descriptive status text with a Tiny undeclared fallback; explicit font declarations override it.
 /// </summary>
-public sealed class ChromeBannerWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget
+public sealed class ChromeBannerWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiRetainedDisplay
 {
     public const string Kind = "chrome/banner";
 
@@ -20,6 +20,9 @@ public sealed class ChromeBannerWidget : IUiWidget, IUiMeasureParticipant, IUiDe
     private const UiFont BandFont = UiFont.Tiny;
 
     private UiElementSpec spec = UiElementSpec.Empty;
+    private readonly UiRetainedPaint retained = new();
+    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect,ctx);
+    UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
 
@@ -53,6 +56,11 @@ public sealed class ChromeBannerWidget : IUiWidget, IUiMeasureParticipant, IUiDe
     public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
         string text = Describe(ctx).Text;
+        retained.SetMeasure(c=>CaptureText(c,text));
+        return CaptureText(ctx,text);
+    }
+    private UiMeasurement CaptureText(UiWidgetContext ctx,string text)
+    {
         return new UiMeasurement(new UiMeasureInputs(new[] { text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx, BandFont), ctx.Theme.Geometry.Padding }, text.Length > 0), () => Math.Max(ReadHeight(), WrappedTextWidget.MeasureBand(ctx, text, AtomVocabulary.TextFont(ctx, BandFont), ctx.Theme.Geometry.Padding)));
     }
 
@@ -67,11 +75,17 @@ public sealed class ChromeBannerWidget : IUiWidget, IUiMeasureParticipant, IUiDe
         string text = Describe(ctx).Text;
         if (text.Length == 0) return;
 
+        Color ink=AtomVocabulary.ResolveRole(spec, ctx, writable: null, defaultEmphasis: UiEmphasis.Muted).Text;
+        PaintText(rect,ctx,text,ink);
+        retained.Capture(ctx,(r,c)=>PaintText(r,c,text,ink));
+    }
+    private void PaintText(Rect rect,UiWidgetContext ctx,string text,Color ink)
+    {
         UiThemeDraw.Label(
             rect,
             text,
             ctx.Theme,
-            AtomVocabulary.ResolveRole(spec, ctx, writable: null, defaultEmphasis: UiEmphasis.Muted).Text,
+            ink,
             AtomVocabulary.TextFont(ctx, BandFont),
             TextAnchor.MiddleLeft);
     }
