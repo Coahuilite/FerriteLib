@@ -67,7 +67,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// per-item binding scope, so "not yet bound" is a legal frame there and must not take the page down.
 /// </para>
 /// </summary>
-internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout
+internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
 {
     internal const string Kind = "input/checkbox";
 
@@ -100,6 +100,9 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
     private const float CheckboxMinSide = 8f;
 
     private UiElementSpec spec = UiElementSpec.Empty;
+    private readonly UiRetainedPaint retained = new();
+    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
+    UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
 
@@ -303,6 +306,7 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
         // below reads this value and never re-parses the attribute.
         string look = Looks.Resolve(spec).Value;
         Paint(rect, shown, state, look, ctx);
+        retained.Capture(ctx, (r,c) => Paint(r, shown, state, look, c));
     }
 
     /// <summary>

@@ -17,6 +17,7 @@ internal static class FailureLifetimeTests
         C(value.TryGetLastValue(out int old) && old==1 && value.HasValue,"last valid value remains separate");
         for(int i=0;i<12;i++)C(ReferenceEquals(first,Fault(()=>_=value.Value)),"cached failure read "+i);
         unrelated.Value=1;C(Fault(()=>_=value.Value)!=null && runs==2,"unrelated input cannot retry");
+        left.Value=8;C(ReferenceEquals(first,Fault(()=>_=value.Value)) && runs==2,"failed branch drops obsolete successful left edge before right recovers");
         right.Value=5;C(value.Value==5 && runs==3 && value.Fault==null,"failed new branch keeps its actual recovery read");
         left.Value=9;C(value.Value==5 && runs==3,"successful recovery replaces old branch dependencies");
         int initialRuns=0;var trigger=runtime.Int();var initial=owner.Compute("first-failure",()=>{initialRuns++;int n=trigger.Value;if(n==0)throw new Exception("first");return n;});
@@ -30,6 +31,11 @@ internal static class FailureLifetimeTests
         a=owner.Compute("cycle-A",()=>{cycleRuns++;return b!.Value;});b=owner.Compute("cycle-B",()=>a.Value);
         var cycle=Fault(()=>_=a.Value);for(int i=0;i<5;i++)_=Fault(()=>_=a.Value);
         C(cycle?.Kind=="pure-cycle" && cycle.Identity.Contains("cycle-A") && cycleRuns==1,"pure recursion has distinct cached diagnostic");
+        var cyclic=runtime.Boolean(true);UiReactiveComputed<int>? recoverA=null,recoverB=null;
+        recoverA=owner.Compute("recover-cycle-A",()=>cyclic.Value?recoverB!.Value:42);
+        recoverB=owner.Compute("recover-cycle-B",()=>recoverA.Value);
+        C(Fault(()=>_=recoverA.Value)?.Kind=="pure-cycle","conditional cycle records actual branch input");
+        cyclic.Value=false;C(recoverA.Value==42,"related input breaks cached pure cycle through preserved failed-child edge");
 
         int callbacks=0,applied=0,independent=0;bool callbackBroken=false;var input=runtime.Int();
         var callback=owner.RespondManaged("side-effect",()=>{int n=input.Value;callbacks++;applied=n;if(callbackBroken)throw new Exception("after write");});

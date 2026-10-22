@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using FerriteLib.UiKit.Kernel;
+using FerriteLib.UiKit.Kernel.Widgets;
 using UnityEngine;
 using Verse;
 
@@ -22,7 +23,7 @@ internal static class KernelFailureLifetimeTests
         try
         {
             UiWidgetRegistry.Clear();UiWidgetRegistry.InitializeCore();
-            CounterFault();FirstFailure();SharedGeometry();DemandAndDraft();UnknownCustom();MultiHost();RequestFailure();
+            CounterFault();InteractiveRetained();RetainedCollections();BranchFailureDraw();FirstFailure();SharedGeometry();DemandAndDraft();UnknownCustom();MultiHost();RequestFailure();
             return 0;
         }
         catch(Exception ex){Console.Error.WriteLine("  FAIL: RU3-HOST "+ex);return 1;}
@@ -136,6 +137,73 @@ internal static class KernelFailureLifetimeTests
         var b=new UiBindings(new UiReactiveRuntime());int attempts=0;b.BindCommand("request",()=>{attempts++;if(attempts==1)throw new Exception("business already applied");});
         using var host=Host("<Widget Kind=\"input/button\" Id=\"request\" ActionBind=\"request\" Text=\"Request\"/>",b);Pump(host);Click(host,"request");Pump(host);Click(host,"request");
         C(attempts==2 && !host.Session.IsTripped(Node(host,"request")),"ordinary button failure preserves applied write and next click is a new qualified request");
+    }
+
+    private static void InteractiveRetained()
+    {
+        var rt=new UiReactiveRuntime();using var owner=rt.CreateOwner("interactive");var broken=rt.Boolean();var flag=rt.Boolean(true);int reads=0,writes=0,resets=0;
+        var boolean=owner.Compute("boolean",()=>{reads++;bool v=flag.Value;if(broken.Value)throw new Exception("bool render");return v;});
+        var b=new UiBindings(rt);b.BindTracked("flag",()=>boolean.Value,v=>{writes++;flag.Value=v;});b.BindCommand("reset",()=>resets++);
+        using var host=Host("<Column Padding=\"0\" Gap=\"0\"><Widget Kind=\"input/checkbox\" Id=\"check\" Bind=\"flag\" Label=\"Checked\"/><Widget Kind=\"input/button\" Id=\"reset\" ActionBind=\"reset\" Text=\"Reset\"/></Column>",b);
+        Pump(host);broken.Value=true;int start=Labels.Count;Pump(host);
+        C(Painted(start,"Checked") && Painted(start,"!") && !Painted(start,"interactive/boolean") && Node(host,"check").PresentationUnavailable,"Checkbox retains its last checked control paint with fault, not a recovery replacement");
+        for(int i=0;i<5;i++)Pump(host);Click(host,"check");Click(host,"reset");
+        bool invalid=false;try{_=boolean.Value;}catch(UiReactiveFault){invalid=true;}
+        C(reads==2 && writes==0 && resets==1 && invalid,"retained Checkbox never reads old state into toggle or qualification; independent reset remains usable");
+        using(var first=Host("<Widget Kind=\"input/checkbox\" Id=\"first\" Bind=\"flag\" Label=\"Checked\"/>",b))
+        {start=Labels.Count;Pump(first);C(!Painted(start,"Checked") && Painted(start,"interactive/boolean"),"first failed Checkbox has unavailable feedback without invented unchecked state");}
+        foreach(string kind in new[]{"input/text-field","input/number-field","input/stepper-slider","input/slider"})
+        {
+            var local=new UiReactiveRuntime();using var editOwner=local.CreateOwner(kind);var fail=local.Boolean();var text=local.Text("model");var number=local.Value(1f,(a,c)=>a==c);int setters=0;
+            var editBindings=new UiBindings(local);
+            var stringValue=editOwner.Compute("string",()=>{string v=text.Value;if(fail.Value)throw new Exception("edit string");return v;});
+            var floatValue=editOwner.Compute("number",()=>{float v=number.Value;if(fail.Value)throw new Exception("edit number");return v;});
+            if(kind=="input/text-field")editBindings.BindTracked("edit",()=>stringValue.Value,v=>{setters++;text.Value=v;});
+            else editBindings.BindTracked("edit",()=>floatValue.Value,v=>{setters++;number.Value=v;},equal:(a,c)=>a==c);
+            editBindings.BindCommand("reset",()=>resets++);
+            string extra=kind=="input/text-field"?" Multiline=\"true\"":" Min=\"0\" Max=\"100\"";
+            using var editHost=Host("<Column Padding=\"0\" Gap=\"0\"><Widget Kind=\""+kind+"\" Id=\"edit\" Bind=\"edit\" Label=\"Value\""+extra+"/><Widget Kind=\"input/button\" Id=\"reset\" ActionBind=\"reset\" Text=\"Reset\"/></Column>",editBindings);
+            Pump(editHost);UiNode node=Node(editHost,"edit");IUiEditState? retainedEditor=null;
+            if(kind=="input/text-field")
+            {bool Parse(string t,out string v){v=t;return true;}var e=UiNative.Editor<string>(editHost.CreateContext(320).WithNode(node),"edit",v=>v,Parse);e.Observe("model");e.Focus();e.Input("draft text",true,false,false,_=>throw new Exception("commit"),()=>"model");retainedEditor=e;}
+            else if(kind!="input/slider")
+            {var n=new UiNumericEdit(0,100,"0.##");var e=UiNative.Editor<float>(editHost.CreateContext(320).WithNode(node),"edit",n.Format,n.Parse);e.Observe(1);e.Focus();e.Input("20",true,false,false,_=>throw new Exception("commit"),()=>1);retainedEditor=e;}
+            Pump(editHost);string draft=retainedEditor?.Draft??"";float oldHeight=node.Rect!.Value.height;
+            fail.Value=true;start=Labels.Count;Pump(editHost);
+            C(Painted(start,"Value") && Painted(start,"!") && node.PresentationUnavailable && node.Rect!.Value.height==oldHeight,kind+" retains dedicated pure control paint and validated last-display measurement");
+            if(retainedEditor!=null)C(retainedEditor.Draft==draft && Painted(start,draft) && setters==0 && !retainedEditor.Focused,kind+" retained same-target draft paints without Observe, native editing, submission or rollback");
+            int before=resets;Click(editHost,"reset");Pump(editHost);C(setters==0 && resets==before+1,kind+" failure blocks dependent edits but leaves independent real operation available");
+            fail.Value=false;Pump(editHost);C(setters==0 && node.ReactiveFault==null,kind+" recovery does not replay a queued edit or mutate business");
+        }
+    }
+    private static void RetainedCollections()
+    {
+        foreach(string kind in new[]{"input/dropdown","input/mode-row","container/tree","chart/line"})
+        {
+            var rt=new UiReactiveRuntime();using var owner=rt.CreateOwner(kind);var fail=rt.Boolean();int reads=0,writes=0;var b=new UiBindings(rt);string extra="";
+            if(kind=="container/tree")
+            {var rows=owner.Compute<IReadOnlyList<UiTreeRow>>("rows",()=>{reads++;if(fail.Value)throw new Exception("rows");return new[]{new UiTreeRow("one",0,"Retained row")};});b.BindTracked("data",()=>rows.Value,equal:(a,c)=>ReferenceEquals(a,c));}
+            else if(kind=="chart/line")
+            {var points=owner.Compute<IReadOnlyList<Vector2>>("points",()=>{reads++;if(fail.Value)throw new Exception("points");return new[]{new Vector2(0,0),new Vector2(1,1)};});b.BindTracked("data",()=>points.Value,equal:(a,c)=>ReferenceEquals(a,c));}
+            else if(kind=="input/mode-row")
+            {b.BindTracked("data",()=>1,_=>writes++);var choices=owner.Compute<IReadOnlyList<UiChoice<int>>>("choices",()=>{reads++;if(fail.Value)throw new Exception("options");return new[]{new UiChoice<int>("Retained choice",1)};});b.BindTrackedOptions("data",()=>choices.Value,(a,c)=>a.Text==c.Text && a.Value==c.Value);}
+            else
+            {extra=" OptionsBind=\"data\"";b.BindTracked("data",()=>"alpha",_=>writes++);var options=owner.Compute<IReadOnlyList<string>>("options",()=>{reads++;if(fail.Value)throw new Exception("options");return new[]{"alpha","beta"};});b.BindTrackedOptions("data",()=>options.Value,(a,c)=>a==c);}
+            using var host=Host("<Widget Kind=\""+kind+"\" Id=\"value\" Bind=\"data\""+extra+"/>",b);Pump(host);float height=Node(host,"value").Rect!.Value.height;
+            if(kind=="input/dropdown"){Click(host,"value");Pump(host);}
+            fail.Value=true;int start=Labels.Count;Pump(host);
+            C(Painted(start,"!") && !Painted(start,kind+"/options") && Node(host,"value").PresentationUnavailable && Node(host,"value").Rect!.Value.height==height,kind+" preserves last control output and complete geometry after tracked collection failure");
+            if(kind!="chart/line")C(Painted(start,kind=="input/dropdown"?"alpha":kind=="input/mode-row"?"Retained choice":"Retained row"),kind+" still paints the last selected or row label");
+            for(int i=0;i<4;i++)Pump(host);Click(host,"value");C(writes==0 && reads==2 && host.Session.OpenPopupAnchor==null,kind+" retained paint cannot publish selection, request, popup input or repeat failed work");
+            fail.Value=false;Pump(host);C(Node(host,"value").ReactiveFault==null && writes==0,kind+" actual related recovery resumes current read without replay");
+        }
+    }
+    private static void BranchFailureDraw()
+    {
+        var rt=new UiReactiveRuntime();using var owner=rt.CreateOwner("branch-paint");var branch=rt.Boolean();var left=rt.Int(1);var right=rt.Int(2);int runs=0;
+        var value=owner.Compute("value",()=>{runs++;if(!branch.Value)return left.Value.ToString();int n=right.Value;if(n<5)throw new Exception("right");return n.ToString();});
+        var b=new UiBindings(rt);b.BindTracked("text",()=>value.Value);using var host=Host("<Widget Kind=\"text/wrapped\" Bind=\"text\"/>",b);Pump(host);branch.Value=true;Pump(host);left.Value=99;for(int i=0;i<5;i++)Pump(host);
+        C(runs==2,"failed current branch ignores obsolete successful source across actual repeated Host draws");right.Value=5;Pump(host);C(runs==3,"actual failed branch input restores Host presentation once");
     }
     private sealed class Metrics:ITextMetrics{public float MeasureText(string t,UiFont f,float w)=>Math.Max(18,t.Length*2);public float MeasureWidth(string t,UiFont f)=>t.Length*8;}
     private sealed class Translation:IUiTranslation{public string Translate(string k)=>k;public int TranslationRevision=>0;}

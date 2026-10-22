@@ -28,7 +28,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// stands while the pointer is over it.
 /// </para>
 /// </summary>
-public sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout
+public sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/mode-row";
 
@@ -42,6 +42,9 @@ public sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUiPo
     private const int OptionSlots = 8;
 
     private UiElementSpec spec = UiElementSpec.Empty;
+    private readonly UiRetainedPaint retained = new();
+    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
+    UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
 
@@ -149,6 +152,11 @@ public sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUiPo
     public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
         int count = OptionsFor(ctx).Count;
+        retained.SetMeasure(c=>CaptureCount(c,count));
+        return CaptureCount(ctx,count);
+    }
+    private UiMeasurement CaptureCount(UiWidgetContext ctx,int count)
+    {
         int columns = ColumnsFor(ctx.ViewWidth);
         return new UiMeasurement(new UiMeasureInputs(numbers: new[] { (float)count, columns, ctx.Theme.Geometry.RowHeight, ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.Spacing }), () =>
         {
@@ -250,6 +258,12 @@ public sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUiPo
         }
 
         OptionHelp.Publish(ctx, OptionHelp.SinkKey(spec), hoveredHelp);
+        var selectedPaint = new bool[options.Count];
+        for(int i=0;i<options.Count;i++) selectedPaint[i]=options[i].Typed ? Equals(options[i].TypedValue,currentTyped) : string.Equals(options[i].Value,current,StringComparison.Ordinal);
+        retained.Capture(ctx,(r,c)=>
+        {
+            for(int i=0;i<options.Count;i++) DrawOption(OptionRect(r,c,i),options[i],selectedPaint[i],c.Theme);
+        });
     }
 
     /// <summary>

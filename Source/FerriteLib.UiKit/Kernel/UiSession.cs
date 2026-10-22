@@ -1337,6 +1337,18 @@ public sealed class UiSession : IDisposable
         }
         node.EditingState = null;
     }
+    internal void SuspendFailedInput(UiNode node)
+    {
+        SuspendNodeEditors(node);
+        if (ReferenceEquals(activeEditNode,node))
+        {
+            if(activeEditState!=null) UiNative.ReleaseEditFocus(activeEditState,this);
+            activeEditNode=null;activeEditState=null;
+        }
+        if(Interactions.CaptureOwner?.Node==node.Id.Key) Interactions.End(UiInteractionEnd.Aborted);
+        if(ReferenceEquals(ownedHotControlOwner,node) && ownedHotControl.HasValue) ReleaseHotControl(ownedHotControl.Value);
+        if(popupTarget?.Node==node.Id.Key) ClosePopup();
+    }
 
     public void Dispose()
     {

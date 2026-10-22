@@ -91,8 +91,8 @@ public sealed class UiReactiveRuntime
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            // Failed branches are real recovery inputs. A successful attempt replaces these edges.
-            observer.RetainRecoveryDependencies(found);
+            // Recovery follows this attempt's actual reads, not the old value's obsolete branch.
+            observer.ReplaceDependencies(found);
             throw ex is UiReactiveFault failure ? failure.Through(observer.Name) : new UiReactiveFault(observer.Name, "evaluation", "Related input change or Retry", ex);
         }
         finally { scope?.Dispose(); Observer = previous; Reads = previousReads; ReadVersions = previousVersions; Current = previousRuntime; }
@@ -200,11 +200,6 @@ internal abstract class UiReactiveObserver : UiReactiveSource, IDisposable
         foreach (UiReactiveSource old in dependencies) if (!found.Contains(old)) old.Unsubscribe(this);
         foreach (UiReactiveSource item in found) if (!dependencies.Contains(item)) item.Subscribe(this);
         dependencies = found;
-    }
-    internal void RetainRecoveryDependencies(HashSet<UiReactiveSource> found)
-    {
-        found.UnionWith(dependencies);
-        ReplaceDependencies(found);
     }
     internal override void RetryFailure(HashSet<UiReactiveSource> visited)
     {

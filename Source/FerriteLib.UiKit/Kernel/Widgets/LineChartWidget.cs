@@ -8,7 +8,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Normalized line data and optional editable points. Capture and 2D sampling use the common pointer
 /// owner; optional explicit keys permit stable dynamic reordering while legacy index usage remains.
 /// </summary>
-public sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiPointerLayout
+public sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "chart/line";
     private const float DefaultHeight = 120f;
@@ -17,6 +17,9 @@ public sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDescr
     private const float HoveredPointSize = 9f;
     private const float HitRadius = 6f;
     private UiElementSpec spec = UiElementSpec.Empty;
+    private readonly UiRetainedPaint retained = new();
+    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
+    UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
     string IUiWidget.Kind => Kind;
 
     public static void Register()
@@ -133,6 +136,14 @@ public sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDescr
         for (int i = 1; i < points.Count; i++)
             DrawLine(ToRectPoint(points[i - 1], plotRect), ToRectPoint(points[i], plotRect), ctx.Theme[UiPaletteRole.Accent]);
         DrawPoints(plotRect, points, hoveredPoint, ctx.Theme);
+        retained.Capture(ctx,(r,c)=>
+        {
+            Rect lastPlot=PlotRect(r);
+            UiThemeDraw.Surface(lastPlot,c.Theme,c.Theme[UiPaletteRole.PanelSurface],c.Theme[UiPaletteRole.Border]);
+            DrawGrid(lastPlot,c.Theme);
+            for(int i=1;i<points.Count;i++) DrawLine(ToRectPoint(points[i-1],lastPlot),ToRectPoint(points[i],lastPlot),c.Theme[UiPaletteRole.Accent]);
+            DrawPoints(lastPlot,points,null,c.Theme);
+        });
     }
 
     private void HandleDrag(Rect plotRect, List<Vector2> points, HashSet<int>? editablePoints, UiWidgetContext ctx)

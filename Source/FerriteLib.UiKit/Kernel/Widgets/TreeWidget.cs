@@ -39,11 +39,14 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <see cref="UiTreeRow.Expanded"/>: both are the model's answers, re-read every pass.
 /// </para>
 /// </summary>
-internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout
+internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
 {
     internal const string Kind = "container/tree";
 
     private UiElementSpec spec = UiElementSpec.Empty;
+    private readonly UiRetainedPaint retained = new();
+    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
+    UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
 
@@ -113,6 +116,11 @@ internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
         List<UiTreeRow> rows = CollectRows(ctx, ReadBindKey());
         var images = new float[rows.Count];
         for (int i = 0; i < rows.Count; i++) images[i] = rows[i].Image == null ? 0 : rows[i].ImageSize.y > 0 ? rows[i].ImageSize.y : rows[i].Image!.height;
+        retained.SetMeasure(c=>CaptureImages(c,images));
+        return CaptureImages(ctx,images);
+    }
+    private UiMeasurement CaptureImages(UiWidgetContext ctx,float[] images)
+    {
         return new UiMeasurement(new UiMeasureInputs(numbers: new List<float>(images) { ReadRowHeight(ctx), ctx.Theme.Geometry.Padding }.ToArray()), () =>
         {
             float total = 0, rowHeight = ReadRowHeight(ctx);
@@ -186,6 +194,19 @@ internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
 
             if (band.yMax >= rect.yMax) break;
         }
+        retained.Capture(ctx,(r,c)=>
+        {
+            float paintY=r.y;
+            foreach(UiTreeRow row in rows)
+            {
+                float currentRowHeight=ReadRowHeight(c);
+                float h=UiRowBand.Measure(row,c.Theme,currentRowHeight);
+                Rect band=new(r.x,paintY,r.width,h);paintY+=h;
+                if(band.y>=r.yMax)break;
+                UiRowBand.Paint(row,band,c,currentRowHeight,style);
+                if(band.yMax>=r.yMax)break;
+            }
+        });
     }
 
     private float ReadRowHeight(UiWidgetContext ctx)

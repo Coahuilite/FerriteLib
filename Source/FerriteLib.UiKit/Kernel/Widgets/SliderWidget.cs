@@ -3,10 +3,13 @@ using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>Default range wrapper: shared behavior, measured label/track, typed request binding.</summary>
-public sealed class SliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout
+public sealed class SliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/slider";
     private UiElementSpec spec = UiElementSpec.Empty;
+    private readonly UiRetainedPaint retained = new();
+    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
+    UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
     string IUiWidget.Kind => Kind;
 
     public static void Register()
@@ -88,5 +91,11 @@ public sealed class SliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelled
         if (layout.LabelWidth > 0)
             UiThemeDraw.Label(new Rect(rect.x, rect.y, layout.LabelWidth, layout.Stacked ? layout.LabelHeight : rect.height), Label(ctx), ctx.Theme, style.Text, AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft);
         UiNative.PaintRange(track, ctx.Theme, range.Clamp(current), range.Min, range.Max);
+        retained.Capture(ctx, (r,c) =>
+        {
+            UiSliderLayout lastLayout=Layout(c,r.width);
+            if(lastLayout.LabelWidth>0) UiThemeDraw.Label(new Rect(r.x,r.y,lastLayout.LabelWidth,lastLayout.Stacked?lastLayout.LabelHeight:r.height),Label(c),c.Theme,style.Text,AtomVocabulary.TextFont(c),TextAnchor.MiddleLeft);
+            UiNative.PaintRange(TrackRect(r,c,lastLayout),c.Theme,range.Clamp(current),range.Min,range.Max);
+        });
     }
 }

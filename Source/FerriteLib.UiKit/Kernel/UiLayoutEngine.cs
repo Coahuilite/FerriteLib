@@ -2594,6 +2594,8 @@ public sealed partial class UiLayoutEngine
         catch (UiReactiveFault failure)
         {
             node.PresentationFault = failure; node.PresentationUnavailable = true;
+            UiMeasurement? retained = (widget as IUiRetainedDisplay)?.MeasureLast(ctx);
+            if (retained != null) return retained.Calculate();
             return RecoveryBandHeight; // a complete, unavailable placeholder, never a failed measurement result
         }
     }

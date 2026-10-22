@@ -26,7 +26,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// attribute already carries; a reserved help slot is deliberately NOT part of either look.
 /// </para>
 /// </summary>
-public sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout
+public sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/dropdown";
 
@@ -46,6 +46,9 @@ public sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabell
     private const float LabelWidth = 80f;
 
     private UiElementSpec spec = UiElementSpec.Empty;
+    private readonly UiRetainedPaint retained = new();
+    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
+    UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
 
@@ -227,6 +230,7 @@ public sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabell
         UiNative.DropdownButton(fieldRect, bindKey, ctx, (ctx.Node ?? ctx.Session.ActiveNode).Id.Key);
         if (!ctx.Session.IsActive) return;
         PaintLabelledField(rect, fieldRect, display, open || current.Length > 0, ctx);
+        retained.Capture(ctx, (r,c) => PaintLabelledField(r, ResolveField(r,c), display, open || current.Length > 0, c));
 
         string helpSink = OptionHelp.SinkKey(spec);
         if (ctx.Session.IsPopupOpen(bindKey, node))
@@ -293,6 +297,7 @@ public sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabell
                 AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft, singleLine: !shared.HasValue);
         }
         DrawField(field, display, selected, ctx.Theme, Looks.Resolve(spec).Value, AtomVocabulary.TextFont(ctx));
+
     }
     /// <summary>True when the resolved look is the selector field; the name is matched case-insensitively.</summary>
     private static bool IsSelector(string look)
@@ -340,6 +345,7 @@ public sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabell
         UiNative.DropdownButton(fieldRect, bindKey, ctx, (ctx.Node ?? ctx.Session.ActiveNode).Id.Key);
         if (!ctx.Session.IsActive) return;
         PaintLabelledField(rect, fieldRect, display, open || hasCurrent, ctx);
+        retained.Capture(ctx, (r,c) => PaintLabelledField(r, ResolveField(r,c), display, open || hasCurrent, c));
 
         string helpSink = OptionHelp.SinkKey(spec);
         if (ctx.Session.IsPopupOpen(bindKey, node))

@@ -115,11 +115,7 @@ public static class UiRowBand
         if (band.width <= 1f || band.height <= 1f)
             return;
         UiTheme theme = ctx.Theme;
-        float pad = theme.Geometry.Padding;
         Parts parts = ResolveParts(row, band, theme, rowHeight, layout);
-        float partSide = parts.Side;
-        float x = parts.ContentX;
-        float labelRight = parts.LabelRight;
         Rect marker = parts.Marker;
         Rect box = parts.Box;
         // Geometry feeds the shared behavior before paint. Only the actual part owner is pressed;
@@ -146,10 +142,18 @@ public static class UiRowBand
 
         if (!ctx.Session.IsActive)
             return;
-        bool armed = disclosure.Captured || check.Captured || body.Captured;
+        Paint(row,band,ctx,rowHeight,style,disclosure.Captured || check.Captured || body.Captured,UiNative.IsMouseOver(band,ctx),layout);
+    }
+    internal static void Paint(UiTreeRow row,Rect band,UiWidgetContext ctx,float rowHeight,UiResolvedStyle style,bool armed=false,bool hovered=false,UiRowBandLayout layout=default)
+    {
+        UiTheme theme=ctx.Theme;
+        float pad=theme.Geometry.Padding;
+        Parts parts=ResolveParts(row,band,theme,rowHeight,layout);
+        float partSide=parts.Side,x=parts.ContentX,labelRight=parts.LabelRight;
+        Rect marker=parts.Marker,box=parts.Box;
         if (armed)
             UiThemeDraw.Solid(band, theme.SelectedSurface.Fill);
-        else if (UiNative.IsMouseOver(band, ctx))
+        else if (hovered)
             UiThemeDraw.Solid(band, theme.HoverSurface.Fill);
         UiResolvedStyle ink = style;
         if (row.Selected)

@@ -60,8 +60,12 @@ public static class UiSessionGuard
         catch (UiReactiveFault failure)
         {
             node.PresentationFault = failure; node.PresentationUnavailable = true;
+            node.Selection = null;
+            ctx.Session.SuspendFailedInput(node);
             Text.Font = previousFont; GUI.color = previousColor;
-            UiThemeDraw.RecoveryBand(rect, ctx.Theme, failure.Identity);
+            if (widget is IUiRetainedDisplay last && last.PaintLast(rect, ctx))
+                UiThemeDraw.FailureMarker(rect, ctx.Theme, failure.Identity);
+            else UiThemeDraw.RecoveryBand(rect, ctx.Theme, failure.Identity);
         }
         catch (UiRequestFailure)
         {

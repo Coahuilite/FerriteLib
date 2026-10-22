@@ -8,7 +8,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// and writes through the typed <see cref = "IUiBindings"/>; no neutral command bridge.
 /// The typed value-binding key is the <c>Bind</c> attribute when present, otherwise the element Id.
 /// </summary>
-public sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiLayoutDiagnosticSource, IUiPointerLayout
+public sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiLayoutDiagnosticSource, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/stepper-slider";
 
@@ -23,6 +23,9 @@ public sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IUiL
     private const float Gap = 6f;
 
     private UiElementSpec spec = UiElementSpec.Empty;
+    private readonly UiRetainedPaint retained = new();
+    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
+    UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     public string KindName => Kind;
 
@@ -141,8 +144,18 @@ public sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IUiL
 
         DrawButton(minusRect, "−", ctx.Theme);
         DrawButton(plusRect, "+", ctx.Theme);
-        UiNative.PaintRange(sliderRect, ctx.Theme, ReadModel(), min, max);
+        float paintedValue=ReadModel();
+        UiNative.PaintRange(sliderRect, ctx.Theme, paintedValue, min, max);
         AtomVocabulary.PaintEditFeedback(fieldRect, ctx, editor);
+        retained.Capture(ctx,(r,c)=>
+        {
+            UiSliderLayout lastLabel=LabelLayout(c,r.width);
+            UiStepperLayout lastLayout=ControlLayout(c,r.width,r.height,lastLabel);
+            if(label.Length>0) UiThemeDraw.Label(new Rect(r.x,r.y,lastLabel.LabelWidth,lastLabel.Stacked?lastLabel.LabelHeight:lastLayout.Minus.Height),label,c.Theme,c.Theme[UiPaletteRole.Foreground],AtomVocabulary.TextFont(c));
+            DrawButton(Place(lastLayout.Minus,r),"−",c.Theme);DrawButton(Place(lastLayout.Plus,r),"+",c.Theme);
+            UiNative.PaintRange(Place(lastLayout.Range,r),c.Theme,paintedValue,min,max);
+            UiRetainedPaint.Field(Place(lastLayout.Field,r),c,editor.Draft);
+        });
     }
 
     UiLayoutDiagnostic? IUiLayoutDiagnosticSource.DiagnoseLayout(UiWidgetContext ctx, float allocatedHeight)

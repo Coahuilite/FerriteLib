@@ -6,11 +6,14 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Single-line or basic plain-text multiline native editing, with one instance-local neutral draft.
 /// Selection, clipboard and character composition belong to Verse/Unity, not to this wrapper.
 /// </summary>
-public sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout
+public sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/text-field";
 
     private UiElementSpec spec = UiElementSpec.Empty;
+    private readonly UiRetainedPaint retained = new();
+    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
+    UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
 
@@ -61,6 +64,11 @@ public sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabel
             UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
             if (node.ValueStates.TryGetValue(binding, out UiValueState? state) && state.Editor is IUiEditState edit && (edit.Focused || edit.Modified || edit.Conflict)) text = edit.Draft;
         }
+        retained.SetMeasure(c=>CaptureText(c,text,label,multiline));
+        return CaptureText(ctx,text,label,multiline);
+    }
+    private UiMeasurement CaptureText(UiWidgetContext ctx,string text,string label,bool multiline)
+    {
         return new UiMeasurement(new UiMeasureInputs(new[] { label, text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx), ctx.Theme.Geometry.Spacing, ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.RowHeight, ctx.Node?.SharedLabelWidth ?? 0 }, multiline || label.Length > 0), () =>
         {
             float declared = AtomVocabulary.ReadHeight(spec, 0);
@@ -104,6 +112,14 @@ public sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabel
         UiEditSession<string> editor = UiNative.Editor<string>(ctx, bindKey, value => value, Parse);
         AtomVocabulary.PaintEditFeedback(field, ctx, editor);
         DrawPlaceholder(field, editor.Draft, ctx, writable);
+        // Native input may have changed the reliable draft after this pass's measurement.
+        retained.SetMeasure(c => CaptureText(c,editor.Draft,AtomVocabulary.ResolveText(spec,c,"Label","LabelKey"),multiline));
+        retained.Capture(ctx, (r,c) =>
+        {
+            ResolveLabelBand(r,c,out Rect slot);
+            UiRetainedPaint.Field(slot,c,editor.Draft);
+            DrawLabel(r,c,style);
+        });
     }
 
     private static bool Parse(string text, out string value) { value = text; return true; }

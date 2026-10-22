@@ -6,13 +6,16 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Native numeric text editing over the common draft/model observation and finite numeric codec.
 /// Invalid or conflicting drafts remain local; accepted requests are not assumed business acceptance.
 /// </summary>
-public sealed class NumberFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout
+public sealed class NumberFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/number-field";
 
     private const string DefaultFormat = "0.##";
 
     private UiElementSpec spec = UiElementSpec.Empty;
+    private readonly UiRetainedPaint retained = new();
+    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
+    UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
 
@@ -80,8 +83,15 @@ public sealed class NumberFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLab
         if (!ctx.Session.IsActive) return;
         UiValueState state = ctx.Session.GetOrCreateValueState((ctx.Node ?? ctx.Session.ActiveNode).Id, bindKey);
         if (numeric.Parse(state.EditText, out float parsed)) state.FloatValue = parsed;
-        AtomVocabulary.PaintEditFeedback(field, ctx, UiNative.Editor<float>(ctx, bindKey, numeric.Format, numeric.Parse));
+        UiEditSession<float> retainedEditor = UiNative.Editor<float>(ctx,bindKey,numeric.Format,numeric.Parse);
+        AtomVocabulary.PaintEditFeedback(field, ctx, retainedEditor);
         DrawLabel(rect, ctx, style);
+        retained.Capture(ctx, (r,c) =>
+        {
+            ResolveLabelBand(r,c,out Rect slot);
+            UiRetainedPaint.Field(slot,c,retainedEditor.Draft);
+            DrawLabel(r,c,style);
+        });
     }
 
     /// <summary>
