@@ -9,7 +9,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// presentation observes that result and never recreates the activation rule.
 /// A missing command is diagnosed at host creation, not rendered as a dead control.
 /// </summary>
-public sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
+internal sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/button";
 

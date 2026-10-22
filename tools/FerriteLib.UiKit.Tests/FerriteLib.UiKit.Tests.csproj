@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj" />
+    <ProjectReference Include="../FerriteLib.UiKit.AuthorExamples/FerriteLib.UiKit.AuthorExamples.csproj" />
     <PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4871" />
 
     <!-- 桩项目的源码位于本项目目录树下，但它们是独立的桩程序集，不能参与本项目的编译。 -->

@@ -6,7 +6,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>
 /// Empty-state status text sharing native width measurement and effective environment typography.
 /// </summary>
-public sealed class EmptyStateWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiRetainedDisplay
+internal sealed class EmptyStateWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiRetainedDisplay
 {
     public const string Kind = "state/empty";
 

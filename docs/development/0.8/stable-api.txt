@@ -1,0 +1,1377 @@
+FerriteLib.UiKit.Kernel.FerriteLibVersion Boolean Require(System.Version, System.Version, System.String, System.String ByRef)
+FerriteLib.UiKit.Kernel.FerriteLibVersion System.String CarrierAssemblyName=FerriteLib.UiKit
+FerriteLib.UiKit.Kernel.FerriteLibVersion System.String Describe()
+FerriteLib.UiKit.Kernel.FerriteLibVersion System.Version Api
+FerriteLib.UiKit.Kernel.ITextMetrics Single MeasureText(System.String, FerriteLib.UiKit.Kernel.UiFont, Single)
+FerriteLib.UiKit.Kernel.ITextMetrics Single MeasureWidth(System.String, FerriteLib.UiKit.Kernel.UiFont)
+FerriteLib.UiKit.Kernel.IUiBindings Boolean CanExecute(System.String)
+FerriteLib.UiKit.Kernel.IUiBindings Boolean IsWritable(System.String)
+FerriteLib.UiKit.Kernel.IUiBindings Boolean TryGetBool(System.String, Boolean ByRef)
+FerriteLib.UiKit.Kernel.IUiBindings Boolean TryGet[T](System.String, T ByRef)
+FerriteLib.UiKit.Kernel.IUiBindings Boolean TryInvokeCommand(System.String)
+FerriteLib.UiKit.Kernel.IUiBindings FerriteLib.UiKit.Kernel.UiInvalidation GetInvalidation(System.String)
+FerriteLib.UiKit.Kernel.IUiBindings Int32 GetRevision(System.String)
+FerriteLib.UiKit.Kernel.IUiBindings System.Collections.Generic.IReadOnlyList`1[T] GetOptions[T](System.String)
+FerriteLib.UiKit.Kernel.IUiBindings T Get[T](System.String)
+FerriteLib.UiKit.Kernel.IUiBindings Void BindAction[T](System.String, System.Action`1[T], FerriteLib.UiKit.Kernel.UiInvalidation) defaults[invalidates=Everything]
+FerriteLib.UiKit.Kernel.IUiBindings Void BindCommand(System.String, System.Action, System.Func`1[System.Boolean], FerriteLib.UiKit.Kernel.UiInvalidation) defaults[canExecute=null,invalidates=Paint]
+FerriteLib.UiKit.Kernel.IUiBindings Void BindOptions[T](System.String, System.Func`1[System.Collections.Generic.IReadOnlyList`1[T]], FerriteLib.UiKit.Kernel.UiInvalidation) defaults[invalidates=Everything]
+FerriteLib.UiKit.Kernel.IUiBindings Void BindReadOnly[T](System.String, System.Func`1[T], FerriteLib.UiKit.Kernel.UiInvalidation) defaults[invalidates=Everything]
+FerriteLib.UiKit.Kernel.IUiBindings Void BindValue[T](System.String, System.Func`1[T], System.Action`1[T], FerriteLib.UiKit.Kernel.UiInvalidation) defaults[invalidates=Everything]
+FerriteLib.UiKit.Kernel.IUiBindings Void Invoke(System.String)
+FerriteLib.UiKit.Kernel.IUiBindings Void Invoke[T](System.String, T)
+FerriteLib.UiKit.Kernel.IUiBindings Void NotifyChanged(System.String[])
+FerriteLib.UiKit.Kernel.IUiBindings Void Set[T](System.String, T)
+FerriteLib.UiKit.Kernel.IUiBindings Void ValidateAction[T](System.String, System.String)
+FerriteLib.UiKit.Kernel.IUiBindings Void ValidateCommand(System.String, System.String)
+FerriteLib.UiKit.Kernel.IUiBindings Void ValidateOptions[T](System.String, System.String)
+FerriteLib.UiKit.Kernel.IUiBindings Void ValidateValue[T](System.String, System.String)
+FerriteLib.UiKit.Kernel.IUiDescriptiveWidget FerriteLib.UiKit.Kernel.UiDescription Describe(FerriteLib.UiKit.Kernel.UiWidgetContext)
+FerriteLib.UiKit.Kernel.IUiEditState Boolean get_Conflict()
+FerriteLib.UiKit.Kernel.IUiEditState Boolean get_Focused()
+FerriteLib.UiKit.Kernel.IUiEditState Boolean get_Modified()
+FerriteLib.UiKit.Kernel.IUiEditState Boolean get_Valid()
+FerriteLib.UiKit.Kernel.IUiEditState System.String get_Draft()
+FerriteLib.UiKit.Kernel.IUiEditState Void Suspend()
+FerriteLib.UiKit.Kernel.IUiLabelledWidget Single MeasureLabel(FerriteLib.UiKit.Kernel.UiWidgetContext)
+FerriteLib.UiKit.Kernel.IUiMainThread Boolean get_IsCurrent()
+FerriteLib.UiKit.Kernel.IUiMeasureParticipant FerriteLib.UiKit.Kernel.UiMeasurement CaptureMeasurement(FerriteLib.UiKit.Kernel.UiWidgetContext)
+FerriteLib.UiKit.Kernel.IUiPointerLayout System.Collections.Generic.IEnumerable`1[FerriteLib.UiKit.Kernel.UiPointerRegion] PointerRegions(FerriteLib.UiKit.Kernel.UiWidgetContext, FerriteLib.UiKit.Kernel.UiLayoutRect)
+FerriteLib.UiKit.Kernel.IUiPresentationDemand System.Collections.Generic.IEnumerable`1[System.String] PresentationKeys(FerriteLib.UiKit.Kernel.UiWidgetContext)
+FerriteLib.UiKit.Kernel.IUiTextMetricsEnvironment FerriteLib.UiKit.Kernel.UiMeasureInputs CaptureEnvironment(FerriteLib.UiKit.Kernel.UiFont)
+FerriteLib.UiKit.Kernel.IUiTimeSource Double get_NowSeconds()
+FerriteLib.UiKit.Kernel.IUiTranslation Int32 get_TranslationRevision()
+FerriteLib.UiKit.Kernel.IUiTranslation System.String Translate(System.String)
+FerriteLib.UiKit.Kernel.IUiTypedChoices Boolean AcceptsValue(System.String, System.Object)
+FerriteLib.UiKit.Kernel.IUiTypedChoices Boolean TryGetChoices(System.String, System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiChoice`1[System.Object]] ByRef)
+FerriteLib.UiKit.Kernel.IUiTypedChoices Boolean TryGetTypedValue(System.String, System.Object ByRef)
+FerriteLib.UiKit.Kernel.IUiTypedChoices Boolean TryGetValueType(System.String, System.Type ByRef)
+FerriteLib.UiKit.Kernel.IUiTypedChoices Boolean TrySetTypedValue(System.String, System.Object)
+FerriteLib.UiKit.Kernel.IUiWidget Single Measure(FerriteLib.UiKit.Kernel.UiWidgetContext)
+FerriteLib.UiKit.Kernel.IUiWidget System.String get_Kind()
+FerriteLib.UiKit.Kernel.IUiWidget Void Configure(FerriteLib.UiKit.Kernel.UiElementSpec)
+FerriteLib.UiKit.Kernel.IUiWidget Void Draw(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiWidgetContext)
+FerriteLib.UiKit.Kernel.IUiWidget Void Validate(FerriteLib.UiKit.Kernel.IUiBindings, System.String)
+FerriteLib.UiKit.Kernel.UiBindingPresentation FerriteLib.UiKit.Kernel.UiPresentationStatus GetStatus(System.String, Boolean) defaults[options=False]
+FerriteLib.UiKit.Kernel.UiBindingPresentation Int32 get_Revision()
+FerriteLib.UiKit.Kernel.UiBindingPresentation System.IDisposable Enter()
+FerriteLib.UiKit.Kernel.UiBindingPresentation Void .ctor(FerriteLib.UiKit.Kernel.UiBindings)
+FerriteLib.UiKit.Kernel.UiBindingPresentation Void Dispose()
+FerriteLib.UiKit.Kernel.UiBindingPresentation Void Retry(System.String, Boolean) defaults[options=False]
+FerriteLib.UiKit.Kernel.UiBindingPresentation Void Synchronize()
+FerriteLib.UiKit.Kernel.UiBindingPresentation implements System.IDisposable
+FerriteLib.UiKit.Kernel.UiBindings Boolean AcceptsValue(System.String, System.Object)
+FerriteLib.UiKit.Kernel.UiBindings Boolean CanExecute(System.String)
+FerriteLib.UiKit.Kernel.UiBindings Boolean IsWritable(System.String)
+FerriteLib.UiKit.Kernel.UiBindings Boolean TryGetBool(System.String, Boolean ByRef)
+FerriteLib.UiKit.Kernel.UiBindings Boolean TryGetChoices(System.String, System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiChoice`1[System.Object]] ByRef)
+FerriteLib.UiKit.Kernel.UiBindings Boolean TryGetTypedValue(System.String, System.Object ByRef)
+FerriteLib.UiKit.Kernel.UiBindings Boolean TryGetValueType(System.String, System.Type ByRef)
+FerriteLib.UiKit.Kernel.UiBindings Boolean TryGet[T](System.String, T ByRef)
+FerriteLib.UiKit.Kernel.UiBindings Boolean TryInvokeCommand(System.String)
+FerriteLib.UiKit.Kernel.UiBindings Boolean TrySetTypedValue(System.String, System.Object)
+FerriteLib.UiKit.Kernel.UiBindings FerriteLib.UiKit.Kernel.UiBindingPresentation CreatePresentation()
+FerriteLib.UiKit.Kernel.UiBindings FerriteLib.UiKit.Kernel.UiInvalidation GetInvalidation(System.String)
+FerriteLib.UiKit.Kernel.UiBindings FerriteLib.UiKit.Kernel.UiReactiveRuntime get_Reactive()
+FerriteLib.UiKit.Kernel.UiBindings Int32 GetRevision(System.String)
+FerriteLib.UiKit.Kernel.UiBindings System.Collections.Generic.IReadOnlyList`1[T] GetOptions[T](System.String)
+FerriteLib.UiKit.Kernel.UiBindings System.IDisposable BeginOperation()
+FerriteLib.UiKit.Kernel.UiBindings System.String ActiveTabKey=active-tab
+FerriteLib.UiKit.Kernel.UiBindings T Get[T](System.String)
+FerriteLib.UiKit.Kernel.UiBindings Void .ctor()
+FerriteLib.UiKit.Kernel.UiBindings Void .ctor(FerriteLib.UiKit.Kernel.UiReactiveRuntime)
+FerriteLib.UiKit.Kernel.UiBindings Void BindAction[T](System.String, System.Action`1[T], FerriteLib.UiKit.Kernel.UiInvalidation) defaults[invalidates=Everything]
+FerriteLib.UiKit.Kernel.UiBindings Void BindCommand(System.String, System.Action, System.Func`1[System.Boolean], FerriteLib.UiKit.Kernel.UiInvalidation) defaults[canExecute=null,invalidates=Paint]
+FerriteLib.UiKit.Kernel.UiBindings Void BindOptions[T](System.String, System.Func`1[System.Collections.Generic.IReadOnlyList`1[T]], FerriteLib.UiKit.Kernel.UiInvalidation) defaults[invalidates=Everything]
+FerriteLib.UiKit.Kernel.UiBindings Void BindReadOnly[T](System.String, System.Func`1[T], FerriteLib.UiKit.Kernel.UiInvalidation) defaults[invalidates=Everything]
+FerriteLib.UiKit.Kernel.UiBindings Void BindTrackedOptions[T](System.String, System.Func`1[System.Collections.Generic.IReadOnlyList`1[T]], System.Func`3[T,T,System.Boolean])
+FerriteLib.UiKit.Kernel.UiBindings Void BindTracked[T](System.String, System.Func`1[T], System.Action`1[T], System.Func`3[T,T,System.Boolean]) defaults[set=null,equal=null]
+FerriteLib.UiKit.Kernel.UiBindings Void BindValue[T](System.String, System.Func`1[T], System.Action`1[T], FerriteLib.UiKit.Kernel.UiInvalidation) defaults[invalidates=Everything]
+FerriteLib.UiKit.Kernel.UiBindings Void Invoke(System.String)
+FerriteLib.UiKit.Kernel.UiBindings Void Invoke[T](System.String, T)
+FerriteLib.UiKit.Kernel.UiBindings Void NotifyChanged(System.String[])
+FerriteLib.UiKit.Kernel.UiBindings Void Set[T](System.String, T)
+FerriteLib.UiKit.Kernel.UiBindings Void ValidateAction[T](System.String, System.String)
+FerriteLib.UiKit.Kernel.UiBindings Void ValidateCommand(System.String, System.String)
+FerriteLib.UiKit.Kernel.UiBindings Void ValidateOptions[T](System.String, System.String)
+FerriteLib.UiKit.Kernel.UiBindings Void ValidateValue[T](System.String, System.String)
+FerriteLib.UiKit.Kernel.UiBindings implements FerriteLib.UiKit.Kernel.IUiBindings
+FerriteLib.UiKit.Kernel.UiBindings implements FerriteLib.UiKit.Kernel.IUiTypedChoices
+FerriteLib.UiKit.Kernel.UiChartPointChange Int32 Index
+FerriteLib.UiKit.Kernel.UiChartPointChange Single X
+FerriteLib.UiKit.Kernel.UiChartPointChange Single Y
+FerriteLib.UiKit.Kernel.UiChartPointChange System.String get_Key()
+FerriteLib.UiKit.Kernel.UiChartPointChange Void .ctor(Int32, Single, Single)
+FerriteLib.UiKit.Kernel.UiChartPointChange Void .ctor(Int32, Single, Single, System.String)
+FerriteLib.UiKit.Kernel.UiChoice`1 System.String get_Text()
+FerriteLib.UiKit.Kernel.UiChoice`1 T get_Value()
+FerriteLib.UiKit.Kernel.UiChoice`1 Void .ctor(System.String, T)
+FerriteLib.UiKit.Kernel.UiColour Boolean Equals(FerriteLib.UiKit.Kernel.UiColour)
+FerriteLib.UiKit.Kernel.UiColour Boolean Equals(System.Object)
+FerriteLib.UiKit.Kernel.UiColour Boolean TryParse(System.String, FerriteLib.UiKit.Kernel.UiColour ByRef)
+FerriteLib.UiKit.Kernel.UiColour Boolean op_Equality(FerriteLib.UiKit.Kernel.UiColour, FerriteLib.UiKit.Kernel.UiColour)
+FerriteLib.UiKit.Kernel.UiColour Boolean op_Inequality(FerriteLib.UiKit.Kernel.UiColour, FerriteLib.UiKit.Kernel.UiColour)
+FerriteLib.UiKit.Kernel.UiColour FerriteLib.UiKit.Kernel.UiColour WithAlpha(Single)
+FerriteLib.UiKit.Kernel.UiColour Int32 GetHashCode()
+FerriteLib.UiKit.Kernel.UiColour Single get_Alpha()
+FerriteLib.UiKit.Kernel.UiColour Single get_Blue()
+FerriteLib.UiKit.Kernel.UiColour Single get_Green()
+FerriteLib.UiKit.Kernel.UiColour Single get_Red()
+FerriteLib.UiKit.Kernel.UiColour Void .ctor(Single, Single, Single, Single) defaults[alpha=1]
+FerriteLib.UiKit.Kernel.UiColour implements System.IEquatable`1[FerriteLib.UiKit.Kernel.UiColour]
+FerriteLib.UiKit.Kernel.UiContractException System.String get_ElementId()
+FerriteLib.UiKit.Kernel.UiContractException System.String get_ElementPath()
+FerriteLib.UiKit.Kernel.UiContractException System.String get_Kind()
+FerriteLib.UiKit.Kernel.UiContractException System.String get_Scope()
+FerriteLib.UiKit.Kernel.UiContractException Void .ctor(System.String, System.String, System.String, System.String, System.String, System.Exception) defaults[innerException=null]
+FerriteLib.UiKit.Kernel.UiContractException implements System.Runtime.InteropServices._Exception
+FerriteLib.UiKit.Kernel.UiContractException implements System.Runtime.Serialization.ISerializable
+FerriteLib.UiKit.Kernel.UiDensity Single get_Gap()
+FerriteLib.UiKit.Kernel.UiDensity Single get_Hairline()
+FerriteLib.UiKit.Kernel.UiDensity Single get_Padding()
+FerriteLib.UiKit.Kernel.UiDensity Single get_RowHeight()
+FerriteLib.UiKit.Kernel.UiDensity Single get_Spacing()
+FerriteLib.UiKit.Kernel.UiDensity Void .ctor(Single, Single, Single, Single, Single) defaults[hairline=1]
+FerriteLib.UiKit.Kernel.UiDescription FerriteLib.UiKit.Kernel.UiDescriptionRole get_Role()
+FerriteLib.UiKit.Kernel.UiDescription System.Nullable`1[FerriteLib.UiKit.Kernel.UiRangeObservation] get_Range()
+FerriteLib.UiKit.Kernel.UiDescription System.Nullable`1[System.Boolean] get_Available()
+FerriteLib.UiKit.Kernel.UiDescription System.Nullable`1[System.Int32] get_Count()
+FerriteLib.UiKit.Kernel.UiDescription System.String get_Name()
+FerriteLib.UiKit.Kernel.UiDescription System.String get_Text()
+FerriteLib.UiKit.Kernel.UiDescription System.String get_UnknownReason()
+FerriteLib.UiKit.Kernel.UiDescription Void .ctor(FerriteLib.UiKit.Kernel.UiDescriptionRole, System.String, System.String, System.Nullable`1[FerriteLib.UiKit.Kernel.UiRangeObservation], System.Nullable`1[System.Boolean], System.Nullable`1[System.Int32], System.String) defaults[name=,text=,range=null,available=null,count=null,unknownReason=null]
+FerriteLib.UiKit.Kernel.UiDescriptionRole FerriteLib.UiKit.Kernel.UiDescriptionRole Chart=6
+FerriteLib.UiKit.Kernel.UiDescriptionRole FerriteLib.UiKit.Kernel.UiDescriptionRole Decoration=4
+FerriteLib.UiKit.Kernel.UiDescriptionRole FerriteLib.UiKit.Kernel.UiDescriptionRole Heading=1
+FerriteLib.UiKit.Kernel.UiDescriptionRole FerriteLib.UiKit.Kernel.UiDescriptionRole Image=3
+FerriteLib.UiKit.Kernel.UiDescriptionRole FerriteLib.UiKit.Kernel.UiDescriptionRole Progress=5
+FerriteLib.UiKit.Kernel.UiDescriptionRole FerriteLib.UiKit.Kernel.UiDescriptionRole Status=2
+FerriteLib.UiKit.Kernel.UiDescriptionRole FerriteLib.UiKit.Kernel.UiDescriptionRole Text=0
+FerriteLib.UiKit.Kernel.UiDescriptionRole Int32 value__
+FerriteLib.UiKit.Kernel.UiDescriptionRole implements System.IComparable
+FerriteLib.UiKit.Kernel.UiDescriptionRole implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiDescriptionRole implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiDiagnosticEvent FerriteLib.UiKit.Kernel.UiDiagnosticKind get_Kind()
+FerriteLib.UiKit.Kernel.UiDiagnosticEvent FerriteLib.UiKit.Kernel.UiNodeId get_Node()
+FerriteLib.UiKit.Kernel.UiDiagnosticEvent FerriteLib.UiKit.Kernel.UiReloadReport get_Report()
+FerriteLib.UiKit.Kernel.UiDiagnosticEvent Int32 get_SessionId()
+FerriteLib.UiKit.Kernel.UiDiagnosticEvent Int64 get_Sequence()
+FerriteLib.UiKit.Kernel.UiDiagnosticEvent System.Nullable`1[FerriteLib.UiKit.Kernel.UiDiagnosticTiming] get_Timing()
+FerriteLib.UiKit.Kernel.UiDiagnosticEvent System.Nullable`1[FerriteLib.UiKit.Kernel.UiOverflowReport] get_Overflow()
+FerriteLib.UiKit.Kernel.UiDiagnosticEvent System.Nullable`1[FerriteLib.UiKit.Kernel.UiStyleFallbackReport] get_Fallback()
+FerriteLib.UiKit.Kernel.UiDiagnosticEvent System.String ToString()
+FerriteLib.UiKit.Kernel.UiDiagnosticEvent System.String get_Code()
+FerriteLib.UiKit.Kernel.UiDiagnosticEvent System.String get_Element()
+FerriteLib.UiKit.Kernel.UiDiagnosticEvent System.String get_ElementPath()
+FerriteLib.UiKit.Kernel.UiDiagnosticEvent System.String get_File()
+FerriteLib.UiKit.Kernel.UiDiagnosticEvent System.String get_Host()
+FerriteLib.UiKit.Kernel.UiDiagnosticEvent System.String get_Key()
+FerriteLib.UiKit.Kernel.UiDiagnosticEvent System.String get_Reason()
+FerriteLib.UiKit.Kernel.UiDiagnosticKind FerriteLib.UiKit.Kernel.UiDiagnosticKind Fit=1
+FerriteLib.UiKit.Kernel.UiDiagnosticKind FerriteLib.UiKit.Kernel.UiDiagnosticKind Recovery=2
+FerriteLib.UiKit.Kernel.UiDiagnosticKind FerriteLib.UiKit.Kernel.UiDiagnosticKind Reload=0
+FerriteLib.UiKit.Kernel.UiDiagnosticKind FerriteLib.UiKit.Kernel.UiDiagnosticKind Timing=3
+FerriteLib.UiKit.Kernel.UiDiagnosticKind Int32 value__
+FerriteLib.UiKit.Kernel.UiDiagnosticKind implements System.IComparable
+FerriteLib.UiKit.Kernel.UiDiagnosticKind implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiDiagnosticKind implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription Boolean TryGetLatest(FerriteLib.UiKit.Kernel.UiDiagnosticEvent ByRef)
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription Boolean TryGetLatest(FerriteLib.UiKit.Kernel.UiDiagnosticKind, FerriteLib.UiKit.Kernel.UiDiagnosticEvent ByRef)
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription Boolean get_IsActive()
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription Boolean get_TimingEnabled()
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription Int32 CountOf(FerriteLib.UiKit.Kernel.UiDiagnosticKind)
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription Int32 get_Budget()
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription Int32 get_Count()
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription Int32 get_SessionId()
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription Int32 get_TimingSampleFrames()
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription Int64 get_Dropped()
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription Int64 get_Published()
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription Int64 get_Suppressed()
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiDiagnosticEvent] Snapshot()
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription System.String get_Host()
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription Void Clear()
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription Void Dispose()
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription Void set_TimingEnabled(Boolean)
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription Void set_TimingSampleFrames(Int32)
+FerriteLib.UiKit.Kernel.UiDiagnosticSubscription implements System.IDisposable
+FerriteLib.UiKit.Kernel.UiDiagnosticTiming Double get_AverageMilliseconds()
+FerriteLib.UiKit.Kernel.UiDiagnosticTiming Double get_MaxMilliseconds()
+FerriteLib.UiKit.Kernel.UiDiagnosticTiming Double get_TotalMilliseconds()
+FerriteLib.UiKit.Kernel.UiDiagnosticTiming Int32 get_Samples()
+FerriteLib.UiKit.Kernel.UiDiagnosticTiming System.String ToString()
+FerriteLib.UiKit.Kernel.UiDiagnosticTiming System.String get_Name()
+FerriteLib.UiKit.Kernel.UiDocumentKind FerriteLib.UiKit.Kernel.UiDocumentKind Layout=0
+FerriteLib.UiKit.Kernel.UiDocumentKind FerriteLib.UiKit.Kernel.UiDocumentKind Style=1
+FerriteLib.UiKit.Kernel.UiDocumentKind Int32 value__
+FerriteLib.UiKit.Kernel.UiDocumentKind implements System.IComparable
+FerriteLib.UiKit.Kernel.UiDocumentKind implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiDocumentKind implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiDocumentService Boolean Add(FerriteLib.UiKit.Kernel.UiDocumentSource, System.String) defaults[embeddedFallbackXml=]
+FerriteLib.UiKit.Kernel.UiDocumentService Boolean Attach(FerriteLib.UiKit.Kernel.UiHost, System.String, System.String) defaults[styleId=null]
+FerriteLib.UiKit.Kernel.UiDocumentService Boolean IsWatching(System.String)
+FerriteLib.UiKit.Kernel.UiDocumentService Boolean Pump()
+FerriteLib.UiKit.Kernel.UiDocumentService Boolean Remove(System.String)
+FerriteLib.UiKit.Kernel.UiDocumentService Boolean Signal(System.String)
+FerriteLib.UiKit.Kernel.UiDocumentService Boolean get_AutoWatch()
+FerriteLib.UiKit.Kernel.UiDocumentService Boolean get_DefaultAutoWatch()
+FerriteLib.UiKit.Kernel.UiDocumentService Boolean get_HasPending()
+FerriteLib.UiKit.Kernel.UiDocumentService Boolean get_IsDisposed()
+FerriteLib.UiKit.Kernel.UiDocumentService FerriteLib.UiKit.Kernel.IUiTimeSource get_TimeSource()
+FerriteLib.UiKit.Kernel.UiDocumentService FerriteLib.UiKit.Kernel.UiReloadPolicy get_Policy()
+FerriteLib.UiKit.Kernel.UiDocumentService FerriteLib.UiKit.Kernel.UiReloadReport Reload(System.String)
+FerriteLib.UiKit.Kernel.UiDocumentService FerriteLib.UiKit.Kernel.UiReloadReport get_LastReport()
+FerriteLib.UiKit.Kernel.UiDocumentService FerriteLib.UiKit.Kernel.UiReloadSchedulerState get_SchedulerState()
+FerriteLib.UiKit.Kernel.UiDocumentService Int32 MaxDependencies=256
+FerriteLib.UiKit.Kernel.UiDocumentService Int32 MaxDocumentBytes=1048576
+FerriteLib.UiKit.Kernel.UiDocumentService Int32 MaxDocuments=64
+FerriteLib.UiKit.Kernel.UiDocumentService Int32 MaxReports=32
+FerriteLib.UiKit.Kernel.UiDocumentService Int32 get_DependencyCount()
+FerriteLib.UiKit.Kernel.UiDocumentService Int32 get_DocumentCount()
+FerriteLib.UiKit.Kernel.UiDocumentService System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiReloadReport] ReloadAll()
+FerriteLib.UiKit.Kernel.UiDocumentService System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiReloadReport] get_Reports()
+FerriteLib.UiKit.Kernel.UiDocumentService Void .ctor(System.Nullable`1[System.Boolean], FerriteLib.UiKit.Kernel.UiReloadPolicy, FerriteLib.UiKit.Kernel.IUiTimeSource) defaults[autoWatch=null,policy=null,timeSource=null]
+FerriteLib.UiKit.Kernel.UiDocumentService Void Detach(FerriteLib.UiKit.Kernel.UiHost)
+FerriteLib.UiKit.Kernel.UiDocumentService Void Dispose()
+FerriteLib.UiKit.Kernel.UiDocumentService Void set_AutoWatch(Boolean)
+FerriteLib.UiKit.Kernel.UiDocumentService implements System.IDisposable
+FerriteLib.UiKit.Kernel.UiDocumentSource FerriteLib.UiKit.Kernel.UiDocumentKind get_Kind()
+FerriteLib.UiKit.Kernel.UiDocumentSource System.String ToString()
+FerriteLib.UiKit.Kernel.UiDocumentSource System.String get_Id()
+FerriteLib.UiKit.Kernel.UiDocumentSource System.String get_Path()
+FerriteLib.UiKit.Kernel.UiDocumentSource Void .ctor(System.String, FerriteLib.UiKit.Kernel.UiDocumentKind, System.String)
+FerriteLib.UiKit.Kernel.UiEditParser`1 Boolean EndInvoke(T ByRef, System.IAsyncResult)
+FerriteLib.UiKit.Kernel.UiEditParser`1 Boolean Invoke(System.String, T ByRef)
+FerriteLib.UiKit.Kernel.UiEditParser`1 System.IAsyncResult BeginInvoke(System.String, T ByRef, System.AsyncCallback, System.Object)
+FerriteLib.UiKit.Kernel.UiEditParser`1 Void .ctor(System.Object, IntPtr)
+FerriteLib.UiKit.Kernel.UiEditParser`1 implements System.ICloneable
+FerriteLib.UiKit.Kernel.UiEditParser`1 implements System.Runtime.Serialization.ISerializable
+FerriteLib.UiKit.Kernel.UiEditSession`1 Boolean Confirm(Boolean, System.Action`1[T], System.Func`1[T])
+FerriteLib.UiKit.Kernel.UiEditSession`1 Boolean TryStepBase(T, T ByRef)
+FerriteLib.UiKit.Kernel.UiEditSession`1 Boolean get_Conflict()
+FerriteLib.UiKit.Kernel.UiEditSession`1 Boolean get_Focused()
+FerriteLib.UiKit.Kernel.UiEditSession`1 Boolean get_HasDraft()
+FerriteLib.UiKit.Kernel.UiEditSession`1 Boolean get_Modified()
+FerriteLib.UiKit.Kernel.UiEditSession`1 Boolean get_Valid()
+FerriteLib.UiKit.Kernel.UiEditSession`1 System.String get_Draft()
+FerriteLib.UiKit.Kernel.UiEditSession`1 Void .ctor(System.Func`2[T,System.String], FerriteLib.UiKit.Kernel.UiEditParser`1[T])
+FerriteLib.UiKit.Kernel.UiEditSession`1 Void Cancel(T)
+FerriteLib.UiKit.Kernel.UiEditSession`1 Void Configure(System.Func`2[T,System.String], FerriteLib.UiKit.Kernel.UiEditParser`1[T])
+FerriteLib.UiKit.Kernel.UiEditSession`1 Void Focus()
+FerriteLib.UiKit.Kernel.UiEditSession`1 Void Input(System.String, Boolean, Boolean, Boolean, System.Action`1[T], System.Func`1[T])
+FerriteLib.UiKit.Kernel.UiEditSession`1 Void Observe(T)
+FerriteLib.UiKit.Kernel.UiEditSession`1 Void Suspend()
+FerriteLib.UiKit.Kernel.UiEditSession`1 Void TakeOver(T, System.Action`1[T], System.Func`1[T])
+FerriteLib.UiKit.Kernel.UiEditSession`1 implements FerriteLib.UiKit.Kernel.IUiEditState
+FerriteLib.UiKit.Kernel.UiElementProperties FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1[FerriteLib.UiKit.Kernel.UiDensity] get_Density()
+FerriteLib.UiKit.Kernel.UiElementProperties FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1[FerriteLib.UiKit.Kernel.UiDensity] get_LocalDensity()
+FerriteLib.UiKit.Kernel.UiElementProperties FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1[FerriteLib.UiKit.Kernel.UiFont] get_Font()
+FerriteLib.UiKit.Kernel.UiElementProperties FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1[FerriteLib.UiKit.Kernel.UiFont] get_LocalFont()
+FerriteLib.UiKit.Kernel.UiElementProperties FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1[System.Nullable`1[FerriteLib.UiKit.Kernel.UiColour]] LocalPalette(FerriteLib.UiKit.Kernel.UiPaletteRole)
+FerriteLib.UiKit.Kernel.UiElementProperties FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1[System.Nullable`1[FerriteLib.UiKit.Kernel.UiColour]] Palette(FerriteLib.UiKit.Kernel.UiPaletteRole)
+FerriteLib.UiKit.Kernel.UiElementProperties FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1[System.Single] LocalMetric(System.String)
+FerriteLib.UiKit.Kernel.UiElementProperties FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1[System.Single] Metric(System.String)
+FerriteLib.UiKit.Kernel.UiElementProperties FerriteLib.UiKit.Kernel.UiResolvedProperty`1[FerriteLib.UiKit.Kernel.UiDensity] get_ResolvedDensity()
+FerriteLib.UiKit.Kernel.UiElementProperties FerriteLib.UiKit.Kernel.UiResolvedProperty`1[FerriteLib.UiKit.Kernel.UiFont] get_ResolvedFont()
+FerriteLib.UiKit.Kernel.UiElementProperties System.Collections.Generic.IReadOnlyDictionary`2[System.String,FerriteLib.UiKit.Kernel.UiResolvedProperty`1[System.Nullable`1[FerriteLib.UiKit.Kernel.UiColour]]] get_ResolvedColours()
+FerriteLib.UiKit.Kernel.UiElementProperties System.Collections.Generic.IReadOnlyDictionary`2[System.String,FerriteLib.UiKit.Kernel.UiResolvedProperty`1[System.Single]] get_ResolvedMetrics()
+FerriteLib.UiKit.Kernel.UiElementProperties System.Collections.Generic.IReadOnlyList`1[System.String] get_ColourNames()
+FerriteLib.UiKit.Kernel.UiElementSpec Boolean TryGetAttribute(System.String, System.String ByRef)
+FerriteLib.UiKit.Kernel.UiElementSpec FerriteLib.UiKit.Kernel.UiElementSpec get_Empty()
+FerriteLib.UiKit.Kernel.UiElementSpec System.Collections.Generic.IReadOnlyDictionary`2[System.String,System.String] get_Attributes()
+FerriteLib.UiKit.Kernel.UiElementSpec System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiElementSpec] get_Children()
+FerriteLib.UiKit.Kernel.UiElementSpec System.String get_Id()
+FerriteLib.UiKit.Kernel.UiElementSpec System.String get_Kind()
+FerriteLib.UiKit.Kernel.UiElementSpec Void .ctor(System.String, System.String, System.Collections.Generic.IReadOnlyDictionary`2[System.String,System.String], System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiElementSpec]) defaults[attributes=null,children=null]
+FerriteLib.UiKit.Kernel.UiEmphasis FerriteLib.UiKit.Kernel.UiEmphasis Muted=1
+FerriteLib.UiKit.Kernel.UiEmphasis FerriteLib.UiKit.Kernel.UiEmphasis Normal=0
+FerriteLib.UiKit.Kernel.UiEmphasis Int32 value__
+FerriteLib.UiKit.Kernel.UiEmphasis implements System.IComparable
+FerriteLib.UiKit.Kernel.UiEmphasis implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiEmphasis implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiFitAudit Boolean get_Enabled()
+FerriteLib.UiKit.Kernel.UiFitAudit Boolean get_Saturated()
+FerriteLib.UiKit.Kernel.UiFitAudit Int32 MaxReports=48
+FerriteLib.UiKit.Kernel.UiFitAudit Int32 get_ReportedCount()
+FerriteLib.UiKit.Kernel.UiFitAudit Int32 get_StyleFallbackCount()
+FerriteLib.UiKit.Kernel.UiFitAudit System.String get_LastStyleFallbackDiagnostic()
+FerriteLib.UiKit.Kernel.UiFitAudit Void Attach(FerriteLib.UiKit.Kernel.ITextMetrics, System.Action`1[FerriteLib.UiKit.Kernel.UiOverflowReport])
+FerriteLib.UiKit.Kernel.UiFitAudit Void AttachStyleFallback(System.Action`1[FerriteLib.UiKit.Kernel.UiStyleFallbackReport])
+FerriteLib.UiKit.Kernel.UiFitAudit Void BeginElement(System.String)
+FerriteLib.UiKit.Kernel.UiFitAudit Void Check(UnityEngine.Rect, System.String, FerriteLib.UiKit.Kernel.UiFont, Boolean)
+FerriteLib.UiKit.Kernel.UiFitAudit Void Detach()
+FerriteLib.UiKit.Kernel.UiFitAudit Void EndElement()
+FerriteLib.UiKit.Kernel.UiFitAudit Void Reset()
+FerriteLib.UiKit.Kernel.UiFitAudit Void set_Enabled(Boolean)
+FerriteLib.UiKit.Kernel.UiFocusPolicy FerriteLib.UiKit.Kernel.UiFocusPolicy FollowClicks=0
+FerriteLib.UiKit.Kernel.UiFocusPolicy FerriteLib.UiKit.Kernel.UiFocusPolicy Manual=2
+FerriteLib.UiKit.Kernel.UiFocusPolicy FerriteLib.UiKit.Kernel.UiFocusPolicy OpenOnly=1
+FerriteLib.UiKit.Kernel.UiFocusPolicy Int32 value__
+FerriteLib.UiKit.Kernel.UiFocusPolicy implements System.IComparable
+FerriteLib.UiKit.Kernel.UiFocusPolicy implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiFocusPolicy implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiFont FerriteLib.UiKit.Kernel.UiFont Medium=2
+FerriteLib.UiKit.Kernel.UiFont FerriteLib.UiKit.Kernel.UiFont Small=1
+FerriteLib.UiKit.Kernel.UiFont FerriteLib.UiKit.Kernel.UiFont Tiny=0
+FerriteLib.UiKit.Kernel.UiFont Int32 value__
+FerriteLib.UiKit.Kernel.UiFont implements System.IComparable
+FerriteLib.UiKit.Kernel.UiFont implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiFont implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiGeometry Boolean Equals(FerriteLib.UiKit.Kernel.UiGeometry)
+FerriteLib.UiKit.Kernel.UiGeometry Boolean Equals(System.Object)
+FerriteLib.UiKit.Kernel.UiGeometry Boolean op_Equality(FerriteLib.UiKit.Kernel.UiGeometry, FerriteLib.UiKit.Kernel.UiGeometry)
+FerriteLib.UiKit.Kernel.UiGeometry Boolean op_Inequality(FerriteLib.UiKit.Kernel.UiGeometry, FerriteLib.UiKit.Kernel.UiGeometry)
+FerriteLib.UiKit.Kernel.UiGeometry FerriteLib.UiKit.Kernel.UiGeometry get_Default()
+FerriteLib.UiKit.Kernel.UiGeometry Int32 GetHashCode()
+FerriteLib.UiKit.Kernel.UiGeometry Single get_Gap()
+FerriteLib.UiKit.Kernel.UiGeometry Single get_Hairline()
+FerriteLib.UiKit.Kernel.UiGeometry Single get_Padding()
+FerriteLib.UiKit.Kernel.UiGeometry Single get_RowHeight()
+FerriteLib.UiKit.Kernel.UiGeometry Single get_Spacing()
+FerriteLib.UiKit.Kernel.UiGeometry Void .ctor(Single, Single, Single, Single, Single)
+FerriteLib.UiKit.Kernel.UiGeometry implements System.IEquatable`1[FerriteLib.UiKit.Kernel.UiGeometry]
+FerriteLib.UiKit.Kernel.UiHitGeometry Boolean Contains(Single, Single)
+FerriteLib.UiKit.Kernel.UiHitGeometry Boolean get_CircularHit()
+FerriteLib.UiKit.Kernel.UiHitGeometry Boolean get_IsValid()
+FerriteLib.UiKit.Kernel.UiHitGeometry Single get_Height()
+FerriteLib.UiKit.Kernel.UiHitGeometry Single get_TravelLength()
+FerriteLib.UiKit.Kernel.UiHitGeometry Single get_TravelStart()
+FerriteLib.UiKit.Kernel.UiHitGeometry Single get_VerticalLength()
+FerriteLib.UiKit.Kernel.UiHitGeometry Single get_VerticalStart()
+FerriteLib.UiKit.Kernel.UiHitGeometry Single get_Width()
+FerriteLib.UiKit.Kernel.UiHitGeometry Single get_X()
+FerriteLib.UiKit.Kernel.UiHitGeometry Single get_Y()
+FerriteLib.UiKit.Kernel.UiHitGeometry Void .ctor(Single, Single, Single, Single)
+FerriteLib.UiKit.Kernel.UiHitGeometry Void .ctor(Single, Single, Single, Single, Single, Single)
+FerriteLib.UiKit.Kernel.UiHitGeometry Void .ctor(Single, Single, Single, Single, Single, Single, Single, Single)
+FerriteLib.UiKit.Kernel.UiHitGeometry Void .ctor(Single, Single, Single, Single, Single, Single, Single, Single, Boolean)
+FerriteLib.UiKit.Kernel.UiHost Boolean TryHandleAccept()
+FerriteLib.UiKit.Kernel.UiHost Boolean TryHandleCancel()
+FerriteLib.UiKit.Kernel.UiHost Boolean get_DisplayRequired()
+FerriteLib.UiKit.Kernel.UiHost FerriteLib.UiKit.Kernel.IUiBindings get_Bindings()
+FerriteLib.UiKit.Kernel.UiHost FerriteLib.UiKit.Kernel.UiBindingPresentation get_Presentation()
+FerriteLib.UiKit.Kernel.UiHost FerriteLib.UiKit.Kernel.UiDiagnosticSubscription get_Diagnostics()
+FerriteLib.UiKit.Kernel.UiHost FerriteLib.UiKit.Kernel.UiElementProperties ElementProperties(System.String)
+FerriteLib.UiKit.Kernel.UiHost FerriteLib.UiKit.Kernel.UiHostInputState get_InputState()
+FerriteLib.UiKit.Kernel.UiHost FerriteLib.UiKit.Kernel.UiLayoutManifest get_Manifest()
+FerriteLib.UiKit.Kernel.UiHost FerriteLib.UiKit.Kernel.UiLayoutSnapshot MeasureAndArrange(UnityEngine.Vector2)
+FerriteLib.UiKit.Kernel.UiHost FerriteLib.UiKit.Kernel.UiReactiveFault get_LayoutFault()
+FerriteLib.UiKit.Kernel.UiHost FerriteLib.UiKit.Kernel.UiStyleResolver get_StyleResolver()
+FerriteLib.UiKit.Kernel.UiHost FerriteLib.UiKit.Kernel.UiWidgetContext CreateContext(Single, System.String) defaults[elementPath=root]
+FerriteLib.UiKit.Kernel.UiHost Int32 get_DefinitionRevision()
+FerriteLib.UiKit.Kernel.UiHost System.String get_Source()
+FerriteLib.UiKit.Kernel.UiHost UnityEngine.Vector2 GetScrollPosition(System.String)
+FerriteLib.UiKit.Kernel.UiHost Void .ctor(System.String, FerriteLib.UiKit.Kernel.UiLayoutManifest, FerriteLib.UiKit.Kernel.IUiBindings, FerriteLib.UiKit.Kernel.UiTheme, FerriteLib.UiKit.Kernel.ITextMetrics, FerriteLib.UiKit.Kernel.IUiTranslation, FerriteLib.UiKit.Kernel.UiStyleDocument) defaults[document=null]
+FerriteLib.UiKit.Kernel.UiHost Void BeginFrame()
+FerriteLib.UiKit.Kernel.UiHost Void Close()
+FerriteLib.UiKit.Kernel.UiHost Void Dispose()
+FerriteLib.UiKit.Kernel.UiHost Void Draw(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiLayoutSnapshot)
+FerriteLib.UiKit.Kernel.UiHost Void DrawFrame(UnityEngine.Rect)
+FerriteLib.UiKit.Kernel.UiHost Void DrawFrame(UnityEngine.Rect, Verse.Window)
+FerriteLib.UiKit.Kernel.UiHost Void EndFrame()
+FerriteLib.UiKit.Kernel.UiHost Void Invalidate()
+FerriteLib.UiKit.Kernel.UiHost Void SetDisplayDemand(Boolean)
+FerriteLib.UiKit.Kernel.UiHost Void SetInteractionScope(System.String, System.String)
+FerriteLib.UiKit.Kernel.UiHost Void SetScrollPosition(System.String, UnityEngine.Vector2)
+FerriteLib.UiKit.Kernel.UiHost Void UpdateDefinition(FerriteLib.UiKit.Kernel.UiLayoutManifest)
+FerriteLib.UiKit.Kernel.UiHost implements System.IDisposable
+FerriteLib.UiKit.Kernel.UiHostInputState Boolean get_HasPointerCapture()
+FerriteLib.UiKit.Kernel.UiHostInputState Boolean get_IsActive()
+FerriteLib.UiKit.Kernel.UiHostInputState Boolean get_IsEditing()
+FerriteLib.UiKit.Kernel.UiImageAlignX FerriteLib.UiKit.Kernel.UiImageAlignX Center=0
+FerriteLib.UiKit.Kernel.UiImageAlignX FerriteLib.UiKit.Kernel.UiImageAlignX Left=1
+FerriteLib.UiKit.Kernel.UiImageAlignX FerriteLib.UiKit.Kernel.UiImageAlignX Right=2
+FerriteLib.UiKit.Kernel.UiImageAlignX Int32 value__
+FerriteLib.UiKit.Kernel.UiImageAlignX implements System.IComparable
+FerriteLib.UiKit.Kernel.UiImageAlignX implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiImageAlignX implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiImageAlignY FerriteLib.UiKit.Kernel.UiImageAlignY Bottom=2
+FerriteLib.UiKit.Kernel.UiImageAlignY FerriteLib.UiKit.Kernel.UiImageAlignY Center=0
+FerriteLib.UiKit.Kernel.UiImageAlignY FerriteLib.UiKit.Kernel.UiImageAlignY Top=1
+FerriteLib.UiKit.Kernel.UiImageAlignY Int32 value__
+FerriteLib.UiKit.Kernel.UiImageAlignY implements System.IComparable
+FerriteLib.UiKit.Kernel.UiImageAlignY implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiImageAlignY implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiImageFit FerriteLib.UiKit.Kernel.UiImageFit Contain=0
+FerriteLib.UiKit.Kernel.UiImageFit FerriteLib.UiKit.Kernel.UiImageFit Cover=1
+FerriteLib.UiKit.Kernel.UiImageFit FerriteLib.UiKit.Kernel.UiImageFit Stretch=2
+FerriteLib.UiKit.Kernel.UiImageFit Int32 value__
+FerriteLib.UiKit.Kernel.UiImageFit implements System.IComparable
+FerriteLib.UiKit.Kernel.UiImageFit implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiImageFit implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiImageLayout FerriteLib.UiKit.Kernel.UiLayoutRect Arrange(FerriteLib.UiKit.Kernel.UiLayoutRect, Single, Single, FerriteLib.UiKit.Kernel.UiImageOptions) defaults[options=null]
+FerriteLib.UiKit.Kernel.UiImageLayout Single AspectHeight(Single, Single, Single)
+FerriteLib.UiKit.Kernel.UiImageOptions FerriteLib.UiKit.Kernel.UiImageAlignX get_AlignX()
+FerriteLib.UiKit.Kernel.UiImageOptions FerriteLib.UiKit.Kernel.UiImageAlignY get_AlignY()
+FerriteLib.UiKit.Kernel.UiImageOptions FerriteLib.UiKit.Kernel.UiImageFit get_Fit()
+FerriteLib.UiKit.Kernel.UiImageOptions FerriteLib.UiKit.Kernel.UiImageOptions Parse(System.String, System.String, System.String)
+FerriteLib.UiKit.Kernel.UiImageOptions Void .ctor(FerriteLib.UiKit.Kernel.UiImageFit, FerriteLib.UiKit.Kernel.UiImageAlignX, FerriteLib.UiKit.Kernel.UiImageAlignY) defaults[fit=Contain,alignX=Center,alignY=Center]
+FerriteLib.UiKit.Kernel.UiInputEligibility Boolean get_CanOperate()
+FerriteLib.UiKit.Kernel.UiInputEligibility Boolean get_CanReceive()
+FerriteLib.UiKit.Kernel.UiInputEligibility Boolean get_Enabled()
+FerriteLib.UiKit.Kernel.UiInputEligibility Boolean get_Writable()
+FerriteLib.UiKit.Kernel.UiInputEligibility Void .ctor(Boolean, Boolean, Boolean) defaults[writable=True,canReceive=True]
+FerriteLib.UiKit.Kernel.UiInteractionEnd FerriteLib.UiKit.Kernel.UiInteractionEnd Aborted=7
+FerriteLib.UiKit.Kernel.UiInteractionEnd FerriteLib.UiKit.Kernel.UiInteractionEnd CaptureLost=3
+FerriteLib.UiKit.Kernel.UiInteractionEnd FerriteLib.UiKit.Kernel.UiInteractionEnd Closed=8
+FerriteLib.UiKit.Kernel.UiInteractionEnd FerriteLib.UiKit.Kernel.UiInteractionEnd Hidden=4
+FerriteLib.UiKit.Kernel.UiInteractionEnd FerriteLib.UiKit.Kernel.UiInteractionEnd Ineligible=2
+FerriteLib.UiKit.Kernel.UiInteractionEnd FerriteLib.UiKit.Kernel.UiInteractionEnd None=0
+FerriteLib.UiKit.Kernel.UiInteractionEnd FerriteLib.UiKit.Kernel.UiInteractionEnd Released=1
+FerriteLib.UiKit.Kernel.UiInteractionEnd FerriteLib.UiKit.Kernel.UiInteractionEnd Removed=5
+FerriteLib.UiKit.Kernel.UiInteractionEnd FerriteLib.UiKit.Kernel.UiInteractionEnd TargetChanged=6
+FerriteLib.UiKit.Kernel.UiInteractionEnd Int32 value__
+FerriteLib.UiKit.Kernel.UiInteractionEnd implements System.IComparable
+FerriteLib.UiKit.Kernel.UiInteractionEnd implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiInteractionEnd implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiInteractionRequests Void Activation(FerriteLib.UiKit.Kernel.UiInteractionTarget, FerriteLib.UiKit.Kernel.UiInteractionResult, System.Action)
+FerriteLib.UiKit.Kernel.UiInteractionRequests Void Range(FerriteLib.UiKit.Kernel.UiInteractionTarget, FerriteLib.UiKit.Kernel.UiInteractionResult, System.Action`1[System.Single])
+FerriteLib.UiKit.Kernel.UiInteractionResult Boolean get_Captured()
+FerriteLib.UiKit.Kernel.UiInteractionResult Boolean get_Consume()
+FerriteLib.UiKit.Kernel.UiInteractionResult Boolean get_Request()
+FerriteLib.UiKit.Kernel.UiInteractionResult FerriteLib.UiKit.Kernel.UiInteractionEnd get_Ended()
+FerriteLib.UiKit.Kernel.UiInteractionResult Single get_Value()
+FerriteLib.UiKit.Kernel.UiInteractionResult Single get_Y()
+FerriteLib.UiKit.Kernel.UiInteractionSession FerriteLib.UiKit.Kernel.UiInteractionEnd get_LastEnd()
+FerriteLib.UiKit.Kernel.UiInteractionSession FerriteLib.UiKit.Kernel.UiInteractionResult Activate(FerriteLib.UiKit.Kernel.UiInteractionTarget, FerriteLib.UiKit.Kernel.UiInputEligibility)
+FerriteLib.UiKit.Kernel.UiInteractionSession FerriteLib.UiKit.Kernel.UiInteractionResult PointerActivation(FerriteLib.UiKit.Kernel.UiInteractionTarget, FerriteLib.UiKit.Kernel.UiPointerSample, FerriteLib.UiKit.Kernel.UiHitGeometry, FerriteLib.UiKit.Kernel.UiInputEligibility)
+FerriteLib.UiKit.Kernel.UiInteractionSession FerriteLib.UiKit.Kernel.UiInteractionResult PointerPoint(FerriteLib.UiKit.Kernel.UiInteractionTarget, FerriteLib.UiKit.Kernel.UiPointerSample, FerriteLib.UiKit.Kernel.UiHitGeometry, FerriteLib.UiKit.Kernel.UiInputEligibility, Single, Single)
+FerriteLib.UiKit.Kernel.UiInteractionSession FerriteLib.UiKit.Kernel.UiInteractionResult PointerRange(FerriteLib.UiKit.Kernel.UiInteractionTarget, FerriteLib.UiKit.Kernel.UiPointerSample, FerriteLib.UiKit.Kernel.UiHitGeometry, FerriteLib.UiKit.Kernel.UiInputEligibility, FerriteLib.UiKit.Kernel.UiRange, Single)
+FerriteLib.UiKit.Kernel.UiInteractionSession FerriteLib.UiKit.Kernel.UiInteractionResult Select(FerriteLib.UiKit.Kernel.UiInteractionTarget, FerriteLib.UiKit.Kernel.UiRange, Single, FerriteLib.UiKit.Kernel.UiInputEligibility)
+FerriteLib.UiKit.Kernel.UiInteractionSession System.Nullable`1[FerriteLib.UiKit.Kernel.UiInteractionTarget] get_CaptureOwner()
+FerriteLib.UiKit.Kernel.UiInteractionSession Void .ctor()
+FerriteLib.UiKit.Kernel.UiInteractionSession Void Dispose()
+FerriteLib.UiKit.Kernel.UiInteractionSession Void End(FerriteLib.UiKit.Kernel.UiInteractionEnd)
+FerriteLib.UiKit.Kernel.UiInteractionSession Void EndNode(System.String, FerriteLib.UiKit.Kernel.UiInteractionEnd)
+FerriteLib.UiKit.Kernel.UiInteractionSession implements System.IDisposable
+FerriteLib.UiKit.Kernel.UiInteractionTarget Boolean Equals(FerriteLib.UiKit.Kernel.UiInteractionTarget)
+FerriteLib.UiKit.Kernel.UiInteractionTarget Boolean Equals(System.Object)
+FerriteLib.UiKit.Kernel.UiInteractionTarget Int32 GetHashCode()
+FerriteLib.UiKit.Kernel.UiInteractionTarget System.Object get_ItemKey()
+FerriteLib.UiKit.Kernel.UiInteractionTarget System.String get_BusinessScope()
+FerriteLib.UiKit.Kernel.UiInteractionTarget System.String get_Node()
+FerriteLib.UiKit.Kernel.UiInteractionTarget System.String get_Part()
+FerriteLib.UiKit.Kernel.UiInteractionTarget System.String get_TargetScope()
+FerriteLib.UiKit.Kernel.UiInteractionTarget Void .ctor(System.String, System.String)
+FerriteLib.UiKit.Kernel.UiInteractionTarget Void .ctor(System.String, System.String, System.String, System.Object, System.String) defaults[businessScope=null]
+FerriteLib.UiKit.Kernel.UiInteractionTarget implements System.IEquatable`1[FerriteLib.UiKit.Kernel.UiInteractionTarget]
+FerriteLib.UiKit.Kernel.UiInvalidation FerriteLib.UiKit.Kernel.UiInvalidation Everything=7
+FerriteLib.UiKit.Kernel.UiInvalidation FerriteLib.UiKit.Kernel.UiInvalidation Measure=2
+FerriteLib.UiKit.Kernel.UiInvalidation FerriteLib.UiKit.Kernel.UiInvalidation None=0
+FerriteLib.UiKit.Kernel.UiInvalidation FerriteLib.UiKit.Kernel.UiInvalidation Paint=1
+FerriteLib.UiKit.Kernel.UiInvalidation FerriteLib.UiKit.Kernel.UiInvalidation Structure=4
+FerriteLib.UiKit.Kernel.UiInvalidation Int32 value__
+FerriteLib.UiKit.Kernel.UiInvalidation implements System.IComparable
+FerriteLib.UiKit.Kernel.UiInvalidation implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiInvalidation implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiItemBindingSchema`1 Void .ctor()
+FerriteLib.UiKit.Kernel.UiItemBindingSchema`1 Void Command(System.String, System.Action`1[T], System.Func`2[T,System.Boolean]) defaults[canExecute=null]
+FerriteLib.UiKit.Kernel.UiItemBindingSchema`1 Void Value[TValue](System.String, System.Func`2[T,TValue], System.Action`2[T,TValue], System.Func`3[TValue,TValue,System.Boolean]) defaults[write=null,equal=null]
+FerriteLib.UiKit.Kernel.UiItemBindings`1 System.Collections.Generic.IReadOnlyList`1[System.String] get_Keys()
+FerriteLib.UiKit.Kernel.UiItemBindings`1 Void .ctor(FerriteLib.UiKit.Kernel.UiBindings, System.String, System.Func`1[System.Collections.Generic.IReadOnlyList`1[T]], System.Func`2[T,System.String], System.Action`1[FerriteLib.UiKit.Kernel.UiItemBindingSchema`1[T]])
+FerriteLib.UiKit.Kernel.UiItemBindings`1 Void Dispose()
+FerriteLib.UiKit.Kernel.UiItemBindings`1 Void Refresh()
+FerriteLib.UiKit.Kernel.UiItemBindings`1 implements System.IDisposable
+FerriteLib.UiKit.Kernel.UiKinds System.String Banner=chrome/banner
+FerriteLib.UiKit.Kernel.UiKinds System.String Button=input/button
+FerriteLib.UiKit.Kernel.UiKinds System.String Checkbox=input/checkbox
+FerriteLib.UiKit.Kernel.UiKinds System.String Dropdown=input/dropdown
+FerriteLib.UiKit.Kernel.UiKinds System.String Empty=state/empty
+FerriteLib.UiKit.Kernel.UiKinds System.String Image=display/image
+FerriteLib.UiKit.Kernel.UiKinds System.String LineChart=chart/line
+FerriteLib.UiKit.Kernel.UiKinds System.String ModeRow=input/mode-row
+FerriteLib.UiKit.Kernel.UiKinds System.String NumberField=input/number-field
+FerriteLib.UiKit.Kernel.UiKinds System.String Progress=display/progress
+FerriteLib.UiKit.Kernel.UiKinds System.String Repeat=Repeat
+FerriteLib.UiKit.Kernel.UiKinds System.String Rule=chrome/rule
+FerriteLib.UiKit.Kernel.UiKinds System.String SectionHeader=section/header
+FerriteLib.UiKit.Kernel.UiKinds System.String Slider=input/slider
+FerriteLib.UiKit.Kernel.UiKinds System.String StepperSlider=input/stepper-slider
+FerriteLib.UiKit.Kernel.UiKinds System.String TextField=input/text-field
+FerriteLib.UiKit.Kernel.UiKinds System.String Tree=container/tree
+FerriteLib.UiKit.Kernel.UiKinds System.String WrappedText=text/wrapped
+FerriteLib.UiKit.Kernel.UiKitFonts Verse.GameFont ToGameFont(FerriteLib.UiKit.Kernel.UiFont)
+FerriteLib.UiKit.Kernel.UiLayout FerriteLib.UiKit.Kernel.UiLayoutPlan Anchored(FerriteLib.UiKit.Kernel.UiLayoutPlan, FerriteLib.UiKit.Kernel.UiLayoutFrame, System.Collections.Generic.IReadOnlyList`1[System.Nullable`1[FerriteLib.UiKit.Kernel.UiLayoutAnchor]], System.Collections.Generic.IReadOnlyList`1[System.Nullable`1[FerriteLib.UiKit.Kernel.UiLayoutAnchor]])
+FerriteLib.UiKit.Kernel.UiLayout FerriteLib.UiKit.Kernel.UiLayoutPlan Overlay(FerriteLib.UiKit.Kernel.UiLayoutFrame, System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiLayoutChild], FerriteLib.UiKit.Kernel.UiLayoutMeasure)
+FerriteLib.UiKit.Kernel.UiLayout FerriteLib.UiKit.Kernel.UiLayoutPlan Row(FerriteLib.UiKit.Kernel.UiLayoutFrame, System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiLayoutChild], FerriteLib.UiKit.Kernel.UiLayoutMeasure)
+FerriteLib.UiKit.Kernel.UiLayout FerriteLib.UiKit.Kernel.UiLayoutPlan Stack(FerriteLib.UiKit.Kernel.UiLayoutFrame, System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiLayoutChild], FerriteLib.UiKit.Kernel.UiLayoutMeasure)
+FerriteLib.UiKit.Kernel.UiLayout FerriteLib.UiKit.Kernel.UiLayoutPlan VerticalContent(FerriteLib.UiKit.Kernel.UiLayoutFrame, System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiLayoutChild], FerriteLib.UiKit.Kernel.UiLayoutMeasure)
+FerriteLib.UiKit.Kernel.UiLayout FerriteLib.UiKit.Kernel.UiLayoutPlan Wrap(FerriteLib.UiKit.Kernel.UiLayoutFrame, System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiLayoutChild], Int32, FerriteLib.UiKit.Kernel.UiLayoutMeasure)
+FerriteLib.UiKit.Kernel.UiLayout FerriteLib.UiKit.Kernel.UiLayoutPoint ClampScroll(FerriteLib.UiKit.Kernel.UiLayoutPoint, FerriteLib.UiKit.Kernel.UiLayoutSize, FerriteLib.UiKit.Kernel.UiLayoutSize)
+FerriteLib.UiKit.Kernel.UiLayout FerriteLib.UiKit.Kernel.UiWidthPlan Columns(System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiWidthDemand], Single, Single)
+FerriteLib.UiKit.Kernel.UiLayout Single Clamp(Single, Single, Single)
+FerriteLib.UiKit.Kernel.UiLayout Single Origin(Single, Single, Single, Single, Single)
+FerriteLib.UiKit.Kernel.UiLayout Single ScrollContentWidth(Single, Single, Single, Single)
+FerriteLib.UiKit.Kernel.UiLayout Single SharedLabelColumn(System.Collections.Generic.IReadOnlyList`1[System.Single])
+FerriteLib.UiKit.Kernel.UiLayout Single ViewportRows(System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiLayoutRect], Single, Single, Single)
+FerriteLib.UiKit.Kernel.UiLayoutAnchor FerriteLib.UiKit.Kernel.UiLayoutOffset get_Offset()
+FerriteLib.UiKit.Kernel.UiLayoutAnchor Int32 get_TargetIndex()
+FerriteLib.UiKit.Kernel.UiLayoutAnchor Single get_OwnFraction()
+FerriteLib.UiKit.Kernel.UiLayoutAnchor Single get_TargetFraction()
+FerriteLib.UiKit.Kernel.UiLayoutAnchor Void .ctor(Int32, Single, Single, FerriteLib.UiKit.Kernel.UiLayoutOffset)
+FerriteLib.UiKit.Kernel.UiLayoutChild Boolean get_Fill()
+FerriteLib.UiKit.Kernel.UiLayoutChild Boolean get_MatchContentHeight()
+FerriteLib.UiKit.Kernel.UiLayoutChild FerriteLib.UiKit.Kernel.UiLayoutOffset get_OffsetX()
+FerriteLib.UiKit.Kernel.UiLayoutChild FerriteLib.UiKit.Kernel.UiLayoutOffset get_OffsetY()
+FerriteLib.UiKit.Kernel.UiLayoutChild Single get_AlignX()
+FerriteLib.UiKit.Kernel.UiLayoutChild Single get_AlignY()
+FerriteLib.UiKit.Kernel.UiLayoutChild Single get_Width()
+FerriteLib.UiKit.Kernel.UiLayoutChild Void .ctor(Single, Boolean, Single, Single, FerriteLib.UiKit.Kernel.UiLayoutOffset, FerriteLib.UiKit.Kernel.UiLayoutOffset, Boolean) defaults[fill=False,alignX=0,alignY=0,offsetX=null,offsetY=null,matchContentHeight=False]
+FerriteLib.UiKit.Kernel.UiLayoutDiagnostic System.String get_Code()
+FerriteLib.UiKit.Kernel.UiLayoutDiagnostic System.String get_Message()
+FerriteLib.UiKit.Kernel.UiLayoutDiagnostic System.String get_Path()
+FerriteLib.UiKit.Kernel.UiLayoutDiagnostic Void .ctor(System.String, System.String, System.String)
+FerriteLib.UiKit.Kernel.UiLayoutFrame FerriteLib.UiKit.Kernel.UiLayoutHeight get_Height()
+FerriteLib.UiKit.Kernel.UiLayoutFrame Single get_AvailableHeight()
+FerriteLib.UiKit.Kernel.UiLayoutFrame Single get_AvailableInnerHeight()
+FerriteLib.UiKit.Kernel.UiLayoutFrame Single get_Bottom()
+FerriteLib.UiKit.Kernel.UiLayoutFrame Single get_Gap()
+FerriteLib.UiKit.Kernel.UiLayoutFrame Single get_InnerWidth()
+FerriteLib.UiKit.Kernel.UiLayoutFrame Single get_Left()
+FerriteLib.UiKit.Kernel.UiLayoutFrame Single get_Right()
+FerriteLib.UiKit.Kernel.UiLayoutFrame Single get_Top()
+FerriteLib.UiKit.Kernel.UiLayoutFrame Single get_Width()
+FerriteLib.UiKit.Kernel.UiLayoutFrame Void .ctor(Single, Single, Single, Single, Single, Single, Single, Single, FerriteLib.UiKit.Kernel.UiLayoutHeight)
+FerriteLib.UiKit.Kernel.UiLayoutHeight Boolean get_Fill()
+FerriteLib.UiKit.Kernel.UiLayoutHeight Single Resolve(Single, Single)
+FerriteLib.UiKit.Kernel.UiLayoutHeight System.Nullable`1[System.Single] get_Fixed()
+FerriteLib.UiKit.Kernel.UiLayoutHeight Void .ctor(System.Nullable`1[System.Single], Boolean)
+FerriteLib.UiKit.Kernel.UiLayoutManifest FerriteLib.UiKit.Kernel.UiLayoutManifest Create(System.String, System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiElementSpec], FerriteLib.UiKit.Kernel.UiStyleDocument, System.Collections.Generic.IReadOnlyDictionary`2[System.String,FerriteLib.UiKit.Kernel.UiElementSpec]) defaults[styles=null,templates=null]
+FerriteLib.UiKit.Kernel.UiLayoutManifest FerriteLib.UiKit.Kernel.UiLayoutManifest Create(System.String, System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiElementSpec], FerriteLib.UiKit.Kernel.UiStyleDocument, System.Collections.Generic.IReadOnlyDictionary`2[System.String,FerriteLib.UiKit.Kernel.UiElementSpec], FerriteLib.UiKit.Kernel.UiWindowBackground)
+FerriteLib.UiKit.Kernel.UiLayoutManifest FerriteLib.UiKit.Kernel.UiLayoutManifest CreateWithBackground(System.String, System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiElementSpec], FerriteLib.UiKit.Kernel.UiWindowBackground, FerriteLib.UiKit.Kernel.UiStyleDocument, System.Collections.Generic.IReadOnlyDictionary`2[System.String,FerriteLib.UiKit.Kernel.UiElementSpec]) defaults[styles=null,templates=null]
+FerriteLib.UiKit.Kernel.UiLayoutManifest FerriteLib.UiKit.Kernel.UiLayoutManifest Parse(System.String)
+FerriteLib.UiKit.Kernel.UiLayoutManifest FerriteLib.UiKit.Kernel.UiLayoutManifest ParseFile(System.String)
+FerriteLib.UiKit.Kernel.UiLayoutManifest FerriteLib.UiKit.Kernel.UiStyleDocument get_Styles()
+FerriteLib.UiKit.Kernel.UiLayoutManifest FerriteLib.UiKit.Kernel.UiWindowBackground get_Background()
+FerriteLib.UiKit.Kernel.UiLayoutManifest System.Collections.Generic.IReadOnlyDictionary`2[System.String,FerriteLib.UiKit.Kernel.UiElementSpec] get_Templates()
+FerriteLib.UiKit.Kernel.UiLayoutManifest System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiElementSpec] get_Roots()
+FerriteLib.UiKit.Kernel.UiLayoutManifest System.String get_SchemaVersion()
+FerriteLib.UiKit.Kernel.UiLayoutManifest System.String get_Source()
+FerriteLib.UiKit.Kernel.UiLayoutMeasure FerriteLib.UiKit.Kernel.UiLayoutSize EndInvoke(System.IAsyncResult)
+FerriteLib.UiKit.Kernel.UiLayoutMeasure FerriteLib.UiKit.Kernel.UiLayoutSize Invoke(Int32, Single, Single, System.Nullable`1[System.Single])
+FerriteLib.UiKit.Kernel.UiLayoutMeasure System.IAsyncResult BeginInvoke(Int32, Single, Single, System.Nullable`1[System.Single], System.AsyncCallback, System.Object)
+FerriteLib.UiKit.Kernel.UiLayoutMeasure Void .ctor(System.Object, IntPtr)
+FerriteLib.UiKit.Kernel.UiLayoutMeasure implements System.ICloneable
+FerriteLib.UiKit.Kernel.UiLayoutMeasure implements System.Runtime.Serialization.ISerializable
+FerriteLib.UiKit.Kernel.UiLayoutOffset Single At(Single)
+FerriteLib.UiKit.Kernel.UiLayoutOffset Single get_Fraction()
+FerriteLib.UiKit.Kernel.UiLayoutOffset Single get_Pixels()
+FerriteLib.UiKit.Kernel.UiLayoutOffset Void .ctor(Single, Single) defaults[fraction=0]
+FerriteLib.UiKit.Kernel.UiLayoutPlan Boolean get_HeightOverflow()
+FerriteLib.UiKit.Kernel.UiLayoutPlan FerriteLib.UiKit.Kernel.UiLayoutSize get_Size()
+FerriteLib.UiKit.Kernel.UiLayoutPlan Single get_NaturalHeight()
+FerriteLib.UiKit.Kernel.UiLayoutPlan System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiLayoutRect] get_Slots()
+FerriteLib.UiKit.Kernel.UiLayoutPoint Single get_X()
+FerriteLib.UiKit.Kernel.UiLayoutPoint Single get_Y()
+FerriteLib.UiKit.Kernel.UiLayoutPoint Void .ctor(Single, Single)
+FerriteLib.UiKit.Kernel.UiLayoutRect Single get_Height()
+FerriteLib.UiKit.Kernel.UiLayoutRect Single get_Width()
+FerriteLib.UiKit.Kernel.UiLayoutRect Single get_X()
+FerriteLib.UiKit.Kernel.UiLayoutRect Single get_Y()
+FerriteLib.UiKit.Kernel.UiLayoutRect Void .ctor(Single, Single, Single, Single)
+FerriteLib.UiKit.Kernel.UiLayoutSize Single get_Height()
+FerriteLib.UiKit.Kernel.UiLayoutSize Single get_Width()
+FerriteLib.UiKit.Kernel.UiLayoutSize Void .ctor(Single, Single)
+FerriteLib.UiKit.Kernel.UiLayoutSnapshot Int32 get_DefinitionRevision()
+FerriteLib.UiKit.Kernel.UiLayoutSnapshot System.Collections.Generic.IReadOnlyDictionary`2[System.String,UnityEngine.Rect] get_RectById()
+FerriteLib.UiKit.Kernel.UiLayoutSnapshot System.Collections.Generic.IReadOnlyDictionary`2[System.String,UnityEngine.Rect] get_ScrollContents()
+FerriteLib.UiKit.Kernel.UiLayoutSnapshot System.Collections.Generic.IReadOnlyDictionary`2[System.String,UnityEngine.Rect] get_Viewports()
+FerriteLib.UiKit.Kernel.UiLayoutSnapshot System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiLayoutDiagnostic] get_Diagnostics()
+FerriteLib.UiKit.Kernel.UiLayoutSnapshot System.Collections.Generic.IReadOnlyList`1[System.String] get_VisibleIds()
+FerriteLib.UiKit.Kernel.UiLayoutSnapshot UnityEngine.Vector2 get_ContentSize()
+FerriteLib.UiKit.Kernel.UiLayoutSnapshot Void .ctor(UnityEngine.Vector2, System.Collections.Generic.IReadOnlyDictionary`2[System.String,UnityEngine.Rect], System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyDictionary`2[System.String,UnityEngine.Rect], Int32)
+FerriteLib.UiKit.Kernel.UiLayoutSnapshot Void .ctor(UnityEngine.Vector2, System.Collections.Generic.IReadOnlyDictionary`2[System.String,UnityEngine.Rect], System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyDictionary`2[System.String,UnityEngine.Rect], System.Collections.Generic.IReadOnlyDictionary`2[System.String,UnityEngine.Rect], Int32)
+FerriteLib.UiKit.Kernel.UiLayoutSnapshot Void .ctor(UnityEngine.Vector2, System.Collections.Generic.IReadOnlyDictionary`2[System.String,UnityEngine.Rect], System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyDictionary`2[System.String,UnityEngine.Rect], System.Collections.Generic.IReadOnlyDictionary`2[System.String,UnityEngine.Rect], Int32, System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiLayoutDiagnostic])
+FerriteLib.UiKit.Kernel.UiMeasureInputs Boolean Equals(FerriteLib.UiKit.Kernel.UiMeasureInputs)
+FerriteLib.UiKit.Kernel.UiMeasureInputs Boolean Equals(System.Object)
+FerriteLib.UiKit.Kernel.UiMeasureInputs Boolean get_UsesTextMetrics()
+FerriteLib.UiKit.Kernel.UiMeasureInputs Int32 GetHashCode()
+FerriteLib.UiKit.Kernel.UiMeasureInputs Void .ctor(System.String[], Single[], Boolean) defaults[text=null,numbers=null,usesTextMetrics=False]
+FerriteLib.UiKit.Kernel.UiMeasureInputs implements System.IEquatable`1[FerriteLib.UiKit.Kernel.UiMeasureInputs]
+FerriteLib.UiKit.Kernel.UiMeasurement FerriteLib.UiKit.Kernel.UiMeasureInputs get_Inputs()
+FerriteLib.UiKit.Kernel.UiMeasurement System.Func`1[System.Single] get_Calculate()
+FerriteLib.UiKit.Kernel.UiMeasurement Void .ctor(FerriteLib.UiKit.Kernel.UiMeasureInputs, System.Func`1[System.Single])
+FerriteLib.UiKit.Kernel.UiNative Boolean Button(UnityEngine.Rect)
+FerriteLib.UiKit.Kernel.UiNative Boolean Button(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiWidgetContext)
+FerriteLib.UiKit.Kernel.UiNative Boolean CanReceivePointerPress(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiWidgetContext)
+FerriteLib.UiKit.Kernel.UiNative Boolean DropdownButton(UnityEngine.Rect, System.String, FerriteLib.UiKit.Kernel.UiWidgetContext)
+FerriteLib.UiKit.Kernel.UiNative Boolean DropdownButton(UnityEngine.Rect, System.String, FerriteLib.UiKit.Kernel.UiWidgetContext, System.String)
+FerriteLib.UiKit.Kernel.UiNative Boolean HasHotControl(Int32)
+FerriteLib.UiKit.Kernel.UiNative Boolean IsEnterPressed()
+FerriteLib.UiKit.Kernel.UiNative Boolean IsFocusLost(UnityEngine.Rect)
+FerriteLib.UiKit.Kernel.UiNative Boolean IsLayoutEvent()
+FerriteLib.UiKit.Kernel.UiNative Boolean IsMouseDownOver(UnityEngine.Rect)
+FerriteLib.UiKit.Kernel.UiNative Boolean IsMouseDragOver(UnityEngine.Rect)
+FerriteLib.UiKit.Kernel.UiNative Boolean IsMouseOver(UnityEngine.Rect)
+FerriteLib.UiKit.Kernel.UiNative Boolean IsMouseOver(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiWidgetContext)
+FerriteLib.UiKit.Kernel.UiNative Boolean IsMouseUpOver(UnityEngine.Rect)
+FerriteLib.UiKit.Kernel.UiNative Boolean IsPointerDown()
+FerriteLib.UiKit.Kernel.UiNative Boolean IsPointerDragging()
+FerriteLib.UiKit.Kernel.UiNative Boolean IsPointerUp()
+FerriteLib.UiKit.Kernel.UiNative FerriteLib.UiKit.Kernel.UiEditSession`1[T] Editor[T](FerriteLib.UiKit.Kernel.UiWidgetContext, System.String, System.Func`2[T,System.String], FerriteLib.UiKit.Kernel.UiEditParser`1[T])
+FerriteLib.UiKit.Kernel.UiNative FerriteLib.UiKit.Kernel.UiInteractionResult Activation(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiWidgetContext, System.String) defaults[binding=activation]
+FerriteLib.UiKit.Kernel.UiNative FerriteLib.UiKit.Kernel.UiInteractionResult Activation(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiWidgetContext, System.String, System.String, System.Object, Boolean) defaults[itemKey=null,writable=True]
+FerriteLib.UiKit.Kernel.UiNative FerriteLib.UiKit.Kernel.UiInteractionResult Point(UnityEngine.Rect, UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiWidgetContext, System.String, System.Object, Single, Single, Boolean) defaults[writable=True]
+FerriteLib.UiKit.Kernel.UiNative FerriteLib.UiKit.Kernel.UiInteractionResult PopupOption(UnityEngine.Rect, System.String, FerriteLib.UiKit.Kernel.UiWidgetContext, System.Object, Boolean) defaults[selectable=True]
+FerriteLib.UiKit.Kernel.UiNative FerriteLib.UiKit.Kernel.UiInteractionResult Range(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiWidgetContext, System.String, Single, Single, Single, Boolean) defaults[writable=True]
+FerriteLib.UiKit.Kernel.UiNative FerriteLib.UiKit.Kernel.UiInteractionTarget InteractionTarget(FerriteLib.UiKit.Kernel.UiWidgetContext, System.String)
+FerriteLib.UiKit.Kernel.UiNative FerriteLib.UiKit.Kernel.UiInteractionTarget InteractionTarget(FerriteLib.UiKit.Kernel.UiWidgetContext, System.String, System.String, System.Object) defaults[itemKey=null]
+FerriteLib.UiKit.Kernel.UiNative Int32 GetControlId(System.String)
+FerriteLib.UiKit.Kernel.UiNative Single ClampValue(Single, Single, Single)
+FerriteLib.UiKit.Kernel.UiNative Single PointerWheelNotches()
+FerriteLib.UiKit.Kernel.UiNative System.String TextField(UnityEngine.Rect, System.String)
+FerriteLib.UiKit.Kernel.UiNative UnityEngine.Vector2 PointerPosition()
+FerriteLib.UiKit.Kernel.UiNative UnityEngine.Vector2 WindowPointer(FerriteLib.UiKit.Kernel.UiWidgetContext)
+FerriteLib.UiKit.Kernel.UiNative Void CaptureHotControl(Int32)
+FerriteLib.UiKit.Kernel.UiNative Void ConsumeKeyEvent()
+FerriteLib.UiKit.Kernel.UiNative Void ConsumePointerEvent()
+FerriteLib.UiKit.Kernel.UiNative Void Edit[T](UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiWidgetContext, System.String, T, System.Func`2[T,System.String], FerriteLib.UiKit.Kernel.UiEditParser`1[T], Boolean, Boolean, System.Action`1[T], System.Func`1[T])
+FerriteLib.UiKit.Kernel.UiNative Void PaintRange(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiTheme, Single, Single, Single)
+FerriteLib.UiKit.Kernel.UiNative Void ReleaseHotControl(Int32)
+FerriteLib.UiKit.Kernel.UiNative Void SuspendEditor(FerriteLib.UiKit.Kernel.UiWidgetContext, System.String)
+FerriteLib.UiKit.Kernel.UiNodeId Boolean Equals(FerriteLib.UiKit.Kernel.UiNodeId)
+FerriteLib.UiKit.Kernel.UiNodeId Boolean Equals(System.Object)
+FerriteLib.UiKit.Kernel.UiNodeId Boolean get_IsNone()
+FerriteLib.UiKit.Kernel.UiNodeId Boolean op_Equality(FerriteLib.UiKit.Kernel.UiNodeId, FerriteLib.UiKit.Kernel.UiNodeId)
+FerriteLib.UiKit.Kernel.UiNodeId Boolean op_Inequality(FerriteLib.UiKit.Kernel.UiNodeId, FerriteLib.UiKit.Kernel.UiNodeId)
+FerriteLib.UiKit.Kernel.UiNodeId Char PathSeparator=/
+FerriteLib.UiKit.Kernel.UiNodeId FerriteLib.UiKit.Kernel.UiNodeId None
+FerriteLib.UiKit.Kernel.UiNodeId Int32 GetHashCode()
+FerriteLib.UiKit.Kernel.UiNodeId System.String ToString()
+FerriteLib.UiKit.Kernel.UiNodeId System.String get_Key()
+FerriteLib.UiKit.Kernel.UiNodeId System.String get_Path()
+FerriteLib.UiKit.Kernel.UiNodeId implements System.IEquatable`1[FerriteLib.UiKit.Kernel.UiNodeId]
+FerriteLib.UiKit.Kernel.UiNotifyAdapter Boolean Detach(System.ComponentModel.INotifyPropertyChanged)
+FerriteLib.UiKit.Kernel.UiNotifyAdapter FerriteLib.UiKit.Kernel.IUiBindings get_Bindings()
+FerriteLib.UiKit.Kernel.UiNotifyAdapter FerriteLib.UiKit.Kernel.IUiMainThread get_MainThread()
+FerriteLib.UiKit.Kernel.UiNotifyAdapter FerriteLib.UiKit.Kernel.UiNotifyAdapter Map(System.String, System.String[])
+FerriteLib.UiKit.Kernel.UiNotifyAdapter FerriteLib.UiKit.Kernel.UiNotifyAdapter MapAll(System.String[])
+FerriteLib.UiKit.Kernel.UiNotifyAdapter Int32 DefaultMaxPendingKeys=256
+FerriteLib.UiKit.Kernel.UiNotifyAdapter Int32 get_AttachedSourceCount()
+FerriteLib.UiKit.Kernel.UiNotifyAdapter Int32 get_FlushCount()
+FerriteLib.UiKit.Kernel.UiNotifyAdapter Int32 get_MappedPropertyCount()
+FerriteLib.UiKit.Kernel.UiNotifyAdapter Int32 get_MaxPendingKeys()
+FerriteLib.UiKit.Kernel.UiNotifyAdapter Int32 get_OffThreadNotificationCount()
+FerriteLib.UiKit.Kernel.UiNotifyAdapter Int32 get_PendingKeyCount()
+FerriteLib.UiKit.Kernel.UiNotifyAdapter Int32 get_UnmappedNotificationCount()
+FerriteLib.UiKit.Kernel.UiNotifyAdapter System.IDisposable Attach(System.ComponentModel.INotifyPropertyChanged)
+FerriteLib.UiKit.Kernel.UiNotifyAdapter System.IDisposable BeginBatch()
+FerriteLib.UiKit.Kernel.UiNotifyAdapter Void .ctor(FerriteLib.UiKit.Kernel.IUiBindings, FerriteLib.UiKit.Kernel.IUiMainThread, Int32) defaults[mainThread=null,maxPendingKeys=256]
+FerriteLib.UiKit.Kernel.UiNotifyAdapter Void Dispose()
+FerriteLib.UiKit.Kernel.UiNotifyAdapter Void Flush()
+FerriteLib.UiKit.Kernel.UiNotifyAdapter Void add_NotificationRejected(System.Action`1[System.String])
+FerriteLib.UiKit.Kernel.UiNotifyAdapter Void remove_NotificationRejected(System.Action`1[System.String])
+FerriteLib.UiKit.Kernel.UiNotifyAdapter implements System.IDisposable
+FerriteLib.UiKit.Kernel.UiNumericEdit Boolean Parse(System.String, Single ByRef)
+FerriteLib.UiKit.Kernel.UiNumericEdit Boolean Step(FerriteLib.UiKit.Kernel.UiEditSession`1[System.Single], Single, Single, System.Action`1[System.Single], System.Func`1[System.Single])
+FerriteLib.UiKit.Kernel.UiNumericEdit Single Clamp(Single)
+FerriteLib.UiKit.Kernel.UiNumericEdit System.String Format(Single)
+FerriteLib.UiKit.Kernel.UiNumericEdit Void .ctor(Single, Single, System.String) defaults[format=0.##]
+FerriteLib.UiKit.Kernel.UiOption System.String get_Text()
+FerriteLib.UiKit.Kernel.UiOption System.String get_Value()
+FerriteLib.UiKit.Kernel.UiOption Void .ctor(System.String, System.String)
+FerriteLib.UiKit.Kernel.UiOverflowAxis FerriteLib.UiKit.Kernel.UiOverflowAxis Height=1
+FerriteLib.UiKit.Kernel.UiOverflowAxis FerriteLib.UiKit.Kernel.UiOverflowAxis Width=0
+FerriteLib.UiKit.Kernel.UiOverflowAxis Int32 value__
+FerriteLib.UiKit.Kernel.UiOverflowAxis implements System.IComparable
+FerriteLib.UiKit.Kernel.UiOverflowAxis implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiOverflowAxis implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiOverflowReport FerriteLib.UiKit.Kernel.UiFont get_Font()
+FerriteLib.UiKit.Kernel.UiOverflowReport FerriteLib.UiKit.Kernel.UiOverflowAxis get_Axis()
+FerriteLib.UiKit.Kernel.UiOverflowReport Int32 get_TextLength()
+FerriteLib.UiKit.Kernel.UiOverflowReport Single get_Available()
+FerriteLib.UiKit.Kernel.UiOverflowReport Single get_Needed()
+FerriteLib.UiKit.Kernel.UiOverflowReport Single get_RectWidth()
+FerriteLib.UiKit.Kernel.UiOverflowReport System.String get_ElementPath()
+FerriteLib.UiKit.Kernel.UiOverflowReport System.String get_Text()
+FerriteLib.UiKit.Kernel.UiOverflowReport Void .ctor(System.String, System.String, FerriteLib.UiKit.Kernel.UiFont, FerriteLib.UiKit.Kernel.UiOverflowAxis, Single, Single, Single) defaults[rectWidth=0]
+FerriteLib.UiKit.Kernel.UiPageWindow Boolean CanClose()
+FerriteLib.UiKit.Kernel.UiPageWindow FerriteLib.UiKit.Kernel.ITextMetrics get_Metrics()
+FerriteLib.UiKit.Kernel.UiPageWindow FerriteLib.UiKit.Kernel.UiHost CreateHost()
+FerriteLib.UiKit.Kernel.UiPageWindow FerriteLib.UiKit.Kernel.UiHost get_PageHost()
+FerriteLib.UiKit.Kernel.UiPageWindow FerriteLib.UiKit.Kernel.UiTheme get_Theme()
+FerriteLib.UiKit.Kernel.UiPageWindow FerriteLib.UiKit.Kernel.UiWindowBackground get_Background()
+FerriteLib.UiKit.Kernel.UiPageWindow System.Func`1[UnityEngine.Vector2] get_InitialSizePolicy()
+FerriteLib.UiKit.Kernel.UiPageWindow System.String get_CloseText()
+FerriteLib.UiKit.Kernel.UiPageWindow System.String get_Title()
+FerriteLib.UiKit.Kernel.UiPageWindow Void .ctor(FerriteLib.UiKit.Kernel.UiWindowKey, FerriteLib.UiKit.Kernel.UiLayoutManifest, FerriteLib.UiKit.Kernel.IUiBindings, FerriteLib.UiKit.Kernel.UiTheme, FerriteLib.UiKit.Kernel.IUiTranslation, System.String, System.String, System.Func`2[FerriteLib.UiKit.Kernel.UiWindowNotice,System.String], FerriteLib.UiKit.Kernel.ITextMetrics, FerriteLib.UiKit.Kernel.UiStyleDocument) defaults[metrics=null,document=null]
+FerriteLib.UiKit.Kernel.UiPageWindow Void DrawBackground(UnityEngine.Rect)
+FerriteLib.UiKit.Kernel.UiPageWindow Void DrawNotice(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiWindowNotice)
+FerriteLib.UiKit.Kernel.UiPageWindow Void set_Background(FerriteLib.UiKit.Kernel.UiWindowBackground)
+FerriteLib.UiKit.Kernel.UiPalette Boolean IsDeclared(FerriteLib.UiKit.Kernel.UiPaletteRole)
+FerriteLib.UiKit.Kernel.UiPalette Boolean TryRole(System.String, FerriteLib.UiKit.Kernel.UiPaletteRole ByRef)
+FerriteLib.UiKit.Kernel.UiPalette FerriteLib.UiKit.Kernel.UiColour Default(FerriteLib.UiKit.Kernel.UiPaletteRole)
+FerriteLib.UiKit.Kernel.UiPalette FerriteLib.UiKit.Kernel.UiColour get_Item(FerriteLib.UiKit.Kernel.UiPaletteRole)
+FerriteLib.UiKit.Kernel.UiPalette FerriteLib.UiKit.Kernel.UiPalette Clone()
+FerriteLib.UiKit.Kernel.UiPalette Int32 get_Revision()
+FerriteLib.UiKit.Kernel.UiPalette Void .ctor()
+FerriteLib.UiKit.Kernel.UiPalette Void Remove(FerriteLib.UiKit.Kernel.UiPaletteRole)
+FerriteLib.UiKit.Kernel.UiPalette Void set_Item(FerriteLib.UiKit.Kernel.UiPaletteRole, FerriteLib.UiKit.Kernel.UiColour)
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole Accent=17
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole Border=19
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole ControlBorder=24
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole ControlSurface=2
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole DangerBorder=29
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole DangerForeground=15
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole DangerSurface=7
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole DisabledForeground=16
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole Divider=21
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole Foreground=10
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole HoverBorder=25
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole HoverSurface=3
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole PanelBorder=23
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole PanelSurface=1
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole SecondaryForeground=11
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole SectionSurface=9
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole SelectedBorder=26
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole SelectedForeground=12
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole SelectedSurface=4
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole StrongBorder=20
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole SuccessBorder=27
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole SuccessForeground=13
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole SuccessSurface=5
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole SwitchOff=18
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole WarningBorder=28
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole WarningForeground=14
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole WarningSurface=6
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole WindowBorder=22
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole WindowSurface=0
+FerriteLib.UiKit.Kernel.UiPaletteRole FerriteLib.UiKit.Kernel.UiPaletteRole WorkspaceSurface=8
+FerriteLib.UiKit.Kernel.UiPaletteRole Int32 value__
+FerriteLib.UiKit.Kernel.UiPaletteRole implements System.IComparable
+FerriteLib.UiKit.Kernel.UiPaletteRole implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiPaletteRole implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiPointerPhase FerriteLib.UiKit.Kernel.UiPointerPhase Drag=2
+FerriteLib.UiKit.Kernel.UiPointerPhase FerriteLib.UiKit.Kernel.UiPointerPhase Lost=4
+FerriteLib.UiKit.Kernel.UiPointerPhase FerriteLib.UiKit.Kernel.UiPointerPhase None=0
+FerriteLib.UiKit.Kernel.UiPointerPhase FerriteLib.UiKit.Kernel.UiPointerPhase Press=1
+FerriteLib.UiKit.Kernel.UiPointerPhase FerriteLib.UiKit.Kernel.UiPointerPhase Release=3
+FerriteLib.UiKit.Kernel.UiPointerPhase Int32 value__
+FerriteLib.UiKit.Kernel.UiPointerPhase implements System.IComparable
+FerriteLib.UiKit.Kernel.UiPointerPhase implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiPointerPhase implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiPointerRegion Boolean get_HasOperation()
+FerriteLib.UiKit.Kernel.UiPointerRegion FerriteLib.UiKit.Kernel.UiLayoutRect get_Bounds()
+FerriteLib.UiKit.Kernel.UiPointerRegion Void .ctor(FerriteLib.UiKit.Kernel.UiLayoutRect, Boolean) defaults[hasOperation=True]
+FerriteLib.UiKit.Kernel.UiPointerSample Boolean get_Consumed()
+FerriteLib.UiKit.Kernel.UiPointerSample FerriteLib.UiKit.Kernel.UiPointerPhase get_Phase()
+FerriteLib.UiKit.Kernel.UiPointerSample Single get_X()
+FerriteLib.UiKit.Kernel.UiPointerSample Single get_Y()
+FerriteLib.UiKit.Kernel.UiPointerSample Void .ctor(FerriteLib.UiKit.Kernel.UiPointerPhase, Single, Single, Boolean) defaults[consumed=False]
+FerriteLib.UiKit.Kernel.UiPresentationStatus Boolean get_HasLastValue()
+FerriteLib.UiKit.Kernel.UiPresentationStatus Boolean get_IsCurrent()
+FerriteLib.UiKit.Kernel.UiPresentationStatus FerriteLib.UiKit.Kernel.UiReactiveFault get_Fault()
+FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1 Boolean get_IsDeclared()
+FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1 T get_Value()
+FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1 Void .ctor(System.Action) defaults[changed=null]
+FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1 Void Remove()
+FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1 Void Set(T)
+FerriteLib.UiKit.Kernel.UiPropertyOrigin FerriteLib.UiKit.Kernel.UiPropertyOrigin Ancestor=2
+FerriteLib.UiKit.Kernel.UiPropertyOrigin FerriteLib.UiKit.Kernel.UiPropertyOrigin Fallback=4
+FerriteLib.UiKit.Kernel.UiPropertyOrigin FerriteLib.UiKit.Kernel.UiPropertyOrigin Host=3
+FerriteLib.UiKit.Kernel.UiPropertyOrigin FerriteLib.UiKit.Kernel.UiPropertyOrigin Instance=0
+FerriteLib.UiKit.Kernel.UiPropertyOrigin FerriteLib.UiKit.Kernel.UiPropertyOrigin LocalStyle=1
+FerriteLib.UiKit.Kernel.UiPropertyOrigin FerriteLib.UiKit.Kernel.UiPropertyOrigin Mixed=5
+FerriteLib.UiKit.Kernel.UiPropertyOrigin Int32 value__
+FerriteLib.UiKit.Kernel.UiPropertyOrigin implements System.IComparable
+FerriteLib.UiKit.Kernel.UiPropertyOrigin implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiPropertyOrigin implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiPropertyResolver FerriteLib.UiKit.Kernel.UiResolvedProperty`1[T] Resolve[T](FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1[T], FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1[T], System.Collections.Generic.IEnumerable`1[System.Collections.Generic.KeyValuePair`2[System.String,FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1[T]]], FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1[T], T)
+FerriteLib.UiKit.Kernel.UiRange Single At(Single, FerriteLib.UiKit.Kernel.UiHitGeometry)
+FerriteLib.UiKit.Kernel.UiRange Single Clamp(Single)
+FerriteLib.UiKit.Kernel.UiRange Single get_Max()
+FerriteLib.UiKit.Kernel.UiRange Single get_Min()
+FerriteLib.UiKit.Kernel.UiRange Void .ctor(Single, Single)
+FerriteLib.UiKit.Kernel.UiRangeObservation Boolean get_Finite()
+FerriteLib.UiKit.Kernel.UiRangeObservation Single get_Fraction()
+FerriteLib.UiKit.Kernel.UiRangeObservation Single get_Max()
+FerriteLib.UiKit.Kernel.UiRangeObservation Single get_Min()
+FerriteLib.UiKit.Kernel.UiRangeObservation Single get_Value()
+FerriteLib.UiKit.Kernel.UiRangeObservation Void .ctor(Single, Single, Single)
+FerriteLib.UiKit.Kernel.UiReactiveComputed`1 Boolean TryGetLastValue(T ByRef)
+FerriteLib.UiKit.Kernel.UiReactiveComputed`1 Boolean get_HasValue()
+FerriteLib.UiKit.Kernel.UiReactiveComputed`1 FerriteLib.UiKit.Kernel.UiReactiveFault get_Fault()
+FerriteLib.UiKit.Kernel.UiReactiveComputed`1 T get_Value()
+FerriteLib.UiKit.Kernel.UiReactiveComputed`1 Void Dispose()
+FerriteLib.UiKit.Kernel.UiReactiveComputed`1 Void Retry()
+FerriteLib.UiKit.Kernel.UiReactiveComputed`1 implements System.IDisposable
+FerriteLib.UiKit.Kernel.UiReactiveFault System.String get_Identity()
+FerriteLib.UiKit.Kernel.UiReactiveFault System.String get_Kind()
+FerriteLib.UiKit.Kernel.UiReactiveFault System.String get_Recovery()
+FerriteLib.UiKit.Kernel.UiReactiveFault System.String get_StoppedScope()
+FerriteLib.UiKit.Kernel.UiReactiveFault implements System.Runtime.InteropServices._Exception
+FerriteLib.UiKit.Kernel.UiReactiveFault implements System.Runtime.Serialization.ISerializable
+FerriteLib.UiKit.Kernel.UiReactiveList`1 Boolean Remove(T)
+FerriteLib.UiKit.Kernel.UiReactiveList`1 Int32 get_Count()
+FerriteLib.UiKit.Kernel.UiReactiveList`1 System.Collections.Generic.IEnumerator`1[T] GetEnumerator()
+FerriteLib.UiKit.Kernel.UiReactiveList`1 System.Collections.Generic.IReadOnlyList`1[T] get_Snapshot()
+FerriteLib.UiKit.Kernel.UiReactiveList`1 T get_Item(Int32)
+FerriteLib.UiKit.Kernel.UiReactiveList`1 Void Add(T)
+FerriteLib.UiKit.Kernel.UiReactiveList`1 Void Clear()
+FerriteLib.UiKit.Kernel.UiReactiveList`1 Void Move(Int32, Int32)
+FerriteLib.UiKit.Kernel.UiReactiveList`1 Void RemoveAt(Int32)
+FerriteLib.UiKit.Kernel.UiReactiveList`1 Void ReplaceAll(System.Collections.Generic.IEnumerable`1[T])
+FerriteLib.UiKit.Kernel.UiReactiveList`1 implements System.Collections.Generic.IEnumerable`1[T]
+FerriteLib.UiKit.Kernel.UiReactiveList`1 implements System.Collections.Generic.IReadOnlyCollection`1[T]
+FerriteLib.UiKit.Kernel.UiReactiveList`1 implements System.Collections.Generic.IReadOnlyList`1[T]
+FerriteLib.UiKit.Kernel.UiReactiveList`1 implements System.Collections.IEnumerable
+FerriteLib.UiKit.Kernel.UiReactiveOwner FerriteLib.UiKit.Kernel.UiReactiveComputed`1[T] Compute[T](System.String, System.Func`1[T])
+FerriteLib.UiKit.Kernel.UiReactiveOwner FerriteLib.UiKit.Kernel.UiReactiveOwner CreateChild(System.String)
+FerriteLib.UiKit.Kernel.UiReactiveOwner FerriteLib.UiKit.Kernel.UiReactiveResponse RespondManaged(System.String, System.Action)
+FerriteLib.UiKit.Kernel.UiReactiveOwner System.IDisposable Respond(System.String, System.Action)
+FerriteLib.UiKit.Kernel.UiReactiveOwner Void Dispose()
+FerriteLib.UiKit.Kernel.UiReactiveOwner implements System.IDisposable
+FerriteLib.UiKit.Kernel.UiReactiveResponse Boolean get_IsPaused()
+FerriteLib.UiKit.Kernel.UiReactiveResponse FerriteLib.UiKit.Kernel.UiReactiveFault get_Fault()
+FerriteLib.UiKit.Kernel.UiReactiveResponse Void Dispose()
+FerriteLib.UiKit.Kernel.UiReactiveResponse Void Resume()
+FerriteLib.UiKit.Kernel.UiReactiveResponse implements System.IDisposable
+FerriteLib.UiKit.Kernel.UiReactiveRuntime FerriteLib.UiKit.Kernel.UiReactiveList`1[T] List[T](System.Collections.Generic.IEnumerable`1[T], System.Func`3[T,T,System.Boolean])
+FerriteLib.UiKit.Kernel.UiReactiveRuntime FerriteLib.UiKit.Kernel.UiReactiveOwner CreateOwner(System.String)
+FerriteLib.UiKit.Kernel.UiReactiveRuntime FerriteLib.UiKit.Kernel.UiReactiveValue`1[System.Boolean] Boolean(Boolean) defaults[value=False]
+FerriteLib.UiKit.Kernel.UiReactiveRuntime FerriteLib.UiKit.Kernel.UiReactiveValue`1[System.Int32] Int(Int32) defaults[value=0]
+FerriteLib.UiKit.Kernel.UiReactiveRuntime FerriteLib.UiKit.Kernel.UiReactiveValue`1[System.String] Text(System.String) defaults[value=]
+FerriteLib.UiKit.Kernel.UiReactiveRuntime FerriteLib.UiKit.Kernel.UiReactiveValue`1[T] Value[T](T, System.Func`3[T,T,System.Boolean])
+FerriteLib.UiKit.Kernel.UiReactiveRuntime System.IDisposable Batch()
+FerriteLib.UiKit.Kernel.UiReactiveRuntime System.IDisposable ReadPhase()
+FerriteLib.UiKit.Kernel.UiReactiveRuntime Void .ctor()
+FerriteLib.UiKit.Kernel.UiReactiveRuntime Void VerifyAccess()
+FerriteLib.UiKit.Kernel.UiReactiveValue`1 T get_Value()
+FerriteLib.UiKit.Kernel.UiReactiveValue`1 Void set_Value(T)
+FerriteLib.UiKit.Kernel.UiReloadPolicy Double get_MaxDeferSeconds()
+FerriteLib.UiKit.Kernel.UiReloadPolicy Double get_QuietSeconds()
+FerriteLib.UiKit.Kernel.UiReloadPolicy Double get_RetrySeconds()
+FerriteLib.UiKit.Kernel.UiReloadPolicy FerriteLib.UiKit.Kernel.UiReloadPolicy Default
+FerriteLib.UiKit.Kernel.UiReloadPolicy Int32 get_MaxRetryAttempts()
+FerriteLib.UiKit.Kernel.UiReloadPolicy Void .ctor(Double, Double, Int32, Double) defaults[quietSeconds=0.25,retrySeconds=0.5,maxRetryAttempts=3,maxDeferSeconds=2]
+FerriteLib.UiKit.Kernel.UiReloadReport Boolean get_Accepted()
+FerriteLib.UiKit.Kernel.UiReloadReport Boolean get_Duplicate()
+FerriteLib.UiKit.Kernel.UiReloadReport Boolean get_Rejected()
+FerriteLib.UiKit.Kernel.UiReloadReport Boolean get_Skipped()
+FerriteLib.UiKit.Kernel.UiReloadReport FerriteLib.UiKit.Kernel.UiDocumentKind get_Kind()
+FerriteLib.UiKit.Kernel.UiReloadReport Int32 get_HostsAffected()
+FerriteLib.UiKit.Kernel.UiReloadReport Int32 get_HostsCommitted()
+FerriteLib.UiKit.Kernel.UiReloadReport System.String ToString()
+FerriteLib.UiKit.Kernel.UiReloadReport System.String get_DocumentId()
+FerriteLib.UiKit.Kernel.UiReloadReport System.String get_Element()
+FerriteLib.UiKit.Kernel.UiReloadReport System.String get_Path()
+FerriteLib.UiKit.Kernel.UiReloadReport System.String get_Reason()
+FerriteLib.UiKit.Kernel.UiReloadReport System.String get_Version()
+FerriteLib.UiKit.Kernel.UiReloadSchedulerState Double get_OldestPendingSeconds()
+FerriteLib.UiKit.Kernel.UiReloadSchedulerState Int32 get_Deferred()
+FerriteLib.UiKit.Kernel.UiReloadSchedulerState Int32 get_Pending()
+FerriteLib.UiKit.Kernel.UiReloadSchedulerState Int32 get_Retrying()
+FerriteLib.UiKit.Kernel.UiReloadSchedulerState Void .ctor(Int32, Int32, Int32, Double)
+FerriteLib.UiKit.Kernel.UiResolvedProperty`1 FerriteLib.UiKit.Kernel.UiPropertyOrigin get_Origin()
+FerriteLib.UiKit.Kernel.UiResolvedProperty`1 System.String get_Source()
+FerriteLib.UiKit.Kernel.UiResolvedProperty`1 T get_Value()
+FerriteLib.UiKit.Kernel.UiResolvedStyle FerriteLib.UiKit.Kernel.UiSurfaceStyle get_Surface()
+FerriteLib.UiKit.Kernel.UiResolvedStyle UnityEngine.Color get_Border()
+FerriteLib.UiKit.Kernel.UiResolvedStyle UnityEngine.Color get_Fill()
+FerriteLib.UiKit.Kernel.UiResolvedStyle UnityEngine.Color get_Text()
+FerriteLib.UiKit.Kernel.UiResolvedStyle Void .ctor(UnityEngine.Color, UnityEngine.Color, UnityEngine.Color)
+FerriteLib.UiKit.Kernel.UiRowBand Single Measure(FerriteLib.UiKit.Kernel.Widgets.UiTreeRow, FerriteLib.UiKit.Kernel.UiTheme, Single)
+FerriteLib.UiKit.Kernel.UiRowBand System.Collections.Generic.IEnumerable`1[FerriteLib.UiKit.Kernel.UiPointerRegion] PointerRegions(FerriteLib.UiKit.Kernel.Widgets.UiTreeRow, UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiTheme, Single, FerriteLib.UiKit.Kernel.UiRowBandActions, FerriteLib.UiKit.Kernel.UiRowBandLayout) defaults[layout=null]
+FerriteLib.UiKit.Kernel.UiRowBand Void Draw(FerriteLib.UiKit.Kernel.Widgets.UiTreeRow, UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiWidgetContext, Single, FerriteLib.UiKit.Kernel.UiResolvedStyle, FerriteLib.UiKit.Kernel.UiRowBandActions, FerriteLib.UiKit.Kernel.UiRowBandLayout) defaults[layout=null]
+FerriteLib.UiKit.Kernel.UiRowBandActions Boolean get_BodyEnabled()
+FerriteLib.UiKit.Kernel.UiRowBandActions Boolean get_CheckboxEnabled()
+FerriteLib.UiKit.Kernel.UiRowBandActions Boolean get_DisclosureEnabled()
+FerriteLib.UiKit.Kernel.UiRowBandActions System.Action`1[System.String] get_Body()
+FerriteLib.UiKit.Kernel.UiRowBandActions System.Action`1[System.String] get_Checkbox()
+FerriteLib.UiKit.Kernel.UiRowBandActions System.Action`1[System.String] get_Disclosure()
+FerriteLib.UiKit.Kernel.UiRowBandActions System.String get_BodyTarget()
+FerriteLib.UiKit.Kernel.UiRowBandActions System.String get_CheckboxTarget()
+FerriteLib.UiKit.Kernel.UiRowBandActions System.String get_DisclosureTarget()
+FerriteLib.UiKit.Kernel.UiRowBandActions Void .ctor(System.Action`1[System.String], System.Action`1[System.String], System.Action`1[System.String]) defaults[body=null,disclosure=null,checkbox=null]
+FerriteLib.UiKit.Kernel.UiRowBandActions Void .ctor(System.Action`1[System.String], System.Action`1[System.String], System.Action`1[System.String], System.String, System.String, System.String)
+FerriteLib.UiKit.Kernel.UiRowBandActions Void .ctor(System.Action`1[System.String], System.Action`1[System.String], System.Action`1[System.String], System.String, System.String, System.String, Boolean, Boolean, Boolean)
+FerriteLib.UiKit.Kernel.UiRowBandLayout System.Nullable`1[System.Single] get_CheckboxRightInset()
+FerriteLib.UiKit.Kernel.UiRowBandLayout System.Nullable`1[System.Single] get_ControlSize()
+FerriteLib.UiKit.Kernel.UiRowBandLayout System.Nullable`1[System.Single] get_IndentStep()
+FerriteLib.UiKit.Kernel.UiRowBandLayout Void .ctor(System.Nullable`1[System.Single], System.Nullable`1[System.Single], System.Nullable`1[System.Single]) defaults[indentStep=null,checkboxRightInset=null,controlSize=null]
+FerriteLib.UiKit.Kernel.UiSelectionObservation Boolean get_Missing()
+FerriteLib.UiKit.Kernel.UiSelectionObservation Boolean get_Selectable()
+FerriteLib.UiKit.Kernel.UiSelectionObservation Int32 get_Index()
+FerriteLib.UiKit.Kernel.UiSelectionObservation Void .ctor(Int32, Boolean)
+FerriteLib.UiKit.Kernel.UiSliderLayout Boolean get_Stacked()
+FerriteLib.UiKit.Kernel.UiSliderLayout FerriteLib.UiKit.Kernel.UiSliderLayout Measure(System.String, Single, FerriteLib.UiKit.Kernel.UiFont, FerriteLib.UiKit.Kernel.UiDensity, FerriteLib.UiKit.Kernel.ITextMetrics)
+FerriteLib.UiKit.Kernel.UiSliderLayout FerriteLib.UiKit.Kernel.UiSliderLayout Measure(System.String, Single, FerriteLib.UiKit.Kernel.UiFont, FerriteLib.UiKit.Kernel.UiDensity, FerriteLib.UiKit.Kernel.ITextMetrics, Single, Single) defaults[minimumControlWidth=0]
+FerriteLib.UiKit.Kernel.UiSliderLayout Single get_Height()
+FerriteLib.UiKit.Kernel.UiSliderLayout Single get_LabelHeight()
+FerriteLib.UiKit.Kernel.UiSliderLayout Single get_LabelWidth()
+FerriteLib.UiKit.Kernel.UiStatusTone FerriteLib.UiKit.Kernel.UiStatusTone Active=1
+FerriteLib.UiKit.Kernel.UiStatusTone FerriteLib.UiKit.Kernel.UiStatusTone Danger=4
+FerriteLib.UiKit.Kernel.UiStatusTone FerriteLib.UiKit.Kernel.UiStatusTone Disabled=5
+FerriteLib.UiKit.Kernel.UiStatusTone FerriteLib.UiKit.Kernel.UiStatusTone Neutral=0
+FerriteLib.UiKit.Kernel.UiStatusTone FerriteLib.UiKit.Kernel.UiStatusTone Success=2
+FerriteLib.UiKit.Kernel.UiStatusTone FerriteLib.UiKit.Kernel.UiStatusTone Warning=3
+FerriteLib.UiKit.Kernel.UiStatusTone Int32 value__
+FerriteLib.UiKit.Kernel.UiStatusTone implements System.IComparable
+FerriteLib.UiKit.Kernel.UiStatusTone implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiStatusTone implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiStyleDeclaration System.Nullable`1[FerriteLib.UiKit.Kernel.UiEmphasis] get_Emphasis()
+FerriteLib.UiKit.Kernel.UiStyleDeclaration System.Nullable`1[FerriteLib.UiKit.Kernel.UiStatusTone] get_Tone()
+FerriteLib.UiKit.Kernel.UiStyleDeclaration System.String get_Density()
+FerriteLib.UiKit.Kernel.UiStyleDeclaration System.String get_Scheme()
+FerriteLib.UiKit.Kernel.UiStyleDeclaration Void .ctor(System.String, System.String, System.Nullable`1[FerriteLib.UiKit.Kernel.UiStatusTone], System.Nullable`1[FerriteLib.UiKit.Kernel.UiEmphasis]) defaults[scheme=null,density=null,tone=null,emphasis=null]
+FerriteLib.UiKit.Kernel.UiStyleDocument Boolean get_IsEmpty()
+FerriteLib.UiKit.Kernel.UiStyleDocument FerriteLib.UiKit.Kernel.UiStyleDocument Parse(System.String)
+FerriteLib.UiKit.Kernel.UiStyleDocument FerriteLib.UiKit.Kernel.UiStyleDocument ParseFile(System.String)
+FerriteLib.UiKit.Kernel.UiStyleDocument FerriteLib.UiKit.Kernel.UiStyleDocument get_Empty()
+FerriteLib.UiKit.Kernel.UiStyleDocument Int32 MaxIssues=32
+FerriteLib.UiKit.Kernel.UiStyleDocument System.Collections.Generic.IReadOnlyCollection`1[System.String] get_DensityNames()
+FerriteLib.UiKit.Kernel.UiStyleDocument System.Collections.Generic.IReadOnlyCollection`1[System.String] get_SchemeNames()
+FerriteLib.UiKit.Kernel.UiStyleDocument System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiStyleIssue] get_Issues()
+FerriteLib.UiKit.Kernel.UiStyleDocument System.String get_DefaultDensity()
+FerriteLib.UiKit.Kernel.UiStyleDocument System.String get_DefaultScheme()
+FerriteLib.UiKit.Kernel.UiStyleFallbackReport System.String get_Attribute()
+FerriteLib.UiKit.Kernel.UiStyleFallbackReport System.String get_Authored()
+FerriteLib.UiKit.Kernel.UiStyleFallbackReport System.String get_Diagnostic()
+FerriteLib.UiKit.Kernel.UiStyleFallbackReport System.String get_ElementPath()
+FerriteLib.UiKit.Kernel.UiStyleFallbackReport System.String get_Kind()
+FerriteLib.UiKit.Kernel.UiStyleFallbackReport System.String get_Resolved()
+FerriteLib.UiKit.Kernel.UiStyleFallbackReport Void .ctor(System.String, System.String, System.String, System.String, System.String)
+FerriteLib.UiKit.Kernel.UiStyleIssue Int32 get_Line()
+FerriteLib.UiKit.Kernel.UiStyleIssue System.String ToString()
+FerriteLib.UiKit.Kernel.UiStyleIssue System.String get_ElementPath()
+FerriteLib.UiKit.Kernel.UiStyleIssue System.String get_Message()
+FerriteLib.UiKit.Kernel.UiStyleIssue Void .ctor(System.String, Int32, System.String) defaults[line=0,elementPath=null]
+FerriteLib.UiKit.Kernel.UiStyleResolver FerriteLib.UiKit.Kernel.UiEmphasis ResolveEmphasis(FerriteLib.UiKit.Kernel.UiStyleDeclaration)
+FerriteLib.UiKit.Kernel.UiStyleResolver FerriteLib.UiKit.Kernel.UiResolvedStyle Resolve(FerriteLib.UiKit.Kernel.UiTheme, System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiStyleDeclaration], System.Nullable`1[System.Boolean]) defaults[writable=null]
+FerriteLib.UiKit.Kernel.UiStyleResolver FerriteLib.UiKit.Kernel.UiStatusTone ResolveTone(FerriteLib.UiKit.Kernel.UiStyleDeclaration, System.Nullable`1[System.Boolean])
+FerriteLib.UiKit.Kernel.UiStyleResolver FerriteLib.UiKit.Kernel.UiStyleDocument get_Document()
+FerriteLib.UiKit.Kernel.UiStyleResolver FerriteLib.UiKit.Kernel.UiTheme ThemeFor(System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiStyleDeclaration])
+FerriteLib.UiKit.Kernel.UiStyleResolver FerriteLib.UiKit.Kernel.UiTheme get_Baseline()
+FerriteLib.UiKit.Kernel.UiStyleResolver Int32 MaxScopes=64
+FerriteLib.UiKit.Kernel.UiStyleResolver Int32 get_ScopeCount()
+FerriteLib.UiKit.Kernel.UiStyleResolver System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiStyleIssue] get_Issues()
+FerriteLib.UiKit.Kernel.UiStyleResolver System.String ResolveDensity(System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiStyleDeclaration])
+FerriteLib.UiKit.Kernel.UiStyleResolver System.String ResolveScheme(System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiStyleDeclaration])
+FerriteLib.UiKit.Kernel.UiStyleResolver Void .ctor(FerriteLib.UiKit.Kernel.UiTheme, FerriteLib.UiKit.Kernel.UiStyleDocument)
+FerriteLib.UiKit.Kernel.UiStyleResolver Void ApplyTo(FerriteLib.UiKit.Kernel.UiTheme)
+FerriteLib.UiKit.Kernel.UiStyleTable FerriteLib.UiKit.Kernel.UiFont get_Font()
+FerriteLib.UiKit.Kernel.UiStyleTable FerriteLib.UiKit.Kernel.UiResolvedStyle Resolve(FerriteLib.UiKit.Kernel.UiStatusTone, FerriteLib.UiKit.Kernel.UiEmphasis, System.Nullable`1[System.Boolean]) defaults[emphasis=Normal,writable=null]
+FerriteLib.UiKit.Kernel.UiStyleTable Int32 get_FallbackCount()
+FerriteLib.UiKit.Kernel.UiStyleTable System.String get_LastFallbackDiagnostic()
+FerriteLib.UiKit.Kernel.UiSurfaceStyle UnityEngine.Color get_Border()
+FerriteLib.UiKit.Kernel.UiSurfaceStyle UnityEngine.Color get_Fill()
+FerriteLib.UiKit.Kernel.UiSurfaceStyle Void .ctor(UnityEngine.Color, UnityEngine.Color)
+FerriteLib.UiKit.Kernel.UiTheme Boolean get_HasDensityOverride()
+FerriteLib.UiKit.Kernel.UiTheme Boolean get_HasFontOverride()
+FerriteLib.UiKit.Kernel.UiTheme FerriteLib.UiKit.Kernel.UiFont get_DefaultFont()
+FerriteLib.UiKit.Kernel.UiTheme FerriteLib.UiKit.Kernel.UiGeometry get_Geometry()
+FerriteLib.UiKit.Kernel.UiTheme FerriteLib.UiKit.Kernel.UiPalette get_Palette()
+FerriteLib.UiKit.Kernel.UiTheme FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1[System.Single] Metric(System.String)
+FerriteLib.UiKit.Kernel.UiTheme FerriteLib.UiKit.Kernel.UiStyleTable get_Styles()
+FerriteLib.UiKit.Kernel.UiTheme FerriteLib.UiKit.Kernel.UiSurfaceStyle Surface(FerriteLib.UiKit.Kernel.UiPaletteRole, FerriteLib.UiKit.Kernel.UiPaletteRole)
+FerriteLib.UiKit.Kernel.UiTheme FerriteLib.UiKit.Kernel.UiSurfaceStyle get_BaseSurface()
+FerriteLib.UiKit.Kernel.UiTheme FerriteLib.UiKit.Kernel.UiSurfaceStyle get_DangerSurface()
+FerriteLib.UiKit.Kernel.UiTheme FerriteLib.UiKit.Kernel.UiSurfaceStyle get_HoverSurface()
+FerriteLib.UiKit.Kernel.UiTheme FerriteLib.UiKit.Kernel.UiSurfaceStyle get_PanelSurface()
+FerriteLib.UiKit.Kernel.UiTheme FerriteLib.UiKit.Kernel.UiSurfaceStyle get_RaisedSurface()
+FerriteLib.UiKit.Kernel.UiTheme FerriteLib.UiKit.Kernel.UiSurfaceStyle get_SelectedSurface()
+FerriteLib.UiKit.Kernel.UiTheme FerriteLib.UiKit.Kernel.UiSurfaceStyle get_SuccessSurface()
+FerriteLib.UiKit.Kernel.UiTheme FerriteLib.UiKit.Kernel.UiSurfaceStyle get_WarningSurface()
+FerriteLib.UiKit.Kernel.UiTheme FerriteLib.UiKit.Kernel.UiTheme Clone()
+FerriteLib.UiKit.Kernel.UiTheme FerriteLib.UiKit.Kernel.UiTheme get_Vanilla()
+FerriteLib.UiKit.Kernel.UiTheme Int32 get_ColourRevision()
+FerriteLib.UiKit.Kernel.UiTheme Int32 get_LayoutRevision()
+FerriteLib.UiKit.Kernel.UiTheme UnityEngine.Color AccentWith(Single)
+FerriteLib.UiKit.Kernel.UiTheme UnityEngine.Color get_AccentHover()
+FerriteLib.UiKit.Kernel.UiTheme UnityEngine.Color get_Item(FerriteLib.UiKit.Kernel.UiPaletteRole)
+FerriteLib.UiKit.Kernel.UiTheme Void .ctor()
+FerriteLib.UiKit.Kernel.UiTheme Void RemoveDensityOverride()
+FerriteLib.UiKit.Kernel.UiTheme Void RemoveFontOverride()
+FerriteLib.UiKit.Kernel.UiTheme Void set_DefaultFont(FerriteLib.UiKit.Kernel.UiFont)
+FerriteLib.UiKit.Kernel.UiTheme Void set_Geometry(FerriteLib.UiKit.Kernel.UiGeometry)
+FerriteLib.UiKit.Kernel.UiTheme Void set_Item(FerriteLib.UiKit.Kernel.UiPaletteRole, UnityEngine.Color)
+FerriteLib.UiKit.Kernel.UiThemeDraw Boolean Image(UnityEngine.Rect, UnityEngine.Texture, UnityEngine.Color)
+FerriteLib.UiKit.Kernel.UiThemeDraw Boolean Image(UnityEngine.Rect, UnityEngine.Texture, UnityEngine.Color, FerriteLib.UiKit.Kernel.UiImageOptions)
+FerriteLib.UiKit.Kernel.UiThemeDraw Single SelectorAccentWidth=3
+FerriteLib.UiKit.Kernel.UiThemeDraw Single SelectorArrowHeight=6
+FerriteLib.UiKit.Kernel.UiThemeDraw Single SelectorArrowWidth=10
+FerriteLib.UiKit.Kernel.UiThemeDraw Single SelectorArrowZoneWidth=18
+FerriteLib.UiKit.Kernel.UiThemeDraw UnityEngine.Rect FitImage(UnityEngine.Rect, UnityEngine.Vector2)
+FerriteLib.UiKit.Kernel.UiThemeDraw UnityEngine.Rect SelectorArrowZone(UnityEngine.Rect)
+FerriteLib.UiKit.Kernel.UiThemeDraw UnityEngine.Rect SelectorTextOutlet(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiTheme)
+FerriteLib.UiKit.Kernel.UiThemeDraw Void AccentRail(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiTheme, Boolean, Single, System.Nullable`1[UnityEngine.Color]) defaults[active=True,width=2,color=null]
+FerriteLib.UiKit.Kernel.UiThemeDraw Void BackgroundPlane(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiTheme)
+FerriteLib.UiKit.Kernel.UiThemeDraw Void Base(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiTheme)
+FerriteLib.UiKit.Kernel.UiThemeDraw Void FocusRail(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiTheme, Boolean, Single) defaults[focused=True,width=2]
+FerriteLib.UiKit.Kernel.UiThemeDraw Void Label(UnityEngine.Rect, System.String, FerriteLib.UiKit.Kernel.UiTheme, System.Nullable`1[UnityEngine.Color], System.Nullable`1[FerriteLib.UiKit.Kernel.UiFont], UnityEngine.TextAnchor, Boolean) defaults[color=null,font=null,anchor=MiddleLeft,singleLine=False]
+FerriteLib.UiKit.Kernel.UiThemeDraw Void Panel(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiTheme)
+FerriteLib.UiKit.Kernel.UiThemeDraw Void RecoveryBand(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiTheme, System.String)
+FerriteLib.UiKit.Kernel.UiThemeDraw Void SectionBand(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiTheme, System.Nullable`1[UnityEngine.Color], System.Nullable`1[UnityEngine.Color]) defaults[fill=null,rule=null]
+FerriteLib.UiKit.Kernel.UiThemeDraw Void SectionHeader(UnityEngine.Rect, System.String, FerriteLib.UiKit.Kernel.UiTheme, System.Nullable`1[UnityEngine.Color], System.Nullable`1[FerriteLib.UiKit.Kernel.UiFont]) defaults[color=null,font=null]
+FerriteLib.UiKit.Kernel.UiThemeDraw Void SelectorArrow(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiTheme, System.Nullable`1[UnityEngine.Color]) defaults[color=null]
+FerriteLib.UiKit.Kernel.UiThemeDraw Void SelectorField(UnityEngine.Rect, System.String, FerriteLib.UiKit.Kernel.UiTheme, FerriteLib.UiKit.Kernel.UiResolvedStyle, System.Nullable`1[FerriteLib.UiKit.Kernel.UiFont]) defaults[font=null]
+FerriteLib.UiKit.Kernel.UiThemeDraw Void Solid(UnityEngine.Rect, UnityEngine.Color)
+FerriteLib.UiKit.Kernel.UiThemeDraw Void StatusBadge(UnityEngine.Rect, System.String, FerriteLib.UiKit.Kernel.UiTheme, FerriteLib.UiKit.Kernel.UiStatusTone, System.Nullable`1[FerriteLib.UiKit.Kernel.UiFont], System.Nullable`1[System.Boolean]) defaults[tone=Neutral,font=null,writable=null]
+FerriteLib.UiKit.Kernel.UiThemeDraw Void StatusTreatment(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiTheme, FerriteLib.UiKit.Kernel.UiStatusTone, System.Nullable`1[System.Boolean]) defaults[tone=Neutral,writable=null]
+FerriteLib.UiKit.Kernel.UiThemeDraw Void Surface(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiSurfaceStyle, Single) defaults[hairline=1]
+FerriteLib.UiKit.Kernel.UiThemeDraw Void Surface(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiTheme, UnityEngine.Color, System.Nullable`1[UnityEngine.Color]) defaults[border=null]
+FerriteLib.UiKit.Kernel.UiThemeDraw Void Workspace(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiTheme)
+FerriteLib.UiKit.Kernel.UiUnknownWidgetKindException System.String get_Kind()
+FerriteLib.UiKit.Kernel.UiUnknownWidgetKindException System.String get_Scope()
+FerriteLib.UiKit.Kernel.UiUnknownWidgetKindException Void .ctor(System.String, System.String)
+FerriteLib.UiKit.Kernel.UiUnknownWidgetKindException implements System.Runtime.InteropServices._Exception
+FerriteLib.UiKit.Kernel.UiUnknownWidgetKindException implements System.Runtime.Serialization.ISerializable
+FerriteLib.UiKit.Kernel.UiValueBehavior FerriteLib.UiKit.Kernel.UiSelectionObservation Observe[T](System.Collections.Generic.IReadOnlyList`1[T], T, System.Func`2[T,System.Boolean]) defaults[selectable=null]
+FerriteLib.UiKit.Kernel.UiValueBehavior FerriteLib.UiKit.Kernel.UiValueOperation`1[System.Boolean] Boolean(FerriteLib.UiKit.Kernel.UiInteractionResult, Boolean)
+FerriteLib.UiKit.Kernel.UiValueBehavior FerriteLib.UiKit.Kernel.UiValueOperation`1[System.Boolean] Expansion(FerriteLib.UiKit.Kernel.UiInteractionResult, Boolean, Boolean)
+FerriteLib.UiKit.Kernel.UiValueBehavior FerriteLib.UiKit.Kernel.UiValueOperation`1[T] Selection[T](FerriteLib.UiKit.Kernel.UiInteractionResult, T, Boolean) defaults[selectable=True]
+FerriteLib.UiKit.Kernel.UiValueBehavior Void Request[T](FerriteLib.UiKit.Kernel.UiInteractionTarget, FerriteLib.UiKit.Kernel.UiValueOperation`1[T], FerriteLib.UiKit.Kernel.UiBindings, System.Action`1[T])
+FerriteLib.UiKit.Kernel.UiValueBehavior Void Request[T](FerriteLib.UiKit.Kernel.UiInteractionTarget, FerriteLib.UiKit.Kernel.UiValueOperation`1[T], System.Action`1[T])
+FerriteLib.UiKit.Kernel.UiValueOperation`1 Boolean get_Available()
+FerriteLib.UiKit.Kernel.UiValueOperation`1 Boolean get_Request()
+FerriteLib.UiKit.Kernel.UiValueOperation`1 FerriteLib.UiKit.Kernel.UiInteractionResult get_Interaction()
+FerriteLib.UiKit.Kernel.UiValueOperation`1 T get_Value()
+FerriteLib.UiKit.Kernel.UiValueState Boolean Dragging
+FerriteLib.UiKit.Kernel.UiValueState Boolean Focused
+FerriteLib.UiKit.Kernel.UiValueState Int32 Cursor
+FerriteLib.UiKit.Kernel.UiValueState Single FloatValue
+FerriteLib.UiKit.Kernel.UiValueState System.String EditText
+FerriteLib.UiKit.Kernel.UiValueState Void .ctor()
+FerriteLib.UiKit.Kernel.UiWidgetCatalog Boolean TryGet(System.String, System.String, FerriteLib.UiKit.Kernel.UiWidgetDescriptor ByRef)
+FerriteLib.UiKit.Kernel.UiWidgetCatalog System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiWidgetDescriptor] Snapshot()
+FerriteLib.UiKit.Kernel.UiWidgetCatalog System.Collections.Generic.IReadOnlyList`1[System.String] Scopes()
+FerriteLib.UiKit.Kernel.UiWidgetContext Boolean get_IsActive()
+FerriteLib.UiKit.Kernel.UiWidgetContext Boolean get_IsDisabled()
+FerriteLib.UiKit.Kernel.UiWidgetContext FerriteLib.UiKit.Kernel.ITextMetrics get_Metrics()
+FerriteLib.UiKit.Kernel.UiWidgetContext FerriteLib.UiKit.Kernel.IUiBindings get_Bindings()
+FerriteLib.UiKit.Kernel.UiWidgetContext FerriteLib.UiKit.Kernel.IUiTranslation get_Translation()
+FerriteLib.UiKit.Kernel.UiWidgetContext FerriteLib.UiKit.Kernel.UiElementProperties get_Properties()
+FerriteLib.UiKit.Kernel.UiWidgetContext FerriteLib.UiKit.Kernel.UiNodeId get_ElementId()
+FerriteLib.UiKit.Kernel.UiWidgetContext FerriteLib.UiKit.Kernel.UiTheme get_Theme()
+FerriteLib.UiKit.Kernel.UiWidgetContext FerriteLib.UiKit.Kernel.UiValueState State(System.String)
+FerriteLib.UiKit.Kernel.UiWidgetContext FerriteLib.UiKit.Kernel.UiWidgetContext Child(System.String)
+FerriteLib.UiKit.Kernel.UiWidgetContext FerriteLib.UiKit.Kernel.UiWidgetContext WithStyleChain(System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiStyleDeclaration])
+FerriteLib.UiKit.Kernel.UiWidgetContext FerriteLib.UiKit.Kernel.UiWidgetContext WithStyleDeclaration(FerriteLib.UiKit.Kernel.UiStyleDeclaration)
+FerriteLib.UiKit.Kernel.UiWidgetContext FerriteLib.UiKit.Kernel.UiWidgetContext WithTheme(FerriteLib.UiKit.Kernel.UiTheme)
+FerriteLib.UiKit.Kernel.UiWidgetContext FerriteLib.UiKit.Kernel.UiWidgetContext WithViewWidth(Single)
+FerriteLib.UiKit.Kernel.UiWidgetContext FerriteLib.UiKit.Kernel.UiWidgetContext WithWindowOrigin(UnityEngine.Vector2)
+FerriteLib.UiKit.Kernel.UiWidgetContext Single get_SharedLabelWidth()
+FerriteLib.UiKit.Kernel.UiWidgetContext Single get_ViewWidth()
+FerriteLib.UiKit.Kernel.UiWidgetContext System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiStyleDeclaration] get_StyleChain()
+FerriteLib.UiKit.Kernel.UiWidgetContext System.String get_ElementPath()
+FerriteLib.UiKit.Kernel.UiWidgetContext System.String get_InteractionScope()
+FerriteLib.UiKit.Kernel.UiWidgetContext System.String get_Source()
+FerriteLib.UiKit.Kernel.UiWidgetContext UnityEngine.Rect ToWindowRect(UnityEngine.Rect)
+FerriteLib.UiKit.Kernel.UiWidgetContext UnityEngine.Vector2 get_WindowOrigin()
+FerriteLib.UiKit.Kernel.UiWidgetContext Void Invalidate()
+FerriteLib.UiKit.Kernel.UiWidgetContext Void set_InteractionScope(System.String)
+FerriteLib.UiKit.Kernel.UiWidgetDescriptor Boolean get_HasAttributeSchema()
+FerriteLib.UiKit.Kernel.UiWidgetDescriptor Boolean get_HasLabelSet()
+FerriteLib.UiKit.Kernel.UiWidgetDescriptor System.Collections.Generic.IReadOnlyCollection`1[System.String] get_AllowedAttributes()
+FerriteLib.UiKit.Kernel.UiWidgetDescriptor System.Collections.Generic.IReadOnlyCollection`1[System.String] get_LabelAttributes()
+FerriteLib.UiKit.Kernel.UiWidgetDescriptor System.String ToString()
+FerriteLib.UiKit.Kernel.UiWidgetDescriptor System.String get_Kind()
+FerriteLib.UiKit.Kernel.UiWidgetDescriptor System.String get_Scope()
+FerriteLib.UiKit.Kernel.UiWidgetDescriptor Void .ctor(System.String, System.String, System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[System.String])
+FerriteLib.UiKit.Kernel.UiWidgetRegistry FerriteLib.UiKit.Kernel.IUiWidget Resolve(System.String, System.String)
+FerriteLib.UiKit.Kernel.UiWidgetRegistry FerriteLib.UiKit.Kernel.UiFont GetFallbackFont(System.String, System.String)
+FerriteLib.UiKit.Kernel.UiWidgetRegistry System.Collections.Generic.IReadOnlyCollection`1[System.String] GetAttributeSchema(System.String, System.String)
+FerriteLib.UiKit.Kernel.UiWidgetRegistry System.Collections.Generic.IReadOnlyCollection`1[System.String] GetLabelAttributes(System.String, System.String)
+FerriteLib.UiKit.Kernel.UiWidgetRegistry System.Collections.Generic.IReadOnlyCollection`1[System.String] KnownKinds(System.String) defaults[scope=null]
+FerriteLib.UiKit.Kernel.UiWidgetRegistry System.Func`3[FerriteLib.UiKit.Kernel.UiElementSpec,FerriteLib.UiKit.Kernel.UiWidgetContext,System.Single] GetNaturalBody(System.String, System.String)
+FerriteLib.UiKit.Kernel.UiWidgetRegistry System.String CoreScope=core
+FerriteLib.UiKit.Kernel.UiWidgetRegistry Void InitializeCore()
+FerriteLib.UiKit.Kernel.UiWidgetRegistry Void Register(System.String, System.String, System.Func`1[FerriteLib.UiKit.Kernel.IUiWidget])
+FerriteLib.UiKit.Kernel.UiWidgetRegistry Void Register(System.String, System.String, System.Func`1[FerriteLib.UiKit.Kernel.IUiWidget], System.Collections.Generic.IReadOnlyCollection`1[System.String])
+FerriteLib.UiKit.Kernel.UiWidgetRegistry Void Register(System.String, System.String, System.Func`1[FerriteLib.UiKit.Kernel.IUiWidget], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[System.String])
+FerriteLib.UiKit.Kernel.UiWidgetRegistry Void Register(System.String, System.String, System.Func`1[FerriteLib.UiKit.Kernel.IUiWidget], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Func`3[FerriteLib.UiKit.Kernel.UiElementSpec,FerriteLib.UiKit.Kernel.UiWidgetContext,System.Single])
+FerriteLib.UiKit.Kernel.UiWidgetRegistry Void Register(System.String, System.String, System.Func`1[FerriteLib.UiKit.Kernel.IUiWidget], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Func`3[FerriteLib.UiKit.Kernel.UiElementSpec,FerriteLib.UiKit.Kernel.UiWidgetContext,System.Single], FerriteLib.UiKit.Kernel.UiFont)
+FerriteLib.UiKit.Kernel.UiWidthDemand FerriteLib.UiKit.Kernel.UiWidthMode get_Mode()
+FerriteLib.UiKit.Kernel.UiWidthDemand Single get_Maximum()
+FerriteLib.UiKit.Kernel.UiWidthDemand Single get_Minimum()
+FerriteLib.UiKit.Kernel.UiWidthDemand Single get_Natural()
+FerriteLib.UiKit.Kernel.UiWidthDemand Void .ctor(FerriteLib.UiKit.Kernel.UiWidthMode, Single, Single, Single) defaults[minimum=1,maximum=3.402823E+38]
+FerriteLib.UiKit.Kernel.UiWidthMode FerriteLib.UiKit.Kernel.UiWidthMode Auto=1
+FerriteLib.UiKit.Kernel.UiWidthMode FerriteLib.UiKit.Kernel.UiWidthMode Fixed=0
+FerriteLib.UiKit.Kernel.UiWidthMode FerriteLib.UiKit.Kernel.UiWidthMode Flexible=2
+FerriteLib.UiKit.Kernel.UiWidthMode Int32 value__
+FerriteLib.UiKit.Kernel.UiWidthMode implements System.IComparable
+FerriteLib.UiKit.Kernel.UiWidthMode implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiWidthMode implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiWidthPlan Boolean get_Overflow()
+FerriteLib.UiKit.Kernel.UiWidthPlan Single get_Available()
+FerriteLib.UiKit.Kernel.UiWidthPlan Single get_Required()
+FerriteLib.UiKit.Kernel.UiWidthPlan System.Collections.Generic.IReadOnlyList`1[System.Single] get_Widths()
+FerriteLib.UiKit.Kernel.UiWindowBackground FerriteLib.UiKit.Kernel.UiImageOptions get_Options()
+FerriteLib.UiKit.Kernel.UiWindowBackground System.String get_Bind()
+FerriteLib.UiKit.Kernel.UiWindowBackground Void .ctor(System.String, FerriteLib.UiKit.Kernel.UiImageOptions) defaults[options=null]
+FerriteLib.UiKit.Kernel.UiWindowCatalog Boolean Close(FerriteLib.UiKit.Kernel.UiWindowKey)
+FerriteLib.UiKit.Kernel.UiWindowCatalog Boolean IsActive(FerriteLib.UiKit.Kernel.UiWindowKey)
+FerriteLib.UiKit.Kernel.UiWindowCatalog Boolean Open(FerriteLib.UiKit.Kernel.UiWindowKey)
+FerriteLib.UiKit.Kernel.UiWindowCatalog Boolean TryGet(FerriteLib.UiKit.Kernel.UiWindowKey, FerriteLib.UiKit.Kernel.UiWindowHost ByRef)
+FerriteLib.UiKit.Kernel.UiWindowCatalog Boolean get_AnyForcesPause()
+FerriteLib.UiKit.Kernel.UiWindowCatalog Boolean get_AnyPreventsCameraMotion()
+FerriteLib.UiKit.Kernel.UiWindowCatalog FerriteLib.UiKit.Kernel.UiFocusPolicy get_FocusPolicy()
+FerriteLib.UiKit.Kernel.UiWindowCatalog FerriteLib.UiKit.Kernel.UiWindowHost get_ActiveWindow()
+FerriteLib.UiKit.Kernel.UiWindowCatalog Int32 CloseAll()
+FerriteLib.UiKit.Kernel.UiWindowCatalog System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiWindowHost] get_Instances()
+FerriteLib.UiKit.Kernel.UiWindowCatalog System.Nullable`1[FerriteLib.UiKit.Kernel.UiWindowKey] get_ActiveKey()
+FerriteLib.UiKit.Kernel.UiWindowCatalog Void .ctor(Verse.WindowStack, FerriteLib.UiKit.Kernel.UiFocusPolicy) defaults[focusPolicy=FollowClicks]
+FerriteLib.UiKit.Kernel.UiWindowCatalog Void Activate(FerriteLib.UiKit.Kernel.UiWindowKey)
+FerriteLib.UiKit.Kernel.UiWindowCatalog Void Register(System.String, System.String, FerriteLib.UiKit.Kernel.UiWindowOptions, System.Func`2[FerriteLib.UiKit.Kernel.UiWindowKey,FerriteLib.UiKit.Kernel.UiWindowHost])
+FerriteLib.UiKit.Kernel.UiWindowChrome Single get_SidePadding()
+FerriteLib.UiKit.Kernel.UiWindowChrome Single get_TitleBarHeight()
+FerriteLib.UiKit.Kernel.UiWindowChrome UnityEngine.Rect get_CloseButton()
+FerriteLib.UiKit.Kernel.UiWindowChrome UnityEngine.Rect get_Content()
+FerriteLib.UiKit.Kernel.UiWindowChrome UnityEngine.Rect get_Outer()
+FerriteLib.UiKit.Kernel.UiWindowChrome UnityEngine.Rect get_TitleBand()
+FerriteLib.UiKit.Kernel.UiWindowHost Boolean CanClose()
+FerriteLib.UiKit.Kernel.UiWindowHost Boolean OnCloseRequest()
+FerriteLib.UiKit.Kernel.UiWindowHost Boolean TryHandleUnansweredCancel()
+FerriteLib.UiKit.Kernel.UiWindowHost Boolean get_DisplayRequired()
+FerriteLib.UiKit.Kernel.UiWindowHost Boolean get_IsActiveTarget()
+FerriteLib.UiKit.Kernel.UiWindowHost Boolean get_PrerequisiteVerified()
+FerriteLib.UiKit.Kernel.UiWindowHost FerriteLib.UiKit.Kernel.ITextMetrics get_Metrics()
+FerriteLib.UiKit.Kernel.UiWindowHost FerriteLib.UiKit.Kernel.UiFont get_CloseFont()
+FerriteLib.UiKit.Kernel.UiWindowHost FerriteLib.UiKit.Kernel.UiFont get_SubtitleFont()
+FerriteLib.UiKit.Kernel.UiWindowHost FerriteLib.UiKit.Kernel.UiFont get_TitleFont()
+FerriteLib.UiKit.Kernel.UiWindowHost FerriteLib.UiKit.Kernel.UiHost CreateHost()
+FerriteLib.UiKit.Kernel.UiWindowHost FerriteLib.UiKit.Kernel.UiHost get_Host()
+FerriteLib.UiKit.Kernel.UiWindowHost FerriteLib.UiKit.Kernel.UiHostInputState get_InputState()
+FerriteLib.UiKit.Kernel.UiWindowHost FerriteLib.UiKit.Kernel.UiTheme get_Theme()
+FerriteLib.UiKit.Kernel.UiWindowHost FerriteLib.UiKit.Kernel.UiWindowChrome get_ShellChrome()
+FerriteLib.UiKit.Kernel.UiWindowHost FerriteLib.UiKit.Kernel.UiWindowOptions get_AppliedOptions()
+FerriteLib.UiKit.Kernel.UiWindowHost Single get_AccentBarHeight()
+FerriteLib.UiKit.Kernel.UiWindowHost Single get_Margin()
+FerriteLib.UiKit.Kernel.UiWindowHost Single get_SidePadding()
+FerriteLib.UiKit.Kernel.UiWindowHost Single get_TitleBarHeight()
+FerriteLib.UiKit.Kernel.UiWindowHost System.Exception get_LastFailure()
+FerriteLib.UiKit.Kernel.UiWindowHost System.Func`1[UnityEngine.Vector2] get_InitialSizePolicy()
+FerriteLib.UiKit.Kernel.UiWindowHost System.Nullable`1[FerriteLib.UiKit.Kernel.UiWindowKey] get_Key()
+FerriteLib.UiKit.Kernel.UiWindowHost System.String get_CloseText()
+FerriteLib.UiKit.Kernel.UiWindowHost System.String get_Subtitle()
+FerriteLib.UiKit.Kernel.UiWindowHost System.String get_Title()
+FerriteLib.UiKit.Kernel.UiWindowHost UnityEngine.Vector2 get_CloseButtonSize()
+FerriteLib.UiKit.Kernel.UiWindowHost UnityEngine.Vector2 get_InitialSize()
+FerriteLib.UiKit.Kernel.UiWindowHost Void .ctor()
+FerriteLib.UiKit.Kernel.UiWindowHost Void BeforeDraw(UnityEngine.Rect)
+FerriteLib.UiKit.Kernel.UiWindowHost Void DoWindowContents(UnityEngine.Rect)
+FerriteLib.UiKit.Kernel.UiWindowHost Void DrawBackground(UnityEngine.Rect)
+FerriteLib.UiKit.Kernel.UiWindowHost Void DrawNotice(UnityEngine.Rect, FerriteLib.UiKit.Kernel.UiWindowNotice)
+FerriteLib.UiKit.Kernel.UiWindowHost Void OnAcceptKeyPressed()
+FerriteLib.UiKit.Kernel.UiWindowHost Void OnCancelKeyPressed()
+FerriteLib.UiKit.Kernel.UiWindowHost Void OnDrawFailure(System.Exception)
+FerriteLib.UiKit.Kernel.UiWindowHost Void PostClose()
+FerriteLib.UiKit.Kernel.UiWindowHost Void PostOpen()
+FerriteLib.UiKit.Kernel.UiWindowHost Void PreClose()
+FerriteLib.UiKit.Kernel.UiWindowHost Void PreOpen()
+FerriteLib.UiKit.Kernel.UiWindowHost Void SetDisplayDemand(Boolean)
+FerriteLib.UiKit.Kernel.UiWindowHost Void add_HostAttached(System.Action`1[FerriteLib.UiKit.Kernel.UiHost])
+FerriteLib.UiKit.Kernel.UiWindowHost Void add_HostDetached(System.Action`1[FerriteLib.UiKit.Kernel.UiHost])
+FerriteLib.UiKit.Kernel.UiWindowHost Void remove_HostAttached(System.Action`1[FerriteLib.UiKit.Kernel.UiHost])
+FerriteLib.UiKit.Kernel.UiWindowHost Void remove_HostDetached(System.Action`1[FerriteLib.UiKit.Kernel.UiHost])
+FerriteLib.UiKit.Kernel.UiWindowKey Boolean Equals(FerriteLib.UiKit.Kernel.UiWindowKey)
+FerriteLib.UiKit.Kernel.UiWindowKey Boolean Equals(System.Object)
+FerriteLib.UiKit.Kernel.UiWindowKey Boolean op_Equality(FerriteLib.UiKit.Kernel.UiWindowKey, FerriteLib.UiKit.Kernel.UiWindowKey)
+FerriteLib.UiKit.Kernel.UiWindowKey Boolean op_Inequality(FerriteLib.UiKit.Kernel.UiWindowKey, FerriteLib.UiKit.Kernel.UiWindowKey)
+FerriteLib.UiKit.Kernel.UiWindowKey Int32 GetHashCode()
+FerriteLib.UiKit.Kernel.UiWindowKey System.String ToString()
+FerriteLib.UiKit.Kernel.UiWindowKey System.String get_Consumer()
+FerriteLib.UiKit.Kernel.UiWindowKey System.String get_ContextKey()
+FerriteLib.UiKit.Kernel.UiWindowKey System.String get_WindowKind()
+FerriteLib.UiKit.Kernel.UiWindowKey Void .ctor(System.String, System.String, System.String)
+FerriteLib.UiKit.Kernel.UiWindowKey implements System.IEquatable`1[FerriteLib.UiKit.Kernel.UiWindowKey]
+FerriteLib.UiKit.Kernel.UiWindowNotice FerriteLib.UiKit.Kernel.UiWindowNotice PageUnavailable=1
+FerriteLib.UiKit.Kernel.UiWindowNotice FerriteLib.UiKit.Kernel.UiWindowNotice Prerequisite=0
+FerriteLib.UiKit.Kernel.UiWindowNotice Int32 value__
+FerriteLib.UiKit.Kernel.UiWindowNotice implements System.IComparable
+FerriteLib.UiKit.Kernel.UiWindowNotice implements System.IConvertible
+FerriteLib.UiKit.Kernel.UiWindowNotice implements System.IFormattable
+FerriteLib.UiKit.Kernel.UiWindowOptions Boolean get_AllowMultipleInstances()
+FerriteLib.UiKit.Kernel.UiWindowOptions Boolean get_SetFocusOnActivate()
+FerriteLib.UiKit.Kernel.UiWindowOptions System.Func`2[FerriteLib.UiKit.Kernel.UiWindowKey,System.Boolean] get_CanClose()
+FerriteLib.UiKit.Kernel.UiWindowOptions System.Nullable`1[System.Boolean] get_AbsorbInputAroundWindow()
+FerriteLib.UiKit.Kernel.UiWindowOptions System.Nullable`1[System.Boolean] get_CloseOnAccept()
+FerriteLib.UiKit.Kernel.UiWindowOptions System.Nullable`1[System.Boolean] get_CloseOnCancel()
+FerriteLib.UiKit.Kernel.UiWindowOptions System.Nullable`1[System.Boolean] get_CloseOnClickedOutside()
+FerriteLib.UiKit.Kernel.UiWindowOptions System.Nullable`1[System.Boolean] get_Draggable()
+FerriteLib.UiKit.Kernel.UiWindowOptions System.Nullable`1[System.Boolean] get_ForcePause()
+FerriteLib.UiKit.Kernel.UiWindowOptions System.Nullable`1[System.Boolean] get_PreventCameraMotion()
+FerriteLib.UiKit.Kernel.UiWindowOptions System.Nullable`1[System.Boolean] get_Resizeable()
+FerriteLib.UiKit.Kernel.UiWindowOptions System.Nullable`1[UnityEngine.Vector2] get_InitialSize()
+FerriteLib.UiKit.Kernel.UiWindowOptions System.Nullable`1[UnityEngine.Vector2] get_NormalSize()
+FerriteLib.UiKit.Kernel.UiWindowOptions Void .ctor()
+FerriteLib.UiKit.Kernel.UiWindowOptions Void set_AbsorbInputAroundWindow(System.Nullable`1[System.Boolean])
+FerriteLib.UiKit.Kernel.UiWindowOptions Void set_AllowMultipleInstances(Boolean)
+FerriteLib.UiKit.Kernel.UiWindowOptions Void set_CanClose(System.Func`2[FerriteLib.UiKit.Kernel.UiWindowKey,System.Boolean])
+FerriteLib.UiKit.Kernel.UiWindowOptions Void set_CloseOnAccept(System.Nullable`1[System.Boolean])
+FerriteLib.UiKit.Kernel.UiWindowOptions Void set_CloseOnCancel(System.Nullable`1[System.Boolean])
+FerriteLib.UiKit.Kernel.UiWindowOptions Void set_CloseOnClickedOutside(System.Nullable`1[System.Boolean])
+FerriteLib.UiKit.Kernel.UiWindowOptions Void set_Draggable(System.Nullable`1[System.Boolean])
+FerriteLib.UiKit.Kernel.UiWindowOptions Void set_ForcePause(System.Nullable`1[System.Boolean])
+FerriteLib.UiKit.Kernel.UiWindowOptions Void set_InitialSize(System.Nullable`1[UnityEngine.Vector2])
+FerriteLib.UiKit.Kernel.UiWindowOptions Void set_NormalSize(System.Nullable`1[UnityEngine.Vector2])
+FerriteLib.UiKit.Kernel.UiWindowOptions Void set_PreventCameraMotion(System.Nullable`1[System.Boolean])
+FerriteLib.UiKit.Kernel.UiWindowOptions Void set_Resizeable(System.Nullable`1[System.Boolean])
+FerriteLib.UiKit.Kernel.UiWindowOptions Void set_SetFocusOnActivate(Boolean)
+FerriteLib.UiKit.Kernel.VerseFerriteMainThread Boolean get_IsCurrent()
+FerriteLib.UiKit.Kernel.VerseFerriteMainThread FerriteLib.UiKit.Kernel.VerseFerriteMainThread Instance
+FerriteLib.UiKit.Kernel.VerseFerriteMainThread implements FerriteLib.UiKit.Kernel.IUiMainThread
+FerriteLib.UiKit.Kernel.VerseFerriteTextMetrics FerriteLib.UiKit.Kernel.VerseFerriteTextMetrics Instance
+FerriteLib.UiKit.Kernel.VerseFerriteTextMetrics Single MeasureText(System.String, FerriteLib.UiKit.Kernel.UiFont, Single)
+FerriteLib.UiKit.Kernel.VerseFerriteTextMetrics Single MeasureWidth(System.String, FerriteLib.UiKit.Kernel.UiFont)
+FerriteLib.UiKit.Kernel.VerseFerriteTextMetrics Void .ctor()
+FerriteLib.UiKit.Kernel.VerseFerriteTextMetrics implements FerriteLib.UiKit.Kernel.ITextMetrics
+FerriteLib.UiKit.Kernel.VerseFerriteTextMetrics implements FerriteLib.UiKit.Kernel.IUiTextMetricsEnvironment
+FerriteLib.UiKit.Kernel.VerseFerriteTimeSource Double get_NowSeconds()
+FerriteLib.UiKit.Kernel.VerseFerriteTimeSource FerriteLib.UiKit.Kernel.VerseFerriteTimeSource Instance
+FerriteLib.UiKit.Kernel.VerseFerriteTimeSource implements FerriteLib.UiKit.Kernel.IUiTimeSource
+FerriteLib.UiKit.Kernel.Widgets.UiTreeRow Boolean get_Checkable()
+FerriteLib.UiKit.Kernel.Widgets.UiTreeRow Boolean get_Checked()
+FerriteLib.UiKit.Kernel.Widgets.UiTreeRow Boolean get_Expandable()
+FerriteLib.UiKit.Kernel.Widgets.UiTreeRow Boolean get_Expanded()
+FerriteLib.UiKit.Kernel.Widgets.UiTreeRow Boolean get_Selected()
+FerriteLib.UiKit.Kernel.Widgets.UiTreeRow Int32 get_Depth()
+FerriteLib.UiKit.Kernel.Widgets.UiTreeRow System.String get_Key()
+FerriteLib.UiKit.Kernel.Widgets.UiTreeRow System.String get_Text()
+FerriteLib.UiKit.Kernel.Widgets.UiTreeRow System.String get_TextKey()
+FerriteLib.UiKit.Kernel.Widgets.UiTreeRow UnityEngine.Texture2D get_Image()
+FerriteLib.UiKit.Kernel.Widgets.UiTreeRow UnityEngine.Vector2 get_ImageSize()
+FerriteLib.UiKit.Kernel.Widgets.UiTreeRow Void .ctor(System.String, Int32, System.String, Boolean, Boolean, System.String, Boolean, Boolean, Boolean, UnityEngine.Texture2D, UnityEngine.Vector2) defaults[expandable=False,expanded=False,textKey=,selected=False,checkable=False,isChecked=False,image=null,imageSize=null]
+TYPE FerriteLib.UiKit.Kernel.FerriteLibVersion : System.Object
+TYPE FerriteLib.UiKit.Kernel.ITextMetrics : 
+TYPE FerriteLib.UiKit.Kernel.IUiBindings : 
+TYPE FerriteLib.UiKit.Kernel.IUiDescriptiveWidget : 
+TYPE FerriteLib.UiKit.Kernel.IUiEditState : 
+TYPE FerriteLib.UiKit.Kernel.IUiLabelledWidget : 
+TYPE FerriteLib.UiKit.Kernel.IUiMainThread : 
+TYPE FerriteLib.UiKit.Kernel.IUiMeasureParticipant : 
+TYPE FerriteLib.UiKit.Kernel.IUiPointerLayout : 
+TYPE FerriteLib.UiKit.Kernel.IUiPresentationDemand : 
+TYPE FerriteLib.UiKit.Kernel.IUiTextMetricsEnvironment : 
+TYPE FerriteLib.UiKit.Kernel.IUiTimeSource : 
+TYPE FerriteLib.UiKit.Kernel.IUiTranslation : 
+TYPE FerriteLib.UiKit.Kernel.IUiTypedChoices : 
+TYPE FerriteLib.UiKit.Kernel.IUiWidget : 
+TYPE FerriteLib.UiKit.Kernel.UiBindingPresentation : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiBindings : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiChartPointChange : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiChoice`1 : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiColour : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiContractException : System.Exception
+TYPE FerriteLib.UiKit.Kernel.UiDensity : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiDescription : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiDescriptionRole : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiDiagnosticEvent : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiDiagnosticKind : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiDiagnosticSubscription : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiDiagnosticTiming : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiDocumentKind : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiDocumentService : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiDocumentSource : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiEditParser`1 : System.MulticastDelegate
+TYPE FerriteLib.UiKit.Kernel.UiEditSession`1 : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiElementProperties : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiElementSpec : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiEmphasis : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiFitAudit : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiFocusPolicy : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiFont : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiGeometry : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiHitGeometry : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiHost : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiHostInputState : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiImageAlignX : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiImageAlignY : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiImageFit : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiImageLayout : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiImageOptions : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiInputEligibility : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiInteractionEnd : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiInteractionRequests : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiInteractionResult : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiInteractionSession : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiInteractionTarget : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiInvalidation : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiItemBindingSchema`1 : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiItemBindings`1 : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiKinds : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiKitFonts : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiLayout : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiLayoutAnchor : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiLayoutChild : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiLayoutDiagnostic : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiLayoutFrame : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiLayoutHeight : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiLayoutManifest : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiLayoutMeasure : System.MulticastDelegate
+TYPE FerriteLib.UiKit.Kernel.UiLayoutOffset : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiLayoutPlan : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiLayoutPoint : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiLayoutRect : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiLayoutSize : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiLayoutSnapshot : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiMeasureInputs : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiMeasurement : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiNative : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiNodeId : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiNotifyAdapter : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiNumericEdit : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiOption : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiOverflowAxis : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiOverflowReport : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiPageWindow : FerriteLib.UiKit.Kernel.UiWindowHost
+TYPE FerriteLib.UiKit.Kernel.UiPalette : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiPaletteRole : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiPointerPhase : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiPointerRegion : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiPointerSample : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiPresentationStatus : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiPropertyDeclaration`1 : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiPropertyOrigin : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiPropertyResolver : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiRange : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiRangeObservation : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiReactiveComputed`1 : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiReactiveFault : System.InvalidOperationException
+TYPE FerriteLib.UiKit.Kernel.UiReactiveList`1 : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiReactiveOwner : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiReactiveResponse : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiReactiveRuntime : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiReactiveValue`1 : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiReloadPolicy : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiReloadReport : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiReloadSchedulerState : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiResolvedProperty`1 : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiResolvedStyle : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiRowBand : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiRowBandActions : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiRowBandLayout : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiSelectionObservation : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiSliderLayout : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiStatusTone : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiStyleDeclaration : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiStyleDocument : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiStyleFallbackReport : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiStyleIssue : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiStyleResolver : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiStyleTable : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiSurfaceStyle : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiTheme : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiThemeDraw : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiUnknownWidgetKindException : System.Exception
+TYPE FerriteLib.UiKit.Kernel.UiValueBehavior : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiValueOperation`1 : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiValueState : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiWidgetCatalog : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiWidgetContext : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiWidgetDescriptor : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiWidgetRegistry : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiWidthDemand : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiWidthMode : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiWidthPlan : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiWindowBackground : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiWindowCatalog : System.Object
+TYPE FerriteLib.UiKit.Kernel.UiWindowChrome : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiWindowHost : Verse.Window
+TYPE FerriteLib.UiKit.Kernel.UiWindowKey : System.ValueType
+TYPE FerriteLib.UiKit.Kernel.UiWindowNotice : System.Enum
+TYPE FerriteLib.UiKit.Kernel.UiWindowOptions : System.Object
+TYPE FerriteLib.UiKit.Kernel.VerseFerriteMainThread : System.Object
+TYPE FerriteLib.UiKit.Kernel.VerseFerriteTextMetrics : System.Object
+TYPE FerriteLib.UiKit.Kernel.VerseFerriteTimeSource : System.Object
+TYPE FerriteLib.UiKit.Kernel.Widgets.UiTreeRow : System.ValueType

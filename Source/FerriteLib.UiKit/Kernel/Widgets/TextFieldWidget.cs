@@ -6,7 +6,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Single-line or basic plain-text multiline native editing, with one instance-local neutral draft.
 /// Selection, clipboard and character composition belong to Verse/Unity, not to this wrapper.
 /// </summary>
-public sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
+internal sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/text-field";
 

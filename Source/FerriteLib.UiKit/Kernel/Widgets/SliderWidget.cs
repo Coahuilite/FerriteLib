@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>Default range wrapper: shared behavior, measured label/track, typed request binding.</summary>
-public sealed class SliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
+internal sealed class SliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/slider";
     private UiElementSpec spec = UiElementSpec.Empty;

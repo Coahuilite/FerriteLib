@@ -27,7 +27,7 @@ A reusable sparse Scheme uses the existing style document service:
 ```
 
 No custom class, registration, private-part lookup or behavior assembly is required. A runtime override
-uses `node.Properties.Palette(UiPaletteRole.Foreground).Set(new UiColour(...))`; `Remove()` reveals the
+uses `host.ElementProperties("elementId").Palette(UiPaletteRole.Foreground).Set(new UiColour(...))`; `Remove()` reveals the
 current inline/local/ancestor/page/host/default source. `LocalPalette(role)` is the corresponding explicit
 local declaration. Source facts remain available in `ResolvedColours`, keyed by the semantic role name.
 The platform `UiTheme[role]` indexer accepts/returns Unity colours for standalone visual callers; it adapts
@@ -63,7 +63,10 @@ chosen border explicitly, use alpha0 to hide it, or remove the declaration to re
 Changing Accent no longer implicitly changes SelectedBorder; changing Foreground no longer implicitly
 changes SwitchOff. Assign both roles when that coupling is wanted. Defaults preserve the old effective
 colours while allowing those meanings to vary independently. Font and five density metrics are not new
-palette roles, and this change grants no new internal geometry customization.
+palette roles. Their confirmed finite opening uses `Font` and `Metric.Padding/Spacing/Gap/RowHeight/Hairline`,
+or individual `Properties.Metric(name)` / `theme.Metric(name)` declarations. Set/Remove affects only that
+property and exposes the current remaining source. Bare container Padding/Gap still allocate its own
+contents; they are not copied into each child control. Private default structure remains closed.
 
 ## Consumer handoff and verification boundary
 

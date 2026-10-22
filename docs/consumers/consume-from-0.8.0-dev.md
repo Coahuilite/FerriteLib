@@ -27,8 +27,8 @@ composition and headless examples and the [complete inventory](../development/0.
 for all remaining first-version work.
 
 See [S0/S1 contract](../development/0.8/s01-contract.md) for per-property remove/following, independent
-composition, headless entry points, capture ownership and error handling. New types are public-unstable;
-keep the exact selected source/configuration/package identity with your development evidence.
+composition, headless entry points, capture ownership and error handling. Supported S1–S7 paths and required dependencies are stable; detailed R9 stays experimental.
+Keep the exact selected source/configuration/package identity with your development evidence.
 
 ## Edit first, publish once
 
@@ -61,7 +61,7 @@ GetOptions, typed choices and bounded reads select the same synchronized inputs.
 properties to immutable presentation data during tracking; an outer list copy alone does not freeze them.
 Repeat consumes an immutable ordered key projection through the existing stable-node reconciliation.
 `BindTracked(..., equal: ...)` can suppress same-result presentation announcements without retaining old
-dependency edges. Existing source calls remain valid; rebuild against this public-unstable 0.8 Dev API.
+dependency edges. Existing source calls remain valid; rebuild against the fixed 0.8 Dev API.
 Ordinary getters/options retain their existing conditions. Start with the
 [counter walkthrough](../development/0.8/counter-walkthrough-zh.md) and the
 [actual runtime/host contract](../development/0.8/reactive-foundation-contract.md); the
@@ -87,8 +87,7 @@ without adding members to `ITextMetrics`. Unknown legacy metrics receive no new 
 
 Use the [single reuse contract](../development/0.8/layout-reuse-contract.md) for a compilable custom
 method and exact inputs/diagnostics, and the [inventory](../development/0.8/migration-status.md) for
-all18 uses/nine containers and retained old conditions. These public-unstable engineering entries do
-not freeze XML/ABI or complete RU4/RU5/native acceptance.
+all18 uses/nine containers and retained old conditions. The supported paths protect source/DLL/XML/behavior under the documented migration window; API grading does not establish native acceptance.
 
 ## Managed faults and retained views
 

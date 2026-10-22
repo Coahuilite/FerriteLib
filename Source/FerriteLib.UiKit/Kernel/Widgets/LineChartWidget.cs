@@ -8,7 +8,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Normalized line data and optional editable points. Capture and 2D sampling use the common pointer
 /// owner; optional explicit keys permit stable dynamic reordering while legacy index usage remains.
 /// </summary>
-public sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiPointerLayout, IUiRetainedDisplay
+internal sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "chart/line";
     private const float DefaultHeight = 120f;

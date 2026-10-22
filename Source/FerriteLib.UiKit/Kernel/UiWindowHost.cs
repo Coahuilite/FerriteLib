@@ -216,6 +216,7 @@ public abstract class UiWindowHost : Window
     /// drafts - and "the same session is still there" is the observable form of that promise.
     /// </summary>
     public UiSession? Session => host?.Session;
+    public UiHostInputState InputState => host?.InputState ?? default;
 
     /// <summary>
     /// Raised once, on the draw thread, immediately after this window built its page host and before that

@@ -6,7 +6,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>
 /// Descriptive status text with a Tiny undeclared fallback; explicit font declarations override it.
 /// </summary>
-public sealed class ChromeBannerWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiRetainedDisplay
+internal sealed class ChromeBannerWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiRetainedDisplay
 {
     public const string Kind = "chrome/banner";
 

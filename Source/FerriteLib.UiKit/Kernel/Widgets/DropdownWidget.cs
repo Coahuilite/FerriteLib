@@ -26,7 +26,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// attribute already carries; a reserved help slot is deliberately NOT part of either look.
 /// </para>
 /// </summary>
-public sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
+internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/dropdown";
 

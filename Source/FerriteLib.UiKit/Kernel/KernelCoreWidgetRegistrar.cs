@@ -1,7 +1,7 @@
 namespace FerriteLib.UiKit.Kernel;
 
 /// <summary>Explicit registration for greenfield core widget kinds.</summary>
-public static class KernelCoreWidgetRegistrar
+internal static class KernelCoreWidgetRegistrar
 {
     internal static bool HasKnownPresentation(IUiWidget widget) => widget is
         Widgets.StepperSliderWidget or Widgets.ChromeBannerWidget or Widgets.InputModeRowWidget or

@@ -130,10 +130,10 @@ failures retain a cause class and unknown value rather than inventing a zero/emp
 Node/depth truncation is aggregate; individual text and item-prefix truncation are explicit facts.
 Identity keys retain their locating meaning; the text budget applies to text/value projections.
 
-### Candidate budgets and the narrow discovery exception
+### Experimental budgets and the narrow discovery exception
 
-The R9 surface/field vocabulary and budgets are **Dev candidates for A8 closeout**, not approved stable
-API defaults. Defaults: 64 nodes, depth8, 512 characters per projected text/value and 32 items per
+The R9 surface/field vocabulary and budgets are delivered **public-unstable engineering choices**.
+The stable basic-error/ordinary-use path does not require them. Defaults: 64 nodes, depth8, 512 characters per projected text/value and 32 items per
 collection. Caller maxima are 512 nodes, depth32, 4096 characters and 128 collection items. Invalid
 budgets are refused. Counts can be exact while their copied prefixes are truncated.
 
@@ -184,6 +184,7 @@ B5 retained uses remain in the complete inventory: Dropdown/ModeRow missing valu
 Tree part priority, editable chart points, seven descriptive uses, keyed Repeat/conditional updates,
 Tooltip/help, return commands and native window options are implemented with their applicable shared
 contracts. Automatic popup refocus, a new tree template shortcut or a new keyboard/global Cancel system
-is not supplied. Existing standard/embedded entry conditions remain; new owner-qualified embedding and
-the R9 read-only field/budget surface are the concrete public consumption candidates for A8. Public type
-tiers remain public-unstable until closeout. Native acceptance and stable publication are separate steps.
+is not supplied. Existing standard/embedded entry conditions remain. Stable standard/embedded paths and
+their necessary dependencies are listed in [S1–S7](public-contract.md); detailed R9 stays experimental.
+Surrounding windows use Host/WindowHost.InputState, Host.ElementProperties, Get/SetScrollPosition,
+SetInteractionScope and Invalidate instead of runtime tables. Native acceptance and publication remain separate.

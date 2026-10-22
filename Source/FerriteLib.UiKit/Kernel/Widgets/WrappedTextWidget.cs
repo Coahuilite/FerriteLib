@@ -23,7 +23,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// widget — which is the author's explicit override of this contract, not a second contract.
 /// </para>
 /// </summary>
-public sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiRetainedDisplay
+internal sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiRetainedDisplay
 {
     public const string Kind = "text/wrapped";
 

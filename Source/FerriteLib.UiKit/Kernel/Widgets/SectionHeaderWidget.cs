@@ -15,7 +15,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// the line (transparent included) instead of switching it off.
 /// </para>
 /// </summary>
-public sealed class SectionHeaderWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiRetainedDisplay
+internal sealed class SectionHeaderWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiRetainedDisplay
 {
     public const string Kind = "section/header";
 

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework><LangVersion>latest</LangVersion><Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors><NuGetAudit>false</NuGetAudit><RestoreUseStaticGraphEvaluation>true</RestoreUseStaticGraphEvaluation>
+    <OutputPath>../../dist/build/$(Configuration)/authors/</OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj"><Private>false</Private></ProjectReference>
+    <PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4871" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

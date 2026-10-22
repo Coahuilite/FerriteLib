@@ -57,6 +57,23 @@ public sealed class UiWidgetContext
     public IUiTranslation Translation { get; }
 
     public IUiBindings Bindings { get; }
+    public bool IsActive => Session.IsActive;
+    public bool IsDisabled => (Node ?? Session.ActiveNode).IsDisabled;
+    public float SharedLabelWidth => (Node ?? Session.ActiveNode).SharedLabelWidth;
+    public UiElementProperties Properties => (Node ?? Session.ActiveNode).Properties;
+    public UiValueState State(string key) => Session.GetOrCreateValueState((Node ?? Session.ActiveNode).Id, key);
+    public void Invalidate() => (Node ?? Session.ActiveNode).MarkDirty();
+    public string InteractionScope
+    {
+        get => (Node ?? Session.ActiveNode).InteractionScope;
+        set
+        {
+            UiNode node = Node ?? Session.ActiveNode;
+            if (node.InteractionScope == value) return;
+            Session.SuspendFailedInput(node);
+            node.InteractionScope = value ?? throw new ArgumentNullException(nameof(value));
+        }
+    }
 
     public float ViewWidth { get; }
 

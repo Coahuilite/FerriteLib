@@ -5,7 +5,7 @@ using FerriteLib.UiKit.Kernel.Widgets;
 using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
-public sealed partial class UiLayoutEngine
+internal sealed partial class UiLayoutEngine
 {
     private int observationLayoutFrame;
     private DateTime? observationLayoutAtUtc;

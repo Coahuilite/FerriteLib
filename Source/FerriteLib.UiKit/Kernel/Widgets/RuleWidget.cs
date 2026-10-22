@@ -23,7 +23,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// no-op creation-time validation exists to refuse.
 /// </para>
 /// </summary>
-public sealed class RuleWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget
+internal sealed class RuleWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget
 {
     public const string Kind = "chrome/rule";
 

@@ -15,12 +15,18 @@ internal static class Program
 
     private static int Main(string[] args)
     {
+        if (args.Length == 2 && args[0] == "--write-stable-surface")
+        { FerriteLibApiTierTests.WriteStableSurface(args[1]); return 0; }
         if (args.Length == 1 && args[0] == "--closeout-editing")
             return RunEditing();
         if (args.Length == 1 && args[0] == "--closeout-appearance")
             return RunAppearance();
         if (args.Length == 1 && args[0] == "--closeout-items")
             return RunItems();
+        if (args.Length == 1 && args[0] == "--closeout-api")
+            return RunApi();
+        if (args.Length == 1 && args[0] == "--closeout-inventory")
+            return RunInventory();
         try
         {
             RunAll();
@@ -44,6 +50,8 @@ internal static class Program
     private static int RunEditing() => KernelSharedEditingTests.RunAll() + KernelCloseoutEditingTests.RunAll();
     private static int RunAppearance() => KernelPaletteTests.RunAll() + KernelStyleScopeTests.RunAll() + KernelCloseoutAppearanceTests.RunAll();
     private static int RunItems() => KernelItemBindingTests.RunAll();
+    private static int RunApi() => FerriteLibApiTierTests.RunAll() + KernelContainmentTests.RunAll() + KernelPublicAuthorTests.RunAll();
+    private static int RunInventory() => KernelCloseoutInventoryTests.RunAll();
 
     private static void RunAll()
     {
@@ -58,6 +66,7 @@ internal static class Program
         failures += RunEditing();
         failures += RunAppearance();
         failures += RunItems();
+        failures += RunInventory();
         failures += KernelSharedChartTests.RunAll();
         failures += KernelDescriptiveFactsTests.RunAll();
         failures += KernelBooleanSelectionExpansionTests.RunAll();
@@ -93,7 +102,6 @@ internal static class Program
         failures += KernelWindowCatalogTests.RunAll();
 
         Console.WriteLine("Kernel backend containment (funnel allowlist)...");
-        failures += KernelContainmentTests.RunAll();
 
         Console.WriteLine("Kernel popup/window-space (greenfield)...");
         failures += KernelPopupTests.RunAll();
@@ -109,7 +117,7 @@ internal static class Program
         failures += FerriteLibVersionTests.RunAll();
 
         Console.WriteLine("FerriteLib public-API tiers (docs/api-tiers.md guard)...");
-        failures += FerriteLibApiTierTests.RunAll();
+        failures += RunApi();
 
         Console.WriteLine("FerriteLib neutrality (no product vocabulary anywhere)...");
         failures += FerriteLibNeutralityTests.RunAll();

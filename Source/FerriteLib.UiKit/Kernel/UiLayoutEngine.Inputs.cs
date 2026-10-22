@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace FerriteLib.UiKit.Kernel;
 
-public sealed partial class UiLayoutEngine
+internal sealed partial class UiLayoutEngine
 {
     private sealed class BoundInput<T>
     {

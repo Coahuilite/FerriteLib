@@ -1,23 +1,27 @@
 # TODO
 
-## 0.8 continuation
+## 0.8 closeout
 
-- [ ] Close the remaining A8 subitems: RU1 final reference/deep defaults and collection API/granularity,
-      RU4 remaining use migrations and RU5 platform delivery.
-      The reactive foundation, explicit-policy RU1 A–E, approved RU2 scope/stage reuse and RU3 managed failure/demand/lifetime are implemented; complete use-by-use migration limits are in
-      `docs/development/0.8/migration-status.md`. Native actions below remain pending, not permission.
+- [ ] Complete isolated Camera+/Nivarian/Raven production-entry integrations, preserving actual business
+      identity/order/refusal and multi-panel/native-window lifecycle. Originals remain read-only.
+- [ ] Close the complete 18-use/nine-container/non-kind migration inventory and applicable changed-contract
+      checks; reuse unaffected accepted RU1–RU3 evidence. S1–S7 author paths and signature dependencies
+      must stay complete; detailed R9 remains delivered experimental.
+- [ ] Record actual 1.6/1.7 capability and complete transitive-dependency evidence separately; no direct
+      drawing backend or native-support claim from a stub/compatibility assembly.
+- [ ] Fix clean source and same-identity five-file isolated Dev, complete API/XML/behavior migration,
+      commit list and consumer handoff. US consumption is coordinated externally, never inferred.
+- [ ] Collect native1.6 text/IME/fonts/window/input/scroll/clip/popup/image acceptance against that fixed
+      candidate; native1.7 remains separately awaiting human. Do not start/install the game automatically.
 
-- [ ] Run the native 1.6 S0/S1 acceptance in docs/development/0.8/s01-contract.md after the developer installs the selected isolated Dev package.
-- [ ] Run the native BSE acceptance in `docs/development/0.8/bse-contract.md` using the selected isolated Dev package.
-- [x] Complete the first-version production inventory in `docs/development/0.8/migration-status.md`, including shared owner-qualified hosts and bounded R9. Automated evidence is separate from native/product acceptance.
-- [ ] Close out unapproved E/N details, L1 size details, typography/density opening-set details and R9 public commitments; K1 grouped deferral is approved, not implemented; run the target native host/observation pass in `docs/development/0.8/host-observation-contract.md`.
-- [ ] Collect native editing/IME acceptance and remaining E/N candidate decisions (B1 approved subitems and N1 exact21/end example are already recorded) against `docs/development/0.8/editing-contract.md`.
-
+E/N defaults, L1, finite appearance, S1–S7/R9 grading, two-subsequent-minor protection and platform priority
+are decided, not pending user choices. K1 added library focus/key system is approved for deferral, not
+implemented. Detailed implementation and acceptance states live in `docs/development/0.8/`.
 
 > The action surface only. Settled rulings, done work and the release/round history live in `MEMORY.md`
 > and `OBLIVIONIS.md`; a closed item is a pointer here, not a paragraph.
 
-## Current objective and execution order
+## Retained 0.7 checkpoint objective and execution order
 
 Branch `0.7.x`, API `0.7.0`, consumer range `[0.7.0,0.8.0)`. Source HEAD `d5af4d8209823bb19f7c112805fcb1b8caf56bbc`,
 clean; the compatibility carrier and the Release payload are both `648f5769…`, the Dev payload `5b331379…`.
@@ -455,7 +459,7 @@ the identity rule per channel, and what each artifact guarantees). What remains 
 Each open line's scope, packages, ownership, contract and live status has exactly one home; nothing is
 restated here.
 
-- **0.7.x** (current, axis `0.7.0`): `docs/development/0.7/` — the change plan, the API contract with its
+- **0.7.x** (retained checkpoint, axis `0.7.0`): `docs/development/0.7/` — the change plan, the API contract with its
   amendments, the verification record and the capability-disposition table.
 - **0.6.x** (published 2026-09-17 at `2545346`): `docs/development/0.6/`. The line added the MVVM-adjacent
   surface (page lifecycle hooks, the notification adapter, reload scheduling with a testable time seam, the

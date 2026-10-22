@@ -140,6 +140,19 @@ public sealed partial class UiHost : IDisposable
     public IUiBindings Bindings => bindings;
 
     public UiSession Session => session;
+    public UiHostInputState InputState => new(session.IsActive, session.ActiveEditNode != null, session.OwnedHotControl.HasValue || session.Interactions.CaptureOwner.HasValue);
+    public UiElementProperties ElementProperties(string elementId) => Element(elementId).Properties;
+    public Vector2 GetScrollPosition(string elementId) => session.GetScrollPosition(Element(elementId));
+    public void SetScrollPosition(string elementId, Vector2 position) => session.SetScrollPosition(Element(elementId), position);
+    public void Invalidate() => session.BumpContentRevision();
+    public void SetInteractionScope(string elementId, string scope)
+    {
+        UiNode node = Element(elementId);
+        if (node.InteractionScope == scope) return;
+        session.SuspendFailedInput(node);
+        node.InteractionScope = scope ?? throw new ArgumentNullException(nameof(scope));
+    }
+    private UiNode Element(string id) => session.GetNodeByElementId(id) ?? throw new ArgumentException("Element '" + id + "' is not in this Host.", nameof(id));
     /// <summary>Managed fault facts and pure Retry entry, owned by this view, not by the business service.</summary>
     public UiBindingPresentation? Presentation => reactivePresentation;
     public UiReactiveFault? LayoutFault { get; private set; }

@@ -112,7 +112,7 @@ An old `IUiWidget` gains no measurement-purity requirement. On its original lega
 is validated before any dependent parent plan is accepted. Repeated requests at identical constraints
 within that synchronization use the validated result; no cross-synchronization purity is inferred.
 Unchanged legacy snapshot conditions remain supported. Current migration levels are maintained in
-[migration-status.md](migration-status.md), not a final RU4 retirement policy.
+[migration-status.md](migration-status.md); [S1–S7](public-contract.md) defines current public migration and dependency commitments.
 
 ## Give a metric service a real environment identity
 

@@ -35,10 +35,14 @@ consumer compiles against, **public-unstable** types are usable but expected to 
 against that file and pins the stable list, so an addition to the public surface fails until it is decided
 in two places.
 
-Manifest vocabulary retires the way code does, and never silently: a deprecated attribute keeps working —
-redirected to its replacement, not ignored — for at least one minor, and removal happens only at a minor
-boundary (maintainer ruling 2026-09-10). A minor bump is the breaking signal pre-1.0, which makes this the
-one mechanism that lets the library say "compile against what you tested" without lying.
+Stable source, already compiled consumer DLLs, XML vocabulary, legal use conditions and documented behavior
+are protected within the same supported game/adapter target. After a working replacement and deprecation,
+retain the old contract through two complete subsequent published minors: deprecate in 0.9, retain through
+0.10/0.11, remove no earlier than 0.12. RC/patch numbers do not count, and 1.x cannot shorten an existing
+window. Deprecated XML redirects rather than silently doing nothing. Experimental entries may change in a
+later minor with explicit migration; a frozen patch does not arbitrarily break them. Consumer `[min,max)`
+ranges remain binding. The controlled prepublication 0.8 line may directly migrate internal users, with
+old→new instructions; this is not a permanent compatibility bypass.
 
 ## The two layers
 
@@ -58,25 +62,12 @@ assembly and no `FerriteLib.Core`; the 0.8 target does not predefine physical as
 - **Neutrality.** No consumer's product vocabulary in the library or its harness — words
   case-insensitively, identifier prefixes case-sensitively; `coahuilite` is the series namespace,
   allowed. The guard is self-applied here with a positive control and a path-pinned self-exemption.
-- **Version axes.** Contract `FerriteLibVersion.Api` (pre-1.0: a minor bump IS breaking, and any public
-  addition bumps minor too), release `About/About.xml <modVersion>`, build csproj `VersionPrefix` — the
-  harness pins all three. `AssemblyInformationalVersion` embeds the commit SHA and is never a
-  compatibility value.
-  **TEMPORARY EXEMPTION, with an expiry: on the 0.7.x line a public addition does NOT bump the minor**
-  (maintainer ruling 2026-09-22, "minor 可以不升级，仍然算到 0.7.x 内"; reasoning added the same day: "这个算临时放行，
-  因为现在就在跨库合作开发 fl0.7.x" — this is a release valve, NOT a change to the rule itself). **Reason:**
-  the library and its consumer are in cross-repository lockstep development on 0.7.x, where a minor bump
-  buys no compatibility signal and only churns both trees. **Expires** at the first of: the 0.7.x line's first
-  release/tag, or the end of that lockstep — then the generic pre-1.0 sentence above resumes and an addition
-  moves the minor again. **Never inherited:** it belongs to the `0.7.x` line and this stage alone, and must
-  not be carried into the next line or into any published state by analogy. **No lane reads "additions" today, so
-  nothing has to be re-cut for this exemption** — measured 2026-09-22 across the whole harness and the
-  script gates: `FerriteLibVersionTests` pins the three axes agreeing on major.minor and never inspects the
-  surface, `FerriteLibApiTierTests` reacts to an addition by requiring a tier (a documentation act in
-  `docs/api-tiers.md`), and no gate or lane anywhere enforces the minor bump itself. If a future lane starts
-  reading additions — or its message wording starts asserting the minor rule — align it in the batch that
-  next touches the carrier, because the harness and the library must exercise the same contract. `MEMORY.md` (§ Version axes) carries the same exemption, its expiry, and the lane-by-lane audit
-  behind "no gate reads additions".
+- **Version axes.** Contract `FerriteLibVersion.Api`, release `About/About.xml <modVersion>` and build
+  csproj `VersionPrefix` agree on major.minor; the harness pins all three. Public additions after freezing
+  require an explicit minor decision; a minor bump does not waive stable migration protection above.
+  `AssemblyInformationalVersion` embeds committed HEAD and is never a compatibility value. The temporary
+  0.7 lockstep exception is historical and never applies to 0.8 or a published state; its original scope,
+  expiry and measured enforcement are retained in `MEMORY.md`.
 - **The game cannot express a prerequisite version** (`ModRequirement` parses only `packageId`,
   `alternativePackageIds`, `displayName`); every consumer asserts the API range in its own constructor.
 
@@ -91,7 +82,7 @@ assembly and no `FerriteLib.Core`; the 0.8 target does not predefine physical as
   no hit-test semantics to bind to, so world-space text (pawn-head marks and friends) is something this
   library cannot provide — a non-goal, not a backlog item. A consumer's whitelist entry for it is
   policy-backed and is not renegotiated per PR; the boundary that remains is that anything drawn into a
-  window goes through the tree.
+  window adopted into the library tree stays inside that measured contract. External authors may adopt only part of FL or own library-external logic.
 - **API stabilization is not gated on a consumer count.** Define the supported contract, verify its
   behavior, and state the compatibility commitment so consumers have a dependable surface to adopt.
   Real-consumer integration is valuable validation, not a prerequisite for stabilizing that surface;

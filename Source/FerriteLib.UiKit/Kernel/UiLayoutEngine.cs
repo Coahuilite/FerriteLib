@@ -15,7 +15,7 @@ namespace FerriteLib.UiKit.Kernel;
 /// height passed down from the arrange call, so a root Scroll fills the window while its content
 /// keeps its natural height.
 /// </summary>
-public sealed partial class UiLayoutEngine
+internal sealed partial class UiLayoutEngine
 {
     private sealed class PlacedEntry
     {

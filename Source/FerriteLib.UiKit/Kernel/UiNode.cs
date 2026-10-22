@@ -66,7 +66,7 @@ public sealed class UiNode
     /// <see cref="UiWidgetContext.Child"/>. Declared elements are rebuilt on every arrange; private
     /// sub-nodes remain linked when their owner's measurement is reused.
     /// </summary>
-    public IReadOnlyList<UiNode> Children => children;
+    internal IReadOnlyList<UiNode> Children => children;
 
     /// <summary>The element's arranged rect in page space, or null when it was not arranged this pass.</summary>
     public Rect? Rect { get; internal set; }
@@ -99,7 +99,7 @@ public sealed class UiNode
     public float SharedLabelWidth { get; internal set; }
 
     /// <summary>Every named state slot this node owns, keyed by the name the widget used.</summary>
-    public IReadOnlyDictionary<string, UiValueState> ValueStates => slots;
+    internal IReadOnlyDictionary<string, UiValueState> ValueStates => slots;
 
     /// <summary>
     /// True while this node's own Measure must run again. The engine re-arranges when any element node is

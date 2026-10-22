@@ -1,25 +1,30 @@
 # MEMORY
 
-## 0.8 development line (2026-10-22)
+## 0.8 development line (2026-10-23)
 
-The active specification is `docs/development/0.8/README.md`. The first reactive foundation now connects
-same-source neutral binding/graph/operation/presentation behavior to the real Host and separate view/business
-owners. The exact delivered scope and dual compilable examples live in
-`docs/development/0.8/reactive-foundation-contract.md`; per-use new-reactivity status is maintained only in
-`migration-status.md`. RU1 A–E approved directions are recorded in the specification; remaining
-reference/deep defaults and final collection API/granularity, final old-entry migration and
-platform commitments are still separate. Native 1.6 acceptance is pending.
+The single product specification is `docs/development/0.8/README.md`. E1–E5/N1–N3, L1, finite appearance,
+S1–S7 stability, experimental R9, migration protection and platform priority are confirmed. Engineering
+status is separate from design approval and native acceptance. K1 added focus/key navigation is deferred;
+native editing/IME/Accept/Cancel remains required. No 0.7 version exception carries into this line.
 
-RU1 A–E now have explicit generic equality, ordinary property composition, controlled structural lists,
-same-round projected options/items and real keyed Repeat consumption, plus an independently synchronized
-multi-item service projection. The single source contract remains `reactive-foundation-contract.md`;
-its compiled examples and the inventory distinguish the connected data path from remaining RU4 uses.
+Accepted RU1–RU3 production foundations and their applicable evidence remain in the reactive, layout-reuse
+and failure-lifetime contracts. Closeout adds native composite-capture precedence, normal-return-before-
+display-failure completion, individual finite metric declarations/removal, and owned current-target item
+bindings. `editing-contract.md`, `property-contract.md` and `item-binding-contract.md` own these details.
+The complete 18-use/nine-container/non-kind inventory remains only in `migration-status.md`.
 
-RU2 now connects explicit/default nested update scopes, complete captured measurement inputs and independently retained local arrangement plans to the same production Host. Real parent/Scroll/shared-column consumers and current effective geometry drive propagation; optional metric/custom entries and retained legacy conditions are defined only in `docs/development/0.8/layout-reuse-contract.md`. Per-use levels remain in `migration-status.md`; native acceptance and RU4/RU5 stay separate.
+`docs/api-tiers.md`, `public-contract.md` and `stable-api.txt` define the supported complete author paths,
+required signature dependencies and explicit advanced-member exceptions. Session/Node are not blanket
+promoted; graphs, queues, caches, default private implementations and routing tables stay internal.
+The separate AuthorExamples assembly has no internals grant. Public compatibility protects source, DLL,
+XML, meaning and legal conditions in the same adapter target; deprecation retains two complete subsequent
+published minors (0.9 → retain0.10/0.11 → earliest removal0.12), without a 1.x shortcut.
 
-RU3 now connects located cached pure failures, actual failed-attempt recovery dependencies, owner-resumed consumer callbacks, independent queues, per-response bounded propagation, default retained pure paint and real view demand/shared ownership. Author recovery/dual examples and fixture/native boundaries are maintained only in `docs/development/0.8/failure-lifetime-contract.md`; the complete use levels remain in `migration-status.md`.
-
-The isolated 0.8.0 line implements S0/S1 and shared boolean/discrete-selection/expansion with Checkbox (both looks), InputModeRow, Dropdown and Tree migration. F2 approves qualified primary release for those wrappers/parts; F3 approves popup outside-primary-press dismissal with consumption. Existing explicit Checkbox Set-before-Invoke, typed/string identity/fallback, same-value selection request and platform focus facts are retained. No keyboard/global Cancel defaults were added. Contracts live in `docs/development/0.8/s01-contract.md`, `bse-contract.md` and the consumer guide; the single complete use inventory is `docs/development/0.8/migration-status.md`. Shared editing/numeric composition and basic plain-text multiline use the same neutral production editor; B1 defaultfalse/invalid-conflict retention/Cancel-draft-only and the N1 immediate21/end example are approved; other E/N details remain candidates, documented in `docs/development/0.8/editing-contract.md`. Editable chart points and the seven descriptive wrappers are connected to the shared pointer/read contracts in `docs/development/0.8/wrappers-contract.md`; optional chart keys preserve stable dynamic identity without changing old entry prerequisites. Nine containers now use the same neutral production geometry; finite same-parent anchors and five-wrapper shared labels are documented in `docs/development/0.8/layout-contract.md`. The neutral30-role palette replaces the old26 colour bag/API/XML, while preserving default appearance and existing typography/density inputs without new geometry rights; ordinary authoring and the intentional migration live in `docs/development/0.8/theme-migration.md`. Per-property sources and removal are connected through `docs/development/0.8/property-contract.md`; all five independent labelled fields share columns when opted in. Immutable XML/program assembly, shared transactional definition updates and precise live host/page appearance ownership are documented in `docs/development/0.8/assembly-contract.md`. Standard and embedded windows now share the owner-qualified frame adapter; explicit contexts own their editor/chart state without an ambient node scope. Bounded detached runtime observation and the PM-approved 512-weak-entry discovery exception are documented in `docs/development/0.8/host-observation-contract.md`. Current content overlap uses optional IUiPointerLayout facts and the same neutral UiPointerLayers decision, with all default interactive wrappers participating and the explicit old-custom boundary in `docs/development/0.8/layers-images-contract.md`; IMGUI draw order is unchanged. The complete technical candidate inventory is connected; E/N/L1/P1 and R9 surface/budget closeout plus native 1.6 acceptance remain open. Structural focus traversal, Button/Checkbox keyboard mappings and Slider keyboard increment/Home/End remain unimplemented and approved for grouped first-version deferral; H1 continues. The 0.7 checkpoint below retains its own identity and acceptance scope.
+Current engineering still owes the three isolated real integrations, platform/transitive-dependency
+closeout, final full inventory evidence and fixed clean-source delivery. 1.6 is primary; 1.7 compatibility
+is checked in the same stage and reported independently. Native1.6/1.7 remain awaiting human; legacy0.7
+human evidence below does not accept0.8. New-engine1.7 adapter then direct drawing is a later route, not a
+1.6-first delivery prerequisite. Consumer migration uses a fixed supplied package, never moving outputs.
 
 ## Current state (2026-10-09)
 
@@ -406,7 +411,7 @@ and delivery procedures do not override the current scripts or the next-stage ha
 - **The pre-1.0 rule: any change to the public surface — additions included — bumps `Api.Minor`,** and
   `modVersion` moves with it. The 0.1.0 -> 0.2.0 bump exists because an additive type (`UiPopup`) shipped
   without one and a consumer desynced into a `TypeLoadException` inside `UiHost.Draw`. A bump is the
-  breaking signal and the "does this carrier contain what I compiled against" counter at the same time,
+  required-version signal and the "does this carrier contain what I compiled against" counter at the same time,
   which is what makes `Require`'s readable-report promise hold in both directions.
 - **An rc that never shipped has no goalpost to move.** Additions are allowed inside `0.7.0` while the local
   consumer is mid-development (opening entry, 2026-09-20); the `0.4.0 -> 0.3.0` refile is the precedent, and
@@ -417,7 +422,7 @@ and delivery procedures do not override the current scripts or the next-stage ha
   asserts the API range in its own constructor. `ModAssemblyHandler` holds a global resolver flag, which is
   why duplicate carriers resolve by load order silently — the collision report is the only detector.
 - **Manifest vocabulary retires the way code does**: a deprecated attribute keeps working, redirected to its
-  replacement rather than ignored, for at least one minor; removal only at a minor boundary.
+  replacement rather than ignored, through two complete subsequent published minors after deprecation; earliest removal is the next minor after those two. This current 0.8 commitment supersedes the historical one-minor floor.
 - **The promise is an artifact: `docs/api-tiers.md` plus its guard lane.** Every exported type is classified
   stable / public-unstable / internalize-candidate exactly once, the stable list is pinned a second time
   inside `FerriteLibApiTierTests`, and an unclassified addition reddens the lane. A promotion or demotion

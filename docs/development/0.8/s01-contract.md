@@ -96,10 +96,10 @@ The old `UiNative.Button` native primitives remain for other, not-yet-migrated k
 `UiNative.Slider` entry keeps its signature and arbitrary-key usage, but now drives the same range core
 and paints through `PaintRange`; it no longer calls `Widgets.HorizontalSlider`. Its derived numeric-editor
 buffer bridge is retained for the existing StepperSlider composition. The modern Slider wrapper has no
-NumberField draft dependency. Editing/composition policies remain the later S2 work.
+NumberField draft dependency. Current confirmed editing/composition policies are in editing-contract.md.
 
 The source/build/mod API axes are `0.8.0`; assembly configuration is Dev or Release. Stable signatures keep
-their existing promise, while new S0/S1 types are public-unstable in `docs/api-tiers.md`. Existing XML and
+their existing promise; S1–S7 and necessary dependencies are stable under `docs/api-tiers.md`, with detailed R9 experimental. Existing XML and
 binding declarations need no new registration. F1 changes Button's default timing from the native compound
 control to explicit release activation. The old raw mouse-down appearance probe now tests a valid held
 capture. Existing injected harness overrides represent established semantic operations only; the new

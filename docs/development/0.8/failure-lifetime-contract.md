@@ -1,8 +1,9 @@
 # Managed failures, retained display and view lifetime
 
 RU3 A–C, R1/R2, H1–H3 and L1/L2 are confirmed directions and connected to the production runtime,
-presentation, default wrappers and Host. These are public-unstable 0.8 engineering entries; final ABI/XML,
-RU4 migration commitments and RU5 backends remain separate. The product rules live in the
+presentation, default wrappers and Host. Their supported author entries and necessary dependencies are
+stable under [S1–S7](public-contract.md); detailed R9 stays experimental. Native/platform acceptance and
+future backends remain separate. The product rules live in the
 [specification](README.md); this page describes the usable implementation and its evidence.
 
 ## Retry a pure display, not the operation that changed business

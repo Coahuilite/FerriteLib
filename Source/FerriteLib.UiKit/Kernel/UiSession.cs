@@ -194,16 +194,16 @@ public sealed class UiSession : IDisposable
     public UiNode ActiveNode => activeNode;
 
     /// <summary>Session-scoped scroll positions, keyed by the scroll container's node.</summary>
-    public IReadOnlyDictionary<UiNode, Vector2> ScrollPositions => scrollPositions;
+    internal IReadOnlyDictionary<UiNode, Vector2> ScrollPositions => scrollPositions;
 
     /// <summary>
     /// Nodes currently tripped into session fallback. Keyed by node, so the display path a diagnostic
     /// prints plays no part in which element owns a recovery slot.
     /// </summary>
-    public IReadOnlyCollection<UiNode> TrippedNodes => trippedNodes;
+    internal IReadOnlyCollection<UiNode> TrippedNodes => trippedNodes;
 
     /// <summary>Session-scoped popup draw callbacks. Not process-global.</summary>
-    public IReadOnlyList<Action> PopupDrawActions => popupDrawActions;
+    internal IReadOnlyList<Action> PopupDrawActions => popupDrawActions;
 
     /// <summary>Id of the popup currently owned by this session, if any.</summary>
     public string? OpenPopupId => openPopupId;
@@ -218,7 +218,7 @@ public sealed class UiSession : IDisposable
     /// <see cref="UiHitLayer.IsPopup"/>, and a diagnostic or a lane reads this instead of a single
     /// "covered rect".
     /// </summary>
-    public IReadOnlyList<UiHitLayer> HitLayers => hitLayers;
+    internal IReadOnlyList<UiHitLayer> HitLayers => hitLayers;
 
     /// <summary>
     /// The window-space origin of the element being drawn. The funnel lifts a draw-local pointer by it,
@@ -868,7 +868,7 @@ public sealed class UiSession : IDisposable
     /// element holds none. The read is by identity because that is the primary key; the old flat
     /// property could not name both dimensions.
     /// </summary>
-    public IReadOnlyDictionary<string, UiValueState> GetValueStates(UiNodeId element)
+    internal IReadOnlyDictionary<string, UiValueState> GetValueStates(UiNodeId element)
     {
         return nodes.TryGetValue(element, out UiNode? node) ? node.ValueStates : NoValueStates;
     }

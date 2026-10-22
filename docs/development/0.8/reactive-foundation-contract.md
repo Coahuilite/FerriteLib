@@ -214,6 +214,8 @@ same-round item/structure snapshots, stable drafts/capture, same-value requests,
 fault-before-layout and independent external service lifetime. Custom probes do not supply these proofs.
 
 These tests do not establish native input, real font pixels, IME, window-stack composition or 1.7 support.
-RU1 A–E are implemented with public-unstable explicit policies. Final reference/deep defaults and the final
-collection API/granularity remain open, separately from this usable engineering surface. Approved RU2
-is connected through the layout reuse contract and its neutral/Host evidence; RU3 confirmed recovery/demand/lifetime behavior is connected through the [single contract](failure-lifetime-contract.md). RU4 remaining old-entry migration and RU5 platform commitments remain separate.
+RU1 A–E use explicit equality and controlled collection policies; no implicit reference/deep default is added.
+The supported entries/dependencies are stable under [S1–S7](public-contract.md). Approved RU2
+is connected through the layout reuse contract and its neutral/Host evidence; RU3 recovery/demand/lifetime
+behavior is connected through the [single contract](failure-lifetime-contract.md). The item helper reduces
+registration/release work without changing that foundation. Fixed delivery and platform evidence remain separate.

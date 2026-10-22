@@ -59,9 +59,11 @@ rollback copies both written claims and the prior effective applications exactly
 colour and nullable surface edges. Public UiStyleResolver.ApplyTo retains its old explicit application
 behavior for caller-owned themes; no new prerequisite or theme service is added.
 
-P1's proposed font/five-metric/26-colour set and single Scheme+Density combination remain reversible
-Dev candidates (FL08-DEFERRED-DEFAULTS r3). Per-property precedence/removal is the confirmed engineering
-contract. B1/N1 approvals are split precisely in editing-contract.md; other E/N/L1 details remain candidates; F1/F2/F3 stay approved.
+P1 confirms existing fonts, the semantic palette and five individual metrics, with one Scheme and one
+Density per level. Density overrides Scheme per metric; explicit instance declarations win. Default
+private structure stays read-only. E1–E5/N1–N3 and L1 are confirmed; the editing/property contracts
+record implementation and evidence independently of native acceptance. S1–S7 dependency and migration
+commitments are in [the public contract](public-contract.md).
 
 Evidence: KernelAssemblyTests exercises XML/program geometry, immutable program updates, real
 prepare/stage failure and editor cleanup, and actual two-item Tree/check/disclosure/chart-key/Dropdown
