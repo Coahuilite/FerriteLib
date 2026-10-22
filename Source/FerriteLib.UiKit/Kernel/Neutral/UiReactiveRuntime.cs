@@ -175,6 +175,7 @@ public sealed class UiReactiveValue<T>
     { this.runtime = runtime; this.value = value; this.equal = equal; source = new Source(runtime); }
     // Mutation implementations need the current storage, not an implicit input dependency.
     internal T ReadCurrent() { runtime.VerifyAccess(); return value; }
+    internal void NotifyCurrent() { runtime.AssertWritable(); source.Invalidate(); runtime.Drain(); }
     public T Value
     {
         get { source.Read(); return value; }
@@ -348,6 +349,7 @@ public sealed class UiReactiveOwner : IDisposable
         var handle = new UiReactiveResponse(reaction);
         children.Add(handle); runtime.Schedule(reaction); runtime.Drain(); return handle;
     }
+    internal void Release(IDisposable child) { Check(); children.Remove(child); child.Dispose(); }
     public void Dispose()
     {
         runtime.VerifyAccess(); if (disposed) return; disposed = true;

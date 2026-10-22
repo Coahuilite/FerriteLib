@@ -40,6 +40,7 @@ public sealed class UiBindingPresentation : IDisposable
     {
         this.bindings = bindings;
         owner = bindings.Reactive.CreateOwner(name);
+        bindings.AttachPresentation(this);
     }
     /// <summary>Eager explicit consumer. Failures remain queryable; independent keys still synchronize.</summary>
     public void Synchronize() => Synchronize(true);
@@ -120,9 +121,20 @@ public sealed class UiBindingPresentation : IDisposable
         if (disposed) throw new ObjectDisposedException(nameof(UiBindingPresentation));
         return bindings.UsePresentation(this);
     }
+    internal void Forget(string key)
+    {
+        foreach (string identity in new[] { "value:" + key, "options:" + key, "command:" + key })
+        {
+            if (calculations.TryGetValue(identity, out var calculation))
+            { calculations.Remove(identity); owner.Release(calculation); }
+            reads.Remove(identity); current.Remove(identity); faults.Remove(identity);
+            synchronized.Remove(identity); evaluations.Remove(identity);
+        }
+        DemandRevision++;
+    }
     public void Dispose()
     {
         bindings.Reactive.VerifyAccess(); if (disposed) return;
-        disposed = true; owner.Dispose(); calculations.Clear(); current.Clear(); faults.Clear(); reads.Clear(); synchronized.Clear();
+        disposed = true; bindings.DetachPresentation(this); owner.Dispose(); calculations.Clear(); current.Clear(); faults.Clear(); reads.Clear(); synchronized.Clear();
     }
 }

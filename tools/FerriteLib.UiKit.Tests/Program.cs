@@ -19,6 +19,8 @@ internal static class Program
             return RunEditing();
         if (args.Length == 1 && args[0] == "--closeout-appearance")
             return RunAppearance();
+        if (args.Length == 1 && args[0] == "--closeout-items")
+            return RunItems();
         try
         {
             RunAll();
@@ -41,6 +43,7 @@ internal static class Program
 
     private static int RunEditing() => KernelSharedEditingTests.RunAll() + KernelCloseoutEditingTests.RunAll();
     private static int RunAppearance() => KernelPaletteTests.RunAll() + KernelStyleScopeTests.RunAll() + KernelCloseoutAppearanceTests.RunAll();
+    private static int RunItems() => KernelItemBindingTests.RunAll();
 
     private static void RunAll()
     {
@@ -54,6 +57,7 @@ internal static class Program
         failures += KernelSharedBehaviorTests.RunAll();
         failures += RunEditing();
         failures += RunAppearance();
+        failures += RunItems();
         failures += KernelSharedChartTests.RunAll();
         failures += KernelDescriptiveFactsTests.RunAll();
         failures += KernelBooleanSelectionExpansionTests.RunAll();

@@ -69,6 +69,9 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
 
 ## Public-unstable
 
+- `UiItemBindings` — per-item source/key/field/command connection owner; S3 implementation is connected, final public dependency closure is still in progress before the 0.8 freeze.
+- `UiItemBindingSchema` — typed one-time item field/command description; same closeout status as its owner.
+
 - `UiMeasureInputs` — detached exact per-stage input values (RU2).
 - `UiMeasurement` — captured measure request with a calculation over those values (RU2).
 - `IUiTextMetricsEnvironment` — optional per-font measurement-environment validity, leaving ITextMetrics unchanged.

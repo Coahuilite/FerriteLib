@@ -152,6 +152,17 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
     private readonly Dictionary<string, OptionsDescriptor> options = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ActionDescriptor> actions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CommandDescriptor> commands = new(StringComparer.Ordinal);
+    private readonly HashSet<UiBindingPresentation> presentations = new();
+    internal void AttachPresentation(UiBindingPresentation value) => presentations.Add(value);
+    internal void DetachPresentation(UiBindingPresentation value) => presentations.Remove(value);
+    internal bool ContainsBinding(string key) => values.ContainsKey(key) || options.ContainsKey(key) || actions.ContainsKey(key) || commands.ContainsKey(key);
+    internal void RemoveItemBinding(string key)
+    {
+        Reactive.AssertWritable();
+        values.Remove(key); options.Remove(key); actions.Remove(key); commands.Remove(key);
+        declaredInvalidation.Remove(key); revisions.Remove(key);
+        foreach (var view in presentations) view.Forget(key);
+    }
 
     // The notification side. declaredInvalidation is what each key says an announcement of it means;
     // a key with no entry answers UiInvalidation.Everything. revisions is the monotonic per-key counter
