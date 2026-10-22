@@ -101,8 +101,8 @@ replace table access; detailed R9 remains experimental and complete. The separat
 assembly has no internals grant. The item helper adds current-object registration/release on Repeat.
 
 E1–E5/N1–N3, L1 and finite appearance are confirmed and implemented; native1.6/1.7 remain awaiting
-human. Real Camera+/Nivarian/Raven isolated integration and final support/delivery evidence are still
-in progress, not replaced by this generic inventory. No 0.7 human evidence is relabeled as0.8.
+human. Real Camera+/Nivarian/Raven isolated source integrations and measured support boundaries are in
+[platform-and-real-integrations.md](platform-and-real-integrations.md); fixed delivery identity travels with the candidate. No 0.7 human evidence is relabeled as0.8.
 K1 is now approved for grouped deferral; H1 continues as approved. A3 structural focus traversal, B2 Enter/Space and B3 Slider keyboard increment/Home/End remain concrete
 unimplemented recommendations. The approved first-version deferral keeps native editor keys and existing
 Cancel/Accept hooks; these items are not counted as implemented. See the

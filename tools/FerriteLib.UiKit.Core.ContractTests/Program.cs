@@ -29,6 +29,7 @@ internal static class Program
             ReactiveInventoryTests.Run(Check);
             ReactiveListWriteTests.Run(Check);
             ItemBindingTests.Run(Check);
+            NeutralDependencyTests.Run(Check);
             PointerLayers();
             ImageGeometry();
             Palette();

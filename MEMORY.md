@@ -20,8 +20,9 @@ The separate AuthorExamples assembly has no internals grant. Public compatibilit
 XML, meaning and legal conditions in the same adapter target; deprecation retains two complete subsequent
 published minors (0.9 → retain0.10/0.11 → earliest removal0.12), without a 1.x shortcut.
 
-Current engineering still owes the three isolated real integrations, platform/transitive-dependency
-closeout, final full inventory evidence and fixed clean-source delivery. 1.6 is primary; 1.7 compatibility
+The isolated real-source cases, measured1.6/1.7 seams and complete neutral dependency closure are
+recorded in `docs/development/0.8/platform-and-real-integrations.md`. Fixed clean-source candidate identity
+is carried with delivery, not inferred from a later HEAD. 1.6 is primary; 1.7 compatibility
 is checked in the same stage and reported independently. Native1.6/1.7 remain awaiting human; legacy0.7
 human evidence below does not accept0.8. New-engine1.7 adapter then direct drawing is a later route, not a
 1.6-first delivery prerequisite. Consumer migration uses a fixed supplied package, never moving outputs.

@@ -58,7 +58,7 @@ public sealed class UiElementSpec
             value = null!;
             return false;
         }
-        return attributes.TryGetValue(name, out value);
+        return attributes.TryGetValue(name, out value!);
     }
 
     public static UiElementSpec Empty { get; } = new UiElementSpec();

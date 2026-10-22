@@ -399,17 +399,3 @@ public static class UiThemeDraw
         return true;
     }
 }
-
-/// <summary>
-/// Generic visual states understood by <see cref="UiThemeDraw.StatusTreatment"/>. What each one paints
-/// is the <see cref="UiStyleTable"/>'s answer, not a switch here.
-/// </summary>
-public enum UiStatusTone
-{
-    Neutral,
-    Active,
-    Success,
-    Warning,
-    Danger,
-    Disabled
-}

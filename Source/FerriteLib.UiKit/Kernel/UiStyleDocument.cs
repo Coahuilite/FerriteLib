@@ -99,7 +99,7 @@ public readonly struct UiStyleDeclaration
 /// the record without limit.
 /// </para>
 /// </summary>
-public sealed class UiStyleDocument
+public sealed partial class UiStyleDocument
 {
     /// <summary>Distinct issues recorded before the document stops recording. Bounds a pathological file.</summary>
     public const int MaxIssues = 32;
@@ -440,6 +440,7 @@ public sealed class UiStyleDocument
     /// <summary>The successor of the legacy <c>&lt;Font&gt;</c> declaration: one key of the scheme's metric
     /// vocabulary whose VALUE is a font class rather than a number.</summary>
     internal const string FontMetricToken = "Font";
+    static partial void ReportLegacyFont(string scheme, string font);
 
     /// <summary>
     /// One <c>&lt;Metric Token="Font" Value="…"/&gt;</c>, the working spelling of a typography selection. Its
@@ -503,8 +504,7 @@ public sealed class UiStyleDocument
         // Reported through the appearance channel as well, exactly once per declared scheme (the parser runs
         // once per document, and the dedup key is the declaration itself): a redirect that only left a line in
         // the document's issue list would be found by a reader of that list and by nobody else.
-        UiFitAudit.ReportStyleFallback(
-            "scheme:" + scheme, "styles", "Font", FontName(font), "Metric Token=\"Font\"");
+        ReportLegacyFont(scheme, FontName(font));
     }
 
     /// <summary>The spelling an author used, for the redirect report.</summary>

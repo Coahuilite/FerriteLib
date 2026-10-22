@@ -9,6 +9,11 @@
     <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\IUiTypedChoices.cs" />
     <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiChoice.cs" />
     <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiInvalidation.cs" />
+    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiElementSpec.cs" />
+    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiNodeId.cs" />
+    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiLayoutManifest.cs" />
+    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiStyleDocument.cs" />
+    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiWindowBackground.cs" />
     <Compile Include="@(NeutralProductionSource)" />
   </ItemGroup>
 </Project>

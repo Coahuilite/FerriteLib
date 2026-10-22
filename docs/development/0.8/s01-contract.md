@@ -1,17 +1,18 @@
 # S0/S1 development contract (0.8.0)
 
-The 0.8 development line implements per-property font/density resolution and shared activation/range
-behavior. It still ships one `FerriteLib.UiKit.dll`. Editing, IME, shared label columns, relative placement,
-and the remaining 0.8 slices are not delivered by S0/S1. The subsequent [BSE package](bse-contract.md) migrates boolean/selection/expansion wrappers; [migration status](migration-status.md) tracks the full retained inventory. Real 1.6 acceptance remains separate.
+This contract records the shared appearance/activation/range foundation, now used by the complete
+0.8 retained inventory. The installed payload remains one `FerriteLib.UiKit.dll`. Editing, shared labels,
+relative placement and subsequent wrappers have their own production contracts; [migration status](migration-status.md)
+tracks all uses and their evidence. Native input/IME and real-font acceptance remain separate.
 
 ## Configure an instance, then remove only its override
 
-After the first arrangement, the existing node lookup exposes declarations:
+Use the supported host entry after the first arrangement:
 
 ```csharp
-UiNode slider = host.Session.GetNodeByElementId("volume")!;
-slider.Properties.Font.Set(UiFont.Tiny);
-slider.Properties.Font.Remove(); // follows the current remaining source, not its creation-time value
+UiElementProperties slider = host.ElementProperties("volume");
+slider.Font.Set(UiFont.Tiny);
+slider.Font.Remove(); // follows the current remaining source, not its creation-time value
 ```
 
 `Font` and `Density` are independent instance declarations. `LocalFont` / `LocalDensity` describe an
@@ -28,8 +29,8 @@ advance the existing layout clock; declaration-only changes are observed indepen
 Legacy XML `Scheme` / `Density` remains supported. Its named definitions are applied token by token,
 outer to inner, so a local definition's missing font/metric/color does not erase an ancestor's declaration.
 These legacy scoped themes are adapter defaults for the programmatic S0 declaration surface; their
-aggregated origin is reported as host/theme, not as invented instance intent. New XML property spelling
-and multiple same-level style composition are not introduced here.
+aggregated origin is reported as host/theme, not as invented instance intent. The current finite
+`Font`/`Metric.*` declarations and exact same-level precedence are in [property-contract.md](property-contract.md).
 
 Slider measure and draw both call neutral `UiSliderLayout.Measure` using `ITextMetrics`, the effective
 font, the density distances, and the assigned width. A label that leaves insufficient track space moves
@@ -77,7 +78,7 @@ exception and target context. It is neither retried nor rolled back. Subsequent 
 - A consumed native primary release is read from `Event.rawType` even after `Event.Use()` changes `type` to Used. It remains consumed: release ends owned capture without activating Button or selecting another Slider value. Raw consumed presses and secondary-button releases do not acquire or end a primary operation.
 - Native capture is owned by the logical session and node. A compatible reflow keeps the recorded native
   capture identifier rather than treating an allocation-order change as a new logical operation.
-- `UiNode.InteractionScope` identifies a changed business object when a getter retargets. Change it before
+- `host.SetInteractionScope(id, scope)` / custom `ctx.InteractionScope` identifies a changed business object when a getter retargets. Change it before
   the next input. A different binding/command key is already a different target. Reordering stable nodes or
   replacing only presentation does not change target identity.
 - A successful pass reconciles omitted capture owners. An aborted traversal releases unreliable capture
@@ -86,13 +87,13 @@ exception and target context. It is neither retried nor rolled back. Subsequent 
   cleanup; Dispose is idempotent. Pure presentation failure does not automatically clear reliable behavior.
 
 `UiWindowHost` maps the native `WindowStack.GetsInput` answer. Embedded `UiHost` usage retains its existing
-input scope; it may supply `Session.PointerInputAllowed` when its enclosing native owner has that fact.
-No new window registration condition is added to old embedded usage. Keyboard Button/Slider defaults,
-Live/Cancel and edit takeover are not approved or implemented by F1.
+input scope; `DrawFrame(rect, surroundingOwner)` supplies the native owner's current qualification.
+No new window registration condition is added to old embedded usage. Added Button/Slider key navigation
+is deferred; current Live/Cancel and edit takeover policies are implemented in [editing-contract.md](editing-contract.md).
 
 ## Compatibility and source boundaries
 
-The old `UiNative.Button` native primitives remain for other, not-yet-migrated kinds. The session-plus-key
+The old raw `UiNative.Button(Rect)` primitive retains its existing usage conditions. The session-plus-key
 `UiNative.Slider` entry keeps its signature and arbitrary-key usage, but now drives the same range core
 and paints through `PaintRange`; it no longer calls `Widgets.HorizontalSlider`. Its derived numeric-editor
 buffer bridge is retained for the existing StepperSlider composition. The modern Slider wrapper has no

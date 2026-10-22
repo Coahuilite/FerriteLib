@@ -2,15 +2,6 @@
 
 ## 0.8 closeout
 
-- [ ] Complete isolated Camera+/Nivarian/Raven production-entry integrations, preserving actual business
-      identity/order/refusal and multi-panel/native-window lifecycle. Originals remain read-only.
-- [ ] Close the complete 18-use/nine-container/non-kind migration inventory and applicable changed-contract
-      checks; reuse unaffected accepted RU1–RU3 evidence. S1–S7 author paths and signature dependencies
-      must stay complete; detailed R9 remains delivered experimental.
-- [ ] Record actual 1.6/1.7 capability and complete transitive-dependency evidence separately; no direct
-      drawing backend or native-support claim from a stub/compatibility assembly.
-- [ ] Fix clean source and same-identity five-file isolated Dev, complete API/XML/behavior migration,
-      commit list and consumer handoff. US consumption is coordinated externally, never inferred.
 - [ ] Collect native1.6 text/IME/fonts/window/input/scroll/clip/popup/image acceptance against that fixed
       candidate; native1.7 remains separately awaiting human. Do not start/install the game automatically.
 

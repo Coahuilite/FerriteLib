@@ -3,16 +3,6 @@ using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
 
-/// <summary>Neutral text emphasis. Saturated treatments use their own semantic foreground role.</summary>
-public enum UiEmphasis
-{
-    /// <summary>Form-control text: the value the page exists to show. Neutral resolves to TextPrimary.</summary>
-    Normal,
-
-    /// <summary>Compact badge text: reads as secondary information. Neutral resolves to TextSecondary.</summary>
-    Muted
-}
-
 /// <summary>
 /// One immutable answer from the resolved-value store: what to fill, what to outline the fill with,
 /// and what to write on it. These are values, not rules — a caller paints them and cannot re-derive a
