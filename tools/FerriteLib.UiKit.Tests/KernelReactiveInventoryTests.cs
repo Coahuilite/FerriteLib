@@ -160,13 +160,14 @@ internal static class KernelReactiveInventoryTests
     private static void Failure()
     {
         using var page = new InventoryPageExample(); var fail = page.Runtime.Boolean(true);
-        page.Bindings.BindTrackedOptions<int>("fault", () => fail.Value ? throw new Exception("inventory-sync-fault") : new[] { 1 }, (a, b) => a == b);
-        using var host = Host(page.Bindings); bool refused = false;
-        try { Pump(host, EventType.Repaint); } catch (InvalidOperationException ex) { refused = ex.ToString().Contains("inventory-sync-fault"); }
-        Check(refused && host.Session.GetNodeByElementId("row#a") == null && host.Session.Interactions.CaptureOwner == null, "failed collection synchronization publishes no partial Repeat geometry or hit owner");
+        page.Bindings.BindTracked<IReadOnlyList<string>>("broken-items", () => fail.Value ? throw new Exception("inventory-sync-fault") : new[] { "a", "b" }, equal: (a,b)=>a.SequenceEqual(b));
+        using var host = new UiHost("inventory",UiLayoutManifest.Parse(Page.Replace("Items=\"items\"","Items=\"broken-items\"")),page.Bindings,UiTheme.Vanilla,new Metrics(),new Translation());
+        Pump(host, EventType.Repaint);
+        Check(host.LayoutFault?.ToString().Contains("inventory-sync-fault")==true && host.Session.GetNodeByElementId("row#a") == null && host.Session.Interactions.CaptureOwner == null && host.Session.IsActive, "failed actual collection geometry remains unpublished while recoverable Host session survives");
         fail.Value = false; Pump(host, EventType.Repaint);
-        Check(host.Session.GetNodeByElementId("row#a") != null && page.Requests == 0, "explicit successful next Host attempt restores tracking without replaying input");
+        Check(host.LayoutFault==null && host.Session.GetNodeByElementId("row#a") != null && page.Requests == 0, "related successful next Host attempt restores tracking without replaying input");
     }
+
     private sealed class Metrics : ITextMetrics
     {
         public float MeasureText(string text, UiFont font, float width) => text.Length * 2;

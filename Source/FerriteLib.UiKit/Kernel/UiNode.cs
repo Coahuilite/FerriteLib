@@ -117,6 +117,9 @@ public sealed class UiNode
     /// that declares no command, which is why it cannot change the behaviour of a page that binds none.
     /// </summary>
     public bool IsDisabled { get; internal set; }
+    public UiReactiveFault? ReactiveFault => QualificationFault ?? PresentationFault;
+    internal UiReactiveFault? QualificationFault, PresentationFault;
+    internal bool PresentationUnavailable;
 
     /// <summary>Latest model-derived discrete-selection facts; never a second selected-value authority.</summary>
     public UiSelectionObservation? Selection { get; internal set; }

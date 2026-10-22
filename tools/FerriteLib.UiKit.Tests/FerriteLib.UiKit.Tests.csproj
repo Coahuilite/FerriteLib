@@ -30,6 +30,7 @@
 
     <!-- 桩项目的源码位于本项目目录树下，但它们是独立的桩程序集，不能参与本项目的编译。 -->
     <Compile Remove="Stubs\**\*.cs" />
+    <Compile Include="../FerriteLib.UiKit.Core.ContractTests/FailureLifetimeExamples.cs" Link="FailureLifetimeExamples.cs" />
     <Compile Include="../FerriteLib.UiKit.Core.ContractTests/ReactiveExamples.cs" Link="ReactiveExamples.cs" />
     <Compile Include="../FerriteLib.UiKit.Core.ContractTests/WorkshopService.cs" Link="WorkshopService.cs" />
     <Compile Include="../FerriteLib.UiKit.Core.ContractTests/WorkshopProjectionExample.cs" Link="WorkshopProjectionExample.cs" />

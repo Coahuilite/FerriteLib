@@ -118,7 +118,7 @@ internal static class ReactiveInventoryTests
         using (var compareView = comparisonBindings.CreatePresentation())
         {
             compareView.Synchronize(); comparisonValue.Value = 2;
-            Check(Throws(compareView.Synchronize, "forbidden") && comparisonValue.Value == 2, "new presentation equality cannot perform reactive writes");
+            compareView.Synchronize(); Check(compareView.GetStatus("value").Fault!.ToString().Contains("forbidden") && comparisonValue.Value == 2, "new presentation equality cannot perform reactive writes");
         }
         var other = new UiReactiveRuntime(); var otherList = other.List(new[] { 1 }, (x, y) => x == y);
         var foreign = owner.Compute("foreign-list", () => otherList.Count);
@@ -129,8 +129,8 @@ internal static class ReactiveInventoryTests
         var fail = runtime.Boolean(); b.BindTrackedOptions<int>("fault-options", () => fail.Value ? throw new Exception("options-cause") : new[] { 1 }, (x, y) => x == y);
         view.Synchronize(); oldRevision = view.Revision; int captionRevision = b.GetRevision("caption");
         fail.Value = true; a.Count++;
-        Check(Throws(view.Synchronize, "options-cause") && view.Revision == oldRevision && b.GetRevision("caption") == captionRevision, "failed options synchronization publishes no partial values or revisions");
-        using (view.Enter()) Check(b.Get<int>("total") == oldTotal && b.GetOptions<int>("fault-options")[0] == 1, "failed sync keeps last complete collection and scalar presentation");
+        view.Synchronize(); Check(view.GetStatus("fault-options",true).Fault!.ToString().Contains("options-cause") && view.Revision > oldRevision && b.GetRevision("caption") > captionRevision, "RU3 failed options are invalid while independent complete values publish");
+        using (view.Enter()) Check(b.Get<int>("total") == page.Total.Value && Throws(()=>_=b.GetOptions<int>("fault-options"),"options-cause") && view.GetStatus("fault-options",true).HasLastValue, "RU3 old collection is retained as display, never returned as a current successful read");
         fail.Value = false; view.Synchronize();
         Check(b.Get<int>("total") == page.Total.Value, "explicit next synchronization restores tracking without operation replay");
         view.Dispose(); view.Dispose(); int seen = page.Observations; a.Count++;

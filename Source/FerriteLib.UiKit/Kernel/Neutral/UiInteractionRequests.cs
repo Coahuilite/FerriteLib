@@ -17,5 +17,5 @@ public static class UiInteractionRequests
         catch (Exception ex) { throw Failure(target, ex); }
     }
     private static InvalidOperationException Failure(UiInteractionTarget target, Exception ex)
-        => new InvalidOperationException("Interaction request failed for node '" + target.Node + "', target '" + target.TargetScope + "'. Side effects may already have occurred; the request is not retried.", ex);
+        => new UiRequestFailure("Interaction request failed for node '" + target.Node + "', target '" + target.TargetScope + "'. Side effects may already have occurred; the request is not retried.", ex);
 }

@@ -114,6 +114,7 @@ internal static class KernelReactiveFoundationTests
         {
             try { Pump(host,EventType.Repaint,new Vector2(-10,-10)); }
             catch(InvalidOperationException ex) { refused=ex.ToString().Contains("forbidden"); }
+            refused = refused || host.Presentation!.GetStatus("value").Fault?.ToString().Contains("forbidden")==true;
         }
         Check(refused && source.Value==0,"new BindTracked getter refuses writes without retrofitting legacy purity");
     }
@@ -138,8 +139,8 @@ internal static class KernelReactiveFoundationTests
         using var failingHost=Host("<Widget Kind=\"probe\" Id=\"probe\" />",b);
         bool refused=false;
         try { Pump(failingHost,EventType.Repaint,new Vector2(-10,-10)); } catch(InvalidOperationException ex) { refused=ex.ToString().Contains("presentation/broken"); }
-        Check(refused && failingHost.Session.GetNodeByElementId("probe")==null,"failed tracking publishes neither half-layout nor hit nodes");
-        fail=false; Pump(failingHost,EventType.Repaint,new Vector2(-10,-10));
+        Check(!refused && failingHost.Presentation!.GetStatus("broken").Fault!=null && failingHost.Session.GetNodeByElementId("probe")!=null,"unused faulty tracked key cannot suppress independent custom consumer geometry");
+        fail=false; failingHost.Presentation!.Retry("broken"); Pump(failingHost,EventType.Repaint,new Vector2(-10,-10));
         Check(probe.Drawn==30,"new explicit frame after failure has restored context and no replayed operation");
     }
     private static void IndependentProjection()

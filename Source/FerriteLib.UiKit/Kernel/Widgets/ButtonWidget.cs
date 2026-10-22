@@ -116,7 +116,7 @@ public sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
                 {
                     hasPayload = ctx.Bindings.TryGet(payloadKey, out payload);
                 }
-                catch (InvalidOperationException)
+                catch (InvalidOperationException ex) when (ex is not UiReactiveFault)
                 {
                     // A key bound to something that is not a string: fail-soft and loud, then fire without it.
                     AtomVocabulary.ReportUnresolved(ctx, Kind, payloadKey, "no payload");

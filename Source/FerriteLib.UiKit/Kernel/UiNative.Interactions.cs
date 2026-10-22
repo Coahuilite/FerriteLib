@@ -22,7 +22,7 @@ public static partial class UiNative
             string before = DiagnosticEventName();
 #endif
             UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
-            bool enabled = !IsInputDisabled(node);
+            bool enabled = !IsInputDisabled(node) && ctx.Session.PointerInputAllowed && ctx.Session.IsInputGeometryReliable;
             bool covered = ctx.Session.IsPointerOverHigherLayer(node, WindowPointer(ctx));
             bool established = enabled && writable && !covered && ButtonOverride(rect);
             UiInteractionResult result = ctx.Session.Interactions.Activate(InteractionTarget(ctx, binding, part, itemKey), new UiInputEligibility(established));

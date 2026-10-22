@@ -73,6 +73,7 @@ public sealed partial class UiHost : IDisposable
     private bool warnedDroppedStyleDocument;
     private int lastLayoutRevision = -1;
     private int presentationRevision;
+    private UiLayoutSnapshot? lastSuccessfulSnapshot;
 
     public UiHost(
         string source,
@@ -123,7 +124,7 @@ public sealed partial class UiHost : IDisposable
 
         engine = new UiLayoutEngine(source, styleResolver, manifest.Templates);
         session = new UiSession();
-        reactivePresentation = (bindings as UiBindings)?.CreateHostPresentation();
+        reactivePresentation = (bindings as UiBindings)?.CreateHostPresentation(source + "/" + session.Identity);
 
         // A document that went wrong must not go quiet, and the consumer must not have to remember to ask:
         // every drop the parser or the resolver recorded is published on the fit audit's appearance
@@ -139,6 +140,17 @@ public sealed partial class UiHost : IDisposable
     public IUiBindings Bindings => bindings;
 
     public UiSession Session => session;
+    /// <summary>Managed fault facts and pure Retry entry, owned by this view, not by the business service.</summary>
+    public UiBindingPresentation? Presentation => reactivePresentation;
+    public UiReactiveFault? LayoutFault { get; private set; }
+    public bool DisplayRequired { get; private set; } = true;
+    public void SetDisplayDemand(bool required)
+    {
+        if (!session.IsActive) return;
+        if (DisplayRequired == required) return;
+        DisplayRequired = required;
+        session.AbortHitPass();
+    }
 
     /// <summary>Reads current model facts and the last committed layout; never arranges or paints.</summary>
     public UiHostObservation Observe(UiObservationBudget? budget = null, string? nodeKey = null)
@@ -196,10 +208,10 @@ public sealed partial class UiHost : IDisposable
 
     public UiLayoutSnapshot MeasureAndArrange(Vector2 available)
     {
-        reactivePresentation?.Synchronize();
-        if (reactivePresentation != null && presentationRevision != reactivePresentation.Revision)
+        reactivePresentation?.Synchronize(false);
+        if (reactivePresentation != null && presentationRevision != reactivePresentation.DemandRevision)
         {
-            presentationRevision = reactivePresentation.Revision;
+            presentationRevision = reactivePresentation.DemandRevision;
             engine.ValidateLegacyPresentation();
         }
         using IDisposable? inputs = reactivePresentation?.Enter();
@@ -216,6 +228,7 @@ public sealed partial class UiHost : IDisposable
             // a global cache key. Unknown legacy Measure still receives its original synchronization.
             UiWidgetContext ctx = CreateContext(available.x);
             UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, available, manifest.Roots);
+            LayoutFault = null;
 
             // A region scope is resolved the first time the engine meets it, and that resolution can drop a
             // name (a scheme or density nobody declared). Publishing here - on the same frame, right after the
@@ -223,6 +236,7 @@ public sealed partial class UiHost : IDisposable
             // cached arrangement there is nothing new to publish and the call costs two integer comparisons.
             PublishStyleIssues();
             lastLayoutRevision = theme.LayoutRevision;
+            lastSuccessfulSnapshot = snapshot;
             return snapshot;
         }
         finally
@@ -332,6 +346,7 @@ public sealed partial class UiHost : IDisposable
     /// </summary>
     public void DrawFrame(Rect viewport)
     {
+        if (!DisplayRequired) return;
         BeginFrame();
         try
         {
@@ -340,6 +355,24 @@ public sealed partial class UiHost : IDisposable
             // re-derive it from string-keyed snapshot views.
             UiLayoutSnapshot snapshot = MeasureAndArrange(new Vector2(viewport.width, viewport.height));
             Draw(viewport, snapshot);
+        }
+        catch (UiReactiveFault failure)
+        {
+            // The layout engine restores the complete previous geometry transaction. It is not
+            // current hit geometry: retain the session/drafts, but publish no partial input pass.
+            LayoutFault = failure;
+            session.AbortHitPass();
+            try
+            {
+                if (lastSuccessfulSnapshot != null)
+                {
+                    Draw(viewport, lastSuccessfulSnapshot);
+                    UiThemeDraw.FailureMarker(viewport, theme, failure.Identity);
+                }
+                else UiThemeDraw.RecoveryBand(viewport, theme, failure.Identity);
+            }
+            catch (UiReactiveFault) { UiThemeDraw.RecoveryBand(viewport, theme, failure.Identity); }
+            finally { session.AbortHitPass(); }
         }
         catch
         {

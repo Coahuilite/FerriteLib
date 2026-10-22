@@ -99,9 +99,10 @@ internal static class ReactiveFoundationTests
         }
         using(runtime.ReadPhase()) Check(Throws(()=>a.Value=9,"forbidden"),"explicit new pure measurement or draw scope refuses writes");
         int provisionalRuns=0;
-        Check(Throws(()=>observer.Respond("initial-failure",()=>{ provisionalRuns++; _=a.Value; throw new Exception("initial"); }),"initial-failure"),"initial response failure clears provisional tracking");
+        var initialFailure=observer.RespondManaged("initial-failure",()=>{ provisionalRuns++; _=a.Value; throw new Exception("initial"); });
+        Check(initialFailure.IsPaused && initialFailure.Fault!.Identity.Contains("initial-failure"),"initial response failure is retained for owner recovery");
         a.Value=4;
-        Check(provisionalRuns==1,"failed response registration retains no temporary subscription");
+        Check(provisionalRuns==1,"failed response registration stays paused after source changes");
         var registrationValue=runtime.Int(); var order=new List<string>();
         observer.Respond("existing-registration-target",()=>{ _=registrationValue.Value; order.Add("B"); });
         order.Clear();
@@ -153,23 +154,23 @@ internal static class ReactiveFoundationTests
         b.BindCommand("throw-after-write", () => { counter.Count.Value=30; throw new Exception("after-write"); });
         Check(Throws(() => b.Invoke("throw-after-write"), "after-write") && counter.Count.Value==30 && counter.Observed==30, "exception neither rolls back nor replays already written business");
         var twinSource=runtime.Int();using var twinOwner=runtime.CreateOwner("twin-failure");
-        twinOwner.Respond("response",()=>{if(twinSource.Value>0)throw new Exception("response-cause");});
+        var twinResponse=twinOwner.RespondManaged("response",()=>{if(twinSource.Value>0)throw new Exception("response-cause");});
         b.BindCommand("twin-fail",()=>{twinSource.Value=1;throw new Exception("business-cause");});
         Exception? twin=null;try{b.Invoke("twin-fail");}catch(Exception ex){twin=ex;}
-        Check(twin is AggregateException && twin.ToString().Contains("business-cause") && twin.ToString().Contains("response-cause"),"simultaneous business and response errors retain both original causes");
+        Check(twin != null && twin.ToString().Contains("business-cause") && twinResponse.Fault!.ToString().Contains("response-cause"),"business error and independently retained response fault preserve both causes");
         view.Synchronize(); int stable = b.Get<int>("count");
         bool failRead = true;
         b.BindTracked<int>("broken", () => failRead ? throw new Exception("sync-failure") : 12);
-        Check(Throws(view.Synchronize, "presentation/broken"), "presentation synchronization failure is located");
+        view.Synchronize(); Check(view.GetStatus("broken").Fault!.Identity=="presentation/broken", "presentation synchronization failure is located without stopping independent keys");
         using(view.Enter()) Check(b.Get<int>("count")==stable, "failed synchronization does not publish a partial read view");
-        failRead=false; view.Synchronize();
+        failRead=false; view.Retry("broken"); view.Synchronize();
         using(view.Enter()) Check(b.Get<int>("broken")==12, "failed new binding can be explicitly synchronized later");
         Exception? accessFailure=null;
         var thread=new Thread(() => { try { _=a.Value; } catch(Exception ex) { accessFailure=ex; } }); thread.Start(); thread.Join();
         Check(accessFailure is InvalidOperationException, "wrong access context is refused rather than silently marshalled");
         var loop=runtime.Int(); using var loopOwner=runtime.CreateOwner("cycle-owner");
-        loopOwner.Respond("loop", () => { int value=loop.Value; if(value>0) loop.Value=value+1; });
-        Check(Throws(() => loop.Value=1, "cycle-owner/loop"), "response cycle is bounded and located");
+        var loopingResponse=loopOwner.RespondManaged("loop", () => { int value=loop.Value; if(value>0) loop.Value=value+1; });
+        loop.Value=1; Check(loopingResponse.Fault?.Kind=="propagation-budget" && loopingResponse.Fault.Identity=="cycle-owner/loop", "response repeated propagation is bounded and located");
         loopOwner.Dispose(); a.Value=4;
         Check(zSeen==4, "loop failure leaves runtime usable for independent owned work");
         int viewRuns=0; b.BindTracked("view-lifetime", () => { viewRuns++; return counter.Count.Value; });

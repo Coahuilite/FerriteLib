@@ -190,7 +190,7 @@ internal static class AtomVocabulary
         {
             if (ctx.Bindings.TryGet<T>(key, out T value)) return value;
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex) when (ex is not UiReactiveFault)
         {
             // TryGet<T> reports a type mismatch this way; narrowed to that type so a consumer getter that
             // throws anything else still reaches the tree's recovery path (see the summary above).

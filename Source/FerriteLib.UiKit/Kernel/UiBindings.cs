@@ -294,15 +294,28 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
             {
                 throw new AggregateException("Business operation and its response drain both failed. Neither is retried.", businessFailure, responseFailure);
             }
-            throw;
+            throw businessFailure is UiReactiveFault or UiRequestFailure ? businessFailure : new UiRequestFailure(businessFailure);
         }
         scope.Dispose();
         return result;
     }
 
     public UiBindingPresentation CreatePresentation() { reactiveEnabled = true; return new(this); }
-    internal UiBindingPresentation? CreateHostPresentation() => reactiveEnabled ? CreatePresentation() : null;
+    internal UiBindingPresentation? CreateHostPresentation(string owner) => reactiveEnabled ? new UiBindingPresentation(this, owner) : null;
     private UiBindingPresentation? presentation;
+    internal sealed class DisplayScope : IDisposable
+    {
+        private readonly UiBindings bindings;
+        private readonly DisplayScope? previous;
+        internal UiReactiveFault? Fault;
+        internal DisplayScope(UiBindings bindings) { this.bindings = bindings; previous = bindings.displayScope; bindings.displayScope = this; }
+        public void Dispose() { bindings.displayScope = previous; }
+    }
+    private DisplayScope? displayScope;
+    internal DisplayScope DisplayOnly() => new(this);
+    internal void NoteDisplayFault(UiReactiveFault fault) { if (displayScope != null) displayScope.Fault = fault; }
+    internal void PreparePresentation(string key) { if (UsesPresentation) presentation!.Prepare(key); }
+    internal void PrepareAllPresentation() { if (UsesPresentation) presentation!.PrepareAll(); }
     // A graph evaluation is a business/derived read even if external application occurs inside Draw.
     // Only ordinary presentation consumers use the frozen view; responses never observe stale UI input.
     private bool UsesPresentation => presentation != null && Reactive.Observer == null;
@@ -325,7 +338,7 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
     {
         if (!descriptor.Tracked) return descriptor.GetBoxed();
         Reactive.VerifyAccess();
-        if (UsesPresentation) return presentation!.Read("value:" + key);
+        if (UsesPresentation) return presentation!.Read("value:" + key, displayScope != null);
         using IDisposable pure = Reactive.Pure();
         return descriptor.GetBoxed();
     }
@@ -754,5 +767,12 @@ public sealed partial class UiBindings : IUiBindings, IUiTypedChoices
                 $"Binding '{elementId}' ({kind}) is '{actual.Name}', not '{typeof(T).Name}'.");
         }
     }
+}
+
+// An explicit request has ended; a subsequent click is a new request, not automatic callback recovery.
+internal sealed class UiRequestFailure : InvalidOperationException
+{
+    internal UiRequestFailure(Exception cause) : base("Explicit UI request failed. Applied business writes remain applied; a new request uses current qualification.", cause) { }
+    internal UiRequestFailure(string message, Exception cause) : base(message, cause) { }
 }
 

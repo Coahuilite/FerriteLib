@@ -300,6 +300,15 @@ public static class UiThemeDraw
             singleLine: true);
     }
 
+    /// <summary>Marks retained display without replacing it or introducing another palette.</summary>
+    internal static void FailureMarker(Rect rect, UiTheme theme, string identity)
+    {
+        float band = Math.Min(3f, rect.height);
+        Solid(new Rect(rect.x, rect.yMax - band, rect.width, band), theme[UiPaletteRole.DangerForeground]);
+        Label(new Rect(rect.xMax - Math.Min(20, rect.width), rect.y, Math.Min(20, rect.width), Math.Min(20, rect.height)),
+            "!", theme, theme[UiPaletteRole.DangerForeground], UiFont.Tiny, TextAnchor.MiddleRight, singleLine: true);
+    }
+
     /// <param name="writable">
     /// False paints the badge as disabled whatever tone was authored, the same state-beats-author rule
     /// <see cref="StatusTreatment"/> documents.

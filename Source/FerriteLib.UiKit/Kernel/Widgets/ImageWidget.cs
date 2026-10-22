@@ -105,7 +105,7 @@ internal sealed class ImageWidget : IUiWidget, IUiMeasureParticipant, IUiDescrip
                 return new UiDescription(role, name: name, unknownReason: "MissingBinding");
             return new UiDescription(role, name: name, available: texture != null);
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex) when (ex is not UiReactiveFault)
         {
             return new UiDescription(role, name: name, unknownReason: "BindingReadUnavailable");
         }
@@ -135,7 +135,7 @@ internal sealed class ImageWidget : IUiWidget, IUiMeasureParticipant, IUiDescrip
         {
             if (UiTextureBinding.TryRead(ctx.Bindings, ReadBindKey(), out Texture? texture)) return texture;
         }
-        catch (InvalidOperationException) { }
+        catch (InvalidOperationException ex) when (ex is not UiReactiveFault) { }
         AtomVocabulary.ReportUnresolved(ctx, Kind, ReadBindKey(), "no texture");
         return null;
     }

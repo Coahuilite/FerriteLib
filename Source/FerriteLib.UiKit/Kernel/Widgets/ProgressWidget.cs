@@ -122,7 +122,7 @@ internal sealed class ProgressWidget : IUiWidget, IUiMeasureParticipant, IUiDesc
                 return new UiDescription(UiDescriptionRole.Progress, unknownReason: "MissingBinding");
             return new UiDescription(UiDescriptionRole.Progress, range: new UiRangeObservation(value, 0, ReadMax()));
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex) when (ex is not UiReactiveFault)
         {
             return new UiDescription(UiDescriptionRole.Progress, unknownReason: "BindingReadUnavailable");
         }

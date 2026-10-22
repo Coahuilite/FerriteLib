@@ -50,6 +50,14 @@ public abstract class UiWindowHost : Window
     private Exception? lastFailure;
     private bool activeTarget = true;
     private UiWindowCatalog? catalog;
+    private bool displayRequired = true;
+    /// <summary>Reliable adapter/consumer visibility, distinct from active input target and modality.</summary>
+    public bool DisplayRequired => displayRequired;
+    public void SetDisplayDemand(bool required)
+    {
+        displayRequired = required;
+        host?.SetDisplayDemand(required);
+    }
 
     // Identity the shell's own text is attributed to in the fit audit: built lazily and cached, because
     // the concrete type is known here but the window key is attached by the catalog after construction,
@@ -431,6 +439,7 @@ public abstract class UiWindowHost : Window
 
     private void DrawShell(Rect inRect)
     {
+        if (!displayRequired) return;
         ResolvePointerDown();
         if (!DrawChrome(inRect)) return;
 #if FER_DEV
@@ -473,6 +482,7 @@ public abstract class UiWindowHost : Window
             if (host == null)
             {
                 UiHost created = CreateHost();
+                created.SetDisplayDemand(displayRequired);
                 host = created;
                 // Before the first draw of that host, which is the whole point of the door: a subscription
                 // made here sees the first frame, and a consumer never has to poll for a host that does not

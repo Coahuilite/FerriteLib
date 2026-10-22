@@ -48,11 +48,27 @@ public static class UiSessionGuard
 
         GameFont previousFont = Text.Font;
         Color previousColor = GUI.color;
+        using UiBindings.DisplayScope? display = widget is IUiDescriptiveWidget && widget is not IUiPointerLayout ? (ctx.Bindings as UiBindings)?.DisplayOnly() : null;
         try
         {
             widget.Draw(rect, ctx);
+            node.PresentationFault = display?.Fault;
+            node.PresentationUnavailable = false;
+            if (node.ReactiveFault != null)
+                UiThemeDraw.FailureMarker(rect, ctx.Theme, node.ReactiveFault.Identity);
         }
-        catch (Exception ex)
+        catch (UiReactiveFault failure)
+        {
+            node.PresentationFault = failure; node.PresentationUnavailable = true;
+            Text.Font = previousFont; GUI.color = previousColor;
+            UiThemeDraw.RecoveryBand(rect, ctx.Theme, failure.Identity);
+        }
+        catch (UiRequestFailure)
+        {
+            Text.Font = previousFont; GUI.color = previousColor;
+            UiThemeDraw.RecoveryBand(rect, ctx.Theme, node.Path);
+        }
+        catch (Exception ex) when (ex is not UiReactiveFault)
         {
             Record(ctx.Session, node, node.Path, widget.Kind, node.Path, ex);
             Text.Font = previousFont;
@@ -77,7 +93,7 @@ public static class UiSessionGuard
         {
             return widget.Measure(ctx);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not UiReactiveFault)
         {
             Record(ctx.Session, node, node.Path, widget.Kind, node.Path, ex);
             Text.Font = previousFont;
@@ -111,6 +127,18 @@ public static class UiSessionGuard
         {
             draw();
         }
+        catch (UiReactiveFault failure)
+        {
+            session.ActiveNode.PresentationFault = failure;
+            session.ActiveNode.PresentationUnavailable = true;
+            Text.Font = previousFont; GUI.color = previousColor;
+            fallback?.Invoke(rect);
+        }
+        catch (UiRequestFailure)
+        {
+            Text.Font = previousFont; GUI.color = previousColor;
+            fallback?.Invoke(rect);
+        }
         catch (Exception ex)
         {
             Record(session, session.ActiveNode, elementId, kind, elementPath, ex);
@@ -139,7 +167,7 @@ public static class UiSessionGuard
         {
             return measure();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not UiReactiveFault)
         {
             Record(session, session.ActiveNode, elementId, kind, elementPath, ex);
             Text.Font = previousFont;

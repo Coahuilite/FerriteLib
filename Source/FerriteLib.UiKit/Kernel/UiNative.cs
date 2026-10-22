@@ -213,7 +213,7 @@ public static partial class UiNative
     {
         for (UiNode? cursor = node; cursor != null; cursor = cursor.Parent)
         {
-            if (cursor.IsDisabled) return true;
+            if (cursor.IsDisabled || cursor.PresentationUnavailable || cursor.QualificationFault != null) return true;
         }
 
         return false;

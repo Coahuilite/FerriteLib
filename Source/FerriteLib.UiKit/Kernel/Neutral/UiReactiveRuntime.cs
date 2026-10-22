@@ -89,10 +89,11 @@ public sealed class UiReactiveRuntime
             foreach (var entry in versions) if (entry.Key.Revision != entry.Value) { observer.MarkDirty(); break; }
             return result;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            // A failed evaluation does not retain provisional edges, publish a value or replay an operation.
-            throw new InvalidOperationException("Reactive evaluation failed at '" + observer.Name + "'.", ex);
+            // Failed branches are real recovery inputs. A successful attempt replaces these edges.
+            observer.RetainRecoveryDependencies(found);
+            throw ex is UiReactiveFault failure ? failure.Through(observer.Name) : new UiReactiveFault(observer.Name, "evaluation", "Related input change or Retry", ex);
         }
         finally { scope?.Dispose(); Observer = previous; Reads = previousReads; ReadVersions = previousVersions; Current = previousRuntime; }
     }
@@ -112,14 +113,17 @@ public sealed class UiReactiveRuntime
             while (pending.Count != 0)
             {
                 UiReactiveReaction next = pending[0]; pending.RemoveAt(0); queued.Remove(next);
-                if (next.Disposed) continue;
+                if (next.Disposed || next.Fault != null) continue;
                 int steps = executions.TryGetValue(next, out int previous) ? previous + 1 : 1;
                 executions[next] = steps;
-                if (steps > 100) throw new InvalidOperationException("Reactive response cycle near '" + next.Name + "' (100 repeated evaluations of this response). Queue discarded; business writes remain applied.");
+                if (steps > 256)
+                {
+                    next.Pause(new UiReactiveFault(next.Name, "propagation-budget", "Owner Resume after correcting the response", new InvalidOperationException("256 repeated evaluations of this response in one drain; not proof of a complete cycle. Applied writes remain applied.")));
+                    continue;
+                }
                 next.Run();
             }
         }
-        catch { pending.Clear(); queued.Clear(); throw; }
         finally { draining = false; }
     }
 }
@@ -146,6 +150,7 @@ internal abstract class UiReactiveSource
     }
     internal void Subscribe(UiReactiveObserver observer) => observers.Add(observer);
     internal void Unsubscribe(UiReactiveObserver observer) => observers.Remove(observer);
+    internal virtual void RetryFailure(HashSet<UiReactiveSource> visited) { }
     internal void Invalidate()
     {
         Revision++;
@@ -196,6 +201,16 @@ internal abstract class UiReactiveObserver : UiReactiveSource, IDisposable
         foreach (UiReactiveSource item in found) if (!dependencies.Contains(item)) item.Subscribe(this);
         dependencies = found;
     }
+    internal void RetainRecoveryDependencies(HashSet<UiReactiveSource> found)
+    {
+        found.UnionWith(dependencies);
+        ReplaceDependencies(found);
+    }
+    internal override void RetryFailure(HashSet<UiReactiveSource> visited)
+    {
+        if (!visited.Add(this)) return;
+        foreach (UiReactiveSource dependency in dependencies) dependency.RetryFailure(visited);
+    }
     internal abstract void MarkDirty();
     public virtual void Dispose()
     {
@@ -207,17 +222,36 @@ internal abstract class UiReactiveObserver : UiReactiveSource, IDisposable
     }
 }
 
-/// <summary>A lazy explicitly readable derived value, owned by a subscription lifetime.</summary>
+/// <summary>A located managed failure. Old presentation is separate from a current invalid result.</summary>
+public sealed class UiReactiveFault : InvalidOperationException
+{
+    public string Identity { get; }
+    public string Kind { get; }
+    public string Recovery { get; }
+    public string StoppedScope { get; }
+    internal UiReactiveFault(string identity, string kind, string recovery, Exception cause)
+        : base("Reactive " + kind + " at '" + identity + "'. Stopped: " + identity + ". Recovery: " + recovery + ".", cause)
+    { Identity = identity; Kind = kind; Recovery = recovery; StoppedScope = identity; }
+    private UiReactiveFault(UiReactiveFault cause, string dependent)
+        : base(cause.Message + " Dependent unavailable: " + dependent + ".", cause)
+    { Identity = cause.Identity; Kind = cause.Kind; Recovery = cause.Recovery; StoppedScope = cause.StoppedScope + " -> " + dependent; }
+    internal UiReactiveFault Through(string dependent) => new(this, dependent);
+}
+
+/// <summary>A lazy pure read, attempted once per input change or explicit Retry.</summary>
 public sealed class UiReactiveComputed<T> : IDisposable
 {
     private sealed class Calculation : UiReactiveObserver
     {
         private Func<T>? read;
-        private T value = default!;
+        internal T Last = default!;
+        internal bool HasValue;
+        internal UiReactiveFault? Fault;
         private bool dirty = true;
         private bool evaluating;
         internal int EvaluationRevision;
-        public override void Dispose() { base.Dispose(); read = null; value = default!; }
+        internal Action? Invalidated;
+        public override void Dispose() { base.Dispose(); read = null; Last = default!; HasValue = false; Fault = null; Invalidated = null; }
         internal Calculation(UiReactiveRuntime runtime, string name, Func<T> read) : base(runtime, name) { this.read = read; }
         internal T Value
         {
@@ -225,37 +259,71 @@ public sealed class UiReactiveComputed<T> : IDisposable
             {
                 Runtime.VerifyAccess();
                 if (Disposed) throw new ObjectDisposedException(Name);
-                if (evaluating) throw new InvalidOperationException("Reactive calculation cycle at '" + Name + "'.");
+                // A failed child is still an actual dependency, including the edge closing a cycle.
+                Read();
+                if (evaluating) throw new UiReactiveFault(Name, "pure-cycle", "Related input change or Retry", new InvalidOperationException("Recursive pure calculation A -> ... -> A."));
                 if (dirty)
                 {
-                    evaluating = true;
-                    try { value = Runtime.Track(this, read!, true); dirty = false; EvaluationRevision++; }
+                    evaluating = true; dirty = false; EvaluationRevision++;
+                    try { Last = Runtime.Track(this, read!, true); HasValue = true; Fault = null; }
+                    catch (UiReactiveFault failure) { Fault = failure; }
                     finally { evaluating = false; }
                 }
-                Read(); return value;
+                if (Fault != null) throw Fault;
+                return Last;
             }
         }
-        internal override void MarkDirty() { if (dirty || Disposed) return; dirty = true; Invalidate(); }
+        internal override void MarkDirty() { if (dirty || Disposed) return; dirty = true; Invalidate(); Invalidated?.Invoke(); }
+        internal override void RetryFailure(HashSet<UiReactiveSource> visited)
+        {
+            if (visited.Contains(this)) return;
+            base.RetryFailure(visited);
+            if (Fault != null) MarkDirty();
+        }
+        internal void Retry() { Runtime.VerifyAccess(); if (Disposed) throw new ObjectDisposedException(Name); RetryFailure(new HashSet<UiReactiveSource>()); MarkDirty(); }
     }
     private readonly Calculation calculation;
     internal UiReactiveComputed(UiReactiveRuntime runtime, string name, Func<T> read) { calculation = new Calculation(runtime, name, read); }
     public T Value => calculation.Value;
+    public UiReactiveFault? Fault => calculation.Fault;
+    public bool HasValue => calculation.HasValue;
+    public bool TryGetLastValue(out T value) { value = calculation.Last; return calculation.HasValue; }
+    public void Retry() => calculation.Retry();
+    internal Action? Invalidated { set => calculation.Invalidated = value; }
     internal int Revision => calculation.EvaluationRevision;
     public void Dispose() => calculation.Dispose();
+}
+
+/// <summary>Owner-controlled automatic callback. Resume runs current state, never historical operations.</summary>
+public sealed class UiReactiveResponse : IDisposable
+{
+    private readonly UiReactiveReaction reaction;
+    internal UiReactiveResponse(UiReactiveReaction reaction) { this.reaction = reaction; }
+    public UiReactiveFault? Fault => reaction.Fault;
+    public bool IsPaused => reaction.Fault != null;
+    public void Resume() => reaction.Resume();
+    public void Dispose() => reaction.Dispose();
 }
 
 internal sealed class UiReactiveReaction : UiReactiveObserver
 {
     private Action? respond;
-    private bool initialized;
+    internal UiReactiveFault? Fault;
     internal UiReactiveReaction(UiReactiveRuntime runtime, string name, Action respond) : base(runtime, name) { this.respond = respond; }
-    internal override void MarkDirty() { if (!Disposed) Runtime.Schedule(this); }
-    public override void Dispose() { base.Dispose(); respond = null; }
+    internal override void MarkDirty() { if (!Disposed && Fault == null) Runtime.Schedule(this); }
+    public override void Dispose() { base.Dispose(); respond = null; Fault = null; }
+    internal void Pause(UiReactiveFault fault) { Fault = fault; }
+    internal void Resume()
+    {
+        Runtime.AssertWritable();
+        if (Disposed) throw new ObjectDisposedException(Name);
+        Fault = null; Runtime.Schedule(this); Runtime.Drain();
+    }
     internal void Run()
     {
-        if (Disposed) return;
-        try { Runtime.Track(this, () => { respond!(); return true; }, false); initialized = true; }
-        catch { if (!initialized) Dispose(); throw; }
+        if (Disposed || Fault != null) return;
+        try { Runtime.Track(this, () => { respond!(); return true; }, false); }
+        catch (UiReactiveFault failure) { Pause(new UiReactiveFault(Name, "consumer-callback", "Owner Resume after checking applied business effects", failure)); }
     }
 }
 
@@ -277,14 +345,13 @@ public sealed class UiReactiveOwner : IDisposable
         Check(); if (read == null) throw new ArgumentNullException(nameof(read));
         var value = new UiReactiveComputed<T>(runtime, name + "/" + key, read); children.Add(value); return value;
     }
-    public IDisposable Respond(string key, Action respond)
+    public IDisposable Respond(string key, Action respond) => RespondManaged(key, respond);
+    public UiReactiveResponse RespondManaged(string key, Action respond)
     {
         Check(); if (respond == null) throw new ArgumentNullException(nameof(respond));
         var reaction = new UiReactiveReaction(runtime, name + "/" + key, respond);
-        children.Add(reaction);
-        runtime.Schedule(reaction);
-        try { runtime.Drain(); return reaction; }
-        catch { reaction.Dispose(); children.Remove(reaction); throw; }
+        var handle = new UiReactiveResponse(reaction);
+        children.Add(handle); runtime.Schedule(reaction); runtime.Drain(); return handle;
     }
     public void Dispose()
     {

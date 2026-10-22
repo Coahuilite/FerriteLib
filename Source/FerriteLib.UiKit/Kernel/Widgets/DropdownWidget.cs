@@ -128,7 +128,7 @@ public sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabell
                     // typed shape is named last so a page that meant a typed value is told how to get one.
                     bindings.ValidateOptions<string>(optionsKey, elementPath);
                 }
-                catch (InvalidOperationException ex)
+                catch (InvalidOperationException ex) when (ex is not UiReactiveFault)
                 {
                     throw new InvalidOperationException(
                         ex.Message + " The dropdown also accepts BindOptions<UiOption> (display, value)."
@@ -575,7 +575,7 @@ public sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabell
             bindings.ValidateOptions<T>(key, elementPath);
             return true;
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex) when (ex is not UiReactiveFault)
         {
             return false;
         }

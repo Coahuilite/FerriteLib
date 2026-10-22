@@ -612,7 +612,17 @@ public sealed partial class UiLayoutEngine
     private static bool ResolveDisabled(UiElementSpec spec, UiWidgetContext ctx)
     {
         string commandKey = ReadAttribute(spec, ActionBindAttribute);
-        return commandKey.Length > 0 && !ctx.Bindings.CanExecute(commandKey);
+        try
+        {
+            bool disabled = commandKey.Length > 0 && !ctx.Bindings.CanExecute(commandKey);
+            if (ctx.Node != null) ctx.Node.QualificationFault = null;
+            return disabled;
+        }
+        catch (UiReactiveFault failure)
+        {
+            if (ctx.Node != null) ctx.Node.QualificationFault = failure;
+            return true;
+        }
     }
 
     public void Draw(UiWidgetContext ctx, UiLayoutSnapshot snapshot, Rect viewport)
@@ -661,7 +671,7 @@ public sealed partial class UiLayoutEngine
             {
                 // Even an undescribed node has a paint-order marker; it does not acquire an opaque hit box.
                 layers.Add(new UiPointerLayer(entry.Node.Id.Key, default, hasOperation: false));
-                if (entry.Widget is IUiPointerLayout layout && !ctx.Session.IsTripped(entry.Node))
+                if (entry.Widget is IUiPointerLayout layout && !ctx.Session.IsTripped(entry.Node) && !entry.Node.PresentationUnavailable)
                 {
                     var regions = new List<UiPointerRegion>();
                     UiNode previous = ctx.Session.EnterNode(entry.Node);
@@ -673,6 +683,12 @@ public sealed partial class UiLayoutEngine
                                 regions.AddRange(layout.PointerRegions(local, new UiLayoutRect(0, 0, rect.width, rect.height)));
                                 return 0;
                             });
+                    }
+                    catch (UiReactiveFault failure)
+                    {
+                        regions.Clear();
+                        entry.Node.PresentationFault = failure;
+                        entry.Node.PresentationUnavailable = true;
                     }
                     finally
                     {
@@ -1115,6 +1131,21 @@ public sealed partial class UiLayoutEngine
         if (containerKind.Length == 0)
         {
             IUiWidget widget = GetOrCreateWidget(spec, node.Id);
+            if (ctx.Bindings is UiBindings reactive)
+            {
+                // Freeze every known consumer input before any input request in Draw. Hidden elements
+                // never reach here. Unknown old custom readers retain conservative all-key service.
+                if (widget is IUiPresentationDemand declared)
+                    foreach (string key in declared.PresentationKeys(ctx.WithNode(node))) reactive.PreparePresentation(key);
+                else if (!KernelCoreWidgetRegistrar.HasKnownPresentation(widget)) reactive.PrepareAllPresentation();
+                else
+                {
+                    reactive.PreparePresentation(ReadDeclaredBindKey(spec));
+                    foreach (var attribute in spec.Attributes)
+                        if (attribute.Key.EndsWith("Bind", StringComparison.Ordinal) || attribute.Key is "SelectedKey" or "PayloadKey" or "WidthKey" or "VisibleKey")
+                            reactive.PreparePresentation(attribute.Value);
+                }
+            }
             // Measure must see the widget's arranged width, not the page width, so width-dependent
             // widgets (e.g. stacked narrow Mood rows) agree with the Draw pass, which already uses
             // entry.MeasureWidth via WithViewWidth. The element is bound to this context too, so a
@@ -1900,7 +1931,7 @@ public sealed partial class UiLayoutEngine
 
             ReportRepeat(ctx, node, RepeatItemsAttribute, itemsKey, "not bound as an ordered item-key list");
         }
-        catch (InvalidOperationException ex)
+        catch (InvalidOperationException ex) when (ex is not UiReactiveFault)
         {
             ReportRepeat(ctx, node, RepeatItemsAttribute, itemsKey, "bound to another type (" + ex.GetType().Name + ")");
         }
@@ -2370,7 +2401,7 @@ public sealed partial class UiLayoutEngine
                 return true;
             }
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex) when (ex is not UiReactiveFault)
         {
             // A key bound to another type: the fallback and its note below, not an exception per frame.
         }
@@ -2552,7 +2583,19 @@ public sealed partial class UiLayoutEngine
         // arrange pass with it, and the tree — not the control — owns whether the page survives that.
         // The fallback keeps the element's slot instead of collapsing it, so a trip cannot reshuffle
         // the rest of the page.
-        return Math.Max(0f, UiSessionGuard.MeasureOrFallback(ctx.Session, node.Path, widget.Kind, node.Path, RecoveryBandHeight, () => MeasureWidgetWithReuse(spec, widget, ctx, node)));
+        using UiBindings.DisplayScope? display = widget is IUiDescriptiveWidget && widget is not IUiPointerLayout ? (ctx.Bindings as UiBindings)?.DisplayOnly() : null;
+        try
+        {
+            float height = Math.Max(0f, UiSessionGuard.MeasureOrFallback(ctx.Session, node.Path, widget.Kind, node.Path, RecoveryBandHeight, () => MeasureWidgetWithReuse(spec, widget, ctx, node)));
+            node.PresentationFault = display?.Fault;
+            node.PresentationUnavailable = false;
+            return height;
+        }
+        catch (UiReactiveFault failure)
+        {
+            node.PresentationFault = failure; node.PresentationUnavailable = true;
+            return RecoveryBandHeight; // a complete, unavailable placeholder, never a failed measurement result
+        }
     }
 
     private static float ResolveContainerHeight(UiElementSpec spec, float naturalHeight, float availableHeight) => ReadLayoutHeight(spec).Resolve(naturalHeight, availableHeight);

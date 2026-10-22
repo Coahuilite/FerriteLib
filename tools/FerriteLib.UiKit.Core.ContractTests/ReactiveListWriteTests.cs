@@ -122,7 +122,8 @@ internal static class ReactiveListWriteTests
         var foreignValue = foreignRuntime.Int();
         var crossing = owner.Compute("cross-runtime", () => foreignValue.ReadCurrent());
         check(Throws(() => _ = crossing.Value, "Cross-runtime"), "new internal current-value seam itself verifies runtime ownership");
-        check(Throws(() => owner.Respond("foreign-write", () => foreign.Add(3)), "Cross-runtime") && foreign.Count == 2,
+        var foreignResponse=owner.RespondManaged("foreign-write", () => foreign.Add(3));
+        check(foreignResponse.Fault!.ToString().Contains("Cross-runtime") && foreign.Count == 2,
             "response list write cannot cross runtime ownership");
         Exception? threadFailure = null, seamFailure = null;
         var thread = new Thread(() =>
@@ -134,17 +135,19 @@ internal static class ReactiveListWriteTests
         check(threadFailure is InvalidOperationException && seamFailure is InvalidOperationException && list.Count == 2,
             "list write and internal current-value seam both reject foreign threads");
 
-        check(Throws(() => owner.Respond("bad-index", () => list.RemoveAt(99)), "ArgumentOutOfRangeException") && list.SubscriberCount == 0,
+        var badIndex=owner.RespondManaged("bad-index", () => list.RemoveAt(99));
+        check(badIndex.Fault!.ToString().Contains("ArgumentOutOfRangeException") && list.SubscriberCount == 0,
             "failed mutation keeps original cause and no provisional subscriptions");
         owner.Respond("after-failure", () => list.Add(3));
         foreign.Add(3);
         check(list.Count == 3 && list.SubscriberCount == 0 && foreign.Count == 3, "access purity and mutation failures restore usable tracking context");
 
         var loop = runtime.List(Array.Empty<int>(), (a, b) => a == b);
-        check(Throws(() => owner.Respond("explicit-list-loop", () => loop.Add(loop.Count)), "list-guards/explicit-list-loop") && loop.Count == 100 && loop.SubscriberCount == 0,
+        var looping=owner.RespondManaged("explicit-list-loop", () => loop.Add(loop.Count));
+        check(looping.Fault?.Kind=="propagation-budget" && loop.Count == 256 && loop.SubscriberCount == 1,
             "genuine explicit list self-read then write still reaches located finite cycle exit");
-        owner.Respond("after-cycle", () => loop.Add(101));
-        check(loop.Count == 101 && loop.SubscriberCount == 0, "cycle failure leaves runtime usable without swallowing applied writes");
+        owner.Respond("after-cycle", () => loop.Add(257));
+        check(loop.Count == 257 && loop.SubscriberCount == 1, "cycle failure leaves runtime usable without swallowing applied writes");
     }
 
     private static void Presentation(Action<bool, string> check)

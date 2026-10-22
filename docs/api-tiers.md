@@ -79,7 +79,11 @@ planning rounds. Promotion still requires an explicit contract and a deliberate 
 - `UiReactiveList` — controlled, serial structural observation and read-only snapshots; items are independently connected (RU1 candidate).
 - `UiReactiveComputed` — owned lazy tracked read.
 - `UiReactiveOwner` — computation/reaction subscription lifetime, independent from business model lifetime.
-- `UiBindingPresentation` — host-owned synchronized read view.
+- `UiBindingPresentation` — host-owned demand-synchronized read view.
+- `UiPresentationStatus` — current validity versus retained last display (RU3 candidate).
+- `UiReactiveFault` — located managed failure and recovery scope (RU3 candidate).
+- `UiReactiveResponse` — owner-controlled paused automatic callback (RU3 candidate).
+- `IUiPresentationDemand` — optional complete custom tracked-binding demand (RU3 candidate).
 
 
 - `UiObservationStatus` — bounded semantic read sampling states; public-unstable.
