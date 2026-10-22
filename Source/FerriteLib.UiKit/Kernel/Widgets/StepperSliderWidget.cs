@@ -108,6 +108,12 @@ public sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IUiL
         UiInteractionResult minus = UiNative.Activation(minusRect, ctx, bindKey, "decrement", writable: writable);
         UiInteractionResult plus = UiNative.Activation(plusRect, ctx, bindKey, "increment", writable: writable);
         UiInteractionResult range = UiNative.Range(sliderRect, ctx, bindKey, current, min, max, writable);
+        // These parts explicitly participate in this editor's combination. Their press/capture is
+        // not ordinary blur, even though activation waits until release and a thumb press may select nothing.
+        UiInteractionTarget? capture = ctx.Session.Interactions.CaptureOwner;
+        if (capture?.Node == (ctx.Node ?? ctx.Session.ActiveNode).Id.Key
+            && (capture.Value.Part == "decrement" || capture.Value.Part == "increment" || capture.Value.Part == ""))
+            UiNative.SuspendEditor(ctx, bindKey);
         bool takeover = false;
         void Set(float value) => ctx.Bindings.Set(bindKey, value);
         float ReadModel() => ctx.Bindings.Get<float>(bindKey);
@@ -118,7 +124,7 @@ public sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IUiL
             UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx, bindKey, part), operation, () => numeric.Step(editor, ReadModel(), minus.Request ? -step : step, Set, ReadModel));
             takeover = true;
         }
-        else if (range.Request && range.Value != numeric.Clamp(current))
+        else if (range.Request)
         {
             UiInteractionRequests.Range(UiNative.InteractionTarget(ctx, bindKey), range, value => editor.TakeOver(value, Set, ReadModel));
             takeover = true;
@@ -133,6 +139,7 @@ public sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IUiL
         UiValueState state = ctx.Session.GetOrCreateValueState((ctx.Node ?? ctx.Session.ActiveNode).Id, bindKey);
         state.EditText = editor.Draft;
         state.Focused = editor.Focused;
+        if (!editor.Focused) UiNative.SuspendEditor(ctx, bindKey);
         if (numeric.Parse(editor.Draft, out float parsed))
             state.FloatValue = parsed;
         // Only presentation follows established requests; a label failure cannot swallow an operation.

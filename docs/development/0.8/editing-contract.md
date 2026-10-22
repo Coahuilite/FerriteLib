@@ -10,11 +10,10 @@ a new kind or an author-wired private text engine:
 <Widget Id="level" Kind="input/stepper-slider" Bind="Level" Min="0" Max="100" Step="1" />
 ```
 
-User-approved subitems: default `Live=false`, retention of invalid/conflicting drafts, and Cancel
-changing only the draft (no business rollback). The N1 example model10/draft20/Step1/Live=false is also
-approved: plus immediately requests21 and ends the draft, not merely changing the draft to21.
-E2 confirmation/normal draft ending, valid automatic blur and other unapproved E/N details remain
-reversible candidates; N2/N3 are not promoted by the N1 answer. Approved F1/F2/F3 remain unchanged. The full remaining inventory is maintained only
+E1–E5 and N1–N3 are confirmed defaults: `Live=false`, retention of invalid/conflicting drafts,
+normal-return draft ending, qualified ordinary blur, and Cancel changing only the draft. With
+model10/draft20/Step1/Live=false, plus requests21 once; an explicit Slider30 requests30 once,
+without an intermediate20. Approved F1/F2/F3 remain unchanged. The full remaining inventory is maintained only
 in [migration status](migration-status.md).
 
 The current sole consumer US requires `Live=true` when it later migrates to this FL line, so that
@@ -35,7 +34,7 @@ and actual-model getter to `UiNative.Edit`; `UiNative.Editor<T>` accesses their 
 Use the widget's normal context/node scope, just as for the other session-owned native primitives.
 The no-platform contract target compiles these actual production sources without Unity/Verse stubs.
 
-## Approved subitems, candidate details and existing entry conditions
+## Confirmed defaults and existing entry conditions
 
 * **Approved default:** implicit `Live` changes from `true` to `false` for all three wrappers. A focused edit keeps its draft;
   use explicit `Live="true"` to retain per-qualified-candidate publication. Intermediate IME text does
@@ -44,9 +43,9 @@ The no-platform contract target compiles these actual production sources without
   both `20` and `10`, rather than mistaking the last input for an untouched edit.
 * Single-line Return confirms; multiline Return remains native newline and Ctrl+Return confirms.
   Unchanged text, or an already-published Live candidate without a new observed basis, does not resend.
-* **E2 candidate:** confirmation sends one valid pending candidate and, after normal return, shows the actual model.
+* Confirmation sends one valid pending candidate and, after normal return, shows the actual model.
   Rejection by business code is not repaired by repeated Set calls.
-* **Valid automatic blur remains candidate:** ordinary blur confirms a valid nonconflicting draft. Invalid or conflicting text remains visible
+* Ordinary blur confirms a valid nonconflicting draft. Invalid or conflicting text remains visible
   without trapping focus. An invalid draft gets the danger underline; an observed model conflict gets
   the selected-tone underline. These treatments read shared facts rather than reparsing in paint.
 * Unmodified text follows observed model changes. Modified text remains local, acquires `Conflict`,
@@ -63,13 +62,20 @@ focus. No old entry silently acquires a binding registration prerequisite.
 ## One explicit numeric operation
 
 With model `10`, local valid draft `20` and Step `1`, the combination's plus operation requests `21`
-once and ends the draft; it never first requests `20`. This N1 example is user-approved, not draft-only increment. N2/N3 remain candidates: an invalid draft cannot be the step base. A real range selection
+once and ends the draft; it never first requests `20`. An invalid draft cannot be the step base. A real range selection
 requests its selected value once and replaces only this combination's draft; capture without a new
 selection does not replace it. Another instance sharing the same Bind keeps its own draft and observes
 the resulting model change. A following no-draft step starts from the actual model, not a rejected request.
 
 Parsing rejects nonfinite candidates. Formatting or an out-of-range model never creates a repair
 write. Existing valid Min/Max/Step declarations retain their conditions.
+
+Participating parts suspend native editor focus on capture, before ordinary blur can publish the old
+draft. Capture alone keeps the draft. A qualified release/selected value then takes over; a canceled
+activation does not. Independent Buttons and other same-Bind instances have no takeover rights.
+Custom native composites use `UiNative.SuspendEditor(ctx, binding)` for this declared participation,
+then the same `UiNumericEdit.Step` / `UiEditSession.TakeOver`; standalone nonrendering clients use the
+same editor transitions without native focus. Do not infer participation from labels or proximity.
 
 ## Native boundary and recovery
 
@@ -91,9 +97,15 @@ After a failed takeover, the attempted new value is not recorded as publication 
 Automatic publication pauses; a later distinct explicit confirmation can still request that valid draft.
 The same distinction applies to a failed Live or Confirm request: passive repaint/Live/blur cannot
 retry or silently end it, while another explicit confirmation is a new request, even for the same text.
+After a normal callback return, the request is complete before reading its display. A subsequent
+getter failure cannot turn it into a retryable request. Ended drafts stay ended; a Live draft retains
+its publication history until safe model observation returns.
 
 Automated evidence: `KernelSharedEditingTests` compares standard/custom/nonrendering trajectories,
 native multiline/read-only/composition protocols, actual combination takeover, same-Bind isolation,
 retargeting, partial setter side effects and a rendering failure after established confirmation.
 `Core.ContractTests` runs E1–E5/N1–N3 on the same neutral sources. Target RimWorld 1.6 input, caret,
 selection, clipboard, IME and final appearance acceptance remain pending.
+`KernelCloseoutEditingTests` adds actual Host/native press→release precedence, capture-only retention,
+each real drag sample, business refusal/normalization and normal-return/read-failure trajectories.
+Run its targeted entry plus existing shared-editor lanes with `--closeout-editing` on the main harness.

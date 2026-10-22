@@ -15,7 +15,7 @@ then run the consumer's own harness and native UI checks; widening the range alo
 Existing Button/Slider manifest and typed binding entries remain usable. Button now activates on valid
 primary release rather than delegating timing to the native compound button. Slider selects immediately
 through shared range behavior and does not edit a neighboring NumberField draft. Keyboard/edit defaults
-are unchanged by this slice. Other 0.8 requirements are not implied by this candidate.
+include the confirmed editing migration below. Other 0.8 requirements are not implied by this candidate.
 
 Checkbox (both looks), InputModeRow, Dropdown trigger/options and Tree parts now use qualified primary
 release (F2). Explicit same-value choices still request once. Dropdown outside primary press closes
@@ -29,6 +29,25 @@ for all remaining first-version work.
 See [S0/S1 contract](../development/0.8/s01-contract.md) for per-property remove/following, independent
 composition, headless entry points, capture ownership and error handling. New types are public-unstable;
 keep the exact selected source/configuration/package identity with your development evidence.
+
+## Edit first, publish once
+
+TextField, NumberField and StepperSlider now default to `Live="false"`. Declare `Live="true"` if your
+old page relied on implicit immediate writes (including the later US migration). Ordinary valid,
+nonconflicting blur commits; invalid/conflicting drafts remain. Cancel discards only local input.
+Normal callback return ends a confirmation even when business refuses or normalizes the value;
+the next display reads the real model. Setter exceptions do not cause rollback or automatic retries.
+
+```xml
+<Widget Id="amount" Kind="input/number-field" Bind="amount" Min="0" Max="100" Live="true" />
+```
+
+Within StepperSlider, a draft20 over model10 plus Step1 requests only21. A selected Slider30 replaces
+that draft with only30; a thumb capture alone keeps it. Each real drag sample remains a business
+request. An unrelated Button or same-Bind field cannot clear the draft. Custom native composites
+explicitly suspend their participating editor with `UiNative.SuspendEditor(ctx, binding)` before
+ordinary blur, and use the same shared `Step`/`TakeOver` transitions. See the
+[editing contract](../development/0.8/editing-contract.md) for the full end/failure and IME rules.
 
 ## Explicit reactive binding and RU1 sources
 

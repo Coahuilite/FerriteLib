@@ -38,7 +38,13 @@ public static partial class UiNative
     public static UiInteractionResult Range(Rect rect, UiWidgetContext ctx, string binding, float value, float min, float max, bool writable = true)
     {
         if (SliderOverride != null && writable && !IsInputDisabled(ctx.Node ?? ctx.Session.ActiveNode) && !ctx.Session.IsPointerOverHigherLayer(ctx.Node ?? ctx.Session.ActiveNode, WindowPointer(ctx)))
-            return ctx.Session.Interactions.Select(InteractionTarget(ctx, binding), new UiRange(min, max), SliderOverride(rect, value, min, max), new UiInputEligibility(!IsInputDisabled(ctx.Node ?? ctx.Session.ActiveNode), writable, !ctx.Session.IsPointerOverHigherLayer(ctx.Node ?? ctx.Session.ActiveNode, WindowPointer(ctx))));
+        {
+            // Historical native-value test seam: returning current means no selected sample.
+            // Production pointer results already distinguish capture-only from a new drag sample.
+            float selected = SliderOverride(rect, value, min, max);
+            if (selected == value) return default;
+            return ctx.Session.Interactions.Select(InteractionTarget(ctx, binding), new UiRange(min, max), selected, new UiInputEligibility(!IsInputDisabled(ctx.Node ?? ctx.Session.ActiveNode), writable, !ctx.Session.IsPointerOverHigherLayer(ctx.Node ?? ctx.Session.ActiveNode, WindowPointer(ctx))));
+        }
         return PointerInteraction(rect, ctx, true, new UiRange(min, max), value, writable, binding);
     }
 

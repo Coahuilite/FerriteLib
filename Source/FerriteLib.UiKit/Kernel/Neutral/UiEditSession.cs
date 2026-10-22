@@ -108,6 +108,7 @@ public sealed class UiEditSession<T> : IUiEditState
         // but leave the draft's own publication history intact for a later explicit confirmation.
         automaticSuspended = true;
         request(value);
+        EndSubmission();
         Cancel(readModel());
     }
 
@@ -127,6 +128,15 @@ public sealed class UiEditSession<T> : IUiEditState
             publishedText = Draft;
             automaticSuspended = true;
             request(candidate);
+            // Dispatch completed. A later display read is not a failed business request.
+            automaticSuspended = false;
+            observed = false;
+            if (end)
+            {
+                EndSubmission();
+                Cancel(readModel());
+                return;
+            }
             // A normal return is not acknowledgement. Read actual model without replacing a Live draft.
             model = readModel();
             observed = true;
@@ -135,6 +145,19 @@ public sealed class UiEditSession<T> : IUiEditState
         }
 
         if (end)
+        {
+            EndSubmission();
             Cancel(readModel());
+        }
+    }
+
+    private void EndSubmission()
+    {
+        basisText = Draft;
+        publishedText = null;
+        automaticSuspended = false;
+        Conflict = false;
+        Focused = false;
+        observed = false;
     }
 }

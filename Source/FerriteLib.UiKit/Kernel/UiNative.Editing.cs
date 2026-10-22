@@ -36,6 +36,17 @@ public static partial class UiNative
         return Editor(ctx.Session, node, binding, InteractionTarget(ctx, binding, "editor"), format, parse);
     }
 
+    /// <summary>End native focus without submitting or discarding a participating composite's draft.</summary>
+    public static void SuspendEditor(UiWidgetContext ctx, string binding)
+    {
+        UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
+        UiValueState state = ctx.Session.GetOrCreateValueState(node.Id, binding);
+        if (state.Editor is IUiEditState editor) editor.Suspend();
+        state.Focused = state.CommitRequested = false;
+        ReleaseEditFocus(state, ctx.Session);
+        ctx.Session.NoteEditClosed(state);
+    }
+
     private static UiEditSession<T> Editor<T>(UiSession session, UiNode node, string binding, UiInteractionTarget target, Func<T, string> format, UiEditParser<T> parse)
     {
         UiValueState state = session.GetOrCreateValueState(node.Id, binding);

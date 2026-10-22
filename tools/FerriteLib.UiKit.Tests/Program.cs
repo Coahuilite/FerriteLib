@@ -13,8 +13,10 @@ internal static class Program
 {
     private static int failures;
 
-    private static int Main()
+    private static int Main(string[] args)
     {
+        if (args.Length == 1 && args[0] == "--closeout-editing")
+            return RunEditing();
         try
         {
             RunAll();
@@ -35,6 +37,8 @@ internal static class Program
         return 1;
     }
 
+    private static int RunEditing() => KernelSharedEditingTests.RunAll() + KernelCloseoutEditingTests.RunAll();
+
     private static void RunAll()
     {
         Console.WriteLine("0.8 S0/S1 production shared behavior...");
@@ -46,7 +50,7 @@ internal static class Program
         failures += KernelImagePlacementTests.RunAll();
         failures += KernelPaletteTests.RunAll();
         failures += KernelSharedBehaviorTests.RunAll();
-        failures += KernelSharedEditingTests.RunAll();
+        failures += RunEditing();
         failures += KernelSharedChartTests.RunAll();
         failures += KernelDescriptiveFactsTests.RunAll();
         failures += KernelBooleanSelectionExpansionTests.RunAll();

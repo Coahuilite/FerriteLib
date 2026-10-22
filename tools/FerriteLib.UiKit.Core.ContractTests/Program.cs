@@ -271,6 +271,27 @@ internal static class Program
             Check(attempts == 2 && model == 20 && !failed.HasDraft,
                 "explicit confirmation is a new attempt after a failed same-draft publication: live=" + live);
         }
+        foreach (string route in new[] { "confirm", "live", "takeover" })
+        {
+            model = 10; int completed = 0;
+            var completedEdit = new UiEditSession<float>(numeric.Format, numeric.Parse);
+            completedEdit.Observe(model); completedEdit.Focus();
+            completedEdit.Input("20", true, false, false, Set, () => model);
+            void Complete(float value) { completed++; model = value; }
+            float BrokenRead() => throw new InvalidOperationException("read after normal return");
+            try
+            {
+                if (route == "live") completedEdit.Input("20", true, false, true, Complete, BrokenRead);
+                else if (route == "takeover") completedEdit.TakeOver(30, Complete, BrokenRead);
+                else completedEdit.Confirm(true, Complete, BrokenRead);
+            }
+            catch (InvalidOperationException) { }
+            Check(completed == 1 && (route == "live" || !completedEdit.HasDraft),
+                "normal dispatch is complete before display read failure: " + route);
+            completedEdit.Observe(model); completedEdit.Confirm(true, Complete, () => model);
+            Check(completed == 1 && !completedEdit.HasDraft,
+                "recovery and explicit no-candidate confirm never replay completed request: " + route);
+        }
     }
 
     private static void StepperGeometry()
