@@ -2220,6 +2220,12 @@ public sealed partial class UiLayoutEngine
     {
         foreach (KeyValuePair<string, string> pair in spec.Attributes)
         {
+            if (UiAppearanceProperties.IsMetricAttribute(pair.Key))
+            {
+                if (!UiAppearanceProperties.TryMetric(pair.Value, out _))
+                    throw TemplateContract(templateName, path, spec, "Invalid " + pair.Key + ": expected a finite non-negative metric.");
+                continue;
+            }
             if (ContainsAttribute(allowed, pair.Key) || UiAppearanceProperties.IsPaletteAttribute(pair.Key)) continue;
             if (engineWide && EngineWideWidgetAttributes.Contains(pair.Key)) continue;
 

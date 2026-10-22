@@ -103,6 +103,17 @@ public sealed class UiTheme
     private UiGeometry geometry = UiGeometry.Default;
     private bool fontDeclared;
     private bool densityDeclared;
+    private readonly Dictionary<string, UiPropertyDeclaration<float>> metrics = new(StringComparer.Ordinal);
+    public UiPropertyDeclaration<float> Metric(string name)
+    {
+        if (!metrics.TryGetValue(name, out var declaration))
+        {
+            declaration = UiAppearanceProperties.MetricDeclaration(name, () => { LayoutRevision++; PropertyRevision++; });
+            metrics.Add(name, declaration);
+        }
+        return declaration;
+    }
+    internal bool HasMetricOverride(string name) => densityDeclared || (metrics.TryGetValue(name, out var value) && value.IsDeclared);
     private int applicationRevision;
     internal int PropertyRevision { get; private set; }
     public UiTheme()
@@ -151,7 +162,8 @@ public sealed class UiTheme
             LayoutRevision++;
         }
     }
-    private float StyleMetric(string name, float fallback) => styleMetrics.TryGetValue(name, out float value) ? value : fallback;
+    private float StyleMetric(string name, float fallback) => styleMetrics.TryGetValue(name, out float value) ? value
+        : metrics.TryGetValue(name, out var declaration) && declaration.IsDeclared ? declaration.Value : fallback;
     internal void ApplyStyleFont(UiFont value)
     {
         UiFont prior = DefaultFont;
@@ -224,6 +236,8 @@ public sealed class UiTheme
         geometry = source.geometry;
         fontDeclared = source.fontDeclared;
         densityDeclared = source.densityDeclared;
+        foreach (var pair in metrics) pair.Value.Remove();
+        foreach (var pair in source.metrics) if (pair.Value.IsDeclared) Metric(pair.Key).Set(pair.Value.Value);
         styleFont = source.styleFont;
         applicationRevision++;
         PropertyRevision++;

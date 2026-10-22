@@ -17,6 +17,8 @@ internal static class Program
     {
         if (args.Length == 1 && args[0] == "--closeout-editing")
             return RunEditing();
+        if (args.Length == 1 && args[0] == "--closeout-appearance")
+            return RunAppearance();
         try
         {
             RunAll();
@@ -38,6 +40,7 @@ internal static class Program
     }
 
     private static int RunEditing() => KernelSharedEditingTests.RunAll() + KernelCloseoutEditingTests.RunAll();
+    private static int RunAppearance() => KernelPaletteTests.RunAll() + KernelStyleScopeTests.RunAll() + KernelCloseoutAppearanceTests.RunAll();
 
     private static void RunAll()
     {
@@ -48,9 +51,9 @@ internal static class Program
         failures += KernelReactiveInventoryTests.RunAll();
         failures += KernelLayerDispatchTests.RunAll();
         failures += KernelImagePlacementTests.RunAll();
-        failures += KernelPaletteTests.RunAll();
         failures += KernelSharedBehaviorTests.RunAll();
         failures += RunEditing();
+        failures += RunAppearance();
         failures += KernelSharedChartTests.RunAll();
         failures += KernelDescriptiveFactsTests.RunAll();
         failures += KernelBooleanSelectionExpansionTests.RunAll();
@@ -135,7 +138,6 @@ internal static class Program
         failures += KernelStyleDocumentTests.RunAll();
 
         Console.WriteLine("Kernel style scopes (region theme in the live tree, page level, drop visibility)...");
-        failures += KernelStyleScopeTests.RunAll();
 
         Console.WriteLine("Kernel stub coverage (game members the harness must carry, trip guard)...");
         failures += KernelStubCoverageTests.RunAll();

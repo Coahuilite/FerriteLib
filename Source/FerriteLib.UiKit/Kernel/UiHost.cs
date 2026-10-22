@@ -1444,6 +1444,12 @@ public sealed partial class UiHost : IDisposable
 
         foreach (KeyValuePair<string, string> pair in spec.Attributes)
         {
+            if (UiAppearanceProperties.IsMetricAttribute(pair.Key))
+            {
+                if (!UiAppearanceProperties.TryMetric(pair.Value, out _))
+                    throw new UiContractException("Invalid " + pair.Key + " at '" + path + "': expected a finite non-negative metric.", source, spec.Id, spec.Kind, path);
+                continue;
+            }
             bool allowedAttribute = false;
             foreach (string candidate in allowed)
             {

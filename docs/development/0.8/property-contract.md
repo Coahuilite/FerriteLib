@@ -5,7 +5,7 @@ Declare a font or semantic colour directly, or apply one named Scheme and Densit
 ```xml
 <Stack Id="form" Scheme="muted" Density="compact" Font="Medium">
   <Widget Id="title" Kind="text/wrapped" Text="Settings" Font="Tiny" />
-  <Widget Id="name" Kind="input/text-field" Bind="name" Label="Name" Palette.Foreground="#FFFFFF" />
+  <Widget Id="name" Kind="input/text-field" Bind="name" Label="Name" Palette.Foreground="#FFFFFF" Metric.RowHeight="40" />
 </Stack>
 ```
 
@@ -34,9 +34,10 @@ translated from old names. `Color.Token`, `<Color Token="...">` and old colour p
 this 0.8 development change; see [the exact migration](theme-migration.md). Standalone styles retain their
 recorded fail-soft policy; inline manifest attributes retain located creation-time validation.
 
-P1's colour direction and ordinary-author access are approved. This change does not open new internal
-RowHeight/Density/structure configuration. The previously available font/five-metric inputs and same-level
-Scheme/Density ordering are preserved, with their unapproved opening-set details still separate. Business
+P1 confirms ordinary-author access to semantic colours, existing fonts, and the five finite density
+inputs. `Metric.Padding`, `Metric.Spacing`, `Metric.Gap`, `Metric.RowHeight` and `Metric.Hairline` declare
+individual finite non-negative values on a widget or environment scope. Bare container `Padding`/`Gap`
+remain that container's allocation, not inherited internal control metrics. Private structure stays read-only. Business
 values, bindings, tone, drafts, interaction policy, capture and final geometry do not inherit as colours.
 No selector, expression language, second component system or theme compatibility path is introduced.
 ## Keep written intent separate from resolved values
@@ -49,7 +50,7 @@ inline declaration if the current component definition still contains it. Removi
 uses the normal immutable definition/update path. A resolved parent theme is never copied into the
 child's declaration store. Sparse named styles leave missing properties open to the remaining sources.
 
-P1 also proposes one Scheme and one Density at the same level. One Scheme supplies its declared colours/font/metrics. One named Density applies after that Scheme on
+Each level has one Scheme and one Density. One Scheme supplies its declared colours/font/metrics. One named Density applies after that Scheme on
 a metric both explicitly define, preserving the old deterministic same-level ordering. A runtime local
 property takes precedence over the named local property. No arbitrary style-list combination is built.
 Font is independent of all density metrics. A local Gap does not replace an ancestor RowHeight with a
@@ -59,10 +60,20 @@ blanket inherited geometry declarations.
 ```csharp
 UiNode field = host.Session.GetNodeByElementId("name")!;
 field.Properties.Font.Set(UiFont.Tiny);
+field.Properties.Metric("RowHeight").Set(40);
 field.Properties.Palette(UiPaletteRole.Foreground).Set(new UiColour(1, .9f, .7f));
 field.Properties.Font.Remove();                 // reveal the current remaining font source
+field.Properties.Metric("RowHeight").Remove(); // remove just this metric, not the whole density
 field.Properties.Palette(UiPaletteRole.Foreground).Remove(); // remove just this colour override
 ```
+
+`LocalMetric(name)` supplies a custom wrapper's sparse local style. The retained `Density` and
+`LocalDensity` bundle entries still declare all five values; individual runtime declarations outrank
+their corresponding bundle, then inline or named declarations. Removing one individual declaration
+reveals the current remaining source. An independent visual client uses `theme.Metric(name).Set/Remove`
+with `UiThemeDraw`, `ITextMetrics` and the same neutral layout helpers, without a Host or registry.
+Whole `theme.Geometry` remains available under its original conditions. Named style applications
+remain closer sources than the supplied host theme.
 
 `ResolvedFont`, `ResolvedMetrics` and `ResolvedColours` expose the current effective source and value;
 individual metrics can come from different sources, in which case ResolvedDensity reports Mixed and
@@ -90,6 +101,8 @@ Checkbox whole-content labels and descriptive headings are not misrepresented as
 Evidence: actual host sparse-style/programmatic-ancestor/inline/equal-value/removal/source/paint-only
 and independent-role regressions in KernelStyleScopeTests; five-wrapper actual labels/font/narrow geometry,
 failed-authoring recovery and real Event/paint-failing Dropdown in KernelLayoutTests. Existing full
-style/layout/input contracts remain tested. Unapproved E/N and typography/density opening-set details remain reversible Dev candidates (see editing-contract.md for B1/N1 approvals); these
-engineering source-resolution rules do not reopen approved F1/F2/F3. Native1.6 appearance acceptance
+style/layout/input contracts remain tested. `KernelCloseoutAppearanceTests` adds all five individual
+declarations/removals, actual selector Padding/Hairline paint, default slider font/spacing/gap/height,
+paint-only colour invalidation and independent visual configuration. E/N and finite appearance defaults
+are confirmed; implementation evidence remains scoped to its tested inputs. Native1.6 appearance acceptance
 is still pending.

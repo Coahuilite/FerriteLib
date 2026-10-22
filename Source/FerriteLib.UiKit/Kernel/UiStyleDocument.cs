@@ -599,7 +599,7 @@ public sealed class UiStyleDocument
             return;
         }
 
-        if (!float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float value) || value < 0f)
+        if (!UiAppearanceProperties.TryMetric(raw.Trim(), out float value))
         {
             Record(issues, origin + " sets '" + token + "' to an unreadable value '" + raw
                 + "'; expected a non-negative number. The declaration is ignored.");

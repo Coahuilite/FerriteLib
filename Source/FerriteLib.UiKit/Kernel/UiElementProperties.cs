@@ -9,6 +9,7 @@ public sealed class UiElementProperties
 {
     internal UiElementProperties(Action changed)
     {
+        this.changed = changed;
         Font = new UiPropertyDeclaration<UiFont>(changed);
         LocalFont = new UiPropertyDeclaration<UiFont>(changed);
         Density = new UiPropertyDeclaration<UiDensity>(changed);
@@ -19,6 +20,18 @@ public sealed class UiElementProperties
     public UiPropertyDeclaration<UiFont> LocalFont { get; }
     public UiPropertyDeclaration<UiDensity> Density { get; }
     public UiPropertyDeclaration<UiDensity> LocalDensity { get; }
+    private readonly Action changed;
+    private readonly Dictionary<string, UiPropertyDeclaration<float>> metrics = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, UiPropertyDeclaration<float>> localMetrics = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, UiPropertyDeclaration<float>> inlineMetrics = new(StringComparer.Ordinal);
+    public UiPropertyDeclaration<float> Metric(string name) => MetricDeclaration(metrics, name);
+    public UiPropertyDeclaration<float> LocalMetric(string name) => MetricDeclaration(localMetrics, name);
+    private UiPropertyDeclaration<float> MetricDeclaration(Dictionary<string, UiPropertyDeclaration<float>> store, string name)
+    {
+        if (!store.TryGetValue(name, out var declaration))
+        { declaration = UiAppearanceProperties.MetricDeclaration(name, changed); store.Add(name, declaration); }
+        return declaration;
+    }
     private readonly Dictionary<string, UiPropertyDeclaration<UiColour?>> colours = new(StringComparer.Ordinal);
     private readonly Dictionary<string, UiPropertyDeclaration<UiColour?>> localColours = new(StringComparer.Ordinal);
     private readonly Dictionary<string, UiResolvedProperty<UiColour?>> resolvedColours = new(StringComparer.Ordinal);
@@ -72,6 +85,7 @@ public sealed class UiElementProperties
                 inlineColours.Clear();
                 namedColours.Clear();
                 namedMetrics.Clear();
+                inlineMetrics.Clear();
             }
             ResolvedFont = priorFont;
             ResolvedDensity = priorDensity;
@@ -92,6 +106,10 @@ public sealed class UiElementProperties
         inlineColours.Clear();
         namedColours.Clear();
         namedMetrics.Clear();
+        inlineMetrics.Clear();
+        foreach (string token in UiAppearanceProperties.Metrics)
+            if (spec.TryGetAttribute("Metric." + token, out string rawMetric) && UiAppearanceProperties.TryMetric(rawMetric, out float metric))
+                inlineMetrics[token] = Declared(metric);
         if (spec.TryGetAttribute("Font", out string font) && Enum.TryParse(font, true, out UiFont parsed)) inlineFont.Set(parsed);
         foreach (string token in UiAppearanceProperties.Colours)
             if (spec.TryGetAttribute("Palette." + token, out string raw) && UiStyleDocument.TryParseColour(raw, out UiColour color))
@@ -145,9 +163,11 @@ public sealed class UiElementProperties
     }
     private UiPropertyDeclaration<float>? Metric(string token, bool local)
     {
+        UiPropertyDeclaration<float>? individual = Find(local ? localMetrics : metrics, token);
+        if (individual?.IsDeclared == true) return individual;
         UiPropertyDeclaration<UiDensity> bundle = local ? LocalDensity : Density;
         if (bundle.IsDeclared) return Declared(UiAppearanceProperties.ReadMetric(bundle.Value, token));
-        return local ? Find(namedMetrics, token) : null;
+        return Find(local ? namedMetrics : inlineMetrics, token);
     }
     private UiStyleDocument.SchemeDefinition? PageScheme
         => authoredDocument?.DefaultScheme is string name && authoredDocument.TryGetScheme(name, out UiStyleDocument.SchemeDefinition scheme) ? scheme : null;
@@ -182,11 +202,11 @@ public sealed class UiElementProperties
         foreach (string token in UiAppearanceProperties.Metrics)
         {
             resolvedMetrics[token] = UiPropertyResolver.Resolve(Metric(token, false), Metric(token, true),
-                WithPage(Ancestors(node, p => p.Metric(token, false), p => p.Metric(token, true), p => p.LocalDensity.IsDeclared ? "local-style" : p.NamedSource(token, true)), PageMetric(token)),
-                host.HasDensityOverride ? Declared(UiAppearanceProperties.ReadMetric(defaults, token)) : null,
+                WithPage(Ancestors(node, p => p.Metric(token, false), p => p.Metric(token, true), p => p.LocalDensity.IsDeclared || Find(p.localMetrics, token)?.IsDeclared == true ? "local-style" : p.NamedSource(token, true)), PageMetric(token)),
+                host.HasMetricOverride(token) ? Declared(UiAppearanceProperties.ReadMetric(defaults, token)) : null,
                 UiAppearanceProperties.ReadMetric(new UiDensity(6, 4, 6, 28, 1), token));
             UiResolvedProperty<float> resolved = resolvedMetrics[token];
-            if (resolved.Origin == UiPropertyOrigin.LocalStyle && !LocalDensity.IsDeclared)
+            if (resolved.Origin == UiPropertyOrigin.LocalStyle && !LocalDensity.IsDeclared && Find(localMetrics, token)?.IsDeclared != true)
                 resolvedMetrics[token] = new UiResolvedProperty<float>(resolved.Value, resolved.Origin, NamedSource(token, true));
         }
         UiDensity d = new(resolvedMetrics["Padding"].Value, resolvedMetrics["Spacing"].Value, resolvedMetrics["Gap"].Value,
