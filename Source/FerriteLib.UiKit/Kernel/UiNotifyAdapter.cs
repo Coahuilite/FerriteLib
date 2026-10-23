@@ -17,7 +17,7 @@ namespace FerriteLib.UiKit.Kernel;
 /// </para>
 /// <para>
 /// <b>A plain C# object is a VM.</b> There is no base class to inherit, no container to configure and no
-/// reflection: the adapter is ordinary event plumbing over <see cref="IUiBindings.NotifyChanged"/>, which
+/// reflection: the adapter is ordinary event plumbing over <see cref="IUiBindingReader.NotifyChanged"/>, which
 /// already coalesces announcements into one commit at the next frame boundary. What the adapter adds is the
 /// explicit mapping, a bounded pending set, a nesting batch scope, and one honest answer about threads.
 /// </para>
@@ -68,16 +68,16 @@ public sealed class UiNotifyAdapter : IDisposable
     private int batchDepth;
     private bool disposed;
 
-    public UiNotifyAdapter(IUiBindings bindings, IUiMainThread? mainThread = null, int maxPendingKeys = DefaultMaxPendingKeys)
+    public UiNotifyAdapter(UiBindings bindings, IUiMainThread mainThread, int maxPendingKeys = DefaultMaxPendingKeys)
     {
         Bindings = bindings ?? throw new ArgumentNullException(nameof(bindings));
-        MainThread = mainThread ?? VerseFerriteMainThread.Instance;
+        MainThread = mainThread ?? throw new ArgumentNullException(nameof(mainThread));
         if (maxPendingKeys <= 0) throw new ArgumentOutOfRangeException(nameof(maxPendingKeys));
         MaxPendingKeys = maxPendingKeys;
     }
 
     /// <summary>The binding surface every announcement is written to.</summary>
-    public IUiBindings Bindings { get; }
+    public UiBindings Bindings { get; }
 
     /// <summary>The thread question this adapter asks before it delivers anything.</summary>
     public IUiMainThread MainThread { get; }
@@ -460,3 +460,7 @@ public sealed class UiNotifyAdapter : IDisposable
         }
     }
 }
+
+
+
+

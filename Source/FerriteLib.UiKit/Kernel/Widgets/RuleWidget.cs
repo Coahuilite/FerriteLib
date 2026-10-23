@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
@@ -48,7 +47,7 @@ internal sealed class RuleWidget : IUiWidget, IUiMeasureParticipant, IUiDescript
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindings bindings, string elementPath)
+    public void Validate(IUiBindingReader bindings, string elementPath)
     {
         // No binding: a rule is not interactive and carries no value.
     }
@@ -65,24 +64,24 @@ internal sealed class RuleWidget : IUiWidget, IUiMeasureParticipant, IUiDescript
 
     public UiDescription Describe(UiWidgetContext ctx) => new UiDescription(UiDescriptionRole.Decoration);
 
-    public void Draw(Rect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
     {
-        if (rect.width <= 0f || rect.height <= 0f) return;
+        if (rect.Width <= 0f || rect.Height <= 0f) return;
 
         // A hairline band is legal input (the default band is one pixel tall), so this guard is the
         // degenerate one and not the "too small to bother" one the text atoms use.
-        float thickness = Math.Min(ReadThickness(ctx), rect.height);
+        float thickness = Math.Min(ReadThickness(ctx), rect.Height);
         float inset = Math.Max(0f, AtomVocabulary.ReadFloat(spec, "Inset", 0f));
-        float width = rect.width - inset * 2f;
+        float width = rect.Width - inset * 2f;
         if (width <= 0f) return;
 
         // One query, no branch: an unwritten Tone, an explicit Neutral and the fallback an unknown
         // value resolves to are the same pixel by construction. A fallback that painted something else
         // than "no declaration" would be a silent promotion, which is what fail-soft must not be.
-        Color color = AtomVocabulary.ResolveRole(spec, ctx, writable: null).Border;
+        UiColour color = AtomVocabulary.ResolveRole(spec, ctx, writable: null).Border;
 
         UiThemeDraw.Solid(
-            new Rect(rect.x + inset, rect.y + (rect.height - thickness) * 0.5f, width, thickness),
+ctx.Drawing,            new UiLayoutRect(rect.X + inset, rect.Y + (rect.Height - thickness) * 0.5f, width, thickness),
             color);
     }
 
@@ -91,3 +90,5 @@ internal sealed class RuleWidget : IUiWidget, IUiMeasureParticipant, IUiDescript
         return Math.Max(1f, AtomVocabulary.ReadFloat(spec, "Thickness", ctx.Theme.Geometry.Hairline));
     }
 }
+
+

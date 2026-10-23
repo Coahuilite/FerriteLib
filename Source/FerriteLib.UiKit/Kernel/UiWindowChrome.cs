@@ -1,4 +1,4 @@
-using UnityEngine;
+
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -25,7 +25,7 @@ namespace FerriteLib.UiKit.Kernel;
 public readonly struct UiWindowChrome
 {
     internal UiWindowChrome(
-        Rect outer, Rect titleBand, Rect closeButton, Rect content, float sidePadding, float titleBarHeight)
+        UiLayoutRect outer, UiLayoutRect titleBand, UiLayoutRect closeButton, UiLayoutRect content, float sidePadding, float titleBarHeight)
     {
         Outer = outer;
         TitleBand = titleBand;
@@ -35,17 +35,17 @@ public readonly struct UiWindowChrome
         TitleBarHeight = titleBarHeight;
     }
 
-    /// <summary>The window's own rect on screen (<c>windowRect</c> as the game moved or resized it).</summary>
-    public Rect Outer { get; }
+    /// <summary>The window's own UiLayoutRect on screen (<c>windowRect</c> as the game moved or resized it).</summary>
+    public UiLayoutRect Outer { get; }
 
     /// <summary>The band reserved for title, subtitle and close affordance: the face top down to the shell's title height.</summary>
-    public Rect TitleBand { get; }
+    public UiLayoutRect TitleBand { get; }
 
-    /// <summary>The close affordance's rect, at the size the shell measured for it.</summary>
-    public Rect CloseButton { get; }
+    /// <summary>The close affordance's Rect, at the size the shell measured for it.</summary>
+    public UiLayoutRect CloseButton { get; }
 
     /// <summary>The page box the tree is arranged and drawn in - the shell's <c>ContentRect</c> answer.</summary>
-    public Rect Content { get; }
+    public UiLayoutRect Content { get; }
 
     /// <summary>The side/bottom inset the shell applied. Values, so a report can name them without re-spelling them.</summary>
     public float SidePadding { get; }
@@ -53,3 +53,5 @@ public readonly struct UiWindowChrome
     /// <summary>The title height the shell applied. The same number <see cref="TitleBand"/> was built with.</summary>
     public float TitleBarHeight { get; }
 }
+
+

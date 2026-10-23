@@ -18,3 +18,4 @@ internal sealed class WorkshopService
     internal void SetAccepting(bool value) { lock (gate) accepting = value; }
     internal Snapshot ReadSnapshot() { lock (gate) return new Snapshot(completed, accepting); }
 }
+

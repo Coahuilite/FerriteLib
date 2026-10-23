@@ -586,6 +586,7 @@ public sealed class UiLayoutManifest
         }
 
         var children = new List<UiElementSpec>();
+        var choices = new List<UiChoice<string>>();
 
         while (reader.Read())
         {
@@ -599,6 +600,17 @@ public sealed class UiLayoutManifest
                         throw ParseError(lineInfo, $"UI layout exceeds the maximum depth of {MaxDepth}.");
                     }
 
+                    if (elementName == "Widget" && reader.Name == "Choice")
+                    {
+                        if (!reader.IsEmptyElement) throw ParseError(lineInfo,"Choice must be an empty value declaration.");
+                        if (kind != UiKinds.Dropdown && kind != UiKinds.ModeRow) throw ParseError(lineInfo,"Choice is only valid on a selection widget.");
+                        string value = reader.GetAttribute("Value") ?? throw ParseError(lineInfo,"Choice needs Value.");
+                        string text = reader.GetAttribute("Text") ?? value;
+                        string help = reader.GetAttribute("Help") ?? "";
+                        for(int a=0;a<reader.AttributeCount;a++){reader.MoveToAttribute(a);if(reader.Name!="Value"&&reader.Name!="Text"&&reader.Name!="Help")throw ParseError(lineInfo,"Unknown Choice attribute '"+reader.Name+"'.");}reader.MoveToElement();
+                        choices.Add(new UiChoice<string>(text,value,help));
+                        break;
+                    }
                     if (string.Equals(elementName, "Widget", StringComparison.Ordinal))
                     {
                         throw ParseError(lineInfo,
@@ -621,7 +633,7 @@ public sealed class UiLayoutManifest
                     }
 
                     ValidateIdentitySegments(children, elementLine);
-                    return new UiElementSpec(id, kind, attributes, children);
+                    return new UiElementSpec(id, kind, attributes, children, choices);
 
                 case XmlNodeType.Text:
                 case XmlNodeType.CDATA:
@@ -696,3 +708,6 @@ public sealed class UiLayoutManifest
         public bool HasLineInfo() => false;
     }
 }
+
+
+

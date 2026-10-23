@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
@@ -39,8 +38,8 @@ public readonly struct UiTreeRow
         bool selected = false,
         bool checkable = false,
         bool isChecked = false,
-        Texture2D? image = null,
-        Vector2 imageSize = default)
+        UiImage image = default,
+        UiLayoutPoint imageSize = default)
     {
         Key = key ?? throw new ArgumentNullException(nameof(key));
         Depth = depth;
@@ -99,12 +98,15 @@ public readonly struct UiTreeRow
     /// a consumer supplies the value (a Verse-side adapter is the usual way to turn a def/thing into a
     /// <see cref="Texture2D"/>) and the tree only lays it out, fits it and paints it.
     /// </summary>
-    public Texture2D? Image { get; }
+    public UiImage Image { get; }
 
     /// <summary>
     /// An explicit size for <see cref="Image"/>, in the same units the manifest uses. A non-positive
     /// component means "the texture's own natural size on this axis", which is the default - so a consumer
     /// states a size only when the icon must be a fixed slot rather than the picture's own proportions.
     /// </summary>
-    public Vector2 ImageSize { get; }
+    public UiLayoutPoint ImageSize { get; }
 }
+
+
+

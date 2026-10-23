@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
@@ -45,7 +44,7 @@ internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
 
     private UiElementSpec spec = UiElementSpec.Empty;
     private readonly UiRetainedPaint retained = new();
-    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
+    bool IUiRetainedDisplay.PaintLast(UiLayoutRect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
     UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
@@ -71,7 +70,7 @@ internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
     /// <c>string</c> payload - the row key, which is the only thing the consumer cannot already know),
     /// and a declared <c>RowHeight</c> that has to be a positive number if it is written at all.
     /// </summary>
-    public void Validate(IUiBindings bindings, string elementPath)
+    public void Validate(IUiBindingReader bindings, string elementPath)
     {
         string key = ReadBindKey();
         if (key.Length == 0)
@@ -115,7 +114,7 @@ internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
     {
         List<UiTreeRow> rows = CollectRows(ctx, ReadBindKey());
         var images = new float[rows.Count];
-        for (int i = 0; i < rows.Count; i++) images[i] = rows[i].Image == null ? 0 : rows[i].ImageSize.y > 0 ? rows[i].ImageSize.y : rows[i].Image!.height;
+        for (int i = 0; i < rows.Count; i++) images[i] = rows[i].Image.IsEmpty ? 0 : rows[i].ImageSize.Y > 0 ? rows[i].ImageSize.Y : rows[i].Image!.Height;
         retained.SetMeasure(c=>CaptureImages(c,images));
         return CaptureImages(ctx,images);
     }
@@ -141,11 +140,11 @@ internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
         foreach (UiTreeRow row in rows)
         {
             float height = UiRowBand.Measure(row, ctx.Theme, rowHeight);
-            var band = new Rect(bounds.X, y, bounds.Width, height);
+            var band = new UiLayoutRect(bounds.X, y, bounds.Width, height);
             y += height;
-            if (band.y >= bounds.Y + bounds.Height) break;
+            if (band.Y >= bounds.Y + bounds.Height) break;
             foreach (UiPointerRegion region in UiRowBand.PointerRegions(row, band, ctx.Theme, rowHeight, actions)) yield return region;
-            if (band.yMax >= bounds.Y + bounds.Height) break;
+            if (band.YMax >= bounds.Y + bounds.Height) break;
         }
     }
     private UiRowBandActions Actions(UiWidgetContext ctx, string key)
@@ -165,9 +164,9 @@ internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
 
     }
 
-    public void Draw(Rect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
     {
-        if (rect.width <= 1f || rect.height <= 1f) return;
+        if (rect.Width <= 1f || rect.Height <= 1f) return;
 
         string key = ReadBindKey();
         List<UiTreeRow> rows = CollectRows(ctx, key);
@@ -179,14 +178,14 @@ internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
         UiRowBandActions actions = Actions(ctx, key);
 
         var retainedRows=new List<KeyValuePair<UiTreeRow,string>>();
-        float y = rect.y;
+        float y = rect.Y;
         for (int i = 0; i < rows.Count; i++)
         {
             UiTreeRow row = rows[i];
             float bandHeight = UiRowBand.Measure(row, theme, rowHeight);
-            var band = new Rect(rect.x, y, rect.width, bandHeight);
+            var band = new UiLayoutRect(rect.X, y, rect.Width, bandHeight);
             y += bandHeight;
-            if (band.y >= rect.yMax) break;
+            if (band.Y >= rect.YMax) break;
 
             // The band itself is the shared public primitive (R4-B): this kind is its first driver, and a
             // consumer's own composite calls the identical entry point for its rows.
@@ -194,20 +193,20 @@ internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
             if(rowText!=null) retainedRows.Add(new KeyValuePair<UiTreeRow,string>(row,rowText));
             if (!ctx.Session.IsActive) return;
 
-            if (band.yMax >= rect.yMax) break;
+            if (band.YMax >= rect.YMax) break;
         }
         retained.Capture(ctx,(r,c)=>
         {
-            float paintY=r.y;
+            float paintY=r.Y;
             foreach(var rowDisplay in retainedRows)
             {
                 UiTreeRow row=rowDisplay.Key;
                 float currentRowHeight=ReadRowHeight(c);
                 float h=UiRowBand.Measure(row,c.Theme,currentRowHeight);
-                Rect band=new(r.x,paintY,r.width,h);paintY+=h;
-                if(band.y>=r.yMax)break;
+                UiLayoutRect band=new(r.X,paintY,r.Width,h);paintY+=h;
+                if(band.Y>=r.YMax)break;
                 UiRowBand.Paint(row,band,c,currentRowHeight,style,capturedText:rowDisplay.Value);
-                if(band.yMax>=r.yMax)break;
+                if(band.YMax>=r.YMax)break;
             }
         });
     }
@@ -269,3 +268,7 @@ internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
         return AtomVocabulary.ReadBindKey(spec);
     }
 }
+
+
+
+

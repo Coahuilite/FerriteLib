@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 
-using UnityEngine;
-
 namespace FerriteLib.UiKit.Kernel;
 
 /// <summary>Which dimension of a label rect the text failed to fit into.</summary>
@@ -252,7 +250,7 @@ public static class UiFitAudit
     /// band height is the signal for real clipping. The width axis is reserved for labels whose owner
     /// declared them single-line, where wrapping is not an available answer and truncation is silent.
     /// </summary>
-    public static void Check(Rect rect, string text, UiFont font, bool singleLine)
+    public static void Check(UiLayoutRect rect, string text, UiFont font, bool singleLine)
     {
         if (!Enabled) return;
 
@@ -275,28 +273,28 @@ public static class UiFitAudit
         }
 
         if (textMetrics == null) return;
-        if (string.IsNullOrEmpty(text) || rect.width <= 1f || rect.height <= 1f) return;
+        if (string.IsNullOrEmpty(text) || rect.Width <= 1f || rect.Height <= 1f) return;
 
         if (singleLine)
         {
             float neededWidth = textMetrics.MeasureWidth(text, font);
-            if (neededWidth > rect.width + Tolerance)
+            if (neededWidth > rect.Width + Tolerance)
             {
-                Report(rect, text, font, UiOverflowAxis.Width, neededWidth, rect.width, subscription);
+                Report(rect, text, font, UiOverflowAxis.Width, neededWidth, rect.Width, subscription);
             }
 
             return;
         }
 
-        float neededHeight = textMetrics.MeasureText(text, font, rect.width);
-        if (neededHeight > rect.height + Tolerance)
+        float neededHeight = textMetrics.MeasureText(text, font, rect.Width);
+        if (neededHeight > rect.Height + Tolerance)
         {
-            Report(rect, text, font, UiOverflowAxis.Height, neededHeight, rect.height, subscription);
+            Report(rect, text, font, UiOverflowAxis.Height, neededHeight, rect.Height, subscription);
         }
     }
 
     private static void Report(
-        Rect rect,
+        UiLayoutRect rect,
         string text,
         UiFont font,
         UiOverflowAxis axis,
@@ -310,13 +308,13 @@ public static class UiFitAudit
         if (subscription != null)
         {
             subscription.PublishOverflow(
-                new UiOverflowReport(path, text, font, axis, needed, available, rect.width), key);
+                new UiOverflowReport(path, text, font, axis, needed, available, rect.Width), key);
             return;
         }
 
         if (!Reported.Add(key)) return;
 
-        sink?.Invoke(new UiOverflowReport(path, text, font, axis, needed, available, rect.width));
+        sink?.Invoke(new UiOverflowReport(path, text, font, axis, needed, available, rect.Width));
     }
 
     private static string Shorten(string text)
@@ -359,3 +357,5 @@ public static class UiFitAudit
         styleSink?.Invoke(report);
     }
 }
+
+

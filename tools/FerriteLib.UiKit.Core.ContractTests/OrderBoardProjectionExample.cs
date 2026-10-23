@@ -35,3 +35,4 @@ internal sealed class OrderBoardProjectionExample : IDisposable
     }
     public void Dispose() => Page.Dispose();
 }
+

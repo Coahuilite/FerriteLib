@@ -45,6 +45,7 @@ public enum UiWindowNotice
 public abstract class UiWindowHost : Window
 {
     private UiHost? host;
+    protected VerseUiExecution Execution { get; } = new VerseUiExecution();
     private bool pageUnavailable;
     private bool noticeDueNextFrame;
     private Exception? lastFailure;
@@ -326,7 +327,7 @@ public abstract class UiWindowHost : Window
             UiSession? session = host?.Session;
             if (session != null && session.IsActive)
             {
-                int? owned = session.OwnedHotControl;
+                UiControlKey? owned = session.OwnedHotControl;
                 if (owned.HasValue)
                 {
                     session.ReleaseHotControl(owned.Value);
@@ -400,7 +401,7 @@ public abstract class UiWindowHost : Window
             // The shell consumes on the handler's behalf, because the handler has no other way to: a consumer
             // that keeps raw backend calls out of its own source cannot reach Event.current, and an answered
             // but unconsumed Cancel key is re-read by the game at the end of the same window pass.
-            UiNative.ConsumeKeyEvent();
+            Execution.ConsumeEvent();
             return;
         }
 
@@ -503,14 +504,14 @@ public abstract class UiWindowHost : Window
                 return;
             }
 
-            host.DrawFrame(content, this);
+            host.DrawFrame(VerseUiExecution.Rect(content), Execution.CaptureFrame(!IsOpen || Find.WindowStack.GetsInput(this)), Execution);
 #if FER_DEV
             // The host can be created on this first pass, or released by a close during DrawFrame.
             // Resolve its own subscription now; never inherit the outer scope's pre-creation null.
             using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, Metrics))
             {
                 UiDevGeometryProbe.RecordShellChrome(chromeNow);
-                UiDevGeometryProbe.OutlineShellChrome(inRect, chromeTitleNow, chromeCloseNow);
+                UiDevGeometryProbe.OutlineShellChrome(Execution, VerseUiExecution.Rect(inRect), VerseUiExecution.Rect(chromeTitleNow), VerseUiExecution.Rect(chromeCloseNow));
             }
 #endif
         }
@@ -722,19 +723,19 @@ public abstract class UiWindowHost : Window
     /// </summary>
     private void ResolvePointerDown()
     {
-        if (catalog == null || !UiNative.IsPointerDown())
+        if (catalog == null || !(Event.current?.type == EventType.MouseDown && Event.current.button == 0))
         {
             return;
         }
 
         bool wasActive = activeTarget;
-        catalog.NotifyPointerDown(ToWindowSpace(UiNative.PointerPosition()));
+        catalog.NotifyPointerDown(ToWindowSpace((Event.current?.mousePosition ?? default)));
 
         if (!wasActive && activeTarget)
         {
             // Consumed so the activating click cannot reach the page this pass: a control drawn while the
             // window was deactivated must not fire from the click that selected the window.
-            UiNative.ConsumePointerEvent();
+            Execution.ConsumeEvent();
         }
     }
 
@@ -760,39 +761,29 @@ public abstract class UiWindowHost : Window
     private bool DrawChromeCore(Rect rect)
     {
         UiTheme theme = Theme;
-        UiThemeDraw.Workspace(rect, theme);
+        UiThemeDraw.Workspace(Execution,VerseUiExecution.Rect(rect),theme);
         bool backgroundSucceeded = true;
         if (!pageUnavailable && !noticeDueNextFrame)
         {
-            try { UiSessionGuard.DrawWindowBackground(rect, DrawBackground); }
+            try { UiSessionGuard.DrawWindowBackground(Execution, VerseUiExecution.Rect(rect), r => DrawBackground(VerseUiExecution.Rect(r))); }
             catch (Exception error)
             {
                 RecordDrawFailure(error);
                 backgroundSucceeded = false;
             }
         }
-        UiThemeDraw.Solid(new Rect(rect.x, rect.y, rect.width, AccentBarHeight), theme[UiPaletteRole.Accent]);
+        UiThemeDraw.Solid(Execution,VerseUiExecution.Rect(new Rect(rect.x, rect.y, rect.width, AccentBarHeight)),theme[UiPaletteRole.Accent]);
 
         if (Title.Length > 0)
         {
             UiThemeDraw.Label(
-                new Rect(rect.x + SidePadding, rect.y + 6f, Math.Max(1f, rect.width * 0.6f), 30f),
-                Title,
-                theme,
-                theme[UiPaletteRole.Foreground],
-                TitleFont,
-                singleLine: true);
+Execution,VerseUiExecution.Rect(new Rect(rect.x + SidePadding, rect.y + 6f, Math.Max(1f, rect.width * 0.6f), 30f)),                Title,                theme,                theme[UiPaletteRole.Foreground],                TitleFont,                singleLine: true);
         }
 
         if (Subtitle.Length > 0)
         {
             UiThemeDraw.Label(
-                new Rect(rect.x + SidePadding, rect.y + 36f, Math.Max(1f, rect.width * 0.6f), 18f),
-                Subtitle,
-                theme,
-                theme[UiPaletteRole.SecondaryForeground],
-                SubtitleFont,
-                singleLine: true);
+Execution,VerseUiExecution.Rect(new Rect(rect.x + SidePadding, rect.y + 36f, Math.Max(1f, rect.width * 0.6f), 18f)),                Subtitle,                theme,                theme[UiPaletteRole.SecondaryForeground],                SubtitleFont,                singleLine: true);
         }
 
         DrawCloseButton(rect);
@@ -803,22 +794,13 @@ public abstract class UiWindowHost : Window
     {
         UiTheme theme = Theme;
         Rect button = CloseButtonRect(rect);
-        bool hovered = UiNative.IsMouseOver(button);
+        bool hovered = Mouse.IsOver(button);
         UiThemeDraw.Surface(
-            button,
-            theme,
-            hovered ? theme[UiPaletteRole.HoverSurface] : theme[UiPaletteRole.PanelSurface],
-            hovered ? theme[UiPaletteRole.StrongBorder] : theme[UiPaletteRole.Border]);
+Execution,VerseUiExecution.Rect(button),            theme,            hovered ? theme[UiPaletteRole.HoverSurface] : theme[UiPaletteRole.PanelSurface],            hovered ? theme[UiPaletteRole.StrongBorder] : theme[UiPaletteRole.Border]);
         UiThemeDraw.Label(
-            button,
-            CloseText,
-            theme,
-            hovered ? theme[UiPaletteRole.Foreground] : theme[UiPaletteRole.SecondaryForeground],
-            CloseFont,
-            TextAnchor.MiddleCenter,
-            singleLine: true);
+Execution,VerseUiExecution.Rect(button),            CloseText,            theme,            hovered ? theme[UiPaletteRole.Foreground] : theme[UiPaletteRole.SecondaryForeground],            CloseFont,            UiTextAnchor.MiddleCenter,            singleLine: true);
 
-        if (UiNative.Button(button))
+        if (Verse.Widgets.ButtonInvisible(button))
         {
             Close();
         }
@@ -870,12 +852,7 @@ public abstract class UiWindowHost : Window
         {
             Rect face = windowRect.AtZero();
             return new UiWindowChrome(
-                windowRect,
-                ToWindowRect(TitleBandRect(face)),
-                ToWindowRect(CloseButtonRect(face)),
-                ToWindowRect(ContentRect(face)),
-                SidePadding,
-                TitleBarHeight);
+VerseUiExecution.Rect(windowRect),VerseUiExecution.Rect(ToWindowRect(TitleBandRect(face))),VerseUiExecution.Rect(ToWindowRect(CloseButtonRect(face))),VerseUiExecution.Rect(ToWindowRect(ContentRect(face))),                SidePadding,                TitleBarHeight);
         }
     }
 
@@ -885,3 +862,6 @@ public abstract class UiWindowHost : Window
         return new Rect(windowRect.x + local.x, windowRect.y + local.y, local.width, local.height);
     }
 }
+
+
+

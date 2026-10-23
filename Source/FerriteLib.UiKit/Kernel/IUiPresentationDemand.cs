@@ -8,3 +8,5 @@ public interface IUiPresentationDemand
 {
     IEnumerable<string> PresentationKeys(UiWidgetContext context);
 }
+
+

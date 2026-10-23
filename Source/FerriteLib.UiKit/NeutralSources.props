@@ -1,19 +1,7 @@
 <Project>
-  <!-- Shared explicit production source set: runtime and no-platform contract target consume this list. -->
+  <!-- Complete retained product core: runtime and platform-free target compile the same sources. -->
   <ItemGroup>
-    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\Neutral\*.cs" />
-    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiFont.cs" />
-    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\ITextMetrics.cs" />
-    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiBindings.cs" />
-    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\IUiBindings.cs" />
-    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\IUiTypedChoices.cs" />
-    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiChoice.cs" />
-    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiInvalidation.cs" />
-    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiElementSpec.cs" />
-    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiNodeId.cs" />
-    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiLayoutManifest.cs" />
-    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiStyleDocument.cs" />
-    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\UiWindowBackground.cs" />
+    <NeutralProductionSource Include="$(MSBuildThisFileDirectory)Kernel\**\*.cs" />
     <Compile Include="@(NeutralProductionSource)" />
   </ItemGroup>
 </Project>

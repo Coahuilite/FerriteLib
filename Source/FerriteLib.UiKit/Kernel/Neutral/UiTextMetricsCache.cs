@@ -59,3 +59,5 @@ internal sealed class UiTextMetricsCache : ITextMetrics, IUiTextMetricsEnvironme
         return result;
     }
 }
+
+

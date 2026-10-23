@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
 /// <summary>
@@ -69,10 +68,10 @@ public sealed class UiNode
     internal IReadOnlyList<UiNode> Children => children;
 
     /// <summary>The element's arranged rect in page space, or null when it was not arranged this pass.</summary>
-    public Rect? Rect { get; internal set; }
+    public UiLayoutRect? Rect { get; internal set; }
 
     /// <summary>Scroll content rect for a scroll container (scroll-local), or null.</summary>
-    public Rect? ContentRect { get; internal set; }
+    public UiLayoutRect? ContentRect { get; internal set; }
 
     /// <summary>True when this node was arranged in the current tree and therefore carries a rect.</summary>
     public bool IsArranged => Rect.HasValue;
@@ -110,7 +109,7 @@ public sealed class UiNode
 
     /// <summary>
     /// True while this element is disabled for input: the command it declares answers
-    /// <see cref="IUiBindings.CanExecute"/> false. The engine resolves it once per element per draw and
+    /// <see cref="IUiBindingReader.CanExecute"/> false. The engine resolves it once per element per draw and
     /// publishes it here because the node is the identity carrier every arranged element owns; the
     /// funnel's interactive entry points consult it, so a disabled element neither executes nor captures
     /// the pointer - one rule for every kind instead of a per-widget branch. Always false for an element
@@ -179,8 +178,8 @@ public sealed class UiNode
         Action restoreAuthoring = Properties.CaptureAuthoring();
         UiNode? parent = Parent;
         UiNode[] priorChildren = children.ToArray();
-        Rect? rect = Rect;
-        Rect? content = ContentRect;
+        UiLayoutRect? rect = Rect;
+        UiLayoutRect? content = ContentRect;
         string kind = Kind;
         int ordinal = Ordinal;
         string elementId = ElementId;
@@ -237,3 +236,6 @@ public sealed class UiNode
         ContentRect = null;
     }
 }
+
+
+

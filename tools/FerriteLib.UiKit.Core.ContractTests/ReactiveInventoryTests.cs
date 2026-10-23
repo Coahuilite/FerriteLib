@@ -46,7 +46,7 @@ internal static class ReactiveInventoryTests
             page.Add("c", 3, 7); a.Count = 10;
             Check(responseTotal == 22 && responseLabel == "a: 10", "automatic response reads latest binding values and options while ordinary Draw input stays frozen");
             Check(shown.Count == 2 && shown[0].Text == "a: 6" && b.Get<int>("total") == 11 && b.GetOptions<UiChoice<int>>("selected")[0].Text == "a: 6", "same-round collection and item projection remain frozen after structural and property writes");
-            b.TryGetChoices("selected", out var erased);
+            var erased = b.Choices("selected").Read();
             b.TryReadObservationOptions("selected", 1, out var prefix, out int count);
             Check(erased.Count == 2 && (int)erased[0].Value! == 1 && prefix.Count == 1 && ((UiChoice<int>)prefix[0]!).Text == "a: 6" && count == 2 && b.Get<int>("selected") == 1, "typed choices and bounded read share synchronized options while same-name value channel stays distinct");
             b.BindCommand("latest-options", () => Check(b.GetOptions<UiChoice<int>>("selected").Count == 3 && b.Get<int>("total") == 22, "operation options and scalar reads bypass current presentation"));
@@ -188,3 +188,5 @@ internal static class ReactiveInventoryTests
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }
+
+

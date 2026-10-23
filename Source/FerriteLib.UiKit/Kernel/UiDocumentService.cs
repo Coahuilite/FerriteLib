@@ -88,7 +88,7 @@ public sealed class UiDocumentService : IDisposable
     /// now contain only the real host calls, and each one has a lane that reddens when it is removed.
     /// </para>
     /// </summary>
-    internal Func<UiHost, string>? DocumentCommitFaultOverride;
+    internal Func<UiHost, string>? DocumentCommitFaultOverride = null;
 
     /// <summary>Pumps between re-arm attempts on the frame path.</summary>
     private const int ReArmPumpInterval = 30;
@@ -106,7 +106,7 @@ public sealed class UiDocumentService : IDisposable
     {
         this.autoWatch = autoWatch ?? DefaultAutoWatch;
         this.policy = policy ?? UiReloadPolicy.Default;
-        this.timeSource = timeSource ?? VerseFerriteTimeSource.Instance;
+        this.timeSource = timeSource ?? UiMonotonicTime.Instance;
     }
 
     /// <summary>
@@ -1555,3 +1555,6 @@ public sealed class UiDocumentService : IDisposable
         }
     }
 }
+
+
+

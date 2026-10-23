@@ -1,11 +1,10 @@
 using System;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
 /// <summary>
 /// Default activation wrapper: caption, optional surface and typed command binding.
-/// Pointer timing/qualification/capture come from UiInteractionSession through UiNative.Activation;
+/// Pointer timing/qualification/capture come from UiInteractionSession through ctx.Controls.Activation;
 /// presentation observes that result and never recreates the activation rule.
 /// A missing command is diagnosed at host creation, not rendered as a dead control.
 /// </summary>
@@ -15,7 +14,7 @@ internal sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointe
 
     private UiElementSpec spec = UiElementSpec.Empty;
     private readonly UiRetainedPaint retained = new();
-    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect,ctx);
+    bool IUiRetainedDisplay.PaintLast(UiLayoutRect rect, UiWidgetContext ctx) => retained.Paint(rect,ctx);
     UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
@@ -39,7 +38,7 @@ internal sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointe
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindings bindings, string elementPath)
+    public void Validate(IUiBindingReader bindings, string elementPath)
     {
         string actionKey = ReadActionKey();
         if (actionKey.Length == 0)
@@ -94,16 +93,16 @@ internal sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointe
     {
         yield return new UiPointerRegion(bounds);
     }
-    public void Draw(Rect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
     {
-        if (rect.width <= 1f || rect.height <= 1f) return;
+        if (rect.Width <= 1f || rect.Height <= 1f) return;
 
         // A held operation wins over hover. Capture comes from shared behavior rather than raw
         // MouseDown geometry; painting neither infers an established activation nor requests it.
         // The same state is available to independent and non-rendering clients.
-        UiInteractionResult interaction = UiNative.Activation(rect, ctx, ReadActionKey());
-        bool armed = interaction.Captured && ctx.Session.Interactions.CaptureOwner?.Node == (ctx.Node ?? ctx.Session.ActiveNode).Id.Key;
-        bool hovered = !armed && UiNative.IsMouseOver(rect);
+        UiInteractionResult interaction = ctx.Controls.Activation(rect, ctx, ReadActionKey());
+        bool armed = interaction.Captured && ctx.Session.Interactions.CaptureOwner?.Node == ctx.Node.Id.Key;
+        bool hovered = !armed && ctx.Controls.IsMouseOver(rect);
 
         // No writability question here, deliberately: this atom's binding is a command, and the data
         // side's writability read answers "not writable" for anything that is not a value binding — so
@@ -111,7 +110,7 @@ internal sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointe
         // instead (a missing ActionBind fails the host).
         UiResolvedStyle idle = AtomVocabulary.ResolveRole(spec, ctx, writable: null);
 
-        UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx, ReadActionKey()), interaction, () =>
+        UiInteractionRequests.Activation(ctx.Controls.InteractionTarget(ctx, ReadActionKey()), interaction, () =>
         {
             // G2: with a PayloadKey the command receives the bound payload - the row's own key, which is what
             // a repeated row needs to say which item it is. Without one the call is exactly what it was.
@@ -157,7 +156,7 @@ internal sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointe
     /// text, and armed takes the active treatment outright because live state beats the author. All
     /// three paint through the one surface outlet at the theme's hairline.
     /// </summary>
-    private void Paint(Rect rect, bool armed, bool hovered, UiResolvedStyle idle, UiWidgetContext ctx,string caption)
+    private void Paint(UiLayoutRect rect, bool armed, bool hovered, UiResolvedStyle idle, UiWidgetContext ctx,string caption)
     {
         UiTheme theme = ctx.Theme;
         UiResolvedStyle shown = idle;
@@ -174,16 +173,16 @@ internal sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointe
         // the same inset and font, so the two shapes cannot disagree about where the text sits.
         if (!string.Equals(AtomVocabulary.Read(spec, "Chrome").Trim(), "none", StringComparison.OrdinalIgnoreCase))
         {
-            UiThemeDraw.Surface(rect, shown.Surface, theme.Geometry.Hairline);
+            UiThemeDraw.Surface(ctx.Drawing,rect, shown.Surface, theme.Geometry.Hairline);
         }
 
         UiThemeDraw.Label(
-            new Rect(rect.x + theme.Geometry.Padding, rect.y, Math.Max(1f, rect.width - theme.Geometry.Padding * 2f), rect.height),
+ctx.Drawing,            new UiLayoutRect(rect.X + theme.Geometry.Padding, rect.Y, Math.Max(1f, rect.Width - theme.Geometry.Padding * 2f), rect.Height),
             caption,
             theme,
             shown.Text,
             AtomVocabulary.TextFont(ctx),
-            TextAnchor.MiddleCenter,
+            UiTextAnchor.MiddleCenter,
             singleLine: true);
     }
 
@@ -192,3 +191,5 @@ internal sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointe
         return AtomVocabulary.Read(spec, "ActionBind");
     }
 }
+
+

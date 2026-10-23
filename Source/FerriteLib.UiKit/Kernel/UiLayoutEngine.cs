@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using UnityEngine;
-using Verse;
-using VerseWidgets = Verse.Widgets;
+
 
 namespace FerriteLib.UiKit.Kernel;
 /// <summary>
@@ -43,8 +41,8 @@ internal sealed partial class UiLayoutEngine
         internal bool IsContainer;
         internal string ContainerKind = "";
         internal float MeasureWidth;
-        internal Rect Rect;
-        internal Rect? ContentRect;
+        internal UiLayoutRect Rect;
+        internal UiLayoutRect? ContentRect;
         internal int SubtreeCount;
 
         /// <summary>
@@ -197,7 +195,7 @@ internal sealed partial class UiLayoutEngine
     private readonly Dictionary<UiNodeId, IUiWidget> widgetInstances = new();
 
     private UiLayoutSnapshot? cachedSnapshot;
-    private Vector2 cachedAvailable;
+    private UiLayoutPoint cachedAvailable;
     private int cachedContentRevision = -1;
     private int cachedDefinitionRevision;
     private int cachedTranslationRevision = int.MinValue;
@@ -245,7 +243,7 @@ internal sealed partial class UiLayoutEngine
         }
     }
 
-    public UiLayoutSnapshot ArrangeRoots(UiWidgetContext ctx, Vector2 available, IReadOnlyList<UiElementSpec> roots)
+    public UiLayoutSnapshot ArrangeRoots(UiWidgetContext ctx, UiLayoutPoint available, IReadOnlyList<UiElementSpec> roots)
     {
         if (ctx == null)
             throw new ArgumentNullException(nameof(ctx));
@@ -254,8 +252,8 @@ internal sealed partial class UiLayoutEngine
         UiTextMetricsCache? priorTextMetrics = textMetricsCache;
         textMetricsCache = priorTextMetrics != null && ReferenceEquals(priorTextMetrics.Source, ctx.Metrics) ? priorTextMetrics.Copy() : new UiTextMetricsCache(ctx.Metrics);
         ctx = ctx.WithMetrics(textMetricsCache);
-        float width = Normalize(available.x, 1f);
-        float height = Normalize(available.y, 1f);
+        float width = Normalize(available.X, 1f);
+        float height = Normalize(available.Y, 1f);
         // The frame boundary: announcements raised during the previous pass are folded into one commit
         // before the cache is consulted, so a Paint-class key leaves the cache alone while a
         // Measure/Structure-class key marks its elements and moves the arrangement clock.
@@ -265,7 +263,7 @@ internal sealed partial class UiLayoutEngine
         // asks for a re-measure even when size, content revision, definition and language all stand still.
         layoutPass++;
         layoutRequested = pendingLegacyValidation || cachedSnapshot == null || ctx.Session.HasDirtyNodes || cachedContentRevision != ctx.Session.ContentRevision
-            || cachedAvailable.x != width || cachedAvailable.y != height || cachedDefinitionRevision != DefinitionRevision(ctx)
+            || cachedAvailable.X != width || cachedAvailable.Y != height || cachedDefinitionRevision != DefinitionRevision(ctx)
             || cachedTranslationRevision != ctx.Translation.TranslationRevision || cachedHostLayoutRevision != ctx.Theme.LayoutRevision;
         forceMeasurement = cachedSnapshot != null && (externalContentChanged || cachedDefinitionRevision != DefinitionRevision(ctx)
             || cachedTranslationRevision != ctx.Translation.TranslationRevision);
@@ -322,10 +320,10 @@ internal sealed partial class UiLayoutEngine
             }
 
             box.Height = Math.Max(1f, y);
-            var rects = new Dictionary<string, Rect>(StringComparer.Ordinal);
+            var rects = new Dictionary<string, UiLayoutRect>(StringComparer.Ordinal);
             var visible = new List<string>();
-            var viewports = new Dictionary<string, Rect>(StringComparer.Ordinal);
-            var scrollContents = new Dictionary<string, Rect>(StringComparer.Ordinal);
+            var viewports = new Dictionary<string, UiLayoutRect>(StringComparer.Ordinal);
+            var scrollContents = new Dictionary<string, UiLayoutRect>(StringComparer.Ordinal);
             foreach (PlacedEntry entry in box.Entries)
             {
                 if (entry.Spec.Id.Length > 0)
@@ -395,11 +393,11 @@ internal sealed partial class UiLayoutEngine
             foreach (UiNodeId id in layoutScopes.Keys) if (ctx.Session.GetNode(id) == null) deadScopes.Add(id);
             foreach (UiNodeId id in deadScopes) layoutScopes.Remove(id);
             cachedHostLayoutRevision = ctx.Theme.LayoutRevision;
-            cachedAvailable = new Vector2(width, height);
+            cachedAvailable = new UiLayoutPoint(width, height);
             cachedContentRevision = ctx.Session.ContentRevision;
             cachedDefinitionRevision = DefinitionRevision(ctx);
             cachedTranslationRevision = ctx.Translation.TranslationRevision;
-            UiLayoutSnapshot nextSnapshot = new UiLayoutSnapshot(new Vector2(width, box.Height), rects, visible, viewports, scrollContents, cachedDefinitionRevision, Array.AsReadOnly(layoutDiagnostics.ToArray()));
+            UiLayoutSnapshot nextSnapshot = new UiLayoutSnapshot(new UiLayoutPoint(width, box.Height), rects, visible, viewports, scrollContents, cachedDefinitionRevision, Array.AsReadOnly(layoutDiagnostics.ToArray()));
             if (layoutRequested || cachedSnapshot == null || !SameGeometry(lastEntries, box.Entries) || !SameDiagnostics(cachedSnapshot.Diagnostics, nextSnapshot.Diagnostics)) cachedSnapshot = nextSnapshot;
             lastEntries = box.Entries;
             observationLayoutFrame = ctx.Session.Frame;
@@ -453,20 +451,20 @@ internal sealed partial class UiLayoutEngine
 
         if (target == null)
             return;
-        Rect targetRect = target.Rect;
+        UiLayoutRect targetRect = target.Rect;
         foreach (PlacedEntry entry in entries ?? lastEntries)
         {
             if (!string.Equals(entry.ContainerKind, "Scroll", StringComparison.Ordinal))
                 continue;
-            Rect viewport = entry.Rect;
-            Rect content = entry.ContentRect ?? new Rect(0f, 0f, Math.Max(1f, viewport.width), Math.Max(1f, viewport.height));
-            float contentLocalY = targetRect.y - viewport.y;
-            if (contentLocalY < -1f || contentLocalY > content.height + 1f)
+            UiLayoutRect viewport = entry.Rect;
+            UiLayoutRect content = entry.ContentRect ?? new UiLayoutRect(0f, 0f, Math.Max(1f, viewport.Width), Math.Max(1f, viewport.Height));
+            float contentLocalY = targetRect.Y - viewport.Y;
+            if (contentLocalY < -1f || contentLocalY > content.Height + 1f)
                 continue;
-            float maxY = Math.Max(0f, content.height - viewport.height);
+            float maxY = Math.Max(0f, content.Height - viewport.Height);
             float clampedY = ClampFloat(contentLocalY, 0f, maxY);
-            Vector2 current = ctx.Session.GetScrollPosition(entry.Node);
-            ctx.Session.SetScrollPosition(entry.Node, new Vector2(current.x, clampedY));
+            UiLayoutPoint current = ctx.Session.GetScrollPosition(entry.Node);
+            ctx.Session.SetScrollPosition(entry.Node, new UiLayoutPoint(current.X, clampedY));
             ctx.Session.ClearScrollTarget();
             return;
         }
@@ -539,7 +537,7 @@ internal sealed partial class UiLayoutEngine
     /// against its nearest arranged ancestor by the caller, which is how a hidden element's VisibleKey
     /// or Tab still brings it back.
     /// </summary>
-    private void RecordDeclaredKeys(UiElementSpec spec, UiNode owner, IUiBindings bindings)
+    private void RecordDeclaredKeys(UiElementSpec spec, UiNode owner, IUiBindingReader bindings)
     {
         RecordKey(ReadDeclaredBindKey(spec), owner, bindings);
         RecordKey(ReadAttribute(spec, ActionBindAttribute), owner, bindings);
@@ -565,7 +563,7 @@ internal sealed partial class UiLayoutEngine
         RecordKey(ReadAttribute(spec, RepeatItemsAttribute), owner, bindings);
     }
 
-    private void RecordKey(string key, UiNode owner, IUiBindings bindings)
+    private void RecordKey(string key, UiNode owner, IUiBindingReader bindings)
     {
         if (key.Length == 0) return;
         if (!committedRevisions.ContainsKey(key))
@@ -604,7 +602,7 @@ internal sealed partial class UiLayoutEngine
 
     /// <summary>
     /// The element's disabled state: the command it declares as <c>ActionBind</c> answers
-    /// <see cref="IUiBindings.CanExecute"/> false. An element that declares no command is never
+    /// <see cref="IUiBindingReader.CanExecute"/> false. An element that declares no command is never
     /// disabled, so this cannot change the behaviour of a page that binds no commands. The answer is
     /// published on the node because that is where the funnel's interactive entry points read it: one
     /// rule for every kind instead of a per-widget branch.
@@ -625,7 +623,7 @@ internal sealed partial class UiLayoutEngine
         }
     }
 
-    public void Draw(UiWidgetContext ctx, UiLayoutSnapshot snapshot, Rect viewport)
+    public void Draw(UiWidgetContext ctx, UiLayoutSnapshot snapshot, UiLayoutRect viewport)
     {
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
         if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
@@ -640,15 +638,15 @@ internal sealed partial class UiLayoutEngine
         // notch yet - is what makes that priority real instead of aspirational: the popup pass runs AFTER
         // content, and a menu over a scrolled page would otherwise never see a wheel event at all. When the
         // menu moves, the event is consumed and this frame's scroll containers keep their position.
-        UiNative.DismissPopupOnOutsidePress(ctx.Session);
-        UiNative.TakePopupWheelIfCovering(ctx.Session);
+        ctx.Controls.DismissPopupOnOutsidePress(ctx.Session);
+        ctx.Controls.TakePopupWheelIfCovering(ctx.Session);
 
         try
         {
             var contentLayers = new List<UiPointerLayer>();
-            CollectPointerLayers(lastEntries, 0, lastEntries.Count, ctx, new Vector2(viewport.x, viewport.y), null, Vector2.zero, ctx.Session.CurrentClip, contentLayers);
+            CollectPointerLayers(lastEntries, 0, lastEntries.Count, ctx, new UiLayoutPoint(viewport.X, viewport.Y), null, UiLayoutPoint.Zero, ctx.Session.CurrentClip, contentLayers);
             ctx.Session.SetContentInputLayers(contentLayers);
-            DrawEntries(lastEntries, 0, lastEntries.Count, ctx, new Vector2(viewport.x, viewport.y), null, Vector2.zero);
+            DrawEntries(lastEntries, 0, lastEntries.Count, ctx, new UiLayoutPoint(viewport.X, viewport.Y), null, UiLayoutPoint.Zero);
             if (ctx.Session.IsActive) ctx.Session.EndHitPass();
         }
         catch
@@ -659,12 +657,12 @@ internal sealed partial class UiLayoutEngine
     }
 
     private void CollectPointerLayers(List<PlacedEntry> entries, int start, int end, UiWidgetContext ctx,
-        Vector2 viewportPosition, Vector2? nativeOrigin, Vector2 windowOrigin, Rect? clip, List<UiPointerLayer> layers)
+        UiLayoutPoint viewportPosition, UiLayoutPoint? nativeOrigin, UiLayoutPoint windowOrigin, UiLayoutRect? clip, List<UiPointerLayer> layers)
     {
         for (int index = start; index < end; index++)
         {
             PlacedEntry entry = entries[index];
-            Rect rect = ToDrawRect(entry.Rect, viewportPosition, nativeOrigin);
+            UiLayoutRect rect = ToDrawRect(entry.Rect, viewportPosition, nativeOrigin);
             UiWidgetContext local = ContextForEntry(entry, ctx, windowOrigin);
             entry.Node.IsDisabled = ResolveDisabled(entry.Spec, local);
             if (entry.Widget != null)
@@ -680,7 +678,7 @@ internal sealed partial class UiLayoutEngine
                         UiSessionGuard.MeasureOrFallback(ctx.Session, entry.Node.Path, entry.Widget.Kind,
                             entry.Node.Path, 0, () =>
                             {
-                                regions.AddRange(layout.PointerRegions(local, new UiLayoutRect(0, 0, rect.width, rect.height)));
+                                regions.AddRange(layout.PointerRegions(local, new UiLayoutRect(0, 0, rect.Width, rect.Height)));
                                 return 0;
                             });
                     }
@@ -698,33 +696,33 @@ internal sealed partial class UiLayoutEngine
                     foreach (UiPointerRegion region in regions)
                     {
                         UiLayoutRect bounds = region.Bounds;
-                        var windowBounds = new UiLayoutRect(rect.x + windowOrigin.x + bounds.X,
-                            rect.y + windowOrigin.y + bounds.Y, bounds.Width, bounds.Height);
+                        var windowBounds = new UiLayoutRect(rect.X + windowOrigin.X + bounds.X,
+                            rect.Y + windowOrigin.Y + bounds.Y, bounds.Width, bounds.Height);
                         UiLayoutRect? effectiveClip = clip.HasValue
-                            ? new UiLayoutRect(clip.Value.x, clip.Value.y, clip.Value.width, clip.Value.height) : null;
+                            ? new UiLayoutRect(clip.Value.X, clip.Value.Y, clip.Value.Width, clip.Value.Height) : null;
                         layers.Add(new UiPointerLayer(entry.Node.Id.Key, windowBounds, effectiveClip,
                             region.HasOperation));
                     }
                 }
             }
             if (!IsScopedContainer(entry.ContainerKind)) continue;
-            Vector2 scopeOrigin = ScopeWindowOrigin(rect, nativeOrigin, windowOrigin);
-            Rect scopeRect = new(scopeOrigin.x, scopeOrigin.y, rect.width, rect.height);
-            Rect childClip = IntersectClip(clip, scopeRect);
-            Vector2 childOrigin = scopeOrigin;
+            UiLayoutPoint scopeOrigin = ScopeWindowOrigin(rect, nativeOrigin, windowOrigin);
+            UiLayoutRect scopeRect = new(scopeOrigin.X, scopeOrigin.Y, rect.Width, rect.Height);
+            UiLayoutRect childClip = IntersectClip(clip, scopeRect);
+            UiLayoutPoint childOrigin = scopeOrigin;
             if (entry.ContainerKind == "Scroll")
             {
-                Rect content = entry.ContentRect ?? new Rect(0, 0, rect.width, rect.height);
-                Vector2 scroll = ClampScroll(ctx.Session.GetScrollPosition(entry.Node), content, rect);
+                UiLayoutRect content = entry.ContentRect ?? new UiLayoutRect(0, 0, rect.Width, rect.Height);
+                UiLayoutPoint scroll = ClampScroll(ctx.Session.GetScrollPosition(entry.Node), content, rect);
                 childOrigin -= scroll;
             }
             CollectPointerLayers(entries, index + 1, index + entry.SubtreeCount, local,
-                viewportPosition, entry.Rect.position, childOrigin, childClip, layers);
+                viewportPosition, entry.Rect.Position, childOrigin, childClip, layers);
             index += entry.SubtreeCount - 1;
         }
     }
 
-    private UiWidgetContext ContextForEntry(PlacedEntry entry, UiWidgetContext ctx, Vector2 windowOrigin)
+    private UiWidgetContext ContextForEntry(PlacedEntry entry, UiWidgetContext ctx, UiLayoutPoint windowOrigin)
     {
         UiWidgetContext local = ctx.WithStyleChain(entry.StyleChain);
         local = local.WithTheme(ScopeTheme(local, entry.Node));
@@ -732,32 +730,32 @@ internal sealed partial class UiLayoutEngine
         return local.WithWindowOrigin(windowOrigin).WithNode(entry.Node);
     }
 
-    private static Vector2 ScopeWindowOrigin(Rect rect, Vector2? nativeOrigin, Vector2 windowOrigin)
-        => nativeOrigin.HasValue ? new Vector2(windowOrigin.x + rect.x, windowOrigin.y + rect.y) : rect.position;
+    private static UiLayoutPoint ScopeWindowOrigin(UiLayoutRect rect, UiLayoutPoint? nativeOrigin, UiLayoutPoint windowOrigin)
+        => nativeOrigin.HasValue ? new UiLayoutPoint(windowOrigin.X + rect.X, windowOrigin.Y + rect.Y) : rect.Position;
 
-    private static Rect IntersectClip(Rect? outer, Rect inner)
+    private static UiLayoutRect IntersectClip(UiLayoutRect? outer, UiLayoutRect inner)
     {
         if (!outer.HasValue) return inner;
-        float left = Math.Max(outer.Value.x, inner.x);
-        float top = Math.Max(outer.Value.y, inner.y);
-        float right = Math.Min(outer.Value.xMax, inner.xMax);
-        float bottom = Math.Min(outer.Value.yMax, inner.yMax);
-        return new Rect(left, top, Math.Max(0, right - left), Math.Max(0, bottom - top));
+        float left = Math.Max(outer.Value.X, inner.X);
+        float top = Math.Max(outer.Value.Y, inner.Y);
+        float right = Math.Min(outer.Value.XMax, inner.XMax);
+        float bottom = Math.Min(outer.Value.YMax, inner.YMax);
+        return new UiLayoutRect(left, top, Math.Max(0, right - left), Math.Max(0, bottom - top));
     }
     private void DrawEntries(
         List<PlacedEntry> entries,
         int start,
         int end,
         UiWidgetContext ctx,
-        Vector2 viewportPosition,
-        Vector2? nativeOrigin,
-        Vector2 windowOrigin)
+        UiLayoutPoint viewportPosition,
+        UiLayoutPoint? nativeOrigin,
+        UiLayoutPoint windowOrigin)
     {
         int index = start;
         while (index < end)
         {
             PlacedEntry entry = entries[index];
-            Rect drawRect = ToDrawRect(entry.Rect, viewportPosition, nativeOrigin);
+            UiLayoutRect drawRect = ToDrawRect(entry.Rect, viewportPosition, nativeOrigin);
 
             // The element's arranged entry carries the scope it was measured in, so the draw pass
             // re-applies exactly that scope: the same chain resolves through the same resolver cache to
@@ -779,13 +777,13 @@ internal sealed partial class UiLayoutEngine
             // The element's content layer, in window space (draw rect plus the context's offset), and the
             // origin the funnel lifts a draw-local pointer by. Only widgets are hit surfaces: a container
             // layer would otherwise cover its own children.
-            Vector2 entryOrigin = entryCtx.WindowOrigin;
+            UiLayoutPoint entryOrigin = entryCtx.WindowOrigin;
             ctx.Session.SetCurrentWindowOrigin(entryOrigin);
             if (entry.Widget != null)
             {
                 ctx.Session.PushHitLayer(
                     entry.Node,
-                    new Rect(drawRect.x + entryOrigin.x, drawRect.y + entryOrigin.y, drawRect.width, drawRect.height),
+                    new UiLayoutRect(drawRect.X + entryOrigin.X, drawRect.Y + entryOrigin.Y, drawRect.Width, drawRect.Height),
                     isPopup: false);
             }
 
@@ -837,7 +835,7 @@ internal sealed partial class UiLayoutEngine
                 // Note() gave above. The nested walk below never had a step at this entry, which is how
                 // the clipped edges went unseen; one moved call makes the picture the third rendering of
                 // this entry too, and no second collector exists to disagree with the capture.
-                UiDevGeometryProbe.Outline(drawRect, sampled);
+                UiDevGeometryProbe.Outline(ctx.Drawing, drawRect, sampled);
 #endif
                 index += entry.SubtreeCount;
             }
@@ -880,10 +878,10 @@ internal sealed partial class UiLayoutEngine
                             // the value (it is the identity a consumer's own catalog is keyed by), and it does not
                             // refuse a DISABLED element - help explains why a control is unavailable rather than
                             // activating it, and the disabled refusal stays where input is refused
-                            // (UiNative.Button). Only widgets claim: a container is not a hit surface, which is
+                            // (ctx.Controls.Button). Only widgets claim: a container is not a hit surface, which is
                             // why the attribute is refused on one at creation instead of being inert here.
                             string helpKey = ReadAttribute(entry.Spec, HelpKeyAttribute);
-                            if (helpKey.Length > 0 && UiNative.IsMouseOver(drawRect, entryCtx))
+                            if (helpKey.Length > 0 && entryCtx.Controls.IsMouseOver(drawRect, entryCtx))
                             {
                                 ctx.Session.ClaimHover(helpKey);
                             }
@@ -908,7 +906,7 @@ internal sealed partial class UiLayoutEngine
                 // into the thing it measures would be the instrument changing the measurement. It paints only
                 // what the capture retained, so the picture cannot show a node the data does not describe -
                 // and with capture off (SA1.5) it paints this same walk and stores nothing.
-                UiDevGeometryProbe.Outline(drawRect, sampled);
+                UiDevGeometryProbe.Outline(ctx.Drawing, drawRect, sampled);
 #endif
 
                 index++;
@@ -918,35 +916,37 @@ internal sealed partial class UiLayoutEngine
 
     private void DrawScopedContainer(
         PlacedEntry entry,
-        Rect outRect,
+        UiLayoutRect outRect,
         UiWidgetContext ctx,
         List<PlacedEntry> entries,
         int childStart,
         int childEnd,
-        Vector2 viewportPosition,
-        Vector2? nativeOrigin,
-        Vector2 windowOrigin)
+        UiLayoutPoint viewportPosition,
+        UiLayoutPoint? nativeOrigin,
+        UiLayoutPoint windowOrigin)
     {
         string kind = entry.ContainerKind;
 
         if (string.Equals(kind, "Scroll", StringComparison.Ordinal))
         {
-            Vector2 scrollPosition = ctx.Session.GetScrollPosition(entry.Node);
-            Rect contentRect = entry.ContentRect ?? new Rect(0f, 0f, Math.Max(1f, outRect.width), Math.Max(1f, outRect.height));
+            UiLayoutPoint scrollPosition = ctx.Session.GetScrollPosition(entry.Node);
+            UiLayoutRect contentRect = entry.ContentRect ?? new UiLayoutRect(0f, 0f, Math.Max(1f, outRect.Width), Math.Max(1f, outRect.Height));
             scrollPosition = ClampScroll(scrollPosition, contentRect, outRect);
 
             // Children draw in scroll-content-local coordinates; the popup/overlay pass later
             // draws outside BeginScrollView, so anchors must be converted to Host window space.
-            Vector2 scopeWindowOrigin = ScopeWindowOrigin(outRect, nativeOrigin, windowOrigin);
-            Rect? parentClip = ctx.Session.CurrentClip;
-            ctx.Session.ConstrainClip(new Rect(scopeWindowOrigin.x, scopeWindowOrigin.y, outRect.width, outRect.height));
+            UiLayoutPoint scopeWindowOrigin = ScopeWindowOrigin(outRect, nativeOrigin, windowOrigin);
+            UiLayoutRect? parentClip = ctx.Session.CurrentClip;
+            ctx.Session.ConstrainClip(new UiLayoutRect(scopeWindowOrigin.X, scopeWindowOrigin.Y, outRect.Width, outRect.Height));
 
             try
             {
-                VerseWidgets.BeginScrollView(outRect, ref scrollPosition, contentRect);
+                ctx.Session.Execution.Scroll(outRect, contentRect, scrollPosition, true, current => {
+                scrollPosition = current;
                 // BeginScrollView may consume a wheel event and change the offset in this very pass.
-                Vector2 childWindowOrigin = new(scopeWindowOrigin.x - scrollPosition.x, scopeWindowOrigin.y - scrollPosition.y);
-                DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.position, childWindowOrigin);
+                UiLayoutPoint childWindowOrigin = new(scopeWindowOrigin.X - scrollPosition.X, scopeWindowOrigin.Y - scrollPosition.Y);
+                DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.Position, childWindowOrigin);
+                });
             }
             finally
             {
@@ -955,7 +955,7 @@ internal sealed partial class UiLayoutEngine
                     ctx.Session.CurrentClip = parentClip;
                     ctx.Session.SetScrollPosition(entry.Node, scrollPosition);
                 }
-                VerseWidgets.EndScrollView();
+
             }
 
             return;
@@ -964,37 +964,38 @@ internal sealed partial class UiLayoutEngine
         // Clip and Overlay are structural groups. The engine owns Begin/EndGroup so leaf widgets
         // never create native structure scopes. Children draw relative to the group origin, so
         // their window-space offset is the group's draw position on top of the parent origin.
-        Vector2 groupWindowOrigin = ScopeWindowOrigin(outRect, nativeOrigin, windowOrigin);
-        Rect? outerClip = ctx.Session.CurrentClip;
-        ctx.Session.ConstrainClip(new Rect(groupWindowOrigin.x, groupWindowOrigin.y, outRect.width, outRect.height));
+        UiLayoutPoint groupWindowOrigin = ScopeWindowOrigin(outRect, nativeOrigin, windowOrigin);
+        UiLayoutRect? outerClip = ctx.Session.CurrentClip;
+        ctx.Session.ConstrainClip(new UiLayoutRect(groupWindowOrigin.X, groupWindowOrigin.Y, outRect.Width, outRect.Height));
         try
         {
-            GUI.BeginGroup(outRect);
-            DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.position, groupWindowOrigin);
+            ctx.Drawing.Clip(outRect, () => {
+            DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.Position, groupWindowOrigin);
+            });
         }
         finally
         {
             if (ctx.Session.IsActive) ctx.Session.CurrentClip = outerClip;
-            GUI.EndGroup();
+
         }
     }
 
-    private static Rect ToDrawRect(Rect rect, Vector2 viewportPosition, Vector2? nativeOrigin)
+    private static UiLayoutRect ToDrawRect(UiLayoutRect rect, UiLayoutPoint viewportPosition, UiLayoutPoint? nativeOrigin)
     {
         if (nativeOrigin.HasValue)
         {
-            return new Rect(
-                rect.x - nativeOrigin.Value.x,
-                rect.y - nativeOrigin.Value.y,
-                rect.width,
-                rect.height);
+            return new UiLayoutRect(
+                rect.X - nativeOrigin.Value.X,
+                rect.Y - nativeOrigin.Value.Y,
+                rect.Width,
+                rect.Height);
         }
 
-        return new Rect(
-            viewportPosition.x + rect.x,
-            viewportPosition.y + rect.y,
-            rect.width,
-            rect.height);
+        return new UiLayoutRect(
+            viewportPosition.X + rect.X,
+            viewportPosition.Y + rect.Y,
+            rect.Width,
+            rect.Height);
     }
 
     /// <summary>
@@ -1015,10 +1016,10 @@ internal sealed partial class UiLayoutEngine
         }
     }
 
-    private static Vector2 ClampScroll(Vector2 position, Rect content, Rect viewport)
+    private static UiLayoutPoint ClampScroll(UiLayoutPoint position, UiLayoutRect content, UiLayoutRect viewport)
     {
-        UiLayoutPoint clamped = UiLayout.ClampScroll(new UiLayoutPoint(position.x, position.y), new UiLayoutSize(content.width, content.height), new UiLayoutSize(viewport.width, viewport.height));
-        return new Vector2(clamped.X, clamped.Y);
+        UiLayoutPoint clamped = UiLayout.ClampScroll(new UiLayoutPoint(position.X, position.Y), new UiLayoutSize(content.Width, content.Height), new UiLayoutSize(viewport.Width, viewport.Height));
+        return new UiLayoutPoint(clamped.X, clamped.Y);
     }
 
     private static float ClampFloat(float value, float min, float max)
@@ -1183,7 +1184,7 @@ internal sealed partial class UiLayoutEngine
                 Widget = widget,
                 IsContainer = false,
                 MeasureWidth = width,
-                Rect = new Rect(0f, 0f, width, height),
+                Rect = new UiLayoutRect(0f, 0f, width, height),
                 SubtreeCount = 1
             };
             var box = new MeasuredBox { Width = width, Height = height };
@@ -1213,7 +1214,7 @@ internal sealed partial class UiLayoutEngine
             PlacedEntry entry = box.Entries[i];
             if (entry.Id.Equals(id))
             {
-                entry.Rect = new Rect(entry.Rect.x, entry.Rect.y, entry.Rect.width, height);
+                entry.Rect = new UiLayoutRect(entry.Rect.X, entry.Rect.Y, entry.Rect.Width, height);
                 return;
             }
         }
@@ -1458,7 +1459,7 @@ internal sealed partial class UiLayoutEngine
             IsContainer = true,
             ContainerKind = kind,
             MeasureWidth = plan.Size.Width,
-            Rect = new Rect(0, 0, plan.Size.Width, plan.Size.Height)
+            Rect = new UiLayoutRect(0, 0, plan.Size.Width, plan.Size.Height)
         };
         box.Entries.Add(container);
         for (int i = 0; i < measured.Count; i++)
@@ -1615,8 +1616,8 @@ internal sealed partial class UiLayoutEngine
             IsContainer = true,
             ContainerKind = kind,
             MeasureWidth = width,
-            Rect = new Rect(0f, 0f, width, viewportHeight),
-            ContentRect = new Rect(0f, 0f, contentWidth, naturalHeight)
+            Rect = new UiLayoutRect(0f, 0f, width, viewportHeight),
+            ContentRect = new UiLayoutRect(0f, 0f, contentWidth, naturalHeight)
         };
         box.Entries.Add(containerEntry);
         box.Entries.AddRange(entries);
@@ -1729,8 +1730,8 @@ internal sealed partial class UiLayoutEngine
         var rects = new UiLayoutRect[tops.Count];
         for (int i = 0; i < tops.Count; i++)
         {
-            Rect rect = tops[i].Rect;
-            rects[i] = new UiLayoutRect(rect.x, rect.y, rect.width, rect.height);
+            UiLayoutRect rect = tops[i].Rect;
+            rects[i] = new UiLayoutRect(rect.X, rect.Y, rect.Width, rect.Height);
         }
 
         return UiLayout.ViewportRows(rects, rows, padding.Bottom, naturalHeight);
@@ -1876,7 +1877,7 @@ internal sealed partial class UiLayoutEngine
             return;
         }
 
-        if (!templates.TryGetValue(templateName, out UiElementSpec template))
+        if (!templates.TryGetValue(templateName, out UiElementSpec? template))
         {
             ReportRepeat(
                 ctx,
@@ -1894,7 +1895,7 @@ internal sealed partial class UiLayoutEngine
             string key = keys[i] == null ? "" : keys[i].Trim();
             if (!AcceptItemKey(ctx, node, key, seen)) continue;
 
-            if (!state.DerivedByKey.TryGetValue(key, out UiElementSpec derived))
+            if (!state.DerivedByKey.TryGetValue(key, out UiElementSpec? derived))
             {
                 derived = BuildItemSpec(template, itemsKey, key, i);
                 state.DerivedByKey.Add(key, derived);
@@ -2012,7 +2013,7 @@ internal sealed partial class UiLayoutEngine
             children[i] = BuildItemSpec(template.Children[i], itemsKey, itemKey, i);
         }
 
-        return new UiElementSpec(id, template.Kind, attributes, children);
+        return new UiElementSpec(id, template.Kind, attributes, children, template.Choices);
     }
 
     /// <summary>
@@ -2051,7 +2052,7 @@ internal sealed partial class UiLayoutEngine
         }
 
         string declared = (value ?? "").Trim();
-        return declared.Length == 0 ? value ?? "" : itemsKey + "." + itemKey + "." + declared;
+        return declared.Length == 0 ? value ?? "" : new UiBindingAddress(itemsKey,itemKey,declared).Key;
     }
 
     /// <summary>
@@ -2298,7 +2299,7 @@ internal sealed partial class UiLayoutEngine
                 IsContainer = entry.IsContainer,
                 ContainerKind = entry.ContainerKind,
                 MeasureWidth = entry.MeasureWidth,
-                Rect = new Rect(entry.Rect.x + x, entry.Rect.y + y, entry.Rect.width, entry.Rect.height),
+                Rect = new UiLayoutRect(entry.Rect.X + x, entry.Rect.Y + y, entry.Rect.Width, entry.Rect.Height),
                 ContentRect = entry.ContentRect,
                 SubtreeCount = entry.SubtreeCount,
                 // The row stamp must survive the offset copy, or the counting budget sees no rows.
@@ -2802,7 +2803,7 @@ internal sealed partial class UiLayoutEngine
 
     /// <summary>
     /// <c>Visible</c> (default true) and <c>VisibleKey</c>: the static declaration first, then a bool
-    /// value binding resolved through <see cref="IUiBindings.TryGetBool"/>.
+    /// value binding resolved through <see cref="IUiBindingReader.TryGetBool"/>.
     /// <para>
     /// An unresolvable key is deliberately not fatal: a page must not fail to exist because a model key
     /// is missing or not yet bound, so the element stays visible. It is not silent either - the key is
@@ -2867,7 +2868,7 @@ internal sealed partial class UiLayoutEngine
         return value;
     }
 
-    private static void DrawContainer(PlacedEntry entry, Rect rect, UiWidgetContext ctx)
+    private static void DrawContainer(PlacedEntry entry, UiLayoutRect rect, UiWidgetContext ctx)
     {
         string kind = entry.ContainerKind;
         bool drawSurface = string.Equals(kind, "Section", StringComparison.Ordinal)
@@ -2879,11 +2880,11 @@ internal sealed partial class UiLayoutEngine
             // through UiThemeDraw keeps one border rule instead of a hand-copied five-rect version.
             if (string.Equals(kind, "Section", StringComparison.Ordinal))
             {
-                UiThemeDraw.Panel(rect, ctx.Theme);
+                UiThemeDraw.Panel(ctx.Drawing,rect, ctx.Theme);
             }
             else
             {
-                UiThemeDraw.Base(rect, ctx.Theme);
+                UiThemeDraw.Base(ctx.Drawing,rect, ctx.Theme);
             }
         }
 
@@ -2893,12 +2894,12 @@ internal sealed partial class UiLayoutEngine
             // own style chain resolved to, so a container's title rect sits on the same padding its children
             // were arranged against.
             Padding padding = ParsePadding(entry.Spec, ctx.Theme);
-            float innerWidth = Math.Max(1f, rect.width - padding.Left - padding.Right);
-            var headerRect = new Rect(rect.x + padding.Left, rect.y + padding.Top, innerWidth, SectionTitleHeight);
+            float innerWidth = Math.Max(1f, rect.Width - padding.Left - padding.Right);
+            var headerRect = new UiLayoutRect(rect.X + padding.Left, rect.Y + padding.Top, innerWidth, SectionTitleHeight);
             // One text outlet: routing the container title through UiThemeDraw.Label is what makes it
             // visible to the fit audit (BeginElement above already attributes by path), which the
             // engine's own private Label copy could never do.
-            UiThemeDraw.Label(headerRect, ReadTitle(entry.Spec, ctx), ctx.Theme, ctx.Theme[UiPaletteRole.Foreground]);
+            UiThemeDraw.Label(ctx.Drawing,headerRect, ReadTitle(entry.Spec, ctx), ctx.Theme, ctx.Theme[UiPaletteRole.Foreground]);
         }
     }
 
@@ -2929,3 +2930,9 @@ internal sealed partial class UiLayoutEngine
         }
     }
 }
+
+
+
+
+
+

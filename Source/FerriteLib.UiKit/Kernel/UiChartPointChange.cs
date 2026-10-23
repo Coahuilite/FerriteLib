@@ -24,3 +24,5 @@ public readonly struct UiChartPointChange
         Key = key;
     }
 }
+
+

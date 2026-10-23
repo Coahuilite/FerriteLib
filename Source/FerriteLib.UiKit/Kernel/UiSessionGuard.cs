@@ -1,6 +1,4 @@
 using System;
-using UnityEngine;
-using Verse;
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -21,18 +19,14 @@ namespace FerriteLib.UiKit.Kernel;
 public static class UiSessionGuard
 {
     // Test seam: lets FerriteLib.UiKit.Tests capture warning text without a real game log.
-    internal static Action<string>? LogWarningOverride;
+    
 
     /// <summary>Restores native paint state while leaving a shell-background failure to the existing window recovery boundary.</summary>
-    internal static void DrawWindowBackground(Rect rect, Action<Rect> draw)
+    internal static void DrawWindowBackground(IUiExecution execution, UiLayoutRect rect, Action<UiLayoutRect> draw)
     {
-        GameFont previousFont = Text.Font;
-        Color previousColor = GUI.color;
-        try { draw(rect); }
+        try { execution.WithState(() => draw(rect)); }
         finally
         {
-            Text.Font = previousFont;
-            GUI.color = previousColor;
         }
     }
 
@@ -40,44 +34,38 @@ public static class UiSessionGuard
     /// Draws one widget, recovering into the standard band if it throws. The engine passes the element's
     /// node, so the recovery slot is the element - not a display path, which two elements can share.
     /// </summary>
-    public static void DrawWidget(IUiWidget widget, Rect rect, UiWidgetContext ctx, UiNode node)
+    public static void DrawWidget(IUiWidget widget, UiLayoutRect rect, UiWidgetContext ctx, UiNode node)
     {
         if (widget == null) throw new ArgumentNullException(nameof(widget));
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
         if (node == null) throw new ArgumentNullException(nameof(node));
 
-        GameFont previousFont = Text.Font;
-        Color previousColor = GUI.color;
-        using UiBindings.DisplayScope? display = KernelCoreWidgetRegistrar.HasKnownPresentation(widget) && widget is IUiDescriptiveWidget && widget is not IUiPointerLayout ? (ctx.Bindings as UiBindings)?.DisplayOnly() : null;
+        using UiBindings.DisplayScope? display = widget is IUiDescriptiveWidget && widget is not IUiPointerLayout ? (ctx.Bindings as UiBindings)?.DisplayOnly() : null;
         try
         {
-            widget.Draw(rect, ctx);
+            ctx.Session.Execution.WithState(() => widget.Draw(rect, ctx));
             node.PresentationFault = display?.Fault;
             node.PresentationUnavailable = false;
             if (node.ReactiveFault != null)
-                UiThemeDraw.FailureMarker(rect, ctx.Theme, node.ReactiveFault.Identity);
+                UiThemeDraw.FailureMarker(ctx.Drawing,rect, ctx.Theme, node.ReactiveFault.Identity);
         }
         catch (UiReactiveFault failure)
         {
             node.PresentationFault = failure; node.PresentationUnavailable = true;
             node.Selection = null;
             ctx.Session.SuspendFailedInput(node);
-            Text.Font = previousFont; GUI.color = previousColor;
             if (widget is IUiRetainedDisplay last && last.PaintLast(rect, ctx))
-                UiThemeDraw.FailureMarker(rect, ctx.Theme, failure.Identity);
-            else UiThemeDraw.RecoveryBand(rect, ctx.Theme, failure.Identity);
+                UiThemeDraw.FailureMarker(ctx.Drawing,rect, ctx.Theme, failure.Identity);
+            else UiThemeDraw.RecoveryBand(ctx.Drawing,rect, ctx.Theme, failure.Identity);
         }
         catch (UiRequestFailure)
         {
-            Text.Font = previousFont; GUI.color = previousColor;
-            UiThemeDraw.RecoveryBand(rect, ctx.Theme, node.Path);
+            UiThemeDraw.RecoveryBand(ctx.Drawing,rect, ctx.Theme, node.Path);
         }
         catch (Exception ex) when (ex is not UiReactiveFault)
         {
             Record(ctx.Session, node, node.Path, widget.Kind, node.Path, ex);
-            Text.Font = previousFont;
-            GUI.color = previousColor;
-            UiThemeDraw.RecoveryBand(rect, ctx.Theme, node.Path);
+            UiThemeDraw.RecoveryBand(ctx.Drawing,rect, ctx.Theme, node.Path);
         }
     }
 
@@ -91,8 +79,6 @@ public static class UiSessionGuard
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
         if (node == null) throw new ArgumentNullException(nameof(node));
 
-        GameFont previousFont = Text.Font;
-        Color previousColor = GUI.color;
         try
         {
             return widget.Measure(ctx);
@@ -100,8 +86,6 @@ public static class UiSessionGuard
         catch (Exception ex) when (ex is not UiReactiveFault)
         {
             Record(ctx.Session, node, node.Path, widget.Kind, node.Path, ex);
-            Text.Font = previousFont;
-            GUI.color = previousColor;
             return fallbackHeight;
         }
     }
@@ -117,37 +101,31 @@ public static class UiSessionGuard
         string elementId,
         string kind,
         string elementPath,
-        Rect rect,
+        UiLayoutRect rect,
         Action draw,
-        Action<Rect>? fallback)
+        Action<UiLayoutRect>? fallback)
     {
         if (session == null) throw new ArgumentNullException(nameof(session));
         if (string.IsNullOrEmpty(elementId)) throw new ArgumentException("Element id is required.", nameof(elementId));
         if (draw == null) throw new ArgumentNullException(nameof(draw));
 
-        GameFont previousFont = Text.Font;
-        Color previousColor = GUI.color;
         try
         {
-            draw();
+            session.Execution.WithState(draw);
         }
         catch (UiReactiveFault failure)
         {
             session.ActiveNode.PresentationFault = failure;
             session.ActiveNode.PresentationUnavailable = true;
-            Text.Font = previousFont; GUI.color = previousColor;
             fallback?.Invoke(rect);
         }
         catch (UiRequestFailure)
         {
-            Text.Font = previousFont; GUI.color = previousColor;
             fallback?.Invoke(rect);
         }
         catch (Exception ex)
         {
             Record(session, session.ActiveNode, elementId, kind, elementPath, ex);
-            Text.Font = previousFont;
-            GUI.color = previousColor;
             fallback?.Invoke(rect);
         }
     }
@@ -165,8 +143,6 @@ public static class UiSessionGuard
         if (string.IsNullOrEmpty(elementId)) throw new ArgumentException("Element id is required.", nameof(elementId));
         if (measure == null) throw new ArgumentNullException(nameof(measure));
 
-        GameFont previousFont = Text.Font;
-        Color previousColor = GUI.color;
         try
         {
             return measure();
@@ -174,8 +150,6 @@ public static class UiSessionGuard
         catch (Exception ex) when (ex is not UiReactiveFault)
         {
             Record(session, session.ActiveNode, elementId, kind, elementPath, ex);
-            Text.Font = previousFont;
-            GUI.color = previousColor;
             return fallbackHeight;
         }
     }
@@ -192,7 +166,7 @@ public static class UiSessionGuard
         session.Trip(key, diagnostic);
         if (first)
         {
-            LogWarning(diagnostic);
+            session.Execution.Warning(diagnostic);
 
             // The session-scoped record is where the trip is attributed: the session owns the subscription,
             // so one window's recovery lands on that window's subscriber and on nobody else's. A session
@@ -215,15 +189,8 @@ public static class UiSessionGuard
         return diagnostic;
     }
 
-    private static void LogWarning(string message)
-    {
-        if (LogWarningOverride != null)
-        {
-            LogWarningOverride(message);
-        }
-        else
-        {
-            Log.Warning(message);
-        }
-    }
 }
+
+
+
+

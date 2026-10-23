@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
@@ -47,135 +46,19 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
 
     private UiElementSpec spec = UiElementSpec.Empty;
     private readonly UiRetainedPaint retained = new();
-    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
+    bool IUiRetainedDisplay.PaintLast(UiLayoutRect rect, UiWidgetContext ctx) => retained.Paint(rect,ctx);
     UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
 
-    public static void Register()
-    {
-        UiWidgetRegistry.Register(
-            UiWidgetRegistry.CoreScope,
-            Kind,
-            () => new DropdownWidget(),
-            new[] {
-                "Id", "Kind", "Bind", "OptionsBind", "Height", "Label", "LabelKey", "Tab", "Hidden",
-                UiAppearanceResolver.Attribute,
-                OptionHelp.Attribute,
-                "Option1", "Value1", "Option2", "Value2", "Option3", "Value3", "Option4", "Value4",
-                "Option5", "Value5", "Option6", "Value6", "Option7", "Value7", "Option8", "Value8",
-                "Option9", "Value9", "Option10", "Value10", "Option11", "Value11", "Option12", "Value12",
-                "Option13", "Value13", "Option14", "Value14", "Option15", "Value15", "Option16", "Value16"
-            },
-            new[] { "Label", "LabelKey" },
-            null,
-            Looks);
-    }
+    public static void Register(){UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope,Kind,()=>new DropdownWidget(),new[]{"Id","Kind","Bind","OptionsBind","Height","Label","LabelKey","Tab","Hidden",UiAppearanceResolver.Attribute,OptionHelp.Attribute},new[]{"Label","LabelKey"},null,Looks);}
 
     public void Configure(UiElementSpec spec)
     {
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindings bindings, string elementPath)
-    {
-        string bindKey = ReadBindKey();
-        if (string.IsNullOrEmpty(bindKey))
-        {
-            throw new InvalidOperationException(
-                $"DropdownWidget at '{elementPath}' requires a non-empty Id or Bind to use as its typed binding key.");
-        }
-
-        // The look is refused here, once, and never degraded on every frame after: the same fail-closed
-        // rule the checkbox declares (see CheckboxWidget.Validate), so a mistyped appearance is located on
-        // the element instead of silently drawing the default forever.
-        ResolvedAppearance appearance = Looks.Resolve(spec);
-        if (!appearance.Declared && DeclaresAppearance(spec))
-        {
-            spec.TryGetAttribute(UiAppearanceResolver.Attribute, out string authored);
-            throw new InvalidOperationException(
-                "DropdownWidget at '" + elementPath + "' declares "
-                + UiAppearanceResolver.Attribute + "='" + (authored ?? "").Trim()
-                + "'; the accepted values are '" + FieldLook + "' (the default plain field) and '"
-                + SelectorLook + "' (accent rail plus arrow zone). Omit the attribute for the default.");
-        }
-
-        if (bindings is IUiTypedChoices typedSeam
-            && typedSeam.TryGetValueType(bindKey, out Type declared)
-            && declared != typeof(string))
-        {
-            // R4-A: a value bound to anything but a string is served by the TYPED path, and that path can only
-            // be fed by UiChoice<T> options. A string list, a UiOption list or the static OptionN/ValueN
-            // attributes carry strings only, so each of them would have to spell the value to hand it back -
-            // the round-trip this path exists to remove. The refusal therefore names the typed shape instead of
-            // accepting a string-shaped stand-in for it.
-            ValidateTypedOptions(typedSeam, bindKey, declared, elementPath);
-            OptionHelp.Validate(bindings, spec, elementPath, "DropdownWidget");
-            return;
-        }
-
-        bindings.ValidateValue<string>(bindKey, elementPath);
-
-        if (spec.TryGetAttribute("OptionsBind", out string optionsKey) && optionsKey.Length > 0)
-        {
-            // FL-16: strings (display == value) or UiOption pairs. The probe uses ValidateOptions, which is the
-            // NON-reporting shape check - so a page that declared either accepted shape records nothing, and a
-            // page that declared a third type is refused here naming both accepted shapes.
-            if (!TryValidateOptions<UiOption>(bindings, optionsKey, elementPath))
-            {
-                try
-                {
-                    // The historical call stays the diagnosis for everything that is not a pair list: it already
-                    // separates "missing" from "registered as the wrong kind of key", which the A5 lane pins. The
-                    // pair shape is appended as the second accepted answer, never substituted for it, and the
-                    // typed shape is named last so a page that meant a typed value is told how to get one.
-                    bindings.ValidateOptions<string>(optionsKey, elementPath);
-                }
-                catch (InvalidOperationException ex) when (ex is not UiReactiveFault)
-                {
-                    throw new InvalidOperationException(
-                        ex.Message + " The dropdown also accepts BindOptions<UiOption> (display, value)."
-                        + " A typed value (anything but a string) needs BindOptions<UiChoice<T>> with the SAME T"
-                        + " as its BindValue<T>, which carries the value itself rather than its spelling.");
-                }
-            }
-        }
-
-        // The same option-level help contract the mode row declares, from one implementation: the popup's
-        // rows are options of this element, so the engine's element-level HelpKey cannot reach them.
-        OptionHelp.Validate(bindings, spec, elementPath, "DropdownWidget");
-    }
-
-    /// <summary>
-    /// The typed path's creation-time contract: the options the element reads must be typed choices, and every
-    /// one of them must carry a value of the value binding's own type. Both halves are checked here because a
-    /// mismatch found at click time would be a control that silently does nothing, which is exactly the
-    /// failure mode the typed path exists to make impossible.
-    /// </summary>
-    private void ValidateTypedOptions(IUiTypedChoices seam, string bindKey, Type declared, string elementPath)
-    {
-        string optionsKey = ReadOptionsKey(bindKey);
-        if (!seam.TryGetChoices(optionsKey, out IReadOnlyList<UiChoice<object?>> choices))
-        {
-            throw new InvalidOperationException(
-                $"Value binding '{bindKey}' at '{elementPath}' is '{declared.Name}', so this dropdown needs typed"
-                + $" choices of that same type: bind BindOptions<UiChoice<{declared.Name}>>('{optionsKey}', ...)."
-                + " A plain string list, a UiOption list and the static OptionN/ValueN attributes all carry strings"
-                + " only, and handing a string to a typed setter is the round-trip this path removes.");
-        }
-
-        foreach (UiChoice<object?> choice in choices)
-        {
-            if (!seam.AcceptsValue(bindKey, choice.Value))
-            {
-                throw new InvalidOperationException(
-                    $"Typed choices '{optionsKey}' at '{elementPath}' carry a value of type '"
-                    + (choice.Value == null ? "null" : choice.Value.GetType().Name)
-                    + $"' under the label '{choice.Text}', which is not the '{declared.Name}' its value binding"
-                    + " accepts.");
-            }
-        }
-    }
+    public void Validate(IUiBindingReader bindings,string elementPath){if(!Looks.Resolve(spec).Declared && DeclaresAppearance(spec))throw new InvalidOperationException("Unknown dropdown appearance at " + elementPath);UiChoiceSource.Validate(bindings,spec,elementPath);OptionHelp.Validate(bindings,spec,elementPath,Kind);}
 
     public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
@@ -186,82 +69,26 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
                 : ctx.Theme.Geometry.RowHeight));
     }
 
+    public float MeasureLabel(UiWidgetContext ctx) { string label=ReadLabel(ctx);return label.Length==0?0:ctx.Metrics.MeasureWidth(label,AtomVocabulary.TextFont(ctx))+ctx.Theme.Geometry.Spacing; }
     public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
 
-    public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
-    {
-        string key = ReadBindKey();
-        bool hasOptions;
-        if (ctx.Bindings is IUiTypedChoices seam && seam.TryGetValueType(key, out Type type) && type != typeof(string))
-            hasOptions = seam.TryGetChoices(ReadOptionsKey(key), out IReadOnlyList<UiChoice<object?>> choices) && choices.Count > 0;
-        else
-            hasOptions = BuildOptions(ctx).Count > 0;
-        Rect field = ResolveField(new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height), ctx);
-        yield return new UiPointerRegion(new UiLayoutRect(field.x, field.y, field.width, field.height), hasOptions);
-    }
+    public IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx,UiLayoutRect bounds){UiLayoutRect field=ResolveField(bounds,ctx);yield return new UiPointerRegion(field,UiChoiceSource.Read(ctx.Bindings,spec).Count>0);}
 
-    public void Draw(Rect rect, UiWidgetContext ctx)
-    {
-        if (rect.width <= 1f || rect.height <= 1f) return;
-
-        string bindKey = ReadBindKey();
-        if (ctx.Bindings is IUiTypedChoices typedSeam
-            && typedSeam.TryGetValueType(bindKey, out Type declared)
-            && declared != typeof(string))
-        {
-            DrawTyped(rect, ctx, bindKey, typedSeam);
-            return;
-        }
-
-        ctx.Bindings.TryGet(bindKey, out string current);
-        List<Option> options = BuildOptions(ctx);
-        var values = new List<string>(options.Count);
-        foreach (Option option in options) values.Add(option.Value);
-        (ctx.Node ?? ctx.Session.ActiveNode).Selection = UiValueBehavior.Observe(values, current, _ => AtomVocabulary.WritableOf(ctx, bindKey) != false);
-        if (options.Count == 0) return;
-        string display = FindDisplayText(options, current);
-        UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
-        bool open = ctx.Session.IsPopupOpen(bindKey, node);
-        string retainedLabel=ReadLabel(ctx);
-        Rect fieldRect = ResolveField(rect, ctx,retainedLabel);
-
-        // The trigger click stores the popup anchor in Host window space (the engine translates
-        // draw rects inside scrolls/groups); the popup pass draws and hit-tests in that same
-        // stored space, so both share one anchor source.
-        UiNative.DropdownButton(fieldRect, bindKey, ctx, (ctx.Node ?? ctx.Session.ActiveNode).Id.Key);
-        if (!ctx.Session.IsActive) return;
-        PaintLabelledField(rect, fieldRect, display, open || current.Length > 0, ctx,retainedLabel);
-        retained.Capture(ctx, (r,c) => PaintLabelledField(r, ResolveField(r,c,retainedLabel), display, open || current.Length > 0, c,retainedLabel));
-
-        string helpSink = OptionHelp.SinkKey(spec);
-        if (ctx.Session.IsPopupOpen(bindKey, node))
-        {
-            Rect? anchor = ctx.Session.OpenPopupAnchor;
-            if (anchor.HasValue)
-            {
-                ctx.Session.RegisterPopupDraw(() => DrawPopup(anchor.Value, options, current, ctx));
-            }
-        }
-        else
-        {
-            // A closed popup has no hovered option, so the sink is cleared here rather than left holding the
-            // last row's identity. Change-detected, so a closed dropdown costs no writes at all.
-            OptionHelp.Publish(ctx, helpSink, "");
-        }
-    }
-
-    /// <summary>
-    /// The element's field, for both draw paths: the optional label in its allocated column, the value
-    /// plane and the text outlet, with the layout arithmetic in one place. Returns the field rect, which is what
-    /// the trigger's hit test and the popup anchor are taken from. The look is resolved HERE - once per frame,
-    /// through the same seam the creation contract and the natural-body entry point use - so the field that
-    /// was refused at creation is never a different field at draw.
-    /// </summary>
-    public float MeasureLabel(UiWidgetContext ctx)
-    {
-        string label = ReadLabel(ctx);
-        return label.Length == 0 ? 0 : ctx.Metrics.MeasureWidth(label, AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing;
-    }
+    public void Draw(UiLayoutRect rect,UiWidgetContext ctx){
+ if(rect.Width<=1||rect.Height<=1)return;
+ string key=ReadBindKey();UiValueEndpoint endpoint=ctx.Bindings.Value(key);object? current=endpoint.Read();
+ var choices=UiChoiceSource.Read(ctx.Bindings,spec);var values=new List<object?>(choices.Count);foreach(var choice in choices)values.Add(choice.Value);
+ ctx.Node.Selection=UiValueBehavior.Observe(values,current,_=>endpoint.Writable);if(choices.Count==0)return;
+ string display=FindChoiceText(choices,current),label=ReadLabel(ctx);UiLayoutRect field=ResolveField(rect,ctx,label);
+ ctx.Controls.DropdownButton(field,key,ctx,ctx.Node.Id.Key);if(!ctx.Session.IsActive)return;
+ bool selected=ctx.Session.IsPopupOpen(key,ctx.Node)||ctx.Node.Selection.Value.Index>=0;
+ PaintLabelledField(rect,field,display,selected,ctx,label);
+ retained.Capture(ctx,(r,c)=>PaintLabelledField(r,ResolveField(r,c,label),display,selected,c,label));
+ if(ctx.Session.IsPopupOpen(key,ctx.Node)&&ctx.Session.OpenPopupAnchor.HasValue){UiLayoutRect anchor=ctx.Session.OpenPopupAnchor.Value;
+ ctx.Session.RegisterPopupDraw(()=>{int hover=UiPopup.DrawChoiceList(UiPopup.RectFor(anchor,choices.Count,ctx.Session.HostViewport),key,ctx,choices,current,v=>endpoint.TryWrite(v),endpoint.Writable);
+ string help=hover>=0&&hover<choices.Count?choices[hover].Help:"";OptionHelp.Publish(ctx,OptionHelp.SinkKey(spec),help);if(help.Length>0)ctx.Session.ClaimHover(help);});
+ }else OptionHelp.Publish(ctx,OptionHelp.SinkKey(spec),"");
+}
 
     private UiSliderLayout? SharedLabelLayout(UiWidgetContext ctx, float width, string? capturedLabel = null)
         => ctx.Node?.SharedLabelWidth > 0
@@ -269,35 +96,35 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
                 ctx.Metrics, ctx.Node.SharedLabelWidth)
             : null;
 
-    private Rect ResolveField(Rect rect, UiWidgetContext ctx, string? capturedLabel = null)
+    private UiLayoutRect ResolveField(UiLayoutRect rect, UiWidgetContext ctx, string? capturedLabel = null)
     {
-        UiSliderLayout? shared = SharedLabelLayout(ctx, rect.width, capturedLabel);
+        UiSliderLayout? shared = SharedLabelLayout(ctx, rect.Width, capturedLabel);
         if (shared.HasValue)
         {
             UiSliderLayout layout = shared.Value;
             if (layout.LabelWidth <= 0) return rect;
             float gap = ctx.Theme.Geometry.Gap;
             return layout.Stacked
-                ? new Rect(rect.x, rect.y + layout.LabelHeight + gap, rect.width, Math.Max(1, rect.height - layout.LabelHeight - gap))
-                : new Rect(rect.x + layout.LabelWidth + gap, rect.y, Math.Max(1, rect.width - layout.LabelWidth - gap), rect.height);
+                ? new UiLayoutRect(rect.X, rect.Y + layout.LabelHeight + gap, rect.Width, Math.Max(1, rect.Height - layout.LabelHeight - gap))
+                : new UiLayoutRect(rect.X + layout.LabelWidth + gap, rect.Y, Math.Max(1, rect.Width - layout.LabelWidth - gap), rect.Height);
         }
         // No group opt-in keeps the established fixed-column entry geometry.
         float labelWidth = (capturedLabel ?? ReadLabel(ctx)).Length > 0 ? LabelWidth : 0;
-        return new Rect(rect.x + labelWidth, rect.y, Math.Max(1, rect.width - labelWidth), rect.height);
+        return new UiLayoutRect(rect.X + labelWidth, rect.Y, Math.Max(1, rect.Width - labelWidth), rect.Height);
     }
 
-    private void PaintLabelledField(Rect rect, Rect field, string display, bool selected, UiWidgetContext ctx, string? capturedLabel = null)
+    private void PaintLabelledField(UiLayoutRect rect, UiLayoutRect field, string display, bool selected, UiWidgetContext ctx, string? capturedLabel = null)
     {
         string label = capturedLabel ?? ReadLabel(ctx);
         if (label.Length > 0)
         {
-            UiSliderLayout? shared = SharedLabelLayout(ctx, rect.width, capturedLabel);
+            UiSliderLayout? shared = SharedLabelLayout(ctx, rect.Width, capturedLabel);
             float width = shared?.LabelWidth ?? LabelWidth;
-            float height = shared?.Stacked == true ? shared.Value.LabelHeight : rect.height;
-            UiThemeDraw.Label(new Rect(rect.x, rect.y, width, height), label, ctx.Theme, ctx.Theme[UiPaletteRole.Foreground],
-                AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft, singleLine: !shared.HasValue);
+            float height = shared?.Stacked == true ? shared.Value.LabelHeight : rect.Height;
+            UiThemeDraw.Label(ctx.Drawing,new UiLayoutRect(rect.X, rect.Y, width, height), label, ctx.Theme, ctx.Theme[UiPaletteRole.Foreground],
+                AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft, singleLine: !shared.HasValue);
         }
-        DrawField(field, display, selected, ctx.Theme, Looks.Resolve(spec).Value, AtomVocabulary.TextFont(ctx));
+        DrawField(ctx.Drawing,field, display, selected, ctx.Theme, Looks.Resolve(spec).Value, AtomVocabulary.TextFont(ctx));
 
     }
     /// <summary>True when the resolved look is the selector field; the name is matched case-insensitively.</summary>
@@ -311,83 +138,6 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
     {
         return spec.TryGetAttribute(UiAppearanceResolver.Attribute, out string raw)
             && !string.IsNullOrWhiteSpace(raw);
-    }
-
-    // --- R4-A: the typed path, taken when the value binding's declared type is not a string ------------------
-
-    /// <summary>
-    /// Draws the element from TYPED choices: the field shows the chosen option's own label, the popup lists the
-    /// same labels, and choosing one hands the option's real value to the typed setter through
-    /// <see cref="IUiTypedChoices"/>. Nothing here spells a value: the current value is matched to an option by
-    /// identity, so a value that no option carries displays nothing rather than its own text, and an unmatched
-    /// value can never be written back by a click.
-    /// </summary>
-    private void DrawTyped(Rect rect, UiWidgetContext ctx, string bindKey, IUiTypedChoices seam)
-    {
-        if (!seam.TryGetChoices(ReadOptionsKey(bindKey), out IReadOnlyList<UiChoice<object?>> choices) || choices.Count == 0)
-        {
-            (ctx.Node ?? ctx.Session.ActiveNode).Selection = new UiSelectionObservation(-1, false);
-            return;
-        }
-
-        bool hasCurrent = seam.TryGetTypedValue(bindKey, out object? current);
-        var values = new List<object?>(choices.Count);
-        foreach (UiChoice<object?> choice in choices) values.Add(choice.Value);
-        (ctx.Node ?? ctx.Session.ActiveNode).Selection = hasCurrent
-            ? UiValueBehavior.Observe(values, current, _ => AtomVocabulary.WritableOf(ctx, bindKey) != false)
-            : new UiSelectionObservation(-1, false);
-        string display = hasCurrent ? FindChoiceText(choices, current) : "";
-        UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
-        bool open = ctx.Session.IsPopupOpen(bindKey, node);
-        string retainedLabel=ReadLabel(ctx);
-        Rect fieldRect = ResolveField(rect, ctx,retainedLabel);
-
-        // The trigger click stores the popup anchor in Host window space, exactly as the string path does: the
-        // anchor source is the primitive, not this path's choice.
-        UiNative.DropdownButton(fieldRect, bindKey, ctx, (ctx.Node ?? ctx.Session.ActiveNode).Id.Key);
-        if (!ctx.Session.IsActive) return;
-        PaintLabelledField(rect, fieldRect, display, open || hasCurrent, ctx,retainedLabel);
-        retained.Capture(ctx, (r,c) => PaintLabelledField(r, ResolveField(r,c,retainedLabel), display, open || hasCurrent, c,retainedLabel));
-
-        string helpSink = OptionHelp.SinkKey(spec);
-        if (ctx.Session.IsPopupOpen(bindKey, node))
-        {
-            Rect? anchor = ctx.Session.OpenPopupAnchor;
-            if (anchor.HasValue)
-            {
-                ctx.Session.RegisterPopupDraw(() => DrawTypedPopup(anchor.Value, bindKey, choices, current, ctx, seam));
-            }
-        }
-        else
-        {
-            OptionHelp.Publish(ctx, helpSink, "");
-        }
-    }
-
-    private void DrawTypedPopup(
-        Rect anchor,
-        string bindKey,
-        IReadOnlyList<UiChoice<object?>> choices,
-        object? current,
-        UiWidgetContext ctx,
-        IUiTypedChoices seam)
-    {
-        int hovered = UiPopup.DrawChoiceList(
-            UiPopup.RectFor(anchor, choices.Count, ctx.Session.HostViewport),
-            bindKey,
-            ctx,
-            choices,
-            current,
-            value =>
-            {
-                // A refused write (a value of the wrong type, or a read-only binding) changes nothing at all:
-                // TrySetTypedValue reports the refusal instead of throwing or coercing.
-                seam.TrySetTypedValue(bindKey, value);
-            }, AtomVocabulary.WritableOf(ctx, bindKey) != false);
-
-        // A typed option's option-level identity is its LABEL: the value is not a string, so the popup cannot
-        // report one, and the label is the only string the author gave this option.
-        OptionHelp.Publish(ctx, OptionHelp.SinkKey(spec), hovered >= 0 && hovered < choices.Count ? choices[hovered].Text : "");
     }
 
     /// <summary>
@@ -418,30 +168,7 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
         return spec.TryGetAttribute("OptionsBind", out string optionsKey) && optionsKey.Length > 0 ? optionsKey : bindKey;
     }
 
-    private void DrawPopup(Rect anchor, List<Option> options, string current, UiWidgetContext ctx)
-    {
-        var pairs = new List<KeyValuePair<string, string>>(options.Count);
-        foreach (Option option in options)
-        {
-            pairs.Add(new KeyValuePair<string, string>(option.Text, option.Value));
-        }
-
-        string bindKey = ReadBindKey();
-        string hovered = UiPopup.DrawOptionList(
-            UiPopup.RectFor(anchor, options.Count, ctx.Session.HostViewport),
-            bindKey,
-            ctx,
-            pairs,
-            current,
-            value => ctx.Bindings.Set(bindKey, value), AtomVocabulary.WritableOf(ctx, bindKey) != false);
-
-        // The option-level identity is the option's VALUE: a dropdown's options come from the consumer's data
-        // (an options binding or the static OptionN/ValueN pairs), so the value is the machine token its help
-        // catalog is keyed by - the same choice the mode row falls back to when a cell declares no help text.
-        OptionHelp.Publish(ctx, OptionHelp.SinkKey(spec), hovered);
-    }
-
-    private static void DrawField(Rect rect, string display, bool selected, UiTheme theme, string look, UiFont font)
+    private static void DrawField(IUiDrawing drawing,UiLayoutRect rect, string display, bool selected, UiTheme theme, string look, UiFont font)
     {
         // The mapping is a table query, not a second copy of it: this method used to re-derive the
         // three tokens the status outlet already computes, which is how the two drifted apart. The style
@@ -450,19 +177,19 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
         UiResolvedStyle style = theme.Styles.Resolve(selected ? UiStatusTone.Active : UiStatusTone.Neutral);
         if (IsSelector(look))
         {
-            DrawSelectorField(rect, display, style, theme, font);
+            DrawSelectorField(drawing,rect, display, style, theme, font);
             return;
         }
 
         float padding = theme.Geometry.Padding;
-        UiThemeDraw.Surface(rect, style.Surface, theme.Geometry.Hairline);
+        UiThemeDraw.Surface(drawing,rect, style.Surface, theme.Geometry.Hairline);
         UiThemeDraw.Label(
-            new Rect(rect.x + padding, rect.y, rect.width - padding * 2f, rect.height),
+drawing,            new UiLayoutRect(rect.X + padding, rect.Y, rect.Width - padding * 2f, rect.Height),
             display,
             theme,
             style.Text,
             font,
-            TextAnchor.MiddleLeft,
+            UiTextAnchor.MiddleLeft,
             singleLine: true);
     }
 
@@ -471,9 +198,9 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
     /// composes through the very method a consumer composite calls, so "the same outlets" means the same
     /// CODE, not two spellings of the same arithmetic. No question-mark slot exists in either look.
     /// </summary>
-    private static void DrawSelectorField(Rect rect, string display, UiResolvedStyle style, UiTheme theme, UiFont font)
+    private static void DrawSelectorField(IUiDrawing drawing,UiLayoutRect rect, string display, UiResolvedStyle style, UiTheme theme, UiFont font)
     {
-        UiThemeDraw.SelectorField(rect, display, theme, style, font);
+        UiThemeDraw.SelectorField(drawing,rect, display, theme, style, font);
     }
 
     private string ReadBindKey()
@@ -486,81 +213,6 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
         return spec.Id;
     }
 
-    private List<Option> BuildOptions(UiWidgetContext ctx)
-    {
-        if (spec.TryGetAttribute("OptionsBind", out string optionsKey) && optionsKey.Length > 0)
-        {
-            // The shape is probed non-reportingly first, then read EXACTLY once, so the authoritative read is
-            // always the matching element type: a valid page can never record the FL-23 mismatch report.
-            if (TryValidateOptions<UiOption>(ctx.Bindings, optionsKey, ctx.ElementPath))
-            {
-                IReadOnlyList<UiOption> pairs = ctx.Bindings.GetOptions<UiOption>(optionsKey);
-                var pairResult = new List<Option>(pairs.Count);
-                foreach (UiOption item in pairs)
-                {
-                    pairResult.Add(new Option(item.Text.Length > 0 ? item.Text : item.Value, item.Value));
-                }
-
-                return pairResult;
-            }
-
-            IReadOnlyList<string> dynamic = ctx.Bindings.GetOptions<string>(optionsKey);
-            var result = new List<Option>(dynamic.Count);
-            foreach (string item in dynamic)
-            {
-                result.Add(new Option(item, item));
-            }
-
-            return result;
-        }
-
-        return ParseStaticOptions();
-    }
-
-    private List<Option> ParseStaticOptions()
-    {
-        var result = new List<Option>();
-        for (int i = 1; i <= 16; i++)
-        {
-            string suffix = i.ToString(CultureInfo.InvariantCulture);
-            if (!spec.TryGetAttribute("Option" + suffix, out string text) || text.Length == 0)
-            {
-                continue;
-            }
-
-            spec.TryGetAttribute("Value" + suffix, out string? value);
-            result.Add(new Option(text, string.IsNullOrEmpty(value) ? text : value));
-        }
-
-        return result;
-    }
-
-    private static string FindDisplayText(List<Option> options, string current)
-    {
-        // A4 (0.7): two passes, value first. The old per-item "value OR text" test let an earlier
-        // option whose display text happened to equal the bound value hide a later option whose
-        // VALUE is exactly that value; the bound value is the authoritative key, so any exact
-        // value match wins outright and the text fallback only runs when no value matched.
-        // Matching stays ordinal and option order stays authoritative within each pass.
-        foreach (Option option in options)
-        {
-            if (string.Equals(option.Value, current, StringComparison.Ordinal))
-            {
-                return option.Text;
-            }
-        }
-
-        foreach (Option option in options)
-        {
-            if (string.Equals(option.Text, current, StringComparison.Ordinal))
-            {
-                return option.Text;
-            }
-        }
-
-        return current;
-    }
-
     private string ReadLabel(UiWidgetContext ctx)
     {
         if (spec.TryGetAttribute("LabelKey", out string key) && key.Length > 0)
@@ -569,24 +221,6 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
         }
 
         return spec.TryGetAttribute("Label", out string label) ? label : "";
-    }
-
-    /// <summary>
-    /// True when the key is an options binding whose element type is <typeparamref name="T"/>. This is the
-    /// NON-reporting probe FL-23 requires: ValidateOptions throws on a mismatch and records nothing, so trying
-    /// the other accepted shape never emits a diagnostic for the shape a page did not declare.
-    /// </summary>
-    private static bool TryValidateOptions<T>(IUiBindings bindings, string key, string elementPath)
-    {
-        try
-        {
-            bindings.ValidateOptions<T>(key, elementPath);
-            return true;
-        }
-        catch (InvalidOperationException ex) when (ex is not UiReactiveFault)
-        {
-            return false;
-        }
     }
 
     private float ReadHeight(float fallback)
@@ -600,16 +234,8 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
 
         return fallback;
     }
-
-    private readonly struct Option
-    {
-        internal readonly string Text;
-        internal readonly string Value;
-
-        internal Option(string text, string value)
-        {
-            Text = text;
-            Value = value;
-        }
-    }
 }
+
+
+
+

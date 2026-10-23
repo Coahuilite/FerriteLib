@@ -32,3 +32,5 @@ internal static partial class UiAppearanceProperties
         _ => throw new ArgumentException("Unknown density metric '" + token + "'.")
     };
 }
+
+

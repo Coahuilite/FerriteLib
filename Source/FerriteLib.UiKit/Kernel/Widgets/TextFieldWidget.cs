@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>
@@ -12,7 +11,7 @@ internal sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLab
 
     private UiElementSpec spec = UiElementSpec.Empty;
     private readonly UiRetainedPaint retained = new();
-    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
+    bool IUiRetainedDisplay.PaintLast(UiLayoutRect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
     UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
@@ -38,7 +37,7 @@ internal sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLab
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindings bindings, string elementPath)
+    public void Validate(IUiBindingReader bindings, string elementPath)
     {
         string bindKey = AtomVocabulary.ReadBindKey(spec);
         if (string.IsNullOrEmpty(bindKey))
@@ -61,7 +60,7 @@ internal sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLab
         {
             string binding = AtomVocabulary.ReadBindKey(spec);
             text = ctx.Bindings.Get<string>(binding) ?? "";
-            UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
+            UiNode node = ctx.Node;
             if (node.ValueStates.TryGetValue(binding, out UiValueState? state) && state.Editor is IUiEditState edit && (edit.Focused || edit.Modified || edit.Conflict)) text = edit.Draft;
         }
         retained.SetMeasure(c=>CaptureText(c,text,label,multiline));
@@ -84,20 +83,20 @@ internal sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLab
 
     public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
     {
-        ResolveLabelBand(new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height), ctx, out Rect field);
-        yield return new UiPointerRegion(new UiLayoutRect(field.x, field.y, field.width, field.height));
+        ResolveLabelBand(new UiLayoutRect(bounds.X, bounds.Y, bounds.Width, bounds.Height), ctx, out UiLayoutRect field);
+        yield return new UiPointerRegion(new UiLayoutRect(field.X, field.Y, field.Width, field.Height));
     }
 
-    public void Draw(Rect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
     {
-        if (rect.width <= 1f || rect.height <= 1f) return;
+        if (rect.Width <= 1f || rect.Height <= 1f) return;
 
         string bindKey = AtomVocabulary.ReadBindKey(spec);
         bool live = AtomVocabulary.ReadBool(spec, "Live", false);
         bool multiline = AtomVocabulary.ReadBool(spec, "Multiline", false);
         string current = ctx.Bindings.TryGet(bindKey, out string bound) ? bound ?? "" : "";
 
-        Rect field = rect;
+        UiLayoutRect field = rect;
         ResolveLabelBand(rect, ctx, out field);
         bool? writable = AtomVocabulary.WritableOf(ctx, bindKey);
         UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, writable);
@@ -105,19 +104,19 @@ internal sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLab
         // One funnel call carries the whole interaction: the disabled refusal, focus, the draft, and the
         // commit rule. The returned string is what the field is actually showing, so the placeholder test
         // below reads the truth rather than the model.
-        UiNative.Edit(field, ctx, bindKey, current, value => value, Parse, live, multiline,
+        ctx.Controls.Edit(field, ctx, bindKey, current, value => value, Parse, live, multiline,
             value => ctx.Bindings.Set(bindKey, value), () => ctx.Bindings.Get<string>(bindKey));
         if (!ctx.Session.IsActive) return;
         string retainedLabel=AtomVocabulary.ResolveText(spec,ctx,"Label","LabelKey");
         DrawLabel(rect, ctx, style,retainedLabel);
-        UiEditSession<string> editor = UiNative.Editor<string>(ctx, bindKey, value => value, Parse);
+        UiEditSession<string> editor = ctx.Controls.Editor<string>(ctx, bindKey, value => value, Parse);
         AtomVocabulary.PaintEditFeedback(field, ctx, editor);
         DrawPlaceholder(field, editor.Draft, ctx, writable);
         // Native input may have changed the reliable draft after this pass's measurement.
         retained.SetMeasure(c => CaptureText(c,editor.Draft,retainedLabel,multiline));
         retained.Capture(ctx, (r,c) =>
         {
-            ResolveLabelBand(r,c,out Rect slot,retainedLabel);
+            ResolveLabelBand(r,c,out UiLayoutRect slot,retainedLabel);
             UiRetainedPaint.Field(slot,c,editor.Draft);
             DrawLabel(r,c,style,retainedLabel);
         });
@@ -131,23 +130,23 @@ internal sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLab
     /// token, which belongs to a control that cannot be used. A read-only field paints none at all - a
     /// hint that invites typing into something that refuses writes is a lie the lane pins from both sides.
     /// </summary>
-    private void DrawPlaceholder(Rect field, string typed, UiWidgetContext ctx, bool? writable)
+    private void DrawPlaceholder(UiLayoutRect field, string typed, UiWidgetContext ctx, bool? writable)
     {
         if (writable == false) return;
         if (typed.Length != 0) return;
-        if (ctx.Session.GetOrCreateValueState((ctx.Node ?? ctx.Session.ActiveNode).Id, AtomVocabulary.ReadBindKey(spec)).Focused) return;
+        if (ctx.Session.GetOrCreateValueState(ctx.Node.Id, AtomVocabulary.ReadBindKey(spec)).Focused) return;
 
         string placeholder = AtomVocabulary.ResolveText(spec, ctx, "Placeholder", "PlaceholderKey");
         if (placeholder.Length == 0) return;
 
         float inset = ctx.Theme.Geometry.Spacing;
         UiThemeDraw.Label(
-            new Rect(field.x + inset, field.y, Math.Max(1f, field.width - inset * 2f), field.height),
+ctx.Drawing,            new UiLayoutRect(field.X + inset, field.Y, Math.Max(1f, field.Width - inset * 2f), field.Height),
             placeholder,
             ctx.Theme,
             ctx.Theme[UiPaletteRole.SecondaryForeground],
             AtomVocabulary.TextFont(ctx),
-            TextAnchor.MiddleLeft);
+            UiTextAnchor.MiddleLeft);
     }
 
     /// <summary>
@@ -162,9 +161,9 @@ internal sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLab
     }
 
     private UiSliderLayout LabelLayout(UiWidgetContext ctx, float width, string? capturedLabel = null) => UiSliderLayout.Measure(capturedLabel ?? AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey"), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0);
-    private void ResolveLabelBand(Rect rect, UiWidgetContext ctx, out Rect field, string? capturedLabel = null)
+    private void ResolveLabelBand(UiLayoutRect rect, UiWidgetContext ctx, out UiLayoutRect field, string? capturedLabel = null)
     {
-        UiSliderLayout layout = LabelLayout(ctx, rect.width, capturedLabel);
+        UiSliderLayout layout = LabelLayout(ctx, rect.Width, capturedLabel);
         if (layout.LabelWidth <= 0)
         {
             field = rect;
@@ -172,15 +171,17 @@ internal sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLab
         }
 
         float gap = ctx.Theme.Geometry.Gap;
-        field = layout.Stacked ? new Rect(rect.x, rect.y + layout.LabelHeight + gap, rect.width, Math.Max(1, rect.height - layout.LabelHeight - gap)) : new Rect(rect.x + layout.LabelWidth + gap, rect.y, Math.Max(1, rect.width - layout.LabelWidth - gap), rect.height);
+        field = layout.Stacked ? new UiLayoutRect(rect.X, rect.Y + layout.LabelHeight + gap, rect.Width, Math.Max(1, rect.Height - layout.LabelHeight - gap)) : new UiLayoutRect(rect.X + layout.LabelWidth + gap, rect.Y, Math.Max(1, rect.Width - layout.LabelWidth - gap), rect.Height);
     }
 
-    private void DrawLabel(Rect rect, UiWidgetContext ctx, UiResolvedStyle style, string? capturedLabel = null)
+    private void DrawLabel(UiLayoutRect rect, UiWidgetContext ctx, UiResolvedStyle style, string? capturedLabel = null)
     {
         string label = capturedLabel ?? AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
         if (label.Length == 0)
             return;
-        UiSliderLayout layout = LabelLayout(ctx, rect.width, capturedLabel);
-        UiThemeDraw.Label(new Rect(rect.x, rect.y, layout.LabelWidth, layout.Stacked ? layout.LabelHeight : rect.height), label, ctx.Theme, style.Text, AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft);
+        UiSliderLayout layout = LabelLayout(ctx, rect.Width, capturedLabel);
+        UiThemeDraw.Label(ctx.Drawing,new UiLayoutRect(rect.X, rect.Y, layout.LabelWidth, layout.Stacked ? layout.LabelHeight : rect.Height), label, ctx.Theme, style.Text, AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft);
     }
 }
+
+

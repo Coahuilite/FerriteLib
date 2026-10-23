@@ -1,6 +1,5 @@
 using System;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
 /// <summary>
@@ -31,9 +30,9 @@ public static class UiRowBand
         if (theme == null)
             throw new ArgumentNullException(nameof(theme));
         float band = rowHeight;
-        if (row.Image != null)
+        if (!row.Image.IsEmpty)
         {
-            float natural = row.ImageSize.y > 0f ? row.ImageSize.y : row.Image.height;
+            float natural = row.ImageSize.Y > 0f ? row.ImageSize.Y : row.Image.Height;
             if (natural > 0f)
             {
                 band = Math.Max(band, natural + theme.Geometry.Padding * 2f);
@@ -44,7 +43,7 @@ public static class UiRowBand
     }
 
     /// <summary>Exact operation regions for a custom row wrapper's IUiPointerLayout capability.</summary>
-    public static System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiTreeRow row, Rect band,
+    public static System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiTreeRow row, UiLayoutRect band,
         UiTheme theme, float rowHeight, UiRowBandActions actions, UiRowBandLayout layout = default)
     {
         Parts parts = ResolveParts(row, band, theme, rowHeight, layout);
@@ -52,10 +51,10 @@ public static class UiRowBand
         if (row.Checkable && actions.Checkbox != null) yield return Region(parts.Box);
         if (actions.Body != null) yield return Region(band);
     }
-    private static UiPointerRegion Region(Rect rect) => new(new UiLayoutRect(rect.x, rect.y, rect.width, rect.height));
+    private static UiPointerRegion Region(UiLayoutRect rect) => new(new UiLayoutRect(rect.X, rect.Y, rect.Width, rect.Height));
     private readonly struct Parts
     {
-        public Parts(Rect marker, Rect box, float contentX, float labelRight, float side)
+        public Parts(UiLayoutRect marker, UiLayoutRect box, float contentX, float labelRight, float side)
         {
             Marker = marker;
             Box = box;
@@ -63,30 +62,30 @@ public static class UiRowBand
             LabelRight = labelRight;
             Side = side;
         }
-        public Rect Marker { get; }
-        public Rect Box { get; }
+        public UiLayoutRect Marker { get; }
+        public UiLayoutRect Box { get; }
         public float ContentX { get; }
         public float LabelRight { get; }
         public float Side { get; }
     }
-    private static Parts ResolveParts(UiTreeRow row, Rect band, UiTheme theme, float rowHeight, UiRowBandLayout layout)
+    private static Parts ResolveParts(UiTreeRow row, UiLayoutRect band, UiTheme theme, float rowHeight, UiRowBandLayout layout)
     {
         float pad = theme.Geometry.Padding;
-        float partSide = layout.ControlSize.HasValue ? Math.Max(1f, Math.Min(band.height, layout.ControlSize.Value)) : Math.Max(6f, Math.Min(band.height, rowHeight) - pad * 2f);
+        float partSide = layout.ControlSize.HasValue ? Math.Max(1f, Math.Min(band.Height, layout.ControlSize.Value)) : Math.Max(6f, Math.Min(band.Height, rowHeight) - pad * 2f);
         float indentStep = layout.IndentStep ?? theme.Geometry.Spacing;
-        float x = band.x + pad + Math.Max(0f, row.Depth * indentStep);
-        float labelRight = band.xMax;
-        var marker = new Rect(x, band.y + (band.height - partSide) * 0.5f, partSide, partSide);
+        float x = band.X + pad + Math.Max(0f, row.Depth * indentStep);
+        float labelRight = band.XMax;
+        var marker = new UiLayoutRect(x, band.Y + (band.Height - partSide) * 0.5f, partSide, partSide);
         if (row.Expandable)
-            x = marker.xMax + pad;
-        float boxX = layout.CheckboxRightInset.HasValue ? Math.Max(band.x, band.xMax - Math.Max(0f, layout.CheckboxRightInset.Value) - partSide) : x;
-        var box = new Rect(boxX, band.y + (band.height - partSide) * 0.5f, partSide, partSide);
+            x = marker.XMax + pad;
+        float boxX = layout.CheckboxRightInset.HasValue ? Math.Max(band.X, band.XMax - Math.Max(0f, layout.CheckboxRightInset.Value) - partSide) : x;
+        var box = new UiLayoutRect(boxX, band.Y + (band.Height - partSide) * 0.5f, partSide, partSide);
         if (row.Checkable)
         {
             if (layout.CheckboxRightInset.HasValue)
-                labelRight = Math.Max(x, box.x - pad);
+                labelRight = Math.Max(x, box.X - pad);
             else
-                x = box.xMax + pad;
+                x = box.XMax + pad;
         }
 
         return new Parts(marker, box, x, labelRight, partSide);
@@ -108,96 +107,96 @@ public static class UiRowBand
     /// right-alignment inset. The default (<see cref = "UiRowBandLayout"/>'s own) is the library's behaviour:
     /// the theme's spacing per level and the box immediately after the indent.
     /// </param>
-    public static void Draw(UiTreeRow row, Rect band, UiWidgetContext ctx, float rowHeight, UiResolvedStyle style, UiRowBandActions actions, UiRowBandLayout layout = default)
+    public static void Draw(UiTreeRow row, UiLayoutRect band, UiWidgetContext ctx, float rowHeight, UiResolvedStyle style, UiRowBandActions actions, UiRowBandLayout layout = default)
         => DrawResolved(row,band,ctx,rowHeight,style,actions,null,layout);
-    internal static string? DrawResolved(UiTreeRow row, Rect band, UiWidgetContext ctx, float rowHeight, UiResolvedStyle style, UiRowBandActions actions, string? text, UiRowBandLayout layout = default)
+    internal static string? DrawResolved(UiTreeRow row, UiLayoutRect band, UiWidgetContext ctx, float rowHeight, UiResolvedStyle style, UiRowBandActions actions, string? text, UiRowBandLayout layout = default)
     {
         if (ctx == null)
             throw new ArgumentNullException(nameof(ctx));
-        if (band.width <= 1f || band.height <= 1f)
+        if (band.Width <= 1f || band.Height <= 1f)
             return null;
         UiTheme theme = ctx.Theme;
         Parts parts = ResolveParts(row, band, theme, rowHeight, layout);
-        Rect marker = parts.Marker;
-        Rect box = parts.Box;
+        UiLayoutRect marker = parts.Marker;
+        UiLayoutRect box = parts.Box;
         // Geometry feeds the shared behavior before paint. Only the actual part owner is pressed;
         // raw MouseDown, hover, or a sibling's capture cannot manufacture a pressed row.
-        UiInteractionResult disclosure = row.Expandable ? UiNative.Activation(marker, ctx, actions.DisclosureTarget, "disclosure", row.Key, actions.Disclosure != null && actions.DisclosureEnabled) : default;
-        bool overDisclosure = row.Expandable && actions.Disclosure != null && UiNative.IsMouseOver(marker, ctx);
-        bool ownsCheck = ctx.Session.Interactions.CaptureOwner?.Equals(UiNative.InteractionTarget(ctx, actions.CheckboxTarget, "check", row.Key)) == true;
-        UiInteractionResult check = row.Checkable && !disclosure.Request ? UiNative.Activation(box, ctx, actions.CheckboxTarget, "check", row.Key, actions.Checkbox != null && actions.CheckboxEnabled && (!overDisclosure || ownsCheck)) : default;
-        bool overCheck = row.Checkable && actions.Checkbox != null && UiNative.IsMouseOver(box, ctx);
-        bool ownsBody = ctx.Session.Interactions.CaptureOwner?.Equals(UiNative.InteractionTarget(ctx, actions.BodyTarget, "body", row.Key)) == true;
-        UiInteractionResult body = !disclosure.Request && !check.Request && actions.Body != null ? UiNative.Activation(band, ctx, actions.BodyTarget, "body", row.Key, actions.BodyEnabled && ((!overDisclosure && !overCheck) || ownsBody)) : default;
+        UiInteractionResult disclosure = row.Expandable ? ctx.Controls.Activation(marker, ctx, actions.DisclosureTarget, "disclosure", row.Key, actions.Disclosure != null && actions.DisclosureEnabled) : default;
+        bool overDisclosure = row.Expandable && actions.Disclosure != null && ctx.Controls.IsMouseOver(marker, ctx);
+        bool ownsCheck = ctx.Session.Interactions.CaptureOwner?.Equals(ctx.Controls.InteractionTarget(ctx, actions.CheckboxTarget, "check", row.Key)) == true;
+        UiInteractionResult check = row.Checkable && !disclosure.Request ? ctx.Controls.Activation(box, ctx, actions.CheckboxTarget, "check", row.Key, actions.Checkbox != null && actions.CheckboxEnabled && (!overDisclosure || ownsCheck)) : default;
+        bool overCheck = row.Checkable && actions.Checkbox != null && ctx.Controls.IsMouseOver(box, ctx);
+        bool ownsBody = ctx.Session.Interactions.CaptureOwner?.Equals(ctx.Controls.InteractionTarget(ctx, actions.BodyTarget, "body", row.Key)) == true;
+        UiInteractionResult body = !disclosure.Request && !check.Request && actions.Body != null ? ctx.Controls.Activation(band, ctx, actions.BodyTarget, "body", row.Key, actions.BodyEnabled && ((!overDisclosure && !overCheck) || ownsBody)) : default;
         if (actions.Disclosure != null && disclosure.Request)
         {
-            UiValueBehavior.Request(UiNative.InteractionTarget(ctx, actions.DisclosureTarget, "disclosure", row.Key), UiValueBehavior.Expansion(disclosure, !row.Expanded, row.Expandable), _ => actions.Disclosure(row.Key));
+            UiValueBehavior.Request(ctx.Controls.InteractionTarget(ctx, actions.DisclosureTarget, "disclosure", row.Key), UiValueBehavior.Expansion(disclosure, !row.Expanded, row.Expandable), _ => actions.Disclosure(row.Key));
         }
         else if (actions.Checkbox != null && check.Request)
         {
-            UiValueBehavior.Request(UiNative.InteractionTarget(ctx, actions.CheckboxTarget, "check", row.Key), UiValueBehavior.Boolean(check, !row.Checked), _ => actions.Checkbox(row.Key));
+            UiValueBehavior.Request(ctx.Controls.InteractionTarget(ctx, actions.CheckboxTarget, "check", row.Key), UiValueBehavior.Boolean(check, !row.Checked), _ => actions.Checkbox(row.Key));
         }
         else if (actions.Body != null)
         {
-            UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx, actions.BodyTarget, "body", row.Key), body, () => actions.Body(row.Key));
+            UiInteractionRequests.Activation(ctx.Controls.InteractionTarget(ctx, actions.BodyTarget, "body", row.Key), body, () => actions.Body(row.Key));
         }
 
         if (!ctx.Session.IsActive)
             return null;
-        return Paint(row,band,ctx,rowHeight,style,disclosure.Captured || check.Captured || body.Captured,UiNative.IsMouseOver(band,ctx),layout,text);
+        return Paint(row,band,ctx,rowHeight,style,disclosure.Captured || check.Captured || body.Captured,ctx.Controls.IsMouseOver(band,ctx),layout,text);
     }
-    internal static string Paint(UiTreeRow row,Rect band,UiWidgetContext ctx,float rowHeight,UiResolvedStyle style,bool armed=false,bool hovered=false,UiRowBandLayout layout=default,string? capturedText=null)
+    internal static string Paint(UiTreeRow row,UiLayoutRect band,UiWidgetContext ctx,float rowHeight,UiResolvedStyle style,bool armed=false,bool hovered=false,UiRowBandLayout layout=default,string? capturedText=null)
     {
         UiTheme theme=ctx.Theme;
         float pad=theme.Geometry.Padding;
         Parts parts=ResolveParts(row,band,theme,rowHeight,layout);
         float partSide=parts.Side,x=parts.ContentX,labelRight=parts.LabelRight;
-        Rect marker=parts.Marker,box=parts.Box;
+        UiLayoutRect marker=parts.Marker,box=parts.Box;
         if (armed)
-            UiThemeDraw.Solid(band, theme.SelectedSurface.Fill);
+            UiThemeDraw.Solid(ctx.Drawing,band, theme.SelectedSurface.Fill);
         else if (hovered)
-            UiThemeDraw.Solid(band, theme.HoverSurface.Fill);
+            UiThemeDraw.Solid(ctx.Drawing,band, theme.HoverSurface.Fill);
         UiResolvedStyle ink = style;
         if (row.Selected)
         {
             ink = theme.Styles.Resolve(UiStatusTone.Active);
-            UiThemeDraw.Surface(band, ink.Surface, theme.Geometry.Hairline);
+            UiThemeDraw.Surface(ctx.Drawing,band, ink.Surface, theme.Geometry.Hairline);
         }
 
         if (row.Expandable)
         {
-            UiThemeDraw.Surface(marker, row.Expanded ? ink.Surface : new UiSurfaceStyle(theme[UiPaletteRole.WindowSurface], ink.Text), theme.Geometry.Hairline);
+            UiThemeDraw.Surface(ctx.Drawing,marker, row.Expanded ? ink.Surface : new UiSurfaceStyle(theme[UiPaletteRole.WindowSurface], ink.Text), theme.Geometry.Hairline);
             if (row.Expanded)
             {
                 float inset = Math.Max(2f, partSide * 0.25f);
-                UiThemeDraw.Solid(new Rect(marker.x + inset, marker.y + inset, Math.Max(1f, partSide - inset * 2f), Math.Max(1f, partSide - inset * 2f)), ink.Text);
+                UiThemeDraw.Solid(ctx.Drawing,new UiLayoutRect(marker.X + inset, marker.Y + inset, Math.Max(1f, partSide - inset * 2f), Math.Max(1f, partSide - inset * 2f)), ink.Text);
             }
         }
 
         if (row.Checkable)
         {
-            UiThemeDraw.Surface(box, row.Checked ? ink.Surface : new UiSurfaceStyle(theme[UiPaletteRole.WindowSurface], ink.Text), theme.Geometry.Hairline);
+            UiThemeDraw.Surface(ctx.Drawing,box, row.Checked ? ink.Surface : new UiSurfaceStyle(theme[UiPaletteRole.WindowSurface], ink.Text), theme.Geometry.Hairline);
             if (row.Checked)
             {
                 float inset = Math.Max(2f, partSide * 0.25f);
-                UiThemeDraw.Solid(new Rect(box.x + inset, box.y + inset, Math.Max(1f, partSide - inset * 2f), Math.Max(1f, partSide - inset * 2f)), ink.Text);
+                UiThemeDraw.Solid(ctx.Drawing,new UiLayoutRect(box.X + inset, box.Y + inset, Math.Max(1f, partSide - inset * 2f), Math.Max(1f, partSide - inset * 2f)), ink.Text);
             }
         }
 
-        if (row.Image != null)
+        if (!row.Image.IsEmpty)
         {
-            float naturalWidth = row.ImageSize.x > 0f ? row.ImageSize.x : row.Image.width;
+            float naturalWidth = row.ImageSize.X > 0f ? row.ImageSize.X : row.Image.Width;
             float slotWidth = Math.Max(1f, Math.Min(naturalWidth, labelRight - x - pad));
-            var slot = new Rect(x, band.y + pad, slotWidth, Math.Max(1f, band.height - pad * 2f));
-            UiThemeDraw.Image(slot, row.Image, ink.Text);
-            x = slot.xMax + pad;
+            var slot = new UiLayoutRect(x, band.Y + pad, slotWidth, Math.Max(1f, band.Height - pad * 2f));
+            UiThemeDraw.Image(ctx.Drawing,slot, row.Image, ink.Text);
+            x = slot.XMax + pad;
         }
 
         float labelWidth = labelRight - x;
         if (labelWidth > 1f)
         {
             string paintedText=capturedText ?? ReadText(row,ctx);
-            UiThemeDraw.Label(new Rect(x, band.y, labelWidth, band.height), paintedText, theme, ink.Text, AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft, singleLine: true);
+            UiThemeDraw.Label(ctx.Drawing,new UiLayoutRect(x, band.Y, labelWidth, band.Height), paintedText, theme, ink.Text, AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft, singleLine: true);
             return paintedText;
         }
         return "";
@@ -289,3 +288,5 @@ public readonly struct UiRowBandActions
     public string DisclosureTarget { get; }
     public string CheckboxTarget { get; }
 }
+
+

@@ -29,7 +29,7 @@ public readonly struct UiLayoutSize
     public float Height { get; }
 }
 
-public readonly struct UiLayoutPoint
+public struct UiLayoutPoint : IEquatable<UiLayoutPoint>
 {
     public UiLayoutPoint(float x, float y)
     {
@@ -37,11 +37,22 @@ public readonly struct UiLayoutPoint
         Y = y;
     }
 
-    public float X { get; }
-    public float Y { get; }
+    public float X { get; set; }
+    public float Y { get; set; }
+    public static UiLayoutPoint Zero => default;
+    public float Magnitude => (float)Math.Sqrt(X * X + Y * Y);
+    public bool Equals(UiLayoutPoint other) => X == other.X && Y == other.Y;
+    public override bool Equals(object? value) => value is UiLayoutPoint other && Equals(other);
+    public override int GetHashCode() => X.GetHashCode() ^ Y.GetHashCode();
+    public static UiLayoutPoint operator +(UiLayoutPoint a, UiLayoutPoint b) => new(a.X + b.X, a.Y + b.Y);
+    public static UiLayoutPoint operator -(UiLayoutPoint a, UiLayoutPoint b) => new(a.X - b.X, a.Y - b.Y);
+    public static UiLayoutPoint operator *(UiLayoutPoint a, float b) => new(a.X * b, a.Y * b);
+    public static UiLayoutPoint operator /(UiLayoutPoint a, float b) => new(a.X / b, a.Y / b);
+    public static bool operator ==(UiLayoutPoint a, UiLayoutPoint b) => a.Equals(b);
+    public static bool operator !=(UiLayoutPoint a, UiLayoutPoint b) => !a.Equals(b);
 }
 
-public readonly struct UiLayoutRect
+public struct UiLayoutRect : IEquatable<UiLayoutRect>
 {
     public UiLayoutRect(float x, float y, float width, float height)
     {
@@ -51,10 +62,25 @@ public readonly struct UiLayoutRect
         Height = height;
     }
 
-    public float X { get; }
-    public float Y { get; }
-    public float Width { get; }
-    public float Height { get; }
+    public float X { get; set; }
+    public float Y { get; set; }
+    public float Width { get; set; }
+    public float Height { get; set; }
+    public float XMin { get => X; set { Width += X - value; X = value; } }
+    public float YMin { get => Y; set { Height += Y - value; Y = value; } }
+    public float XMax { get => X + Width; set => Width = value - X; }
+    public float YMax { get => Y + Height; set => Height = value - Y; }
+    public UiLayoutPoint Position { get => new(X, Y); set { X = value.X; Y = value.Y; } }
+    public UiLayoutPoint Size { get => new(Width, Height); set { Width = value.X; Height = value.Y; } }
+    public UiLayoutPoint Center => new(X + Width / 2, Y + Height / 2);
+    public bool Contains(UiLayoutPoint point) => point.X >= X && point.X < XMax && point.Y >= Y && point.Y < YMax;
+    public bool Overlaps(UiLayoutRect other) => other.XMax > X && other.X < XMax && other.YMax > Y && other.Y < YMax;
+    public bool Equals(UiLayoutRect other) => X == other.X && Y == other.Y && Width == other.Width && Height == other.Height;
+    public override bool Equals(object? value) => value is UiLayoutRect other && Equals(other);
+    public override int GetHashCode() => X.GetHashCode() ^ Y.GetHashCode() ^ Width.GetHashCode() ^ Height.GetHashCode();
+    public static bool operator ==(UiLayoutRect a, UiLayoutRect b) => a.Equals(b);
+    public static bool operator !=(UiLayoutRect a, UiLayoutRect b) => !a.Equals(b);
+    public override string ToString() => $"({X},{Y},{Width},{Height})";
 }
 
 public readonly struct UiLayoutHeight
@@ -530,3 +556,5 @@ public static class UiLayout
 
     private static UiLayoutPlan Plan(UiLayoutFrame frame, UiLayoutRect[] slots, float natural) => new UiLayoutPlan(new UiLayoutSize(frame.Width, frame.Height.Resolve(natural, frame.AvailableHeight)), slots, natural);
 }
+
+

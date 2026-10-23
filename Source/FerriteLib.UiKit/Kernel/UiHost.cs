@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using UnityEngine;
-using Verse;
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -13,7 +11,7 @@ namespace FerriteLib.UiKit.Kernel;
 public sealed partial class UiHost : IDisposable
 {
     private readonly string source;
-    private readonly IUiBindings bindings;
+    private readonly IUiBindingReader bindings;
     private readonly UiBindingPresentation? reactivePresentation;
     private readonly UiTheme theme;
     private readonly ITextMetrics metrics;
@@ -68,7 +66,7 @@ public sealed partial class UiHost : IDisposable
 
     // Test seam: lets FerriteLib.UiKit.Tests capture the dropped-style warning without a real game log,
     // the same shape UiSessionGuard.LogWarningOverride already uses for recovery warnings.
-    internal static Action<string>? StyleWarningOverride;
+    internal static Action<string>? StyleWarningOverride = null;
 
     private bool warnedDroppedStyleDocument;
     private int lastLayoutRevision = -1;
@@ -78,7 +76,7 @@ public sealed partial class UiHost : IDisposable
     public UiHost(
         string source,
         UiLayoutManifest manifest,
-        IUiBindings bindings,
+        IUiBindingReader bindings,
         UiTheme theme,
         ITextMetrics metrics,
         IUiTranslation translation,
@@ -137,13 +135,13 @@ public sealed partial class UiHost : IDisposable
         TrackObservationHost(this);
     }
 
-    public IUiBindings Bindings => bindings;
+    public IUiBindingReader Bindings => bindings;
 
     public UiSession Session => session;
     public UiHostInputState InputState => new(session.IsActive, session.ActiveEditNode != null, session.OwnedHotControl.HasValue || session.Interactions.CaptureOwner.HasValue);
     public UiElementProperties ElementProperties(string elementId) => Element(elementId).Properties;
-    public Vector2 GetScrollPosition(string elementId) => session.GetScrollPosition(Element(elementId));
-    public void SetScrollPosition(string elementId, Vector2 position) => session.SetScrollPosition(Element(elementId), position);
+    public UiLayoutPoint GetScrollPosition(string elementId) => session.GetScrollPosition(Element(elementId));
+    public void SetScrollPosition(string elementId, UiLayoutPoint position) => session.SetScrollPosition(Element(elementId), position);
     public void Invalidate() => session.BumpContentRevision();
     public void SetInteractionScope(string elementId, string scope)
     {
@@ -220,7 +218,7 @@ public sealed partial class UiHost : IDisposable
         return new UiWidgetContext(source, session, metrics, theme, translation, bindings, viewWidth, elementPath);
     }
 
-    public UiLayoutSnapshot MeasureAndArrange(Vector2 available)
+    public UiLayoutSnapshot MeasureAndArrange(UiLayoutPoint available)
     {
         reactivePresentation?.Synchronize(false);
         if (reactivePresentation != null && presentationRevision != reactivePresentation.DemandRevision)
@@ -240,7 +238,7 @@ public sealed partial class UiHost : IDisposable
         {
             // The engine validates effective inputs per stage; presentation changes no longer bump
             // a global cache key. Unknown legacy Measure still receives its original synchronization.
-            UiWidgetContext ctx = CreateContext(available.x);
+            UiWidgetContext ctx = CreateContext(available.X);
             UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, available, manifest.Roots);
             LayoutFault = null;
 
@@ -263,7 +261,7 @@ public sealed partial class UiHost : IDisposable
         }
     }
 
-    public void Draw(Rect viewport, UiLayoutSnapshot snapshot)
+    public void Draw(UiLayoutRect viewport, UiLayoutSnapshot snapshot)
     {
         using IDisposable? inputs = reactivePresentation?.Enter();
         // The draw runs inside this host's diagnostic scope: a fit-audit finding comes out of a static text
@@ -278,10 +276,10 @@ public sealed partial class UiHost : IDisposable
             // Popups are drawn after content and must clamp themselves into the frame's usable window
             // space; publish it here, the one place that knows both the viewport and the session.
 #if FER_DEV
-            subscription?.Geometry?.BeginPass(session.Frame);
+            subscription?.Geometry?.BeginPass(session.Frame, session.Controls.DiagnosticEventName());
 #endif
             session.SetHostViewport(viewport);
-            UiWidgetContext ctx = CreateContext(viewport.width);
+            UiWidgetContext ctx = CreateContext(viewport.Width);
             engine.Draw(ctx, snapshot, viewport);
             if (!session.IsActive) return;
 
@@ -346,28 +344,21 @@ public sealed partial class UiHost : IDisposable
         session.EndFrame();
     }
 
-    /// <summary>Standard and embedded window adapter: the real native owner supplies input qualification.</summary>
-    public void DrawFrame(Rect viewport, Window owner)
-    {
-        if (owner == null) throw new ArgumentNullException(nameof(owner));
-        session.PointerInputAllowed = !owner.IsOpen || Find.WindowStack.GetsInput(owner);
-        DrawFrame(viewport);
-    }
-
     /// <summary>
     /// Runs one complete synchronous IMGUI frame for this host. The host owns frame boundaries so a
     /// consumer cannot accidentally leave a session mid-frame when drawing throws.
     /// </summary>
-    public void DrawFrame(Rect viewport)
+    public void DrawFrame(UiLayoutRect viewport, UiFrame frame, IUiExecution execution)
     {
         if (!DisplayRequired) return;
+        session.SetFrame(frame, execution);
         BeginFrame();
         try
         {
             // The engine consumes a pending scroll-target request at the end of its own arrange, by node
             // (task-18): resolution belongs where the entries and the nodes are, so the host does not
             // re-derive it from string-keyed snapshot views.
-            UiLayoutSnapshot snapshot = MeasureAndArrange(new Vector2(viewport.width, viewport.height));
+            UiLayoutSnapshot snapshot = MeasureAndArrange(new UiLayoutPoint(viewport.Width, viewport.Height));
             Draw(viewport, snapshot);
         }
         catch (UiReactiveFault failure)
@@ -381,11 +372,11 @@ public sealed partial class UiHost : IDisposable
                 if (lastSuccessfulSnapshot != null)
                 {
                     Draw(viewport, lastSuccessfulSnapshot);
-                    UiThemeDraw.FailureMarker(viewport, theme, failure.Identity);
+                    UiThemeDraw.FailureMarker(session.Drawing,viewport, theme, failure.Identity);
                 }
-                else UiThemeDraw.RecoveryBand(viewport, theme, failure.Identity);
+                else UiThemeDraw.RecoveryBand(session.Drawing,viewport, theme, failure.Identity);
             }
-            catch (UiReactiveFault) { UiThemeDraw.RecoveryBand(viewport, theme, failure.Identity); }
+            catch (UiReactiveFault) { UiThemeDraw.RecoveryBand(session.Drawing,viewport, theme, failure.Identity); }
             finally { session.AbortHitPass(); }
         }
         catch
@@ -439,20 +430,20 @@ public sealed partial class UiHost : IDisposable
     {
         if (!session.IsActive || !DisplayRequired) return false;
 
-        if (session.ActiveEditState != null && UiNative.NativeCompositionActive) return true;
+        if (session.ActiveEditState != null && session.Controls.NativeCompositionActive) return true;
 
         if (session.OpenPopupId != null)
         {
             session.ClosePopup();
-            UiNative.ConsumeKeyEvent();
+            session.Controls.ConsumeKeyEvent();
             return true;
         }
 
-        int? capture = session.OwnedHotControl;
+        UiControlKey? capture = session.OwnedHotControl;
         if (capture.HasValue && session.OwnedHotControlOwner != null)
         {
             session.ReleaseHotControl(capture.Value);
-            UiNative.ConsumeKeyEvent();
+            session.Controls.ConsumeKeyEvent();
             return true;
         }
 
@@ -460,7 +451,7 @@ public sealed partial class UiHost : IDisposable
         if (edit != null)
         {
             edit.DiscardRequested = true;
-            UiNative.ConsumeKeyEvent();
+            session.Controls.ConsumeKeyEvent();
             return true;
         }
 
@@ -472,7 +463,7 @@ public sealed partial class UiHost : IDisposable
             if (key.Length == 0) continue;
             if (bindings.TryInvokeCommand(key))
             {
-                UiNative.ConsumeKeyEvent();
+                session.Controls.ConsumeKeyEvent();
                 return true;
             }
         }
@@ -492,10 +483,10 @@ public sealed partial class UiHost : IDisposable
 
         UiValueState? edit = session.ActiveEditState;
         if (edit == null) return false;
-        if (UiNative.NativeCompositionActive || UiNative.NativeMultilineReturn(edit)) return true;
+        if (session.Controls.NativeCompositionActive || session.Controls.NativeMultilineReturn(edit)) return true;
 
         edit.CommitRequested = true;
-        UiNative.ConsumeKeyEvent();
+        session.Controls.ConsumeKeyEvent();
         return true;
     }
 
@@ -568,7 +559,7 @@ public sealed partial class UiHost : IDisposable
         }
         else
         {
-            Log.Warning(warning);
+            session.Execution.Warning(warning);
         }
     }
 
@@ -932,7 +923,7 @@ public sealed partial class UiHost : IDisposable
     /// </summary>
     private void ReleaseHotControlForReload()
     {
-        int? held = session.OwnedHotControl;
+        UiControlKey? held = session.OwnedHotControl;
         if (held.HasValue)
         {
             session.ReleaseHotControl(held.Value);
@@ -978,7 +969,7 @@ public sealed partial class UiHost : IDisposable
         // scroll container must not leave a position behind for whatever identity claims that slot next.
         if (session.ScrollPositions.ContainsKey(node))
         {
-            session.SetScrollPosition(node, new Vector2(0f, 0f));
+            session.SetScrollPosition(node, new UiLayoutPoint(0f, 0f));
         }
 
         foreach (UiNode child in node.Children)
@@ -992,7 +983,7 @@ public sealed partial class UiHost : IDisposable
 
     private void ResetState(UiValueState state)
     {
-        UiNative.ReleaseEditFocus(state, session);
+        session.Controls.ReleaseEditFocus(state, session);
         session.NoteEditClosed(state);
         if (state.Editor is IUiEditState editor) editor.Suspend();
         state.Editor = null;
@@ -1498,3 +1489,9 @@ public sealed partial class UiHost : IDisposable
             || string.Equals(kind, "Clip", StringComparison.Ordinal);
     }
 }
+
+
+
+
+
+

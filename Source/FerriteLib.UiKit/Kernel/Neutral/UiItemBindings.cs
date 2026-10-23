@@ -64,7 +64,7 @@ public sealed class UiItemBindings<T> : IDisposable where T : class
         for (int i = 0; i < left.Count; i++) if (!string.Equals(left[i], right[i], StringComparison.Ordinal)) return false;
         return true;
     }
-    private string Address(string key, string field) => itemsKey + "." + key + "." + field;
+    private string Address(string key, string field) => new UiBindingAddress(itemsKey,key,field).Key;
     private void Check()
     { bindings.Reactive.VerifyAccess(); if (disposed) throw new ObjectDisposedException(itemsKey); }
     public void Refresh()
@@ -127,3 +127,6 @@ public sealed class UiItemBindings<T> : IDisposable where T : class
         }
     }
 }
+
+
+

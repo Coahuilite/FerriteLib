@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
 /// <summary>
@@ -11,6 +10,19 @@ namespace FerriteLib.UiKit.Kernel;
 /// </summary>
 public sealed class UiSession : IDisposable
 {
+    public UiControls Controls { get; }
+    public UiFrame Input { get; private set; } = new UiFrame(UiFramePhase.None, inputAllowed:false);
+    private IUiExecution? execution;
+    public IUiExecution Execution => execution ?? throw new InvalidOperationException("Drawing or native input requires an explicit execution scope.");
+    public IUiDrawing Drawing => Execution;
+    public void SetFrame(UiFrame frame, IUiExecution execution)
+    {
+        if (!IsActive) throw new ObjectDisposedException(nameof(UiSession));
+        Input = frame ?? throw new ArgumentNullException(nameof(frame));
+        this.execution = execution ?? throw new ArgumentNullException(nameof(execution));
+        PointerInputAllowed = frame.InputAllowed;
+    }
+    internal UiNode Root => unscopedNode;
     public UiInteractionSession Interactions { get; } = new UiInteractionSession();
 
     /// <summary>Native window qualification. Embedded hosts default to their existing input scope.</summary>
@@ -25,7 +37,7 @@ public sealed class UiSession : IDisposable
 
     // Scroll state is keyed by the scroll container's node, not by a display path: two scroll elements
     // whose display paths collide still hold two scroll positions (0.4.0 node step 2).
-    private readonly Dictionary<UiNode, Vector2> scrollPositions = new();
+    private readonly Dictionary<UiNode, UiLayoutPoint> scrollPositions = new();
 
     // Every arranged element's node, keyed by identity, plus the "no element" node a host-level caller
     // resolves into. The nodes own their element's state, and the table is the session's, so disposing
@@ -48,18 +60,18 @@ public sealed class UiSession : IDisposable
         contentInputLayers.Clear();
         contentInputLayers.AddRange(layers);
     }
-    private Vector2 currentWindowOrigin;
+    private UiLayoutPoint currentWindowOrigin;
 
     // Recovery slots are keyed by the node that tripped, so two elements that print the same display
     // path cannot share one fallback slot (0.4.0 node step 2).
     private readonly HashSet<UiNode> trippedNodes = new();
     private readonly Dictionary<UiNode, string> trippedLogs = new();
-    private int? ownedHotControl;
+    private UiControlKey? ownedHotControl;
     private readonly List<Action> popupDrawActions = new();
     private string? openPopupId;
     private UiInteractionTarget? popupTarget;
     private UiInteractionTarget? popupCaptureTarget;
-    private Rect? openPopupAnchor;
+    private UiLayoutRect? openPopupAnchor;
     // Whether the open popup's owner reported itself drawn in the pass in progress. Reset at every pass
     // boundary, where a false value releases the popup (see EndHitPass) - that is the half a call-site
     // refresh cannot see: an owner that is no longer arranged may never call its trigger again.
@@ -91,8 +103,8 @@ public sealed class UiSession : IDisposable
     private UiValueState? activeEditState;
     private UiNode? lastInteractionNode;
     private UiNode? cancelTargetNode;
-    internal Rect? CurrentClip { get; set; }
-    private Rect hostViewport;
+    internal UiLayoutRect? CurrentClip { get; set; }
+    private UiLayoutRect hostViewport;
     private string? scrollTargetElementId;
     private string hoverClaim = "";
     private UiNodeId hoverClaimElement;
@@ -110,6 +122,7 @@ public sealed class UiSession : IDisposable
     public UiSession()
     {
         Identity = Interlocked.Increment(ref nextIdentity);
+        Controls = new UiControls(this);
         unscopedNode = new UiNode(this, UiNodeId.None, "", -1);
         nodes.Add(UiNodeId.None, unscopedNode);
         activeNode = unscopedNode;
@@ -148,7 +161,7 @@ public sealed class UiSession : IDisposable
     /// <see cref="UiInvalidation.Structure"/> announcement the engine committed at a frame boundary.
     /// <para>
     /// It is deliberately <b>not</b> the library's invalidation API. A consumer announces a model change
-    /// per key through <see cref="IUiBindings.NotifyChanged"/>, and a <see cref="UiInvalidation.Paint"/>
+    /// per key through <see cref="IUiBindingReader.NotifyChanged"/>, and a <see cref="UiInvalidation.Paint"/>
     /// announcement leaves this clock alone on purpose: a fixed-size readout must not re-arrange the page.
     /// There is exactly one such clock; do not add a second.
     /// </para>
@@ -194,7 +207,7 @@ public sealed class UiSession : IDisposable
     public UiNode ActiveNode => activeNode;
 
     /// <summary>Session-scoped scroll positions, keyed by the scroll container's node.</summary>
-    internal IReadOnlyDictionary<UiNode, Vector2> ScrollPositions => scrollPositions;
+    internal IReadOnlyDictionary<UiNode, UiLayoutPoint> ScrollPositions => scrollPositions;
 
     /// <summary>
     /// Nodes currently tripped into session fallback. Keyed by node, so the display path a diagnostic
@@ -210,7 +223,7 @@ public sealed class UiSession : IDisposable
     internal UiInteractionTarget? PopupTarget => popupTarget;
 
     /// <summary>Anchor rect of the popup currently owned by this session, if any.</summary>
-    public Rect? OpenPopupAnchor => openPopupAnchor;
+    public UiLayoutRect? OpenPopupAnchor => openPopupAnchor;
 
     /// <summary>
     /// The owned hit stack in paint order, bottom-to-top, as built by the draw pass that is running or just
@@ -224,9 +237,9 @@ public sealed class UiSession : IDisposable
     /// The window-space origin of the element being drawn. The funnel lifts a draw-local pointer by it,
     /// which is how a primitive compares its pointer with the window-space hit layers.
     /// </summary>
-    internal Vector2 CurrentWindowOrigin => currentWindowOrigin;
+    internal UiLayoutPoint CurrentWindowOrigin => currentWindowOrigin;
 
-    internal void SetCurrentWindowOrigin(Vector2 origin)
+    internal void SetCurrentWindowOrigin(UiLayoutPoint origin)
     {
         currentWindowOrigin = origin;
     }
@@ -248,9 +261,9 @@ public sealed class UiSession : IDisposable
         // EARLIER in the same pass may already have consumed the event, and IMGUI leaves nothing in the type to
         // tell "a press that was taken" from "a frame with no press". Reading it at the pass boundary is the
         // only moment that cannot depend on draw order (§3.4: an outside click ends the edit, whoever ate it).
-        passBeganWithPrimaryPress = UiNative.IsPointerDown();
+        passBeganWithPrimaryPress = Controls.IsPointerDown();
 
-        CurrentClip = hostViewport.width > 0f && hostViewport.height > 0f ? hostViewport : (Rect?)null;
+        CurrentClip = hostViewport.Width > 0f && hostViewport.Height > 0f ? hostViewport : (UiLayoutRect?)null;
         contentInputLayers.Clear();
         dispatchLayers.Clear();
         dispatchLayers.AddRange(hitLayers);
@@ -267,7 +280,7 @@ public sealed class UiSession : IDisposable
     /// Appends one layer to the pass in progress. Content layers are appended as their elements draw, so the
     /// stack ends up in paint order; a popup appends after content and is therefore above it.
     /// </summary>
-    internal void PushHitLayer(UiNode element, Rect windowRect, bool isPopup, string? popupOwnerId = null)
+    internal void PushHitLayer(UiNode element, UiLayoutRect windowRect, bool isPopup, string? popupOwnerId = null)
     {
         if (element == null) return;
         hitLayers.Add(new UiHitLayer(element, windowRect, isPopup, popupOwnerId));
@@ -294,8 +307,8 @@ public sealed class UiSession : IDisposable
     /// IMGUI calls; unknown custom outer rectangles never become guessed opaque input layers.
     /// </para>
     /// </summary>
-    public bool IsPointerOverHigherLayer(UiNode element, Vector2 windowPoint)
-        => IsPointerOverPopup(windowPoint) || UiPointerLayers.IsCovered(contentInputLayers, ContentLayerOwner(element), windowPoint.x, windowPoint.y);
+    public bool IsPointerOverHigherLayer(UiNode element, UiLayoutPoint windowPoint)
+        => IsPointerOverPopup(windowPoint) || UiPointerLayers.IsCovered(contentInputLayers, ContentLayerOwner(element), windowPoint.X, windowPoint.Y);
 
     private string ContentLayerOwner(UiNode element)
     {
@@ -305,7 +318,7 @@ public sealed class UiSession : IDisposable
                 if (contentInputLayers[i].Owner == candidate.Id.Key) return candidate.Id.Key;
         return element.Id.Key;
     }
-    internal bool IsPointerOverPopup(Vector2 windowPoint)
+    internal bool IsPointerOverPopup(UiLayoutPoint windowPoint)
     {
         for (int i = dispatchLayers.Count - 1; i >= 0; i--)
             if (dispatchLayers[i].IsPopup && Contains(dispatchLayers[i].Rect, windowPoint)) return true;
@@ -318,7 +331,7 @@ public sealed class UiSession : IDisposable
     /// apply. The signature stays because it is public surface and a removal belongs at a minor boundary, not
     /// inside a behaviour slice; a call site keeps compiling and starts yielding the way the contract reads.
     /// </summary>
-    public bool IsPointerOverHigherLayer(UiNode element, Vector2 windowPoint, string? ownPopupId)
+    public bool IsPointerOverHigherLayer(UiNode element, UiLayoutPoint windowPoint, string? ownPopupId)
     {
         return IsPointerOverHigherLayer(element, windowPoint);
     }
@@ -328,7 +341,7 @@ public sealed class UiSession : IDisposable
     /// published layers as every other coverage decision. The bounded option list uses it to decide whether
     /// the wheel belongs to the menu.
     /// </summary>
-    internal bool OpenPopupCoversPointer(Vector2 windowPoint)
+    internal bool OpenPopupCoversPointer(UiLayoutPoint windowPoint)
     {
         if (openPopupId == null) return false;
 
@@ -392,12 +405,12 @@ public sealed class UiSession : IDisposable
         if (next == openPopupScrollRows) return false;
 
         openPopupScrollRows = next;
-        if (UiNative.Trace != null)
+        if (Controls.Trace != null)
         {
             // Caller-agnostic facts only, like every other line the funnel reports: which menu moved, where
             // it stands, how far it can go. This session cannot read the backend - the event phase belongs to
             // the funnel's own trace lines, not to a session that has no business touching Event.current.
-            UiNative.Trace("wheel popup id=" + openPopupId + " rows=" + openPopupScrollRows
+            Controls.Trace("wheel popup id=" + openPopupId + " rows=" + openPopupScrollRows
                 + " of " + openPopupMaxScrollRows);
         }
 
@@ -588,7 +601,7 @@ public sealed class UiSession : IDisposable
             {
                 dropped.Focused = false;
                 if (dropped.Editor is IUiEditState editor) editor.Suspend();
-                UiNative.ReleaseEditFocus(dropped, this);
+                Controls.ReleaseEditFocus(dropped, this);
                 dropped.CommitRequested = false;
                 dropped.DiscardRequested = false;
             }
@@ -616,14 +629,14 @@ public sealed class UiSession : IDisposable
         return false;
     }
 
-    internal void ConstrainClip(Rect rect)
+    internal void ConstrainClip(UiLayoutRect rect)
     {
         if (CurrentClip.HasValue)
         {
-            Rect clip = CurrentClip.Value;
-            float x = Math.Max(clip.x, rect.x), y = Math.Max(clip.y, rect.y);
-            rect = new Rect(x, y, Math.Max(0f, Math.Min(clip.xMax, rect.xMax) - x),
-                Math.Max(0f, Math.Min(clip.yMax, rect.yMax) - y));
+            UiLayoutRect clip = CurrentClip.Value;
+            float x = Math.Max(clip.X, rect.X), y = Math.Max(clip.Y, rect.Y);
+            rect = new UiLayoutRect(x, y, Math.Max(0f, Math.Min(clip.XMax, rect.XMax) - x),
+                Math.Max(0f, Math.Min(clip.YMax, rect.YMax) - y));
         }
         CurrentClip = rect;
     }
@@ -635,9 +648,9 @@ public sealed class UiSession : IDisposable
     /// which is why the raw-pointer chart had to ask and a covered chart kept writing values. An unpublished
     /// clip (a frame with no Host viewport) refuses nothing.
     /// </summary>
-    internal bool IsPointInEffectiveClip(Vector2 windowPoint)
+    internal bool IsPointInEffectiveClip(UiLayoutPoint windowPoint)
     {
-        Rect? clip = CurrentClip;
+        UiLayoutRect? clip = CurrentClip;
         return !clip.HasValue || Contains(clip.Value, windowPoint);
     }
 
@@ -649,7 +662,7 @@ public sealed class UiSession : IDisposable
     /// window-space rect for its own hit test, so rendering and hit geometry read one number instead of
     /// drifting apart.
     /// </summary>
-    internal void NotePopupOwnerDrawn(string ownerId, Rect windowRect)
+    internal void NotePopupOwnerDrawn(string ownerId, UiLayoutRect windowRect)
     {
         if (ownerId == null) throw new ArgumentNullException(nameof(ownerId));
         if (openPopupId == null || !string.Equals(openPopupId, ownerId, StringComparison.Ordinal)) return;
@@ -667,18 +680,18 @@ public sealed class UiSession : IDisposable
     /// <summary>True when two rects share area. Touching edges do not count, so an element exactly against
     /// the viewport border reads as outside it - the same "fits" reading <see cref="UiPopup.RectFor"/> has.
     /// </summary>
-    private static bool Intersects(Rect left, Rect right)
+    private static bool Intersects(UiLayoutRect left, UiLayoutRect right)
     {
-        return right.width > 0f && right.height > 0f && left.xMax > right.x && left.x < right.xMax && left.yMax > right.y && left.y < right.yMax;
+        return right.Width > 0f && right.Height > 0f && left.XMax > right.X && left.X < right.XMax && left.YMax > right.Y && left.Y < right.YMax;
     }
 
-    private static bool Contains(Rect rect, Vector2 point)
+    private static bool Contains(UiLayoutRect rect, UiLayoutPoint point)
     {
-        return point.x >= rect.x && point.x <= rect.xMax && point.y >= rect.y && point.y <= rect.yMax;
+        return point.X >= rect.X && point.X <= rect.XMax && point.Y >= rect.Y && point.Y <= rect.YMax;
     }
 
     /// <summary>Host viewport in window space, published once per frame before any content draws.</summary>
-    public Rect HostViewport => hostViewport;
+    public UiLayoutRect HostViewport => hostViewport;
 
     /// <summary>Id of the element the host should scroll into view on the next arranged frame, if any.</summary>
     public string? ScrollTargetElementId => scrollTargetElementId;
@@ -741,7 +754,7 @@ public sealed class UiSession : IDisposable
     }
 
     /// <summary>Opens or replaces this session's popup. No process-global popup state is created.</summary>
-    public void OpenPopup(string ownerId, Rect anchor)
+    public void OpenPopup(string ownerId, UiLayoutRect anchor)
     {
         if (ownerId == null) throw new ArgumentNullException(nameof(ownerId));
         EnsureActive();
@@ -791,7 +804,7 @@ public sealed class UiSession : IDisposable
     }
 
     /// <summary>Publishes the frame's Host viewport so popups can clamp themselves into it.</summary>
-    internal void SetHostViewport(Rect viewport)
+    internal void SetHostViewport(UiLayoutRect viewport)
     {
         EnsureActive();
         hostViewport = viewport;
@@ -1158,13 +1171,13 @@ public sealed class UiSession : IDisposable
     }
 
     /// <summary>The scroll position one scroll container's node holds; zero when it holds none.</summary>
-    public Vector2 GetScrollPosition(UiNode node)
+    public UiLayoutPoint GetScrollPosition(UiNode node)
     {
-        return node != null && scrollPositions.TryGetValue(node, out Vector2 pos) ? pos : Vector2.zero;
+        return node != null && scrollPositions.TryGetValue(node, out UiLayoutPoint pos) ? pos : UiLayoutPoint.Zero;
     }
 
     /// <summary>Writes one scroll container's position, keyed by its node.</summary>
-    public void SetScrollPosition(UiNode node, Vector2 position)
+    public void SetScrollPosition(UiNode node, UiLayoutPoint position)
     {
         if (node == null) throw new ArgumentNullException(nameof(node));
         EnsureActive();
@@ -1266,7 +1279,7 @@ public sealed class UiSession : IDisposable
 
 
     /// <summary>Native hot control id currently captured by this session, if any.</summary>
-    public int? OwnedHotControl => ownedHotControl;
+    public UiControlKey? OwnedHotControl => ownedHotControl;
 
     /// <summary>
     /// The element that holds <see cref="OwnedHotControl"/>, or null when the capture was taken outside any
@@ -1278,7 +1291,7 @@ public sealed class UiSession : IDisposable
     public UiNode? OwnedHotControlOwner => ownedHotControlOwner;
 
     /// <summary>True when <paramref name="controlId"/> is the hot control this session owns.</summary>
-    public bool IsHotControlOwned(int controlId)
+    public bool IsHotControlOwned(UiControlKey controlId)
     {
         return ownedHotControl.HasValue && ownedHotControl.Value == controlId;
     }
@@ -1288,16 +1301,16 @@ public sealed class UiSession : IDisposable
     /// beside the element that is drawing. Only the owning session may release it; closing/disposing the
     /// host releases exactly this session's capture and never another session's.
     /// </summary>
-    public void CaptureHotControl(int controlId) => CaptureHotControlForNode(controlId, activeNode);
+    public void CaptureHotControl(UiControlKey controlId) => CaptureHotControlForNode(controlId, activeNode);
 
-    internal void CaptureHotControlForNode(int controlId, UiNode owner)
+    internal void CaptureHotControlForNode(UiControlKey controlId, UiNode owner)
     {
         EnsureActive();
         ownedHotControl = controlId;
         ownedHotControlOwner = ReferenceEquals(owner, unscopedNode) ? null : owner;
         // Taking the capture is itself a report that the owner is drawing right now.
         captureOwnerDrawn = true;
-        UiNative.CaptureHotControl(controlId);
+        Execution.Capture(controlId);
     }
 
     /// <summary>
@@ -1306,7 +1319,7 @@ public sealed class UiSession : IDisposable
     /// holds the press" from "this owner stopped being drawn and nobody else can release what it took".
     /// A no-op unless this session owns <paramref name="controlId"/>.
     /// </summary>
-    internal void NoteHotControlOwnerDrawn(int controlId)
+    internal void NoteHotControlOwnerDrawn(UiControlKey controlId)
     {
         if (IsHotControlOwned(controlId)) captureOwnerDrawn = true;
     }
@@ -1315,13 +1328,13 @@ public sealed class UiSession : IDisposable
     /// Releases the native hot control, but only when this session owns it. No-ops otherwise so a
     /// closing host cannot release a capture owned by another session.
     /// </summary>
-    public void ReleaseHotControl(int controlId)
+    public void ReleaseHotControl(UiControlKey controlId)
     {
         EnsureActive();
         if (ownedHotControl.HasValue && ownedHotControl.Value == controlId)
         {
             Interactions.End(UiInteractionEnd.CaptureLost);
-            UiNative.ReleaseHotControl(controlId);
+            Execution.Release(controlId);
             ownedHotControl = null;
             ownedHotControlOwner = null;
         }
@@ -1342,7 +1355,7 @@ public sealed class UiSession : IDisposable
         SuspendNodeEditors(node);
         if (ReferenceEquals(activeEditNode,node))
         {
-            if(activeEditState!=null) UiNative.ReleaseEditFocus(activeEditState,this);
+            if(activeEditState!=null) Controls.ReleaseEditFocus(activeEditState,this);
             activeEditNode=null;activeEditState=null;
         }
         if(Interactions.CaptureOwner?.Node==node.Id.Key) Interactions.End(UiInteractionEnd.Aborted);
@@ -1351,7 +1364,7 @@ public sealed class UiSession : IDisposable
     }
     internal void SuspendDisplayInput()
     {
-        if(activeEditState!=null) UiNative.ReleaseEditFocus(activeEditState,this);
+        if(activeEditState!=null) Controls.ReleaseEditFocus(activeEditState,this);
         foreach(UiNode node in nodes.Values) SuspendNodeEditors(node);
         activeEditNode=null;activeEditState=null;
         ClosePopup();
@@ -1361,7 +1374,7 @@ public sealed class UiSession : IDisposable
     {
         if (!IsActive) return;
         Interactions.Dispose();
-        if (activeEditState != null) UiNative.ReleaseEditFocus(activeEditState, this);
+        if (activeEditState != null) Controls.ReleaseEditFocus(activeEditState, this);
         IsActive = false;
 
         // The session is the subscription's owner: disposing it releases the subscription, its bounded
@@ -1373,7 +1386,7 @@ public sealed class UiSession : IDisposable
         {
             // Dispose is the close path: release only this session's capture, then clear the
             // ownership record together with popup/focus/drag transient state.
-            UiNative.ReleaseHotControl(ownedHotControl.Value);
+            Execution.Release(ownedHotControl.Value);
             ownedHotControl = null;
             ownedHotControlOwner = null;
         }
@@ -1421,3 +1434,6 @@ public sealed class UiSession : IDisposable
         }
     }
 }
+
+
+

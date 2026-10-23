@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
@@ -17,7 +16,7 @@ internal sealed class EmptyStateWidget : IUiWidget, IUiMeasureParticipant, IUiDe
 
     private UiElementSpec spec = UiElementSpec.Empty;
     private readonly UiRetainedPaint retained = new();
-    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect,ctx);
+    bool IUiRetainedDisplay.PaintLast(UiLayoutRect rect, UiWidgetContext ctx) => retained.Paint(rect,ctx);
     UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
@@ -37,7 +36,7 @@ internal sealed class EmptyStateWidget : IUiWidget, IUiMeasureParticipant, IUiDe
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindings bindings, string elementPath)
+    public void Validate(IUiBindingReader bindings, string elementPath)
     {
         // No required binding.
     }
@@ -57,17 +56,17 @@ internal sealed class EmptyStateWidget : IUiWidget, IUiMeasureParticipant, IUiDe
 
     public UiDescription Describe(UiWidgetContext ctx) => new UiDescription(UiDescriptionRole.Status, text: ResolveText(ctx));
 
-    public void Draw(Rect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
     {
-        if (rect.width <= 1f || rect.height <= 1f) return;
+        if (rect.Width <= 1f || rect.Height <= 1f) return;
 
         string text=Describe(ctx).Text;
         PaintText(rect,ctx,text);
         retained.Capture(ctx,(r,c)=>PaintText(r,c,text));
     }
-    private void PaintText(Rect rect,UiWidgetContext ctx,string text)
+    private void PaintText(UiLayoutRect rect,UiWidgetContext ctx,string text)
     {
-        UiThemeDraw.Label(rect, text, ctx.Theme, ctx.Theme[UiPaletteRole.SecondaryForeground], AtomVocabulary.TextFont(ctx, BandFont), TextAnchor.MiddleCenter);
+        UiThemeDraw.Label(ctx.Drawing,rect, text, ctx.Theme, ctx.Theme[UiPaletteRole.SecondaryForeground], AtomVocabulary.TextFont(ctx, BandFont), UiTextAnchor.MiddleCenter);
     }
 
     /// <summary>Shared by Measure and Draw so the allocated band always matches the drawn string.</summary>
@@ -93,3 +92,5 @@ internal sealed class EmptyStateWidget : IUiWidget, IUiMeasureParticipant, IUiDe
         return DefaultHeight;
     }
 }
+
+

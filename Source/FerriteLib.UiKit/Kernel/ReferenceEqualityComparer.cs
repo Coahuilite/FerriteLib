@@ -19,3 +19,5 @@ internal sealed class ReferenceEqualityComparer : IEqualityComparer<object>
 
     int IEqualityComparer<object>.GetHashCode(object obj) => RuntimeHelpers.GetHashCode(obj);
 }
+
+

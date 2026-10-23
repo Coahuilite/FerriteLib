@@ -19,3 +19,5 @@ public interface IUiTimeSource
     /// <summary>Seconds since process start, monotonic, unaffected by game speed or pause.</summary>
     double NowSeconds { get; }
 }
+
+

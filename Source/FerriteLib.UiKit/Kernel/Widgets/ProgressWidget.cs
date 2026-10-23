@@ -1,6 +1,5 @@
 using System;
 using System.Globalization;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
@@ -17,7 +16,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <para>
 /// <b>It never takes input, on purpose.</b> A progress readout that stole the pointer would be the same
 /// defect a rule has: an element whose colour communicates, placed anywhere, must not become a
-/// dead click target. There is no <c>UiNative.Button</c> call here.
+/// dead click target. There is no <c>ctx.Controls.Button</c> call here.
 /// </para>
 /// <para>
 /// Fail-soft like the checkbox: an unbound or mistyped key paints an empty track and records one
@@ -59,7 +58,7 @@ internal sealed class ProgressWidget : IUiWidget, IUiMeasureParticipant, IUiDesc
     /// to be a positive number if it is written at all. A malformed <c>Max</c> is refused here rather than
     /// degraded per frame, because the element still knows its own path at creation time.
     /// </summary>
-    public void Validate(IUiBindings bindings, string elementPath)
+    public void Validate(IUiBindingReader bindings, string elementPath)
     {
         string key = ReadBindKey();
         if (key.Length == 0)
@@ -92,9 +91,9 @@ internal sealed class ProgressWidget : IUiWidget, IUiMeasureParticipant, IUiDesc
         return AtomVocabulary.ReadHeight(spec, ctx.Theme.Geometry.RowHeight);
     }
 
-    public void Draw(Rect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
     {
-        if (rect.width <= 1f || rect.height <= 1f) return;
+        if (rect.Width <= 1f || rect.Height <= 1f) return;
 
         UiDescription description = Describe(ctx);
         if (!description.Range.HasValue) AtomVocabulary.ReportUnresolved(ctx, Kind, ReadBindKey(), "0");
@@ -104,14 +103,14 @@ internal sealed class ProgressWidget : IUiWidget, IUiMeasureParticipant, IUiDesc
         float edge = Math.Max(1f, theme.Geometry.Hairline);
         UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, writable: null);
 
-        UiThemeDraw.Surface(rect, theme.BaseSurface, edge);
+        UiThemeDraw.Surface(ctx.Drawing,rect, theme.BaseSurface, edge);
 
-        float innerWidth = rect.width - edge * 2f;
-        float innerHeight = rect.height - edge * 2f;
+        float innerWidth = rect.Width - edge * 2f;
+        float innerHeight = rect.Height - edge * 2f;
         if (innerWidth <= 0f || innerHeight <= 0f) return;
 
         float fillWidth = fraction <= 0f ? 0f : Math.Max(edge, innerWidth * fraction);
-        UiThemeDraw.Solid(new Rect(rect.x + edge, rect.y + edge, fillWidth, innerHeight), style.Fill);
+        UiThemeDraw.Solid(ctx.Drawing,new UiLayoutRect(rect.X + edge, rect.Y + edge, fillWidth, innerHeight), style.Fill);
     }
 
     public UiDescription Describe(UiWidgetContext ctx)
@@ -145,3 +144,5 @@ internal sealed class ProgressWidget : IUiWidget, IUiMeasureParticipant, IUiDesc
         return AtomVocabulary.ReadBindKey(spec);
     }
 }
+
+

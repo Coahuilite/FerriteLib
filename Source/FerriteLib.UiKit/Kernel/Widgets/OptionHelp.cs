@@ -41,7 +41,7 @@ internal static class OptionHelp
     /// because the publication is a write. A read-only or unbound key would refuse that write mid-frame and
     /// trip the recovery band, so it is refused where the author can be told instead of discovered at draw.
     /// </summary>
-    internal static void Validate(IUiBindings bindings, UiElementSpec spec, string elementPath, string kindName)
+    internal static void Validate(IUiBindingReader bindings, UiElementSpec spec, string elementPath, string kindName)
     {
         string key = SinkKey(spec);
         if (key.Length == 0) return;
@@ -73,3 +73,5 @@ internal static class OptionHelp
         ctx.Bindings.Set(sinkKey, identity);
     }
 }
+
+

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
 internal sealed partial class UiLayoutEngine
@@ -177,7 +176,7 @@ internal sealed partial class UiLayoutEngine
             Array.AsReadOnly(output.ToArray()), Array.AsReadOnly(hostFacts));
     }
 
-    private bool ObservationHasPendingLayoutNotification(IUiBindings bindings)
+    private bool ObservationHasPendingLayoutNotification(IUiBindingReader bindings)
     {
         foreach (var committed in committedRevisions)
             if (committed.Value != bindings.GetRevision(committed.Key) && (bindings.GetInvalidation(committed.Key) & (UiInvalidation.Measure | UiInvalidation.Structure)) != 0)
@@ -193,7 +192,7 @@ internal sealed partial class UiLayoutEngine
         return depth;
     }
 
-    private static string RectText(Rect rect) => string.Format(CultureInfo.InvariantCulture, "{0},{1},{2},{3}", rect.x, rect.y, rect.width, rect.height);
+    private static string RectText(UiLayoutRect rect) => string.Format(CultureInfo.InvariantCulture, "{0},{1},{2},{3}", rect.X, rect.Y, rect.Width, rect.Height);
     private static string ColourText(UiColour colour) => string.Format(CultureInfo.InvariantCulture, "{0},{1},{2},{3}", colour.Red, colour.Green, colour.Blue, colour.Alpha);
     private static void ObserveWidget(PlacedEntry entry, UiWidgetContext ctx, UiObservationBudget budget, List<UiObservedFact> facts)
     {
@@ -327,8 +326,9 @@ internal sealed partial class UiLayoutEngine
             ObserveModeOptions(entry, ctx, budget, facts, binding);
         }
 
-        if (ctx.Bindings is IUiTypedChoices typed && typed.TryGetTypedValue(binding, out object? model))
+        if (ctx.Bindings.TryValue(binding, out UiValueEndpoint? endpoint))
         {
+            object? model = endpoint!.Read();
             if (model == null || model is string || model is bool || model is float || model is int || model is double || model is Enum)
                 Add("value", model == null ? "null" : Convert.ToString(model, CultureInfo.InvariantCulture) ?? "");
             else if (model is IReadOnlyList<UiTreeRow> rows)
@@ -355,7 +355,7 @@ internal sealed partial class UiLayoutEngine
         }
         else
         {
-            bool providerSupportsRead = ctx.Bindings is IUiTypedChoices;
+            bool providerSupportsRead = true;
             Add("value", "", "current-model", providerSupportsRead ? UiObservationStatus.NotFound : UiObservationStatus.Unsupported,
                 providerSupportsRead ? "value-binding-not-found" : "binding-provider-has-no-typed-read-seam");
         }
@@ -372,11 +372,11 @@ internal sealed partial class UiLayoutEngine
             key = entry.Spec.Id;
         string staticPoints = ReadAttribute(entry.Spec, "Points");
         bool useBinding = ReadAttribute(entry.Spec, "Bind").Length > 0 || staticPoints.Length == 0;
-        if (useBinding && ctx.Bindings.TryGet(key, out IReadOnlyList<Vector2> points))
+        if (useBinding && ctx.Bindings.TryGet(key, out IReadOnlyList<UiLayoutPoint> points))
         {
             Add("count", points.Count.ToString(CultureInfo.InvariantCulture));
             for (int i = 0; i < Math.Min(points.Count, budget.Items); i++)
-                Add("point." + i, string.Format(CultureInfo.InvariantCulture, "{0},{1}", points[i].x, points[i].y));
+                Add("point." + i, string.Format(CultureInfo.InvariantCulture, "{0},{1}", points[i].X, points[i].Y));
             if (points.Count > budget.Items)
                 facts.Add(new UiObservedFact("points", "", reason: "item-budget", truncated: true));
             string keysBinding = ReadAttribute(entry.Spec, "PointKeysBind");
@@ -404,97 +404,15 @@ internal sealed partial class UiLayoutEngine
             source: "shared-selection-writability"));
     }
 
-    private static void ObserveDropdownOptions(PlacedEntry entry, UiWidgetContext ctx, UiObservationBudget budget, List<UiObservedFact> facts, string binding)
+    private static void ObserveDropdownOptions(PlacedEntry entry,UiWidgetContext ctx,UiObservationBudget budget,List<UiObservedFact> facts,string binding)
     {
-        string optionsKey = ReadAttribute(entry.Spec, "OptionsBind");
-        bool typedValue = ctx.Bindings is IUiTypedChoices choiceProvider
-            && choiceProvider.TryGetValueType(binding, out Type declaredType) && declaredType != typeof(string);
-        bool dynamicOptions = optionsKey.Length > 0 || typedValue;
-        if (optionsKey.Length == 0) optionsKey = binding;
-        if (dynamicOptions && ctx.Bindings is UiBindings concrete
-            && concrete.TryReadObservationOptions(optionsKey, budget.Items, out var options, out int count))
-        {
-            facts.Add(new UiObservedFact("option-count", count.ToString(CultureInfo.InvariantCulture), source: "current-model"));
-            for (int i = 0; i < options.Count; i++)
-            {
-                object? option = options[i];
-                if (option is string text) ObserveOption(ctx, budget, facts, binding, i, text, text, "current-options");
-                else if (option is UiOption pair)
-                    ObserveOption(ctx, budget, facts, binding, i, pair.Text.Length > 0 ? pair.Text : pair.Value, pair.Value, "current-options");
-                else if (option is IUiChoice choice)
-                    ObserveOption(ctx, budget, facts, binding, i, choice.Text, choice.BoxedValue, "current-typed-options");
-                else facts.Add(new UiObservedFact("option." + i, "", UiObservationStatus.Unsupported, reason: "unknown-option-shape"));
-            }
-            if (count > options.Count) facts.Add(new UiObservedFact("options", "", reason: "item-budget", truncated: true));
-        }
-        else if (!dynamicOptions)
-        {
-            int total = 0;
-            int kept = 0;
-            for (int slot = 1; slot <= 16; slot++)
-            {
-                string text = ReadAttribute(entry.Spec, "Option" + slot);
-                if (text.Length == 0) continue;
-                total++;
-                if (kept == budget.Items) continue;
-                string value = ReadAttribute(entry.Spec, "Value" + slot);
-                ObserveOption(ctx, budget, facts, binding, kept, text, value.Length > 0 ? value : text, "static-options");
-                facts.Add(new UiObservedFact("option." + kept + ".slot", slot.ToString(CultureInfo.InvariantCulture), source: "declaration"));
-                kept++;
-            }
-            facts.Add(new UiObservedFact("option-count", total.ToString(CultureInfo.InvariantCulture), source: "static-options"));
-            if (total > kept) facts.Add(new UiObservedFact("options", "", reason: "item-budget", truncated: true));
-        }
-        else
-        {
-            bool providerSupportsRead = ctx.Bindings is UiBindings;
-            facts.Add(new UiObservedFact("options", "", providerSupportsRead ? UiObservationStatus.NotFound : UiObservationStatus.Unsupported,
-                "current-model", providerSupportsRead ? "options-binding-not-found" : "provider-has-no-bounded-options-read"));
-        }
+        IReadOnlyList<UiChoice<object?>> choices;int count;string source;
+        if(entry.Spec.Choices.Count>0){count=entry.Spec.Choices.Count;var prefix=new List<UiChoice<object?>>();for(int i=0;i<Math.Min(count,budget.Items);i++){var c=entry.Spec.Choices[i];prefix.Add(new UiChoice<object?>(c.Text,c.Value,c.Help));}choices=prefix;source="static-options";}
+        else {choices=ctx.Bindings.Choices(UiChoiceSource.ChoiceKey(entry.Spec)).Prefix(budget.Items,out count);source="current-typed-options";}
+        facts.Add(new UiObservedFact("option-count",count.ToString(CultureInfo.InvariantCulture),source:source));
+        for(int i=0;i<choices.Count;i++){var c=choices[i];ObserveOption(ctx,budget,facts,binding,i,c.Text,c.Value,source);facts.Add(new UiObservedFact("option."+i+".help",budget.Limit(c.Help),source:source,truncated:c.Help.Length>budget.Text));}
+        if(count>choices.Count)facts.Add(new UiObservedFact("options","",reason:"item-budget",truncated:true));
     }
-
-    private static void ObserveModeOptions(PlacedEntry entry, UiWidgetContext ctx, UiObservationBudget budget, List<UiObservedFact> facts, string binding)
-    {
-        bool isTyped = ctx.Bindings is IUiTypedChoices choices && choices.TryGetValueType(binding, out Type type) && type != typeof(string);
-        if (isTyped && ctx.Bindings is UiBindings concrete
-            && concrete.TryReadObservationOptions(binding, budget.Items, out var options, out int count))
-        {
-            facts.Add(new UiObservedFact("option-count", count.ToString(CultureInfo.InvariantCulture), source: "current-model"));
-            for (int i = 0; i < options.Count; i++)
-            {
-                string suffix = (i + 1).ToString(CultureInfo.InvariantCulture);
-                string titleKey = ReadAttribute(entry.Spec, "TitleKey" + suffix);
-                string title = ReadAttribute(entry.Spec, "Title" + suffix);
-                if (options[i] is not IUiChoice choice)
-                {
-                    facts.Add(new UiObservedFact("option." + i, "", UiObservationStatus.Unsupported, reason: "unknown-typed-option-shape"));
-                    continue;
-                }
-                if (titleKey.Length > 0) title = ctx.Translation.Translate(titleKey);
-                else if (title.Length == 0) title = choice.Text;
-                ObserveOption(ctx, budget, facts, binding, i, title, choice.BoxedValue, "current-typed-options");
-            }
-            if (count > options.Count) facts.Add(new UiObservedFact("options", "", reason: "item-budget", truncated: true));
-        }
-        else if (!isTyped)
-        {
-            int total = 0;
-            int kept = 0;
-            for (int slot = 1; slot <= 8; slot++)
-            {
-                string value = ReadAttribute(entry.Spec, "Value" + slot);
-                if (value.Length == 0) continue;
-                total++;
-                if (kept == budget.Items) continue;
-                string titleKey = ReadAttribute(entry.Spec, "TitleKey" + slot);
-                string title = titleKey.Length > 0 ? ctx.Translation.Translate(titleKey) : ReadAttribute(entry.Spec, "Title" + slot);
-                ObserveOption(ctx, budget, facts, binding, kept, title.Length > 0 ? title : value, value, "static-options/translation");
-                facts.Add(new UiObservedFact("option." + kept + ".slot", slot.ToString(CultureInfo.InvariantCulture), source: "declaration"));
-                kept++;
-            }
-            facts.Add(new UiObservedFact("option-count", total.ToString(CultureInfo.InvariantCulture), source: "static-options"));
-            if (total > kept) facts.Add(new UiObservedFact("options", "", reason: "item-budget", truncated: true));
-        }
-        else facts.Add(new UiObservedFact("options", "", UiObservationStatus.Unsupported, "current-model", "provider-has-no-bounded-options-read"));
-    }
+    private static void ObserveModeOptions(PlacedEntry entry,UiWidgetContext ctx,UiObservationBudget budget,List<UiObservedFact> facts,string binding)
+        => ObserveDropdownOptions(entry,ctx,budget,facts,binding);
 }

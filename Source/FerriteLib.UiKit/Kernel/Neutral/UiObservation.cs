@@ -118,3 +118,5 @@ public sealed class UiHostDiscovery
     public bool Truncated { get; }
     public int HistoricalCapacityRefusals { get; }
 }
+
+

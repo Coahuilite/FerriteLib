@@ -1,6 +1,5 @@
 using System;
 using System.Globalization;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
@@ -162,9 +161,9 @@ internal static class AtomVocabulary
     /// "the value is not there yet" and "the model hands back another type" are ordinary states of a page
     /// that is still drawing, not a reason to replace the slot.
     /// <para>
-    /// The bool read goes through <see cref="IUiBindings.TryGetBool"/>, the query P2 added for exactly this
+    /// The bool read goes through <see cref="IUiBindingReader.TryGetBool"/>, the query P2 added for exactly this
     /// shape, so it needs no exception at all. The generic one has to catch, because
-    /// <see cref="IUiBindings.TryGet{T}"/> reports a type mismatch as an <see cref="InvalidOperationException"/>
+    /// <see cref="IUiBindingReader.TryGet{T}"/> reports a type mismatch as an <see cref="InvalidOperationException"/>
     /// and the surface has no non-throwing typed read for anything else. The catch is narrowed to that one
     /// exception type and the fallback is recorded, so a consumer getter that throws anything else still
     /// reaches the tree's recovery path, and one that throws this type is answered - not silently.
@@ -332,12 +331,12 @@ internal static class AtomVocabulary
     /// fallback an unknown value gets, and the deprecation a retired name gets. One write path, so the two
     /// cannot drift apart.
     /// </summary>
-    internal static void PaintEditFeedback(Rect field, UiWidgetContext ctx, IUiEditState editor)
+    internal static void PaintEditFeedback(UiLayoutRect field, UiWidgetContext ctx, IUiEditState editor)
     {
         if (editor.Valid && !editor.Conflict) return;
         // Feedback reads the shared facts; it never parses, repairs or writes a draft.
-        Color color = !editor.Valid ? ctx.Theme[UiPaletteRole.DangerSurface] : ctx.Theme[UiPaletteRole.SelectedSurface];
-        UiThemeDraw.Solid(new Rect(field.x, field.yMax - 2, field.width, 2), color);
+        UiColour color = !editor.Valid ? ctx.Theme[UiPaletteRole.DangerSurface] : ctx.Theme[UiPaletteRole.SelectedSurface];
+        UiThemeDraw.Solid(ctx.Drawing,new UiLayoutRect(field.X, field.YMax - 2, field.Width, 2), color);
     }
 
     private static void ReportFallback(UiElementSpec spec, UiWidgetContext ctx, string attribute, string authored, string resolved)
@@ -345,3 +344,5 @@ internal static class AtomVocabulary
         UiFitAudit.ReportStyleFallback(ctx.ElementPath, spec.Kind, attribute, authored, resolved);
     }
 }
+
+

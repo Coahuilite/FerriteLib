@@ -27,3 +27,4 @@ internal sealed class WorkshopProjectionExample : IDisposable
     }
     public void Dispose() => BusinessOwner.Dispose();
 }
+

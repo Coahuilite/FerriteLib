@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>
@@ -18,7 +17,7 @@ internal sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDes
     private const float HitRadius = 6f;
     private UiElementSpec spec = UiElementSpec.Empty;
     private readonly UiRetainedPaint retained = new();
-    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
+    bool IUiRetainedDisplay.PaintLast(UiLayoutRect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
     UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
     string IUiWidget.Kind => Kind;
 
@@ -32,7 +31,7 @@ internal sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDes
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindings bindings, string elementPath)
+    public void Validate(IUiBindingReader bindings, string elementPath)
     {
         string bindKey = ReadBindKey();
         bool hasStatic = spec.TryGetAttribute("Points", out string raw) && raw.Trim().Length > 0;
@@ -40,7 +39,7 @@ internal sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDes
         bool hasBind = bindKey.Length > 0 && (explicitBind || !hasStatic);
         if (hasBind)
         {
-            bindings.ValidateValue<IReadOnlyList<Vector2>>(bindKey, elementPath);
+            bindings.ValidateValue<IReadOnlyList<UiLayoutPoint>>(bindKey, elementPath);
         }
 
         if (spec.TryGetAttribute("PointKeysBind", out string keys) && keys.Length > 0)
@@ -73,39 +72,39 @@ internal sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDes
     public IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
     {
         if (!AllowsPointEditing) yield break;
-        List<Vector2> points = ResolvePoints(ctx);
+        List<UiLayoutPoint> points = ResolvePoints(ctx);
         if (points.Count < 2) yield break;
         HashSet<int>? editablePoints = null;
         if (spec.TryGetAttribute("EditablePoints", out string raw) && raw.Trim().Length > 0)
             editablePoints = ParseEditablePoints(raw);
-        Rect plot = PlotRect(new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height));
+        UiLayoutRect plot = PlotRect(new UiLayoutRect(bounds.X, bounds.Y, bounds.Width, bounds.Height));
         for (int i = 0; i < points.Count; i++)
         {
             if (editablePoints != null && !editablePoints.Contains(i)) continue;
-            Rect hit = PointHit(points[i], plot);
-            yield return new UiPointerRegion(new UiLayoutRect(hit.x, hit.y, hit.width, hit.height));
+            UiLayoutRect hit = PointHit(points[i], plot);
+            yield return new UiPointerRegion(new UiLayoutRect(hit.X, hit.Y, hit.Width, hit.Height));
         }
     }
-    private static Rect PlotRect(Rect rect) => new(rect.x + PlotPadding, rect.y + PlotPadding,
-        Math.Max(1, rect.width - PlotPadding * 2), Math.Max(1, rect.height - PlotPadding * 2));
-    private static Rect PointHit(Vector2 point, Rect plot)
+    private static UiLayoutRect PlotRect(UiLayoutRect rect) => new(rect.X + PlotPadding, rect.Y + PlotPadding,
+        Math.Max(1, rect.Width - PlotPadding * 2), Math.Max(1, rect.Height - PlotPadding * 2));
+    private static UiLayoutRect PointHit(UiLayoutPoint point, UiLayoutRect plot)
     {
-        Vector2 pixel = ToRectPoint(point, plot);
-        return new Rect(pixel.x - HitRadius, pixel.y - HitRadius, HitRadius * 2, HitRadius * 2);
+        UiLayoutPoint pixel = ToRectPoint(point, plot);
+        return new UiLayoutRect(pixel.X - HitRadius, pixel.Y - HitRadius, HitRadius * 2, HitRadius * 2);
     }
-    public void Draw(Rect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
     {
-        if (rect.width <= 1f || rect.height <= 1f)
+        if (rect.Width <= 1f || rect.Height <= 1f)
             return;
-        List<Vector2> points = ResolvePoints(ctx);
+        List<UiLayoutPoint> points = ResolvePoints(ctx);
         if (points.Count < 2)
         {
-            UiNative.EndPointCapture(ctx, UiInteractionEnd.Removed);
+            ctx.Controls.EndPointCapture(ctx, UiInteractionEnd.Removed);
             return;
         }
 
         bool editable = AllowsPointEditing;
-        Rect plotRect = PlotRect(rect);
+        UiLayoutRect plotRect = PlotRect(rect);
         HashSet<int>? editablePoints = null;
         if (editable && spec.TryGetAttribute("EditablePoints", out string editableRaw) && editableRaw.Trim().Length > 0)
         {
@@ -119,37 +118,37 @@ internal sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDes
             // hovered by anyone's reading, and the highlight must not promise a drag the press gate refuses.
             // Disabled is deliberately not part of the hover question (help still explains an unavailable
             // control); it IS part of the press question, in CanReceivePointerPress below.
-            if (UiNative.IsMouseOver(rect, ctx))
+            if (ctx.Controls.IsMouseOver(rect, ctx))
             {
-                hoveredPoint = FindHoveredPoint(plotRect, points, UiNative.PointerPosition(), editablePoints);
+                hoveredPoint = FindHoveredPoint(plotRect, points, ctx.Controls.PointerPosition(), editablePoints);
             }
 
             HandleDrag(plotRect, points, editablePoints, ctx);
         }
         else
-            UiNative.EndPointCapture(ctx, UiInteractionEnd.Ineligible);
+            ctx.Controls.EndPointCapture(ctx, UiInteractionEnd.Ineligible);
         if (!ctx.Session.IsActive)
             return;
         points = ResolvePoints(ctx);
-        UiThemeDraw.Surface(plotRect, ctx.Theme, ctx.Theme[UiPaletteRole.PanelSurface], ctx.Theme[UiPaletteRole.Border]);
-        DrawGrid(plotRect, ctx.Theme);
+        UiThemeDraw.Surface(ctx.Drawing,plotRect, ctx.Theme, ctx.Theme[UiPaletteRole.PanelSurface], ctx.Theme[UiPaletteRole.Border]);
+        DrawGrid(ctx.Drawing, plotRect, ctx.Theme);
         for (int i = 1; i < points.Count; i++)
-            DrawLine(ToRectPoint(points[i - 1], plotRect), ToRectPoint(points[i], plotRect), ctx.Theme[UiPaletteRole.Accent]);
-        DrawPoints(plotRect, points, hoveredPoint, ctx.Theme);
+            DrawLine(ctx.Drawing, ToRectPoint(points[i - 1], plotRect), ToRectPoint(points[i], plotRect), ctx.Theme[UiPaletteRole.Accent]);
+        DrawPoints(ctx.Drawing, plotRect, points, hoveredPoint, ctx.Theme);
         retained.Capture(ctx,(r,c)=>
         {
-            Rect lastPlot=PlotRect(r);
-            UiThemeDraw.Surface(lastPlot,c.Theme,c.Theme[UiPaletteRole.PanelSurface],c.Theme[UiPaletteRole.Border]);
-            DrawGrid(lastPlot,c.Theme);
-            for(int i=1;i<points.Count;i++) DrawLine(ToRectPoint(points[i-1],lastPlot),ToRectPoint(points[i],lastPlot),c.Theme[UiPaletteRole.Accent]);
-            DrawPoints(lastPlot,points,null,c.Theme);
+            UiLayoutRect lastPlot=PlotRect(r);
+            UiThemeDraw.Surface(c.Drawing,lastPlot,c.Theme,c.Theme[UiPaletteRole.PanelSurface],c.Theme[UiPaletteRole.Border]);
+            DrawGrid(ctx.Drawing, lastPlot,c.Theme);
+            for(int i=1;i<points.Count;i++) DrawLine(ctx.Drawing, ToRectPoint(points[i-1],lastPlot),ToRectPoint(points[i],lastPlot),c.Theme[UiPaletteRole.Accent]);
+            DrawPoints(ctx.Drawing, lastPlot,points,null,c.Theme);
         });
     }
 
-    private void HandleDrag(Rect plotRect, List<Vector2> points, HashSet<int>? editablePoints, UiWidgetContext ctx)
+    private void HandleDrag(UiLayoutRect plotRect, List<UiLayoutPoint> points, HashSet<int>? editablePoints, UiWidgetContext ctx)
     {
-        UiNode node = ctx.Node ?? ctx.Session.ActiveNode;
-        UiValueState state = ctx.Session.GetOrCreateValueState((ctx.Node ?? ctx.Session.ActiveNode).Id, "chart-identity");
+        UiNode node = ctx.Node;
+        UiValueState state = ctx.Session.GetOrCreateValueState(ctx.Node.Id, "chart-identity");
         UiChartIdentity identity = state.ChartIdentity ??= new UiChartIdentity();
         string keysBinding = spec.TryGetAttribute("PointKeysBind", out string keysKey) ? keysKey : "";
         IReadOnlyList<string>? keys;
@@ -159,7 +158,7 @@ internal sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDes
         }
         catch
         {
-            UiNative.EndPointCapture(ctx, UiInteractionEnd.Aborted);
+            ctx.Controls.EndPointCapture(ctx, UiInteractionEnd.Aborted);
             throw;
         }
 
@@ -167,23 +166,23 @@ internal sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDes
         object? heldKey = owner?.Node == node.Id.Key && owner?.Part == "chart-point" ? owner.Value.ItemKey : null;
         var coordinates = new UiChartCoordinate[points.Count];
         for (int i = 0; i < points.Count; i++)
-            coordinates[i] = new UiChartCoordinate(points[i].x, points[i].y);
+            coordinates[i] = new UiChartCoordinate(points[i].X, points[i].Y);
         if (!identity.Observe(coordinates, keys, keysBinding, heldKey))
-            UiNative.EndPointCapture(ctx, UiInteractionEnd.TargetChanged);
+            ctx.Controls.EndPointCapture(ctx, UiInteractionEnd.TargetChanged);
         spec.TryGetAttribute("ActionBind", out string actionKey);
         string targetBinding = ReadBindKey() + "\u001f" + actionKey + "\u001f" + keysBinding;
         for (int i = 0; i < points.Count; i++)
         {
             object key = keys == null ? i : keys[i];
             bool allowed = editablePoints == null || editablePoints.Contains(i);
-            Rect hit = PointHit(points[i], plotRect);
-            UiInteractionResult operation = UiNative.Point(hit, plotRect, ctx, targetBinding, key, points[i].x, points[i].y, allowed && ctx.Bindings.CanExecute(actionKey));
+            UiLayoutRect hit = PointHit(points[i], plotRect);
+            UiInteractionResult operation = ctx.Controls.Point(hit, plotRect, ctx, targetBinding, key, points[i].X, points[i].Y, allowed && ctx.Bindings.CanExecute(actionKey));
             if (!operation.Request)
                 continue;
             identity.NoteRequest(key, operation.Value, operation.Y);
             int index = i;
             var change = new UiChartPointChange(index, operation.Value, operation.Y, keys == null ? null : keys[i]);
-            UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx, targetBinding, "chart-point", key), operation, () => ctx.Bindings.Invoke(actionKey, change));
+            UiInteractionRequests.Activation(ctx.Controls.InteractionTarget(ctx, targetBinding, "chart-point", key), operation, () => ctx.Bindings.Invoke(actionKey, change));
             return;
         }
     }
@@ -212,15 +211,15 @@ internal sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDes
         return spec.Id;
     }
 
-    private List<Vector2> ResolvePoints(UiWidgetContext ctx)
+    private List<UiLayoutPoint> ResolvePoints(UiWidgetContext ctx)
     {
         string bindKey = ReadBindKey();
-        if (bindKey.Length > 0 && ctx.Bindings.TryGet(bindKey, out IReadOnlyList<Vector2> bound))
+        if (bindKey.Length > 0 && ctx.Bindings.TryGet(bindKey, out IReadOnlyList<UiLayoutPoint> bound))
         {
-            var result = new List<Vector2>(bound.Count);
-            foreach (Vector2 point in bound)
+            var result = new List<UiLayoutPoint>(bound.Count);
+            foreach (UiLayoutPoint point in bound)
             {
-                result.Add(new Vector2(Clamp01(point.x), Clamp01(point.y)));
+                result.Add(new UiLayoutPoint(Clamp01(point.X), Clamp01(point.Y)));
             }
 
             return result;
@@ -229,9 +228,9 @@ internal sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDes
         return ParsePoints(spec.TryGetAttribute("Points", out string raw) ? raw : "");
     }
 
-    internal static List<Vector2> ParsePoints(string raw)
+    internal static List<UiLayoutPoint> ParsePoints(string raw)
     {
-        var result = new List<Vector2>();
+        var result = new List<UiLayoutPoint>();
         if (raw == null)
             return result;
         string[] pointParts = raw.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
@@ -245,7 +244,7 @@ internal sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDes
                 throw new FormatException($"Invalid chart point '{pointPart.Trim()}'; expected numeric x,y.");
             }
 
-            result.Add(new Vector2(Clamp01(x), Clamp01(y)));
+            result.Add(new UiLayoutPoint(Clamp01(x), Clamp01(y)));
         }
 
         return result;
@@ -266,31 +265,31 @@ internal sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDes
         return result;
     }
 
-    private static void DrawGrid(Rect plotRect, UiTheme theme)
+    private static void DrawGrid(IUiDrawing drawing, UiLayoutRect plotRect, UiTheme theme)
     {
         for (int i = 1; i <= 3; i++)
         {
-            float fx = plotRect.x + plotRect.width * i / 4f;
-            UiThemeDraw.Solid(new Rect(fx, plotRect.y, 1f, plotRect.height), theme[UiPaletteRole.Divider]);
-            float fy = plotRect.y + plotRect.height * i / 4f;
-            UiThemeDraw.Solid(new Rect(plotRect.x, fy, plotRect.width, 1f), theme[UiPaletteRole.Divider]);
+            float fx = plotRect.X + plotRect.Width * i / 4f;
+            UiThemeDraw.Solid(drawing,new UiLayoutRect(fx, plotRect.Y, 1f, plotRect.Height), theme[UiPaletteRole.Divider]);
+            float fy = plotRect.Y + plotRect.Height * i / 4f;
+            UiThemeDraw.Solid(drawing,new UiLayoutRect(plotRect.X, fy, plotRect.Width, 1f), theme[UiPaletteRole.Divider]);
         }
     }
 
-    private static void DrawPoints(Rect plotRect, IReadOnlyList<Vector2> points, int? hoveredPoint, UiTheme theme)
+    private static void DrawPoints(IUiDrawing drawing, UiLayoutRect plotRect, IReadOnlyList<UiLayoutPoint> points, int? hoveredPoint, UiTheme theme)
     {
         int hovered = hoveredPoint ?? -1;
         for (int i = 0; i < points.Count; i++)
         {
-            Vector2 pixel = ToRectPoint(points[i], plotRect);
+            UiLayoutPoint pixel = ToRectPoint(points[i], plotRect);
             bool isHovered = i == hovered;
             float size = isHovered ? HoveredPointSize : PointSize;
-            var pointRect = new Rect(pixel.x - size * 0.5f, pixel.y - size * 0.5f, size, size);
-            UiThemeDraw.Solid(pointRect, isHovered ? theme.AccentHover : theme[UiPaletteRole.Accent]);
+            var pointRect = new UiLayoutRect(pixel.X - size * 0.5f, pixel.Y - size * 0.5f, size, size);
+            UiThemeDraw.Solid(drawing,pointRect, isHovered ? theme.AccentHover : theme[UiPaletteRole.Accent]);
         }
     }
 
-    internal static int? FindHoveredPoint(Rect plotRect, IReadOnlyList<Vector2> points, Vector2 pointer, HashSet<int>? editablePoints)
+    internal static int? FindHoveredPoint(UiLayoutRect plotRect, IReadOnlyList<UiLayoutPoint> points, UiLayoutPoint pointer, HashSet<int>? editablePoints)
     {
         for (int i = 0; i < points.Count; i++)
         {
@@ -305,30 +304,30 @@ internal sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDes
         return null;
     }
 
-    private static Vector2 ToRectPoint(Vector2 normalized, Rect plotRect)
+    private static UiLayoutPoint ToRectPoint(UiLayoutPoint normalized, UiLayoutRect plotRect)
     {
-        return new Vector2(plotRect.x + Clamp01(normalized.x) * plotRect.width, plotRect.yMax - Clamp01(normalized.y) * plotRect.height);
+        return new UiLayoutPoint(plotRect.X + Clamp01(normalized.X) * plotRect.Width, plotRect.YMax - Clamp01(normalized.Y) * plotRect.Height);
     }
 
-    private static float Distance(Vector2 a, Vector2 b)
+    private static float Distance(UiLayoutPoint a, UiLayoutPoint b)
     {
-        float dx = a.x - b.x;
-        float dy = a.y - b.y;
+        float dx = a.X - b.X;
+        float dy = a.Y - b.Y;
         return (float)Math.Sqrt((double)(dx * dx + dy * dy));
     }
 
-    private static void DrawLine(Vector2 a, Vector2 b, UnityEngine.Color color)
+    private static void DrawLine(IUiDrawing drawing, UiLayoutPoint a, UiLayoutPoint b, UiColour color)
     {
-        float dx = b.x - a.x;
-        float dy = b.y - a.y;
+        float dx = b.X - a.X;
+        float dy = b.Y - a.Y;
         float distance = (float)Math.Sqrt((double)(dx * dx + dy * dy));
-        int steps = Math.Max(1, Mathf.CeilToInt(distance / 2f));
+        int steps = Math.Max(1, UiMath.CeilToInt(distance / 2f));
         for (int step = 0; step < steps; step++)
         {
             float t = steps == 1 ? 1f : step / (float)(steps - 1);
-            float px = a.x + dx * t;
-            float py = a.y + dy * t;
-            UiThemeDraw.Solid(new Rect(px, py, 1f, 1f), color);
+            float px = a.X + dx * t;
+            float py = a.Y + dy * t;
+            UiThemeDraw.Solid(drawing,new UiLayoutRect(px, py, 1f, 1f), color);
         }
     }
 
@@ -360,3 +359,6 @@ internal sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDes
         return value;
     }
 }
+
+
+

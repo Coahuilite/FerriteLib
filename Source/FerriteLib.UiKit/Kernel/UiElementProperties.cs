@@ -276,3 +276,5 @@ public sealed class UiElementProperties
     public UiResolvedProperty<UiDensity> ResolvedDensity { get; private set; }
     internal static UiDensity DensityOf(UiTheme theme) => new(theme.Geometry.Padding, theme.Geometry.Spacing, theme.Geometry.Gap, theme.Geometry.RowHeight, theme.Geometry.Hairline);
 }
+
+

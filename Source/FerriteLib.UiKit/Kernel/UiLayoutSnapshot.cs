@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
 /// <summary>
@@ -9,47 +8,47 @@ namespace FerriteLib.UiKit.Kernel;
 /// </summary>
 public sealed class UiLayoutSnapshot
 {
-    public Vector2 ContentSize { get; }
+    public UiLayoutPoint ContentSize { get; }
 
-    public IReadOnlyDictionary<string, Rect> RectById { get; }
+    public IReadOnlyDictionary<string, UiLayoutRect> RectById { get; }
 
     public IReadOnlyList<string> VisibleIds { get; }
 
     /// <summary>Structural viewport rects keyed by scroll container id/path.</summary>
-    public IReadOnlyDictionary<string, Rect> Viewports { get; }
+    public IReadOnlyDictionary<string, UiLayoutRect> Viewports { get; }
 
     /// <summary>
     /// Scroll content rects keyed by the same key as <see cref="Viewports"/>. Content rects are in
     /// scroll-local coordinates (origin 0,0) and are the rects passed to
     /// <c>Verse.Widgets.BeginScrollView</c>.
     /// </summary>
-    public IReadOnlyDictionary<string, Rect> ScrollContents { get; }
+    public IReadOnlyDictionary<string, UiLayoutRect> ScrollContents { get; }
 
     public int DefinitionRevision { get; }
     public IReadOnlyList<UiLayoutDiagnostic> Diagnostics { get; }
 
     public UiLayoutSnapshot(
-        Vector2 contentSize,
-        IReadOnlyDictionary<string, Rect> rectById,
+        UiLayoutPoint contentSize,
+        IReadOnlyDictionary<string, UiLayoutRect> rectById,
         IReadOnlyList<string> visibleIds,
-        IReadOnlyDictionary<string, Rect> viewports,
+        IReadOnlyDictionary<string, UiLayoutRect> viewports,
         int definitionRevision)
         : this(
             contentSize,
             rectById,
             visibleIds,
             viewports,
-            new Dictionary<string, Rect>(),
+            new Dictionary<string, UiLayoutRect>(),
             definitionRevision)
     {
     }
 
-    public UiLayoutSnapshot(Vector2 contentSize, IReadOnlyDictionary<string, Rect> rectById, IReadOnlyList<string> visibleIds, IReadOnlyDictionary<string, Rect> viewports, IReadOnlyDictionary<string, Rect> scrollContents, int definitionRevision)
+    public UiLayoutSnapshot(UiLayoutPoint contentSize, IReadOnlyDictionary<string, UiLayoutRect> rectById, IReadOnlyList<string> visibleIds, IReadOnlyDictionary<string, UiLayoutRect> viewports, IReadOnlyDictionary<string, UiLayoutRect> scrollContents, int definitionRevision)
         : this(contentSize, rectById, visibleIds, viewports, scrollContents, definitionRevision, System.Array.Empty<UiLayoutDiagnostic>())
     {
     }
 
-    public UiLayoutSnapshot(Vector2 contentSize, IReadOnlyDictionary<string, Rect> rectById, IReadOnlyList<string> visibleIds, IReadOnlyDictionary<string, Rect> viewports, IReadOnlyDictionary<string, Rect> scrollContents, int definitionRevision, IReadOnlyList<UiLayoutDiagnostic> diagnostics)
+    public UiLayoutSnapshot(UiLayoutPoint contentSize, IReadOnlyDictionary<string, UiLayoutRect> rectById, IReadOnlyList<string> visibleIds, IReadOnlyDictionary<string, UiLayoutRect> viewports, IReadOnlyDictionary<string, UiLayoutRect> scrollContents, int definitionRevision, IReadOnlyList<UiLayoutDiagnostic> diagnostics)
     {
         Diagnostics = new ListView<UiLayoutDiagnostic>(diagnostics);
         ContentSize = contentSize;
@@ -62,17 +61,17 @@ public sealed class UiLayoutSnapshot
 
     // Accept every existing IReadOnly* source without copying, changing its comparer or exposing
     // mutable interfaces. The producer still owns updates; the published outlet grants reads only.
-    private sealed class RectView : IReadOnlyDictionary<string, Rect>
+    private sealed class RectView : IReadOnlyDictionary<string, UiLayoutRect>
     {
-        private readonly IReadOnlyDictionary<string, Rect> source;
-        internal RectView(IReadOnlyDictionary<string, Rect> source) => this.source = source;
-        public Rect this[string key] => source[key];
+        private readonly IReadOnlyDictionary<string, UiLayoutRect> source;
+        internal RectView(IReadOnlyDictionary<string, UiLayoutRect> source) => this.source = source;
+        public UiLayoutRect this[string key] => source[key];
         public IEnumerable<string> Keys => source.Keys;
-        public IEnumerable<Rect> Values => source.Values;
+        public IEnumerable<UiLayoutRect> Values => source.Values;
         public int Count => source.Count;
         public bool ContainsKey(string key) => source.ContainsKey(key);
-        public bool TryGetValue(string key, out Rect value) => source.TryGetValue(key, out value);
-        public IEnumerator<KeyValuePair<string, Rect>> GetEnumerator() => source.GetEnumerator();
+        public bool TryGetValue(string key, out UiLayoutRect value) => source.TryGetValue(key, out value);
+        public IEnumerator<KeyValuePair<string, UiLayoutRect>> GetEnumerator() => source.GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
@@ -86,3 +85,5 @@ public sealed class UiLayoutSnapshot
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }
+
+

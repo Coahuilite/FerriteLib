@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -45,9 +44,9 @@ public static class UiPopup
     /// option is reachable by scrolling instead of being painted below the window where no pointer can arrive.
     /// </para>
     /// </summary>
-    public static int VisibleRowCount(int optionCount, Rect viewport)
+    public static int VisibleRowCount(int optionCount, UiLayoutRect viewport)
     {
-        int fits = (int)(viewport.height / OptionHeight);
+        int fits = (int)(viewport.Height / OptionHeight);
         if (fits < 1) fits = 1;
         return fits < optionCount ? fits : optionCount;
     }
@@ -66,18 +65,18 @@ public static class UiPopup
     /// row - because the height stays a multiple of <see cref="OptionHeight"/>.
     /// </para>
     /// </summary>
-    public static Rect RectFor(Rect anchor, int optionCount, Rect viewport)
+    public static UiLayoutRect RectFor(UiLayoutRect anchor, int optionCount, UiLayoutRect viewport)
     {
         float height = VisibleRowCount(optionCount, viewport) * OptionHeight;
-        float y = anchor.yMax;
-        float x = anchor.x;
-        if (viewport.height <= 0f) return new Rect(x, y, anchor.width, height);
+        float y = anchor.YMax;
+        float x = anchor.X;
+        if (viewport.Height <= 0f) return new UiLayoutRect(x, y, anchor.Width, height);
 
-        if (y + height > viewport.yMax && anchor.y - height >= viewport.y)
+        if (y + height > viewport.YMax && anchor.Y - height >= viewport.Y)
         {
-            y = anchor.y - height;
+            y = anchor.Y - height;
         }
-        else if (y + height > viewport.yMax)
+        else if (y + height > viewport.YMax)
         {
             // Neither side has the room. The height is already bounded to the viewport, so the menu fits the
             // window entirely: pin it to the TOP. That keeps the first options - the ones a player looks for
@@ -85,15 +84,15 @@ public static class UiPopup
             // close-click can still land. The old branch clamped the bottom edge instead, which was only ever
             // reachable because the height could exceed the viewport: with a bounded menu it would park the
             // whole trigger under the last rows for no reason.
-            y = viewport.y;
+            y = viewport.Y;
         }
 
-        if (x + anchor.width > viewport.xMax)
+        if (x + anchor.Width > viewport.XMax)
         {
-            x = Math.Max(viewport.x, viewport.xMax - anchor.width);
+            x = Math.Max(viewport.X, viewport.XMax - anchor.Width);
         }
 
-        return new Rect(x, y, anchor.width, height);
+        return new UiLayoutRect(x, y, anchor.Width, height);
     }
 
     /// <summary>
@@ -105,22 +104,22 @@ public static class UiPopup
     /// Returns the <b>hovered</b> option's value, or an empty string when no visible row is hovered, so the
     /// caller can publish an option-level fact - the dropdown's <c>HoverHelpKey</c> identity - without
     /// re-deriving this helper's row geometry. The hover test is the raw rect form on purpose: the popup is the
-    /// topmost layer and these rows are its own. <see cref="UiNative.PopupOption"/> applies the shared
+    /// topmost layer and these rows are its own. <see cref="ctx.Controls.PopupOption"/> applies the shared
     /// capture protocol with that row's stable value identity. Hover consumes nothing.
     /// </para>
     /// <para>
     /// A row that the scroll has moved out of the menu is not drawn, not hovered and not hit-tested: the answer
     /// it would report belongs to a rect that is not on screen. Scrolling is this list's own rect's business
     /// (<see cref="RowsOf"/>), and the wheel that drives it is routed by
-    /// <see cref="UiNative.TakePopupWheelIfCovering"/>.
+    /// <see cref="ctx.Controls.TakePopupWheelIfCovering"/>.
     /// </para>
     /// </summary>
-    public static string DrawOptionList(Rect popupRect, string elementId, UiWidgetContext ctx,
+    public static string DrawOptionList(UiLayoutRect popupRect, string elementId, UiWidgetContext ctx,
         IReadOnlyList<KeyValuePair<string, string>> options, string current, Action<string> onSelected)
         => DrawOptionList(popupRect, elementId, ctx, options, current, onSelected, true);
 
     public static string DrawOptionList(
-        Rect popupRect,
+        UiLayoutRect popupRect,
         string elementId,
         UiWidgetContext ctx,
         IReadOnlyList<KeyValuePair<string, string>> options,
@@ -139,19 +138,19 @@ public static class UiPopup
         for (int slot = 0; slot < window.RowCount; slot++)
         {
             int index = window.FirstRow + slot;
-            Rect rowRect = RowRect(popupRect, slot);
-            if (UiNative.IsMouseOver(rowRect))
+            UiLayoutRect rowRect = RowRect(popupRect, slot);
+            if (ctx.Controls.IsMouseOver(rowRect))
             {
                 hovered = options[index].Value;
             }
 
-            DrawRow(rowRect, options[index].Key,
+            DrawRow(ctx.Drawing,rowRect, options[index].Key,
                 string.Equals(options[index].Value, current, StringComparison.Ordinal), ctx.Theme);
-            UiInteractionResult input = UiNative.PopupOption(rowRect, elementId, ctx, options[index].Value, selectable);
+            UiInteractionResult input = ctx.Controls.PopupOption(rowRect, elementId, ctx, options[index].Value, selectable);
             if (input.Request)
             {
                 ctx.Session.ClosePopup();
-                UiInteractionTarget target = UiNative.InteractionTarget(ctx, elementId, "popup-option", options[index].Value);
+                UiInteractionTarget target = ctx.Controls.InteractionTarget(ctx, elementId, "popup-option", options[index].Value);
                 UiValueBehavior.Request(target, UiValueBehavior.Selection(input, options[index].Value), onSelected);
                 return hovered;
             }
@@ -175,12 +174,12 @@ public static class UiPopup
     /// and the two list forms stay one contract rather than two habits.
     /// </para>
     /// </summary>
-    public static int DrawChoiceList(Rect popupRect, string elementId, UiWidgetContext ctx,
+    public static int DrawChoiceList(UiLayoutRect popupRect, string elementId, UiWidgetContext ctx,
         IReadOnlyList<UiChoice<object?>> options, object? current, Action<object?> onSelected)
         => DrawChoiceList(popupRect, elementId, ctx, options, current, onSelected, true);
 
     public static int DrawChoiceList(
-        Rect popupRect,
+        UiLayoutRect popupRect,
         string elementId,
         UiWidgetContext ctx,
         IReadOnlyList<UiChoice<object?>> options,
@@ -199,18 +198,18 @@ public static class UiPopup
         for (int slot = 0; slot < window.RowCount; slot++)
         {
             int index = window.FirstRow + slot;
-            Rect rowRect = RowRect(popupRect, slot);
-            if (UiNative.IsMouseOver(rowRect))
+            UiLayoutRect rowRect = RowRect(popupRect, slot);
+            if (ctx.Controls.IsMouseOver(rowRect))
             {
                 hovered = index;
             }
 
-            DrawRow(rowRect, options[index].Text, Equals(options[index].Value, current), ctx.Theme);
-            UiInteractionResult input = UiNative.PopupOption(rowRect, elementId, ctx, options[index].Value, selectable);
+            DrawRow(ctx.Drawing,rowRect, options[index].Text, Equals(options[index].Value, current), ctx.Theme);
+            UiInteractionResult input = ctx.Controls.PopupOption(rowRect, elementId, ctx, options[index].Value, selectable);
             if (input.Request)
             {
                 ctx.Session.ClosePopup();
-                UiInteractionTarget target = UiNative.InteractionTarget(ctx, elementId, "popup-option", options[index].Value);
+                UiInteractionTarget target = ctx.Controls.InteractionTarget(ctx, elementId, "popup-option", options[index].Value);
                 UiValueBehavior.Request(target, UiValueBehavior.Selection(input, options[index].Value), onSelected);
                 return hovered;
             }
@@ -230,9 +229,9 @@ public static class UiPopup
     /// that is not there.
     /// </para>
     /// </summary>
-    private static PopupWindow RowsOf(Rect popupRect, UiWidgetContext ctx, int optionCount)
+    private static PopupWindow RowsOf(UiLayoutRect popupRect, UiWidgetContext ctx, int optionCount)
     {
-        int visible = (int)(popupRect.height / OptionHeight);
+        int visible = (int)(popupRect.Height / OptionHeight);
         if (visible < 1) visible = 1;
         if (visible > optionCount) visible = optionCount;
 
@@ -263,18 +262,18 @@ public static class UiPopup
     /// cannot express any of this: a composite draws several dropdowns under one UiNode. Both option lists go
     /// through here, so the rule stays in one place.
     /// </summary>
-    private static void PushPopupLayer(Rect popupRect, string elementId, UiWidgetContext ctx)
+    private static void PushPopupLayer(UiLayoutRect popupRect, string elementId, UiWidgetContext ctx)
     {
-        ctx.Session.PushHitLayer(ctx.Node ?? ctx.Session.ActiveNode, popupRect, isPopup: true, popupOwnerId: elementId);
-        if (UiNative.Trace != null)
+        ctx.Session.PushHitLayer(ctx.Node, popupRect, isPopup: true, popupOwnerId: elementId);
+        if (ctx.Controls.Trace != null)
         {
             // The published rect and the scroll that picked which rows live inside it, in one line: a real-game
             // log has to be able to say which option was reachable where, not only that a menu was open.
-            UiNative.Trace("publish id=" + elementId + " rect=" + UiNative.Describe(popupRect)
+            ctx.Controls.Trace("publish id=" + elementId + " rect=" + UiControls.Describe(popupRect)
                 + " firstRow=" + ctx.Session.OpenPopupScrollRows);
         }
 
-        UiThemeDraw.Panel(popupRect, ctx.Theme);
+        UiThemeDraw.Panel(ctx.Drawing,popupRect, ctx.Theme);
     }
 
     /// <summary>
@@ -282,9 +281,9 @@ public static class UiPopup
     /// WITHIN the visible window (not the index into the caller's option list - the window's first row is what
     /// turns one into the other, and only rows inside the menu's own rect may be painted or hit).
     /// </summary>
-    private static Rect RowRect(Rect popupRect, int slot)
+    private static UiLayoutRect RowRect(UiLayoutRect popupRect, int slot)
     {
-        return new Rect(popupRect.x, popupRect.y + slot * OptionHeight, popupRect.width, OptionHeight);
+        return new UiLayoutRect(popupRect.X, popupRect.Y + slot * OptionHeight, popupRect.Width, OptionHeight);
     }
 
     /// <summary>
@@ -293,18 +292,20 @@ public static class UiPopup
     /// (this row used to re-derive the mapping verbatim, which is the fourth copy the one-table rule exists to
     /// delete), and both option lists paint through here.
     /// </summary>
-    private static void DrawRow(Rect rowRect, string label, bool selected, UiTheme theme)
+    private static void DrawRow(IUiDrawing drawing,UiLayoutRect rowRect, string label, bool selected, UiTheme theme)
     {
         UiResolvedStyle style = theme.Styles.Resolve(selected ? UiStatusTone.Active : UiStatusTone.Neutral);
         float padding = theme.Geometry.Padding;
-        UiThemeDraw.Surface(rowRect, style.Surface, theme.Geometry.Hairline);
+        UiThemeDraw.Surface(drawing,rowRect, style.Surface, theme.Geometry.Hairline);
         UiThemeDraw.Label(
-            new Rect(rowRect.x + padding, rowRect.y, rowRect.width - padding * 2f, rowRect.height),
+drawing,            new UiLayoutRect(rowRect.X + padding, rowRect.Y, rowRect.Width - padding * 2f, rowRect.Height),
             label,
             theme,
             style.Text,
             theme.Styles.Font,
-            TextAnchor.MiddleLeft,
+            UiTextAnchor.MiddleLeft,
             singleLine: true);
     }
 }
+
+

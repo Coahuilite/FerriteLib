@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
@@ -51,7 +50,7 @@ internal sealed class RepeatTemplateWidget : IUiWidget, IUiMeasureParticipant
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindings bindings, string elementPath)
+    public void Validate(IUiBindingReader bindings, string elementPath)
     {
         string items = AtomVocabulary.Read(spec, "Items").Trim();
         if (items.Length == 0)
@@ -83,7 +82,9 @@ internal sealed class RepeatTemplateWidget : IUiWidget, IUiMeasureParticipant
     }
 
     /// <summary>Never reached: the engine arranges a Repeat through its own container path.</summary>
-    public void Draw(Rect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
     {
     }
 }
+
+

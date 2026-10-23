@@ -15,31 +15,8 @@ namespace FerriteLib.UiKit.Kernel;
 /// refresh or an enablement decision.
 /// </para>
 /// </summary>
-public interface IUiBindings
+public interface IUiBindingReader
 {
-    void BindValue<T>(
-        string elementId, Func<T> get, Action<T> set, UiInvalidation invalidates = UiInvalidation.Everything);
-
-    void BindReadOnly<T>(string elementId, Func<T> get, UiInvalidation invalidates = UiInvalidation.Everything);
-
-    void BindOptions<T>(
-        string elementId, Func<IReadOnlyList<T>> get, UiInvalidation invalidates = UiInvalidation.Everything);
-
-    void BindAction<T>(string actionId, Action<T> action, UiInvalidation invalidates = UiInvalidation.Everything);
-
-    /// <summary>
-    /// Binds one command, optionally with a dynamic executability predicate that this surface enforces
-    /// rather than merely describes: <see cref="Invoke(string)"/> refuses to run a command whose predicate
-    /// answers false, and <see cref="CanExecute"/> is the read a control paints and hit-tests with. A
-    /// command whose executability moves is a <see cref="UiInvalidation.Paint"/> change - a disabled plane
-    /// and a click that no longer does anything, not a re-measure - which is why that is the declared
-    /// default here.
-    /// </summary>
-    void BindCommand(
-        string actionId,
-        Action action,
-        Func<bool>? canExecute = null,
-        UiInvalidation invalidates = UiInvalidation.Paint);
 
     T Get<T>(string elementId);
 
@@ -123,15 +100,6 @@ public interface IUiBindings
     /// </summary>
     UiInvalidation GetInvalidation(string key);
 
-    /// <summary>
-    /// Announces that the authoritative model behind one or more keys moved. The library never polls or
-    /// diffs the model; this is the whole notification contract, and the consumer owns calling it when
-    /// its authoritative state changes. Announcements raised during a pass are coalesced into one commit
-    /// at the next frame boundary, and announcing the same key again before that commit costs nothing
-    /// extra.
-    /// </summary>
-    void NotifyChanged(params string[] keys);
-
     void ValidateValue<T>(string elementId, string elementPath);
 
     void ValidateOptions<T>(string elementId, string elementPath);
@@ -139,4 +107,10 @@ public interface IUiBindings
     void ValidateAction<T>(string actionId, string elementPath);
 
     void ValidateCommand(string actionId, string elementPath);
+    bool TryValue(string key,out UiValueEndpoint? endpoint);
+    UiValueEndpoint Value(string key);
+    UiChoiceEndpoint Choices(string key);
 }
+
+
+

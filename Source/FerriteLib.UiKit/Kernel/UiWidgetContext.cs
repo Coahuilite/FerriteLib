@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -56,19 +55,19 @@ public sealed class UiWidgetContext
 
     public IUiTranslation Translation { get; }
 
-    public IUiBindings Bindings { get; }
+    public IUiBindingReader Bindings { get; }
     public bool IsActive => Session.IsActive;
-    public bool IsDisabled => (Node ?? Session.ActiveNode).IsDisabled;
-    public float SharedLabelWidth => (Node ?? Session.ActiveNode).SharedLabelWidth;
-    public UiElementProperties Properties => (Node ?? Session.ActiveNode).Properties;
-    public UiValueState State(string key) => Session.GetOrCreateValueState((Node ?? Session.ActiveNode).Id, key);
-    public void Invalidate() => (Node ?? Session.ActiveNode).MarkDirty();
+    public bool IsDisabled => Node.IsDisabled;
+    public float SharedLabelWidth => Node.SharedLabelWidth;
+    public UiElementProperties Properties => Node.Properties;
+    public UiValueState State(string key) => Session.GetOrCreateValueState(Node.Id, key);
+    public void Invalidate() => Node.MarkDirty();
     public string InteractionScope
     {
-        get => (Node ?? Session.ActiveNode).InteractionScope;
+        get => Node.InteractionScope;
         set
         {
-            UiNode node = Node ?? Session.ActiveNode;
+            UiNode node = Node;
             if (node.InteractionScope == value) return;
             Session.SuspendFailedInput(node);
             node.InteractionScope = value ?? throw new ArgumentNullException(nameof(value));
@@ -98,7 +97,9 @@ public sealed class UiWidgetContext
     /// <see cref="UiNode.State"/> and ask for a re-measure with <see cref="UiNode.MarkDirty"/> instead of
     /// naming a string slot. Null for a context a caller built by hand.
     /// </summary>
-    public UiNode? Node { get; }
+    public UiNode Node { get; }
+    public UiControls Controls => Session.Controls;
+    public IUiDrawing Drawing => Session.Drawing;
 
     /// <summary>
     /// The nearest-first style declaration chain this element sits in: the element's own declaration at
@@ -121,18 +122,18 @@ public sealed class UiWidgetContext
     /// the content pass, outside any IMGUI group or scroll matrix) share one coordinate space
     /// with their trigger anchor.
     /// </summary>
-    public Vector2 WindowOrigin { get; }
+    public UiLayoutPoint WindowOrigin { get; }
 
-    public UiWidgetContext(
+    internal UiWidgetContext(
         string source,
         UiSession session,
         ITextMetrics metrics,
         UiTheme theme,
         IUiTranslation translation,
-        IUiBindings bindings,
+        IUiBindingReader bindings,
         float viewWidth,
         string elementPath,
-        Vector2 windowOrigin = default,
+        UiLayoutPoint windowOrigin = default,
         UiNodeId elementId = default,
         UiNode? node = null,
         IReadOnlyList<UiStyleDeclaration>? styleChain = null)
@@ -147,7 +148,7 @@ public sealed class UiWidgetContext
         ElementPath = elementPath ?? "";
         WindowOrigin = windowOrigin;
         ElementId = node?.Id ?? elementId;
-        Node = node;
+        Node = node ?? session.Root;
         StyleChain = styleChain;
     }
 
@@ -200,7 +201,7 @@ public sealed class UiWidgetContext
     }
 
     /// <summary>Returns a context whose draw rects are offset into Host window space by <paramref name="windowOrigin"/>.</summary>
-    public UiWidgetContext WithWindowOrigin(Vector2 windowOrigin)
+    public UiWidgetContext WithWindowOrigin(UiLayoutPoint windowOrigin)
     {
         return new UiWidgetContext(Source, Session, Metrics, Theme, Translation, Bindings, ViewWidth, ElementPath, windowOrigin, ElementId, Node, StyleChain);
     }
@@ -258,8 +259,11 @@ public sealed class UiWidgetContext
     }
 
     /// <summary>Converts a draw-local rect (as passed to <c>IUiWidget.Draw</c>) into Host window space.</summary>
-    public Rect ToWindowRect(Rect rect)
+    public UiLayoutRect ToWindowRect(UiLayoutRect rect)
     {
-        return new Rect(rect.x + WindowOrigin.x, rect.y + WindowOrigin.y, rect.width, rect.height);
+        return new UiLayoutRect(rect.X + WindowOrigin.X, rect.Y + WindowOrigin.Y, rect.Width, rect.Height);
     }
 }
+
+
+

@@ -87,3 +87,4 @@ public sealed class VerseFerriteTextMetrics : ITextMetrics, IUiTextMetricsEnviro
         }
     }
 }
+

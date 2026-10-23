@@ -73,3 +73,4 @@ internal sealed class FailureWorkshopExample : IDisposable
     internal void RecoverNotification(){BadConnection=false;Notification.Resume();}
     public void Dispose()=>Owner.Dispose();
 }
+

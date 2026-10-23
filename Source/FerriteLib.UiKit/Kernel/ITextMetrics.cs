@@ -16,3 +16,5 @@ public interface ITextMetrics
     /// </summary>
     float MeasureWidth(string text, UiFont font);
 }
+
+

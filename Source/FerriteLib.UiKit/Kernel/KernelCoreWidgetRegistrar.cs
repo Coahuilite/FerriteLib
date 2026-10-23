@@ -36,3 +36,5 @@ internal static class KernelCoreWidgetRegistrar
         Widgets.RepeatTemplateWidget.Register();
     }
 }
+
+

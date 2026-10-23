@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
@@ -23,7 +22,7 @@ internal sealed class SectionHeaderWidget : IUiWidget, IUiMeasureParticipant, IU
 
     private UiElementSpec spec = UiElementSpec.Empty;
     private readonly UiRetainedPaint retained = new();
-    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect,ctx);
+    bool IUiRetainedDisplay.PaintLast(UiLayoutRect rect, UiWidgetContext ctx) => retained.Paint(rect,ctx);
     UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
@@ -43,7 +42,7 @@ internal sealed class SectionHeaderWidget : IUiWidget, IUiMeasureParticipant, IU
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindings bindings, string elementPath)
+    public void Validate(IUiBindingReader bindings, string elementPath)
     {
         // No required binding. The one attribute this kind does not merely read but implements a closed set of
         // values for is Chrome: a value it would ignore is an inert declaration, refused here where the element
@@ -78,17 +77,17 @@ internal sealed class SectionHeaderWidget : IUiWidget, IUiMeasureParticipant, IU
 
     public UiDescription Describe(UiWidgetContext ctx) => new UiDescription(UiDescriptionRole.Heading, text: Title(ctx));
 
-    public void Draw(Rect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
     {
-        if (rect.width <= 1f || rect.height <= 1f) return;
+        if (rect.Width <= 1f || rect.Height <= 1f) return;
 
         string title = Describe(ctx).Text;
         PaintText(rect,ctx,title);
         retained.Capture(ctx,(r,c)=>PaintText(r,c,title));
     }
-    private void PaintText(Rect rect,UiWidgetContext ctx,string title)
+    private void PaintText(UiLayoutRect rect,UiWidgetContext ctx,string title)
     {
-        UiThemeDraw.Label(rect, title, ctx.Theme, ctx.Theme[UiPaletteRole.Foreground], AtomVocabulary.TextFont(ctx), TextAnchor.MiddleLeft);
+        UiThemeDraw.Label(ctx.Drawing,rect, title, ctx.Theme, ctx.Theme[UiPaletteRole.Foreground], AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft);
 
         // Chrome="none": the title without the rule under it. Read here rather than cached in Configure so the
         // decision sits next to the paint it suppresses and a reloaded spec needs no second path.
@@ -98,7 +97,7 @@ internal sealed class SectionHeaderWidget : IUiWidget, IUiMeasureParticipant, IU
         }
 
         UiThemeDraw.Surface(
-            new Rect(rect.x, rect.yMax - 1f, rect.width, 1f),
+ctx.Drawing,            new UiLayoutRect(rect.X, rect.YMax - 1f, rect.Width, 1f),
             ctx.Theme,
             ctx.Theme[UiPaletteRole.Divider],
             ctx.Theme[UiPaletteRole.Divider]);
@@ -118,3 +117,5 @@ internal sealed class SectionHeaderWidget : IUiWidget, IUiMeasureParticipant, IU
 
     private string Title(UiWidgetContext ctx) => AtomVocabulary.ResolveText(spec, ctx, "Title", "TitleKey");
 }
+
+

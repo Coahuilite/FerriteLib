@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
@@ -46,7 +45,7 @@ internal sealed class ImageWidget : IUiWidget, IUiMeasureParticipant, IUiDescrip
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindings bindings, string elementPath)
+    public void Validate(IUiBindingReader bindings, string elementPath)
     {
         string key = ReadBindKey();
         if (key.Length == 0)
@@ -64,12 +63,12 @@ internal sealed class ImageWidget : IUiWidget, IUiMeasureParticipant, IUiDescrip
     {
         if (spec.TryGetAttribute("Height", out string declaredHeight) && declaredHeight.Trim().Length > 0)
             return new UiMeasurement(new UiMeasureInputs(), () => AtomVocabulary.ReadFloat(spec, "Height", ctx.Theme.Geometry.RowHeight));
-        Texture? texture = ReadTexture(ctx);
-        float width = texture == null ? 0 : texture.width, height = texture == null ? 0 : texture.height;
+        UiImage texture = ReadTexture(ctx);
+        float width = texture.IsEmpty ? 0 : texture.Width, height = texture.IsEmpty ? 0 : texture.Height;
         return new UiMeasurement(new UiMeasureInputs(numbers: new[] { width, height, AtomVocabulary.ReadBool(spec, "AspectHeight", false) ? ctx.ViewWidth : 0, ctx.Theme.Geometry.Padding, ctx.Theme.Geometry.RowHeight }), () =>
         {
             if (spec.TryGetAttribute("Height", out string raw) && raw.Trim().Length > 0) return AtomVocabulary.ReadFloat(spec, "Height", ctx.Theme.Geometry.RowHeight);
-            if (texture != null && AtomVocabulary.ReadBool(spec, "AspectHeight", false))
+            if (!texture.IsEmpty && AtomVocabulary.ReadBool(spec, "AspectHeight", false))
             {
                 float aspect = UiImageLayout.AspectHeight(ctx.ViewWidth, width, height);
                 return aspect > 0 ? aspect : ctx.Theme.Geometry.RowHeight;
@@ -80,19 +79,19 @@ internal sealed class ImageWidget : IUiWidget, IUiMeasureParticipant, IUiDescrip
 
     public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
 
-    public void Draw(Rect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
     {
-        if (rect.width <= 1f || rect.height <= 1f) return;
+        if (rect.Width <= 1f || rect.Height <= 1f) return;
 
         UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, writable: null);
-        if (UiThemeDraw.Image(rect, ReadTexture(ctx), style.Text, ReadOptions()))
+        if (UiThemeDraw.Image(ctx.Drawing,rect, ReadTexture(ctx), style.Text, ReadOptions()))
         {
             return;
         }
 
         // The empty slot, in the element's own resolved style: the same plane and hairline the checkbox box
         // and the tree's marker use, so a missing picture reads as a placeholder rather than as a broken glyph.
-        UiThemeDraw.Surface(rect, style.Surface, ctx.Theme.Geometry.Hairline);
+        UiThemeDraw.Surface(ctx.Drawing,rect, style.Surface, ctx.Theme.Geometry.Hairline);
     }
 
     public UiDescription Describe(UiWidgetContext ctx)
@@ -101,9 +100,9 @@ internal sealed class ImageWidget : IUiWidget, IUiMeasureParticipant, IUiDescrip
         string name = AtomVocabulary.ResolveText(spec, ctx, "Description", "DescriptionKey");
         try
         {
-            if (!UiTextureBinding.TryRead(ctx.Bindings, ReadBindKey(), out Texture? texture))
+            if (!UiTextureBinding.TryRead(ctx.Bindings, ReadBindKey(), out UiImage texture))
                 return new UiDescription(role, name: name, unknownReason: "MissingBinding");
-            return new UiDescription(role, name: name, available: texture != null);
+            return new UiDescription(role, name: name, available: !texture.IsEmpty);
         }
         catch (InvalidOperationException ex) when (ex is not UiReactiveFault)
         {
@@ -129,14 +128,17 @@ internal sealed class ImageWidget : IUiWidget, IUiMeasureParticipant, IUiDescrip
     /// answers null and records one report, so a page with no picture source paints its empty slot instead of
     /// tripping the slot. <c>Validate</c> still refuses the authoring mistake at creation time.
     /// </summary>
-    private Texture? ReadTexture(UiWidgetContext ctx)
+    private UiImage ReadTexture(UiWidgetContext ctx)
     {
         try
         {
-            if (UiTextureBinding.TryRead(ctx.Bindings, ReadBindKey(), out Texture? texture)) return texture;
+            if (UiTextureBinding.TryRead(ctx.Bindings, ReadBindKey(), out UiImage texture)) return texture;
         }
         catch (InvalidOperationException ex) when (ex is not UiReactiveFault) { }
         AtomVocabulary.ReportUnresolved(ctx, Kind, ReadBindKey(), "no texture");
-        return null;
+        return default;
     }
 }
+
+
+

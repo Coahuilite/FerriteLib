@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -63,19 +62,19 @@ internal struct UiDevGeometrySample
     /// level; inside a scrolled container it is that container's content-local space, which is why the draw
     /// rect is recorded beside it instead of being derived from it.
     /// </summary>
-    internal Rect Arranged { get; set; }
+    internal UiLayoutRect Arranged { get; set; }
 
     /// <summary>The rect the widget's Draw was handed - the element's own drawing space.</summary>
-    internal Rect Draw { get; set; }
+    internal UiLayoutRect Draw { get; set; }
 
     /// <summary>The draw rect converted into Host window space, which is where the pointer and hit stack live.</summary>
-    internal Rect Window { get; set; }
+    internal UiLayoutRect Window { get; set; }
 
     /// <summary>The draw-local to window-space offset this sample was converted with.</summary>
-    internal Vector2 Origin { get; set; }
+    internal UiLayoutPoint Origin { get; set; }
 
     /// <summary>Scroll content rect (scroll-local) for a scoped container, else null.</summary>
-    internal Rect? Content { get; set; }
+    internal UiLayoutRect? Content { get; set; }
 
     /// <summary>Fixed, Auto or MatchContent, read from the declaration.</summary>
     internal string HeightMode { get; set; }
@@ -132,7 +131,7 @@ internal struct UiDevGeometrySample
     internal bool Disabled { get; set; }
 
     /// <summary>The effective clip in force (Host window space), or null when none could be read.</summary>
-    internal Rect? Clip { get; set; }
+    internal UiLayoutRect? Clip { get; set; }
 
     /// <summary>
     /// The hover boundary. Always null at this site - the hover claim is published during the element's own
@@ -140,16 +139,16 @@ internal struct UiDevGeometrySample
     /// that the text and the data both render this same fact. A boundary hard-coded as "unknown" in one
     /// rendering and derived from the sample in the other is a divergence nothing would catch.
     /// </summary>
-    internal Rect? Hover { get; set; }
+    internal UiLayoutRect? Hover { get; set; }
 
     /// <summary>Always null at this site: this library publishes no focus owner to report.</summary>
-    internal Rect? Focus { get; set; }
+    internal UiLayoutRect? Focus { get; set; }
 
     /// <summary>The session's open popup owner, or "".</summary>
     internal string OpenPopupId { get; set; }
 
     /// <summary>The open popup's anchor (Host window space), or null when no popup was open.</summary>
-    internal Rect? PopupAnchor { get; set; }
+    internal UiLayoutRect? PopupAnchor { get; set; }
 
     /// <summary>True when this element owns the session's open popup.</summary>
     internal bool OwnsOpenPopup { get; set; }
@@ -181,10 +180,10 @@ internal struct UiDevInputSample
     internal string ElementId { get; set; }
 
     /// <summary>The queried rect in Host window space.</summary>
-    internal Rect Rect { get; set; }
+    internal UiLayoutRect Rect { get; set; }
 
     /// <summary>The pointer in Host window space - the same space as <see cref="Rect"/>.</summary>
-    internal Vector2 Point { get; set; }
+    internal UiLayoutPoint Point { get; set; }
 
     /// <summary>What the funnel decided.</summary>
     internal string Verdict { get; set; }
@@ -267,11 +266,11 @@ internal sealed class UiDevGeometryCapture
     internal long DroppedInput { get; private set; }
 
     /// <summary>Starts a new pass, dropping the previous one's samples. A repeat of the current pass no-ops.</summary>
-    internal void BeginPass(int current)
+    internal void BeginPass(int current, string phase)
     {
         if (current == pass) return;
         pass = current;
-        EntryEvent = UiNative.DiagnosticEventName();
+        EntryEvent = phase;
         geometry.Clear();
         input.Clear();
         chrome = null;
@@ -564,15 +563,15 @@ internal sealed class UiDevGeometryCapture
         return value.ToString("0.###", CultureInfo.InvariantCulture);
     }
 
-    private static string Point(Vector2 point)
+    private static string Point(UiLayoutPoint point)
     {
-        return "(" + Number(point.x) + "," + Number(point.y) + ")";
+        return "(" + Number(point.X) + "," + Number(point.Y) + ")";
     }
 
-    private static string Rect(Rect rect)
+    private static string Rect(UiLayoutRect rect)
     {
-        return "(" + Number(rect.x) + "," + Number(rect.y) + ","
-            + Number(rect.width) + "," + Number(rect.height) + ")";
+        return "(" + Number(rect.X) + "," + Number(rect.Y) + ","
+            + Number(rect.Width) + "," + Number(rect.Height) + ")";
     }
 
     /// <summary>A text field, with an empty value spelled so a reader can tell "none" from "missing column".</summary>
@@ -582,7 +581,7 @@ internal sealed class UiDevGeometryCapture
     }
 
     /// <summary>A boundary as text: the rect, or <c>unknown(reason)</c>.</summary>
-    private static string Boundary(Rect? rect, string unknownReason)
+    private static string Boundary(UiLayoutRect? rect, string unknownReason)
     {
         return rect.HasValue ? Rect(rect.Value) : "unknown(" + unknownReason + ")";
     }
@@ -627,7 +626,7 @@ internal sealed class UiDevGeometryCapture
 internal static class UiDevGeometryProbe
 {
     /// <summary>Colour of the outline painted around each sampled element's draw rect.</summary>
-    private static readonly Color OutlineInk = new Color(0.16f, 0.86f, 1f, 1f);
+    private static readonly UiColour OutlineInk = new UiColour(0.16f, 0.86f, 1f, 1f);
 
     /// <summary>The authored role attribute, read as text: the instrument never interprets a role.</summary>
     private const string ToneAttribute = "Tone";
@@ -658,9 +657,9 @@ internal static class UiDevGeometryProbe
         bool isContainer,
         bool isScopedContainer,
         bool isHitSurface,
-        Rect arranged,
-        Rect? contentRect,
-        Rect drawRect,
+        UiLayoutRect arranged,
+        UiLayoutRect? contentRect,
+        UiLayoutRect drawRect,
         UiWidgetContext ctx,
         bool themeIsRegionClone,
         UiStyleResolver? resolver,
@@ -669,7 +668,7 @@ internal static class UiDevGeometryProbe
         UiDevGeometryCapture? capture = UiDiagnosticHub.ActiveSubscription?.Geometry;
         if (capture == null) return false;
 
-        capture.BeginPass(ctx.Session.Frame);
+        capture.BeginPass(ctx.Session.Frame, ctx.Controls.DiagnosticEventName());
         string kind = isContainer && containerKind.Length > 0 ? containerKind : spec.Kind;
         string scheme = "";
         string density = "";
@@ -699,7 +698,7 @@ internal static class UiDevGeometryProbe
             Origin = ctx.WindowOrigin,
             Content = contentRect,
             HeightMode = HeightMode(spec),
-            ResolvedHeight = arranged.height,
+            ResolvedHeight = arranged.Height,
             ScopeFont = theme.DefaultFont,
             // The transparent case, recorded as the fact it is: the font a label finally paints with is chosen
             // inside the element's own draw, so nothing here may stand in for it.
@@ -818,12 +817,12 @@ internal static class UiDevGeometryProbe
     /// Shell chrome has its own entry, <see cref="OutlineShellChrome"/>, because those rects carry no node.
     /// </para>
     /// </summary>
-    internal static void Outline(Rect drawRect, bool retained)
+    internal static void Outline(IUiDrawing drawing, UiLayoutRect drawRect, bool retained)
     {
         UiDiagnosticSubscription? subscription = UiDiagnosticHub.ActiveSubscription;
         if (subscription == null || !subscription.GeometryOverlay) return;
         if (subscription.GeometryEnabled && !retained) return;
-        OutlineRect(drawRect);
+        OutlineRect(drawing, drawRect);
     }
 
     /// <summary>
@@ -833,13 +832,13 @@ internal static class UiDevGeometryProbe
     /// pass (per-host isolation is the diagnostic surface's rule, not a new one). The geometry RECORD is
     /// the separate, always-when-capturing <see cref="RecordShellChrome"/>; this half only paints.
     /// </summary>
-    internal static void OutlineShellChrome(Rect windowFrame, Rect titleBand, Rect closeButton)
+    internal static void OutlineShellChrome(IUiDrawing drawing, UiLayoutRect windowFrame, UiLayoutRect titleBand, UiLayoutRect closeButton)
     {
         UiDiagnosticSubscription? subscription = UiDiagnosticHub.ActiveSubscription;
         if (subscription == null || !subscription.GeometryOverlay) return;
-        OutlineRect(windowFrame);
-        OutlineRect(titleBand);
-        OutlineRect(closeButton);
+        OutlineRect(drawing, windowFrame);
+        OutlineRect(drawing, titleBand);
+        OutlineRect(drawing, closeButton);
     }
 
     /// <summary>
@@ -859,15 +858,15 @@ internal static class UiDevGeometryProbe
     }
 
     /// <summary>Four hairlines around one rect - the one outline paint outlet.</summary>
-    private static void OutlineRect(Rect drawRect)
+    private static void OutlineRect(IUiDrawing drawing, UiLayoutRect drawRect)
     {
-        if (drawRect.width <= 0f || drawRect.height <= 0f) return;
+        if (drawRect.Width <= 0f || drawRect.Height <= 0f) return;
 
         const float hairline = 1f;
-        UiThemeDraw.Solid(new Rect(drawRect.x, drawRect.y, drawRect.width, hairline), OutlineInk);
-        UiThemeDraw.Solid(new Rect(drawRect.x, drawRect.yMax - hairline, drawRect.width, hairline), OutlineInk);
-        UiThemeDraw.Solid(new Rect(drawRect.x, drawRect.y, hairline, drawRect.height), OutlineInk);
-        UiThemeDraw.Solid(new Rect(drawRect.xMax - hairline, drawRect.y, hairline, drawRect.height), OutlineInk);
+        UiThemeDraw.Solid(drawing,new UiLayoutRect(drawRect.X, drawRect.Y, drawRect.Width, hairline), OutlineInk);
+        UiThemeDraw.Solid(drawing,new UiLayoutRect(drawRect.X, drawRect.YMax - hairline, drawRect.Width, hairline), OutlineInk);
+        UiThemeDraw.Solid(drawing,new UiLayoutRect(drawRect.X, drawRect.Y, hairline, drawRect.Height), OutlineInk);
+        UiThemeDraw.Solid(drawing,new UiLayoutRect(drawRect.XMax - hairline, drawRect.Y, hairline, drawRect.Height), OutlineInk);
     }
 
     /// <summary>
@@ -876,21 +875,21 @@ internal static class UiDevGeometryProbe
     /// taken when the pass started with a pointer press/release, or the native control fired. A pass that
     /// entered already Used is also observable, but explicitly marks its original input kind unknown.
     /// </summary>
-    internal static void NoteInput(UiWidgetContext ctx, UiNode? element, Rect rect, string verdict, string eventBefore)
+    internal static void NoteInput(UiWidgetContext ctx, UiNode? element, UiLayoutRect rect, string verdict, string eventBefore)
     {
         UiDevGeometryCapture? capture = UiDiagnosticHub.ActiveSubscription?.Geometry;
         if (capture == null) return;
 
-        capture.BeginPass(ctx.Session.Frame);
+        capture.BeginPass(ctx.Session.Frame, ctx.Controls.DiagnosticEventName());
         bool sampleInput = string.Equals(verdict, "hit", StringComparison.Ordinal)
             || capture.EntryEvent == "MouseDown" || capture.EntryEvent == "MouseUp"
             || capture.EntryEvent == "Used"
-            || UiNative.IsPointerDown()
-            || UiNative.IsPointerUp();
+            || ctx.Controls.IsPointerDown()
+            || ctx.Controls.IsPointerUp();
         if (!sampleInput) return;
 
-        string eventAfter = UiNative.DiagnosticEventName();
-        Vector2 pointer = UiNative.PointerPosition();
+        string eventAfter = ctx.Controls.DiagnosticEventName();
+        UiLayoutPoint pointer = ctx.Controls.PointerPosition();
         capture.Add(new UiDevInputSample
         {
             Pass = ctx.Session.Frame,
@@ -899,7 +898,7 @@ internal static class UiDevGeometryProbe
             Kind = element is null ? "" : element.Kind,
             ElementId = element is null ? "" : element.ElementId,
             Rect = ctx.ToWindowRect(rect),
-            Point = ctx.ToWindowRect(new Rect(pointer.x, pointer.y, 0f, 0f)).position,
+            Point = ctx.ToWindowRect(new UiLayoutRect(pointer.X, pointer.Y, 0f, 0f)).Position,
             Verdict = verdict,
             EventBefore = eventBefore,
             EventAfter = eventAfter,
@@ -934,3 +933,7 @@ internal static class UiDevGeometryProbe
     }
 }
 #endif
+
+
+
+

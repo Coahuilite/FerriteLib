@@ -35,3 +35,5 @@ public sealed class UiValueState
     /// </summary>
     internal bool DiscardRequested;
 }
+
+

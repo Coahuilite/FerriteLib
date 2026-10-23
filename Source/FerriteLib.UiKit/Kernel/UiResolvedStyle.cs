@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -10,7 +9,7 @@ namespace FerriteLib.UiKit.Kernel;
 /// </summary>
 public readonly struct UiResolvedStyle
 {
-    public UiResolvedStyle(Color fill, Color border, Color text)
+    public UiResolvedStyle(UiColour fill, UiColour border, UiColour text)
     {
         Fill = fill;
         Border = border;
@@ -18,13 +17,13 @@ public readonly struct UiResolvedStyle
     }
 
     /// <summary>The colour the surface fills its rect with.</summary>
-    public Color Fill { get; }
+    public UiColour Fill { get; }
 
     /// <summary>The colour of the surface edge.</summary>
-    public Color Border { get; }
+    public UiColour Border { get; }
 
     /// <summary>The colour any label painted on this surface uses.</summary>
-    public Color Text { get; }
+    public UiColour Text { get; }
 
     /// <summary>The fill/border half of this answer, ready for the painting outlet.</summary>
     public UiSurfaceStyle Surface => new(Fill, Border);
@@ -124,7 +123,7 @@ public sealed class UiStyleTable
             emphasis == UiEmphasis.Muted ? theme[UiPaletteRole.SecondaryForeground] : theme[UiPaletteRole.Foreground]);
     }
 
-    private static UiResolvedStyle From(UiSurfaceStyle surface, Color text)
+    private static UiResolvedStyle From(UiSurfaceStyle surface, UiColour text)
     {
         return new UiResolvedStyle(surface.Fill, surface.Border, text);
     }
@@ -149,3 +148,5 @@ public sealed class UiStyleTable
         lastFallback = diagnostic;
     }
 }
+
+

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -28,7 +27,7 @@ namespace FerriteLib.UiKit.Kernel;
 /// </summary>
 public readonly struct UiDevBoundary
 {
-    private UiDevBoundary(bool isKnown, Rect rect, string reason)
+    private UiDevBoundary(bool isKnown, UiLayoutRect rect, string reason)
     {
         IsKnown = isKnown;
         Rect = rect;
@@ -36,7 +35,7 @@ public readonly struct UiDevBoundary
     }
 
     /// <summary>A boundary that was observed, in Host window space.</summary>
-    public static UiDevBoundary Known(Rect rect)
+    public static UiDevBoundary Known(UiLayoutRect rect)
     {
         return new UiDevBoundary(true, rect, "");
     }
@@ -59,7 +58,7 @@ public readonly struct UiDevBoundary
     public bool IsKnown { get; }
 
     /// <summary>The observed rect in Host window space. Meaningful only when <see cref="IsKnown"/>.</summary>
-    public Rect Rect { get; }
+    public UiLayoutRect Rect { get; }
 
     /// <summary>Why the value is unknown. Empty when <see cref="IsKnown"/>.</summary>
     public string UnknownReason { get; }
@@ -69,10 +68,10 @@ public readonly struct UiDevBoundary
         if (!IsKnown) return "unknown(" + UnknownReason + ")";
         // this.Rect, not Rect: the property shares its name with its type, and qualifying the receiver keeps
         // every reference here unambiguous.
-        return "(" + this.Rect.x.ToString("0.###", CultureInfo.InvariantCulture) + ","
-            + this.Rect.y.ToString("0.###", CultureInfo.InvariantCulture) + ","
-            + this.Rect.width.ToString("0.###", CultureInfo.InvariantCulture) + ","
-            + this.Rect.height.ToString("0.###", CultureInfo.InvariantCulture) + ")";
+        return "(" + this.Rect.X.ToString("0.###", CultureInfo.InvariantCulture) + ","
+            + this.Rect.Y.ToString("0.###", CultureInfo.InvariantCulture) + ","
+            + this.Rect.Width.ToString("0.###", CultureInfo.InvariantCulture) + ","
+            + this.Rect.Height.ToString("0.###", CultureInfo.InvariantCulture) + ")";
     }
 }
 
@@ -197,16 +196,16 @@ public sealed class UiDevNodeSnapshot
     /// level; inside a scrolled container it is that container's content-local space, which is why
     /// <see cref="Draw"/> is recorded beside it instead of being derived from it.
     /// </summary>
-    public Rect Arranged { get; internal set; }
+    public UiLayoutRect Arranged { get; internal set; }
 
     /// <summary>The rect the widget's Draw was handed - the element's own drawing space.</summary>
-    public Rect Draw { get; internal set; }
+    public UiLayoutRect Draw { get; internal set; }
 
     /// <summary><see cref="Draw"/> converted into Host window space, where the pointer and hit stack live.</summary>
-    public Rect Window { get; internal set; }
+    public UiLayoutRect Window { get; internal set; }
 
     /// <summary>The draw-local to window-space offset this sample was converted with.</summary>
-    public Vector2 Origin { get; internal set; }
+    public UiLayoutPoint Origin { get; internal set; }
 
     /// <summary>Scroll content rect (scroll-local) for a scoped container; unknown for everything else.</summary>
     public UiDevBoundary Content { get; internal set; }
@@ -429,10 +428,10 @@ public sealed class UiDevInputSnapshot
     public string ElementId { get; internal set; } = "";
 
     /// <summary>The queried rect in Host window space.</summary>
-    public Rect Rect { get; internal set; }
+    public UiLayoutRect Rect { get; internal set; }
 
     /// <summary>The pointer in Host window space - the same space as <see cref="Rect"/>.</summary>
-    public Vector2 Point { get; internal set; }
+    public UiLayoutPoint Point { get; internal set; }
 
     /// <summary>What the funnel decided: <c>disabled</c>, <c>covered</c>, <c>hit</c> or <c>miss</c>.</summary>
     public string Verdict { get; internal set; } = "";
@@ -562,3 +561,5 @@ public sealed class UiDevGeometrySnapshot
             + " inputs=" + Inputs.Count.ToString(CultureInfo.InvariantCulture);
     }
 }
+
+

@@ -24,12 +24,13 @@ public sealed class UiElementSpec
 
     /// <summary>Child specs. Flat manifests produce an empty list.</summary>
     public IReadOnlyList<UiElementSpec> Children { get; }
+    public IReadOnlyList<UiChoice<string>> Choices { get; }
 
     public UiElementSpec(
         string id,
         string kind,
         IReadOnlyDictionary<string, string>? attributes = null,
-        IReadOnlyList<UiElementSpec>? children = null)
+        IReadOnlyList<UiElementSpec>? children = null, IReadOnlyList<UiChoice<string>>? choices = null)
     {
         if (kind == null) throw new ArgumentNullException(nameof(kind));
         if (kind.Length == 0) throw new ArgumentException("Widget Kind must not be empty.", nameof(kind));
@@ -45,6 +46,7 @@ public sealed class UiElementSpec
         }
         this.attributes = new ReadOnlyDictionary<string, string>(attributeCopy);
 
+        Choices = choices == null ? Array.Empty<UiChoice<string>>() : Array.AsReadOnly(choices.ToArray());
         Children = children == null
             ? Array.Empty<UiElementSpec>()
             : Array.AsReadOnly(children.ToArray());
@@ -70,5 +72,9 @@ public sealed class UiElementSpec
         attributes = new ReadOnlyDictionary<string, string>(
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
         Children = Array.Empty<UiElementSpec>();
+        Choices = Array.Empty<UiChoice<string>>();
     }
 }
+
+
+

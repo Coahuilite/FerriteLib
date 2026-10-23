@@ -43,7 +43,7 @@ internal sealed class InventoryPageExample : IDisposable
         Bindings.BindTracked("focus", () => Focus.Value?.Count ?? 0);
         Bindings.BindTracked<IReadOnlyList<string>>("items", () => { KeyRuns++; return Items.Value.Select(item => item.Key).ToList().AsReadOnly(); }, equal: SameKeys);
         Bindings.BindTracked("selected", () => Selected.Value, value => { Requests++; Selected.Value = value; });
-        Bindings.BindTrackedOptions("selected", () =>
+        Bindings.BindTrackedChoices("selected", () =>
         {
             ChoiceRuns++;
             return Items.Value.Select(item => new UiChoice<int>(item.Key + ": " + item.Count, item.Code)).ToList().AsReadOnly();
@@ -74,3 +74,4 @@ internal sealed class InventoryPageExample : IDisposable
     }
     public void Dispose() => BusinessOwner.Dispose();
 }
+

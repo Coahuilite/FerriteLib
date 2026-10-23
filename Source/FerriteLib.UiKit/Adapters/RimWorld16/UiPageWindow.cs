@@ -25,7 +25,7 @@ public sealed class UiPageWindow : UiWindowHost
 {
     private readonly UiWindowKey key;
     private readonly UiLayoutManifest manifest;
-    private readonly IUiBindings bindings;
+    private readonly IUiBindingReader bindings;
     private readonly UiTheme theme;
     private readonly IUiTranslation translation;
     private readonly ITextMetrics metrics;
@@ -37,7 +37,7 @@ public sealed class UiPageWindow : UiWindowHost
     public UiPageWindow(
         UiWindowKey key,
         UiLayoutManifest manifest,
-        IUiBindings bindings,
+        IUiBindingReader bindings,
         UiTheme theme,
         IUiTranslation translation,
         string title,
@@ -102,8 +102,8 @@ public sealed class UiPageWindow : UiWindowHost
     {
         UiWindowBackground? current = Background;
         if (current == null) return;
-        if (!UiTextureBinding.TryRead(bindings, current.Bind, out Texture? texture)) return;
-        UiThemeDraw.Image(rect, texture, Color.white, current.Options);
+        if (!UiTextureBinding.TryRead(bindings, current.Bind, out UiImage texture)) return;
+        UiThemeDraw.Image(Execution,VerseUiExecution.Rect(rect),texture,UiColour.White,current.Options);
     }
 
     protected override UiTheme Theme => theme;
@@ -144,6 +144,9 @@ public sealed class UiPageWindow : UiWindowHost
 
     protected override void DrawNotice(Rect rect, UiWindowNotice notice)
     {
-        UiThemeDraw.Label(rect, noticeText(notice), theme, singleLine: false);
+        UiThemeDraw.Label(Execution,VerseUiExecution.Rect(rect),noticeText(notice),theme,singleLine: false);
     }
 }
+
+
+

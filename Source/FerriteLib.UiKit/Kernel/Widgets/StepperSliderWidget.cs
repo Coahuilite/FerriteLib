@@ -1,11 +1,10 @@
 using System;
 using System.Globalization;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>
 /// Greenfield stepper-slider composite. Uses the session-owned <see cref = "UiNative"/> primitives
-/// and writes through the typed <see cref = "IUiBindings"/>; no neutral command bridge.
+/// and writes through the typed <see cref = "IUiBindingReader"/>; no neutral command bridge.
 /// The typed value-binding key is the <c>Bind</c> attribute when present, otherwise the element Id.
 /// </summary>
 internal sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiLayoutDiagnosticSource, IUiPointerLayout, IUiRetainedDisplay
@@ -24,7 +23,7 @@ internal sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IU
 
     private UiElementSpec spec = UiElementSpec.Empty;
     private readonly UiRetainedPaint retained = new();
-    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
+    bool IUiRetainedDisplay.PaintLast(UiLayoutRect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
     UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     public string KindName => Kind;
@@ -46,7 +45,7 @@ internal sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IU
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindings bindings, string elementPath)
+    public void Validate(IUiBindingReader bindings, string elementPath)
     {
         string bindKey = ReadBindKey();
         if (string.IsNullOrEmpty(bindKey))
@@ -81,9 +80,9 @@ internal sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IU
         yield return new UiPointerRegion(layout.Plus);
     }
 
-    public void Draw(Rect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
     {
-        if (rect.width <= 1f || rect.height <= 1f)
+        if (rect.Width <= 1f || rect.Height <= 1f)
             return;
         float min = ReadFloat("Min", 0f);
         float max = ReadFloat("Max", 1f);
@@ -95,25 +94,25 @@ internal sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IU
         string bindKey = ReadBindKey();
         float current = ctx.Bindings.TryGet(bindKey, out float bound) ? bound : min;
         var numeric = new UiNumericEdit(min, max, format);
-        UiEditSession<float> editor = UiNative.Editor<float>(ctx, bindKey, numeric.Format, numeric.Parse);
+        UiEditSession<float> editor = ctx.Controls.Editor<float>(ctx, bindKey, numeric.Format, numeric.Parse);
         editor.Observe(current);
         string label = ReadLabel(ctx);
-        UiSliderLayout labelLayout = LabelLayout(ctx, rect.width);
-        UiStepperLayout layout = ControlLayout(ctx, rect.width, rect.height, labelLayout);
-        Rect minusRect = Place(layout.Minus, rect);
-        Rect sliderRect = Place(layout.Range, rect);
-        Rect fieldRect = Place(layout.Field, rect);
-        Rect plusRect = Place(layout.Plus, rect);
+        UiSliderLayout labelLayout = LabelLayout(ctx, rect.Width);
+        UiStepperLayout layout = ControlLayout(ctx, rect.Width, rect.Height, labelLayout);
+        UiLayoutRect minusRect = Place(layout.Minus, rect);
+        UiLayoutRect sliderRect = Place(layout.Range, rect);
+        UiLayoutRect fieldRect = Place(layout.Field, rect);
+        UiLayoutRect plusRect = Place(layout.Plus, rect);
         bool writable = ctx.Bindings.IsWritable(bindKey);
-        UiInteractionResult minus = UiNative.Activation(minusRect, ctx, bindKey, "decrement", writable: writable);
-        UiInteractionResult plus = UiNative.Activation(plusRect, ctx, bindKey, "increment", writable: writable);
-        UiInteractionResult range = UiNative.Range(sliderRect, ctx, bindKey, current, min, max, writable);
+        UiInteractionResult minus = ctx.Controls.Activation(minusRect, ctx, bindKey, "decrement", writable: writable);
+        UiInteractionResult plus = ctx.Controls.Activation(plusRect, ctx, bindKey, "increment", writable: writable);
+        UiInteractionResult range = ctx.Controls.Range(sliderRect, ctx, bindKey, current, min, max, writable);
         // These parts explicitly participate in this editor's combination. Their press/capture is
         // not ordinary blur, even though activation waits until release and a thumb press may select nothing.
         UiInteractionTarget? capture = ctx.Session.Interactions.CaptureOwner;
-        if (capture?.Node == (ctx.Node ?? ctx.Session.ActiveNode).Id.Key
+        if (capture?.Node == ctx.Node.Id.Key
             && (capture.Value.Part == "decrement" || capture.Value.Part == "increment" || capture.Value.Part == ""))
-            UiNative.SuspendEditor(ctx, bindKey);
+            ctx.Controls.SuspendEditor(ctx, bindKey);
         bool takeover = false;
         void Set(float value) => ctx.Bindings.Set(bindKey, value);
         float ReadModel() => ctx.Bindings.Get<float>(bindKey);
@@ -121,46 +120,46 @@ internal sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IU
         {
             UiInteractionResult operation = minus.Request ? minus : plus;
             string part = minus.Request ? "decrement" : "increment";
-            UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx, bindKey, part), operation, () => numeric.Step(editor, ReadModel(), minus.Request ? -step : step, Set, ReadModel));
+            UiInteractionRequests.Activation(ctx.Controls.InteractionTarget(ctx, bindKey, part), operation, () => numeric.Step(editor, ReadModel(), minus.Request ? -step : step, Set, ReadModel));
             takeover = true;
         }
         else if (range.Request)
         {
-            UiInteractionRequests.Range(UiNative.InteractionTarget(ctx, bindKey), range, value => editor.TakeOver(value, Set, ReadModel));
+            UiInteractionRequests.Range(ctx.Controls.InteractionTarget(ctx, bindKey), range, value => editor.TakeOver(value, Set, ReadModel));
             takeover = true;
         }
 
         if (!ctx.Session.IsActive)
             return;
         if (!takeover)
-            UiNative.Edit(fieldRect, ctx, bindKey, ReadModel(), numeric.Format, numeric.Parse, live, false, Set, ReadModel);
+            ctx.Controls.Edit(fieldRect, ctx, bindKey, ReadModel(), numeric.Format, numeric.Parse, live, false, Set, ReadModel);
         if (!ctx.Session.IsActive)
             return;
-        UiValueState state = ctx.Session.GetOrCreateValueState((ctx.Node ?? ctx.Session.ActiveNode).Id, bindKey);
+        UiValueState state = ctx.Session.GetOrCreateValueState(ctx.Node.Id, bindKey);
         state.EditText = editor.Draft;
         state.Focused = editor.Focused;
-        if (!editor.Focused) UiNative.SuspendEditor(ctx, bindKey);
+        if (!editor.Focused) ctx.Controls.SuspendEditor(ctx, bindKey);
         if (numeric.Parse(editor.Draft, out float parsed))
             state.FloatValue = parsed;
         // Only presentation follows established requests; a label failure cannot swallow an operation.
         if (label.Length > 0)
         {
             float labelWidth = labelLayout.LabelWidth;
-            UiThemeDraw.Label(new Rect(rect.x, rect.y, labelWidth, labelLayout.Stacked ? labelLayout.LabelHeight : layout.Minus.Height), label, ctx.Theme, ctx.Theme[UiPaletteRole.Foreground], AtomVocabulary.TextFont(ctx));
+            UiThemeDraw.Label(ctx.Drawing,new UiLayoutRect(rect.X, rect.Y, labelWidth, labelLayout.Stacked ? labelLayout.LabelHeight : layout.Minus.Height), label, ctx.Theme, ctx.Theme[UiPaletteRole.Foreground], AtomVocabulary.TextFont(ctx));
         }
 
-        DrawButton(minusRect, "−", ctx.Theme);
-        DrawButton(plusRect, "+", ctx.Theme);
+        DrawButton(ctx.Drawing,minusRect, "−", ctx.Theme);
+        DrawButton(ctx.Drawing,plusRect, "+", ctx.Theme);
         float paintedValue=ReadModel();
-        UiNative.PaintRange(sliderRect, ctx.Theme, paintedValue, min, max);
+        ctx.Controls.PaintRange(sliderRect, ctx.Theme, paintedValue, min, max);
         AtomVocabulary.PaintEditFeedback(fieldRect, ctx, editor);
         retained.Capture(ctx,(r,c)=>
         {
-            UiSliderLayout lastLabel=LabelLayout(c,r.width,label);
-            UiStepperLayout lastLayout=ControlLayout(c,r.width,r.height,lastLabel);
-            if(label.Length>0) UiThemeDraw.Label(new Rect(r.x,r.y,lastLabel.LabelWidth,lastLabel.Stacked?lastLabel.LabelHeight:lastLayout.Minus.Height),label,c.Theme,c.Theme[UiPaletteRole.Foreground],AtomVocabulary.TextFont(c));
-            DrawButton(Place(lastLayout.Minus,r),"−",c.Theme);DrawButton(Place(lastLayout.Plus,r),"+",c.Theme);
-            UiNative.PaintRange(Place(lastLayout.Range,r),c.Theme,paintedValue,min,max);
+            UiSliderLayout lastLabel=LabelLayout(c,r.Width,label);
+            UiStepperLayout lastLayout=ControlLayout(c,r.Width,r.Height,lastLabel);
+            if(label.Length>0) UiThemeDraw.Label(c.Drawing,new UiLayoutRect(r.X,r.Y,lastLabel.LabelWidth,lastLabel.Stacked?lastLabel.LabelHeight:lastLayout.Minus.Height),label,c.Theme,c.Theme[UiPaletteRole.Foreground],AtomVocabulary.TextFont(c));
+            DrawButton(c.Drawing,Place(lastLayout.Minus,r),"−",c.Theme);DrawButton(c.Drawing,Place(lastLayout.Plus,r),"+",c.Theme);
+            ctx.Controls.PaintRange(Place(lastLayout.Range,r),c.Theme,paintedValue,min,max);
             UiRetainedPaint.Field(Place(lastLayout.Field,r),c,editor.Draft);
         });
     }
@@ -181,8 +180,8 @@ internal sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IU
             Math.Max(1, ReadFloat("ButtonWidth", DefaultButtonWidth)),
             Math.Max(1, ReadFloat("FieldWidth", DefaultFieldWidth)), Gap, ctx.Theme.Geometry.Gap);
 
-    private static Rect Place(UiLayoutRect local, Rect outer)
-        => new(outer.x + local.X, outer.y + local.Y, local.Width, local.Height);
+    private static UiLayoutRect Place(UiLayoutRect local, UiLayoutRect outer)
+        => new(outer.X + local.X, outer.Y + local.Y, local.Width, local.Height);
     public float MeasureLabel(UiWidgetContext ctx)
     {
         string label = ReadLabel(ctx);
@@ -211,10 +210,10 @@ internal sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IU
         return spec.TryGetAttribute("Label", out string label) ? label : "";
     }
 
-    private static void DrawButton(Rect rect, string text, UiTheme theme)
+    private static void DrawButton(IUiDrawing drawing,UiLayoutRect rect, string text, UiTheme theme)
     {
-        UiThemeDraw.Solid(rect, theme[UiPaletteRole.ControlSurface]);
-        UiThemeDraw.Label(rect, text, theme, theme[UiPaletteRole.Foreground], anchor: TextAnchor.MiddleCenter);
+        UiThemeDraw.Solid(drawing,rect, theme[UiPaletteRole.ControlSurface]);
+        UiThemeDraw.Label(drawing,rect, text, theme, theme[UiPaletteRole.Foreground], anchor: UiTextAnchor.MiddleCenter);
     }
 
 
@@ -250,3 +249,5 @@ internal sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IU
             || string.Equals(raw, "1", StringComparison.Ordinal);
     }
 }
+
+

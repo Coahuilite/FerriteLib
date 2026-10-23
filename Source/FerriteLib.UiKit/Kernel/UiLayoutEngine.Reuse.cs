@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -86,7 +85,7 @@ internal sealed partial class UiLayoutEngine
         ctx.ViewWidth, (float)ctx.Theme.DefaultFont, ctx.Theme.Geometry.Padding, ctx.Theme.Geometry.Spacing,
         ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.RowHeight, ctx.Theme.Geometry.Hairline, ctx.Node?.SharedLabelWidth ?? 0
     });
-    private static UiMeasureInputs MeasureSources(UiElementSpec spec, IUiBindings bindings)
+    private static UiMeasureInputs MeasureSources(UiElementSpec spec, IUiBindingReader bindings)
     {
         string[] keys = { ReadDeclaredBindKey(spec), ReadAttribute(spec, ActionBindAttribute), ReadAttribute(spec, OptionsBindAttribute),
             ReadAttribute(spec, WidthKeyAttribute), ReadAttribute(spec, VisibleKeyAttribute), ReadAttribute(spec, "SelectedKey"),
@@ -154,8 +153,8 @@ internal sealed partial class UiLayoutEngine
         return true;
     }
 
-    private static bool SameRect(Rect a, Rect b) => a.x == b.x && a.y == b.y && a.width == b.width && a.height == b.height;
-    private static bool SameRect(Rect? a, Rect? b) => a.HasValue == b.HasValue && (!a.HasValue || SameRect(a.Value, b!.Value));
+    private static bool SameRect(UiLayoutRect a, UiLayoutRect b) => a.X == b.X && a.Y == b.Y && a.Width == b.Width && a.Height == b.Height;
+    private static bool SameRect(UiLayoutRect? a, UiLayoutRect? b) => a.HasValue == b.HasValue && (!a.HasValue || SameRect(a.Value, b!.Value));
 
     private static void AppendDefinition(List<string> into, UiElementSpec spec)
     {
@@ -198,3 +197,5 @@ internal sealed partial class UiLayoutEngine
         return next.Plan;
     }
 }
+
+

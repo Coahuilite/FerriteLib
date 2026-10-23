@@ -53,3 +53,5 @@ public readonly struct UiDescription
     public int? Count { get; }
     public string? UnknownReason { get; }
 }
+
+

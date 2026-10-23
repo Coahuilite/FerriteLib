@@ -23,7 +23,7 @@ internal static class NeutralDependencyTests
         bool Safe(string source)
         {
             string code=System.Text.RegularExpressions.Regex.Replace(source,@"^\s*//.*$","",System.Text.RegularExpressions.RegexOptions.Multiline);
-            return !forbidden.Any(name=>code.Contains(name,StringComparison.Ordinal));
+            return !forbidden.Any(name=>System.Text.RegularExpressions.Regex.IsMatch(code,@"\b"+System.Text.RegularExpressions.Regex.Escape(name)+@"\b"));
         }
         check(sources.All(path=>Safe(File.ReadAllText(path))),"NEUTRAL production sources do not hide engine access through named lookup/reflection");
         check(!Safe("Type.GetType(\"UnityStubs.Rect\")"),"NEUTRAL hidden-platform source guard rejects planted lookup");
@@ -44,3 +44,5 @@ internal static class NeutralDependencyTests
         foreach(string name in seen.OrderBy(s=>s,StringComparer.Ordinal))Console.WriteLine("NEUTRAL-DEPENDENCY "+name);
     }
 }
+
+

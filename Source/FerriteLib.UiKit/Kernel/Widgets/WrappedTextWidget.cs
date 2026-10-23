@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
@@ -35,7 +34,7 @@ internal sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiD
 
     private UiElementSpec spec = UiElementSpec.Empty;
     private readonly UiRetainedPaint retained = new();
-    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect,ctx);
+    bool IUiRetainedDisplay.PaintLast(UiLayoutRect rect, UiWidgetContext ctx) => retained.Paint(rect,ctx);
     UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
@@ -55,7 +54,7 @@ internal sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiD
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindings bindings, string elementPath)
+    public void Validate(IUiBindingReader bindings, string elementPath)
     {
         if (spec.TryGetAttribute("Bind", out string bindKey) && bindKey.Length > 0)
         {
@@ -104,9 +103,9 @@ internal sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiD
 
     public UiDescription Describe(UiWidgetContext ctx) => AtomVocabulary.DescribeText(spec, ctx, UiDescriptionRole.Text, "Text", "TextKey");
 
-    public void Draw(Rect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
     {
-        if (rect.width <= 1f || rect.height <= 1f) return;
+        if (rect.Width <= 1f || rect.Height <= 1f) return;
 
         // Resolved before the empty-string return: an authored role typo is recorded on the pass that
         // draws this element, whether or not it has text to paint.
@@ -117,19 +116,19 @@ internal sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiD
         PaintText(rect,ctx,text,style);
         retained.Capture(ctx,(r,c)=>PaintText(r,c,text,style));
     }
-    private void PaintText(Rect rect,UiWidgetContext ctx,string text,UiResolvedStyle style)
+    private void PaintText(UiLayoutRect rect,UiWidgetContext ctx,string text,UiResolvedStyle style)
     {
         // Upper-left anchored and inset by the same padding Measure added, so the rect handed to the
         // single text outlet is the rect the wrapped height was computed for. The fit audit then
         // reports a real defect only, never this atom's own padding.
-        float pad = Math.Min(ctx.Theme.Geometry.Padding, Math.Max(0f, (rect.height - 1f) * 0.5f));
+        float pad = Math.Min(ctx.Theme.Geometry.Padding, Math.Max(0f, (rect.Height - 1f) * 0.5f));
         UiThemeDraw.Label(
-            new Rect(rect.x, rect.y + pad, rect.width, Math.Max(1f, rect.height - pad * 2f)),
+ctx.Drawing,            new UiLayoutRect(rect.X, rect.Y + pad, rect.Width, Math.Max(1f, rect.Height - pad * 2f)),
             text,
             ctx.Theme,
             style.Text,
             AtomVocabulary.TextFont(ctx),
-            TextAnchor.UpperLeft);
+            UiTextAnchor.UpperLeft);
     }
 
     /// <summary>
@@ -151,7 +150,7 @@ internal sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiD
     /// leaf paints its empty default, keeps the band it reserves for an empty string, and records one
     /// deduplicated report through the same bounded channel the collection kinds use
     /// (<see cref="AtomVocabulary.ReportUnresolved"/>). A key bound to another type is an authoring defect and
-    /// keeps its own answer: <see cref="IUiBindings.TryGet{T}"/> raises it, the tree's guard replaces the slot
+    /// keeps its own answer: <see cref="IUiBindingReader.TryGet{T}"/> raises it, the tree's guard replaces the slot
     /// with one recovery band, and the trip is recorded once per slot. A <b>page-level</b> <c>Bind</c> nobody
     /// registered reaches neither branch, because <see cref="Validate"/> refuses it at Host creation - the
     /// fail-soft rule is about keys that can be unresolved at runtime, not about tolerating a manifest typo.
@@ -160,3 +159,5 @@ internal sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiD
     private string ResolveText(UiWidgetContext ctx) =>
         AtomVocabulary.DescribeText(spec, ctx, UiDescriptionRole.Text, "Text", "TextKey", reportMissing: true).Text;
 }
+
+

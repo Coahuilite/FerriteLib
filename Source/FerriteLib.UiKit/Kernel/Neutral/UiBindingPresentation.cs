@@ -138,3 +138,5 @@ public sealed class UiBindingPresentation : IDisposable
         disposed = true; bindings.DetachPresentation(this); owner.Dispose(); calculations.Clear(); current.Clear(); faults.Clear(); reads.Clear(); synchronized.Clear();
     }
 }
+
+

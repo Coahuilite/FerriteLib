@@ -59,3 +59,5 @@ public static class UiImageLayout
 
     private static bool Positive(float value) => value > 0f && !float.IsInfinity(value) && !float.IsNaN(value);
 }
+
+

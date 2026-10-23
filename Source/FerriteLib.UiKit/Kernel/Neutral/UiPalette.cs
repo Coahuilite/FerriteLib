@@ -33,6 +33,7 @@ public readonly struct UiColour : IEquatable<UiColour>
     public float Alpha { get; }
     private static bool Channel(float value) => !float.IsNaN(value) && !float.IsInfinity(value) && value >= 0 && value <= 1;
     public UiColour WithAlpha(float alpha) => new(Red, Green, Blue, alpha);
+    public static UiColour White => new(1, 1, 1);
     public bool Equals(UiColour other) => Red == other.Red && Green == other.Green && Blue == other.Blue && Alpha == other.Alpha;
     public override bool Equals(object? value) => value is UiColour colour && Equals(colour);
     public override int GetHashCode() => Red.GetHashCode() ^ Green.GetHashCode() ^ Blue.GetHashCode() ^ Alpha.GetHashCode();
@@ -157,3 +158,5 @@ public sealed class UiPalette
         _ => throw new ArgumentOutOfRangeException(nameof(role))
     };
 }
+
+

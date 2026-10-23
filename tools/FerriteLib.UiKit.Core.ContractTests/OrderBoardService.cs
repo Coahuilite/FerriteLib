@@ -34,3 +34,4 @@ internal sealed class OrderBoardService
     internal void Replace(params Row[] value) { lock (gate) { rows.Clear(); rows.AddRange(value); } }
     internal Snapshot ReadSnapshot() { lock (gate) return new Snapshot(new List<Row>(rows).AsReadOnly(), accepting); }
 }
+

@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
@@ -21,7 +20,7 @@ internal sealed class ChromeBannerWidget : IUiWidget, IUiMeasureParticipant, IUi
 
     private UiElementSpec spec = UiElementSpec.Empty;
     private readonly UiRetainedPaint retained = new();
-    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect,ctx);
+    bool IUiRetainedDisplay.PaintLast(UiLayoutRect rect, UiWidgetContext ctx) => retained.Paint(rect,ctx);
     UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
@@ -45,7 +44,7 @@ internal sealed class ChromeBannerWidget : IUiWidget, IUiMeasureParticipant, IUi
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindings bindings, string elementPath)
+    public void Validate(IUiBindingReader bindings, string elementPath)
     {
         if (spec.TryGetAttribute("Bind", out string bindKey) && bindKey.Length > 0)
         {
@@ -68,26 +67,26 @@ internal sealed class ChromeBannerWidget : IUiWidget, IUiMeasureParticipant, IUi
 
     public UiDescription Describe(UiWidgetContext ctx) => AtomVocabulary.DescribeText(spec, ctx, UiDescriptionRole.Status, "Text", "TextKey");
 
-    public void Draw(Rect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
     {
-        if (rect.width <= 1f || rect.height <= 1f) return;
+        if (rect.Width <= 1f || rect.Height <= 1f) return;
 
         string text = Describe(ctx).Text;
         if (text.Length == 0) return;
 
-        Color ink=AtomVocabulary.ResolveRole(spec, ctx, writable: null, defaultEmphasis: UiEmphasis.Muted).Text;
+        UiColour ink=AtomVocabulary.ResolveRole(spec, ctx, writable: null, defaultEmphasis: UiEmphasis.Muted).Text;
         PaintText(rect,ctx,text,ink);
         retained.Capture(ctx,(r,c)=>PaintText(r,c,text,ink));
     }
-    private void PaintText(Rect rect,UiWidgetContext ctx,string text,Color ink)
+    private void PaintText(UiLayoutRect rect,UiWidgetContext ctx,string text,UiColour ink)
     {
         UiThemeDraw.Label(
-            rect,
+ctx.Drawing,            rect,
             text,
             ctx.Theme,
             ink,
             AtomVocabulary.TextFont(ctx, BandFont),
-            TextAnchor.MiddleLeft);
+            UiTextAnchor.MiddleLeft);
     }
 
     private float ReadHeight()
@@ -102,3 +101,5 @@ internal sealed class ChromeBannerWidget : IUiWidget, IUiMeasureParticipant, IUi
         return DefaultHeight;
     }
 }
+
+

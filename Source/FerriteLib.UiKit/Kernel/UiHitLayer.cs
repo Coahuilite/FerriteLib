@@ -1,4 +1,3 @@
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -12,7 +11,7 @@ namespace FerriteLib.UiKit.Kernel;
 /// </summary>
 public readonly struct UiHitLayer
 {
-    public UiHitLayer(UiNode element, Rect rect, bool isPopup)
+    public UiHitLayer(UiNode element, UiLayoutRect rect, bool isPopup)
         : this(element, rect, isPopup, null)
     {
     }
@@ -22,7 +21,7 @@ public readonly struct UiHitLayer
     /// layer, so dispatch can tell "my own popup" from "somebody else's popup". Node identity cannot decide
     /// that: every control a composite widget draws shares one <see cref="UiNode"/>.
     /// </summary>
-    public UiHitLayer(UiNode element, Rect rect, bool isPopup, string? popupOwnerId)
+    public UiHitLayer(UiNode element, UiLayoutRect rect, bool isPopup, string? popupOwnerId)
     {
         Element = element;
         Rect = rect;
@@ -40,8 +39,10 @@ public readonly struct UiHitLayer
     public string? PopupOwnerId { get; }
 
     /// <summary>The layer's rect in Host window space.</summary>
-    public Rect Rect { get; }
+    public UiLayoutRect Rect { get; }
 
     /// <summary>True for a popup layer, which always sits above content.</summary>
     public bool IsPopup { get; }
 }
+
+

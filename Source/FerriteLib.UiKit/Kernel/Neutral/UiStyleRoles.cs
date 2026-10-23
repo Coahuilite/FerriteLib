@@ -3,3 +3,4 @@ namespace FerriteLib.UiKit.Kernel;
 public enum UiEmphasis { Normal, Muted }
 /// <summary>Semantic state vocabulary consumed by the adapter's treatment table.</summary>
 public enum UiStatusTone { Neutral, Active, Success, Warning, Danger, Disabled }
+

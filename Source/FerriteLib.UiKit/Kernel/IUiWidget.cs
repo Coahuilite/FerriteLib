@@ -1,4 +1,3 @@
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -18,11 +17,13 @@ public interface IUiWidget
     /// Called by the Host during creation. Implementations must check every binding/action they
     /// need and throw <see cref="UiContractException"/> with the element path on mismatch.
     /// </summary>
-    void Validate(IUiBindings bindings, string elementPath);
+    void Validate(IUiBindingReader bindings, string elementPath);
 
     /// <summary>Returns the natural content height for the current context.</summary>
     float Measure(UiWidgetContext ctx);
 
     /// <summary>Draws into the arranged rect and handles the current IMGUI event synchronously.</summary>
-    void Draw(Rect rect, UiWidgetContext ctx);
+    void Draw(UiLayoutRect rect, UiWidgetContext ctx);
 }
+
+

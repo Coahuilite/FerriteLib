@@ -93,3 +93,5 @@ public static class UiWidgetCatalog
             declaration.Scope, declaration.Kind, declaration.AllowedSchema, declaration.LabelSet);
     }
 }
+
+

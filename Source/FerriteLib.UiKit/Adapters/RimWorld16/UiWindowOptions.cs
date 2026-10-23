@@ -105,3 +105,4 @@ public sealed class UiWindowOptions
     /// </summary>
     public Func<UiWindowKey, bool>? CanClose { get; set; }
 }
+

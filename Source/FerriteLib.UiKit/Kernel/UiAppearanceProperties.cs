@@ -10,3 +10,5 @@ internal static partial class UiAppearanceProperties
         theme.Palette[role] = value.Value;
     }
 }
+
+

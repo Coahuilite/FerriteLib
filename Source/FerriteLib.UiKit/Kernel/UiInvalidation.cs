@@ -42,3 +42,5 @@ public enum UiInvalidation
     /// <summary>Everything an announcement can invalidate. The conservative default for an undeclared binding.</summary>
     Everything = Paint | Measure | Structure
 }
+
+

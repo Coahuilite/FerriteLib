@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 
@@ -10,7 +9,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <b>Why this earns a kind</b> - per-element interaction state plus the hit rule behind it. A boolean
 /// control is not a small button: it owns the two-state read-back (the click writes the inverse of the value
 /// it just read), it owns the body geometry it draws inside whatever band it was arranged, and it owns the
-/// hover/armed ladder the library has to paint by hand because <see cref="UiNative.Button"/> is
+/// hover/armed ladder the library has to paint by hand because <see cref="ctx.Controls.Button"/> is
 /// <c>Widgets.ButtonInvisible</c> and carries no chrome. The manifest cannot express any of the three.
 /// </para>
 /// <para>
@@ -101,7 +100,7 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
 
     private UiElementSpec spec = UiElementSpec.Empty;
     private readonly UiRetainedPaint retained = new();
-    bool IUiRetainedDisplay.PaintLast(Rect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
+    bool IUiRetainedDisplay.PaintLast(UiLayoutRect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
     UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
 
     string IUiWidget.Kind => Kind;
@@ -132,7 +131,7 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
     /// appearance is refused rather than falling back, which is the same fail-closed rule the closed
     /// <c>Height</c> vocabulary uses: a look that silently degraded would be a page nobody authored.
     /// </summary>
-    public void Validate(IUiBindings bindings, string elementPath)
+    public void Validate(IUiBindingReader bindings, string elementPath)
     {
         string key = ReadBindKey();
         if (key.Length == 0)
@@ -258,9 +257,9 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
     /// box") would then flatten the track onto the very plane it sits on. Reading the control edge from the
     /// shared ladder keeps the control visible under such a scope while still letting a palette choose it.
     /// </summary>
-    private static Color ControlEdge(UiTheme theme)
+    private static UiColour ControlEdge(UiTheme theme)
     {
-        return theme[UiPaletteRole.StrongBorder].a > 0f ? theme[UiPaletteRole.StrongBorder] : theme[UiPaletteRole.Border];
+        return theme[UiPaletteRole.StrongBorder].Alpha > 0f ? theme[UiPaletteRole.StrongBorder] : theme[UiPaletteRole.Border];
     }
 
     public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
@@ -268,9 +267,9 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
         yield return new UiPointerRegion(bounds);
     }
 
-    public void Draw(Rect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
     {
-        if (rect.width <= 1f || rect.height <= 1f) return;
+        if (rect.Width <= 1f || rect.Height <= 1f) return;
 
         string key = ReadBindKey();
         bool? writable = AtomVocabulary.WritableOf(ctx, key);
@@ -285,11 +284,11 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
 
         // Armed wins over hover, exactly as the button atom orders its ladder: live state beats the
         // pointer's proximity.
-        UiInteractionResult interaction = UiNative.Activation(rect, ctx, key, "", writable: writable != false);
+        UiInteractionResult interaction = ctx.Controls.Activation(rect, ctx, key, "", writable: writable != false);
         TakeInput(ctx, key, state, interaction);
         if (!ctx.Session.IsActive) return;
         bool armed = interaction.Captured;
-        bool hovered = !armed && UiNative.IsMouseOver(rect, ctx);
+        bool hovered = !armed && ctx.Controls.IsMouseOver(rect, ctx);
 
         UiResolvedStyle idle = AtomVocabulary.ResolveRole(spec, ctx, writable);
         UiResolvedStyle shown = idle;
@@ -318,7 +317,7 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
     /// </summary>
     private void TakeInput(UiWidgetContext ctx, string key, bool state, UiInteractionResult interaction)
     {
-        UiInteractionTarget target = UiNative.InteractionTarget(ctx, key);
+        UiInteractionTarget target = ctx.Controls.InteractionTarget(ctx, key);
         UiValueOperation<bool> operation = UiValueBehavior.Boolean(
             interaction, !state);
         Action<bool> request = value =>
@@ -330,7 +329,7 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
         if (ctx.Bindings is UiBindings reactive) UiValueBehavior.Request(target, operation, reactive, request);
         else UiValueBehavior.Request(target, operation, request);
     }
-    private void Paint(Rect rect, UiResolvedStyle style, bool state, string look, UiWidgetContext ctx, string label, float band)
+    private void Paint(UiLayoutRect rect, UiResolvedStyle style, bool state, string look, UiWidgetContext ctx, string label, float band)
     {
         UiTheme theme = ctx.Theme;
 
@@ -341,28 +340,28 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
         float body;
         if (IsSwitch(look))
         {
-            body = PaintSwitch(rect, state, theme, band);
+            body = PaintSwitch(ctx.Drawing,rect, state, theme, band);
         }
         else
         {
-            body = PaintCheckbox(rect, style, state, theme, band);
+            body = PaintCheckbox(ctx.Drawing,rect, style, state, theme, band);
         }
 
         if (label.Length == 0) return;
 
         // The SAME gap the measurement reserved, from the one helper both call.
-        float labelX = rect.x + body + ContentGap(theme, look);
+        float labelX = rect.X + body + ContentGap(theme, look);
 
-        float labelWidth = rect.xMax - labelX;
+        float labelWidth = rect.XMax - labelX;
         if (labelWidth <= 1f) return;
 
         UiThemeDraw.Label(
-            new Rect(labelX, rect.y, labelWidth, rect.height),
+ctx.Drawing,            new UiLayoutRect(labelX, rect.Y, labelWidth, rect.Height),
             label,
             theme,
             style.Text,
             AtomVocabulary.TextFont(ctx),
-            TextAnchor.MiddleLeft,
+            UiTextAnchor.MiddleLeft,
             singleLine: true);
     }
 
@@ -378,36 +377,36 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
     /// two independent tokens cannot both collapse onto the card face.
     /// </para>
     /// </summary>
-    private float PaintSwitch(Rect rect, bool state, UiTheme theme, float band)
+    private float PaintSwitch(IUiDrawing drawing,UiLayoutRect rect, bool state, UiTheme theme, float band)
     {
-        float trackWidth = Math.Min(SwitchTrackWidth, Math.Max(1f, rect.width));
+        float trackWidth = Math.Min(SwitchTrackWidth, Math.Max(1f, rect.Width));
         float trackHeight = Math.Min(SwitchTrackHeight, Math.Max(1f, band));
-        var track = new Rect(rect.x, rect.y + (rect.height - trackHeight) * 0.5f, trackWidth, trackHeight);
+        var track = new UiLayoutRect(rect.X, rect.Y + (rect.Height - trackHeight) * 0.5f, trackWidth, trackHeight);
 
         UiSurfaceStyle surface = state
             ? theme.SelectedSurface
             : new UiSurfaceStyle(theme.RaisedSurface.Fill, ControlEdge(theme));
-        UiThemeDraw.Surface(track, surface, theme.Geometry.Hairline);
+        UiThemeDraw.Surface(drawing,track, surface, theme.Geometry.Hairline);
 
         float knob = Math.Min(SwitchKnobSize, Math.Max(1f, trackWidth - SwitchKnobInset * 2f));
         float throwWidth = Math.Max(0f, trackWidth - knob - SwitchKnobInset * 2f);
-        float knobX = track.x + SwitchKnobInset + (state ? throwWidth : 0f);
-        var knobRect = new Rect(knobX, track.y + SwitchKnobInset, knob, knob);
+        float knobX = track.X + SwitchKnobInset + (state ? throwWidth : 0f);
+        var knobRect = new UiLayoutRect(knobX, track.Y + SwitchKnobInset, knob, knob);
 
         // The neutral OFF thumb and accent ON thumb are independent palette meanings, not label inks.
-        UiThemeDraw.Solid(knobRect, state ? theme[UiPaletteRole.Accent] : theme[UiPaletteRole.SwitchOff]);
+        UiThemeDraw.Solid(drawing,knobRect, state ? theme[UiPaletteRole.Accent] : theme[UiPaletteRole.SwitchOff]);
 
         return trackWidth;
     }
 
     /// <summary>The explicit alternative: today's box and mark, at the size this kind always drew.</summary>
-    private static float PaintCheckbox(Rect rect, UiResolvedStyle style, bool state, UiTheme theme, float band)
+    private static float PaintCheckbox(IUiDrawing drawing,UiLayoutRect rect, UiResolvedStyle style, bool state, UiTheme theme, float band)
     {
         float padding = theme.Geometry.Padding;
         float side = CheckboxSide(band, padding);
-        var box = new Rect(rect.x, rect.y + (rect.height - side) * 0.5f, side, side);
+        var box = new UiLayoutRect(rect.X, rect.Y + (rect.Height - side) * 0.5f, side, side);
 
-        UiThemeDraw.Surface(box, style.Surface, theme.Geometry.Hairline);
+        UiThemeDraw.Surface(drawing,box, style.Surface, theme.Geometry.Hairline);
 
         if (state)
         {
@@ -415,7 +414,7 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
             // plane, edge and mark together, and the disabled row keeps the disabled text colour.
             float inset = Math.Max(2f, side * 0.25f);
             UiThemeDraw.Solid(
-                new Rect(box.x + inset, box.y + inset, Math.Max(1f, side - inset * 2f), Math.Max(1f, side - inset * 2f)),
+drawing,                new UiLayoutRect(box.X + inset, box.Y + inset, Math.Max(1f, side - inset * 2f), Math.Max(1f, side - inset * 2f)),
                 style.Text);
         }
 
@@ -444,4 +443,6 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
         return AtomVocabulary.ReadBindKey(spec);
     }
 }
+
+
 

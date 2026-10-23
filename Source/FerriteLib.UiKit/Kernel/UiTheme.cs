@@ -1,23 +1,22 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Kernel;
 
 /// <summary>Platform fill and border values handed to a visual outlet.</summary>
 public readonly struct UiSurfaceStyle
 {
-    public UiSurfaceStyle(Color fill, Color border)
+    public UiSurfaceStyle(UiColour fill, UiColour border)
     {
         Fill = fill;
         Border = border;
     }
 
     /// <summary>The colour a painted surface fills its rect with.</summary>
-    public Color Fill { get; }
+    public UiColour Fill { get; }
 
     /// <summary>The colour of the edge every painted surface carries.</summary>
-    public Color Border { get; }
+    public UiColour Border { get; }
 }
 
 /// <summary>
@@ -124,14 +123,12 @@ public sealed class UiTheme
     public UiPalette Palette { get; }
     public UiStyleTable Styles { get; }
     public static UiTheme Vanilla => new();
-    public Color this[UiPaletteRole role]
+    public UiColour this[UiPaletteRole role]
     {
-        get => ToPlatform(Colour(role));
-        set => Palette[role] = FromPlatform(value);
+        get => Colour(role);
+        set => Palette[role] = value;
     }
     internal UiColour Colour(UiPaletteRole role) => appliedColours.TryGetValue(role, out UiColour value) ? value : Palette[role];
-    internal static Color ToPlatform(UiColour value) => new(value.Red, value.Green, value.Blue, value.Alpha);
-    internal static UiColour FromPlatform(Color value) => new(value.r, value.g, value.b, value.a);
     internal bool HasColourOverride(string role) => Palette.IsDeclared(ParseRole(role));
     private static UiPaletteRole ParseRole(string name)
         => UiPalette.TryRole(name, out UiPaletteRole role) ? role : throw new ArgumentException("Unknown palette role '" + name + "'.");
@@ -243,19 +240,19 @@ public sealed class UiTheme
         PropertyRevision++;
         if (DefaultFont != priorFont || Geometry != priorGeometry) LayoutRevision++;
     }
-    public Color AccentHover
+    public UiColour AccentHover
     {
         get
         {
-            Color accent = this[UiPaletteRole.Accent];
-            return new Color(Lift(accent.r), Lift(accent.g), Lift(accent.b), accent.a);
+            UiColour accent = this[UiPaletteRole.Accent];
+            return new UiColour(Lift(accent.Red), Lift(accent.Green), Lift(accent.Blue), accent.Alpha);
         }
     }
     private static float Lift(float channel) => channel + (1 - channel) * .3f;
-    public Color AccentWith(float alpha)
+    public UiColour AccentWith(float alpha)
     {
-        Color accent = this[UiPaletteRole.Accent];
-        return new Color(accent.r, accent.g, accent.b, alpha);
+        UiColour accent = this[UiPaletteRole.Accent];
+        return new UiColour(accent.Red, accent.Green, accent.Blue, alpha);
     }
     public UiSurfaceStyle Surface(UiPaletteRole fill, UiPaletteRole border) => new(this[fill], this[border]);
     public UiSurfaceStyle BaseSurface => Surface(UiPaletteRole.WindowSurface, UiPaletteRole.WindowBorder);
@@ -267,3 +264,6 @@ public sealed class UiTheme
     public UiSurfaceStyle WarningSurface => Surface(UiPaletteRole.WarningSurface, UiPaletteRole.WarningBorder);
     public UiSurfaceStyle DangerSurface => Surface(UiPaletteRole.DangerSurface, UiPaletteRole.DangerBorder);
 }
+
+
+

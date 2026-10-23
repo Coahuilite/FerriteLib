@@ -1,8 +1,6 @@
 using System;
-using UnityEngine;
-using Verse;
 
-using VerseWidgets = Verse.Widgets;
+
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -19,146 +17,92 @@ public static class UiThemeDraw
     /// single-line label is clipped horizontally instead of wrapping out of its row. The fitting audit
     /// then checks width instead of height, because for those labels wrapping is not an available answer.
     /// </param>
-    public static void Label(Rect rect, string text, UiTheme theme, Color? color = null, UiFont? font = null, TextAnchor anchor = TextAnchor.MiddleLeft, bool singleLine = false)
-    {
-        UiFont resolvedFont = font ?? theme.Styles.Font;
-        // Every kernel label funnels through this method, which is what makes the fitting audit cheap:
-        // one hook covers the whole page, and widgets never have to remember to check themselves.
-        UiFitAudit.Check(rect, text, resolvedFont, singleLine);
-
-        Color oldColor = GUI.color;
-        TextAnchor oldAnchor = Text.Anchor;
-        GameFont oldFont = Text.Font;
-        bool oldWrap = Text.WordWrap;
-        try
-        {
-            Text.Font = UiKitFonts.ToGameFont(resolvedFont);
-            Text.Anchor = anchor;
-            // Verse's label renderer wraps by default, so a declared single-line label used to wrap
-            // anyway and paint out of its own row while the width axis reported the same finding (the
-            // in-game author-credit popup row): a wrapping row is what the declaration exists to refuse.
-            // The save/restore is the same process-global dance the font and anchor get above.
-            if (singleLine) Text.WordWrap = false;
-            GUI.color = color ?? theme[UiPaletteRole.Foreground];
-            VerseWidgets.Label(rect, text);
-        }
-        finally
-        {
-            Text.WordWrap = oldWrap;
-            Text.Font = oldFont;
-            Text.Anchor = oldAnchor;
-            GUI.color = oldColor;
-        }
-    }
+    public static void Label(IUiDrawing drawing, UiLayoutRect rect,string text,UiTheme theme,UiColour? color=null,UiFont? font=null,UiTextAnchor anchor=UiTextAnchor.MiddleLeft,bool singleLine=false){UiFont resolved=font??theme.Styles.Font;UiFitAudit.Check(rect,text,resolved,singleLine);drawing.Text(rect,text,resolved,color??theme[UiPaletteRole.Foreground],anchor,!singleLine);}
 
     /// <summary>
     /// Paints one surface treatment: the fill plus its hairline edge. This is the pair-shaped entry a
     /// table answer feeds, so a caller never spells a fill and a border separately — which is how the
     /// same two tokens used to end up re-derived per widget.
     /// </summary>
-    public static void Surface(Rect rect, UiSurfaceStyle style, float hairline = 1f)
+    public static void Surface(IUiDrawing drawing,UiLayoutRect rect, UiSurfaceStyle style, float hairline = 1f)
     {
-        if (rect.width <= 0f || rect.height <= 0f) return;
+        if (rect.Width <= 0f || rect.Height <= 0f) return;
 
         float edge = Math.Max(1f, hairline);
-        Color oldColor = GUI.color;
-        try
         {
-            Solid(rect, style.Fill);
-            Solid(new Rect(rect.x, rect.y, rect.width, edge), style.Border);
-            Solid(new Rect(rect.x, rect.yMax - edge, rect.width, edge), style.Border);
-            Solid(new Rect(rect.x, rect.y, edge, rect.height), style.Border);
-            Solid(new Rect(rect.xMax - edge, rect.y, edge, rect.height), style.Border);
-        }
-        finally
-        {
-            GUI.color = oldColor;
+            Solid(drawing,rect, style.Fill);
+            Solid(drawing,new UiLayoutRect(rect.X, rect.Y, rect.Width, edge), style.Border);
+            Solid(drawing,new UiLayoutRect(rect.X, rect.YMax - edge, rect.Width, edge), style.Border);
+            Solid(drawing,new UiLayoutRect(rect.X, rect.Y, edge, rect.Height), style.Border);
+            Solid(drawing,new UiLayoutRect(rect.XMax - edge, rect.Y, edge, rect.Height), style.Border);
         }
     }
 
     /// <summary>Paints an explicit fill with an explicit edge colour, or the theme's shared border.</summary>
-    public static void Surface(Rect rect, UiTheme theme, Color fill, Color? border = null)
+    public static void Surface(IUiDrawing drawing,UiLayoutRect rect, UiTheme theme, UiColour fill, UiColour? border = null)
     {
-        Surface(rect, new UiSurfaceStyle(fill, border ?? theme[UiPaletteRole.Border]), theme.Geometry.Hairline);
+        Surface(drawing,rect, new UiSurfaceStyle(fill, border ?? theme[UiPaletteRole.Border]), theme.Geometry.Hairline);
     }
 
-    public static void Panel(Rect rect, UiTheme theme)
+    public static void Panel(IUiDrawing drawing,UiLayoutRect rect, UiTheme theme)
     {
-        Surface(rect, theme.PanelSurface, theme.Geometry.Hairline);
+        Surface(drawing,rect, theme.PanelSurface, theme.Geometry.Hairline);
     }
 
-    public static void Base(Rect rect, UiTheme theme)
+    public static void Base(IUiDrawing drawing,UiLayoutRect rect, UiTheme theme)
     {
-        Surface(rect, theme.BaseSurface, theme.Geometry.Hairline);
+        Surface(drawing,rect, theme.BaseSurface, theme.Geometry.Hairline);
     }
 
     /// <summary>Paints the uninterrupted workspace plane behind a multi-column layout.</summary>
-    public static void Workspace(Rect rect, UiTheme theme)
+    public static void Workspace(IUiDrawing drawing,UiLayoutRect rect, UiTheme theme)
     {
-        if (rect.width <= 0f || rect.height <= 0f) return;
-        Color oldColor = GUI.color;
-        try
+        if (rect.Width <= 0f || rect.Height <= 0f) return;
         {
-            Solid(rect, theme[UiPaletteRole.WorkspaceSurface]);
-        }
-        finally
-        {
-            GUI.color = oldColor;
+            Solid(drawing,rect, theme[UiPaletteRole.WorkspaceSurface]);
         }
     }
 
     /// <summary>Descriptive alias for callers that treat the workspace as a background plane.</summary>
-    public static void BackgroundPlane(Rect rect, UiTheme theme)
+    public static void BackgroundPlane(IUiDrawing drawing,UiLayoutRect rect, UiTheme theme)
     {
-        Workspace(rect, theme);
+        Workspace(drawing,rect, theme);
     }
 
     /// <summary>Paints a flat section band and its lower rule, both at the theme's density.</summary>
-    public static void SectionBand(Rect rect, UiTheme theme, Color? fill = null, Color? rule = null)
+    public static void SectionBand(IUiDrawing drawing,UiLayoutRect rect, UiTheme theme, UiColour? fill = null, UiColour? rule = null)
     {
-        if (rect.width <= 0f || rect.height <= 0f) return;
-        Color oldColor = GUI.color;
-        try
+        if (rect.Width <= 0f || rect.Height <= 0f) return;
         {
             float edge = Math.Max(1f, theme.Geometry.Hairline);
-            Solid(rect, fill ?? theme[UiPaletteRole.SectionSurface]);
-            Solid(new Rect(rect.x, rect.yMax - edge, rect.width, edge), rule ?? theme[UiPaletteRole.Divider]);
-        }
-        finally
-        {
-            GUI.color = oldColor;
+            Solid(drawing,rect, fill ?? theme[UiPaletteRole.SectionSurface]);
+            Solid(drawing,new UiLayoutRect(rect.X, rect.YMax - edge, rect.Width, edge), rule ?? theme[UiPaletteRole.Divider]);
         }
     }
 
     /// <summary>Paints a section band with an optional general-purpose title.</summary>
-    public static void SectionHeader(Rect rect, string title, UiTheme theme, Color? color = null, UiFont? font = null)
+    public static void SectionHeader(IUiDrawing drawing,UiLayoutRect rect, string title, UiTheme theme, UiColour? color = null, UiFont? font = null)
     {
-        SectionBand(rect, theme);
+        SectionBand(drawing,rect, theme);
         if (!string.IsNullOrEmpty(title))
         {
-            Label(rect, title, theme, color ?? theme[UiPaletteRole.Foreground], font ?? UiFont.Small);
+            Label(drawing,rect, title, theme, color ?? theme[UiPaletteRole.Foreground], font ?? UiFont.Small);
         }
     }
 
     /// <summary>Paints the narrow edge marker used for active or focused content.</summary>
-    public static void AccentRail(Rect rect, UiTheme theme, bool active = true, float width = 2f, Color? color = null)
+    public static void AccentRail(IUiDrawing drawing,UiLayoutRect rect, UiTheme theme, bool active = true, float width = 2f, UiColour? color = null)
     {
-        if (!active || rect.width <= 0f || rect.height <= 0f) return;
-        Color oldColor = GUI.color;
-        try
+        if (!active || rect.Width <= 0f || rect.Height <= 0f) return;
         {
-            Solid(new Rect(rect.x, rect.y, Mathf.Clamp(width, 1f, rect.width), rect.height), color ?? theme[UiPaletteRole.Accent]);
-        }
-        finally
-        {
-            GUI.color = oldColor;
+            Solid(drawing,new UiLayoutRect(rect.X, rect.Y, UiMath.Clamp(width, 1f, rect.Width), rect.Height), color ?? theme[UiPaletteRole.Accent]);
         }
     }
 
     /// <summary>Alias emphasizing that the rail marks keyboard or mouse focus.</summary>
-    public static void FocusRail(Rect rect, UiTheme theme, bool focused = true, float width = 2f)
+    public static void FocusRail(IUiDrawing drawing,UiLayoutRect rect, UiTheme theme, bool focused = true, float width = 2f)
     {
-        AccentRail(rect, theme, focused, width);
+        AccentRail(drawing,rect, theme, focused, width);
     }
 
     // --- the selector field: one neutral shape, three outlets (SA1.1) ------------------------------
@@ -185,10 +129,10 @@ public static class UiThemeDraw
     public const float SelectorArrowHeight = 6f;
 
     /// <summary>The arrow slot inside a selector field: the <see cref="SelectorArrowZoneWidth"/> at the field's right edge.</summary>
-    public static Rect SelectorArrowZone(Rect field)
+    public static UiLayoutRect SelectorArrowZone(UiLayoutRect field)
     {
-        float width = Math.Min(SelectorArrowZoneWidth, Math.Max(0f, field.width));
-        return new Rect(field.xMax - width, field.y, width, field.height);
+        float width = Math.Min(SelectorArrowZoneWidth, Math.Max(0f, field.Width));
+        return new UiLayoutRect(field.XMax - width, field.Y, width, field.Height);
     }
 
     /// <summary>
@@ -197,12 +141,12 @@ public static class UiThemeDraw
     /// through these outlets, so a consumer composite that adopts the selector look cannot drift from
     /// the core kind that registers it.
     /// </summary>
-    public static Rect SelectorTextOutlet(Rect field, UiTheme theme)
+    public static UiLayoutRect SelectorTextOutlet(UiLayoutRect field, UiTheme theme)
     {
         float padding = theme.Geometry.Padding;
-        float x = field.x + Math.Min(SelectorAccentWidth, field.width) + padding;
-        float right = SelectorArrowZone(field).x - padding;
-        return new Rect(x, field.y, Math.Max(0f, right - x), field.height);
+        float x = field.X + Math.Min(SelectorAccentWidth, field.Width) + padding;
+        float right = SelectorArrowZone(field).X - padding;
+        return new UiLayoutRect(x, field.Y, Math.Max(0f, right - x), field.Height);
     }
 
     /// <summary>
@@ -212,22 +156,22 @@ public static class UiThemeDraw
     /// through <see cref="Solid"/>, so this adds no second backend outlet. The colour is the caller's
     /// token (default: the theme's primary ink); the shape is these constants.
     /// </summary>
-    public static void SelectorArrow(Rect zone, UiTheme theme, Color? color = null)
+    public static void SelectorArrow(IUiDrawing drawing,UiLayoutRect zone, UiTheme theme, UiColour? color = null)
     {
-        if (zone.width <= 0f || zone.height <= 0f) return;
-        Color ink = color ?? theme[UiPaletteRole.Foreground];
+        if (zone.Width <= 0f || zone.Height <= 0f) return;
+        UiColour ink = color ?? theme[UiPaletteRole.Foreground];
 
-        float baseWidth = Math.Min(SelectorArrowWidth, Math.Max(1f, zone.width));
-        float height = Math.Min(SelectorArrowHeight, Math.Max(1f, zone.height));
-        float centreX = zone.x + zone.width * 0.5f;
-        float top = zone.y + (zone.height - height) * 0.5f;
-        int rows = Mathf.CeilToInt(height);
+        float baseWidth = Math.Min(SelectorArrowWidth, Math.Max(1f, zone.Width));
+        float height = Math.Min(SelectorArrowHeight, Math.Max(1f, zone.Height));
+        float centreX = zone.X + zone.Width * 0.5f;
+        float top = zone.Y + (zone.Height - height) * 0.5f;
+        int rows = UiMath.CeilToInt(height);
         for (int row = 0; row < rows; row++)
         {
             // Linear taper from the base to the point; the last row is the tip.
             float step = rows <= 1 ? 0f : (float)row / (rows - 1);
             float rowWidth = Math.Max(1f, baseWidth * (1f - step));
-            Solid(new Rect(centreX - rowWidth * 0.5f, top + row, rowWidth, 1f), ink);
+            Solid(drawing,new UiLayoutRect(centreX - rowWidth * 0.5f, top + row, rowWidth, 1f), ink);
         }
     }
 
@@ -244,27 +188,27 @@ public static class UiThemeDraw
     /// The text font; null takes <see cref="UiFont.Small"/>, the size the core dropdown field has always
     /// drawn its value text at.
     /// </param>
-    public static void SelectorField(Rect field, string display, UiTheme theme, UiResolvedStyle style, UiFont? font = null)
+    public static void SelectorField(IUiDrawing drawing,UiLayoutRect field, string display, UiTheme theme, UiResolvedStyle style, UiFont? font = null)
     {
-        if (field.width <= 1f || field.height <= 1f) return;
+        if (field.Width <= 1f || field.Height <= 1f) return;
 
-        Surface(field, style.Surface, theme.Geometry.Hairline);
+        Surface(drawing,field, style.Surface, theme.Geometry.Hairline);
 
-        Rect arrow = SelectorArrowZone(field);
-        if (arrow.width > 0f)
+        UiLayoutRect arrow = SelectorArrowZone(field);
+        if (arrow.Width > 0f)
         {
             Solid(
-                new Rect(arrow.x - theme.Geometry.Hairline, field.y, theme.Geometry.Hairline, field.height),
+drawing,                new UiLayoutRect(arrow.X - theme.Geometry.Hairline, field.Y, theme.Geometry.Hairline, field.Height),
                 style.Surface.Border);
-            SelectorArrow(arrow, theme, style.Text);
+            SelectorArrow(drawing,arrow, theme, style.Text);
         }
 
-        AccentRail(field, theme, width: SelectorAccentWidth);
+        AccentRail(drawing,field, theme, width: SelectorAccentWidth);
 
-        Rect outlet = SelectorTextOutlet(field, theme);
-        if (outlet.width > 1f)
+        UiLayoutRect outlet = SelectorTextOutlet(field, theme);
+        if (outlet.Width > 1f)
         {
-            Label(outlet, display, theme, style.Text, font ?? UiFont.Small, TextAnchor.MiddleLeft, singleLine: true);
+            Label(drawing,outlet, display, theme, style.Text, font ?? UiFont.Small, UiTextAnchor.MiddleLeft, singleLine: true);
         }
     }
 
@@ -274,10 +218,10 @@ public static class UiThemeDraw
     /// rule for style. Null means the caller did not ask, and the tone decides alone.
     /// </param>
     /// <summary>Paints a compact rectangular status treatment without owning interaction.</summary>
-    public static void StatusTreatment(Rect rect, UiTheme theme, UiStatusTone tone = UiStatusTone.Neutral, bool? writable = null)
+    public static void StatusTreatment(IUiDrawing drawing,UiLayoutRect rect, UiTheme theme, UiStatusTone tone = UiStatusTone.Neutral, bool? writable = null)
     {
-        if (rect.width <= 0f || rect.height <= 0f) return;
-        Surface(rect, theme.Styles.Resolve(tone, UiEmphasis.Normal, writable).Surface, theme.Geometry.Hairline);
+        if (rect.Width <= 0f || rect.Height <= 0f) return;
+        Surface(drawing,rect, theme.Styles.Resolve(tone, UiEmphasis.Normal, writable).Surface, theme.Geometry.Hairline);
     }
 
     /// <summary>
@@ -286,13 +230,13 @@ public static class UiThemeDraw
     /// vocabulary and no translation keys, so it reports the slot's identity rather than a sentence
     /// nobody declared. The diagnostic text lives in the session, not here.
     /// </summary>
-    public static void RecoveryBand(Rect rect, UiTheme theme, string elementPath)
+    public static void RecoveryBand(IUiDrawing drawing,UiLayoutRect rect, UiTheme theme, string elementPath)
     {
-        if (rect.width <= 1f || rect.height <= 1f) return;
+        if (rect.Width <= 1f || rect.Height <= 1f) return;
 
-        Surface(rect, theme, theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.Border]);
+        Surface(drawing,rect, theme, theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.Border]);
         Label(
-            new Rect(rect.x + 6f, rect.y, Math.Max(1f, rect.width - 12f), rect.height),
+drawing,            new UiLayoutRect(rect.X + 6f, rect.Y, Math.Max(1f, rect.Width - 12f), rect.Height),
             elementPath ?? "",
             theme,
             theme[UiPaletteRole.DangerForeground],
@@ -301,12 +245,12 @@ public static class UiThemeDraw
     }
 
     /// <summary>Marks retained display without replacing it or introducing another palette.</summary>
-    internal static void FailureMarker(Rect rect, UiTheme theme, string identity)
+    internal static void FailureMarker(IUiDrawing drawing,UiLayoutRect rect, UiTheme theme, string identity)
     {
-        float band = Math.Min(3f, rect.height);
-        Solid(new Rect(rect.x, rect.yMax - band, rect.width, band), theme[UiPaletteRole.DangerForeground]);
-        Label(new Rect(rect.xMax - Math.Min(20, rect.width), rect.y, Math.Min(20, rect.width), Math.Min(20, rect.height)),
-            "!", theme, theme[UiPaletteRole.DangerForeground], UiFont.Tiny, TextAnchor.MiddleRight, singleLine: true);
+        float band = Math.Min(3f, rect.Height);
+        Solid(drawing,new UiLayoutRect(rect.X, rect.YMax - band, rect.Width, band), theme[UiPaletteRole.DangerForeground]);
+        Label(drawing,new UiLayoutRect(rect.XMax - Math.Min(20, rect.Width), rect.Y, Math.Min(20, rect.Width), Math.Min(20, rect.Height)),
+            "!", theme, theme[UiPaletteRole.DangerForeground], UiFont.Tiny, UiTextAnchor.MiddleRight, singleLine: true);
     }
 
     /// <param name="writable">
@@ -314,13 +258,13 @@ public static class UiThemeDraw
     /// <see cref="StatusTreatment"/> documents.
     /// </param>
     /// <summary>Paints a status treatment and centers its short, reusable badge label.</summary>
-    public static void StatusBadge(Rect rect, string text, UiTheme theme, UiStatusTone tone = UiStatusTone.Neutral, UiFont? font = null, bool? writable = null)
+    public static void StatusBadge(IUiDrawing drawing,UiLayoutRect rect, string text, UiTheme theme, UiStatusTone tone = UiStatusTone.Neutral, UiFont? font = null, bool? writable = null)
     {
         // A badge is compact surface text, which is the emphasis whose neutral label is secondary; the
         // plane and the text come from one query, so a badge and a field can no longer disagree.
         UiResolvedStyle style = theme.Styles.Resolve(tone, UiEmphasis.Muted, writable);
-        Surface(rect, style.Surface, theme.Geometry.Hairline);
-        Label(rect, text, theme, style.Text, font ?? UiFont.Tiny, TextAnchor.MiddleCenter, singleLine: true);
+        Surface(drawing,rect, style.Surface, theme.Geometry.Hairline);
+        Label(drawing,rect, text, theme, style.Text, font ?? UiFont.Tiny, UiTextAnchor.MiddleCenter, singleLine: true);
     }
 
     /// <summary>
@@ -329,13 +273,7 @@ public static class UiThemeDraw
     /// <c>Verse.Widgets.DrawBoxSolid</c>, which is what keeps the backend-contact allowlist short enough
     /// to gate (see the harness containment lane).
     /// </summary>
-    public static void Solid(Rect rect, Color color)
-    {
-        if (rect.width > 0f && rect.height > 0f)
-        {
-            VerseWidgets.DrawBoxSolid(rect, color);
-        }
-    }
+    public static void Solid(IUiDrawing drawing, UiLayoutRect rect,UiColour color){if(rect.Width>0&&rect.Height>0)drawing.Fill(rect,color);}
 
     /// <summary>
     /// The letterbox fit, and the library's one answer to "where does a picture go inside this rect": the
@@ -344,10 +282,10 @@ public static class UiThemeDraw
     /// or slot answers an empty rect, which every caller reads as "nothing to fit" rather than as a
     /// zero-sized draw.
     /// </summary>
-    public static Rect FitImage(Rect slot, Vector2 naturalSize)
+    public static UiLayoutRect FitImage(UiLayoutRect slot, UiLayoutPoint naturalSize)
     {
-        UiLayoutRect fitted = UiImageLayout.Arrange(new UiLayoutRect(slot.x, slot.y, slot.width, slot.height), naturalSize.x, naturalSize.y);
-        return new Rect(fitted.X, fitted.Y, fitted.Width, fitted.Height);
+        UiLayoutRect fitted = UiImageLayout.Arrange(new UiLayoutRect(slot.X, slot.Y, slot.Width, slot.Height), naturalSize.X, naturalSize.Y);
+        return new UiLayoutRect(fitted.X, fitted.Y, fitted.Width, fitted.Height);
     }
 
     /// <summary>
@@ -358,44 +296,11 @@ public static class UiThemeDraw
     /// (the image kind paints its empty slot, a hidden element is not drawn at all). It consumes no input, and
     /// a null texture is an answer rather than a fault.
     /// </summary>
-    public static bool Image(Rect rect, Texture? texture, Color tint)
-        => Image(rect, texture, tint, default);
+    public static bool Image(IUiDrawing drawing, UiLayoutRect rect,UiImage image,UiColour tint)=>Image(drawing,rect,image,tint,default);
 
     /// <summary>Draws a supplier-owned texture with explicit fit and inner alignment. Cover clips to the slot.</summary>
-    public static bool Image(Rect rect, Texture? texture, Color tint, UiImageOptions options)
-    {
-        if (texture == null)
-        {
-            return false;
-        }
-
-        UiLayoutRect plan = UiImageLayout.Arrange(new UiLayoutRect(rect.x, rect.y, rect.width, rect.height), texture.width, texture.height, options);
-        Rect fitted = new Rect(plan.X, plan.Y, plan.Width, plan.Height);
-        if (fitted.width <= 1f || fitted.height <= 1f)
-        {
-            return false;
-        }
-
-        Color oldColor = GUI.color;
-        try
-        {
-            GUI.color = tint;
-            if (options.Fit == UiImageFit.Cover)
-            {
-                GUI.BeginGroup(rect);
-                try
-                {
-                    GUI.DrawTexture(new Rect(fitted.x - rect.x, fitted.y - rect.y, fitted.width, fitted.height), texture, ScaleMode.StretchToFill, true);
-                }
-                finally { GUI.EndGroup(); }
-            }
-            else GUI.DrawTexture(fitted, texture, ScaleMode.StretchToFill, true);
-        }
-        finally
-        {
-            GUI.color = oldColor;
-        }
-
-        return true;
-    }
+    public static bool Image(IUiDrawing drawing,UiLayoutRect rect,UiImage image,UiColour tint,UiImageOptions options){if(image.IsEmpty)return false;UiLayoutRect fitted=UiImageLayout.Arrange(rect,image.Width,image.Height,options);if(fitted.Width<=1||fitted.Height<=1)return false;if(options.Fit==UiImageFit.Cover)drawing.Clip(rect,()=>drawing.Image(new UiLayoutRect(fitted.X-rect.X,fitted.Y-rect.Y,fitted.Width,fitted.Height),image,tint));else drawing.Image(fitted,image,tint);return true;}
 }
+
+
+
