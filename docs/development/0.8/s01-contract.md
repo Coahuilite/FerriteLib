@@ -42,13 +42,13 @@ above the track and contributes wrapped height. Explicit `Height` still constrai
 An independent platform presentation can use the existing context and its own layout:
 
 ```csharp
-var target = UiNative.InteractionTarget(ctx, "Apply");
-var operation = UiNative.Activation(myHitRect, ctx, "Apply");
+var target = ctx.Controls.InteractionTarget(ctx, "Apply");
+var operation = ctx.Controls.Activation(myHitRect, ctx, "Apply");
 UiInteractionRequests.Activation(target, operation, () => ctx.Bindings.Invoke("Apply"));
 // Paint my own appearance by reading operation.Captured; no second activation rule.
 ```
 
-Range composition uses `UiNative.Range(rect, ctx, binding, modelValue, min, max, writable)` and
+Range composition uses `ctx.Controls.Range(rect, ctx, binding, modelValue, min, max, writable)` and
 `UiInteractionRequests.Range(target, operation, value => bindings.Set(binding, value))`. The default
 `ButtonWidget` / `SliderWidget` call those same production entries. The native adapter translates input,
 window qualification, clip and popup facts, then applies native capture/release and event consumption.
@@ -87,24 +87,17 @@ exception and target context. It is neither retried nor rolled back. Subsequent 
   cleanup; Dispose is idempotent. Pure presentation failure does not automatically clear reliable behavior.
 
 `UiWindowHost` maps the native `WindowStack.GetsInput` answer. Embedded `UiHost` usage retains its existing
-input scope; `DrawFrame(rect, surroundingOwner)` supplies the native owner's current qualification.
+input scope; the explicit frame supplied to DrawFrame carries the native owner's current qualification.
 No new window registration condition is added to old embedded usage. Added Button/Slider key navigation
 is deferred; current Live/Cancel and edit takeover policies are implemented in [editing-contract.md](editing-contract.md).
 
 ## Compatibility and source boundaries
 
-The old raw `UiNative.Button(Rect)` primitive retains its existing usage conditions. The session-plus-key
-`UiNative.Slider` entry keeps its signature and arbitrary-key usage, but now drives the same range core
-and paints through `PaintRange`; it no longer calls `Widgets.HorizontalSlider`. Its derived numeric-editor
-buffer bridge is retained for the existing StepperSlider composition. The modern Slider wrapper has no
-NumberField draft dependency. Current confirmed editing/composition policies are in editing-contract.md.
-
-The source/build/mod API axes are `0.8.0`; assembly configuration is Dev or Release. Stable signatures keep
-their existing promise; S1–S7 and necessary dependencies are stable under `docs/api-tiers.md`, with detailed R9 experimental. Existing XML and
-binding declarations need no new registration. F1 changes Button's default timing from the native compound
-control to explicit release activation. The old raw mouse-down appearance probe now tests a valid held
-capture. Existing injected harness overrides represent established semantic operations only; the new
-three-route tests use actual pointer facts with those overrides unset.
+The approved prepublication refactor removes ambient/raw native compatibility entry points.
+Use explicit ctx.Controls, or session.CreateContext for independent native C#. Four-question
+composition and the complete author migration are in [refactor migration](refactor-migration.md).
+Source/build/mod axes remain0.8.0. The new signature inventory and necessary dependencies protect
+the supported contract; detailed R9 and runtime plumbing remain experimental.
 
 `NeutralSources.props` is the production source inventory imported by both the runtime project and
 `tools/FerriteLib.UiKit.Core.ContractTests`. The independent target uses .NET 10 standard libraries only,

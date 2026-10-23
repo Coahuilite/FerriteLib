@@ -22,6 +22,10 @@ public sealed class UiNode
     private readonly Dictionary<string,object> customState = new(StringComparer.Ordinal);
     private readonly Dictionary<string,Action> customRelease = new(StringComparer.Ordinal);
     private bool released;
+    internal void RequireActive()
+    {
+        if (released || !session.IsActive) throw new ObjectDisposedException(nameof(UiNode));
+    }
     public T GetState<T>(string name,Func<T> create,Action<T>? release=null) where T:class
     {
         if(!session.IsActive||released)throw new ObjectDisposedException(nameof(UiNode));

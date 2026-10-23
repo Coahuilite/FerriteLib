@@ -43,7 +43,15 @@ internal sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUi
 
     public static void Register()
     {
-        UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, Kind, () => new InputModeRowWidget(), new[] { "Id", "Kind", "Bind", "OptionsBind", "Height", "Tab", "Hidden", OptionHelp.Attribute }));
+        UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, Kind, () => new InputModeRowWidget(), new[] { "Id", "Kind", "Bind", "OptionsBind", "Height", "Tab", "Hidden", OptionHelp.Attribute },naturalBody:NaturalBodyWidth));
+    }
+
+    private static float NaturalBodyWidth(UiElementSpec spec,UiWidgetContext ctx)
+    {
+        float width=0;
+        foreach(var choice in UiChoiceSource.Read(ctx.Bindings,spec,ctx.Translation))
+            width=Math.Max(width,ctx.Metrics.MeasureWidth(choice.Text,AtomVocabulary.TextFont(ctx)));
+        return width;
     }
 
     public void Configure(UiElementSpec spec)
@@ -167,9 +175,9 @@ internal sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUi
         return 1;
     }
 
-    private IReadOnlyList<UiChoice<object?>> OptionsFor(UiWidgetContext ctx) => UiChoiceSource.Read(ctx.Bindings, spec);
+    private IReadOnlyList<UiChoice<object?>> OptionsFor(UiWidgetContext ctx) => UiChoiceSource.Read(ctx.Bindings, spec,ctx.Translation);
     private float ReadFloat(string name, float fallback)
     {
-        return spec.TryGetAttribute(name, out string raw) && float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out float value) ? value : fallback;
+        return spec.TryGetAttribute(name, out string raw) && spec.TryGetNumber(name, out float value) ? value : fallback;
     }
 }

@@ -1,7 +1,7 @@
-using System;
-using FerriteLib.UiKit.Kernel;
 using UnityEngine;
 using Verse;
+using System;
+using FerriteLib.UiKit.Kernel;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -29,7 +29,7 @@ internal static class KernelPaletteTests
         finally
         {
             Event.current = previous;
-            UiNative.DebugMousePositionEnabled = false;
+            NativeFixture.DebugMousePositionEnabled = false;
             GUIUtility.hotControl = 0;
         }
     }
@@ -54,20 +54,20 @@ internal static class KernelPaletteTests
         using var host = new UiHost("palette-author", UiLayoutManifest.Parse(xml), bindings, theme, new Metrics(), new Translation());
         using var peer = new UiHost("palette-peer", UiLayoutManifest.Parse(xml), bindings, new UiTheme(), new Metrics(), new Translation());
         Event.current = new Event { type = EventType.Repaint };
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(200,100));
-        host.DrawFrame(new Rect(0,0,200,100));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(200,100));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0,0,200,100));
         UiNode first = host.Session.GetNodeByElementId("first")!;
         UiNode second = host.Session.GetNodeByElementId("second")!;
         Check(first.Properties.ResolvedColours["ControlSurface"].Value == new UiColour(16f/255,32f/255,48f/255)
             && second.Properties.ResolvedColours["ControlSurface"].Origin == UiPropertyOrigin.Fallback,
             "declarative local colour changes only its same-kind instance");
         theme.Palette[UiPaletteRole.ControlSurface] = new UiColour(.7f,.1f,.2f);
-        host.DrawFrame(new Rect(0,0,200,100));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0,0,200,100));
         Check(second.Properties.ResolvedColours["ControlSurface"].Origin == UiPropertyOrigin.Host
             && second.Properties.ResolvedColours["ControlSurface"].Value == theme.Palette[UiPaletteRole.ControlSurface]
-            && ReferenceEquals(snapshot, host.MeasureAndArrange(new Vector2(200,100))) && requests == 0,
+            && ReferenceEquals(snapshot, host.MeasureAndArrange(new UiLayoutPoint(200,100))) && requests == 0,
             "current host palette reaches untouched sibling without geometry or business requests");
-        peer.DrawFrame(new Rect(0,0,200,100));
+        NativeFixture.DrawFrame(        peer,new UiLayoutRect(0,0,200,100));
         Check(peer.Session.GetNodeByElementId("second")!.Properties.ResolvedColours["ControlSurface"].Value == UiPalette.Default(UiPaletteRole.ControlSurface),
             "another host remains isolated");
         UiPalette originalPalette = theme.Palette;
@@ -75,9 +75,9 @@ internal static class KernelPaletteTests
         theme.Palette[UiPaletteRole.Accent] = new UiColour(.1f,.7f,.2f);
         theme.RestoreFrom(held);
         Check(ReferenceEquals(originalPalette, theme.Palette), "theme restoration preserves ordinary author's palette reference");
-        Color before = GUI.color;
-        UiThemeDraw.StatusBadge(new Rect(0,0,50,28), "test", theme, UiStatusTone.Warning);
-        Check(GUI.color == before, "visual helper restores ambient GUI colour");
+        UiColour before = VerseUiExecution.Colour(GUI.color);
+        UiThemeDraw.StatusBadge(NativeFixture.Paint,new UiLayoutRect(0,0,50,28), "test", theme, UiStatusTone.Warning);
+        Check(VerseUiExecution.Colour(GUI.color) == before, "visual helper restores ambient GUI colour");
     }
     private static void CaptureAndRepaint()
     {
@@ -90,23 +90,23 @@ internal static class KernelPaletteTests
         using var host = new UiHost("palette-capture", UiLayoutManifest.Parse(
             "<UiPage Schema=\"2\" Source=\"palette-capture\"><Widget Id=\"button\" Kind=\"input/button\" ActionBind=\"go\" Text=\"Go\" Height=\"28\"/></UiPage>"),
             bindings, theme, new Metrics(), new Translation());
-        UiNative.DebugMousePositionEnabled = false;
-        Event.current = new Event { type = EventType.MouseDown, button = 0, mousePosition = new Vector2(20,14) };
-        host.DrawFrame(new Rect(0,0,100,50));
+        NativeFixture.DebugMousePositionEnabled = false;
+        Event.current = new Event { type = EventType.MouseDown, button = 0, mousePosition = VerseUiExecution.Point(new UiLayoutPoint(20,14)) };
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0,0,100,50));
         UiInteractionTarget? owner = host.Session.Interactions.CaptureOwner;
-        int? hot = host.Session.OwnedHotControl;
+        UiControlKey? hot = host.Session.OwnedHotControl;
         Check(owner.HasValue && hot.HasValue && requests == 0, "real primary press holds capture before palette change");
         UiNode node = host.Session.GetNodeByElementId("button")!;
-        UiLayoutSnapshot before = host.MeasureAndArrange(new Vector2(100,50));
+        UiLayoutSnapshot before = host.MeasureAndArrange(new UiLayoutPoint(100,50));
         theme.Palette[UiPaletteRole.SelectedSurface] = new UiColour(.2f,.6f,.1f);
-        Event.current = new Event { type = EventType.Repaint, mousePosition = new Vector2(20,14) };
-        host.DrawFrame(new Rect(0,0,100,50));
+        Event.current = new Event { type = EventType.Repaint, mousePosition = VerseUiExecution.Point(new UiLayoutPoint(20,14)) };
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0,0,100,50));
         Check(host.Session.Interactions.CaptureOwner.HasValue && host.Session.OwnedHotControl == hot
             && ReferenceEquals(node, host.Session.GetNodeByElementId("button")) && requests == 0
-            && ReferenceEquals(before, host.MeasureAndArrange(new Vector2(100,50))),
+            && ReferenceEquals(before, host.MeasureAndArrange(new UiLayoutPoint(100,50))),
             "recolour preserves real capture, instance and measured snapshot without requests");
-        Event.current = new Event { type = EventType.MouseUp, button = 0, mousePosition = new Vector2(20,14) };
-        host.DrawFrame(new Rect(0,0,100,50));
+        Event.current = new Event { type = EventType.MouseUp, button = 0, mousePosition = VerseUiExecution.Point(new UiLayoutPoint(20,14)) };
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0,0,100,50));
         Check(requests == 1 && !host.Session.Interactions.CaptureOwner.HasValue, "held operation still releases exactly once after recolour");
     }
     private sealed class Metrics : ITextMetrics

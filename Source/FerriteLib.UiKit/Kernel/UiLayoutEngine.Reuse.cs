@@ -54,7 +54,7 @@ internal sealed partial class UiLayoutEngine
     {
         LayoutScope? parent = activeLayoutScope;
         UiNodeId parentId = activeUpdateScope;
-        bool declaresScope = spec.TryGetAttribute("UpdateScope", out string raw) && string.Equals(raw.Trim(), "true", StringComparison.OrdinalIgnoreCase);
+        bool declaresScope = spec.TryGetBoolean("UpdateScope", out bool enabled) && enabled;
         string kind = GetContainerKind(spec);
         bool compositionRoot = kind == "Section" || kind == "Surface" || kind == "Scroll" || kind == "Clip" || kind == "Repeat";
         if (parent == null || declaresScope || compositionRoot)

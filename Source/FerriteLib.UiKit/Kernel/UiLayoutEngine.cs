@@ -1250,7 +1250,7 @@ internal sealed partial class UiLayoutEngine
 
         // Malformed thresholds are rejected at creation time (UiHost); a value that still fails to
         // parse here can only come from a programmatically built spec, and degrades to never-narrow.
-        if (!float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float breakpoint)
+        if (!spec.TryGetNumber("Breakpoint", out float breakpoint)
             || breakpoint <= 0f)
         {
             return false;
@@ -1304,7 +1304,7 @@ internal sealed partial class UiLayoutEngine
         var nodes = new UiNode[children.Count];
         for (int i = 0; i < children.Count; i++)
             nodes[i] = ChildNode(ctx, parent, children[i].Spec, children[i].DeclaredIndex);
-        if (parentSpec.TryGetAttribute("SharedLabels", out string shared) && string.Equals(shared, "true", StringComparison.OrdinalIgnoreCase))
+        if (parentSpec.TryGetBoolean("SharedLabels", out bool shared) && shared)
         {
             var participants = new List<UiNode>();
             var demands = new List<float>();
@@ -1606,14 +1606,14 @@ internal sealed partial class UiLayoutEngine
         string value = (raw ?? "").Trim();
         if (value.Length == 0) return false;
         if (spec.TryGetAttribute("Height", out string heightRaw)
-            && float.TryParse((heightRaw ?? "").Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float _))
+            && spec.TryGetNumber("Height", out _))
         {
             // ANY numeric Height keeps its exact prior meaning, zero included: ResolveContainerHeight
             // answers a declared 0 with a 0-high viewport, and a new attribute must not rewrite that.
             return false;
         }
 
-        return float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out rows)
+        return spec.TryGetNumber("VisibleRows", out rows)
             && rows > 0f && !float.IsNaN(rows) && !float.IsInfinity(rows);
     }
 
@@ -2147,7 +2147,7 @@ internal sealed partial class UiLayoutEngine
     {
         width = 0f;
         if (spec.TryGetAttribute("Width", out string raw)
-            && float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out width)
+            && spec.TryGetNumber("Width", out width)
             && width > 0f)
         {
             return true;
@@ -2254,7 +2254,7 @@ internal sealed partial class UiLayoutEngine
         return UiLayout.Clamp(width, ReadWidthBound(spec, "MinWidth", 0), ReadWidthBound(spec, "MaxWidth", float.MaxValue));
     }
 
-    private static float ReadWidthBound(UiElementSpec spec, string attribute, float fallback) => spec.TryGetAttribute(attribute, out string raw) && float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float value) && value > 0 ? value : fallback;
+    private static float ReadWidthBound(UiElementSpec spec, string attribute, float fallback) => spec.TryGetAttribute(attribute, out string raw) && spec.TryGetNumber(attribute, out float value) && value > 0 ? value : fallback;
     private float ResolveWrapWidth(UiElementSpec spec, float innerWidth, UiWidgetContext ctx)
     {
         if (TryFixedWidth(spec, ctx, out float fixedWidth))
@@ -2312,7 +2312,7 @@ internal sealed partial class UiLayoutEngine
     {
         value = 0;
         return spec.TryGetAttribute(attribute, out string raw)
-            && int.TryParse(raw.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+            && spec.TryGetInteger(attribute, out value);
     }
 
     private float ResolveHeight(
@@ -2333,7 +2333,7 @@ internal sealed partial class UiLayoutEngine
                 return contentHeight ?? MeasuredHeight(spec, widget, ctx, node);
             }
 
-            if (float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float fixedHeight))
+            if (spec.TryGetNumber("Height", out float fixedHeight))
             {
                 return Math.Max(0f, fixedHeight);
             }
@@ -2379,7 +2379,7 @@ internal sealed partial class UiLayoutEngine
     {
         if (spec.TryGetAttribute("Height", out string raw) && raw.Trim().Length > 0 && !string.Equals(raw.Trim(), "Auto", StringComparison.OrdinalIgnoreCase) && !UiPlacement.IsMatchContentHeight(spec))
         {
-            if (float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float fixedHeight))
+            if (spec.TryGetNumber("Height", out float fixedHeight))
                 return new UiLayoutHeight(fixedHeight, false);
             throw new FormatException("Container id=\"" + spec.Id + "\" (Kind=\"" + spec.Kind + "\") has invalid Height '" + raw + "'; expected a number, Auto or MatchContent.");
         }
@@ -2389,8 +2389,7 @@ internal sealed partial class UiLayoutEngine
 
     private static bool IsFill(UiElementSpec spec)
     {
-        return spec.TryGetAttribute("Fill", out string raw)
-            && bool.TryParse(raw.Trim(), out bool fill)
+        return spec.TryGetBoolean("Fill", out bool fill)
             && fill;
     }
 
@@ -2469,24 +2468,9 @@ internal sealed partial class UiLayoutEngine
             return new Padding(token, token, token, token);
         }
 
-        string[] parts = raw.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length != 1 && parts.Length != 2 && parts.Length != 4)
-        {
-            throw new FormatException(
-                $"Element id=\"{spec.Id}\" (Kind=\"{spec.Kind}\") has invalid Padding '{raw}'.");
-        }
-
-        var values = new float[parts.Length];
-        for (int i = 0; i < parts.Length; i++)
-        {
-            if (!float.TryParse(parts[i].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out values[i]))
-            {
-                throw new FormatException(
-                    $"Element id=\"{spec.Id}\" (Kind=\"{spec.Kind}\") has invalid Padding value '{parts[i].Trim()}'.");
-            }
-        }
-
-        return parts.Length switch
+        if (!spec.TryGetNumbers("Padding", out var values))
+            throw new FormatException($"Element id=\"{spec.Id}\" (Kind=\"{spec.Kind}\") has invalid Padding '{raw}'.");
+        return values.Count switch
         {
             1 => new Padding(values[0], values[0], values[0], values[0]),
             2 => new Padding(values[0], values[1], values[0], values[1]),
@@ -2505,7 +2489,7 @@ internal sealed partial class UiLayoutEngine
             return theme.Geometry.Gap;
         }
 
-        if (float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float gap) && gap >= 0f)
+        if (spec.TryGetNumber("Gap", out float gap) && gap >= 0f)
         {
             return gap;
         }
@@ -2525,9 +2509,7 @@ internal sealed partial class UiLayoutEngine
         UiElementSpec spec, UiWidgetContext ctx, bool narrow, UiNode? parent, int declaredIndex)
     {
         if (narrow
-            && spec.TryGetAttribute("NarrowHidden", out string narrowRaw)
-            && (string.Equals(narrowRaw.Trim(), "true", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(narrowRaw.Trim(), "1", StringComparison.Ordinal)))
+            && spec.TryGetBoolean("NarrowHidden", out bool narrowHidden) && narrowHidden)
         {
             return true;
         }
@@ -2537,9 +2519,7 @@ internal sealed partial class UiLayoutEngine
         // "this element belongs to one presentation" expressible without the two mutually exclusive
         // subtrees the earlier workaround needed.
         if (!narrow
-            && spec.TryGetAttribute("WideHidden", out string wideRaw)
-            && (string.Equals(wideRaw.Trim(), "true", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(wideRaw.Trim(), "1", StringComparison.Ordinal)))
+            && spec.TryGetBoolean("WideHidden", out bool wideHidden) && wideHidden)
         {
             return true;
         }
@@ -2549,15 +2529,7 @@ internal sealed partial class UiLayoutEngine
             return true;
         }
 
-        if (spec.TryGetAttribute("Hidden", out string raw))
-        {
-            string value = raw.Trim();
-            if (string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(value, "1", StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
+        if (spec.TryGetBoolean("Hidden", out bool hidden) && hidden) return true;
 
         if (!spec.TryGetAttribute("Tab", out string tab) || tab.Trim().Length == 0)
         {
@@ -2581,15 +2553,7 @@ internal sealed partial class UiLayoutEngine
     private bool IsVisibleDeclaration(
         UiElementSpec spec, UiWidgetContext ctx, UiNode? parent, int declaredIndex)
     {
-        if (spec.TryGetAttribute("Visible", out string visibleRaw))
-        {
-            string visible = visibleRaw.Trim();
-            if (string.Equals(visible, "false", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(visible, "0", StringComparison.Ordinal))
-            {
-                return false;
-            }
-        }
+        if (spec.TryGetBoolean("Visible", out bool visible) && !visible) return false;
 
         string key = ReadAttribute(spec, VisibleKeyAttribute);
         if (key.Length == 0) return true;

@@ -5,7 +5,7 @@ namespace FerriteLib.UiKit.Kernel;
 
 /// <summary>
 /// The single geometry-and-input primitive for dropdown-shaped popups. Every surface that opens a
-/// session popup over content must draw its option list through <see cref="DrawOptionList"/>: it is
+/// session popup over content must draw its option list through <see cref="DrawChoices{T}"/>: it is
 /// the only place that pushes a popup layer into the owned hit stack
 /// (<see cref="UiSession.PushHitLayer"/>), which is what makes anything under the popup yield the click,
 /// and the only place that applies the viewport rules - the clamp/flip and the bounded, scrollable height
@@ -114,77 +114,9 @@ public static class UiPopup
     /// <see cref="ctx.Controls.TakePopupWheelIfCovering"/>.
     /// </para>
     /// </summary>
-    public static string DrawOptionList(UiLayoutRect popupRect, string elementId, UiWidgetContext ctx,
-        IReadOnlyList<KeyValuePair<string, string>> options, string current, Action<string> onSelected)
-        => DrawOptionList(popupRect, elementId, ctx, options, current, onSelected, true);
-
-    public static string DrawOptionList(
-        UiLayoutRect popupRect,
-        string elementId,
-        UiWidgetContext ctx,
-        IReadOnlyList<KeyValuePair<string, string>> options,
-        string current,
-        Action<string> onSelected, bool selectable)
-    {
-        if (string.IsNullOrEmpty(elementId)) throw new ArgumentException("Popup element id is required.", nameof(elementId));
-        if (ctx == null) throw new ArgumentNullException(nameof(ctx));
-        if (options == null) throw new ArgumentNullException(nameof(options));
-        if (onSelected == null) throw new ArgumentNullException(nameof(onSelected));
-
-        PushPopupLayer(popupRect, elementId, ctx);
-        PopupWindow window = RowsOf(popupRect, ctx, options.Count);
-
-        string hovered = "";
-        for (int slot = 0; slot < window.RowCount; slot++)
-        {
-            int index = window.FirstRow + slot;
-            UiLayoutRect rowRect = RowRect(popupRect, slot);
-            if (ctx.Controls.IsMouseOver(rowRect))
-            {
-                hovered = options[index].Value;
-            }
-
-            DrawRow(ctx.Drawing,rowRect, options[index].Key,
-                string.Equals(options[index].Value, current, StringComparison.Ordinal), ctx.Theme);
-            UiInteractionResult input = ctx.Controls.PopupOption(rowRect, elementId, ctx, options[index].Value, selectable);
-            if (input.Request)
-            {
-                ctx.Session.ClosePopup();
-                UiInteractionTarget target = ctx.Controls.InteractionTarget(ctx, elementId, "popup-option", options[index].Value);
-                UiValueBehavior.Request(target, UiValueBehavior.Selection(input, options[index].Value), onSelected);
-                return hovered;
-            }
-        }
-
-        return hovered;
-    }
-
-    /// <summary>
-    /// The typed sibling of <see cref="DrawOptionList"/> (R4-A, 0.7.x): the same panel, the same hit layer, the
-    /// same bounded row window and the same row hit, for options whose values are not strings. Selection and
-    /// hover compare the boxed values with <c>object.Equals</c> - value equality for an enum or a boxed
-    /// primitive, and REFERENCE equality for a reference-typed choice that does not override <c>Equals</c> (bind
-    /// such a type only if its instances are the ones the page hands back, as the demo's lane does) - and
-    /// <paramref name="onSelected"/> receives the chosen option's real instance back: no label is parsed and no
-    /// value is spelled, which is the whole reason this overload exists beside the string one.
-    /// <para>
-    /// Returns the hovered row's INDEX, or -1 when no visible row is hovered, so the caller can publish that
-    /// row's option-level help identity without re-deriving this helper's row geometry. The index is the index
-    /// into the CALLER'S list, not the slot in the window: a scrolled menu still reports the option it carries,
-    /// and the two list forms stay one contract rather than two habits.
-    /// </para>
-    /// </summary>
-    public static int DrawChoiceList(UiLayoutRect popupRect, string elementId, UiWidgetContext ctx,
-        IReadOnlyList<UiChoice<object?>> options, object? current, Action<object?> onSelected)
-        => DrawChoiceList(popupRect, elementId, ctx, options, current, onSelected, true);
-
-    public static int DrawChoiceList(
-        UiLayoutRect popupRect,
-        string elementId,
-        UiWidgetContext ctx,
-        IReadOnlyList<UiChoice<object?>> options,
-        object? current,
-        Action<object?> onSelected, bool selectable)
+    /// <summary>Draw one typed choice source; return the hovered source index, or -1 outside visible rows.</summary>
+    public static int DrawChoices<T>(UiLayoutRect popupRect,string elementId,UiWidgetContext ctx,
+        IReadOnlyList<UiChoice<T>> options,T current,Action<T> onSelected,bool selectable=true)
     {
         if (string.IsNullOrEmpty(elementId)) throw new ArgumentException("Popup element id is required.", nameof(elementId));
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
@@ -199,12 +131,12 @@ public static class UiPopup
         {
             int index = window.FirstRow + slot;
             UiLayoutRect rowRect = RowRect(popupRect, slot);
-            if (ctx.Controls.IsMouseOver(rowRect))
+            if (ctx.Controls.IsWindowMouseOver(rowRect))
             {
                 hovered = index;
             }
 
-            DrawRow(ctx.Drawing,rowRect, options[index].Text, Equals(options[index].Value, current), ctx.Theme);
+            DrawRow(ctx.Drawing,rowRect, UiChoiceSource.Label(options[index],ctx.Translation), EqualityComparer<T>.Default.Equals(options[index].Value,current), ctx.Theme);
             UiInteractionResult input = ctx.Controls.PopupOption(rowRect, elementId, ctx, options[index].Value, selectable);
             if (input.Request)
             {

@@ -1,8 +1,9 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -396,7 +397,7 @@ internal static class KernelReloadSchedulingTests
 
         // The real signal: the library's own IMGUI hot-control capture, which is what a drag or a text edit
         // holds. The lane drives the real session state rather than a test-only boolean.
-        host.Session.CaptureHotControl(4242);
+        NativeFixture.Capture(host.Session,NativeFixture.Key(4242));
         bool committed = service.Pump();
 
         Check(!committed && service.Reports.Count == 0, "a ready commit is not applied while the user holds an interaction");
@@ -445,7 +446,7 @@ internal static class KernelReloadSchedulingTests
         Check(service.SchedulerState.OldestPendingSeconds > oldestBefore,
             "OldestPendingSeconds advances with the clock, not with anything else");
 
-        host.Session.CaptureHotControl(7);
+        NativeFixture.Capture(host.Session,NativeFixture.Key(7));
         service.Pump();
         Check(service.SchedulerState.Deferred == 1 && service.SchedulerState.Pending == 0
             && service.SchedulerState.Retrying == 0,
@@ -543,7 +544,7 @@ internal static class KernelReloadSchedulingTests
         UiTheme theme = UiTheme.Vanilla.Clone();
         using var host = NewHost("sched-pair", UiLayoutManifest.Parse(layout1), new UiBindings(), theme);
         service.Attach(host, "lay", "sty");
-        Check(SameColor(theme[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)), "the first style version applied on attach");
+        Check(SameColor(theme[UiPaletteRole.PanelSurface], new UiColour(0f, 0f, 1f, 1f)), "the first style version applied on attach");
 
         // Two files saved in quick succession inside one quiet window: each document is its own batch and its
         // own report, and the one settle commits both.
@@ -559,7 +560,7 @@ internal static class KernelReloadSchedulingTests
         Check(service.Pump(), "both documents commit in the settle after their shared quiet window");
 
         Check(HasElement(host.Manifest, "added"), "the layout version reached the host");
-        Check(SameColor(theme[UiPaletteRole.PanelSurface], new Color(0f, 1f, 0f, 1f)), "and the style version reached the same host");
+        Check(SameColor(theme[UiPaletteRole.PanelSurface], new UiColour(0f, 1f, 0f, 1f)), "and the style version reached the same host");
         Check(service.Reports.Count >= 2,
             "each document is its own batch and its own report (reports=" + service.Reports.Count + ")");
     }
@@ -586,7 +587,7 @@ internal static class KernelReloadSchedulingTests
 
         UiNode? draft = hostA.Session.GetNodeByElementId("keep");
         Check(draft != null, "the arranged element the draft hangs on exists");
-        draft!.State.EditText = "uncommitted-draft";
+        NativeFixture.Custom(        draft!).EditText = "uncommitted-draft";
         UiLayoutManifest before = hostA.Manifest;
 
         string v2 = Page("sched-rollback",
@@ -604,7 +605,7 @@ internal static class KernelReloadSchedulingTests
         Check(report != null && report.Rejected, "the scheduled batch is refused when a later host fails its commit");
         Check(ReferenceEquals(hostA.Manifest, before) && HasElement(hostA.Manifest, "keep"),
             "the rolled-back host is back on the old document");
-        Check(draft.State.EditText == "uncommitted-draft",
+        Check(NativeFixture.Custom(draft).EditText == "uncommitted-draft",
             "and R1's draft survives the scheduler-driven rollback");
     }
 
@@ -800,7 +801,7 @@ internal static class KernelReloadSchedulingTests
     {
         if (probeKindRegistered) return;
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "sched/probe", () => new PassProbeWidget());
+UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, "sched/probe", () => new PassProbeWidget()));
         probeKindRegistered = true;
     }
 
@@ -821,13 +822,13 @@ internal static class KernelReloadSchedulingTests
             label = spec.TryGetAttribute("Text", out string text) ? text : "";
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
         public float Measure(UiWidgetContext ctx) => 16f;
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             PassTrace.Add(label + (ctx.Session.OwnedHotControl.HasValue ? ":hot" : ":free"));
             Action? trigger = PendingTrigger;
@@ -865,7 +866,7 @@ internal static class KernelReloadSchedulingTests
 
         UiNode? triggerNode = host.Session.GetNodeByElementId("trigger");
         Check(triggerNode != null, "the probe element has a node a draft can hang on");
-        triggerNode!.State.EditText = "mid-pass-draft";
+        NativeFixture.Custom(        triggerNode!).EditText = "mid-pass-draft";
 
         string v2 = Page("sched-inpass",
             "<Column Id=\"root\">"
@@ -875,7 +876,7 @@ internal static class KernelReloadSchedulingTests
             + "</Column>");
         File.WriteAllText(path, v2);
 
-        host.Session.CaptureHotControl(4242);
+        NativeFixture.Capture(host.Session,NativeFixture.Key(4242));
         PassTrace.Clear();
         string? thrown = null;
         PendingTrigger = () => service.Reload("ip");
@@ -901,7 +902,7 @@ internal static class KernelReloadSchedulingTests
             "the commit is synchronous: the manifest is already the new tree when the pass returns");
         Check(host.Session.IsActive, "the session survives the mid-pass commit");
         Check(ReferenceEquals(triggerNode, host.Session.GetNodeByElementId("trigger"))
-            && triggerNode!.State.EditText == "mid-pass-draft",
+            && NativeFixture.Custom(triggerNode!).EditText == "mid-pass-draft",
             "a surviving identity keeps its node and its draft across the mid-pass commit");
         Check(host.Session.OwnedHotControl == null, "and the held capture was released by the mid-pass seal");
 
@@ -911,7 +912,7 @@ internal static class KernelReloadSchedulingTests
         trace = string.Join(",", PassTrace);
         Check(PassTrace.Count == 2 && PassTrace[0] == "trigger:free" && PassTrace[1] == "head:free",
             "the next pass draws the new tree only ([" + trace + "])");
-        Check(triggerNode!.State.EditText == "mid-pass-draft", "and the draft is still there on the pass after");
+        Check(NativeFixture.Custom(triggerNode!).EditText == "mid-pass-draft", "and the draft is still there on the pass after");
     }
 
     /// <summary>
@@ -945,7 +946,7 @@ internal static class KernelReloadSchedulingTests
         service.Attach(host, "lay", "sty");
         PendingTrigger = null;
         Draw(host);
-        Check(SameColor(theme[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)), "the first style version applied on attach");
+        Check(SameColor(theme[UiPaletteRole.PanelSurface], new UiColour(0f, 0f, 1f, 1f)), "the first style version applied on attach");
 
         string layout2 = Page("sched-inpass-all",
             "<Column Id=\"root\">"
@@ -974,7 +975,7 @@ internal static class KernelReloadSchedulingTests
         Check(PassTrace.Count == 2 && PassTrace[0] == "trigger:free" && PassTrace[1] == "tail:free",
             "the running pass still finishes on the pre-reload snapshot ([" + trace + "])");
         Check(HasElement(host.Manifest, "added"), "the layout half committed synchronously");
-        Check(SameColor(theme[UiPaletteRole.PanelSurface], new Color(0f, 1f, 0f, 1f)),
+        Check(SameColor(theme[UiPaletteRole.PanelSurface], new UiColour(0f, 1f, 0f, 1f)),
             "and the style half was applied to the theme inside the same pass");
 
         PendingTrigger = null;
@@ -1048,19 +1049,19 @@ internal static class KernelReloadSchedulingTests
         return dir;
     }
 
-    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindings bindings)
+    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindingReader bindings)
     {
         return new UiHost(source, manifest, bindings, UiTheme.Vanilla, new FixedMetrics(), new FixedTranslation());
     }
 
-    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindings bindings, UiTheme theme)
+    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindingReader bindings, UiTheme theme)
     {
         return new UiHost(source, manifest, bindings, theme, new FixedMetrics(), new FixedTranslation());
     }
 
     private static void Draw(UiHost host)
     {
-        host.DrawFrame(new Rect(0f, 0f, 400f, 300f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 400f, 300f));
     }
 
     private static string Page(string source, string body)
@@ -1082,9 +1083,9 @@ internal static class KernelReloadSchedulingTests
             + "</Styles>";
     }
 
-    private static bool SameColor(Color a, Color b)
+    private static bool SameColor(UiColour a, UiColour b)
     {
-        return Math.Abs(a.r - b.r) < 0.001f && Math.Abs(a.g - b.g) < 0.001f && Math.Abs(a.b - b.b) < 0.001f;
+        return Math.Abs(a.Red - b.Red) < 0.001f && Math.Abs(a.Green - b.Green) < 0.001f && Math.Abs(a.Blue - b.Blue) < 0.001f;
     }
 
     private static bool HasElement(UiLayoutManifest manifest, string id)

@@ -113,7 +113,7 @@ public sealed class UiElementProperties
         namedMetrics.Clear();
         inlineMetrics.Clear();
         foreach (string token in UiAppearanceProperties.Metrics)
-            if (spec.TryGetAttribute("Metric." + token, out string rawMetric) && UiAppearanceProperties.TryMetric(rawMetric, out float metric))
+            if (spec.TryGetNumber("Metric." + token, out float metric) && metric >= 0)
                 inlineMetrics[token] = Declared(metric);
         if (spec.TryGetAttribute("Font", out string font) && Enum.TryParse(font, true, out UiFont parsed)) inlineFont.Set(parsed);
         foreach (string token in UiAppearanceProperties.Colours)

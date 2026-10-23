@@ -333,7 +333,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, Kind,
 
     private float ReadHeight()
     {
-        if (spec.TryGetAttribute("Height", out string raw) && float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out float height) && height > 0f)
+        if (spec.TryGetAttribute("Height", out string raw) && spec.TryGetNumber("Height", out float height) && height > 0f)
         {
             return height;
         }
@@ -345,7 +345,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, Kind,
     {
         if (!spec.TryGetAttribute(name, out string raw))
             return fallback;
-        return string.Equals(raw, "true", StringComparison.OrdinalIgnoreCase) || string.Equals(raw, "1", StringComparison.Ordinal);
+        return spec.TryGetBoolean(name, out bool value) ? value : fallback;
     }
 
     private static float Clamp01(float value)

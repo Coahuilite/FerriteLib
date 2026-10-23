@@ -58,7 +58,7 @@ internal static class ReactiveInventoryTests
         {
             IReadOnlyList<string> itemKeys = b.Get<IReadOnlyList<string>>("items");
             var geometry = UiLayout.Stack(new UiLayoutFrame(200, 400, 0, 0, 0, 0, 0, 0, default), itemKeys.Select(_ => new UiLayoutChild(200)).ToArray(),
-                (i, w, h, c) => new UiLayoutSize(w, b.Get<string>("items." + itemKeys[i] + ".caption").Length));
+                (i, w, h, c) => new UiLayoutSize(w, b.Get<string>(new UiBindingAddress("items",itemKeys[i],"caption").Key).Length));
             Check(geometry.Slots.Count == 3 && geometry.Slots[0].Height == 5 && b.GetOptions<UiChoice<int>>("selected")[0].Text == "a: 10", "real object-list projection and bindings drive neutral per-item geometry at next synchronization");
         }
         int structuralRevision = b.GetRevision("items"); totalRuns = page.TotalRuns; choices = page.ChoiceRuns;

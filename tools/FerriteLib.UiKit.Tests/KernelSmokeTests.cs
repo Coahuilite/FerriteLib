@@ -1,6 +1,7 @@
+using UnityEngine;
+using Verse;
 using System;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -93,20 +94,20 @@ internal static class KernelSmokeTests
             new StubMetrics(),
             new StubTranslation());
 
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(400f, 600f));
-        if (!snapshot.RectById.TryGetValue("global-volume", out Rect rect)) throw new Exception("Missing global-volume rect");
-        if (rect.width <= 0f || rect.height <= 0f) throw new Exception("Invalid global-volume rect");
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(400f, 600f));
+        if (!snapshot.RectById.TryGetValue("global-volume", out UiLayoutRect rect)) throw new Exception("Missing global-volume rect");
+        if (rect.Width <= 0f || rect.Height <= 0f) throw new Exception("Invalid global-volume rect");
 
         host.BeginFrame();
-        host.Draw(new Rect(0f, 0f, 400f, 600f), snapshot);
+        NativeFixture.Draw(        host,new UiLayoutRect(0f, 0f, 400f, 600f), snapshot);
         host.EndFrame();
     }
 
     private static void VerifyDrawFrameClosesFrameOnFailure()
     {
         UiWidgetRegistry.Clear();
-        UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "test/throws",
-            () => new ThrowingWidget());
+UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, "test/throws",
+            () => new ThrowingWidget()));
 
         UiLayoutManifest manifest = UiLayoutManifest.Parse(
             "<UiPage Schema=\"2\" Source=\"test\"><Widget Id=\"throws\" Kind=\"test/throws\" /></UiPage>");
@@ -126,7 +127,7 @@ internal static class KernelSmokeTests
 
         try
         {
-            host.DrawFrame(new Rect(0f, 0f, 400f, 200f));
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0f, 0f, 400f, 200f));
             throw new Exception("DrawFrame did not propagate the popup-pass failure");
         }
         catch (InvalidOperationException ex) when (ex.Message == "draw failure")
@@ -150,13 +151,13 @@ internal static class KernelSmokeTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
         public float Measure(UiWidgetContext ctx) => 20f;
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             ctx.Session.RegisterPopupDraw(() => { });
             throw new InvalidOperationException("draw failure");
@@ -218,7 +219,7 @@ internal static class KernelSmokeTests
 
         if (ReferenceEquals(host1.Session, host2.Session)) throw new Exception("Hosts share a session");
         // Scroll state is keyed by node now; any node in host1's session proves the isolation claim.
-        host1.Session.SetScrollPosition(host1.Session.ActiveNode, new Vector2(1f, 2f));
+        host1.Session.SetScrollPosition(host1.Session.ActiveNode, new UiLayoutPoint(1f, 2f));
         if (host2.Session.ScrollPositions.Count != 0) throw new Exception("Session state leaked across hosts");
 
         host1.Close();

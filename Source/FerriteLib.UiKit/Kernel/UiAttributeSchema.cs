@@ -28,12 +28,17 @@ public readonly struct UiAttributeValue
     private readonly float number;
     private readonly bool boolean;
     private readonly byte flags;
-    private UiAttributeValue(string text, float number, bool boolean, byte flags)
+    private readonly IReadOnlyList<float>? numbers;
+    private readonly UiLayoutOffset offset;
+    private UiAttributeValue(string text, float number, bool boolean, byte flags,
+        IReadOnlyList<float>? numbers = null, UiLayoutOffset offset = default)
     {
         this.text = text;
         this.number = number;
         this.boolean = boolean;
         this.flags = flags;
+        this.numbers = numbers;
+        this.offset = offset;
     }
 
     private readonly string? text;
@@ -42,22 +47,41 @@ public readonly struct UiAttributeValue
     public static UiAttributeValue Literal(string text)
     {
         text = text ?? "";
-        bool numeric = float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out float n) && !float.IsNaN(n) && !float.IsInfinity(n);
-        bool logical = bool.TryParse(text, out bool b);
-        if (text == "0" || text == "1")
+        string token = text.Trim();
+        bool numeric = Finite(token, out float n);
+        bool logical = bool.TryParse(token, out bool b);
+        if (token == "0" || token == "1")
         {
             logical = true;
-            b = text == "1";
+            b = token == "1";
         }
 
-        return new UiAttributeValue(text, n, b, (byte)((numeric ? 1 : 0) | (logical ? 2 : 0)));
+        bool percentage = token.EndsWith("%", StringComparison.Ordinal);
+        bool hasOffset = numeric || (percentage && Finite(token.Substring(0, token.Length - 1).Trim(), out _));
+        float ratio = 0;
+        if (percentage && hasOffset) Finite(token.Substring(0, token.Length - 1).Trim(), out ratio);
+        IReadOnlyList<float>? components = numeric ? Array.AsReadOnly(new[] { n }) : null;
+        if (!numeric && (token.IndexOf(',') >= 0 || token.IndexOf(';') >= 0))
+        {
+            string[] parts = token.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+            var parsed = new float[parts.Length];
+            bool valid = parts.Length == 1 || parts.Length == 2 || parts.Length == 4;
+            for (int i = 0; i < parts.Length; i++) valid &= Finite(parts[i].Trim(), out parsed[i]);
+            if (valid) components = Array.AsReadOnly(parsed);
+        }
+        return new UiAttributeValue(text, n, b, (byte)((numeric ? 1 : 0) | (logical ? 2 : 0) | (hasOffset ? 4 : 0)),
+            components, percentage ? new UiLayoutOffset(0, ratio / 100f) : new UiLayoutOffset(n));
     }
+
+    private static bool Finite(string token, out float number) =>
+        float.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out number) && !float.IsNaN(number) && !float.IsInfinity(number);
 
     public static UiAttributeValue Number(float value)
     {
         if (float.IsNaN(value) || float.IsInfinity(value))
             throw new ArgumentOutOfRangeException(nameof(value));
-        return new UiAttributeValue(value.ToString("R", CultureInfo.InvariantCulture), value, false, 1);
+        return new UiAttributeValue(value.ToString("R", CultureInfo.InvariantCulture), value, false, 5,
+            Array.AsReadOnly(new[] { value }), new UiLayoutOffset(value));
     }
 
     public static UiAttributeValue Boolean(bool value) => new(value ? "true" : "false", 0, value, 2);
@@ -72,6 +96,9 @@ public readonly struct UiAttributeValue
         value = boolean;
         return (flags & 2) != 0;
     }
+
+    internal bool TryOffset(out UiLayoutOffset value) { value = offset; return (flags & 4) != 0; }
+    internal bool TryNumbers(out IReadOnlyList<float> value) { value = numbers ?? Array.Empty<float>(); return numbers != null; }
 }
 
 public readonly struct UiAttributeDefinition
@@ -151,15 +178,12 @@ public sealed class UiAttributeSchema
             case "width":
                 return UiAttributeKind.Length;
             case "gap":
-            case "padding":
             case "minwidth":
             case "maxwidth":
             case "breakpoint":
             case "cols":
             case "narrowcols":
             case "visiblerows":
-            case "offsetx":
-            case "offsety":
             case "min":
             case "max":
             case "step":
@@ -179,11 +203,11 @@ public sealed class UiAttributeSchema
             {
                 UiAttributeKind.Number => v.TryNumber(out _),
                 UiAttributeKind.Boolean => v.TryBoolean(out _),
-                UiAttributeKind.Length => v.TryNumber(out _) || v.Text.Length == 0 || v.Text.Equals("Auto", StringComparison.OrdinalIgnoreCase) || v.Text.Equals("MatchContent", StringComparison.OrdinalIgnoreCase),
+                UiAttributeKind.Length => v.TryNumber(out _) || v.Text.Trim().Length == 0 || v.Text.Trim().Equals("Auto", StringComparison.OrdinalIgnoreCase) || v.Text.Trim().Equals("MatchContent", StringComparison.OrdinalIgnoreCase),
                 _ => true
             };
             if (!valid)
-                throw new UiContractException("Invalid " + entry.Key + " literal '" + v.Text + "'; expected " + entry.Value.Kind + ".", source, spec.Id, spec.Kind, path);
+                throw new UiContractException("Invalid " + entry.Key + " literal '" + v.Text + "' at '"+path+"'; expected " + (entry.Value.Kind == UiAttributeKind.Length ? "a finite number, Auto or MatchContent" : entry.Value.Kind.ToString()) + ".", source, spec.Id, spec.Kind, path);
         }
     }
 }

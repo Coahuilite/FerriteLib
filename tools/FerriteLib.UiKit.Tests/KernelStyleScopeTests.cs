@@ -1,10 +1,11 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -26,7 +27,7 @@ internal static class KernelStyleScopeTests
     /// <summary>17 ideographs: wide enough that a font change is a different measured band, not a rounding.</summary>
     private const string LongCjk = "这是一段用于验证换行高度的文本内容";
 
-    private static readonly Color IcePanel = new(0f, 0f, 1f, 1f);
+    private static readonly UiColour IcePanel = new(0f, 0f, 1f, 1f);
 
     private static int failures;
 
@@ -66,14 +67,14 @@ internal static class KernelStyleScopeTests
             + "<Stack Id=\"parent\" Padding=\"0\"><Widget Id=\"child\" Kind=\"" + ProbeKind + "\" Scheme=\"local\" Palette.Foreground=\"#00FF00\"/>"
             + "<Widget Id=\"follow\" Kind=\"" + ProbeKind + "\" Scheme=\"sparse\"/></Stack></UiPage>";
         using var host = new UiHost(Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
-        host.MeasureAndArrange(new Vector2(400, 400));
+        host.MeasureAndArrange(new UiLayoutPoint(400, 400));
         UiNode parent = host.Session.GetNodeByElementId("parent")!;
         UiNode child = host.Session.GetNodeByElementId("child")!;
         UiNode follow = host.Session.GetNodeByElementId("follow")!;
         parent.Properties.Font.Set(UiFont.Medium);
         parent.Properties.Density.Set(new UiDensity(10, 8, 9, 44, 1));
         parent.Properties.Palette(UiPaletteRole.Foreground).Set(new UiColour(1, 0, 0, 1));
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(400, 400));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(400, 400));
         Check(child.Properties.ResolvedFont.Value == UiFont.Tiny && child.Properties.ResolvedFont.Origin == UiPropertyOrigin.LocalStyle,
             "a real explicitly applied local font beats a programmatic ancestor declaration");
         Check(follow.Properties.ResolvedFont.Value == UiFont.Medium && follow.Properties.ResolvedFont.Origin == UiPropertyOrigin.Ancestor,
@@ -83,32 +84,32 @@ internal static class KernelStyleScopeTests
             "named style omissions continue per density metric instead of inheriting a resolved bundle");
         child.Properties.Font.Set(UiFont.Tiny);
         child.Properties.LocalFont.Set(UiFont.Small);
-        host.MeasureAndArrange(new Vector2(400, 400));
+        host.MeasureAndArrange(new UiLayoutPoint(400, 400));
         Check(child.Properties.ResolvedFont.Origin == UiPropertyOrigin.Instance && child.Properties.ResolvedFont.Value == UiFont.Tiny,
             "an explicit value equal to the old effective value retains its own declaration intent");
         child.Properties.Font.Remove();
-        host.MeasureAndArrange(new Vector2(400, 400));
+        host.MeasureAndArrange(new UiLayoutPoint(400, 400));
         Check(child.Properties.ResolvedFont.Value == UiFont.Small, "removing the instance reveals the still-declared local wrapper style");
         child.Properties.LocalFont.Remove();
-        host.MeasureAndArrange(new Vector2(400, 400));
+        host.MeasureAndArrange(new UiLayoutPoint(400, 400));
         Check(child.Properties.ResolvedFont.Value == UiFont.Tiny && child.Properties.ResolvedMetrics["Gap"].Value == 2,
             "removing only local font reveals named typography without resetting independent density");
         Check(child.Properties.ResolvedColours["Foreground"].Origin == UiPropertyOrigin.Instance
-            && SameColor(child.Properties.ResolvedColours["Foreground"].Value!.Value, new Color(0, 1, 0, 1)),
+            && SameColor(child.Properties.ResolvedColours["Foreground"].Value!.Value, new UiColour(0, 1, 0, 1)),
             "inline semantic colour is its own per-property instance declaration");
-        snapshot = host.MeasureAndArrange(new Vector2(400, 400));
+        snapshot = host.MeasureAndArrange(new UiLayoutPoint(400, 400));
         child.Properties.Palette(UiPaletteRole.Foreground).Set(new UiColour(0, 0, 1, 1));
-        UiLayoutSnapshot afterColour = host.MeasureAndArrange(new Vector2(400, 400));
+        UiLayoutSnapshot afterColour = host.MeasureAndArrange(new UiLayoutPoint(400, 400));
         Check(ReferenceEquals(snapshot, afterColour), "colour-only intent changes do not invalidate measured geometry");
-        host.DrawFrame(new Rect(0, 0, 400, 400));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0, 0, 400, 400));
         UiTheme childTheme = LastTheme(DrawnPaths, DrawnThemes, "/child")!;
-        Check(SameColor(childTheme[UiPaletteRole.Foreground], new Color(0, 0, 1, 1)) && SameColor(childTheme[UiPaletteRole.SwitchOff], UiTheme.ToPlatform(UiPalette.Default(UiPaletteRole.SwitchOff))),
+        Check(SameColor(childTheme[UiPaletteRole.Foreground], new UiColour(0, 0, 1, 1)) && SameColor(childTheme[UiPaletteRole.SwitchOff], UiPalette.Default(UiPaletteRole.SwitchOff)),
             "paint reads current semantic colour and derived fallback ink, without a frozen fallback bag");
         child.Properties.Palette(UiPaletteRole.Foreground).Remove();
         parent.Properties.Palette(UiPaletteRole.Foreground).Set(new UiColour(1, 1, 0, 1));
-        host.DrawFrame(new Rect(0, 0, 400, 400));
-        Check(SameColor(LastTheme(DrawnPaths, DrawnThemes, "/child")![UiPaletteRole.Foreground], new Color(0, 1, 0, 1))
-            && SameColor(LastTheme(DrawnPaths, DrawnThemes, "/follow")![UiPaletteRole.Foreground], new Color(1, 1, 0, 1)),
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0, 0, 400, 400));
+        Check(SameColor(LastTheme(DrawnPaths, DrawnThemes, "/child")![UiPaletteRole.Foreground], new UiColour(0, 1, 0, 1))
+            && SameColor(LastTheme(DrawnPaths, DrawnThemes, "/follow")![UiPaletteRole.Foreground], new UiColour(1, 1, 0, 1)),
             "removal reveals inline intent while an unoverridden sibling keeps following the current ancestor");
     }
     private static void VerifyPageColourOverrides()
@@ -120,29 +121,29 @@ internal static class KernelStyleScopeTests
             + "<Widget Id=\"child\" Kind=\"" + ProbeKind + "\"/></Stack></UiPage>";
         using var host = new UiHost(Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.Vanilla,
             new StubMetrics(), new StubTranslation());
-        Color red = new(1, 0, 0, 1);
-        Color green = new(0, 1, 0, 1);
-        Color yellow = new(1, 1, 0, 1);
+        UiColour red = new(1, 0, 0, 1);
+        UiColour green = new(0, 1, 0, 1);
+        UiColour yellow = new(1, 1, 0, 1);
         Frame(host, 400, 400);
         UiNode parent = host.Session.GetNodeByElementId("parent")!;
         UiNode child = host.Session.GetNodeByElementId("child")!;
         AssertPanel(host.Session.GetNodeByElementId("inline")!, red, UiPropertyOrigin.Instance,
             "inline declaration beats page overlay in measure and draw");
         AssertPanel(child, IcePanel, UiPropertyOrigin.Ancestor, "unoverridden child retains page colour");
-        parent.Properties.Palette(UiPaletteRole.PanelSurface).Set(UiTheme.FromPlatform(red));
+        parent.Properties.Palette(UiPaletteRole.PanelSurface).Set(red);
         Frame(host, 401, 400);
         AssertPanel(child, red, UiPropertyOrigin.Ancestor, "ancestor declaration beats page overlay");
-        child.Properties.LocalPalette(UiPaletteRole.PanelSurface).Set(UiTheme.FromPlatform(green));
+        child.Properties.LocalPalette(UiPaletteRole.PanelSurface).Set(green);
         Frame(host, 402, 400);
         AssertPanel(child, green, UiPropertyOrigin.LocalStyle, "local declaration beats ancestor and page");
-        child.Properties.Palette(UiPaletteRole.PanelSurface).Set(UiTheme.FromPlatform(yellow));
+        child.Properties.Palette(UiPaletteRole.PanelSurface).Set(yellow);
         Frame(host, 403, 400);
         AssertPanel(child, yellow, UiPropertyOrigin.Instance, "runtime instance beats local declaration");
         child.Properties.Palette(UiPaletteRole.PanelSurface).Remove();
         Frame(host, 404, 400);
         AssertPanel(child, green, UiPropertyOrigin.LocalStyle, "instance removal reveals current local declaration");
         child.Properties.LocalPalette(UiPaletteRole.PanelSurface).Remove();
-        parent.Properties.Palette(UiPaletteRole.PanelSurface).Set(UiTheme.FromPlatform(yellow));
+        parent.Properties.Palette(UiPaletteRole.PanelSurface).Set(yellow);
         Frame(host, 405, 400);
         AssertPanel(child, yellow, UiPropertyOrigin.Ancestor, "local removal follows current ancestor value");
         parent.Properties.Palette(UiPaletteRole.PanelSurface).Remove();
@@ -150,7 +151,7 @@ internal static class KernelStyleScopeTests
         AssertPanel(child, IcePanel, UiPropertyOrigin.Ancestor, "ancestor removal reveals unchanged page overlay");
     }
 
-    private static void AssertPanel(UiNode node, Color expected, UiPropertyOrigin origin, string name)
+    private static void AssertPanel(UiNode node, UiColour expected, UiPropertyOrigin origin, string name)
     {
         UiResolvedProperty<UiColour?> fact = node.Properties.ResolvedColours["PanelSurface"];
         string suffix = "/" + node.ElementId;
@@ -170,8 +171,8 @@ internal static class KernelStyleScopeTests
         using UiHost host = new(Scope, RegionManifest(), new UiBindings(), theme, new StubMetrics(), new StubTranslation());
 
         ClearBoxes();
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(320f, 240f));
-        host.DrawFrame(new Rect(0f, 0f, 320f, 240f));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(320f, 240f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 320f, 240f));
 
         UiTheme? inside = LastTheme(MeasuredPaths, MeasuredThemes, "/inside");
         UiTheme? outside = LastTheme(MeasuredPaths, MeasuredThemes, "/outside");
@@ -180,11 +181,11 @@ internal static class KernelStyleScopeTests
             "the region's scheme reaches the element inside it");
         Check(inside != null && !ReferenceEquals(inside, theme),
             "and that theme is the region's own bag, not the injected instance");
-        CheckClose(20f, snapshot.RectById["inside"].height,
+        CheckClose(20f, snapshot.RectById["inside"].Height,
             "the region's density reaches that element's measured band");
         Check(outside != null && ReferenceEquals(outside, theme),
             "an element outside the region keeps the injected theme itself (the page level is the injected bag)");
-        CheckClose(UiGeometry.Default.RowHeight, snapshot.RectById["outside"].height,
+        CheckClose(UiGeometry.Default.RowHeight, snapshot.RectById["outside"].Height,
             "and keeps the page's density");
         Check(AnyRecordedBoxColor(IcePanel),
             "the region paints its own chrome with that theme: the region's Panel fill is on the wire");
@@ -197,14 +198,14 @@ internal static class KernelStyleScopeTests
         using UiHost host = new(Scope, RegionManifest(), new UiBindings(), theme, new StubMetrics(), new StubTranslation());
 
         ResetProbe();
-        host.DrawFrame(new Rect(0f, 0f, 320f, 240f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 320f, 240f));
         UiTheme? firstMeasure = LastTheme(MeasuredPaths, MeasuredThemes, "/inside");
         UiTheme? firstDraw = LastTheme(DrawnPaths, DrawnThemes, "/inside");
 
         // A different viewport height is a different available size, so the second frame really arranges
         // again - otherwise "the same instance" would be a claim about a cached snapshot nobody measured.
         ResetProbe();
-        host.DrawFrame(new Rect(0f, 0f, 320f, 260f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 320f, 260f));
         UiTheme? secondMeasure = LastTheme(MeasuredPaths, MeasuredThemes, "/inside");
         UiTheme? secondDraw = LastTheme(DrawnPaths, DrawnThemes, "/inside");
 
@@ -229,7 +230,7 @@ internal static class KernelStyleScopeTests
         // Frame 1: the scope is built from the baseline as it stands.
         UiLayoutSnapshot first = Frame(host, 320f, 240f);
         UiTheme? firstScope = LastTheme(MeasuredPaths, MeasuredThemes, "/inside");
-        float firstBand = first.RectById["note"].height;
+        float firstBand = first.RectById["note"].Height;
 
         // The control: the layout clock has not moved, so a scope is still one instance and its atom still
         // measures the same band. The expiry rule must not turn reuse into a per-frame rebuild.
@@ -237,7 +238,7 @@ internal static class KernelStyleScopeTests
         UiTheme? secondScope = LastTheme(MeasuredPaths, MeasuredThemes, "/inside");
         Check(firstScope != null && ReferenceEquals(firstScope, secondScope),
             "while the layout clock stands still one scope keeps one instance across frames");
-        CheckClose(firstBand, second.RectById["note"].height,
+        CheckClose(firstBand, second.RectById["note"].Height,
             "and the atom inside it keeps the band it measured");
 
         // The clock moves: a layout-bearing token on the injected theme. Every band measured against the
@@ -251,9 +252,9 @@ internal static class KernelStyleScopeTests
             "a baseline layout-clock move drops the cached scope instead of handing the stale instance back");
         Check(thirdScope != null && thirdScope.DefaultFont == UiFont.Medium,
             "the rebuilt scope carries the value the move introduced");
-        Check(third.RectById["note"].height > firstBand + 0.01f,
+        Check(third.RectById["note"].Height > firstBand + 0.01f,
             "and the real atom inside the region measures a taller band with it: "
-            + third.RectById["note"].height + " vs " + firstBand);
+            + third.RectById["note"].Height + " vs " + firstBand);
 
         // The page level is the injected bag itself, and it moved in that same frame. A region lagging
         // behind it is exactly the inconsistency the clock read removes.
@@ -266,7 +267,7 @@ internal static class KernelStyleScopeTests
         UiTheme? fourthScope = LastTheme(MeasuredPaths, MeasuredThemes, "/inside");
         Check(thirdScope != null && ReferenceEquals(thirdScope, fourthScope),
             "and the rebuilt scope is reused from then on");
-        CheckClose(third.RectById["note"].height, fourth.RectById["note"].height,
+        CheckClose(third.RectById["note"].Height, fourth.RectById["note"].Height,
             "with the band it was rebuilt under");
     }
 
@@ -289,8 +290,8 @@ internal static class KernelStyleScopeTests
                 "the page level moves the theme's own layout clock, before any frame - the clock the cache already reads");
             Check(ReferenceEquals(host.StyleResolver.Document, standalone),
                 "the handed-in document is the one the host resolved");
-            UiLayoutSnapshot first = host.MeasureAndArrange(new Vector2(300f, 200f));
-            CheckClose(20f, first.RectById["probe"].height,
+            UiLayoutSnapshot first = host.MeasureAndArrange(new UiLayoutPoint(300f, 200f));
+            CheckClose(20f, first.RectById["probe"].Height,
                 "so the very first arrangement already measures in the document's density");
         }
 
@@ -301,8 +302,8 @@ internal static class KernelStyleScopeTests
         {
             Check(embeddedTheme.LayoutRevision > embeddedRevision,
                 "the manifest's own <Styles> section takes the same path into the same theme");
-            UiLayoutSnapshot first = host.MeasureAndArrange(new Vector2(300f, 200f));
-            CheckClose(20f, first.RectById["probe"].height,
+            UiLayoutSnapshot first = host.MeasureAndArrange(new UiLayoutPoint(300f, 200f));
+            CheckClose(20f, first.RectById["probe"].Height,
                 "and that first arrangement follows it too (one parser, one clock)");
         }
     }
@@ -326,7 +327,7 @@ internal static class KernelStyleScopeTests
                 + "<Palette Role=\"PanelSurface\" Value=\"#00ff00\"/>"
                 + "<Palette Role=\"ControlSurface\" Value=\"not-a-colour\"/>"
                 + "<Palette Token=\"Nope\" Value=\"#ffffff\"/>"
-                + "<Font Value=\"Huge\"/>"
+                + "<Metric Token=\"Font\" Value=\"Huge\"/>"
                 + "</Scheme>"
                 + "</Styles>");
             Check(broken.Issues.Count == 4,
@@ -343,11 +344,11 @@ internal static class KernelStyleScopeTests
                     && UiFitAudit.LastStyleFallbackDiagnostic.IndexOf("missing", StringComparison.Ordinal) >= 0,
                 "the report names the drop, not just a count: " + (UiFitAudit.LastStyleFallbackDiagnostic ?? "(none)"));
 
-            UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(320f, 200f));
+            UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(320f, 200f));
             Check(snapshot.RectById.ContainsKey("inside"),
                 "the page still arranges - appearance never takes a page down");
             UiTheme? inside = LastTheme(MeasuredPaths, MeasuredThemes, "/inside");
-            Check(inside != null && SameColor(inside[UiPaletteRole.PanelSurface], new Color(0f, 1f, 0f, 1f)),
+            Check(inside != null && SameColor(inside[UiPaletteRole.PanelSurface], new UiColour(0f, 1f, 0f, 1f)),
                 "and the readable declaration beside the dropped ones still landed");
         }
         finally
@@ -368,7 +369,7 @@ internal static class KernelStyleScopeTests
             UiTheme theme = UiTheme.Vanilla;
             using (UiHost host = new(Scope, RegionManifest(), new UiBindings(), theme, new StubMetrics(), new StubTranslation()))
             {
-                host.DrawFrame(new Rect(0f, 0f, 320f, 240f));
+                NativeFixture.DrawFrame(                host,new UiLayoutRect(0f, 0f, 320f, 240f));
                 Check(records.Count == 0 && UiFitAudit.StyleFallbackCount == 0,
                     "a correct document says nothing on the appearance channel (fail-soft must not mean noisy)");
             }
@@ -380,7 +381,7 @@ internal static class KernelStyleScopeTests
             using (UiHost host = new(Scope, RegionManifest("stranger"), new UiBindings(), naming, new StubMetrics(), new StubTranslation()))
             {
                 Check(records.Count == 0, "nothing is reported before an arrangement resolves the scope");
-                UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(320f, 200f));
+                UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(320f, 200f));
                 Check(records.Count == 1,
                     "the unknown scheme name is reported in the frame that resolved it (got " + records.Count + ")");
                 Check(snapshot.RectById.ContainsKey("inside"),
@@ -413,7 +414,7 @@ internal static class KernelStyleScopeTests
             using UiHost host = new(Scope, RegionManifest("us-flat-panel"), new UiBindings(), theme, new StubMetrics(), new StubTranslation());
             Check(records.Count == 0, "nothing is reported before an arrangement resolves the scope");
 
-            UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(320f, 200f));
+            UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(320f, 200f));
 
             Check(records.Count == 1, "the unknown scheme is one finding (got " + records.Count + ")");
             string path = records.Count > 0 ? records[0].ElementPath : "(none)";
@@ -530,7 +531,7 @@ internal static class KernelStyleScopeTests
             UiTheme orphan = UiTheme.Vanilla;
             using UiHost host = new(Scope, ProbeManifest("", " Scheme=\"ice\""), new UiBindings(), orphan, new StubMetrics(), new StubTranslation());
             Check(records.Count == 0, "nothing is reported before the scope is resolved");
-            host.MeasureAndArrange(new Vector2(300f, 200f));
+            host.MeasureAndArrange(new UiLayoutPoint(300f, 200f));
             Check(records.Count == 1,
                 "a scope named on a page with no document is reported, not ignored (got " + records.Count + ")");
             Check(host.StyleResolver.Document.IsEmpty,
@@ -618,7 +619,7 @@ internal static class KernelStyleScopeTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
@@ -629,7 +630,7 @@ internal static class KernelStyleScopeTests
             return ctx.Theme.Geometry.RowHeight;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             DrawnPaths.Add(ctx.ElementPath);
             DrawnThemes.Add(ctx.Theme);
@@ -642,7 +643,7 @@ internal static class KernelStyleScopeTests
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(Scope, ProbeKind, () => new ScopeProbe(), new[] { "Height" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new ScopeProbe(), new[] { "Height" }));
     }
 
     private static void ResetProbe()
@@ -660,8 +661,8 @@ internal static class KernelStyleScopeTests
     private static UiLayoutSnapshot Frame(UiHost host, float width, float height)
     {
         ResetProbe();
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(width, height));
-        host.DrawFrame(new Rect(0f, 0f, width, height));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(width, height));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, width, height));
 
         // A frame that recovered an element is not a frame this lane may call healthy: the theme and band
         // assertions below would still pass while the element under test was replaced by its recovery band
@@ -688,7 +689,7 @@ internal static class KernelStyleScopeTests
         clear.Invoke(null, null);
     }
 
-    private static bool AnyRecordedBoxColor(Color wanted)
+    private static bool AnyRecordedBoxColor(UiColour wanted)
     {
         FieldInfo? field = typeof(Verse.Widgets).GetField("DrawBoxSolidColors", BindingFlags.Public | BindingFlags.Static);
         if (field == null) throw new Exception("Verse stub is missing DrawBoxSolidColors");
@@ -698,16 +699,16 @@ internal static class KernelStyleScopeTests
         for (int i = 0; i < colors.Count; i++)
         {
             object? recorded = colors[i];
-            if (recorded is Color color && SameColor(color, wanted)) return true;
+            if (SameColor(NativeFixture.Record<UiColour>(recorded), wanted)) return true;
         }
 
         return false;
     }
 
-    private static bool SameColor(UiColour actual, Color expected) => SameColor(UiTheme.ToPlatform(actual), expected);
-    private static bool SameColor(Color left, Color right)
+
+    private static bool SameColor(UiColour left, UiColour right)
     {
-        return Near(left.r, right.r) && Near(left.g, right.g) && Near(left.b, right.b) && Near(left.a, right.a);
+        return Near(left.Red, right.Red) && Near(left.Green, right.Green) && Near(left.Blue, right.Blue) && Near(left.Alpha, right.Alpha);
     }
 
     private static bool Near(float expected, float actual)

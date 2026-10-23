@@ -79,7 +79,7 @@ internal static class LayoutReuseTests
             foreach (string key in keys) if (!bands.ContainsKey(key)) bands.Add(key, new Band());
             var frame = new UiLayoutFrame(40, 300, 0, 0, 0, 0, 0, 0, new UiLayoutHeight(null, false));
             prior = UiLayoutReuse.Resolve(prior, new UiMeasureInputs(keys.ToArray()),
-                (i, w, a, r) => bands[keys[i]].Read(page.Bindings.Get<string>("items." + keys[i] + ".caption"), w, metrics),
+                (i, w, a, r) => bands[keys[i]].Read(page.Bindings.Get<string>(new UiBindingAddress("items",keys[i],"caption").Key), w, metrics),
                 measure => { arrangements++; return UiLayout.VerticalContent(frame, children, measure); }, out reused);
         }
         Synchronize(); service.Increment(); projection.Apply(service.ReadSnapshot()); Synchronize();

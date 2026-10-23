@@ -1,8 +1,9 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -115,18 +116,18 @@ internal static class KernelInvalidationTests
         bindings.BindReadOnly("b", () => heightB, UiInvalidation.Measure);
 
         using UiHost host = Host(Page("a", "b"), bindings);
-        UiLayoutSnapshot first = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot first = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(
-            Near(first.RectById["a"].height, 10f) && Near(first.RectById["b"].height, 20f),
+            Near(first.RectById["a"].Height, 10f) && Near(first.RectById["b"].Height, 20f),
             "the first arrange measures every readout from its binding");
 
-        UiLayoutSnapshot cached = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot cached = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(ReferenceEquals(first, cached), "an unchanged page reuses its arranged snapshot");
 
         int clockBefore = host.Session.ContentRevision;
         heightA = 40f;
         bindings.NotifyChanged("a");
-        UiLayoutSnapshot afterPaint = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot afterPaint = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(
             ReferenceEquals(cached, afterPaint),
             "a Paint-class key reuses the arrangement: a fixed-size readout must not re-measure the page");
@@ -138,13 +139,13 @@ internal static class KernelInvalidationTests
         // engine's decision were missing this lane would pass the reuse claim for the wrong reason.
         heightB = 50f;
         bindings.NotifyChanged("b");
-        UiLayoutSnapshot afterMeasure = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot afterMeasure = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(
             !ReferenceEquals(afterPaint, afterMeasure),
             "a Measure-class key re-arranges, so the reuse above is the class's decision");
-        Check(Near(afterMeasure.RectById["b"].height, 50f), "and the new value is what the arrange measured");
+        Check(Near(afterMeasure.RectById["b"].Height, 50f), "and the new value is what the arrange measured");
         Check(
-            Near(afterMeasure.RectById["a"].height, 40f),
+            Near(afterMeasure.RectById["a"].Height, 40f),
             "while the Paint-class value is read by that same arrange - the next paint would have shown it");
         Check(
             host.Session.ContentRevision == clockBefore + 1,
@@ -160,14 +161,14 @@ internal static class KernelInvalidationTests
         bindings.BindReadOnly("orphan", () => orphan, UiInvalidation.Measure);
 
         using UiHost host = Host(Page("a"), bindings);
-        host.MeasureAndArrange(new Vector2(200f, 200f));
-        UiLayoutSnapshot cached = host.MeasureAndArrange(new Vector2(200f, 200f));
+        host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
+        UiLayoutSnapshot cached = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         int clock = host.Session.ContentRevision;
         int aBefore = Count("a");
 
         orphan = 5f;
         bindings.NotifyChanged("orphan");
-        UiLayoutSnapshot after = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot after = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
 
         Check(
             ReferenceEquals(cached, after),
@@ -185,8 +186,8 @@ internal static class KernelInvalidationTests
         bindings.BindReadOnly("c", () => heightC, UiInvalidation.Structure);
 
         using UiHost host = Host(Page("b", "c"), bindings);
-        host.MeasureAndArrange(new Vector2(200f, 200f));
-        host.MeasureAndArrange(new Vector2(200f, 200f));
+        host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
+        host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         int clock = host.Session.ContentRevision;
         int bBefore = Count("b");
         int cBefore = Count("c");
@@ -194,12 +195,12 @@ internal static class KernelInvalidationTests
         heightB = 60f;
         heightC = 70f;
         bindings.NotifyChanged("b", "b", "c", "c", "c");
-        UiLayoutSnapshot after = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot after = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
 
         Check(Count("b") == bBefore + 1, "three announcements of one key re-measure its element once");
         Check(Count("c") == cBefore + 1, "and two announcements of another do the same");
         Check(
-            Near(after.RectById["b"].height, 60f) && Near(after.RectById["c"].height, 70f),
+            Near(after.RectById["b"].Height, 60f) && Near(after.RectById["c"].Height, 70f),
             "the commit uses the model's current values for the whole batch");
         Check(
             host.Session.ContentRevision == clock + 1,
@@ -220,22 +221,22 @@ internal static class KernelInvalidationTests
         bindings.BindReadOnly("k", () => height, UiInvalidation.Measure);
 
         using UiHost host = Host(Page("k"), bindings);
-        host.MeasureAndArrange(new Vector2(200f, 200f));
-        host.MeasureAndArrange(new Vector2(200f, 200f));
+        host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
+        host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         int clock = host.Session.ContentRevision;
         int measured = Count("k");
 
-        var viewport = new Rect(0f, 0f, 200f, 200f);
+        var viewport = new UiLayoutRect(0f, 0f, 200f, 200f);
         height = 50f;
         announceInDraw = true;
-        host.DrawFrame(viewport);
+        NativeFixture.DrawFrame(        host,viewport);
 
         Check(Count("k") == measured, "a notification raised inside the draw pass does not re-arrange that pass");
         Check(Near(DrawnHeightOf("k"), 10f), "and the pass finishes with the tree it started with");
         Check(host.Session.ContentRevision == clock, "so nothing committed mid-pass");
 
         announceInDraw = false;
-        host.DrawFrame(viewport);
+        NativeFixture.DrawFrame(        host,viewport);
 
         Check(Count("k") == measured + 1, "the commit lands on the next arrangement boundary");
         Check(Near(DrawnHeightOf("k"), 50f), "carrying the value the model moved to");
@@ -258,10 +259,10 @@ internal static class KernelInvalidationTests
         bindings.BindReadOnly("k", () => height, UiInvalidation.Paint);
 
         using UiHost host = Host(Page("k"), bindings);
-        host.MeasureAndArrange(new Vector2(200f, 200f));
-        UiLayoutSnapshot cached = host.MeasureAndArrange(new Vector2(200f, 200f));
+        host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
+        UiLayoutSnapshot cached = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(
-            ReferenceEquals(cached, host.MeasureAndArrange(new Vector2(200f, 200f))),
+            ReferenceEquals(cached, host.MeasureAndArrange(new UiLayoutPoint(200f, 200f))),
             "an idle page keeps reusing its arranged snapshot");
 
         UiNode node = host.Session.GetNodeByElementId("k")
@@ -272,7 +273,7 @@ internal static class KernelInvalidationTests
         node.MarkDirty();
         Check(node.IsDirty, "MarkDirty raises the node's own flag");
 
-        UiLayoutSnapshot after = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot after = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(
             !ReferenceEquals(cached, after),
             "one dirty node re-runs the arrange with the content revision unchanged");
@@ -304,7 +305,7 @@ internal static class KernelInvalidationTests
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(Scope, ReadoutKind, () => new ReadoutWidget(), new[] { "Id", "Kind", "Bind" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ReadoutKind, () => new ReadoutWidget(), new[] { "Id", "Kind", "Bind" }));
         MeasureCounts.Clear();
         DrawnHeights.Clear();
         announceInDraw = false;
@@ -397,7 +398,7 @@ internal static class KernelInvalidationTests
             this.spec = spec;
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
             bindings.ValidateValue<float>(Key(), elementPath);
         }
@@ -409,14 +410,13 @@ internal static class KernelInvalidationTests
             return ctx.Bindings.Get<float>(key);
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             string key = Key();
-            DrawnHeights[key] = rect.height;
+            DrawnHeights[key] = rect.Height;
             if (announceInDraw)
             {
-                // The shape a real page has: the model moved and a widget notices while it paints.
-                ctx.Bindings.NotifyChanged(key);
+((UiBindings)ctx.Bindings).NotifyChanged(key);
             }
         }
 

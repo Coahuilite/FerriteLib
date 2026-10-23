@@ -1,9 +1,10 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using FerriteLib.UiKit;
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 internal static class KernelDescriptiveFactsTests
@@ -31,7 +32,7 @@ internal static class KernelDescriptiveFactsTests
         finally
         {
             Event.current = null;
-            UiNative.ButtonOverride = null;
+            NativeFixture.ButtonOverride = null;
             GUIUtility.hotControl = 0;
         }
     }
@@ -44,8 +45,8 @@ internal static class KernelDescriptiveFactsTests
         float model = .6f;
         var bindings = new UiBindings();
         bindings.BindReadOnly("progress", () => model);
-        bindings.BindReadOnly<Texture2D>("picture", () => null !);
-        var ctx = new UiWidgetContext("description", session, new Metrics(), UiTheme.Vanilla, new Translation(), bindings, 200, "root");
+        bindings.BindReadOnly<UiImage>("picture", () => default);
+        var ctx = NativeFixture.Context("description", session, new Metrics(), UiTheme.Vanilla, new Translation(), bindings, 200, "root");
         var kinds = new[]
         {
             WrappedTextWidget.Kind,
@@ -66,7 +67,7 @@ internal static class KernelDescriptiveFactsTests
             UiDescriptionRole.Decoration,
             UiDescriptionRole.Progress
         };
-        UiNative.ButtonOverride = _ => throw new Exception("descriptive input is invented");
+        NativeFixture.ButtonOverride = _ => throw new Exception("descriptive input is invented");
         for (int i = 0; i < kinds.Length; i++)
         {
             IUiWidget widget = UiWidgetRegistry.Resolve("description", kinds[i]);
@@ -114,11 +115,11 @@ internal static class KernelDescriptiveFactsTests
             Event.current = new Event
             {
                 type = EventType.MouseDown,
-                mousePosition = new Vector2(20, 14),
+                mousePosition = VerseUiExecution.Point(new UiLayoutPoint(20, 14)),
                 button = 0
             };
             GUIUtility.hotControl = 777;
-            widget.Draw(new Rect(0, 0, 200, 60), ctx);
+            NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 200, 60), ctx);
             Check(Event.current.type == EventType.MouseDown && GUIUtility.hotControl == 777, "descriptive paint neither consumes a press nor captures: " + kinds[i]);
             GUIUtility.hotControl = 0;
         }
@@ -146,23 +147,23 @@ internal static class KernelDescriptiveFactsTests
             string alignment = container == "Overlay" ? " AlignX=\"Left\"" : "";
             var manifest = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"description\"><" + container + " Id=\"parent\" Padding=\"0\" Gap=\"0\"><Widget Id=\"banner\" Kind=\"chrome/banner\" Text=\"ab\" Width=\"Auto\"" + alignment + " Height=\"28\" /></" + container + "></UiPage>");
             using var host = new UiHost("description", manifest, new UiBindings(), UiTheme.Vanilla, new Metrics(), new Translation());
-            var available = new Vector2(400, 300);
+            var available = new UiLayoutPoint(400, 300);
             UiLayoutSnapshot snapshot = host.MeasureAndArrange(available);
             UiNode parent = host.Session.GetNodeByElementId("parent")!;
             UiNode banner = host.Session.GetNodeByElementId("banner")!;
-            Check(snapshot.RectById["banner"].width == 10 && banner.Properties.ResolvedFont.Value == UiFont.Tiny, "undeclared banner keeps Tiny fallback in actual Auto geometry: " + container);
+            Check(snapshot.RectById["banner"].Width == 10 && banner.Properties.ResolvedFont.Value == UiFont.Tiny, "undeclared banner keeps Tiny fallback in actual Auto geometry: " + container);
             parent.Properties.Font.Set(UiFont.Medium);
             snapshot = host.MeasureAndArrange(available);
-            Check(snapshot.RectById["banner"].width == 24 && banner.Properties.ResolvedFont.Origin == UiPropertyOrigin.Ancestor, "Auto geometry and inherited Medium share the child's effective font: " + container);
+            Check(snapshot.RectById["banner"].Width == 24 && banner.Properties.ResolvedFont.Origin == UiPropertyOrigin.Ancestor, "Auto geometry and inherited Medium share the child's effective font: " + container);
             banner.Properties.Font.Set(UiFont.Tiny);
             snapshot = host.MeasureAndArrange(available);
-            Check(snapshot.RectById["banner"].width == 10, "explicit child Tiny wins: " + container);
+            Check(snapshot.RectById["banner"].Width == 10, "explicit child Tiny wins: " + container);
             banner.Properties.Font.Remove();
             snapshot = host.MeasureAndArrange(available);
-            Check(snapshot.RectById["banner"].width == 24, "removal follows current Medium without copying: " + container);
+            Check(snapshot.RectById["banner"].Width == 24, "removal follows current Medium without copying: " + container);
             parent.Properties.Font.Remove();
             snapshot = host.MeasureAndArrange(available);
-            Check(snapshot.RectById["banner"].width == 10 && banner.Properties.ResolvedFont.Origin == UiPropertyOrigin.Fallback, "removing the environment restores the kind fallback: " + container);
+            Check(snapshot.RectById["banner"].Width == 10 && banner.Properties.ResolvedFont.Origin == UiPropertyOrigin.Fallback, "removing the environment restores the kind fallback: " + container);
         }
     }
 

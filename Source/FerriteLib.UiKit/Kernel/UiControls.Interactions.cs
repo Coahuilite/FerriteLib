@@ -7,6 +7,7 @@ public sealed partial class UiControls
     public UiInteractionTarget InteractionTarget(UiWidgetContext ctx, string binding) => InteractionTarget(ctx, binding, "", null);
     public UiInteractionTarget InteractionTarget(UiWidgetContext ctx, string binding, string part, object? itemKey = null)
     {
+        RequireOwner(ctx);
         UiNode node = ctx.Node;
         return new UiInteractionTarget(node.Id.Key, binding + "\u001f" + node.InteractionScope, part, itemKey, node.InteractionScope);
     }
@@ -48,7 +49,7 @@ public sealed partial class UiControls
         return PointerInteraction(rect, session, node, InteractionTarget(ctx, binding), CanReceivePointerPress(rect, ctx), !IsInputDisabled(node) && writable, range, limits, value, ctx);
     }
 
-    private UiInteractionResult PointerInteraction(UiLayoutRect rect, UiSession session, UiNode node, UiInteractionTarget target, bool canReceive, bool canOperate, bool range, UiRange limits, float value, UiWidgetContext? ctx = null, bool pointOperation = false, float currentY = 0, UiHitGeometry? pointGeometry = null)
+    private UiInteractionResult PointerInteraction(UiLayoutRect rect, UiSession session, UiNode node, UiInteractionTarget target, bool canReceive, bool canOperate, bool range, UiRange limits, float value, UiWidgetContext? ctx = null, bool pointOperation = false, float currentY = 0, UiHitGeometry? pointGeometry = null,bool windowSpace=false)
     {
 #if FER_DEV
         string eventBefore = DiagnosticEventName();
@@ -61,7 +62,7 @@ public sealed partial class UiControls
         UiPointerPhase phase = PointerPhase();
         if (owns && (!sameNativeOwner || !HasHotControl(control)))
             phase = UiPointerPhase.Lost;
-        var point = PointerPosition();
+        var point = windowSpace?Input.Pointer:PointerPosition();
         var input = new UiPointerSample(phase, point.X, point.Y, Input.Consumed);
         bool captureAvailable = Execution.CaptureAvailable;
         var eligibility = new UiInputEligibility(canOperate && session.PointerInputAllowed && session.IsInputGeometryReliable, true, canReceive && (captureAvailable || owns));
@@ -129,7 +130,7 @@ public sealed partial class UiControls
     {
         UiNode node = ownerNode;
         bool enabled = selectable && !IsInputDisabled(node) && (!option || session.IsPopupOpen(elementId, node));
-        return PointerInteraction(rect, session, node, target, enabled && IsMouseOver(rect), enabled, false, default, 0);
+        return PointerInteraction(rect, session, node, target, enabled && IsWindowMouseOver(rect), enabled, false, default, 0,windowSpace:true);
     }
 
     private UiPointerPhase PointerPhase()

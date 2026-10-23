@@ -1,10 +1,11 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -86,10 +87,10 @@ internal static class KernelRepeatTests
             Check(Node(host, "row#" + Keys[i]) != null, "row '" + Keys[i] + "' has an element of its own");
         }
 
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(240f, 400f));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(240f, 400f));
         Check(snapshot.RectById.ContainsKey("row#a") && snapshot.RectById.ContainsKey("row#c"),
             "every row's geometry is published under its item-qualified identity");
-        Check(snapshot.RectById["row#a"].y < snapshot.RectById["row#c"].y, "rows follow the binding's order");
+        Check(snapshot.RectById["row#a"].Y < snapshot.RectById["row#c"].Y, "rows follow the binding's order");
         Check(!snapshot.RectById.ContainsKey("row"),
             "the declared template Id alone addresses no row: a repeated element's instance key carries the item");
     }
@@ -100,9 +101,9 @@ internal static class KernelRepeatTests
         using UiHost host = NewHost(new[] { "a", "b" });
         Draw(host);
 
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(240f, 400f));
-        Rect flag = snapshot.RectById["flag#b"];
-        var centre = new Vector2(flag.x + flag.width * 0.5f, flag.y + flag.height * 0.5f);
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(240f, 400f));
+        UiLayoutRect flag = snapshot.RectById["flag#b"];
+        var centre = new UiLayoutPoint(flag.X + flag.Width * 0.5f, flag.Y + flag.Height * 0.5f);
         Pump(host, EventType.MouseDown, centre);
         Pump(host, EventType.MouseUp, centre);
 
@@ -125,7 +126,7 @@ internal static class KernelRepeatTests
     {
         UiFitAudit.Reset();
         UiTheme theme = UiTheme.Vanilla;
-        var activeEdge = new Color(0.91f, 0.11f, 0.17f, 1f);
+        var activeEdge = new UiColour(0.91f, 0.11f, 0.17f, 1f);
         // The Active cell's border is theme.AccentGold and a rule paints exactly that border, so the probe
         // colour counts whole rows without depending on the order the rows were drawn in.
         theme[UiPaletteRole.SelectedBorder] = activeEdge;
@@ -143,14 +144,14 @@ internal static class KernelRepeatTests
         for (int i = 0; i < keys.Count; i++)
         {
             string captured = keys[i];
-            bindings.BindReadOnly<bool>("items." + captured + ".selected", () => selected[captured]);
+            bindings.BindReadOnly<bool>(new UiBindingAddress("items",captured,"selected").Key, () => selected[captured]);
         }
 
         using var host = new UiHost(
             Scope, UiLayoutManifest.Parse(SelectedKeyPageXml), bindings, theme, new StubMetrics(), new StubTranslation());
 
         UiLayoutSnapshot snapshot = Arrange(host);
-        List<Rect> active = ActiveRuleRects(activeEdge);
+        List<UiLayoutRect> active = ActiveRuleRects(activeEdge);
         Check(active.Count == 1,
             "exactly one row carries the active treatment, not one per row: " + active.Count + " active row(s) of "
             + keys.Count + " (a row reading the page-level decoy 'selected' would make it " + keys.Count + ")");
@@ -161,7 +162,7 @@ internal static class KernelRepeatTests
         // moves with it, so the answer is per row and not a fixed slot.
         selected["b"] = false;
         selected["c"] = true;
-        host.Bindings.NotifyChanged("items");
+((UiBindings)host.Bindings).NotifyChanged("items");
         snapshot = Arrange(host);
         active = ActiveRuleRects(activeEdge);
         Check(active.Count == 1 && Within(active[0], snapshot.RectById["row#c"]),
@@ -182,17 +183,17 @@ internal static class KernelRepeatTests
     {
         ClearDrawRecordings();
         Draw(host);
-        return host.MeasureAndArrange(new Vector2(240f, 400f));
+        return host.MeasureAndArrange(new UiLayoutPoint(240f, 400f));
     }
 
-    private static List<Rect> ActiveRuleRects(Color activeEdge)
+    private static List<UiLayoutRect> ActiveRuleRects(UiColour activeEdge)
     {
         var colors = (IList)DrawRecording("DrawBoxSolidColors");
         var rects = (IList)DrawRecording("DrawBoxSolidRects");
-        var found = new List<Rect>();
+        var found = new List<UiLayoutRect>();
         for (int i = 0; i < colors.Count && i < rects.Count; i++)
         {
-            if (SameColor((Color)colors[i]!, activeEdge)) found.Add((Rect)rects[i]!);
+            if (SameColor(NativeFixture.Record<UiColour>(colors[i]!), activeEdge)) found.Add(NativeFixture.Record<UiLayoutRect>(rects[i]!));
         }
 
         return found;
@@ -215,15 +216,15 @@ internal static class KernelRepeatTests
         return field.GetValue(null)!;
     }
 
-    private static bool Within(Rect inner, Rect outer)
+    private static bool Within(UiLayoutRect inner, UiLayoutRect outer)
     {
-        return inner.y >= outer.y - 0.001f && inner.yMax <= outer.yMax + 0.001f;
+        return inner.Y >= outer.Y - 0.001f && inner.YMax <= outer.YMax + 0.001f;
     }
 
-    private static bool SameColor(Color left, Color right)
+    private static bool SameColor(UiColour left, UiColour right)
     {
-        return Math.Abs(left.r - right.r) < 0.001f && Math.Abs(left.g - right.g) < 0.001f
-            && Math.Abs(left.b - right.b) < 0.001f && Math.Abs(left.a - right.a) < 0.001f;
+        return Math.Abs(left.Red - right.Red) < 0.001f && Math.Abs(left.Green - right.Green) < 0.001f
+            && Math.Abs(left.Blue - right.Blue) < 0.001f && Math.Abs(left.Alpha - right.Alpha) < 0.001f;
     }
 
 
@@ -234,27 +235,27 @@ internal static class KernelRepeatTests
 
         UiNode rowA = Require(host, "row#a");
         UiNode rowB = Require(host, "row#b");
-        rowA.GetOrCreateState("probe").FloatValue = 7f;
+        NativeFixture.Custom(rowA,"probe").FloatValue = 7f;
 
-        UiLayoutSnapshot before = host.MeasureAndArrange(new Vector2(240f, 400f));
-        bool aWasFirst = before.RectById["row#a"].y < before.RectById["row#b"].y;
+        UiLayoutSnapshot before = host.MeasureAndArrange(new UiLayoutPoint(240f, 400f));
+        bool aWasFirst = before.RectById["row#a"].Y < before.RectById["row#b"].Y;
 
         Keys.Clear();
         Keys.Add("b");
         Keys.Add("a");
-        host.Bindings.NotifyChanged("items");
+((UiBindings)host.Bindings).NotifyChanged("items");
         Draw(host);
 
         UiNode afterA = Require(host, "row#a");
         UiNode afterB = Require(host, "row#b");
         Check(ReferenceEquals(rowA, afterA) && ReferenceEquals(rowB, afterB),
             "reordering reuses each key's node instead of rebuilding it");
-        Check(Near(afterA.GetOrCreateState("probe").FloatValue, 7f),
+        Check(Near(NativeFixture.Custom(afterA,"probe").FloatValue, 7f),
             "the state written under key 'a' is still under key 'a' after the reorder");
-        Check(Near(afterB.GetOrCreateState("probe").FloatValue, 0f), "and none of it bled onto key 'b'");
+        Check(Near(NativeFixture.Custom(afterB,"probe").FloatValue, 0f), "and none of it bled onto key 'b'");
 
-        UiLayoutSnapshot after = host.MeasureAndArrange(new Vector2(240f, 400f));
-        bool aIsFirst = after.RectById["row#a"].y < after.RectById["row#b"].y;
+        UiLayoutSnapshot after = host.MeasureAndArrange(new UiLayoutPoint(240f, 400f));
+        bool aIsFirst = after.RectById["row#a"].Y < after.RectById["row#b"].Y;
         Check(aWasFirst != aIsFirst, "while the drawn order followed the binding to its new order");
     }
 
@@ -265,22 +266,22 @@ internal static class KernelRepeatTests
 
         UiNode rowA = Require(host, "row#a");
         UiNode rowC = Require(host, "row#c");
-        rowC.GetOrCreateState("probe").FloatValue = 5f;
+        NativeFixture.Custom(rowC,"probe").FloatValue = 5f;
 
         Keys.Insert(1, "b");
-        BindItemKeys(host.Bindings);
-        host.Bindings.NotifyChanged("items");
+        BindItemKeys((UiBindings)host.Bindings);
+((UiBindings)host.Bindings).NotifyChanged("items");
         Draw(host);
 
         Check(ReferenceEquals(rowA, Require(host, "row#a")) && ReferenceEquals(rowC, Require(host, "row#c")),
             "inserting a key kept both existing rows' nodes");
-        Check(Near(Require(host, "row#c").GetOrCreateState("probe").FloatValue, 5f),
+        Check(Near(NativeFixture.Custom(Require(host, "row#c"),"probe").FloatValue, 5f),
             "and their state - the inserted key did not take the third slot's identity");
         Check(Node(host, "row#b") != null, "the inserted key got a row of its own");
 
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(240f, 400f));
-        Check(snapshot.RectById["row#a"].y < snapshot.RectById["row#b"].y
-            && snapshot.RectById["row#b"].y < snapshot.RectById["row#c"].y,
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(240f, 400f));
+        Check(snapshot.RectById["row#a"].Y < snapshot.RectById["row#b"].Y
+            && snapshot.RectById["row#b"].Y < snapshot.RectById["row#c"].Y,
             "and the rows sit in the new binding order");
     }
 
@@ -298,13 +299,13 @@ internal static class KernelRepeatTests
         {
             string key = "temp" + cycle.ToString();
             Keys.Add(key);
-            BindItemKeys(host.Bindings);
-            host.Bindings.NotifyChanged("items");
+            BindItemKeys((UiBindings)host.Bindings);
+((UiBindings)host.Bindings).NotifyChanged("items");
             Draw(host);
             Check(Node(host, "row#" + key) != null, "cycle " + cycle + ": the inserted key renders");
 
             Keys.Remove(key);
-            host.Bindings.NotifyChanged("items");
+((UiBindings)host.Bindings).NotifyChanged("items");
             Draw(host);
             Check(host.Session.GetNodeByElementId("row#" + key) == null,
                 "cycle " + cycle + ": the removed key's node is gone from the session, not merely zeroed");
@@ -324,21 +325,21 @@ internal static class KernelRepeatTests
         Draw(host);
 
         UiNode rowA = Require(host, "row#a");
-        rowA.GetOrCreateState("kept").FloatValue = 9f;
+        NativeFixture.Custom(rowA,"kept").FloatValue = 9f;
         UiNode probe = ChildNamed(Require(host, "probe#a"), "probe")
             ?? throw new Exception("the row's widget minted no sub-node");
-        probe.GetOrCreateState("probe").FloatValue = 3f;
+        NativeFixture.Custom(probe,"probe").FloatValue = 3f;
         UiNodeId probeId = probe.Id;
         UiNodeId rowAId = rowA.Id;
 
         Keys.Remove("a");
-        host.Bindings.NotifyChanged("items");
+((UiBindings)host.Bindings).NotifyChanged("items");
         Draw(host);
 
         Check(host.Session.GetNodeByElementId("row#a") == null,
             "the removed item's element node is gone from the session");
         Check(host.Session.GetNode(probeId) == null, "and the sub-node its widget minted went with it");
-        Check(host.Session.GetValueStates(rowAId).Count == 0,
+        Check(NativeFixture.CustomSlots(host.Session,rowAId).Count == 0,
             "and the state slots that node owned are released with it");
         Check(Require(host, "row#b") != null, "while the surviving row is untouched");
     }
@@ -349,23 +350,23 @@ internal static class KernelRepeatTests
         Draw(host);
 
         UiNode rowA = Require(host, "row#a");
-        rowA.GetOrCreateState("probe").FloatValue = 4f;
+        NativeFixture.Custom(rowA,"probe").FloatValue = 4f;
 
         showRows = false;
-        host.Bindings.NotifyChanged("show-rows");
-        host.DrawFrame(new Rect(0f, 0f, 240f, 400f));
-        UiLayoutSnapshot hidden = host.MeasureAndArrange(new Vector2(240f, 400f));
+((UiBindings)host.Bindings).NotifyChanged("show-rows");
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 240f, 400f));
+        UiLayoutSnapshot hidden = host.MeasureAndArrange(new UiLayoutPoint(240f, 400f));
         Check(!hidden.RectById.ContainsKey("row#a"), "a hidden collection arranges no row");
         Check(Node(host, "row#a") != null, "but its rows keep their identity: hiding is not removal");
-        Check(Near(Require(host, "row#a").GetOrCreateState("probe").FloatValue, 4f),
+        Check(Near(NativeFixture.Custom(Require(host, "row#a"),"probe").FloatValue, 4f),
             "and the state the hide was not supposed to touch is still there");
 
         showRows = true;
-        host.Bindings.NotifyChanged("show-rows");
+((UiBindings)host.Bindings).NotifyChanged("show-rows");
         Draw(host);
         Check(ReferenceEquals(rowA, Require(host, "row#a")),
             "showing it again reuses the very node it had before the hide");
-        Check(Near(rowA.GetOrCreateState("probe").FloatValue, 4f), "with its state intact");
+        Check(Near(NativeFixture.Custom(rowA,"probe").FloatValue, 4f), "with its state intact");
     }
 
     private static void VerifyDuplicateKeyIsRefused()
@@ -450,14 +451,18 @@ internal static class KernelRepeatTests
 
     private static void VerifyTemplateVocabularyCannotDrift()
     {
-        AssertSameVocabulary("ContainerAttributes", "TemplateContainerAttributes");
-        AssertSameVocabulary("CommonWidgetAttributes", "EngineWideWidgetAttributes");
+        Check(typeof(UiDefinitionCompiler).GetField("ContainerAttributes",BindingFlags.Static|BindingFlags.NonPublic)!=null
+            &&typeof(UiDefinitionCompiler).GetField("CommonWidgetAttributes",BindingFlags.Static|BindingFlags.NonPublic)!=null,
+            "one actual definition compiler owns both common grammars");
+        Check(typeof(UiLayoutEngine).GetField("TemplateContainerAttributes",BindingFlags.Static|BindingFlags.NonPublic)==null
+            &&typeof(UiHost).GetField("CommonWidgetAttributes",BindingFlags.Static|BindingFlags.NonPublic)==null,
+            "root and template validation have no parallel vocabulary copies");
     }
 
     private static void VerifyRepeatDeclarationContract()
     {
         using UiHost host = NewHost(new[] { "a" });
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(240f, 400f));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(240f, 400f));
         Check(snapshot.RectById.ContainsKey("row#a"), "the declared page arrangement succeeded");
 
         string unknownAttribute =
@@ -527,7 +532,7 @@ internal static class KernelRepeatTests
         Check(UiFitAudit.StyleFallbackCount >= 2,
             "and each unresolved read is recorded once through the bounded channel: " + UiFitAudit.StyleFallbackCount);
         Check(
-            UiFitAudit.LastStyleFallbackDiagnostic is string diagnostic && diagnostic.Contains("items.a."),
+            UiFitAudit.LastStyleFallbackDiagnostic is string diagnostic && diagnostic.Contains(new UiBindingAddress("items","a","pct").Key),
             "the report names the key it could not resolve: " + UiFitAudit.LastStyleFallbackDiagnostic);
     }
 
@@ -548,9 +553,9 @@ internal static class KernelRepeatTests
         Check(!host.Session.IsTripped(Require(host, "flag#a")),
             "and the frame that brings the value stays out of recovery too");
 
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(240f, 400f));
-        Rect flag = snapshot.RectById["flag#a"];
-        var centre = new Vector2(flag.x + flag.width * 0.5f, flag.y + flag.height * 0.5f);
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(240f, 400f));
+        UiLayoutRect flag = snapshot.RectById["flag#a"];
+        var centre = new UiLayoutPoint(flag.X + flag.Width * 0.5f, flag.Y + flag.Height * 0.5f);
         Pump(host, EventType.MouseDown, centre);
         Pump(host, EventType.MouseUp, centre);
         Check(!Done["a"], "the value the page bound one frame later is read and written like any other");
@@ -565,13 +570,13 @@ internal static class KernelRepeatTests
         UiNode caption = Require(host, "caption#a");
         Check(!host.Session.IsTripped(caption),
             "an absent bound key is not an error for the atom either: it draws its documented default");
-        Check(caption.Rect.HasValue && caption.Rect.Value.height > 0f,
+        Check(caption.Rect.HasValue && caption.Rect.Value.Height > 0f,
             "and the band it reserves while empty still exists, so the empty leaf cannot collapse its siblings");
 
         int reports = UiFitAudit.StyleFallbackCount;
         Check(reports == 1, "while the emptiness is recorded once, like every other fail-soft answer: " + reports);
         Check(
-            UiFitAudit.LastStyleFallbackDiagnostic is string diagnostic && diagnostic.Contains("items.a.caption"),
+            UiFitAudit.LastStyleFallbackDiagnostic is string diagnostic && diagnostic.Contains(new UiBindingAddress("items","a","caption").Key),
             "and the report names the key it could not resolve: " + UiFitAudit.LastStyleFallbackDiagnostic);
         Draw(host);
         Draw(host);
@@ -692,7 +697,7 @@ internal static class KernelRepeatTests
         return bindings;
     }
 
-    private static void BindItemKeys(IUiBindings bindings, ItemBindingMode mode = ItemBindingMode.Correct)
+    private static void BindItemKeys(UiBindings bindings, ItemBindingMode mode = ItemBindingMode.Correct)
     {
         for (int i = 0; i < Keys.Count; i++)
         {
@@ -708,7 +713,7 @@ internal static class KernelRepeatTests
     /// One item key's bindings. The atom's key is bound in every mode but <see cref="ItemBindingMode.CaptionAbsent"/>,
     /// because a tripped sibling would drown the signal the contract lanes are looking for.
     /// </summary>
-    private static void BindItemKey(IUiBindings bindings, string key, ItemBindingMode mode)
+    private static void BindItemKey(UiBindings bindings, string key, ItemBindingMode mode)
     {
         string captured = key;
         Done[captured] = false;
@@ -716,11 +721,11 @@ internal static class KernelRepeatTests
 
         if (mode == ItemBindingMode.CaptionMistyped)
         {
-            bindings.BindReadOnly<bool>("items." + captured + ".caption", () => true);
+            bindings.BindReadOnly<bool>(new UiBindingAddress("items",captured,"caption").Key, () => true);
         }
         else if (mode != ItemBindingMode.CaptionAbsent)
         {
-            bindings.BindReadOnly<string>("items." + captured + ".caption", () => Caption[captured]);
+            bindings.BindReadOnly<string>(new UiBindingAddress("items",captured,"caption").Key, () => Caption[captured]);
         }
 
         switch (mode)
@@ -732,8 +737,8 @@ internal static class KernelRepeatTests
                 break;
             case ItemBindingMode.NewKindsMistyped:
                 // Deliberately the wrong types: a bool key bound to a string, a float key bound to a bool.
-                bindings.BindReadOnly<string>("items." + captured + ".done", () => "not-a-bool");
-                bindings.BindReadOnly<bool>("items." + captured + ".pct", () => true);
+                bindings.BindReadOnly<string>(new UiBindingAddress("items",captured,"done").Key, () => "not-a-bool");
+                bindings.BindReadOnly<bool>(new UiBindingAddress("items",captured,"pct").Key, () => true);
                 break;
             case ItemBindingMode.NewKindsAbsent:
                 break;
@@ -741,12 +746,12 @@ internal static class KernelRepeatTests
     }
 
     /// <summary>The two new-kind value bindings for one item key, bound with their declared types.</summary>
-    private static void BindItemValues(IUiBindings bindings, string key)
+    private static void BindItemValues(UiBindings bindings, string key)
     {
         string captured = key;
         bindings.BindValue<bool>(
-            "items." + captured + ".done", () => Done[captured], value => Done[captured] = value, UiInvalidation.Paint);
-        bindings.BindReadOnly<float>("items." + captured + ".pct", () => Pct[captured], UiInvalidation.Paint);
+            new UiBindingAddress("items",captured,"done").Key, () => Done[captured], value => Done[captured] = value, UiInvalidation.Paint);
+        bindings.BindReadOnly<float>(new UiBindingAddress("items",captured,"pct").Key, () => Pct[captured], UiInvalidation.Paint);
     }
 
     private static string? CreationFailure(string xml)
@@ -791,13 +796,13 @@ internal static class KernelRepeatTests
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(
-            Scope, ChildProbeKind, () => new ChildProbeWidget(), new[] { "Id", "Kind", "Height" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(
+            Scope, ChildProbeKind, () => new ChildProbeWidget(), new[] { "Id", "Kind", "Height" }));
     }
 
     private static void Draw(UiHost host)
     {
-        host.DrawFrame(new Rect(0f, 0f, 240f, 400f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 240f, 400f));
     }
 
     private static UiNode Require(UiHost host, string elementId)
@@ -821,14 +826,14 @@ internal static class KernelRepeatTests
         return null;
     }
 
-    private static void Pump(UiHost host, EventType type, Vector2 point)
+    private static void Pump(UiHost host, EventType type, UiLayoutPoint point)
     {
         Event e = Event.KeyboardEvent("space");
         e.type = type;
         e.button = 0;
-        e.mousePosition = point;
+        e.mousePosition = VerseUiExecution.Point(point);
         Event.current = e;
-        host.DrawFrame(new Rect(0f, 0f, 240f, 400f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 240f, 400f));
         Event.current = null;
     }
 
@@ -937,7 +942,7 @@ internal static class KernelRepeatTests
             this.spec = spec;
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
@@ -946,10 +951,10 @@ internal static class KernelRepeatTests
             return 4f;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             UiNode child = ctx.Child("probe").Node ?? throw new Exception("Child() returned no node");
-            child.GetOrCreateState("probe").FloatValue = 3f;
+            NativeFixture.Custom(child,"probe").FloatValue = 3f;
         }
     }
 
@@ -1005,27 +1010,27 @@ internal static class KernelRepeatTests
         var keys = new List<string> { "a", "b", "c", "d" };
         using (UiHost host = RowsHost(VisibleRowsPage(" VisibleRows=\"2.5\"", ""), keys, false))
         {
-            UiLayoutSnapshot s = host.MeasureAndArrange(new Vector2(400f, 400f));
-            Rect a = RowRect(s, "a");
-            Rect b = RowRect(s, "b");
-            Rect c = RowRect(s, "c");
-            Check(a.y < b.y && b.y < c.y, "the count runs in flow order down the row roots");
-            float expected = c.y + 0.5f * c.height;
-            Rect viewport = s.RectById["list"];
-            Check(Near(viewport.height, expected),
+            UiLayoutSnapshot s = host.MeasureAndArrange(new UiLayoutPoint(400f, 400f));
+            UiLayoutRect a = RowRect(s, "a");
+            UiLayoutRect b = RowRect(s, "b");
+            UiLayoutRect c = RowRect(s, "c");
+            Check(a.Y < b.Y && b.Y < c.Y, "the count runs in flow order down the row roots");
+            float expected = c.Y + 0.5f * c.Height;
+            UiLayoutRect viewport = s.RectById["list"];
+            Check(Near(viewport.Height, expected),
                 "the viewport cuts at half the third row's OWN height, the full gap before it kept: got "
-                + viewport.height + ", expected " + expected);
-            Check(viewport.height > b.yMax + 1f && viewport.height < c.yMax,
+                + viewport.Height + ", expected " + expected);
+            Check(viewport.Height > b.YMax + 1f && viewport.Height < c.YMax,
                 "and it is genuinely mid-row - not a row boundary and not the whole list");
-            Check(Near(s.ScrollContents["list"].width, viewport.width - 16f)
-                    && s.ScrollContents["list"].height > viewport.height,
+            Check(Near(s.ScrollContents["list"].Width, viewport.Width - 16f)
+                    && s.ScrollContents["list"].Height > viewport.Height,
                 "the overflow reserved the scrollbar width and the content stayed taller than the viewport");
 
             // (2) shrink the set below the count: natural height, everything visible.
             keys.RemoveRange(2, 2);
-            host.Bindings.NotifyChanged("items");
-            s = host.MeasureAndArrange(new Vector2(400f, 400f));
-            Check(Near(s.RectById["list"].height, s.ScrollContents["list"].height),
+((UiBindings)host.Bindings).NotifyChanged("items");
+            s = host.MeasureAndArrange(new UiLayoutPoint(400f, 400f));
+            Check(Near(s.RectById["list"].Height, s.ScrollContents["list"].Height),
                 "a two-row list under a 2.5 promise answers natural: every row is visible");
         }
 
@@ -1040,9 +1045,9 @@ internal static class KernelRepeatTests
                    Scope, UiLayoutManifest.Parse(VisibleRowsPage(" VisibleRows=\"2.5\"", "")),
                    RowsBindings(keys, true), UiTheme.Vanilla, wrapMetrics, new StubTranslation()))
         {
-            UiLayoutSnapshot s = host.MeasureAndArrange(new Vector2(400f, 400f));
-            Rect a = RowRect(s, "a");
-            Rect c = RowRect(s, "c");
+            UiLayoutSnapshot s = host.MeasureAndArrange(new UiLayoutPoint(400f, 400f));
+            UiLayoutRect a = RowRect(s, "a");
+            UiLayoutRect c = RowRect(s, "c");
             // The straddle must be shown on the SAME text the engine wrapped - the widths of other texts
             // (titles, the page's own measurements) must not masquerade as this detail's full/reserved
             // pair. Inputs printed first so a calibration failure is distinguishable from a proof failure.
@@ -1053,8 +1058,8 @@ internal static class KernelRepeatTests
             Console.WriteLine("    | VisibleRows wrap-step inputs: advance=" + detailAdvance
                 + " detail-widths seen (" + wrapMetrics.DetailNarrowest + ", " + wrapMetrics.DetailWidest + ")"
                 + " detail-height wide-round=" + wideLines + " narrow-round=" + narrowLines
-                + " final row heights a=" + a.height + " c=" + c.height
-                + " viewport=" + s.RectById["list"].height);
+                + " final row heights a=" + a.Height + " c=" + c.Height
+                + " viewport=" + s.RectById["list"].Height);
             // wideLines/narrowLines are HEIGHTS (16px per line in this stub); the straddle is in lines.
             float linesAtWide = wideLines / 16f;
             bool straddleValid = wrapMetrics.SawTwoWidths
@@ -1071,10 +1076,10 @@ internal static class KernelRepeatTests
                 Console.Error.WriteLine("  (wrap-step equality below is NOT a proof: inputs invalid)");
             }
 
-            float expected = c.y + 0.5f * c.height;
-            Check(Near(s.RectById["list"].height, expected),
+            float expected = c.Y + 0.5f * c.Height;
+            Check(Near(s.RectById["list"].Height, expected),
                 "with wrapped rows the viewport equals the FINAL round's cut from the final rects");
-            Check(Near(s.ScrollContents["list"].width, s.RectById["list"].width - 16f),
+            Check(Near(s.ScrollContents["list"].Width, s.RectById["list"].Width - 16f),
                 "and the reservation happened: content is 16 narrower than the viewport");
         }
 
@@ -1087,8 +1092,8 @@ internal static class KernelRepeatTests
                        "<Widget Id=\"empty\" Kind=\"state/empty\" Text=\"nothing\" VisibleKey=\"has-items\" />"),
                    new List<string> { "a", "b", "c" }, false))
         {
-            UiLayoutSnapshot s = host.MeasureAndArrange(new Vector2(400f, 400f));
-            Check(Near(s.RectById["list"].height, s.ScrollContents["list"].height),
+            UiLayoutSnapshot s = host.MeasureAndArrange(new UiLayoutPoint(400f, 400f));
+            Check(Near(s.RectById["list"].Height, s.ScrollContents["list"].Height),
                 "a three-row list under 3.5 answers natural even with the hidden empty-state sibling present");
             bool emptyVisible = false;
             foreach (string id in s.VisibleIds)
@@ -1105,10 +1110,10 @@ internal static class KernelRepeatTests
                        "<Widget Id=\"empty\" Kind=\"state/empty\" Text=\"nothing\" VisibleKey=\"has-items\" />"),
                    new List<string>(), true))
         {
-            UiLayoutSnapshot s = host.MeasureAndArrange(new Vector2(400f, 400f));
+            UiLayoutSnapshot s = host.MeasureAndArrange(new UiLayoutPoint(400f, 400f));
             Check(s.RectById.ContainsKey("empty"), "the empty-list fixture actually shows its empty state");
-            Check(Near(s.RectById["list"].height, s.ScrollContents["list"].height)
-                    && Near(s.ScrollContents["list"].width, s.RectById["list"].width),
+            Check(Near(s.RectById["list"].Height, s.ScrollContents["list"].Height)
+                    && Near(s.ScrollContents["list"].Width, s.RectById["list"].Width),
                 "an empty list budgets to the visible empty state: everything shows and no scrollbar is reserved");
         }
 
@@ -1121,11 +1126,11 @@ internal static class KernelRepeatTests
             + "</Scroll></UiPage>";
         using (UiHost host = RowsHost(padded, new List<string>(), false))
         {
-            UiLayoutSnapshot s = host.MeasureAndArrange(new Vector2(400f, 600f));
-            Check(Near(s.RectById["list"].height, s.RectById["c"].y + 0.5f * s.RectById["c"].height + 100f),
+            UiLayoutSnapshot s = host.MeasureAndArrange(new UiLayoutPoint(400f, 600f));
+            Check(Near(s.RectById["list"].Height, s.RectById["c"].Y + 0.5f * s.RectById["c"].Height + 100f),
                 "ordinary direct children each count once and padding remains in the viewport budget");
-            Check(s.ScrollContents["list"].height > s.RectById["list"].height
-                    && Near(s.ScrollContents["list"].width, s.RectById["list"].width - 16f),
+            Check(s.ScrollContents["list"].Height > s.RectById["list"].Height
+                    && Near(s.ScrollContents["list"].Width, s.RectById["list"].Width - 16f),
                 "padded counted content taller than the viewport reserves the scrollbar width");
         }
 
@@ -1134,8 +1139,8 @@ internal static class KernelRepeatTests
         using (UiHost host = RowsHost(VisibleRowsPage(" VisibleRows=\"1000000000\"", ""),
                    new List<string> { "a", "b", "c", "d" }, true))
         {
-            UiLayoutSnapshot s = host.MeasureAndArrange(new Vector2(400f, 400f));
-            Check(Near(s.RectById["list"].height, s.ScrollContents["list"].height),
+            UiLayoutSnapshot s = host.MeasureAndArrange(new UiLayoutPoint(400f, 400f));
+            Check(Near(s.RectById["list"].Height, s.ScrollContents["list"].Height),
                 "a billion promised rows over four real ones answer natural - no int overflow in the way");
         }
 
@@ -1144,8 +1149,8 @@ internal static class KernelRepeatTests
                    VisibleRowsPage(" Height=\"60\" VisibleRows=\"2.5\"", ""),
                    new List<string> { "a", "b", "c", "d" }, true))
         {
-            UiLayoutSnapshot s = host.MeasureAndArrange(new Vector2(400f, 400f));
-            Check(Near(s.RectById["list"].height, 60f),
+            UiLayoutSnapshot s = host.MeasureAndArrange(new UiLayoutPoint(400f, 400f));
+            Check(Near(s.RectById["list"].Height, 60f),
                 "a declared numeric Height outranks VisibleRows and sizes the viewport by itself");
         }
 
@@ -1206,14 +1211,14 @@ internal static class KernelRepeatTests
         bindings.BindReadOnly<bool>("has-items", () => hasItems);
         foreach (string key in keys)
         {
-            bindings.BindReadOnly<string>("items." + key + ".title", () => key + " title");
-            bindings.BindReadOnly<string>("items." + key + ".detail", () => LongDetail(key));
+            bindings.BindReadOnly<string>(new UiBindingAddress("items",key,"title").Key, () => key + " title");
+            bindings.BindReadOnly<string>(new UiBindingAddress("items",key,"detail").Key, () => LongDetail(key));
         }
 
         return bindings;
     }
 
-    private static Rect RowRect(UiLayoutSnapshot snapshot, string itemKey)
+    private static UiLayoutRect RowRect(UiLayoutSnapshot snapshot, string itemKey)
     {
         // VisibleIds carries display PATHS while RectById is keyed by the materialized element Id
         // ("row#<key>"): match on the last path segment, then look the Id up.

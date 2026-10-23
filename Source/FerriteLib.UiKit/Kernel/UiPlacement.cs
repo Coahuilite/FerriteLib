@@ -117,14 +117,8 @@ internal static class UiPlacement
         string value = raw.Trim();
         if (value.Length == 0)
             return default;
-        bool percentage = value.EndsWith("%", StringComparison.Ordinal);
-        string number = percentage ? value.Substring(0, value.Length - 1).Trim() : value;
-        if (!float.TryParse(number, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsed) || float.IsNaN(parsed) || float.IsInfinity(parsed))
-        {
-            throw new FormatException("Element id=\"" + spec.Id + "\" (Kind=\"" + spec.Kind + "\") has invalid " + attribute + " '" + raw + "'; expected a number or a percentage (N%).");
-        }
-
-        return percentage ? new UiLayoutOffset(0, parsed / 100f) : new UiLayoutOffset(parsed);
+        if (spec.TryGetOffset(attribute, out UiLayoutOffset offset)) return offset;
+        throw new FormatException("Element id=\"" + spec.Id + "\" has invalid " + attribute + " '" + raw + "'; expected a number or a percentage (N%).");
     }
 
     /// <summary>
@@ -153,7 +147,7 @@ internal static class UiPlacement
         foreach (string token in UiAppearanceProperties.Colours)
             if (spec.TryGetAttribute("Palette." + token, out string raw) && !UiStyleDocument.TryParseColour(raw, out _))
                 throw Contract(spec, path, scope, "Palette." + token + " must be a valid colour (#RRGGBB/#RRGGBBAA or RGB/RGBA channels).");
-        if (spec.TryGetAttribute("SharedLabels", out string sharedLabels) && !bool.TryParse(sharedLabels, out _))
+        if (spec.TryGetAttribute("SharedLabels", out string sharedLabels) && !spec.TryGetBoolean("SharedLabels", out _))
             throw Contract(spec, path, scope, "SharedLabels must be true or false.");
         string? anchorOwner = parent == null ? parentKind : parent.Kind;
         ValidateAnchorDeclaration(spec, path, scope, anchorOwner, "AnchorX", AlignXAttribute, Axis.Horizontal);
@@ -391,22 +385,10 @@ internal static class UiPlacement
     private static void ValidateOffset(UiElementSpec spec, string path, string scope, string attribute, string raw)
     {
         string value = raw.Trim();
-        bool percentage = value.EndsWith("%", StringComparison.Ordinal);
-        string number = percentage ? value.Substring(0, value.Length - 1).Trim() : value;
-        if (!float.TryParse(number, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsed)
-            || float.IsNaN(parsed) || float.IsInfinity(parsed))
-        {
-            throw Contract(spec, path, scope,
-                "Element id=\"" + spec.Id + "\" at '" + path + "' has invalid " + attribute + " '" + raw
-                + "'; expected a number or a percentage (N%).");
-        }
-
-        if (percentage && (parsed < 0f || parsed > 100f))
-        {
-            throw Contract(spec, path, scope,
-                "Element id=\"" + spec.Id + "\" at '" + path + "' has " + attribute + " '" + raw
-                + "' outside the accepted 0..100% range; a ratio is a fraction of the parent's inner span.");
-        }
+        if (!spec.TryGetOffset(attribute, out UiLayoutOffset offset))
+            throw Contract(spec, path, scope, "Element id=\"" + spec.Id + "\" at '" + path + "' has invalid " + attribute + " '" + raw + "'; expected a number or a percentage (N%).");
+        if (IsPercentage(raw) && (offset.Fraction < 0 || offset.Fraction > 1))
+            throw Contract(spec, path, scope, attribute + " '" + raw + "' is outside the accepted 0..100% range.");
     }
 
     private static bool TryAlignmentOf(string? raw, Axis axis, out Alignment alignment)
@@ -481,14 +463,13 @@ internal static class UiPlacement
     {
         width = 0f;
         return spec.TryGetAttribute("Width", out string raw)
-            && float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out width)
+            && spec.TryGetNumber("Width", out width)
             && width > 0f;
     }
 
     private static bool IsFill(UiElementSpec spec)
     {
-        return spec.TryGetAttribute("Fill", out string raw)
-            && bool.TryParse(raw.Trim(), out bool fill)
+        return spec.TryGetBoolean("Fill", out bool fill)
             && fill;
     }
 

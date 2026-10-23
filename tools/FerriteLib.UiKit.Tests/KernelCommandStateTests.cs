@@ -1,10 +1,11 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -118,14 +119,14 @@ internal static class KernelCommandStateTests
         var bindings = new UiBindings();
         bindings.BindCommand("gated", () => { }, () => false);
         bindings.BindCommand("open", () => { });
-        var rect = new Rect(0f, 0f, 60f, 20f);
+        var rect = new UiLayoutRect(0f, 0f, 60f, 20f);
 
         ClearRecordedBoxes();
-        UiThemeDraw.StatusTreatment(rect, theme, UiStatusTone.Active, writable: bindings.CanExecute("gated"));
+        UiThemeDraw.StatusTreatment(NativeFixture.Paint,rect, theme, UiStatusTone.Active, writable: bindings.CanExecute("gated"));
         CheckPaint(0, theme[UiPaletteRole.WindowSurface], theme[UiPaletteRole.Divider], "a disabled command paints the disabled plane whatever tone was authored");
 
         ClearRecordedBoxes();
-        UiThemeDraw.StatusTreatment(rect, theme, UiStatusTone.Active, writable: bindings.CanExecute("open"));
+        UiThemeDraw.StatusTreatment(NativeFixture.Paint,rect, theme, UiStatusTone.Active, writable: bindings.CanExecute("open"));
         CheckPaint(0, theme[UiPaletteRole.SelectedSurface], theme[UiPaletteRole.Accent], "an executable command keeps the authored tone");
 
         Check(
@@ -133,7 +134,7 @@ internal static class KernelCommandStateTests
             "and the two treatments differ in every colour, so neither check above can pass by accident");
 
         ClearRecordedBoxes();
-        UiThemeDraw.StatusBadge(rect, "value", theme, UiStatusTone.Danger, null, writable: bindings.CanExecute("gated"));
+        UiThemeDraw.StatusBadge(NativeFixture.Paint,rect, "value", theme, UiStatusTone.Danger, null, writable: bindings.CanExecute("gated"));
         CheckPaint(0, theme[UiPaletteRole.WindowSurface], theme[UiPaletteRole.Divider], "the badge plane follows the same single rule");
         CheckLastLabel(theme[UiPaletteRole.DisabledForeground], "and the badge writes the disabled text colour");
     }
@@ -151,14 +152,14 @@ internal static class KernelCommandStateTests
             + "</UiPage>",
             bindings);
 
-        var viewport = new Rect(0f, 0f, 240f, 120f);
-        Vector2 point = new(20f, 14f);
+        var viewport = new UiLayoutRect(0f, 0f, 240f, 120f);
+        UiLayoutPoint point = new(20f, 14f);
 
         try
         {
             // Settle the arrangement with no event so the pumps below only exercise input.
             Event.current = null;
-            host.DrawFrame(viewport);
+            NativeFixture.DrawFrame(            host,viewport);
 
             Pump(host, EventType.MouseDown, point);
             Check(
@@ -185,7 +186,7 @@ internal static class KernelCommandStateTests
         {
             Event.current = null;
             GUIUtility.hotControl = 0;
-            UiNative.ButtonOverride = null;
+            NativeFixture.ButtonOverride = null;
         }
     }
 
@@ -197,8 +198,8 @@ internal static class KernelCommandStateTests
 
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(
-            Scope, ProbeKind, () => new ActionProbeWidget(), new[] { "Id", "Kind", "ActionBind", "Height" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(
+            Scope, ProbeKind, () => new ActionProbeWidget(), new[] { "Id", "Kind", "ActionBind", "Height" }));
 
         using UiHost host = Host(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
@@ -209,7 +210,8 @@ internal static class KernelCommandStateTests
             + "</UiPage>",
             bindings);
 
-        host.DrawFrame(new Rect(0f, 0f, 240f, 120f));
+        NativeFixture.DrawFrame(
+        host,new UiLayoutRect(0f, 0f, 240f, 120f));
 
         UiNode probe = host.Session.GetNodeByElementId("probe")
             ?? throw new Exception("the action-bound probe was not arranged");
@@ -236,12 +238,13 @@ internal static class KernelCommandStateTests
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(
-            Scope, GateProbeKind, () => new GateProbeWidget(), new[] { "Id", "Kind", "ActionBind", "Height" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(
+            Scope, GateProbeKind, () => new GateProbeWidget(), new[] { "Id", "Kind", "ActionBind", "Height" }));
 
-        bool enabled = false;
+        bool enabled = false;float model=.25f;int requests=0;
         var bindings = new UiBindings();
         bindings.BindCommand("gate", () => { }, () => enabled);
+        bindings.BindValue("track",()=>model,value=>{model=value;requests++;});
 
         using UiHost host = Host(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
@@ -250,73 +253,39 @@ internal static class KernelCommandStateTests
             + "</UiPage>",
             bindings);
 
-        var viewport = new Rect(0f, 0f, 240f, 120f);
-        host.DrawFrame(viewport);
+        var viewport = new UiLayoutRect(0f, 0f, 240f, 120f);
+        NativeFixture.DrawFrame(        host,viewport);
 
         UiNode track = host.Session.GetNodeByElementId("track")
             ?? throw new Exception("the command-bound element was not arranged");
         Check(track.IsDisabled, "the command-bound element is published disabled while its predicate answers false");
 
-        var rect = new Rect(10f, 10f, 120f, 20f);
-        int sliderCalls = 0;
-        UiNative.SliderOverride = (r, v, min, max) =>
-        {
-            sliderCalls++;
-            return 0.9f;
-        };
-
-        float returned = UiNative.Slider(rect, "track", host.Session, 0.1f, 0f, 1f, out bool changed);
-        Check(
-            sliderCalls == 0,
-            "a disabled slider never reaches the native control, so no drag starts and nothing takes the pointer");
-        Check(!changed && Near(returned, 0.1f), "and it reports the value it was handed, unchanged");
-
-        int fieldCalls = 0;
-        UiNative.TextFieldOverride = (r, text) =>
-        {
-            fieldCalls++;
-            return "999";
-        };
-
-        string shown = UiNative.NumberField(rect, "track", host.Session, 0.25f, 0f, 1f, "0.##", out bool committed);
-        Check(fieldCalls == 0, "a disabled field never reaches the native control either");
-        Check(!committed, "and it commits nothing");
-        Check(!host.Session.GetOrCreateValueState("track").Focused, "and it never takes focus");
-        Check(shown.Length > 0, "while still handing the caller the model's value to draw");
-
-        // Contrast: with the predicate answering true the same calls reach the native seams, so the checks
-        // above are the guard's answer rather than a lane that never exercises them.
-        enabled = true;
-        host.DrawFrame(viewport);
-        Check(!track.IsDisabled, "the same element stops being disabled once its predicate allows the command");
-
-        sliderCalls = 0;
-        returned = UiNative.Slider(rect, "track", host.Session, 0.1f, 0f, 1f, out changed);
-        Check(
-            sliderCalls == 1 && changed && Near(returned, 0.9f),
-            "an enabled slider reaches the native control and reports the drag");
-
-        fieldCalls = 0;
-        UiNative.TextFieldOverride = (r, text) =>
-        {
-            fieldCalls++;
-            return "0.75";
-        };
-        UiNative.NumberField(rect, "track", host.Session, 0.25f, 0f, 1f, "0.##", out committed);
-        Check(fieldCalls == 1 && committed, "and an enabled field takes the edit and commits it");
-
-        // The documented arbitrary-state-key usage of those parameters: a key that names no arranged element
-        // has no node to consult, and must behave exactly as it did before the guard existed.
-        enabled = false;
-        host.DrawFrame(viewport);
-        sliderCalls = 0;
-        UiNative.Slider(rect, "not-an-element", host.Session, 0.1f, 0f, 1f, out changed);
-        Check(sliderCalls == 1, "a key that names no arranged element keeps the pre-guard behaviour");
-
-        UiNative.SliderOverride = null;
-        UiNative.TextFieldOverride = null;
+        var rect = new UiLayoutRect(10f,10f,120f,20f);
+        UiWidgetContext ctx=host.CreateContext(240).WithNode(track);
+        void Pointer(EventType phase){Event.current=new Event{type=phase,button=0,mousePosition=new Vector2(100,15)};}
+        Pointer(EventType.MouseDown);
+        UiInteractionResult disabled=NativeFixture.Range(rect,ctx,"track",.1f,0,1);
+        Check(!disabled.Captured&&!disabled.Request&&GUIUtility.hotControl==0,"disabled range takes no native capture and requests nothing");
+        int fieldCalls=0;
+        var codec=new UiNumericEdit(0,1,"0.##");
+        NativeFixture.TextFieldOverride=(_,_)=>{fieldCalls++;return "0.75";};
+        NativeFixture.Edit(rect,ctx,"track",model,codec.Format,codec.Parse,true,false,v=>{requests++;model=v;},()=>model);
+        Check(fieldCalls==0&&requests==0&&!host.InputState.IsEditing,"disabled numeric editor never enters native edit, focus or business request");
+        enabled=true;Pointer(EventType.Repaint);NativeFixture.DrawFrame(host,viewport);
+        Check(!track.IsDisabled,"same element becomes enabled when its command predicate allows");
+        Pointer(EventType.MouseDown);var pressed=NativeFixture.Range(rect,ctx,"track",.1f,0,1);
+        Pointer(EventType.MouseUp);var released=NativeFixture.Range(rect,ctx,"track",.1f,0,1);
+        Check(pressed.Captured&&pressed.Request&&pressed.Value>.1f&&!released.Request,"enabled range requests its changed press sample and does not replay on release");
+        fieldCalls=0;Pointer(EventType.MouseDown);
+        NativeFixture.Edit(rect,ctx,"track",model,codec.Format,codec.Parse,true,false,v=>{requests++;model=v;},()=>model);
+        Check(fieldCalls==1&&requests==1&&Near(model,.75f),"enabled numeric editor executes native once and requests the actual parse");
+        // Arbitrary author-owned keys are still legal, but their actual element is explicit now.
+        enabled=false;Pointer(EventType.Repaint);NativeFixture.DrawFrame(host,viewport);
+        var custom=NativeFixture.Context("custom",host.Session,new StubMetrics(),UiTheme.Vanilla,new StubTranslation(),bindings,240,"independent-control");
+        Pointer(EventType.MouseDown);var independent=NativeFixture.Range(rect,custom,"not-an-element",.1f,0,1);
+        Check(independent.Captured,"an explicitly owned custom element is not disabled by an unrelated command-bound element");
+        NativeFixture.TextFieldOverride=null;
     }
-
     // --- helpers -------------------------------------------------------------------------------
 
     private static UiHost Host(string xml, UiBindings bindings)
@@ -330,18 +299,18 @@ internal static class KernelCommandStateTests
     /// MouseUp with a matching control, so "the disabled element never took the pointer" is observable
     /// rather than an opinion about the code path.
     /// </summary>
-    private static void Pump(UiHost host, EventType type, Vector2 point)
+    private static void Pump(UiHost host, EventType type, UiLayoutPoint point)
     {
         Event e = Event.KeyboardEvent("space");
         e.type = type;
         e.button = 0;
-        e.mousePosition = point;
+        e.mousePosition = VerseUiExecution.Point(point);
         Event.current = e;
-        host.DrawFrame(new Rect(0f, 0f, 240f, 120f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 240f, 120f));
         Event.current = null;
     }
 
-    private static void CheckPaint(int offset, Color fill, Color border, string name)
+    private static void CheckPaint(int offset, UiColour fill, UiColour border, string name)
     {
         IList colors = RecordedBoxColors();
         if (colors.Count < offset + 5)
@@ -352,18 +321,18 @@ internal static class KernelCommandStateTests
             return;
         }
 
-        Check(SameColor((Color)colors[offset], fill), name + " (fill)");
+        Check(SameColor(NativeFixture.Record<UiColour>(colors[offset]), fill), name + " (fill)");
 
         bool edgesMatch = true;
         for (int i = 1; i < 5; i++)
         {
-            edgesMatch &= SameColor((Color)colors[offset + i], border);
+            edgesMatch &= SameColor(NativeFixture.Record<UiColour>(colors[offset + i]), border);
         }
 
         Check(edgesMatch, name + " (border)");
     }
 
-    private static void CheckLastLabel(Color expected, string name)
+    private static void CheckLastLabel(UiColour expected, string name)
     {
         IList colors = RecordedLabelColors();
         if (colors.Count == 0)
@@ -373,7 +342,7 @@ internal static class KernelCommandStateTests
             return;
         }
 
-        Check(SameColor((Color)colors[colors.Count - 1], expected), name);
+        Check(SameColor(NativeFixture.Record<UiColour>(colors[colors.Count - 1]), expected), name);
     }
 
     private static void ClearRecordedBoxes()
@@ -405,9 +374,9 @@ internal static class KernelCommandStateTests
         method.Invoke(null, null);
     }
 
-    private static bool SameColor(Color left, Color right)
+    private static bool SameColor(UiColour left, UiColour right)
     {
-        return Near(left.r, right.r) && Near(left.g, right.g) && Near(left.b, right.b) && Near(left.a, right.a);
+        return Near(left.Red, right.Red) && Near(left.Green, right.Green) && Near(left.Blue, right.Blue) && Near(left.Alpha, right.Alpha);
     }
 
     private static bool Near(float expected, float actual)
@@ -457,7 +426,7 @@ internal static class KernelCommandStateTests
             this.spec = spec;
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
             if (spec.TryGetAttribute("ActionBind", out string declared) && declared.Trim().Length > 0)
             {
@@ -470,7 +439,7 @@ internal static class KernelCommandStateTests
             return 20f;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
         }
     }
@@ -490,7 +459,7 @@ internal static class KernelCommandStateTests
             this.spec = spec;
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
             bindings.ValidateAction<float>(spec.TryGetAttribute("ActionBind", out string key) ? key : "", elementPath);
         }
@@ -500,9 +469,9 @@ internal static class KernelCommandStateTests
             return 20f;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
-            if (UiNative.Button(rect, ctx) && spec.TryGetAttribute("ActionBind", out string key))
+            if (ctx.Controls.Button(rect, ctx) && spec.TryGetAttribute("ActionBind", out string key))
             {
                 ctx.Bindings.Invoke(key, 1f);
             }

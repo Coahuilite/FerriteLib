@@ -1,9 +1,9 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-
-using UnityEngine;
 
 using FerriteLib.UiKit.Kernel;
 
@@ -46,10 +46,10 @@ internal static class KernelDiagnosticsTests
         // host's source is its identity here, so no lane may be forced to share one to find a widget.
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "diag/overflow", () => new OverflowWidget());
-        UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "diag/stable", () => new StableOverflowWidget());
-        UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "diag/ruler", () => new RulerProbeWidget());
-        UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "diag/throwing", () => new ThrowingWidget());
+UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, "diag/overflow", () => new OverflowWidget()));
+UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, "diag/stable", () => new StableOverflowWidget()));
+UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, "diag/ruler", () => new RulerProbeWidget()));
+UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, "diag/throwing", () => new ThrowingWidget()));
 
         try
         {
@@ -357,7 +357,7 @@ internal static class KernelDiagnosticsTests
         UiFitAudit.Enabled = false;
         AppDomain.MonitoringIsEnabled = true;
         AppDomain domain = AppDomain.CurrentDomain;
-        var probe = new Rect(0f, 0f, 8f, 8f);
+        var probe = new UiLayoutRect(0f, 0f, 8f, 8f);
 
         for (int i = 0; i < 500; i++)
         {
@@ -690,23 +690,23 @@ internal static class KernelDiagnosticsTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
         public float Measure(UiWidgetContext ctx) => 20f;
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             // A distinct string per draw is what gives the budget lane distinct findings to overflow with.
             draws++;
             UiThemeDraw.Label(
-                new Rect(rect.x, rect.y, 4f, 4f),
+ctx.Drawing,                new UiLayoutRect(rect.X, rect.Y, 4f, 4f),
                 "diag overflow text " + draws.ToString(),
                 ctx.Theme,
                 null,
                 UiFont.Medium,
-                TextAnchor.MiddleLeft,
+                UiTextAnchor.MiddleLeft,
                 singleLine: true);
         }
     }
@@ -725,21 +725,21 @@ internal static class KernelDiagnosticsTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
         public float Measure(UiWidgetContext ctx) => 16f;
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             UiThemeDraw.Label(
-                new Rect(rect.x, rect.y, 100f, 16f),
+ctx.Drawing,                new UiLayoutRect(rect.X, rect.Y, 100f, 16f),
                 "hello",
                 ctx.Theme,
                 null,
                 UiFont.Medium,
-                TextAnchor.MiddleLeft,
+                UiTextAnchor.MiddleLeft,
                 singleLine: true);
         }
     }
@@ -769,21 +769,21 @@ internal static class KernelDiagnosticsTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
         public float Measure(UiWidgetContext ctx) => 20f;
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             UiThemeDraw.Label(
-                new Rect(rect.x, rect.y, 4f, 4f),
+ctx.Drawing,                new UiLayoutRect(rect.X, rect.Y, 4f, 4f),
                 "stable overflowing text",
                 ctx.Theme,
                 null,
                 UiFont.Medium,
-                TextAnchor.MiddleLeft,
+                UiTextAnchor.MiddleLeft,
                 singleLine: true);
         }
     }
@@ -796,13 +796,13 @@ internal static class KernelDiagnosticsTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
         public float Measure(UiWidgetContext ctx) => throw new InvalidOperationException("planted widget failure");
 
-        public void Draw(Rect rect, UiWidgetContext ctx) => throw new InvalidOperationException("planted widget failure");
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx) => throw new InvalidOperationException("planted widget failure");
     }
 
     private sealed class FixedMetrics : ITextMetrics
@@ -873,7 +873,7 @@ internal static class KernelDiagnosticsTests
 
     private static void Draw(UiHost host)
     {
-        host.DrawFrame(new Rect(0f, 0f, 400f, 300f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 400f, 300f));
     }
 
     private static UiHost NewHost(string source, string xml, ITextMetrics metrics)

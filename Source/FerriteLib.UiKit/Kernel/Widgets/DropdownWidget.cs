@@ -57,7 +57,7 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
     public void Validate(IUiBindingReader bindings, string elementPath)
     {
         if (!Looks.Resolve(spec).Declared && DeclaresAppearance(spec))
-            throw new InvalidOperationException("Unknown dropdown appearance at " + elementPath);
+            throw new InvalidOperationException("Unknown dropdown Appearance='"+spec.Attributes[UiAppearanceResolver.Attribute]+"' at '"+elementPath+"'; accepted: "+string.Join(", ",Looks.Supported)+".");
         UiChoiceSource.Validate(bindings, spec, elementPath);
         OptionHelp.Validate(bindings, spec, elementPath, Kind);
     }
@@ -78,7 +78,7 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
     public IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
     {
         UiLayoutRect field = ResolveField(bounds, ctx);
-        yield return new UiPointerRegion(field, UiChoiceSource.Read(ctx.Bindings, spec).Count > 0);
+        yield return new UiPointerRegion(field, UiChoiceSource.Read(ctx.Bindings, spec,ctx.Translation).Count > 0);
     }
 
     public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
@@ -88,7 +88,7 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
         string key = ReadBindKey();
         UiValueEndpoint endpoint = ctx.Bindings.Value(key);
         object? current = endpoint.Read();
-        var choices = UiChoiceSource.Read(ctx.Bindings, spec);
+        var choices = UiChoiceSource.Read(ctx.Bindings, spec,ctx.Translation);
         var values = new List<object?>(choices.Count);
         foreach (var choice in choices)
             values.Add(choice.Value);
@@ -108,7 +108,8 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
             UiLayoutRect anchor = ctx.Session.OpenPopupAnchor.Value;
             ctx.Session.RegisterPopupDraw(() =>
             {
-                int hover = UiPopup.DrawChoiceList(UiPopup.RectFor(anchor, choices.Count, ctx.Session.HostViewport), key, ctx, choices, current, v => endpoint.TryWrite(v), endpoint.Writable);
+                int hover = UiPopup.DrawChoices(UiPopup.RectFor(anchor, choices.Count, ctx.Session.HostViewport), key, ctx, choices, current, v => endpoint.TryWrite(v), endpoint.Writable);
+                if(!ctx.Session.IsActive)return;
                 string help = hover >= 0 && hover < choices.Count ? choices[hover].Help : "";
                 OptionHelp.Publish(ctx, OptionHelp.SinkKey(spec), help);
                 if (help.Length > 0)
@@ -178,7 +179,7 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
             }
         }
 
-        return "";
+        return current?.ToString() ?? "";
     }
 
     /// <summary>
@@ -241,7 +242,7 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
 
     private float ReadHeight(float fallback)
     {
-        if (spec.TryGetAttribute("Height", out string raw) && float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out float height) && height > 0f)
+        if (spec.TryGetAttribute("Height", out string raw) && spec.TryGetNumber("Height", out float height) && height > 0f)
         {
             return height;
         }

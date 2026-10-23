@@ -1,10 +1,11 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -70,10 +71,10 @@ internal static class KernelStyleDocumentTests
 
         var standaloneResolver = new UiStyleResolver(UiTheme.Vanilla, standalone);
         var embeddedResolver = new UiStyleResolver(UiTheme.Vanilla, embedded);
-        Color standalonePanel = standaloneResolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "ice") })[UiPaletteRole.PanelSurface];
-        Color embeddedPanel = embeddedResolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "ice") })[UiPaletteRole.PanelSurface];
+        UiColour standalonePanel = standaloneResolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "ice") })[UiPaletteRole.PanelSurface];
+        UiColour embeddedPanel = embeddedResolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "ice") })[UiPaletteRole.PanelSurface];
         Check(
-            SameColor(standalonePanel, embeddedPanel) && SameColor(standalonePanel, new Color(0f, 0f, 1f, 1f)),
+            SameColor(standalonePanel, embeddedPanel) && SameColor(standalonePanel, new UiColour(0f, 0f, 1f, 1f)),
             "the same content through either origin lands on the same value (one parser, one vocabulary)");
 
         Check(
@@ -106,14 +107,14 @@ internal static class KernelStyleDocumentTests
             + "<Scheme Name=\"element\"><Palette Role=\"PanelSurface\" Value=\"#ff0000\"/></Scheme>";
 
         // default: nothing declared anywhere -> the library's own value.
-        Color libraryDefault = UiTheme.Vanilla[UiPaletteRole.PanelSurface];
+        UiColour libraryDefault = UiTheme.Vanilla[UiPaletteRole.PanelSurface];
         Check(
             SameColor(new UiStyleResolver(UiTheme.Vanilla, UiStyleDocument.Empty).ThemeFor(null)[UiPaletteRole.PanelSurface], libraryDefault),
             "default: with no source at all the library value stands");
 
         // theme > default: the injected theme is the baseline under every document.
         UiTheme tinted = UiTheme.Vanilla;
-        tinted[UiPaletteRole.PanelSurface] = new Color(0.01f, 0.02f, 0.03f, 1f);
+        tinted[UiPaletteRole.PanelSurface] = new UiColour(0.01f, 0.02f, 0.03f, 1f);
         Check(
             SameColor(new UiStyleResolver(tinted, UiStyleDocument.Empty).ThemeFor(null)[UiPaletteRole.PanelSurface], tinted[UiPaletteRole.PanelSurface]),
             "theme > default: the consumer's token wins over the library one");
@@ -122,17 +123,17 @@ internal static class KernelStyleDocumentTests
         var resolver = new UiStyleResolver(tinted, document);
 
         Check(
-            SameColor(resolver.ThemeFor(null)[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)),
+            SameColor(resolver.ThemeFor(null)[UiPaletteRole.PanelSurface], new UiColour(0f, 0f, 1f, 1f)),
             "page > theme: the page-level scheme overrides the injected theme");
 
         var container = new UiStyleDeclaration(scheme: "container");
         Check(
-            SameColor(resolver.ThemeFor(new[] { default(UiStyleDeclaration), container })[UiPaletteRole.PanelSurface], new Color(0f, 1f, 0f, 1f)),
+            SameColor(resolver.ThemeFor(new[] { default(UiStyleDeclaration), container })[UiPaletteRole.PanelSurface], new UiColour(0f, 1f, 0f, 1f)),
             "container > page: a container's scheme beats the page-level one");
 
         var element = new UiStyleDeclaration(scheme: "element");
         Check(
-            SameColor(resolver.ThemeFor(new[] { element, container })[UiPaletteRole.PanelSurface], new Color(1f, 0f, 0f, 1f)),
+            SameColor(resolver.ThemeFor(new[] { element, container })[UiPaletteRole.PanelSurface], new UiColour(1f, 0f, 0f, 1f)),
             "element > container: the nearest declaration wins");
 
         // state > element: a value the player cannot write is painted disabled whatever was authored.
@@ -157,7 +158,7 @@ internal static class KernelStyleDocumentTests
         var silentElement = default(UiStyleDeclaration);
         UiTheme inherited = resolver.ThemeFor(new[] { silentElement, container });
 
-        Check(SameColor(inherited[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)),
+        Check(SameColor(inherited[UiPaletteRole.PanelSurface], new UiColour(0f, 0f, 1f, 1f)),
             "scheme inherits: an element that declares nothing takes its container's palette");
         Check(Math.Abs(inherited.Geometry.RowHeight - 20f) <= 0.0001f,
             "density inherits the same way");
@@ -198,10 +199,7 @@ internal static class KernelStyleDocumentTests
         Check(theme.LayoutRevision > revisionBefore, "applying a document moves the layout clock the host compares");
 
         UiLayoutManifest manifest = UiLayoutManifest.Parse(
-            "<UiPage Schema=\"2\" Source=\"style-doc\">"
-            + "<Widget Id=\"dd\" Kind=\"input/dropdown\" Option1=\"A\" Value1=\"A\"/>"
-            + "<Widget Id=\"banner\" Kind=\"chrome/banner\" Text=\"ok\" Height=\"30\"/>"
-            + "</UiPage>");
+            "<UiPage Schema=\"2\" Source=\"style-doc\"><Widget Id=\"dd\" Kind=\"input/dropdown\"  ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget><Widget Id=\"banner\" Kind=\"chrome/banner\" Text=\"ok\" Height=\"30\"/></UiPage>");
         var bindings = new UiBindings();
         bindings.BindValue("dd", () => "A", _ => { });
 
@@ -211,11 +209,12 @@ internal static class KernelStyleDocumentTests
         UiFitAudit.Enabled = true;
 
         using UiHost host = new("style-doc", manifest, bindings, theme, new ModelMetrics(), new FixedTranslation());
-        UiLayoutSnapshot first = host.MeasureAndArrange(new Vector2(240f, 200f));
-        Check(Math.Abs(first.RectById["dd"].height - 20f) <= 0.01f,
+        UiLayoutSnapshot first = host.MeasureAndArrange(new UiLayoutPoint(240f, 200f));
+        Check(Math.Abs(first.RectById["dd"].Height - 20f) <= 0.01f,
             "the first arrangement already uses the document's density (no stale default)");
 
-        host.DrawFrame(new Rect(0f, 0f, 240f, 200f));
+        NativeFixture.DrawFrame(
+        host,new UiLayoutRect(0f, 0f, 240f, 200f));
         Check(reports.Count == 0, "a page drawn under the document reports no new fitting findings");
 
         // One scope, one theme instance: the region theme is built once and reused across frames.
@@ -252,7 +251,7 @@ internal static class KernelStyleDocumentTests
             using (UiHost host = new("dropped-styles", dropped, new UiBindings(), UiTheme.Vanilla,
                 new ModelMetrics(), new FixedTranslation()))
             {
-                host.MeasureAndArrange(new Vector2(240f, 200f));
+                host.MeasureAndArrange(new UiLayoutPoint(240f, 200f));
             }
 
             Check(warnings.Count > 0, "a dropped <Styles> section produces a warning instead of silence");
@@ -279,7 +278,7 @@ internal static class KernelStyleDocumentTests
             using (UiHost host = new("good-styles", good, new UiBindings(), UiTheme.Vanilla,
                 new ModelMetrics(), new FixedTranslation()))
             {
-                host.MeasureAndArrange(new Vector2(240f, 200f));
+                host.MeasureAndArrange(new UiLayoutPoint(240f, 200f));
             }
 
             Check(warnings.Count == 0, "a document that parses stays silent");
@@ -299,7 +298,7 @@ internal static class KernelStyleDocumentTests
             + "<Palette Role=\"PanelSurface\" Value=\"#00ff00\"/>"
             + "<Palette Role=\"ControlSurface\" Value=\"not-a-colour\"/>"
             + "<Palette Role=\"Nope\" Value=\"#ffffff\"/>"
-            + "<Font Value=\"Huge\"/>"
+            + "<Metric Token=\"Font\" Value=\"Huge\"/>"
             + "</Scheme>"
             + "<Density Name=\"bad\"><Metric Token=\"RowHeight\" Value=\"-4\"/></Density>"
             + "<Mystery/>"
@@ -311,7 +310,7 @@ internal static class KernelStyleDocumentTests
 
         var resolver = new UiStyleResolver(UiTheme.Vanilla, document);
         UiTheme partial = resolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "partial") });
-        Check(SameColor(partial[UiPaletteRole.PanelSurface], new Color(0f, 1f, 0f, 1f)), "the readable value in that scheme landed");
+        Check(SameColor(partial[UiPaletteRole.PanelSurface], new UiColour(0f, 1f, 0f, 1f)), "the readable value in that scheme landed");
         Check(SameColor(partial[UiPaletteRole.ControlSurface], UiTheme.Vanilla[UiPaletteRole.ControlSurface]), "the unreadable one fell back to the default");
 
         resolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "nobody-declared-this") });
@@ -380,17 +379,17 @@ internal static class KernelStyleDocumentTests
     private static void VerifyCloneContract()
     {
         UiTheme original = UiTheme.Vanilla;
-        original[UiPaletteRole.PanelSurface] = new Color(0.11f, 0.12f, 0.13f, 1f);
+        original[UiPaletteRole.PanelSurface] = new UiColour(0.11f, 0.12f, 0.13f, 1f);
         original.Geometry = new UiGeometry(3f, 4f, 5f, 26f, 1f);
 
         UiTheme copy = original.Clone();
         Check(SameColor(copy[UiPaletteRole.PanelSurface], original[UiPaletteRole.PanelSurface]), "clone copies token values");
         Check(copy.Geometry == original.Geometry, "clone copies the density bundle");
         Check(!ReferenceEquals(copy.Styles, original.Styles), "clone has its own resolved-value store");
-        Check(copy.Styles.Resolve(UiStatusTone.Neutral).Text.r == original.Styles.Resolve(UiStatusTone.Neutral).Text.r,
+        Check(copy.Styles.Resolve(UiStatusTone.Neutral).Text.Red == original.Styles.Resolve(UiStatusTone.Neutral).Text.Red,
             "both stores answer from their own theme");
 
-        copy[UiPaletteRole.PanelSurface] = new Color(0.9f, 0.9f, 0.9f, 1f);
+        copy[UiPaletteRole.PanelSurface] = new UiColour(0.9f, 0.9f, 0.9f, 1f);
         Check(!SameColor(copy[UiPaletteRole.PanelSurface], original[UiPaletteRole.PanelSurface]), "moving a token on the copy leaves the original alone");
     }
 
@@ -399,12 +398,12 @@ internal static class KernelStyleDocumentTests
         UiFitAudit.Detach();
     }
 
-    private static bool SameColor(Color left, Color right)
+    private static bool SameColor(UiColour left, UiColour right)
     {
-        return Math.Abs(left.r - right.r) <= 0.0001f
-            && Math.Abs(left.g - right.g) <= 0.0001f
-            && Math.Abs(left.b - right.b) <= 0.0001f
-            && Math.Abs(left.a - right.a) <= 0.0001f;
+        return Math.Abs(left.Red - right.Red) <= 0.0001f
+            && Math.Abs(left.Green - right.Green) <= 0.0001f
+            && Math.Abs(left.Blue - right.Blue) <= 0.0001f
+            && Math.Abs(left.Alpha - right.Alpha) <= 0.0001f;
     }
 
     private static void Check(bool condition, string name)

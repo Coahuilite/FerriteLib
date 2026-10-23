@@ -1,3 +1,5 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -5,7 +7,6 @@ using System.Reflection;
 
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -83,7 +84,7 @@ internal static class KernelFixturePageTests
         {
             UiNode? row = host.Session.GetNodeByElementId("entry#" + key);
             Check(row != null, "entry '" + key + "' is a row element with its own identity");
-            Check(Near(snapshot.RectById["done#" + key].height, theme.Geometry.RowHeight),
+            Check(Near(snapshot.RectById["done#" + key].Height, theme.Geometry.RowHeight),
                 "and the checkbox band inside it is the density's row height, not a page literal");
         }
 
@@ -114,7 +115,7 @@ internal static class KernelFixturePageTests
 
     private static void VerifyAnnouncementIsTheOnlyRefresh()
     {
-        using UiHost host = FixtureHost(out IUiBindings bindings);
+        using UiHost host = FixtureHost(out UiBindings bindings);
         Arrange(host);
 
         string added = "entry-c";
@@ -138,13 +139,13 @@ internal static class KernelFixturePageTests
         // counts are two frames and not the lane's history.
         string key = model.Keys[0];
         ClearDraws();
-        host.DrawFrame(new Rect(0f, 0f, 240f, 400f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 240f, 400f));
         int before = BoxSolids(host, "done#" + key);
         Check(before > 0, "the unchecked checkbox painted its box alone");
 
         model.Done[key] = true;
         ClearDraws();
-        host.DrawFrame(new Rect(0f, 0f, 240f, 400f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 240f, 400f));
         int afterSolids = BoxSolids(host, "done#" + key);
         Check(afterSolids > before,
             "a value change is painted on the next pass without re-creating anything on the page side ("
@@ -153,7 +154,7 @@ internal static class KernelFixturePageTests
 
     private static void VerifyPaintClassReusesTheArrangement()
     {
-        using UiHost host = FixtureHost(out IUiBindings bindings);
+        using UiHost host = FixtureHost(out UiBindings bindings);
         UiLayoutSnapshot before = Arrange(host);
         float beforeWidth = ProgressFillWidth(host, "total");
 
@@ -171,22 +172,22 @@ internal static class KernelFixturePageTests
         using UiHost host = FixtureHost(out _);
         ClearDraws();
         UiLayoutSnapshot snapshot = Arrange(host);
-        Rect tree = snapshot.RectById["outline"];
+        UiLayoutRect tree = snapshot.RectById["outline"];
 
         IList rects = (IList)Field(typeof(Verse.Widgets), "LabelRects", null);
-        var outlineLabels = new List<Rect>();
+        var outlineLabels = new List<UiLayoutRect>();
         foreach (object entry in rects)
         {
-            var rect = (Rect)entry;
-            if (rect.y >= tree.y - 1f) outlineLabels.Add(rect);
+            var rect = NativeFixture.Record<UiLayoutRect>(entry);
+            if (rect.Y >= tree.Y - 1f) outlineLabels.Add(rect);
         }
 
         Check(outlineLabels.Count == model.Outline.Count, "the outline drew one band per supplied row: " + outlineLabels.Count);
-        Check(outlineLabels[1].x < outlineLabels[2].x,
-            "and each deeper level is indented past its parent: " + outlineLabels[1].x + " -> " + outlineLabels[2].x);
+        Check(outlineLabels[1].X < outlineLabels[2].X,
+            "and each deeper level is indented past its parent: " + outlineLabels[1].X + " -> " + outlineLabels[2].X);
 
         UiTreeRow second = model.Outline[1];
-        ClickAt(host, new Vector2(tree.x + 4f, tree.y + 18f + 9f));
+        ClickAt(host, new UiLayoutPoint(tree.X + 4f, tree.Y + 18f + 9f));
         Check(string.Equals(model.Focused, second.Key, StringComparison.Ordinal),
             "a click reports the clicked row's own stable key: " + model.Focused);
     }
@@ -217,7 +218,7 @@ internal static class KernelFixturePageTests
         }
     }
 
-    private static UiHost FixtureHost(out IUiBindings bindings)
+    private static UiHost FixtureHost(out UiBindings bindings)
     {
         model = new FixtureModel();
         model.AddEntry("entry-a");
@@ -247,37 +248,37 @@ internal static class KernelFixturePageTests
         return host;
     }
 
-    private static void BindEntry(IUiBindings bindings, string key)
+    private static void BindEntry(UiBindings bindings, string key)
     {
         string captured = key;
         bindings.BindValue<bool>(
-            "entries." + captured + ".done", () => model.Done[captured], value => model.Done[captured] = value, UiInvalidation.Paint);
-        bindings.BindReadOnly<string>("entries." + captured + ".caption", () => model.Caption[captured]);
-        bindings.BindReadOnly<float>("entries." + captured + ".amount", () => model.Amount[captured], UiInvalidation.Paint);
+            new UiBindingAddress("entries",captured,"done").Key, () => model.Done[captured], value => model.Done[captured] = value, UiInvalidation.Paint);
+        bindings.BindReadOnly<string>(new UiBindingAddress("entries",captured,"caption").Key, () => model.Caption[captured]);
+        bindings.BindReadOnly<float>(new UiBindingAddress("entries",captured,"amount").Key, () => model.Amount[captured], UiInvalidation.Paint);
     }
 
     // --- helpers ---------------------------------------------------------------------------------
 
-    private static void ClickAt(UiHost host, Vector2 point)
+    private static void ClickAt(UiHost host, UiLayoutPoint point)
     {
         Pump(host, EventType.MouseDown, point);
         Pump(host, EventType.MouseUp, point);
     }
 
-    private static void Pump(UiHost host, EventType type, Vector2 point)
+    private static void Pump(UiHost host, EventType type, UiLayoutPoint point)
     {
         Event e = Event.KeyboardEvent("space");
         e.type = type;
         e.button = 0;
-        e.mousePosition = point;
+        e.mousePosition = VerseUiExecution.Point(point);
         Event.current = e;
-        host.DrawFrame(new Rect(0f, 0f, 240f, 400f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 240f, 400f));
         Event.current = null;
     }
 
-    private static Vector2 Centre(Rect rect)
+    private static UiLayoutPoint Centre(UiLayoutRect rect)
     {
-        return new Vector2(rect.x + rect.width * 0.5f, rect.y + rect.height * 0.5f);
+        return new UiLayoutPoint(rect.X + rect.Width * 0.5f, rect.Y + rect.Height * 0.5f);
     }
 
     /// <summary>Solid calls recorded inside one element's band, after a cleared recording.</summary>
@@ -285,14 +286,14 @@ internal static class KernelFixturePageTests
     {
         UiNode? node = host.Session.GetNodeByElementId(elementId);
         if (node == null || !node.Rect.HasValue) return 0;
-        Rect band = node.Rect.Value;
+        UiLayoutRect band = node.Rect.Value;
         IList rects = (IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null);
         int count = 0;
         foreach (object entry in rects)
         {
-            var rect = (Rect)entry;
-            if (rect.x >= band.x - 0.5f && rect.xMax <= band.xMax + 0.5f
-                && rect.y >= band.y - 0.5f && rect.yMax <= band.yMax + 0.5f)
+            var rect = NativeFixture.Record<UiLayoutRect>(entry);
+            if (rect.X >= band.X - 0.5f && rect.XMax <= band.XMax + 0.5f
+                && rect.Y >= band.Y - 0.5f && rect.YMax <= band.YMax + 0.5f)
             {
                 count++;
             }
@@ -303,17 +304,17 @@ internal static class KernelFixturePageTests
 
     private static UiLayoutSnapshot Arrange(UiHost host)
     {
-        host.DrawFrame(new Rect(0f, 0f, 240f, 400f));
-        return host.MeasureAndArrange(new Vector2(240f, 400f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 240f, 400f));
+        return host.MeasureAndArrange(new UiLayoutPoint(240f, 400f));
     }
 
     private static float ProgressFillWidth(UiHost host, string elementId)
     {
         ClearDraws();
-        host.DrawFrame(new Rect(0f, 0f, 240f, 400f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 240f, 400f));
         UiNode? node = host.Session.GetNodeByElementId(elementId);
         if (node == null || !node.Rect.HasValue) return 0f;
-        Rect band = node.Rect.Value;
+        UiLayoutRect band = node.Rect.Value;
         IList rects = (IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null);
 
         // The track's own edge strips are solids too, so the proportion is the widest recording inside the
@@ -321,12 +322,12 @@ internal static class KernelFixturePageTests
         float widest = 0f;
         foreach (object entry in rects)
         {
-            var rect = (Rect)entry;
-            if (rect.x >= band.x - 0.5f && rect.xMax <= band.xMax + 0.5f
-                && rect.y >= band.y - 0.5f && rect.y <= band.yMax + 0.5f
-                && rect.width < band.width - 1f)
+            var rect = NativeFixture.Record<UiLayoutRect>(entry);
+            if (rect.X >= band.X - 0.5f && rect.XMax <= band.XMax + 0.5f
+                && rect.Y >= band.Y - 0.5f && rect.Y <= band.YMax + 0.5f
+                && rect.Width < band.Width - 1f)
             {
-                widest = Math.Max(widest, rect.width);
+                widest = Math.Max(widest, rect.Width);
             }
         }
 
@@ -409,4 +410,3 @@ internal static class KernelFixturePageTests
         public int TranslationRevision => 0;
     }
 }
-

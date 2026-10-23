@@ -79,8 +79,8 @@ public sealed class UiWidgetContext
     /// <summary>
     /// The element this context belongs to. The layout engine sets it per arranged entry, so a widget
     /// measures and draws with its own identity (the same value in both halves of a pass), and the
-    /// session resolves per-element state against it. <see cref="UiNodeId.None"/> for a context a
-    /// caller built by hand, which is the historical "no element" behaviour.
+    /// session resolves per-element state against it. Standalone native callers obtain an explicit
+    /// named identity through UiSession.CreateContext; the Host's initial root context precedes arrangement.
     /// </summary>
     public UiNodeId ElementId { get; }
 
@@ -94,8 +94,8 @@ public sealed class UiWidgetContext
     /// <summary>
     /// The element's node: the object that owns its state and its dirty flag (0.4.0 node step 1). The
     /// engine sets it per arranged entry, so a widget can read its own state through
-    /// <see cref="UiNode.State"/> and ask for a re-measure with <see cref="UiNode.MarkDirty"/> instead of
-    /// naming a string slot. Null for a context a caller built by hand.
+    /// <see cref="UiNode.GetState{T}"/> and ask for a re-measure with <see cref="UiNode.MarkDirty"/>.
+    /// A standalone named control uses the same Session-owned node identity without a page.
     /// </summary>
     public UiNode Node { get; }
     public UiControls Controls => Session.Controls;

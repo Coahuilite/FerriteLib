@@ -1,11 +1,19 @@
 # MEMORY
 
-## 0.8 development line (2026-10-23)
+## 0.8 development line (2026-10-24)
 
 The single product specification is `docs/development/0.8/README.md`. E1–E5/N1–N3, L1, finite appearance,
 S1–S7 stability, experimental R9, migration protection and platform priority are confirmed. Engineering
 status is separate from design approval and native acceptance. K1 added focus/key navigation is deferred;
 native editing/IME/Accept/Cancel remains required. No 0.7 version exception carries into this line.
+
+The approved prepublication refactor replaces unpublished API/XML/ambient bridges. Complete Kernel
+sources now share the no-platform target; explicit native execution and standalone session contexts,
+typed declarations, unified choices/descriptors/item addresses and optional capability composition are
+specified in docs/development/0.8/refactor-migration.md. It also records current abstraction consumers,
+old-chain removals and author prerequisites. No0.7 compatibility shape is silently carried forward. The omitted Choice.Help policy is pending PM
+confirmation; the source/default discrepancy and explicit preservation path are in that migration
+contract, with the remaining action in TODO.md.
 
 Accepted RU1–RU3 production foundations and their applicable evidence remain in the reactive, layout-reuse
 and failure-lifetime contracts. Closeout adds native composite-capture precedence, normal-return-before-

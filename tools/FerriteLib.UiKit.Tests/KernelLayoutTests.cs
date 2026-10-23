@@ -1,3 +1,5 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -5,7 +7,6 @@ using System.Linq;
 using System.Reflection;
 using FerriteLib.UiKit;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 /// <summary>
@@ -81,7 +82,7 @@ internal static class KernelLayoutTests
             + "<Widget Id=\"stepper\" Kind=\"input/stepper-slider\" Bind=\"value\" LabelKey=\"label\" Height=\"28\"/>"
             + "<Widget Id=\"after\" Kind=\"text/wrapped\" Text=\"still measured\"/></Stack></UiPage>"),
             bindings, UiTheme.Vanilla, new StubMetrics(), new DiagnosticFailureTranslation());
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(80, 100));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(80, 100));
         UiNode node = host.Session.GetNodeByElementId("stepper")!;
         Check(snapshot.RectById.ContainsKey("after") && host.Session.IsTripped(node)
             && host.Session.TryGetTripLog(node, out string log) && log.Contains("diagnostic measure cause"),
@@ -104,56 +105,56 @@ internal static class KernelLayoutTests
         using var host = new UiHost(Scope, UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"layout-test\">"
             + "<Widget Id=\"stepper\" Kind=\"input/stepper-slider\" Bind=\"value\"/></UiPage>"),
             bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(80, 100));
-        Rect field = default;
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(80, 100));
+        UiLayoutRect field = default;
         Event prior = Event.current;
-        UiNative.DebugMousePositionEnabled = false;
-        UiNative.TextFieldOverride = (rect, text) => { field = rect; return text; };
+        NativeFixture.DebugMousePositionEnabled = false;
+        NativeFixture.TextFieldOverride = (rect, text) => { field = rect; return text; };
         try
         {
             Event.current = new Event { type = EventType.Repaint };
-            host.DrawFrame(new Rect(0, 0, 80, 100));
-            Check(snapshot.RectById["stepper"].width == 80 && field.x == 37 && field.width == 64,
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0, 0, 80, 100));
+            Check(snapshot.RectById["stepper"].Width == 80 && field.X == 37 && field.Width == 64,
                 "80px outer allocation retains actual field[37,101] rather than quietly shrinking authored widths");
-            Event.current = new Event { type = EventType.MouseDown, button = 0, mousePosition = new Vector2(115, 14) };
-            host.DrawFrame(new Rect(0, 0, 80, 100));
-            Event.current = new Event { type = EventType.MouseUp, button = 0, mousePosition = new Vector2(115, 14) };
-            host.DrawFrame(new Rect(0, 0, 80, 100));
+            Event.current = new Event { type = EventType.MouseDown, button = 0, mousePosition = VerseUiExecution.Point(new UiLayoutPoint(115, 14)) };
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0, 0, 80, 100));
+            Event.current = new Event { type = EventType.MouseUp, button = 0, mousePosition = VerseUiExecution.Point(new UiLayoutPoint(115, 14)) };
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0, 0, 80, 100));
             Check(requests == 0, "plus[107,131] beyond the effective viewport cannot activate under an 80px host");
-            Event.current = new Event { type = EventType.MouseDown, button = 0, mousePosition = new Vector2(12, 14) };
-            host.DrawFrame(new Rect(0, 0, 80, 100));
-            Event.current = new Event { type = EventType.MouseUp, button = 0, mousePosition = new Vector2(12, 14) };
-            host.DrawFrame(new Rect(0, 0, 80, 100));
+            Event.current = new Event { type = EventType.MouseDown, button = 0, mousePosition = VerseUiExecution.Point(new UiLayoutPoint(12, 14)) };
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0, 0, 80, 100));
+            Event.current = new Event { type = EventType.MouseUp, button = 0, mousePosition = VerseUiExecution.Point(new UiLayoutPoint(12, 14)) };
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0, 0, 80, 100));
             Check(requests == 1, "the in-bounds minus keeps its existing qualified request path");
             Check(snapshot.Diagnostics.Any(d => d.Path == "stepper" && d.Code == "InternalWidthInsufficient"
                 && d.Message.Contains("131") && d.Message.Contains("80") && d.Message.Contains("51")),
                 "real measure snapshot locates required131 versus allocated80 and shortage51");
         }
-        finally { UiNative.TextFieldOverride = null; Event.current = prior; }
+        finally { NativeFixture.TextFieldOverride = null; Event.current = prior; }
     }
     private static void VerifyDropdownPaintBoundary()
     {
         var widget = new FerriteLib.UiKit.Kernel.Widgets.DropdownWidget();
         widget.Configure(new UiElementSpec("drop", "input/dropdown", new Dictionary<string, string>
-        { ["Bind"] = "choice", ["Label"] = "Choice", ["Option1"] = "A" }, Array.Empty<UiElementSpec>()));
+        { ["Bind"] = "choice", ["Label"] = "Choice" }, Array.Empty<UiElementSpec>(),new[]{new UiChoice<string>("A","A","A")}));
         var bindings = new UiBindings();
         bindings.BindValue("choice", () => "A", _ => { });
         using var session = new UiSession();
-        var ctx = new UiWidgetContext(Scope, session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 200, "drop");
+        var ctx = NativeFixture.Context(Scope, session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 200, "drop");
         var paintFailure = typeof(Verse.Widgets).GetField("DrawBoxSolidFailure")!;
-        UiNative.DebugMousePositionEnabled = false;
+        NativeFixture.DebugMousePositionEnabled = false;
         GUIUtility.hotControl = 0;
         var cause = new InvalidOperationException("dropdown pure paint");
         try
         {
-            Event.current = new Event { type = EventType.MouseDown, button = 0, mousePosition = new Vector2(120, 14) };
-            widget.Draw(new Rect(0, 0, 200, 28), ctx);
+            Event.current = new Event { type = EventType.MouseDown, button = 0, mousePosition = VerseUiExecution.Point(new UiLayoutPoint(120, 14)) };
+            NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 200, 28), ctx);
             paintFailure.SetValue(null, cause);
             Exception? observed = null;
             try
             {
-                Event.current = new Event { type = EventType.MouseUp, button = 0, mousePosition = new Vector2(120, 14) };
-                widget.Draw(new Rect(0, 0, 200, 28), ctx);
+                Event.current = new Event { type = EventType.MouseUp, button = 0, mousePosition = VerseUiExecution.Point(new UiLayoutPoint(120, 14)) };
+                NativeFixture.Draw(                widget,new UiLayoutRect(0, 0, 200, 28), ctx);
             }
             catch (Exception ex) { observed = ex; }
             Check(ReferenceEquals(observed, cause) && session.OpenPopupId != null && !session.Interactions.CaptureOwner.HasValue,
@@ -177,7 +178,7 @@ internal static class KernelLayoutTests
         bindings.BindValue("text", () => text, value => text = value);
         string xml = "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Stack Id=\"group\" SharedLabels=\"true\" Padding=\"0\" Gap=\"0\">" + "<Widget Id=\"s\" Kind=\"input/slider\" Bind=\"number\" Label=\"A\" />" + "<Widget Id=\"n\" Kind=\"input/number-field\" Bind=\"number\" Label=\"Longest label\" />" + "<Widget Id=\"t\" Kind=\"input/text-field\" Bind=\"text\" Label=\"Text\" />" + "<Widget Id=\"c\" Kind=\"input/stepper-slider\" Bind=\"number\" Label=\"Step\" />" + "</Stack></UiPage>";
         using var host = new UiHost(Scope, Parse(xml), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
-        UiLayoutSnapshot wide = host.MeasureAndArrange(new Vector2(600, 600));
+        UiLayoutSnapshot wide = host.MeasureAndArrange(new UiLayoutPoint(600, 600));
         UiNode[] nodes = new[]
         {
             "s",
@@ -189,11 +190,11 @@ internal static class KernelLayoutTests
         Check(column > 0 && nodes.All(node => node.SharedLabelWidth == column), "L all five real label-field wrappers share the measured longest effective label, without private-part authoring");
         float previous = column;
         nodes[1].Properties.Font.Set(UiFont.Medium);
-        host.MeasureAndArrange(new Vector2(600, 600));
+        host.MeasureAndArrange(new UiLayoutPoint(600, 600));
         Check(nodes.All(node => node.SharedLabelWidth > previous), "L actual participant font invalidation recalculates the whole label group");
-        UiLayoutSnapshot narrow = host.MeasureAndArrange(new Vector2(80, 600));
-        Check(nodes.All(node => narrow.RectById[node.ElementId].height > UiTheme.Vanilla.Geometry.RowHeight), "L narrow allocation makes each participating wrapper report its stacked label and control demand");
-        host.Draw(new Rect(0, 0, 80, 600), narrow);
+        UiLayoutSnapshot narrow = host.MeasureAndArrange(new UiLayoutPoint(80, 600));
+        Check(nodes.All(node => narrow.RectById[node.ElementId].Height > UiTheme.Vanilla.Geometry.RowHeight), "L narrow allocation makes each participating wrapper report its stacked label and control demand");
+        NativeFixture.Draw(        host,new UiLayoutRect(0, 0, 80, 600), narrow);
         Check(number == .5f && text == "plain", "L shared-label measurement and repaint do not request business changes");
         UiLayoutSnapshot overflow = Arrange("<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Row Id=\"row\" Padding=\"0\" Gap=\"0\"><Widget Id=\"x\" Kind=\"input/slider\" Bind=\"number\" MinWidth=\"40\" />" + "<Widget Id=\"y\" Kind=\"input/slider\" Bind=\"number\" MinWidth=\"30\" /></Row></UiPage>", 50, 100).Snapshot;
         Check(overflow.Diagnostics.Any(item => item.Code == "WidthInsufficient" && item.Path.Contains("row")), "L insufficient width has a bounded located fact rather than silently breaking minima");
@@ -206,17 +207,17 @@ internal static class KernelLayoutTests
         var engine = new UiLayoutEngine(Scope);
         UiWidgetContext ctx = CreateContext();
         var roots = Parse(Page("AnchorX=\"b.Right\" OffsetX=\"5\"", "AnchorX=\"parent.Center\" AlignX=\"Center\"")).Roots;
-        UiLayoutSnapshot before = engine.ArrangeRoots(ctx, new Vector2(200, 100), roots);
-        Check(Near(before.RectById["b"].x, 85) && Near(before.RectById["a"].x, 120), "L finite dependencies resolve sibling declared later and parent center in the production geometry");
+        UiLayoutSnapshot before = engine.ArrangeRoots(ctx, new UiLayoutPoint(200, 100), roots);
+        Check(Near(before.RectById["b"].X, 85) && Near(before.RectById["a"].X, 120), "L finite dependencies resolve sibling declared later and parent center in the production geometry");
         UiNode a = ctx.Session.GetNodeByElementId("a")!;
         UiNode parent = a.Parent!;
-        Rect? oldRect = a.Rect;
+        UiLayoutRect? oldRect = a.Rect;
         UiNode[] oldChildren = parent.Children.ToArray();
         UiResolvedProperty<UiColour?> priorColour = a.Properties.ResolvedColours["Foreground"];
         bool rejected = false;
         try
         {
-            engine.ArrangeRoots(ctx, new Vector2(201, 100), Parse(Page("AnchorX=\"b.Right\" Font=\"Tiny\" Palette.Foreground=\"#FF0000\"", "AnchorX=\"a.Right\"")).Roots);
+            engine.ArrangeRoots(ctx, new UiLayoutPoint(201, 100), Parse(Page("AnchorX=\"b.Right\" Font=\"Tiny\" Palette.Foreground=\"#FF0000\"", "AnchorX=\"a.Right\"")).Roots);
         }
         catch (FormatException ex)
         {
@@ -229,12 +230,12 @@ internal static class KernelLayoutTests
             && Nullable.Equals(a.Properties.ResolvedColours["Foreground"].Value, priorColour.Value),
             "L failed candidate restores derived authoring facts as well as previous geometry");
         Check(!ctx.Session.IsInputGeometryReliable, "L failed arrange suspends input against unreliable new geometry");
-        UiLayoutSnapshot cached = engine.ArrangeRoots(ctx, new Vector2(200, 100), roots);
-        Check(ReferenceEquals(cached, before) && Near(cached.RectById["a"].x, 120), "L failed candidate never replaces the committed snapshot or entries");
+        UiLayoutSnapshot cached = engine.ArrangeRoots(ctx, new UiLayoutPoint(200, 100), roots);
+        Check(ReferenceEquals(cached, before) && Near(cached.RectById["a"].X, 120), "L failed candidate never replaces the committed snapshot or entries");
         rejected = false;
         try
         {
-            engine.ArrangeRoots(ctx, new Vector2(202, 100), Parse(Page("AnchorY=\"missing.Bottom\"", "")).Roots);
+            engine.ArrangeRoots(ctx, new UiLayoutPoint(202, 100), Parse(Page("AnchorY=\"missing.Bottom\"", "")).Roots);
         }
         catch (FormatException ex)
         {
@@ -242,8 +243,8 @@ internal static class KernelLayoutTests
         }
 
         Check(rejected && a.Rect.Equals(oldRect), "L missing visible sibling is located and preserves old arrangement");
-        UiLayoutSnapshot recovered = engine.ArrangeRoots(ctx, new Vector2(210, 100), roots);
-        Check(Near(recovered.RectById["b"].x, 90), "L a subsequent valid arrange replaces the previous geometry normally");
+        UiLayoutSnapshot recovered = engine.ArrangeRoots(ctx, new UiLayoutPoint(210, 100), roots);
+        Check(Near(recovered.RectById["b"].X, 90), "L a subsequent valid arrange replaces the previous geometry normally");
     }
 
     private static void VerifyRowColumnStackMeasure()
@@ -268,16 +269,16 @@ internal static class KernelLayoutTests
 
         UiLayoutSnapshot snapshot = Arrange(xml, 400f, 600f).Snapshot;
 
-        Check(Near(snapshot.RectById["stack"].height, 46f), "Stack height = padding 6 + 10 + gap 4 + 20 + padding 6");
-        Check(Near(snapshot.RectById["a"].y, 6f) && Near(snapshot.RectById["b"].y, 20f),
+        Check(Near(snapshot.RectById["stack"].Height, 46f), "Stack height = padding 6 + 10 + gap 4 + 20 + padding 6");
+        Check(Near(snapshot.RectById["a"].Y, 6f) && Near(snapshot.RectById["b"].Y, 20f),
             "Stack children stack vertically");
-        Check(Near(snapshot.RectById["column"].height, 16f), "Column height = 1 + 5 + 2 + 7 + 1");
-        Check(Near(snapshot.RectById["c"].y, 47f) && Near(snapshot.RectById["d"].y, 54f),
-            "Column children stack vertically after the preceding stack root (c.y=" + snapshot.RectById["c"].y + ", d.y=" + snapshot.RectById["d"].y + ")");
-        Check(Near(snapshot.RectById["row"].height, 26f), "Row height = max(10,20) + vertical padding 6");
-        Check(Near(snapshot.RectById["e"].x, 3f) && Near(snapshot.RectById["f"].x, 38f),
+        Check(Near(snapshot.RectById["column"].Height, 16f), "Column height = 1 + 5 + 2 + 7 + 1");
+        Check(Near(snapshot.RectById["c"].Y, 47f) && Near(snapshot.RectById["d"].Y, 54f),
+            "Column children stack vertically after the preceding stack root (c.y=" + snapshot.RectById["c"].Y + ", d.y=" + snapshot.RectById["d"].Y + ")");
+        Check(Near(snapshot.RectById["row"].Height, 26f), "Row height = max(10,20) + vertical padding 6");
+        Check(Near(snapshot.RectById["e"].X, 3f) && Near(snapshot.RectById["f"].X, 38f),
             "Row children sit side by side");
-        Check(Near(snapshot.ContentSize.y, 88f), "Root content height accumulates stack+column+row");
+        Check(Near(snapshot.ContentSize.Y, 88f), "Root content height accumulates stack+column+row");
     }
 
     private static void VerifyWrapLineBreaking()
@@ -295,13 +296,13 @@ internal static class KernelLayoutTests
 
         UiLayoutSnapshot snapshot = Arrange(xml, 260f, 600f).Snapshot;
 
-        Check(Near(snapshot.RectById["a"].x, 0f) && Near(snapshot.RectById["a"].y, 0f),
+        Check(Near(snapshot.RectById["a"].X, 0f) && Near(snapshot.RectById["a"].Y, 0f),
             "Wrap first child starts at origin");
-        Check(Near(snapshot.RectById["b"].x, 130f) && Near(snapshot.RectById["b"].y, 0f),
+        Check(Near(snapshot.RectById["b"].X, 130f) && Near(snapshot.RectById["b"].Y, 0f),
             "Wrap second child stays on first line");
-        Check(Near(snapshot.RectById["c"].x, 0f) && Near(snapshot.RectById["c"].y, 20f),
+        Check(Near(snapshot.RectById["c"].X, 0f) && Near(snapshot.RectById["c"].Y, 20f),
             "Wrap third child breaks to second line");
-        Check(Near(snapshot.RectById["wrap"].height, 30f), "Wrap height covers two lines of 10px children plus row gap 10");
+        Check(Near(snapshot.RectById["wrap"].Height, 30f), "Wrap height covers two lines of 10px children plus row gap 10");
     }
 
     private static void VerifyOverlayStacking()
@@ -318,12 +319,12 @@ internal static class KernelLayoutTests
 
         UiLayoutSnapshot snapshot = Arrange(xml, 200f, 600f).Snapshot;
 
-        Check(Near(snapshot.RectById["back"].x, snapshot.RectById["front"].x)
-            && Near(snapshot.RectById["back"].y, snapshot.RectById["front"].y),
+        Check(Near(snapshot.RectById["back"].X, snapshot.RectById["front"].X)
+            && Near(snapshot.RectById["back"].Y, snapshot.RectById["front"].Y),
             "Overlay children share the same top-left origin");
-        Check(Near(snapshot.RectById["overlay"].height, 20f),
+        Check(Near(snapshot.RectById["overlay"].Height, 20f),
             "Overlay height is the max child height, not the sum");
-        Check(Near(snapshot.RectById["front"].height, 20f), "Overlay front child keeps its own height");
+        Check(Near(snapshot.RectById["front"].Height, 20f), "Overlay front child keeps its own height");
     }
 
     private static void VerifyScrollRects()
@@ -334,17 +335,17 @@ internal static class KernelLayoutTests
 
         UiLayoutSnapshot snapshot = Arrange(xml, 200f, 600f).Snapshot;
 
-        Check(snapshot.Viewports.TryGetValue("scroll", out Rect viewport)
-            && Near(viewport.x, 0f) && Near(viewport.y, 0f)
-            && Near(viewport.width, 200f) && Near(viewport.height, 50f),
+        Check(snapshot.Viewports.TryGetValue("scroll", out UiLayoutRect viewport)
+            && Near(viewport.X, 0f) && Near(viewport.Y, 0f)
+            && Near(viewport.Width, 200f) && Near(viewport.Height, 50f),
             "Scroll viewport rect is the arranged fixed-height rect");
-        Check(snapshot.ScrollContents.TryGetValue("scroll", out Rect content)
-            && Near(content.x, 0f) && Near(content.y, 0f)
-            && Near(content.width, 184f) && Near(content.height, 60f),
+        Check(snapshot.ScrollContents.TryGetValue("scroll", out UiLayoutRect content)
+            && Near(content.X, 0f) && Near(content.Y, 0f)
+            && Near(content.Width, 184f) && Near(content.Height, 60f),
             "Overflowing Scroll reserves the 16px vertical scrollbar width");
-        Check(Near(snapshot.RectById["a"].width, 184f) && Near(snapshot.RectById["b"].width, 184f),
+        Check(Near(snapshot.RectById["a"].Width, 184f) && Near(snapshot.RectById["b"].Width, 184f),
             "Overflowing Scroll remeasures children at the visible content width");
-        Check(Near(snapshot.RectById["scroll"].height, 50f), "Scroll element rect height is viewport height");
+        Check(Near(snapshot.RectById["scroll"].Height, 50f), "Scroll element rect height is viewport height");
     }
 
     private static void VerifyNonOverflowingScrollKeepsWidth()
@@ -359,10 +360,10 @@ internal static class KernelLayoutTests
             + "</Scroll></UiPage>";
 
         UiLayoutSnapshot snapshot = Arrange(xml, 200f, 600f).Snapshot;
-        Check(snapshot.ScrollContents.TryGetValue("scroll", out Rect content)
-            && Near(content.width, 200f) && Near(content.height, 60f),
+        Check(snapshot.ScrollContents.TryGetValue("scroll", out UiLayoutRect content)
+            && Near(content.Width, 200f) && Near(content.Height, 60f),
             "Non-overflowing Scroll keeps the full viewport width");
-        Check(Near(snapshot.RectById["a"].width, 200f) && Near(snapshot.RectById["b"].width, 200f),
+        Check(Near(snapshot.RectById["a"].Width, 200f) && Near(snapshot.RectById["b"].Width, 200f),
             "Non-overflowing Scroll keeps children at the full width");
     }
 
@@ -373,16 +374,16 @@ internal static class KernelLayoutTests
         string xml = ScrollXml();
         UiLayoutEngine engine = new(Scope);
         UiWidgetContext ctx = CreateContext();
-        UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, new Vector2(200f, 600f), Parse(xml).Roots);
+        UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, new UiLayoutPoint(200f, 600f), Parse(xml).Roots);
 
         ResetScrollCounters();
         UiNode scrollNode = ctx.Session.GetNodeByElementId("scroll")
             ?? throw new Exception("the arranged scroll element has no node");
-        ctx.Session.SetScrollPosition(scrollNode, new Vector2(0f, 3f));
-        engine.Draw(ctx, snapshot, new Rect(0f, 0f, 200f, 200f));
+        ctx.Session.SetScrollPosition(scrollNode, new UiLayoutPoint(0f, 3f));
+        NativeFixture.Prepare(ctx.Session);engine.Draw(ctx, snapshot, new UiLayoutRect(0f, 0f, 200f, 200f));
 
-        Vector2 stored = ctx.Session.GetScrollPosition(scrollNode);
-        Check(Near(stored.y, 3f), "Scroll draw preserves the session scroll position");
+        UiLayoutPoint stored = ctx.Session.GetScrollPosition(scrollNode);
+        Check(Near(stored.Y, 3f), "Scroll draw preserves the session scroll position");
         Check(ReadStaticInt(typeof(Verse.Widgets), "ScrollViewDepth") == 0,
             "Scroll draw leaves no open scroll view");
         Check(ReadStaticInt(typeof(Verse.Widgets), "BeginScrollViewCalls")
@@ -400,19 +401,19 @@ internal static class KernelLayoutTests
 
         // The scroll position belongs to the scroll element's node, which exists once that element has
         // been arranged; the clamp under test then runs on the arrange that follows.
-        engine.ArrangeRoots(ctx, new Vector2(200f, 600f), Parse(xml).Roots);
+        engine.ArrangeRoots(ctx, new UiLayoutPoint(200f, 600f), Parse(xml).Roots);
         UiNode scrollNode = ctx.Session.GetNodeByElementId("scroll")
             ?? throw new Exception("the arranged scroll element has no node");
-        ctx.Session.SetScrollPosition(scrollNode, new Vector2(0f, 1000f));
+        ctx.Session.SetScrollPosition(scrollNode, new UiLayoutPoint(0f, 1000f));
 
-        UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, new Vector2(200f, 600f), Parse(xml).Roots);
-        Vector2 pos = ctx.Session.GetScrollPosition(scrollNode);
-        Check(Near(pos.y, 10f), "Scroll position clamps to contentHeight - viewportHeight (60-50)");
+        UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, new UiLayoutPoint(200f, 600f), Parse(xml).Roots);
+        UiLayoutPoint pos = ctx.Session.GetScrollPosition(scrollNode);
+        Check(Near(pos.Y, 10f), "Scroll position clamps to contentHeight - viewportHeight (60-50)");
 
-        ctx.Session.SetScrollPosition(scrollNode, new Vector2(0f, -5f));
-        snapshot = engine.ArrangeRoots(ctx, new Vector2(210f, 600f), Parse(xml).Roots);
+        ctx.Session.SetScrollPosition(scrollNode, new UiLayoutPoint(0f, -5f));
+        snapshot = engine.ArrangeRoots(ctx, new UiLayoutPoint(210f, 600f), Parse(xml).Roots);
         pos = ctx.Session.GetScrollPosition(scrollNode);
-        Check(Near(pos.x, 0f) && Near(pos.y, 0f), "Negative scroll clamps to zero");
+        Check(Near(pos.X, 0f) && Near(pos.Y, 0f), "Negative scroll clamps to zero");
     }
 
     private static void VerifyHiddenElements()
@@ -430,7 +431,7 @@ internal static class KernelLayoutTests
 
         UiLayoutSnapshot snapshot = Arrange(xml, 200f, 600f).Snapshot;
 
-        Check(Near(snapshot.ContentSize.y, 44f), "Hidden child contributes no height");
+        Check(Near(snapshot.ContentSize.Y, 44f), "Hidden child contributes no height");
         Check(!snapshot.RectById.ContainsKey("b"), "Hidden child has no arranged rect");
         Check(!snapshot.VisibleIds.Contains("stack/b"), "Hidden child is absent from VisibleIds");
         Check(snapshot.VisibleIds.Contains("stack/a") && snapshot.VisibleIds.Contains("stack/c"),
@@ -453,14 +454,14 @@ internal static class KernelLayoutTests
         UiLayoutSnapshot snapshot = Arrange(xml, 200f, 200f).Snapshot;
 
         // Available 200: fixed 20 + natural 30 + 2 gaps of 4 leave 142 for the Fill scroll.
-        Check(snapshot.Viewports.TryGetValue("fill", out Rect viewport)
-            && Near(viewport.height, 142f),
+        Check(snapshot.Viewports.TryGetValue("fill", out UiLayoutRect viewport)
+            && Near(viewport.Height, 142f),
             "Fill child absorbs exactly the remainder after fixed/natural siblings");
-        Check(Near(snapshot.RectById["a"].y, 0f) && Near(snapshot.RectById["b"].y, 170f),
+        Check(Near(snapshot.RectById["a"].Y, 0f) && Near(snapshot.RectById["b"].Y, 170f),
             "Fixed/natural siblings keep their flow positions around the Fill child");
-        Check(Near(snapshot.RectById["column"].height, 200f),
+        Check(Near(snapshot.RectById["column"].Height, 200f),
             "Column with Fill children fits the available height exactly");
-        Check(Near(snapshot.ContentSize.y, 200f),
+        Check(Near(snapshot.ContentSize.Y, 200f),
             "Root content height with a Fill child equals the window height");
     }
 
@@ -479,14 +480,14 @@ internal static class KernelLayoutTests
         UiLayoutSnapshot snapshot = Arrange(xml, 200f, 200f).Snapshot;
 
         // Available 200 minus one gap of 4 is shared by the two Fill scrolls.
-        Check(snapshot.Viewports.TryGetValue("fill-a", out Rect viewportA)
-            && Near(viewportA.height, 98f),
+        Check(snapshot.Viewports.TryGetValue("fill-a", out UiLayoutRect viewportA)
+            && Near(viewportA.Height, 98f),
             "First Fill sibling gets its share of the remainder");
-        Check(snapshot.Viewports.TryGetValue("fill-b", out Rect viewportB)
-            && Near(viewportB.height, 98f),
+        Check(snapshot.Viewports.TryGetValue("fill-b", out UiLayoutRect viewportB)
+            && Near(viewportB.Height, 98f),
             "Second Fill sibling gets the same share");
-        Check(Near(viewportB.y, 102f), "Second Fill sibling sits below the first plus the gap");
-        Check(Near(snapshot.RectById["column"].height, 200f),
+        Check(Near(viewportB.Y, 102f), "Second Fill sibling sits below the first plus the gap");
+        Check(Near(snapshot.RectById["column"].Height, 200f),
             "Column with two Fill children fits the available height exactly");
     }
 
@@ -502,9 +503,9 @@ internal static class KernelLayoutTests
             + "</Row></UiPage>";
 
         UiLayoutSnapshot snapshot = Arrange(xml, 800f, 100f).Snapshot;
-        Rect right = snapshot.RectById["right"];
-        Check(Near(snapshot.RectById["middle"].width, 400f), "Auto width subtracts fixed siblings and both gaps");
-        Check(Near(right.xMax, 800f), "Right sibling ends exactly at the Row boundary");
+        UiLayoutRect right = snapshot.RectById["right"];
+        Check(Near(snapshot.RectById["middle"].Width, 400f), "Auto width subtracts fixed siblings and both gaps");
+        Check(Near(right.XMax, 800f), "Right sibling ends exactly at the Row boundary");
     }
 
     // --- US->FL round 3: N1 (Auto width) and N2 (Breakpoint) lanes -------------------------------
@@ -517,12 +518,12 @@ internal static class KernelLayoutTests
     private static void RegisterLabeledTestWidget()
     {
         RegisterTestWidget(10f, null, false);
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             Scope,
             TestLabelKind,
             () => new RecordingWidget(10f, null, false),
             new[] { "Height", "Label" },
-            new[] { "Label" });
+            new[] { "Label" }));
     }
 
     private static void VerifyAutoWidthTracksGlyphModel()
@@ -537,11 +538,11 @@ internal static class KernelLayoutTests
             + "</Row></UiPage>";
 
         UiLayoutSnapshot cjk = Arrange(Row("音量"), 400f, 600f).Snapshot;
-        Check(Near(cjk.RectById["cap"].width, 32f), "CJK two-ideograph label column = 32px (2×16)");
-        Check(Near(cjk.RectById["rest"].width, 368f), "unsized sibling takes the remainder");
+        Check(Near(cjk.RectById["cap"].Width, 32f), "CJK two-ideograph label column = 32px (2×16)");
+        Check(Near(cjk.RectById["rest"].Width, 368f), "unsized sibling takes the remainder");
 
         UiLayoutSnapshot latin = Arrange(Row("ab"), 400f, 600f).Snapshot;
-        Check(Near(latin.RectById["cap"].width, 16f), "same character count, Latin advance = 16px — the column tracks glyphs, not a constant");
+        Check(Near(latin.RectById["cap"].Width, 16f), "same character count, Latin advance = 16px — the column tracks glyphs, not a constant");
     }
 
     private static void VerifyAutoMinWidthMaxWidthClamp()
@@ -557,9 +558,9 @@ internal static class KernelLayoutTests
             + "</Row></UiPage>";
 
         UiLayoutSnapshot snapshot = Arrange(xml, 400f, 600f).Snapshot;
-        Check(Near(snapshot.RectById["floor"].width, 40f), "MinWidth raises the 16px natural width to 40");
-        Check(Near(snapshot.RectById["ceil"].width, 10f), "MaxWidth caps the 32px natural width to 10");
-        Check(Near(snapshot.RectById["rest"].width, 350f), "flex sibling shares what the clamped autos leave");
+        Check(Near(snapshot.RectById["floor"].Width, 40f), "MinWidth raises the 16px natural width to 40");
+        Check(Near(snapshot.RectById["ceil"].Width, 10f), "MaxWidth caps the 32px natural width to 10");
+        Check(Near(snapshot.RectById["rest"].Width, 350f), "flex sibling shares what the clamped autos leave");
     }
 
     private static void VerifyAutoCappedByBudget()
@@ -574,8 +575,8 @@ internal static class KernelLayoutTests
             + "</Row></UiPage>";
 
         UiLayoutSnapshot snapshot = Arrange(xml, 100f, 600f).Snapshot;
-        Check(Near(snapshot.RectById["fixed"].width, 90f), "fixed siblings are never squeezed");
-        Check(Near(snapshot.RectById["cap"].width, 10f), "the Auto column is capped by the budget the fixed sibling leaves, not by its 64px natural width");
+        Check(Near(snapshot.RectById["fixed"].Width, 90f), "fixed siblings are never squeezed");
+        Check(Near(snapshot.RectById["cap"].Width, 10f), "the Auto column is capped by the budget the fixed sibling leaves, not by its 64px natural width");
     }
 
     private static void VerifyStackAutoChildHugsLabel()
@@ -590,8 +591,8 @@ internal static class KernelLayoutTests
             + "</Column></UiPage>";
 
         UiLayoutSnapshot snapshot = Arrange(xml, 400f, 600f).Snapshot;
-        Check(Near(snapshot.RectById["cap"].width, 16f), "stack child with Width=Auto hugs its label");
-        Check(Near(snapshot.RectById["full"].width, 400f), "unsized stack children keep the full width");
+        Check(Near(snapshot.RectById["cap"].Width, 16f), "stack child with Width=Auto hugs its label");
+        Check(Near(snapshot.RectById["full"].Width, 400f), "unsized stack children keep the full width");
     }
 
     private static void VerifyCoreKindAutoMeasurable()
@@ -606,7 +607,7 @@ internal static class KernelLayoutTests
             + "</Row></UiPage>";
 
         UiLayoutSnapshot snapshot = Arrange(xml, 400f, 600f).Snapshot;
-        Check(Near(snapshot.RectById["slider"].width, 32f),
+        Check(Near(snapshot.RectById["slider"].Width, 32f),
             "the core stepper-slider's declared label set feeds the same Auto seam (N3's reshape is N1 proving itself)");
     }
 
@@ -622,24 +623,19 @@ internal static class KernelLayoutTests
         RegisterTestWidget(10f, null, false);
 
         string ModeRow(string title, string description) =>
-            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Row Id=\"row\" Padding=\"0\" Gap=\"0\">"
-            + "<Widget Id=\"mode\" Kind=\"input/mode-row\" Width=\"Auto\" Height=\"28\""
-            + " Title1=\"" + title + "\" Value1=\"A\" Description1=\"" + description + "\" />"
-            + "<Widget Id=\"rest\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
-            + "</Row></UiPage>";
+            "<UiPage Schema=\"2\" Source=\""+(Scope)+"\"><Row Id=\"row\" Padding=\"0\" Gap=\"0\"><Widget Id=\"mode\" Kind=\"input/mode-row\" Width=\"Auto\" Height=\"28\"    ><Choice Value=\"A\" Text=\""+(title)+"\" Help=\""+(description)+"\"/></Widget><Widget Id=\"rest\" Kind=\""+(TestWidgetKind)+"\" Height=\"10\" /></Row></UiPage>";
 
         UiLayoutSnapshot longDescription = Arrange(ModeRow("ab", "WWWWWWWWWWWW"), 400f, 600f).Snapshot;
-        Check(Near(longDescription.RectById["mode"].width, 16f),
+        Check(Near(longDescription.RectById["mode"].Width, 16f),
             "a mode-row's Auto width does not include a description: title 'ab' measures 16px while the"
             + " 12-character description would measure 96px");
 
         UiLayoutSnapshot shortDescription = Arrange(ModeRow("ab", "WW"), 400f, 600f).Snapshot;
-        Check(Near(shortDescription.RectById["mode"].width, longDescription.RectById["mode"].width),
+        Check(Near(shortDescription.RectById["mode"].Width, longDescription.RectById["mode"].Width),
             "changing only the description leaves the Auto width untouched");
 
         UiLayoutSnapshot longerTitle = Arrange(ModeRow("abcd", "WWWWWWWWWWWW"), 400f, 600f).Snapshot;
-        Check(Near(longerTitle.RectById["mode"].width, 32f),
+        Check(Near(longerTitle.RectById["mode"].Width, 32f),
             "and a longer title still widens the same element (16 -> 32), so the pin above is a measurement"
             + " and not the unmeasurable-Auto fallback");
     }
@@ -659,8 +655,8 @@ internal static class KernelLayoutTests
             + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" Height=\"10\" />"
             + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "</Row></UiPage>", 400f, 600f).Snapshot;
-        Check(Near(unmeasurable.RectById["auto"].width, 200f)
-            && Near(unmeasurable.RectById["plain"].width, 200f),
+        Check(Near(unmeasurable.RectById["auto"].Width, 200f)
+            && Near(unmeasurable.RectById["plain"].Width, 200f),
             "unmeasurable Auto shares the remaining space with the omitted-Width sibling, no 1-unit stub");
 
         // 2. Registered label set but empty label: same fallback.
@@ -670,7 +666,7 @@ internal static class KernelLayoutTests
             + "<Widget Id=\"auto\" Kind=\"" + TestLabelKind + "\" Width=\"Auto\" Label=\"\" Height=\"10\" />"
             + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "</Row></UiPage>", 400f, 600f).Snapshot;
-        Check(Near(emptyLabel.RectById["auto"].width, 200f),
+        Check(Near(emptyLabel.RectById["auto"].Width, 200f),
             "registered-but-empty label falls back the same way (measure returns zero)");
 
         // 3. Fixed siblings are still honored; the fallback child splits only the remainder.
@@ -681,9 +677,9 @@ internal static class KernelLayoutTests
             + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" Height=\"10\" />"
             + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "</Row></UiPage>", 400f, 600f).Snapshot;
-        Check(Near(withFixed.RectById["fixed"].width, 90f)
-            && Near(withFixed.RectById["auto"].width, 155f)
-            && Near(withFixed.RectById["plain"].width, 155f),
+        Check(Near(withFixed.RectById["fixed"].Width, 90f)
+            && Near(withFixed.RectById["auto"].Width, 155f)
+            && Near(withFixed.RectById["plain"].Width, 155f),
             "fixed sibling keeps 90; the two flex slots split the 310 remainder equally");
 
         // 4. A positive MinWidth rescues the child into the Auto bucket through the declared clamp.
@@ -693,7 +689,7 @@ internal static class KernelLayoutTests
             + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" MinWidth=\"40\" Height=\"10\" />"
             + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "</Row></UiPage>", 400f, 600f).Snapshot;
-        Check(Near(floored.RectById["auto"].width, 40f) && Near(floored.RectById["plain"].width, 360f),
+        Check(Near(floored.RectById["auto"].Width, 40f) && Near(floored.RectById["plain"].Width, 360f),
             "positive MinWidth Auto keeps its existing Auto behavior (40, not a flex share)");
 
         // 5. On the fallback path the declared MaxWidth clamps the flex share like any child.
@@ -703,7 +699,7 @@ internal static class KernelLayoutTests
             + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" MaxWidth=\"100\" Height=\"10\" />"
             + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "</Row></UiPage>", 400f, 600f).Snapshot;
-        Check(Near(capped.RectById["auto"].width, 100f),
+        Check(Near(capped.RectById["auto"].Width, 100f),
             "MaxWidth applies on the fallback path");
 
         // 6. Positive control: a measurable Auto child still hugs its label (the fix must not
@@ -715,9 +711,9 @@ internal static class KernelLayoutTests
             + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" Height=\"10\" />"
             + "<Widget Id=\"plain\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "</Row></UiPage>", 400f, 600f).Snapshot;
-        Check(Near(mixed.RectById["label"].width, 32f)
-            && Near(mixed.RectById["auto"].width, 184f)
-            && Near(mixed.RectById["plain"].width, 184f),
+        Check(Near(mixed.RectById["label"].Width, 32f)
+            && Near(mixed.RectById["auto"].Width, 184f)
+            && Near(mixed.RectById["plain"].Width, 184f),
             "measurable Auto hugs 32 while the two flex slots split the remaining 368");
 
         // 7. Stack keeps its own fallback (full width), unchanged by A1.
@@ -726,7 +722,7 @@ internal static class KernelLayoutTests
             + "<Column Id=\"column\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"auto\" Kind=\"" + TestWidgetKind + "\" Width=\"Auto\" Height=\"10\" />"
             + "</Column></UiPage>", 400f, 600f).Snapshot;
-        Check(Near(stacked.RectById["auto"].width, 400f),
+        Check(Near(stacked.RectById["auto"].Width, 400f),
             "Stack's unmeasurable-Auto fallback (full width) is preserved");
     }
 
@@ -747,16 +743,16 @@ internal static class KernelLayoutTests
         UiWidgetContext ctx = CreateContext();
         UiLayoutManifest manifest = Parse(xml);
 
-        UiLayoutSnapshot wide = engine.ArrangeRoots(ctx, new Vector2(400f, 600f), manifest.Roots);
-        Check(Near(wide.RectById["a"].y, wide.RectById["b"].y), "wide: Row lays its children side by side");
-        Check(wide.RectById["b"].x > wide.RectById["a"].x, "wide: siblings advance in x");
+        UiLayoutSnapshot wide = engine.ArrangeRoots(ctx, new UiLayoutPoint(400f, 600f), manifest.Roots);
+        Check(Near(wide.RectById["a"].Y, wide.RectById["b"].Y), "wide: Row lays its children side by side");
+        Check(wide.RectById["b"].X > wide.RectById["a"].X, "wide: siblings advance in x");
 
-        UiLayoutSnapshot narrow = engine.ArrangeRoots(ctx, new Vector2(150f, 600f), manifest.Roots);
-        Check(narrow.RectById["b"].y > narrow.RectById["a"].y, "narrow: the same engine re-arranges to one-per-line");
-        Check(Near(narrow.RectById["a"].x, narrow.RectById["b"].x), "narrow: siblings share the column's x");
+        UiLayoutSnapshot narrow = engine.ArrangeRoots(ctx, new UiLayoutPoint(150f, 600f), manifest.Roots);
+        Check(narrow.RectById["b"].Y > narrow.RectById["a"].Y, "narrow: the same engine re-arranges to one-per-line");
+        Check(Near(narrow.RectById["a"].X, narrow.RectById["b"].X), "narrow: siblings share the column's x");
 
-        UiLayoutSnapshot restored = engine.ArrangeRoots(ctx, new Vector2(400f, 600f), manifest.Roots);
-        Check(Near(restored.RectById["b"].y, restored.RectById["a"].y), "wide again: the flip is stateless, no residue from the narrow pass");
+        UiLayoutSnapshot restored = engine.ArrangeRoots(ctx, new UiLayoutPoint(400f, 600f), manifest.Roots);
+        Check(Near(restored.RectById["b"].Y, restored.RectById["a"].Y), "wide again: the flip is stateless, no residue from the narrow pass");
     }
 
     private static void VerifyNarrowHidden()
@@ -792,12 +788,12 @@ internal static class KernelLayoutTests
             + "</Wrap></UiPage>";
 
         UiLayoutSnapshot wide = Arrange(xml, 400f, 600f).Snapshot;
-        Check(Near(wide.RectById["b"].x, 200f) && Near(wide.RectById["b"].y, 0f), "wide: Cols=2 puts the second child in the second column");
-        Check(Near(wide.RectById["c"].x, 0f) && Near(wide.RectById["c"].y, 10f), "wide: the third child wraps to the second row");
+        Check(Near(wide.RectById["b"].X, 200f) && Near(wide.RectById["b"].Y, 0f), "wide: Cols=2 puts the second child in the second column");
+        Check(Near(wide.RectById["c"].X, 0f) && Near(wide.RectById["c"].Y, 10f), "wide: the third child wraps to the second row");
 
         UiLayoutSnapshot narrow = Arrange(xml, 150f, 600f).Snapshot;
-        Check(Near(narrow.RectById["b"].x, 0f) && Near(narrow.RectById["b"].y, 10f), "narrow: NarrowCols=1 forces one column — the 响应式列数 acceptance row");
-        Check(Near(narrow.RectById["d"].y, 30f), "narrow: all four children stack");
+        Check(Near(narrow.RectById["b"].X, 0f) && Near(narrow.RectById["b"].Y, 10f), "narrow: NarrowCols=1 forces one column — the 响应式列数 acceptance row");
+        Check(Near(narrow.RectById["d"].Y, 30f), "narrow: all four children stack");
     }
 
     // A2 (0.7): Height used to be grammar-validated nowhere — a malformed string passed creation and
@@ -841,7 +837,7 @@ internal static class KernelLayoutTests
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
             + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"1e2\" />"
             + "</UiPage>", 400f, 600f).Snapshot;
-        Check(Near(exponent.RectById["a"].height, 100f),
+        Check(Near(exponent.RectById["a"].Height, 100f),
             "exponential notation is accepted at creation and arranges to 100 like the engine reads it");
 
         // Zero and negative keep their existing engine clamp (Math.Max(0f, fixedHeight)) — the
@@ -850,7 +846,7 @@ internal static class KernelLayoutTests
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
             + "<Widget Id=\"a\" Kind=\"" + TestWidgetKind + "\" Height=\"0\" />"
             + "</UiPage>", 400f, 600f).Snapshot;
-        Check(Near(zero.RectById["a"].height, 0f), "zero Height still arranges to a zero slot, not an error");
+        Check(Near(zero.RectById["a"].Height, 0f), "zero Height still arranges to a zero slot, not an error");
 
         // Refusing must name what and where: the path of a nested element appears in the message.
         try
@@ -860,7 +856,7 @@ internal static class KernelLayoutTests
         }
         catch (UiContractException ex)
         {
-            Check(ex.Message.Contains("Height 'tall'") && ex.Message.Contains("'c/a'"),
+            Check(ex.Message.Contains("Height") && ex.Message.Contains("'tall'") && ex.Message.Contains("'c/a'"),
                 "the refusal names the attribute, the value and the element path");
         }
 
@@ -961,15 +957,15 @@ internal static class KernelLayoutTests
             + "</Row></UiPage>";
 
         var engine = new UiLayoutEngine(Scope);
-        var ctx = new UiWidgetContext(
+        var ctx = NativeFixture.Context(
             Scope, new UiSession(), new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 400f, "root");
 
-        Check(Near(engine.ArrangeRoots(ctx, new Vector2(400f, 600f), Parse(xml).Roots).RectById["keyed"].width, 120f),
+        Check(Near(engine.ArrangeRoots(ctx, new UiLayoutPoint(400f, 600f), Parse(xml).Roots).RectById["keyed"].Width, 120f),
             "the bound width is the declared width");
 
         bound = 150f;
         bindings.NotifyChanged("col-width");
-        Check(Near(engine.ArrangeRoots(ctx, new Vector2(400f, 600f), Parse(xml).Roots).RectById["keyed"].width, 150f),
+        Check(Near(engine.ArrangeRoots(ctx, new UiLayoutPoint(400f, 600f), Parse(xml).Roots).RectById["keyed"].Width, 150f),
             "announcing the key re-arranges the element that declared it");
 
         RegisterTestWidget(10f, null, false);
@@ -979,9 +975,9 @@ internal static class KernelLayoutTests
         var mismatched = new UiBindings();
         mismatched.BindValue("col-width", () => other, value => other = value);
         UiFitAudit.Reset();
-        var ctx2 = new UiWidgetContext(
+        var ctx2 = NativeFixture.Context(
             Scope, new UiSession(), new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), mismatched, 400f, "root");
-        Check(Near(new UiLayoutEngine(Scope).ArrangeRoots(ctx2, new Vector2(400f, 600f), Parse(xml).Roots).RectById["keyed"].width, 200f),
+        Check(Near(new UiLayoutEngine(Scope).ArrangeRoots(ctx2, new UiLayoutPoint(400f, 600f), Parse(xml).Roots).RectById["keyed"].Width, 200f),
             "an unanswerable WidthKey falls back to the unsized distribution rather than guessing");
         Check(UiFitAudit.StyleFallbackCount == 1, "and it is reported once through the fail-soft appearance channel");
     }
@@ -989,8 +985,8 @@ internal static class KernelLayoutTests
     private static void VerifyResponsiveValidation()
     {
         RegisterTestWidget(10f, null, false);
-        UiWidgetRegistry.Register(
-            Scope, "test/sized", () => new RecordingWidget(10f, null, false), new[] { "Height" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(
+            Scope, "test/sized", () => new RecordingWidget(10f, null, false), new[] { "Height" }));
 
         // The latent N1 specimen: a schematized kind could not carry Width at all before round 3.
         Host("<Row Id=\"r\"><Widget Id=\"a\" Kind=\"test/sized\" Width=\"Auto\" Height=\"10\" /></Row>");
@@ -1025,16 +1021,16 @@ internal static class KernelLayoutTests
 
         // Padding 2, gap 2: a.y = 2, b.y = 2 + 10 + 2, container height = 2 + 10 + 2 + 10 + 2.
         UiLayoutSnapshot tight = ArrangeWithGeometry(xml, new UiGeometry(2f, 4f, 2f, 28f, 1f));
-        Check(Near(tight.RectById["a"].y, 2f) && Near(tight.RectById["b"].y, 14f)
-            && Near(tight.RectById["stack"].height, 26f),
+        Check(Near(tight.RectById["a"].Y, 2f) && Near(tight.RectById["b"].Y, 14f)
+            && Near(tight.RectById["stack"].Height, 26f),
             "an undeclared container takes the theme's geometry (padding 2, gap 2)");
 
         // Padding 10, gap 10 under the same page: a.y = 10, b.y = 30, height = 50.
         UiLayoutSnapshot loose = ArrangeWithGeometry(xml, new UiGeometry(10f, 4f, 10f, 28f, 1f));
-        Check(Near(loose.RectById["a"].y, 10f) && Near(loose.RectById["b"].y, 30f)
-            && Near(loose.RectById["stack"].height, 50f),
+        Check(Near(loose.RectById["a"].Y, 10f) && Near(loose.RectById["b"].Y, 30f)
+            && Near(loose.RectById["stack"].Height, 50f),
             "a theme-only change moves the arranged rects: the page's rhythm is no longer frozen in XML");
-        Check(!Near(loose.RectById["a"].y, tight.RectById["a"].y),
+        Check(!Near(loose.RectById["a"].Y, tight.RectById["a"].Y),
             "the two themes really differ, so the lane is not reading one geometry twice");
     }
 
@@ -1052,13 +1048,13 @@ internal static class KernelLayoutTests
             + "</Stack></UiPage>";
 
         UiLayoutSnapshot loose = ArrangeWithGeometry(pinned, new UiGeometry(10f, 4f, 10f, 28f, 1f));
-        Check(Near(loose.RectById["a"].y, 0f) && Near(loose.RectById["b"].y, 10f)
-            && Near(loose.RectById["stack"].height, 20f),
+        Check(Near(loose.RectById["a"].Y, 0f) && Near(loose.RectById["b"].Y, 10f)
+            && Near(loose.RectById["stack"].Height, 20f),
             "Padding=\"0\"/Gap=\"0\" arranges exactly as the pre-CP-0 engine did");
 
         UiLayoutSnapshot tight = ArrangeWithGeometry(pinned, new UiGeometry(2f, 4f, 2f, 28f, 1f));
-        Check(Near(tight.RectById["a"].y, loose.RectById["a"].y)
-            && Near(tight.RectById["stack"].height, loose.RectById["stack"].height),
+        Check(Near(tight.RectById["a"].Y, loose.RectById["a"].Y)
+            && Near(tight.RectById["stack"].Height, loose.RectById["stack"].Height),
             "and the explicit attribute wins over either geometry, so the escape hatch is not density-shaped");
     }
 
@@ -1084,18 +1080,18 @@ internal static class KernelLayoutTests
         UiLayoutEngine engine = new(Scope);
         UiWidgetContext ctx = new(
             Scope, new UiSession(), new StubMetrics(), theme, new StubTranslation(), new UiBindings(), 400f, "root");
-        UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, new Vector2(400f, 100f), Parse(xml).Roots);
+        UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, new UiLayoutPoint(400f, 100f), Parse(xml).Roots);
 
         // Measure half: the child sits on the theme's 10px padding, below the 22px title band.
-        Check(Near(snapshot.RectById["a"].x, 10f) && Near(snapshot.RectById["a"].y, 32f),
+        Check(Near(snapshot.RectById["a"].X, 10f) && Near(snapshot.RectById["a"].Y, 32f),
             "the measure half arranges the child against the theme's padding and the title band");
 
         IList rects = LabelRects();
         rects.Clear();
-        engine.Draw(ctx, snapshot, new Rect(0f, 0f, 400f, 100f));
+        NativeFixture.Prepare(ctx.Session);engine.Draw(ctx, snapshot, new UiLayoutRect(0f, 0f, 400f, 100f));
         Check(rects.Count == 1, "the container title is the one label this frame draws");
-        Rect header = (Rect)rects[0];
-        Check(Near(header.x, 10f) && Near(header.y, 10f) && Near(header.width, 380f),
+        UiLayoutRect header = NativeFixture.Record<UiLayoutRect>(rects[0]);
+        Check(Near(header.X, 10f) && Near(header.Y, 10f) && Near(header.Width, 380f),
             "and the draw half builds the title rect from the same padding (x=10, inner width 380), so the two"
             + " halves cannot disagree about a container's spacing");
     }
@@ -1119,7 +1115,7 @@ internal static class KernelLayoutTests
         UiLayoutEngine engine = new(Scope);
         UiWidgetContext ctx = new(
             Scope, new UiSession(), new StubMetrics(), theme, new StubTranslation(), new UiBindings(), 400f, "root");
-        return engine.ArrangeRoots(ctx, new Vector2(400f, 400f), Parse(xml).Roots);
+        return engine.ArrangeRoots(ctx, new UiLayoutPoint(400f, 400f), Parse(xml).Roots);
     }
 
     private static void Host(string body)
@@ -1162,7 +1158,7 @@ internal static class KernelLayoutTests
         bindings.BindValue("active-tab", () => activeTab, value => activeTab = value);
         UiWidgetContext ctx = new(Scope, session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 200f, "root");
 
-        UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, new Vector2(200f, 100f), Parse(xml).Roots);
+        UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, new UiLayoutPoint(200f, 100f), Parse(xml).Roots);
         Check(!snapshot.RectById.ContainsKey("basic"), "Inactive Tab element is absent from layout");
         Check(snapshot.RectById.ContainsKey("packs"), "Active Tab element remains visible");
     }
@@ -1180,13 +1176,13 @@ internal static class KernelLayoutTests
 
         UiLayoutEngine engine = new(Scope);
         UiWidgetContext ctx = CreateContext();
-        UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, new Vector2(200f, 600f), Parse(xml).Roots);
+        UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, new UiLayoutPoint(200f, 600f), Parse(xml).Roots);
 
         ResetGroupCounters();
         bool threw = false;
         try
         {
-            engine.Draw(ctx, snapshot, new Rect(0f, 0f, 200f, 200f));
+            NativeFixture.Prepare(ctx.Session);engine.Draw(ctx, snapshot, new UiLayoutRect(0f, 0f, 200f, 200f));
         }
         catch (InvalidOperationException)
         {
@@ -1213,11 +1209,11 @@ internal static class KernelLayoutTests
             + "</UiPage>";
     }
 
-    private static void RegisterTestWidget(float height, List<Rect>? drawn, bool throwOnDraw)
+    private static void RegisterTestWidget(float height, List<UiLayoutRect>? drawn, bool throwOnDraw)
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(Scope, TestWidgetKind, () => new RecordingWidget(height, drawn, throwOnDraw));
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, TestWidgetKind, () => new RecordingWidget(height, drawn, throwOnDraw)));
     }
 
     private static UiLayoutManifest Parse(string xml)
@@ -1232,13 +1228,13 @@ internal static class KernelLayoutTests
     {
         UiLayoutEngine engine = new(Scope);
         UiWidgetContext ctx = CreateContext();
-        UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, new Vector2(width, height), Parse(xml).Roots);
+        UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, new UiLayoutPoint(width, height), Parse(xml).Roots);
         return (engine, ctx, snapshot);
     }
 
     private static UiWidgetContext CreateContext()
     {
-        return new UiWidgetContext(
+        return NativeFixture.Context(
             Scope,
             new UiSession(),
             new StubMetrics(),
@@ -1298,10 +1294,10 @@ internal static class KernelLayoutTests
     private sealed class RecordingWidget : IUiWidget
     {
         private readonly float height;
-        private readonly List<Rect>? drawn;
+        private readonly List<UiLayoutRect>? drawn;
         private readonly bool throwOnDraw;
 
-        public RecordingWidget(float height, List<Rect>? drawn, bool throwOnDraw)
+        public RecordingWidget(float height, List<UiLayoutRect>? drawn, bool throwOnDraw)
         {
             this.height = height;
             this.drawn = drawn;
@@ -1314,7 +1310,7 @@ internal static class KernelLayoutTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
@@ -1323,7 +1319,7 @@ internal static class KernelLayoutTests
             return height;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             if (throwOnDraw) throw new InvalidOperationException("boom");
             drawn?.Add(rect);

@@ -53,7 +53,7 @@ distances remain independent of typography. Seven descriptive uses need no artif
 
 ## Chart capture uses the same pointer owner
 
-`chart/line` retains normalized `IReadOnlyList<Vector2>` bindings, static `Points`, `EditablePoints` and
+`chart/line` retains normalized `IReadOnlyList<UiLayoutPoint>` bindings, static `Points`, `EditablePoints` and
 `UiChartPointChange.Index/X/Y`. A primary press within the existing six-pixel circular hit radius captures
 without publishing. Actual drag samples map through the shared plot geometry to finite normalized X/Y,
 retain the existing 0.0001 sample tolerance, and issue one callback per new selection. Repaint and release
@@ -62,7 +62,7 @@ and disposal use the same ownership cleanup as the other wrappers. Another nativ
 stolen or released.
 
 `UiInteractionSession.PointerPoint` extends the existing pointer state owner rather than introducing a
-chart drag bit/cursor authority. `UiNative.Point` adapts platform eligibility/capture and `UiHitGeometry`
+chart drag bit/cursor authority. `ctx.Controls.Point` adapts platform eligibility/capture and `UiHitGeometry`
 provides the same circular hit and two-axis mapping facts to pure clients. `UiInteractionResult.Value` is
 point X and `Y` is the second coordinate. The chart draws actual model points after dispatch; it does not
 optimistically substitute a requested point for a model that rejected it.

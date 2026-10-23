@@ -1,6 +1,7 @@
+using UnityEngine;
+using Verse;
 using System;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 internal static class KernelLayerDispatchTests
@@ -12,8 +13,8 @@ internal static class KernelLayerDispatchTests
         {
             UiWidgetRegistry.Clear();
             UiWidgetRegistry.InitializeCore();
-            UiNative.DebugMousePositionEnabled = false;
-            UiNative.ButtonOverride = null;
+            NativeFixture.DebugMousePositionEnabled = false;
+            NativeFixture.ButtonOverride = null;
             GUIUtility.hotControl = 0;
             int large = 0;
             int small = 0;
@@ -26,12 +27,12 @@ internal static class KernelLayerDispatchTests
                 + "<Widget Id=\"lock\" Kind=\"input/button\" ActionBind=\"lock\" Text=\"Lock\" Width=\"30\" Height=\"30\" AlignX=\"Left\" AlignY=\"Top\" OffsetX=\"100\" OffsetY=\"10\"/>"
                 + "</Overlay></UiPage>"), bindings, new UiTheme(), new Metrics(), new Translation());
             Event.current = new Event { type = EventType.Repaint };
-            host.DrawFrame(new Rect(0,0,200,100));
-            Event.current = new Event { type = EventType.MouseDown, button = 0, mousePosition = new Vector2(115,25) };
-            host.DrawFrame(new Rect(0,0,200,100));
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0,0,200,100));
+            Event.current = new Event { type = EventType.MouseDown, button = 0, mousePosition = VerseUiExecution.Point(new UiLayoutPoint(115,25)) };
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0,0,200,100));
             string owner = host.Session.Interactions.CaptureOwner?.Node ?? "none";
-            Event.current = new Event { type = EventType.MouseUp, button = 0, mousePosition = new Vector2(115,25) };
-            host.DrawFrame(new Rect(0,0,200,100));
+            Event.current = new Event { type = EventType.MouseUp, button = 0, mousePosition = VerseUiExecution.Point(new UiLayoutPoint(115,25)) };
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0,0,200,100));
             Console.WriteLine("  observed: LAYER fixed baseline large=" + large + " lock=" + small + " press-owner=" + owner);
             if (large != 0 || small != 1) throw new Exception("top small lock must receive the gesture, not earlier large button");
             Console.WriteLine("  ok: LAYER real host final paint order gives the small upper target one activation");
@@ -67,8 +68,8 @@ internal static class KernelLayerDispatchTests
     private static UiHost Host(UiBindings bindings, string upper) => new("layers-more", Page(upper), bindings, new UiTheme(), new Metrics(), new Translation());
     private static void Frame(UiHost host, EventType type, float x = 115, float y = 25)
     {
-        Event.current = new Event { type = type, button = 0, mousePosition = new Vector2(x,y) };
-        host.DrawFrame(new Rect(0,0,200,100));
+        Event.current = new Event { type = type, button = 0, mousePosition = VerseUiExecution.Point(new UiLayoutPoint(x,y)) };
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0,0,200,100));
     }
     private static void EligibilityAndDecoration()
     {
@@ -89,7 +90,7 @@ internal static class KernelLayerDispatchTests
             Check(large == 0 && small == 1, "live eligibility change takes effect without changing declaration order");
         }
         const string decoration = "<Widget Id=\"decoration\" Kind=\"display/image\" Bind=\"picture\" Width=\"30\" Height=\"30\" AlignX=\"Left\" AlignY=\"Top\" OffsetX=\"100\" OffsetY=\"10\"/>";
-        bindings.BindReadOnly<Texture2D>("picture", () => null!);
+        bindings.BindReadOnly<UiImage>("picture", () => default);
         using (var host = Host(bindings, decoration))
         {
             Frame(host, EventType.MouseDown);
@@ -125,7 +126,7 @@ internal static class KernelLayerDispatchTests
     }
     private static void CustomGeometry()
     {
-        UiWidgetRegistry.Register("layers-more", "test/precise", () => new Precise(), new[] { "Id", "Kind", "Width", "Height" });
+UiWidgetRegistry.Define(new UiWidgetDefinition("layers-more", "test/precise", () => new Precise(), new[] { "Id", "Kind", "Width", "Height" }));
         int large = 0;
         int custom = 0;
         var bindings = new UiBindings();
@@ -161,12 +162,12 @@ internal static class KernelLayerDispatchTests
             + Lock.Replace("OffsetY=\"10\"", "OffsetY=\"80\"") + "</Overlay></Scroll>";
         using (var host = Host(bindings, scrolled))
         {
-            host.MeasureAndArrange(new Vector2(200,100));
-            host.Session.SetScrollPosition(host.Session.GetNodeByElementId("scroll")!, new Vector2(0,70));
+            host.MeasureAndArrange(new UiLayoutPoint(200,100));
+            host.Session.SetScrollPosition(host.Session.GetNodeByElementId("scroll")!, new UiLayoutPoint(0,70));
             Frame(host, EventType.MouseDown);
             Frame(host, EventType.MouseUp);
             Check(large == 1 && small == 2, "current scroll transform participates before lower native input runs");
-            host.Session.SetScrollPosition(host.Session.GetNodeByElementId("scroll")!, Vector2.zero);
+            host.Session.SetScrollPosition(host.Session.GetNodeByElementId("scroll")!, UiLayoutPoint.Zero);
             Frame(host, EventType.MouseDown);
             Frame(host, EventType.MouseUp);
             Check(large == 2 && small == 2, "changed scroll offset cannot leave stale upper coverage");
@@ -188,7 +189,7 @@ internal static class KernelLayerDispatchTests
             + Lock + "</Overlay></UiPage>");
         try
         {
-            UiNative.TextFieldOverride = (_, text) => { nativeDraws++; return text; };
+            NativeFixture.TextFieldOverride = (_, text) => { nativeDraws++; return text; };
             using (var host = new UiHost("layer-editor", EditorPage(160), bindings, new UiTheme(), new Metrics(), new Translation()))
             {
                 Frame(host, EventType.Repaint);
@@ -199,16 +200,16 @@ internal static class KernelLayerDispatchTests
             }
             using (var host = new UiHost("layer-editor", EditorPage(80), bindings, new UiTheme(), new Metrics(), new Translation()))
             {
-                UiNative.TextFieldOverride = (_, _) => "draft";
+                NativeFixture.TextFieldOverride = (_, _) => "draft";
                 Frame(host, EventType.MouseDown,20,20);
                 Frame(host, EventType.MouseUp,20,20);
-                UiNative.TextFieldOverride = (_, text) => text;
+                NativeFixture.TextFieldOverride = (_, text) => text;
                 Frame(host, EventType.MouseDown);
                 Frame(host, EventType.MouseUp);
                 Check(model == "draft" && writes == 1 && lockRequests == 2, "nonoverlapping later control retains ordinary outside-click edit publication");
             }
         }
-        finally { UiNative.TextFieldOverride = null; }
+        finally { NativeFixture.TextFieldOverride = null; }
     }
 
     private static void CompositeEligibility()
@@ -217,7 +218,7 @@ internal static class KernelLayerDispatchTests
         var bindings = new UiBindings();
         bindings.BindCommand("large", () => large++);
         bindings.BindReadOnly("choice", () => "one");
-        string upper = "<Widget Id=\"dropdown\" Kind=\"input/dropdown\" Bind=\"choice\" Option1=\"one\" Width=\"30\" Height=\"30\" AlignX=\"Left\" AlignY=\"Top\" OffsetX=\"100\" OffsetY=\"10\"/>";
+        string upper = "<Widget Id=\"dropdown\" Kind=\"input/dropdown\" Bind=\"choice\"  Width=\"30\" Height=\"30\" AlignX=\"Left\" AlignY=\"Top\" OffsetX=\"100\" OffsetY=\"10\"><Choice Value=\"one\" Text=\"one\" Help=\"one\"/></Widget>";
         using (var host = Host(bindings, upper))
         {
             Frame(host, EventType.MouseDown);
@@ -257,7 +258,7 @@ internal static class KernelLayerDispatchTests
 
     private static void ChildGeometryOwner()
     {
-        UiWidgetRegistry.Register("layer-child", "test/child", () => new ChildControl(), new[] { "Id", "Kind", "Width", "Height" });
+UiWidgetRegistry.Define(new UiWidgetDefinition("layer-child", "test/child", () => new ChildControl(), new[] { "Id", "Kind", "Width", "Height" }));
         int lower = 0;
         int upper = 0;
         var bindings = new UiBindings();
@@ -283,15 +284,15 @@ internal static class KernelLayerDispatchTests
     {
         public string Kind => "test/child";
         public void Configure(UiElementSpec spec) { }
-        public void Validate(IUiBindings bindings, string path) => bindings.ValidateCommand("child", path);
+        public void Validate(IUiBindingReader bindings, string path) => bindings.ValidateCommand("child", path);
         public float Measure(UiWidgetContext ctx) => 80;
         public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
         { yield return new UiPointerRegion(bounds); }
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             UiWidgetContext child = ctx.Child("private-button");
-            UiInteractionResult result = UiNative.Activation(rect, child, "child");
-            UiInteractionRequests.Activation(UiNative.InteractionTarget(child,"child"), result, () => child.Bindings.Invoke("child"));
+            UiInteractionResult result = ctx.Controls.Activation(rect, child, "child");
+            UiInteractionRequests.Activation(ctx.Controls.InteractionTarget(child,"child"), result, () => child.Bindings.Invoke("child"));
         }
     }
 
@@ -299,18 +300,18 @@ internal static class KernelLayerDispatchTests
     {
         public string Kind => "test/precise";
         public void Configure(UiElementSpec spec) { }
-        public void Validate(IUiBindings bindings, string path) => bindings.ValidateCommand("custom", path);
+        public void Validate(IUiBindingReader bindings, string path) => bindings.ValidateCommand("custom", path);
         public float Measure(UiWidgetContext ctx) => 80;
-        private static Rect Region(float x, float y) => new(x + 100, y + 10, 30,30);
+        private static UiLayoutRect Region(float x, float y) => new(x + 100, y + 10, 30,30);
         public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
         {
-            Rect region = Region(bounds.X,bounds.Y);
-            yield return new UiPointerRegion(new UiLayoutRect(region.x,region.y,region.width,region.height));
+            UiLayoutRect region = Region(bounds.X,bounds.Y);
+            yield return new UiPointerRegion(new UiLayoutRect(region.X,region.Y,region.Width,region.Height));
         }
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
-            UiInteractionResult result = UiNative.Activation(Region(rect.x,rect.y), ctx, "custom");
-            UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx,"custom"), result, () => ctx.Bindings.Invoke("custom"));
+            UiInteractionResult result = ctx.Controls.Activation(Region(rect.X,rect.Y), ctx, "custom");
+            UiInteractionRequests.Activation(ctx.Controls.InteractionTarget(ctx,"custom"), result, () => ctx.Bindings.Invoke("custom"));
         }
     }
 

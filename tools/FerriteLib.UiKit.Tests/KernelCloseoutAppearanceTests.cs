@@ -1,8 +1,10 @@
+using System.Linq;
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Reflection;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 internal static class KernelCloseoutAppearanceTests
@@ -11,7 +13,7 @@ internal static class KernelCloseoutAppearanceTests
     private static void Check(bool value, string name)
     { if (!value) throw new Exception(name); Console.WriteLine("  ok: CLOSEOUT-APPEARANCE " + name); }
     private static void Pump(UiHost host)
-    { Event.current = new Event { type = EventType.Repaint }; host.DrawFrame(new Rect(0, 0, 400, 300)); }
+    { Event.current = new Event { type = EventType.Repaint }; NativeFixture.DrawFrame(host,new UiLayoutRect(0, 0, 400, 300)); }
     internal static int RunAll()
     {
         try { DefaultsAndSources(); IndependentVisual(); return 0; }
@@ -22,23 +24,23 @@ internal static class KernelCloseoutAppearanceTests
     {
         UiWidgetRegistry.Clear(); UiWidgetRegistry.InitializeCore(); var b = new UiBindings();
         b.BindValue("value", () => .5f, _ => { }); b.BindValue("pick", () => "A", _ => { });
-        b.BindOptions("pick", () => new[] { "A" });
+        b.BindChoices("pick", ()=> (new[] { "A" }).Select(value=>new UiChoice<string>(value,value,value)).ToArray());
         var metrics = new Metrics();
         string xml = "<UiPage Schema=\"2\" Source=\"appearance\"><Styles Schema=\"1\"><Scheme Name=\"base\"><Metric Token=\"RowHeight\" Value=\"40\"/><Metric Token=\"Gap\" Value=\"9\"/><Metric Token=\"Font\" Value=\"Medium\"/></Scheme><Density Name=\"sparse\"><Metric Token=\"Gap\" Value=\"5\"/></Density></Styles>"
             + "<Column Id=\"parent\" Scheme=\"base\" Padding=\"0\" Gap=\"0\"><Widget Id=\"range\" Kind=\"input/slider\" Bind=\"value\" Label=\"Label\" Density=\"sparse\" Metric.Spacing=\"11\"/>"
             + "<Widget Id=\"pick\" Kind=\"input/dropdown\" Bind=\"pick\" OptionsBind=\"pick\" Appearance=\"selector\" Metric.Padding=\"12\" Metric.Hairline=\"3\"/></Column></UiPage>";
         using var host = new UiHost("appearance", UiLayoutManifest.Parse(xml), b, new UiTheme(), metrics, new Translation());
         Pump(host); UiNode parent = host.Session.GetNodeByElementId("parent")!, range = host.Session.GetNodeByElementId("range")!, pick = host.Session.GetNodeByElementId("pick")!;
-        Check(range.Rect!.Value.height == 40 && metrics.Font == UiFont.Medium && range.Properties.ResolvedMetrics["Gap"].Value == 5
+        Check(range.Rect!.Value.Height == 40 && metrics.Font == UiFont.Medium && range.Properties.ResolvedMetrics["Gap"].Value == 5
             && range.Properties.ResolvedMetrics["RowHeight"].Origin == UiPropertyOrigin.Ancestor,
             "default slider consumes named font/row height while sparse Density overrides only its Gap");
-        Check(range.Properties.ResolvedMetrics["Spacing"].Value == 11 && parent.Rect!.Value.width == 400,
+        Check(range.Properties.ResolvedMetrics["Spacing"].Value == 11 && parent.Rect!.Value.Width == 400,
             "inline metric configures internal spacing without replacing parent's outer allocation");
         int text = -1; for (int i = 0; i < List("LabelTexts").Count; i++) if ((string)List("LabelTexts")[i]! == "A") text = i;
-        Rect outlet = (Rect)List("LabelRects")[text]!;
-        Check(outlet.x == pick.Rect!.Value.x + UiThemeDraw.SelectorAccentWidth + 12,
+        UiLayoutRect outlet = NativeFixture.Record<UiLayoutRect>(List("LabelRects")[text]!);
+        Check(outlet.X == pick.Rect!.Value.X + UiThemeDraw.SelectorAccentWidth + 12,
             "default selector's actual text outlet consumes explicit Padding12");
-        bool edge = false; foreach (Rect rect in List("DrawBoxSolidRects")) if (rect.width == pick.Rect.Value.width && rect.height == 3) edge = true;
+        bool edge = false; foreach (UiLayoutRect rect in NativeFixture.Records<UiLayoutRect>(List("DrawBoxSolidRects"))) if (rect.Width == pick.Rect.Value.Width && rect.Height == 3) edge = true;
         Check(edge, "default selector paints actual Hairline3 edge");
         foreach (string name in new[] { "Padding", "Spacing", "Gap", "RowHeight", "Hairline" })
         {
@@ -51,9 +53,9 @@ internal static class KernelCloseoutAppearanceTests
             Check(range.Properties.ResolvedMetrics[name].Value == expected,
                 "individual removal reveals current inline/named/ancestor value: " + name);
         }
-        var snapshot = host.MeasureAndArrange(new Vector2(400, 300)); long measures = range.LayoutMeasureCount;
+        var snapshot = host.MeasureAndArrange(new UiLayoutPoint(400, 300)); long measures = range.LayoutMeasureCount;
         range.Properties.Palette(UiPaletteRole.Foreground).Set(new UiColour(1, 0, 0)); Pump(host);
-        Check(ReferenceEquals(snapshot, host.MeasureAndArrange(new Vector2(400, 300))) && range.LayoutMeasureCount == measures,
+        Check(ReferenceEquals(snapshot, host.MeasureAndArrange(new UiLayoutPoint(400, 300))) && range.LayoutMeasureCount == measures,
             "semantic colour is paint-only and preserves real measurement/snapshot");
         range.Properties.Palette(UiPaletteRole.Foreground).Remove(); parent.Properties.Font.Set(UiFont.Tiny); Pump(host);
         Check(range.Properties.ResolvedFont.Value == UiFont.Tiny && range.LayoutMeasureCount > measures,
@@ -74,8 +76,8 @@ internal static class KernelCloseoutAppearanceTests
         UiSliderLayout layout = UiSliderLayout.Measure("Label", 100, theme.DefaultFont,
             new UiDensity(8, 7, 6, 35, 2), metrics);
         theme.Palette[UiPaletteRole.Foreground] = new UiColour(0, 1, 0);
-        int first = List("LabelColors").Count; UiThemeDraw.Label(new Rect(0, 0, 100, layout.Height), "Independent", theme);
-        Check(metrics.Font == UiFont.Medium && (Color)List("LabelColors")[first]! == new Color(0, 1, 0),
+        int first = List("LabelColors").Count; UiThemeDraw.Label(NativeFixture.Paint,new UiLayoutRect(0, 0, 100, layout.Height), "Independent", theme);
+        Check(metrics.Font == UiFont.Medium && NativeFixture.Record<UiColour>(List("LabelColors")[first]!) == new UiColour(0, 1, 0),
             "standalone measure/draw consumes font and semantic palette without Host or page registration");
         theme.RemoveFontOverride(); theme.Palette.Remove(UiPaletteRole.Foreground);
         Check(theme.DefaultFont == UiFont.Small && theme.Palette[UiPaletteRole.Foreground] == UiPalette.Default(UiPaletteRole.Foreground),

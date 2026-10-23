@@ -43,7 +43,9 @@ public sealed class VerseUiExecution : IUiExecution, IDisposable
     public static Color Colour(UiColour c) => new(c.Red, c.Green, c.Blue, c.Alpha);
     public void PrepareControl(UiControlKey key)
     {
-        int allocated = GUIUtility.GetControlID(key.GetHashCode(), FocusType.Passive);
+        // Logical names may repeat in another execution owner. Keep the native hint owner-scoped;
+        // only the native allocator decides the resulting ID and sequence remains part of that mapping.
+        int allocated = GUIUtility.GetControlID(unchecked(key.GetHashCode()*397 ^ Images.Scope.GetHashCode()), FocusType.Passive);
         if (captureOwner != key || !HasCapture(key))
             controls[key] = allocated;
     }
@@ -207,6 +209,7 @@ public sealed class VerseUiImages : IDisposable
 {
     private static long nextScope;
     private readonly long scope = Interlocked.Increment(ref nextScope);
+    internal long Scope => scope;
     private readonly Dictionary<int, Texture> textures = new();
     private int nextKey;
     public UiImage Add(Texture texture)

@@ -1,7 +1,8 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -32,15 +33,13 @@ internal static class KernelRegistryManifestTests
     private static void VerifyCoreScopeFallbackAndExactScopeWins()
     {
         UiWidgetRegistry.Clear();
-
-        UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "test/probe",
-            () => new ProbeWidget("core"));
+UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, "test/probe",
+            () => new ProbeWidget("core")));
 
         IUiWidget throughCore = UiWidgetRegistry.Resolve("consumer-scope", "test/probe");
         Check(throughCore.Kind == "core", "core kind resolves through another scope");
-
-        UiWidgetRegistry.Register("consumer-scope", "test/probe",
-            () => new ProbeWidget("exact"));
+UiWidgetRegistry.Define(new UiWidgetDefinition("consumer-scope", "test/probe",
+            () => new ProbeWidget("exact")));
 
         IUiWidget exact = UiWidgetRegistry.Resolve("consumer-scope", "test/probe");
         IUiWidget other = UiWidgetRegistry.Resolve("third-scope", "test/probe");
@@ -51,9 +50,8 @@ internal static class KernelRegistryManifestTests
     private static void VerifyAttributeSchemaFallsBackToCore()
     {
         UiWidgetRegistry.Clear();
-
-        UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "test/schema-probe",
-            () => new ProbeWidget("schema"), new[] { "Height", "Label" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, "test/schema-probe",
+            () => new ProbeWidget("schema"), new[] { "Height", "Label" }));
 
         IReadOnlyCollection<string>? schema = UiWidgetRegistry.GetAttributeSchema(
             "consumer-scope", "test/schema-probe");
@@ -76,11 +74,10 @@ internal static class KernelRegistryManifestTests
     private static void VerifyDuplicateRegistrationRejected()
     {
         UiWidgetRegistry.Clear();
-
-        UiWidgetRegistry.Register("dupe-scope", "test/probe", () => new ProbeWidget("first"));
+UiWidgetRegistry.Define(new UiWidgetDefinition("dupe-scope", "test/probe", () => new ProbeWidget("first")));
         try
         {
-            UiWidgetRegistry.Register("dupe-scope", "test/probe", () => new ProbeWidget("second"));
+UiWidgetRegistry.Define(new UiWidgetDefinition("dupe-scope", "test/probe", () => new ProbeWidget("second")));
             Check(false, "duplicate registration should throw");
         }
         catch (InvalidOperationException ex)
@@ -221,13 +218,13 @@ internal static class KernelRegistryManifestTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
         public float Measure(UiWidgetContext ctx) => 10f;
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
         }
     }

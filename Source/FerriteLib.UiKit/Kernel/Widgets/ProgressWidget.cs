@@ -69,7 +69,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         bindings.ValidateValue<float>(key, elementPath);
 
         if (spec.TryGetAttribute("Max", out string raw) && raw.Trim().Length > 0
-            && (!float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float declared)
+            && (!spec.TryGetNumber("Max", out float declared)
                 || float.IsNaN(declared) || float.IsInfinity(declared) || declared <= 0f))
         {
             throw new InvalidOperationException(
@@ -128,7 +128,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     private float ReadMax()
     {
         if (spec.TryGetAttribute("Max", out string raw)
-            && float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float declared)
+            && spec.TryGetNumber("Max", out float declared)
             && declared > 0f)
         {
             return declared;

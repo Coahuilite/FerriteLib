@@ -499,8 +499,10 @@ public static class Widgets
     // control and consumes the event; MouseUp with a matching hot control over the rect activates and
     // consumes it. A stub that always returned false could not express a click being stolen by a
     // control drawn earlier in the same pass - the exact failure shape reported from the game.
+    public static readonly List<Rect> ButtonInvisibleRects=new();
     private static bool ButtonInvisibleCore(Rect rect)
     {
+        ButtonInvisibleRects.Add(rect);
         Event? e = Event.current;
         if (e == null || e.button != 0) return false;
 
@@ -1141,4 +1143,3 @@ public static class Find
 {
     public static WindowStack WindowStack { get; set; } = new WindowStack();
 }
-

@@ -1,3 +1,5 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -5,7 +7,6 @@ using System.Reflection;
 
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -123,14 +124,14 @@ internal static class KernelTextFieldTests
         using UiSession session = new();
         TextFieldWidget widget = MakeWidget(Attrs("search"));
         UiWidgetContext ctx = MakeContext(session, bindings);
-        var rect = new Rect(0f, 0f, Width, Height);
+        var rect = new UiLayoutRect(0f, 0f, Width, Height);
 
         EnablePointer(Center(rect));
-        UiNative.TextFieldOverride = (r, text) => "typed";
-        widget.Draw(rect, ctx);
+        NativeFixture.TextFieldOverride = (r, text) => "typed";
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
 
         Check(model == "typed", "the keystroke reaches the model through the typed binding");
-        Check(session.GetOrCreateValueState("search").Focused, "and the pointer inside the field focused it");
+        Check(NativeFixture.Slot(session,"search").IsFocused, "and the pointer inside the field focused it");
         DisablePointer();
     }
 
@@ -144,46 +145,46 @@ internal static class KernelTextFieldTests
         using UiSession session = new();
         TextFieldWidget widget = MakeWidget(Attrs("search", live: false));
         UiWidgetContext ctx = MakeContext(session, bindings);
-        var rect = new Rect(0f, 0f, Width, Height);
-        UiValueState state = session.GetOrCreateValueState("search");
+        var rect = new UiLayoutRect(0f, 0f, Width, Height);
+        UiControlState state = NativeFixture.Slot(session,"search");
 
         // A pointer outside the field must not take focus, and must not write anything: the backend hands
         // back the text it was given, so this frame carries no edit at all.
-        EnablePointer(new Vector2(rect.xMax + 40f, rect.yMax + 40f));
-        UiNative.TextFieldOverride = (r, text) => text;
-        widget.Draw(rect, ctx);
-        Check(!state.Focused, "a pointer outside the field does not focus it");
+        EnablePointer(new UiLayoutPoint(rect.XMax + 40f, rect.YMax + 40f));
+        NativeFixture.TextFieldOverride = (r, text) => text;
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
+        Check(!state.IsFocused, "a pointer outside the field does not focus it");
         Check(model == "start", "and nothing is written");
 
         // The complementary rule, pinned rather than left to the fixture: an edit that arrives while the
         // field is unfocused commits immediately even under Live=false. There is no draft to defer - the
         // deferral exists so a focused editor can be typed into, and this frame is not that.
-        UiNative.TextFieldOverride = (r, text) => "typed";
-        widget.Draw(rect, ctx);
+        NativeFixture.TextFieldOverride = (r, text) => "typed";
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
         Check(model == "typed", "an edit the field never held as a draft commits immediately, even under Live=false");
 
         // Now the deferred case: restore the model, focus the field, and type again.
         model = "start";
         ((UiEditSession<string>)state.Editor!).Cancel(model);
-        UiNative.DebugMousePosition = Center(rect);
-        UiNative.TextFieldOverride = (r, text) => "typed";
-        widget.Draw(rect, ctx);
-        Check(state.Focused, "a pointer inside the field focuses it");
+        NativeFixture.DebugMousePosition = Center(rect);
+        NativeFixture.TextFieldOverride = (r, text) => "typed";
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
+        Check(state.IsFocused, "a pointer inside the field focuses it");
         Check(model == "start", "Live=false keeps the focused draft out of the model");
-        Check(state.EditText == "typed", "the draft is the session's, and it is what the field shows");
+        Check(state.Draft== "typed", "the draft is the session's, and it is what the field shows");
 
         // Losing focus commits the draft and the field displays the model again.
-        UiNative.DebugMouseDown = false;
-        UiNative.DebugFocusLost = true;
-        UiNative.TextFieldOverride = (r, text) => text;
-        widget.Draw(rect, ctx);
-        Check(!state.Focused, "losing focus releases the field");
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.DebugFocusLost = true;
+        NativeFixture.TextFieldOverride = (r, text) => text;
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
+        Check(!state.IsFocused, "losing focus releases the field");
         Check(model == "typed", "and the deferred draft reaches the model on blur");
 
-        UiNative.DebugFocusLost = false;
+        NativeFixture.DebugFocusLost = false;
         ClearLabels();
-        widget.Draw(rect, ctx);
-        Check(state.EditText == "typed", "the next frame shows the committed model, not a stale draft");
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
+        Check(state.Draft== "typed", "the next frame shows the committed model, not a stale draft");
         DisablePointer();
     }
 
@@ -202,23 +203,23 @@ internal static class KernelTextFieldTests
         using UiSession session = new();
         TextFieldWidget widget = MakeWidget(Attrs("search", live: false));
         UiWidgetContext ctx = MakeContext(session, bindings);
-        var rect = new Rect(0f, 0f, Width, Height);
+        var rect = new UiLayoutRect(0f, 0f, Width, Height);
 
         EnablePointer(Center(rect));
-        UiNative.TextFieldOverride = (r, text) => "draft";
-        widget.Draw(rect, ctx);
+        NativeFixture.TextFieldOverride = (r, text) => "draft";
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
         Check(model == "start" && writes == 0, "a keystroke while Live=false writes nothing, however long the draft");
 
-        UiNative.DebugMouseDown = false;
-        UiNative.TextFieldOverride = (r, text) => text;
-        UiNative.DebugEnter = true;
-        widget.Draw(rect, ctx);
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.TextFieldOverride = (r, text) => text;
+        NativeFixture.DebugEnter = true;
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
         Check(model == "draft", "Enter commits the draft through the binding");
         Check(writes == 1, "exactly once, not once per frame");
-        Check(!session.GetOrCreateValueState("search").Focused, "and Enter releases focus");
+        Check(!NativeFixture.Slot(session,"search").IsFocused, "and Enter releases focus");
 
-        UiNative.DebugEnter = false;
-        widget.Draw(rect, ctx);
+        NativeFixture.DebugEnter = false;
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
         Check(writes == 1, "a following frame with no edit writes nothing again");
 
         // The deferred write must be a commit, not a live write that happened to be late: with Live=true
@@ -230,8 +231,8 @@ internal static class KernelTextFieldTests
         TextFieldWidget liveWidget = MakeWidget(Attrs("search"));
         UiWidgetContext liveCtx = MakeContext(session2, bindings2);
         EnablePointer(Center(rect));
-        UiNative.TextFieldOverride = (r, text) => "draft";
-        liveWidget.Draw(rect, liveCtx);
+        NativeFixture.TextFieldOverride = (r, text) => "draft";
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        liveWidget,rect, liveCtx);}
         Check(live == "draft", "explicit Live=true keeps immediate publication");
         DisablePointer();
     }
@@ -257,15 +258,15 @@ internal static class KernelTextFieldTests
             new StubTranslation());
 
         int native = 0;
-        UiNative.TextFieldOverride = (r, text) =>
+        NativeFixture.TextFieldOverride = (r, text) =>
         {
             native++;
             return "hacked";
         };
 
-        EnablePointer(new Vector2(10f, 10f));
+        EnablePointer(new UiLayoutPoint(10f, 10f));
         ClearLabels();
-        host.DrawFrame(new Rect(0f, 0f, Width, 120f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, Width, 120f));
 
         Check(native > 0, "a read-only field still draws through the native control: read-only is not the command-disabled state");
         Check(published == "sealed", "but the edit is never written through the read-only binding");
@@ -281,11 +282,12 @@ internal static class KernelTextFieldTests
     private static void VerifyDisabledFieldTakesNoEdit()
     {
         PrepareCore();
-        UiWidgetRegistry.Register(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Id", "Kind", "ActionBind", "Height" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Id", "Kind", "ActionBind", "Height" }));
 
-        bool enabled = false;
+        bool enabled = false;string model="model";int requests=0;
         var bindings = new UiBindings();
         bindings.BindCommand("gate", () => { }, () => enabled);
+        bindings.BindValue("field",()=>model,value=>{model=value;requests++;});
 
         using UiHost host = new(
             Scope,
@@ -298,34 +300,33 @@ internal static class KernelTextFieldTests
             new StubMetrics(),
             new StubTranslation());
 
-        host.DrawFrame(new Rect(0f, 0f, Width, 120f));
+        NativeFixture.DrawFrame(
+        host,new UiLayoutRect(0f, 0f, Width, 120f));
         UiNode node = host.Session.GetNodeByElementId("gate")
             ?? throw new Exception("the command-bound element was not arranged");
         Check(node.IsDisabled, "the probe element is published disabled while its predicate answers false");
 
-        var rect = new Rect(0f, 0f, Width, Height);
+        var rect = new UiLayoutRect(0f, 0f, Width, Height);
         int native = 0;
-        UiNative.TextFieldOverride = (r, text) =>
+        NativeFixture.TextFieldOverride = (r, text) =>
         {
             native++;
             return "hacked";
         };
 
-        string shown = UiNative.TextField(rect, "gate", host.Session, "model", out bool committed);
-        Check(native == 0, "a disabled field never reaches the native control, so no click is consumed and no text is edited");
-        Check(!committed, "and it commits nothing");
-        Check(!host.Session.GetOrCreateValueState("gate").Focused, "and it never takes focus");
-        Check(shown == "model", "while still handing the caller the model's value to draw");
-
-        // Contrast, so the checks above are the guard's answer rather than a lane that never reached it.
-        enabled = true;
-        host.DrawFrame(new Rect(0f, 0f, Width, 120f));
-        Check(!node.IsDisabled, "the same element stops being disabled once its predicate allows the command");
-        native = 0;
-        UiNative.TextField(rect, "gate", host.Session, "model", out committed);
-        Check(native == 1 && committed, "and an enabled field reaches the control and reports the edit");
-
-        UiNative.TextFieldOverride = null;
+        var ctx=host.CreateContext(Width).WithNode(node);
+        static bool Parse(string text,out string value){value=text;return true;}
+        Event.current=new Event{type=EventType.MouseDown,button=0,mousePosition=new Vector2(10,10)};
+        NativeFixture.Edit(rect,ctx,"field",model,s=>s,Parse,true,false,v=>{requests++;model=v;},()=>model);
+        Check(native==0&&requests==0&&model=="model","disabled field never executes native edit or requests business writes");
+        Check(!host.InputState.IsEditing,"disabled field never takes focus");
+        enabled=true;Event.current=new Event{type=EventType.Repaint};
+        NativeFixture.DrawFrame(host,new UiLayoutRect(0,0,Width,120));
+        Check(!node.IsDisabled,"same element becomes enabled when command predicate allows");
+        native=0;Event.current=new Event{type=EventType.MouseDown,button=0,mousePosition=new Vector2(10,10)};
+        NativeFixture.Edit(rect,ctx,"field",model,s=>s,Parse,true,false,v=>{requests++;model=v;},()=>model);
+        Check(native==1&&requests==1&&model=="hacked","enabled field executes native control once and requests its real text");
+        NativeFixture.TextFieldOverride = null;
     }
 
     // --- placeholder and measure ------------------------------------------------------------------
@@ -340,27 +341,27 @@ internal static class KernelTextFieldTests
         using UiSession session = new();
         TextFieldWidget widget = MakeWidget(Attrs("search", placeholder: "find a pack"));
         UiWidgetContext ctx = MakeContext(session, bindings);
-        var rect = new Rect(0f, 0f, Width, Height);
-        UiNative.TextFieldOverride = (r, text) => text;
+        var rect = new UiLayoutRect(0f, 0f, Width, Height);
+        NativeFixture.TextFieldOverride = (r, text) => text;
 
         DisablePointer();
         ClearLabels();
-        widget.Draw(rect, ctx);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
         Check(LabelTexts().Contains("find a pack"), "an empty, unfocused field paints its placeholder");
 
         EnablePointer(Center(rect));
         ClearLabels();
-        widget.Draw(rect, ctx);
-        Check(session.GetOrCreateValueState("search").Focused, "the pointer inside focused the empty field");
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
+        Check(NativeFixture.Slot(session,"search").IsFocused, "the pointer inside focused the empty field");
         Check(!LabelTexts().Contains("find a pack"), "a focused field paints none: the caret is the hint");
 
-        UiNative.DebugMouseDown = false;
-        UiNative.DebugFocusLost = true;
-        widget.Draw(rect, ctx);
-        UiNative.DebugFocusLost = false;
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.DebugFocusLost = true;
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
+        NativeFixture.DebugFocusLost = false;
         model = "typed";
         ClearLabels();
-        widget.Draw(rect, ctx);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
         Check(!LabelTexts().Contains("find a pack"), "and a non-empty field paints none either");
 
         DisablePointer();
@@ -407,20 +408,20 @@ internal static class KernelTextFieldTests
         return attrs;
     }
 
-    private static UiWidgetContext MakeContext(UiSession session, IUiBindings bindings)
+    private static UiWidgetContext MakeContext(UiSession session, IUiBindingReader bindings)
     {
-        return new UiWidgetContext(
+        return NativeFixture.Context(
             "text-field-test", session, new StubMetrics(), UiTheme.Vanilla,
             new StubTranslation(), bindings, Width, "root");
     }
 
-    private static Vector2 Center(Rect rect) => new(rect.x + rect.width / 2f, rect.y + rect.height / 2f);
+    private static UiLayoutPoint Center(UiLayoutRect rect) => new(rect.X + rect.Width / 2f, rect.Y + rect.Height / 2f);
 
-    private static void EnablePointer(Vector2 point)
+    private static void EnablePointer(UiLayoutPoint point)
     {
-        UiNative.DebugMousePositionEnabled = true;
-        UiNative.DebugMousePosition = point;
-        UiNative.DebugMouseDown = true;
+        NativeFixture.DebugMousePositionEnabled = true;
+        NativeFixture.DebugMousePosition = point;
+        NativeFixture.DebugMouseDown = true;
     }
 
     private static void DisablePointer()
@@ -430,14 +431,14 @@ internal static class KernelTextFieldTests
 
     private static void ResetSeams()
     {
-        UiNative.DebugMousePositionEnabled = false;
-        UiNative.DebugMousePosition = default;
-        UiNative.DebugMouseDown = false;
-        UiNative.DebugMouseDrag = false;
-        UiNative.DebugMouseUp = false;
-        UiNative.DebugEnter = false;
-        UiNative.DebugFocusLost = false;
-        UiNative.TextFieldOverride = null;
+        NativeFixture.DebugMousePositionEnabled = false;
+        NativeFixture.DebugMousePosition = default;
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.DebugMouseDrag = false;
+        NativeFixture.DebugMouseUp = false;
+        NativeFixture.DebugEnter = false;
+        NativeFixture.DebugFocusLost = false;
+        NativeFixture.TextFieldOverride = null;
     }
 
     private static void ClearLabels()
@@ -561,7 +562,7 @@ internal static class KernelTextFieldTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
@@ -570,7 +571,7 @@ internal static class KernelTextFieldTests
             return 24f;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
         }
     }

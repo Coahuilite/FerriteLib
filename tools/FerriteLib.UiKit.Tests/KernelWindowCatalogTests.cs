@@ -157,8 +157,8 @@ internal static class KernelWindowCatalogTests
         harness.Catalog.TryGet(alpha, out UiWindowHost opened);
         opened.WindowOnGUI();
         UiSession session = RequireSession(opened);
-        session.GetOrCreateValueState("draft").EditText = "typed";
-        session.GetOrCreateValueState("draft").FloatValue = 7f;
+        NativeFixture.Custom(        session,"draft").EditText = "typed";
+        NativeFixture.Custom(        session,"draft").FloatValue = 7f;
 
         Check(harness.Catalog.Open(beta), "opening the other context creates an instance");
         Check(harness.Catalog.ActiveKey == beta, "and that instance becomes the active target");
@@ -186,8 +186,8 @@ internal static class KernelWindowCatalogTests
         }
 
         Check(ReferenceEquals(opened.Session, session), "its page session is unchanged");
-        Check(session.GetOrCreateValueState("draft").EditText == "typed"
-            && Math.Abs(session.GetOrCreateValueState("draft").FloatValue - 7f) < 0.001f,
+        Check(NativeFixture.Custom(session,"draft").EditText == "typed"
+            && Math.Abs(NativeFixture.Custom(session,"draft").FloatValue - 7f) < 0.001f,
             "and its draft survived the target change");
         Check(harness.Stack.Count == 2, "the vanilla stack still holds exactly the two instances");
     }
@@ -712,10 +712,10 @@ internal static class KernelWindowCatalogTests
         harness.Catalog.TryGet(alpha, out UiWindowHost first);
         first.WindowOnGUI();
         UiSession session = RequireSession(first);
-        session.GetOrCreateValueState("draft").EditText = "typed";
-        session.CaptureHotControl(4242);
-        Check(session.OwnedHotControl == 4242, "the page session owns the pointer capture");
-        Check(UiNative.HasHotControl(4242), "and the backend hot control is that capture");
+        NativeFixture.Custom(        session,"draft").EditText = "typed";
+        NativeFixture.Capture(session,NativeFixture.Key(4242));
+        Check(session.OwnedHotControl == NativeFixture.Key(4242), "the page session owns the pointer capture");
+        Check(NativeFixture.HasHotControl(session,NativeFixture.Key(4242)), "and the backend hot control is that capture");
 
         harness.Catalog.Open(beta);
         harness.Place(beta, new Rect(400f, 0f, 320f, 240f));
@@ -725,9 +725,9 @@ internal static class KernelWindowCatalogTests
         Check(!first.IsActiveTarget && second.IsActiveTarget, "the target moved to the new window");
         Check(ReferenceEquals(first.Session, session), "the deactivated window keeps its page session");
         Check(session.IsActive, "which is still alive, not disposed");
-        Check(session.GetOrCreateValueState("draft").EditText == "typed", "and keeps its draft");
+        Check(NativeFixture.Custom(session,"draft").EditText == "typed", "and keeps its draft");
         Check(!session.OwnedHotControl.HasValue, "the lost target released the capture it owned");
-        Check(!UiNative.HasHotControl(4242), "so the backend no longer routes pointer events to that control");
+        Check(!NativeFixture.HasHotControl(session,NativeFixture.Key(4242)), "so the backend no longer routes pointer events to that control");
 
         harness.Catalog.Activate(alpha);
         Check(first.IsActiveTarget, "returning to the window restores the target");
@@ -1256,8 +1256,8 @@ internal static class KernelWindowCatalogTests
     {
         Event.current = null;
         GUIUtility.hotControl = 0;
-        UiNative.DebugMousePositionEnabled = false;
-        UiNative.ButtonOverride = null;
+        NativeFixture.DebugMousePositionEnabled = false;
+        NativeFixture.ButtonOverride = null;
     }
 
     private static void Check(bool condition, string name)
@@ -1392,9 +1392,9 @@ internal static class KernelWindowCatalogTests
             return host;
         }
 
-        protected override void DrawNotice(Rect rect, UiWindowNotice notice)
+        protected override void DrawNotice(Rect rect,UiWindowNotice notice)
         {
-            UiThemeDraw.Label(rect, "notice:" + notice + ":" + new string('n', 60), Theme, singleLine: true);
+            UiThemeDraw.Label(NativeFixture.Paint,VerseUiExecution.Rect(rect), "notice:" + notice + ":" + new string('n', 60), Theme, singleLine: true);
         }
     }
 
@@ -1418,7 +1418,7 @@ internal static class KernelWindowCatalogTests
                 new LaneTranslation());
         }
 
-        protected override void DrawNotice(Rect rect, UiWindowNotice notice)
+        protected override void DrawNotice(Rect rect,UiWindowNotice notice)
         {
         }
     }

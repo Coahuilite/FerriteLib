@@ -3,11 +3,10 @@
 ## Neutral means no engine in the complete dependency closure
 
 `NeutralSources.props` is the actual shared production source inventory, not a rewritten simulation.
-It now includes immutable program/XML page definitions, node identity, finite style/font/metric parsing
-and background declarations, alongside the existing reactive, binding, behavior and layout sources.
-The neutral half of appearance parsing uses only standard libraries. The 1.6 partial style adapter owns
-the existing fit-audit fallback publication; the neutral parser still records the same redirect issue.
-No rendering backend or second response graph was added.
+It includes the entire actual Kernel: Host/Session/tree/layout scheduling/transactions/lifetimes,
+context/default wrappers/compiler, definitions/reactive/edit/recovery/document code. Only native
+window/input/font/resource/execution mechanisms are in Adapters/RimWorld16. Retired Font XML is
+refused with a located issue; Metric Token=Font is the successor. No second response graph/backend.
 
 `NeutralDependencyTests` parses real program/XML/style inputs without engine references, scans the full
 recorded production inventory for platform/reflection lookup, checks its planted hidden-lookup control,
@@ -17,9 +16,10 @@ overapproximation of the neutral source set's dependencies. It is never shipped 
 
 ## Three isolated consumers use their real source
 
-These are consumer-side source integrations under `dist/closeout/integrations`, not library kinds or
-neutral-harness business fixtures. The upstream originals stay read-only. Source snapshots and logs
-belong to the closeout evidence bundle, not the mod package.
+These consumer-side source integrations live under `dist/refactor/integrations`; old
+`dist/closeout/integrations` remains read-only. They are neither library kinds nor neutral-harness
+business fixtures. Upstream originals remain read-only. Source snapshots and logs belong to the
+refactor evidence bundle, not the mod package.
 
 | Input | Actual integrated source and result | Remaining boundary |
 | --- | --- | --- |
@@ -28,8 +28,8 @@ belong to the closeout evidence bundle, not the mod package.
 | Raven replacement, source `ae39ef845b4f4e504a0e9dedf864b290473bf06c`, mod1.1.0 | Full isolated source compiles against actual Raven/Chezhou1.6 DLLs and current FL. Original Harmony/window/business entry signatures remain. Actual migrated `ToolView`, `ToolUi`, `SwitchableBindings`, `LiveTextWidget` run in a source-linked probe: ordinary dirty refresh uses `UpdateDefinition` on the same Host/session, preserves scroll, defers while editing/captured, resumes on release and disposes that owner. Historical immediate fields explicitly request `Live=true`; standard multiline replaces the private copy. | Probe supplies deterministic text/palette/native services and a small `Body`; it does not run upstream business services, Harmony patch application or game windows. Historical0.7 native/complexity results retain their old identity. |
 
 Source-level traces are distinct from target-game acceptance. The small custom research field delegates
-editing to `UiNative.Edit`; it does not reimplement the editor. Probe-only reflection inspects retained
-instances/injects the existing text seam; no shipped library or consumer entry depends on that reflection.
+editing to `ctx.Controls.Edit`; it does not reimplement the editor. Probe-only reflection inspects retained
+instances and configures the actual native stub text engine; no shipped library or consumer entry depends on that reflection.
 
 ## Actual 1.6 and 1.7 metadata show different adapter obligations
 

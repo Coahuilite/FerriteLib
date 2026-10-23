@@ -1,8 +1,8 @@
 # Boolean, selection and expansion (0.8 development)
 
 Use the existing `input/checkbox` (both `switch` and `checkbox` appearances), `input/mode-row`,
-`input/dropdown` and `container/tree` declarations. Their bindings and registration conditions remain
-unchanged. F2 establishes an operation on a qualified primary release; a press arms but does not write.
+`input/dropdown` and `container/tree` declarations. Values use the existing typed bindings; selections now use BindChoices<T> and UiChoice<T>
+(or static XML Choice entries) instead of the retired string/typed companion protocols. F2 establishes an operation on a qualified primary release; a press arms but does not write.
 Consumed releases end owned capture without requesting. F3 closes a popup on an outside primary press
 and consumes that input before underlying content runs. An uncovered trigger toggles on its own release.
 No new keyboard, Space, focus traversal or global Cancel policy is introduced.
@@ -10,8 +10,8 @@ No new keyboard, Space, focus traversal or global Cancel policy is introduced.
 ## Compose another presentation with the same behavior
 
 ```csharp
-var target = UiNative.InteractionTarget(ctx, "enabled");
-var input = UiNative.Activation(hitRect, ctx, "enabled", "", writable: canWrite);
+var target = ctx.Controls.InteractionTarget(ctx, "enabled");
+var input = ctx.Controls.Activation(hitRect, ctx, "enabled", "", writable: canWrite);
 var change = UiValueBehavior.Boolean(input, !model.Enabled);
 UiValueBehavior.Request(target, change, value => bindings.Set("enabled", value));
 // Paint model.Enabled, not change.Value: a request is not business acceptance.

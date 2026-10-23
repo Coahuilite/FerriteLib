@@ -6,6 +6,7 @@ public sealed partial class UiControls
     private bool ContentCoversEditor(UiLayoutRect rect, UiSession session, UiNode node, UiLayoutPoint windowPoint) => (session.PassBeganWithPrimaryPress || PointerPhase() != UiPointerPhase.None) && IsMouseOver(rect) && session.IsPointerOverHigherLayer(node, windowPoint);
     public UiEditSession<T> Editor<T>(UiWidgetContext ctx, string binding, Func<T, string> format, UiEditParser<T> parse)
     {
+        RequireOwner(ctx);
         UiNode node = ctx.Node;
         return Editor(ctx.Session, node, binding, InteractionTarget(ctx, binding, "editor"), format, parse);
     }
@@ -13,6 +14,7 @@ public sealed partial class UiControls
     /// <summary>End native focus without submitting or discarding a participating composite's draft.</summary>
     public void SuspendEditor(UiWidgetContext ctx, string binding)
     {
+        RequireOwner(ctx);
         UiNode node = ctx.Node;
         UiControlState state = ctx.Session.GetControlState(node.Id, binding);
         if (state.Editor is IUiEditState editor)
@@ -55,6 +57,7 @@ public sealed partial class UiControls
 
     public void Edit<T>(UiLayoutRect rect, UiWidgetContext ctx, string binding, T model, Func<T, string> format, UiEditParser<T> parse, bool live, bool multiline, Action<T> request, Func<T> readModel)
     {
+        RequireOwner(ctx);
         UiSession session = ctx.Session;
         UiNode node = ctx.Node;
         UiControlState state = session.GetControlState(node.Id, binding);
@@ -163,7 +166,8 @@ public sealed partial class UiControls
     private UiControlKey EditControlName(UiSession session, UiControlState state) => new UiControlKey("fl-edit/" + session.Identity + "/" + state.EditorTarget?.Node + "/" + state.EditorTarget?.TargetScope);
     internal void ReleaseEditFocus(UiControlState state, UiSession session)
     {
-        if (Execution.HasFocus(EditControlName(session, state)))
-            Execution.ReleaseFocus(EditControlName(session, state));
+        IUiExecution? execution=session.CurrentExecution;
+        if (execution?.HasFocus(EditControlName(session, state))==true)
+            execution.ReleaseFocus(EditControlName(session, state));
     }
 }

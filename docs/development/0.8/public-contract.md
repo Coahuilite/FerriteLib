@@ -1,128 +1,131 @@
 # S1–S7: supported author paths
 
-Use the default kinds to describe a page, or implement `IUiWidget` for custom content. The stable
-surface includes each required parameter, return type, callback and implementation interface, not
-just an entry-point name. [API tiers](../../api-tiers.md) lists every exported type and the explicit
-advanced-member exceptions; [stable-api.txt](stable-api.txt) records every stable public/protected
-signature, constant and optional default. The harness compares that exact surface and checks its
-transitive signature dependencies.
+Declare a page with the default kinds, compose selected capabilities in C#, or operate independently
+of a page. The [API tiers](../../api-tiers.md) classify the exact surface; [stable-api.txt](stable-api.txt)
+pins supported signatures, constants and optional defaults. This is the approved prepublication
+replacement described in [refactor migration](refactor-migration.md), not a compatibility shim.
 
 ## S1 — declare, compose and replace a page
 
-- `UiElementSpec(id, kind, attributes, children)` copies its inputs. Read `Id`, `Kind`, `Attributes`,
-  `Children` and `TryGetAttribute`; definitions are not mutable runtime nodes.
-- `UiLayoutManifest.Parse`, `ParseFile`, `Create` and `CreateWithBackground` produce the same validated
-  definition model. `Roots`, `Templates`, `Styles` and `Background` describe its content.
-- `UiKinds` supplies all 18 registered kind identifiers. The nine container names and the complete
-  supported attribute/use inventory remain in [migration status](migration-status.md).
-- `UiHost.UpdateDefinition` performs explicit prepare/stage/seal. Compatible identity retains applicable
-  state; failed candidates keep the last good tree. File workflows use `UiDocumentSource`,
-  `UiDocumentService.Add/Attach/Signal/Pump/Reload/Detach/Dispose`, `UiReloadPolicy`, `IUiTimeSource`
-  and `IUiMainThread`. No document service is required for programmatic updates.
+`UiElementSpec(id, kind, values, children, choices)` copies its inputs. `Values` holds immutable
+`UiAttributeValue` literals; `Attributes`/`TryGetAttribute` retain diagnostic/text vocabulary. Use
+`Number`, `Boolean` or `Literal` from C#. XML constructs those same values. Number, Boolean, padding
+and offset layout consumers read the parsed result, not a second string grammar. Boolean literals
+accept trimmed true/false/1/0. Padding accepts one, two or four finite numbers; offsets accept pixels
+or0..100% subject to the placement rules. Invalid/contradictory declarations fail with a located error.
 
-Repeat's source is an ordered key projection; templates qualify supported binding roles to that key.
-Visibility, finite anchors, shared labels and UpdateScope retain their existing contracts. See the
-[assembly](assembly-contract.md) and [layout](layout-contract.md) contracts.
+`UiLayoutManifest.Parse/ParseFile/Create/CreateWithBackground` use the same definition model.
+`Roots`, `Templates`, `Styles` and `Background` are read-only. `UiWidgetDefinition` and
+`UiAttributeSchema` supply one root/template/compiler vocabulary; typed binding roles also qualify
+custom attributes inside Repeat. `UiKinds` names all18 kinds; the nine containers and non-kind uses
+remain in [migration status](migration-status.md). `UiHost.UpdateDefinition` retains the existing
+prepare/stage/seal transaction, compatible identities and last-good rollback. File workflows use
+`UiDocumentSource`, `UiDocumentService`, `UiReloadPolicy`, `IUiTimeSource` and `IUiMainThread`.
 
-## S2 — connect data, requests and independent owners
+## S2 — connect ordinary or tracked data and requests
 
-- `IUiBindings` and `UiBindings` include `BindValue`, `BindReadOnly`, `BindOptions`, `BindAction`,
-  `BindCommand`, `Get/TryGet/TryGetBool`, `Set`, `GetOptions`, `Invoke/TryInvokeCommand`, `CanExecute`,
-  `IsWritable`, validation, `NotifyChanged`, `GetRevision` and `GetInvalidation`. Hand-written
-  implementations implement this whole interface. `IUiTypedChoices`, `UiChoice<T>` and `UiOption`
-  supply optional typed/string choices without stringifying business identity.
-- `UiReactiveRuntime.Int/Text/Boolean/Value/List/CreateOwner/Batch/ReadPhase` provide explicit sources,
-  equality, serial ownership and pure-read enrollment. Ordinary getters keep their old conditions.
-- `UiReactiveValue.Value`, controlled `UiReactiveList` operations and `Snapshot`,
-  `UiReactiveOwner.CreateChild/Compute/Respond/RespondManaged/Dispose`,
-  `UiReactiveComputed.Value/Fault/Retry/Dispose` and `UiReactiveResponse.IsPaused/Fault/Resume/Dispose`
-  preserve RU1–RU3. Model authority, safe result delivery and callback recovery remain distinct.
-- `UiBindings.BindTracked/BindTrackedOptions/BeginOperation/CreatePresentation` and
-  `UiBindingPresentation.Synchronize/Enter/GetStatus/Retry/Dispose` support explicit consumers as well
-  as Host-owned presentation. `UiPresentationStatus` and `UiReactiveFault` expose current validity.
-- `UiNotifyAdapter` maps external notifications explicitly and unsubscribes on disposal. No automatic
-  deep observation or cross-thread delivery is inferred.
+`UiBindings` is the author registry. `IUiBindingReader` is the runtime capability given to widgets:
+value reads/writes, commands/actions/eligibility, revisions/validation and value/choice endpoints.
+Registration and `NotifyChanged` belong to the registry, not the reader. A custom reader can delegate
+to an owned registry as the real isolated consumer does. No reflection/type-probing fallback exists.
 
-The [reactive](reactive-foundation-contract.md) and [failure/lifetime](failure-lifetime-contract.md)
-contracts define timing, failure and ownership. A dispatched request is not business acceptance.
+- `BindValue/BindReadOnly`, `BindAction/BindCommand` and `NotifyChanged` retain ordinary getter and
+  explicit invalidation conditions. `Set` requests the owner's mutation; it does not imply acceptance.
+- `BindChoices<T>` carries `UiChoice<T>(text,value,help,textKey)`. String is just T=string. Dynamic
+  labels, help and real identity use this same representation; XML `<Choice Value Text Help TextKey/>`
+  normalizes into it. The current empty-Help omission differs from old Dropdown Value/string and
+  Text/typed outputs; PM policy confirmation is pending (see refactor migration). Explicit Help
+  preserves either old per-item output. BindOptions/GetOptions remain generic collection facilities
+  for tree/chart and other collection consumers, not a second selection protocol.
+- `UiValueEndpoint` resolves current registration/type/writability/read/write; `UiChoiceEndpoint`
+  reads the same choices or a bounded prefix without enumerating the rest.
+- `UiReactiveRuntime.Int/Text/Boolean/Value/List/CreateOwner/Batch/ReadPhase`, value/list operations,
+  `UiReactiveOwner.CreateChild/Compute/Respond/RespondManaged`, computed Fault/Retry and response
+  IsPaused/Fault/Resume retain RU1–RU3. No cross-thread delivery or implicit ordinary-getter purity.
+- `BindTracked`, `BindTrackedChoices`, `BindTrackedOptions` enroll pure immutable projections with
+  explicit equality. Host-owned `UiBindingPresentation` keeps current validity separate from retained
+  display. Custom tracked reads declare actual descriptor binding roles or `IUiPresentationDemand`;
+  there is no prepare-everything compatibility whitelist. Ordinary getters gain no such prerequisite.
+- `UiNotifyAdapter` explicitly maps subscriptions and releases them on disposal.
 
-## S3 — describe item connections once
+See [reactive](reactive-foundation-contract.md) and [failure/lifetime](failure-lifetime-contract.md).
 
-`UiItemBindings<T>(bindings, itemsKey, source, identity, configure)` and
-`UiItemBindingSchema<T>.Value/Command` register typed current-target fields/commands. `Keys`, `Refresh`
-and `Dispose` manage UI connections over reference objects. Same-key snapshots update targets;
-duplicate keys are located before mutation; deletion releases presentation subscriptions and caches.
-Reorder never rewrites business order. See the [item contract](item-binding-contract.md), including
-filtering, active notifications and third-party snapshot bridges.
+## S3 — connect stable items to current business targets
 
-## S4 — customize without inheriting a default implementation
+`UiItemBindings<T>` and `UiItemBindingSchema<T>.Value/Command` describe a source/key/field once.
+Refresh validates then updates current targets; same-key replacement and reorder do not redirect a
+request to a stale instance, selected object or old ordinal. The model owns business order and refusal.
+`UiBindingAddress(source,item,field).Key` is the injective address used by both helper and Repeat;
+manual callers use it too. Deletion releases UI connections, not external business objects. Filtering
+and temporary hiding retain or release connections according to the author's stated membership owner.
+See [item binding](item-binding-contract.md).
 
-Implement `IUiWidget.Kind/Configure/Validate/Measure/Draw`, register a factory with
-`UiWidgetRegistry.Register`, and declare its real attribute/label schema. `IUiMeasureParticipant`
-and `UiMeasurement`/`UiMeasureInputs` opt into captured-input reuse; `IUiTextMetricsEnvironment`
-supplies truthful per-font environment validity without changing `ITextMetrics`.
+## S4 — use only the capabilities a custom control owns
 
-Use the provided `UiWidgetContext`: Bindings, Theme, Metrics, Translation, ViewWidth, ElementId,
-ElementPath, WindowOrigin, ToWindowRect, Child, State, Properties, InteractionScope, Invalidate,
-SharedLabelWidth and IsActive/IsDisabled. A named State slot belongs to that custom instance; do not
-write a shared editor's compatibility projections as a second draft authority. Child identities and
-state release with their owner. Changing InteractionScope declares a genuinely different target.
+Use `UiWidgetParts` for optional measure/paint/operate/pointer/describe/validate callbacks, or implement
+`IUiWidget`. Register a single immutable `UiWidgetDefinition` with `UiWidgetRegistry.Define`, including
+its schema, label/font facts and optional natural-body width. There is no Register alias/numbered XML
+protocol. `IUiMeasureParticipant` captures complete actual inputs; `IUiTextMetricsEnvironment` adds
+truthful font-environment validity without changing `ITextMetrics`.
 
-`UiNative.Activation/Range/Point/PopupOption` bridge native facts to `UiInteractionSession`;
-`UiInteractionTarget`, `UiInputEligibility`, `UiPointerSample`, `UiHitGeometry`, `UiRange` and
-`UiInteractionResult` are the complete neutral dependencies. `UiInteractionRequests` and
-`UiValueBehavior` dispatch once. `IUiPointerLayout`/`UiPointerRegion` declare effective configured
-operation geometry; unknown old custom Draw keeps its conservative behavior rather than acquiring
-an implicit purity or registration prerequisite.
+A supplied `UiWidgetContext` gives Bindings, Controls, Drawing, Theme, Metrics, Translation, ViewWidth,
+identity/path, WindowOrigin/ToWindowRect, Child, State, Properties, InteractionScope, Invalidate,
+SharedLabelWidth and active/disabled facts. State slots can supply an explicit release callback; hiding
+is not destruction, removal/close releases once. Arbitrary business IDisposable objects are not invoked.
 
-`UiNative.Edit/Editor/SuspendEditor`, `UiEditSession<T>`, `UiEditParser<T>`, `IUiEditState` and
-`UiNumericEdit` share editing/composite behavior with standalone nonrendering callers. Native
-character editing remains the adapter's role. Descriptive/label contracts and tree row bands use
-`IUiDescriptiveWidget`, `IUiLabelledWidget`, `UiDescription`, `UiTreeRow` and `UiRowBand` dependencies.
-Default widget implementation types and the layout engine are now internal; use kinds and these seams.
+`ctx.Controls.Activation/Range/Point/PopupOption/Edit/Editor/SuspendEditor` use the same neutral
+`UiInteractionSession`, `UiEditSession<T>`, `UiNumericEdit`, eligibility and geometry contracts as
+headless callers. A native pointer/editor requires an explicit owned context and execution; foreign or
+released handles are diagnosed, never redirected to an ambient active node. `IUiPointerLayout` supplies
+configured operation regions. Descriptions/labels use `IUiDescriptiveWidget`, `IUiLabelledWidget`,
+`UiDescription`, `UiTreeRow` and row-band helpers.
 
-## S5 — configure appearance or use visual core alone
+For **native controls without a Host**, retain a `UiSession` and create a named control context with
+`session.CreateContext(source,scope,metrics,theme,translation,reader,width)`. Capture one frame on the
+actual execution owner and call `SetFrame` once per native callback, then operate any number of controls
+on that same frame. Dispose session before execution. The complete no-friend example is
+`tools/FerriteLib.UiKit.AuthorExamples/StandaloneNativeNumber.cs`. Pure semantic operations use
+`UiInteractionSession`/`UiInteractionRequests` directly, without invented Nodes/Rects.
+
+## S5 — configure appearance or draw independently
 
 `UiTheme`, `UiPalette`, `UiPaletteRole`, `UiColour`, `UiElementProperties`, per-property declarations,
-resolved values/origins, `UiDensity`, `UiGeometry`, `UiStyleDocument/Resolver/Declaration` and style
-issues form the supported finite appearance path. Set/remove individual metrics, fonts and semantic
-colours; Scheme then Density combine per property. Bare container allocation is separate.
+resolved values/origins, `UiDensity`, `UiGeometry`, style document/resolver and finite layout helpers
+keep font, five metrics and semantic colours independently removable. Colour repaints; font/geometry
+remeasure. Read-only resolved views stay live across normal resolution.
 
-Independent visual clients use `UiThemeDraw`, `ITextMetrics`, `UiFont/UiKitFonts`,
-`VerseFerriteTextMetrics` and neutral layout/image helpers without a Host or registry. Text/font and
-distance changes remeasure; pure colour changes repaint. Image suppliers retain resource ownership.
-See [properties](property-contract.md), [theme migration](theme-migration.md) and
-[layers/images](layers-images-contract.md). The current drawing/text adapter is 1.6-specific.
+Independent visuals use `UiThemeDraw` with an explicit `IUiDrawing`, theme and neutral rect. They need
+no Host/XML/registry/reactive runtime. `VerseFerriteTextMetrics` supplies actual1.6 font rules.
+Images are neutral `UiImage` values supplied by `VerseUiExecution.Images`; the adapter owns references
+and never destroys supplier textures. A token resolves only within its resource scope.
 
-## S6 — choose a standard or embedded host
+## S6 — use a standard window or embed in an existing callback
 
-Construct `UiPageWindow` directly, or use `UiWindowCatalog.Register/Open/Activate/TryGet/Close/CloseAll`
-with `UiWindowKey`, `UiWindowOptions` and `UiFocusPolicy`. `UiWindowHost` is the custom-shell extension,
-not a prerequisite. Protected shell/failure/close hooks and their callback dependencies are stable.
+`UiPageWindow` is concrete; `UiWindowCatalog` supports registration/open/activation/lookup/close with
+`UiWindowKey`, `UiWindowOptions` and `UiFocusPolicy`. `UiWindowHost` owns its native execution, image
+scope and native qualification; its protected shell/failure/close hooks remain supported.
 
-Embedded windows create one `UiHost`, call `DrawFrame(rect, realOwner)` and Dispose on actual close.
-The original owner-free DrawFrame and manual frame/measure/draw entries retain their legal conditions.
-`SetDisplayDemand`, `InputState`, `ElementProperties`, `Get/SetScrollPosition`, `SetInteractionScope`,
-`Invalidate`, `TryHandleAccept/Cancel`, `Close/Dispose`, attachment events and `PageHost` provide the
-necessary lifetime/use path without Session tables. InputState is a current fact, not a cached queue.
-See [hosts and observation](host-observation-contract.md); native window authority remains native.
+Embedded callers retain one UiHost and one VerseUiExecution, translate the rect and invoke
+`host.DrawFrame(rect, execution.CaptureFrame(nativeInputAllowed), execution)`. The explicit frame is
+current native fact; window qualification remains the native owner's responsibility. No ambient
+owner-free overload remains. Manual frame/measure/draw requires that same explicit preparation.
+SetDisplayDemand is reliable visibility, not focus; actual close disposes the owner. InputState,
+ElementProperties, scroll/interaction scope/invalidation, Accept/Cancel and attachment hooks avoid
+runtime tables. Compatible update, current scroll offset and cross-Host rollback use the same core.
 
-## S7 — locate errors and release diagnostics
+## S7 — find errors and inspect bounded facts
 
-`FerriteLibVersion.Api/Require`, `UiContractException`, `UiUnknownWidgetKindException`,
-`UiHost.LayoutFault`, presentation status and recovery facts provide located contract/current-value
-errors. `host.Diagnostics` returns a bounded `UiDiagnosticSubscription`; Snapshot/TryGetLatest,
-CountOf/Clear/Dispose and `UiDiagnosticEvent/Kind/Timing`, overflow/style/reload records provide basic
-diagnostics. Text wording and cache counters are not a business protocol.
+Version Require/API, located contract errors, LayoutFault, presentation/recovery status, basic bounded
+Diagnostics Snapshot/TryGetLatest/CountOf/Clear/Dispose and overflow/style/reload records are supported.
+Detailed R9 discovery/tree/budgets and Dev geometry sampling remain experimental. They are detached
+facts, not another model, graph or write handle. The stable Session subset is explicitly listed in
+api-tiers.md; Node and the rest of Session runtime plumbing are not blanket promoted.
 
-Detailed R9 discovery/tree/budgets and Dev geometry sampling remain delivered experimental entries.
-Ordinary author paths above do not depend on them. Graphs, queues, caches, private nodes and writable
-runtime tables remain internal; the detailed reader returns detached bounded facts.
+## Executable evidence
 
-## Compile and run the author examples
-
-`tools/FerriteLib.UiKit.AuthorExamples/AuthorPaths.cs` is a separate assembly without an internals
-grant. It compiles standard/embedded pages, custom shared editing, independent visual consumption and
-active/third-party item bridges against the public contract. The main harness's `--closeout-api` lane
-runs those compiled examples plus stable type/signature/dependency and containment checks. This is
-source/compiled-consumer/adapter evidence; native 1.6/1.7 acceptance stays separate.
+AuthorExamples is a separate no-friend net472 assembly. RefactorExamples executes public-only
+editor/typed choice/Repeat/custom, current-target, hidden multi-owner, pure visual/headless and typed
+XML/C# layout cases. Adapter.ContractTests executes real VerseUiExecution and these external authors;
+Core.ContractTests compiles the entire Kernel without any engine/stub dependency. Main harness retains
+all purpose-specific lanes and Dev-only assertions. Native1.6 font/IME/window and1.7 acceptance remain
+separate human/platform records.

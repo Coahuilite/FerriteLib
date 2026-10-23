@@ -1,8 +1,9 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -53,14 +54,14 @@ internal static class KernelContentHeightTests
         using UiHost host = NewHost(OverlayPage(" Height=\"MatchContent\""));
         UiLayoutSnapshot snapshot = Arrange(host, 320f);
 
-        Rect text = snapshot.RectById["row-text"];
-        Rect hit = snapshot.RectById["row-hit"];
-        float ownContent = snapshot.RectById["hit-one"].height + snapshot.RectById["hit-two"].height;
+        UiLayoutRect text = snapshot.RectById["row-text"];
+        UiLayoutRect hit = snapshot.RectById["row-hit"];
+        float ownContent = snapshot.RectById["hit-one"].Height + snapshot.RectById["hit-two"].Height;
 
-        Check(Near(hit.height, text.height),
-            "the hit column takes the text column's measured height (" + hit.height + " vs " + text.height + ")");
-        Check(text.height > ownContent,
-            "and the text column is genuinely the taller one: " + text.height + " against the bands' own "
+        Check(Near(hit.Height, text.Height),
+            "the hit column takes the text column's measured height (" + hit.Height + " vs " + text.Height + ")");
+        Check(text.Height > ownContent,
+            "and the text column is genuinely the taller one: " + text.Height + " against the bands' own "
             + ownContent + " - the under-coverage this mode removes");
     }
 
@@ -73,13 +74,13 @@ internal static class KernelContentHeightTests
         using UiHost host = NewHost(OverlayPage(""));
         UiLayoutSnapshot snapshot = Arrange(host, 320f);
 
-        Rect text = snapshot.RectById["row-text"];
-        Rect hit = snapshot.RectById["row-hit"];
+        UiLayoutRect text = snapshot.RectById["row-text"];
+        UiLayoutRect hit = snapshot.RectById["row-hit"];
 
-        Check(hit.height > 0f, "the control page still arranges both columns");
-        Check(hit.height < text.height,
-            "without the mode the hit column keeps its own content height and under-covers (" + hit.height
-            + " < " + text.height + ")");
+        Check(hit.Height > 0f, "the control page still arranges both columns");
+        Check(hit.Height < text.Height,
+            "without the mode the hit column keeps its own content height and under-covers (" + hit.Height
+            + " < " + text.Height + ")");
     }
 
     /// <summary>
@@ -134,17 +135,17 @@ internal static class KernelContentHeightTests
     {
         using UiHost host = NewHost(NarrowPage);
         UiLayoutSnapshot wide = Arrange(host, 320f);
-        Check(Near(wide.RectById["band"].height, wide.RectById["note"].height),
+        Check(Near(wide.RectById["band"].Height, wide.RectById["note"].Height),
             "wide (still a Row): the mode resolves against the row's content");
 
         UiLayoutSnapshot narrow = Arrange(host, 150f);
         float rowHeight = UiTheme.Vanilla.Geometry.RowHeight;
-        Check(Near(narrow.RectById["band"].height, rowHeight),
+        Check(Near(narrow.RectById["band"].Height, rowHeight),
             "narrow (the Row became a Column): the mode degrades to the element's own content band ("
-            + narrow.RectById["band"].height + " vs the theme row height " + rowHeight + ")");
-        Check(!Near(narrow.RectById["band"].height, narrow.RectById["note"].height),
-            "and nothing pretends to match: " + narrow.RectById["band"].height + " vs "
-            + narrow.RectById["note"].height);
+            + narrow.RectById["band"].Height + " vs the theme row height " + rowHeight + ")");
+        Check(!Near(narrow.RectById["band"].Height, narrow.RectById["note"].Height),
+            "and nothing pretends to match: " + narrow.RectById["band"].Height + " vs "
+            + narrow.RectById["note"].Height);
     }
 
     // --- pages -----------------------------------------------------------------------------------
@@ -203,8 +204,8 @@ internal static class KernelContentHeightTests
 
     private static UiLayoutSnapshot Arrange(UiHost host, float width)
     {
-        host.DrawFrame(new Rect(0f, 0f, width, 400f));
-        return host.MeasureAndArrange(new Vector2(width, 400f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, width, 400f));
+        return host.MeasureAndArrange(new UiLayoutPoint(width, 400f));
     }
 
     private static string? CreationFailure(string xml)

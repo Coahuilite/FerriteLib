@@ -1,3 +1,5 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -5,7 +7,6 @@ using System.Reflection;
 
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -79,7 +80,7 @@ internal static class KernelToneVocabularyTests
             UiFitAudit.Reset();
             try
             {
-                Color painted = PaintedRule(ctx, ("Tone", authored));
+                UiColour painted = PaintedRule(ctx, ("Tone", authored));
                 Check(SameColor(painted, theme.Styles.Resolve(tone).Border),
                     "Tone=\"" + authored + "\" paints that role's treatment");
                 Check(records.Count == 0 && UiFitAudit.StyleFallbackCount == 0,
@@ -104,7 +105,7 @@ internal static class KernelToneVocabularyTests
         bindings.BindCommand("go", () => { });
         UiWidgetContext ctx = Context(session, theme, bindings, 160f);
 
-        Color authored = default;
+        UiColour authored = default;
         var records = new List<UiStyleFallbackReport>();
         try
         {
@@ -135,8 +136,8 @@ internal static class KernelToneVocabularyTests
             UiFitAudit.Reset();
         }
 
-        Color lower = PaintedRule(ctx, ("Tone", "active"));
-        Color neutral = PaintedRule(ctx, ("Tone", "Neutral"));
+        UiColour lower = PaintedRule(ctx, ("Tone", "active"));
+        UiColour neutral = PaintedRule(ctx, ("Tone", "Neutral"));
         Check(SameColor(lower, authored),
             "the name is matched case-insensitively, like every other attribute value in this vocabulary");
         Check(!SameColor(authored, neutral),
@@ -152,7 +153,7 @@ internal static class KernelToneVocabularyTests
         bindings.BindCommand("go", () => { });
         UiWidgetContext ctx = Context(session, theme, bindings, 160f);
 
-        Color authored = default;
+        UiColour authored = default;
         var records = new List<UiStyleFallbackReport>();
         try
         {
@@ -183,7 +184,7 @@ internal static class KernelToneVocabularyTests
             UiFitAudit.Reset();
         }
 
-        Color neutral = PaintedRule(ctx, ("Tone", "Neutral"));
+        UiColour neutral = PaintedRule(ctx, ("Tone", "Neutral"));
         Check(!SameColor(authored, neutral),
             "the disabled redirect is not the neutral fallback: state and role stay distinguishable");
     }
@@ -205,7 +206,7 @@ internal static class KernelToneVocabularyTests
             UiFitAudit.AttachStyleFallback(records.Add);
             UiFitAudit.Reset();
 
-            Color unknown = PaintedRule(ctx, ("Tone", "chartreuse"));
+            UiColour unknown = PaintedRule(ctx, ("Tone", "chartreuse"));
             Check(SameColor(unknown, theme.Styles.Resolve(UiStatusTone.Neutral).Border),
                 "a value outside the vocabulary still falls back to the neutral treatment");
             Check(records.Count == 1 && records[0].Attribute == "Tone" && records[0].Authored == "chartreuse"
@@ -255,27 +256,27 @@ internal static class KernelToneVocabularyTests
         if (derived == null) return;
 
         UiTheme probe = UiTheme.Vanilla;
-        var accent = new Color(0.2f, 0.4f, 0.6f, 0.5f);
+        var accent = new UiColour(0.2f, 0.4f, 0.6f, 0.5f);
         probe[UiPaletteRole.Accent] = accent;
-        Color hover = (Color)derived.GetValue(probe)!;
+        UiColour hover = NativeFixture.Record<UiColour>(derived.GetValue(probe)!);
 
-        Check(hover.r > accent.r && hover.g > accent.g && hover.b > accent.b,
+        Check(hover.Red > accent.Red && hover.Green > accent.Green && hover.Blue > accent.Blue,
             "the derived step lightens every channel of the accent");
-        Check(Near(hover.a, accent.a),
+        Check(Near(hover.Alpha, accent.Alpha),
             "and keeps its alpha, so a transparent accent gets a transparent hover step, not an opaque one");
 
-        float liftR = Lift(accent.r, hover.r);
-        float liftG = Lift(accent.g, hover.g);
-        float liftB = Lift(accent.b, hover.b);
+        float liftR = Lift(accent.Red, hover.Red);
+        float liftG = Lift(accent.Green, hover.Green);
+        float liftB = Lift(accent.Blue, hover.Blue);
         Check(Near(liftR, liftG) && Near(liftG, liftB),
             "one fixed fraction toward white on every channel, not an adaptive lighten (got "
             + liftR + ", " + liftG + ", " + liftB + ")");
 
-        probe[UiPaletteRole.Accent] = new Color(0.9f, 0.1f, 0.3f, 1f);
-        Color moved = (Color)derived.GetValue(probe)!;
+        probe[UiPaletteRole.Accent] = new UiColour(0.9f, 0.1f, 0.3f, 1f);
+        UiColour moved = NativeFixture.Record<UiColour>(derived.GetValue(probe)!);
         Check(!SameColor(moved, hover),
             "re-tinting the accent moves the derived step: nothing stored beside it went stale");
-        Check(SameColor((Color)derived.GetValue(probe)!, moved),
+        Check(SameColor(NativeFixture.Record<UiColour>(derived.GetValue(probe)!), moved),
             "and reading it twice in a row is deterministic");
 
         // The name left the document vocabulary too, so a scheme writing it is reported rather than
@@ -308,7 +309,7 @@ internal static class KernelToneVocabularyTests
         foreach (UiStatusTone tone in everyTone)
         {
             UiResolvedStyle style = bag.Styles.Resolve(tone);
-            Check(style.Fill.a > 0f && style.Border.a > 0f && style.Text.a > 0f,
+            Check(style.Fill.Alpha > 0f && style.Border.Alpha > 0f && style.Text.Alpha > 0f,
                 "the role " + tone + " resolves to a paintable treatment on a partial bag, not to nothing");
         }
 
@@ -325,7 +326,7 @@ internal static class KernelToneVocabularyTests
             "answering a declared role is a rule, never a recorded fallback");
 
         // An explicit override is what the role then answers, because the table is a read-through view.
-        var own = new Color(0.11f, 0.22f, 0.33f, 1f);
+        var own = new UiColour(0.11f, 0.22f, 0.33f, 1f);
         UiTheme overridden = new()
         {
             [UiPaletteRole.SelectedSurface] = own
@@ -387,12 +388,12 @@ internal static class KernelToneVocabularyTests
     }
 
     /// <summary>Draws one rule and returns the single colour it painted.</summary>
-    private static Color PaintedRule(UiWidgetContext ctx, params (string Name, string Value)[] attributes)
+    private static UiColour PaintedRule(UiWidgetContext ctx, params (string Name, string Value)[] attributes)
     {
         RuleWidget rule = new();
         rule.Configure(new UiElementSpec("probe", RuleWidget.Kind, Attributes(attributes)));
         ClearBoxes();
-        rule.Draw(new Rect(0f, 0f, 100f, 9f), ctx);
+        NativeFixture.Draw(        rule,new UiLayoutRect(0f, 0f, 100f, 9f), ctx);
 
         IList colors = RecordedBoxColors();
         if (colors.Count != 1)
@@ -401,7 +402,7 @@ internal static class KernelToneVocabularyTests
             return default;
         }
 
-        return (Color)colors[0]!;
+        return NativeFixture.Record<UiColour>(colors[0]!);
     }
 
     private static Dictionary<string, string> Attributes(params (string Name, string Value)[] pairs)
@@ -415,9 +416,9 @@ internal static class KernelToneVocabularyTests
         return attributes;
     }
 
-    private static UiWidgetContext Context(UiSession session, UiTheme theme, IUiBindings bindings, float viewWidth)
+    private static UiWidgetContext Context(UiSession session, UiTheme theme, IUiBindingReader bindings, float viewWidth)
     {
-        return new UiWidgetContext(Scope, session, new StubMetrics(), theme, new StubTranslation(), bindings, viewWidth, "root");
+        return NativeFixture.Context(Scope, session, new StubMetrics(), theme, new StubTranslation(), bindings, viewWidth, "root");
     }
 
     private static string Page(string body)
@@ -444,9 +445,9 @@ internal static class KernelToneVocabularyTests
         return from >= 1f ? 0f : (to - from) / (1f - from);
     }
 
-    private static bool SameColor(Color left, Color right)
+    private static bool SameColor(UiColour left, UiColour right)
     {
-        return Near(left.r, right.r) && Near(left.g, right.g) && Near(left.b, right.b) && Near(left.a, right.a);
+        return Near(left.Red, right.Red) && Near(left.Green, right.Green) && Near(left.Blue, right.Blue) && Near(left.Alpha, right.Alpha);
     }
 
     private static bool Near(float expected, float actual)

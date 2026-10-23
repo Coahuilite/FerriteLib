@@ -62,7 +62,14 @@ public sealed partial class UiBindings
 
     internal Type EndpointType(string key) => values.TryGetValue(key, out var d) ? d.ValueType : throw new InvalidOperationException("Released value binding '" + key + "'.");
     internal object? EndpointRead(string key) => values.TryGetValue(key, out var d) ? ReadValue(key, d) : throw new InvalidOperationException("Released value binding '" + key + "'.");
-    internal Type ChoiceType(string key) => options.TryGetValue(key, out var d) && d.ChoiceValueType != null ? d.ChoiceValueType : throw new InvalidOperationException("Binding '" + key + "' is not a typed choice source.");
+    internal Type ChoiceType(string key)
+    {
+        if(options.TryGetValue(key,out var choice))
+            return choice.ChoiceValueType??throw new InvalidOperationException("Binding '"+key+"' is an options collection of '"+choice.ItemType.Name+"', not a typed choice source. Register selections with BindChoices<T>.");
+        if(values.TryGetValue(key,out var value))
+            throw new InvalidOperationException("Required choice binding '"+key+"' is registered as a "+(value.CanWrite?"writable":"read-only")+" value of type '"+value.ValueType.Name+"', not as choices. Register the list with BindChoices<T>.");
+        throw new InvalidOperationException("Missing choice binding '"+key+"'. Register the list with BindChoices<T>.");
+    }
     internal IReadOnlyList<UiChoice<object?>> ReadChoices(string key)
     {
         ChoiceType(key);
@@ -128,7 +135,7 @@ public sealed partial class UiBindings
         {
             var result = new List<UiChoice<object?>>();
             foreach (var c in (IReadOnlyList<UiChoice<T>>)list)
-                result.Add(new UiChoice<object?>(c.Text, c.Value, c.Help));
+                result.Add(new UiChoice<object?>(c.Text, c.Value, c.Help,c.TextKey));
             return result.AsReadOnly();
         }
 
@@ -140,7 +147,7 @@ public sealed partial class UiBindings
             for (int i = 0; i < Math.Min(count, maximum); i++)
             {
                 var c = source[i];
-                result.Add(new UiChoice<object?>(c.Text, c.Value, c.Help));
+                result.Add(new UiChoice<object?>(c.Text, c.Value, c.Help,c.TextKey));
             }
 
             return result.AsReadOnly();

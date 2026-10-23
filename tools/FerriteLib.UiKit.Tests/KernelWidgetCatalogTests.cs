@@ -1,3 +1,5 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -5,7 +7,6 @@ using System.Reflection;
 using System.Threading;
 
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -75,7 +76,7 @@ internal static class KernelWidgetCatalogTests
         Register(ScopeB, "gamma");
         Register(ScopeA, "zeta", new[] { "Zeta" }, new[] { "Label", "LabelKey" });
         Register(ScopeA, "alpha", new[] { "AlphaInA" });
-        UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "probe-core", () => new ProbeWidget(), new[] { "CoreAttr" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, "probe-core", () => new ProbeWidget(), new[] { "CoreAttr" }));
 
         IReadOnlyList<UiWidgetDescriptor> snapshot = UiWidgetCatalog.Snapshot();
         string[] actual = Pairs(snapshot);
@@ -115,7 +116,7 @@ internal static class KernelWidgetCatalogTests
         // A caller that keeps the collection it registered and edits it must not move the registry.
         var callerSchema = new List<string> { "One", "Two" };
         var callerLabels = new List<string> { "Label" };
-        UiWidgetRegistry.Register("cat-mut", "kind", () => new ProbeWidget(), callerSchema, callerLabels);
+UiWidgetRegistry.Define(new UiWidgetDefinition("cat-mut", "kind", () => new ProbeWidget(), callerSchema, callerLabels));
         UiWidgetCatalog.TryGet("cat-mut", "kind", out UiWidgetDescriptor described);
         callerSchema.Clear();
         callerLabels.Clear();
@@ -145,7 +146,7 @@ internal static class KernelWidgetCatalogTests
         Reset();
         Register(ScopeA, "zeta", new[] { "Zeta" });
         Register(ScopeB, "gamma");
-        UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "probe-core", () => new ProbeWidget(), new[] { "CoreAttr" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, "probe-core", () => new ProbeWidget(), new[] { "CoreAttr" }));
 
         Check(
             UiWidgetCatalog.TryGet(ScopeA, "zeta", out UiWidgetDescriptor zeta)
@@ -175,7 +176,7 @@ internal static class KernelWidgetCatalogTests
         Reset();
         Register(ScopeA, "zeta");
         Register(ScopeB, "alpha");
-        UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, "probe-core", () => new ProbeWidget());
+UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, "probe-core", () => new ProbeWidget()));
 
         IReadOnlyList<string> scopes = UiWidgetCatalog.Scopes();
         Check(SameSequence(ToList(scopes), new[] { "cat-a", "cat-b", "core" }),
@@ -202,8 +203,8 @@ internal static class KernelWidgetCatalogTests
         Reset();
         factoryCalls = 0;
         throwingFactoryCalls = 0;
-        UiWidgetRegistry.Register("cat-factory", "counted", () => { factoryCalls++; return new ProbeWidget(); });
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition("cat-factory", "counted", () => { factoryCalls++; return new ProbeWidget(); }));
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             "cat-factory",
             "throwing",
             () =>
@@ -211,7 +212,7 @@ internal static class KernelWidgetCatalogTests
                 throwingFactoryCalls++;
                 throw new InvalidOperationException("a factory must not run while listing");
             },
-            new[] { "Attr" });
+            new[] { "Attr" }));
 
         for (int i = 0; i < 3; i++)
         {
@@ -307,8 +308,8 @@ internal static class KernelWidgetCatalogTests
         factoryCalls = 0;
         object gate = RegistryLock();
         var probe = new LockProbeCollection(gate, new[] { "Alpha", "Beta" });
-        UiWidgetRegistry.Register(
-            "cat-lock", "probed", () => { factoryCalls++; return new ProbeWidget(); }, probe);
+UiWidgetRegistry.Define(new UiWidgetDefinition(
+            "cat-lock", "probed", () => { factoryCalls++; return new ProbeWidget(); }, probe));
 
         int atRegistration = probe.Enumerations;
         Console.WriteLine(
@@ -346,18 +347,18 @@ internal static class KernelWidgetCatalogTests
     private static void Register(
         string scope, string kind, IReadOnlyCollection<string>? schema = null, IReadOnlyCollection<string>? labels = null)
     {
-        UiWidgetRegistry.Register(scope, kind, () => new ProbeWidget(), schema, labels);
+UiWidgetRegistry.Define(new UiWidgetDefinition(scope, kind, () => new ProbeWidget(), schema:schema==null?null:UiAttributeSchema.FromNames(schema), labels:labels));
     }
 
     private static void InjectEmptyScope(string scope)
     {
-        FieldInfo? field = typeof(UiWidgetRegistry).GetField("Scopes", BindingFlags.NonPublic | BindingFlags.Static);
-        if (field?.GetValue(null) is not Dictionary<string, Dictionary<string, Func<IUiWidget>>> table)
+        FieldInfo? field = typeof(UiWidgetRegistry).GetField("definitions", BindingFlags.NonPublic | BindingFlags.Static);
+        if (field?.GetValue(null) is not Dictionary<string, Dictionary<string, UiWidgetDefinition>> table)
         {
             throw new Exception("the registry's scope table moved; this lane injects an empty scope into it");
         }
 
-        table[scope] = new Dictionary<string, Func<IUiWidget>>(StringComparer.Ordinal);
+        table[scope] = new Dictionary<string, UiWidgetDefinition>(StringComparer.Ordinal);
     }
 
     private static object RegistryLock()
@@ -457,7 +458,7 @@ internal static class KernelWidgetCatalogTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
@@ -466,7 +467,7 @@ internal static class KernelWidgetCatalogTests
             return 0f;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
         }
     }

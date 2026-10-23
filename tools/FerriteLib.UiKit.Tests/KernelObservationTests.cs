@@ -1,8 +1,9 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 internal static class KernelObservationTests
@@ -45,7 +46,7 @@ internal static class KernelObservationTests
         using var host = new UiHost("r9", manifest, bindings, UiTheme.Vanilla, new Metrics(), new Translation());
         Check(host.Observe().Status == UiObservationStatus.NotSampled, "unarranged host reports unsampled without materialization");
         Check(UiHost.ObserveLiveHosts(128).Hosts.Any(item => item.Host == host.Session.Identity), "live host discovered by stable session identity");
-        host.MeasureAndArrange(new Vector2(320, 240));
+        host.MeasureAndArrange(new UiLayoutPoint(320, 240));
         UiNode node = host.Session.GetNodeByElementId("text")!;
         var ctx = host.CreateContext(320).WithNode(node);
         bool Parse(string value, out string parsed)
@@ -54,11 +55,11 @@ internal static class KernelObservationTests
             return true;
         }
 
-        var editor = UiNative.Editor<string>(ctx, "text", value => value, Parse);
+        var editor = NativeFixture.Editor<string>(ctx, "text", value => value, Parse);
         editor.Observe(model);
         editor.Input("local draft", true, false, false, _ => throw new Exception("unexpected publication"), () => model);
         int frame = host.Session.Frame;
-        UiNative.TextFieldOverride = (_, _) => throw new Exception("observation must not paint");
+        NativeFixture.TextFieldOverride = (_, _) => throw new Exception("observation must not paint");
         try
         {
             UiHostObservation snapshot = host.Observe(nodeKey: node.Id.Key);
@@ -82,7 +83,7 @@ internal static class KernelObservationTests
             failRead = false;
             visible = false;
             bindings.NotifyChanged("show");
-            host.MeasureAndArrange(new Vector2(320, 240));
+            host.MeasureAndArrange(new UiLayoutPoint(320, 240));
             UiHostObservation hidden = host.Observe(nodeKey: node.Id.Key);
             Check(hidden.Nodes.Count == 1 && hidden.Reason == "retained-node-without-current-arranged-entry"
                 && hidden.Nodes[0].Facts.Any(f => f.Name == "geometry" && f.Status == UiObservationStatus.NotSampled)
@@ -91,7 +92,7 @@ internal static class KernelObservationTests
         }
         finally
         {
-            UiNative.TextFieldOverride = null;
+            NativeFixture.TextFieldOverride = null;
         }
 
         host.Close();
@@ -111,17 +112,16 @@ internal static class KernelObservationTests
         var manifest = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"r9-host\">" + "<Widget Id=\"text\" Kind=\"input/text-field\" Bind=\"text\"/></UiPage>");
         var window = new UiPageWindow(new UiWindowKey("r9", "page", "standard"), manifest, bindings, UiTheme.Vanilla, new Translation(), "Page", "Close", _ => "Unavailable", new Metrics());
         using var embedded = new UiHost("r9-host", manifest, bindings, UiTheme.Vanilla, new Metrics(), new Translation());
-        window.windowRect = new Rect(0, 0, 500, 400);
+        window.windowRect = VerseUiExecution.Rect(new UiLayoutRect(0, 0, 500, 400));
         Verse.Find.WindowStack.Add(window);
-        UiNative.DebugMousePositionEnabled = true;
-        UiNative.DebugMouseDown = false;
-        UiNative.DebugEnter = false;
-        UiNative.DebugFocusLost = false;
-        UiNative.TextFieldOverride = (_, text) => text;
+        NativeFixture.DebugMousePositionEnabled = true;
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.DebugEnter = false;
+        NativeFixture.DebugFocusLost = false;
+        NativeFixture.TextFieldOverride = (_, text) => text;
         try
         {
-            window.WindowOnGUI();
-            embedded.DrawFrame(new Rect(0, 0, 320, 240), window);
+            NativeEvents.Begin(EventType.Repaint,new UiLayoutPoint(-10,-10));window.WindowOnGUI();NativeFixture.DrawFrame(embedded,VerseUiExecution.Rect(new UiLayoutRect(0,0,320,240)),window);
             UiHost standard = window.PageHost!;
             Check(standard != null && standard.Session.Identity != embedded.Session.Identity, "ordinary concrete page and embedded host own distinct real sessions");
             bool Parse(string value, out string parsed)
@@ -139,40 +139,37 @@ internal static class KernelObservationTests
             )
             {
                 UiNode node = host.Session.GetNodeByElementId("text")!;
-                var editor = UiNative.Editor<string>(host.CreateContext(320).WithNode(node), "text", value => value, Parse);
+                var editor = NativeFixture.Editor<string>(host.CreateContext(320).WithNode(node), "text", value => value, Parse);
                 editor.Observe(model);
                 editor.Focus();
             }
 
-            UiNative.TextFieldOverride = (_, _) => "candidate";
-            window.WindowOnGUI();
-            embedded.DrawFrame(new Rect(0, 0, 320, 240), window);
+            NativeFixture.TextFieldOverride = (_, _) => "candidate";
+            NativeEvents.Begin(EventType.Repaint,new UiLayoutPoint(-10,-10));window.WindowOnGUI();NativeFixture.DrawFrame(embedded,VerseUiExecution.Rect(new UiLayoutRect(0,0,320,240)),window);
             Check(requests == 0 && standard!.Session.ActiveEditState != null && embedded.Session.ActiveEditState != null, "both host routes hold the same deferred common edit without publishing on paint");
             var modal = new BlockingWindow();
             Verse.Find.WindowStack.Add(modal);
             try
             {
-                UiNative.TextFieldOverride = (_, text) => text;
-                window.WindowOnGUI();
-                embedded.DrawFrame(new Rect(0, 0, 320, 240), window);
+                NativeFixture.TextFieldOverride = (_, text) => text;
+                NativeEvents.Begin(EventType.Repaint,new UiLayoutPoint(-10,-10));window.WindowOnGUI();NativeFixture.DrawFrame(embedded,VerseUiExecution.Rect(new UiLayoutRect(0,0,320,240)),window);
                 Check(!embedded.Session.PointerInputAllowed && !standard!.Session.PointerInputAllowed && requests == 0
                     && standard.Observe().Nodes[0].Facts.Any(f => f.Name == "draft" && f.Value == "candidate"),
                     "real shell stack qualification suspends input under a modal without publishing or discarding the draft");
             }
             finally { Verse.Find.WindowStack.TryRemove(modal); }
             UiNode standardNode = standard!.Session.GetNodeByElementId("text")!;
-            UiNative.Editor<string>(standard.CreateContext(320).WithNode(standardNode), "text", value => value, Parse).Focus();
+            NativeFixture.Editor<string>(standard.CreateContext(320).WithNode(standardNode), "text", value => value, Parse).Focus();
             UiNode embeddedNode = embedded.Session.GetNodeByElementId("text")!;
-            UiNative.Editor<string>(embedded.CreateContext(320).WithNode(embeddedNode), "text", value => value, Parse).Focus();
-            embedded.DrawFrame(new Rect(0, 0, 320, 240), window);
-            window.WindowOnGUI();
+            NativeFixture.Editor<string>(embedded.CreateContext(320).WithNode(embeddedNode), "text", value => value, Parse).Focus();
+            NativeEvents.Begin(EventType.Repaint,new UiLayoutPoint(-10,-10));NativeFixture.DrawFrame(embedded,VerseUiExecution.Rect(new UiLayoutRect(0,0,320,240)),window);window.WindowOnGUI();
             Check(standard.Session.PointerInputAllowed && embedded.Session.PointerInputAllowed && standard.TryHandleAccept(),
                 "standard host regains stack-qualified input and confirms its retained editor");
-            UiNative.TextFieldOverride = (_, text) => text;
+            NativeFixture.TextFieldOverride = (_, text) => text;
             window.WindowOnGUI();
             Check(requests == 1 && model == "candidate" && embedded.Session.ActiveEditState != null, "standard confirmation requests once and does not clear the other host editor");
             Check(embedded.TryHandleAccept(), "embedded host owns its independent confirmation boundary");
-            embedded.DrawFrame(new Rect(0, 0, 320, 240), window);
+            NativeFixture.DrawFrame(            embedded,VerseUiExecution.Rect(new UiLayoutRect(0, 0, 320, 240)), window);
             Check(requests == 2 && embedded.Session.ActiveEditState == null, "explicit other-host confirmation follows the common request contract");
             window.PreClose();
             Check(!standard.Session.IsActive && embedded.Session.IsActive, "standard close disposes only its own session and leaves embedded use alive");
@@ -181,10 +178,10 @@ internal static class KernelObservationTests
         {
             Verse.Find.WindowStack.TryRemove(window);
             window.PreClose();
-            UiNative.TextFieldOverride = null;
-            UiNative.DebugMousePositionEnabled = false;
-            UiNative.DebugEnter = false;
-            UiNative.DebugFocusLost = false;
+            NativeFixture.TextFieldOverride = null;
+            NativeFixture.DebugMousePositionEnabled = false;
+            NativeFixture.DebugEnter = false;
+            NativeFixture.DebugFocusLost = false;
         }
     }
 
@@ -195,36 +192,28 @@ internal static class KernelObservationTests
         SelectionValue current = SelectionValue.Missing;
         float progress = 3;
         bool progressUnavailable = false;
-        Texture2D? texture = null;
+        using var native=new VerseUiExecution();UiImage texture=default;
         int writes = 0;
         var bindings = new UiBindings();
         var choices = new[] { new UiChoice<SelectionValue>("same label", SelectionValue.First), new UiChoice<SelectionValue>("same label", SelectionValue.Second) };
         bindings.BindValue("typed", () => current, value => { current = value; writes++; });
-        bindings.BindOptions("choices", () => (IReadOnlyList<UiChoice<SelectionValue>>)choices);
+        bindings.BindChoices("choices", () => (IReadOnlyList<UiChoice<SelectionValue>>)choices);
         bindings.BindReadOnly("mode", () => SelectionValue.Second);
-        bindings.BindOptions("mode", () => (IReadOnlyList<UiChoice<SelectionValue>>)choices);
+        bindings.BindChoices("mode", () => (IReadOnlyList<UiChoice<SelectionValue>>)choices);
         bindings.BindValue("sparse", () => "later", _ => writes++);
         bindings.BindValue("sparse-mode", () => "later", _ => writes++);
-        bindings.BindReadOnly<Texture2D>("picture", () => texture!);
+        bindings.BindReadOnly<UiImage>("picture", () => texture);
         bindings.BindReadOnly("progress", () => progressUnavailable ? throw new InvalidOperationException("unavailable") : progress);
         bindings.BindAction<UiChartPointChange>("point", _ => writes++);
-        var manifest = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"r9-facts\"><Stack Id=\"root\" Padding=\"0\" Gap=\"0\">"
-            + "<Widget Id=\"first\" Kind=\"input/dropdown\" Bind=\"typed\" OptionsBind=\"choices\"/>"
-            + "<Widget Id=\"second\" Kind=\"input/dropdown\" Bind=\"typed\" OptionsBind=\"choices\"/>"
-            + "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\"/>"
-            + "<Widget Id=\"sparse\" Kind=\"input/dropdown\" Bind=\"sparse\" Option2=\"later label\" Value2=\"later\" Option4=\"fourth\"/>"
-            + "<Widget Id=\"sparse-mode\" Kind=\"input/mode-row\" Bind=\"sparse-mode\" Value2=\"later\" Title2=\"later label\" Value4=\"fourth\"/>"
-            + "<Widget Id=\"image\" Kind=\"display/image\" Bind=\"picture\" Height=\"28\"/>"
-            + "<Widget Id=\"progress\" Kind=\"display/progress\" Bind=\"progress\" Max=\"2\"/>"
-            + "<Widget Id=\"chart\" Kind=\"chart/line\" Points=\"0,0;1,1\" Editable=\"0\" ActionBind=\"point\"/>"
-            + "</Stack></UiPage>");
+        var manifest = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"r9-facts\"><Stack Id=\"root\" Padding=\"0\" Gap=\"0\"><Widget Id=\"first\" Kind=\"input/dropdown\" Bind=\"typed\" OptionsBind=\"choices\"/><Widget Id=\"second\" Kind=\"input/dropdown\" Bind=\"typed\" OptionsBind=\"choices\"/><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\"/><Widget Id=\"sparse\" Kind=\"input/dropdown\" Bind=\"sparse\"   ><Choice Value=\"later\" Text=\"later label\" Help=\"later\"/><Choice Value=\"fourth\" Text=\"fourth\" Help=\"fourth\"/></Widget><Widget Id=\"sparse-mode\" Kind=\"input/mode-row\" Bind=\"sparse-mode\"   ><Choice Value=\"later\" Text=\"later label\" Help=\"later\"/><Choice Value=\"fourth\" Text=\"fourth\" Help=\"fourth\"/></Widget><Widget Id=\"image\" Kind=\"display/image\" Bind=\"picture\" Height=\"28\"/><Widget Id=\"progress\" Kind=\"display/progress\" Bind=\"progress\" Max=\"2\"/><Widget Id=\"chart\" Kind=\"chart/line\" Points=\"0,0;1,1\" Editable=\"0\" ActionBind=\"point\"/></Stack></UiPage>");
         using var host = new UiHost("r9-facts", manifest, bindings, UiTheme.Vanilla, new Metrics(), new Translation());
+        host.Session.SetFrame(native.CaptureFrame(),native);
         Event previousEvent = Event.current;
-        UiNative.DebugMousePositionEnabled = false;
+        NativeFixture.DebugMousePositionEnabled = false;
         try
         {
             Event.current = new Event { type = EventType.Repaint };
-            host.DrawFrame(new Rect(0, 0, 400, 800));
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0, 0, 400, 800));
             UiHostObservation sample = host.Observe(new UiObservationBudget(items: 1));
             IReadOnlyList<UiObservedFact> Facts(string id) => sample.Nodes.Single(node => node.Path == "root/" + id).Facts;
             bool Has(string id, string name, string value) => Facts(id).Any(f => f.Name == name && f.Value == value);
@@ -236,14 +225,14 @@ internal static class KernelObservationTests
                 && Has("mode", "selection.missing", "False") && Has("mode", "option.0.selectable", "False"),
                 "typed option values and selectability remain distinct from duplicate labels and actual wrapper Missing");
             foreach (string id in new[] { "sparse", "sparse-mode" })
-                Check(Has(id, "option-count", "2") && Has(id, "option.0.slot", "2") && Has(id, "option.0.value", "later")
+                Check(Has(id, "option-count", "2") && Has(id,"option.0.text","later label") && !Facts(id).Any(f=>f.Name=="option.1.value") && Has(id, "option.0.value", "later")
                     && Facts(id).Any(f => f.Name == "options" && f.Truncated),
-                    "sparse static " + id + " counts real entries, reads slot2 under Items1 and reports omitted slot4");
+                    "sparse static " + id + " counts actual Choice entries, reads only the first under Items1 and reports the omitted second");
             Check(Has("chart", "editable", "False"), "Editable0 observation uses the exact production chart capability");
             sample = host.Observe(new UiObservationBudget(items: 2));
             Check(Has("first", "option.1.text", "same label") && Has("first", "option.1.value", "Second"),
                 "duplicate typed labels do not merge distinct stable values");
-            texture = new Texture2D(2, 2);
+            texture = native.Images.Add(new Texture2D(2,2));
             progress = float.NaN;
             sample = host.Observe();
             Check(Has("image", "available", "True") && Has("progress", "finite", "False") && Has("progress", "value", "NaN"),
@@ -253,12 +242,12 @@ internal static class KernelObservationTests
             Check(Facts("progress").Any(f => f.Name == "description" && f.Status == UiObservationStatus.NotSampled)
                 && !Facts("progress").Any(f => f.Name == "value"), "unavailable progress remains unknown, not zero");
             UiNode second = host.Session.GetNodeByElementId("second")!;
-            Rect trigger = second.Rect!.Value;
-            Vector2 point = new(trigger.x + 5, trigger.y + 5);
-            Event.current = new Event { type = EventType.MouseDown, button = 0, mousePosition = point };
-            host.DrawFrame(new Rect(0, 0, 400, 800));
-            Event.current = new Event { type = EventType.MouseUp, button = 0, mousePosition = point };
-            host.DrawFrame(new Rect(0, 0, 400, 800));
+            UiLayoutRect trigger = second.Rect!.Value;
+            UiLayoutPoint point = new(trigger.X + 5, trigger.Y + 5);
+            Event.current = new Event { type = EventType.MouseDown, button = 0, mousePosition = VerseUiExecution.Point(point) };
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0, 0, 400, 800));
+            Event.current = new Event { type = EventType.MouseUp, button = 0, mousePosition = VerseUiExecution.Point(point) };
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0, 0, 400, 800));
             UiHostObservation popup = host.Observe();
             Check(popup.Facts.Any(f => f.Name == "popup-owner-node" && f.Value == second.Id.Key)
                 && popup.Facts.Any(f => f.Name == "popup-owner-part" && f.Value == "trigger")
@@ -279,26 +268,26 @@ internal static class KernelObservationTests
             + "<Widget Kind=\"chrome/rule\" Height=\"30\"/><Widget Id=\"button\" Kind=\"input/button\" ActionBind=\"run\" Height=\"28\"/>"
             + "<Widget Kind=\"chrome/rule\" Height=\"100\"/></Scroll><Widget Kind=\"chrome/rule\" Height=\"100\"/></Scroll></UiPage>");
         using var host = new UiHost("r9-nested", manifest, bindings, UiTheme.Vanilla, new Metrics(), new Translation());
-        Rect viewport = new(35, 45, 300, 180);
-        host.MeasureAndArrange(new Vector2(viewport.width, viewport.height));
-        host.Session.SetScrollPosition(host.Session.GetNodeByElementId("outer")!, new Vector2(0, 20));
-        host.Session.SetScrollPosition(host.Session.GetNodeByElementId("inner")!, new Vector2(0, 15));
-        Rect button = host.Session.GetNodeByElementId("button")!.Rect!.Value;
+        UiLayoutRect viewport = new(35, 45, 300, 180);
+        host.MeasureAndArrange(new UiLayoutPoint(viewport.Width, viewport.Height));
+        host.Session.SetScrollPosition(host.Session.GetNodeByElementId("outer")!, new UiLayoutPoint(0, 20));
+        host.Session.SetScrollPosition(host.Session.GetNodeByElementId("inner")!, new UiLayoutPoint(0, 15));
+        UiLayoutRect button = host.Session.GetNodeByElementId("button")!.Rect!.Value;
         Event previousEvent = Event.current;
-        UiNative.DebugMousePositionEnabled = false;
-        void Pump(EventType type, Vector2 point)
+        NativeFixture.DebugMousePositionEnabled = false;
+        void Pump(EventType type, UiLayoutPoint point)
         {
-            Event.current = new Event { type = type, button = 0, mousePosition = point };
-            host.DrawFrame(viewport);
+            Event.current = new Event { type = type, button = 0, mousePosition = VerseUiExecution.Point(point) };
+            NativeFixture.DrawFrame(            host,viewport);
         }
         try
         {
-            Pump(EventType.Repaint, new Vector2(-100, -100));
-            Vector2 raw = new(viewport.x + button.x + 5, viewport.y + button.y + 5);
+            Pump(EventType.Repaint, new UiLayoutPoint(-100, -100));
+            UiLayoutPoint raw = new(viewport.X + button.X + 5, viewport.Y + button.Y + 5);
             Pump(EventType.MouseDown, raw);
             Pump(EventType.MouseUp, raw);
             Check(requests == 0, "unscrolled page coordinates do not activate a nested scrolled target");
-            Vector2 visible = new(raw.x, raw.y - 20 - 15);
+            UiLayoutPoint visible = new(raw.X, raw.Y - 20 - 15);
             Pump(EventType.MouseDown, visible);
             Check(requests == 0 && host.Session.Interactions.CaptureOwner.HasValue,
                 "nested scroll and offset viewport map a real primary press to the shared owner");
@@ -313,16 +302,16 @@ internal static class KernelObservationTests
         finally { Event.current = previousEvent; }
     }
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-    private static WeakReference<UiHost> AbandonedHost()
+    private static System.WeakReference<UiHost> AbandonedHost()
     {
         var manifest = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"r9-weak\"><Widget Id=\"rule\" Kind=\"chrome/rule\"/></UiPage>");
         var host = new UiHost("r9-weak", manifest, new UiBindings(), UiTheme.Vanilla, new Metrics(), new Translation());
-        return new WeakReference<UiHost>(host);
+        return new System.WeakReference<UiHost>(host);
     }
 
     private static void DiscoveryLifetimeAndCapacity()
     {
-        WeakReference<UiHost> abandoned = AbandonedHost();
+        System.WeakReference<UiHost> abandoned = AbandonedHost();
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
@@ -348,15 +337,15 @@ internal static class KernelObservationTests
 
     private static void BoundedCollections()
     {
-        var options = new GuardedList<UiOption>(new[] { new UiOption("one", "1"), new UiOption("two", "2"), new UiOption("three", "3") });
+        var options = new GuardedList<UiChoice<string>>(new[] { new UiChoice<string>("one", "1"), new UiChoice<string>("two", "2"), new UiChoice<string>("three", "3") });
         var bindings = new UiBindings();
         bindings.BindValue("choice", () => "2", _ => throw new Exception("observation cannot select"));
-        bindings.BindOptions("choices", () => options);
+        bindings.BindChoices("choices", () => options);
         bindings.BindValue("static", () => "kept", _ => throw new Exception("observation cannot select"));
         bindings.BindOptions("static", () => (IReadOnlyList<string>)new[] { "ignored decoy" });
-        var manifest = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"r9-options\">" + "<Widget Id=\"choice\" Kind=\"input/dropdown\" Bind=\"choice\" OptionsBind=\"choices\"/><Widget Id=\"static\" Kind=\"input/dropdown\" Bind=\"static\" Option1=\"static label\"/></UiPage>");
+        var manifest = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"r9-options\"><Widget Id=\"choice\" Kind=\"input/dropdown\" Bind=\"choice\" OptionsBind=\"choices\"/><Widget Id=\"static\" Kind=\"input/dropdown\" Bind=\"static\" ><Choice Value=\"static label\" Text=\"static label\" Help=\"static label\"/></Widget></UiPage>");
         using var host = new UiHost("r9-options", manifest, bindings, UiTheme.Vanilla, new Metrics(), new Translation());
-        host.MeasureAndArrange(new Vector2(320, 240));
+        host.MeasureAndArrange(new UiLayoutPoint(320, 240));
         options.MaximumRead = 2;
         UiHostObservation snapshot = host.Observe(new UiObservationBudget(items: 2));
         var facts = snapshot.Nodes.Single(node => node.Path == "choice").Facts;
@@ -405,7 +394,7 @@ internal static class KernelObservationTests
     private sealed class BlockingWindow : Verse.Window
     {
         public BlockingWindow() { absorbInputAroundWindow = true; }
-        public override void DoWindowContents(Rect rect) { }
+        public override void DoWindowContents(UnityEngine.Rect rect) { }
     }
     private sealed class Metrics : ITextMetrics
     {

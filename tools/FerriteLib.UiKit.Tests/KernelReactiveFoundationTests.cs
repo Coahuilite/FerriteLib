@@ -1,23 +1,24 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 internal static class KernelReactiveFoundationTests
 {
-    private static readonly Rect View = new(20, 30, 240, 200);
+    private static readonly UiLayoutRect View = new(20, 30, 240, 200);
     private static void Check(bool condition, string name)
     {
         if (!condition) throw new Exception(name);
         Console.WriteLine("  ok: REACTIVE-HOST " + name);
     }
-    private static void Pump(UiHost host, EventType phase, Vector2 point)
+    private static void Pump(UiHost host, EventType phase, UiLayoutPoint point)
     {
-        Event.current = new Event { type=phase, button=0, mousePosition=point };
-        host.DrawFrame(View);
+        Event.current = new Event { type=phase, button=0, mousePosition=VerseUiExecution.Point(point) };
+        NativeFixture.DrawFrame(        host,View);
     }
     private static UiHost Host(string content, UiBindings bindings, ITextMetrics? metrics = null)
         => new("reactive", UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"reactive\"><Column Padding=\"0\" Gap=\"0\">"+content+"</Column></UiPage>"), bindings, UiTheme.Vanilla, metrics ?? new Metrics(), new Translation());
@@ -34,7 +35,7 @@ internal static class KernelReactiveFoundationTests
             return 0;
         }
         catch(Exception ex) { Console.Error.WriteLine("  FAIL: REACTIVE-HOST "+ex); return 1; }
-        finally { Event.current=null; UiNative.DebugMousePositionEnabled=false; UiNative.DebugMouseDown=false; UiNative.DebugMouseUp=false; UiNative.DebugHotControl=0; }
+        finally { Event.current=null; NativeFixture.DebugMousePositionEnabled=false; NativeFixture.DebugMouseDown=false; NativeFixture.DebugMouseUp=false; NativeFixture.DebugHotControl=0; }
     }
     private static void DefaultCounterAndWorkshop()
     {
@@ -55,11 +56,11 @@ internal static class KernelReactiveFoundationTests
             ?? throw new Exception("Verse stub label recorder missing"));
         bool PaintedSince(int start,string text) { for(int i=start;i<labels.Count;i++)if((string)labels[i]! == text)return true;return false; }
         int first=labels.Count;
-        Pump(host,EventType.Repaint,new Vector2(-10,-10));
-        float height=host.Session.GetNodeByElementId("caption")!.Rect!.Value.height;
+        Pump(host,EventType.Repaint,new UiLayoutPoint(-10,-10));
+        float height=host.Session.GetNodeByElementId("caption")!.Rect!.Value.Height;
         Check(PaintedSince(first,prefix+"9") && metrics.LastText==prefix+"9",example+" default wrapped text paints the synchronized value used by actual measurement");
-        Rect button=host.Session.GetNodeByElementId("add")!.Rect!.Value;
-        var point=new Vector2(View.x+button.x+button.width/2,View.y+button.y+button.height/2);
+        UiLayoutRect button=host.Session.GetNodeByElementId("add")!.Rect!.Value;
+        var point=new UiLayoutPoint(View.X+button.X+button.Width/2,View.Y+button.Y+button.Height/2);
         int before=requests();
         Pump(host,EventType.MouseDown,point);
         Check(value()==9 && requests()==before,example+" default Button press captures without executing the command");
@@ -68,7 +69,7 @@ internal static class KernelReactiveFoundationTests
         Check(value()==10 && requests()==before+1 && PaintedSince(releaseLabels,prefix+"9"),example+" default Button qualified release dispatches once while current text keeps its synchronized input");
         int nextLabels=labels.Count;
         Pump(host,EventType.Repaint,point);
-        Check(PaintedSince(nextLabels,prefix+"10") && metrics.LastText==prefix+"10" && host.Session.GetNodeByElementId("caption")!.Rect!.Value.height==height+2,
+        Check(PaintedSince(nextLabels,prefix+"10") && metrics.LastText==prefix+"10" && host.Session.GetNodeByElementId("caption")!.Rect!.Value.Height==height+2,
             example+" next legal Host synchronization updates real wrapped text and content-dependent geometry without notification");
         Pump(host,EventType.Repaint,point);
         Check(requests()==before+1,example+" repaint does not repeat the established business operation");
@@ -81,9 +82,9 @@ internal static class KernelReactiveFoundationTests
         using var owner=example.Runtime.CreateOwner("adapter-business");
         owner.Respond("both",()=>{ seenSelected=example.Selected.Value; seenCount=example.Count.Value; observations++; });
         using var host=Host("<Widget Kind=\"input/checkbox\" Id=\"toggle\" Bind=\"selected\" ActionBind=\"changed\" />",b);
-        Pump(host,EventType.Repaint,new Vector2(-10,-10));
-        Rect rect=host.Session.GetNodeByElementId("toggle")!.Rect!.Value;
-        var point=new Vector2(View.x+rect.x+10,View.y+rect.y+rect.height/2);
+        Pump(host,EventType.Repaint,new UiLayoutPoint(-10,-10));
+        UiLayoutRect rect=host.Session.GetNodeByElementId("toggle")!.Rect!.Value;
+        var point=new UiLayoutPoint(View.X+rect.X+10,View.Y+rect.Y+rect.Height/2);
         Pump(host,EventType.MouseDown,point);
         int before=observations;
         Pump(host,EventType.MouseUp,point);
@@ -103,16 +104,16 @@ internal static class KernelReactiveFoundationTests
         b.BindCommand("legacy-write",()=>operations++);
         b.BindReadOnly("value",()=>{ b.Invoke("legacy-write"); return 1; });
         var probe=new Probe { OnMeasure=()=>b.Invoke("legacy-write") };
-        UiWidgetRegistry.Register("reactive","legacy-probe",()=>probe,Array.Empty<string>());
+UiWidgetRegistry.Define(new UiWidgetDefinition("reactive","legacy-probe",()=>probe,Array.Empty<string>()));
         using(var host=Host("<Widget Kind=\"legacy-probe\" Id=\"legacy\" />",b))
-            Pump(host,EventType.Repaint,new Vector2(-10,-10));
+            Pump(host,EventType.Repaint,new UiLayoutPoint(-10,-10));
         Check(operations>1,"legacy getter and custom Measure keep original operation conditions");
         var runtime=new UiReactiveRuntime(); var source=runtime.Int(); var tracked=new UiBindings(runtime);
         tracked.BindTracked("value",()=>{ source.Value++; return source.Value; });
         bool refused=false;
         using(var host=Host("<Widget Kind=\"legacy-probe\" Id=\"new\" />",tracked))
         {
-            try { Pump(host,EventType.Repaint,new Vector2(-10,-10)); }
+            try { Pump(host,EventType.Repaint,new UiLayoutPoint(-10,-10)); }
             catch(InvalidOperationException ex) { refused=ex.ToString().Contains("forbidden"); }
             refused = refused || host.Presentation!.GetStatus("value").Fault?.ToString().Contains("forbidden")==true;
         }
@@ -124,13 +125,13 @@ internal static class KernelReactiveFoundationTests
         int reads=0; b.BindTracked("value",()=>{reads++;return value.Value;});
         b.BindCommand("change",()=>{ value.Value=20; Check(b.Get<int>("value")==20,"command Get bypasses presentation snapshot"); });
         var probe=new Probe();
-        UiWidgetRegistry.Register("reactive","probe",()=>probe,Array.Empty<string>());
+UiWidgetRegistry.Define(new UiWidgetDefinition("reactive","probe",()=>probe,Array.Empty<string>()));
         using var host=Host("<Widget Kind=\"probe\" Id=\"probe\" />",b);
         probe.OnDraw=()=>b.Invoke("change");
-        Pump(host,EventType.Repaint,new Vector2(-10,-10));
+        Pump(host,EventType.Repaint,new UiLayoutPoint(-10,-10));
         Check(probe.Measured==1 && probe.Drawn==1 && probe.Height==10 && value.Value==20,"synchronize measure and draw share one presentation version despite input operation");
         probe.OnDraw=null;
-        Pump(host,EventType.Repaint,new Vector2(-10,-10));
+        Pump(host,EventType.Repaint,new UiLayoutPoint(-10,-10));
         Check(probe.Measured==20 && probe.Drawn==20 && probe.Height==200,"next allowed Host frame adopts value and recomputes geometry without manual notification");
         int before=reads; host.Close(); value.Value=30;
         Check(reads==before,"closed Host no longer evaluates view calculations");
@@ -138,37 +139,39 @@ internal static class KernelReactiveFoundationTests
         b.BindTracked<int>("broken",()=>fail?throw new Exception("host-sync"):1);
         using var failingHost=Host("<Widget Kind=\"probe\" Id=\"probe\" />",b);
         bool refused=false;
-        try { Pump(failingHost,EventType.Repaint,new Vector2(-10,-10)); } catch(InvalidOperationException ex) { refused=ex.ToString().Contains("presentation/broken"); }
-        Check(!refused && failingHost.Presentation!.GetStatus("broken").Fault!=null && failingHost.Session.GetNodeByElementId("probe")!=null,"unused faulty tracked key cannot suppress independent custom consumer geometry");
-        fail=false; failingHost.Presentation!.Retry("broken"); Pump(failingHost,EventType.Repaint,new Vector2(-10,-10));
+        try { Pump(failingHost,EventType.Repaint,new UiLayoutPoint(-10,-10)); } catch(InvalidOperationException ex) { refused=ex.ToString().Contains("presentation/broken"); }
+        Check(!refused && failingHost.Presentation!.GetStatus("broken").Fault==null && failingHost.Session.GetNodeByElementId("probe")!=null,"unused faulty tracked key cannot suppress independent custom consumer geometry");
+        fail=false; failingHost.Presentation!.Retry("broken"); Pump(failingHost,EventType.Repaint,new UiLayoutPoint(-10,-10));
         Check(probe.Drawn==30,"new explicit frame after failure has restored context and no replayed operation");
     }
     private static void IndependentProjection()
     {
         var service=new WorkshopService(); using var projection=new WorkshopProjectionExample(service);
-        var probe=new WorkshopProbe(); UiWidgetRegistry.Register("reactive","workshop",()=>probe,Array.Empty<string>());
+        var probe=new WorkshopProbe(); UiWidgetRegistry.Define(new UiWidgetDefinition("reactive","workshop",()=>probe,Array.Empty<string>()));
         using var host=Host("<Widget Kind=\"workshop\" Id=\"orders\" />",projection.Bindings);
-        projection.Bindings.Invoke("complete"); Pump(host,EventType.Repaint,new Vector2(-10,-10));
+        projection.Bindings.Invoke("complete"); Pump(host,EventType.Repaint,new UiLayoutPoint(-10,-10));
         Check(probe.Completed==1 && probe.Height==11,"real Host consumes independent safe business projection through same neutral runtime");
         host.Close(); service.Complete(); projection.Apply(service.ReadSnapshot());
         Check(projection.LastBusinessObservation==2,"external service and independent projection remain active after Host closes");
     }
-    private sealed class Probe:IUiWidget
+    private sealed class Probe:IUiWidget,IUiPresentationDemand
     {
         public string Kind=>"probe";
+        public IEnumerable<string> PresentationKeys(UiWidgetContext ctx){yield return "value";}
         internal int Measured,Drawn; internal float Height; internal Action? OnDraw; internal Action? OnMeasure;
         public void Configure(UiElementSpec spec) { }
-        public void Validate(IUiBindings bindings,string path)=>bindings.ValidateValue<int>("value",path);
+        public void Validate(IUiBindingReader bindings,string path)=>bindings.ValidateValue<int>("value",path);
         public float Measure(UiWidgetContext ctx) { OnMeasure?.Invoke(); Measured=ctx.Bindings.Get<int>("value");return Measured*10; }
-        public void Draw(Rect rect,UiWidgetContext ctx) { OnDraw?.Invoke(); Drawn=ctx.Bindings.Get<int>("value"); Height=rect.height; }
+        public void Draw(UiLayoutRect rect,UiWidgetContext ctx) { OnDraw?.Invoke(); Drawn=ctx.Bindings.Get<int>("value"); Height=rect.Height; }
     }
-    private sealed class WorkshopProbe:IUiWidget
+    private sealed class WorkshopProbe:IUiWidget,IUiPresentationDemand
     {
+        public IEnumerable<string> PresentationKeys(UiWidgetContext ctx){yield return "completed";yield return "text";}
         public string Kind=>"workshop"; internal int Completed;internal float Height;
         public void Configure(UiElementSpec spec) { }
-        public void Validate(IUiBindings bindings,string path)=>bindings.ValidateValue<int>("completed",path);
+        public void Validate(IUiBindingReader bindings,string path)=>bindings.ValidateValue<int>("completed",path);
         public float Measure(UiWidgetContext ctx)=>ctx.Bindings.Get<string>("text").Length;
-        public void Draw(Rect rect,UiWidgetContext ctx) { Completed=ctx.Bindings.Get<int>("completed");Height=rect.height; }
+        public void Draw(UiLayoutRect rect,UiWidgetContext ctx) { Completed=ctx.Bindings.Get<int>("completed");Height=rect.Height; }
     }
     private sealed class ContentMetrics:ITextMetrics
     {
@@ -186,4 +189,3 @@ internal static class KernelReactiveFoundationTests
         public string Translate(string key)=>key;public int TranslationRevision=>0;
     }
 }
-

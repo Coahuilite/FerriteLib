@@ -38,6 +38,7 @@ internal static class KernelStubCoverageTests
         Run("The stub's pure game helpers behave the way the game's do", VerifyPureHelpers);
         Run("The stub's math helpers behave the way the game's do", VerifyMathHelpers);
         Run("The stub's value types answer the accessors and arithmetic a consumer reads", VerifyValueFamilies);
+        Run("The actual native tooltip seam executes its reference-signature conversion", VerifyTooltipSeam);
         Run("A page calling a game inset draws instead of recovering", VerifyConsumerShapedCallDraws);
         Run("The trip guard fires on a planted trip (positive control)", VerifyGuardFiresOnAPlantedTrip);
         Run("The guard's deliberate switch is explicit and works", VerifyDeliberateSwitch);
@@ -341,7 +342,7 @@ internal static class KernelStubCoverageTests
             + "</UiPage>");
 
         using UiHost host = new(Scope, manifest, new UiBindings(), UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
-        host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
+        NativeFixture.DrawFrame(        host,new Rect(0f, 0f, 200f, 120f));
 
         KernelTripGuard.ExpectNoTrips(host.Session, "stub-coverage page draw");
         Check(ProbeWidget.Draws == 1,
@@ -363,7 +364,7 @@ internal static class KernelStubCoverageTests
             + "</UiPage>");
 
         using UiHost host = new(Scope, manifest, new UiBindings(), UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
-        host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
+        NativeFixture.DrawFrame(        host,new Rect(0f, 0f, 200f, 120f));
 
         Check(KernelTripGuard.AnyTripped(host.Session),
             "the planted throw is recorded as a tripped element");
@@ -392,7 +393,7 @@ internal static class KernelStubCoverageTests
         PrepareRegistry();
 
         using UiHost host = new(Scope, ProbeManifest(), new UiBindings(), UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
-        host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
+        NativeFixture.DrawFrame(        host,new Rect(0f, 0f, 200f, 120f));
 
         // A healthy session passes either way; what the switch changes is that a tripping lane can say so
         // in the call instead of leaving the guard out and hoping nobody notices.
@@ -413,8 +414,8 @@ internal static class KernelStubCoverageTests
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Height" });
-        UiWidgetRegistry.Register(Scope, ThrowingProbeKind, () => new ThrowingProbeWidget(), new[] { "Height" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Height" }));
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ThrowingProbeKind, () => new ThrowingProbeWidget(), new[] { "Height" }));
     }
 
     private const string ThrowingProbeKind = "stub/probe-throws";
@@ -433,17 +434,17 @@ internal static class KernelStubCoverageTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
         public float Measure(UiWidgetContext ctx) => 24f;
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
-            Rect inner = rect.ContractedBy(8f);
+            UiLayoutRect inner = new(rect.X+8,rect.Y+8,Math.Max(0,rect.Width-16),Math.Max(0,rect.Height-16));
             Draws++;
-            UiThemeDraw.Label(inner, "probe", ctx.Theme);
+            UiThemeDraw.Label(ctx.Drawing,inner, "probe", ctx.Theme);
         }
     }
 
@@ -455,13 +456,13 @@ internal static class KernelStubCoverageTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
         public float Measure(UiWidgetContext ctx) => 24f;
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             throw new InvalidOperationException("planted stub-coverage draw failure");
         }
@@ -515,5 +516,15 @@ internal static class KernelStubCoverageTests
     private static void Reset()
     {
         UiFitAudit.Detach();
+    }
+
+    private static void VerifyTooltipSeam()
+    {
+        using var execution = new VerseUiExecution();
+        var texts = (System.Collections.IList)typeof(TooltipHandler).GetField("TipTexts")!.GetValue(null)!;
+        int before = texts.Count;
+        execution.Tooltip(new UiLayoutRect(1, 2, 30, 40), "native-tooltip");
+        Check(texts.Count == before + 1 && (string)texts[before] == "native-tooltip",
+            "real execution invokes TipSignal implicit conversion and TipRegion once without recovery");
     }
 }

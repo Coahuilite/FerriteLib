@@ -1,4 +1,4 @@
-# Public API tiers — 0.8 closeout
+# Public API tiers — 0.8 prepublication refactor
 
 The stable target covers S1–S7 and their necessary parameter, return, callback and implementation-interface dependencies. It protects a supported game/adapter target, not a native acceptance result. Current 1.6 and pending 1.7 evidence remain separate.
 
@@ -95,16 +95,11 @@ The type census and stable set are pinned in `FerriteLibApiTierTests`. Its depen
 - `UiDensity` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
 - `UiSliderLayout` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
 - `UiElementProperties` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
-- `UiOption` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
 - `UiChoice` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
 - `UiHost` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
-- `UiValueState` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
 - `UiElementSpec` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
 - `UiWidgetContext` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
-- `IUiBindings` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
-- `IUiTypedChoices` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
 - `UiBindings` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
-- `UiNative` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
 - `UiTheme` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
 - `UiThemeDraw` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
 - `UiFitAudit` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
@@ -156,9 +151,35 @@ The type census and stable set are pinned in `FerriteLibApiTierTests`. Its depen
 - `UiKinds` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
 - `UiHostInputState` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
 
+- `VerseUiExecution` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `VerseUiImages` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `IUiBindingReader` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiBindingRole` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiAttributeKind` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiAttributeValue` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiAttributeDefinition` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiAttributeSchema` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiBindingAddress` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiValueEndpoint` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiChoiceEndpoint` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiControls` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiFrame` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiFramePhase` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiKey` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiTextAnchor` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiControlKey` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiImage` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiNativeEdit` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiNativeEditResult` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `IUiExecution` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `IUiDrawing` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `IUiWidgetCapabilities` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiWidgetParts` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiWidgetDefinition` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `UiSession` — explicit standalone control ownership; only the member subset below is stable.
+
 ## Public-unstable
 
-- `UiSession` — advanced adapter/runtime inspection; not required by the stable author paths.
 - `UiNode` — advanced adapter/runtime inspection; not required by the stable author paths.
 - `UiHitLayer` — advanced adapter/runtime inspection; not required by the stable author paths.
 - `UiPopup` — advanced adapter/runtime inspection; not required by the stable author paths.
@@ -186,16 +207,20 @@ None. The former registrar, layout engine and default implementation classes are
 - `UiWidgetContext.Session`, `.Node`, `.WithNode` and constructors taking a Session/Node remain advanced adapter construction seams. Ordinary custom widgets receive a context; use ElementId/ElementPath, Child, State, Properties, InteractionScope, Invalidate, SharedLabelWidth and IsActive/IsDisabled instead.
 - `UiHost.Session` and `UiWindowHost.Session` remain advanced legacy adapter access. Stable surrounding windows use InputState, ElementProperties, Get/SetScrollPosition, SetInteractionScope, Invalidate, DrawFrame, Accept/Cancel and Close/Dispose.
 - `UiHost.Observe`, `.ObserveLiveHosts`, `.ObserveLiveHost` and their R9 result/budget dependencies are experimental. So are `UiDiagnosticSubscription.GeometryEnabled`, `.GeometryOverlay`, `.DumpGeometry` and `.TryGetGeometrySnapshot`; basic bounded diagnostic records/subscription/disposal are stable.
-- Session-taking `UiNative` legacy overloads and `UiNative.Trace` remain advanced. Their original raw/native conditions are retained; no tree registration or tracked-read prerequisite is added. Context-taking shared activation/range/point/editor paths and standalone draw helpers are stable.
+- `UiControls.Trace` is advanced diagnostic instrumentation. `UiSession` supports only construction, `CreateContext`, `SetFrame`, `Controls`, `IsActive`, `Identity`, `Dispose` and the inherited IDisposable contract as stable. All other Session members remain advanced Host/runtime plumbing. No Session/Node tables are promoted.
 
 Mutable dependency graphs, queues, caches, default private nodes, geometry staging and event-routing tables are internal. R9 returns detached bounded facts, never those tables or business write handles. Detailed budgets and sampled fields remain experimental while the read facility is delivered.
 
 ## Contract and migration references
 
-`UiNative.Button(Rect)` is the retained context-free overload: the shell's chrome close affordance is
-the one library call site left raw. It draws outside the page tree and has no page hit layer to
-arbitrate against. New tree controls use the context-carrying overload. Retire this exception only
-when that affordance becomes a tree element or the raw overload is explicitly migrated.
+No ambient UiNative bridge or context-free core hit overload remains. Native controls use explicit
+UiSession.CreateContext and UiControls, with a single callback frame and execution owner. The only
+raw backend contacts are path-pinned and member-pinned in KernelContainmentTests:
+- Adapters/RimWorld16/VerseUiExecution.cs — native input/capture/focus/editing/draw/clip/scroll/resources.
+- Adapters/RimWorld16/VerseFerriteTextMetrics.cs — real-font measurement and temporary-state restoration.
+- Adapters/RimWorld16/UiWindowHost.cs — window pointer attribution and its own chrome close button.
+The complete Kernel has no backend allowance. The positive control rejects adapter basenames at wrong
+paths, ungranted members, qualified calls and retired ambient calls, including nested arguments.
 
 - [S1–S7 exact paths and dependencies](development/0.8/public-contract.md)
 - [Complete 18-use/nine-container migration inventory](development/0.8/migration-status.md)

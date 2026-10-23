@@ -106,7 +106,7 @@ ctx.Drawing,            new UiLayoutRect(rect.X, rect.YMax - 1f, rect.Width, 1f)
     private float ReadHeight()
     {
         if (spec.TryGetAttribute("Height", out string raw)
-            && float.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float height)
+            && spec.TryGetNumber("Height", out float height)
             && height > 0f)
         {
             return height;

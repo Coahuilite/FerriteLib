@@ -1,3 +1,5 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -5,7 +7,6 @@ using System.Reflection;
 
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -76,8 +77,8 @@ internal static class KernelRoleAttributeTests
             + "</Row>"
             + "</UiPage>";
         using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.Vanilla, new WrappingMetrics(), new StubTranslation());
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(400f, 60f));
-        CheckClose(32f, snapshot.RectById["cap"].width,
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(400f, 60f));
+        CheckClose(32f, snapshot.RectById["cap"].Width,
             "a role does not join the label set: Width=Auto still measures Text/TextKey (2 ideographs x 16)");
     }
 
@@ -118,7 +119,7 @@ internal static class KernelRoleAttributeTests
                 Attributes(("ActionBind", "go"), ("Text", "Apply"), ("Tone", "purplish"))));
             UiWidgetContext ctx = Context(session, theme, bindings, 120f);
             ClearBoxes();
-            button.Draw(new Rect(0f, 0f, 120f, 28f), ctx);
+            NativeFixture.Draw(            button,new UiLayoutRect(0f, 0f, 120f, 28f), ctx);
             CheckPainted(theme[UiPaletteRole.ControlSurface], theme[UiPaletteRole.Border], "a tone outside the vocabulary paints the default row");
             Check(fired == 0, "painting is not activating: the seam was never armed");
 
@@ -139,7 +140,7 @@ internal static class KernelRoleAttributeTests
                 "the last diagnostic names the authored value");
 
             ClearBoxes();
-            button.Draw(new Rect(0f, 0f, 120f, 28f), ctx);
+            NativeFixture.Draw(            button,new UiLayoutRect(0f, 0f, 120f, 28f), ctx);
             Check(records.Count == 1 && UiFitAudit.StyleFallbackCount == 1,
                 "a second pass reports the same finding once, not per frame");
 
@@ -148,7 +149,7 @@ internal static class KernelRoleAttributeTests
             toned.Configure(new UiElementSpec("apply", ButtonWidget.Kind,
                 Attributes(("ActionBind", "go"), ("Text", "Apply"), ("Tone", "Danger"))));
             ClearBoxes();
-            toned.Draw(new Rect(0f, 0f, 120f, 28f), ctx);
+            NativeFixture.Draw(            toned,new UiLayoutRect(0f, 0f, 120f, 28f), ctx);
             CheckPainted(theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerSurface], "a declared tone paints that row");
             Check(records.Count == 1, "a declared tone records nothing: it is a rule, not a fallback");
 
@@ -157,7 +158,7 @@ internal static class KernelRoleAttributeTests
             leaf.Configure(new UiElementSpec("note", WrappedTextWidget.Kind,
                 Attributes(("Text", "hello"), ("Emphasis", "shouty"))));
             int before = LabelCount();
-            leaf.Draw(new Rect(0f, 0f, 200f, 40f), Context(session, theme, new UiBindings(), 200f));
+            NativeFixture.Draw(            leaf,new UiLayoutRect(0f, 0f, 200f, 40f), Context(session, theme, new UiBindings(), 200f));
             Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.Foreground]),
                 "an emphasis outside the vocabulary paints the Normal text colour");
             Check(records.Count == 2 && records[1].Attribute == "Emphasis" && records[1].Resolved == "Normal",
@@ -168,7 +169,7 @@ internal static class KernelRoleAttributeTests
             muted.Configure(new UiElementSpec("note", WrappedTextWidget.Kind,
                 Attributes(("Text", "hello"), ("Emphasis", "Muted"))));
             before = LabelCount();
-            muted.Draw(new Rect(0f, 0f, 200f, 40f), Context(session, theme, new UiBindings(), 200f));
+            NativeFixture.Draw(            muted,new UiLayoutRect(0f, 0f, 200f, 40f), Context(session, theme, new UiBindings(), 200f));
             Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.SecondaryForeground]), "Emphasis=Muted paints the secondary text");
             Check(records.Count == 2, "a declared emphasis records nothing");
 
@@ -179,7 +180,7 @@ internal static class KernelRoleAttributeTests
                 + "<Widget Id=\"probe\" Kind=\"input/button\" ActionBind=\"go\" Text=\"x\" Tone=\"chartreuse\" Height=\"28\" />"
                 + "</UiPage>";
             using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), bindings, theme, new WrappingMetrics(), new StubTranslation());
-            host.DrawFrame(new Rect(0f, 0f, 200f, 60f));
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0f, 0f, 200f, 60f));
             Check(records.Count == 3, "the tree's own pass recorded the fallback as well");
             if (records.Count == 3)
             {
@@ -194,7 +195,7 @@ internal static class KernelRoleAttributeTests
                 "Reset forgets the appearance findings and the last diagnostic with them");
             int sinkCalls = records.Count;
             ClearBoxes();
-            button.Draw(new Rect(0f, 0f, 120f, 28f), ctx);
+            NativeFixture.Draw(            button,new UiLayoutRect(0f, 0f, 120f, 28f), ctx);
             Check(UiFitAudit.StyleFallbackCount == 1, "a later pass records again, so the half stays live");
             Check(records.Count == sinkCalls + 1, "and the sink fires again after the reset");
 
@@ -260,7 +261,7 @@ internal static class KernelRoleAttributeTests
         button.Configure(new UiElementSpec("apply", ButtonWidget.Kind, Attributes(("ActionBind", "go"), ("Text", "ok"), ("Tone", "Danger"))));
         ClearBoxes();
         int before = LabelCount();
-        button.Draw(new Rect(0f, 0f, 120f, 28f), ctx);
+        NativeFixture.Draw(        button,new UiLayoutRect(0f, 0f, 120f, 28f), ctx);
         CheckPainted(theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerSurface], "a Danger button fills and edges with the alarm row");
         Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DangerForeground]), "and writes that row's text colour");
 
@@ -268,27 +269,27 @@ internal static class KernelRoleAttributeTests
         success.Configure(new UiElementSpec("apply", ButtonWidget.Kind, Attributes(("ActionBind", "go"), ("Text", "ok"), ("Tone", "Success"), ("Emphasis", "Muted"))));
         ClearBoxes();
         before = LabelCount();
-        success.Draw(new Rect(0f, 0f, 120f, 28f), ctx);
+        NativeFixture.Draw(        success,new UiLayoutRect(0f, 0f, 120f, 28f), ctx);
         CheckPainted(theme[UiPaletteRole.SuccessSurface], theme[UiPaletteRole.StrongBorder], "a Success button fills with the success row");
         Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.SelectedForeground]), "a saturated tone's text ignores emphasis, as the table says");
 
         WrappedTextWidget leaf = new();
         leaf.Configure(new UiElementSpec("note", WrappedTextWidget.Kind, Attributes(("Text", "hello"), ("Tone", "Danger"))));
         before = LabelCount();
-        leaf.Draw(new Rect(0f, 0f, 200f, 40f), ctx);
+        NativeFixture.Draw(        leaf,new UiLayoutRect(0f, 0f, 200f, 40f), ctx);
         Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DangerForeground]), "text/wrapped writes the role's text colour");
 
         // The rule's three coordinates must be one pixel: fail-soft renders what "no declaration" renders,
         // never a promotion to the neutral treatment the author did not ask for.
         RuleWidget rule = new();
         rule.Configure(new UiElementSpec("sep", RuleWidget.Kind, Attributes(("Thickness", "2"))));
-        Color untold = Painted(rule, ctx);
+        UiColour untold = Painted(rule, ctx);
 
         rule.Configure(new UiElementSpec("sep", RuleWidget.Kind, Attributes(("Thickness", "2"), ("Tone", "Neutral"))));
-        Color explicitNeutral = Painted(rule, ctx);
+        UiColour explicitNeutral = Painted(rule, ctx);
 
         rule.Configure(new UiElementSpec("sep", RuleWidget.Kind, Attributes(("Thickness", "2"), ("Tone", "puce"))));
-        Color fellBack = Painted(rule, ctx);
+        UiColour fellBack = Painted(rule, ctx);
 
         Check(SameColor(untold, explicitNeutral) && SameColor(explicitNeutral, fellBack),
             "an unwritten tone, an explicit Neutral and an unknown value's fallback paint one pixel");
@@ -296,20 +297,20 @@ internal static class KernelRoleAttributeTests
             "and that pixel is the neutral treatment's edge");
 
         rule.Configure(new UiElementSpec("sep", RuleWidget.Kind, Attributes(("Thickness", "2"), ("Tone", "Danger"))));
-        Color dangerRule = Painted(rule, ctx);
+        UiColour dangerRule = Painted(rule, ctx);
         Check(SameColor(dangerRule, theme[UiPaletteRole.DangerSurface]), "a toned rule opts into that treatment's edge colour");
         Check(!SameColor(dangerRule, untold), "and a real tone is still visibly a declaration");
 
         SliderWidget slider = new();
         slider.Configure(new UiElementSpec("v", SliderWidget.Kind, Attributes(("Bind", "v"), ("Label", "Vol"), ("Tone", "Danger"))));
         before = LabelCount();
-        slider.Draw(new Rect(0f, 0f, 200f, 28f), ctx);
+        NativeFixture.Draw(        slider,new UiLayoutRect(0f, 0f, 200f, 28f), ctx);
         Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DangerForeground]), "input/slider paints its label in the role's text colour");
 
         NumberFieldWidget field = new();
         field.Configure(new UiElementSpec("v", NumberFieldWidget.Kind, Attributes(("Bind", "v"), ("Label", "Vol"), ("Tone", "Danger"))));
         before = LabelCount();
-        field.Draw(new Rect(0f, 0f, 200f, 28f), ctx);
+        NativeFixture.Draw(        field,new UiLayoutRect(0f, 0f, 200f, 28f), ctx);
         Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DangerForeground]), "input/number-field paints its label in the role's text colour");
     }
 
@@ -333,7 +334,7 @@ internal static class KernelRoleAttributeTests
         readOnly.Configure(new UiElementSpec("published", SliderWidget.Kind,
             Attributes(("Bind", "published"), ("Min", "0"), ("Max", "1"), ("Label", "Vol"), ("Tone", "Danger"))));
         int before = LabelCount();
-        readOnly.Draw(new Rect(0f, 0f, 200f, 28f), Context(session, theme, bindings, 200f));
+        NativeFixture.Draw(        readOnly,new UiLayoutRect(0f, 0f, 200f, 28f), Context(session, theme, bindings, 200f));
         Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DisabledForeground]),
             "a read-only slider paints disabled whatever tone the author wrote (state beats author)");
 
@@ -341,21 +342,21 @@ internal static class KernelRoleAttributeTests
         writable.Configure(new UiElementSpec("editable", SliderWidget.Kind,
             Attributes(("Bind", "editable"), ("Min", "0"), ("Max", "1"), ("Label", "Vol"), ("Tone", "Danger"))));
         before = LabelCount();
-        writable.Draw(new Rect(0f, 0f, 200f, 28f), Context(session, theme, bindings, 200f));
+        NativeFixture.Draw(        writable,new UiLayoutRect(0f, 0f, 200f, 28f), Context(session, theme, bindings, 200f));
         Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DangerForeground]), "a writable slider keeps the authored tone");
 
         WrappedTextWidget bound = new();
         bound.Configure(new UiElementSpec("note", WrappedTextWidget.Kind,
             Attributes(("Bind", "publishedText"), ("Text", "x"), ("Tone", "Danger"))));
         before = LabelCount();
-        bound.Draw(new Rect(0f, 0f, 200f, 40f), Context(session, theme, bindings, 200f));
+        NativeFixture.Draw(        bound,new UiLayoutRect(0f, 0f, 200f, 40f), Context(session, theme, bindings, 200f));
         Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DisabledForeground]),
             "a text leaf reading a read-only binding is disabled too");
 
         WrappedTextWidget literal = new();
         literal.Configure(new UiElementSpec("note", WrappedTextWidget.Kind, Attributes(("Text", "x"), ("Tone", "Danger"))));
         before = LabelCount();
-        literal.Draw(new Rect(0f, 0f, 200f, 40f), Context(session, theme, bindings, 200f));
+        NativeFixture.Draw(        literal,new UiLayoutRect(0f, 0f, 200f, 40f), Context(session, theme, bindings, 200f));
         Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DangerForeground]),
             "an unbound leaf has no data side to ask, so the role decides");
 
@@ -365,7 +366,7 @@ internal static class KernelRoleAttributeTests
         button.Configure(new UiElementSpec("apply", ButtonWidget.Kind,
             Attributes(("ActionBind", "go"), ("Text", "ok"), ("Tone", "Danger"))));
         ClearBoxes();
-        button.Draw(new Rect(0f, 0f, 120f, 28f), Context(session, theme, bindings, 120f));
+        NativeFixture.Draw(        button,new UiLayoutRect(0f, 0f, 120f, 28f), Context(session, theme, bindings, 120f));
         CheckPainted(theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerSurface], "a command-bound button keeps its authored tone (no writability question)");
 
         Check(UiFitAudit.StyleFallbackCount == 0, "state beating author is a rule, not a fallback");
@@ -401,7 +402,10 @@ internal static class KernelRoleAttributeTests
             // A band shorter than the wrapped need makes the audit speak; the atom insets its own
             // padding first, so the probe rect has to leave a band taller than one pixel for the audit
             // to look at it at all.
-            leaf.Draw(new Rect(0f, 0f, 120f, 20f), Context(session, theme, new UiBindings(), 120f));
+            NativeFixture.Draw(            // A band shorter than the wrapped need makes the audit speak; the atom insets its own
+            // padding first, so the probe rect has to leave a band taller than one pixel for the audit
+            // to look at it at all.
+            leaf,new UiLayoutRect(0f, 0f, 120f, 20f), Context(session, theme, new UiBindings(), 120f));
             Check(reports.Count == 1 && reports[0].Font == UiFont.Medium,
                 "the font the outlet was handed is the density font the band was measured with (reports: "
                 + reports.Count + ")");
@@ -411,7 +415,7 @@ internal static class KernelRoleAttributeTests
             UiFitAudit.Reset();
             ChromeBannerWidget banner = new();
             banner.Configure(new UiElementSpec("b", ChromeBannerWidget.Kind, Attributes(("Text", LongCjk))));
-            banner.Draw(new Rect(0f, 0f, 20f, 20f), Context(session, theme, new UiBindings(), 20f));
+            NativeFixture.Draw(            banner,new UiLayoutRect(0f, 0f, 20f, 20f), Context(session, theme, new UiBindings(), 20f));
             Check(reports.Count == 1 && reports[0].Font == UiFont.Medium,
                 "chrome/banner now paints the explicit environment font that its band measures");
         }
@@ -438,17 +442,13 @@ internal static class KernelRoleAttributeTests
                 Context(session, dense, bindings, 120f), ("Text", LongCjk)),
             "the text atom's band carries the density padding (3 lines of 16 plus 2 x 10 at a 120px column)");
 
-        Rect track = default;
-        UiNative.SliderOverride = (rect, current, min, max) =>
-        {
-            track = rect;
-            return current;
-        };
+        int beforeTrack = NativeFixture.Records<UiLayoutRect>(typeof(Verse.Widgets).GetField("DrawBoxSolidRects")!.GetValue(null)!).Count;
         SliderWidget slider = new();
         slider.Configure(new UiElementSpec("v", SliderWidget.Kind, Attributes(("Bind", "v"), ("Label", "ab"))));
-        slider.Draw(new Rect(0f, 0f, 300f, 28f), ctx);
-        CheckClose(36f, track.x, "the slider's label band and gap both follow the density tokens (16 + 8 spacing + 12 gap)");
-        UiNative.SliderOverride = null;
+        NativeFixture.Draw(        slider,new UiLayoutRect(0f, 0f, 300f, 28f), ctx);
+        var track = NativeFixture.Records<UiLayoutRect>(typeof(Verse.Widgets).GetField("DrawBoxSolidRects")!.GetValue(null)!)[beforeTrack];
+        CheckClose(36f, track.X - 6f, "the slider's label band and gap both follow the density tokens (16 + 8 spacing + 12 gap)");
+        NativeFixture.SliderOverride = null;
 
         CheckClose(36f, Measured(new WrappedTextWidget(), WrappedTextWidget.Kind, ctx, ("Text", "ab"), ("Tone", "Danger")),
             "and a role adds nothing to that band (1 line of 16 plus 2 x 10)");
@@ -483,11 +483,11 @@ internal static class KernelRoleAttributeTests
 
         try
         {
-            UiNative.DebugMousePositionEnabled = true;
-            UiNative.DebugMousePosition = new Vector2(80f, 14f);
-            UiNative.DebugMouseDown = true;
-            UiNative.DebugMouseDrag = true;
-            UiNative.SliderOverride = (rect, current, min, max) => 0.9f;
+            NativeFixture.DebugMousePositionEnabled = true;
+            NativeFixture.DebugMousePosition = new UiLayoutPoint(175.2f, 14f);
+            NativeFixture.DebugMouseDown = true;
+            NativeFixture.DebugMouseDrag = true;
+
 
             SliderWidget readOnly = new();
             readOnly.Configure(new UiElementSpec("published", SliderWidget.Kind,
@@ -495,7 +495,7 @@ internal static class KernelRoleAttributeTests
             Exception? thrown = null;
             try
             {
-                readOnly.Draw(new Rect(0f, 0f, 200f, 28f), ctx);
+                NativeEvents.Click(new UiLayoutPoint(175.2f,14),()=>NativeFixture.Draw(readOnly,new UiLayoutRect(0,0,200,28),ctx));
             }
             catch (Exception ex)
             {
@@ -511,10 +511,10 @@ internal static class KernelRoleAttributeTests
             SliderWidget writable = new();
             writable.Configure(new UiElementSpec("editable", SliderWidget.Kind,
                 Attributes(("Bind", "editable"), ("Min", "0"), ("Max", "1"))));
-            writable.Draw(new Rect(0f, 0f, 200f, 28f), ctx);
+            NativeEvents.Click(new UiLayoutPoint(175.2f,14),()=>NativeFixture.Draw(writable,new UiLayoutRect(0,0,200,28),ctx));
             CheckClose(0.9f, editable, "the same drag on a writable binding commits");
 
-            UiNative.TextFieldOverride = (rect, text) => "0.7";
+            NativeFixture.TextFieldOverride = (rect, text) => "0.7";
 
             NumberFieldWidget readOnlyField = new();
             readOnlyField.Configure(new UiElementSpec("published", NumberFieldWidget.Kind,
@@ -522,7 +522,7 @@ internal static class KernelRoleAttributeTests
             thrown = null;
             try
             {
-                readOnlyField.Draw(new Rect(0f, 0f, 120f, 28f), Context(session, theme, bindings, 120f));
+                NativeFixture.Draw(                readOnlyField,new UiLayoutRect(0f, 0f, 120f, 28f), Context(session, theme, bindings, 120f));
             }
             catch (Exception ex)
             {
@@ -536,7 +536,7 @@ internal static class KernelRoleAttributeTests
             NumberFieldWidget writableField = new();
             writableField.Configure(new UiElementSpec("editable", NumberFieldWidget.Kind,
                 Attributes(("Bind", "editable"), ("Min", "0"), ("Max", "10"), ("Live", "true"))));
-            writableField.Draw(new Rect(0f, 0f, 120f, 28f), Context(session, theme, bindings, 120f));
+            NativeFixture.Draw(            writableField,new UiLayoutRect(0f, 0f, 120f, 28f), Context(session, theme, bindings, 120f));
             CheckClose(0.7f, editable, "the same edit on a writable binding commits");
         }
         finally
@@ -554,12 +554,12 @@ internal static class KernelRoleAttributeTests
         using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), bindings, theme, new WrappingMetrics(), new StubTranslation());
         try
         {
-            UiNative.DebugMousePositionEnabled = true;
-            UiNative.DebugMousePosition = new Vector2(80f, 14f);
-            UiNative.DebugMouseDown = true;
-            UiNative.DebugMouseDrag = true;
-            UiNative.SliderOverride = (rect, current, min, max) => 0.9f;
-            host.DrawFrame(new Rect(0f, 0f, 200f, 60f));
+            NativeFixture.DebugMousePositionEnabled = true;
+            NativeFixture.DebugMousePosition = new UiLayoutPoint(80f, 14f);
+            NativeFixture.DebugMouseDown = true;
+            NativeFixture.DebugMouseDrag = true;
+            NativeFixture.SliderOverride = (rect, current, min, max) => 0.9f;
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0f, 0f, 200f, 60f));
         }
         finally
         {
@@ -573,10 +573,10 @@ internal static class KernelRoleAttributeTests
 
     // --- harness --------------------------------------------------------------------------------
 
-    private static UiLayoutSnapshot Arrange(string xml, IUiBindings bindings, UiTheme theme)
+    private static UiLayoutSnapshot Arrange(string xml, IUiBindingReader bindings, UiTheme theme)
     {
         using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), bindings, theme, new WrappingMetrics(), new StubTranslation());
-        return host.MeasureAndArrange(new Vector2(400f, 400f));
+        return host.MeasureAndArrange(new UiLayoutPoint(400f, 400f));
     }
 
     private static float Measured(IUiWidget widget, string kind, UiWidgetContext ctx, params (string Name, string Value)[] attributes)
@@ -614,16 +614,16 @@ internal static class KernelRoleAttributeTests
         return attributes;
     }
 
-    private static UiWidgetContext Context(UiSession session, UiTheme theme, IUiBindings bindings, float viewWidth)
+    private static UiWidgetContext Context(UiSession session, UiTheme theme, IUiBindingReader bindings, float viewWidth)
     {
-        return new UiWidgetContext(Scope, session, new WrappingMetrics(), theme, new StubTranslation(), bindings, viewWidth, "root");
+        return NativeFixture.Context(Scope, session, new WrappingMetrics(), theme, new StubTranslation(), bindings, viewWidth, "root");
     }
 
     /// <summary>Draws one rule and returns the single colour it painted.</summary>
-    private static Color Painted(RuleWidget rule, UiWidgetContext ctx)
+    private static UiColour Painted(RuleWidget rule, UiWidgetContext ctx)
     {
         ClearBoxes();
-        rule.Draw(new Rect(0f, 0f, 100f, 9f), ctx);
+        NativeFixture.Draw(        rule,new UiLayoutRect(0f, 0f, 100f, 9f), ctx);
         IList colors = RecordedBoxColors();
         if (colors.Count != 1)
         {
@@ -631,10 +631,10 @@ internal static class KernelRoleAttributeTests
             return default;
         }
 
-        return (Color)colors[0]!;
+        return NativeFixture.Record<UiColour>(colors[0]!);
     }
 
-    private static void CheckPainted(Color fill, Color border, string name)
+    private static void CheckPainted(UiColour fill, UiColour border, string name)
     {
         IList colors = RecordedBoxColors();
         if (colors.Count < 5)
@@ -643,16 +643,16 @@ internal static class KernelRoleAttributeTests
             return;
         }
 
-        bool ok = SameColor((Color)colors[0]!, fill);
+        bool ok = SameColor(NativeFixture.Record<UiColour>(colors[0]!), fill);
         for (int i = 1; i < 5; i++)
         {
-            ok &= SameColor((Color)colors[i]!, border);
+            ok &= SameColor(NativeFixture.Record<UiColour>(colors[i]!), border);
         }
 
         Check(ok, name);
     }
 
-    private static Color LastLabelColor(int start)
+    private static UiColour LastLabelColor(int start)
     {
         IList colors = RecordedLabelColors();
         if (colors.Count <= start)
@@ -661,7 +661,7 @@ internal static class KernelRoleAttributeTests
             return default;
         }
 
-        return (Color)colors[colors.Count - 1]!;
+        return NativeFixture.Record<UiColour>(colors[colors.Count - 1]!);
     }
 
     private static int LabelCount()
@@ -669,14 +669,14 @@ internal static class KernelRoleAttributeTests
         return RecordedLabelColors().Count;
     }
 
-    private static bool SameColor(Color left, Color right)
+    private static bool SameColor(UiColour left, UiColour right)
     {
-        return Near(left.r, right.r) && Near(left.g, right.g) && Near(left.b, right.b) && Near(left.a, right.a);
+        return Near(left.Red, right.Red) && Near(left.Green, right.Green) && Near(left.Blue, right.Blue) && Near(left.Alpha, right.Alpha);
     }
 
-    private static bool SameRect(Rect left, Rect right)
+    private static bool SameRect(UiLayoutRect left, UiLayoutRect right)
     {
-        return Near(left.x, right.x) && Near(left.y, right.y) && Near(left.width, right.width) && Near(left.height, right.height);
+        return Near(left.X, right.X) && Near(left.Y, right.Y) && Near(left.Width, right.Width) && Near(left.Height, right.Height);
     }
 
     private static bool Near(float expected, float actual)
@@ -718,15 +718,15 @@ internal static class KernelRoleAttributeTests
 
     private static void ResetSeams()
     {
-        UiNative.DebugMousePositionEnabled = false;
-        UiNative.DebugMouseDown = false;
-        UiNative.DebugMouseDrag = false;
-        UiNative.DebugMouseUp = false;
-        UiNative.DebugEnter = false;
-        UiNative.DebugFocusLost = false;
-        UiNative.ButtonOverride = null;
-        UiNative.SliderOverride = null;
-        UiNative.TextFieldOverride = null;
+        NativeFixture.DebugMousePositionEnabled = false;
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.DebugMouseDrag = false;
+        NativeFixture.DebugMouseUp = false;
+        NativeFixture.DebugEnter = false;
+        NativeFixture.DebugFocusLost = false;
+        NativeFixture.ButtonOverride = null;
+        NativeFixture.SliderOverride = null;
+        NativeFixture.TextFieldOverride = null;
     }
 
     private static void ClearBoxes()

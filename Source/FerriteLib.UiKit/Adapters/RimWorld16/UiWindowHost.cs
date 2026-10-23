@@ -28,11 +28,9 @@ public enum UiWindowNotice
 /// here, "chrome" is a defined boundary with an owner instead of an exemption request.
 /// </para>
 /// <para>
-/// <b>Boundary.</b> Every pixel this type paints goes through <see cref="UiThemeDraw"/> and every hit
-/// test through <see cref="UiNative.Button"/> / <see cref="UiNative.IsMouseOver"/>. It deliberately does
-/// NOT appear in the harness containment allowlist, so a raw backend call added here reddens
-/// <c>KernelContainmentTests</c> rather than being caught in review — the acceptance line the review
-/// asked for (condition d), enforced by a gate instead of by trust.
+/// <b>Boundary.</b> Page drawing uses the explicit execution port. This native adapter owns pointer
+/// attribution and its own close chrome; KernelContainmentTests pins their actual path/member contacts.
+/// Core controls and drafts remain in the neutral Session, never in the native window.
 /// </para>
 /// <para>
 /// <b>No consumer numbers as library defaults.</b> Window <em>size</em> is a provider
@@ -46,6 +44,8 @@ public abstract class UiWindowHost : Window
 {
     private UiHost? host;
     protected VerseUiExecution Execution { get; } = new VerseUiExecution();
+    /// <summary>Window-owned native image references. Bind the returned neutral tokens; closing drops references, never supplier textures.</summary>
+    public VerseUiImages Images => Execution.Images;
     private bool pageUnavailable;
     private bool noticeDueNextFrame;
     private Exception? lastFailure;
@@ -622,6 +622,7 @@ public abstract class UiWindowHost : Window
 
         // Closing disposes the session with the host, so reopening gets a clean retry.
         ReleaseHost();
+        Execution.Dispose();
         base.PreClose();
     }
 

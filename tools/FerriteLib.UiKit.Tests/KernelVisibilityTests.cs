@@ -1,9 +1,10 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -60,7 +61,7 @@ internal static class KernelVisibilityTests
             + "</UiPage>",
             new UiBindings());
 
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(!snapshot.RectById.ContainsKey("gone"), "Visible=false hides the widget it is declared on");
         Check(snapshot.RectById.ContainsKey("here"), "Visible=true shows it");
         Check(!snapshot.RectById.ContainsKey("legacy"), "and the legacy static Hidden still hides");
@@ -90,13 +91,13 @@ internal static class KernelVisibilityTests
             + "</UiPage>",
             bindings);
 
-        UiLayoutSnapshot hidden = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot hidden = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(!hidden.RectById.ContainsKey("keeper"), "a false VisibleKey hides the element on the first arrange");
         Check(hidden.RectById.ContainsKey("other"), "and leaves its sibling alone");
 
         show = true;
         bindings.NotifyChanged("show-keeper");
-        UiLayoutSnapshot shown = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot shown = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(
             shown.RectById.ContainsKey("keeper"),
             "and announcing the key shows the element again without reopening the page");
@@ -104,7 +105,7 @@ internal static class KernelVisibilityTests
 
         show = false;
         bindings.NotifyChanged("show-keeper");
-        UiLayoutSnapshot hiddenAgain = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot hiddenAgain = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(!hiddenAgain.RectById.ContainsKey("keeper"), "and it hides again the same way");
     }
 
@@ -119,7 +120,7 @@ internal static class KernelVisibilityTests
             new UiBindings());
 
         UiFitAudit.Reset();
-        UiLayoutSnapshot first = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot first = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         int reported = UiFitAudit.StyleFallbackCount;
 
         Check(
@@ -133,7 +134,7 @@ internal static class KernelVisibilityTests
 
         // A different size forces a real re-arrange, so the visibility query runs again: the finding must
         // not be recorded a second time.
-        host.MeasureAndArrange(new Vector2(201f, 200f));
+        host.MeasureAndArrange(new UiLayoutPoint(201f, 200f));
         Check(
             UiFitAudit.StyleFallbackCount == reported,
             "and a page that re-arranges every frame records it once, not once per frame");
@@ -158,14 +159,14 @@ internal static class KernelVisibilityTests
             + "</UiPage>",
             bindings);
 
-        UiLayoutSnapshot all = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot all = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(
             PathOf("a") == "row/" + ProbeKind + "[0]" && PathOf("c") == "row/" + ProbeKind + "[2]",
             "unnamed siblings are identified by their declared ordinal (the lane's own control: identity is observable at all)");
 
         showMiddle = false;
         bindings.NotifyChanged("show-middle");
-        UiLayoutSnapshot hidden = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot hidden = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(!hidden.VisibleIds.Contains("row/" + ProbeKind + "[1]"), "the middle sibling is hidden");
         Check(
             PathOf("c") == "row/" + ProbeKind + "[2]",
@@ -174,7 +175,7 @@ internal static class KernelVisibilityTests
 
         showMiddle = true;
         bindings.NotifyChanged("show-middle");
-        host.MeasureAndArrange(new Vector2(200f, 200f));
+        host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(
             PathOf("b") == "row/" + ProbeKind + "[1]",
             "showing it again reuses the same identity, so its state was never handed to another element");
@@ -195,17 +196,17 @@ internal static class KernelVisibilityTests
             + "</UiPage>",
             bindings);
 
-        host.MeasureAndArrange(new Vector2(200f, 200f));
+        host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         UiNode keeper = host.Session.GetNodeByElementId("keeper")
             ?? throw new Exception("the keeper was not arranged");
-        keeper.GetOrCreateState("draft").EditText = "typed";
+        NativeFixture.Custom(keeper,"draft").EditText = "typed";
         UiNode other = host.Session.GetNodeByElementId("other")
             ?? throw new Exception("the sibling was not arranged");
-        other.GetOrCreateState("draft").EditText = "untouched";
+        NativeFixture.Custom(other,"draft").EditText = "untouched";
 
         show = false;
         bindings.NotifyChanged("show-keeper");
-        host.MeasureAndArrange(new Vector2(200f, 200f));
+        host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
 
         UiNode? keeperAfter = host.Session.GetNodeByElementId("keeper");
         Check(
@@ -215,19 +216,19 @@ internal static class KernelVisibilityTests
             keeperAfter != null,
             "GetNodeByElementId answers by identity rather than by arrangement, which is what keeps a hidden element's draft reachable");
         Check(
-            keeperAfter != null && keeperAfter.ValueStates["draft"].EditText == "typed",
+            keeperAfter != null && NativeFixture.CustomSlots(keeperAfter)["draft"].EditText == "typed",
             "and its draft survives the hide");
         Check(
             ReferenceEquals(host.Session.GetNodeByElementId("other"), other)
-                && other.ValueStates["draft"].EditText == "untouched",
+                && NativeFixture.CustomSlots(other)["draft"].EditText == "untouched",
             "while an unrelated element's identity and state are untouched");
 
         show = true;
         bindings.NotifyChanged("show-keeper");
-        host.MeasureAndArrange(new Vector2(200f, 200f));
+        host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(
             ReferenceEquals(host.Session.GetNodeByElementId("keeper"), keeper)
-                && keeper.ValueStates["draft"].EditText == "typed",
+                && NativeFixture.CustomSlots(keeper)["draft"].EditText == "typed",
             "showing it again resumes on the same node with the same state");
     }
 
@@ -235,7 +236,7 @@ internal static class KernelVisibilityTests
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Id", "Kind", "Tag", "Height" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Id", "Kind", "Tag", "Height" }));
 
         bool showC = true;
         var bindings = new UiBindings();
@@ -251,44 +252,44 @@ internal static class KernelVisibilityTests
         string three = Page("a", "b", "c");
         string two = Page("a", "c");
 
-        new UiLayoutEngine(Scope).ArrangeRoots(ctx, new Vector2(200f, 200f), UiLayoutManifest.Parse(three).Roots);
+        new UiLayoutEngine(Scope).ArrangeRoots(ctx, new UiLayoutPoint(200f, 200f), UiLayoutManifest.Parse(three).Roots);
 
         UiNode a = session.GetNodeByElementId("a") ?? throw new Exception("a was not arranged");
         UiNode b = session.GetNodeByElementId("b") ?? throw new Exception("b was not arranged");
         UiNode c = session.GetNodeByElementId("c") ?? throw new Exception("c was not arranged");
-        a.GetOrCreateState("draft").EditText = "keep";
-        b.GetOrCreateState("draft").EditText = "gone";
-        c.GetOrCreateState("draft").EditText = "hidden-but-here";
+        NativeFixture.Custom(a,"draft").EditText = "keep";
+        NativeFixture.Custom(b,"draft").EditText = "gone";
+        NativeFixture.Custom(c,"draft").EditText = "hidden-but-here";
         UiNode body = session.GetNodeByElementId("body") ?? throw new Exception("the scroll container was not arranged");
-        session.SetScrollPosition(body, new Vector2(0f, 5f));
+        session.SetScrollPosition(body, new UiLayoutPoint(0f, 5f));
 
         // First: hide c through its key. A declared identity keeps everything.
         showC = false;
         bindings.NotifyChanged("show-c");
-        new UiLayoutEngine(Scope).ArrangeRoots(ctx, new Vector2(200f, 200f), UiLayoutManifest.Parse(three).Roots);
+        new UiLayoutEngine(Scope).ArrangeRoots(ctx, new UiLayoutPoint(200f, 200f), UiLayoutManifest.Parse(three).Roots);
 
         Check(
-            ReferenceEquals(session.GetNodeByElementId("c"), c) && c.ValueStates["draft"].EditText == "hidden-but-here",
+            ReferenceEquals(session.GetNodeByElementId("c"), c) && NativeFixture.CustomSlots(c)["draft"].EditText == "hidden-but-here",
             "a declared but hidden identity keeps its node and its state - the prune is about removal, not about being arranged");
 
         // Then: remove b. That identity, and only that identity, is released.
-        new UiLayoutEngine(Scope).ArrangeRoots(ctx, new Vector2(200f, 200f), UiLayoutManifest.Parse(two).Roots);
+        new UiLayoutEngine(Scope).ArrangeRoots(ctx, new UiLayoutPoint(200f, 200f), UiLayoutManifest.Parse(two).Roots);
 
         Check(
             session.GetNodeByElementId("b") == null,
             "a removed identity answers null from the Id bridge too: the node is released by identity, not merely un-arranged");
         Check(session.GetNode(b.Id) == null, "and the node is unreachable by identity too, so nothing holds a stale Kind");
         Check(
-            ReferenceEquals(session.GetNodeByElementId("a"), a) && a.ValueStates["draft"].EditText == "keep",
+            ReferenceEquals(session.GetNodeByElementId("a"), a) && NativeFixture.CustomSlots(a)["draft"].EditText == "keep",
             "while a surviving identity keeps its node and its state");
         Check(
-            ReferenceEquals(session.GetNodeByElementId("c"), c) && c.ValueStates["draft"].EditText == "hidden-but-here",
+            ReferenceEquals(session.GetNodeByElementId("c"), c) && NativeFixture.CustomSlots(c)["draft"].EditText == "hidden-but-here",
             "including a hidden one the new definition still declares");
-        Vector2 scroll = session.GetScrollPosition(body);
-        Check(Near(scroll.x, 0f) && Near(scroll.y, 5f), "and unrelated session state - a scroll position - survives the prune");
+        UiLayoutPoint scroll = session.GetScrollPosition(body);
+        Check(Near(scroll.X, 0f) && Near(scroll.Y, 5f), "and unrelated session state - a scroll position - survives the prune");
 
         Check(
-            session.GetValueStates(b.Id).Count == 0,
+            NativeFixture.CustomSlots(session,b.Id).Count == 0,
             "and the released node's state slots went with it rather than staying reachable");
     }
 
@@ -319,11 +320,11 @@ internal static class KernelVisibilityTests
             + visible + " />";
     }
 
-    private static UiHost Host(string xml, IUiBindings bindings)
+    private static UiHost Host(string xml, IUiBindingReader bindings)
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Id", "Kind", "Tag", "Height" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Id", "Kind", "Tag", "Height" }));
         MeasuredPaths.Clear();
         return new UiHost(
             Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
@@ -393,7 +394,7 @@ internal static class KernelVisibilityTests
             this.spec = spec;
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
@@ -404,7 +405,7 @@ internal static class KernelVisibilityTests
             return 12f;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
         }
     }

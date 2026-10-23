@@ -1,8 +1,9 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using FerriteLib.UiKit;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -87,13 +88,13 @@ internal static class KernelPlacementTests
         // An Auto width is the element's own envelope too, so the pivot tracks the measured label.
         UiLayoutSnapshot auto = Snapshot(Overlay(
             "<Widget Id=\"a\" Kind=\"" + ProbeKind + "\" Height=\"20\" Width=\"Auto\" Label=\"ab\" AlignX=\"Center\" />"));
-        Check(Near(auto.RectById["a"].x, 192f) && Near(auto.RectById["a"].width, 16f),
+        Check(Near(auto.RectById["a"].X, 192f) && Near(auto.RectById["a"].Width, 16f),
             "an Auto envelope centres like any other: a 16px label sits at (400-16)/2 = 192");
 
         // Both axes at once, which is what a placement container is for.
         UiLayoutSnapshot corner = Snapshot(Overlay(
             "<Widget Id=\"a\" Kind=\"" + ProbeKind + "\" Height=\"20\" Width=\"120\" AlignX=\"Right\" AlignY=\"Bottom\" />"));
-        Check(Near(corner.RectById["a"].x, 280f) && Near(corner.RectById["a"].y, 80f),
+        Check(Near(corner.RectById["a"].X, 280f) && Near(corner.RectById["a"].Y, 80f),
             "both axes resolve in one pass: Right/Bottom corners the element in the parent's inner box");
     }
 
@@ -117,18 +118,18 @@ internal static class KernelPlacementTests
         // been measured at the parent's whole inner width, and a numeric Width next to no AlignX keeps that
         // slot - which is why CP-1 asks for no migration on an existing page.
         UiLayoutSnapshot bare = Snapshot(Overlay("<Widget Id=\"a\" Kind=\"" + ProbeKind + "\" Height=\"20\" />"));
-        Check(Near(bare.RectById["a"].x, 0f) && Near(bare.RectById["a"].width, 400f),
+        Check(Near(bare.RectById["a"].X, 0f) && Near(bare.RectById["a"].Width, 400f),
             "an Overlay child with no placement vocabulary keeps today's full-inner-width slot");
 
         UiLayoutSnapshot declared = Snapshot(Overlay(
             "<Widget Id=\"a\" Kind=\"" + ProbeKind + "\" Height=\"20\" Width=\"120\" />"));
-        Check(Near(declared.RectById["a"].x, bare.RectById["a"].x)
-            && Near(declared.RectById["a"].width, bare.RectById["a"].width),
+        Check(Near(declared.RectById["a"].X, bare.RectById["a"].X)
+            && Near(declared.RectById["a"].Width, bare.RectById["a"].Width),
             "and a numeric Width beside no AlignX still arranges exactly as before (no migration)");
 
         UiLayoutSnapshot stretch = Snapshot(Overlay(
             "<Widget Id=\"a\" Kind=\"" + ProbeKind + "\" Height=\"20\" AlignX=\"Stretch\" />"));
-        Check(Near(stretch.RectById["a"].x, 0f) && Near(stretch.RectById["a"].width, 400f),
+        Check(Near(stretch.RectById["a"].X, 0f) && Near(stretch.RectById["a"].Width, 400f),
             "an explicit Stretch is the same slot as the default");
     }
 
@@ -212,15 +213,15 @@ internal static class KernelPlacementTests
             + "<Widget Id=\"a\" Kind=\"" + ProbeKind + "\" Height=\"10\" />"
             + "<Widget Id=\"b\" Kind=\"" + ProbeKind + "\" Height=\"10\" />"
             + "</Column></UiPage>", 400f, 200f);
-        Check(Near(column.RectById["a"].x, 0f) && Near(column.RectById["a"].y, 0f)
-            && Near(column.RectById["b"].y, 10f) && Near(column.RectById["a"].width, 400f),
+        Check(Near(column.RectById["a"].X, 0f) && Near(column.RectById["a"].Y, 0f)
+            && Near(column.RectById["b"].Y, 10f) && Near(column.RectById["a"].Width, 400f),
             "a Column child with no placement vocabulary arranges exactly as before");
 
         UiLayoutSnapshot sized = Snapshot(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Column Id=\"c\" Padding=\"0\" Gap=\"0\">"
             + "<Widget Id=\"a\" Kind=\"" + ProbeKind + "\" Height=\"10\" Width=\"100\" />"
             + "</Column></UiPage>", 400f, 200f);
-        Check(Near(sized.RectById["a"].width, 400f) && Near(sized.RectById["a"].x, 0f),
+        Check(Near(sized.RectById["a"].Width, 400f) && Near(sized.RectById["a"].X, 0f),
             "a numeric Width beside no AlignX keeps today's flow slot (the width is still the flow's to decide)");
 
         UiLayoutSnapshot row = Snapshot(
@@ -228,8 +229,8 @@ internal static class KernelPlacementTests
             + "<Widget Id=\"a\" Kind=\"" + ProbeKind + "\" Height=\"10\" Width=\"100\" />"
             + "<Widget Id=\"b\" Kind=\"" + ProbeKind + "\" Height=\"20\" Width=\"100\" />"
             + "</Row></UiPage>", 400f, 200f);
-        Check(Near(row.RectById["a"].x, 0f) && Near(row.RectById["a"].y, 0f)
-            && Near(row.RectById["b"].x, 100f) && Near(row.RectById["b"].y, 0f),
+        Check(Near(row.RectById["a"].X, 0f) && Near(row.RectById["a"].Y, 0f)
+            && Near(row.RectById["b"].X, 100f) && Near(row.RectById["b"].Y, 0f),
             "a Row child with no placement vocabulary arranges exactly as before");
     }
 
@@ -243,9 +244,9 @@ internal static class KernelPlacementTests
             + "<Widget Id=\"centre\" Kind=\"" + ProbeKind + "\" Height=\"10\" Width=\"100\" AlignX=\"Center\" />"
             + "<Widget Id=\"nudged\" Kind=\"" + ProbeKind + "\" Height=\"10\" Width=\"100\" AlignX=\"Right\" OffsetX=\"-10\" />"
             + "</Column></UiPage>", 400f, 200f);
-        Check(Near(column.RectById["right"].x, 300f), "a Column child aligns right against the parent's inner width (400-100)");
-        Check(Near(column.RectById["centre"].x, 150f), "and centres: (400-100)/2");
-        Check(Near(column.RectById["nudged"].x, 290f), "a pixel nudge rides on the cross-axis reference point");
+        Check(Near(column.RectById["right"].X, 300f), "a Column child aligns right against the parent's inner width (400-100)");
+        Check(Near(column.RectById["centre"].X, 150f), "and centres: (400-100)/2");
+        Check(Near(column.RectById["nudged"].X, 290f), "a pixel nudge rides on the cross-axis reference point");
 
         UiLayoutSnapshot row = Snapshot(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Row Id=\"r\" Padding=\"0\" Gap=\"0\">"
@@ -254,10 +255,10 @@ internal static class KernelPlacementTests
             + "<Widget Id=\"middle\" Kind=\"" + ProbeKind + "\" Height=\"20\" Width=\"100\" AlignY=\"Middle\" />"
             + "<Widget Id=\"nudged\" Kind=\"" + ProbeKind + "\" Height=\"20\" Width=\"100\" AlignY=\"Bottom\" OffsetY=\"5\" />"
             + "</Row></UiPage>", 400f, 200f);
-        Check(Near(row.RectById["tall"].y, 0f), "the tallest Row child defines the line, and keeps the line top");
-        Check(Near(row.RectById["bottom"].y, 30f), "AlignY=Bottom sits on the Row's own inner bottom (50-20)");
-        Check(Near(row.RectById["middle"].y, 15f), "AlignY=Middle centres on the Row's inner height: (50-20)/2");
-        Check(Near(row.RectById["nudged"].y, 35f), "a pixel nudge rides on the cross-axis reference point");
+        Check(Near(row.RectById["tall"].Y, 0f), "the tallest Row child defines the line, and keeps the line top");
+        Check(Near(row.RectById["bottom"].Y, 30f), "AlignY=Bottom sits on the Row's own inner bottom (50-20)");
+        Check(Near(row.RectById["middle"].Y, 15f), "AlignY=Middle centres on the Row's inner height: (50-20)/2");
+        Check(Near(row.RectById["nudged"].Y, 35f), "a pixel nudge rides on the cross-axis reference point");
 
         // A Wrap line is a horizontal line of flow, and a Scroll flows vertically: both have a cross axis,
         // and both must read the same rule.
@@ -266,14 +267,14 @@ internal static class KernelPlacementTests
             + "<Widget Id=\"tall\" Kind=\"" + ProbeKind + "\" Height=\"40\" Width=\"200\" />"
             + "<Widget Id=\"short\" Kind=\"" + ProbeKind + "\" Height=\"10\" Width=\"100\" AlignY=\"Bottom\" />"
             + "</Wrap></UiPage>", 400f, 200f);
-        Check(Near(wrap.RectById["tall"].y, 0f) && Near(wrap.RectById["short"].y, 30f),
+        Check(Near(wrap.RectById["tall"].Y, 0f) && Near(wrap.RectById["short"].Y, 30f),
             "a Wrap line is horizontal, so its cross axis is vertical: the short child sits on the line's bottom");
 
         UiLayoutSnapshot scroll = Snapshot(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Scroll Id=\"s\" Padding=\"0\" Gap=\"0\" Height=\"100\">"
             + "<Widget Id=\"right\" Kind=\"" + ProbeKind + "\" Height=\"10\" Width=\"100\" AlignX=\"Right\" />"
             + "</Scroll></UiPage>", 400f, 100f);
-        Check(Near(scroll.RectById["right"].x, 300f),
+        Check(Near(scroll.RectById["right"].X, 300f),
             "a Scroll flows vertically, so its cross axis is horizontal too");
     }
 
@@ -333,56 +334,56 @@ internal static class KernelPlacementTests
     {
         // The probe paints a 3-px rail inside its rect. Placement must read the ARRANGED rect (120), never
         // the painted shape (3), or the envelope would follow the paint - which is exactly what E3 forbids.
-        var painted = new List<Rect>();
+        var painted = new List<UiLayoutRect>();
         RegisterProbe(painted);
 
         UiLayoutEngine engine = new(Scope);
         UiWidgetContext ctx = CreateContext();
         UiLayoutSnapshot snapshot = engine.ArrangeRoots(
-            ctx, new Vector2(400f, 100f), Parse(Overlay(
+            ctx, new UiLayoutPoint(400f, 100f), Parse(Overlay(
                 "<Widget Id=\"a\" Kind=\"" + ProbeKind + "\" Height=\"20\" Width=\"120\" AlignX=\"Center\" />")).Roots);
 
-        Check(Near(snapshot.RectById["a"].x, 140f) && Near(snapshot.RectById["a"].width, 120f),
+        Check(Near(snapshot.RectById["a"].X, 140f) && Near(snapshot.RectById["a"].Width, 120f),
             "the placed envelope is the arranged rect (140, width 120), not the 3-px painted rail");
 
-        engine.Draw(ctx, snapshot, new Rect(0f, 0f, 400f, 100f));
-        Check(painted.Count == 1 && Near(painted[0].x, 140f) && Near(painted[0].width, 120f),
+        NativeFixture.Prepare(ctx.Session);engine.Draw(ctx, snapshot, new UiLayoutRect(0f, 0f, 400f, 100f));
+        Check(painted.Count == 1 && Near(painted[0].X, 140f) && Near(painted[0].Width, 120f),
             "and the draw half hands the widget that same rect, so measure and draw agree");
-        Check(Near(painted[0].width, 120f) && !Near(painted[0].width, 3f),
+        Check(Near(painted[0].Width, 120f) && !Near(painted[0].Width, 3f),
             "the rail is painted inside the envelope; it never becomes the envelope");
     }
 
     private static void VerifyOverflowMovesNothing()
     {
         RegisterProbe();
-        var painted = new List<Rect>();
+        var painted = new List<UiLayoutRect>();
         RegisterOverflowProbe(painted);
 
         UiLayoutEngine engine = new(Scope);
         UiWidgetContext ctx = CreateContext();
         UiLayoutSnapshot before = engine.ArrangeRoots(
-            ctx, new Vector2(400f, 100f), Parse(Overlay(
+            ctx, new UiLayoutPoint(400f, 100f), Parse(Overlay(
                 "<Widget Id=\"left\" Kind=\"" + ProbeKind + "\" Height=\"20\" Width=\"120\" AlignX=\"Left\" />"
                 + "<Widget Id=\"spill\" Kind=\"probe/spill\" Height=\"20\" Width=\"120\" AlignX=\"Left\" OffsetX=\"40\" />"
                 + "<Widget Id=\"right\" Kind=\"" + ProbeKind + "\" Height=\"20\" Width=\"120\" AlignX=\"Right\" />")).Roots);
 
-        Rect left = before.RectById["left"];
-        Rect right = before.RectById["right"];
-        Rect spill = before.RectById["spill"];
-        Check(Near(spill.x, 40f) && Near(spill.width, 120f), "the spilling element is placed by its rect, not by what it paints");
+        UiLayoutRect left = before.RectById["left"];
+        UiLayoutRect right = before.RectById["right"];
+        UiLayoutRect spill = before.RectById["spill"];
+        Check(Near(spill.X, 40f) && Near(spill.Width, 120f), "the spilling element is placed by its rect, not by what it paints");
 
-        engine.Draw(ctx, before, new Rect(0f, 0f, 400f, 100f));
-        Check(painted.Count == 2 && painted[0].width < 400f && painted[1].width > 400f,
+        NativeFixture.Prepare(ctx.Session);engine.Draw(ctx, before, new UiLayoutRect(0f, 0f, 400f, 100f));
+        Check(painted.Count == 2 && painted[0].Width < 400f && painted[1].Width > 400f,
             "the probe really painted past the parent's inner width while its envelope stayed 120");
 
         UiLayoutSnapshot after = engine.ArrangeRoots(
-            ctx, new Vector2(400f, 100f), Parse(Overlay(
+            ctx, new UiLayoutPoint(400f, 100f), Parse(Overlay(
                 "<Widget Id=\"left\" Kind=\"" + ProbeKind + "\" Height=\"20\" Width=\"120\" AlignX=\"Left\" />"
                 + "<Widget Id=\"spill\" Kind=\"probe/spill\" Height=\"20\" Width=\"120\" AlignX=\"Left\" OffsetX=\"40\" />"
                 + "<Widget Id=\"right\" Kind=\"" + ProbeKind + "\" Height=\"20\" Width=\"120\" AlignX=\"Right\" />")).Roots);
-        Check(Near(after.RectById["left"].x, left.x) && Near(after.RectById["left"].width, left.width)
-            && Near(after.RectById["right"].x, right.x) && Near(after.RectById["right"].width, right.width)
-            && Near(after.RectById["spill"].width, 120f),
+        Check(Near(after.RectById["left"].X, left.X) && Near(after.RectById["left"].Width, left.Width)
+            && Near(after.RectById["right"].X, right.X) && Near(after.RectById["right"].Width, right.Width)
+            && Near(after.RectById["spill"].Width, 120f),
             "an overflowing paint moves no sibling and does not grow its own envelope");
     }
 
@@ -392,17 +393,17 @@ internal static class KernelPlacementTests
     {
         UiLayoutSnapshot snapshot = Snapshot(Overlay(
             "<Widget Id=\"a\" Kind=\"" + ProbeKind + "\" Height=\"20\" Width=\"120\" " + childAttributes + " />"));
-        Rect rect = snapshot.RectById["a"];
-        Check(Near(rect.x, expectedX) && Near(rect.width, 120f),
-            what + " (x=" + rect.x + ", width=" + rect.width + ")");
+        UiLayoutRect rect = snapshot.RectById["a"];
+        Check(Near(rect.X, expectedX) && Near(rect.Width, 120f),
+            what + " (x=" + rect.X + ", width=" + rect.Width + ")");
     }
 
     private static void CheckY(string childAttributes, float expectedY, string what)
     {
         UiLayoutSnapshot snapshot = Snapshot(Overlay(
             "<Widget Id=\"a\" Kind=\"" + ProbeKind + "\" Height=\"20\" Width=\"120\" " + childAttributes + " />"));
-        Check(Near(snapshot.RectById["a"].y, expectedY),
-            what + " (y=" + snapshot.RectById["a"].y + ")");
+        Check(Near(snapshot.RectById["a"].Y, expectedY),
+            what + " (y=" + snapshot.RectById["a"].Y + ")");
     }
 
     private static string Child(string childAttributes)
@@ -460,7 +461,7 @@ internal static class KernelPlacementTests
     {
         UiLayoutEngine engine = new(Scope);
         UiWidgetContext ctx = CreateContext();
-        return engine.ArrangeRoots(ctx, new Vector2(width, height), Parse(xml).Roots);
+        return engine.ArrangeRoots(ctx, new UiLayoutPoint(width, height), Parse(xml).Roots);
     }
 
     private static UiLayoutManifest Parse(string xml)
@@ -470,7 +471,7 @@ internal static class KernelPlacementTests
 
     private static UiWidgetContext CreateContext()
     {
-        return new UiWidgetContext(
+        return NativeFixture.Context(
             Scope,
             new UiSession(),
             new StubMetrics(),
@@ -486,25 +487,25 @@ internal static class KernelPlacementTests
         RegisterProbe(null);
     }
 
-    private static void RegisterProbe(List<Rect>? painted)
+    private static void RegisterProbe(List<UiLayoutRect>? painted)
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             Scope,
             ProbeKind,
             () => new ProbeWidget(ProbeKind, painted, 0f),
             new[] { "Height", "Width", "Label" },
-            new[] { "Label" });
+            new[] { "Label" }));
     }
 
-    private static void RegisterOverflowProbe(List<Rect> painted)
+    private static void RegisterOverflowProbe(List<UiLayoutRect> painted)
     {
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             Scope,
             "probe/spill",
             () => new ProbeWidget("probe/spill", painted, 400f),
-            new[] { "Height", "Width" });
+            new[] { "Height", "Width" }));
     }
 
     private static bool Near(float a, float b)
@@ -528,10 +529,10 @@ internal static class KernelPlacementTests
     private sealed class ProbeWidget : IUiWidget
     {
         private readonly string kind;
-        private readonly List<Rect>? painted;
+        private readonly List<UiLayoutRect>? painted;
         private readonly float spill;
 
-        public ProbeWidget(string kind, List<Rect>? painted, float spill)
+        public ProbeWidget(string kind, List<UiLayoutRect>? painted, float spill)
         {
             this.kind = kind;
             this.painted = painted;
@@ -544,7 +545,7 @@ internal static class KernelPlacementTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
@@ -553,14 +554,14 @@ internal static class KernelPlacementTests
             return 20f;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             if (painted == null) return;
 
             // The envelope is the rect it was handed. A 3-px rail is painted inside it, and the spill
             // probe paints past it - the paint is what E3 must never let become the envelope.
             painted.Add(rect);
-            if (spill > 0f) painted.Add(new Rect(rect.x, rect.y, rect.width + spill, rect.height));
+            if (spill > 0f) painted.Add(new UiLayoutRect(rect.X, rect.Y, rect.Width + spill, rect.Height));
         }
     }
 

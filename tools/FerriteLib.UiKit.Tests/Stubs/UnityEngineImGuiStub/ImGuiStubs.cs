@@ -137,7 +137,11 @@ public static class GUIUtility
         }
 
         controlIdCounter++;
-        return controlIdCounter;
+        // Model both documented hint matching and allocation sequence. Ignoring the hint aliases
+        // unrelated owners; using the hint alone hides control-reorder capture bugs. This is not
+        // Unity's private numeric algorithm.
+        int id=unchecked(hint*397+controlIdCounter);
+        return id==0?int.MinValue:id;
     }
 }
 
@@ -251,5 +255,3 @@ public sealed class GUIStyle
     public RectOffset padding { get; set; } = new();
     public RectOffset border { get; set; } = new();
 }
-
-

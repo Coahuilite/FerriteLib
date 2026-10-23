@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -203,7 +204,7 @@ internal static class KernelOrdinarySettingsRecipeTests
         bindings.BindReadOnly("level-help", () => model.Help, UiInvalidation.Measure);
         bindings.BindReadOnly("level-status", () => model.Status, UiInvalidation.Paint);
         bindings.BindValue("quality", () => model.Quality, v => model.Quality = v);
-        bindings.BindOptions("quality-options", () => model.QualityOptions);
+        bindings.BindChoices("quality-options", ()=> (model.QualityOptions).Select(value=>new UiChoice<string>(value,value,value)).ToArray());
         bindings.BindReadOnly("show-advanced", () => model.ShowAdvanced, UiInvalidation.Structure);
         bindings.BindCommand("toggle-advanced", () => model.ToggleAdvanced());
     }
@@ -214,7 +215,7 @@ internal static class KernelOrdinarySettingsRecipeTests
     {
         (SettingsModel model, UiBindings bindings) = Recipe();
         using UiHost host = Host(bindings);
-        UiLayoutSnapshot wide = host.MeasureAndArrange(new Vector2(400f, 300f));
+        UiLayoutSnapshot wide = host.MeasureAndArrange(VerseUiExecution.Point(new Vector2(400f, 300f)));
 
         foreach (string id in new[] { "level", "level-number", "level-help", "quality", "status", "toggle" })
         {
@@ -222,7 +223,7 @@ internal static class KernelOrdinarySettingsRecipeTests
         }
 
         UiTheme theme = new();
-        Check(Near(theme.Geometry.RowHeight, wide.RectById["level"].height),
+        Check(Near(theme.Geometry.RowHeight, wide.RectById["level"].Height),
             "the slider's band is the theme's density row height, not a page literal");
         Check(!wide.RectById.ContainsKey("advanced"),
             "the hidden group is not laid out at all (its VisibleKey is false)");
@@ -232,17 +233,17 @@ internal static class KernelOrdinarySettingsRecipeTests
     {
         (SettingsModel model, UiBindings bindings) = Recipe();
         using UiHost host = Host(bindings, withBalance: true);
-        UiLayoutSnapshot wide = host.MeasureAndArrange(new Vector2(400f, 300f));
+        UiLayoutSnapshot wide = host.MeasureAndArrange(VerseUiExecution.Point(new Vector2(400f, 300f)));
 
         Check(wide.RectById.ContainsKey("balance") && wide.RectById.ContainsKey("balance-number"),
             "the analogous row placed like the first one");
         UiTheme theme = new();
-        Check(Near(theme.Geometry.RowHeight, wide.RectById["balance"].height),
+        Check(Near(theme.Geometry.RowHeight, wide.RectById["balance"].Height),
             "with the same theme-derived band and no new code shape");
 
         model.SetBalance(0.75f);
         host.BeginFrame();
-        host.Draw(new Rect(0f, 0f, 400f, 300f), wide);
+        NativeFixture.Draw(        host,VerseUiExecution.Rect(new Rect(0f, 0f, 400f, 300f)), wide);
         host.EndFrame();
         Check(Near(0.75f, model.Balance) && Near(0.5f, model.Level),
             "and its binding writes its own model field, not the first setting's");
@@ -252,39 +253,32 @@ internal static class KernelOrdinarySettingsRecipeTests
     {
         (SettingsModel model, UiBindings bindings) = Recipe();
         using UiHost host = Host(bindings);
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(400f, 300f));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(VerseUiExecution.Point(new Vector2(400f, 300f)));
 
-        // The UI half: a real drag through the slider's native seam commits through the model.
-        UiNative.SliderOverride = (rect, current, min, max) => current < 0.8f ? 0.8f : current;
-        try
-        {
-            host.BeginFrame();
-            host.Draw(new Rect(0f, 0f, 400f, 300f), snapshot);
-            host.EndFrame();
-        }
-        finally
-        {
-            UiNative.SliderOverride = null;
-        }
+        // Measure the actual native rail, then press at its 0.8 value position.
+        int beforeRail=NativeFixture.Records<UiLayoutRect>(typeof(Verse.Widgets).GetField("DrawBoxSolidRects")!.GetValue(null)!).Count;
+        NativeEvents.Begin(EventType.Repaint);NativeFixture.DrawFrame(host,new UiLayoutRect(0,0,400,300));
+        var rail=NativeFixture.Records<UiLayoutRect>(typeof(Verse.Widgets).GetField("DrawBoxSolidRects")!.GetValue(null)!)[beforeRail];
+        var point=new UiLayoutPoint(rail.X+rail.Width*.8f,rail.Y+rail.Height/2);
+        NativeEvents.Click(point,()=>NativeFixture.DrawFrame(host,new UiLayoutRect(0,0,400,300)));
 
-        Check(Near(0.8f, model.Level), "the slider's write reached the model through its mutation path");
+        Check(Near(0.8f, model.Level), "the slider's write reached the model through its mutation path: "+model.Level);
         Check(Near(0.8f, bindings.Get<float>("level")), "and the same key serves every control that binds it");
 
         // The shared read half: the number field renders the value the slider just committed.
-        string shown = "";
-        UiNative.TextFieldOverride = (rect, text) => { shown = text; return text; };
+        var shown = new List<string>();
+        NativeFixture.TextFieldOverride = (rect, text) => { shown.Add(text); return text; };
         try
         {
-            host.BeginFrame();
-            host.Draw(new Rect(0f, 0f, 400f, 300f), snapshot);
-            host.EndFrame();
+            NativeEvents.Begin(EventType.Repaint);
+            NativeFixture.DrawFrame(host,new UiLayoutRect(0,0,400,300));
         }
         finally
         {
-            UiNative.TextFieldOverride = null;
+            NativeFixture.TextFieldOverride = null;
         }
 
-        Check(shown.Contains("0.8"), "the number field displays the same binding's value on the next pass");
+        Check(shown.Count == 2 && shown[0].Contains("0.8") && shown[1] == "0", "the level field displays the shared value while the independent balance field stays zero");
 
         // The non-UI half: a writer outside the page reaches the identical path.
         model.SetLevel(0.25f);
@@ -296,19 +290,19 @@ internal static class KernelOrdinarySettingsRecipeTests
     {
         (SettingsModel model, UiBindings bindings) = Recipe();
         using UiHost host = Host(bindings);
-        UiLayoutSnapshot first = host.MeasureAndArrange(new Vector2(400f, 300f));
+        UiLayoutSnapshot first = host.MeasureAndArrange(VerseUiExecution.Point(new Vector2(400f, 300f)));
 
         model.SetLevel(0.66f);
-        UiLayoutSnapshot afterPaint = host.MeasureAndArrange(new Vector2(400f, 300f));
+        UiLayoutSnapshot afterPaint = host.MeasureAndArrange(VerseUiExecution.Point(new Vector2(400f, 300f)));
         Check(ReferenceEquals(first, afterPaint),
             "a Paint-class announcement reuses the arranged snapshot: the value moves no rect");
 
         model.SetHelp("Keeps the output between the limits the hardware reports, per directive 7.3, "
             + "and this deliberately long replacement re-measures the band it is drawn into.");
-        UiLayoutSnapshot afterMeasure = host.MeasureAndArrange(new Vector2(400f, 300f));
+        UiLayoutSnapshot afterMeasure = host.MeasureAndArrange(VerseUiExecution.Point(new Vector2(400f, 300f)));
         Check(!ReferenceEquals(first, afterMeasure),
             "a measured content change does re-arrange");
-        Check(afterMeasure.RectById["level-help"].height > first.RectById["level-help"].height,
+        Check(afterMeasure.RectById["level-help"].Height > first.RectById["level-help"].Height,
             "and the help atom's band grew to fit the longer string");
     }
 
@@ -316,16 +310,16 @@ internal static class KernelOrdinarySettingsRecipeTests
     {
         (SettingsModel model, UiBindings bindings) = Recipe();
         using UiHost host = Host(bindings);
-        UiLayoutSnapshot hidden = host.MeasureAndArrange(new Vector2(400f, 300f));
+        UiLayoutSnapshot hidden = host.MeasureAndArrange(VerseUiExecution.Point(new Vector2(400f, 300f)));
         Check(!hidden.RectById.ContainsKey("advanced"), "the group starts hidden");
 
         model.ToggleAdvanced();
-        UiLayoutSnapshot shown = host.MeasureAndArrange(new Vector2(400f, 300f));
+        UiLayoutSnapshot shown = host.MeasureAndArrange(VerseUiExecution.Point(new Vector2(400f, 300f)));
         Check(shown.RectById.ContainsKey("advanced") && shown.RectById.ContainsKey("advanced-note"),
             "announcing the structure key opened the group in the same host, with no reopen");
 
         model.ToggleAdvanced();
-        UiLayoutSnapshot hiddenAgain = host.MeasureAndArrange(new Vector2(400f, 300f));
+        UiLayoutSnapshot hiddenAgain = host.MeasureAndArrange(VerseUiExecution.Point(new Vector2(400f, 300f)));
         Check(!hiddenAgain.RectById.ContainsKey("advanced"), "and the same door closes it");
     }
 
@@ -333,17 +327,17 @@ internal static class KernelOrdinarySettingsRecipeTests
     {
         (SettingsModel model, UiBindings bindings) = Recipe();
         using UiHost host = Host(bindings);
-        UiLayoutSnapshot shortWay = host.MeasureAndArrange(new Vector2(400f, 300f));
-        float shortBand = shortWay.RectById["level-help"].height;
+        UiLayoutSnapshot shortWay = host.MeasureAndArrange(VerseUiExecution.Point(new Vector2(400f, 300f)));
+        float shortBand = shortWay.RectById["level-help"].Height;
 
         model.SetHelp("这是一段故意加长的说明文字，用来证明测量与绘制共用同一把尺；换语言、加长文案时，"
             + "它同样会重新量带而不是被裁掉，页面其余部分的位置由引擎重新分配，作者不需要改任何一行几何代码。");
-        UiLayoutSnapshot wideWay = host.MeasureAndArrange(new Vector2(400f, 300f));
-        Check(wideWay.RectById["level-help"].height > shortBand,
+        UiLayoutSnapshot wideWay = host.MeasureAndArrange(VerseUiExecution.Point(new Vector2(400f, 300f)));
+        Check(wideWay.RectById["level-help"].Height > shortBand,
             "the longer localized string re-bands the atom instead of clipping it");
 
-        UiLayoutSnapshot narrowWay = host.MeasureAndArrange(new Vector2(260f, 300f));
-        Check(narrowWay.RectById["level-help"].height >= wideWay.RectById["level-help"].height,
+        UiLayoutSnapshot narrowWay = host.MeasureAndArrange(VerseUiExecution.Point(new Vector2(260f, 300f)));
+        Check(narrowWay.RectById["level-help"].Height >= wideWay.RectById["level-help"].Height,
             "narrower content gives it fewer columns and never less height");
     }
 
@@ -351,17 +345,17 @@ internal static class KernelOrdinarySettingsRecipeTests
     {
         (SettingsModel model, UiBindings bindings) = Recipe();
         using UiHost host = Host(bindings, withBalance: true);
-        UiLayoutSnapshot wide = host.MeasureAndArrange(new Vector2(400f, 300f));
-        Check(wide.RectById["level-number"].x > wide.RectById["level"].x,
+        UiLayoutSnapshot wide = host.MeasureAndArrange(VerseUiExecution.Point(new Vector2(400f, 300f)));
+        Check(wide.RectById["level-number"].X > wide.RectById["level"].X,
             "wide: the row lays its controls side by side");
 
-        UiLayoutSnapshot narrow = host.MeasureAndArrange(new Vector2(240f, 300f));
-        Check(Near(narrow.RectById["level-number"].x, narrow.RectById["level"].x)
-            && narrow.RectById["level-number"].y > narrow.RectById["level"].y,
+        UiLayoutSnapshot narrow = host.MeasureAndArrange(VerseUiExecution.Point(new Vector2(240f, 300f)));
+        Check(Near(narrow.RectById["level-number"].X, narrow.RectById["level"].X)
+            && narrow.RectById["level-number"].Y > narrow.RectById["level"].Y,
             "below the declared Breakpoint the same row stacks — the narrow policy is the container's own vocabulary");
 
         Check(narrow.RectById.ContainsKey("scroller")
-            && Near(240f, narrow.RectById["scroller"].height),
+            && Near(240f, narrow.RectById["scroller"].Height),
             "the overflowing column sits inside the declared Scroll viewport — scroll region, not a cut-off");
     }
 

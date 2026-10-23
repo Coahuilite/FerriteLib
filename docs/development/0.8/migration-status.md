@@ -1,5 +1,11 @@
 # Complete first-version migration status
 
+The prepublication refactor retains every row below. All Kernel sources (Host/Session/tree/compiler/
+widgets included) now share the no-platform target; native execution is explicit. New author prerequisites,
+old-chain removals and abstraction consumers are in [refactor migration](refactor-migration.md).
+The main purpose-specific suites and CloseoutInventory still exercise all18 uses/nine containers/non-kind
+paths. Detailed native font/IME/window acceptance remains pending; no row is dropped with an old API.
+
 ## 2026-10-23 closeout: complete scope and evidence classes
 
 The reactive foundation/RU1 path now feeds RU2 captured measurement and independently retained local
@@ -81,11 +87,11 @@ All nine containers retain the same transactional geometry path. Known Hidden/Vi
 
 Standard and embedded Host share SetDisplayDemand and current fault boundaries. Real standard-shell fixtures distinguish B input focus, explicit hidden demand, A/B shared owner and idempotent close; owned confirmation keeps A17 after B23 selection and business execution rejects current ineligibility. No B-local-modal backend or universal occlusion analysis is claimed. External adapters/services are not paused implicitly.
 
-Bindings/presentation expose per-key current validity and Retry; consumer callbacks expose owner-controlled IsPaused/Fault/Resume. Pure-cycle and per-response propagation-budget diagnostics identify actual computation/response paths. Node.ReactiveFault and Host.LayoutFault are additional located runtime facts, not a second business graph; existing bounded observation/instrument tests remain. XML/program assembly and definition rollback keep their original boundary. Retained snapshots reject changed definition/interaction scope; ordinary getters and ITextMetrics keep their original conditions. Optional IUiPresentationDemand is the complete custom tracked-key entrance; unknown old custom receives conservative all-key service, not inferred savings or required purity.
+Bindings/presentation expose per-key current validity and Retry; consumer callbacks expose owner-controlled IsPaused/Fault/Resume. Pure-cycle and per-response propagation-budget diagnostics identify actual computation/response paths. Node.ReactiveFault and Host.LayoutFault are additional located runtime facts, not a second business graph; existing bounded observation/instrument tests remain. XML/program assembly and definition rollback keep their original boundary. Retained snapshots reject changed definition/interaction scope; ordinary getters and ITextMetrics keep their original conditions. Custom tracked-key demand is explicit through descriptor binding roles or IUiPresentationDemand; ordinary untracked custom remains under its original getter conditions.
 
 The production same-source FailureLifetimeTests and actual KernelFailureLifetimeTests compile FailureLifetimeExamples.cs for both counter and independent workshop. They add sustained failure/recovery, resolved labels, default editable/selection controls, shared geometry, queues, hidden drafts and two-host lifetime. Existing per-purpose evidence above is reused for unchanged mechanics, not relabeled as new per-control reactive migration. See the [single failure/lifetime contract](failure-lifetime-contract.md).
 
-## Retained/confirmed technical candidate connected; A8/native acceptance separate
+## Refactored complete capability chain; A8/native acceptance separate
 
 All18 registered uses have current production-input trajectories in KernelCloseoutInventoryTests,
 without rebuilding the Host. Data-backed uses actually consume tracked values/options; header/empty
@@ -116,4 +122,4 @@ Palette authoring and exact intentional theme migration: [theme-migration.md](th
 
 Content overlap now uses current shared input geometry and neutral layer decisions. Default controls participate without extra author configuration; precise custom overlap uses the optional capability with the explicit old-custom boundary in [layers-images-contract.md](layers-images-contract.md).
 
-Image additionally supports finite Fit/inner alignment, opt-in width-aspect measurement and supplier-owned Texture/RenderTexture values. Standard UiPageWindow adds program/declarative/instance background configuration; unconfigured defaults remain. Layer/image/background regressions are in KernelLayerDispatchTests and KernelImagePlacementTests; actual same-source neutral checks include PointerLayers and ImageGeometry. Native acceptance remains pending. See [the single contract](layers-images-contract.md) for defaults, ownership, exact custom seam and migration conditions.
+Image additionally supports finite Fit/inner alignment, opt-in width-aspect measurement and scope-owned UiImage tokens over supplier-owned Texture/RenderTexture references. Standard UiPageWindow adds program/declarative/instance background configuration; unconfigured defaults remain. Layer/image/background regressions are in KernelLayerDispatchTests and KernelImagePlacementTests; actual same-source neutral checks include PointerLayers and ImageGeometry. Native acceptance remains pending. See [the single contract](layers-images-contract.md) for defaults, ownership, exact custom seam and migration conditions.

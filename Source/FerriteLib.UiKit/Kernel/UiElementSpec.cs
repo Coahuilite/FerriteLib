@@ -48,5 +48,17 @@ public sealed class UiElementSpec
         return Values.TryGetValue(name, out var literal) && literal.TryBoolean(out value);
     }
 
+    internal bool TryGetInteger(string name, out int value)
+    {
+        value = 0;
+        if (!TryGetNumber(name, out float number) || number < int.MinValue || number >= 2147483648f || number != Math.Floor(number)) return false;
+        value = (int)number;
+        return true;
+    }
+    internal bool TryGetOffset(string name, out UiLayoutOffset value)
+    { value = default; return Values.TryGetValue(name, out var literal) && literal.TryOffset(out value); }
+    internal bool TryGetNumbers(string name, out IReadOnlyList<float> value)
+    { value = Array.Empty<float>(); return Values.TryGetValue(name, out var literal) && literal.TryNumbers(out value); }
+
     public static UiElementSpec Empty { get; } = new UiElementSpec("", "empty");
 }

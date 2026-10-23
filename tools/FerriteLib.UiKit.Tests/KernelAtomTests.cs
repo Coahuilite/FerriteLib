@@ -1,10 +1,11 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -126,22 +127,22 @@ internal static class KernelAtomTests
         bindings.BindValue("Count", () => count, v => count = v);
 
         using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla, new WrappedMetrics(), new StubTranslation());
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(400f, 620f));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(400f, 620f));
 
         foreach (string id in new[] { "note", "apply", "sep", "level", "count" })
         {
             Check(snapshot.RectById.ContainsKey(id), "the manifest created a rect for '" + id + "'");
         }
 
-        Rect noteRect = snapshot.RectById["note"];
-        Check(Near(120f, noteRect.width), "the declared Width survives into the arranged slot");
-        Check(Near(60f, noteRect.height),
+        UiLayoutRect noteRect = snapshot.RectById["note"];
+        Check(Near(120f, noteRect.Width), "the declared Width survives into the arranged slot");
+        Check(Near(60f, noteRect.Height),
             "the wrapped band is the measured height: 17 ideographs at 120px wrap into 3 lines of 16 plus 12 padding");
-        Check(Near(9f, snapshot.RectById["sep"].height), "a declared Height still wins over the rule's natural hairline");
+        Check(Near(9f, snapshot.RectById["sep"].Height), "a declared Height still wins over the rule's natural hairline");
 
         // The one pass that proves all five Draw paths execute inside a real tree without a trip.
-        EnablePointer(new Vector2(-100000f, -100000f));
-        host.DrawFrame(new Rect(0f, 0f, 400f, 620f));
+        EnablePointer(new UiLayoutPoint(-100000f, -100000f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 400f, 620f));
         Check(host.Session.TrippedNodes.Count == 0,
             "every atom drew in one frame without tripping the recovery guard");
         Check(fired == 0, "no seam fired a command during a pass with the pointer far away");
@@ -214,13 +215,13 @@ internal static class KernelAtomTests
         bindings.BindValue("Count", () => count, v => count = v);
 
         using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla, new WrappedMetrics(), new StubTranslation());
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(400f, 200f));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(400f, 200f));
 
-        Check(Near(32f, snapshot.RectById["note"].width), "text/wrapped Auto = 2 ideographs x 16px");
-        Check(Near(16f, snapshot.RectById["apply"].width), "input/button Auto = 2 Latin characters x 8px");
-        Check(Near(32f, snapshot.RectById["level"].width), "input/slider Auto measures its Label");
-        Check(Near(16f, snapshot.RectById["count"].width), "input/number-field Auto measures its Label");
-        Check(Near(304f, snapshot.RectById["rest"].width), "the unlabeled rule takes the remainder");
+        Check(Near(32f, snapshot.RectById["note"].Width), "text/wrapped Auto = 2 ideographs x 16px");
+        Check(Near(16f, snapshot.RectById["apply"].Width), "input/button Auto = 2 Latin characters x 8px");
+        Check(Near(32f, snapshot.RectById["level"].Width), "input/slider Auto measures its Label");
+        Check(Near(16f, snapshot.RectById["count"].Width), "input/number-field Auto measures its Label");
+        Check(Near(304f, snapshot.RectById["rest"].Width), "the unlabeled rule takes the remainder");
     }
 
     // --- input/button ---------------------------------------------------------------------------
@@ -239,57 +240,38 @@ internal static class KernelAtomTests
         ButtonWidget widget = new();
         widget.Configure(new UiElementSpec("apply", ButtonWidget.Kind, Attrs(("ActionBind", "apply"), ("Text", "Apply"))));
         UiWidgetContext ctx = MakeContext(session, bindings, theme);
-        var rect = new Rect(0f, 0f, 120f, 28f);
+        var rect = new UiLayoutRect(0f, 0f, 120f, 28f);
 
         // F1: a real press arms, but does not activate; an outside release abandons it.
-        EnablePointer(new Vector2(60f, 14f));
-        UiNative.ButtonOverride = null;
-        UiNative.DebugMouseDown = true;
+        EnablePointer(new UiLayoutPoint(60f, 14f));
+        NativeFixture.ButtonOverride = null;
+        NativeFixture.DebugMouseDown = true;
         ClearRecordedBoxes();
-        widget.Draw(rect, ctx);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
         Check(HasColor(RecordedBoxColors(), theme[UiPaletteRole.SelectedSurface]) && HasColor(RecordedBoxColors(), theme[UiPaletteRole.Accent]),
             "a held valid press paints the shared capture's active treatment");
         Check(fired == 0, "press alone does not activate");
-        UiNative.DebugMouseDown = false;
-        UiNative.DebugMouseUp = true;
-        UiNative.DebugMousePosition = new Vector2(-5000f, -5000f);
-        widget.Draw(rect, ctx);
-        UiNative.DebugMouseUp = false;
-        UiNative.DebugMousePosition = new Vector2(60f, 14f);
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.DebugMouseUp = true;
+        NativeFixture.DebugMousePosition = new UiLayoutPoint(-5000f, -5000f);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
+        NativeFixture.DebugMouseUp = false;
+        NativeFixture.DebugMousePosition = new UiLayoutPoint(60f, 14f);
         ClearRecordedBoxes();
-        widget.Draw(rect, ctx);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
         Check(HasColor(RecordedBoxColors(), theme[UiPaletteRole.HoverSurface]) && HasColor(RecordedBoxColors(), theme[UiPaletteRole.StrongBorder]),
             "hover after abandoned activation paints hover, not active");
-        UiNative.DebugMousePosition = new Vector2(-5000f, -5000f);
+        NativeFixture.DebugMousePosition = new UiLayoutPoint(-5000f, -5000f);
         ClearRecordedBoxes();
-        widget.Draw(rect, ctx);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
         Check(HasColor(RecordedBoxColors(), theme[UiPaletteRole.ControlSurface]) && HasColor(RecordedBoxColors(), theme[UiPaletteRole.Border]),
             "the idle treatment is the neutral row of the tone table");
         Check(!HasColor(RecordedBoxColors(), theme[UiPaletteRole.HoverSurface]), "an idle button emits no hover token");
 
-        // The hit rule: activation arrives with exactly the arranged rect, and only while the pointer
-        // is inside it. The override stands in for the native control, so the rect it is handed is the
-        // one this atom computed.
-        Vector2 pointer = new(60f, 14f);
-        UiNative.DebugMousePosition = pointer;
-        Rect? activated = null;
-        UiNative.ButtonOverride = candidate =>
-        {
-            activated = candidate;
-            return pointer.x >= candidate.x && pointer.x <= candidate.xMax
-                && pointer.y >= candidate.y && pointer.y <= candidate.yMax;
-        };
-        widget.Draw(rect, ctx);
-        Check(fired == 1, "a click on the arranged rect fires the command once");
-        Check(activated.HasValue && SameRect(rect, activated.Value),
-            "the activation seam received exactly the arranged rect");
-
-        // The override reads the captured pointer, so moving it is what moves the click target here.
-        pointer = new Vector2(-5000f, -5000f);
-        UiNative.DebugMousePosition = pointer;
-        widget.Draw(rect, ctx);
-        Check(fired == 1, "a click outside the rect does not fire");
-        ResetSeams();
+        NativeEvents.Click(new UiLayoutPoint(60,14),()=>NativeFixture.Draw(widget,rect,ctx));
+        Check(fired==1,"actual qualified release within the arranged rectangle fires exactly once");
+        NativeEvents.Click(new UiLayoutPoint(rect.XMax+1,14),()=>NativeFixture.Draw(widget,rect,ctx));
+        Check(fired==1,"actual press and release outside the arranged rectangle cannot activate");        ResetSeams();
     }
 
     // --- chrome/rule ----------------------------------------------------------------------------
@@ -308,16 +290,16 @@ internal static class KernelAtomTests
         CheckClose(2f, widget.Measure(ctx), "the natural size is the hairline, not a text band or a declaration");
 
         ClearRecordedBoxes();
-        widget.Draw(new Rect(10f, 5f, 200f, 9f), ctx);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,new UiLayoutRect(10f, 5f, 200f, 9f), ctx);}
         IList rects = RecordedBoxRects();
         Check(rects.Count == 1, "a rule paints exactly one solid");
         if (rects.Count == 1)
         {
-            var drawn = (Rect)rects[0]!;
-            CheckClose(14f, drawn.x, "Inset applies on the leading side");
-            CheckClose(192f, drawn.width, "and on the trailing side");
-            CheckClose(8.5f, drawn.y, "the line sits on the vertical centre of its band");
-            CheckClose(2f, drawn.height, "the declared thickness is the painted height");
+            var drawn = NativeFixture.Record<UiLayoutRect>(rects[0]!);
+            CheckClose(14f, drawn.X, "Inset applies on the leading side");
+            CheckClose(192f, drawn.Width, "and on the trailing side");
+            CheckClose(8.5f, drawn.Y, "the line sits on the vertical centre of its band");
+            CheckClose(2f, drawn.Height, "the declared thickness is the painted height");
         }
 
         IList colors = RecordedBoxColors();
@@ -327,7 +309,7 @@ internal static class KernelAtomTests
         // One pixel is a legal band, so the degenerate guard is the zero-size one.
         ClearRecordedBoxes();
         widget.Configure(new UiElementSpec("sep", RuleWidget.Kind, new Dictionary<string, string>()));
-        widget.Draw(new Rect(0f, 0f, 100f, 1f), ctx);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,new UiLayoutRect(0f, 0f, 100f, 1f), ctx);}
         Check(RecordedBoxRects().Count == 1, "an undeclared rule still paints its one-pixel hairline");
     }
 
@@ -348,29 +330,24 @@ internal static class KernelAtomTests
         widget.Configure(new UiElementSpec("level", SliderWidget.Kind, Attrs(("Bind", "level"), ("Min", "0"), ("Max", "1"), ("Label", "音量"))));
         UiWidgetContext ctx = MakeContext(session, bindings, theme);
 
-        Rect captured = default;
-        EnablePointer(new Vector2(-100000f, -100000f));
-        UiNative.SliderOverride = (rect, current, min, max) =>
+        var bounds=new UiLayoutRect(0,0,300,28);
+        UiLayoutRect Track()
         {
-            captured = rect;
-            return 0.8f;
-        };
-        widget.Draw(new Rect(0f, 0f, 300f, 28f), ctx);
-        CheckClose(0.8f, value, "the slider writes its value through the typed binding");
-        CheckClose(42f, captured.x, "the label band is 2 ideographs x 16px plus 4 padding, then the 6px gap");
-        CheckClose(258f, captured.width, "the track is exactly what the measured label leaves");
-
-        // Same element, Latin label: the band follows the glyphs, so a hard-coded 80f column cannot pass.
-        widget.Configure(new UiElementSpec("level", SliderWidget.Kind, Attrs(("Bind", "level"), ("Min", "0"), ("Max", "1"), ("Label", "ab"))));
-        widget.Draw(new Rect(0f, 0f, 300f, 28f), ctx);
-        CheckClose(26f, captured.x, "2 Latin characters (16px) plus 4 padding, then the gap");
-        CheckClose(274f, captured.width, "the track grows by exactly what the shorter label frees");
-
-        // An out-of-range host value is clamped into the declared window before it is written back.
-        UiNative.SliderOverride = (rect, current, min, max) => 5f;
-        widget.Draw(new Rect(0f, 0f, 300f, 28f), ctx);
-        CheckClose(1f, value, "a host value above Max is clamped, not written as-is");
-        ResetSeams();
+            NativeEvents.Begin(EventType.Repaint,new UiLayoutPoint(-1000,-1000));ClearRecordedBoxes();NativeFixture.Draw(widget,bounds,ctx);
+            var rail=NativeFixture.Record<UiLayoutRect>(((IList)typeof(Verse.Widgets).GetField("DrawBoxSolidRects")!.GetValue(null)!)[0]);
+            return new UiLayoutRect(rail.X-6,0,rail.Width+12,28);
+        }
+        UiLayoutRect captured=Track();
+        CheckClose(42,captured.X,"actual painted range reserves the measured ideograph label band plus gap");
+        CheckClose(258,captured.Width,"actual painted track uses exactly the remaining band");
+        NativeEvents.Click(new UiLayoutPoint(captured.X+6+(captured.Width-12)*.8f,14),()=>NativeFixture.Draw(widget,bounds,ctx));
+        CheckClose(.8f,value,"actual native range selection requests through the typed binding");
+        widget.Configure(new UiElementSpec("level",SliderWidget.Kind,Attrs(("Bind","level"),("Min","0"),("Max","1"),("Label","ab"))));
+        captured=Track();CheckClose(26,captured.X,"Latin glyph band leaves its own measured label width");CheckClose(274,captured.Width,"shorter label frees exactly sixteen pixels");
+        NativeEvents.Begin(EventType.MouseDown,new UiLayoutPoint(captured.X+6+(captured.Width-12)*.5f,14));NativeFixture.Draw(widget,bounds,ctx);
+        NativeEvents.Begin(EventType.MouseDrag,new UiLayoutPoint(900,14));NativeFixture.Draw(widget,bounds,ctx);
+        NativeEvents.Begin(EventType.MouseUp,new UiLayoutPoint(900,14));NativeFixture.Draw(widget,bounds,ctx);
+        CheckClose(1,value,"real captured drag beyond Max clamps rather than publishing an out-of-range value");        ResetSeams();
     }
 
     // --- input/number-field ---------------------------------------------------------------------
@@ -389,17 +366,17 @@ internal static class KernelAtomTests
         NumberFieldWidget widget = new();
         widget.Configure(new UiElementSpec("count", NumberFieldWidget.Kind, Attrs(("Bind", "count"), ("Min", "0"), ("Max", "10"))));
         UiWidgetContext ctx = MakeContext(session, bindings, theme);
-        var rect = new Rect(0f, 0f, 120f, 28f);
+        var rect = new UiLayoutRect(0f, 0f, 120f, 28f);
 
-        EnablePointer(new Vector2(-100000f, -100000f));
-        UiNative.TextFieldOverride = (r, text) => "0.75";
-        widget.Draw(rect, ctx);
+        EnablePointer(new UiLayoutPoint(-100000f, -100000f));
+        NativeFixture.TextFieldOverride = (r, text) => "0.75";
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
         CheckClose(0.75f, value, "an unfocused free edit commits through the binding");
 
-        UiNative.TextFieldOverride = (r, text) => "abc";
-        widget.Draw(rect, ctx);
+        NativeFixture.TextFieldOverride = (r, text) => "abc";
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,rect, ctx);}
         CheckClose(0.75f, value, "unparseable text is never written");
-        Check(session.GetOrCreateValueState("count").EditText == "abc", "and it stays in the session edit buffer");
+        Check(NativeFixture.Slot(session,"count").Draft== "abc", "and it stays in the session edit buffer");
 
         // Focus, then a deferred edit: Live=false must not write while the field holds focus.
         float lazy = 0.5f;
@@ -409,17 +386,17 @@ internal static class KernelAtomTests
         deferred.Configure(new UiElementSpec("lazy", NumberFieldWidget.Kind, Attrs(("Bind", "lazy"), ("Min", "0"), ("Max", "10"), ("Live", "false"))));
         UiWidgetContext lazyCtx = MakeContext(session, lazyBindings, theme);
 
-        UiNative.TextFieldOverride = (r, text) => text;
-        UiNative.DebugMouseDown = true;
-        UiNative.DebugMousePosition = new Vector2(60f, 14f);
-        deferred.Draw(rect, lazyCtx);
-        UiNative.DebugMouseDown = false;
-        Check(session.GetOrCreateValueState("lazy").Focused, "a mouse-down inside the field focuses it");
+        NativeFixture.TextFieldOverride = (r, text) => text;
+        NativeFixture.DebugMouseDown = true;
+        NativeFixture.DebugMousePosition = new UiLayoutPoint(60f, 14f);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        deferred,rect, lazyCtx);}
+        NativeFixture.DebugMouseDown = false;
+        Check(NativeFixture.Slot(session,"lazy").IsFocused, "a mouse-down inside the field focuses it");
 
-        UiNative.TextFieldOverride = (r, text) => "0.7";
-        deferred.Draw(rect, lazyCtx);
+        NativeFixture.TextFieldOverride = (r, text) => "0.7";
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        deferred,rect, lazyCtx);}
         CheckClose(0.5f, lazy, "a focused Live=false field defers the write");
-        CheckClose(0.7f, session.GetOrCreateValueState("lazy").FloatValue, "while the parsed value still lands in the session");
+        CheckClose(0.7f, NativeFixture.Number(NativeFixture.Slot(session,"lazy")), "while the parsed value still lands in the session");
         ResetSeams();
     }
 
@@ -514,33 +491,33 @@ internal static class KernelAtomTests
         return attributes;
     }
 
-    private static UiWidgetContext MakeContext(UiSession session, IUiBindings bindings, UiTheme theme)
+    private static UiWidgetContext MakeContext(UiSession session, IUiBindingReader bindings, UiTheme theme)
     {
-        return new UiWidgetContext(Scope, session, new WrappedMetrics(), theme, new StubTranslation(), bindings, 400f, "root");
+        return NativeFixture.Context(Scope, session, new WrappedMetrics(), theme, new StubTranslation(), bindings, 400f, "root");
     }
 
-    private static void EnablePointer(Vector2 position)
+    private static void EnablePointer(UiLayoutPoint position)
     {
-        UiNative.DebugMousePositionEnabled = true;
-        UiNative.DebugMousePosition = position;
-        UiNative.ButtonOverride = rect =>
-            position.x >= rect.x && position.x <= rect.xMax && position.y >= rect.y && position.y <= rect.yMax;
-        UiNative.SliderOverride = (rect, current, min, max) => current;
-        UiNative.TextFieldOverride = (rect, text) => text;
+        NativeFixture.DebugMousePositionEnabled = true;
+        NativeFixture.DebugMousePosition = position;
+        NativeFixture.ButtonOverride = rect =>
+            position.X >= rect.X && position.X <= rect.XMax && position.Y >= rect.Y && position.Y <= rect.YMax;
+        NativeFixture.SliderOverride = (rect, current, min, max) => current;
+        NativeFixture.TextFieldOverride = (rect, text) => text;
     }
 
     private static void ResetSeams()
     {
-        UiNative.DebugMousePositionEnabled = false;
-        UiNative.DebugMousePosition = Vector2.zero;
-        UiNative.DebugMouseDown = false;
-        UiNative.DebugMouseDrag = false;
-        UiNative.DebugMouseUp = false;
-        UiNative.DebugEnter = false;
-        UiNative.DebugFocusLost = false;
-        UiNative.ButtonOverride = null;
-        UiNative.SliderOverride = null;
-        UiNative.TextFieldOverride = null;
+        NativeFixture.DebugMousePositionEnabled = false;
+        NativeFixture.DebugMousePosition = UiLayoutPoint.Zero;
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.DebugMouseDrag = false;
+        NativeFixture.DebugMouseUp = false;
+        NativeFixture.DebugEnter = false;
+        NativeFixture.DebugFocusLost = false;
+        NativeFixture.ButtonOverride = null;
+        NativeFixture.SliderOverride = null;
+        NativeFixture.TextFieldOverride = null;
     }
 
     private static void ClearRecordedBoxes()
@@ -558,25 +535,25 @@ internal static class KernelAtomTests
         return (IList)Field("DrawBoxSolidColors");
     }
 
-    private static bool HasColor(IList colors, Color expected)
+    private static bool HasColor(IList colors, UiColour expected)
     {
         foreach (object value in colors)
         {
-            if (value is Color color && SameColor(color, expected)) return true;
+            if (SameColor(NativeFixture.Record<UiColour>(value), expected)) return true;
         }
 
         return false;
     }
 
-    private static bool SameColor(Color one, Color other)
+    private static bool SameColor(UiColour one, UiColour other)
     {
-        return one.r == other.r && one.g == other.g && one.b == other.b && one.a == other.a;
+        return one.Red == other.Red && one.Green == other.Green && one.Blue == other.Blue && one.Alpha == other.Alpha;
     }
 
-    private static bool SameRect(Rect one, Rect other)
+    private static bool SameRect(UiLayoutRect one, UiLayoutRect other)
     {
-        return Near(one.x, other.x) && Near(one.y, other.y)
-            && Near(one.width, other.width) && Near(one.height, other.height);
+        return Near(one.X, other.X) && Near(one.Y, other.Y)
+            && Near(one.Width, other.Width) && Near(one.Height, other.Height);
     }
 
     private static object Field(string name)

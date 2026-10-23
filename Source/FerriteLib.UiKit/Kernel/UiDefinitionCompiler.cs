@@ -81,7 +81,7 @@ internal sealed class UiDefinitionCompiler
         // CP-1/CP-2 placement contract, checked here because this is the creation-time door: a placement
         // attribute is valid only inside a placement container, and a flow container's child accepts the
         // cross-axis subset without an offset. The rule lives in UiPlacement so the engine can share it.
-        if (spec.TryGetAttribute("UpdateScope", out string updateScope) && !bool.TryParse(updateScope.Trim(), out _))
+        if (spec.TryGetAttribute("UpdateScope", out string updateScope) && !spec.TryGetBoolean("UpdateScope", out _))
             throw new UiContractException("UpdateScope must be true or false.", source, spec.Id, spec.Kind, path);
         UiPlacement.ValidateChild(spec, path, source, parent);
         UiPlacement.ValidateSiblingAnchors(spec, path, source);
@@ -100,7 +100,7 @@ internal sealed class UiDefinitionCompiler
             catch (UiUnknownWidgetKindException ex)
             {
                 throw new UiContractException(
-                    ex.Message,
+                    ex.Message+" at '"+path+"'.",
                     source,
                     spec.Id,
                     spec.Kind,
@@ -165,8 +165,7 @@ internal sealed class UiDefinitionCompiler
 
         string value = (raw ?? "").Trim();
         if (value.Length == 0
-            || !float.TryParse(value, System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out float rows)
+            || !spec.TryGetNumber("VisibleRows", out float rows)
             || rows <= 0f || float.IsNaN(rows) || float.IsInfinity(rows))
         {
             throw new UiContractException(
@@ -236,8 +235,7 @@ internal sealed class UiDefinitionCompiler
         {
             string width = widthRaw.Trim();
             bool auto = string.Equals(width, "Auto", StringComparison.OrdinalIgnoreCase);
-            if (!auto && (!float.TryParse(width, System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out float parsed) || parsed <= 0f))
+            if (!auto && (!spec.TryGetNumber("Width", out float parsed) || parsed <= 0f))
             {
                 throw new UiContractException(
                     $"Element id=\"{spec.Id}\" at '{path}' has invalid Width '{widthRaw}'; expected a positive number or Auto.",
@@ -260,8 +258,7 @@ internal sealed class UiDefinitionCompiler
             // parents can answer the reference it asks for - is checked in ValidateContentHeight below, where
             // the parent element is in hand.
             bool heightContent = UiPlacement.IsMatchContentHeight(spec);
-            bool heightNumber = float.TryParse(height, System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out float parsedHeight)
+            bool heightNumber = spec.TryGetNumber("Height", out float parsedHeight)
                 && !float.IsNaN(parsedHeight) && !float.IsInfinity(parsedHeight);
             if (height.Length > 0 && !heightAuto && !heightContent && !heightNumber)
             {
@@ -279,11 +276,7 @@ internal sealed class UiDefinitionCompiler
         // one deduplicated appearance fallback instead - fail-soft, but not silent.
         if (spec.TryGetAttribute("Visible", out string visibleRaw))
         {
-            string visible = visibleRaw.Trim();
-            if (!string.Equals(visible, "true", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(visible, "false", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(visible, "1", StringComparison.Ordinal)
-                && !string.Equals(visible, "0", StringComparison.Ordinal))
+            if (!spec.TryGetBoolean("Visible", out _))
             {
                 throw new UiContractException(
                     $"Element id=\"{spec.Id}\" at '{path}' has invalid Visible '{visibleRaw}'; expected true or false.",
@@ -295,10 +288,8 @@ internal sealed class UiDefinitionCompiler
         ValidatePositiveNumber(spec, path, "MaxWidth");
         if (spec.TryGetAttribute("MinWidth", out string minRaw)
             && spec.TryGetAttribute("MaxWidth", out string maxRaw)
-            && float.TryParse(minRaw.Trim(), System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out float minW)
-            && float.TryParse(maxRaw.Trim(), System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out float maxW)
+            && spec.TryGetNumber("MinWidth", out float minW)
+            && spec.TryGetNumber("MaxWidth", out float maxW)
             && minW > maxW)
         {
             throw new UiContractException(
@@ -402,8 +393,7 @@ internal sealed class UiDefinitionCompiler
     private void ValidatePositiveNumber(UiElementSpec spec, string path, string attribute)
     {
         if (!spec.TryGetAttribute(attribute, out string raw)) return;
-        if (!float.TryParse(raw.Trim(), System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out float value) || value <= 0f)
+        if (!spec.TryGetNumber(attribute, out float value) || value <= 0f)
         {
             throw new UiContractException(
                 $"Element id=\"{spec.Id}\" at '{path}' has invalid {attribute} '{raw}'; expected a positive number.",
@@ -414,8 +404,7 @@ internal sealed class UiDefinitionCompiler
     private void ValidatePositiveInteger(UiElementSpec spec, string path, string attribute)
     {
         if (!spec.TryGetAttribute(attribute, out string raw)) return;
-        if (!int.TryParse(raw.Trim(), System.Globalization.NumberStyles.Integer,
-                System.Globalization.CultureInfo.InvariantCulture, out int value) || value <= 0)
+        if (!spec.TryGetInteger(attribute, out int value) || value <= 0)
         {
             throw new UiContractException(
                 $"Element id=\"{spec.Id}\" at '{path}' has invalid {attribute} '{raw}'; expected a positive integer.",
@@ -431,6 +420,8 @@ internal sealed class UiDefinitionCompiler
     private void ValidateAttributes(UiElementSpec spec, string path, bool isContainer)
     {
         (isContainer?ContainerSchema:CommonSchema).Validate(spec,source,path);
+        if (isContainer && spec.TryGetAttribute("Padding", out _) && !spec.TryGetNumbers("Padding", out _))
+            throw new UiContractException("Invalid Padding at '" + path + "'; expected one, two or four finite numbers.", source, spec.Id, spec.Kind, path);
         if(!isContainer)UiWidgetRegistry.Schema(source,spec.Kind)?.Validate(spec,source,path);
         IReadOnlyCollection<string>? allowed = isContainer
             ? ContainerAttributes
@@ -442,7 +433,7 @@ internal sealed class UiDefinitionCompiler
         {
             if (UiAppearanceProperties.IsMetricAttribute(pair.Key))
             {
-                if (!UiAppearanceProperties.TryMetric(pair.Value, out _))
+                if (!spec.TryGetNumber(pair.Key, out float metric) || metric < 0)
                     throw new UiContractException("Invalid " + pair.Key + " at '" + path + "': expected a finite non-negative metric.", source, spec.Id, spec.Kind, path);
                 continue;
             }
@@ -481,7 +472,3 @@ internal sealed class UiDefinitionCompiler
             || string.Equals(kind, "Clip", StringComparison.Ordinal);
     }
 }
-
-
-
-

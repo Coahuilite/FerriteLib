@@ -1,6 +1,7 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
@@ -13,11 +14,9 @@ namespace FerriteLib.UiKit.Tests;
 /// hovered row too, so the same attribute now drives the popup's options and both kinds read it through one
 /// implementation (<see cref="OptionHelp"/>) instead of two copies.
 /// <para>
-/// The identity a popup row publishes is the option's <b>value</b>: a dropdown's options come from the
-/// consumer's data (an options binding, or the static <c>OptionN</c>/<c>ValueN</c> pairs), so the value is the
-/// machine token a help catalog is keyed by — the same choice the mode row falls back to when a cell declares
-/// no help text. The publication follows the same rule on both kinds: the hovered row's identity, cleared when
-/// nothing is hovered, written only when the answer changes.
+/// Each choice carries an explicit help identity. Migrated string/static declarations explicitly
+/// preserve their old Value identity; typed choices can explicitly preserve their old Text identity.
+/// Publication clears on leave/close and writes only when the hovered answer changes.
 /// </para>
 /// </summary>
 internal static class KernelOptionHelpTests
@@ -36,8 +35,27 @@ internal static class KernelOptionHelpTests
         Run("Hovering a popup row publishes its value", VerifyPopupRowPublishes);
         Run("Leaving the rows clears it, and so does closing", VerifyClearing);
         Run("A re-hovered row writes nothing", VerifyNoChurn);
+        Run("Typed choices preserve explicit legacy label help without converting their business values", VerifyTypedLabelHelp);
         ResetSeams();
         return failures;
+    }
+
+    private static void VerifyTypedLabelHelp()
+    {
+        PrepareCore();
+        int value=1,writes=0;string help="";
+        var bindings=new UiBindings();
+        bindings.BindValue("typed",()=>value,v=>{value=v;writes++;});
+        bindings.BindChoices("typed",()=>new[]{new UiChoice<int>("First label",1,"First label"),new UiChoice<int>("Second label",2,"Second label")});
+        bindings.BindValue("help",()=>help,v=>help=v);
+        using var host=new UiHost(Scope,UiLayoutManifest.Parse("<UiPage Schema='2' Source='"+Scope+"'><Widget Id='typed' Kind='input/dropdown' Bind='typed' Height='24' HoverHelpKey='help'/></UiPage>"),bindings,UiTheme.Vanilla,new StubMetrics(),new StubTranslation());
+        NativeEvents.Click(Trigger().Center,()=>NativeFixture.DrawFrame(host,Viewport()));
+        NativeEvents.Begin(EventType.Repaint,Row(1).Center);NativeFixture.DrawFrame(host,Viewport());
+        Check(help=="Second label"&&value==1&&writes==0,"typed row publishes its explicitly preserved old Text identity, not its int value or a request");
+        NativeEvents.Click(Row(1).Center,()=>NativeFixture.DrawFrame(host,Viewport()));
+        Check(value==2&&writes==1,"the same typed row still dispatches the real business value exactly once");
+        NativeEvents.Begin(EventType.Repaint,new UiLayoutPoint(-100,-100));NativeFixture.DrawFrame(host,Viewport());
+        Check(help=="","typed explicit help clears after selection/leave like string/static help");
     }
 
     private static void VerifyBothKindsDeclareIt()
@@ -93,17 +111,17 @@ internal static class KernelOptionHelpTests
         Check(fixture.Help == "b", "the row's identity starts published");
 
         // Still open, pointer off the rows: the popup's own pass reports "nothing hovered".
-        UiNative.DebugMousePosition = new Vector2(Width / 2f, 500f);
-        fixture.Host.DrawFrame(Viewport());
+        NativeFixture.DebugMousePosition = new UiLayoutPoint(Width / 2f, 500f);
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(fixture.Host,Viewport());
         Check(fixture.Help == "", "leaving the rows clears the sink while the popup stays open");
 
         // Close it by clicking the trigger again.
-        UiNative.DebugMousePositionEnabled = false;
-        UiNative.ButtonOverride = rect => SameRect(rect, Trigger());
-        fixture.Host.DrawFrame(Viewport());
+        NativeEvents.Click(Trigger().Center,()=>NativeFixture.DrawFrame(fixture.Host,Viewport()));
         Check(!fixture.Host.Session.IsPopupOpen("choice"), "clicking the trigger closes the popup");
-        UiNative.ButtonOverride = null;
-        fixture.Host.DrawFrame(Viewport());
+        NativeFixture.ButtonOverride = null;
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(fixture.Host,Viewport());
         Check(fixture.Help == "", "and a closed dropdown holds no option identity");
     }
 
@@ -139,31 +157,31 @@ internal static class KernelOptionHelpTests
         fixture.Host = Host(bindings, "HoverHelpKey=\"help\"");
 
         // Frame 1: click the trigger. The popup's rows live in Host window space below it.
-        UiNative.ButtonOverride = rect => SameRect(rect, Trigger());
-        fixture.Host.DrawFrame(Viewport());
-        UiNative.ButtonOverride = null;
-        UiNative.DebugMousePositionEnabled = true;
+        NativeEvents.Click(Trigger().Center,()=>NativeFixture.DrawFrame(fixture.Host,Viewport()));
+        NativeFixture.ButtonOverride = null;
+        NativeFixture.DebugMousePositionEnabled = true;
         return fixture;
     }
 
-    private static void Hover(Fixture fixture, Rect row)
+    private static void Hover(Fixture fixture, UiLayoutRect row)
     {
-        UiNative.DebugMousePosition = new Vector2(row.x + row.width / 2f, row.y + row.height / 2f);
-        fixture.Host.DrawFrame(Viewport());
+        NativeFixture.DebugMousePosition = new UiLayoutPoint(row.X + row.Width / 2f, row.Y + row.Height / 2f);
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(fixture.Host,Viewport());
     }
 
     /// <summary>The trigger's window-space rect: the widget is the page root at the viewport origin.</summary>
-    private static Rect Trigger() => new(0f, 0f, Width, OptionHeight);
+    private static UiLayoutRect Trigger() => new(0f, 0f, Width, OptionHeight);
 
     /// <summary>One popup row's window-space rect, straight from <see cref="UiPopup.RectFor"/> and the anchored
     /// popup geometry: the anchor is the trigger, the rows start at its bottom edge.</summary>
-    private static Rect Row(int index)
+    private static UiLayoutRect Row(int index)
     {
-        Rect popup = UiPopup.RectFor(Trigger(), 2, Viewport());
-        return new Rect(popup.x, popup.y + index * OptionHeight, popup.width, OptionHeight);
+        UiLayoutRect popup = UiPopup.RectFor(Trigger(), 2, Viewport());
+        return new UiLayoutRect(popup.X, popup.Y + index * OptionHeight, popup.Width, OptionHeight);
     }
 
-    private static Rect Viewport() => new(0f, 0f, Width, 600f);
+    private static UiLayoutRect Viewport() => new(0f, 0f, Width, 600f);
 
     private static UiHost Host(UiBindings bindings, string helpAttribute)
     {
@@ -172,10 +190,7 @@ internal static class KernelOptionHelpTests
         return new UiHost(
             Scope,
             UiLayoutManifest.Parse(
-                "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-                + "<Widget Id=\"dd\" Kind=\"input/dropdown\" Bind=\"choice\" Height=\"24\" " + helpAttribute
-                + " Option1=\"Alpha\" Value1=\"a\" Option2=\"Beta\" Value2=\"b\" />"
-                + "</UiPage>"),
+                "<UiPage Schema=\"2\" Source=\""+(Scope)+"\"><Widget Id=\"dd\" Kind=\"input/dropdown\" Bind=\"choice\" Height=\"24\" "+(helpAttribute)+"     ><Choice Value=\"a\" Text=\"Alpha\" Help=\"a\"/><Choice Value=\"b\" Text=\"Beta\" Help=\"b\"/></Widget></UiPage>"),
             bindings,
             UiTheme.Vanilla,
             new StubMetrics(),
@@ -201,10 +216,10 @@ internal static class KernelOptionHelpTests
         }
     }
 
-    private static bool SameRect(Rect left, Rect right)
+    private static bool SameRect(UiLayoutRect left, UiLayoutRect right)
     {
-        return Math.Abs(left.x - right.x) < 0.01f && Math.Abs(left.y - right.y) < 0.01f
-            && Math.Abs(left.width - right.width) < 0.01f && Math.Abs(left.height - right.height) < 0.01f;
+        return Math.Abs(left.X - right.X) < 0.01f && Math.Abs(left.Y - right.Y) < 0.01f
+            && Math.Abs(left.Width - right.Width) < 0.01f && Math.Abs(left.Height - right.Height) < 0.01f;
     }
 
     private static bool Contains(IReadOnlyCollection<string> set, string name)
@@ -219,11 +234,11 @@ internal static class KernelOptionHelpTests
 
     private static void ResetSeams()
     {
-        UiNative.DebugMousePositionEnabled = false;
-        UiNative.DebugMousePosition = default;
-        UiNative.DebugMouseDown = false;
-        UiNative.ButtonOverride = null;
-        UiNative.TextFieldOverride = null;
+        NativeFixture.DebugMousePositionEnabled = false;
+        NativeFixture.DebugMousePosition = default;
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.ButtonOverride = null;
+        NativeFixture.TextFieldOverride = null;
     }
 
     private static int Run(string name, Action action)

@@ -1,10 +1,11 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -67,35 +68,28 @@ internal static class KernelModeRowHelpTests
         }
 
         Check(Contains(schema, InputModeRowWidget.HoverHelpKeyAttribute), "the schema allows HoverHelpKey");
-        Check(Contains(schema, "Description3") && Contains(schema, "Value3"),
-            "and still allows the per-option description/value pair it publishes");
-
-        IReadOnlyCollection<string>? labels = UiWidgetRegistry.GetLabelAttributes(UiWidgetRegistry.CoreScope, InputModeRowWidget.Kind);
-        Check(
-            labels != null && labels.Count == 16 && Contains(labels, "Title1") && Contains(labels, "TitleKey1")
-                && !Contains(labels, "Description1"),
-            "the label set is both title families (16 names) and still excludes the descriptions, which are published, never painted (B8's half)");
+        Check(!Contains(schema,"Description3")&&!Contains(schema,"Value3"),"per-choice help and value are carried together, never numbered widget attributes");
+        var labels=UiWidgetRegistry.GetLabelAttributes(UiWidgetRegistry.CoreScope,InputModeRowWidget.Kind);
+        Check(labels==null||!Contains(labels,"Description1"),"help identities are published rather than treated as painted labels");
     }
-
     private static void VerifyInertOptionRefusal()
     {
         PrepareCore();
 
         Reject(
-            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\" Value1=\"A\" Description3=\"orphan help\" />",
+            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  Description3=\"orphan help\" ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget>",
             "Description3",
             "a description whose index has no option");
 
         Reject(
-            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\" Value1=\"A\" Title2=\"orphan title\" />",
+            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  Title2=\"orphan title\" ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget>",
             "Title2",
             "a title whose index has no option");
 
         // The refusal is not a blanket ban on gaps in the numbering: an option with a description and no
         // title, and an option 4 after an absent option 3, are both ordinary manifests.
         Host(
-            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\""
-            + " Value1=\"A\" Description1=\"help a\" Value4=\"D\" Title4=\"Dee\" />");
+            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"     ><Choice Value=\"A\" Text=\"A\" Help=\"help a\"/><Choice Value=\"D\" Text=\"Dee\" Help=\"D\"/></Widget>");
         Check(true, "a description without a title, and a gap in the option numbering, still create");
     }
 
@@ -105,7 +99,7 @@ internal static class KernelModeRowHelpTests
 
         // Unbound: the row would write through a key nothing answers.
         Reject(
-            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\" Value1=\"A\" HoverHelpKey=\"nobody-bound-this\" />",
+            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  HoverHelpKey=\"nobody-bound-this\" ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget>",
             "nobody-bound-this",
             "a HoverHelpKey nothing is bound to");
 
@@ -115,7 +109,7 @@ internal static class KernelModeRowHelpTests
         bindings.BindReadOnly("published", () => "help");
         Check(RejectWithBindings(
                 bindings,
-                "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\" Value1=\"A\" HoverHelpKey=\"published\" />",
+                "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  HoverHelpKey=\"published\" ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget>",
                 "not writable"),
             "a read-only HoverHelpKey is refused, because the publication is a write");
 
@@ -126,7 +120,7 @@ internal static class KernelModeRowHelpTests
         wrong.BindValue("numeric", () => number, value => number = value);
         Check(RejectWithBindings(
                 wrong,
-                "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\" Value1=\"A\" HoverHelpKey=\"numeric\" />",
+                "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  HoverHelpKey=\"numeric\" ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget>",
                 "numeric"),
             "a HoverHelpKey bound to a non-string value is refused by the typed validation");
 
@@ -137,7 +131,7 @@ internal static class KernelModeRowHelpTests
         good.BindValue<string>("help", () => help, value => help = value);
         HostWithBindings(
             good,
-            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\" Value1=\"A\" HoverHelpKey=\"help\" />");
+            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  HoverHelpKey=\"help\" ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget>");
         Check(true, "a writable string HoverHelpKey creates");
     }
 
@@ -148,7 +142,8 @@ internal static class KernelModeRowHelpTests
         Fixture fixture = Build();
         EnablePointer(CellCenter(fixture, 1));
 
-        fixture.Widget.Draw(fixture.Rect, fixture.Context);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(
+        fixture.Widget,fixture.Rect, fixture.Context);}
 
         Check(fixture.Help == "help B", "hovering option 2 publishes its declared description");
         Check(fixture.Writes == 1, "and publishes it once");
@@ -159,18 +154,19 @@ internal static class KernelModeRowHelpTests
         Fixture fixture = Build();
 
         EnablePointer(CellCenter(fixture, 0));
-        fixture.Widget.Draw(fixture.Rect, fixture.Context);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        fixture.Widget,fixture.Rect, fixture.Context);}
         Check(fixture.Help == "help A" && fixture.Writes == 1, "hovering option 1 publishes its identity");
 
-        fixture.Widget.Draw(fixture.Rect, fixture.Context);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(
+        fixture.Widget,fixture.Rect, fixture.Context);}
         Check(fixture.Writes == 1, "the same option hovered again writes nothing: one write per transition, not per frame");
 
-        UiNative.DebugMousePosition = CellCenter(fixture, 1);
-        fixture.Widget.Draw(fixture.Rect, fixture.Context);
+        NativeFixture.DebugMousePosition = CellCenter(fixture, 1);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        fixture.Widget,fixture.Rect, fixture.Context);}
         Check(fixture.Help == "help B" && fixture.Writes == 2, "moving the hover to option 2 changes the identity and writes once");
 
-        UiNative.DebugMousePosition = CellCenter(fixture, 0);
-        fixture.Widget.Draw(fixture.Rect, fixture.Context);
+        NativeFixture.DebugMousePosition = CellCenter(fixture, 0);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        fixture.Widget,fixture.Rect, fixture.Context);}
         Check(fixture.Help == "help A" && fixture.Writes == 3, "and moving back changes it again");
     }
 
@@ -179,15 +175,16 @@ internal static class KernelModeRowHelpTests
         Fixture fixture = Build();
 
         EnablePointer(CellCenter(fixture, 1));
-        fixture.Widget.Draw(fixture.Rect, fixture.Context);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        fixture.Widget,fixture.Rect, fixture.Context);}
         Check(fixture.Help == "help B", "the hover starts published");
 
-        UiNative.DebugMousePosition = new Vector2(fixture.Rect.xMax + 40f, fixture.Rect.yMax + 40f);
-        fixture.Widget.Draw(fixture.Rect, fixture.Context);
+        NativeFixture.DebugMousePosition = new UiLayoutPoint(fixture.Rect.XMax + 40f, fixture.Rect.YMax + 40f);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        fixture.Widget,fixture.Rect, fixture.Context);}
         Check(fixture.Help == "", "leaving the row clears the published identity");
         Check(fixture.Writes == 2, "and the clear is one write, not a per-frame stream of empties");
 
-        fixture.Widget.Draw(fixture.Rect, fixture.Context);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(
+        fixture.Widget,fixture.Rect, fixture.Context);}
         Check(fixture.Writes == 2, "a following frame outside the row writes nothing");
     }
 
@@ -196,7 +193,8 @@ internal static class KernelModeRowHelpTests
         Fixture fixture = Build();
         EnablePointer(CellCenter(fixture, 2));
 
-        fixture.Widget.Draw(fixture.Rect, fixture.Context);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(
+        fixture.Widget,fixture.Rect, fixture.Context);}
 
         Check(fixture.Help == "C", "an option that declares no description publishes its value, so the hovered option is always named");
     }
@@ -205,14 +203,7 @@ internal static class KernelModeRowHelpTests
     {
         Fixture fixture = Build();
         EnablePointer(CellCenter(fixture, 1));
-        UiNative.ButtonOverride = rect =>
-        {
-            Vector2 p = UiNative.DebugMousePosition;
-            return p.x >= rect.x && p.x <= rect.xMax && p.y >= rect.y && p.y <= rect.yMax;
-        };
-
-        fixture.Widget.Draw(fixture.Rect, fixture.Context);
-
+        NativeEvents.Click(NativeFixture.DebugMousePosition,()=>NativeFixture.Draw(fixture.Widget,fixture.Rect,fixture.Context));
         Check(fixture.Mode == "B", "a click on the hovered option still selects it");
         Check(fixture.Help == "help B", "and the same frame publishes the hover: the claim consumed nothing");
     }
@@ -226,7 +217,7 @@ internal static class KernelModeRowHelpTests
     private static void VerifyHoverRespectsTheFunnelRules()
     {
         PrepareCore();
-        UiWidgetRegistry.Register(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Id", "Kind", "ActionBind", "Height" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Id", "Kind", "ActionBind", "Height" }));
 
         bool enabled = false;
         var bindings = new UiBindings();
@@ -236,22 +227,20 @@ internal static class KernelModeRowHelpTests
         using UiHost host = new(
             Scope,
             UiLayoutManifest.Parse(
-                "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-                + "<Widget Id=\"gate\" Kind=\"" + ProbeKind + "\" ActionBind=\"gate\" Height=\"20\" />"
-                + "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\" Value1=\"A\" />"
-                + "</UiPage>"),
+                "<UiPage Schema=\"2\" Source=\""+(Scope)+"\"><Widget Id=\"gate\" Kind=\""+(ProbeKind)+"\" ActionBind=\"gate\" Height=\"20\" /><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget></UiPage>"),
             bindings,
             UiTheme.Vanilla,
             new StubMetrics(),
             new StubTranslation());
 
-        host.DrawFrame(new Rect(0f, 0f, Width, 200f));
+        NativeFixture.DrawFrame(
+        host,new UiLayoutRect(0f, 0f, Width, 200f));
         UiNode gate = host.Session.GetNodeByElementId("gate") ?? throw new Exception("the command-bound element was not arranged");
         UiNode mode = host.Session.GetNodeByElementId("mode") ?? throw new Exception("the mode row was not arranged");
         Check(gate.IsDisabled, "the probe element is published disabled while its predicate answers false");
 
-        var rect = new Rect(0f, 0f, Width, CellHeight);
-        EnablePointer(new Vector2(10f, 10f));
+        var rect = new UiLayoutRect(0f, 0f, Width, CellHeight);
+        EnablePointer(new UiLayoutPoint(10f, 10f));
         UiWidgetContext gateCtx = MakeContext(host.Session, bindings).WithNode(gate);
         UiWidgetContext modeCtx = MakeContext(host.Session, bindings).WithNode(mode);
 
@@ -259,8 +248,8 @@ internal static class KernelModeRowHelpTests
         // refuses input (Button and the session-plus-key primitives), while hover also drives inspection - and a
         // control that is unavailable is exactly when a player needs the help that explains it. The consumer's
         // own unavailable-state help entries are the evidence for that split.
-        Check(UiNative.IsMouseOver(rect, gateCtx), "a disabled element IS hovered: help explains why it is unavailable instead of activating it");
-        Check(UiNative.IsMouseOver(rect, modeCtx), "and so is an enabled element covering the same rect");
+        Check(NativeFixture.IsMouseOver(rect, gateCtx), "a disabled element IS hovered: help explains why it is unavailable instead of activating it");
+        Check(NativeFixture.IsMouseOver(rect, modeCtx), "and so is an enabled element covering the same rect");
 
         // Plant a popup layer that belongs to another element and covers the point: the mode row is under it.
         // A pass publishes the layers the previous pass recorded (BeginHitPass copies hitLayers into the
@@ -269,14 +258,14 @@ internal static class KernelModeRowHelpTests
         host.Session.PushHitLayer(mode, rect, isPopup: false);
         host.Session.PushHitLayer(gate, rect, isPopup: true);
         host.Session.BeginHitPass();
-        Check(!UiNative.IsMouseOver(rect, modeCtx), "an element under another element's popup layer is not hovered");
+        Check(!NativeFixture.IsMouseOver(rect, modeCtx), "an element under another element's popup layer is not hovered");
 
         // A popup layer over the same node covers it too: coverage is the rect, and no owner id exempts
         // anything from it any more (FL-IC1 retired the trigger's own-popup exemption, which is what had let
         // a menu drawn over its own trigger steal the click from its rows - see KernelInputEligibilityTests).
         host.Session.PushHitLayer(mode, rect, isPopup: true);
         host.Session.BeginHitPass();
-        Check(!UiNative.IsMouseOver(rect, modeCtx), "a same-node popup also suppresses content hover");
+        Check(!NativeFixture.IsMouseOver(rect, modeCtx), "a same-node popup also suppresses content hover");
     }
 
     // --- fixture -----------------------------------------------------------------------------------
@@ -286,7 +275,7 @@ internal static class KernelModeRowHelpTests
         public InputModeRowWidget Widget = null!;
         public UiSession Session = null!;
         public UiWidgetContext Context = null!;
-        public Rect Rect;
+        public UiLayoutRect Rect;
         public string Mode = "A";
         public string Help = "";
         public int Writes;
@@ -309,22 +298,11 @@ internal static class KernelModeRowHelpTests
             fixture.Writes++;
         });
 
-        var attrs = new Dictionary<string, string>
-        {
-            ["Bind"] = "mode",
-            ["HoverHelpKey"] = "help",
-            ["Height"] = "20",
-            ["Value1"] = "A", ["Title1"] = "A", ["Description1"] = "help A",
-            ["Value2"] = "B", ["Title2"] = "B", ["Description2"] = "help B",
-            ["Value3"] = "C", ["Title3"] = "C",
-            ["Value4"] = "D", ["Title4"] = "D", ["Description4"] = "help D"
-        };
-
-        fixture.Widget = new InputModeRowWidget();
-        fixture.Widget.Configure(new UiElementSpec("mode", InputModeRowWidget.Kind, attrs));
-        fixture.Session = new UiSession();
+        var attrs=new Dictionary<string,string>{{"Bind","mode"},{"HoverHelpKey","help"},{"Height","20"}};
+        var choices=new[]{new UiChoice<string>("A","A","help A"),new UiChoice<string>("B","B","help B"),new UiChoice<string>("C","C","C"),new UiChoice<string>("D","D","help D")};
+        fixture.Widget=new InputModeRowWidget();fixture.Widget.Configure(new UiElementSpec("mode",InputModeRowWidget.Kind,attrs,choices:choices));        fixture.Session = new UiSession();
         fixture.Context = MakeContext(fixture.Session, bindings);
-        fixture.Rect = new Rect(0f, 0f, Width, 200f);
+        fixture.Rect = new UiLayoutRect(0f, 0f, Width, 200f);
         return fixture;
     }
 
@@ -333,17 +311,17 @@ internal static class KernelModeRowHelpTests
     /// arithmetic the kind lays its cells out with, so a pointer placed here is inside that cell by
     /// construction rather than by a hard-coded pixel.
     /// </summary>
-    private static Vector2 CellCenter(Fixture fixture, int index)
+    private static UiLayoutPoint CellCenter(Fixture fixture, int index)
     {
         UiGeometry g = UiTheme.Vanilla.Geometry;
-        int columns = fixture.Rect.width >= 560f ? 4 : fixture.Rect.width >= 360f ? 2 : 1;
-        float innerWidth = Math.Max(1f, fixture.Rect.width - g.Spacing * 2f);
+        int columns = fixture.Rect.Width >= 560f ? 4 : fixture.Rect.Width >= 360f ? 2 : 1;
+        float innerWidth = Math.Max(1f, fixture.Rect.Width - g.Spacing * 2f);
         float columnWidth = (innerWidth - (columns - 1) * g.Gap) / columns;
         int row = index / columns;
         int col = index % columns;
-        float x = fixture.Rect.x + g.Spacing + col * (columnWidth + g.Gap) + columnWidth / 2f;
-        float y = fixture.Rect.y + g.Spacing + row * (CellHeight + g.Gap) + CellHeight / 2f;
-        return new Vector2(x, y);
+        float x = fixture.Rect.X + g.Spacing + col * (columnWidth + g.Gap) + columnWidth / 2f;
+        float y = fixture.Rect.Y + g.Spacing + row * (CellHeight + g.Gap) + CellHeight / 2f;
+        return new UiLayoutPoint(x, y);
     }
 
     // --- helpers ----------------------------------------------------------------------------------
@@ -354,9 +332,9 @@ internal static class KernelModeRowHelpTests
         UiWidgetRegistry.InitializeCore();
     }
 
-    private static UiWidgetContext MakeContext(UiSession session, IUiBindings bindings)
+    private static UiWidgetContext MakeContext(UiSession session, IUiBindingReader bindings)
     {
-        return new UiWidgetContext(
+        return NativeFixture.Context(
             Scope, session, new StubMetrics(), UiTheme.Vanilla,
             new StubTranslation(), bindings, Width, "root");
     }
@@ -401,24 +379,24 @@ internal static class KernelModeRowHelpTests
         return bindings;
     }
 
-    private static void EnablePointer(Vector2 point)
+    private static void EnablePointer(UiLayoutPoint point)
     {
-        UiNative.DebugMousePositionEnabled = true;
-        UiNative.DebugMousePosition = point;
-        UiNative.DebugMouseDown = false;
+        NativeFixture.DebugMousePositionEnabled = true;
+        NativeFixture.DebugMousePosition = point;NativeFixture.BeginDebugEvent();
+        NativeFixture.DebugMouseDown = false;
     }
 
     private static void ResetSeams()
     {
-        UiNative.DebugMousePositionEnabled = false;
-        UiNative.DebugMousePosition = default;
-        UiNative.DebugMouseDown = false;
-        UiNative.DebugMouseDrag = false;
-        UiNative.DebugMouseUp = false;
-        UiNative.DebugEnter = false;
-        UiNative.DebugFocusLost = false;
-        UiNative.ButtonOverride = null;
-        UiNative.TextFieldOverride = null;
+        NativeFixture.DebugMousePositionEnabled = false;
+        NativeFixture.DebugMousePosition = default;
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.DebugMouseDrag = false;
+        NativeFixture.DebugMouseUp = false;
+        NativeFixture.DebugEnter = false;
+        NativeFixture.DebugFocusLost = false;
+        NativeFixture.ButtonOverride = null;
+        NativeFixture.TextFieldOverride = null;
     }
 
     private static bool Contains(IReadOnlyCollection<string> set, string name)
@@ -500,7 +478,7 @@ internal static class KernelModeRowHelpTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
@@ -509,7 +487,7 @@ internal static class KernelModeRowHelpTests
             return CellHeight;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
         }
     }

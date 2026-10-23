@@ -1,7 +1,7 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
-
-using UnityEngine;
 
 using FerriteLib.UiKit.Kernel;
 
@@ -61,15 +61,15 @@ internal static class KernelTextAuditTests
         UiFitAudit.Attach(new ModelMetrics(), reports.Add);
         UiFitAudit.Reset();
 
-        Draw(new Rect(0f, 0f, 100f, 8f), "too tall for eight pixels", UiFont.Tiny);
+        Draw(new UiLayoutRect(0f, 0f, 100f, 8f), "too tall for eight pixels", UiFont.Tiny);
         Check(reports.Count == 0, "Attached but not enabled: the audit must not report");
 
         UiFitAudit.Enabled = true;
-        Draw(new Rect(0f, 0f, 100f, 8f), "too tall for eight pixels", UiFont.Tiny);
+        Draw(new UiLayoutRect(0f, 0f, 100f, 8f), "too tall for eight pixels", UiFont.Tiny);
         Check(reports.Count == 1, "Enabling is what turns measurement on");
 
         UiFitAudit.Enabled = false;
-        Draw(new Rect(0f, 0f, 100f, 8f), "different overflowing text", UiFont.Tiny);
+        Draw(new UiLayoutRect(0f, 0f, 100f, 8f), "different overflowing text", UiFont.Tiny);
         Check(reports.Count == 1, "Disabling stops the per-frame text-generation cost");
         Stop();
     }
@@ -79,7 +79,7 @@ internal static class KernelTextAuditTests
         List<UiOverflowReport> reports = Start();
 
         // A single-line label: 4 Latin units at Tiny (12px em, half-width advance) = 24px of need.
-        Draw(new Rect(0f, 0f, 10f, SingleLineBand), "abcd", UiFont.Tiny, singleLine: true);
+        Draw(new UiLayoutRect(0f, 0f, 10f, SingleLineBand), "abcd", UiFont.Tiny, singleLine: true);
 
         Check(reports.Count == 1, "One width finding for an overflowing single-line label");
         if (reports.Count != 1)
@@ -102,7 +102,7 @@ internal static class KernelTextAuditTests
 
         for (int frame = 0; frame < 4; frame++)
         {
-            Draw(new Rect(0f, 0f, 10f, SingleLineBand), "same text every frame", UiFont.Tiny, singleLine: true);
+            Draw(new UiLayoutRect(0f, 0f, 10f, SingleLineBand), "same text every frame", UiFont.Tiny, singleLine: true);
         }
 
         Check(reports.Count == 1, "A page redrawn 60 times per second reports one finding, not 60");
@@ -114,9 +114,9 @@ internal static class KernelTextAuditTests
         List<UiOverflowReport> reports = Start();
 
         UiFitAudit.BeginElement("page-root/body-row/nav-column/nav");
-        Draw(new Rect(0f, 0f, 10f, SingleLineBand), "scoped overflow", UiFont.Tiny, singleLine: true);
+        Draw(new UiLayoutRect(0f, 0f, 10f, SingleLineBand), "scoped overflow", UiFont.Tiny, singleLine: true);
         UiFitAudit.EndElement();
-        Draw(new Rect(0f, 0f, 10f, SingleLineBand), "unscoped overflow", UiFont.Tiny, singleLine: true);
+        Draw(new UiLayoutRect(0f, 0f, 10f, SingleLineBand), "unscoped overflow", UiFont.Tiny, singleLine: true);
 
         Check(reports.Count == 2, "Scoped and unscoped findings are distinct");
         Check(reports.Count == 2 && reports[0].ElementPath == "page-root/body-row/nav-column/nav",
@@ -139,8 +139,8 @@ internal static class KernelTextAuditTests
 
         // Two labels of different lengths in the same rect: one field must separate them.
         string longLabel = "a close affordance label that does not fit";
-        Draw(new Rect(0f, 0f, 12f, SingleLineBand), longLabel, UiFont.Tiny, singleLine: true);
-        Draw(new Rect(0f, 0f, 12f, SingleLineBand), "short", UiFont.Tiny, singleLine: true);
+        Draw(new UiLayoutRect(0f, 0f, 12f, SingleLineBand), longLabel, UiFont.Tiny, singleLine: true);
+        Draw(new UiLayoutRect(0f, 0f, 12f, SingleLineBand), "short", UiFont.Tiny, singleLine: true);
 
         Check(reports.Count == 2, "Both unscoped findings are reported (got " + reports.Count + ")");
         if (reports.Count != 2)
@@ -169,7 +169,7 @@ internal static class KernelTextAuditTests
         // ruler reporting need > available is routed to the Height axis with the band as Available. It stays
         // green under a wrap-aware ruler for the same one-line reason (measured 2026-09-24, T27). The
         // wrapping evidence is the paragraph pair below.
-        Draw(new Rect(0f, 0f, 100f, 10f), "ab", UiFont.Tiny);
+        Draw(new UiLayoutRect(0f, 0f, 100f, 10f), "ab", UiFont.Tiny);
 
         Check(reports.Count == 1, "One height finding");
         Check(reports.Count == 1 && reports[0].Axis == UiOverflowAxis.Height, "Failing axis is Height");
@@ -190,8 +190,8 @@ internal static class KernelTextAuditTests
         // reason unrelated to its claim (measured 2026-09-24, T27; §14.31).
         const float width = 100f;
         string paragraph = new string('x', 400);
-        Draw(new Rect(0f, 0f, width, WrappedHeight(paragraph, UiFont.Tiny, width) + 1f), paragraph, UiFont.Tiny);
-        Draw(new Rect(0f, 0f, width, WrappedHeight(paragraph, UiFont.Small, width) + 1f), paragraph, UiFont.Small);
+        Draw(new UiLayoutRect(0f, 0f, width, WrappedHeight(paragraph, UiFont.Tiny, width) + 1f), paragraph, UiFont.Tiny);
+        Draw(new UiLayoutRect(0f, 0f, width, WrappedHeight(paragraph, UiFont.Small, width) + 1f), paragraph, UiFont.Small);
 
         Check(reports.Count == 0, "A paragraph whose band holds its wrapped lines is not a finding");
         Stop();
@@ -209,7 +209,7 @@ internal static class KernelTextAuditTests
         string paragraph = new string('x', 400);
         List<UiOverflowReport> reports = Start();
 
-        Draw(new Rect(0f, 0f, width, WrappedHeight(paragraph, UiFont.Small, width) * 0.5f), paragraph, UiFont.Small);
+        Draw(new UiLayoutRect(0f, 0f, width, WrappedHeight(paragraph, UiFont.Small, width) * 0.5f), paragraph, UiFont.Small);
 
         Check(reports.Count == 1, "A band half the paragraph's wrapped height is reported (got " + reports.Count + ")");
         Check(reports.Count == 1 && reports[0].Axis == UiOverflowAxis.Height, "and it is the Height axis");
@@ -240,10 +240,10 @@ internal static class KernelTextAuditTests
     {
         List<UiOverflowReport> reports = Start();
 
-        Draw(new Rect(0f, 0f, 200f, 40f), "fits", UiFont.Small);
-        Draw(new Rect(0f, 0f, 200f, 40f), "fits", UiFont.Small, singleLine: true);
-        Draw(new Rect(0f, 0f, 200f, 40f), "", UiFont.Small);
-        Draw(new Rect(0f, 0f, 0f, 40f), "zero width", UiFont.Small);
+        Draw(new UiLayoutRect(0f, 0f, 200f, 40f), "fits", UiFont.Small);
+        Draw(new UiLayoutRect(0f, 0f, 200f, 40f), "fits", UiFont.Small, singleLine: true);
+        Draw(new UiLayoutRect(0f, 0f, 200f, 40f), "", UiFont.Small);
+        Draw(new UiLayoutRect(0f, 0f, 0f, 40f), "zero width", UiFont.Small);
 
         Check(reports.Count == 0, "Fitting, empty, and degenerate rects produce no findings");
         Stop();
@@ -255,7 +255,7 @@ internal static class KernelTextAuditTests
 
         for (int i = 0; i < UiFitAudit.MaxReports + 12; i++)
         {
-            Draw(new Rect(0f, 0f, 4f, 4f), "distinct text " + i.ToString(), UiFont.Medium);
+            Draw(new UiLayoutRect(0f, 0f, 4f, 4f), "distinct text " + i.ToString(), UiFont.Medium);
         }
 
         Check(reports.Count == UiFitAudit.MaxReports,
@@ -267,12 +267,12 @@ internal static class KernelTextAuditTests
     private static void VerifyDetach()
     {
         List<UiOverflowReport> reports = Start();
-        Draw(new Rect(0f, 0f, 4f, 4f), "before detach", UiFont.Medium);
+        Draw(new UiLayoutRect(0f, 0f, 4f, 4f), "before detach", UiFont.Medium);
         Check(reports.Count == 1, "Audit reports while attached");
 
         UiFitAudit.Detach();
         UiFitAudit.Enabled = true;
-        Draw(new Rect(0f, 0f, 4f, 4f), "after detach", UiFont.Medium);
+        Draw(new UiLayoutRect(0f, 0f, 4f, 4f), "after detach", UiFont.Medium);
         Check(reports.Count == 1, "A detached audit has no sink to report to, even if re-enabled");
 
         UiFitAudit.Detach();
@@ -305,9 +305,9 @@ internal static class KernelTextAuditTests
         Console.Error.WriteLine("  FAIL: " + name);
     }
 
-    private static void Draw(Rect rect, string text, UiFont font, bool singleLine = false)
+    private static void Draw(UiLayoutRect rect, string text, UiFont font, bool singleLine = false)
     {
-        UiThemeDraw.Label(rect, text, UiTheme.Vanilla, null, font, TextAnchor.MiddleLeft, singleLine);
+        UiThemeDraw.Label(NativeFixture.Paint,rect, text, UiTheme.Vanilla, null, font, UiTextAnchor.MiddleLeft, singleLine);
     }
 
     private static bool Near(float expected, float actual)

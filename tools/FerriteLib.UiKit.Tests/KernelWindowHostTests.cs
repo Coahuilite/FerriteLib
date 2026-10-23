@@ -139,24 +139,14 @@ internal static class KernelWindowHostTests
         var window = new TestWindow(LaneScope());
         window.windowRect = new Rect(0f, 0f, 900f, 700f);
 
-        window.WindowOnGUI();
-        Check(window.CloseCalls == 0, "no button hit means no close");
-
-        UiNative.ButtonOverride = rect =>
-        {
-            window.CloseRects.Add(rect);
-            return true;
-        };
-        window.WindowOnGUI();
-
-        Check(window.CloseCalls == 1, "the close affordance closes the window");
-        Check(window.Notices.Count == 0, "and closing is not mistaken for a failure");
-
-        // One button only, inside the title band and against the right edge: the shell owns this
-        // geometry, so it is the shell that must place it.
-        Check(window.CloseRects.Count == 1, "the chrome draws exactly one interactive affordance");
-        Rect close = window.CloseRects[0];
-        Check(close.y >= 0f && close.yMax <= TestShell.TitleBar, "the affordance lives in the title band");
+        var recorded=(System.Collections.IList)typeof(Verse.Widgets).GetField("ButtonInvisibleRects")!.GetValue(null)!;
+        recorded.Clear();NativeEvents.Begin(EventType.Repaint,new UiLayoutPoint(-10,-10));window.WindowOnGUI();
+        Check(window.CloseCalls==0,"paint alone does not close the window");
+        Check(recorded.Count==1,"actual shell callback invokes exactly one native chrome affordance");
+        Rect close=(Rect)recorded[0]!;
+        NativeEvents.Click(new UiLayoutPoint(close.center.x,close.center.y),window.WindowOnGUI);
+        Check(window.CloseCalls==1,"actual native down/up over the measured chrome affordance closes once");
+        Check(window.Notices.Count==0,"closing is not treated as rendering failure");        Check(close.y >= 0f && close.yMax <= TestShell.TitleBar, "the affordance lives in the title band");
         Check(Math.Abs(close.xMax - (900f - TestShell.Padding)) < 0.01f,
             "and it is right-aligned inside the shell's padding");
     }
@@ -203,16 +193,9 @@ internal static class KernelWindowHostTests
 
         var drawn = new TestWindow(LaneScope()) { CloseLabel = LongAscii, Ruler = ruler };
         drawn.windowRect = new Rect(0f, 0f, 900f, 700f);
-        UiNative.ButtonOverride = rect =>
-        {
-            drawn.CloseRects.Add(rect);
-            return false;
-        };
-        drawn.WindowOnGUI();
-
-        Check(drawn.CloseRects.Count == 1 && drawn.CloseRects[0].width >= ruler.MeasureWidth(LongAscii, UiFont.Tiny),
-            "the drawn affordance is at least as wide as the measured label");
-        Check(reports.Count == 0,
+        var recorded=(System.Collections.IList)typeof(Verse.Widgets).GetField("ButtonInvisibleRects")!.GetValue(null)!;
+        recorded.Clear();NativeEvents.Begin(EventType.Repaint,new UiLayoutPoint(-10,-10));drawn.WindowOnGUI();
+        Check(recorded.Count==1&&((Rect)recorded[0]!).width>=ruler.MeasureWidth(LongAscii,UiFont.Tiny),"actual drawn close affordance is at least as wide as its measured label");        Check(reports.Count == 0,
             "and the fit audit reports no finding for it (got " + reports.Count + ")");
 
         ResetSeams();
@@ -321,8 +304,8 @@ internal static class KernelWindowHostTests
 
     private static void ResetSeams()
     {
-        UiNative.DebugMousePositionEnabled = false;
-        UiNative.ButtonOverride = null;
+        NativeFixture.DebugMousePositionEnabled = false;
+        NativeFixture.ButtonOverride = null;
     }
 
     /// <summary>Geometry the shell is expected to own, restated so a silent change is a test failure.</summary>
@@ -341,21 +324,21 @@ internal static class KernelWindowHostTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
             bindings.ValidateValue<bool>("explode", elementPath);
         }
 
         public float Measure(UiWidgetContext ctx) => 24f;
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             if (ctx.Bindings.TryGet("explode", out bool explode) && explode)
             {
                 throw new InvalidOperationException("planted widget failure");
             }
 
-            UiThemeDraw.Label(rect, "page", ctx.Theme);
+            UiThemeDraw.Label(ctx.Drawing,rect, "page", ctx.Theme);
         }
     }
 
@@ -370,7 +353,7 @@ internal static class KernelWindowHostTests
         public TestWindow(string scope)
         {
             this.scope = scope;
-            UiWidgetRegistry.Register(scope, WidgetKind, () => new PageWidget());
+UiWidgetRegistry.Define(new UiWidgetDefinition(scope, WidgetKind, () => new PageWidget()));
             bindings.BindValue("explode", () => ExplodeWidget, _ => { });
         }
 
@@ -448,13 +431,13 @@ internal static class KernelWindowHostTests
             return host;
         }
 
-        protected override void DrawNotice(Rect rect, UiWindowNotice notice)
+        protected override void DrawNotice(Rect rect,UiWindowNotice notice)
         {
             Notices.Add(notice);
             FailureText = LastFailure?.Message ?? "";
             // The notice body is consumer text, but the shell is what calls it — that is the case this
             // lane needs: an empty body is silent, a long one is a finding the shell must attribute.
-            UiThemeDraw.Label(rect, NoticeText, Theme, singleLine: true);
+            UiThemeDraw.Label(NativeFixture.Paint,VerseUiExecution.Rect(rect), NoticeText, Theme, singleLine: true);
         }
 
         protected override void BeforeDraw(Rect contentRect)

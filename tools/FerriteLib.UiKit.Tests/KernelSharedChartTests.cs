@@ -1,16 +1,17 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using FerriteLib.UiKit;
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 internal static class KernelSharedChartTests
 {
-    private static readonly Rect Bounds = new(0, 0, 200, 120);
-    private static readonly Rect Plot = new(8, 8, 184, 104);
+    private static readonly UiLayoutRect Bounds = new(0, 0, 200, 120);
+    private static readonly UiLayoutRect Plot = new(8, 8, 184, 104);
     private static void Check(bool condition, string message)
     {
         if (!condition)
@@ -43,18 +44,18 @@ internal static class KernelSharedChartTests
 
     private static void Input(EventType phase, float x, float y, bool used = false)
     {
-        UiNative.DebugMousePositionEnabled = false;
+        NativeFixture.DebugMousePositionEnabled = false;
         Event.current = new Event
         {
             type = phase,
             button = 0,
-            mousePosition = new Vector2(x, y)
+            mousePosition = VerseUiExecution.Point(new UiLayoutPoint(x, y))
         };
         if (used)
             Event.current.Use();
     }
 
-    private static UiWidgetContext Context(UiSession session, UiBindings bindings) => new("point", session, new Metrics(), UiTheme.Vanilla, new Translation(), bindings, Bounds.width, "chart");
+    private static UiWidgetContext Context(UiSession session, UiBindings bindings) => NativeFixture.Context("point", session, new Metrics(), UiTheme.Vanilla, new Translation(), bindings, Bounds.Width, "chart");
     private static LineChartWidget Widget(bool keyed = false)
     {
         var widget = new LineChartWidget();
@@ -74,7 +75,7 @@ internal static class KernelSharedChartTests
     {
         GUIUtility.hotControl = 0;
         using var session = new UiSession();
-        var points = new List<Vector2>
+        var points = new List<UiLayoutPoint>
         {
             new(0, 1),
             new(.5f, .5f),
@@ -82,7 +83,7 @@ internal static class KernelSharedChartTests
         };
         var bindings = new UiBindings();
         var requests = new List<string>();
-        bindings.BindReadOnly<IReadOnlyList<Vector2>>("points", () => points);
+        bindings.BindReadOnly<IReadOnlyList<UiLayoutPoint>>("points", () => points);
         bindings.BindAction<UiChartPointChange>("change", change => requests.Add(change.X + "," + change.Y));
         var ctx = Context(session, bindings);
         var widget = Widget();
@@ -93,16 +94,16 @@ internal static class KernelSharedChartTests
         {
             Input(phase, x, y, used);
             if (route == 0)
-                widget.Draw(Bounds, ctx);
+                NativeFixture.Draw(                widget,Bounds, ctx);
             else
             {
                 UiInteractionResult operation;
                 if (route == 1)
-                    operation = UiNative.Point(new Rect(94, 54, 12, 12), Plot, ctx, "points\u001fchange\u001f", 1, .5f, .5f);
+                    operation = NativeFixture.Point(new UiLayoutRect(94, 54, 12, 12), Plot, ctx, "points\u001fchange\u001f", 1, .5f, .5f);
                 else
                 {
                     UiPointerPhase pointer = phase == EventType.MouseDown ? UiPointerPhase.Press : phase == EventType.MouseDrag ? UiPointerPhase.Drag : phase == EventType.MouseUp ? UiPointerPhase.Release : UiPointerPhase.None;
-                    operation = pure.PointerPoint(target, new UiPointerSample(pointer, x, y, used), new UiHitGeometry(94, 54, 12, 12, Plot.x, Plot.width, Plot.y, Plot.height), new UiInputEligibility(true), .5f, .5f);
+                    operation = pure.PointerPoint(target, new UiPointerSample(pointer, x, y, used), new UiHitGeometry(94, 54, 12, 12, Plot.X, Plot.Width, Plot.Y, Plot.Height), new UiInputEligibility(true), .5f, .5f);
                 }
 
                 UiInteractionRequests.Activation(target, operation, () => requests.Add(operation.Value + "," + operation.Y));
@@ -128,7 +129,7 @@ internal static class KernelSharedChartTests
     {
         GUIUtility.hotControl = 0;
         using var session = new UiSession();
-        var points = new List<Vector2>
+        var points = new List<UiLayoutPoint>
         {
             new(0, 1),
             new(.5f, .5f),
@@ -144,40 +145,40 @@ internal static class KernelSharedChartTests
         var bindings = new UiBindings();
         bool fail = false;
         var cause = new InvalidOperationException("point callback failed after write");
-        bindings.BindReadOnly<IReadOnlyList<Vector2>>("points", () => points);
+        bindings.BindReadOnly<IReadOnlyList<UiLayoutPoint>>("points", () => points);
         bindings.BindReadOnly<IReadOnlyList<string>>("keys", () => keys);
         bindings.BindAction<UiChartPointChange>("change", change =>
         {
             changes.Add(change);
-            points[change.Index] = new Vector2(change.X, change.Y);
+            points[change.Index] = new UiLayoutPoint(change.X, change.Y);
             if (fail)
                 throw cause;
         });
         var ctx = Context(session, bindings);
         var widget = Widget(true);
         Input(EventType.MouseDown, 100, 60);
-        widget.Draw(Bounds, ctx);
+        NativeFixture.Draw(        widget,Bounds, ctx);
         (points[0], points[1]) = (points[1], points[0]);
         (keys[0], keys[1]) = (keys[1], keys[0]);
         Input(EventType.MouseDrag, 146, 34);
-        widget.Draw(Bounds, ctx);
-        Check(changes.Count == 1 && changes[0].Index == 0 && changes[0].Key == "B" && points[1].x == 0, "stable keyed point reorders to current Index without writing another point");
+        NativeFixture.Draw(        widget,Bounds, ctx);
+        Check(changes.Count == 1 && changes[0].Index == 0 && changes[0].Key == "B" && points[1].X == 0, "stable keyed point reorders to current Index without writing another point");
         Input(EventType.Repaint, 146, 34);
-        widget.Draw(Bounds, ctx);
+        NativeFixture.Draw(        widget,Bounds, ctx);
         Check(session.Interactions.CaptureOwner?.ItemKey?.Equals("B") == true, "normal keyed drag echo does not look like target replacement");
         keys[0] = "replacement";
         Input(EventType.MouseDrag, 160, 20);
-        widget.Draw(Bounds, ctx);
+        NativeFixture.Draw(        widget,Bounds, ctx);
         Check(changes.Count == 1 && !session.Interactions.CaptureOwner.HasValue && GUIUtility.hotControl == 0, "removed logical point ends both capture records without writing its replacement");
         widget = Widget();
         Input(EventType.MouseDown, 146, 34);
-        widget.Draw(Bounds, ctx);
+        NativeFixture.Draw(        widget,Bounds, ctx);
         fail = true;
         Input(EventType.MouseDrag, 160, 20);
         Exception? observed = null;
         try
         {
-            widget.Draw(Bounds, ctx);
+            NativeFixture.Draw(            widget,Bounds, ctx);
         }
         catch (Exception ex)
         {
@@ -187,11 +188,11 @@ internal static class KernelSharedChartTests
         Check(ReferenceEquals(observed?.InnerException, cause) && changes.Count == 2, "point callback partial effects retain original contextual cause");
         fail = false;
         Input(EventType.Repaint, 160, 20);
-        widget.Draw(Bounds, ctx);
+        NativeFixture.Draw(        widget,Bounds, ctx);
         Check(session.Interactions.CaptureOwner.HasValue && changes.Count == 2, "legacy normal self-drag echo is retained without callback replay");
-        points[1] = new Vector2(.2f, .2f);
+        points[1] = new UiLayoutPoint(.2f, .2f);
         Input(EventType.MouseDrag, 170, 10);
-        widget.Draw(Bounds, ctx);
+        NativeFixture.Draw(        widget,Bounds, ctx);
         Check(!session.Interactions.CaptureOwner.HasValue && changes.Count == 2, "observed ambiguous legacy series replacement ends capture rather than guessing identity");
         widget = Widget(true);
         keys[1] = keys[0];
@@ -199,7 +200,7 @@ internal static class KernelSharedChartTests
         observed = null;
         try
         {
-            widget.Draw(Bounds, ctx);
+            NativeFixture.Draw(            widget,Bounds, ctx);
         }
         catch (Exception ex)
         {
@@ -225,12 +226,12 @@ internal static class KernelSharedChartTests
             var bindings = new UiBindings();
             var points = new[]
             {
-                new Vector2(0, 1),
-                new Vector2(.5f, .5f),
-                new Vector2(1, 0)
+                new UiLayoutPoint(0, 1),
+                new UiLayoutPoint(.5f, .5f),
+                new UiLayoutPoint(1, 0)
             };
             int requests = 0;
-            bindings.BindReadOnly<IReadOnlyList<Vector2>>("points", () => points);
+            bindings.BindReadOnly<IReadOnlyList<UiLayoutPoint>>("points", () => points);
             bindings.BindAction<UiChartPointChange>("change", _ =>
             {
                 requests++;
@@ -240,14 +241,14 @@ internal static class KernelSharedChartTests
             var ctx = Context(session, bindings);
             var widget = Widget();
             Input(EventType.MouseDown, 100, 60);
-            widget.Draw(Bounds, ctx);
+            NativeFixture.Draw(            widget,Bounds, ctx);
             var cause = new InvalidOperationException("pure paint failure");
             paintFailure.SetValue(null, cause);
             Exception? observed = null;
             try
             {
                 Input(EventType.MouseDrag, 146, 34);
-                widget.Draw(Bounds, ctx);
+                NativeFixture.Draw(                widget,Bounds, ctx);
             }
             catch (Exception ex)
             {
@@ -262,7 +263,7 @@ internal static class KernelSharedChartTests
             if (!close)
             {
                 Input(EventType.Repaint, 146, 34);
-                widget.Draw(Bounds, ctx);
+                NativeFixture.Draw(                widget,Bounds, ctx);
                 Check(requests == 1, "pure point paint failure does not replay the request");
             }
             else
@@ -276,7 +277,7 @@ internal static class KernelSharedChartTests
         UiWidgetRegistry.InitializeCore();
         using var host = new UiHost("point", UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"point\"><Widget Id=\"static\" Kind=\"chart/line\" Points=\"0,1;1,0\" /></UiPage>"), new UiBindings(), UiTheme.Vanilla, new Metrics(), new Translation());
         Input(EventType.Repaint, 100, 60);
-        host.DrawFrame(Bounds);
+        NativeFixture.DrawFrame(        host,Bounds);
         Check(host.Session.TrippedNodes.Count == 0 && !host.Session.Interactions.CaptureOwner.HasValue, "static Points with an Id requires neither a value binding nor a keys registration");
     }
 

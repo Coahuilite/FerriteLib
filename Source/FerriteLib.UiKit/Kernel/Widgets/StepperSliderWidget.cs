@@ -216,7 +216,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     private float ReadHeight()
     {
         if (spec.TryGetAttribute("Height", out string raw)
-            && float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out float height)
+            && spec.TryGetNumber("Height", out float height)
             && height > 0f)
         {
             return height;
@@ -233,7 +233,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     private float ReadFloat(string name, float fallback)
     {
         return spec.TryGetAttribute(name, out string raw)
-            && float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out float value)
+            && spec.TryGetNumber(name, out float value)
             ? value
             : fallback;
     }
@@ -241,7 +241,6 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     private bool ReadBool(string name, bool fallback)
     {
         if (!spec.TryGetAttribute(name, out string raw)) return fallback;
-        return string.Equals(raw, "true", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(raw, "1", StringComparison.Ordinal);
+        return spec.TryGetBoolean(name, out bool value) ? value : fallback;
     }
 }

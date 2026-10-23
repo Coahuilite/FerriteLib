@@ -4,6 +4,7 @@ using System.Collections.Generic;
 namespace FerriteLib.UiKit.Kernel;
 internal static class UiChoiceSource
 {
+    internal static string Label<T>(UiChoice<T> choice,IUiTranslation translation)=>choice.TextKey.Length==0?choice.Text:translation.Translate(choice.TextKey);
     internal static string ValueKey(UiElementSpec spec) => spec.TryGetAttribute("Bind", out string key) && key.Length > 0 ? key : spec.Id;
     internal static string ChoiceKey(UiElementSpec spec) => spec.TryGetAttribute("OptionsBind", out string key) && key.Length > 0 ? key : ValueKey(spec);
     internal static void Validate(IUiBindingReader reader, UiElementSpec spec, string path)
@@ -16,13 +17,16 @@ internal static class UiChoiceSource
             throw new InvalidOperationException("Two choice sources at '" + path + "'.");
     }
 
-    internal static IReadOnlyList<UiChoice<object?>> Read(IUiBindingReader reader, UiElementSpec spec)
+    internal static IReadOnlyList<UiChoice<object?>> Read(IUiBindingReader reader, UiElementSpec spec,IUiTranslation translation)
     {
-        if (spec.Choices.Count == 0)
-            return reader.Choices(ChoiceKey(spec)).Read();
-        var result = new List<UiChoice<object?>>(spec.Choices.Count);
-        foreach (var choice in spec.Choices)
-            result.Add(new UiChoice<object?>(choice.Text, choice.Value, choice.Help));
+        var result = new List<UiChoice<object?>>();
+        if(spec.Choices.Count==0)
+        {
+            foreach(var choice in reader.Choices(ChoiceKey(spec)).Read())
+                result.Add(new UiChoice<object?>(Label(choice,translation),choice.Value,choice.Help));
+        }
+        else foreach (var choice in spec.Choices)
+            result.Add(new UiChoice<object?>(Label(choice,translation), choice.Value, choice.Help));
         return result.AsReadOnly();
     }
 }

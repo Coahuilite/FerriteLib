@@ -1,5 +1,6 @@
 param(
-    [string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot)
+    [string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot),
+    [string]$LogPath = ''
 )
 
 Set-StrictMode -Version Latest
@@ -269,6 +270,7 @@ dotnet run --no-restore --project $testsProject -c Dev *> $log
 $code = $LASTEXITCODE
 try {
     $output = if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log -Raw } else { '' }
+    if ($LogPath) { [IO.File]::WriteAllText([IO.Path]::GetFullPath($LogPath), $output) }
 } finally {
     Remove-Item -LiteralPath $log -Force -ErrorAction SilentlyContinue
 }

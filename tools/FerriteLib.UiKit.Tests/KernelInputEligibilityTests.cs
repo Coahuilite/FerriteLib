@@ -1,9 +1,11 @@
+using System.Linq;
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 
 using FerriteLib.UiKit;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -121,36 +123,35 @@ internal static class KernelInputEligibilityTests
         string current = "v0";
         using Fixture page = SixOptionDropdown(() => current, value => { writes++; current = value; }, options);
 
-        Rect trigger = page.RectOf("dropdown");
+        UiLayoutRect trigger = page.RectOf("dropdown");
         page.OpenMenuAt(trigger);
-        Rect menu = page.RequirePopupLayer();
-        Vector2 coveredRow = new Vector2(trigger.x + 10f, menu.yMax - OptionHeight / 2f);
+        UiLayoutRect menu = page.RequirePopupLayer();
+        UiLayoutPoint coveredRow = new UiLayoutPoint(trigger.X + 10f, menu.YMax - OptionHeight / 2f);
 
         // The premise, asserted rather than assumed: one point, two claimants, menu on top.
         Check(Over(menu, coveredRow), "the chosen point is inside the published menu: " + menu);
         Check(Over(trigger, coveredRow), "and the same point is inside the trigger that owns the menu: " + trigger);
 
         var trace = new List<string>();
-        UiNative.Trace = trace.Add;
+        NativeFixture.Trace = trace.Add;
         try
         {
-            page.Click(coveredRow);
+            page.Pump(EventType.MouseDown, coveredRow);
+            page.Pump(EventType.MouseUp, coveredRow);
 
             Check(string.Equals(current, "v5", StringComparison.Ordinal),
                 "the option row under the pointer took the click and wrote its value (current='" + current + "')");
             Check(writes == 1, "the selection wrote the model exactly once (writes=" + writes + ")");
             Check(page.Session.OpenPopupId == null, "the menu closed WITH its option, not before it");
-            Check(trace.Exists(line => line.IndexOf("id=dropdown", StringComparison.Ordinal) >= 0
-                && line.IndexOf("ownPopup=true", StringComparison.Ordinal) >= 0
-                && line.IndexOf("yields=true", StringComparison.Ordinal) >= 0),
-                "the trigger recorded that it yielded to the menu it owns: " + string.Join(" | ", trace));
+            Check(page.Session.Input.Phase == UiFramePhase.Used,
+                "the actual release is consumed by the row over its trigger, without replay");
             Check(trace.Exists(line => line.IndexOf("option fired", StringComparison.Ordinal) >= 0),
                 "the option row reported the fire that changed the value");
             KernelTripGuard.ExpectNoTrips(page.Session, "option row over its own trigger");
         }
         finally
         {
-            UiNative.Trace = null;
+            NativeFixture.Trace = null;
             Event.current = null;
             GUIUtility.hotControl = 0;
         }
@@ -189,21 +190,21 @@ internal static class KernelInputEligibilityTests
 
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(Scope, HeightKind, () => new SpacerWidget());
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, HeightKind, () => new SpacerWidget()));
 
         var bindings = new UiBindings();
         bindings.BindValue("dropdown", () => current, value => { writes++; received = value; current = value; });
-        bindings.BindOptions("modes", () => choices);
+        bindings.BindChoices("modes", () => choices);
 
         using Fixture page = new Fixture(
             new UiHost(Scope, UiLayoutManifest.Parse(LowDropdownPage("modes")), bindings, UiTheme.Vanilla,
                 new LaneMetrics(), new LaneTranslation()),
-            new Rect(0f, 0f, 300f, 220f));
+            new UiLayoutRect(0f, 0f, 300f, 220f));
 
-        Rect trigger = page.RectOf("dropdown");
+        UiLayoutRect trigger = page.RectOf("dropdown");
         page.OpenMenuAt(trigger);
-        Rect menu = page.RequirePopupLayer();
-        Vector2 coveredRow = new Vector2(trigger.x + 10f, menu.yMax - OptionHeight / 2f);
+        UiLayoutRect menu = page.RequirePopupLayer();
+        UiLayoutPoint coveredRow = new UiLayoutPoint(trigger.X + 10f, menu.YMax - OptionHeight / 2f);
         Check(Over(menu, coveredRow) && Over(trigger, coveredRow),
             "the typed fixture reproduces the same overlap (menu " + menu + ", trigger " + trigger + ")");
 
@@ -224,13 +225,13 @@ internal static class KernelInputEligibilityTests
         int writes = 0;
         using Fixture page = SixOptionDropdown(() => current, value => { writes++; current = value; }, options);
 
-        Rect trigger = page.RectOf("dropdown");
+        UiLayoutRect trigger = page.RectOf("dropdown");
         page.OpenMenuAt(trigger);
-        Rect menu = page.RequirePopupLayer();
+        UiLayoutRect menu = page.RequirePopupLayer();
 
-        Check(trigger.yMax > menu.yMax + 0.01f,
+        Check(trigger.YMax > menu.YMax + 0.01f,
             "the fixture leaves a strip of the trigger outside the menu (trigger " + trigger + ", menu " + menu + ")");
-        Vector2 uncovered = new Vector2(trigger.x + 10f, (menu.yMax + trigger.yMax) / 2f);
+        UiLayoutPoint uncovered = new UiLayoutPoint(trigger.X + 10f, (menu.YMax + trigger.YMax) / 2f);
         Check(Over(trigger, uncovered) && !Over(menu, uncovered),
             "the close-click point is on the trigger and off the menu: " + uncovered);
 
@@ -251,18 +252,18 @@ internal static class KernelInputEligibilityTests
         int writes = 0;
         using Fixture page = DropdownPage(options, () => current, value => { writes++; current = value; }, 300f);
 
-        Rect trigger = page.RectOf("dropdown");
+        UiLayoutRect trigger = page.RectOf("dropdown");
         page.OpenMenuAt(trigger);
-        Rect menu = page.RequirePopupLayer();
+        UiLayoutRect menu = page.RequirePopupLayer();
 
-        Check(menu.height <= page.Viewport.height + 0.01f
-                && menu.y >= page.Viewport.y - 0.01f
-                && menu.yMax <= page.Viewport.yMax + 0.01f,
+        Check(menu.Height <= page.Viewport.Height + 0.01f
+                && menu.Y >= page.Viewport.Y - 0.01f
+                && menu.YMax <= page.Viewport.YMax + 0.01f,
             "a forty-option menu is bounded inside the viewport instead of running past it: " + menu);
-        Check(Math.Abs(menu.height % OptionHeight) < 0.01f,
+        Check(Math.Abs(menu.Height % OptionHeight) < 0.01f,
             "the bounded height is a whole number of rows, so every point inside the layer is inside a row: " + menu);
 
-        int visible = (int)(menu.height / OptionHeight);
+        int visible = (int)(menu.Height / OptionHeight);
         Check(visible >= 1 && visible < options.Count,
             "the premise this slice exists for: the list is longer than the menu shows (visible=" + visible
             + " of " + options.Count + ")");
@@ -270,7 +271,7 @@ internal static class KernelInputEligibilityTests
         // Each lane of this file leaves the shared native hot control as it found it: the doubles clear it
         // only when the same control id sees the release, so a lane that ended mid-press would poison the next.
         GUIUtility.hotControl = 0;
-        Vector2 bottomSlot = new Vector2(menu.x + 10f, menu.yMax - OptionHeight / 2f);
+        UiLayoutPoint bottomSlot = new UiLayoutPoint(menu.X + 10f, menu.YMax - OptionHeight / 2f);
         page.Click(bottomSlot);
         Check(string.Equals(current, options[visible - 1], StringComparison.Ordinal),
             "the bottom slot selects the row it actually shows (" + options[visible - 1] + "), not the row it hides");
@@ -293,7 +294,7 @@ internal static class KernelInputEligibilityTests
         Check(page.Session.OpenPopupScrollRows == 0,
             "scrolling back inside one open stops at the top, and a past-the-top notch is clamped, not passed on");
         Check(page.Session.OpenPopupId != null, "and no amount of owned scrolling dismissed the menu");
-        page.Click(new Vector2(menu.x + 10f, menu.y + OptionHeight / 2f));
+        page.Click(new UiLayoutPoint(menu.X + 10f, menu.Y + OptionHeight / 2f));
         Check(string.Equals(current, options[0], StringComparison.Ordinal),
             "so the FIRST option is selectable from the same open state that reached the last one");
 
@@ -324,18 +325,18 @@ internal static class KernelInputEligibilityTests
             value => { writes++; current = value; }, 300f);
 
         GUIUtility.hotControl = 0;
-        Rect trigger = page.RectOf("dropdown");
+        UiLayoutRect trigger = page.RectOf("dropdown");
         page.OpenMenuAt(trigger);
-        Rect menu = page.RequirePopupLayer();
+        UiLayoutRect menu = page.RequirePopupLayer();
 
-        Check(menu.height <= page.Viewport.height + 0.01f && menu.yMax <= page.Viewport.yMax + 0.01f
-                && Math.Abs(menu.height % OptionHeight) < 0.01f,
+        Check(menu.Height <= page.Viewport.Height + 0.01f && menu.YMax <= page.Viewport.YMax + 0.01f
+                && Math.Abs(menu.Height % OptionHeight) < 0.01f,
             "the typed menu is bounded to whole rows by the same rule: " + menu);
-        int visible = (int)(menu.height / OptionHeight);
+        int visible = (int)(menu.Height / OptionHeight);
         Check(visible >= 1 && visible < values.Count,
             "and the typed list is longer than the typed menu shows (visible=" + visible + " of " + values.Count + ")");
 
-        Vector2 bottomSlot = new Vector2(menu.x + 10f, menu.yMax - OptionHeight / 2f);
+        UiLayoutPoint bottomSlot = new UiLayoutPoint(menu.X + 10f, menu.YMax - OptionHeight / 2f);
         for (int notch = 0; notch < 20; notch++)
         {
             Check(page.Wheel(bottomSlot, down: true), "a notch inside the typed menu is owned by it, as the string list's");
@@ -353,7 +354,7 @@ internal static class KernelInputEligibilityTests
         for (int notch = 0; notch < 20; notch++) page.Wheel(bottomSlot, down: false);
         Check(page.Session.OpenPopupScrollRows == 0 && page.Session.OpenPopupId != null,
             "and the typed menu returns to its first row inside one open, without the scroll leaving the top");
-        page.Click(new Vector2(menu.x + 10f, menu.y + OptionHeight / 2f));
+        page.Click(new UiLayoutPoint(menu.X + 10f, menu.Y + OptionHeight / 2f));
         Check(current == 1 && writes == 2,
             "with the typed first option selectable there (current=" + current + ")");
         KernelTripGuard.ExpectNoTrips(page.Session, "typed menu scrolls like the string menu");
@@ -365,20 +366,20 @@ internal static class KernelInputEligibilityTests
         string current = options[0];
         using Fixture page = DropdownPage(options, () => current, value => current = value, 300f);
 
-        Rect trigger = page.RectOf("dropdown");
+        UiLayoutRect trigger = page.RectOf("dropdown");
         page.OpenMenuAt(trigger);
-        Rect menu = page.RequirePopupLayer();
+        UiLayoutRect menu = page.RequirePopupLayer();
 
-        Check(menu.yMax < page.Viewport.yMax - 1f,
+        Check(menu.YMax < page.Viewport.YMax - 1f,
             "the fixture leaves room under the menu for the outside-notch case: " + menu);
-        Vector2 outside = new Vector2(menu.x + 10f, page.Viewport.yMax - 6f);
+        UiLayoutPoint outside = new UiLayoutPoint(menu.X + 10f, page.Viewport.YMax - 6f);
         Check(!Over(menu, outside), "the outside point is not inside the menu: " + outside);
 
         GUIUtility.hotControl = 0;
         Check(!page.Wheel(outside, down: true), "a notch outside the open menu is not the menu's event");
         Check(page.Session.OpenPopupScrollRows == 0, "and it does not scroll the menu");
 
-        Vector2 inside = new Vector2(menu.x + 10f, menu.yMax - OptionHeight / 2f);
+        UiLayoutPoint inside = new UiLayoutPoint(menu.X + 10f, menu.YMax - OptionHeight / 2f);
         Check(page.Wheel(inside, down: true), "a notch inside the menu IS the menu's event");
         Check(page.Session.OpenPopupScrollRows > 0,
             "and the menu moved, which is the priority the ruling asks for");
@@ -411,16 +412,16 @@ internal static class KernelInputEligibilityTests
 
     private static void VerifyChartUnderMenuNeverCapturesOrWrites()
     {
-        var points = new List<Vector2> { new(0f, 1f), new(0.5f, 0.5f), new(1f, 0f) };
+        var points = new List<UiLayoutPoint> { new(0f, 1f), new(0.5f, 0.5f), new(1f, 0f) };
         var changes = new List<UiChartPointChange>();
         string chosen = "x";
 
         using Fixture page = ChartUnderDropdown(points, changes, () => chosen, value => chosen = value);
-        Rect chartRect = page.RectOf("chart");
-        Vector2 point = PlotCentre(chartRect);
+        UiLayoutRect chartRect = page.RectOf("chart");
+        UiLayoutPoint point = PlotCentre(chartRect);
 
         page.OpenMenuAt(page.RectOf("dd"));
-        Rect menu = page.RequirePopupLayer();
+        UiLayoutRect menu = page.RequirePopupLayer();
         Check(Over(menu, point),
             "the D2 premise: the editable chart point sits under the open menu (menu " + menu + ", point " + point + ")");
 
@@ -431,10 +432,10 @@ internal static class KernelInputEligibilityTests
         Check(page.Session.OwnedHotControlOwner?.ElementId != "chart" && page.Session.Interactions.CaptureOwner?.Part == "popup-option",
             "the covered chart captured nothing into its session");
 
-        page.Pump(EventType.MouseDrag, point + new Vector2(12f, 8f));
+        page.Pump(EventType.MouseDrag, point + new UiLayoutPoint(12f, 8f));
         Check(changes.Count == 0, "the covered chart committed no drag (changes=" + changes.Count + ")");
 
-        page.Pump(EventType.MouseUp, point + new Vector2(12f, 8f));
+        page.Pump(EventType.MouseUp, point + new UiLayoutPoint(12f, 8f));
         // Refusing is not stealing. The press the chart would have taken lands inside the menu, so the event
         // survives to the option row under it: the row fires, the model takes that option's value, and the menu
         // closes by ITS rule - not because the chart grabbed the pointer underneath.
@@ -446,18 +447,18 @@ internal static class KernelInputEligibilityTests
 
     private static void VerifyChartDragWorksAfterTheMenuCloses()
     {
-        var points = new List<Vector2> { new(0f, 1f), new(0.5f, 0.5f), new(1f, 0f) };
+        var points = new List<UiLayoutPoint> { new(0f, 1f), new(0.5f, 0.5f), new(1f, 0f) };
         var changes = new List<UiChartPointChange>();
         string chosen = "x";
 
         using Fixture page = ChartUnderDropdown(points, changes, () => chosen, value => chosen = value);
-        Rect chartRect = page.RectOf("chart");
-        Vector2 point = PlotCentre(chartRect);
+        UiLayoutRect chartRect = page.RectOf("chart");
+        UiLayoutPoint point = PlotCentre(chartRect);
 
         // Close the menu the way a player does: choose the option that was covering the chart.
         page.OpenMenuAt(page.RectOf("dd"));
-        Rect menu = page.RequirePopupLayer();
-        page.Click(new Vector2(menu.x + 10f, menu.y + OptionHeight / 2f));
+        UiLayoutRect menu = page.RequirePopupLayer();
+        page.Click(new UiLayoutPoint(menu.X + 10f, menu.Y + OptionHeight / 2f));
         Check(page.Session.OpenPopupId == null, "the menu closed on its option");
         Check(string.Equals(chosen, "x", StringComparison.Ordinal),
             "and the row that was chosen is the one the model now holds (chosen='" + chosen + "')");
@@ -467,7 +468,7 @@ internal static class KernelInputEligibilityTests
         page.Pump(EventType.Repaint, point);
         Check(page.Session.OwnedHotControl != null, "the same chart takes the press once nothing covers it");
 
-        page.Pump(EventType.MouseDrag, point + new Vector2(24f, -16f));
+        page.Pump(EventType.MouseDrag, point + new UiLayoutPoint(24f, -16f));
         Check(changes.Count == 1, "the drag emitted exactly one typed change (changes=" + changes.Count + ")");
         // The kind never writes the consumer's list: it emits one typed change and the page applies it.
         Check(changes[0].Index == 1,
@@ -475,10 +476,10 @@ internal static class KernelInputEligibilityTests
         Check(changes[0].X > 0.5f && changes[0].Y > 0.5f,
             "and it moved toward the pointer on both axes - a pixel rise is a normalized climb ("
             + changes[0].X.ToString("F3") + ", " + changes[0].Y.ToString("F3") + ")");
-        Check(Math.Abs(points[1].x - 0.5f) < 0.0001f && Math.Abs(points[1].y - 0.5f) < 0.0001f,
+        Check(Math.Abs(points[1].X - 0.5f) < 0.0001f && Math.Abs(points[1].Y - 0.5f) < 0.0001f,
             "and the consumer's own list still holds what it was handed: the change is the only write channel");
 
-        page.Pump(EventType.MouseUp, point + new Vector2(24f, -16f));
+        page.Pump(EventType.MouseUp, point + new UiLayoutPoint(24f, -16f));
         Check(page.Session.OwnedHotControl == null && GUIUtility.hotControl == 0,
             "the release ended the hold, in the session and in the native slot");
         KernelTripGuard.ExpectNoTrips(page.Session, "chart drag after the menu closes");
@@ -486,13 +487,13 @@ internal static class KernelInputEligibilityTests
 
     private static void VerifyHeldChartDragContinuesOutsideTheRect()
     {
-        var points = new List<Vector2> { new(0f, 1f), new(0.5f, 0.5f), new(1f, 0f) };
+        var points = new List<UiLayoutPoint> { new(0f, 1f), new(0.5f, 0.5f), new(1f, 0f) };
         var changes = new List<UiChartPointChange>();
 
         using Fixture page = ChartOnly(points, changes);
-        Rect chartRect = page.RectOf("chart");
-        Vector2 point = PlotCentre(chartRect);
-        Vector2 farOutside = new Vector2(chartRect.x - 40f, chartRect.yMax + 60f);
+        UiLayoutRect chartRect = page.RectOf("chart");
+        UiLayoutPoint point = PlotCentre(chartRect);
+        UiLayoutPoint farOutside = new UiLayoutPoint(chartRect.X - 40f, chartRect.YMax + 60f);
         Check(!Over(chartRect, farOutside), "the continuation point is outside the chart's own rect: " + farOutside);
 
         page.Pump(EventType.MouseDown, point);
@@ -514,7 +515,7 @@ internal static class KernelInputEligibilityTests
 
     private static void VerifyDisabledChartTakesNoPress()
     {
-        var points = new List<Vector2> { new(0f, 1f), new(0.5f, 0.5f), new(1f, 0f) };
+        var points = new List<UiLayoutPoint> { new(0f, 1f), new(0.5f, 0.5f), new(1f, 0f) };
         var changes = new List<UiChartPointChange>();
         bool runnable = false;
 
@@ -528,7 +529,7 @@ internal static class KernelInputEligibilityTests
             + "</UiPage>";
 
         var bindings = new UiBindings();
-        bindings.BindReadOnly<IReadOnlyList<Vector2>>("points", () => points);
+        bindings.BindReadOnly<IReadOnlyList<UiLayoutPoint>>("points", () => points);
         bindings.BindAction<UiChartPointChange>("changed", changes.Add);
         // The engine publishes an element's disabled state from the command its ActionBind names, so the
         // chart's own key answers CanExecute: one disabled rule for every kind, no per-widget branch.
@@ -537,13 +538,13 @@ internal static class KernelInputEligibilityTests
         using Fixture page = new Fixture(
             new UiHost(Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla,
                 new LaneMetrics(), new LaneTranslation()),
-            new Rect(0f, 0f, 300f, 300f));
+            new UiLayoutRect(0f, 0f, 300f, 300f));
 
-        Vector2 point = PlotCentre(page.RectOf("chart"));
+        UiLayoutPoint point = PlotCentre(page.RectOf("chart"));
 
         page.Pump(EventType.MouseDown, point);
-        page.Pump(EventType.MouseDrag, point + new Vector2(10f, 0f));
-        page.Pump(EventType.MouseUp, point + new Vector2(10f, 0f));
+        page.Pump(EventType.MouseDrag, point + new UiLayoutPoint(10f, 0f));
+        page.Pump(EventType.MouseUp, point + new UiLayoutPoint(10f, 0f));
         Check(page.Session.OwnedHotControl == null && changes.Count == 0,
             "a disabled chart took no capture and committed no change");
 
@@ -560,7 +561,7 @@ internal static class KernelInputEligibilityTests
 
     private static void VerifyChartOutsideTheEffectiveClipTakesNoPress()
     {
-        var points = new List<Vector2> { new(0f, 1f), new(0.5f, 0.5f), new(1f, 0f) };
+        var points = new List<UiLayoutPoint> { new(0f, 1f), new(0.5f, 0.5f), new(1f, 0f) };
         var changes = new List<UiChartPointChange>();
 
         UiWidgetRegistry.Clear();
@@ -577,22 +578,22 @@ internal static class KernelInputEligibilityTests
             + "</UiPage>";
 
         var bindings = new UiBindings();
-        bindings.BindReadOnly<IReadOnlyList<Vector2>>("points", () => points);
+        bindings.BindReadOnly<IReadOnlyList<UiLayoutPoint>>("points", () => points);
         bindings.BindAction<UiChartPointChange>("changed", changes.Add);
 
         using Fixture page = new Fixture(
             new UiHost(Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla,
                 new LaneMetrics(), new LaneTranslation()),
-            new Rect(0f, 0f, 300f, 300f));
+            new UiLayoutRect(0f, 0f, 300f, 300f));
 
-        Rect chartRect = page.RectOf("chart");
-        Vector2 point = PlotCentre(chartRect);
-        Check(point.y > page.Viewport.y + 40f,
+        UiLayoutRect chartRect = page.RectOf("chart");
+        UiLayoutPoint point = PlotCentre(chartRect);
+        Check(point.Y > page.Viewport.Y + 40f,
             "the fixture puts the chart's own point below the scroll window that clips it (chart " + chartRect + ")");
 
         page.Pump(EventType.MouseDown, point);
-        page.Pump(EventType.MouseDrag, point + new Vector2(10f, 0f));
-        page.Pump(EventType.MouseUp, point + new Vector2(10f, 0f));
+        page.Pump(EventType.MouseDrag, point + new UiLayoutPoint(10f, 0f));
+        page.Pump(EventType.MouseUp, point + new UiLayoutPoint(10f, 0f));
         Check(page.Session.OwnedHotControl == null && changes.Count == 0,
             "a press in the clipped band captures nothing and writes nothing");
 
@@ -600,9 +601,9 @@ internal static class KernelInputEligibilityTests
         // press point moves with the content, which is what a real container does to a clipped chart.
         UiNode scrollNode = page.Session.GetNodeByElementId("window")
             ?? throw new Exception("the scroll window has no node");
-        page.Session.SetScrollPosition(scrollNode, new Vector2(0f, 40f));
-        Vector2 visiblePress = new Vector2(point.x, point.y - 40f);
-        Check(visiblePress.y < page.Viewport.y + 40f,
+        page.Session.SetScrollPosition(scrollNode, new UiLayoutPoint(0f, 40f));
+        UiLayoutPoint visiblePress = new UiLayoutPoint(point.X, point.Y - 40f);
+        Check(visiblePress.Y < page.Viewport.Y + 40f,
                 "the scroll brought the point inside the window: " + visiblePress);
         page.Pump(EventType.Repaint, visiblePress);
         page.Pump(EventType.MouseDown, visiblePress);
@@ -617,7 +618,7 @@ internal static class KernelInputEligibilityTests
 
     private static void VerifyCaptureReleasedWhenOwnerStopsDrawing()
     {
-        var points = new List<Vector2> { new(0f, 1f), new(0.5f, 0.5f), new(1f, 0f) };
+        var points = new List<UiLayoutPoint> { new(0f, 1f), new(0.5f, 0.5f), new(1f, 0f) };
         var changes = new List<UiChartPointChange>();
         bool visible = true;
 
@@ -631,17 +632,17 @@ internal static class KernelInputEligibilityTests
             + "</UiPage>";
 
         var bindings = new UiBindings();
-        bindings.BindReadOnly<IReadOnlyList<Vector2>>("points", () => points);
+        bindings.BindReadOnly<IReadOnlyList<UiLayoutPoint>>("points", () => points);
         bindings.BindAction<UiChartPointChange>("changed", changes.Add);
         bindings.BindReadOnly("chart-visible", () => visible);
 
         using Fixture page = new Fixture(
             new UiHost(Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla,
                 new LaneMetrics(), new LaneTranslation()),
-            new Rect(0f, 0f, 300f, 300f));
+            new UiLayoutRect(0f, 0f, 300f, 300f));
 
         using UiSession other = new UiSession();
-        Vector2 point = PlotCentre(page.RectOf("chart"));
+        UiLayoutPoint point = PlotCentre(page.RectOf("chart"));
 
         try
         {
@@ -650,8 +651,8 @@ internal static class KernelInputEligibilityTests
             Check(page.Session.OwnedHotControl != null, "the chart holds the capture a drag holds");
 
             // A second session takes the native slot afterwards; the release must not sweep it away.
-            other.CaptureHotControl(777);
-            int held = page.Session.OwnedHotControl!.Value;
+            NativeFixture.Capture(other,NativeFixture.Key(777));
+            UiControlKey held = page.Session.OwnedHotControl!.Value;
 
             visible = false;
             page.Session.BumpContentRevision();
@@ -660,7 +661,7 @@ internal static class KernelInputEligibilityTests
             Check(page.Session.OwnedHotControl == null,
                 "an owner that is no longer drawn ends its own capture instead of holding it forever (held " + held + ")");
             Check(page.Session.OwnedHotControlOwner == null, "and its owner record goes with it");
-            Check(other.OwnedHotControl == 777 && GUIUtility.hotControl == 777,
+            Check(other.OwnedHotControl == NativeFixture.Key(777) && other.Execution.HasCapture(NativeFixture.Key(777)),
                 "the other session's capture is untouched, in its record and in the native slot");
             KernelTripGuard.ExpectNoTrips(page.Session, "capture released when the owner stops drawing");
         }
@@ -673,11 +674,11 @@ internal static class KernelInputEligibilityTests
 
     private static void VerifyRemovedIdentityReleasesItsCapture()
     {
-        var points = new List<Vector2> { new(0f, 1f), new(0.5f, 0.5f), new(1f, 0f) };
+        var points = new List<UiLayoutPoint> { new(0f, 1f), new(0.5f, 0.5f), new(1f, 0f) };
         var changes = new List<UiChartPointChange>();
 
         using Fixture page = ChartOnly(points, changes);
-        Vector2 point = PlotCentre(page.RectOf("chart"));
+        UiLayoutPoint point = PlotCentre(page.RectOf("chart"));
         UiNode chartNode = page.Session.GetNodeByElementId("chart")
             ?? throw new Exception("the arranged chart has no node");
 
@@ -693,7 +694,7 @@ internal static class KernelInputEligibilityTests
                 page.Session.Interactions.CaptureOwner?.Part == "chart-point",
                 "the common interaction owner, not a second chart drag bit, records the point capture");
 
-            int held = page.Session.OwnedHotControl!.Value;
+            UiControlKey held = page.Session.OwnedHotControl!.Value;
 
             // The definition no longer declares this identity: the same release a reloaded page or a removed
             // repeater row performs, reached through the session's own prune of the arranged tree.
@@ -733,16 +734,16 @@ internal static class KernelInputEligibilityTests
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(Scope, HeightKind, () => new SpacerWidget());
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, HeightKind, () => new SpacerWidget()));
 
         var bindings = new UiBindings();
         bindings.BindValue("dropdown", get, set);
-        bindings.BindOptions("modes", () => choices);
+        bindings.BindChoices("modes", () => choices);
 
         return new Fixture(
             new UiHost(Scope, UiLayoutManifest.Parse(LowDropdownPage("modes")), bindings, UiTheme.Vanilla,
                 new LaneMetrics(), new LaneTranslation()),
-            new Rect(0f, 0f, 300f, viewportHeight));
+            new UiLayoutRect(0f, 0f, 300f, viewportHeight));
     }
 
     private static List<string> LongOptions(int count)
@@ -778,20 +779,20 @@ internal static class KernelInputEligibilityTests
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(Scope, HeightKind, () => new SpacerWidget());
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, HeightKind, () => new SpacerWidget()));
 
         var bindings = new UiBindings();
         bindings.BindValue("dropdown", get, set);
-        bindings.BindOptions("Options", () => options);
+        bindings.BindChoices("Options", ()=> (options).Select(value=>new UiChoice<string>(value,value,value)).ToArray());
 
         return new Fixture(
             new UiHost(Scope, UiLayoutManifest.Parse(LowDropdownPage("Options")), bindings, UiTheme.Vanilla,
                 new LaneMetrics(), new LaneTranslation()),
-            new Rect(0f, 0f, 300f, viewportHeight));
+            new UiLayoutRect(0f, 0f, 300f, viewportHeight));
     }
 
     private static Fixture ChartUnderDropdown(
-        List<Vector2> points,
+        List<UiLayoutPoint> points,
         List<UiChartPointChange> changes,
         Func<string> get,
         Action<string> set)
@@ -810,17 +811,17 @@ internal static class KernelInputEligibilityTests
 
         var bindings = new UiBindings();
         bindings.BindValue("dd", get, set);
-        bindings.BindOptions("Options", () => new List<string> { "x", "y", "z", "w" });
-        bindings.BindReadOnly<IReadOnlyList<Vector2>>("points", () => points);
+        bindings.BindChoices("Options", ()=> (new List<string> { "x", "y", "z", "w" }).Select(value=>new UiChoice<string>(value,value,value)).ToArray());
+        bindings.BindReadOnly<IReadOnlyList<UiLayoutPoint>>("points", () => points);
         bindings.BindAction<UiChartPointChange>("changed", changes.Add);
 
         return new Fixture(
             new UiHost(Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla,
                 new LaneMetrics(), new LaneTranslation()),
-            new Rect(0f, 0f, 300f, 300f));
+            new UiLayoutRect(0f, 0f, 300f, 300f));
     }
 
-    private static Fixture ChartOnly(List<Vector2> points, List<UiChartPointChange> changes)
+    private static Fixture ChartOnly(List<UiLayoutPoint> points, List<UiChartPointChange> changes)
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
@@ -832,13 +833,13 @@ internal static class KernelInputEligibilityTests
             + "</UiPage>";
 
         var bindings = new UiBindings();
-        bindings.BindReadOnly<IReadOnlyList<Vector2>>("points", () => points);
+        bindings.BindReadOnly<IReadOnlyList<UiLayoutPoint>>("points", () => points);
         bindings.BindAction<UiChartPointChange>("changed", changes.Add);
 
         return new Fixture(
             new UiHost(Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla,
                 new LaneMetrics(), new LaneTranslation()),
-            new Rect(0f, 0f, 300f, 300f));
+            new UiLayoutRect(0f, 0f, 300f, 300f));
     }
 
     /// <summary>
@@ -846,15 +847,15 @@ internal static class KernelInputEligibilityTests
     /// The padding is the kind's geometry and is written here as the number the kind uses, so the lane aims at
     /// a real control point instead of guessing.
     /// </summary>
-    private static Vector2 PlotCentre(Rect chartRect)
+    private static UiLayoutPoint PlotCentre(UiLayoutRect chartRect)
     {
         const float plotPadding = 8f;
-        return new Vector2(
-            chartRect.x + plotPadding + Math.Max(1f, chartRect.width - plotPadding * 2f) * 0.5f,
-            chartRect.y + plotPadding + Math.Max(1f, chartRect.height - plotPadding * 2f) * 0.5f);
+        return new UiLayoutPoint(
+            chartRect.X + plotPadding + Math.Max(1f, chartRect.Width - plotPadding * 2f) * 0.5f,
+            chartRect.Y + plotPadding + Math.Max(1f, chartRect.Height - plotPadding * 2f) * 0.5f);
     }
 
-    private static Rect RequireLayerRect(UiSession session)
+    private static UiLayoutRect RequireLayerRect(UiSession session)
     {
         for (int i = session.HitLayers.Count - 1; i >= 0; i--)
         {
@@ -864,9 +865,9 @@ internal static class KernelInputEligibilityTests
         throw new Exception("the popup pass published no hit layer");
     }
 
-    private static bool Over(Rect rect, Vector2 point)
+    private static bool Over(UiLayoutRect rect, UiLayoutPoint point)
     {
-        return point.x >= rect.x && point.x <= rect.xMax && point.y >= rect.y && point.y <= rect.yMax;
+        return point.X >= rect.X && point.X <= rect.XMax && point.Y >= rect.Y && point.Y <= rect.YMax;
     }
 
     /// <summary>One host, the viewport its frames draw against, and the event pump the lanes share.</summary>
@@ -874,7 +875,7 @@ internal static class KernelInputEligibilityTests
     {
         private bool arranged;
 
-        public Fixture(UiHost host, Rect viewport)
+        public Fixture(UiHost host, UiLayoutRect viewport)
         {
             Host = host;
             Viewport = viewport;
@@ -885,35 +886,35 @@ internal static class KernelInputEligibilityTests
 
         public UiSession Session { get; }
 
-        public Rect Viewport { get; }
+        public UiLayoutRect Viewport { get; }
 
-        public Rect RectOf(string elementId)
+        public UiLayoutRect RectOf(string elementId)
         {
             Arrange();
-            return Host.MeasureAndArrange(new Vector2(Viewport.width, Viewport.height)).RectById[elementId];
+            return Host.MeasureAndArrange(new UiLayoutPoint(Viewport.Width, Viewport.Height)).RectById[elementId];
         }
 
         public void Arrange()
         {
             if (arranged) return;
             arranged = true;
-            Host.MeasureAndArrange(new Vector2(Viewport.width, Viewport.height));
+            Host.MeasureAndArrange(new UiLayoutPoint(Viewport.Width, Viewport.Height));
         }
 
-        public void Pump(EventType type, Vector2 point)
+        public void Pump(EventType type, UiLayoutPoint point)
         {
             Arrange();
             Event e = Event.KeyboardEvent("space");
             e.type = type;
             e.button = 0;
-            e.mousePosition = point;
+            e.mousePosition = VerseUiExecution.Point(point);
             Event.current = e;
-            Host.DrawFrame(Viewport);
+            NativeFixture.DrawFrame(            Host,Viewport);
             Event.current = null;
         }
 
         /// <summary>One click as the game dispatches it: separate down and up events, not one flag.</summary>
-        public void Click(Vector2 point)
+        public void Click(UiLayoutPoint point)
         {
             Pump(EventType.Layout, point);
             Pump(EventType.MouseDown, point);
@@ -929,16 +930,16 @@ internal static class KernelInputEligibilityTests
         /// so these lanes prove the routing, the clamp and the ownership; a real device's weight and direction
         /// remain the playtest's.
         /// </summary>
-        public bool Wheel(Vector2 point, bool down)
+        public bool Wheel(UiLayoutPoint point, bool down)
         {
             Arrange();
             Event e = Event.KeyboardEvent("space");
             e.type = EventType.ScrollWheel;
             e.button = 0;
-            e.mousePosition = point;
-            e.delta = new Vector2(0f, down ? 1f : -1f);
+            e.mousePosition = VerseUiExecution.Point(point);
+            e.delta = VerseUiExecution.Point(new UiLayoutPoint(0f, down ? 1f : -1f));
             Event.current = e;
-            Host.DrawFrame(Viewport);
+            NativeFixture.DrawFrame(            Host,Viewport);
             // The reference Event exposes no 'used' getter; consumption is what Use() leaves behind: the type
             // flips to Used. The same read answers for the double and for the game.
             bool consumed = e.type == EventType.Used;
@@ -947,9 +948,9 @@ internal static class KernelInputEligibilityTests
         }
 
         /// <summary>Opens the page's dropdown by clicking the middle of its own trigger band.</summary>
-        public void OpenMenuAt(Rect trigger)
+        public void OpenMenuAt(UiLayoutRect trigger)
         {
-            Click(new Vector2(trigger.x + 10f, trigger.y + trigger.height / 2f));
+            Click(new UiLayoutPoint(trigger.X + 10f, trigger.Y + trigger.Height / 2f));
             if (Session.OpenPopupId == null)
             {
                 throw new Exception("the fixture's dropdown did not open at " + trigger);
@@ -957,7 +958,7 @@ internal static class KernelInputEligibilityTests
         }
 
         /// <summary>The rect the open menu published, read from the pass that drew it.</summary>
-        public Rect RequirePopupLayer() => RequireLayerRect(Session);
+        public UiLayoutRect RequirePopupLayer() => RequireLayerRect(Session);
 
         public void Dispose() => Host.Dispose();
     }
@@ -973,7 +974,7 @@ internal static class KernelInputEligibilityTests
             this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
         }
 
-        public void Validate(IUiBindings bindings, string elementPath) { }
+        public void Validate(IUiBindingReader bindings, string elementPath) { }
 
         public float Measure(UiWidgetContext ctx)
         {
@@ -984,7 +985,7 @@ internal static class KernelInputEligibilityTests
                 : 10f;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx) { }
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx) { }
     }
 
     private sealed class LaneMetrics : ITextMetrics

@@ -121,10 +121,10 @@ Whole-Host hiding suspends editing focus and owned popup input while retaining d
 submission and rejects its Accept/Cancel entry points. Showing does not submit that retained draft.
 
 All defaults prepare their declared tracked consumer input before their own measurement and before Draw
-can issue requests. Old custom `IUiWidget` readers with unknown demand retain conservative all-tracked-key
-service while they participate; they gain neither a required member nor an inferred saving guarantee.
-A custom widget can opt into `IUiPresentationDemand.PresentationKeys(context)` with its complete tracked
-binding demand. This declaration is over public binding keys, not internal nodes or recovery queues.
+can issue requests. Custom tracked readers declare their complete actual demand through descriptor
+binding roles or IUiPresentationDemand.PresentationKeys(context); there is no prepare-every-key
+compatibility path. This is an explicit tracked-author migration, not a purity prerequisite for ordinary
+untracked getters. This declaration is over public binding keys, not internal nodes or recovery queues.
 Ordinary getters/options still use their original notification and legal synchronization conditions.
 
 ## Keep shared ownership distinct from input focus and modal policy

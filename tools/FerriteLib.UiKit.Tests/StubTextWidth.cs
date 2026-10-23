@@ -1,3 +1,5 @@
+using UnityEngine;
+using Verse;
 using FerriteLib.UiKit.Kernel;
 
 namespace FerriteLib.UiKit.Tests;

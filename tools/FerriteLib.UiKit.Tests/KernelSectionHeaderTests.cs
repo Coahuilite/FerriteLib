@@ -1,10 +1,11 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -30,7 +31,7 @@ internal static class KernelSectionHeaderTests
     private const string Title = "Section";
 
     /// <summary>The divider a scheme installs, as the document's own hex writes it.</summary>
-    private static readonly Color ProbeDivider = new(0x21 / 255f, 0x92 / 255f, 0x4A / 255f, 1f);
+    private static readonly UiColour ProbeDivider = new(0x21 / 255f, 0x92 / 255f, 0x4A / 255f, 1f);
 
     private static int failures;
 
@@ -57,8 +58,8 @@ internal static class KernelSectionHeaderTests
         using UiHost host = NewHost(Page(""), theme);
         UiLayoutSnapshot snapshot = Arrange(host, 200f);
 
-        Rect head = snapshot.RectById["head"];
-        List<Rect> painted = RecordedSolidRects();
+        UiLayoutRect head = snapshot.RectById["head"];
+        List<UiLayoutRect> painted = RecordedSolidRects();
         Check(painted.Count > 0, "the default header paints its divider (" + painted.Count + " surface call(s))");
         Check(AllInside(painted, head), "and every call lands inside the element's own rect");
         Check(AnyRecordedBoxColor(theme[UiPaletteRole.Divider]), "in the theme's Divider token rather than a literal colour");
@@ -75,7 +76,7 @@ internal static class KernelSectionHeaderTests
         using UiHost host = NewHost(Page(" Chrome=\"none\""), theme);
         UiLayoutSnapshot snapshot = Arrange(host, 200f);
 
-        Rect head = snapshot.RectById["head"];
+        UiLayoutRect head = snapshot.RectById["head"];
         int painted = RecordedSolidRects().Count;
         Check(painted == 0, "Chrome=none paints nothing in the element's rect (" + painted + " surface call(s))");
         Check(AnyLabelInside(head), "while the title is still drawn: the switch removes the chrome, not the content");
@@ -133,8 +134,8 @@ internal static class KernelSectionHeaderTests
 
     private static UiLayoutSnapshot Arrange(UiHost host, float width)
     {
-        host.DrawFrame(new Rect(0f, 0f, width, 40f));
-        return host.MeasureAndArrange(new Vector2(width, 40f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, width, 40f));
+        return host.MeasureAndArrange(new UiLayoutPoint(width, 40f));
     }
 
     private static string? CreationFailure(string xml)
@@ -163,13 +164,13 @@ internal static class KernelSectionHeaderTests
             what + " is refused at creation, naming the value the kind implements: " + (failure ?? "NO FAILURE"));
     }
 
-    private static bool AllInside(List<Rect> rects, Rect bounds)
+    private static bool AllInside(List<UiLayoutRect> rects, UiLayoutRect bounds)
     {
         for (int i = 0; i < rects.Count; i++)
         {
-            Rect rect = rects[i];
-            if (rect.y < bounds.y - 0.001f || rect.yMax > bounds.yMax + 0.001f
-                || rect.x < bounds.x - 0.001f || rect.xMax > bounds.xMax + 0.001f)
+            UiLayoutRect rect = rects[i];
+            if (rect.Y < bounds.Y - 0.001f || rect.YMax > bounds.YMax + 0.001f
+                || rect.X < bounds.X - 0.001f || rect.XMax > bounds.XMax + 0.001f)
             {
                 return false;
             }
@@ -185,33 +186,33 @@ internal static class KernelSectionHeaderTests
         clear.Invoke(null, null);
     }
 
-    private static List<Rect> RecordedSolidRects()
+    private static List<UiLayoutRect> RecordedSolidRects()
     {
         var rects = (IList?)StubField("DrawBoxSolidRects") ?? throw new Exception("Verse stub is missing DrawBoxSolidRects");
-        var found = new List<Rect>();
+        var found = new List<UiLayoutRect>();
         for (int i = 0; i < rects.Count; i++)
         {
-            if (rects[i] is Rect rect) found.Add(rect);
+            found.Add(NativeFixture.Record<UiLayoutRect>(rects[i]));
         }
 
         return found;
     }
 
-    private static bool AnyRecordedBoxColor(Color wanted)
+    private static bool AnyRecordedBoxColor(UiColour wanted)
     {
         return AnyRecordedBoxColorNear(wanted, 0.0001f);
     }
 
-    private static bool AnyRecordedBoxColorNear(Color wanted, float tolerance = 0.01f)
+    private static bool AnyRecordedBoxColorNear(UiColour wanted, float tolerance = 0.01f)
     {
         var colors = (IList?)StubField("DrawBoxSolidColors") ?? throw new Exception("Verse stub is missing DrawBoxSolidColors");
         for (int i = 0; i < colors.Count; i++)
         {
-            if (colors[i] is Color color
-                && Math.Abs(color.r - wanted.r) <= tolerance
-                && Math.Abs(color.g - wanted.g) <= tolerance
-                && Math.Abs(color.b - wanted.b) <= tolerance
-                && Math.Abs(color.a - wanted.a) <= tolerance)
+            UiColour color=NativeFixture.Record<UiColour>(colors[i]);
+            if ( Math.Abs(color.Red - wanted.Red) <= tolerance
+                && Math.Abs(color.Green - wanted.Green) <= tolerance
+                && Math.Abs(color.Blue - wanted.Blue) <= tolerance
+                && Math.Abs(color.Alpha - wanted.Alpha) <= tolerance)
             {
                 return true;
             }
@@ -220,14 +221,14 @@ internal static class KernelSectionHeaderTests
         return false;
     }
 
-    private static bool AnyLabelInside(Rect bounds)
+    private static bool AnyLabelInside(UiLayoutRect bounds)
     {
         var rects = (IList?)StubField("LabelRects") ?? throw new Exception("Verse stub is missing LabelRects");
         for (int i = 0; i < rects.Count; i++)
         {
-            if (rects[i] is Rect rect
-                && rect.x < bounds.xMax && rect.xMax > bounds.x
-                && rect.y < bounds.yMax && rect.yMax > bounds.y)
+            UiLayoutRect rect=NativeFixture.Record<UiLayoutRect>(rects[i]);
+            if ( rect.X < bounds.XMax && rect.XMax > bounds.X
+                && rect.Y < bounds.YMax && rect.YMax > bounds.Y)
             {
                 return true;
             }

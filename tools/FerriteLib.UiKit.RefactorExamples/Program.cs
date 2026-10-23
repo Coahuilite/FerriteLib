@@ -63,7 +63,37 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("author","author/visual",()=>new 
         host.UpdateDefinition(UiLayoutManifest.Parse(xml.Replace("<Widget Id='custom' Kind='author/visual' Height='30'/>","")));Frame(UiFramePhase.Repaint);
         bool oldHandle=false;try{customNode.GetState("owned",()=>new object());}catch(ObjectDisposedException){oldHandle=true;}
         Check(released==1&&oldHandle,"actual removal releases explicitly owned local resources once and diagnoses stale node use");
+        TypedLayout();
         Console.WriteLine("REFACTOR-AUTHOR assertions="+assertions+" writes="+writes+" choice="+choice+" replacement-hits="+replacement.Hits);
+    }
+    static void TypedLayout()
+    {
+        UiLayoutSnapshot Arrange(UiLayoutManifest manifest)
+        {
+            using var host = new UiHost("author", manifest, new UiBindings(), new UiTheme(), new Metrics(), new Translation());
+            return host.MeasureAndArrange(new UiLayoutPoint(300, 200));
+        }
+        string Page(string fill) => "<UiPage Schema='2' Source='author'><Column Id='outer' Padding='0' Gap='0' Fill='true'><Surface Id='fill' Fill='"+fill+"' Padding='2,4' Gap='0'><Widget Id='leaf' Kind='text/wrapped' Text='x' Width='1e2' Height='2e1'/></Surface><Surface Id='fixed' Padding='0' Height='20'/></Column></UiPage>";
+        UiWidgetRegistry.Define(new UiWidgetDefinition("author","author/padding-text",()=>new UiWidgetParts("author/padding-text"),new UiAttributeSchema(new UiAttributeDefinition("Padding",UiAttributeKind.Text))));
+        var own=Arrange(UiLayoutManifest.Parse("<UiPage Schema='2' Source='author'><Widget Id='own' Kind='author/padding-text' Padding='consumer-token' Height='20'/></UiPage>"));
+        Check(own.RectById["own"].Height==20,"container numeric Padding grammar does not override a custom widget's explicitly declared Text schema");
+        var one=Arrange(UiLayoutManifest.Parse(Page(" 1 ")));
+        var yes=Arrange(UiLayoutManifest.Parse(Page("true")));
+        var zero=Arrange(UiLayoutManifest.Parse(Page("0")));
+        Check(one.RectById["fill"].Height==yes.RectById["fill"].Height && one.RectById["fill"].Height>zero.RectById["fill"].Height,
+            "accepted Boolean 1/true share actual flexible layout; 0 keeps natural height");
+        var typed=UiLayoutManifest.Create("author", new[]{new UiElementSpec("outer","Column",new Dictionary<string,UiAttributeValue>{["Padding"]=UiAttributeValue.Number(0),["Gap"]=UiAttributeValue.Number(0),["Fill"]=UiAttributeValue.Boolean(true)},new[]{
+            new UiElementSpec("fill","Surface",new Dictionary<string,UiAttributeValue>{["Fill"]=UiAttributeValue.Boolean(true),["Padding"]=UiAttributeValue.Literal("2,4"),["Gap"]=UiAttributeValue.Number(0)},new[]{new UiElementSpec("leaf","text/wrapped",new Dictionary<string,UiAttributeValue>{["Text"]=UiAttributeValue.Literal("x"),["Width"]=UiAttributeValue.Number(100),["Height"]=UiAttributeValue.Number(20)})}),
+            new UiElementSpec("fixed","Surface",new Dictionary<string,UiAttributeValue>{["Padding"]=UiAttributeValue.Number(0),["Height"]=UiAttributeValue.Number(20)})})});
+        var cs=Arrange(typed);
+        Check(cs.RectById["fill"].Equals(one.RectById["fill"]) && cs.RectById["leaf"].Equals(one.RectById["leaf"]),"XML and typed C# numbers/Boolean/padding consume identical cached declaration values");
+        var placement=Arrange(UiLayoutManifest.Parse("<UiPage Schema='2' Source='author'><Overlay Id='overlay' Padding='0' Height='100'><Surface Id='placed' Width='100' Height='20' AlignX='Right' OffsetX='10%'/></Overlay></UiPage>"));
+        Check(placement.RectById["placed"].X==230,"cached percentage offset uses current parent span with numeric width");
+        foreach(string bad in new[]{"<Column Id='bad' Fill='maybe'/>","<Column Id='bad' Padding='1,NaN'/>","<Column Id='bad' Gap='Infinity'/>","<Wrap Id='bad' Cols='2.5'/>","<Overlay Id='o'><Surface Id='bad' Fill='1' AlignX='Right'/></Overlay>"})
+        {
+            bool refused=false;try{Arrange(UiLayoutManifest.Parse("<UiPage Schema='2' Source='author'>"+bad+"</UiPage>"));}catch(UiContractException){refused=true;}
+            Check(refused,"invalid/contradictory static declaration refuses before consumption: "+bad);
+        }
     }
     sealed class Row { public string Key="",Text="";public int Hits; }
     sealed class CustomVisual:IUiWidget

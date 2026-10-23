@@ -607,8 +607,9 @@ public sealed class UiLayoutManifest
                         string value = reader.GetAttribute("Value") ?? throw ParseError(lineInfo,"Choice needs Value.");
                         string text = reader.GetAttribute("Text") ?? value;
                         string help = reader.GetAttribute("Help") ?? "";
-                        for(int a=0;a<reader.AttributeCount;a++){reader.MoveToAttribute(a);if(reader.Name!="Value"&&reader.Name!="Text"&&reader.Name!="Help")throw ParseError(lineInfo,"Unknown Choice attribute '"+reader.Name+"'.");}reader.MoveToElement();
-                        choices.Add(new UiChoice<string>(text,value,help));
+                        string textKey = reader.GetAttribute("TextKey") ?? "";
+                        for(int a=0;a<reader.AttributeCount;a++){reader.MoveToAttribute(a);if(reader.Name!="Value"&&reader.Name!="Text"&&reader.Name!="Help"&&reader.Name!="TextKey")throw ParseError(lineInfo,"Unknown Choice attribute '"+reader.Name+"'.");}reader.MoveToElement();
+                        choices.Add(new UiChoice<string>(text,value,help,textKey));
                         break;
                     }
                     if (string.Equals(elementName, "Widget", StringComparison.Ordinal))

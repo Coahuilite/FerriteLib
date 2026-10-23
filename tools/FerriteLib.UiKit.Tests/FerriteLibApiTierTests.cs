@@ -1,3 +1,5 @@
+using UnityEngine;
+using Verse;
 using FerriteLib.UiKit.Kernel;
 using System;
 using System.Collections.Generic;
@@ -117,16 +119,12 @@ internal static class FerriteLibApiTierTests
         "UiDensity",
         "UiSliderLayout",
         "UiElementProperties",
-        "UiOption",
         "UiChoice",
         "UiHost",
-        "UiValueState",
         "UiElementSpec",
         "UiWidgetContext",
-        "IUiBindings",
-        "IUiTypedChoices",
+        "IUiBindingReader",
         "UiBindings",
-        "UiNative",
         "UiTheme",
         "UiThemeDraw",
         "UiFitAudit",
@@ -177,6 +175,32 @@ internal static class FerriteLibApiTierTests
         "UiWidgetCatalog",
         "UiKinds",
         "UiHostInputState",
+        "VerseUiExecution",
+        "VerseUiImages",
+        "IUiBindingReader",
+        "UiBindingRole",
+        "UiAttributeKind",
+        "UiAttributeValue",
+        "UiAttributeDefinition",
+        "UiAttributeSchema",
+        "UiBindingAddress",
+        "UiValueEndpoint",
+        "UiChoiceEndpoint",
+        "UiControls",
+        "UiFrame",
+        "UiFramePhase",
+        "UiKey",
+        "UiTextAnchor",
+        "UiControlKey",
+        "UiImage",
+        "UiNativeEdit",
+        "UiNativeEditResult",
+        "IUiExecution",
+        "IUiDrawing",
+        "IUiWidgetCapabilities",
+        "UiWidgetParts",
+        "UiWidgetDefinition",
+        "UiSession",
     };
 
     public static int RunAll()
@@ -199,7 +223,8 @@ internal static class FerriteLibApiTierTests
         if ((type == "UiHost" || type == "UiWindowHost") && name == "Session") return true;
         if (type == "UiHost" && (name == "Observe" || name == "ObserveLiveHosts" || name == "ObserveLiveHost")) return true;
         if (type == "UiDiagnosticSubscription" && new[] { "GeometryEnabled", "GeometryOverlay", "DumpGeometry", "TryGetGeometrySnapshot" }.Contains(name)) return true;
-        if (type == "UiNative" && (name == "Trace" || member is MethodBase method && method.GetParameters().Any(p => p.ParameterType == typeof(UiSession)))) return true;
+        if (type == "UiControls" && name == "Trace") return true;
+        if (type == "UiSession" && member is not ConstructorInfo && !new[] { "CreateContext", "SetFrame", "Controls", "IsActive", "Identity", "Dispose" }.Contains(name)) return true;
         return false;
     }
     internal static void WriteStableSurface(string path) => File.WriteAllLines(path, StableSurface());
@@ -208,7 +233,7 @@ internal static class FerriteLibApiTierTests
         var tiers = ReadTiers(); var lines = new List<string>();
         foreach (Type type in typeof(UiHost).Assembly.GetExportedTypes().Where(t => tiers.TryGetValue(TierName(t), out string? tier) && tier == StableHeading))
         {
-            lines.Add("TYPE " + type.FullName + " : " + type.BaseType);
+            lines.Add(("TYPE " + type.FullName + " : " + type.BaseType).TrimEnd(new[] { ' ' }));
             foreach (Type contract in type.GetInterfaces().Where(t => t.IsPublic)) lines.Add(type.FullName + " implements " + contract);
             foreach (MemberInfo member in type.GetMembers(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
             {

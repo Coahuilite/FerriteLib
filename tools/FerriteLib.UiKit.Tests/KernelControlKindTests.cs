@@ -1,3 +1,5 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -5,7 +7,6 @@ using System.Reflection;
 
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -38,7 +39,8 @@ internal static class KernelControlKindTests
     private static string pickedKey = "";
     private static string pickedDisclosure = "";
     private static string pickedCheck = "";
-    private static Texture2D? textureIcon;
+    private static UiImage textureIcon;
+    private static readonly VerseUiExecution imageExecution=new();
     private static List<UiTreeRow> treeRows = new();
 
     public static int RunAll()
@@ -112,7 +114,7 @@ internal static class KernelControlKindTests
         using (UiHost host = Host(BoolAutoPage(""), CheckboxBindings()))
         {
             UiLayoutSnapshot snapshot = Arrange(host);
-            switchWidth = snapshot.RectById["flag"].width;
+            switchWidth = snapshot.RectById["flag"].Width;
             Check(Near(switchWidth, SwitchBody),
                 "an unlabelled bool control with the default appearance reserves its own body, not zero: got "
                 + switchWidth.ToString("0.###") + ", expected " + SwitchBody.ToString("0.###"));
@@ -127,7 +129,7 @@ internal static class KernelControlKindTests
         using (UiHost host = Host(BoolAutoPage(" Appearance=\"checkbox\""), CheckboxBindings()))
         {
             UiLayoutSnapshot snapshot = Arrange(host);
-            float boxWidth = snapshot.RectById["flag"].width;
+            float boxWidth = snapshot.RectById["flag"].Width;
             Check(Near(boxWidth, CheckboxBoxSide),
                 "the checkbox appearance reserves its box side, derived from the pinned metrics - body "
                 + CheckboxBoxSide.ToString("0.###") + " = max(" + CheckboxMinSide.ToString("0.###")
@@ -145,7 +147,7 @@ internal static class KernelControlKindTests
             + SwitchBody.ToString("0.###") + " checkbox=" + CheckboxBoxSide.ToString("0.###"));
         using (UiHost host = Host(BoolAutoPage(" Appearance=\"switch\""), CheckboxBindings()))
         {
-            Check(Near(Arrange(host).RectById["flag"].width, SwitchBody),
+            Check(Near(Arrange(host).RectById["flag"].Width, SwitchBody),
                 "the switch look measures its own track body, spelled out explicitly");
         }
 
@@ -153,7 +155,7 @@ internal static class KernelControlKindTests
         using (UiHost host = Host(BoolAutoPage(" Label=\"\""), CheckboxBindings()))
         {
             UiLayoutSnapshot snapshot = Arrange(host);
-            float blank = snapshot.RectById["flag"].width;
+            float blank = snapshot.RectById["flag"].Width;
             Check(Near(blank, SwitchBody),
                 "a blank label reserves no gap: got " + blank.ToString("0.###") + ", expected "
                 + SwitchBody.ToString("0.###"));
@@ -163,7 +165,7 @@ internal static class KernelControlKindTests
         using (UiHost host = Host(BoolAutoPage(" Label=\"Flag\""), CheckboxBindings()))
         {
             UiLayoutSnapshot snapshot = Arrange(host);
-            float labelled = snapshot.RectById["flag"].width;
+            float labelled = snapshot.RectById["flag"].Width;
             Check(labelled > SwitchBody + SwitchGap,
                 "the label is added to the body and its gap, not measured instead of it: got "
                 + labelled.ToString("0.###") + ", body+gap is "
@@ -174,9 +176,9 @@ internal static class KernelControlKindTests
         using (UiHost host = Host(BoolAutoPage(" Height=\"40\""), CheckboxBindings()))
         {
             UiLayoutSnapshot snapshot = Arrange(host);
-            Check(Near(snapshot.RectById["flag"].height, 40f),
+            Check(Near(snapshot.RectById["flag"].Height, 40f),
                 "an explicit Height still decides the band, got "
-                + snapshot.RectById["flag"].height.ToString("0.###"));
+                + snapshot.RectById["flag"].Height.ToString("0.###"));
         }
 
         // The declared look set is the SHARED seam, not a private reading of the attribute: the registry
@@ -201,7 +203,7 @@ internal static class KernelControlKindTests
             "a differently-cased declaration resolves to the canonical look name, not to the authored spelling");
         using (UiHost host = Host(BoolAutoPage(" Appearance=\"CHECKBOX\""), CheckboxBindings()))
         {
-            float upperWidth = Arrange(host).RectById["flag"].width;
+            float upperWidth = Arrange(host).RectById["flag"].Width;
             Check(Near(upperWidth, CheckboxBoxSide),
                 "and the host measures the same checkbox body the lower-case spelling does - the comparison is "
                 + "checkbox against checkbox, the equivalent fixture: CHECKBOX=" + upperWidth.ToString("0.###")
@@ -229,8 +231,8 @@ internal static class KernelControlKindTests
         // The OFF outline is the theme's control edge. A palette that flattens the raised plane onto its own
         // edge (fill == border, this vocabulary's way of saying "no box") must still leave the track visible,
         // which is only possible if the fill and the edge come from two independent tokens.
-        var flat = new Color(0.10f, 0.09f, 0.07f, 1f);
-        var controlEdge = new Color(0.55f, 0.55f, 0.55f, 1f);
+        var flat = new UiColour(0.10f, 0.09f, 0.07f, 1f);
+        var controlEdge = new UiColour(0.55f, 0.55f, 0.55f, 1f);
         UiTheme flattened = UiTheme.Vanilla;
         flattened[UiPaletteRole.ControlSurface] = flat;
         flattened[UiPaletteRole.ControlBorder] = flat;
@@ -240,14 +242,14 @@ internal static class KernelControlKindTests
         using (UiHost host = Host(BoolAutoPage(""), CheckboxBindings(), flattened))
         {
             ClearDraws();
-            host.DrawFrame(new Rect(0f, 0f, 200f, 60f));
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0f, 0f, 200f, 60f));
             IList colors = RecordedColors();
             Check(colors.Count >= 5, "the OFF switch painted its track: " + colors.Count + " solid(s)");
-            bool fill = colors.Count > 0 && SameColor((Color)colors[0], flat);
+            bool fill = colors.Count > 0 && SameColor(NativeFixture.Record<UiColour>(colors[0]), flat);
             bool edge = colors.Count >= 5;
             for (int i = 1; i < 5 && i < colors.Count; i++)
             {
-                edge &= SameColor((Color)colors[i], controlEdge);
+                edge &= SameColor(NativeFixture.Record<UiColour>(colors[i]), controlEdge);
             }
 
             Check(fill, "the OFF track fills with the raised plane it sits on");
@@ -281,7 +283,7 @@ internal static class KernelControlKindTests
         using (UiHost on = Host(BoolAutoPage(""), CheckboxBindings()))
         {
             ClearDraws();
-            on.DrawFrame(new Rect(0f, 0f, 200f, 60f));
+            NativeFixture.DrawFrame(            on,new UiLayoutRect(0f, 0f, 200f, 60f));
             Check(SameColor(KnobColour(), UiTheme.Vanilla[UiPaletteRole.Accent]),
                 "an ON switch paints its THUMB in the accent token, not in the selected plane's text colour: got "
                 + Describe(KnobColour()) + ", accent is " + Describe(UiTheme.Vanilla[UiPaletteRole.Accent]));
@@ -291,13 +293,13 @@ internal static class KernelControlKindTests
         using (UiHost off = Host(BoolAutoPage(""), CheckboxBindings()))
         {
             ClearDraws();
-            off.DrawFrame(new Rect(0f, 0f, 200f, 60f));
+            NativeFixture.DrawFrame(            off,new UiLayoutRect(0f, 0f, 200f, 60f));
             Check(SameColor(KnobColour(), UiTheme.Vanilla[UiPaletteRole.Foreground]),
                 "while an OFF switch paints its thumb in the neutral ink - the UNSET fallback of the token");
             bool accent = false;
             foreach (object color in RecordedColors())
             {
-                accent |= SameColor((Color)color, UiTheme.Vanilla[UiPaletteRole.Accent]);
+                accent |= SameColor(NativeFixture.Record<UiColour>(color), UiTheme.Vanilla[UiPaletteRole.Accent]);
             }
 
             Check(!accent, "and an OFF switch paints no accent at all");
@@ -316,19 +318,19 @@ internal static class KernelControlKindTests
             + "</Styles>");
         Check(slate.Issues.Count == 0,
             "the palette document accepts SwitchThumbOff as a colour role: " + slate.Issues.Count + " issue(s)");
-        var thumbGrey = new Color(0.32f, 0.33f, 0.35f, 1f);
+        var thumbGrey = new UiColour(0.32f, 0.33f, 0.35f, 1f);
 
         flagValue = false;
         using (UiHost offGrey = SlateHost("<Column Id=\"col\" Scheme=\"slate\">", slate))
         {
             ClearDraws();
-            offGrey.DrawFrame(new Rect(0f, 0f, 200f, 60f));
+            NativeFixture.DrawFrame(            offGrey,new UiLayoutRect(0f, 0f, 200f, 60f));
             Check(SameColor(KnobColour(), thumbGrey),
                 "the declared OFF-thumb colour paints the thumb through the real document->resolver->clone path: got "
                 + Describe(KnobColour()));
             IList inks = (IList)Field(typeof(Verse.Widgets), "LabelColors", null);
-            Check(inks.Count > 0 && SameColor((Color)inks[inks.Count - 1], UiTheme.Vanilla[UiPaletteRole.Foreground])
-                    && !SameColor((Color)inks[inks.Count - 1], thumbGrey),
+            Check(inks.Count > 0 && SameColor(NativeFixture.Record<UiColour>(inks[inks.Count - 1]), UiTheme.Vanilla[UiPaletteRole.Foreground])
+                    && !SameColor(NativeFixture.Record<UiColour>(inks[inks.Count - 1]), thumbGrey),
                 "and the label keeps its bright ink - the grey thumb never rides on important text");
         }
 
@@ -336,7 +338,7 @@ internal static class KernelControlKindTests
         using (UiHost onGrey = SlateHost("<Column Id=\"col\" Scheme=\"slate\">", slate))
         {
             ClearDraws();
-            onGrey.DrawFrame(new Rect(0f, 0f, 200f, 60f));
+            NativeFixture.DrawFrame(            onGrey,new UiLayoutRect(0f, 0f, 200f, 60f));
             Check(SameColor(KnobColour(), UiTheme.Vanilla[UiPaletteRole.Accent]),
                 "the ON thumb still answers the accent under the same scope declaration");
         }
@@ -345,7 +347,7 @@ internal static class KernelControlKindTests
         using (UiHost unslated = SlateHost("<Column Id=\"col\">", slate))
         {
             ClearDraws();
-            unslated.DrawFrame(new Rect(0f, 0f, 200f, 60f));
+            NativeFixture.DrawFrame(            unslated,new UiLayoutRect(0f, 0f, 200f, 60f));
             Check(SameColor(KnobColour(), UiTheme.Vanilla[UiPaletteRole.Foreground]),
                 "a scope that declares no OFF-thumb keeps the historical bright thumb even with the document in hand");
         }
@@ -373,17 +375,17 @@ internal static class KernelControlKindTests
     /// appearance-equivalent repainting that reorders or re-splits the surface calls. Throws - rather than
     /// answering a default - when the pass recorded no thumb, because a missing knob IS the defect.
     /// </summary>
-    private static Color KnobColour()
+    private static UiColour KnobColour()
     {
         IList rects = (IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null);
         IList colors = RecordedColors();
         float side = CheckboxWidget.SwitchKnobSize;
         for (int i = 0; i < rects.Count; i++)
         {
-            Rect r = (Rect)rects[i]!;
-            if (Math.Abs(r.width - side) <= 0.01f && Math.Abs(r.height - side) <= 0.01f)
+            UiLayoutRect r = NativeFixture.Record<UiLayoutRect>(rects[i]!);
+            if (Math.Abs(r.Width - side) <= 0.01f && Math.Abs(r.Height - side) <= 0.01f)
             {
-                return (Color)colors[i]!;
+                return NativeFixture.Record<UiColour>(colors[i]!);
             }
         }
 
@@ -436,10 +438,10 @@ internal static class KernelControlKindTests
             CheckboxBindings());
 
         UiLayoutSnapshot snapshot = Arrange(host);
-        Rect band = snapshot.RectById["flag"];
-        ClickAt(host, new Vector2(band.xMax + 20f, band.y + band.height * 0.5f));
+        UiLayoutRect band = snapshot.RectById["flag"];
+        ClickAt(host, new UiLayoutPoint(band.XMax + 20f, band.Y + band.Height * 0.5f));
         Check(!flagValue, "a click outside the element's arranged band writes nothing");
-        ClickAt(host, new Vector2(band.x + 2f, band.y + 2f));
+        ClickAt(host, new UiLayoutPoint(band.X + 2f, band.Y + 2f));
         Check(flagValue, "and a click inside it does");
     }
 
@@ -458,11 +460,11 @@ internal static class KernelControlKindTests
         Check(!node.IsDisabled, "a read-only value binding is not a dead command element");
 
         ClearDraws();
-        host.DrawFrame(new Rect(0f, 0f, 200f, 60f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 200f, 60f));
         Check(RecordedColors().Count >= 5, "the checkbox painted its box");
         UiTheme theme = UiTheme.Vanilla;
         Check(
-            SameColor((Color)RecordedColors()[0], theme[UiPaletteRole.WindowSurface]) && SameColor((Color)RecordedColors()[1], theme[UiPaletteRole.Divider]),
+            SameColor(NativeFixture.Record<UiColour>(RecordedColors()[0]), theme[UiPaletteRole.WindowSurface]) && SameColor(NativeFixture.Record<UiColour>(RecordedColors()[1]), theme[UiPaletteRole.Divider]),
             "and the plane is the one disabled treatment the resolved-value table owns");
 
         // Capture is observed on the MouseDown itself: after a full click the hot control is released again
@@ -544,8 +546,8 @@ internal static class KernelControlKindTests
 
         UiTheme theme = UiTheme.Vanilla;
         float edge = Math.Max(1f, theme.Geometry.Hairline);
-        Rect band = Arrange(host).RectById["bar"];
-        float inner = band.width - edge * 2f;
+        UiLayoutRect band = Arrange(host).RectById["bar"];
+        float inner = band.Width - edge * 2f;
 
         pctValue = 1f;
         Check(Near(FillWidth(host), inner * 0.5f), "a value of 1 against Max=2 fills half the track: " + FillWidth(host));
@@ -559,15 +561,15 @@ internal static class KernelControlKindTests
 
     private static void VerifyProgressIsPaintClass()
     {
-        using UiHost host = Host(ProgressPage(), ProgressBindings(out IUiBindings bindings));
+        using UiHost host = Host(ProgressPage(), ProgressBindings(out UiBindings bindings));
 
         pctValue = 0.5f;
-        UiLayoutSnapshot before = host.MeasureAndArrange(new Vector2(200f, 120f));
+        UiLayoutSnapshot before = host.MeasureAndArrange(new UiLayoutPoint(200f, 120f));
         float beforeWidth = FillWidth(host);
 
         pctValue = 1.5f;
         bindings.NotifyChanged("pct");
-        UiLayoutSnapshot after = host.MeasureAndArrange(new Vector2(200f, 120f));
+        UiLayoutSnapshot after = host.MeasureAndArrange(new UiLayoutPoint(200f, 120f));
 
         Check(ReferenceEquals(before, after),
             "a Paint-class announcement reuses the arranged snapshot instead of re-measuring the page");
@@ -614,27 +616,27 @@ internal static class KernelControlKindTests
 
         using UiHost host = Host(TreePage(), TreeBindings());
         ClearDraws();
-        host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(200f, 120f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 200f, 120f));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(200f, 120f));
 
         IList rects = (IList)Field(typeof(Verse.Widgets), "LabelRects", null);
         IList texts = (IList)Field(typeof(Verse.Widgets), "LabelTexts", null);
         Check(rects.Count == 3, "one label per row: " + rects.Count);
 
-        var first = (Rect)rects[0]!;
-        var second = (Rect)rects[1]!;
-        var third = (Rect)rects[2]!;
-        Check(Near(first.height, 20f) && Near(second.height, 20f) && Near(third.height, 20f),
+        var first = NativeFixture.Record<UiLayoutRect>(rects[0]!);
+        var second = NativeFixture.Record<UiLayoutRect>(rects[1]!);
+        var third = NativeFixture.Record<UiLayoutRect>(rects[2]!);
+        Check(Near(first.Height, 20f) && Near(second.Height, 20f) && Near(third.Height, 20f),
             "every band is the declared RowHeight tall");
-        Check(second.x > first.x && third.x > second.x,
+        Check(second.X > first.X && third.X > second.X,
             "and each level indents one step further than its parent");
         Check(string.Equals((string)texts[0]!, "root", StringComparison.Ordinal)
             && string.Equals((string)texts[2]!, "grandchild", StringComparison.Ordinal),
             "rows draw in the order the model supplied");
 
-        Rect tree = snapshot.RectById["tree"];
+        UiLayoutRect tree = snapshot.RectById["tree"];
         pickedKey = "";
-        ClickAt(host, new Vector2(tree.x + 4f, tree.y + 20f + 10f));
+        ClickAt(host, new UiLayoutPoint(tree.X + 4f, tree.Y + 20f + 10f));
         Check(string.Equals(pickedKey, "child", StringComparison.Ordinal),
             "a click inside the second band reports the second row's key, so the bands are where the rows are: " + pickedKey);
     }
@@ -649,18 +651,18 @@ internal static class KernelControlKindTests
 
         using UiHost host = Host(TreePage(), TreeBindings());
         UiLayoutSnapshot snapshot = ArrangeTree(host);
-        Rect tree = snapshot.RectById["tree"];
+        UiLayoutRect tree = snapshot.RectById["tree"];
 
         pickedKey = "";
-        ClickAt(host, new Vector2(tree.x + 4f, tree.y + 10f));
+        ClickAt(host, new UiLayoutPoint(tree.X + 4f, tree.Y + 10f));
         Check(string.Equals(pickedKey, "alpha", StringComparison.Ordinal), "the first band reports the first key");
 
         treeRows.Reverse();
-        host.Bindings.NotifyChanged("tree");
+((UiBindings)host.Bindings).NotifyChanged("tree");
         snapshot = ArrangeTree(host);
         tree = snapshot.RectById["tree"];
         pickedKey = "";
-        ClickAt(host, new Vector2(tree.x + 4f, tree.y + 10f));
+        ClickAt(host, new UiLayoutPoint(tree.X + 4f, tree.Y + 10f));
         Check(string.Equals(pickedKey, "beta", StringComparison.Ordinal),
             "after a reorder the same band reports the row that now owns it, never a stashed index");
     }
@@ -678,7 +680,7 @@ internal static class KernelControlKindTests
             "the expanded row paints a filled marker and the collapsed one an outline");
 
         treeRows.Reverse();
-        host.Bindings.NotifyChanged("tree");
+((UiBindings)host.Bindings).NotifyChanged("tree");
         Check(BandSolids(host, 1) > BandSolids(host, 0),
             "after the reorder the filled marker followed its row's key, not the band index");
     }
@@ -698,21 +700,21 @@ internal static class KernelControlKindTests
 
         using UiHost host = Host(TreePage(), TreeBindings());
         ClearDraws();
-        host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(200f, 120f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 200f, 120f));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(200f, 120f));
 
         IList rects = (IList)Field(typeof(Verse.Widgets), "LabelRects", null);
         Check(rects.Count == 3, "only the rows that can carry identity are drawn: " + rects.Count);
         Check(UiFitAudit.StyleFallbackCount >= 3,
             "and each refusal is reported once through the bounded channel: " + UiFitAudit.StyleFallbackCount);
 
-        Rect tree = snapshot.RectById["tree"];
+        UiLayoutRect tree = snapshot.RectById["tree"];
         pickedKey = "";
-        ClickAt(host, new Vector2(tree.x + 4f, tree.y + 20f + 10f));
+        ClickAt(host, new UiLayoutPoint(tree.X + 4f, tree.Y + 20f + 10f));
         Check(string.Equals(pickedKey, "dup", StringComparison.Ordinal),
             "the accepted row of the duplicated key is hit by its own key: " + pickedKey);
         pickedKey = "";
-        ClickAt(host, new Vector2(tree.x + 4f, tree.y + 40f + 10f));
+        ClickAt(host, new UiLayoutPoint(tree.X + 4f, tree.Y + 40f + 10f));
         Check(string.Equals(pickedKey, "tail", StringComparison.Ordinal),
             "and the row after the refused ones kept its band, not their slots: " + pickedKey);
     }
@@ -745,42 +747,42 @@ internal static class KernelControlKindTests
         textureIcon = MakeTexture(64, 32);
         using UiHost host = Host(ImagePage("Width=\"80\" Height=\"20\""), ImageBindings());
 
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(200f, 120f));
-        Rect element = snapshot.RectById["icon"];
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(200f, 120f));
+        UiLayoutRect element = snapshot.RectById["icon"];
         ClearDraws();
-        host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 200f, 120f));
 
         IList textures = TextureRects();
         IList labelInks = (IList)Field(typeof(Verse.Widgets), "LabelColors", null);
         Check(textures.Count == 1, "the bound texture is drawn exactly once: " + textures.Count);
 
-        var fitted = (Rect)textures[0]!;
-        Check(Near(fitted.width, 40f) && Near(fitted.height, 20f),
+        var fitted = NativeFixture.Record<UiLayoutRect>(textures[0]!);
+        Check(Near(fitted.Width, 40f) && Near(fitted.Height, 20f),
             "a 64x32 texture in an 80x20 slot letterboxes to 40x20, keeping its aspect: " + fitted);
-        Check(Near(fitted.x, element.x + 20f) && Near(fitted.y, element.y),
+        Check(Near(fitted.X, element.X + 20f) && Near(fitted.Y, element.Y),
             "and it centres on the axis that has slack: " + fitted);
-        Check(fitted.x >= element.x - 0.01f && fitted.xMax <= element.xMax + 0.01f
-            && fitted.y >= element.y - 0.01f && fitted.yMax <= element.yMax + 0.01f,
+        Check(fitted.X >= element.X - 0.01f && fitted.XMax <= element.XMax + 0.01f
+            && fitted.Y >= element.Y - 0.01f && fitted.YMax <= element.YMax + 0.01f,
             "the drawn rect never leaves the element it was handed");
 
         // The page's own label is the control: an icon's ink must be the SAME resolved style a string takes,
         // so the lane compares the two outlets' recorded colours instead of naming a token here.
-        Check(labelInks.Count == 1 && SameColor((Color)TextureInks()[0]!, (Color)labelInks[0]!),
+        Check(labelInks.Count == 1 && SameColor(NativeFixture.Record<UiColour>(TextureInks()[0]!), NativeFixture.Record<UiColour>(labelInks[0]!)),
             "the icon's tint is the same resolved ink the label beside it took");
         Check(Equals(TextureModes()[0], ScaleMode.StretchToFill),
             "and the draw stretches into the library's own fitted rect rather than asking Unity to fit");
 
         // No texture: the element paints its empty slot and NO texture at all - visible, and not a broken glyph.
-        textureIcon = null;
-        host.Bindings.NotifyChanged("icon");
+        textureIcon = default;
+((UiBindings)host.Bindings).NotifyChanged("icon");
         ClearDraws();
-        host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 200f, 120f));
         Check(TextureRects().Count == 0, "a null texture draws no texture at all");
         bool slotPainted = false;
         foreach (object entry in (IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null))
         {
-            var rect = (Rect)entry;
-            if (Near(rect.width, 80f) && Near(rect.height, 20f)) slotPainted = true;
+            var rect = NativeFixture.Record<UiLayoutRect>(entry);
+            if (Near(rect.Width, 80f) && Near(rect.Height, 20f)) slotPainted = true;
         }
 
         Check(slotPainted, "and the element paints its own empty slot in its resolved style instead");
@@ -788,16 +790,16 @@ internal static class KernelControlKindTests
         // Hidden: nothing at all, which is how "hidden" stays distinguishable from "there is no icon".
         textureIcon = MakeTexture(64, 32);
         using UiHost hidden = Host(ImageOnlyPage("Width=\"80\" Height=\"20\" Hidden=\"true\""), ImageBindings());
-        hidden.MeasureAndArrange(new Vector2(200f, 120f));
+        hidden.MeasureAndArrange(new UiLayoutPoint(200f, 120f));
         ClearDraws();
-        hidden.DrawFrame(new Rect(0f, 0f, 200f, 120f));
+        NativeFixture.DrawFrame(        hidden,new UiLayoutRect(0f, 0f, 200f, 120f));
         Check(TextureRects().Count == 0
             && ((IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null)).Count == 0,
             "a hidden element paints nothing at all, so a hidden image and an empty slot differ");
 
         // Pointer: an image takes none, so it can sit on top of a row without stealing the row's click.
         using UiHost live = Host(ImageOnlyPage("Width=\"80\" Height=\"20\""), ImageBindings());
-        UiLayoutSnapshot liveSnapshot = live.MeasureAndArrange(new Vector2(200f, 120f));
+        UiLayoutSnapshot liveSnapshot = live.MeasureAndArrange(new UiLayoutPoint(200f, 120f));
         ClickAt(live, Centre(liveSnapshot.RectById["icon"]));
         Check(!live.Session.OwnedHotControl.HasValue,
             "and clicking an image captures no pointer and dispatches nothing");
@@ -807,7 +809,7 @@ internal static class KernelControlKindTests
 
     private static void VerifyTreeComposedRow()
     {
-        Texture2D icon = MakeTexture(32, 32);
+        UiImage icon = MakeTexture(32, 32);
         treeRows = new List<UiTreeRow>
         {
             new("tall", 0, "tall", expandable: true, expanded: false, checkable: true, isChecked: false, image: icon),
@@ -815,10 +817,10 @@ internal static class KernelControlKindTests
         };
 
         using UiHost host = Host(TreeComposedPage(), TreeComposedBindings());
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(200f, 120f));
-        Rect tree = snapshot.RectById["tree"];
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(200f, 120f));
+        UiLayoutRect tree = snapshot.RectById["tree"];
         ClearDraws();
-        host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 200f, 120f));
 
         IList labelRects = (IList)Field(typeof(Verse.Widgets), "LabelRects", null);
         Check(labelRects.Count == 2, "one label per row, with the parts beside them: " + labelRects.Count);
@@ -826,15 +828,15 @@ internal static class KernelControlKindTests
 
         // Measured, not assumed: the second row's band starts below the picture's own height plus padding, so
         // the first band is taller than the declared RowHeight. The label rects are the kind's own bands.
-        float firstBand = ((Rect)labelRects[1]!).y - ((Rect)labelRects[0]!).y;
+        float firstBand = (NativeFixture.Record<UiLayoutRect>(labelRects[1]!)).Y - (NativeFixture.Record<UiLayoutRect>(labelRects[0]!)).Y;
         Check(firstBand >= 32f, "the image row's band is measured from the picture, not from RowHeight: " + firstBand);
 
         // Each part is its own target and carries the row's stable key. The target rects are read out of the
         // kind's own paints (a surface paints its fill first, then its edges) rather than re-derived here.
         IList solids = (IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null);
         Check(solids.Count >= 10, "the collapsed marker and the empty box each painted: " + solids.Count);
-        var markerRect = (Rect)solids[0]!;
-        var boxRect = (Rect)solids[5]!;
+        var markerRect = NativeFixture.Record<UiLayoutRect>(solids[0]!);
+        var boxRect = NativeFixture.Record<UiLayoutRect>(solids[5]!);
 
         pickedKey = "";
         pickedDisclosure = "";
@@ -853,7 +855,7 @@ internal static class KernelControlKindTests
         pickedKey = "";
         pickedDisclosure = "";
         pickedCheck = "";
-        ClickAt(host, new Vector2(tree.xMax - 4f, ((Rect)labelRects[0]!).y + 4f));
+        ClickAt(host, new UiLayoutPoint(tree.XMax - 4f, (NativeFixture.Record<UiLayoutRect>(labelRects[0]!)).Y + 4f));
         Check(pickedKey == "tall" && pickedDisclosure.Length == 0 && pickedCheck.Length == 0,
             "and the row body, right of every part, still reports the row: '" + pickedKey + "'");
 
@@ -864,11 +866,11 @@ internal static class KernelControlKindTests
             new("tall", 0, "tall", expandable: true, expanded: true, checkable: true, isChecked: true, image: icon),
             new("short", 0, "short", selected: true),
         };
-        host.Bindings.NotifyChanged("tree");
+((UiBindings)host.Bindings).NotifyChanged("tree");
         ClearDraws();
-        host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 200f, 120f));
         IList inks = (IList)Field(typeof(Verse.Widgets), "LabelColors", null);
-        Check(inks.Count == 2 && !SameColor((Color)inks[0]!, (Color)inks[1]!),
+        Check(inks.Count == 2 && !SameColor(NativeFixture.Record<UiColour>(inks[0]!), NativeFixture.Record<UiColour>(inks[1]!)),
             "the selected row paints its own resolved ink while its neighbour keeps the page's");
         Check(((IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null)).Count >= 10,
             "an expanded marker and a ticked box both paint, each from its own row flag");
@@ -879,16 +881,17 @@ internal static class KernelControlKindTests
     private static void VerifyRowBandLayoutOverrides()
     {
         UiTheme theme = UiTheme.Vanilla;
-        Texture2D icon = MakeTexture(16, 16);
+        UiImage icon = MakeTexture(16, 16);
         UiTreeRow row = new("row", 2, "row", expandable: true, checkable: true, image: icon);
 
         using UiHost host = Host(TreeComposedPage(), TreeComposedBindings());
-        UiWidgetContext ctx = host.CreateContext(180f, "row-band-lane");
+        host.MeasureAndArrange(new UiLayoutPoint(180,120));
+        UiWidgetContext ctx = host.CreateContext(180f, "row-band-lane").WithNode(host.Session.GetNodeByElementId("tree")!);
         UiResolvedStyle style = theme.Styles.Resolve(UiStatusTone.Neutral, UiEmphasis.Muted, null);
         var actions = new UiRowBandActions(null, key => pickedDisclosure = key, key => pickedCheck = key);
 
         float rowHeight = 20f;
-        var band = new Rect(0f, 0f, 180f, UiRowBand.Measure(row, theme, rowHeight));
+        var band = new UiLayoutRect(0f, 0f, 180f, UiRowBand.Measure(row, theme, rowHeight));
 
         // 1. The library's own answer: the theme's spacing per level, and the box after the indent. The part
         //    rects are read out of the band's own paints (a surface paints its fill first), never re-derived.
@@ -896,33 +899,33 @@ internal static class KernelControlKindTests
         UiRowBand.Draw(row, band, ctx, rowHeight, style, actions);
         IList defaultSolids = (IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null);
         Check(defaultSolids.Count >= 10, "the default layout paints the marker and the box: " + defaultSolids.Count);
-        var defaultMarker = (Rect)defaultSolids[0]!;
-        var defaultBox = (Rect)defaultSolids[5]!;
-        Check(defaultBox.x < band.xMax * 0.5f, "and the box sits left, right after the indent: " + defaultBox);
+        var defaultMarker = NativeFixture.Record<UiLayoutRect>(defaultSolids[0]!);
+        var defaultBox = NativeFixture.Record<UiLayoutRect>(defaultSolids[5]!);
+        Check(defaultBox.X < band.XMax * 0.5f, "and the box sits left, right after the indent: " + defaultBox);
 
         // 2. A caller's own indent step: the same band, indented further, with the box still following it.
         var indented = new UiRowBandLayout(indentStep: 18f, checkboxRightInset: null);
         ClearDraws();
         UiRowBand.Draw(row, band, ctx, rowHeight, style, actions, indented);
         IList indentedSolids = (IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null);
-        var indentedMarker = (Rect)indentedSolids[0]!;
-        Check(indentedMarker.x > defaultMarker.x + 20f,
-            "an 18px step indents two levels far past the theme's 4px one: " + defaultMarker.x + " -> " + indentedMarker.x);
-        Check(Near(indentedMarker.x, band.x + theme.Geometry.Padding + 2f * 18f),
-            "and the step is the caller's number, not the theme's: " + indentedMarker.x);
+        var indentedMarker = NativeFixture.Record<UiLayoutRect>(indentedSolids[0]!);
+        Check(indentedMarker.X > defaultMarker.X + 20f,
+            "an 18px step indents two levels far past the theme's 4px one: " + defaultMarker.X + " -> " + indentedMarker.X);
+        Check(Near(indentedMarker.X, band.X + theme.Geometry.Padding + 2f * 18f),
+            "and the step is the caller's number, not the theme's: " + indentedMarker.X);
 
         // 3. A right-aligned box: its own rect at the band's far edge, and a REAL hit target there.
         var rightAligned = new UiRowBandLayout(indentStep: 18f, checkboxRightInset: 6f);
         ClearDraws();
         UiRowBand.Draw(row, band, ctx, rowHeight, style, actions, rightAligned);
         IList rightSolids = (IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null);
-        var rightBox = (Rect)rightSolids[5]!;
-        Check(Near(rightBox.xMax, band.xMax - 6f), "the box's far edge is the caller's inset from the band: " + rightBox);
-        Check(rightBox.x > indentedMarker.x, "and it no longer sits after the indent at all");
+        var rightBox = NativeFixture.Record<UiLayoutRect>(rightSolids[5]!);
+        Check(Near(rightBox.XMax, band.XMax - 6f), "the box's far edge is the caller's inset from the band: " + rightBox);
+        Check(rightBox.X > indentedMarker.X, "and it no longer sits after the indent at all");
 
         pickedCheck = "";
         pickedDisclosure = "";
-        ClickDrawAt(Centre(rightBox), () => UiRowBand.Draw(row, band, ctx, rowHeight, style, actions, rightAligned));
+        ClickDrawAt(Centre(rightBox), ctx.Session, () => UiRowBand.Draw(row, band, ctx, rowHeight, style, actions, rightAligned));
         Check(pickedCheck == "row" && pickedDisclosure.Length == 0,
             "clicking the right-aligned box reports the checkbox for that row alone: '" + pickedCheck + "'");
 
@@ -931,7 +934,7 @@ internal static class KernelControlKindTests
         var noCheck = new UiRowBandActions(null, key => pickedDisclosure = key, null);
         pickedCheck = "";
         pickedDisclosure = "";
-        ClickDrawAt(Centre(rightBox), () => UiRowBand.Draw(row, band, ctx, rowHeight, style, actions: noCheck, rightAligned));
+        ClickDrawAt(Centre(rightBox), ctx.Session, () => UiRowBand.Draw(row, band, ctx, rowHeight, style, actions: noCheck, rightAligned));
         Check(pickedCheck.Length == 0 && pickedDisclosure.Length == 0,
             "and with no checkbox target bound, a click on the box reports nothing");
     }
@@ -981,7 +984,7 @@ internal static class KernelControlKindTests
     private static UiBindings ImageBindings()
     {
         var bindings = new UiBindings();
-        bindings.BindReadOnly<Texture2D?>("icon", () => textureIcon, UiInvalidation.Structure);
+        bindings.BindReadOnly<UiImage>("icon", () => textureIcon, UiInvalidation.Structure);
         return bindings;
     }
 
@@ -1000,9 +1003,9 @@ internal static class KernelControlKindTests
     /// stub the harness RUNS against is what can be constructed, and it is the same assembly whose recorders
     /// the assertions read. One reflection call, in the lane only - production code never builds a texture.
     /// </summary>
-    private static Texture2D MakeTexture(int width, int height)
+    private static UiImage MakeTexture(int width, int height)
     {
-        return (Texture2D)Activator.CreateInstance(typeof(Texture2D), width, height)!;
+        return imageExecution.Images.Add((Texture2D)Activator.CreateInstance(typeof(Texture2D), width, height)!);
     }
 
     private static IList TextureRects()
@@ -1027,7 +1030,7 @@ internal static class KernelControlKindTests
         return bindings;
     }
 
-    private static UiBindings ProgressBindings(out IUiBindings asInterface)
+    private static UiBindings ProgressBindings(out UiBindings asInterface)
     {
         var bindings = new UiBindings();
         bindings.BindReadOnly<float>("pct", () => pctValue, UiInvalidation.Paint);
@@ -1050,8 +1053,8 @@ internal static class KernelControlKindTests
 
     private static UiHost Host(string xml, UiBindings bindings, UiTheme theme)
     {
-        return new UiHost(
-            Scope, UiLayoutManifest.Parse(xml), bindings, theme, new StubMetrics(), new StubTranslation());
+        var host=new UiHost(Scope,UiLayoutManifest.Parse(xml),bindings,theme,new StubMetrics(),new StubTranslation());
+        host.Session.SetFrame(imageExecution.CaptureFrame(),imageExecution);return host;
     }
 
     /// <summary>Builds a host only to see whether creation refuses it; a null answer means it was accepted.</summary>
@@ -1087,8 +1090,8 @@ internal static class KernelControlKindTests
 
     private static UiLayoutSnapshot Arrange(UiHost host)
     {
-        host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
-        return host.MeasureAndArrange(new Vector2(200f, 120f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 200f, 120f));
+        return host.MeasureAndArrange(new UiLayoutPoint(200f, 120f));
     }
 
     private static UiLayoutSnapshot ArrangeTree(UiHost host)
@@ -1096,7 +1099,7 @@ internal static class KernelControlKindTests
         return Arrange(host);
     }
 
-    private static void ClickAt(UiHost host, Vector2 point)
+    private static void ClickAt(UiHost host, UiLayoutPoint point)
     {
         Pump(host, EventType.MouseDown, point);
         Pump(host, EventType.MouseUp, point);
@@ -1106,56 +1109,56 @@ internal static class KernelControlKindTests
     /// The same two-pass click as <see cref="ClickAt"/>, but driving a caller's own draw instead of a host
     /// frame: this is how a lane exercises the public row band the way a consumer's composite does.
     /// </summary>
-    private static void ClickDrawAt(Vector2 point, Action draw)
+    private static void ClickDrawAt(UiLayoutPoint point, UiSession session, Action draw)
     {
         foreach (EventType type in new[] { EventType.MouseDown, EventType.MouseUp })
         {
             Event e = Event.KeyboardEvent("space");
             e.type = type;
             e.button = 0;
-            e.mousePosition = point;
+            e.mousePosition = VerseUiExecution.Point(point);
             Event.current = e;
-            draw();
+            NativeFixture.Prepare(session);draw();
             Event.current = null;
         }
     }
 
-    private static void Pump(UiHost host, EventType type, Vector2 point)
+    private static void Pump(UiHost host, EventType type, UiLayoutPoint point)
     {
         Event e = Event.KeyboardEvent("space");
         e.type = type;
         e.button = 0;
-        e.mousePosition = point;
+        e.mousePosition = VerseUiExecution.Point(point);
         Event.current = e;
-        host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 200f, 120f));
         Event.current = null;
     }
 
-    private static Vector2 Centre(Rect rect)
+    private static UiLayoutPoint Centre(UiLayoutRect rect)
     {
-        return new Vector2(rect.x + rect.width * 0.5f, rect.y + rect.height * 0.5f);
+        return new UiLayoutPoint(rect.X + rect.Width * 0.5f, rect.Y + rect.Height * 0.5f);
     }
 
     private static float FillWidth(UiHost host)
     {
         ClearDraws();
-        host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 200f, 120f));
         IList rects = (IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null);
-        return rects.Count >= 6 ? ((Rect)rects[5]!).width : 0f;
+        return rects.Count >= 6 ? (NativeFixture.Record<UiLayoutRect>(rects[5]!)).Width : 0f;
     }
 
     /// <summary>Draws once into a cleared recording and counts the solid calls inside one 20px band.</summary>
     private static int BandSolids(UiHost host, int bandIndex)
     {
         ClearDraws();
-        host.DrawFrame(new Rect(0f, 0f, 200f, 120f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 200f, 120f));
         IList rects = (IList)Field(typeof(Verse.Widgets), "DrawBoxSolidRects", null);
         float top = bandIndex * 20f;
         int count = 0;
         foreach (object entry in rects)
         {
-            var rect = (Rect)entry;
-            if (rect.y >= top - 0.5f && rect.y <= top + 20f + 0.5f) count++;
+            var rect = NativeFixture.Record<UiLayoutRect>(entry);
+            if (rect.Y >= top - 0.5f && rect.Y <= top + 20f + 0.5f) count++;
         }
 
         return count;
@@ -1194,14 +1197,14 @@ internal static class KernelControlKindTests
         method.Invoke(null, null);
     }
 
-    private static bool SameColor(Color left, Color right)
+    private static bool SameColor(UiColour left, UiColour right)
     {
-        return Near(left.r, right.r) && Near(left.g, right.g) && Near(left.b, right.b) && Near(left.a, right.a);
+        return Near(left.Red, right.Red) && Near(left.Green, right.Green) && Near(left.Blue, right.Blue) && Near(left.Alpha, right.Alpha);
     }
 
-    private static string Describe(Color color)
+    private static string Describe(UiColour color)
     {
-        return "(" + color.r + ", " + color.g + ", " + color.b + ", " + color.a + ")";
+        return "(" + color.Red + ", " + color.Green + ", " + color.Blue + ", " + color.Alpha + ")";
     }
 
     private static bool Near(float left, float right)

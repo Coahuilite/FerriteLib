@@ -1,10 +1,11 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -58,10 +59,7 @@ internal static class KernelElementHelpTests
     private static void VerifyAttributeGate()
     {
         PrepareCore();
-
-        // A custom kind whose schema does not list HelpKey still accepts it: the gate is the engine's common
-        // widget vocabulary, which is what makes the hook usable by every kind including consumer kinds.
-        UiWidgetRegistry.Register(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Id", "Kind", "Height" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Id", "Kind", "Height" }));
         Host(ProbeKind, "HelpKey=\"help/probe\"");
         Check(true, "a kind whose schema never listed HelpKey still creates with one");
 
@@ -82,22 +80,26 @@ internal static class KernelElementHelpTests
     private static void VerifyHoverClaims()
     {
         using UiHost host = TwoHelpElements();
-        host.DrawFrame(Viewport());
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(        host,Viewport());
         UiNode a = host.Session.GetNodeByElementId("a") ?? throw new Exception("'a' was not arranged");
         UiNode b = host.Session.GetNodeByElementId("b") ?? throw new Exception("'b' was not arranged");
 
-        EnablePointer(new Vector2(10f, 10f));
-        host.DrawFrame(Viewport());
+        EnablePointer(new UiLayoutPoint(10f, 10f));
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(        host,Viewport());
         Check(host.Session.HoverClaim == "help/a", "hovering the first element claims its declared identity");
         Check(host.Session.HoverClaimElement == a.Id, "and the claim is attributed to that element");
 
-        UiNative.DebugMousePosition = new Vector2(10f, RowHeight + 10f);
-        host.DrawFrame(Viewport());
+        NativeFixture.DebugMousePosition = new UiLayoutPoint(10f, RowHeight + 10f);
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(        host,Viewport());
         Check(host.Session.HoverClaim == "help/b", "moving the pointer to the second element re-claims in the same pass");
         Check(host.Session.HoverClaimElement == b.Id, "with its own attribution");
 
-        UiNative.DebugMousePosition = new Vector2(10f, 400f);
-        host.DrawFrame(Viewport());
+        NativeFixture.DebugMousePosition = new UiLayoutPoint(10f, 400f);
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(        host,Viewport());
         Check(host.Session.HoverClaim == null, "leaving both releases the claim (the grace window is zero here)");
     }
 
@@ -115,8 +117,9 @@ internal static class KernelElementHelpTests
             new StubMetrics(),
             new StubTranslation());
 
-        EnablePointer(new Vector2(10f, 10f));
-        host.DrawFrame(Viewport());
+        EnablePointer(new UiLayoutPoint(10f, 10f));
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(        host,Viewport());
         Check(host.Session.HoverClaim == null, "an element that declares no HelpKey claims nothing, however hovered it is");
     }
 
@@ -134,8 +137,9 @@ internal static class KernelElementHelpTests
             new StubMetrics(),
             new StubTranslation());
 
-        EnablePointer(new Vector2(10f, 10f));
-        host.DrawFrame(Viewport());
+        EnablePointer(new UiLayoutPoint(10f, 10f));
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(        host,Viewport());
         Check(host.Session.HoverClaim == "us/Whatever/Exact-Token",
             "the declared token arrives verbatim: the library neither translates it nor rewrites it");
     }
@@ -143,7 +147,7 @@ internal static class KernelElementHelpTests
     private static void VerifyDisabledStillClaims()
     {
         PrepareCore();
-        UiWidgetRegistry.Register(Scope, CommandKind, () => new ProbeWidget(), new[] { "Id", "Kind", "ActionBind", "Height" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, CommandKind, () => new ProbeWidget(), new[] { "Id", "Kind", "ActionBind", "Height" }));
 
         bool enabled = false;
         var bindings = new UiBindings();
@@ -161,8 +165,9 @@ internal static class KernelElementHelpTests
             new StubMetrics(),
             new StubTranslation());
 
-        EnablePointer(new Vector2(10f, 10f));
-        host.DrawFrame(Viewport());
+        EnablePointer(new UiLayoutPoint(10f, 10f));
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(        host,Viewport());
         UiNode gate = host.Session.GetNodeByElementId("gate") ?? throw new Exception("'gate' was not arranged");
         Check(gate.IsDisabled, "the command-bound element is published disabled while its predicate answers false");
         Check(host.Session.HoverClaim == "help/unavailable",
@@ -172,16 +177,18 @@ internal static class KernelElementHelpTests
     private static void VerifyCoveredDoesNotClaim()
     {
         using UiHost host = TwoHelpElements();
-        host.DrawFrame(Viewport());
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(        host,Viewport());
         UiNode a = host.Session.GetNodeByElementId("a") ?? throw new Exception("'a' was not arranged");
         UiNode b = host.Session.GetNodeByElementId("b") ?? throw new Exception("'b' was not arranged");
 
-        var covering = new Rect(0f, 0f, Width, RowHeight * 2f);
-        EnablePointer(new Vector2(10f, 10f));
+        var covering = new UiLayoutRect(0f, 0f, Width, RowHeight * 2f);
+        EnablePointer(new UiLayoutPoint(10f, 10f));
 
         // Plant B's popup over A, then let the engine's own frame boundary publish it as the dispatch stack.
         host.Session.PushHitLayer(b, covering, isPopup: true);
-        host.DrawFrame(Viewport());
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(        host,Viewport());
 
         Check(host.Session.HoverClaim != "help/a", "an element under another element's popup does not claim its own help");
         Check(a != b, "and the two nodes really are distinct, so the check above is about coverage rather than identity");
@@ -196,11 +203,7 @@ internal static class KernelElementHelpTests
         using UiHost host = new(
             Scope,
             UiLayoutManifest.Parse(
-                "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-                + "<Column Id=\"col\" Padding=\"0\" Gap=\"0\">"
-                + "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\" HelpKey=\"help/row\""
-                + " Value1=\"A\" Title1=\"A\" Description1=\"help/row/option-a\" />"
-                + "</Column></UiPage>"),
+                "<UiPage Schema=\"2\" Source=\""+(Scope)+"\"><Column Id=\"col\" Padding=\"0\" Gap=\"0\"><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\" HelpKey=\"help/row\"    ><Choice Value=\"A\" Text=\"A\" Help=\"help/row/option-a\"/></Widget></Column></UiPage>"),
             bindings,
             UiTheme.Vanilla,
             new StubMetrics(),
@@ -208,8 +211,9 @@ internal static class KernelElementHelpTests
 
         // The cell starts at the theme's Spacing inset; its centre is inside the option, not the row padding.
         UiGeometry geometry = UiTheme.Vanilla.Geometry;
-        EnablePointer(new Vector2(Width / 2f, geometry.Spacing + 10f));
-        host.DrawFrame(Viewport());
+        EnablePointer(new UiLayoutPoint(Width / 2f, geometry.Spacing + 10f));
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(        host,Viewport());
 
         Check(host.Session.HoverClaim == "help/row/option-a",
             "the kind's option claim refines the engine's element claim: the specific topic wins while an option is hovered");
@@ -220,24 +224,32 @@ internal static class KernelElementHelpTests
         using UiHost host = TwoHelpElements();
         host.Session.HoverGraceFrames = 2;
 
-        EnablePointer(new Vector2(10f, 10f));
-        host.DrawFrame(Viewport());
+        EnablePointer(new UiLayoutPoint(10f, 10f));
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(        host,Viewport());
         Check(host.Session.HoverClaim == "help/a", "the claim starts live");
 
         // The machine's own sequence, measured rather than assumed: the boundary after a live claim clears it so
         // widgets must re-claim, and only a pass that re-claims nothing restores the held claim for the grace
         // window. So the first gap pass reads empty and the next two carry the held claim.
-        UiNative.DebugMousePosition = new Vector2(10f, 400f);
-        host.DrawFrame(Viewport());
+        NativeFixture.DebugMousePosition = new UiLayoutPoint(10f, 400f);
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(        host,Viewport());
         Check(host.Session.HoverClaim == null, "the first gap pass re-claims nothing, which is the boundary's job");
 
-        host.DrawFrame(Viewport());
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(
+        host,Viewport());
         Check(host.Session.HoverClaim == "help/a", "the next pass re-presents the held claim");
 
-        host.DrawFrame(Viewport());
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(
+        host,Viewport());
         Check(host.Session.HoverClaim == "help/a", "and it holds for the second grace pass");
 
-        host.DrawFrame(Viewport());
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(
+        host,Viewport());
         Check(host.Session.HoverClaim == null, "then releases it, so the machine carries the engine's claim like any other");
     }
 
@@ -246,7 +258,7 @@ internal static class KernelElementHelpTests
     private static UiHost TwoHelpElements()
     {
         PrepareCore();
-        UiWidgetRegistry.Register(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Id", "Kind", "Height" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Id", "Kind", "Height" }));
 
         return new UiHost(
             Scope,
@@ -262,7 +274,7 @@ internal static class KernelElementHelpTests
             new StubTranslation());
     }
 
-    private static Rect Viewport() => new(0f, 0f, Width, 600f);
+    private static UiLayoutRect Viewport() => new(0f, 0f, Width, 600f);
 
     private static void PrepareCore()
     {
@@ -299,24 +311,24 @@ internal static class KernelElementHelpTests
         }
     }
 
-    private static void EnablePointer(Vector2 point)
+    private static void EnablePointer(UiLayoutPoint point)
     {
-        UiNative.DebugMousePositionEnabled = true;
-        UiNative.DebugMousePosition = point;
-        UiNative.DebugMouseDown = false;
+        NativeFixture.DebugMousePositionEnabled = true;
+        NativeFixture.DebugMousePosition = point;
+        NativeFixture.DebugMouseDown = false;
     }
 
     private static void ResetSeams()
     {
-        UiNative.DebugMousePositionEnabled = false;
-        UiNative.DebugMousePosition = default;
-        UiNative.DebugMouseDown = false;
-        UiNative.DebugMouseDrag = false;
-        UiNative.DebugMouseUp = false;
-        UiNative.DebugEnter = false;
-        UiNative.DebugFocusLost = false;
-        UiNative.ButtonOverride = null;
-        UiNative.TextFieldOverride = null;
+        NativeFixture.DebugMousePositionEnabled = false;
+        NativeFixture.DebugMousePosition = default;
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.DebugMouseDrag = false;
+        NativeFixture.DebugMouseUp = false;
+        NativeFixture.DebugEnter = false;
+        NativeFixture.DebugFocusLost = false;
+        NativeFixture.ButtonOverride = null;
+        NativeFixture.TextFieldOverride = null;
     }
 
     private static int Run(string name, Action action)
@@ -387,7 +399,7 @@ internal static class KernelElementHelpTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
@@ -396,7 +408,7 @@ internal static class KernelElementHelpTests
             return RowHeight;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
         }
     }

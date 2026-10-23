@@ -1,16 +1,17 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 internal static class KernelBooleanSelectionExpansionTests
 {
     private const string Scope = "bse";
-    private static readonly Rect View = new(20, 30, 420, 400);
+    private static readonly UiLayoutRect View = new(20, 30, 420, 400);
     private static void Check(bool condition, string description)
     {
         if (!condition)
@@ -18,26 +19,26 @@ internal static class KernelBooleanSelectionExpansionTests
         Console.WriteLine("  ok: BSE " + description);
     }
 
-    private static void Pump(UiHost host, EventType phase, Vector2 point, bool consumed = false)
+    private static void Pump(UiHost host, EventType phase, UiLayoutPoint point, bool consumed = false)
     {
         var input = new Event
         {
             type = phase,
             button = 0,
-            mousePosition = point
+            mousePosition = VerseUiExecution.Point(point)
         };
         if (consumed)
             input.Use();
         Event.current = input;
-        host.DrawFrame(View);
+        NativeFixture.DrawFrame(        host,View);
     }
 
-    private static Vector2 Centre(Rect rect) => new(rect.x + rect.width / 2, rect.y + rect.height / 2);
-    private static Rect RectOf(UiHost host, string id)
+    private static UiLayoutPoint Centre(UiLayoutRect rect) => new(rect.X + rect.Width / 2, rect.Y + rect.Height / 2);
+    private static UiLayoutRect RectOf(UiHost host, string id)
     {
         UiNode node = host.Session.GetNodeByElementId(id)!;
-        Rect rect = node.Rect!.Value;
-        return new Rect(rect.x + View.x, rect.y + View.y, rect.width, rect.height);
+        UiLayoutRect rect = node.Rect!.Value;
+        return new UiLayoutRect(rect.X + View.X, rect.Y + View.Y, rect.Width, rect.Height);
     }
 
     private static UiHost Host(string content, UiBindings bindings)
@@ -46,7 +47,7 @@ internal static class KernelBooleanSelectionExpansionTests
         UiWidgetRegistry.InitializeCore();
         var manifest = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"" + Scope + "\"><Column Padding=\"0\" Gap=\"2\">" + content + "</Column></UiPage>");
         var host = new UiHost(Scope, manifest, bindings, UiTheme.Vanilla, new Metrics(), new Translation());
-        Pump(host, EventType.Repaint, new Vector2(-100, -100));
+        Pump(host, EventType.Repaint, new UiLayoutPoint(-100, -100));
         return host;
     }
 
@@ -54,9 +55,9 @@ internal static class KernelBooleanSelectionExpansionTests
     {
         try
         {
-            UiNative.ButtonOverride = null;
-            UiNative.DebugMousePositionEnabled = false;
-            UiNative.Trace = null;
+            NativeFixture.ButtonOverride = null;
+            NativeFixture.DebugMousePositionEnabled = false;
+            NativeFixture.Trace = null;
             EstablishedRequestsSurvivePaintFailure();
             SharedBindingPopupOwners();
             PressedPresentationFacts();
@@ -80,9 +81,9 @@ internal static class KernelBooleanSelectionExpansionTests
         {
             Event.current = null;
             GUIUtility.hotControl = 0;
-            UiNative.ButtonOverride = null;
-            UiNative.DebugMousePositionEnabled = false;
-            UiNative.Trace = null;
+            NativeFixture.ButtonOverride = null;
+            NativeFixture.DebugMousePositionEnabled = false;
+            NativeFixture.Trace = null;
         }
     }
 
@@ -108,8 +109,8 @@ internal static class KernelBooleanSelectionExpansionTests
             });
             string look = route == 1 ? "checkbox" : "switch";
             using var host = Host("<Widget Id=\"flag\" Kind=\"input/checkbox\" Bind=\"flag\" ActionBind=\"after\" Appearance=\"" + look + "\" />", bindings);
-            Rect hit = RectOf(host, "flag");
-            Vector2 point = Centre(hit);
+            UiLayoutRect hit = RectOf(host, "flag");
+            UiLayoutPoint point = Centre(hit);
             var trace = new List<string>();
             foreach (EventType phase in new[]
             {
@@ -129,23 +130,23 @@ internal static class KernelBooleanSelectionExpansionTests
                     {
                         type = phase,
                         button = 0,
-                        mousePosition = point
+                        mousePosition = VerseUiExecution.Point(point)
                     };
-                    var ctx = new UiWidgetContext(Scope, host.Session, new Metrics(), UiTheme.Vanilla, new Translation(), bindings, View.width, "custom-check");
-                    var target = UiNative.InteractionTarget(ctx, "flag");
-                    UiValueBehavior.Request(target, UiValueBehavior.Boolean(UiNative.Activation(hit, ctx, "flag"), !model), value =>
+                    var ctx = NativeFixture.Context(Scope, host.Session, new Metrics(), UiTheme.Vanilla, new Translation(), bindings, View.Width, "custom-check");
+                    var target = NativeFixture.InteractionTarget(ctx, "flag");
+                    UiValueBehavior.Request(target, UiValueBehavior.Boolean(NativeFixture.Activation(hit, ctx, "flag"), !model), value =>
                     {
                         model = value;
                         writes++;
                         commands++;
                     });
-                    UiThemeDraw.Solid(new Rect(hit.x, hit.y, 3, hit.height), ctx.Theme[UiPaletteRole.Accent]);
+                    UiThemeDraw.Solid(NativeFixture.Paint,new UiLayoutRect(hit.X, hit.Y, 3, hit.Height), ctx.Theme[UiPaletteRole.Accent]);
                 }
                 else
                 {
                     var target = new UiInteractionTarget("flag", "flag");
                     UiPointerPhase input = phase == EventType.MouseDown ? UiPointerPhase.Press : phase == EventType.MouseUp ? UiPointerPhase.Release : UiPointerPhase.None;
-                    UiInteractionResult interaction = pure.PointerActivation(target, new UiPointerSample(input, point.x, point.y), new UiHitGeometry(hit.x, hit.y, hit.width, hit.height), new UiInputEligibility(true));
+                    UiInteractionResult interaction = pure.PointerActivation(target, new UiPointerSample(input, point.X, point.Y), new UiHitGeometry(hit.X, hit.Y, hit.Width, hit.Height), new UiInputEligibility(true));
                     UiValueBehavior.Request(target, UiValueBehavior.Boolean(interaction, !model), value =>
                     {
                         model = value;
@@ -176,39 +177,39 @@ internal static class KernelBooleanSelectionExpansionTests
             current = value;
             writes++;
         });
-        bindings.BindOptions("items", () => new[] { "a", "b" });
-        using var host = Host("<Widget Id=\"first\" Kind=\"input/dropdown\" Bind=\"shared\" OptionsBind=\"items\" /><Widget Id=\"second\" Kind=\"input/dropdown\" Bind=\"shared\" OptionsBind=\"items\" /><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"shared\" Value1=\"a\" Value2=\"b\" />", bindings);
-        Vector2 first = Centre(RectOf(host, "first"));
+        bindings.BindChoices("items", ()=> (new[] { "a", "b" }).Select(value=>new UiChoice<string>(value,value,value)).ToArray());
+        using var host = Host("<Widget Id=\"first\" Kind=\"input/dropdown\" Bind=\"shared\" OptionsBind=\"items\" /><Widget Id=\"second\" Kind=\"input/dropdown\" Bind=\"shared\" OptionsBind=\"items\" /><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"shared\"   ><Choice Value=\"a\" Text=\"a\" Help=\"a\"/><Choice Value=\"b\" Text=\"b\" Help=\"b\"/></Widget>", bindings);
+        UiLayoutPoint first = Centre(RectOf(host, "first"));
         Pump(host, EventType.MouseDown, first);
         Pump(host, EventType.MouseUp, first);
-        Check(host.Session.IsPopupOpen("shared") && host.Session.OpenPopupAnchor?.y == RectOf(host, "first").y, "two real Dropdown instances sharing Bind do not close or reanchor the first menu during sibling traversal");
+        Check(host.Session.IsPopupOpen("shared") && host.Session.OpenPopupAnchor?.Y == RectOf(host, "first").Y, "two real Dropdown instances sharing Bind do not close or reanchor the first menu during sibling traversal");
         Pump(host, EventType.Repaint, first);
         Check(host.Session.IsPopupOpen("shared"), "same-Bind sibling repaint preserves actual popup instance");
-        Rect anchor = host.Session.OpenPopupAnchor!.Value;
-        Vector2 option = new(anchor.x + 10, anchor.yMax + UiPopup.OptionHeight * 1.5f);
+        UiLayoutRect anchor = host.Session.OpenPopupAnchor!.Value;
+        UiLayoutPoint option = new(anchor.X + 10, anchor.YMax + UiPopup.OptionHeight * 1.5f);
         Pump(host, EventType.MouseDown, option);
         Pump(host, EventType.MouseUp, option);
         Check(current == "b" && writes == 1 && host.Session.OpenPopupId == null, "same-Bind first popup selects once through its own option target");
-        Vector2 second = Centre(RectOf(host, "second"));
+        UiLayoutPoint second = Centre(RectOf(host, "second"));
         Pump(host, EventType.MouseDown, second);
         Pump(host, EventType.MouseUp, second);
-        Check(host.Session.IsPopupOpen("shared") && host.Session.OpenPopupAnchor?.y == RectOf(host, "second").y, "same-Bind second popup keeps its own anchor while the earlier sibling draws");
+        Check(host.Session.IsPopupOpen("shared") && host.Session.OpenPopupAnchor?.Y == RectOf(host, "second").Y, "same-Bind second popup keeps its own anchor while the earlier sibling draws");
         Pump(host, EventType.Repaint, second);
         host.Session.ClosePopup();
-        Rect modeRect = RectOf(host, "mode");
-        Vector2 mode = new(modeRect.x + 15, modeRect.y + modeRect.height / 2);
+        UiLayoutRect modeRect = RectOf(host, "mode");
+        UiLayoutPoint mode = new(modeRect.X + 15, modeRect.Y + modeRect.Height / 2);
         Pump(host, EventType.MouseDown, mode);
         UiInteractionTarget? held = host.Session.Interactions.CaptureOwner;
         Check(held?.Node == host.Session.GetNodeByElementId("mode")!.Id.Key, "real ModeRow starts a same-Bind non-popup capture");
         host.Session.OpenPopup("shared", RectOf(host, "first"));
         var modeNode = host.Session.GetNodeByElementId("mode")!;
-        var composite = new UiWidgetContext(Scope, host.Session, new Metrics(), UiTheme.Vanilla, new Translation(), bindings, View.width, "same-node-composite", node: modeNode);
+        var composite = NativeFixture.Context(Scope, host.Session, new Metrics(), UiTheme.Vanilla, new Translation(), bindings, View.Width, "same-node-composite", node: modeNode);
         Event.current = new Event
         {
             type = EventType.Repaint,
-            mousePosition = mode
+            mousePosition = VerseUiExecution.Point(mode)
         };
-        UiNative.PopupOption(modeRect, "shared", composite, "a");
+        NativeFixture.PopupOption(modeRect, "shared", composite, "a");
         host.Session.ClosePopup();
         Check(host.Session.Interactions.CaptureOwner?.Equals(held!.Value) == true && host.Session.OwnedHotControl.HasValue, "closing a raw same-Bind popup does not release ModeRow capture by prefix inference");
         Pump(host, EventType.MouseUp, mode);
@@ -267,8 +268,8 @@ internal static class KernelBooleanSelectionExpansionTests
                 attributes[boolean ? "ActionBind" : operation == "disclosure" ? "DisclosureBind" : operation == "check" ? "CheckBind" : "ActionBind"] = boolean ? "after" : "row";
                 IUiWidget widget = boolean ? new CheckboxWidget() : new TreeWidget();
                 widget.Configure(new UiElementSpec("actual-wrapper", kind, attributes));
-                var ctx = new UiWidgetContext(Scope, session, new Metrics(), UiTheme.Vanilla, translation, bindings, 200, "actual-wrapper");
-                var rect = new Rect(0, 0, 200, boolean ? 28 : 56);
+                var ctx = NativeFixture.Context(Scope, session, new Metrics(), UiTheme.Vanilla, translation, bindings, 200, "actual-wrapper");
+                var rect = new UiLayoutRect(0, 0, 200, boolean ? 28 : 56);
                 float pad = UiTheme.Vanilla.Geometry.Padding;
                 float side = Math.Max(6, 28 - pad * 2);
                 float x = boolean || operation == "body" ? 180 : pad + side / 2 + (operation == "check" ? side + pad : 0);
@@ -276,9 +277,9 @@ internal static class KernelBooleanSelectionExpansionTests
                 {
                     type = EventType.MouseDown,
                     button = 0,
-                    mousePosition = new Vector2(x, 14)
+                    mousePosition = VerseUiExecution.Point(new UiLayoutPoint(x, 14))
                 };
-                widget.Draw(rect, ctx);
+                NativeFixture.Draw(                widget,rect, ctx);
                 Check(calls.Count == 0 && session.Interactions.CaptureOwner.HasValue, operation + " paint-failure fixture holds an actual native press");
                 translation.Throw = true;
                 translation.Attempts = 0;
@@ -286,12 +287,12 @@ internal static class KernelBooleanSelectionExpansionTests
                 {
                     type = EventType.MouseUp,
                     button = 0,
-                    mousePosition = new Vector2(x, 14)
+                    mousePosition = VerseUiExecution.Point(new UiLayoutPoint(x, 14))
                 };
                 bool paintFailed = false;
                 try
                 {
-                    widget.Draw(rect, ctx);
+                    NativeFixture.Draw(                    widget,rect, ctx);
                 }
                 catch (ApplicationException ex)when (ex.Message == "paint-only")
                 {
@@ -312,9 +313,9 @@ internal static class KernelBooleanSelectionExpansionTests
                     Event.current = new Event
                     {
                         type = EventType.Repaint,
-                        mousePosition = new Vector2(x, 14)
+                        mousePosition = VerseUiExecution.Point(new UiLayoutPoint(x, 14))
                     };
-                    widget.Draw(rect, ctx);
+                    NativeFixture.Draw(                    widget,rect, ctx);
                     Check(calls.Count == before, operation + " paint recovery does not retry business request");
                 }
             }
@@ -335,7 +336,7 @@ internal static class KernelBooleanSelectionExpansionTests
         public int TranslationRevision => 0;
     }
 
-    private static bool SameColor(Color left, Color right) => Math.Abs(left.r - right.r) < 0.001f && Math.Abs(left.g - right.g) < 0.001f && Math.Abs(left.b - right.b) < 0.001f && Math.Abs(left.a - right.a) < 0.001f;
+    private static bool SameColor(UiColour left, UiColour right) => Math.Abs(left.Red - right.Red) < 0.001f && Math.Abs(left.Green - right.Green) < 0.001f && Math.Abs(left.Blue - right.Blue) < 0.001f && Math.Abs(left.Alpha - right.Alpha) < 0.001f;
     private static void PressedPresentationFacts()
     {
         foreach (string kind in new[]
@@ -363,7 +364,7 @@ internal static class KernelBooleanSelectionExpansionTests
                     continue;
                 using var session = new UiSession();
                 var theme = UiTheme.Vanilla.Clone();
-                theme[UiPaletteRole.SelectedForeground] = new Color(0.93f, 0.14f, 0.27f, 1);
+                theme[UiPaletteRole.SelectedForeground] = new UiColour(0.93f, 0.14f, 0.27f, 1);
                 var bindings = new UiBindings();
                 int requests = 0;
                 if (eligibility == "readonly")
@@ -377,10 +378,10 @@ internal static class KernelBooleanSelectionExpansionTests
                 var node = session.GetOrCreateNode(UiNodeId.Root(spec, 0), widgetKind, 0);
                 node.IsDisabled = eligibility == "disabled";
                 session.PointerInputAllowed = eligibility != "window";
-                var ctx = new UiWidgetContext(Scope, session, new Metrics(), theme, new Translation(), bindings, 200, "visual", node: node);
+                var ctx = NativeFixture.Context(Scope, session, new Metrics(), theme, new Translation(), bindings, 200, "visual", node: node);
                 IUiWidget widget = kind == "tree" ? new TreeWidget() : new CheckboxWidget();
                 widget.Configure(spec);
-                var rect = new Rect(0, 0, 200, 28);
+                var rect = new UiLayoutRect(0, 0, 200, 28);
                 if (eligibility == "covered")
                 {
                     session.BeginHitPass();
@@ -393,15 +394,15 @@ internal static class KernelBooleanSelectionExpansionTests
                     if (kind != "tree")
                     {
                         IList colors = Recorded("LabelColors");
-                        return colors.Count > 0 && SameColor((Color)colors[colors.Count - 1]!, theme.Styles.Resolve(UiStatusTone.Active).Text);
+                        return colors.Count > 0 && SameColor(NativeFixture.Record<UiColour>(colors[colors.Count - 1]!), theme.Styles.Resolve(UiStatusTone.Active).Text);
                     }
 
                     IList rects = Recorded("DrawBoxSolidRects");
                     IList fills = Recorded("DrawBoxSolidColors");
                     for (int i = 0; i < rects.Count; i++)
                     {
-                        Rect painted = (Rect)rects[i]!;
-                        if (painted.x == rect.x && painted.y == rect.y && painted.width == rect.width && painted.height == rect.height && SameColor((Color)fills[i]!, theme.SelectedSurface.Fill))
+                        UiLayoutRect painted = NativeFixture.Record<UiLayoutRect>(rects[i]!);
+                        if (painted.X == rect.X && painted.Y == rect.Y && painted.Width == rect.Width && painted.Height == rect.Height && SameColor(NativeFixture.Record<UiColour>(fills[i]!), theme.SelectedSurface.Fill))
                             return true;
                     }
 
@@ -417,11 +418,11 @@ internal static class KernelBooleanSelectionExpansionTests
                     {
                         type = phase,
                         button = 0,
-                        mousePosition = new Vector2(180, 14)
+                        mousePosition = VerseUiExecution.Point(new UiLayoutPoint(180, 14))
                     };
                     if (used)
                         Event.current.Use();
-                    widget.Draw(rect, ctx);
+                    NativeFixture.Draw(                    widget,rect, ctx);
                 }
 
                 bool eligible = eligibility == "eligible";
@@ -448,9 +449,9 @@ internal static class KernelBooleanSelectionExpansionTests
             selected = value;
             requests++;
         });
-        using var host = Host("<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Value1=\"a\" Value2=\"b\" />", bindings);
-        Rect rect = RectOf(host, "mode");
-        Vector2 point = new(rect.x + rect.width * 0.75f, rect.y + rect.height / 2);
+        using var host = Host("<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\"   ><Choice Value=\"a\" Text=\"a\" Help=\"a\"/><Choice Value=\"b\" Text=\"b\" Help=\"b\"/></Widget>", bindings);
+        UiLayoutRect rect = RectOf(host, "mode");
+        UiLayoutPoint point = new(rect.X + rect.Width * 0.75f, rect.Y + rect.Height / 2);
         Pump(host, EventType.MouseDown, point);
         Check(host.Session.Interactions.CaptureOwner?.ItemKey as string == "b", "mode-row second item captures its value identity");
         Pump(host, EventType.Repaint, point);
@@ -478,16 +479,16 @@ internal static class KernelBooleanSelectionExpansionTests
                 selected = value;
                 writes++;
             });
-            bindings.BindOptions("items", () => new[] { "a", "b" });
+            bindings.BindChoices("items", ()=> (new[] { "a", "b" }).Select(value=>new UiChoice<string>(value,value,value)).ToArray());
             using var host = Host("<Widget Id=\"pick\" Kind=\"input/dropdown\" OptionsBind=\"items\" />", bindings);
             using var neutral = new UiInteractionSession();
-            var ctx = new UiWidgetContext(Scope, host.Session, new Metrics(), UiTheme.Vanilla, new Translation(), bindings, View.width, "independent");
-            Rect trigger = RectOf(host, "pick");
-            Rect menu = new(trigger.x, trigger.yMax, trigger.width, UiPopup.OptionHeight * 2);
+            var ctx = NativeFixture.Context(Scope, host.Session, new Metrics(), UiTheme.Vanilla, new Translation(), bindings, View.Width, "independent");
+            UiLayoutRect trigger = RectOf(host, "pick");
+            UiLayoutRect menu = new(trigger.X, trigger.YMax, trigger.Width, UiPopup.OptionHeight * 2);
             var trace = new List<string>();
             void Drive(EventType phase, bool option)
             {
-                Vector2 point = option ? new Vector2(menu.x + 10, menu.y + UiPopup.OptionHeight * 1.5f) : Centre(trigger);
+                UiLayoutPoint point = option ? new UiLayoutPoint(menu.X + 10, menu.Y + UiPopup.OptionHeight * 1.5f) : Centre(trigger);
                 if (route == 0)
                     Pump(host, phase, point);
                 else if (route == 1)
@@ -496,12 +497,12 @@ internal static class KernelBooleanSelectionExpansionTests
                     {
                         type = phase,
                         button = 0,
-                        mousePosition = point
+                        mousePosition = VerseUiExecution.Point(point)
                     };
-                    UiNative.DropdownButton(trigger, "pick", ctx);
+                    NativeFixture.DropdownButton(trigger, "pick", ctx);
                     if (host.Session.IsPopupOpen("pick"))
                     {
-                        UiPopup.DrawOptionList(menu, "pick", ctx, new[] { new KeyValuePair<string, string>("A", "a"), new KeyValuePair<string, string>("B", "b") }, selected, value =>
+                        UiPopup.DrawChoices(menu, "pick", ctx, new[] { new UiChoice<string>("A", "a"), new UiChoice<string>("B", "b") }, selected, value =>
                         {
                             selected = value;
                             writes++;
@@ -512,8 +513,8 @@ internal static class KernelBooleanSelectionExpansionTests
                 {
                     UiPointerPhase sample = phase == EventType.MouseDown ? UiPointerPhase.Press : phase == EventType.MouseUp ? UiPointerPhase.Release : UiPointerPhase.None;
                     var target = new UiInteractionTarget("headless", "pick", "trigger", null, "model");
-                    var input = new UiPointerSample(sample, point.x, point.y);
-                    var interaction = neutral.PointerActivation(target, input, new UiHitGeometry(trigger.x, trigger.y, trigger.width, trigger.height), new(true));
+                    var input = new UiPointerSample(sample, point.X, point.Y);
+                    var interaction = neutral.PointerActivation(target, input, new UiHitGeometry(trigger.X, trigger.Y, trigger.Width, trigger.Height), new(true));
                     UiValueBehavior.Request(target, UiValueBehavior.Expansion(interaction, !expanded, true), value => expanded = value);
                     if (expanded)
                     {
@@ -521,7 +522,7 @@ internal static class KernelBooleanSelectionExpansionTests
                         {
                             string value = i == 0 ? "a" : "b";
                             target = new UiInteractionTarget("headless", "pick", "popup-option", value, "model");
-                            interaction = neutral.PointerActivation(target, input, new UiHitGeometry(menu.x, menu.y + i * UiPopup.OptionHeight, menu.width, UiPopup.OptionHeight), new(true));
+                            interaction = neutral.PointerActivation(target, input, new UiHitGeometry(menu.X, menu.Y + i * UiPopup.OptionHeight, menu.Width, UiPopup.OptionHeight), new(true));
                             UiValueBehavior.Request(target, UiValueBehavior.Selection(interaction, value), candidate =>
                             {
                                 expanded = false;
@@ -573,16 +574,16 @@ internal static class KernelBooleanSelectionExpansionTests
             selected = value;
             writes++;
         });
-        bindings.BindOptions("choices", () => new[] { "a", "b", "c" });
+        bindings.BindChoices("choices", ()=> (new[] { "a", "b", "c" }).Select(value=>new UiChoice<string>(value,value,value)).ToArray());
         bindings.BindCommand("under", () => underlying++);
         using var host = Host("<Widget Id=\"choice\" Kind=\"input/dropdown\" Bind=\"choice\" OptionsBind=\"choices\" /><Widget Id=\"under\" Kind=\"input/button\" ActionBind=\"under\" Height=\"28\" /><Widget Id=\"tail\" Kind=\"input/button\" ActionBind=\"under\" Height=\"140\" />", bindings);
-        Vector2 trigger = Centre(RectOf(host, "choice"));
+        UiLayoutPoint trigger = Centre(RectOf(host, "choice"));
         Pump(host, EventType.MouseDown, trigger);
         Check(host.Session.OpenPopupId == null, "dropdown press only arms trigger");
         Pump(host, EventType.MouseUp, trigger);
         Check(host.Session.IsPopupOpen("choice"), "dropdown release opens expansion");
-        Rect anchor = host.Session.OpenPopupAnchor!.Value;
-        Vector2 option = new(anchor.x + 10, anchor.yMax + UiPopup.OptionHeight * 1.5f);
+        UiLayoutRect anchor = host.Session.OpenPopupAnchor!.Value;
+        UiLayoutPoint option = new(anchor.X + 10, anchor.YMax + UiPopup.OptionHeight * 1.5f);
         Pump(host, EventType.MouseDown, option);
         Pump(host, EventType.Repaint, option);
         Check(host.Session.Interactions.CaptureOwner?.ItemKey as string == "b", "later popup option survives earlier option visits");
@@ -593,9 +594,9 @@ internal static class KernelBooleanSelectionExpansionTests
         Check(selected == "b" && writes == 1 && underlying == 0 && host.Session.OpenPopupId == null, "popup release selects once without covered button command");
         Pump(host, EventType.MouseDown, trigger);
         Pump(host, EventType.MouseUp, trigger);
-        Vector2 outside = Centre(RectOf(host, "tail"));
+        UiLayoutPoint outside = Centre(RectOf(host, "tail"));
         // The menu is three rows high; move the tail command below that menu.
-        outside = new Vector2(outside.x, anchor.yMax + 110);
+        outside = new UiLayoutPoint(outside.X, anchor.YMax + 110);
         Check(RectOf(host, "tail").Contains(outside), "F3 outside point is over a real underlying business button");
         Pump(host, EventType.MouseDown, outside);
         Check(Event.current.type == EventType.Used && host.Session.OpenPopupId == null, "F3 real Host route consumes outside primary press and closes menu");
@@ -615,8 +616,8 @@ internal static class KernelBooleanSelectionExpansionTests
         bindings.BindValue("rows", () => rows, value => rows = value);
         bindings.BindAction<string>("row", key => calls.Add(key));
         using var host = Host("<Widget Id=\"tree\" Kind=\"container/tree\" Bind=\"rows\" ActionBind=\"row\" RowHeight=\"28\" />", bindings);
-        Rect tree = RectOf(host, "tree");
-        Vector2 second = new(tree.x + tree.width - 20, tree.y + 42);
+        UiLayoutRect tree = RectOf(host, "tree");
+        UiLayoutPoint second = new(tree.X + tree.Width - 20, tree.Y + 42);
         Pump(host, EventType.MouseDown, second);
         Check(host.Session.Interactions.CaptureOwner?.ItemKey as string == "b", "Tree body uses stable row key");
         rows = new[]
@@ -626,7 +627,7 @@ internal static class KernelBooleanSelectionExpansionTests
         };
         host.Session.BumpContentRevision();
         Pump(host, EventType.Repaint, second);
-        Vector2 first = new(second.x, tree.y + 14);
+        UiLayoutPoint first = new(second.X, tree.Y + 14);
         Pump(host, EventType.MouseUp, first);
         Check(calls.SequenceEqual(new[] { "b" }), "Tree reorder releases to same stable row, not old index");
         Pump(host, EventType.MouseDown, first);
@@ -669,26 +670,26 @@ internal static class KernelBooleanSelectionExpansionTests
             throw new ApplicationException("native partial write");
         });
         bindings.BindCommand("after", () => commands++);
-        var ctx = new UiWidgetContext(Scope, native, new Metrics(), UiTheme.Vanilla, new Translation(), bindings, 100, "checkbox");
+        var ctx = NativeFixture.Context(Scope, native, new Metrics(), UiTheme.Vanilla, new Translation(), bindings, 100, "checkbox");
         var checkbox = new CheckboxWidget();
         checkbox.Configure(new UiElementSpec("flag", "input/checkbox", new Dictionary<string, string> { ["Bind"] = "flag", ["ActionBind"] = "after" }));
-        var rect = new Rect(0, 0, 100, 28);
+        var rect = new UiLayoutRect(0, 0, 100, 28);
         Event.current = new Event
         {
             type = EventType.MouseDown,
             button = 0,
-            mousePosition = new Vector2(50, 14)
+            mousePosition = VerseUiExecution.Point(new UiLayoutPoint(50, 14))
         };
-        checkbox.Draw(rect, ctx);
+        NativeFixture.Draw(        checkbox,rect, ctx);
         Event.current = new Event
         {
             type = EventType.MouseUp,
             button = 0,
-            mousePosition = new Vector2(50, 14)
+            mousePosition = VerseUiExecution.Point(new UiLayoutPoint(50, 14))
         };
         try
         {
-            checkbox.Draw(rect, ctx);
+            NativeFixture.Draw(            checkbox,rect, ctx);
             throw new Exception("native checkbox failed to expose setter failure");
         }
         catch (InvalidOperationException ex)
@@ -703,7 +704,7 @@ internal static class KernelBooleanSelectionExpansionTests
         bindings.BindReadOnly("flag", () => false);
         using (var host = Host("<Widget Id=\"flag\" Kind=\"input/checkbox\" />", bindings))
         {
-            Vector2 point = Centre(RectOf(host, "flag"));
+            UiLayoutPoint point = Centre(RectOf(host, "flag"));
             Pump(host, EventType.MouseDown, point);
             Pump(host, EventType.MouseUp, point);
             Check(host.Session.OwnedHotControl == null && host.Session.Interactions.CaptureOwner == null, "read-only real Checkbox never captures or requests");
@@ -717,15 +718,15 @@ internal static class KernelBooleanSelectionExpansionTests
             selected++;
             closing!.Close();
         });
-        choices.BindOptions("items", () => new[] { "a", "b", "c" });
+        choices.BindChoices("items", ()=> (new[] { "a", "b", "c" }).Select(value=>new UiChoice<string>(value,value,value)).ToArray());
         closing = Host("<Widget Id=\"pick\" Kind=\"input/dropdown\" OptionsBind=\"items\" />", choices);
         using (closing)
         {
-            Vector2 trigger = Centre(RectOf(closing, "pick"));
+            UiLayoutPoint trigger = Centre(RectOf(closing, "pick"));
             Pump(closing, EventType.MouseDown, trigger);
             Pump(closing, EventType.MouseUp, trigger);
-            Rect anchor = closing.Session.OpenPopupAnchor!.Value;
-            Vector2 first = new(anchor.x + 10, anchor.yMax + 10);
+            UiLayoutRect anchor = closing.Session.OpenPopupAnchor!.Value;
+            UiLayoutPoint first = new(anchor.X + 10, anchor.YMax + 10);
             Pump(closing, EventType.MouseDown, first);
             Pump(closing, EventType.MouseUp, first);
             Check(selected == 1 && !closing.Session.IsActive && GUIUtility.hotControl == 0, "selection callback close stops popup traversal and releases session");
@@ -776,17 +777,17 @@ internal static class KernelBooleanSelectionExpansionTests
                 "input/checkbox" => new CheckboxWidget(),
                 "input/mode-row" => new InputModeRowWidget(),
                 _ => new DropdownWidget()};
-            UiElementSpec Spec(string binding) => new("same-node", kind, new Dictionary<string, string> { ["Bind"] = binding, ["ActionBind"] = "action-" + binding, ["Value1"] = "v", ["Option1"] = "V", ["Max"] = "10" });
-            var ctx = new UiWidgetContext(Scope, session, new Metrics(), UiTheme.Vanilla, new Translation(), bindings, 200, "same-node");
-            var rect = new Rect(0, 0, 200, 28);
+            UiElementSpec Spec(string binding) => new("same-node", kind, new Dictionary<string, string> { ["Bind"] = binding, ["ActionBind"] = "action-" + binding, ["Max"] = "10" },choices: new[]{new UiChoice<string>("V","v")});
+            var ctx = NativeFixture.Context(Scope, session, new Metrics(), UiTheme.Vanilla, new Translation(), bindings, 200, "same-node");
+            var rect = new UiLayoutRect(0, 0, 200, 28);
             widget.Configure(Spec("a"));
             Event.current = new Event
             {
                 type = EventType.MouseDown,
                 button = 0,
-                mousePosition = new Vector2(100, 14)
+                mousePosition = VerseUiExecution.Point(new UiLayoutPoint(100, 14))
             };
-            widget.Draw(rect, ctx);
+            NativeFixture.Draw(            widget,rect, ctx);
             Check(session.Interactions.CaptureOwner.HasValue, kind + " established its original binding capture");
             int before = a;
             widget.Configure(Spec("b"));
@@ -794,9 +795,9 @@ internal static class KernelBooleanSelectionExpansionTests
             {
                 type = EventType.MouseUp,
                 button = 0,
-                mousePosition = new Vector2(100, 14)
+                mousePosition = VerseUiExecution.Point(new UiLayoutPoint(100, 14))
             };
-            widget.Draw(rect, ctx);
+            NativeFixture.Draw(            widget,rect, ctx);
             Check(a == before && b == 0 && session.OwnedHotControl == null && session.Interactions.LastEnd == UiInteractionEnd.TargetChanged && session.OpenPopupId == null, kind + " same logical part binding replacement ends immediately without old/new target request");
         }
 
@@ -810,7 +811,7 @@ internal static class KernelBooleanSelectionExpansionTests
         )
         {
             var ends = new List<string>();
-            UiNative.Trace = ends.Add;
+            NativeFixture.Trace = ends.Add;
             using var session = new UiSession();
             int calls = 0;
             var bindings = new UiBindings();
@@ -819,7 +820,7 @@ internal static class KernelBooleanSelectionExpansionTests
             bindings.BindAction<string>("b", _ => calls++);
             var widget = new TreeWidget();
             UiElementSpec Spec(string target) => new("tree", "container/tree", new Dictionary<string, string> { ["Bind"] = "rows", [attribute] = target, ["RowHeight"] = "28" });
-            var ctx = new UiWidgetContext(Scope, session, new Metrics(), UiTheme.Vanilla, new Translation(), bindings, 200, "tree");
+            var ctx = NativeFixture.Context(Scope, session, new Metrics(), UiTheme.Vanilla, new Translation(), bindings, 200, "tree");
             float pad = UiTheme.Vanilla.Geometry.Padding;
             float side = Math.Max(6, 28 - pad * 2);
             float x = attribute == "ActionBind" ? 180 : pad + side / 2 + (attribute == "CheckBind" ? side + pad : 0);
@@ -828,22 +829,22 @@ internal static class KernelBooleanSelectionExpansionTests
             {
                 type = EventType.MouseDown,
                 button = 0,
-                mousePosition = new Vector2(x, 14)
+                mousePosition = VerseUiExecution.Point(new UiLayoutPoint(x, 14))
             };
-            widget.Draw(new Rect(0, 0, 200, 28), ctx);
+            NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 200, 28), ctx);
             Check(session.Interactions.CaptureOwner.HasValue, "Tree " + attribute + " starts its own gesture");
             widget.Configure(Spec("b"));
             Event.current = new Event
             {
                 type = EventType.MouseUp,
                 button = 0,
-                mousePosition = new Vector2(x, 14)
+                mousePosition = VerseUiExecution.Point(new UiLayoutPoint(x, 14))
             };
-            widget.Draw(new Rect(0, 0, 200, 28), ctx);
+            NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 200, 28), ctx);
             Check(calls == 0 && session.OwnedHotControl == null && ends.Any(line => line.Contains("reason=TargetChanged")), "Tree " + attribute + " replacement ends the same part without transferring the gesture");
         }
 
-        UiNative.Trace = null;
+        NativeFixture.Trace = null;
     }
 
     private static void TreePartsAndRemoval()
@@ -859,12 +860,12 @@ internal static class KernelBooleanSelectionExpansionTests
         bindings.BindAction<string>("expand", key => calls.Add("expand:" + key));
         bindings.BindAction<string>("check", key => calls.Add("check:" + key));
         using var host = Host("<Widget Id=\"tree\" Kind=\"container/tree\" Bind=\"rows\" ActionBind=\"row\" DisclosureBind=\"expand\" CheckBind=\"check\" RowHeight=\"28\" />", bindings);
-        Rect band = RectOf(host, "tree");
+        UiLayoutRect band = RectOf(host, "tree");
         float pad = UiTheme.Vanilla.Geometry.Padding;
         float side = Math.Max(6, 28 - pad * 2);
-        Vector2 marker = new(band.x + pad + side / 2, band.y + 14);
-        Vector2 check = new(marker.x + side + pad, marker.y);
-        foreach (Vector2 point in new[]
+        UiLayoutPoint marker = new(band.X + pad + side / 2, band.Y + 14);
+        UiLayoutPoint check = new(marker.X + side + pad, marker.Y);
+        foreach (UiLayoutPoint point in new[]
         {
             marker,
             check

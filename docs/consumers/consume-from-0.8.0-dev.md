@@ -12,7 +12,9 @@ if (!FerriteLibVersion.Require(new Version(0, 8, 0), new Version(0, 9, 0),
 The old `[0.7.0,0.8.0)` range excludes this candidate. Explicitly adopt the new development input, compile,
 then run the consumer's own harness and native UI checks; widening the range alone is not a migration.
 
-Existing Button/Slider manifest and typed binding entries remain usable. Button now activates on valid
+This is the approved prepublication breaking refactor. Start with [the exact migration](../development/0.8/refactor-migration.md)
+and [supported S1–S7 paths](../development/0.8/public-contract.md), including explicit frame/execution,
+UiChoice<T>, typed declarations and structured item addresses. Existing Button/Slider kinds remain usable. Button now activates on valid
 primary release rather than delegating timing to the native compound button. Slider selects immediately
 through shared range behavior and does not edit a neighboring NumberField draft. Keyboard/edit defaults
 include the confirmed editing migration below. Other 0.8 requirements are not implied by this candidate.
@@ -45,7 +47,7 @@ the next display reads the real model. Setter exceptions do not cause rollback o
 Within StepperSlider, a draft20 over model10 plus Step1 requests only21. A selected Slider30 replaces
 that draft with only30; a thumb capture alone keeps it. Each real drag sample remains a business
 request. An unrelated Button or same-Bind field cannot clear the draft. Custom native composites
-explicitly suspend their participating editor with `UiNative.SuspendEditor(ctx, binding)` before
+explicitly suspend their participating editor with `ctx.Controls.SuspendEditor(ctx, binding)` before
 ordinary blur, and use the same shared `Step`/`TakeOver` transitions. See the
 [editing contract](../development/0.8/editing-contract.md) for the full end/failure and IME rules.
 
@@ -56,8 +58,8 @@ scalar inputs. `Value<T>(initial, equal)` requires an explicit policy for other 
 ordinary classes can wrap sources in C# properties without an FL base class. `List<T>(items, equal)`
 controls structure; item properties are independently observed. Four actual operation entries share nested batches; Host owns the presentation read
 view, not your business owner/service. Declare tracked bindings before constructing the Host.
-Use `BindTrackedOptions` for a pure immutable options projection with explicit item equality. Actual
-GetOptions, typed choices and bounded reads select the same synchronized inputs. Project mutable item
+Use `BindTrackedChoices` for a pure immutable choice projection with explicit item equality. Actual
+Choice endpoint and bounded reads select the same synchronized inputs. Project mutable item
 properties to immutable presentation data during tracking; an outer list copy alone does not freeze them.
 Repeat consumes an immutable ordered key projection through the existing stable-node reconciliation.
 `BindTracked(..., equal: ...)` can suppress same-result presentation announcements without retaining old
@@ -93,7 +95,8 @@ all18 uses/nine containers and retained old conditions. The supported paths prot
 
 Use `computed.Fault/Retry()` for pure R1 work and `owner.RespondManaged(...)` with `IsPaused/Fault/Resume()` for consumer R2 callbacks. Related inputs can retry pure work; source changes cannot resume a paused callback. Default wrappers retain successful control paint with fault feedback, while current derived reads still fail and dependent input stops. A first failure is unavailable, not zero/empty.
 
-For reliably hidden retained views call `UiHost.SetDisplayDemand` or `UiWindowHost.SetDisplayDemand`; focus is not visibility. Keep shared computations under a shared owner. Old custom readers keep conservative service; optional `IUiPresentationDemand` declares complete tracked-key demand without changing old interfaces or ordinary getters. The [failure/lifetime contract](../development/0.8/failure-lifetime-contract.md) has recovery, draft, two-host and captured-target confirmation examples and the actual fixture/native limits.
+For reliably hidden retained views call `UiHost.SetDisplayDemand` or `UiWindowHost.SetDisplayDemand`; focus is not visibility. Keep shared computations under a shared owner. Custom tracked readers declare actual binding roles or IUiPresentationDemand. Ordinary untracked
+getters retain their original conditions; no prepare-all compatibility path remains. The [failure/lifetime contract](../development/0.8/failure-lifetime-contract.md) has recovery, draft, two-host and captured-target confirmation examples and the actual fixture/native limits.
 
 ## Replace old implementation/table access
 
@@ -101,7 +104,7 @@ Before publication this development migration internalizes default widget implem
 engine and writable Session tables. Keep existing manifest kinds and bindings; use `UiKinds` instead of
 implementation-class constants. Use `host.ElementProperties(id)`, `Get/SetScrollPosition(id)`,
 `SetInteractionScope(id, scope)`, `Invalidate()` and `InputState`; custom widgets use the supplied context's
-`State/Properties/InteractionScope/Invalidate` and shared `UiNative` behavior. Do not move a draft into a
+`State/Properties/InteractionScope/Invalidate` and shared `ctx.Controls` behavior. Do not move a draft into a
 shared binding-key cache. S1–S7 and complete dependencies are supported; explicitly listed Session/Node
 and detailed R9 members are experimental. The separate `tools/FerriteLib.UiKit.AuthorExamples` assembly
 compiles these paths without an internals grant.
@@ -110,7 +113,7 @@ The old26 colour-property bag becomes `theme.Palette[UiPaletteRole.*]` (or the C
 with the explicit mapping in [theme migration](../development/0.8/theme-migration.md). Existing fonts and
 `Metric.Padding/Spacing/Gap/RowHeight/Hairline` are finite declarations; remove an override to reveal its
 current source. Ordinary container Padding/Gap still allocate that container, not inherited density.
-Legacy `<Font Value="..."/>` redirects to `Metric Token="Font"` and reports its deprecation; it is not silently ignored.
+Retired `<Font Value="..."/>` is a located invalid style document. Use `<Metric Token="Font" Value="..."/>`; last-good style recovery is retained.
 
 Use `UiItemBindings<T>` for optional current-key fields/commands over safe snapshots or active services;
 plain existing bindings remain valid. Refresh explicitly at the real change boundary and dispose only

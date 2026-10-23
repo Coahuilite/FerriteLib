@@ -102,7 +102,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         }
 
         if (spec.TryGetAttribute("RowHeight", out string raw) && raw.Trim().Length > 0
-            && (!float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float declared)
+            && (!spec.TryGetNumber("RowHeight", out float declared)
                 || declared <= 0f))
         {
             throw new InvalidOperationException(

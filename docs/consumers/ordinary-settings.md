@@ -2,8 +2,9 @@
 
 Audience: an author wiring a plain settings group (labeled values, a dropdown, a conditional section,
 explanatory text) into a consumer mod. Nothing here needs a custom widget, a VM base class, a builder DSL,
-or a new library type. This guide describes the 0.7 supported path; the runnable, compile-checked source of
-truth is the harness file
+or a new library type. This guide describes the current 0.8 recipe; see the
+[breaking migration](consume-from-0.8.0-dev.md) when adopting it. The runnable, compile-checked source
+is the harness file
 
 `tools/FerriteLib.UiKit.Tests/KernelOrdinarySettingsRecipeTests.cs`
 
@@ -19,7 +20,7 @@ uses it.)
    row builder plus a second `BindValue`. You never write a rectangle, a `Measure`, or a `Draw`.
 2. **The model (plain C#)** — an ordinary class with fields and mutation methods. No base class, no
    attributes, no reflection, no DI.
-3. **The wiring (bindings)** — `UiBindings`: `BindValue`/`BindReadOnly` for typed values, `BindOptions` for
+3. **The wiring (bindings)** — `UiBindings`: `BindValue`/`BindReadOnly` for typed values, `BindChoices` with UiChoice<T> for
    a dropdown's list, `BindCommand` behind a button, and one read-only value for a live status line.
 4. **The host (already yours or the library's)** — `UiWindowHost`/`UiPageWindow` own the chrome, the
    `UiHost`, and the session. You attach/detach; you do not pump.
@@ -82,4 +83,4 @@ nothing in this guide assumes it.
 It is not a Form framework and there is no plan for one: the page model composes these atoms and you own
 your information architecture, navigation, and workflows. If you find a settings-shaped thing you cannot
 express with the atoms, bindings, containers and the host above, that is a bug report against FL — see
-`consume-from-0.7.0.md` §last for where to file it.
+`consume-from-0.8.0-dev.md` §last for where to file it.

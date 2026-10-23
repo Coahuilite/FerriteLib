@@ -1,9 +1,10 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -343,12 +344,13 @@ internal static class KernelDocumentReloadTests
         UiNode? scroll = host.Session.GetNodeByElementId("body");
         Check(keep != null && scroll != null, "the arrange published the nodes state hangs on");
 
-        keep!.State.EditText = "draft";
-        keep.State.Cursor = 4;
-        keep.State.Focused = true;
-        keep.State.FloatValue = 3f;
-        keep.GetOrCreateState("extra").EditText = "slot";
-        host.Session.SetScrollPosition(scroll!, new Vector2(0f, 12f));
+        NativeFixture.Custom(
+        keep!).EditText = "draft";
+        NativeFixture.Custom(        keep).Cursor = 4;
+        NativeFixture.Custom(        keep).Focused = true;
+        NativeFixture.Custom(        keep).FloatValue = 3f;
+        NativeFixture.Custom(        keep,"extra").EditText = "slot";
+        host.Session.SetScrollPosition(scroll!, new UiLayoutPoint(0f, 12f));
 
         string v2 = ScrollPage("scope-state", "<Widget Id=\"added\" Kind=\"chrome/banner\" Text=\"added\"/>");
         File.WriteAllText(path, v2);
@@ -359,17 +361,20 @@ internal static class KernelDocumentReloadTests
 
         UiNode? keepAfter = host.Session.GetNodeByElementId("keep");
         Check(ReferenceEquals(keep, keepAfter), "a compatible reload keeps the same node object for a stable identity");
-        Check(keepAfter!.State.EditText == "draft" && keepAfter.State.Cursor == 4
-            && keepAfter.State.Focused && Math.Abs(keepAfter.State.FloatValue - 3f) < 0.001f,
+        Check(NativeFixture.Custom(keepAfter!).EditText == "draft" && NativeFixture.Custom(keepAfter).Cursor == 4
+            && NativeFixture.Custom(keepAfter).Focused && Math.Abs(NativeFixture.Custom(keepAfter).FloatValue - 3f) < 0.001f,
             "the draft, cursor, focus and value state all survive");
-        Check(keepAfter.GetOrCreateState("extra").EditText == "slot", "a named state slot survives too");
-        Vector2 survived = host.Session.GetScrollPosition(scroll!);
-        Check(Math.Abs(survived.x) < 0.001f && Math.Abs(survived.y - 12f) < 0.001f, "the scroll position survives");
+        Check(NativeFixture.Custom(keepAfter,"extra").EditText == "slot", "a named state slot survives too");
+        UiLayoutPoint survived = host.Session.GetScrollPosition(scroll!);
+        Check(Math.Abs(survived.X) < 0.001f && Math.Abs(survived.Y - 12f) < 0.001f, "the scroll position survives");
 
         // Kind changed under the same identity: the node is the same one, the control is not, so the state
         // belongs to nobody and must be dropped rather than handed to the new kind.
-        keepAfter!.State.EditText = "draft-2";
-        keepAfter.State.Cursor = 2;
+        NativeFixture.Custom(
+        // Kind changed under the same identity: the node is the same one, the control is not, so the state
+        // belongs to nobody and must be dropped rather than handed to the new kind.
+        keepAfter!).EditText = "draft-2";
+        NativeFixture.Custom(        keepAfter).Cursor = 2;
         string v3 = ScrollPage("scope-state", "", keepElement: "<Widget Id=\"keep\" Kind=\"chrome/rule\"/>");
         File.WriteAllText(path, v3);
         service.Signal("st");
@@ -378,26 +383,23 @@ internal static class KernelDocumentReloadTests
         UiNode? rekinded = host.Session.GetNodeByElementId("keep");
         Check(rekinded != null && ReferenceEquals(rekinded, keep),
             "the kind change keeps the node the stable identity names");
-        Check(rekinded != null && rekinded.State.EditText.Length == 0 && rekinded.State.Cursor == 0,
+        Check(rekinded != null && NativeFixture.Custom(rekinded).EditText.Length == 0 && NativeFixture.Custom(rekinded).Cursor == 0,
             "a kind change under a stable identity cleans the old element's state");
-        Check(rekinded != null && rekinded.GetOrCreateState("extra").EditText.Length == 0,
+        Check(rekinded != null && NativeFixture.Custom(rekinded,"extra").EditText.Length == 0,
             "and the slots the old kind used");
 
         // Removed: identity is gone, so the old state must not linger for a future element to inherit.
-        rekinded!.State.EditText = "draft-3";
-        rekinded.State.Cursor = 3;
+        NativeFixture.Custom(
+        // Removed: identity is gone, so the old state must not linger for a future element to inherit.
+        rekinded!).EditText = "draft-3";
+        NativeFixture.Custom(        rekinded).Cursor = 3;
         string v4 = ScrollPage("scope-state", "", keepElement: "");
         File.WriteAllText(path, v4);
         service.Signal("st");
         Settle(service);
         Draw(host);
         Check(!HasElement(host.Manifest, "keep"), "the element is gone from the new tree");
-        Check(rekinded.State.EditText.Length == 0 && rekinded.State.Cursor == 0
-            && !rekinded.State.Focused && !rekinded.State.Dragging
-            && Math.Abs(rekinded.State.FloatValue) < 0.001f,
-            "a removed element's state is cleaned up");
-        Check(rekinded.GetOrCreateState("extra").EditText.Length == 0, "and its named slots with it");
-
+        Check(NativeFixture.Released(rekinded),"removed node drops all owned slots and rejects stale state access");
         // A removed scroll container's position is state as well, and it is cleaned up with the node.
         string v5 = Page("scope-state",
             "<Column Id=\"root\"><Widget Id=\"added\" Kind=\"chrome/banner\" Text=\"added\"/></Column>");
@@ -405,8 +407,8 @@ internal static class KernelDocumentReloadTests
         service.Signal("st");
         Settle(service);
         Draw(host);
-        Vector2 droppedScroll = host.Session.GetScrollPosition(scroll!);
-        Check(Math.Abs(droppedScroll.x) < 0.001f && Math.Abs(droppedScroll.y) < 0.001f,
+        UiLayoutPoint droppedScroll = host.Session.GetScrollPosition(scroll!);
+        Check(Math.Abs(droppedScroll.X) < 0.001f && Math.Abs(droppedScroll.Y) < 0.001f,
             "a removed scroll container's position is cleaned up too");
     }
 
@@ -462,9 +464,9 @@ internal static class KernelDocumentReloadTests
         Draw(host);
 
         UiNode? keep = host.Session.GetNodeByElementId("keep");
-        host.Session.CaptureHotControl(4242);
-        keep!.State.EditText = "mid-edit";
-        Check(host.Session.OwnedHotControl == 4242, "the session holds the capture an active edit would hold");
+        NativeFixture.Capture(host.Session,NativeFixture.Key(4242));
+        NativeFixture.Custom(        keep!).EditText = "mid-edit";
+        Check(host.Session.OwnedHotControl == NativeFixture.Key(4242), "the session holds the capture an active edit would hold");
 
         string v2 = Page("scope-hot",
             "<Column Id=\"root\">"
@@ -476,7 +478,7 @@ internal static class KernelDocumentReloadTests
         Settle(service);
 
         Check(host.Session.OwnedHotControl == null, "a reload releases the hot control instead of leaving it held");
-        Check(keep.State.EditText == "mid-edit", "and keeps the compatible draft");
+        Check(NativeFixture.Custom(keep).EditText == "mid-edit", "and keeps the compatible draft");
     }
 
     private static void VerifyCoalescingAndDedup(string sandbox)
@@ -688,9 +690,9 @@ internal static class KernelDocumentReloadTests
 
         UiStyleDocument beforeA = hostA.StyleResolver.Document;
         UiStyleDocument beforeB = hostB.StyleResolver.Document;
-        Check(SameColor(themeA[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)),
+        Check(SameColor(themeA[UiPaletteRole.PanelSurface], new UiColour(0f, 0f, 1f, 1f)),
             "the first style document's page level reached host A");
-        Check(SameColor(themeB[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)),
+        Check(SameColor(themeB[UiPaletteRole.PanelSurface], new UiColour(0f, 0f, 1f, 1f)),
             "and reached host B");
 
         // The real pre-check, driven directly with candidates that really fail: a page level naming a name
@@ -740,8 +742,8 @@ internal static class KernelDocumentReloadTests
             "once no host fails, the same style batch commits to both");
         Check(!ReferenceEquals(hostA.StyleResolver.Document, beforeA)
             && !ReferenceEquals(hostB.StyleResolver.Document, beforeB)
-            && SameColor(themeA[UiPaletteRole.PanelSurface], new Color(0f, 1f, 0f, 1f))
-            && SameColor(themeB[UiPaletteRole.PanelSurface], new Color(0f, 1f, 0f, 1f)),
+            && SameColor(themeA[UiPaletteRole.PanelSurface], new UiColour(0f, 1f, 0f, 1f))
+            && SameColor(themeB[UiPaletteRole.PanelSurface], new UiColour(0f, 1f, 0f, 1f)),
             "and both hosts resolve the new page level together");
     }
 
@@ -768,7 +770,7 @@ internal static class KernelDocumentReloadTests
         using var host = NewHost("scope-retint", UiLayoutManifest.Parse(v1), new UiBindings(), theme);
         service.Attach(host, "tint");
 
-        Color tint = new Color(0.5f, 0.1f, 0.1f, 1f);
+        UiColour tint = new UiColour(0.5f, 0.1f, 0.1f, 1f);
         theme[UiPaletteRole.WindowSurface] = tint;
 
         File.WriteAllText(path, Page("scope-retint",
@@ -790,11 +792,11 @@ internal static class KernelDocumentReloadTests
         using var styleService = NewService(false);
         styleService.Add(new UiDocumentSource("tint-style", UiDocumentKind.Style, stylePath), styleV1);
         UiTheme themed = UiTheme.Vanilla.Clone();
-        Color panelBaseline = themed[UiPaletteRole.PanelSurface];
+        UiColour panelBaseline = themed[UiPaletteRole.PanelSurface];
 
         using var styled = NewHost("scope-retint-style", UiLayoutManifest.Parse(KeepPage("scope-retint-style")), new UiBindings(), themed);
         styleService.Attach(styled, null, "tint-style");
-        Check(SameColor(themed[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)),
+        Check(SameColor(themed[UiPaletteRole.PanelSurface], new UiColour(0f, 0f, 1f, 1f)),
             "a page-level document is applied on the first commit");
 
         File.WriteAllText(stylePath,
@@ -808,7 +810,7 @@ internal static class KernelDocumentReloadTests
         // A current host tint outside the outgoing page declaration survives removal.
         File.WriteAllText(stylePath, PageSchemeStyle("ice", "#00ff00"));
         Check(styleService.Reload("tint-style")?.Accepted == true, "a page level is applied again");
-        Color residualTint = new Color(0.2f, 0.4f, 0.6f, 1f);
+        UiColour residualTint = new UiColour(0.2f, 0.4f, 0.6f, 1f);
         themed[UiPaletteRole.WindowSurface] = residualTint;
         File.WriteAllText(stylePath, "<Styles Schema=\"1\"></Styles>");
         Check(styleService.Reload("tint-style")?.Accepted == true, "and the next reload drops the page level");
@@ -816,18 +818,18 @@ internal static class KernelDocumentReloadTests
             "A4 removing a page application preserves current unrelated host tint");
         File.WriteAllText(stylePath, "<Styles Schema=\"1\" Density=\"gap\"><Density Name=\"gap\"><Metric Token=\"Gap\" Value=\"3\"/></Density></Styles>");
         Check(styleService.Reload("tint-style")?.Accepted == true && themed.Geometry.Gap == 3, "A4 real Host applies only page Gap3");
-        themed[UiPaletteRole.Foreground] = new Color(0, 1, 1, 1);
+        themed[UiPaletteRole.Foreground] = new UiColour(0, 1, 1, 1);
         themed.DefaultFont = UiFont.Medium;
         themed.Geometry = new UiGeometry(12, 8, 9, 45, 2);
-        themed[UiPaletteRole.SwitchOff] = new Color(.4f, .2f, .7f, 1);
+        themed[UiPaletteRole.SwitchOff] = new UiColour(.4f, .2f, .7f, 1);
         Check(themed.Geometry.Gap == 3 && themed.Geometry.RowHeight == 45,
             "A4 current host metrics remain distinct beneath the one explicitly applied page metric");
         File.WriteAllText(stylePath, "<Styles Schema=\"1\"></Styles>");
         Check(styleService.Reload("tint-style")?.Accepted == true, "A4 real document route removes the sparse density");
-        styled.MeasureAndArrange(new Vector2(400, 400));
+        styled.MeasureAndArrange(new UiLayoutPoint(400, 400));
         UiNode keep = styled.Session.GetNodeByElementId("keep")!;
         Check(themed.DefaultFont == UiFont.Medium && themed.Geometry.Gap == 9 && themed.Geometry.RowHeight == 45
-            && SameColor(themed[UiPaletteRole.Foreground], new Color(0, 1, 1, 1)) && SameColor(themed[UiPaletteRole.SwitchOff], new Color(.4f, .2f, .7f, 1)),
+            && SameColor(themed[UiPaletteRole.Foreground], new UiColour(0, 1, 1, 1)) && SameColor(themed[UiPaletteRole.SwitchOff], new UiColour(.4f, .2f, .7f, 1)),
             "A4 removing Gap3 preserves current font, other metric, colour and dedicated thumb declaration values");
         Check(keep.Properties.ResolvedFont.Origin == UiPropertyOrigin.Host
             && keep.Properties.ResolvedMetrics["RowHeight"].Origin == UiPropertyOrigin.Host
@@ -835,10 +837,10 @@ internal static class KernelDocumentReloadTests
             "A4 actual node sources remain current host declarations, not a copied creation snapshot");
         themed.RemoveFontOverride();
         themed.RemoveDensityOverride();
-        styled.MeasureAndArrange(new Vector2(400, 400));
+        styled.MeasureAndArrange(new UiLayoutPoint(400, 400));
         Check(keep.Properties.ResolvedFont.Origin == UiPropertyOrigin.Fallback
             && keep.Properties.ResolvedMetrics["RowHeight"].Origin == UiPropertyOrigin.Fallback
-            && SameColor(themed[UiPaletteRole.Foreground], new Color(0, 1, 1, 1)),
+            && SameColor(themed[UiPaletteRole.Foreground], new UiColour(0, 1, 1, 1)),
             "A4 later declaration removal still reveals live fallback and never clears unrelated colour intent");
     }
 
@@ -868,9 +870,9 @@ internal static class KernelDocumentReloadTests
         UiNode? draft = hostA.Session.GetNodeByElementId("keep");
         UiNode? scroll = hostA.Session.GetNodeByElementId("body");
         Check(draft != null && scroll != null, "the arranged element and its scroll container exist");
-        draft!.State.EditText = "uncommitted-draft";
-        draft.GetOrCreateState("slot").EditText = "slot-draft";
-        hostA.Session.SetScrollPosition(scroll!, new Vector2(0f, 9f));
+        NativeFixture.Custom(        draft!).EditText = "uncommitted-draft";
+        NativeFixture.Custom(        draft,"slot").EditText = "slot-draft";
+        hostA.Session.SetScrollPosition(scroll!, new UiLayoutPoint(0f, 9f));
         UiLayoutManifest before = hostA.Manifest;
 
         string v2 = Page("scope-rollback",
@@ -884,17 +886,17 @@ internal static class KernelDocumentReloadTests
         Check(report != null && report.Rejected, "the batch is refused when a later host fails its commit");
         Check(ReferenceEquals(hostA.Manifest, before) && HasElement(hostA.Manifest, "keep"),
             "the rolled-back host is back on the old document");
-        Check(draft.State.EditText == "uncommitted-draft",
+        Check(NativeFixture.Custom(draft).EditText == "uncommitted-draft",
             "and its uncommitted draft survived the rollback");
-        Check(draft.GetOrCreateState("slot").EditText == "slot-draft", "and its named state slots");
-        Vector2 scrolled = hostA.Session.GetScrollPosition(scroll!);
-        Check(Math.Abs(scrolled.y - 9f) < 0.001f, "and its scroll position");
+        Check(NativeFixture.Custom(draft,"slot").EditText == "slot-draft", "and its named state slots");
+        UiLayoutPoint scrolled = hostA.Session.GetScrollPosition(scroll!);
+        Check(Math.Abs(scrolled.Y - 9f) < 0.001f, "and its scroll position");
 
         // The same candidate, with no fault, still commits and still cleans the removed element up.
         Check(service.Reload("rb")?.Accepted == true, "the same batch commits once no host fails");
         Draw(hostA);
         Check(!HasElement(hostA.Manifest, "keep"), "a committed batch still drops the removed element");
-        Check(draft.State.EditText.Length == 0, "and still cleans its state");
+        Check(NativeFixture.Released(draft),"confirmed removal clears owned slots and refuses stale state after a prior rollback");
     }
 
     // --- a transiently missing file keeps the last known good (P4 R2) ---------------------------
@@ -1006,7 +1008,7 @@ internal static class KernelDocumentReloadTests
         using var validHost = NewHost(
             "style-first-valid", UiLayoutManifest.Parse(KeepPage("style-first-valid")), new UiBindings(), theme);
         Check(validService.Attach(validHost, null, "s5v"), "a valid style document still attaches");
-        Check(SameColor(theme[UiPaletteRole.PanelSurface], new Color(0f, 0f, 1f, 1f)), "and its page level is applied on first attach");
+        Check(SameColor(theme[UiPaletteRole.PanelSurface], new UiColour(0f, 0f, 1f, 1f)), "and its page level is applied on first attach");
     }
 
     // --- rebinding releases the old service (P4 R6) ----------------------------------------------
@@ -1486,25 +1488,25 @@ internal static class KernelDocumentReloadTests
         return dir;
     }
 
-    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindings bindings)
+    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindingReader bindings)
     {
         return new UiHost(source, manifest, bindings, UiTheme.Vanilla, new FixedMetrics(), new FixedTranslation());
     }
 
     /// <summary>A host built on a theme the lane holds, so a page-level application is observable.</summary>
-    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindings bindings, UiTheme theme)
+    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindingReader bindings, UiTheme theme)
     {
         return new UiHost(source, manifest, bindings, theme, new FixedMetrics(), new FixedTranslation());
     }
 
     private static void Draw(UiHost host)
     {
-        host.DrawFrame(new Rect(0f, 0f, 400f, 300f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 400f, 300f));
     }
 
     private static UiLayoutSnapshot Arrange(UiHost host)
     {
-        return host.MeasureAndArrange(new Vector2(400f, 300f));
+        return host.MeasureAndArrange(new UiLayoutPoint(400f, 300f));
     }
 
     private static string Page(string source, string body)
@@ -1569,12 +1571,12 @@ internal static class KernelDocumentReloadTests
         return false;
     }
 
-    private static bool SameColor(Color left, Color right)
+    private static bool SameColor(UiColour left, UiColour right)
     {
-        return Math.Abs(left.r - right.r) < 0.001f
-            && Math.Abs(left.g - right.g) < 0.001f
-            && Math.Abs(left.b - right.b) < 0.001f
-            && Math.Abs(left.a - right.a) < 0.001f;
+        return Math.Abs(left.Red - right.Red) < 0.001f
+            && Math.Abs(left.Green - right.Green) < 0.001f
+            && Math.Abs(left.Blue - right.Blue) < 0.001f
+            && Math.Abs(left.Alpha - right.Alpha) < 0.001f;
     }
 
     private static bool ContainsName(IReadOnlyCollection<string> names, string name)

@@ -44,16 +44,18 @@ IME ownership remain; this package adds no global keyboard or focus-management p
 ```csharp
 // Create once for this surrounding window, not once per repaint.
 var page = new UiHost("sample/settings", manifest, bindings, theme, metrics, translation);
+var execution = new VerseUiExecution();
 // In the surrounding window's GUI callback:
-page.DrawFrame(contentRect, this);
+page.DrawFrame(VerseUiExecution.Rect(contentRect),
+    execution.CaptureFrame(Verse.Find.WindowStack.GetsInput(this)), execution);
 // When that surrounding owner really closes:
 page.Dispose();
+execution.Dispose();
 ```
 
-The surrounding native window supplies itself, the real content rectangle and lifecycle. The shared
-owner overload obtains native stack qualification once for both standard and embedded routes. The
-original `DrawFrame(Rect)` remains legal for non-window/test/custom embedding and preserves its existing
-explicit Session qualification conditions. `DrawFrame` owns its frame
+The surrounding native owner supplies the real content rectangle, input qualification and lifecycle.
+Capture once per actual native callback and retain the same frame for every control/helper in it.
+DrawFrame owns its frame
 boundary, measurement, drawing, hit pass, popup pass and failure cleanup. Managed `UiReactiveFault` is isolated before fatal shell release and exposed through the node/presentation or `LayoutFault`; unclassified outer failure retains the existing fatal protection. Authors do not guess a `Dispose`/`EndFrame` ordering. A callback that closes the host
 ends normal drawing/traversal. One host's Close leaves another host's session and shared business model
 alone. Nested Scroll/Clip geometry and popup coverage continue through the same engine/native adapter.
@@ -61,10 +63,10 @@ F3 outside primary dismissal consumes that input and cannot replay its later rel
 business actions. Raw consumed MouseUp still ends only the library's own capture.
 
 A custom widget's explicit `ctx.Node` is its state owner even outside an ambient `EnterNode` scope.
-Editors and their wrapper compatibility projections use that node's existing named state slots;
+Editors use that node's existing named state slots;
 same-Bind instances remain independent. Retargeting suspends the replaced neutral editor and releases
-only its own native focus/active-editor record. Element-less legacy session/key primitives retain their
-original session-level conditions.
+only its own native focus/active-editor record. Independent native callers use the explicit named UiSession.CreateContext entry; no ambient or
+element-less compatibility primitive remains.
 
 ## Read the current runtime without drawing it
 

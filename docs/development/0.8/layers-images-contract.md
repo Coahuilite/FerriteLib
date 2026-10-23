@@ -9,7 +9,7 @@ target; release outside its own region, lost eligibility, removal or Close follo
 
 The engine projects current declared input geometry through the same arranged scope/scroll transform and
 effective clip before native Draw. The neutral production UiPointerLayers decision resolves content
-coverage; UiNative reads that result and the existing interaction session remains the sole capture owner.
+coverage; UiControls reads that result and the existing interaction session remains the sole capture owner.
 IMGUI calls keep their original order on every event. There is no second Draw, fake Event replay or new
 per-widget dispatch algorithm. Popup/F3 priority stays above content, and content coverage does not turn an
 ordinary nonoverlapping outside click into popup-style edit suspension. A covered native editor cannot
@@ -31,7 +31,7 @@ public IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayout
 }
 ```
 
-A ctx.Child keeps its independent interaction/capture identity; layer queries resolve its owning widget through the real Parent chain rather than treating the child as a new paint layer. Draw uses ButtonBounds with its allocated origin and supplies current execution eligibility to the existing UiNative activation/shared
+A ctx.Child keeps its independent interaction/capture identity; layer queries resolve its owning widget through the real Parent chain rather than treating the child as a new paint layer. Draw uses ButtonBounds with its allocated origin and supplies current execution eligibility to the existing UiControls activation/shared
 request path. It does not implement topmost selection or capture. An empty sequence means decoration;
 UiRowBand.PointerRegions exposes the same part geometry used by the retained row visual for custom row
 wrappers. All default interactive wrappers provide their real field/track/option/row/point geometry.
@@ -53,23 +53,22 @@ Native1.6 paint/input acceptance remains separate; fixture geometry and event re
 
 ## Use the default image before writing a custom renderer
 
-Bind a supplier-owned `Texture2D`, `RenderTexture` or declared `Texture` value. The supplier creates,
-updates and destroys the resource; UiKit neither clones nor retains a second resource reference. A live
-render target can update its pixels without a layout change. When replacing a source with different
-natural dimensions, notify the ordinary binding/content revision if its dimensions affect measurement.
-Draw always reads the current value. Null/unbound runtime reads leave the existing image placeholder;
-a non-positive source size does not draw. Known-null description remains `Available=false`, while a
-present source is `Available=true` (presence, not a promise of valid dimensions or native pixels).
-Missing/read-unavailable descriptions retain their explicit unknown reason. The read-only definition
-carries the placement options; measured/arranged bounds are the same bounds the image outlet receives.
+Register supplier-owned Texture/Texture2D/RenderTexture objects in the actual execution.Images scope.
+Only the resulting UiImage token crosses into neutral bindings. The supplier creates/updates/destroys
+textures; the adapter owns references and drops them without Destroy. Tokens from another scope do not
+resolve. Source replacement uses a new token; notify ordinary layout dependencies when dimensions change.
+Default/empty tokens preserve the missing slot and unavailable description; invalid sizes do not paint.
+A live render target can update its pixels without changing layout or adding a second resource.
 
 ```csharp
-Texture? portrait = suppliedRenderTarget;
+var portrait = execution.Images.Add(suppliedRenderTarget);
 var bindings = new UiBindings();
-bindings.BindReadOnly<Texture?>("portrait", () => portrait);
-var image = new UiElementSpec("portrait-view", "display/image", new Dictionary<string, string>
+bindings.BindReadOnly("portrait", () => portrait);
+var image = new UiElementSpec("portrait-view", "display/image", new Dictionary<string, UiAttributeValue>
 {
-    ["Bind"] = "portrait", ["AspectHeight"] = "true", ["Fit"] = "Contain"
+    ["Bind"] = UiAttributeValue.Literal("portrait"),
+    ["AspectHeight"] = UiAttributeValue.Boolean(true),
+    ["Fit"] = UiAttributeValue.Literal("Contain")
 });
 var page = UiLayoutManifest.Create("consumer/portraits", new[] { image });
 ```
@@ -91,10 +90,10 @@ names, including numeric enum aliases, are authoring errors. `AspectHeight=true`
 this opt-in the old source-height-plus-two-padding measure remains. AspectHeight uses the density row fallback for a missing or invalid-size source; the legacy measure still follows a positive source height (even when its width is invalid). Explicit Height reserves its authored slot regardless of source state.
 
 `UiImageLayout` is the actual platform-free geometry used by `UiThemeDraw.Image`, not a fixture copy.
-Custom visuals may use the same `UiImageOptions` overload; the retained three-argument Image and FitImage
-entry points preserve their Contain/Center meaning. Cover uses a balanced paint-only GUI group and
+Custom visuals use the same UiImageOptions geometry with an explicit IUiDrawing. Image and FitImage
+keep their Contain/Center defaults. Cover uses a balanced paint-only GUI group and
 restores the tint even if drawing throws. The image is decoration: no input region or capture is added.
-Old custom bindings without the optional typed seam keep the original Texture2D binding route.
+All image bindings now carry UiImage; there is no parallel Texture2D core binding route.
 
 ## Add a background to the standard window
 
@@ -135,9 +134,9 @@ they do not replace default definitions or acquire a new layout/input authority.
 | --- | --- | --- |
 | Default controls overlap | Shared precise geometry and topmost arbitration; L2 approved unavailable-operation obstruction | Ordinary declarations unchanged |
 | Custom private hit parts | Optional IUiPointerLayout, shared neutral arbitration, Child-owner resolution | Describe actual regions; keep input on shared interaction |
-| Existing Image | Same defaults, source-height measure, empty slot, Texture2D custom-binding route | Existing bindings remain legal |
-| Image variants | Fit, inner alignment, explicit width-aspect measure; Texture/RenderTexture values | Supply a current resource and normal invalidation |
-| Standard window background | Manifest/program/instance configuration, approved Contain default | Supply texture; own its lifetime |
+| Existing Image | Same defaults, source-height measure and empty slot; neutral scoped token | Existing bindings remain legal |
+| Image variants | Fit, inner alignment, explicit width-aspect measure; native resources via scoped tokens | Supply a current resource and normal invalidation |
+| Standard window background | Manifest/program/instance configuration, approved Contain default | Supply UiImage from the window.Images scope; own texture lifetime |
 | Animation/media/whole-skin replacement | Not introduced | Application/existing extension boundary |
 
 The actual Host/native-outlet fixture asserts fit/clip/group cleanup, old versus explicit measurement,

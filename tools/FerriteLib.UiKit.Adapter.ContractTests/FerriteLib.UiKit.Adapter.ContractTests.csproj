@@ -1,13 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
  <PropertyGroup><OutputType>Exe</OutputType><PlatformTarget>x64</PlatformTarget><TargetFramework>net472</TargetFramework><LangVersion>latest</LangVersion><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors><NuGetAudit>false</NuGetAudit><RestoreUseStaticGraphEvaluation>true</RestoreUseStaticGraphEvaluation><OutputPath>../../dist/build/$(Configuration)/adapter-probe/</OutputPath></PropertyGroup>
  <ItemGroup><ProjectReference Include="../../Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj"/><ProjectReference Include="../FerriteLib.UiKit.AuthorExamples/FerriteLib.UiKit.AuthorExamples.csproj"/><PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4871"/></ItemGroup>
- <ItemGroup><Compile Include="../FerriteLib.UiKit.Tests/KernelCloseoutEditingTests.cs" Link="KernelCloseoutEditingTests.cs" /></ItemGroup>
+ <ItemGroup><Compile Include="../FerriteLib.UiKit.Tests/KernelCloseoutEditingTests.cs" Link="KernelCloseoutEditingTests.cs" /><Compile Include="../FerriteLib.UiKit.Tests/NativeFixture.cs" Link="NativeFixture.cs" /><Compile Include="../FerriteLib.UiKit.Tests/KernelNativeEventConsumptionTests.cs" Link="KernelNativeEventConsumptionTests.cs" /></ItemGroup>
  <Target Name="BuildRuntimeStubs" AfterTargets="Build">
   <MSBuild Projects="../FerriteLib.UiKit.Tests/Stubs/UnityEngineInputLegacyModuleStub/UnityEngineInputLegacyModuleStub.csproj;../FerriteLib.UiKit.Tests/Stubs/UnityEngineStub/UnityEngineStub.csproj;../FerriteLib.UiKit.Tests/Stubs/UnityEngineImGuiStub/UnityEngineImGuiStub.csproj;../FerriteLib.UiKit.Tests/Stubs/UnityEngineTextRenderingModuleStub/UnityEngineTextRenderingModuleStub.csproj;../FerriteLib.UiKit.Tests/Stubs/VerseStub/VerseStub.csproj" Targets="Restore;Build" Properties="Configuration=$(Configuration)" BuildInParallel="false" />
   <ItemGroup><RuntimeStub Include="../FerriteLib.UiKit.Tests/bin/stubs/unityengine/UnityEngine.CoreModule.dll;../FerriteLib.UiKit.Tests/bin/stubs/unityengine-imgui/UnityEngine.IMGUIModule.dll;../FerriteLib.UiKit.Tests/bin/stubs/unityengine-input/UnityEngine.InputLegacyModule.dll;../FerriteLib.UiKit.Tests/bin/stubs/unityengine-textrendering/UnityEngine.TextRenderingModule.dll;../FerriteLib.UiKit.Tests/bin/stubs/verse/Assembly-CSharp.dll" /></ItemGroup><Copy SourceFiles="@(RuntimeStub)" DestinationFolder="$(OutputPath)" />
  </Target>
 </Project>
-
-
-
-

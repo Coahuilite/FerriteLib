@@ -1,8 +1,9 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -25,7 +26,7 @@ internal static class KernelIdentityTests
     private const string SlashlessKind = "identityprobe";
     private const string ThrowingKind = "test/identity-throws";
     private const string ClickKind = "test/click-probe";
-    private static readonly Rect Viewport = new(0f, 0f, 300f, 200f);
+    private static readonly UiLayoutRect Viewport = new(0f, 0f, 300f, 200f);
 
     private static int failures;
 
@@ -34,17 +35,14 @@ internal static class KernelIdentityTests
         failures = 0;
         ResetProbe();
         UiWidgetRegistry.Clear();
-        UiWidgetRegistry.Register(Scope, ProbeKind, () => new IdentityProbeWidget(ProbeKind),
-            new[] { "Id", "Kind", "Text", "Dragging", "Cursor", "Hidden", "Tab", "Height" });
-        // A kind without a separator, used where a lane grades the sibling-collision rule itself: with a
-        // namespaced kind, the Id that spells its generated segment would carry '/' and the separator
-        // rule would refuse it first, so that lane would grade nothing.
-        UiWidgetRegistry.Register(Scope, SlashlessKind, () => new IdentityProbeWidget(SlashlessKind),
-            new[] { "Id", "Kind", "Text", "Dragging", "Cursor", "Hidden", "Tab" });
-        UiWidgetRegistry.Register(Scope, ThrowingKind, () => new ThrowingProbeWidget(),
-            new[] { "Id", "Kind", "Text" });
-        UiWidgetRegistry.Register(Scope, ClickKind, () => new ClickProbeWidget(),
-            new[] { "Id", "Kind", "Height", "ActionBind" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new IdentityProbeWidget(ProbeKind),
+            new[] { "Id", "Kind", "Text", "Dragging", "Cursor", "Hidden", "Tab", "Height" }));
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, SlashlessKind, () => new IdentityProbeWidget(SlashlessKind),
+            new[] { "Id", "Kind", "Text", "Dragging", "Cursor", "Hidden", "Tab" }));
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ThrowingKind, () => new ThrowingProbeWidget(),
+            new[] { "Id", "Kind", "Text" }));
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ClickKind, () => new ClickProbeWidget(),
+            new[] { "Id", "Kind", "Height", "ActionBind" }));
 
         try
         {
@@ -107,7 +105,7 @@ internal static class KernelIdentityTests
     {
         ResetProbe();
         using UiHost host = Host(TwoSiblingPage());
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(Viewport.width, Viewport.height));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(Viewport.Width, Viewport.Height));
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (string key in snapshot.VisibleIds)
@@ -128,7 +126,7 @@ internal static class KernelIdentityTests
     {
         ResetProbe();
         using UiHost host = Host(TwoSiblingPage());
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
 
         UiNodeId measuredA = IdentityOf("A", "measure");
         UiNodeId measuredB = IdentityOf("B", "measure");
@@ -169,14 +167,14 @@ internal static class KernelIdentityTests
         UiNodeId before;
         using (UiHost host = Host(TwoSiblingPage()))
         {
-            host.DrawFrame(Viewport);
+            NativeFixture.DrawFrame(            host,Viewport);
             before = IdentityOf("B", "draw");
 
             // One content-revision bump forces the engine to re-measure the same tree: the sibling must
             // keep the identity it had, which is what makes its state survive a data refresh.
             host.Session.BumpContentRevision();
             ResetProbe();
-            host.DrawFrame(Viewport);
+            NativeFixture.DrawFrame(            host,Viewport);
             UiNodeId after = IdentityOf("B", "measure");
             if (after != before)
             {
@@ -189,7 +187,7 @@ internal static class KernelIdentityTests
         ResetProbe();
         using (UiHost hidden = Host(HiddenSiblingPage()))
         {
-            hidden.DrawFrame(Viewport);
+            NativeFixture.DrawFrame(            hidden,Viewport);
             UiNodeId withHiddenA = IdentityOf("B", "draw");
             if (withHiddenA != before)
             {
@@ -211,7 +209,7 @@ internal static class KernelIdentityTests
         bindings.BindValue(UiBindings.ActiveTabKey, () => tab, value => tab = value);
 
         using UiHost host = Host(TabSiblingPage(), bindings);
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
 
         UiNodeId b = IdentityOf("B", "draw");
         if (!string.Equals(b.Path, "row/" + ProbeKind + "[1]", StringComparison.Ordinal))
@@ -222,7 +220,7 @@ internal static class KernelIdentityTests
         tab = "TabA";
         ResetProbe();
         host.Session.BumpContentRevision();
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
 
         UiNodeId a = IdentityOf("A", "draw");
         if (!string.Equals(a.Path, "row/" + ProbeKind + "[0]", StringComparison.Ordinal))
@@ -230,7 +228,7 @@ internal static class KernelIdentityTests
             throw new Exception("a Tab switch renumbered the visible sibling: " + a.Path);
         }
 
-        if (!host.Session.GetValueStates(b).ContainsKey("probe"))
+        if (!NativeFixture.CustomSlots(host.Session,b).ContainsKey("probe"))
         {
             throw new Exception("the Tab-hidden sibling lost its state slot");
         }
@@ -327,21 +325,21 @@ internal static class KernelIdentityTests
     {
         ResetProbe();
         using UiHost host = Host(TwoSiblingPage());
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
 
         UiNodeId a = IdentityOf("A", "draw");
         UiNodeId b = IdentityOf("B", "draw");
 
-        IReadOnlyDictionary<string, UiValueState> slotsA = host.Session.GetValueStates(a);
-        IReadOnlyDictionary<string, UiValueState> slotsB = host.Session.GetValueStates(b);
-        if (!slotsA.TryGetValue("probe", out UiValueState? stateA) || !slotsB.TryGetValue("probe", out UiValueState? stateB))
+        IReadOnlyDictionary<string, NativeFixture.LocalState> slotsA = NativeFixture.CustomSlots(host.Session,a);
+        IReadOnlyDictionary<string, NativeFixture.LocalState> slotsB = NativeFixture.CustomSlots(host.Session,b);
+        if (!slotsA.TryGetValue("probe", out NativeFixture.LocalState? stateA) || !slotsB.TryGetValue("probe", out NativeFixture.LocalState? stateB))
         {
             throw new Exception("an element drew without owning a 'probe' slot (A=" + slotsA.Count + ", B=" + slotsB.Count + ")");
         }
 
         if (ReferenceEquals(stateA, stateB))
         {
-            throw new Exception("both siblings share one UiValueState object");
+            throw new Exception("both siblings share one NativeFixture.LocalState object");
         }
 
         if (stateA!.EditText != "A" || stateB!.EditText != "B")
@@ -363,7 +361,7 @@ internal static class KernelIdentityTests
 
         // Nothing may have landed in the element-less namespace: a read outside any element resolves
         // there, and a widget's state that aliased into it would make this non-empty.
-        UiValueState unscoped = host.Session.GetOrCreateValueState("probe");
+        NativeFixture.LocalState unscoped = NativeFixture.Custom(host.Session,"probe");
         if (unscoped.EditText.Length != 0 || unscoped.Dragging)
         {
             throw new Exception("widget state leaked into the session-level namespace");
@@ -374,11 +372,11 @@ internal static class KernelIdentityTests
     {
         ResetProbe();
         using UiHost host = Host(ThrowerPage());
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
 
         UiNodeId after = IdentityOf("after", "draw");
-        IReadOnlyDictionary<string, UiValueState> slots = host.Session.GetValueStates(after);
-        if (!slots.TryGetValue("probe", out UiValueState? state) || state.EditText != "after")
+        IReadOnlyDictionary<string, NativeFixture.LocalState> slots = NativeFixture.CustomSlots(host.Session,after);
+        if (!slots.TryGetValue("probe", out NativeFixture.LocalState? state) || state.EditText != "after")
         {
             throw new Exception("the element drawn after a throwing sibling did not get its own slot");
         }
@@ -403,7 +401,7 @@ internal static class KernelIdentityTests
         // Both siblings claim the SAME string, because a widget's help key is its own vocabulary: the
         // claim string therefore cannot tell them apart, and the identity is the only axis that can.
         IdentityProbeWidget.ClaimingTag = "A";
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
         UiNodeId a = IdentityOf("A", "draw");
         if (!string.Equals(host.Session.HoverClaim, IdentityProbeWidget.HelpKey, StringComparison.Ordinal))
         {
@@ -418,7 +416,7 @@ internal static class KernelIdentityTests
         host.Session.HoverGraceFrames = 2;
         ResetProbe();
         IdentityProbeWidget.ClaimingTag = "B";
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
         UiNodeId b = IdentityOf("B", "draw");
 
         if (!string.Equals(host.Session.HoverClaim, IdentityProbeWidget.HelpKey, StringComparison.Ordinal))
@@ -434,8 +432,8 @@ internal static class KernelIdentityTests
         // Two claim-free passes: the first is the boundary that holds the finished claim, the second is
         // the grace pass that re-presents it. The held claim must carry B's identity, not A's.
         IdentityProbeWidget.ClaimingTag = "";
-        host.DrawFrame(Viewport);
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
 
         if (!string.Equals(host.Session.HoverClaim, IdentityProbeWidget.HelpKey, StringComparison.Ordinal))
         {
@@ -457,7 +455,7 @@ internal static class KernelIdentityTests
     {
         ResetProbe();
         using UiHost host = Host(TwoSiblingPage());
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
 
         UiNodeId idA = IdentityOf("A", "draw");
         UiNode? first = NodeOf("A", "draw");
@@ -471,23 +469,24 @@ internal static class KernelIdentityTests
             throw new Exception("the session's node for the identity is not the node the widget was handed");
         }
 
-        if (!ReferenceEquals(first.State, host.Session.GetOrCreateValueState(idA)))
+        if (!ReferenceEquals(NativeFixture.Custom(first), NativeFixture.Custom(host.Session,idA)))
         {
             throw new Exception("the element's own state is not the node's state");
         }
 
-        if (!ReferenceEquals(first.ValueStates["probe"], host.Session.GetOrCreateValueState(idA, "probe")))
+        if (!ReferenceEquals(NativeFixture.CustomSlots(first)["probe"], NativeFixture.Custom(host.Session,idA, "probe")))
         {
             throw new Exception("a named slot is not the node's slot");
         }
 
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(
+        host,Viewport);
         if (!ReferenceEquals(first, NodeOf("A", "draw")))
         {
             throw new Exception("a re-arrange replaced the node instead of reusing it");
         }
 
-        if (!first.ValueStates.TryGetValue("probe", out UiValueState? state) || state.EditText != "A")
+        if (!NativeFixture.CustomSlots(first).TryGetValue("probe", out NativeFixture.LocalState? state) || state.EditText != "A")
         {
             throw new Exception("the element's state did not survive the pass");
         }
@@ -503,7 +502,7 @@ internal static class KernelIdentityTests
     {
         ResetProbe();
         using UiHost host = Host(SeparatorKindPage());
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
 
         UiNodeId a = IdentityOf("A", "draw");
         UiNodeId b = IdentityOf("B", "draw");
@@ -526,9 +525,9 @@ internal static class KernelIdentityTests
             throw new Exception("the session did not keep the two nodes apart");
         }
 
-        IReadOnlyDictionary<string, UiValueState> slotsA = host.Session.GetValueStates(a);
-        IReadOnlyDictionary<string, UiValueState> slotsB = host.Session.GetValueStates(b);
-        if (!slotsA.TryGetValue("probe", out UiValueState? stateA) || !slotsB.TryGetValue("probe", out UiValueState? stateB))
+        IReadOnlyDictionary<string, NativeFixture.LocalState> slotsA = NativeFixture.CustomSlots(host.Session,a);
+        IReadOnlyDictionary<string, NativeFixture.LocalState> slotsB = NativeFixture.CustomSlots(host.Session,b);
+        if (!slotsA.TryGetValue("probe", out NativeFixture.LocalState? stateA) || !slotsB.TryGetValue("probe", out NativeFixture.LocalState? stateB))
         {
             throw new Exception("a sibling did not own its own 'probe' slot");
         }
@@ -549,7 +548,7 @@ internal static class KernelIdentityTests
                 + "update this assertion: '" + a.Path + "' vs '" + b.Path + "'");
         }
 
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(Viewport.width, Viewport.height));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(Viewport.Width, Viewport.Height));
         int printed = 0;
         foreach (string key in snapshot.VisibleIds)
         {
@@ -574,13 +573,14 @@ internal static class KernelIdentityTests
     {
         ResetProbe();
         using UiHost host = Host(TwoSiblingPage());
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
         if (CountObservations("A", "measure") != 1)
         {
             throw new Exception("expected one Measure on the first arrange, got " + CountObservations("A", "measure"));
         }
 
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(
+        host,Viewport);
         if (CountObservations("A", "measure") != 1)
         {
             throw new Exception("an unchanged pass re-measured the tree; the snapshot cache stopped working");
@@ -603,7 +603,8 @@ internal static class KernelIdentityTests
             throw new Exception("MarkDirty did not set the flag");
         }
 
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(
+        host,Viewport);
         if (CountObservations("A", "measure") != 2)
         {
             throw new Exception("a dirty node did not force a re-arrange");
@@ -624,7 +625,7 @@ internal static class KernelIdentityTests
     {
         ResetProbe();
         using UiHost host = Host(TwoSiblingPage());
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
 
         UiNode? row = host.Session.GetNodeByElementId("row");
         UiNode? a = NodeOf("A", "draw");
@@ -649,16 +650,16 @@ internal static class KernelIdentityTests
             throw new Exception("arranged geometry was not published to the nodes");
         }
 
-        if (Math.Abs(b.Rect.Value.x - (a.Rect.Value.x + a.Rect.Value.width + 4f)) > 0.01f)
+        if (Math.Abs(b.Rect.Value.X - (a.Rect.Value.X + a.Rect.Value.Width + 4f)) > 0.01f)
         {
-            throw new Exception("the node rects do not match the arranged row geometry (b.x=" + b.Rect.Value.x + ")");
+            throw new Exception("the node rects do not match the arranged row geometry (b.x=" + b.Rect.Value.X + ")");
         }
 
         // A child that is not arranged this pass leaves its parent's list and keeps no geometry.
         ResetProbe();
         using (UiHost hidden = Host(HiddenSiblingPage()))
         {
-            hidden.DrawFrame(Viewport);
+            NativeFixture.DrawFrame(            hidden,Viewport);
             UiNode? hiddenRow = hidden.Session.GetNodeByElementId("row");
             if (hiddenRow == null || hiddenRow.Children.Count != 1)
             {
@@ -681,7 +682,7 @@ internal static class KernelIdentityTests
     {
         ResetProbe();
         using UiHost host = Host(TwoSiblingPage());
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
 
         UiNode? leftA = SubOf("A", "draw");
         UiNode? leftB = SubOf("B", "draw");
@@ -711,13 +712,14 @@ internal static class KernelIdentityTests
             throw new Exception("the sub-node's display path does not name it: " + leftA.Path);
         }
 
-        if (!leftA.ValueStates.TryGetValue("buffer", out UiValueState? bufferA) || bufferA.EditText != "A"
-            || !leftB.ValueStates.TryGetValue("buffer", out UiValueState? bufferB) || bufferB.EditText != "B")
+        if (!NativeFixture.CustomSlots(leftA).TryGetValue("buffer", out NativeFixture.LocalState? bufferA) || bufferA.EditText != "A"
+            || !NativeFixture.CustomSlots(leftB).TryGetValue("buffer", out NativeFixture.LocalState? bufferB) || bufferB.EditText != "B")
         {
             throw new Exception("sub-node state crossed between the two elements");
         }
 
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(
+        host,Viewport);
         if (!ReferenceEquals(leftA, SubOf("A", "draw")))
         {
             throw new Exception("a re-arrange replaced the sub-node instead of reusing it");
@@ -734,7 +736,7 @@ internal static class KernelIdentityTests
     {
         ResetProbe();
         using UiHost host = Host(ThrowingSeparatorPage());
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
 
         if (host.Session.TrippedNodes.Count != 2)
         {
@@ -758,7 +760,7 @@ internal static class KernelIdentityTests
                 + "api-tiers residual line: '" + tripped[0].Path + "' vs '" + tripped[1].Path + "'");
         }
 
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(Viewport.width, Viewport.height));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(Viewport.Width, Viewport.Height));
         int printed = 0;
         foreach (string key in snapshot.VisibleIds)
         {
@@ -783,7 +785,7 @@ internal static class KernelIdentityTests
     {
         ResetProbe();
         using UiHost host = Host(ScrollSiblingPage());
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
 
         UiNode? scrollA = NodeOf("A", "draw")?.Parent;
         UiNode? scrollB = NodeOf("B", "draw")?.Parent;
@@ -792,13 +794,13 @@ internal static class KernelIdentityTests
             throw new Exception("the two unnamed Scroll siblings did not get their own nodes");
         }
 
-        host.Session.SetScrollPosition(scrollA, new Vector2(0f, 5f));
-        if (Math.Abs(host.Session.GetScrollPosition(scrollB).y) > 0.01f)
+        host.Session.SetScrollPosition(scrollA, new UiLayoutPoint(0f, 5f));
+        if (Math.Abs(host.Session.GetScrollPosition(scrollB).Y) > 0.01f)
         {
             throw new Exception("scroll state crossed between two sibling scroll containers");
         }
 
-        if (Math.Abs(host.Session.GetScrollPosition(scrollA).y - 5f) > 0.01f)
+        if (Math.Abs(host.Session.GetScrollPosition(scrollA).Y - 5f) > 0.01f)
         {
             throw new Exception("the scroll container's own position was lost");
         }
@@ -808,7 +810,7 @@ internal static class KernelIdentityTests
         using (UiHost target = Host(TargetPage()))
         {
             target.Session.SetScrollTarget("target");
-            target.MeasureAndArrange(new Vector2(300f, 200f));
+            target.MeasureAndArrange(new UiLayoutPoint(300f, 200f));
             UiNode? scroll = target.Session.GetNodeByElementId("scroll");
             if (scroll == null)
             {
@@ -820,20 +822,20 @@ internal static class KernelIdentityTests
                 throw new Exception("the resolved request was not consumed");
             }
 
-            if (target.Session.GetScrollPosition(scroll).y <= 0f)
+            if (target.Session.GetScrollPosition(scroll).Y <= 0f)
             {
                 throw new Exception("the target did not move its scroll container");
             }
 
-            target.Session.SetScrollPosition(scroll, new Vector2(0f, 7f));
-            target.MeasureAndArrange(new Vector2(300f, 200f));
-            if (Math.Abs(target.Session.GetScrollPosition(scroll).y - 7f) > 0.01f)
+            target.Session.SetScrollPosition(scroll, new UiLayoutPoint(0f, 7f));
+            target.MeasureAndArrange(new UiLayoutPoint(300f, 200f));
+            if (Math.Abs(target.Session.GetScrollPosition(scroll).Y - 7f) > 0.01f)
             {
                 throw new Exception("a consumed request applied a second time");
             }
 
             target.Session.SetScrollTarget("missing-id");
-            target.MeasureAndArrange(new Vector2(300f, 200f));
+            target.MeasureAndArrange(new UiLayoutPoint(300f, 200f));
             if (target.Session.ScrollTargetElementId == null)
             {
                 throw new Exception("an unresolvable target was dropped instead of staying pending");
@@ -853,17 +855,17 @@ internal static class KernelIdentityTests
         var bindings = new UiBindings();
         string choice = "x";
         bindings.BindValue("dd", () => choice, value => choice = value);
-        bindings.BindOptions("Options", () => new List<string> { "x", "y" });
+        bindings.BindChoices("Options", ()=> (new List<string> { "x", "y" }).Select(value=>new UiChoice<string>(value,value,value)).ToArray());
         bindings.BindAction<int>("under-clicked", value => ClickProbeWidget.Fires++);
 
         using UiHost host = Host(ClickPage(), bindings);
-        Vector2 onTrigger = new(150f, 14f);
-        Vector2 underThePopup = new(150f, 70f);
+        UiLayoutPoint onTrigger = new(150f, 14f);
+        UiLayoutPoint underThePopup = new(150f, 70f);
 
         try
         {
-            UiNative.DebugMousePositionEnabled = true;
-            UiNative.ButtonOverride = rect => Over(rect, UiNative.DebugMousePosition);
+            NativeFixture.DebugMousePositionEnabled = true;
+            NativeFixture.ButtonOverride = rect => Over(rect, NativeFixture.DebugMousePosition);
 
             Pump(host, onTrigger);
             if (!host.Session.IsPopupOpen("dd"))
@@ -890,22 +892,19 @@ internal static class KernelIdentityTests
         }
         finally
         {
-            UiNative.DebugMousePositionEnabled = false;
-            UiNative.ButtonOverride = null;
+            NativeFixture.DebugMousePositionEnabled = false;
+            NativeFixture.ButtonOverride = null;
         }
     }
 
-    private static void Pump(UiHost host, Vector2 point)
+    private static void Pump(UiHost host, UiLayoutPoint point)
     {
-        UiNative.DebugMousePosition = point;
-        UiNative.DebugMouseDown = true;
-        host.DrawFrame(new Rect(0f, 0f, 300f, 200f));
-        UiNative.DebugMouseDown = false;
+        NativeEvents.Click(point, () => NativeFixture.DrawFrame(host,new UiLayoutRect(0,0,300,200)));
     }
 
-    private static bool Over(Rect rect, Vector2 point)
+    private static bool Over(UiLayoutRect rect, UiLayoutPoint point)
     {
-        return point.x >= rect.x && point.x <= rect.xMax && point.y >= rect.y && point.y <= rect.yMax;
+        return point.X >= rect.X && point.X <= rect.XMax && point.Y >= rect.Y && point.Y <= rect.YMax;
     }
 
     private static string ClickPage()
@@ -918,7 +917,7 @@ internal static class KernelIdentityTests
 
     // --- fixture -------------------------------------------------------------------------------
 
-    private static UiHost Host(string xml, IUiBindings? bindings = null)
+    private static UiHost Host(string xml, IUiBindingReader? bindings = null)
     {
         return new UiHost(
             Scope,
@@ -1152,7 +1151,7 @@ internal static class KernelIdentityTests
                 : 14f;
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
@@ -1162,7 +1161,7 @@ internal static class KernelIdentityTests
             return height;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             // A sub-control this widget owns: minted as a node under the element's node, with its own
             // state, so it can be graded for identity and isolation like any element.
@@ -1170,17 +1169,17 @@ internal static class KernelIdentityTests
             UiNode? sub = left.Node;
             if (sub != null)
             {
-                sub.GetOrCreateState("buffer").EditText = tag;
+                NativeFixture.Custom(                sub,"buffer").EditText = tag;
             }
 
             Seen.Add(new Observation(tag, "draw", ctx.ElementId, ctx.ElementPath, ctx.Node, sub));
 
-            UiValueState state = ctx.Session.GetOrCreateValueState("probe");
+            NativeFixture.LocalState state = NativeFixture.Custom(ctx.Node,"probe");
             state.EditText = tag;
             state.Dragging = dragging;
             state.Cursor = cursor;
 
-            if (!ReferenceEquals(state, ctx.Session.GetOrCreateValueState(ctx.ElementId, "probe")))
+            if (!ReferenceEquals(state, NativeFixture.Custom(ctx.Session,ctx.ElementId, "probe")))
             {
                 MissedOwnSlot.Add(tag);
             }
@@ -1216,7 +1215,7 @@ internal static class KernelIdentityTests
             this.spec = spec;
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
             if (spec.TryGetAttribute("ActionBind", out string action) && action.Length > 0)
             {
@@ -1229,9 +1228,9 @@ internal static class KernelIdentityTests
             return 40f;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
-            if (UiNative.Button(rect, ctx) && spec.TryGetAttribute("ActionBind", out string action) && action.Length > 0)
+            if (ctx.Controls.Button(rect, ctx) && spec.TryGetAttribute("ActionBind", out string action) && action.Length > 0)
             {
                 // The binding's handler counts the click; incrementing here too would count every click twice.
                 ctx.Bindings.Invoke(action, 1);
@@ -1248,7 +1247,7 @@ internal static class KernelIdentityTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
@@ -1257,7 +1256,7 @@ internal static class KernelIdentityTests
             throw new InvalidOperationException("identity probe: measure boom");
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             throw new InvalidOperationException("identity probe: draw boom");
         }

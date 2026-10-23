@@ -55,6 +55,10 @@ $ErrorActionPreference = "Stop"
 # library's neutrality, and that scan silently passed on an empty tree the moment the trees moved.
 
 $root = [System.IO.Path]::GetFullPath($ProjectRoot)
+# Verification and every spawned build/test use repository-local scratch space.
+$env:TEMP = Join-Path $root 'dist/test-temp'
+$env:TMP = $env:TEMP
+New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
 $projectFile = Join-Path $root 'Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj'
 $testsProject = Join-Path $root 'tools\FerriteLib.UiKit.Tests\FerriteLib.UiKit.Tests.csproj'
 $assembliesDir = Join-Path $root 'dist\build\Release'

@@ -78,25 +78,25 @@ by reading sources from another runtime. Cross-runtime reads/writes inside a tra
 `[ThreadStatic]` current-runtime marker is saved/restored through nested calls and `finally`; no graph,
 business data, subscriptions or scheduler live in static state. The outermost exit leaves no marker.
 Ordinary `BindValue`, `BindReadOnly`, `BindOptions`, hand-written
-`IUiBindings` and custom `IUiWidget` retain their original live-getter conditions, including serially handed-off untracked registry calls
+`IUiBindingReader` and custom `IUiWidget` retain their original live-getter conditions, including serially handed-off untracked registry calls
 without a new creation-thread prerequisite. Explicit runtime/BindTracked/BeginOperation use activates the
-new serial-access contract. The platform-only audit
-partial forwards existing binding type-mismatch diagnostics; the neutral source has no platform reference.
+new serial-access contract. Binding diagnostics use the explicit neutral execution warning outlet when present; the complete
+Kernel has no platform reference.
 
 ## Project actual options, not live item objects
 
 ```csharp
-bindings.BindTrackedOptions("selected", () => current.Value
+bindings.BindTrackedChoices("selected", () => current.Value
     .Select(item => new UiChoice<int>(item.Key + ": " + item.Count, item.Code))
     .ToList().AsReadOnly(), (a, b) => a.Text == b.Text && a.Value == b.Value);
 ```
 
-`BindTrackedOptions<T>` is a new pure getter contract with required item equality. It copies the outer
+`BindTrackedChoices<T>` is a pure choice getter contract with required item equality. It copies the outer
 list **inside** the tracked calculation. Labels and typed values must themselves be immutable presentation
 values (or explicitly frozen projections); no automatic copying of arbitrary business object graphs occurs.
 The getter must read each mutable property needed by this presentation while tracking, not defer it to Draw.
-An ordinary string-options list and `UiChoice<T>` use the same registry; actual `GetOptions<T>`,
-`TryGetChoices` and bounded observation prefixes all select the same synchronized options channel.
+Ordinary and tracked UiChoice<T> lists use the same choice endpoint. Full reads and bounded
+observation prefixes select that synchronized channel without a type-probing companion.
 Value and options can share the same key, as real typed mode rows require, without channel collision.
 Outside a presentation, full options/choice reads project the current business values. A bounded observation
 calls that same pure getter and copies only Count plus the requested indices, without a library-added full
@@ -119,7 +119,7 @@ changing a branch to an equal-valued source still updates subsequent following r
 `UiHost.MeasureAndArrange` synchronizes its own `UiBindingPresentation` before entering the existing
 engine. `Draw` consumes that same published read view. A tracked binding read from this presentation
 scope sees the synchronized input, including when an earlier input callback has just changed the model.
-RU3 synchronizes independent complete binding results and records invalid keys separately. Default/explicit consumer demand is prepared before that consumer measures and before Draw issues requests; unknown old custom consumers retain conservative all-key service. A failed current read throws; only dedicated display paths may use retained old paint. Geometry publication remains transactional. Retry requires related input or an explicit pure request; another frame is not a retry. Direct split-phase users must keep the
+RU3 synchronizes independent complete binding results and records invalid keys separately. Default/explicit consumer demand is prepared before that consumer measures and before Draw issues requests; custom tracked consumers declare complete descriptor roles or IUiPresentationDemand, without a prepare-all fallback. A failed current read throws; only dedicated display paths may use retained old paint. Geometry publication remains transactional. Retry requires related input or an explicit pure request; another frame is not a retry. Direct split-phase users must keep the
 `MeasureAndArrange` result and its corresponding `Draw` together, without another arrangement in between.
 
 Business operations through `Set<T>`, `Invoke(string)`, `TryInvokeCommand`, `Invoke<T>` and the boxed
@@ -153,7 +153,7 @@ using (bindings.BeginOperation())
 All four actual binding operation entrances create implicit nested batches; external projection application
 can use `runtime.Batch()`. Automatic responses wait for the outer boundary. The shared
 `UiValueBehavior.Request(..., UiBindings, request)` boundary is used by the real Checkbox for its compound
-Set-before-Invoke operation, as well as the no-platform behavior E2E. Hand-written `IUiBindings` keeps the
+Set-before-Invoke operation, as well as the no-platform behavior E2E. Hand-written `IUiBindingReader` keeps the
 existing callback route; other shared extensions must choose the new operation overload explicitly when
 they compose multiple operations. Single-binding requests already enter the same runtime batch.
 

@@ -23,14 +23,14 @@ consumer must declare it explicitly. US has not adopted this Dev and is not chan
 ## Draft and model are different facts
 
 `UiEditSession<T>` is the only draft authority. Each node's native editor slot references this same
-production type; `UiValueState.EditText`, `Focused` and `FloatValue` are compatibility projections.
+production type. Writable UiValueState compatibility projections have been removed.
 `UiNumericEdit` supplies finite invariant parsing, formatting, clamping and local step composition.
 No editor caches a second business value. `Observe` samples the actual model; a normal setter return
 does not imply business adoption.
 
-The native `UiNative.Edit<T>` driver, default wrappers and nonrendering clients use these same source
+The native `ctx.Controls.Edit<T>` driver, default wrappers and nonrendering clients use these same source
 files and transitions. Independent native widgets can pass their formatter/parser, request callback
-and actual-model getter to `UiNative.Edit`; `UiNative.Editor<T>` accesses their instance-local draft.
+and actual-model getter to `ctx.Controls.Edit`; `ctx.Controls.Editor<T>` accesses their instance-local draft.
 Use the widget's normal context/node scope, just as for the other session-owned native primitives.
 The no-platform contract target compiles these actual production sources without Unity/Verse stubs.
 
@@ -53,11 +53,11 @@ The no-platform contract target compiles these actual production sources without
 * **Approved Cancel boundary:** Cancel shows the latest actual model without rolling back earlier Live requests. Hidden drafts
   survive; hide/disable releases the active-edit record. Retarget/remove/dispose do not invent a commit.
 
-The old raw `TextField(rect,text)` and session/key `TextField`/`NumberField` signatures remain usable
-without tree registration. The identity-bearing forms now adapt the same driver; they still report a
-candidate for their caller to dispatch. Their historical discard-on-disabled policy remains explicit
-in that compatibility adapter. New callback-based wrappers preserve a disabled draft while releasing
-focus. No old entry silently acquires a binding registration prerequisite.
+Independent native authors create a named context with UiSession.CreateContext and supply one explicit
+frame/execution at each native callback. They use the same callback editor and binding capability;
+no Host/XML/reactive runtime is required. Raw/session-key compatibility editor bridges are removed.
+Disabled callback editors retain their reliable draft while releasing focus. See the complete
+no-friend StandaloneNativeNumber author and [refactor migration](refactor-migration.md).
 
 ## One explicit numeric operation
 
@@ -73,7 +73,7 @@ write. Existing valid Min/Max/Step declarations retain their conditions.
 Participating parts suspend native editor focus on capture, before ordinary blur can publish the old
 draft. Capture alone keeps the draft. A qualified release/selected value then takes over; a canceled
 activation does not. Independent Buttons and other same-Bind instances have no takeover rights.
-Custom native composites use `UiNative.SuspendEditor(ctx, binding)` for this declared participation,
+Custom native composites use `ctx.Controls.SuspendEditor(ctx, binding)` for this declared participation,
 then the same `UiNumericEdit.Step` / `UiEditSession.TakeOver`; standalone nonrendering clients use the
 same editor transitions without native focus. Do not infer participation from labels or proximity.
 
@@ -82,7 +82,7 @@ same editor transitions without native focus. Do not infer participation from la
 Verse `Widgets.TextField`/`TextArea` remain the character/selection/clipboard engines. Read-only filters
 mutating key and native command events before the native control while retaining navigation, SelectAll
 and Copy, and never adopts a returned changed draft. Platform eligibility, event consumption, font and
-composition facts are in `UiNative.Editing`, not in the neutral state.
+composition facts come from VerseUiExecution; UiControls drives the same neutral state.
 
 Host Accept/Cancel reserve a composition key for the native edit instead of also confirming/discarding
 the whole draft or closing the window. This is fixture-tested protocol, not target-game IME acceptance.

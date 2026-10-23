@@ -1,10 +1,11 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using FerriteLib.UiKit;
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 internal static class KernelSharedEditingTests
@@ -55,26 +56,26 @@ internal static class KernelSharedEditingTests
         UiWidgetContext Context(UiNode node) => new("edit", session, new StubMetrics(), UiTheme.Vanilla,
             new StubTranslation(), bindings, 200, node.Id.Key, node: node);
         bool Parse(string text, out string value) { value = text; return true; }
-        var a = UiNative.Editor<string>(Context(first), "text", value => value, Parse);
-        var b = UiNative.Editor<string>(Context(second), "text", value => value, Parse);
+        var a = NativeFixture.Editor<string>(Context(first), "text", value => value, Parse);
+        var b = NativeFixture.Editor<string>(Context(second), "text", value => value, Parse);
         a.Observe("model");
         a.Input("first draft", true, false, false, _ => { }, () => "model");
         b.Observe("model");
         Check(!ReferenceEquals(a, b) && a.Draft == "first draft" && b.Draft == "model",
             "explicit contexts own distinct same-binding drafts without an ambient EnterNode");
-        UiNative.DebugMousePositionEnabled = true;
-        UiNative.DebugMousePosition = new Vector2(20, 14);
-        UiNative.DebugMouseDown = true;
-        UiNative.Edit(new Rect(0, 0, 200, 28), Context(first), "text", "model", value => value, Parse,
-            false, false, _ => { }, () => "model");
-        Check(ReferenceEquals(session.ActiveEditState, session.GetOrCreateValueState(first.Id, "text"))
+        NativeFixture.DebugMousePositionEnabled = true;
+        NativeFixture.DebugMousePosition = new UiLayoutPoint(20, 14);
+        NativeFixture.DebugMouseDown = true;
+        {NativeFixture.BeginDebugEvent();NativeFixture.Edit(new UiLayoutRect(0, 0, 200, 28), Context(first), "text", "model", value => value, Parse,
+            false, false, _ => { }, () => "model");}
+        Check(ReferenceEquals(session.ActiveEditState, NativeFixture.Slot(session,first.Id, "text"))
             && ReferenceEquals(first.EditingState, session.ActiveEditState)
             && !ReferenceEquals(second.EditingState, session.ActiveEditState),
             "explicit-context drive records the actual owner rather than the ambient session node");
         first.InteractionScope = "replacement";
-        var replacement = UiNative.Editor<string>(Context(first), "text", value => value, Parse);
+        var replacement = NativeFixture.Editor<string>(Context(first), "text", value => value, Parse);
         Check(!ReferenceEquals(a, replacement) && !a.Focused && session.ActiveEditState == null
-            && ReferenceEquals(b, UiNative.Editor<string>(Context(second), "text", value => value, Parse)),
+            && ReferenceEquals(b, NativeFixture.Editor<string>(Context(second), "text", value => value, Parse)),
             "real explicit owner retarget suspends only the replaced core editor");
     }
     private static List<string> Trace(int route)
@@ -91,7 +92,7 @@ internal static class KernelSharedEditingTests
         }
 
         bindings.BindValue("text", () => model, Set);
-        var ctx = new UiWidgetContext("edit", session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 200, "text");
+        var ctx = NativeFixture.Context("edit", session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 200, "text");
         var widget = new TextFieldWidget();
         widget.Configure(new UiElementSpec("text", TextFieldWidget.Kind, new Dictionary<string, string> { ["Bind"] = "text" }));
         bool Parse(string text, out string value)
@@ -101,7 +102,7 @@ internal static class KernelSharedEditingTests
         }
 
         var headless = new UiEditSession<string>(value => value, Parse);
-        UiEditSession<string> Editor() => route == 2 ? headless : UiNative.Editor<string>(ctx, "text", value => value, Parse);
+        UiEditSession<string> Editor() => route == 2 ? headless : NativeFixture.Editor<string>(ctx, "text", value => value, Parse);
         var trace = new List<string>();
         void Drive(string? text = null, bool focus = false, bool confirm = false, bool blur = false, bool cancel = false)
         {
@@ -119,18 +120,19 @@ internal static class KernelSharedEditingTests
             }
             else
             {
-                UiNative.DebugMousePositionEnabled = true;
-                UiNative.DebugMousePosition = new Vector2(20, 14);
-                UiNative.DebugMouseDown = focus;
-                UiNative.DebugEnter = confirm;
-                UiNative.DebugFocusLost = blur;
-                UiNative.TextFieldOverride = (_, shown) => text ?? shown;
+                NativeFixture.DebugMousePositionEnabled = true;
+                NativeFixture.DebugMousePosition = new UiLayoutPoint(20, 14);
+                NativeFixture.DebugMouseDown = focus;
+                NativeFixture.DebugEnter = confirm;
+                NativeFixture.DebugFocusLost = blur;
+                NativeFixture.TextFieldOverride = (_, shown) => text ?? shown;
+                NativeFixture.BeginDebugEvent();
                 if (cancel)
-                    session.GetOrCreateValueState("text").DiscardRequested = true;
+                    NativeFixture.Slot(                    session,"text").DiscardRequested = true;
                 if (route == 0)
-                    widget.Draw(new Rect(0, 0, 200, 28), ctx);
+                    NativeFixture.Draw(                    widget,new UiLayoutRect(0, 0, 200, 28), ctx);
                 else
-                    UiNative.Edit(new Rect(0, 0, 200, 28), ctx, "text", model, value => value, Parse, false, false, Set, () => model);
+                    NativeFixture.Edit(new UiLayoutRect(0, 0, 200, 28), ctx, "text", model, value => value, Parse, false, false, Set, () => model);
             }
 
             var editor = Editor();
@@ -152,6 +154,7 @@ internal static class KernelSharedEditingTests
         model = "latest";
         Drive(cancel: true);
         Check(model == "latest" && requests == 1 && Editor().Draft == "latest", "cancel follows latest model without rollback");
+        Console.WriteLine("EDIT-TRACE route="+route+" "+string.Join(" ; ",trace));
         return trace;
     }
 
@@ -167,50 +170,53 @@ internal static class KernelSharedEditingTests
             model = value;
             requests++;
         });
-        var ctx = new UiWidgetContext("edit", session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 200, "text");
+        var ctx = NativeFixture.Context("edit", session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 200, "text");
         var widget = new TextFieldWidget();
         widget.Configure(new UiElementSpec("text", TextFieldWidget.Kind, new Dictionary<string, string> { ["Bind"] = "text", ["Multiline"] = "true" }));
-        UiNative.DebugMousePositionEnabled = true;
-        UiNative.DebugMousePosition = new Vector2(20, 14);
-        UiNative.DebugMouseDown = true;
-        UiNative.TextFieldOverride = (_, _) => "one\ntwo";
-        widget.Draw(new Rect(0, 0, 200, 80), ctx);
-        UiNative.DebugMouseDown = false;
-        UiNative.TextFieldOverride = (_, text) => text;
+        NativeFixture.DebugMousePositionEnabled = true;
+        NativeFixture.DebugMousePosition = new UiLayoutPoint(20, 14);
+        NativeFixture.DebugMouseDown = true;
+        NativeFixture.TextFieldOverride = (_, _) => "one\ntwo";
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.Draw(        widget,new UiLayoutRect(0, 0, 200, 80), ctx);
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.TextFieldOverride = (_, text) => text;
         Event.current = new Event
         {
             type = EventType.KeyDown,
             keyCode = KeyCode.Return
         };
-        widget.Draw(new Rect(0, 0, 200, 80), ctx);
-        Check(requests == 0 && session.GetOrCreateValueState("text").Focused, "multiline Return remains native newline, not confirmation");
+        NativeFixture.Draw(        widget,new UiLayoutRect(0, 0, 200, 80), ctx);
+        Check(requests == 0 && NativeFixture.Slot(session,"text").IsFocused, "multiline Return remains native newline, not confirmation");
         Event.current = new Event
         {
             type = EventType.KeyDown,
             keyCode = KeyCode.Return,
             control = true
         };
-        widget.Draw(new Rect(0, 0, 200, 80), ctx);
+        NativeFixture.Draw(        widget,new UiLayoutRect(0, 0, 200, 80), ctx);
         Check(requests == 1 && model == "one\ntwo", "multiline Ctrl+Return confirms one shared draft");
         var readOnly = new UiBindings();
         readOnly.BindReadOnly("text", () => model);
-        ctx = new UiWidgetContext("edit", session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), readOnly, 200, "text");
-        UiNative.TextFieldOverride = (_, _) => "forbidden";
-        UiNative.DebugMouseDown = true;
+        ctx = NativeFixture.Context("edit", session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), readOnly, 200, "text");
+        NativeFixture.TextFieldOverride = (_, _) => "forbidden";
+        NativeFixture.DebugMouseDown = true;
+        NativeEvents.Begin(EventType.MouseDown,new UiLayoutPoint(20,14));
+        NativeFixture.Draw(widget,new UiLayoutRect(0,0,200,80),ctx);
         Event.current = new Event
         {
             type = EventType.KeyDown,
             character = 'x'
         };
-        widget.Draw(new Rect(0, 0, 200, 80), ctx);
-        Check(Event.current.type == EventType.Used && session.GetOrCreateValueState("text").EditText == model, "readonly protects native mutation before the control and never adopts the changed string");
+        NativeFixture.Draw(        widget,new UiLayoutRect(0, 0, 200, 80), ctx);
+        Check(Event.current.type == EventType.Used && NativeFixture.Slot(session,"text").Draft== model, "readonly protects native mutation before the control and never adopts the changed string");
         Event.current = new Event
         {
             type = EventType.KeyDown,
             keyCode = (KeyCode)99,
             control = true
         };
-        widget.Draw(new Rect(0, 0, 200, 80), ctx);
+        NativeFixture.Draw(        widget,new UiLayoutRect(0, 0, 200, 80), ctx);
         Check(Event.current.type == EventType.KeyDown && requests == 1, "readonly native Copy is allowed without a request");
     }
 
@@ -226,36 +232,33 @@ internal static class KernelSharedEditingTests
             requests.Add(value);
             model = value;
         });
-        var ctx = new UiWidgetContext("edit", session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 400, "value");
+        var ctx = NativeFixture.Context("edit", session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 400, "value");
         var widget = new StepperSliderWidget();
         widget.Configure(new UiElementSpec("value", StepperSliderWidget.Kind, new Dictionary<string, string> { ["Bind"] = "value", ["Min"] = "0", ["Max"] = "100", ["Step"] = "1" }));
         var numeric = new UiNumericEdit(0, 100);
-        var editor = UiNative.Editor<float>(ctx, "value", numeric.Format, numeric.Parse);
+        var editor = NativeFixture.Editor<float>(ctx, "value", numeric.Format, numeric.Parse);
         editor.Observe(model);
         editor.Focus();
         editor.Input("20", true, false, false, _ => throw new Exception("premature request"), () => model);
-        UiNative.ButtonOverride = rect => rect.x > 370;
-        widget.Draw(new Rect(0, 0, 400, 28), ctx);
+        NativeEvents.Click(new UiLayoutPoint(388,14),()=>NativeFixture.Draw(widget,new UiLayoutRect(0,0,400,28),ctx));
         Check(requests.SequenceEqual(new[] { 21f }) && !editor.HasDraft, "real combination steps from draft once, not model or intermediate commit");
         editor.Focus();
         editor.Input("-", true, false, false, _ => throw new Exception("invalid request"), () => model);
-        widget.Draw(new Rect(0, 0, 400, 28), ctx);
+        NativeEvents.Click(new UiLayoutPoint(388,14),()=>NativeFixture.Draw(widget,new UiLayoutRect(0,0,400,28),ctx));
         Check(requests.Count == 1 && editor.Draft == "-", "real combination refuses invalid step without losing text");
-        UiNative.ButtonOverride = null;
-        UiNative.SliderOverride = (_, _, _, _) => 30;
-        widget.Draw(new Rect(0, 0, 400, 28), ctx);
-        Check(requests.SequenceEqual(new[] { 21f, 30f }) && !editor.HasDraft, "real range selection takes over invalid local draft");
+        NativeEvents.Click(new UiLayoutPoint(113.4f,14),()=>NativeFixture.Draw(widget,new UiLayoutRect(0,0,400,28),ctx));
+        Check(requests.Count==2&&requests[0]==21f&&Math.Abs(requests[1]-30f)<.001f && !editor.HasDraft, "real range selection takes over invalid local draft");
     }
 
     private static void Reset()
     {
-        UiNative.TextFieldOverride = null;
-        UiNative.ButtonOverride = null;
-        UiNative.SliderOverride = null;
-        UiNative.DebugMousePositionEnabled = false;
-        UiNative.DebugMouseDown = false;
-        UiNative.DebugEnter = false;
-        UiNative.DebugFocusLost = false;
+        NativeFixture.TextFieldOverride = null;
+        NativeFixture.ButtonOverride = null;
+        NativeFixture.SliderOverride = null;
+        NativeFixture.DebugMousePositionEnabled = false;
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.DebugEnter = false;
+        NativeFixture.DebugFocusLost = false;
         Event.current = null;
         typeof(Input).GetProperty("compositionString")!.SetValue(null, "");
     }
@@ -283,7 +286,7 @@ internal static class KernelSharedEditingTests
                     throw new InvalidOperationException("before write");
                 model = value;
             });
-            var ctx = new UiWidgetContext("edit", session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 400, "value");
+            var ctx = NativeFixture.Context("edit", session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 400, "value");
             IUiWidget widget = combination ? new StepperSliderWidget() : new NumberFieldWidget();
             var attributes = new Dictionary<string, string>
             {
@@ -292,32 +295,32 @@ internal static class KernelSharedEditingTests
                 ["Live"] = "true"
             };
             widget.Configure(new UiElementSpec("value", combination ? StepperSliderWidget.Kind : NumberFieldWidget.Kind, attributes));
-            UiNative.DebugMousePositionEnabled = true;
-            UiNative.DebugMousePosition = new Vector2(combination ? 330 : 20, 14);
-            UiNative.DebugMouseDown = true;
-            UiNative.TextFieldOverride = (_, _) => "20";
-            widget.Draw(new Rect(0, 0, 400, 28), ctx);
-            UiNative.DebugMouseDown = false;
-            UiNative.TextFieldOverride = (_, _) => "10";
-            widget.Draw(new Rect(0, 0, 400, 28), ctx);
-            UiNative.TextFieldOverride = (_, text) => text;
-            widget.Draw(new Rect(0, 0, 400, 28), ctx);
-            Check(requests.SequenceEqual(new[] { 20f, 10f }) && model == 10 && session.GetOrCreateValueState("value").EditText == "10", "real Live wrapper publishes 10→20→10 without losing the return input: combination=" + combination);
+            NativeFixture.DebugMousePositionEnabled = true;
+            NativeFixture.DebugMousePosition = new UiLayoutPoint(combination ? 330 : 20, 14);
+            NativeFixture.DebugMouseDown = true;
+            NativeFixture.TextFieldOverride = (_, _) => "20";
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 400, 28), ctx);}
+            NativeFixture.DebugMouseDown = false;
+            NativeFixture.TextFieldOverride = (_, _) => "10";
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 400, 28), ctx);}
+            NativeFixture.TextFieldOverride = (_, text) => text;
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 400, 28), ctx);}
+            Check(requests.SequenceEqual(new[] { 20f, 10f }) && model == 10 && NativeFixture.Slot(session,"value").Draft== "10", "real Live wrapper publishes 10→20→10 without losing the return input: combination=" + combination);
             if (!combination)
                 continue;
             attributes["Live"] = "false";
             widget.Configure(new UiElementSpec("value", StepperSliderWidget.Kind, attributes));
-            UiNative.DebugMouseDown = true;
-            UiNative.TextFieldOverride = (_, _) => "20";
-            widget.Draw(new Rect(0, 0, 400, 28), ctx);
-            UiNative.DebugMouseDown = false;
-            UiNative.TextFieldOverride = (_, text) => text;
-            UiNative.ButtonOverride = rect => rect.x > 370;
+            NativeFixture.DebugMouseDown = true;
+            NativeFixture.TextFieldOverride = (_, _) => "20";
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 400, 28), ctx);}
+            NativeFixture.DebugMouseDown = false;
+            NativeFixture.TextFieldOverride = (_, text) => text;
+
             fail = true;
             Exception? observed = null;
             try
             {
-                widget.Draw(new Rect(0, 0, 400, 28), ctx);
+                NativeEvents.Click(new UiLayoutPoint(388,14),()=>NativeFixture.Draw(widget,new UiLayoutRect(0,0,400,28),ctx));
             }
             catch (Exception ex)
             {
@@ -326,11 +329,12 @@ internal static class KernelSharedEditingTests
 
             Check(observed?.InnerException != null && requests.Last() == 21 && model == 10, "real combination failed step attempted 21, not its held draft20");
             fail = false;
-            UiNative.ButtonOverride = null;
-            widget.Draw(new Rect(0, 0, 400, 28), ctx);
-            Check(requests.Count == 3 && session.GetOrCreateValueState("value").EditText == "20", "failed combination does not automatically retry or discard the old draft");
-            UiNative.DebugEnter = true;
-            widget.Draw(new Rect(0, 0, 400, 28), ctx);
+            NativeFixture.ButtonOverride = null;
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 400, 28), ctx);}
+            Check(requests.Count == 3 && NativeFixture.Slot(session,"value").Draft== "20", "failed combination does not automatically retry or discard the old draft");
+            NativeEvents.Click(new UiLayoutPoint(330,14),()=>NativeFixture.Draw(widget,new UiLayoutRect(0,0,400,28),ctx));
+            NativeFixture.DebugEnter = true;
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 400, 28), ctx);}
             Check(requests.SequenceEqual(new[] { 20f, 10f, 21f, 20f }) && model == 20, "a distinct explicit confirmation still publishes20 after the failed21");
         }
     }
@@ -359,23 +363,23 @@ internal static class KernelSharedEditingTests
                     throw cause;
                 model = value;
             });
-            var ctx = new UiWidgetContext("edit", session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 200, "value");
+            var ctx = NativeFixture.Context("edit", session, new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), bindings, 200, "value");
             var widget = new NumberFieldWidget();
             widget.Configure(new UiElementSpec("value", NumberFieldWidget.Kind, new Dictionary<string, string> { ["Bind"] = "value", ["Max"] = "100", ["Live"] = live ? "true" : "false" }));
-            UiNative.DebugMousePositionEnabled = true;
-            UiNative.DebugMousePosition = new Vector2(20, 14);
-            UiNative.DebugMouseDown = true;
-            UiNative.TextFieldOverride = (_, _) => "20";
+            NativeFixture.DebugMousePositionEnabled = true;
+            NativeFixture.DebugMousePosition = new UiLayoutPoint(20, 14);
+            NativeFixture.DebugMouseDown = true;
+            NativeFixture.TextFieldOverride = (_, _) => "20";
             Exception? observed = null;
             try
             {
-                widget.Draw(new Rect(0, 0, 200, 28), ctx);
+                {NativeFixture.BeginDebugEvent();NativeFixture.Draw(                widget,new UiLayoutRect(0, 0, 200, 28), ctx);}
                 if (!live)
                 {
-                    UiNative.DebugMouseDown = false;
-                    UiNative.DebugEnter = true;
-                    UiNative.TextFieldOverride = (_, text) => text;
-                    widget.Draw(new Rect(0, 0, 200, 28), ctx);
+                    NativeFixture.DebugMouseDown = false;
+                    NativeFixture.DebugEnter = true;
+                    NativeFixture.TextFieldOverride = (_, text) => text;
+                    {NativeFixture.BeginDebugEvent();NativeFixture.Draw(                    widget,new UiLayoutRect(0, 0, 200, 28), ctx);}
                 }
             }
             catch (Exception ex)
@@ -384,20 +388,20 @@ internal static class KernelSharedEditingTests
             }
 
             Check(ReferenceEquals(observed?.InnerException, cause) && attempts == 1 && model == 10, "real editor retains a failed original request: Live=" + live);
-            UiNative.DebugEnter = UiNative.DebugMouseDown = false;
-            UiNative.TextFieldOverride = (_, text) => text;
-            widget.Draw(new Rect(0, 0, 200, 28), ctx);
-            UiNative.DebugFocusLost = true;
-            widget.Draw(new Rect(0, 0, 200, 28), ctx);
-            Check(attempts == 1 && session.GetOrCreateValueState("value").EditText == "20", "real passive repaint and blur retain failed text without retry: Live=" + live);
-            UiNative.DebugFocusLost = false;
-            UiNative.DebugMouseDown = true;
-            widget.Draw(new Rect(0, 0, 200, 28), ctx);
-            UiNative.DebugMouseDown = false;
-            UiNative.DebugEnter = true;
+            NativeFixture.DebugEnter = NativeFixture.DebugMouseDown = false;
+            NativeFixture.TextFieldOverride = (_, text) => text;
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 200, 28), ctx);}
+            NativeFixture.DebugFocusLost = true;
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 200, 28), ctx);}
+            Check(attempts == 1 && NativeFixture.Slot(session,"value").Draft== "20", "real passive repaint and blur retain failed text without retry: Live=" + live);
+            NativeFixture.DebugFocusLost = false;
+            NativeFixture.DebugMouseDown = true;
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 200, 28), ctx);}
+            NativeFixture.DebugMouseDown = false;
+            NativeFixture.DebugEnter = true;
             fail = false;
-            widget.Draw(new Rect(0, 0, 200, 28), ctx);
-            Check(attempts == 2 && model == 20 && !session.GetOrCreateValueState("value").Focused, "real explicit confirmation starts one new same-draft attempt: Live=" + live);
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 200, 28), ctx);}
+            Check(attempts == 2 && model == 20 && !NativeFixture.Slot(session,"value").IsFocused, "real explicit confirmation starts one new same-draft attempt: Live=" + live);
         }
     }
 
@@ -415,46 +419,49 @@ internal static class KernelSharedEditingTests
             requests++;
         });
         using var host = new UiHost("edit", UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"edit\"><Widget Id=\"text\" Kind=\"input/text-field\" Live=\"true\" Height=\"28\" /></UiPage>"), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
-        var bounds = new Rect(0, 0, 200, 100);
-        UiNative.DebugMousePositionEnabled = true;
-        UiNative.DebugMousePosition = new Vector2(20, 14);
-        UiNative.DebugMouseDown = true;
-        UiNative.TextFieldOverride = (_, _) => "composing";
+        var bounds = new UiLayoutRect(0, 0, 200, 100);
+        NativeFixture.DebugMousePositionEnabled = true;
+        NativeFixture.DebugMousePosition = new UiLayoutPoint(20, 14);
+        NativeFixture.DebugMouseDown = true;
+        NativeFixture.TextFieldOverride = (_, _) => "composing";
         typeof(Input).GetProperty("compositionString")!.SetValue(null, "composing");
-        host.DrawFrame(bounds);
+        NativeFixture.BeginDebugEvent();
+        NativeFixture.DrawFrame(        host,bounds);
         Check(requests == 0, "native composition sample does not enter business publication even under Live=true");
-        UiNative.DebugMouseDown = false;
-        UiNative.TextFieldOverride = (_, text) => text;
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.TextFieldOverride = (_, text) => text;
         Event.current = new Event
         {
             type = EventType.KeyDown,
             keyCode = KeyCode.Return
         };
+        NativeFixture.Prepare(host.Session);
         Check(host.TryHandleAccept() && !host.Session.ActiveEditState!.CommitRequested, "real host reserves composition Return without requesting whole-edit confirmation");
-        host.DrawFrame(bounds);
+        NativeFixture.DrawFrame(        host,bounds);
         Check(requests == 0 && host.Session.ActiveEditState != null, "composition Return does not also end the shared edit");
         Event.current = new Event
         {
             type = EventType.KeyDown,
             keyCode = KeyCode.Escape
         };
+        NativeFixture.Prepare(host.Session);
         Check(host.TryHandleCancel() && !host.Session.ActiveEditState!.DiscardRequested, "real host reserves composition Escape without discarding the whole draft");
-        host.DrawFrame(bounds);
+        NativeFixture.DrawFrame(        host,bounds);
         Check(Event.current.type == EventType.Used && requests == 0, "native composition cancel cannot fall through into the late window-close check");
         typeof(Input).GetProperty("compositionString")!.SetValue(null, "");
         Event.current = new Event
         {
             type = EventType.Repaint
         };
-        host.DrawFrame(bounds);
+        NativeFixture.DrawFrame(        host,bounds);
         Check(model == "composing" && requests == 1, "composition completion publishes its qualified Live candidate once");
         Event.current = new Event
         {
             type = EventType.KeyDown,
             keyCode = KeyCode.Return
         };
-        host.TryHandleAccept();
-        host.DrawFrame(bounds);
+        NativeFixture.Prepare(host.Session);host.TryHandleAccept();
+        NativeFixture.DrawFrame(        host,bounds);
         Check(requests == 1 && host.Session.ActiveEditState == null, "host confirmation after Live publication does not send the same candidate again");
     }
 
@@ -494,7 +501,7 @@ internal static class KernelSharedEditingTests
 
         Scoped(second, ctx =>
         {
-            var editor = UiNative.Editor<float>(ctx, "value", numeric.Format, numeric.Parse);
+            var editor = NativeFixture.Editor<float>(ctx, "value", numeric.Format, numeric.Parse);
             editor.Observe(model);
             editor.Input("45", true, false, false, _ => throw new Exception("unexpected request"), () => model);
         });
@@ -502,19 +509,19 @@ internal static class KernelSharedEditingTests
         {
             var widget = new NumberFieldWidget();
             widget.Configure(new UiElementSpec("first", NumberFieldWidget.Kind, new Dictionary<string, string> { ["Bind"] = "value", ["Max"] = "100" }));
-            UiNative.DebugMousePositionEnabled = true;
-            UiNative.DebugMouseDown = true;
-            UiNative.DebugMousePosition = new Vector2(20, 14);
-            UiNative.TextFieldOverride = (_, _) => "20";
-            widget.Draw(new Rect(0, 0, 200, 28), ctx);
-            UiNative.DebugMouseDown = false;
-            UiNative.DebugEnter = true;
+            NativeFixture.DebugMousePositionEnabled = true;
+            NativeFixture.DebugMouseDown = true;
+            NativeFixture.DebugMousePosition = new UiLayoutPoint(20, 14);
+            NativeFixture.TextFieldOverride = (_, _) => "20";
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 200, 28), ctx);}
+            NativeFixture.DebugMouseDown = false;
+            NativeFixture.DebugEnter = true;
             var paintCause = new InvalidOperationException("native paint failed");
-            UiNative.TextFieldOverride = (_, _) => throw paintCause;
+            NativeFixture.TextFieldOverride = (_, _) => throw paintCause;
             Exception? observed = null;
             try
             {
-                widget.Draw(new Rect(0, 0, 200, 28), ctx);
+                {NativeFixture.BeginDebugEvent();NativeFixture.Draw(                widget,new UiLayoutRect(0, 0, 200, 28), ctx);}
             }
             catch (Exception ex)
             {
@@ -522,21 +529,21 @@ internal static class KernelSharedEditingTests
             }
 
             Check(ReferenceEquals(observed, paintCause) && requests == 1 && model == 20, "established confirmation is dispatched before a pure native rendering failure");
-            UiNative.DebugEnter = false;
-            UiNative.TextFieldOverride = (_, text) => text;
-            widget.Draw(new Rect(0, 0, 200, 28), ctx);
+            NativeFixture.DebugEnter = false;
+            NativeFixture.TextFieldOverride = (_, text) => text;
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 200, 28), ctx);}
             Check(requests == 1, "paint failure does not replay the established request");
-            UiNative.DebugMouseDown = true;
-            UiNative.TextFieldOverride = (_, _) => "30";
-            widget.Draw(new Rect(0, 0, 200, 28), ctx);
-            UiNative.DebugMouseDown = false;
-            UiNative.DebugEnter = true;
-            UiNative.TextFieldOverride = (_, text) => text;
+            NativeFixture.DebugMouseDown = true;
+            NativeFixture.TextFieldOverride = (_, _) => "30";
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 200, 28), ctx);}
+            NativeFixture.DebugMouseDown = false;
+            NativeFixture.DebugEnter = true;
+            NativeFixture.TextFieldOverride = (_, text) => text;
             failSet = true;
             observed = null;
             try
             {
-                widget.Draw(new Rect(0, 0, 200, 28), ctx);
+                {NativeFixture.BeginDebugEvent();NativeFixture.Draw(                widget,new UiLayoutRect(0, 0, 200, 28), ctx);}
             }
             catch (Exception ex)
             {
@@ -544,17 +551,17 @@ internal static class KernelSharedEditingTests
             }
 
             Check(ReferenceEquals(observed?.InnerException, cause) && requests == 2 && model == 30, "partial setter side effects retain original cause and target without rollback");
-            UiNative.DebugEnter = false;
+            NativeFixture.DebugEnter = false;
             failSet = false;
-            widget.Draw(new Rect(0, 0, 200, 28), ctx);
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 200, 28), ctx);}
             Check(requests == 2, "setter failure never creates an automatic retry");
             first.InteractionScope = "replacement";
-            widget.Draw(new Rect(0, 0, 200, 28), ctx);
-            Check(!UiNative.Editor<float>(ctx, "value", numeric.Format, numeric.Parse).HasDraft, "real business retarget drops the old editor without publication");
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            widget,new UiLayoutRect(0, 0, 200, 28), ctx);}
+            Check(!NativeFixture.Editor<float>(ctx, "value", numeric.Format, numeric.Parse).HasDraft, "real business retarget drops the old editor without publication");
         });
         Scoped(second, ctx =>
         {
-            var editor = UiNative.Editor<float>(ctx, "value", numeric.Format, numeric.Parse);
+            var editor = NativeFixture.Editor<float>(ctx, "value", numeric.Format, numeric.Parse);
             editor.Observe(model);
             Check(editor.Draft == "45" && editor.Conflict, "same Bind does not grant another instance takeover rights");
         });

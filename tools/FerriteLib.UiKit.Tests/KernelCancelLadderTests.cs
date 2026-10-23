@@ -1,10 +1,11 @@
+using System.Linq;
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 
 using FerriteLib.UiKit;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
-using Verse;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -180,7 +181,7 @@ internal static class KernelCancelLadderTests
             Check(page.Changes.Count >= 1, "the value the drag already wrote stays written (§3.2: a Cancel ends an interaction, it does not roll back a result)");
 
             page.PumpLayout();
-            Check(!page.Session.GetOrCreateValueState("chart").Dragging,
+            Check(!page.Session.Interactions.CaptureOwner.HasValue,
                 "the chart sees it no longer holds the control and ends its own drag");
         }
         finally
@@ -244,7 +245,7 @@ internal static class KernelCancelLadderTests
         {
             page.PressRow("b");
             UiNode rowNode = page.Session.LastInteractionNode!;
-            Check(rowNode.CancelBindingKey == "items.b.closeRow",
+            Check(rowNode.CancelBindingKey == new UiBindingAddress("items","b","closeRow").Key,
                 "the row publishes ITS OWN scoped key, not the declared one: " + rowNode.CancelBindingKey);
 
             shell.PumpKey(KeyCode.Escape);
@@ -292,7 +293,7 @@ internal static class KernelCancelLadderTests
         try
         {
             page.PressRow("c");
-            Check(page.Session.LastInteractionNode!.CancelBindingKey == "items.c.closeRow",
+            Check(page.Session.LastInteractionNode!.CancelBindingKey == new UiBindingAddress("items","c","closeRow").Key,
                 "the row declares a key the consumer never registered as a command");
 
             shell.PumpKey(KeyCode.Escape);
@@ -313,7 +314,7 @@ internal static class KernelCancelLadderTests
         {
             Check(page.Session.SetCancelTarget("detail"), "the section is the subject");
             page.ShowDetail = false;
-            page.Host.Bindings.NotifyChanged("showDetail");
+((UiBindings)page.Host.Bindings).NotifyChanged("showDetail");
             page.PumpLayout();
             page.PumpLayout();
 
@@ -362,7 +363,7 @@ internal static class KernelCancelLadderTests
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
         BranchComposite composite = new();
-        UiWidgetRegistry.Register(Scope, BranchComposite.KindName, () => composite);
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, BranchComposite.KindName, () => composite));
 
         int cancellations = 0;
         UiBindings bindings = new();
@@ -376,7 +377,7 @@ internal static class KernelCancelLadderTests
             + "</Column>"
             + "</UiPage>";
 
-        Rect viewport = new Rect(0f, 0f, 300f, 200f);
+        UiLayoutRect viewport = new UiLayoutRect(0f, 0f, 300f, 200f);
         using UiHost host = new UiHost(Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla,
             new LaneMetrics(), new LaneTranslation());
         try
@@ -389,9 +390,9 @@ internal static class KernelCancelLadderTests
                 Event e = Event.KeyboardEvent("click");
                 e.type = type;
                 e.button = 0;
-                e.mousePosition = new Vector2(20f, 14f);
+                e.mousePosition = VerseUiExecution.Point(new UiLayoutPoint(20f, 14f));
                 Event.current = e;
-                host.DrawFrame(viewport);
+                NativeFixture.DrawFrame(                host,viewport);
                 Event.current = null;
             }
 
@@ -432,7 +433,7 @@ internal static class KernelCancelLadderTests
 
         internal readonly UiHost Host;
         internal readonly UiBindings Bindings;
-        internal readonly Rect Viewport = new(0f, 0f, 300f, 420f);
+        internal readonly UiLayoutRect Viewport = new(0f, 0f, 300f, 420f);
         internal readonly List<UiChartPointChange> Changes = new();
 
         internal string Choice = "x";
@@ -449,11 +450,11 @@ internal static class KernelCancelLadderTests
         private readonly List<string> keys = new() { "a", "b", "c" };
         // The same three-point shape the IC1 drag lane drives: its middle control point sits at the plot
         // centre, which is where a lane aiming at the chart's middle actually lands a press.
-        private readonly List<UnityEngine.Vector2> points = new()
+        private readonly List<UiLayoutPoint> points = new()
         {
-            new UnityEngine.Vector2(0f, 1f),
-            new UnityEngine.Vector2(0.5f, 0.5f),
-            new UnityEngine.Vector2(1f, 0f),
+            new UiLayoutPoint(0f, 1f),
+            new UiLayoutPoint(0.5f, 0.5f),
+            new UiLayoutPoint(1f, 0f),
         };
 
 
@@ -464,10 +465,10 @@ internal static class KernelCancelLadderTests
 
             Bindings = new UiBindings();
             Bindings.BindValue("menu", () => Choice, value => Choice = value);
-            Bindings.BindOptions("Options", () => Options);
+            Bindings.BindChoices("Options", ()=> (Options).Select(value=>new UiChoice<string>(value,value,value)).ToArray());
             Bindings.BindValue("showDetail", () => ShowDetail, value => ShowDetail = value);
             Bindings.BindReadOnly<IReadOnlyList<string>>("items", () => keys, UiInvalidation.Structure);
-            Bindings.BindReadOnly<IReadOnlyList<UnityEngine.Vector2>>("points", () => points);
+            Bindings.BindReadOnly<IReadOnlyList<UiLayoutPoint>>("points", () => points);
             Bindings.BindAction<UiChartPointChange>("changed", Changes.Add);
             Bindings.BindCommand("closeDetail", () => CloseDetailCalls++, () => DetailCancellable);
             Bindings.BindCommand("closeNever", () => CloseNeverCalls++);
@@ -477,13 +478,13 @@ internal static class KernelCancelLadderTests
             foreach (string key in keys)
             {
                 string captured = key;
-                Bindings.BindCommand("items." + captured + ".openRow", () => { });
+                Bindings.BindCommand(new UiBindingAddress("items",captured,"openRow").Key, () => { });
 
                 // Row "c" is the specimen for the authoring mistake the ladder has to survive: the template
                 // declares a Cancel layer whose command nobody ever registered. The row still draws, still
                 // takes presses, and its declared layer must be climbed past rather than thrown.
                 if (captured == "c") continue;
-                Bindings.BindCommand("items." + captured + ".closeRow",
+                Bindings.BindCommand(new UiBindingAddress("items",captured,"closeRow").Key,
                     () => { ClosedRow = captured; RowCloseCalls++; ClosedRows.Add(captured); },
                     () => !ClosedRows.Contains(captured));
             }
@@ -494,8 +495,8 @@ internal static class KernelCancelLadderTests
 
         internal UiSession Session => Host.Session;
 
-        internal Rect RectOf(string elementId) => Host
-            .MeasureAndArrange(new Vector2(Viewport.width, Viewport.height))
+        internal UiLayoutRect RectOf(string elementId) => Host
+            .MeasureAndArrange(new UiLayoutPoint(Viewport.Width, Viewport.Height))
             .RectById[elementId];
 
         internal void OpenMenu()
@@ -527,46 +528,46 @@ internal static class KernelCancelLadderTests
         /// </summary>
         internal void BeginChartDrag()
         {
-            Vector2 centre = Centre(RectOf("chart"));
+            UiLayoutPoint centre = Centre(RectOf("chart"));
             Pump(EventType.Layout, centre);
             Pump(EventType.MouseDown, centre);
             Pump(EventType.Repaint, centre);
-            Pump(EventType.MouseDrag, centre + new Vector2(24f, -16f));
+            Pump(EventType.MouseDrag, centre + new UiLayoutPoint(24f, -16f));
         }
 
         /// <summary>One click as the game dispatches it: separate events, not one flag.</summary>
-        private void Click(Rect rect)
+        private void Click(UiLayoutRect rect)
         {
-            Vector2 point = Centre(rect);
+            UiLayoutPoint point = Centre(rect);
             Pump(EventType.Layout, point);
             Pump(EventType.MouseDown, point);
             Pump(EventType.MouseUp, point);
             Pump(EventType.Repaint, point);
         }
 
-        private void Pump(EventType type, Vector2 point)
+        private void Pump(EventType type, UiLayoutPoint point)
         {
             Event e = Event.KeyboardEvent("pump");
             e.type = type;
             e.button = 0;
-            e.mousePosition = point;
+            e.mousePosition = VerseUiExecution.Point(point);
             Event.current = e;
-            Host.DrawFrame(Viewport);
+            NativeFixture.DrawFrame(            Host,Viewport);
             Event.current = null;
         }
 
         internal void PumpLayout()
         {
-            Pump(EventType.Layout, Vector2.zero);
+            Pump(EventType.Layout, UiLayoutPoint.Zero);
         }
 
-        private static Vector2 Centre(Rect rect) => new(rect.x + rect.width / 2f, rect.y + rect.height / 2f);
+        private static UiLayoutPoint Centre(UiLayoutRect rect) => new(rect.X + rect.Width / 2f, rect.Y + rect.Height / 2f);
 
         internal LadderShell AttachShell()
         {
             LadderShell opening = new LadderShell(this);
             Find.WindowStack.Add(opening);
-            opening.windowRect = new Rect(0f, 0f, Viewport.width, Viewport.height);
+            opening.windowRect = VerseUiExecution.Rect(new UiLayoutRect(0f, 0f, Viewport.Width, Viewport.Height));
 
             // One pass THROUGH THE WINDOW: the shell adopts its page host lazily inside its own guarded pass,
             // so a lane that only ever drew the host directly would hand the key to a shell holding no host -
@@ -579,17 +580,17 @@ internal static class KernelCancelLadderTests
         {
             PolicyShell opening = new PolicyShell(this);
             Find.WindowStack.Add(opening);
-            opening.windowRect = new Rect(0f, 0f, Viewport.width, Viewport.height);
+            opening.windowRect = VerseUiExecution.Rect(new UiLayoutRect(0f, 0f, Viewport.Width, Viewport.Height));
             opening.PumpLayout();
             return opening;
         }
 
         internal void DetachShell(LadderShell closing)
         {
-            UiNative.DebugMousePositionEnabled = false;
-            UiNative.DebugMouseDown = false;
-            UiNative.DebugMouseDrag = false;
-            UiNative.DebugMouseUp = false;
+            NativeFixture.DebugMousePositionEnabled = false;
+            NativeFixture.DebugMouseDown = false;
+            NativeFixture.DebugMouseDrag = false;
+            NativeFixture.DebugMouseUp = false;
             Find.WindowStack.TryRemove(closing);
         }
 
@@ -627,11 +628,11 @@ internal static class KernelCancelLadderTests
 
         protected override UiHost CreateHost() => page.Host;
 
-        protected override void DrawNotice(Rect rect, UiWindowNotice notice)
+        protected override void DrawNotice(UnityEngine.Rect rect,UiWindowNotice notice)
         {
         }
 
-        protected override void BeforeDraw(Rect contentRect)
+        protected override void BeforeDraw(UnityEngine.Rect contentRect)
         {
             Event? current = Event.current;
             EventBeforeContents = current == null ? "none" : current.type.ToString();
@@ -806,17 +807,17 @@ internal static class KernelCancelLadderTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
         public float Measure(UiWidgetContext ctx) => 28f;
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             UiWidgetContext branch = ctx.Child("branch");
             LastTarget = branch.Node;
-            if (UiNative.Button(rect, branch)) Presses++;
+            if (ctx.Controls.Button(rect, branch)) Presses++;
         }
     }
 }

@@ -1,10 +1,11 @@
+using System.Linq;
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 
 using FerriteLib.UiKit;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
-using Verse;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -111,7 +112,7 @@ internal static class KernelEditTransactionTests
             page.PressEnter();
             Check(page.Num == 0.7f, "the frame that ends the edit commits the parsed draft: " + page.Num);
             Check(page.NumWrites == 1, "exactly once, not once per frame");
-            Check(!page.State("num").Focused, "and the edit is closed");
+            Check(!page.State("num").IsFocused, "and the edit is closed");
             Check(page.Session.ActiveEditNode == null, "with the session's record released");
 
             page.IdleFrame();
@@ -130,7 +131,7 @@ internal static class KernelEditTransactionTests
         try
         {
             page.FocusNumberField("num", "abc");
-            Check(page.State("num").EditText == "abc",
+            Check(page.State("num").Draft== "abc",
                 "the unparseable text stays in the buffer, because that is what the player typed");
 
             page.PressEnter();
@@ -195,7 +196,7 @@ internal static class KernelEditTransactionTests
             Check(shell.EventBeforeContents == "Used",
                 "the hook ran BEFORE the page was drawn: the event is already used when the contents pass starts");
             Check(page.Num == 0.7f && page.NumWrites == 1, "the open edit committed exactly once");
-            Check(!page.State("num").Focused, "and the edit is closed");
+            Check(!page.State("num").IsFocused, "and the edit is closed");
             Check(Find.WindowStack.IsOpen(shell), "Enter on an open edit must not close the window");
         }
         finally
@@ -222,7 +223,7 @@ internal static class KernelEditTransactionTests
             Check(Find.WindowStack.IsOpen(shell), "and the window stays open - one press, one undone layer");
             Check(page.Num == 0.5f && page.NumWrites == 0,
                 "the draft is dropped and nothing is written — a Cancel does not invent a value");
-            Check(!page.State("num").Focused, "the edit is closed");
+            Check(!page.State("num").IsFocused, "the edit is closed");
             Check(page.Shown("num") == "0.5", "the buffer is restored from the model");
         }
         finally
@@ -280,8 +281,8 @@ internal static class KernelEditTransactionTests
 
             Check(page.NativeCalls == nativeBefore,
                 "the covered field never reaches the native control, so the option row keeps its press");
-            Check(page.State("num").Focused, "the edit is paused, not ended");
-            Check(page.State("num").EditText == "0.7", "the draft survives the pass untouched");
+            Check(page.State("num").IsFocused, "the edit is paused, not ended");
+            Check(page.State("num").Draft== "0.7", "the draft survives the pass untouched");
             Check(page.NumWrites == 0 && page.Num == 0.5f, "and nothing was written in either direction");
 
             page.Session.ClosePopup();
@@ -309,12 +310,12 @@ internal static class KernelEditTransactionTests
 
             Check(page.Session.ActiveEditNode == null,
                 "an element taken out of play ends the session's active-edit record (§3.7)");
-            Check(page.Gated == 0.5f && page.GatedWrites == 0, "and its draft is dropped, not written");
+            Check(page.Gated == .5f && page.GatedWrites==0 && page.Shown("gated")=="0.7","disabled callback editor suspends its reliable draft without publication");
 
             page.GateEnabled = true;
             page.IdleFrame();
             page.IdleFrame();
-            Check(page.Shown("gated") == "0.5", "re-enabled, the field resumes on the model, not on a dead edit");
+            Check(page.Shown("gated")=="0.7" && page.Session.ActiveEditNode==null,"re-enabled callback editor retains its draft without resurrecting focus or a queued commit");
         }
         finally
         {
@@ -336,20 +337,20 @@ internal static class KernelEditTransactionTests
         try
         {
             page.FocusNumberField("num", "0.7");
-            Check(page.State("num").Focused && page.Session.ActiveEditNode != null,
+            Check(page.State("num").IsFocused&& page.Session.ActiveEditNode != null,
                 "the edit is open and recorded before the page changes");
 
             page.ShowNum = false;
-            page.Host.Bindings.NotifyChanged("showNum");
+((UiBindings)page.Host.Bindings).NotifyChanged("showNum");
             page.IdleFrame();
             page.IdleFrame();
 
-            Check(!page.State("num").Focused, "hiding the field ended the edit on the state itself");
+            Check(!page.State("num").IsFocused, "hiding the field ended the edit on the state itself");
             Check(page.Session.ActiveEditNode == null, "and the session's record went with it");
             Check(page.Num == 0.5f && page.NumWrites == 0, "the draft was dropped, never written");
 
             page.ShowNum = true;
-            page.Host.Bindings.NotifyChanged("showNum");
+((UiBindings)page.Host.Bindings).NotifyChanged("showNum");
             page.IdleFrame();
             page.IdleFrame();
 
@@ -377,7 +378,7 @@ internal static class KernelEditTransactionTests
         try
         {
             page.FocusNumberField("num", "0.7");
-            Check(page.NumWrites == 0 && page.State("num").Focused,
+            Check(page.NumWrites == 0 && page.State("num").IsFocused,
                 "the draft is deferred while the field holds focus");
 
             page.RealClick("menu");
@@ -385,7 +386,7 @@ internal static class KernelEditTransactionTests
             Check(page.Num == 0.7f && page.NumWrites == 1,
                 "the press another control consumed still committed the draft, exactly once: writes="
                 + page.NumWrites);
-            Check(!page.State("num").Focused, "and the edit closed");
+            Check(!page.State("num").IsFocused, "and the edit closed");
             Check(page.Session.ActiveEditNode == null, "with the session's record released");
         }
         finally
@@ -405,7 +406,7 @@ internal static class KernelEditTransactionTests
 
         internal readonly UiHost Host;
         internal readonly UiBindings Bindings;
-        internal readonly Rect Viewport = new(0f, 0f, 300f, 320f);
+        internal readonly UiLayoutRect Viewport = new(0f, 0f, 300f, 320f);
 
         internal float Num = 0.5f;
         internal int NumWrites;
@@ -425,7 +426,7 @@ internal static class KernelEditTransactionTests
         {
             UiWidgetRegistry.Clear();
             UiWidgetRegistry.InitializeCore();
-            UiWidgetRegistry.Register(Scope, GatedNumber.KindName, () => new GatedNumber());
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, GatedNumber.KindName, () => new GatedNumber()));
 
             Bindings = new UiBindings();
             Bindings.BindValue("num", () => Num, value => { Num = value; NumWrites++; });
@@ -433,13 +434,13 @@ internal static class KernelEditTransactionTests
             Bindings.BindValue("text", () => Text, value => { Text = value; TextWrites++; });
             Bindings.BindValue("gated", () => Gated, value => { Gated = value; GatedWrites++; });
             Bindings.BindValue("menu", () => Choice, value => Choice = value);
-            Bindings.BindOptions("Options", () => Options);
+            Bindings.BindChoices("Options", ()=> (Options).Select(value=>new UiChoice<string>(value,value,value)).ToArray());
             Bindings.BindValue("showNum", () => ShowNum, value => ShowNum = value);
             Bindings.BindCommand("gate", () => { }, () => GateEnabled);
 
             Host = new UiHost(Scope, UiLayoutManifest.Parse(PageXml), Bindings, UiTheme.Vanilla,
                 new LaneMetrics(), new LaneTranslation());
-            UiNative.TextFieldOverride = (rect, text) =>
+            NativeFixture.TextFieldOverride = (rect, text) =>
             {
                 NativeCalls++;
                 return text;
@@ -450,15 +451,15 @@ internal static class KernelEditTransactionTests
 
         // The state a field owns lives on the ELEMENT's node, not on the session-level node an out-of-draw
         // call resolves against; reading the wrong slot is how a lane passes by looking at an empty bag.
-        internal UiValueState State(string elementId)
+        internal UiControlState State(string elementId)
         {
             UiNode node = Session.GetNodeByElementId(elementId)
                 ?? throw new Exception("the page never arranged element '" + elementId + "'");
-            return Session.GetOrCreateValueState(node.Id, elementId);
+            return Session.GetControlState(node.Id, elementId);
         }
 
-        internal Rect RectOf(string elementId) => Host
-            .MeasureAndArrange(new Vector2(Viewport.width, Viewport.height))
+        internal UiLayoutRect RectOf(string elementId) => Host
+            .MeasureAndArrange(new UiLayoutPoint(Viewport.Width, Viewport.Height))
             .RectById[elementId];
 
         /// <summary>
@@ -467,18 +468,18 @@ internal static class KernelEditTransactionTests
         /// </summary>
         internal void FocusNumberField(string elementId, string typed)
         {
-            Rect rect = RectOf(elementId);
-            UiNative.TextFieldOverride = (r, text) =>
+            UiLayoutRect rect = RectOf(elementId);
+            NativeFixture.TextFieldOverride = (r, text) =>
             {
                 NativeCalls++;
                 return typed;
             };
-            UiNative.DebugMousePositionEnabled = true;
-            UiNative.DebugMousePosition = Centre(rect);
-            UiNative.DebugMouseDown = true;
-            Host.DrawFrame(Viewport);
-            UiNative.DebugMouseDown = false;
-            UiNative.TextFieldOverride = (r, text) =>
+            NativeFixture.DebugMousePositionEnabled = true;
+            NativeFixture.DebugMousePosition = Centre(rect);
+            NativeFixture.DebugMouseDown = true;
+            NativeFixture.BeginDebugEvent();NativeFixture.DrawFrame(Host,Viewport);
+            NativeFixture.DebugMouseDown = false;
+            NativeFixture.TextFieldOverride = (r, text) =>
             {
                 NativeCalls++;
                 return text;
@@ -488,18 +489,18 @@ internal static class KernelEditTransactionTests
         /// <summary>A frame with the pointer still inside the field and nothing typed.</summary>
         internal void HoldFrame(string elementId)
         {
-            UiNative.DebugMousePosition = Centre(RectOf(elementId));
-            Host.DrawFrame(Viewport);
+            NativeFixture.DebugMousePosition = Centre(RectOf(elementId));
+            NativeFixture.BeginDebugEvent();NativeFixture.DrawFrame(Host,Viewport);
         }
 
         internal void PointInsideMenuOver(string elementId)
         {
-            UiNative.DebugMousePosition = Centre(RectOf(elementId));
+            NativeFixture.DebugMousePosition = Centre(RectOf(elementId));
         }
 
         internal void IdleFrame()
         {
-            Host.DrawFrame(Viewport);
+            NativeFixture.BeginDebugEvent();NativeFixture.DrawFrame(Host,Viewport);
         }
 
         /// <summary>
@@ -510,9 +511,9 @@ internal static class KernelEditTransactionTests
         /// </summary>
         internal void RealClick(string elementId)
         {
-            Vector2 point = Centre(RectOf(elementId));
-            UiNative.DebugMousePositionEnabled = false;
-            UiNative.DebugMouseDown = false;
+            UiLayoutPoint point = Centre(RectOf(elementId));
+            NativeFixture.DebugMousePositionEnabled = false;
+            NativeFixture.DebugMouseDown = false;
             foreach (EventType type in new EventType[]
             {
                 EventType.Layout, EventType.MouseDown, EventType.MouseUp, EventType.Repaint,
@@ -521,28 +522,28 @@ internal static class KernelEditTransactionTests
                 Event e = Event.KeyboardEvent("click");
                 e.type = type;
                 e.button = 0;
-                e.mousePosition = point;
+                e.mousePosition = VerseUiExecution.Point(point);
                 Event.current = e;
-                Host.DrawFrame(Viewport);
+                NativeFixture.DrawFrame(                Host,Viewport);
                 Event.current = null;
             }
         }
 
         internal void PressEnter()
         {
-            UiNative.DebugEnter = true;
-            Host.DrawFrame(Viewport);
-            UiNative.DebugEnter = false;
+            NativeFixture.DebugEnter = true;
+            NativeFixture.BeginDebugEvent();NativeFixture.DrawFrame(Host,Viewport);
+            NativeFixture.DebugEnter = false;
         }
 
         /// <summary>The text the field would show after a frame, read from the state the funnel owns.</summary>
-        internal string Shown(string elementId) => State(elementId).EditText;
+        internal string Shown(string elementId) => State(elementId).Draft;
 
         internal EditShell AttachShell()
         {
             EditShell opening = new EditShell(this);
             Find.WindowStack.Add(opening);
-            opening.windowRect = new Rect(0f, 0f, Viewport.width, Viewport.height);
+            opening.windowRect = VerseUiExecution.Rect(new UiLayoutRect(0f, 0f, Viewport.Width, Viewport.Height));
 
             // One pass THROUGH THE WINDOW: the shell adopts its page host lazily inside its own guarded pass,
             // so a lane that only drew the host directly would hand the key to a shell holding no host.
@@ -557,11 +558,11 @@ internal static class KernelEditTransactionTests
 
         internal void Restore()
         {
-            UiNative.DebugMousePositionEnabled = false;
-            UiNative.DebugMouseDown = false;
-            UiNative.DebugEnter = false;
-            UiNative.DebugFocusLost = false;
-            UiNative.TextFieldOverride = null;
+            NativeFixture.DebugMousePositionEnabled = false;
+            NativeFixture.DebugMouseDown = false;
+            NativeFixture.DebugEnter = false;
+            NativeFixture.DebugFocusLost = false;
+            NativeFixture.TextFieldOverride = null;
         }
 
         public void Dispose()
@@ -570,7 +571,7 @@ internal static class KernelEditTransactionTests
             Host.Dispose();
         }
 
-        private static Vector2 Centre(Rect rect) => new(rect.x + rect.width / 2f, rect.y + rect.height / 2f);
+        private static UiLayoutPoint Centre(UiLayoutRect rect) => new(rect.X + rect.Width / 2f, rect.Y + rect.Height / 2f);
     }
 
     /// <summary>
@@ -609,11 +610,11 @@ internal static class KernelEditTransactionTests
 
         protected override UiHost CreateHost() => page.Host;
 
-        protected override void DrawNotice(Rect rect, UiWindowNotice notice)
+        protected override void DrawNotice(UnityEngine.Rect rect,UiWindowNotice notice)
         {
         }
 
-        protected override void BeforeDraw(Rect contentRect)
+        protected override void BeforeDraw(UnityEngine.Rect contentRect)
         {
             Event? current = Event.current;
             EventBeforeContents = current == null ? "none" : current.type.ToString();
@@ -684,7 +685,7 @@ internal static class KernelEditTransactionTests
     }
 
     /// <summary>
-    /// A consumer-shaped specimen: a kind that drives <see cref="UiNative.NumberField"/> by hand and declares
+    /// A consumer-shaped specimen: a kind that drives <see cref="UiControls.Edit{T}"/> by hand and declares
     /// a command, which is the only way a page-model element becomes disabled. No core editable kind carries
     /// <c>ActionBind</c> in its schema today, so a lane that wants "the element an edit is open on was taken
     /// out of play" has to own the declaration itself — and that is also the shape a real consumer composite
@@ -701,7 +702,7 @@ internal static class KernelEditTransactionTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
             bindings.ValidateValue<float>("gated", elementPath);
             bindings.ValidateCommand("gate", elementPath);
@@ -709,16 +710,12 @@ internal static class KernelEditTransactionTests
 
         public float Measure(UiWidgetContext ctx) => 24f;
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             float current = ctx.Bindings.TryGet("gated", out float bound) ? bound : 0f;
-            UiNative.NumberField(rect, "gated", ctx.Session, current, 0f, 1f, "0.##", out bool committed);
-            if (!committed) return;
-
-            // Deferred exactly like the core atom: while the field holds the edit, a valid parse is a draft
-            // and not a write. A specimen that wrote on every keystroke would test nothing about §3.4.
-            UiValueState edited = ctx.Session.GetOrCreateValueState("gated");
-            if (!edited.Focused) ctx.Bindings.Set("gated", edited.FloatValue);
+            var codec=new UiNumericEdit(0,1,"0.##");
+ctx.Controls.Edit(rect,ctx,"gated",current,codec.Format,codec.Parse,false,false,
+                value=>ctx.Bindings.Set("gated",value),()=>ctx.Bindings.Get<float>("gated"));
         }
     }
 }

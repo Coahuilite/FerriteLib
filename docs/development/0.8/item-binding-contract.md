@@ -23,7 +23,8 @@ observe business objects, dispatch across threads or make a transactional copy o
 Connected reactive properties continue to invalidate their own readers normally.
 
 Use `Items="items"` on Repeat. Template-local `Bind="count"` and `ActionBind="move"` resolve to
-`items.<key>.count` and `items.<key>.move` through the existing item scope. The complete, compiled
+`new UiBindingAddress("items", key, "count").Key` and the corresponding "move" address.
+The same length-prefixed encoding is used by the helper and template compiler, including dotted keys. The complete, compiled
 example is `tools/FerriteLib.UiKit.Core.ContractTests/ItemBindingExample.cs`; both the no-platform
 target and actual Host harness compile it. `KernelItemBindingTests` supplies its real default template.
 

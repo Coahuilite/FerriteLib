@@ -1,10 +1,11 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -40,20 +41,20 @@ internal static class KernelWidgetBehaviorTests
 
     // Rect math mirrors StepperSliderWidget.Draw for the default (no-label) layout:
     // minus [0,24], slider [30,300], field [306,370], plus [376,400] at y=0..28.
-    private static Rect MinusRect() => new(0f, 0f, ButtonWidth, RowHeight);
+    private static UiLayoutRect MinusRect() => new(0f, 0f, ButtonWidth, RowHeight);
 
-    private static Rect FieldRect()
+    private static UiLayoutRect FieldRect()
     {
         float sliderX = ButtonWidth + Gap;
         float remaining = Math.Max(1f, TotalWidth - sliderX - FieldWidth - Gap * 2f - ButtonWidth);
         float fieldX = sliderX + remaining + Gap;
-        return new Rect(fieldX, 0f, FieldWidth, RowHeight);
+        return new UiLayoutRect(fieldX, 0f, FieldWidth, RowHeight);
     }
 
-    private static Rect PlusRect()
+    private static UiLayoutRect PlusRect()
     {
-        Rect field = FieldRect();
-        return new Rect(field.xMax + Gap, 0f, ButtonWidth, RowHeight);
+        UiLayoutRect field = FieldRect();
+        return new UiLayoutRect(field.XMax + Gap, 0f, ButtonWidth, RowHeight);
     }
 
     private static void VerifyStepperButtonsStepAndClamp()
@@ -69,22 +70,22 @@ internal static class KernelWidgetBehaviorTests
         UiWidgetContext ctx = MakeContext(session, bindings);
         EnablePointer();
 
-        UiNative.DebugMousePosition = Center(MinusRect());
-        widget.Draw(new Rect(0f, 0f, TotalWidth, RowHeight), ctx);
+        NativeFixture.DebugMousePosition = Center(MinusRect());
+        NativeEvents.Click(NativeFixture.DebugMousePosition,()=>NativeFixture.Draw(widget,new UiLayoutRect(0,0,TotalWidth,RowHeight),ctx));
         CheckClose(0.45f, value, "minus button steps down by Step and writes the binding");
 
-        UiNative.DebugMousePosition = Center(PlusRect());
-        widget.Draw(new Rect(0f, 0f, TotalWidth, RowHeight), ctx);
+        NativeFixture.DebugMousePosition = Center(PlusRect());
+        NativeEvents.Click(NativeFixture.DebugMousePosition,()=>NativeFixture.Draw(widget,new UiLayoutRect(0,0,TotalWidth,RowHeight),ctx));
         CheckClose(0.5f, value, "plus button steps back up");
 
         value = 0.98f;
-        UiNative.DebugMousePosition = Center(PlusRect());
-        widget.Draw(new Rect(0f, 0f, TotalWidth, RowHeight), ctx);
+        NativeFixture.DebugMousePosition = Center(PlusRect());
+        NativeEvents.Click(NativeFixture.DebugMousePosition,()=>NativeFixture.Draw(widget,new UiLayoutRect(0,0,TotalWidth,RowHeight),ctx));
         CheckClose(1f, value, "plus clamps at Max");
 
         value = 0.02f;
-        UiNative.DebugMousePosition = Center(MinusRect());
-        widget.Draw(new Rect(0f, 0f, TotalWidth, RowHeight), ctx);
+        NativeFixture.DebugMousePosition = Center(MinusRect());
+        NativeEvents.Click(NativeFixture.DebugMousePosition,()=>NativeFixture.Draw(widget,new UiLayoutRect(0,0,TotalWidth,RowHeight),ctx));
         CheckClose(0f, value, "minus clamps at Min");
 
         DisablePointer();
@@ -102,12 +103,11 @@ internal static class KernelWidgetBehaviorTests
         UiWidgetContext ctx = MakeContext(session, bindings);
 
         EnablePointer();
-        UiNative.SliderOverride = (rect, current, min, max) => 0.8f;
-        widget.Draw(new Rect(0f, 0f, TotalWidth, RowHeight), ctx);
+        NativeEvents.Click(new UiLayoutPoint(242.4f,14),()=>NativeFixture.Draw(widget,new UiLayoutRect(0,0,TotalWidth,RowHeight),ctx));
 
         CheckClose(0.8f, value, "slider change is written through the typed binding");
-        UiValueState state = session.GetOrCreateValueState("vol");
-        Check(state.EditText == "0.8", "number field text syncs to the new slider value");
+        UiControlState state = NativeFixture.Slot(session,"vol");
+        Check(state.Draft== "0.8", "number field text syncs to the new slider value");
         DisablePointer();
     }
 
@@ -123,18 +123,18 @@ internal static class KernelWidgetBehaviorTests
         UiWidgetContext ctx = MakeContext(session, bindings);
 
         EnablePointer();
-        Rect field = FieldRect();
+        UiLayoutRect field = FieldRect();
 
         // Live (default): editing while unfocused commits immediately.
-        UiNative.TextFieldOverride = (rect, text) => "0.75";
-        widget.Draw(new Rect(0f, 0f, TotalWidth, RowHeight), ctx);
+        NativeFixture.TextFieldOverride = (rect, text) => "0.75";
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,new UiLayoutRect(0f, 0f, TotalWidth, RowHeight), ctx);}
         CheckClose(0.75f, value, "unfocused field edit commits through the binding");
 
         // Unparseable text never writes.
-        UiNative.TextFieldOverride = (rect, text) => "abc";
-        widget.Draw(new Rect(0f, 0f, TotalWidth, RowHeight), ctx);
+        NativeFixture.TextFieldOverride = (rect, text) => "abc";
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,new UiLayoutRect(0f, 0f, TotalWidth, RowHeight), ctx);}
         CheckClose(0.75f, value, "invalid text is kept in the edit buffer, not written");
-        Check(session.GetOrCreateValueState("vol").EditText == "abc",
+        Check(NativeFixture.Slot(session,"vol").Draft== "abc",
             "invalid text stays in the session edit buffer");
 
         // Live=false: edits are deferred while the control holds focus.
@@ -142,18 +142,18 @@ internal static class KernelWidgetBehaviorTests
         StepperSliderWidget lazy = MakeStepper();
         lazy.Configure(new UiElementSpec("lazy", StepperSliderWidget.Kind, Attrs("0", "1", "0.05", "false")));
 
-        UiNative.TextFieldOverride = (rect, text) => text;
-        UiNative.DebugMouseDown = true;
-        UiNative.DebugMousePosition = Center(field);
-        lazy.Draw(new Rect(0f, 0f, TotalWidth, RowHeight), ctx);
-        UiNative.DebugMouseDown = false;
-        Check(session.GetOrCreateValueState("lazy").Focused, "mouse-down inside the field focuses it");
+        NativeFixture.TextFieldOverride = (rect, text) => text;
+        NativeFixture.DebugMouseDown = true;
+        NativeFixture.DebugMousePosition = Center(field);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        lazy,new UiLayoutRect(0f, 0f, TotalWidth, RowHeight), ctx);}
+        NativeFixture.DebugMouseDown = false;
+        Check(NativeFixture.Slot(session,"lazy").IsFocused, "mouse-down inside the field focuses it");
 
         value = 0.5f;
-        UiNative.TextFieldOverride = (rect, text) => "0.7";
-        lazy.Draw(new Rect(0f, 0f, TotalWidth, RowHeight), ctx);
+        NativeFixture.TextFieldOverride = (rect, text) => "0.7";
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        lazy,new UiLayoutRect(0f, 0f, TotalWidth, RowHeight), ctx);}
         CheckClose(0.5f, value, "focused Live=false field defers the write");
-        CheckClose(0.7f, session.GetOrCreateValueState("lazy").FloatValue,
+        CheckClose(0.7f, NativeFixture.Number(NativeFixture.Slot(session,"lazy")),
             "focused edit still lands in the session value state");
 
         DisablePointer();
@@ -192,21 +192,21 @@ internal static class KernelWidgetBehaviorTests
         widget.Configure(MakeModeRowSpec());
         UiWidgetContext ctx = MakeContext(session, bindings);
 
-        var page = new Rect(0f, 0f, 150f, 138f);
+        var page = new UiLayoutRect(0f, 0f, 150f, 138f);
         EnablePointer();
         // Narrow layout: option 2 occupies the second stacked row.
-        float columnWidth = page.width - 8f;
-        UiNative.DebugMousePosition = new Vector2(
-            page.x + 4f + columnWidth / 2f,
-            page.y + 4f + 1 * (RowHeight + 6f) + RowHeight / 2f);
-        widget.Draw(page, ctx);
+        float columnWidth = page.Width - 8f;
+        NativeFixture.DebugMousePosition = new UiLayoutPoint(
+            page.X + 4f + columnWidth / 2f,
+            page.Y + 4f + 1 * (RowHeight + 6f) + RowHeight / 2f);
+        NativeEvents.Click(NativeFixture.DebugMousePosition,()=>NativeFixture.Draw(widget,page,ctx));
         Check(mode == "B", "clicking an option writes its value through the typed binding");
         DisablePointer();
 
         // Selected state must paint with the theme's selected fill + gold accent border;
         // an unselected row must not emit either token.
         ClearRecordedBoxes();
-        widget.Draw(page, ctx);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,page, ctx);}
         IList colors = RecordedBoxColors();
         UiTheme theme = UiTheme.Vanilla;
         Check(colors.Contains(theme[UiPaletteRole.SelectedSurface]) && colors.Contains(theme[UiPaletteRole.Accent]),
@@ -214,7 +214,7 @@ internal static class KernelWidgetBehaviorTests
 
         mode = "unset";
         ClearRecordedBoxes();
-        widget.Draw(page, ctx);
+        {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        widget,page, ctx);}
         colors = RecordedBoxColors();
         Check(!colors.Contains(theme[UiPaletteRole.SelectedSurface]) && !colors.Contains(theme[UiPaletteRole.Accent]),
             "unselected options emit neither selected token");
@@ -238,60 +238,48 @@ internal static class KernelWidgetBehaviorTests
         return attrs;
     }
 
-    private static UiElementSpec MakeModeRowSpec()
+    private static UiElementSpec MakeModeRowSpec()=>new("mode",InputModeRowWidget.Kind,choices:new[]{new UiChoice<string>("A","A"),new UiChoice<string>("B","B"),new UiChoice<string>("C","C"),new UiChoice<string>("D","D")});
+    private static UiWidgetContext MakeContext(UiSession session, IUiBindingReader bindings)
     {
-        var attrs = new Dictionary<string, string>
-        {
-            ["Title1"] = "A", ["Value1"] = "A",
-            ["Title2"] = "B", ["Value2"] = "B",
-            ["Title3"] = "C", ["Value3"] = "C",
-            ["Title4"] = "D", ["Value4"] = "D"
-        };
-
-        return new UiElementSpec("mode", InputModeRowWidget.Kind, attrs);
-    }
-
-    private static UiWidgetContext MakeContext(UiSession session, IUiBindings bindings)
-    {
-        return new UiWidgetContext(
+        return NativeFixture.Context(
             "test", session, new FixedMetrics(), UiTheme.Vanilla,
             new FixedTranslation(), bindings, TotalWidth, "root");
     }
 
-    private static Vector2 Center(Rect rect) => new(rect.x + rect.width / 2f, rect.y + rect.height / 2f);
+    private static UiLayoutPoint Center(UiLayoutRect rect) => new(rect.X + rect.Width / 2f, rect.Y + rect.Height / 2f);
 
     private static void EnablePointer()
     {
-        UiNative.DebugMousePositionEnabled = true;
-        UiNative.DebugMousePosition = new Vector2(-100000f, -100000f);
-        UiNative.ButtonOverride = rect =>
+        NativeFixture.DebugMousePositionEnabled = true;
+        NativeFixture.DebugMousePosition = new UiLayoutPoint(-100000f, -100000f);
+        NativeFixture.ButtonOverride = rect =>
         {
-            Vector2 p = UiNative.DebugMousePosition;
-            return p.x >= rect.x && p.x <= rect.xMax && p.y >= rect.y && p.y <= rect.yMax;
+            UiLayoutPoint p = NativeFixture.DebugMousePosition;
+            return p.X >= rect.X && p.X <= rect.XMax && p.Y >= rect.Y && p.Y <= rect.YMax;
         };
-        UiNative.SliderOverride = (rect, current, min, max) => current;
-        UiNative.TextFieldOverride = (rect, text) => text;
+        NativeFixture.SliderOverride = (rect, current, min, max) => current;
+        NativeFixture.TextFieldOverride = (rect, text) => text;
     }
 
     private static void DisablePointer()
     {
-        UiNative.DebugMousePositionEnabled = false;
-        UiNative.DebugMouseDown = false;
-        UiNative.DebugEnter = false;
+        NativeFixture.DebugMousePositionEnabled = false;
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.DebugEnter = false;
         ResetSeams();
     }
 
     private static void ResetSeams()
     {
-        UiNative.DebugMousePositionEnabled = false;
-        UiNative.DebugMouseDown = false;
-        UiNative.DebugMouseDrag = false;
-        UiNative.DebugMouseUp = false;
-        UiNative.DebugEnter = false;
-        UiNative.DebugFocusLost = false;
-        UiNative.ButtonOverride = null;
-        UiNative.SliderOverride = null;
-        UiNative.TextFieldOverride = null;
+        NativeFixture.DebugMousePositionEnabled = false;
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.DebugMouseDrag = false;
+        NativeFixture.DebugMouseUp = false;
+        NativeFixture.DebugEnter = false;
+        NativeFixture.DebugFocusLost = false;
+        NativeFixture.ButtonOverride = null;
+        NativeFixture.SliderOverride = null;
+        NativeFixture.TextFieldOverride = null;
     }
 
     private static void ClearRecordedBoxes()
@@ -307,7 +295,7 @@ internal static class KernelWidgetBehaviorTests
         FieldInfo? colors = typeof(Verse.Widgets).GetField(
             "DrawBoxSolidColors", BindingFlags.Public | BindingFlags.Static);
         if (colors == null) throw new Exception("Verse stub is missing DrawBoxSolidColors");
-        return (IList)colors.GetValue(null)!;
+        return NativeFixture.Records<UiColour>(colors.GetValue(null)!);
     }
 
     private static void Check(bool condition, string name)

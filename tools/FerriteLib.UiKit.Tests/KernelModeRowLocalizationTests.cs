@@ -1,3 +1,5 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -5,7 +7,6 @@ using System.Reflection;
 
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -36,9 +37,9 @@ internal static class KernelModeRowLocalizationTests
     public static int RunAll()
     {
         failures = 0;
-        Run("input/mode-row declares both label families", VerifyRegistration);
-        Run("TitleKeyN resolves through the translation seam", VerifyKeyResolves);
-        Run("TitleKeyN wins over the literal TitleN", VerifyKeyWins);
+        Run("input/mode-row declares its single choice source", VerifyRegistration);
+        Run("Choice.TextKey resolves through the translation seam", VerifyKeyResolves);
+        Run("Choice.TextKey wins over literal Text", VerifyKeyWins);
         Run("Neither declared falls back to the option's value", VerifyValueFallback);
         Run("Width=Auto measures the translated title", VerifyAutoMeasuresTheTranslation);
         Run("A TitleKeyN with no option is refused at creation", VerifyOrphanTitleKeyRefused);
@@ -57,19 +58,13 @@ internal static class KernelModeRowLocalizationTests
             return;
         }
 
-        Check(Contains(schema, "TitleKey1") && Contains(schema, "TitleKey8"), "the schema declares TitleKey1..8");
-        Check(Contains(schema, "Title1") && Contains(schema, "Description1"), "and keeps the literal and help names it had");
-
-        IReadOnlyCollection<string>? labels = UiWidgetRegistry.GetLabelAttributes(UiWidgetRegistry.CoreScope, InputModeRowWidget.Kind);
-        Check(
-            labels != null && labels.Count == 16 && Contains(labels, "Title1") && Contains(labels, "TitleKey1"),
-            "the label set is both families (16 names), so Auto measures the text the page actually shows");
-        Check(labels != null && !Contains(labels, "Description1"), "and still excludes the help identities, which are never painted");
+        Check(Contains(schema,"Bind")&&Contains(schema,"OptionsBind")&&!Contains(schema,"TitleKey1"),"mode row declares one choice source, not numbered label protocols");
+        IReadOnlyCollection<string>? labels=UiWidgetRegistry.GetLabelAttributes(UiWidgetRegistry.CoreScope,InputModeRowWidget.Kind);
+        Check(labels==null||!Contains(labels,"Description1"),"help is not a painted label attribute; Auto reads actual choice labels");
     }
-
     private static void VerifyKeyResolves()
     {
-        Fixture fixture = Build(new Dictionary<string, string> { ["TitleKey1"] = "US.Mode.Vanilla" });
+        Fixture fixture = Build(new UiChoice<string>("A","A",textKey:"US.Mode.Vanilla"));
         Draw(fixture);
 
         Check(fixture.Labels().Contains("[US.Mode.Vanilla]"), "the key is resolved through the translation seam before it is painted");
@@ -78,11 +73,7 @@ internal static class KernelModeRowLocalizationTests
 
     private static void VerifyKeyWins()
     {
-        Fixture fixture = Build(new Dictionary<string, string>
-        {
-            ["Title1"] = "Literal",
-            ["TitleKey1"] = "US.Mode.Vanilla"
-        });
+        Fixture fixture=Build(new UiChoice<string>("Literal","A",textKey:"US.Mode.Vanilla"));
         Draw(fixture);
 
         Check(fixture.Labels().Contains("[US.Mode.Vanilla]"), "a declared key wins over the literal, the rule every other *Key pair uses");
@@ -91,7 +82,7 @@ internal static class KernelModeRowLocalizationTests
 
     private static void VerifyValueFallback()
     {
-        Fixture fixture = Build(new Dictionary<string, string>());
+        Fixture fixture = Build(new UiChoice<string>("A","A"));
         Draw(fixture);
 
         Check(fixture.Labels().Contains("A"), "with neither declared the option's value is the label, as before");
@@ -105,12 +96,7 @@ internal static class KernelModeRowLocalizationTests
         // while the literal "abcdefgh" would be 64px and the value "A" 8px. Only a seam that resolves the
         // key before measuring can produce 88.
         string xml =
-            "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
-            + "<Row Id=\"row\" Padding=\"0\" Gap=\"0\">"
-            + "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Width=\"Auto\" Height=\"20\""
-            + " Value1=\"A\" Title1=\"abcdefgh\" TitleKey1=\"US.Mode.A\" />"
-            + "<Widget Id=\"rest\" Kind=\"" + LabelKind + "\" Height=\"10\" />"
-            + "</Row></UiPage>";
+            "<UiPage Schema=\"2\" Source=\""+(Scope)+"\"><Row Id=\"row\" Padding=\"0\" Gap=\"0\"><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Width=\"Auto\" Height=\"20\"    ><Choice Value=\"A\" Text=\"abcdefgh\" TextKey=\"US.Mode.A\" Help=\"A\"/></Widget><Widget Id=\"rest\" Kind=\""+(LabelKind)+"\" Height=\"10\" /></Row></UiPage>";
 
         UiLayoutSnapshot snapshot = Arrange(xml);
 
@@ -119,9 +105,9 @@ internal static class KernelModeRowLocalizationTests
         // that the KEY half participates at all: 88px comes from the translated string and nothing else.
         var probe = new StubMetrics();
         UiFont font = UiTheme.Vanilla.DefaultFont;
-        Check(Near(snapshot.RectById["mode"].width, probe.MeasureWidth("[US.Mode.A]", font)),
+        Check(Near(snapshot.RectById["mode"].Width, probe.MeasureWidth("[US.Mode.A]", font)),
             "Auto measures the translated title, so a bilingual page reserves the width it shows — measured "
-            + snapshot.RectById["mode"].width + ", translated=" + probe.MeasureWidth("[US.Mode.A]", font)
+            + snapshot.RectById["mode"].Width + ", translated=" + probe.MeasureWidth("[US.Mode.A]", font)
             + ", literal=" + probe.MeasureWidth("abcdefgh", font) + ", raw key=" + probe.MeasureWidth("US.Mode.A", font));
     }
 
@@ -129,7 +115,7 @@ internal static class KernelModeRowLocalizationTests
     {
         PrepareCore();
 
-        Check(Reject("<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\" Value1=\"A\" TitleKey3=\"US.Orphan\" />", "TitleKey3"),
+        Check(Reject("<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  TitleKey3=\"US.Orphan\" ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget>", "TitleKey3"),
             "a TitleKeyN whose index has no option is refused at creation, naming the attribute");
     }
 
@@ -139,7 +125,7 @@ internal static class KernelModeRowLocalizationTests
     {
         public InputModeRowWidget Widget = null!;
         public UiWidgetContext Context = null!;
-        public Rect Rect;
+        public UiLayoutRect Rect;
 
         public IList Labels()
         {
@@ -149,31 +135,19 @@ internal static class KernelModeRowLocalizationTests
         }
     }
 
-    private static Fixture Build(Dictionary<string, string> extra)
+    private static Fixture Build(UiChoice<string> choice)
     {
         PrepareCore();
-
-        var attrs = new Dictionary<string, string>
-        {
-            ["Bind"] = "mode",
-            ["Height"] = "20",
-            ["Value1"] = "A"
-        };
-        foreach (KeyValuePair<string, string> pair in extra)
-        {
-            attrs[pair.Key] = pair.Value;
-        }
-
-        var bindings = new UiBindings();
+        var attrs=new Dictionary<string,string>{{"Bind","mode"},{"Height","20"}};        var bindings = new UiBindings();
         bindings.BindValue<string>("mode", () => "A", _ => { });
 
         var fixture = new Fixture
         {
             Widget = new InputModeRowWidget(),
-            Rect = new Rect(0f, 0f, Width, 120f)
+            Rect = new UiLayoutRect(0f, 0f, Width, 120f)
         };
-        fixture.Widget.Configure(new UiElementSpec("mode", InputModeRowWidget.Kind, attrs));
-        fixture.Context = new UiWidgetContext(
+        fixture.Widget.Configure(new UiElementSpec("mode", InputModeRowWidget.Kind, attrs,choices:new[]{choice}));
+        fixture.Context = NativeFixture.Context(
             Scope, new UiSession(), new StubMetrics(), UiTheme.Vanilla,
             new StubTranslation(), bindings, Width, "root");
         return fixture;
@@ -182,22 +156,22 @@ internal static class KernelModeRowLocalizationTests
     private static void Draw(Fixture fixture)
     {
         ClearLabels();
-        fixture.Widget.Draw(fixture.Rect, fixture.Context);
+        NativeEvents.Begin(EventType.Repaint,new UiLayoutPoint(-10,-10));NativeFixture.Draw(fixture.Widget,fixture.Rect,fixture.Context);
     }
 
     private static UiLayoutSnapshot Arrange(string xml)
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(Scope, LabelKind, () => new HeightWidget(), new[] { "Id", "Kind", "Height" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, LabelKind, () => new HeightWidget(), new[] { "Id", "Kind", "Height" }));
 
         var engine = new UiLayoutEngine(Scope);
         var bindings = new UiBindings();
         bindings.BindValue<string>("mode", () => "A", _ => { });
-        var ctx = new UiWidgetContext(
+        var ctx = NativeFixture.Context(
             Scope, new UiSession(), new StubMetrics(), UiTheme.Vanilla,
             new StubTranslation(), bindings, 400f, "root");
-        return engine.ArrangeRoots(ctx, new Vector2(400f, 600f), UiLayoutManifest.Parse(xml).Roots);
+        return engine.ArrangeRoots(ctx, new UiLayoutPoint(400f, 600f), UiLayoutManifest.Parse(xml).Roots);
     }
 
     private static void PrepareCore()
@@ -256,10 +230,10 @@ internal static class KernelModeRowLocalizationTests
 
     private static void ResetSeams()
     {
-        UiNative.DebugMousePositionEnabled = false;
-        UiNative.DebugMousePosition = default;
-        UiNative.DebugMouseDown = false;
-        UiNative.ButtonOverride = null;
+        NativeFixture.DebugMousePositionEnabled = false;
+        NativeFixture.DebugMousePosition = default;
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.ButtonOverride = null;
     }
 
     private static int Run(string name, Action action)
@@ -330,7 +304,7 @@ internal static class KernelModeRowLocalizationTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
@@ -339,7 +313,7 @@ internal static class KernelModeRowLocalizationTests
             return 10f;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
         }
     }

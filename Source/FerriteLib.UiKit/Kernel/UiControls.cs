@@ -30,6 +30,7 @@ public sealed partial class UiControls
 
     private void RequireOwner(UiWidgetContext ctx)
     {
+        ctx.Node.RequireActive();
         if (ctx.Node.Id.IsNone)
             throw new InvalidOperationException("Pointer/native controls require an owner-created element context; use headless behaviors for semantic operations.");
         if (!ReferenceEquals(ctx.Session, session))
@@ -120,7 +121,8 @@ public sealed partial class UiControls
     public bool IsMouseDownOver(UiLayoutRect rect) => IsPointerDown() && IsMouseOver(rect);
     public bool IsMouseDragOver(UiLayoutRect rect) => IsPointerDragging() && IsMouseOver(rect);
     public bool IsMouseUpOver(UiLayoutRect rect) => IsPointerUp() && IsMouseOver(rect);
-    public bool IsMouseOver(UiLayoutRect rect) => Input.InputAllowed && rect.Contains(PointerPosition());
+    public bool IsMouseOver(UiLayoutRect rect) => Input.Phase!=UiFramePhase.None && Input.InputAllowed && rect.Contains(PointerPosition());
+    internal bool IsWindowMouseOver(UiLayoutRect rect) => Input.Phase!=UiFramePhase.None && Input.InputAllowed && rect.Contains(Input.Pointer);
     public bool IsMouseOver(UiLayoutRect rect, UiWidgetContext ctx) => !session.IsPointerOverHigherLayer(ctx.Node, WindowPointer(ctx)) && IsMouseOver(rect);
     public bool IsEnterPressed() => Input.Phase == UiFramePhase.KeyDown && (Input.Key == UiKey.Return || Input.Key == UiKey.KeypadEnter);
     public bool IsLayoutEvent() => Input.Phase == UiFramePhase.Layout;

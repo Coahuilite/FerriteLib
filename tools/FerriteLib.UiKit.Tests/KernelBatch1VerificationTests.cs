@@ -1,10 +1,11 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -73,7 +74,7 @@ internal static class KernelBatch1VerificationTests
                 + Rule("n", "Neutral") + Rule("su", "Success") + Rule("wa", "Warning") + Rule("da", "Danger")
                 + "</Stack>");
             using UiHost host = NewHost(xml);
-            host.DrawFrame(new Rect(0f, 0f, 300f, 200f));
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0f, 0f, 300f, 200f));
 
             Check(records.Count == 0 && UiFitAudit.StyleFallbackCount == 0,
                 "Neutral/Success/Warning/Danger are declared values, not fallbacks (records " + records.Count + ")");
@@ -103,7 +104,7 @@ internal static class KernelBatch1VerificationTests
                 + Rule("a1", "Active") + Rule("a2", "Active") + Rule("d1", "Disabled") + Rule("u1", "chartreuse")
                 + "</Stack>");
             using UiHost host = NewHost(xml);
-            host.DrawFrame(new Rect(0f, 0f, 300f, 200f));
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0f, 0f, 300f, 200f));
 
             Check(records.Count == 4, "four declarations record four notes after one frame (got " + records.Count + ")");
 
@@ -142,7 +143,8 @@ internal static class KernelBatch1VerificationTests
             Check(activePaths.Count == 2 && activePaths[0] != activePaths[1],
                 "two declarations of the same authored name record two notes, one per element path");
 
-            host.DrawFrame(new Rect(0f, 0f, 300f, 200f));
+            NativeFixture.DrawFrame(
+            host,new UiLayoutRect(0f, 0f, 300f, 200f));
             Check(records.Count == 4 && UiFitAudit.StyleFallbackCount == 4,
                 "a second frame adds nothing: dedup is per declaration, not per frame (got " + records.Count + ")");
         }
@@ -168,13 +170,14 @@ internal static class KernelBatch1VerificationTests
             string xml = Page("<Stack Id=\"s\" Padding=\"0\" Gap=\"0\">"
                 + Rule("n", "Neutral") + Rule("t", "Teal") + "</Stack>");
             using UiHost host = NewHost(xml);
-            List<Color> colors = StaticList<Color>("DrawBoxSolidColors");
+            List<UiColour> colors = StaticList<UiColour>("DrawBoxSolidColors");
             int before = colors.Count;
-            host.DrawFrame(new Rect(0f, 0f, 300f, 200f));
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0f, 0f, 300f, 200f));
 
             Check(records.Count == 1 && records[0].Attribute == "Tone"
                 && records[0].Authored == "Teal" && records[0].Resolved == "Neutral",
                 "a fifth value is recorded once as a Tone fallback to Neutral (got " + records.Count + ")");
+            colors = StaticList<UiColour>("DrawBoxSolidColors");
             Check(colors.Count == before + 2, "both rules painted one solid each");
             if (colors.Count == before + 2)
             {
@@ -205,9 +208,9 @@ internal static class KernelBatch1VerificationTests
         bindings.BindReadOnly<string>("ro", () => "x");
         UiWidgetContext ctx = new(Scope, session, Metrics(), theme, Translation(), bindings, 200f, "root");
 
-        Color authored = DrawLeaf(ctx, ("Text", "x"), ("Tone", "Disabled"));
-        Color fromBinding = DrawLeaf(ctx, ("Bind", "ro"), ("Tone", "Neutral"));
-        Color neutral = DrawLeaf(ctx, ("Text", "x"), ("Tone", "Neutral"));
+        UiColour authored = DrawLeaf(ctx, ("Text", "x"), ("Tone", "Disabled"));
+        UiColour fromBinding = DrawLeaf(ctx, ("Bind", "ro"), ("Tone", "Neutral"));
+        UiColour neutral = DrawLeaf(ctx, ("Text", "x"), ("Tone", "Neutral"));
 
         Check(SameColor(authored, fromBinding),
             "Tone=\"Disabled\" paints exactly what a read-only binding derives");
@@ -261,11 +264,11 @@ internal static class KernelBatch1VerificationTests
         // accent - so a red HoverPoint declaration cannot leak into the theme.
         var resolver = new UiStyleResolver(UiTheme.Vanilla, ghost);
         UiTheme scoped = resolver.ThemeFor(new[] { new UiStyleDeclaration(scheme: "ghost") });
-        Check(SameColor(scoped[UiPaletteRole.Accent], new Color(0f, 1f, 0f, 1f)),
+        Check(SameColor(scoped[UiPaletteRole.Accent], new UiColour(0f, 1f, 0f, 1f)),
             "the rest of the scheme still applies (AccentGold is the scheme's green)");
-        Check(SameColor(scoped.AccentHover, Lift(new Color(0f, 1f, 0f, 1f))),
+        Check(SameColor(scoped.AccentHover, Lift(new UiColour(0f, 1f, 0f, 1f))),
             "and the derived hover step follows the applied accent");
-        Check(!SameColor(scoped.AccentHover, new Color(1f, 0f, 0f, 1f)),
+        Check(!SameColor(scoped.AccentHover, new UiColour(1f, 0f, 0f, 1f)),
             "the dropped HoverPoint value never reaches the theme (the hover step is not red)");
     }
 
@@ -282,26 +285,26 @@ internal static class KernelBatch1VerificationTests
             "and it is read-only: a caller cannot assign the derived step");
 
         UiTheme probe = UiTheme.Vanilla;
-        probe[UiPaletteRole.Accent] = new Color(0.10f, 0.50f, 0.90f, 0.25f);
-        Color first = probe.AccentHover;
-        CheckNear(0.37f, first.r, "the red channel travels 30% of its remaining distance to white");
-        CheckNear(0.65f, first.g, "the green channel does too");
-        CheckNear(0.93f, first.b, "so does the blue channel");
-        CheckNear(0.25f, first.a, "and alpha is carried unchanged");
+        probe[UiPaletteRole.Accent] = new UiColour(0.10f, 0.50f, 0.90f, 0.25f);
+        UiColour first = probe.AccentHover;
+        CheckNear(0.37f, first.Red, "the red channel travels 30% of its remaining distance to white");
+        CheckNear(0.65f, first.Green, "the green channel does too");
+        CheckNear(0.93f, first.Blue, "so does the blue channel");
+        CheckNear(0.25f, first.Alpha, "and alpha is carried unchanged");
 
-        probe[UiPaletteRole.Accent] = new Color(0.90f, 0.10f, 0.30f, 1f);
-        Color second = probe.AccentHover;
-        CheckNear(0.93f, second.r, "re-tinting the accent recomputes red");
-        CheckNear(0.37f, second.g, "recomputes green");
-        CheckNear(0.51f, second.b, "recomputes blue");
+        probe[UiPaletteRole.Accent] = new UiColour(0.90f, 0.10f, 0.30f, 1f);
+        UiColour second = probe.AccentHover;
+        CheckNear(0.93f, second.Red, "re-tinting the accent recomputes red");
+        CheckNear(0.37f, second.Green, "recomputes green");
+        CheckNear(0.51f, second.Blue, "recomputes blue");
         Check(!SameColor(first, second), "reading AccentHover after moving AccentGold returns a moved value");
         Check(SameColor(probe.AccentHover, second), "and reading it twice in a row is deterministic");
 
-        probe[UiPaletteRole.Accent] = new Color(0.20f, 0.40f, 0.60f, 0f);
-        CheckNear(0f, probe.AccentHover.a, "a zero-alpha accent gets a zero-alpha hover step, never an opaque one");
+        probe[UiPaletteRole.Accent] = new UiColour(0.20f, 0.40f, 0.60f, 0f);
+        CheckNear(0f, probe.AccentHover.Alpha, "a zero-alpha accent gets a zero-alpha hover step, never an opaque one");
 
-        probe[UiPaletteRole.Accent] = new Color(1f, 1f, 1f, 1f);
-        Check(SameColor(probe.AccentHover, new Color(1f, 1f, 1f, 1f)), "white is a fixed point of the derivation");
+        probe[UiPaletteRole.Accent] = new UiColour(1f, 1f, 1f, 1f);
+        Check(SameColor(probe.AccentHover, new UiColour(1f, 1f, 1f, 1f)), "white is a fixed point of the derivation");
     }
 
     // --- CP-0: density reaches container spacing -------------------------------------------
@@ -324,18 +327,18 @@ internal static class KernelBatch1VerificationTests
         UiLayoutSnapshot atSix = Arrange(xml, six, 300f, 400f);
         UiLayoutSnapshot atWide = Arrange(xml, wide, 300f, 400f);
 
-        Rect aSix = atSix.RectById["a"];
-        Rect bSix = atSix.RectById["b"];
-        Rect aWide = atWide.RectById["a"];
-        Rect bWide = atWide.RectById["b"];
+        UiLayoutRect aSix = atSix.RectById["a"];
+        UiLayoutRect bSix = atSix.RectById["b"];
+        UiLayoutRect aWide = atWide.RectById["a"];
+        UiLayoutRect bWide = atWide.RectById["b"];
 
-        CheckNear(6f, aSix.x, "an undeclared container's first child starts at the theme's Padding (left)");
-        CheckNear(6f, aSix.y, "and at the theme's Padding (top)");
-        CheckNear(16f, bSix.y, "two children are separated by the theme's Gap (6 + 4 + 6)");
+        CheckNear(6f, aSix.X, "an undeclared container's first child starts at the theme's Padding (left)");
+        CheckNear(6f, aSix.Y, "and at the theme's Padding (top)");
+        CheckNear(16f, bSix.Y, "two children are separated by the theme's Gap (6 + 4 + 6)");
 
-        CheckNear(13f, aWide.x, "a theme-only geometry change moves the child's x");
-        CheckNear(13f, aWide.y, "and its y");
-        CheckNear(24f, bWide.y, "and the gap between them (13 + 4 + 7)");
+        CheckNear(13f, aWide.X, "a theme-only geometry change moves the child's x");
+        CheckNear(13f, aWide.Y, "and its y");
+        CheckNear(24f, bWide.Y, "and the gap between them (13 + 4 + 7)");
         Check(!SameRect(aSix, aWide), "the rects moved although no manifest attribute changed");
     }
 
@@ -361,9 +364,9 @@ internal static class KernelBatch1VerificationTests
         Check(SameRect(pre.RectById["a"], esc.RectById["a"])
             && SameRect(pre.RectById["b"], esc.RectById["b"]),
             "Padding=0/Gap=0 reproduces the pre-Batch-1 zero result exactly");
-        CheckNear(0f, esc.RectById["a"].x, "the escape hatch's first child is at x=0");
-        CheckNear(0f, esc.RectById["a"].y, "and y=0");
-        CheckNear(4f, esc.RectById["b"].y, "and the second child follows with a zero gap");
+        CheckNear(0f, esc.RectById["a"].X, "the escape hatch's first child is at x=0");
+        CheckNear(0f, esc.RectById["a"].Y, "and y=0");
+        CheckNear(4f, esc.RectById["b"].Y, "and the second child follows with a zero gap");
 
         // Positive control: without the escape hatch the same manifest under the same theme does move.
         UiLayoutSnapshot wouldMove = Arrange(bare, wide, 300f, 400f);
@@ -392,29 +395,30 @@ internal static class KernelBatch1VerificationTests
             + "</Column>");
 
         using UiHost host = NewHost(xml, document);
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(300f, 300f));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(300f, 300f));
 
-        Rect box1 = snapshot.RectById["box1"];
-        Rect a1 = snapshot.RectById["a1"];
-        Rect box2 = snapshot.RectById["box2"];
-        Rect a2 = snapshot.RectById["a2"];
+        UiLayoutRect box1 = snapshot.RectById["box1"];
+        UiLayoutRect a1 = snapshot.RectById["a1"];
+        UiLayoutRect box2 = snapshot.RectById["box2"];
+        UiLayoutRect a2 = snapshot.RectById["a2"];
 
-        List<Rect> labels = StaticList<Rect>("LabelRects");
+        List<UiLayoutRect> labels = StaticList<UiLayoutRect>("LabelRects");
         int before = labels.Count;
-        host.Draw(new Rect(0f, 0f, 300f, 300f), snapshot);
+        NativeFixture.Draw(        host,new UiLayoutRect(0f, 0f, 300f, 300f), snapshot);
 
-        CheckNear(11f, a1.x - box1.x, "the roomy scope's measure half places the child on its Padding (11)");
-        CheckNear(3f, a2.x - box2.x, "the tight scope's measure half places the child on its Padding (3)");
+        CheckNear(11f, a1.X - box1.X, "the roomy scope's measure half places the child on its Padding (11)");
+        CheckNear(3f, a2.X - box2.X, "the tight scope's measure half places the child on its Padding (3)");
 
+        labels = StaticList<UiLayoutRect>("LabelRects");
         Check(labels.Count >= before + 2, "both titled containers drew their title (got " + (labels.Count - before) + " label(s))");
         if (labels.Count < before + 2) return;
 
-        Rect title1 = labels[before];
-        Rect title2 = labels[before + 1];
-        CheckNear(11f, title1.x - box1.x, "the draw half resolves the roomy scope's Padding (11), so measure and draw agree");
-        CheckNear(box1.width - 22f, title1.width, "and insets the title rect by that same Padding");
-        CheckNear(3f, title2.x - box2.x, "the draw half resolves the tight scope's Padding (3) too");
-        CheckNear(box2.width - 6f, title2.width, "and insets this title rect by that same Padding");
+        UiLayoutRect title1 = labels[before];
+        UiLayoutRect title2 = labels[before + 1];
+        CheckNear(11f, title1.X - box1.X, "the draw half resolves the roomy scope's Padding (11), so measure and draw agree");
+        CheckNear(box1.Width - 22f, title1.Width, "and insets the title rect by that same Padding");
+        CheckNear(3f, title2.X - box2.X, "the draw half resolves the tight scope's Padding (3) too");
+        CheckNear(box2.Width - 6f, title2.Width, "and insets this title rect by that same Padding");
     }
 
     // --- CP-1 / CP-2: placement -----------------------------------------------------------
@@ -440,9 +444,9 @@ internal static class KernelBatch1VerificationTests
         CheckY("AlignY=\"Bottom\" OffsetY=\"10%\"", 124f, "10% is a tenth of the parent's 140");
 
         // The placed envelope is still the declared size; placement moves a box, it does not resize one.
-        Rect sized = OverlayChild("AlignX=\"Right\" AlignY=\"Bottom\"");
-        CheckNear(200f, sized.width, "placement never resizes the element");
-        CheckNear(40f, sized.height, "on either axis");
+        UiLayoutRect sized = OverlayChild("AlignX=\"Right\" AlignY=\"Bottom\"");
+        CheckNear(200f, sized.Width, "placement never resizes the element");
+        CheckNear(40f, sized.Height, "on either axis");
     }
 
     /// <summary>
@@ -460,23 +464,23 @@ internal static class KernelBatch1VerificationTests
         string overlayUnsized = Page("<Overlay Id=\"o\" Padding=\"10\" Gap=\"6\" Height=\"160\">"
             + W("c", RuleWidget.Kind, "Height=\"20\"") + "</Overlay>");
 
-        Rect bare = Arrange(overlayBare, 500f, 200f).RectById["c"];
-        Rect stretch = Arrange(overlayStretch, 500f, 200f).RectById["c"];
-        Rect unsized = Arrange(overlayUnsized, 500f, 200f).RectById["c"];
+        UiLayoutRect bare = Arrange(overlayBare, 500f, 200f).RectById["c"];
+        UiLayoutRect stretch = Arrange(overlayStretch, 500f, 200f).RectById["c"];
+        UiLayoutRect unsized = Arrange(overlayUnsized, 500f, 200f).RectById["c"];
         Check(SameRect(bare, stretch) && SameRect(bare, unsized),
             "absent, explicit Stretch and no declared width land on one identical slot");
-        CheckNear(10f, bare.x, "which is the container's inner origin");
-        CheckNear(480f, bare.width, "at the whole inner width");
+        CheckNear(10f, bare.X, "which is the container's inner origin");
+        CheckNear(480f, bare.Width, "at the whole inner width");
 
         string columnBare = Page("<Column Id=\"c\" Padding=\"0\" Gap=\"0\">"
             + W("w", RuleWidget.Kind, "Height=\"20\" Width=\"100\"") + "</Column>");
         string columnStretch = Page("<Column Id=\"c\" Padding=\"0\" Gap=\"0\">"
             + W("w", RuleWidget.Kind, "Height=\"20\" AlignX=\"Stretch\"") + "</Column>");
-        Rect flowBare = Arrange(columnBare, 400f, 200f).RectById["w"];
-        Rect flowStretch = Arrange(columnStretch, 400f, 200f).RectById["w"];
+        UiLayoutRect flowBare = Arrange(columnBare, 400f, 200f).RectById["w"];
+        UiLayoutRect flowStretch = Arrange(columnStretch, 400f, 200f).RectById["w"];
         Check(SameRect(flowBare, flowStretch), "a flow child's absent and explicit Stretch are identical too");
-        CheckNear(0f, flowBare.x, "the flow child keeps the flow's slot at x=0");
-        CheckNear(400f, flowBare.width, "and the flow's full width, so a numeric Width beside no alignment is still the flow's to decide");
+        CheckNear(0f, flowBare.X, "the flow child keeps the flow's slot at x=0");
+        CheckNear(400f, flowBare.Width, "and the flow's full width, so a numeric Width beside no alignment is still the flow's to decide");
     }
 
     /// <summary>Every refusal in the contract's matrix, each one a located creation-time error.</summary>
@@ -537,26 +541,27 @@ internal static class KernelBatch1VerificationTests
             + "</Overlay>");
 
         using UiHost host = NewHost(xml);
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(500f, 200f));
-        Rect rail = snapshot.RectById["rail"];
-        CheckNear(290f, rail.x, "the envelope's x is the 200-wide arranged rect (10 + 480 - 200), not the 20px paint");
-        CheckNear(110f, rail.y, "the envelope's y is the 40-tall arranged rect (10 + 140 - 40), not the 1px paint");
-        CheckNear(200f, rail.width, "the envelope keeps the arranged width");
-        CheckNear(40f, rail.height, "the envelope keeps the arranged height");
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(500f, 200f));
+        UiLayoutRect rail = snapshot.RectById["rail"];
+        CheckNear(290f, rail.X, "the envelope's x is the 200-wide arranged rect (10 + 480 - 200), not the 20px paint");
+        CheckNear(110f, rail.Y, "the envelope's y is the 40-tall arranged rect (10 + 140 - 40), not the 1px paint");
+        CheckNear(200f, rail.Width, "the envelope keeps the arranged width");
+        CheckNear(40f, rail.Height, "the envelope keeps the arranged height");
 
-        List<Rect> painted = StaticList<Rect>("DrawBoxSolidRects");
+        List<UiLayoutRect> painted = StaticList<UiLayoutRect>("DrawBoxSolidRects");
         int before = painted.Count;
-        host.Draw(new Rect(0f, 0f, 500f, 200f), snapshot);
+        NativeFixture.Draw(        host,new UiLayoutRect(0f, 0f, 500f, 200f), snapshot);
 
+        painted = StaticList<UiLayoutRect>("DrawBoxSolidRects");
         Check(painted.Count == before + 1, "the rule painted exactly one solid (got " + (painted.Count - before) + ")");
         if (painted.Count != before + 1) return;
 
-        Rect railPaint = painted[before];
-        CheckNear(20f, railPaint.width, "the paint really is far narrower than its 200px envelope (Inset=90)");
-        CheckNear(1f, railPaint.height, "and far shorter than its 40px envelope");
-        CheckNear(129.5f, railPaint.y, "the paint sits on the rect's vertical centre (110 + (40 - 1)/2)");
-        Check(!Near(470f, rail.x), "placement did not use the 20px painted width");
-        Check(!Near(149f, rail.y), "placement did not use the 1px painted height");
+        UiLayoutRect railPaint = painted[before];
+        CheckNear(20f, railPaint.Width, "the paint really is far narrower than its 200px envelope (Inset=90)");
+        CheckNear(1f, railPaint.Height, "and far shorter than its 40px envelope");
+        CheckNear(129.5f, railPaint.Y, "the paint sits on the rect's vertical centre (110 + (40 - 1)/2)");
+        Check(!Near(470f, rail.X), "placement did not use the 20px painted width");
+        Check(!Near(149f, rail.Y), "placement did not use the 1px painted height");
     }
 
     /// <summary>
@@ -628,9 +633,9 @@ internal static class KernelBatch1VerificationTests
         UiLayoutSnapshot wide = Arrange(xml, 600f, 300f);
         UiLayoutSnapshot narrow = Arrange(xml, 300f, 300f);
 
-        CheckNear(100f, wide.RectById["w"].y,
+        CheckNear(100f, wide.RectById["w"].Y,
             "wide (effective Row) the AlignY=Bottom placement applies: 0 + 1 * (120 - 20)");
-        CheckNear(0f, narrow.RectById["w"].y,
+        CheckNear(0f, narrow.RectById["w"].Y,
             "narrow (effective Column) the same declaration is inert, exactly as the contract states");
     }
 
@@ -711,7 +716,7 @@ internal static class KernelBatch1VerificationTests
                 + "</Stack>");
             using UiHost host = new(
                 Scope, UiLayoutManifest.Parse(xml), new UiBindings(), UiTheme.Vanilla, new OverflowMetrics(), Translation());
-            host.DrawFrame(new Rect(0f, 0f, 120f, 200f));
+            NativeFixture.DrawFrame(            host,new UiLayoutRect(0f, 0f, 120f, 200f));
 
             Check(reports.Count >= 1,
                 "content exceeding the element's arranged rect raises a fit-audit finding (got " + reports.Count + ")");
@@ -784,25 +789,25 @@ internal static class KernelBatch1VerificationTests
         return Math.Abs(left - right) <= 0.001f;
     }
 
-    private static bool SameRect(Rect left, Rect right)
+    private static bool SameRect(UiLayoutRect left, UiLayoutRect right)
     {
-        return Near(left.x, right.x) && Near(left.y, right.y)
-            && Near(left.width, right.width) && Near(left.height, right.height);
+        return Near(left.X, right.X) && Near(left.Y, right.Y)
+            && Near(left.Width, right.Width) && Near(left.Height, right.Height);
     }
 
-    private static bool SameColor(Color left, Color right)
+    private static bool SameColor(UiColour left, UiColour right)
     {
-        return Near(left.r, right.r) && Near(left.g, right.g)
-            && Near(left.b, right.b) && Near(left.a, right.a);
+        return Near(left.Red, right.Red) && Near(left.Green, right.Green)
+            && Near(left.Blue, right.Blue) && Near(left.Alpha, right.Alpha);
     }
 
-    private static Color Lift(Color accent)
+    private static UiColour Lift(UiColour accent)
     {
-        return new Color(
-            accent.r + (1f - accent.r) * 0.3f,
-            accent.g + (1f - accent.g) * 0.3f,
-            accent.b + (1f - accent.b) * 0.3f,
-            accent.a);
+        return new UiColour(
+            accent.Red + (1f - accent.Red) * 0.3f,
+            accent.Green + (1f - accent.Green) * 0.3f,
+            accent.Blue + (1f - accent.Blue) * 0.3f,
+            accent.Alpha);
     }
 
     private static void ResetHarness()
@@ -851,7 +856,7 @@ internal static class KernelBatch1VerificationTests
         return template.Replace("{0}", first).Replace("{1}", second);
     }
 
-    private static UiHost NewHost(string xml, UiStyleDocument? document = null, IUiBindings? bindings = null, UiTheme? theme = null)
+    private static UiHost NewHost(string xml, UiStyleDocument? document = null, IUiBindingReader? bindings = null, UiTheme? theme = null)
     {
         return new UiHost(
             Scope,
@@ -871,10 +876,10 @@ internal static class KernelBatch1VerificationTests
     private static UiLayoutSnapshot Arrange(string xml, UiTheme theme, float width, float height)
     {
         using UiHost host = NewHost(xml, null, null, theme);
-        return host.MeasureAndArrange(new Vector2(width, height));
+        return host.MeasureAndArrange(new UiLayoutPoint(width, height));
     }
 
-    private static Rect OverlayChild(string childAttributes)
+    private static UiLayoutRect OverlayChild(string childAttributes)
     {
         string xml = Page("<Overlay Id=\"o\" Padding=\"10\" Gap=\"6\" Height=\"160\">"
             + W("c", RuleWidget.Kind, "Width=\"200\" Height=\"40\" " + childAttributes)
@@ -884,17 +889,17 @@ internal static class KernelBatch1VerificationTests
 
     private static void CheckX(string childAttributes, float expectedX, string what)
     {
-        Rect rect = OverlayChild(childAttributes);
-        Check(Near(rect.x, expectedX), what + " (x=" + rect.x + ", expected " + expectedX + ")");
+        UiLayoutRect rect = OverlayChild(childAttributes);
+        Check(Near(rect.X, expectedX), what + " (x=" + rect.X + ", expected " + expectedX + ")");
     }
 
     private static void CheckY(string childAttributes, float expectedY, string what)
     {
-        Rect rect = OverlayChild(childAttributes);
-        Check(Near(rect.y, expectedY), what + " (y=" + rect.y + ", expected " + expectedY + ")");
+        UiLayoutRect rect = OverlayChild(childAttributes);
+        Check(Near(rect.Y, expectedY), what + " (y=" + rect.Y + ", expected " + expectedY + ")");
     }
 
-    private static void ExpectRejected(string xml, string attribute, string value, string pathFragment, IUiBindings? bindings = null, bool requireValue = true)
+    private static void ExpectRejected(string xml, string attribute, string value, string pathFragment, IUiBindingReader? bindings = null, bool requireValue = true)
     {
         try
         {
@@ -912,7 +917,7 @@ internal static class KernelBatch1VerificationTests
         }
     }
 
-    private static void ExpectAccepted(string xml, IUiBindings? bindings, string what)
+    private static void ExpectAccepted(string xml, IUiBindingReader? bindings, string what)
     {
         try
         {
@@ -925,15 +930,15 @@ internal static class KernelBatch1VerificationTests
         }
     }
 
-    private static void CheckAccepted(string xml, IUiBindings? bindings, string what)
+    private static void CheckAccepted(string xml, IUiBindingReader? bindings, string what)
     {
         ExpectAccepted(xml, bindings, what);
     }
 
     private static void ExpectConsumed(string what, string id, string baselineXml, string variantXml)
     {
-        Rect baseline = default;
-        Rect variant = default;
+        UiLayoutRect baseline = default;
+        UiLayoutRect variant = default;
         try
         {
             baseline = Arrange(baselineXml, 400f, 300f).RectById[id];
@@ -954,18 +959,19 @@ internal static class KernelBatch1VerificationTests
         }
     }
 
-    private static string Describe(Rect rect)
+    private static string Describe(UiLayoutRect rect)
     {
-        return "(" + rect.x + "," + rect.y + "," + rect.width + "," + rect.height + ")";
+        return "(" + rect.X + "," + rect.Y + "," + rect.Width + "," + rect.Height + ")";
     }
 
-    private static Color DrawLeaf(UiWidgetContext ctx, params (string Name, string Value)[] attributes)
+    private static UiColour DrawLeaf(UiWidgetContext ctx, params (string Name, string Value)[] attributes)
     {
         WrappedTextWidget leaf = new();
         leaf.Configure(new UiElementSpec("leaf", WrappedTextWidget.Kind, Attributes(attributes)));
-        List<Color> labels = StaticList<Color>("LabelColors");
+        List<UiColour> labels = StaticList<UiColour>("LabelColors");
         int before = labels.Count;
-        leaf.Draw(new Rect(0f, 0f, 200f, 40f), ctx);
+        NativeFixture.Draw(        leaf,new UiLayoutRect(0f, 0f, 200f, 40f), ctx);
+        labels = StaticList<UiColour>("LabelColors");
         if (labels.Count <= before)
         {
             Check(false, "the leaf painted no label, so its treatment cannot be read");
@@ -991,8 +997,7 @@ internal static class KernelBatch1VerificationTests
         FieldInfo? info = typeof(Verse.Widgets).GetField(field, BindingFlags.Public | BindingFlags.Static);
         if (info == null) throw new Exception("Verse stub is missing the recorder field " + field);
         object? value = info.GetValue(null);
-        if (value is not List<T> list) throw new Exception("Verse stub field " + field + " is not List<" + typeof(T).Name + ">");
-        return list;
+        return NativeFixture.Records<T>(value??throw new Exception("Missing recorder "+field));
     }
 
     private static ITextMetrics Metrics()

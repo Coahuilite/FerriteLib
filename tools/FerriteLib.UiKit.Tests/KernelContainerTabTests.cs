@@ -1,9 +1,10 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -74,7 +75,7 @@ internal static class KernelContainerTabTests
         bindings.BindValue(UiBindings.ActiveTabKey, () => tab, value => tab = value);
 
         using UiHost host = Host(xml, bindings);
-        UiLayoutSnapshot packs = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot packs = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(
             packs.RectById.ContainsKey("packs") && packs.RectById.ContainsKey("packs-child")
                 && !packs.RectById.ContainsKey("basic") && !packs.RectById.ContainsKey("basic-child"),
@@ -82,7 +83,7 @@ internal static class KernelContainerTabTests
 
         tab = "Basic";
         bindings.NotifyChanged(UiBindings.ActiveTabKey);
-        UiLayoutSnapshot basic = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot basic = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(
             basic.RectById.ContainsKey("basic") && basic.RectById.ContainsKey("basic-child")
                 && !basic.RectById.ContainsKey("packs") && !basic.RectById.ContainsKey("packs-child"),
@@ -90,7 +91,7 @@ internal static class KernelContainerTabTests
 
         tab = "Packs";
         bindings.NotifyChanged(UiBindings.ActiveTabKey);
-        UiLayoutSnapshot again = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot again = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(
             again.RectById.ContainsKey("packs") && again.RectById.ContainsKey("packs-child"),
             "switching back restores it with no residue, on the same host (nothing was reopened)");
@@ -103,15 +104,12 @@ internal static class KernelContainerTabTests
     /// </summary>
     private static void VerifyVocabularyPinned()
     {
-        HashSet<string> hostContainers = PrivateSet(typeof(UiHost), "ContainerAttributes");
-        HashSet<string> engineContainers = PrivateSet(typeof(UiLayoutEngine), "TemplateContainerAttributes");
-
-        Check(hostContainers.Contains("Tab"), "UiHost's container vocabulary carries Tab");
-        Check(engineContainers.Contains("Tab"), "and the engine's mirrored list for template subtrees carries it too");
-        Check(hostContainers.SetEquals(engineContainers),
-            "the two container lists are still the same vocabulary, so the fix cannot half-land again");
+        HashSet<string> grammar=PrivateSet(typeof(UiDefinitionCompiler),"ContainerAttributes");
+        Check(grammar.Contains("Tab"),"the shared root/template compiler permits container Tab");
+        Check(typeof(UiHost).GetField("ContainerAttributes",BindingFlags.Static|BindingFlags.NonPublic)==null
+            &&typeof(UiLayoutEngine).GetField("TemplateContainerAttributes",BindingFlags.Static|BindingFlags.NonPublic)==null,
+            "there is no mirrored host/engine vocabulary to drift from the single compiler");
     }
-
     private static void VerifyInvalidationAndIdentity()
     {
         Prepare();
@@ -123,27 +121,27 @@ internal static class KernelContainerTabTests
             "<Section Id=\"card\" Title=\"Card\" Tab=\"Packs\">" + Child("inside") + "</Section>",
             bindings);
 
-        host.MeasureAndArrange(new Vector2(200f, 200f));
+        host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         UiNode card = host.Session.GetNodeByElementId("card") ?? throw new Exception("the container was not arranged");
-        card.GetOrCreateState("draft").EditText = "typed";
+        NativeFixture.Custom(        card,"draft").EditText = "typed";
 
         tab = "Other";
         bindings.NotifyChanged(UiBindings.ActiveTabKey);
-        UiLayoutSnapshot hidden = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot hidden = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(!hidden.RectById.ContainsKey("card"), "announcing active-tab hides the gated container");
 
         UiNode? afterHide = host.Session.GetNodeByElementId("card");
         Check(afterHide != null && ReferenceEquals(afterHide, card),
             "and a hidden container keeps its node: hidden is not removed, exactly as for Visible/Hidden");
-        Check(afterHide != null && afterHide.ValueStates["draft"].EditText == "typed",
+        Check(afterHide != null && NativeFixture.CustomSlots(afterHide)["draft"].EditText == "typed",
             "so its state survives the hide rather than being handed to another element");
 
         tab = "Packs";
         bindings.NotifyChanged(UiBindings.ActiveTabKey);
-        host.MeasureAndArrange(new Vector2(200f, 200f));
+        host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(
             ReferenceEquals(host.Session.GetNodeByElementId("card"), card)
-                && card.ValueStates["draft"].EditText == "typed",
+                && NativeFixture.CustomSlots(card)["draft"].EditText == "typed",
             "and switching back resumes on the same node with the same state");
     }
 
@@ -190,7 +188,7 @@ internal static class KernelContainerTabTests
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Id", "Kind", "Height" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Id", "Kind", "Height" }));
     }
 
     private static HashSet<string> PrivateSet(Type type, string fieldName)
@@ -269,7 +267,7 @@ internal static class KernelContainerTabTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
@@ -278,7 +276,7 @@ internal static class KernelContainerTabTests
             return 12f;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
         }
     }

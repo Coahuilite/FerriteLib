@@ -1,8 +1,9 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.IO;
 using System.Collections.Generic;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -174,7 +175,7 @@ internal static class KernelContractTests
 
         // Missing action binding.
         var missing = new UiBindings();
-        missing.BindReadOnly<IReadOnlyList<Vector2>>("points", () => new List<Vector2> { new(0f, 1f), new(1f, 0f) });
+        missing.BindReadOnly<IReadOnlyList<UiLayoutPoint>>("points", () => new List<UiLayoutPoint> { new(0f, 1f), new(1f, 0f) });
         try
         {
             using UiHost missingHost = new("test", manifest, missing, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
@@ -187,7 +188,7 @@ internal static class KernelContractTests
 
         // Wrong payload type.
         var wrongType = new UiBindings();
-        wrongType.BindReadOnly<IReadOnlyList<Vector2>>("points", () => new List<Vector2> { new(0f, 1f), new(1f, 0f) });
+        wrongType.BindReadOnly<IReadOnlyList<UiLayoutPoint>>("points", () => new List<UiLayoutPoint> { new(0f, 1f), new(1f, 0f) });
         wrongType.BindAction<string>("point-changed", _ => { });
         try
         {
@@ -201,7 +202,7 @@ internal static class KernelContractTests
 
         // Correct contract creates.
         var good = new UiBindings();
-        good.BindReadOnly<IReadOnlyList<Vector2>>("points", () => new List<Vector2> { new(0f, 1f), new(1f, 0f) });
+        good.BindReadOnly<IReadOnlyList<UiLayoutPoint>>("points", () => new List<UiLayoutPoint> { new(0f, 1f), new(1f, 0f) });
         good.BindAction<UiChartPointChange>("point-changed", _ => { });
         using UiHost host = new("test", manifest, good, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.Close();
@@ -231,30 +232,30 @@ internal static class KernelContractTests
         var bindings = new UiBindings();
 
         using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(800f, 300f));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(800f, 300f));
 
         // Fill scroll viewport height = available height; content keeps its natural height.
-        if (!snapshot.Viewports.TryGetValue("content", out Rect viewport))
+        if (!snapshot.Viewports.TryGetValue("content", out UiLayoutRect viewport))
         {
             throw new Exception("Fill scroll produced no viewport");
         }
 
-        if (Math.Abs(viewport.height - 300f) > 0.01f)
+        if (Math.Abs(viewport.Height - 300f) > 0.01f)
         {
-            throw new Exception("Fill scroll viewport height != available height (" + viewport.height + ")");
+            throw new Exception("Fill scroll viewport height != available height (" + viewport.Height + ")");
         }
 
-        if (!snapshot.ScrollContents.TryGetValue("content", out Rect content))
+        if (!snapshot.ScrollContents.TryGetValue("content", out UiLayoutRect content))
         {
             throw new Exception("Fill scroll produced no content rect");
         }
 
-        if (content.height <= viewport.height)
+        if (content.Height <= viewport.Height)
         {
             throw new Exception("Fill scroll content did not keep its natural height");
         }
 
-        if (!snapshot.RectById.TryGetValue("nav", out Rect nav) || Math.Abs(nav.height - 300f) > 0.01f)
+        if (!snapshot.RectById.TryGetValue("nav", out UiLayoutRect nav) || Math.Abs(nav.Height - 300f) > 0.01f)
         {
             throw new Exception("Fill column did not stretch to available height");
         }
@@ -280,14 +281,14 @@ internal static class KernelContractTests
         using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
 
         host.Session.SetScrollTarget("target");
-        host.DrawFrame(new Rect(0f, 0f, 200f, 200f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 200f, 200f));
 
         UiNode? scrollNode = host.Session.GetNodeByElementId("scroll");
         if (scrollNode == null) throw new Exception("No node for the scroll element.");
-        Vector2 pos = host.Session.GetScrollPosition(scrollNode);
-        if (Math.Abs(pos.y - 40f) > 0.01f)
+        UiLayoutPoint pos = host.Session.GetScrollPosition(scrollNode);
+        if (Math.Abs(pos.Y - 40f) > 0.01f)
         {
-            throw new Exception("Scroll target did not position the scroll (" + pos.y + ", expected 40)");
+            throw new Exception("Scroll target did not position the scroll (" + pos.Y + ", expected 40)");
         }
 
         if (host.Session.ScrollTargetElementId != null)
@@ -297,7 +298,7 @@ internal static class KernelContractTests
 
         // Pending target for a hidden (unresolvable) element stays pending.
         host.Session.SetScrollTarget("missing-id");
-        host.DrawFrame(new Rect(0f, 0f, 200f, 200f));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 200f, 200f));
         if (host.Session.ScrollTargetElementId == null)
         {
             throw new Exception("Unresolvable scroll target was dropped instead of staying pending");
@@ -316,43 +317,43 @@ internal static class KernelContractTests
 
         UiLayoutManifest manifest = UiLayoutManifest.Parse(xml);
         var bindings = new UiBindings();
-        var points = new List<Vector2> { new(0f, 1f), new(0.3f, 1f), new(0.7f, 0f), new(1f, 0f) };
+        var points = new List<UiLayoutPoint> { new(0f, 1f), new(0.3f, 1f), new(0.7f, 0f), new(1f, 0f) };
         var changes = new List<UiChartPointChange>();
-        bindings.BindReadOnly<IReadOnlyList<Vector2>>("points", () => points);
+        bindings.BindReadOnly<IReadOnlyList<UiLayoutPoint>>("points", () => points);
         bindings.BindAction<UiChartPointChange>("point-changed", change => changes.Add(change));
 
         using UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(300f, 100f));
-        Rect chartRect = snapshot.RectById["chart"];
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(300f, 100f));
+        UiLayoutRect chartRect = snapshot.RectById["chart"];
 
         try
         {
-            UiNative.DebugMousePositionEnabled = true;
-            UiNative.DebugMouseDown = false;
-            UiNative.DebugMouseDrag = false;
-            UiNative.DebugMouseUp = false;
-            UiNative.DebugHotControl = 0;
-            UiNative.DebugControlIdCounter = 0;
+            NativeFixture.DebugMousePositionEnabled = true;
+            NativeFixture.DebugMouseDown = false;
+            NativeFixture.DebugMouseDrag = false;
+            NativeFixture.DebugMouseUp = false;
+            NativeFixture.DebugHotControl = 0;
+            NativeFixture.DebugControlIdCounter = 0;
 
             // MouseDown on editable point 2 (x=0.3, y=1): plot padding 8, width 300-16=284,
             // x = 8 + 0.3*284 = 93.2; y = 8 (top).
-            UiNative.DebugMousePosition = new Vector2(chartRect.x + 93.2f, chartRect.y + 8f);
-            UiNative.DebugMouseDown = true;
+            NativeFixture.DebugMousePosition = new UiLayoutPoint(chartRect.X + 93.2f, chartRect.Y + 8f);
+            NativeFixture.DebugMouseDown = true;
             host.BeginFrame();
-            host.Draw(new Rect(0f, 0f, 300f, 100f), snapshot);
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            host,new UiLayoutRect(0f, 0f, 300f, 100f), snapshot);}
             host.EndFrame();
 
-            if (UiNative.DebugHotControl == 0)
+            if (NativeFixture.DebugHotControl == 0)
             {
                 throw new Exception("MouseDown did not capture the native hot control");
             }
 
             // Drag to x=0.6 while captured (pointer leaves the chart rect to prove capture).
-            UiNative.DebugMouseDown = false;
-            UiNative.DebugMouseDrag = true;
-            UiNative.DebugMousePosition = new Vector2(chartRect.x + 500f, chartRect.y + 500f);
+            NativeFixture.DebugMouseDown = false;
+            NativeFixture.DebugMouseDrag = true;
+            NativeFixture.DebugMousePosition = new UiLayoutPoint(chartRect.X + 500f, chartRect.Y + 500f);
             host.BeginFrame();
-            host.Draw(new Rect(0f, 0f, 300f, 100f), snapshot);
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            host,new UiLayoutRect(0f, 0f, 300f, 100f), snapshot);}
             host.EndFrame();
 
             if (changes.Count == 0)
@@ -366,38 +367,38 @@ internal static class KernelContractTests
             }
 
             // MouseUp releases the hot control.
-            UiNative.DebugMouseDrag = false;
-            UiNative.DebugMouseUp = true;
+            NativeFixture.DebugMouseDrag = false;
+            NativeFixture.DebugMouseUp = true;
             host.BeginFrame();
-            host.Draw(new Rect(0f, 0f, 300f, 100f), snapshot);
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            host,new UiLayoutRect(0f, 0f, 300f, 100f), snapshot);}
             host.EndFrame();
 
-            if (UiNative.DebugHotControl != 0)
+            if (NativeFixture.DebugHotControl != 0)
             {
                 throw new Exception("MouseUp did not release the native hot control");
             }
 
             // A fresh MouseDown outside any editable point must not capture.
-            UiNative.DebugMouseUp = false;
-            UiNative.DebugMouseDown = true;
-            UiNative.DebugMousePosition = new Vector2(chartRect.x + 8f, chartRect.y + 8f); // point 0 is not editable
+            NativeFixture.DebugMouseUp = false;
+            NativeFixture.DebugMouseDown = true;
+            NativeFixture.DebugMousePosition = new UiLayoutPoint(chartRect.X + 8f, chartRect.Y + 8f); // point 0 is not editable
             host.BeginFrame();
-            host.Draw(new Rect(0f, 0f, 300f, 100f), snapshot);
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            host,new UiLayoutRect(0f, 0f, 300f, 100f), snapshot);}
             host.EndFrame();
 
-            if (UiNative.DebugHotControl != 0)
+            if (NativeFixture.DebugHotControl != 0)
             {
                 throw new Exception("MouseDown on a non-editable point captured the hot control");
             }
         }
         finally
         {
-            UiNative.DebugMousePositionEnabled = false;
-            UiNative.DebugMouseDown = false;
-            UiNative.DebugMouseDrag = false;
-            UiNative.DebugMouseUp = false;
-            UiNative.DebugHotControl = 0;
-            UiNative.DebugControlIdCounter = 0;
+            NativeFixture.DebugMousePositionEnabled = false;
+            NativeFixture.DebugMouseDown = false;
+            NativeFixture.DebugMouseDrag = false;
+            NativeFixture.DebugMouseUp = false;
+            NativeFixture.DebugHotControl = 0;
+            NativeFixture.DebugControlIdCounter = 0;
         }
     }
 
@@ -405,7 +406,7 @@ internal static class KernelContractTests
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register("rev-test", "test/height", () => new HeightBoundWidget());
+UiWidgetRegistry.Define(new UiWidgetDefinition("rev-test", "test/height", () => new HeightBoundWidget()));
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"rev-test\">"
@@ -418,14 +419,14 @@ internal static class KernelContractTests
         bindings.BindReadOnly("height", () => current);
 
         using UiHost host = new("rev-test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
-        UiLayoutSnapshot first = host.MeasureAndArrange(new Vector2(200f, 200f));
-        if (Math.Abs(first.RectById["h"].height - 10f) > 0.01f)
+        UiLayoutSnapshot first = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
+        if (Math.Abs(first.RectById["h"].Height - 10f) > 0.01f)
         {
             throw new Exception("Initial measure did not reflect the binding height");
         }
 
         // Same revision and size: the arranged snapshot is reused.
-        UiLayoutSnapshot cached = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot cached = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         if (!ReferenceEquals(first, cached))
         {
             throw new Exception("Same revision re-arranged instead of using the cached snapshot");
@@ -433,28 +434,28 @@ internal static class KernelContractTests
 
         // The binding changes but the revision does not: the cache stays (stale) until bumped.
         current = 30f;
-        UiLayoutSnapshot stale = host.MeasureAndArrange(new Vector2(200f, 200f));
-        if (!ReferenceEquals(stale, cached) || Math.Abs(stale.RectById["h"].height - 10f) > 0.01f)
+        UiLayoutSnapshot stale = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
+        if (!ReferenceEquals(stale, cached) || Math.Abs(stale.RectById["h"].Height - 10f) > 0.01f)
         {
             throw new Exception("Unbumped content change re-arranged or changed heights");
         }
 
         // Bumping the session content revision forces re-measure with the new value.
         host.Session.BumpContentRevision();
-        UiLayoutSnapshot refreshed = host.MeasureAndArrange(new Vector2(200f, 200f));
-        if (Math.Abs(refreshed.RectById["h"].height - 30f) > 0.01f)
+        UiLayoutSnapshot refreshed = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
+        if (Math.Abs(refreshed.RectById["h"].Height - 30f) > 0.01f)
         {
             throw new Exception("Content revision bump did not re-arrange with the new height");
         }
 
         // A different available size must bypass the single-slot cache (width-change invalidation).
-        UiLayoutSnapshot resized = host.MeasureAndArrange(new Vector2(120f, 200f));
+        UiLayoutSnapshot resized = host.MeasureAndArrange(new UiLayoutPoint(120f, 200f));
         if (ReferenceEquals(resized, refreshed))
         {
             throw new Exception("Available-size change reused the cached snapshot");
         }
 
-        UiLayoutSnapshot backToOriginal = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot backToOriginal = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         if (ReferenceEquals(backToOriginal, resized))
         {
             throw new Exception("Returning to the previous size reused the resized snapshot");
@@ -465,7 +466,7 @@ internal static class KernelContractTests
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register("lang-test", "test/height", () => new HeightBoundWidget());
+UiWidgetRegistry.Define(new UiWidgetDefinition("lang-test", "test/height", () => new HeightBoundWidget()));
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"lang-test\">"
@@ -479,8 +480,8 @@ internal static class KernelContractTests
 
         StubTranslation translation = new StubTranslation();
         using UiHost host = new("lang-test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), translation);
-        UiLayoutSnapshot first = host.MeasureAndArrange(new Vector2(200f, 200f));
-        if (!ReferenceEquals(first, host.MeasureAndArrange(new Vector2(200f, 200f))))
+        UiLayoutSnapshot first = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
+        if (!ReferenceEquals(first, host.MeasureAndArrange(new UiLayoutPoint(200f, 200f))))
         {
             throw new Exception("Steady state re-arranged instead of reusing the cached snapshot");
         }
@@ -490,13 +491,13 @@ internal static class KernelContractTests
         // up the new value, so a cache that ignores the translation revision fails here.
         current = 40f;
         translation.TranslationRevision = 7;
-        UiLayoutSnapshot reArranged = host.MeasureAndArrange(new Vector2(200f, 200f));
+        UiLayoutSnapshot reArranged = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         if (ReferenceEquals(reArranged, first))
         {
             throw new Exception("Language change reused the previous language's snapshot");
         }
 
-        if (Math.Abs(reArranged.RectById["h"].height - 40f) > 0.01f)
+        if (Math.Abs(reArranged.RectById["h"].Height - 40f) > 0.01f)
         {
             throw new Exception("Language change re-arranged but did not re-measure");
         }
@@ -515,7 +516,7 @@ internal static class KernelContractTests
 
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register("theme-test", "test/height", () => new HeightBoundWidget());
+UiWidgetRegistry.Define(new UiWidgetDefinition("theme-test", "test/height", () => new HeightBoundWidget()));
 
         string xml =
             "<UiPage Schema=\"2\" Source=\"theme-test\">"
@@ -533,57 +534,57 @@ internal static class KernelContractTests
 
         UiTheme plain = UiTheme.Vanilla;
         UiTheme altered = UiTheme.Vanilla;
-        altered[UiPaletteRole.WindowSurface] = new Color(1f, 0f, 0f, 1f);
-        altered[UiPaletteRole.PanelSurface] = new Color(0f, 1f, 0f, 0.5f);
-        altered[UiPaletteRole.ControlSurface] = new Color(0f, 0f, 1f, 1f);
-        altered[UiPaletteRole.HoverSurface] = new Color(1f, 1f, 0f, 1f);
-        altered[UiPaletteRole.SelectedSurface] = new Color(0f, 1f, 1f, 1f);
-        altered[UiPaletteRole.SuccessSurface] = new Color(0.5f, 0.5f, 0.5f, 1f);
-        altered[UiPaletteRole.DangerSurface] = new Color(0.2f, 0.9f, 0.1f, 1f);
-        altered[UiPaletteRole.WorkspaceSurface] = new Color(0.9f, 0.1f, 0.1f, 1f);
-        altered[UiPaletteRole.SectionSurface] = new Color(0.1f, 0.9f, 0.9f, 1f);
-        altered[UiPaletteRole.Foreground] = new Color(0f, 0f, 0f, 1f);
-        altered[UiPaletteRole.SecondaryForeground] = new Color(1f, 1f, 1f, 1f);
-        altered[UiPaletteRole.SelectedForeground] = new Color(0.3f, 0.3f, 0.3f, 1f);
-        altered[UiPaletteRole.DangerForeground] = new Color(0.7f, 0.7f, 0.7f, 1f);
-        altered[UiPaletteRole.DisabledForeground] = new Color(0.1f, 0.2f, 0.3f, 1f);
-        altered[UiPaletteRole.Accent] = new Color(0.4f, 0.5f, 0.6f, 1f);
-        altered[UiPaletteRole.SwitchOff] = new Color(0.7f, 0.2f, 0.6f, 1f); // SA1.1: a colour cannot move a rect either
+        altered[UiPaletteRole.WindowSurface] = new UiColour(1f, 0f, 0f, 1f);
+        altered[UiPaletteRole.PanelSurface] = new UiColour(0f, 1f, 0f, 0.5f);
+        altered[UiPaletteRole.ControlSurface] = new UiColour(0f, 0f, 1f, 1f);
+        altered[UiPaletteRole.HoverSurface] = new UiColour(1f, 1f, 0f, 1f);
+        altered[UiPaletteRole.SelectedSurface] = new UiColour(0f, 1f, 1f, 1f);
+        altered[UiPaletteRole.SuccessSurface] = new UiColour(0.5f, 0.5f, 0.5f, 1f);
+        altered[UiPaletteRole.DangerSurface] = new UiColour(0.2f, 0.9f, 0.1f, 1f);
+        altered[UiPaletteRole.WorkspaceSurface] = new UiColour(0.9f, 0.1f, 0.1f, 1f);
+        altered[UiPaletteRole.SectionSurface] = new UiColour(0.1f, 0.9f, 0.9f, 1f);
+        altered[UiPaletteRole.Foreground] = new UiColour(0f, 0f, 0f, 1f);
+        altered[UiPaletteRole.SecondaryForeground] = new UiColour(1f, 1f, 1f, 1f);
+        altered[UiPaletteRole.SelectedForeground] = new UiColour(0.3f, 0.3f, 0.3f, 1f);
+        altered[UiPaletteRole.DangerForeground] = new UiColour(0.7f, 0.7f, 0.7f, 1f);
+        altered[UiPaletteRole.DisabledForeground] = new UiColour(0.1f, 0.2f, 0.3f, 1f);
+        altered[UiPaletteRole.Accent] = new UiColour(0.4f, 0.5f, 0.6f, 1f);
+        altered[UiPaletteRole.SwitchOff] = new UiColour(0.7f, 0.2f, 0.6f, 1f); // SA1.1: a colour cannot move a rect either
         // Batch 1 (CP-6④): no second accent token exists. The derived hover step moves with AccentGold by
         // construction, so perturbing the accent is what perturbs it.
-        altered[UiPaletteRole.Border] = new Color(0f, 0f, 0f, 0f);
-        altered[UiPaletteRole.StrongBorder] = new Color(1f, 1f, 1f, 1f);
-        altered[UiPaletteRole.Divider] = new Color(0.5f, 0f, 0.5f, 1f);
+        altered[UiPaletteRole.Border] = new UiColour(0f, 0f, 0f, 0f);
+        altered[UiPaletteRole.StrongBorder] = new UiColour(1f, 1f, 1f, 1f);
+        altered[UiPaletteRole.Divider] = new UiColour(0.5f, 0f, 0.5f, 1f);
 
         using UiHost a = new("theme-test", manifest, bindings, plain, new StubMetrics(), new StubTranslation());
         using UiHost b = new("theme-test", manifest, bindings, altered, new StubMetrics(), new StubTranslation());
-        UiLayoutSnapshot sa = a.MeasureAndArrange(new Vector2(240f, 240f));
-        UiLayoutSnapshot sb = b.MeasureAndArrange(new Vector2(240f, 240f));
+        UiLayoutSnapshot sa = a.MeasureAndArrange(new UiLayoutPoint(240f, 240f));
+        UiLayoutSnapshot sb = b.MeasureAndArrange(new UiLayoutPoint(240f, 240f));
 
         if (sa.RectById.Count != sb.RectById.Count)
         {
             throw new Exception("Recolouring changed the number of laid-out elements");
         }
 
-        foreach (KeyValuePair<string, Rect> pair in sa.RectById)
+        foreach (KeyValuePair<string, UiLayoutRect> pair in sa.RectById)
         {
-            if (!sb.RectById.TryGetValue(pair.Key, out Rect other))
+            if (!sb.RectById.TryGetValue(pair.Key, out UiLayoutRect other))
             {
                 throw new Exception("Recolouring dropped element '" + pair.Key + "'");
             }
 
             // Compared component-wise rather than with Rect.Equals: the harness's UnityEngine stub
             // owns that type, and a missing member here would throw inside the guard and pass silently.
-            Rect one = pair.Value;
-            if (Math.Abs(one.x - other.x) > 0.01f
-                || Math.Abs(one.y - other.y) > 0.01f
-                || Math.Abs(one.width - other.width) > 0.01f
-                || Math.Abs(one.height - other.height) > 0.01f)
+            UiLayoutRect one = pair.Value;
+            if (Math.Abs(one.X - other.X) > 0.01f
+                || Math.Abs(one.Y - other.Y) > 0.01f
+                || Math.Abs(one.Width - other.Width) > 0.01f
+                || Math.Abs(one.Height - other.Height) > 0.01f)
             {
                 throw new Exception(
-                    "A colour token moved '" + pair.Key + "': " + one.width + "x" + one.height
-                    + " at " + one.x + "," + one.y + " became " + other.width + "x" + other.height
-                    + " at " + other.x + "," + other.y);
+                    "A colour token moved '" + pair.Key + "': " + one.Width + "x" + one.Height
+                    + " at " + one.X + "," + one.Y + " became " + other.Width + "x" + other.Height
+                    + " at " + other.X + "," + other.Y);
             }
         }
     }
@@ -708,10 +709,10 @@ internal static class KernelContractTests
             "UiStyleDocument.cs",
             "UiStyleResolver.cs",
             "UiFitAudit.cs",
-            "UiKitFonts.cs",
+            "../Adapters/RimWorld16/UiKitFonts.cs",
             "UiFont.cs",
             "ITextMetrics.cs",
-            "VerseFerriteTextMetrics.cs"
+            "../Adapters/RimWorld16/VerseFerriteTextMetrics.cs"
         };
         string[] pageModel =
         {
@@ -726,7 +727,7 @@ internal static class KernelContractTests
             "UiLayoutEngine",
             "UiLayoutSnapshot",
             "UiLayoutManifest",
-            "IUiBindings",
+            "IUiBindingReader",
             "UiBindings",
             "UiWidgetRegistry",
             "IUiWidget",
@@ -807,8 +808,8 @@ internal static class KernelContractTests
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register("recover-test", "test/throwing", () => new ThrowingWidget());
-        UiWidgetRegistry.Register("recover-test", "test/recording", () => new RecordingWidget());
+UiWidgetRegistry.Define(new UiWidgetDefinition("recover-test", "test/throwing", () => new ThrowingWidget()));
+UiWidgetRegistry.Define(new UiWidgetDefinition("recover-test", "test/recording", () => new RecordingWidget()));
 
         UiLayoutManifest manifest = UiLayoutManifest.Parse(
             "<UiPage Schema=\"2\" Source=\"recover-test\">"
@@ -821,12 +822,12 @@ internal static class KernelContractTests
         var bindings = new UiBindings();
         using UiHost host = new("recover-test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
 
-        var viewport = new Rect(0f, 0f, 300f, 200f);
+        var viewport = new UiLayoutRect(0f, 0f, 300f, 200f);
         RecordingWidget.Draws = 0;
         try
         {
-            host.DrawFrame(viewport);
-            host.DrawFrame(viewport);
+            NativeFixture.DrawFrame(            host,viewport);
+            NativeFixture.DrawFrame(            host,viewport);
         }
         catch (Exception ex)
         {
@@ -873,13 +874,13 @@ internal static class KernelContractTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
         public float Measure(UiWidgetContext ctx) => throw new InvalidOperationException("planted widget failure");
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             throw new InvalidOperationException("planted widget failure");
         }
@@ -895,13 +896,13 @@ internal static class KernelContractTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
         public float Measure(UiWidgetContext ctx) => 20f;
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             Draws++;
         }
@@ -933,7 +934,7 @@ internal static class KernelContractTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
@@ -942,36 +943,36 @@ internal static class KernelContractTests
             return ctx.Bindings.TryGet("height", out float height) ? height : 0f;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
         }
     }
 
     private static void VerifyCloseDuringDragReleasesOwnCapture()
     {
-        (UiHost host, UiLayoutSnapshot snapshot, Rect chartRect) = CreateChartHost("chart", 300f, 100f);
+        (UiHost host, UiLayoutSnapshot snapshot, UiLayoutRect chartRect) = CreateChartHost("chart", 300f, 100f);
 
         try
         {
-            UiNative.DebugMousePositionEnabled = true;
-            UiNative.DebugMouseDown = true;
-            UiNative.DebugMouseDrag = false;
-            UiNative.DebugMouseUp = false;
-            UiNative.DebugHotControl = 0;
+            NativeFixture.DebugMousePositionEnabled = true;
+            NativeFixture.DebugMouseDown = true;
+            NativeFixture.DebugMouseDrag = false;
+            NativeFixture.DebugMouseUp = false;
+            NativeFixture.DebugHotControl = 0;
 
             // MouseDown on editable point 2 (x=0.3, y=1) captures through the session path.
-            UiNative.DebugMousePosition = new Vector2(chartRect.x + 93.2f, chartRect.y + 8f);
+            NativeFixture.DebugMousePosition = new UiLayoutPoint(chartRect.X + 93.2f, chartRect.Y + 8f);
             host.BeginFrame();
-            host.Draw(new Rect(0f, 0f, 300f, 100f), snapshot);
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            host,new UiLayoutRect(0f, 0f, 300f, 100f), snapshot);}
             host.EndFrame();
 
-            if (UiNative.DebugHotControl == 0)
+            if (NativeFixture.DebugHotControl == 0)
             {
                 throw new Exception("MouseDown did not capture through the session path");
             }
 
-            int capturedId = UiNative.DebugHotControl;
-            if (!host.Session.IsHotControlOwned(capturedId))
+            int capturedId = NativeFixture.DebugHotControl;
+            if (!host.Session.IsHotControlOwned(host.Session.OwnedHotControl!.Value))
             {
                 throw new Exception("Session does not record ownership of the captured hot control");
             }
@@ -979,7 +980,7 @@ internal static class KernelContractTests
             // Close mid-drag (no MouseUp): Host.Close disposes the session, which releases exactly
             // the capture this session owns and clears popup/focus/drag state.
             host.Close();
-            if (UiNative.DebugHotControl != 0)
+            if (NativeFixture.DebugHotControl != 0)
             {
                 throw new Exception("Host close did not release its session's owned hot control");
             }
@@ -991,84 +992,84 @@ internal static class KernelContractTests
         }
         finally
         {
-            UiNative.DebugMousePositionEnabled = false;
-            UiNative.DebugMouseDown = false;
-            UiNative.DebugMouseDrag = false;
-            UiNative.DebugMouseUp = false;
-            UiNative.DebugHotControl = 0;
+            NativeFixture.DebugMousePositionEnabled = false;
+            NativeFixture.DebugMouseDown = false;
+            NativeFixture.DebugMouseDrag = false;
+            NativeFixture.DebugMouseUp = false;
+            NativeFixture.DebugHotControl = 0;
             host.Close();
         }
     }
 
     private static void VerifyCrossHostCloseIsolated()
     {
-        (UiHost hostA, UiLayoutSnapshot snapshotA, Rect chartRectA) = CreateChartHost("chart-a", 300f, 100f);
-        (UiHost hostB, UiLayoutSnapshot snapshotB, Rect chartRectB) = CreateChartHost("chart-b", 300f, 100f);
+        (UiHost hostA, UiLayoutSnapshot snapshotA, UiLayoutRect chartRectA) = CreateChartHost("chart-a", 300f, 100f);
+        (UiHost hostB, UiLayoutSnapshot snapshotB, UiLayoutRect chartRectB) = CreateChartHost("chart-b", 300f, 100f);
 
         try
         {
-            UiNative.DebugMousePositionEnabled = true;
-            UiNative.DebugMouseDown = true;
-            UiNative.DebugMouseDrag = false;
-            UiNative.DebugMouseUp = false;
-            UiNative.DebugHotControl = 0;
+            NativeFixture.DebugMousePositionEnabled = true;
+            NativeFixture.DebugMouseDown = true;
+            NativeFixture.DebugMouseDrag = false;
+            NativeFixture.DebugMouseUp = false;
+            NativeFixture.DebugHotControl = 0;
 
             // Both hosts capture their own chart point mid-drag.
-            UiNative.DebugMousePosition = new Vector2(chartRectA.x + 93.2f, chartRectA.y + 8f);
+            NativeFixture.DebugMousePosition = new UiLayoutPoint(chartRectA.X + 93.2f, chartRectA.Y + 8f);
             hostA.BeginFrame();
-            hostA.Draw(new Rect(0f, 0f, 300f, 100f), snapshotA);
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            hostA,new UiLayoutRect(0f, 0f, 300f, 100f), snapshotA);}
             hostA.EndFrame();
 
             // The platform relinquishes A's native slot before B receives a new press. A may still have
             // stale logical ownership until its next pass; B must not steal a genuinely held native slot.
-            UiNative.DebugHotControl = 0;
-            UiNative.DebugMousePosition = new Vector2(chartRectB.x + 93.2f, chartRectB.y + 8f);
+            NativeFixture.DebugHotControl = 0;
+            NativeFixture.DebugMousePosition = new UiLayoutPoint(chartRectB.X + 93.2f, chartRectB.Y + 8f);
             hostB.BeginFrame();
-            hostB.Draw(new Rect(0f, 0f, 300f, 100f), snapshotB);
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            hostB,new UiLayoutRect(0f, 0f, 300f, 100f), snapshotB);}
             hostB.EndFrame();
 
-            int captureB = UiNative.DebugHotControl;
-            if (captureB == 0 || !hostB.Session.IsHotControlOwned(captureB))
+            int captureB = NativeFixture.DebugHotControl;
+            if (captureB == 0 || !hostB.Session.IsHotControlOwned(hostB.Session.OwnedHotControl!.Value))
             {
                 throw new Exception("Host B did not capture through its session");
             }
 
             // Closing host A must not release host B's native capture nor touch B's ownership.
             hostA.Close();
-            if (UiNative.DebugHotControl != captureB)
+            if (NativeFixture.DebugHotControl != captureB)
             {
                 throw new Exception("Closing host A released host B's native capture");
             }
 
-            if (!hostB.Session.IsHotControlOwned(captureB))
+            if (!hostB.Session.IsHotControlOwned(hostB.Session.OwnedHotControl!.Value))
             {
                 throw new Exception("Closing host A cleared host B's ownership record");
             }
 
             // Host B can still release its own capture.
-            UiNative.DebugMouseDown = false;
-            UiNative.DebugMouseUp = true;
+            NativeFixture.DebugMouseDown = false;
+            NativeFixture.DebugMouseUp = true;
             hostB.BeginFrame();
-            hostB.Draw(new Rect(0f, 0f, 300f, 100f), snapshotB);
+            {NativeFixture.BeginDebugEvent();NativeFixture.Draw(            hostB,new UiLayoutRect(0f, 0f, 300f, 100f), snapshotB);}
             hostB.EndFrame();
-            if (UiNative.DebugHotControl != 0)
+            if (NativeFixture.DebugHotControl != 0)
             {
                 throw new Exception("Host B could not release its own capture after host A closed");
             }
         }
         finally
         {
-            UiNative.DebugMousePositionEnabled = false;
-            UiNative.DebugMouseDown = false;
-            UiNative.DebugMouseDrag = false;
-            UiNative.DebugMouseUp = false;
-            UiNative.DebugHotControl = 0;
+            NativeFixture.DebugMousePositionEnabled = false;
+            NativeFixture.DebugMouseDown = false;
+            NativeFixture.DebugMouseDrag = false;
+            NativeFixture.DebugMouseUp = false;
+            NativeFixture.DebugHotControl = 0;
             hostA.Close();
             hostB.Close();
         }
     }
 
-    private static (UiHost Host, UiLayoutSnapshot Snapshot, Rect ChartRect) CreateChartHost(string elementId, float width, float height)
+    private static (UiHost Host, UiLayoutSnapshot Snapshot, UiLayoutRect ChartRect) CreateChartHost(string elementId, float width, float height)
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
@@ -1081,12 +1082,12 @@ internal static class KernelContractTests
 
         UiLayoutManifest manifest = UiLayoutManifest.Parse(xml);
         var bindings = new UiBindings();
-        var points = new List<Vector2> { new(0f, 1f), new(0.3f, 1f), new(0.7f, 0f), new(1f, 0f) };
-        bindings.BindReadOnly<IReadOnlyList<Vector2>>(elementId + "-points", () => points);
+        var points = new List<UiLayoutPoint> { new(0f, 1f), new(0.3f, 1f), new(0.7f, 0f), new(1f, 0f) };
+        bindings.BindReadOnly<IReadOnlyList<UiLayoutPoint>>(elementId + "-points", () => points);
         bindings.BindAction<UiChartPointChange>(elementId + "-changed", _ => { });
 
         UiHost host = new("test", manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(width, height));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(width, height));
         return (host, snapshot, snapshot.RectById[elementId]);
     }
 
@@ -1129,35 +1130,35 @@ internal static class KernelContractTests
         bindings.BindValue("active-tab", () => "GroupA", _ => { });
 
         using UiHost host = new(scope, manifest, bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(800f, 600f));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(800f, 600f));
 
-        if (!snapshot.Viewports.TryGetValue("content-scroll", out Rect contentViewport)
-            || !snapshot.Viewports.TryGetValue("help-scroll", out Rect helpViewport))
+        if (!snapshot.Viewports.TryGetValue("content-scroll", out UiLayoutRect contentViewport)
+            || !snapshot.Viewports.TryGetValue("help-scroll", out UiLayoutRect helpViewport))
         {
             throw new Exception("Fill scrolls produced no viewports");
         }
 
-        if (!snapshot.RectById.TryGetValue("footer", out Rect footer))
+        if (!snapshot.RectById.TryGetValue("footer", out UiLayoutRect footer))
         {
             throw new Exception("Footer produced no rect");
         }
 
         // Real-equivalent root contract: the fixed footer sits below every scroll viewport with
         // the declared gap, and its bottom stays inside the window (no overlap, no clipping).
-        if (footer.y < contentViewport.yMax + 6f - 0.01f || footer.y < helpViewport.yMax + 6f - 0.01f)
+        if (footer.Y < contentViewport.YMax + 6f - 0.01f || footer.Y < helpViewport.YMax + 6f - 0.01f)
         {
-            throw new Exception("Footer overlaps a Fill scroll viewport (footer.y=" + footer.y
-                + ", content.yMax=" + contentViewport.yMax + ", help.yMax=" + helpViewport.yMax + ")");
+            throw new Exception("Footer overlaps a Fill scroll viewport (footer.y=" + footer.Y
+                + ", content.yMax=" + contentViewport.YMax + ", help.yMax=" + helpViewport.YMax + ")");
         }
 
-        if (footer.yMax > 600f - 12f + 0.01f)
+        if (footer.YMax > 600f - 12f + 0.01f)
         {
-            throw new Exception("Footer bottom leaves the window (footer.yMax=" + footer.yMax + ")");
+            throw new Exception("Footer bottom leaves the window (footer.yMax=" + footer.YMax + ")");
         }
 
-        if (Math.Abs(snapshot.ContentSize.y - 600f) > 0.01f)
+        if (Math.Abs(snapshot.ContentSize.Y - 600f) > 0.01f)
         {
-            throw new Exception("Root content height does not fit the window (" + snapshot.ContentSize.y + ")");
+            throw new Exception("Root content height does not fit the window (" + snapshot.ContentSize.Y + ")");
         }
 
         host.Close();
@@ -1167,20 +1168,18 @@ internal static class KernelContractTests
     {
         string[] sectionSchema = { "Id", "Kind", "Title", "TitleKey", "HelpKey", "Tab", "Hidden", "Height" };
         string[] footerSchema = { "Id", "Kind", "Height", "Tab", "Hidden" };
-
-        UiWidgetRegistry.Register(scope, "neutral/section", () => new StubWidget("neutral/section"), sectionSchema);
-        UiWidgetRegistry.Register(scope, "neutral/footer", () => new StubWidget("neutral/footer"), footerSchema);
+UiWidgetRegistry.Define(new UiWidgetDefinition(scope, "neutral/section", () => new StubWidget("neutral/section"), sectionSchema));
+UiWidgetRegistry.Define(new UiWidgetDefinition(scope, "neutral/footer", () => new StubWidget("neutral/footer"), footerSchema));
     }
 
     private static void VerifyDuplicateRegistrationRejected()
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
-
-        UiWidgetRegistry.Register("dup-test", "test/kind", () => new StubWidget("test/kind"));
+UiWidgetRegistry.Define(new UiWidgetDefinition("dup-test", "test/kind", () => new StubWidget("test/kind")));
         try
         {
-            UiWidgetRegistry.Register("dup-test", "test/kind", () => new StubWidget("test/kind"));
+UiWidgetRegistry.Define(new UiWidgetDefinition("dup-test", "test/kind", () => new StubWidget("test/kind")));
             throw new Exception("Duplicate kind registration was not rejected");
         }
         catch (InvalidOperationException ex)
@@ -1196,7 +1195,7 @@ internal static class KernelContractTests
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register("dup-test", "test/kind", () => new StubWidget("test/kind"));
+UiWidgetRegistry.Define(new UiWidgetDefinition("dup-test", "test/kind", () => new StubWidget("test/kind")));
         UiWidgetRegistry.Clear();
     }
 
@@ -1215,7 +1214,7 @@ internal static class KernelContractTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
         }
 
@@ -1224,7 +1223,7 @@ internal static class KernelContractTests
             return 24f;
         }
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
         }
     }

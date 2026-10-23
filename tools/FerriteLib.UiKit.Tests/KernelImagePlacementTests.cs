@@ -1,8 +1,9 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Reflection;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -42,13 +43,15 @@ internal static class KernelImagePlacementTests
     private static UiLayoutManifest Page(string attributes) => UiLayoutManifest.Parse(
         "<UiPage Schema=\"2\" Source=\"images\"><Column Id=\"column\" Padding=\"0\">"
         + "<Widget Id=\"image\" Kind=\"display/image\" Bind=\"picture\" " + attributes + "/></Column></UiPage>");
-    private static UiHost Host(UiLayoutManifest page, UiBindings bindings) => new("images", page, bindings, new UiTheme(), new Metrics(), new Translation());
+    private static readonly VerseUiExecution imageExecution=new();
+    private static UiHost Host(UiLayoutManifest page,UiBindings bindings)
+    {var host=new UiHost("images",page,bindings,new UiTheme(),new Metrics(),new Translation());host.Session.SetFrame(imageExecution.CaptureFrame(),imageExecution);return host;}
 
     private static void GeometryAndMeasure()
     {
         var texture = new Texture2D(200,100);
         var bindings = new UiBindings();
-        bindings.BindReadOnly("picture", () => texture);
+        UiImage picture=imageExecution.Images.Add(texture);bindings.BindReadOnly("picture",()=>picture);
         var definition = new UiElementSpec("image", "display/image", new System.Collections.Generic.Dictionary<string,string>
         {
             ["Bind"] = "picture", ["Fit"] = "Stretch", ["Height"] = "50"
@@ -56,41 +59,41 @@ internal static class KernelImagePlacementTests
         using (var program = Host(UiLayoutManifest.Create("program-images", new[] { definition }), bindings))
         {
             Clear();
-            program.DrawFrame(new Rect(0,0,80,100));
-            Rect direct = (Rect)Recorded("DrawTextureRects")[0]!;
-            Check(direct.width == 80 && direct.height == 50, "ordinary C# definitions use image options without custom wrapper");
+            NativeFixture.DrawFrame(            program,new UiLayoutRect(0,0,80,100));
+            UiLayoutRect direct = NativeFixture.Record<UiLayoutRect>(Recorded("DrawTextureRects")[0]!);
+            Check(direct.Width == 80 && direct.Height == 50, "ordinary C# definitions use image options without custom wrapper");
         }
         using var natural = Host(Page(""), bindings);
-        float oldHeight = natural.MeasureAndArrange(new Vector2(80,200)).RectById["image"].height;
+        float oldHeight = natural.MeasureAndArrange(new UiLayoutPoint(80,200)).RectById["image"].Height;
         Check(oldHeight == 100 + new UiTheme().Geometry.Padding * 2, "unconfigured natural source height plus padding remains");
         using var aspect = Host(Page("AspectHeight=\"true\""), bindings);
-        Check(aspect.MeasureAndArrange(new Vector2(80,200)).RectById["image"].height == 40, "explicit aspect measure uses allocated width");
+        Check(aspect.MeasureAndArrange(new UiLayoutPoint(80,200)).RectById["image"].Height == 40, "explicit aspect measure uses allocated width");
         using var explicitHeight = Host(Page("AspectHeight=\"true\" Height=\"23\""), bindings);
-        Check(explicitHeight.MeasureAndArrange(new Vector2(80,200)).RectById["image"].height == 23, "explicit height takes precedence");
+        Check(explicitHeight.MeasureAndArrange(new UiLayoutPoint(80,200)).RectById["image"].Height == 23, "explicit height takes precedence");
         using var contained = Host(Page("Height=\"100\" ImageAlignY=\"Bottom\""), bindings);
         Clear();
-        contained.DrawFrame(new Rect(0,0,100,150));
-        Rect fit = (Rect)Recorded("DrawTextureRects")[0]!;
-        Check(fit.width == 100 && fit.height == 50 && fit.y == 50, "real image wrapper passes finite bottom aligned fit to native outlet");
+        NativeFixture.DrawFrame(        contained,new UiLayoutRect(0,0,100,150));
+        UiLayoutRect fit = NativeFixture.Record<UiLayoutRect>(Recorded("DrawTextureRects")[0]!);
+        Check(fit.Width == 100 && fit.Height == 50 && fit.Y == 50, "real image wrapper passes finite bottom aligned fit to native outlet");
         using var cover = Host(Page("Height=\"100\" Fit=\"Cover\" ImageAlignX=\"Right\""), bindings);
         int depth = (int)typeof(GUI).GetField("GroupDepth")!.GetValue(null)!;
         Clear();
-        cover.DrawFrame(new Rect(0,0,100,150));
-        Rect crop = (Rect)Recorded("DrawTextureRects")[0]!;
-        Check(crop.x == -100 && crop.width == 200 && crop.height == 100, "cover right alignment uses oversized local rect inside slot clip");
+        NativeFixture.DrawFrame(        cover,new UiLayoutRect(0,0,100,150));
+        UiLayoutRect crop = NativeFixture.Record<UiLayoutRect>(Recorded("DrawTextureRects")[0]!);
+        Check(crop.X == -100 && crop.Width == 200 && crop.Height == 100, "cover right alignment uses oversized local rect inside slot clip");
         Check((int)typeof(GUI).GetField("GroupDepth")!.GetValue(null)! == depth, "cover closes its clip group");
-        Color previousTint = GUI.color;
+        UiColour previousTint = VerseUiExecution.Colour(GUI.color);
         FieldInfo failure = typeof(GUI).GetField("DrawTextureFailure")!;
         bool threw = false;
         failure.SetValue(null, new InvalidOperationException("pure paint failure"));
         try
         {
-            UiThemeDraw.Image(new Rect(0,0,100,100), texture, new Color(.2f,.3f,.4f), new UiImageOptions(UiImageFit.Cover));
+            UiThemeDraw.Image(imageExecution,new UiLayoutRect(0,0,100,100), picture, new UiColour(.2f,.3f,.4f), new UiImageOptions(UiImageFit.Cover));
         }
         catch (InvalidOperationException) { threw = true; }
         finally { failure.SetValue(null, null); }
         Check(threw && (int)typeof(GUI).GetField("GroupDepth")!.GetValue(null)! == depth
-            && GUI.color.r == previousTint.r && GUI.color.g == previousTint.g && GUI.color.b == previousTint.b,
+            && GUI.color.r == previousTint.Red && GUI.color.g == previousTint.Green && GUI.color.b == previousTint.Blue,
             "cover draw failure propagates with balanced group and restored tint");        bool bad = false;
         try { using var rejected = Host(Page("Fit=\"Tile\""), bindings); } catch (Exception) { bad = true; }
         Check(bad, "unsupported image fit refused at authoring validation");
@@ -100,23 +103,23 @@ internal static class KernelImagePlacementTests
     {
         Texture? current = new RenderTexture(120,60,0);
         var bindings = new UiBindings();
-        bindings.BindReadOnly<Texture?>("picture", () => current);
+        UiImage picture=imageExecution.Images.Add(current);bindings.BindReadOnly("picture",()=>picture);
         using var host = Host(Page("Height=\"80\""), bindings);
         Clear();
-        host.DrawFrame(new Rect(0,0,100,100));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0,0,100,100));
         Check(Recorded("DrawTextureTextures").Count == 1 && ReferenceEquals(Recorded("DrawTextureTextures")[0], current),
             "supplier RenderTexture reaches existing Texture outlet without conversion or ownership");
-        current = new Texture2D(40,80);
+        current = new Texture2D(40,80);imageExecution.Images.Release(picture);picture=imageExecution.Images.Add(current);
         Clear();
-        host.DrawFrame(new Rect(0,0,100,100));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0,0,100,100));
         Check(ReferenceEquals(Recorded("DrawTextureTextures")[0], current), "replacement read on next draw without resource cache");
-        current = null;
+        current = null;imageExecution.Images.Release(picture);picture=default;
         Clear();
-        host.DrawFrame(new Rect(0,0,100,100));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0,0,100,100));
         Check(Recorded("DrawTextureTextures").Count == 0, "known null source draws placeholder not stale image");
-        current = new Texture2D(0,80);
+        current = new Texture2D(0,80);picture=imageExecution.Images.Add(current);
         Clear();
-        host.DrawFrame(new Rect(0,0,100,100));
+        NativeFixture.DrawFrame(        host,new UiLayoutRect(0,0,100,100));
         Check(Recorded("DrawTextureTextures").Count == 0, "invalid source dimensions do not reach native draw");
     }
 
@@ -124,7 +127,7 @@ internal static class KernelImagePlacementTests
     {
         Texture? image = new Texture2D(200,100);
         var bindings = new UiBindings();
-        bindings.BindReadOnly<Texture?>("back", () => image);
+        UiImage background=default;bindings.BindReadOnly("back",()=>background);
         var page = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"background\" BackgroundBind=\"back\"/>");
         var programBackground = new UiWindowBackground("back");
         var programPage = UiLayoutManifest.CreateWithBackground("program-background", Array.Empty<UiElementSpec>(), programBackground);
@@ -132,14 +135,15 @@ internal static class KernelImagePlacementTests
         Check(page.Background != null && page.Background.Options.Fit == UiImageFit.Contain, "declarative empty page retains approved contain background");
         var window = new UiPageWindow(new UiWindowKey("image-test", "page", "one"), page, bindings,
             new UiTheme(), new Translation(), "title", "close", _ => "notice", new Metrics());
-        window.windowRect = new Rect(0,0,300,300);
+        window.windowRect = VerseUiExecution.Rect(new UiLayoutRect(0,0,300,300));
+        background=window.Images.Add(image);
         Clear();
         Recorded("PaintTrace").Clear();
         window.WindowOnGUI();
         Check(Recorded("DrawTextureTextures").Count == 1 && ReferenceEquals(Recorded("DrawTextureTextures")[0], image),
             "standard sealed page window draws explicit background through same outlet");
-        Rect actual = (Rect)Recorded("DrawTextureRects")[0]!;
-        Check(actual.width == 300 && actual.height == 150 && actual.y == 75, "background spans whole shell, centered with exposed base colour");
+        UiLayoutRect actual = NativeFixture.Record<UiLayoutRect>(Recorded("DrawTextureRects")[0]!);
+        Check(actual.Width == 300 && actual.Height == 150 && actual.Y == 75, "background spans whole shell, centered with exposed base colour");
         IList trace = Recorded("PaintTrace");
         int imageIndex = trace.IndexOf("image");
         Check(imageIndex > 0 && (string)trace[0]! == "solid" && trace.IndexOf("label:title") > imageIndex
@@ -150,12 +154,14 @@ internal static class KernelImagePlacementTests
         peer.WindowOnGUI();
         Check(Recorded("DrawTextureTextures").Count == 0, "unconfigured independent window retains original shell");
         window.Background = null;
+
         Clear();
         Recorded("PaintTrace").Clear();
         window.WindowOnGUI();
         Check(Recorded("DrawTextureTextures").Count == 0, "instance unbind restores base without revealing definition background");
         window.Background = new UiWindowBackground("back", new UiImageOptions(UiImageFit.Cover));
-        image = null;
+        image = null;window.Images.Release(background);background=default;
+
         Clear();
         Recorded("PaintTrace").Clear();
         window.WindowOnGUI();
@@ -167,27 +173,26 @@ internal static class KernelImagePlacementTests
     private static void BackgroundContentAndPopup()
     {
         var bindings = new UiBindings();
-        bindings.BindReadOnly<Texture>("back", () => new Texture2D(200,100));
+        UiImage background=default;bindings.BindReadOnly("back",()=>background);
         bindings.BindReadOnly("choice", () => "one");
         int calls = 0;
         bindings.BindCommand("act", () => calls++);
-        var page = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"layered-shell\" BackgroundBind=\"back\">"
-            + "<Column Id=\"body\" Padding=\"0\"><Widget Id=\"button\" Kind=\"input/button\" Text=\"content\" ActionBind=\"act\" Height=\"30\"/>"
-            + "<Widget Id=\"menu\" Kind=\"input/dropdown\" Bind=\"choice\" Option1=\"one\" Option2=\"two\" Height=\"30\"/></Column></UiPage>");
+        var page = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"layered-shell\" BackgroundBind=\"back\"><Column Id=\"body\" Padding=\"0\"><Widget Id=\"button\" Kind=\"input/button\" Text=\"content\" ActionBind=\"act\" Height=\"30\"/><Widget Id=\"menu\" Kind=\"input/dropdown\" Bind=\"choice\"   Height=\"30\"><Choice Value=\"one\" Text=\"one\" Help=\"one\"/><Choice Value=\"two\" Text=\"two\" Help=\"two\"/></Widget></Column></UiPage>");
         var window = new UiPageWindow(new UiWindowKey("image-test", "content", "one"), page, bindings,
             new UiTheme(), new Translation(), "title", "close", _ => "notice", new Metrics());
-        window.windowRect = new Rect(0,0,300,300);
+        background=window.Images.Add(new Texture2D(200,100));
+        window.windowRect = VerseUiExecution.Rect(new UiLayoutRect(0,0,300,300));
         Event.current = new Event { type = EventType.Repaint };
         window.WindowOnGUI();
         foreach (EventType type in new[] { EventType.MouseDown, EventType.MouseUp })
         {
-            Event.current = new Event { type = type, button = 0, mousePosition = new Vector2(40,65) };
+            Event.current = new Event { type = type, button = 0, mousePosition = VerseUiExecution.Point(new UiLayoutPoint(40,65)) };
             window.WindowOnGUI();
         }
         Check(calls == 1, "whole window background introduces no input owner over real content button");
         foreach (EventType type in new[] { EventType.MouseDown, EventType.MouseUp })
         {
-            Event.current = new Event { type = type, button = 0, mousePosition = new Vector2(40,105) };
+            Event.current = new Event { type = type, button = 0, mousePosition = VerseUiExecution.Point(new UiLayoutPoint(40,105)) };
             window.WindowOnGUI();
         }
         Check(window.Session!.OpenPopupId != null, "background preserves real dropdown popup opening");
@@ -206,20 +211,21 @@ internal static class KernelImagePlacementTests
         var first = new Texture2D(200,100);
         var second = new Texture2D(100,200);
         var bindings = new UiBindings();
-        bindings.BindReadOnly("first", () => first);
-        bindings.BindReadOnly("second", () => second);
+        UiImage firstToken=default,secondToken=default;bindings.BindReadOnly("first",()=>firstToken);
+        bindings.BindReadOnly("second",()=>secondToken);
         UiLayoutManifest Definition(string key, string fit = "Contain") => UiLayoutManifest.Parse(
             "<UiPage Schema=\"2\" Source=\"background-update\" BackgroundBind=\"" + key + "\" BackgroundFit=\"" + fit + "\"/>");
         var window = new UiPageWindow(new UiWindowKey("image-test", "update", "one"), Definition("first"), bindings,
             new UiTheme(), new Translation(), "title", "close", _ => "notice", new Metrics());
-        window.windowRect = new Rect(0,0,300,300);
+        firstToken=window.Images.Add(first);secondToken=window.Images.Add(second);
+        window.windowRect = VerseUiExecution.Rect(new UiLayoutRect(0,0,300,300));
         Event.current = new Event { type = EventType.Repaint };
         window.WindowOnGUI();
         window.PageHost!.UpdateDefinition(Definition("second", "Cover"));
         Clear();
         window.WindowOnGUI();
         Check(ReferenceEquals(Recorded("DrawTextureTextures")[0], second)
-            && ((Rect)Recorded("DrawTextureRects")[0]!).height == 600,
+            && (NativeFixture.Record<UiLayoutRect>(Recorded("DrawTextureRects")[0]!)).Height == 600,
             "standard window follows committed definition background binding and fit");
         bindings.BindReadOnly("not-texture", () => "wrong type");
         UiLayoutManifest accepted = window.PageHost.Manifest;
@@ -280,7 +286,7 @@ internal static class KernelImagePlacementTests
             Check(Recorded("DrawTextureTextures").Count == 1, "accepted reloaded background actually paints");
             System.IO.File.WriteAllText(path, Definition("not-texture"));
             UiReloadReport? bad = service.Reload("background");
-            Check(bad != null && bad.Rejected && bad.Reason.Contains("Texture") && window.Background!.Bind == "first",
+            Check(bad != null && bad.Rejected && bad.Reason.Contains("UiImage") && window.Background!.Bind == "first",
                 "document prepare reports invalid background type and keeps accepted background");
         }
         finally { System.IO.Directory.Delete(directory, recursive: true); }
@@ -289,21 +295,21 @@ internal static class KernelImagePlacementTests
     {
         int reads = 0;
         int notices = 0;
-        Color previousColour = GUI.color;
+        UiColour previousColour = VerseUiExecution.Colour(GUI.color);
         Verse.GameFont previousFont = Verse.Text.Font;
         var failure = new InvalidOperationException("supplier background getter exploded");
         var bindings = new UiBindings();
-        bindings.BindReadOnly<Texture>("throwing", () =>
+        bindings.BindReadOnly<UiImage>("throwing", () =>
         {
             reads++;
-            GUI.color = new Color(.2f,.3f,.4f);
+            GUI.color = VerseUiExecution.Colour(new UiColour(.2f,.3f,.4f));
             Verse.Text.Font = previousFont == Verse.GameFont.Tiny ? Verse.GameFont.Medium : Verse.GameFont.Tiny;
             throw failure;
         });
         var page = UiLayoutManifest.CreateWithBackground("background-failure", Array.Empty<UiElementSpec>(), new UiWindowBackground("throwing"));
         var window = new UiPageWindow(new UiWindowKey("image-test", "failure", "one"), page, bindings,
             new UiTheme(), new Translation(), "title", "close", _ => { notices++; return "notice"; }, new Metrics());
-        window.windowRect = new Rect(0,0,300,300);
+        window.windowRect = VerseUiExecution.Rect(new UiLayoutRect(0,0,300,300));
         try
         {
             Event.current = new Event { type = EventType.Repaint };
@@ -312,7 +318,7 @@ internal static class KernelImagePlacementTests
             object? recorded = typeof(UiWindowHost).GetProperty("LastFailure", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window);
             Check(ReferenceEquals(recorded, failure), "supplier exception is retained as actual shell failure, not silent missing image");
             Check(notices == 0 && window.Session == null, "background failure defers notice and leaves no active page in the failed pass");
-            Check(GUI.color.r == previousColour.r && GUI.color.g == previousColour.g && GUI.color.b == previousColour.b
+            Check(GUI.color.r == previousColour.Red && GUI.color.g == previousColour.Green && GUI.color.b == previousColour.Blue
                 && Verse.Text.Font == previousFont, "supplier failure restores font and colour before continuing chrome");
             Check(Recorded("PaintTrace").IndexOf("label:close") >= 0, "background failure preserves close chrome");
             window.WindowOnGUI();
@@ -322,7 +328,7 @@ internal static class KernelImagePlacementTests
         }
         finally
         {
-            GUI.color = previousColour;
+            GUI.color = VerseUiExecution.Colour(previousColour);
             Verse.Text.Font = previousFont;
             window.PreClose();
         }

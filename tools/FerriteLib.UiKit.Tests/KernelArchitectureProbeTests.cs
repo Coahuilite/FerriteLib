@@ -1,10 +1,11 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -76,13 +77,13 @@ internal static class KernelArchitectureProbeTests
 
         internal static void Register()
         {
-            UiWidgetRegistry.Register(Scope, Kind, () => new HeadlessButtonProbe(),
-                new[] { "ActionBind", "Height" }, null);
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, Kind, () => new HeadlessButtonProbe(),
+                new[] { "ActionBind", "Height" }, null));
         }
 
         public void Configure(UiElementSpec element) => spec = element ?? throw new ArgumentNullException(nameof(element));
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
             string key = Read(spec, "ActionBind");
             if (key.Length == 0)
@@ -95,11 +96,11 @@ internal static class KernelArchitectureProbeTests
 
         public float Measure(UiWidgetContext ctx) => DeclaredHeight(spec, ctx.Theme.Geometry.RowHeight);
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             string command = Read(spec, "ActionBind");
-            UiInteractionResult operation = UiNative.Activation(rect, ctx, command);
-            UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx, command), operation, () => ctx.Bindings.Invoke(command));
+            UiInteractionResult operation = ctx.Controls.Activation(rect, ctx, command);
+            UiInteractionRequests.Activation(ctx.Controls.InteractionTarget(ctx, command), operation, () => ctx.Bindings.Invoke(command));
         }
     }
 
@@ -116,13 +117,13 @@ internal static class KernelArchitectureProbeTests
 
         internal static void Register()
         {
-            UiWidgetRegistry.Register(Scope, Kind, () => new RailButtonProbe(),
-                new[] { "ActionBind", "Height" }, null);
+UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, Kind, () => new RailButtonProbe(),
+                new[] { "ActionBind", "Height" }, null));
         }
 
         public void Configure(UiElementSpec element) => spec = element ?? throw new ArgumentNullException(nameof(element));
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
             string key = Read(spec, "ActionBind");
             if (key.Length == 0)
@@ -135,16 +136,16 @@ internal static class KernelArchitectureProbeTests
 
         public float Measure(UiWidgetContext ctx) => DeclaredHeight(spec, ctx.Theme.Geometry.RowHeight);
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             string command = Read(spec, "ActionBind");
-            UiInteractionResult operation = UiNative.Activation(rect, ctx, command);
+            UiInteractionResult operation = ctx.Controls.Activation(rect, ctx, command);
             UiTheme theme = ctx.Theme;
             bool armed = operation.Captured;
-            bool hovered = !armed && UiNative.IsMouseOver(rect);
-            Color rail = armed ? theme[UiPaletteRole.SelectedSurface] : hovered ? theme.AccentHover : theme[UiPaletteRole.StrongBorder];
-            UiThemeDraw.Solid(new Rect(rect.x, rect.yMax - 3f, rect.width, 3f), rail);
-            UiInteractionRequests.Activation(UiNative.InteractionTarget(ctx, command), operation, () => ctx.Bindings.Invoke(command));
+            bool hovered = !armed && ctx.Controls.IsMouseOver(rect);
+            UiColour rail = armed ? theme[UiPaletteRole.SelectedSurface] : hovered ? theme.AccentHover : theme[UiPaletteRole.StrongBorder];
+            UiThemeDraw.Solid(ctx.Drawing,new UiLayoutRect(rect.X, rect.YMax - 3f, rect.Width, 3f), rail);
+            UiInteractionRequests.Activation(ctx.Controls.InteractionTarget(ctx, command), operation, () => ctx.Bindings.Invoke(command));
         }
     }
 
@@ -171,15 +172,15 @@ internal static class KernelArchitectureProbeTests
         bool canRun = true;
         using UiHost host = BuildButtonHost(ghostScheme: true, fired, () => canRun);
 
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(300f, 200f));
-        Rect ghost = snapshot.RectById["ghost"];
-        Rect shown = snapshot.RectById["shown"];
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(300f, 200f));
+        UiLayoutRect ghost = snapshot.RectById["ghost"];
+        UiLayoutRect shown = snapshot.RectById["shown"];
 
-        DrivePointer(ghost.center);
+        DrivePointer(ghost.Center);
         ClearPaint();
-        host.DrawFrame(new Rect(0f, 0f, 300f, 200f));
+        NativeEvents.Click(NativeFixture.DebugMousePosition,()=>{ClearPaint();NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 300f, 200f));});
 
-        Check(ghost.height > 1f, "the invisible button keeps its arranged height: geometry is not the paint");
+        Check(ghost.Height > 1f, "the invisible button keeps its arranged height: geometry is not the paint");
         Check(BoxRectsIn(ghost).Count > 0, "it still paints - invisibility is transparency, not the absence of drawing");
         Check(AllAlphaZero(BoxColoursIn(ghost)), "and every solid inside its rect has zero alpha");
         Check(LabelColoursIn(ghost).Count > 0, "its caption outlet is still called, transparently");
@@ -189,32 +190,32 @@ internal static class KernelArchitectureProbeTests
         // assertion above cannot pass for the wrong reason.
         var controlFired = new Counter();
         using UiHost opaque = BuildButtonHost(ghostScheme: false, controlFired, () => true);
-        UiLayoutSnapshot opaqueSnapshot = opaque.MeasureAndArrange(new Vector2(300f, 200f));
-        Rect opaqueGhost = opaqueSnapshot.RectById["ghost"];
-        DrivePointer(opaqueGhost.center);
+        UiLayoutSnapshot opaqueSnapshot = opaque.MeasureAndArrange(new UiLayoutPoint(300f, 200f));
+        UiLayoutRect opaqueGhost = opaqueSnapshot.RectById["ghost"];
+        DrivePointer(opaqueGhost.Center);
         ClearPaint();
-        opaque.DrawFrame(new Rect(0f, 0f, 300f, 200f));
+        NativeEvents.Click(NativeFixture.DebugMousePosition,()=>{ClearPaint();NativeFixture.DrawFrame(        opaque,new UiLayoutRect(0f, 0f, 300f, 200f));});
         Check(!AllAlphaZero(BoxColoursIn(opaqueGhost)),
             "positive control: without the scheme the same button paints an opaque surface");
 
         // Behavior: the click fires, the external visual owns no logic, and disabled blocks the click.
         fired.Value = 0;
-        DrivePointer(ghost.center);
-        host.DrawFrame(new Rect(0f, 0f, 300f, 200f));
+        DrivePointer(ghost.Center);
+        NativeEvents.Click(NativeFixture.DebugMousePosition,()=>{ClearPaint();NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 300f, 200f));});
         Check(fired.Value == 1, "the invisible button fires its command on a click inside its rect");
 
         fired.Value = 0;
-        DrivePointer(shown.center);
-        host.DrawFrame(new Rect(0f, 0f, 300f, 200f));
+        DrivePointer(shown.Center);
+        NativeEvents.Click(NativeFixture.DebugMousePosition,()=>{ClearPaint();NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 300f, 200f));});
         Check(fired.Value == 0, "a click on the external visual element fires nothing: it carries no logic");
 
         var disabledFired = new Counter();
         bool disabledCanRun = true;
         using UiHost disabled = BuildButtonHost(ghostScheme: true, disabledFired, () => disabledCanRun);
         disabledCanRun = false;
-        UiLayoutSnapshot disabledSnapshot = disabled.MeasureAndArrange(new Vector2(300f, 200f));
-        DrivePointer(disabledSnapshot.RectById["ghost"].center);
-        disabled.DrawFrame(new Rect(0f, 0f, 300f, 200f));
+        UiLayoutSnapshot disabledSnapshot = disabled.MeasureAndArrange(new UiLayoutPoint(300f, 200f));
+        DrivePointer(disabledSnapshot.RectById["ghost"].Center);
+        NativeEvents.Click(NativeFixture.DebugMousePosition,()=>{ClearPaint();NativeFixture.DrawFrame(        disabled,new UiLayoutRect(0f, 0f, 300f, 200f));});
         Check(disabledFired.Value == 0, "a disabled invisible button does not fire: the disabled rule is not paint-dependent");
 
         ResetSeams();
@@ -235,17 +236,17 @@ internal static class KernelArchitectureProbeTests
         widget.Configure(new UiElementSpec("ghost", HeadlessButtonProbe.Kind, Attrs(("ActionBind", "apply"))));
         using UiSession session = new();
         UiWidgetContext ctx = MakeContext(session, bindings, UiTheme.Vanilla);
-        var rect = new Rect(10f, 10f, 120f, 24f);
+        var rect = new UiLayoutRect(10f, 10f, 120f, 24f);
 
-        DrivePointer(new Vector2(50f, 20f));
+        DrivePointer(new UiLayoutPoint(50f, 20f));
         ClearPaint();
-        widget.Draw(rect, ctx);
+        NativeEvents.Click(NativeFixture.DebugMousePosition,()=>{ClearPaint();NativeFixture.Draw(        widget,rect, ctx);});
         Check(BoxRects().Count == 0, "the headless probe emits no solid at all");
         Check(LabelRects().Count == 0, "and no text at all: truly headless, not transparent");
         Check(fired == 1, "yet the click fires: the input path does not need a paint");
 
-        DrivePointer(new Vector2(-5000f, -5000f));
-        widget.Draw(rect, ctx);
+        DrivePointer(new UiLayoutPoint(-5000f, -5000f));
+        NativeEvents.Click(NativeFixture.DebugMousePosition,()=>{ClearPaint();NativeFixture.Draw(        widget,rect, ctx);});
         Check(fired == 1, "and a click outside the rect still does not fire");
 
         Note("cost of the split: the probe retyped Configure/Validate/Measure (about 14 lines) plus the two "
@@ -260,11 +261,11 @@ internal static class KernelArchitectureProbeTests
     {
         PrepareRegistry();
         using UiHost host = BuildButtonHost(ghostScheme: false, new Counter(), () => true);
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(300f, 200f));
-        Rect ghost = snapshot.RectById["ghost"];
-        DrivePointer(ghost.center);
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(300f, 200f));
+        UiLayoutRect ghost = snapshot.RectById["ghost"];
+        DrivePointer(ghost.Center);
         ClearPaint();
-        host.DrawFrame(new Rect(0f, 0f, 300f, 200f));
+        NativeEvents.Click(NativeFixture.DebugMousePosition,()=>{ClearPaint();NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 300f, 200f));});
 
         Check(BoxColoursIn(ghost).Count > 0,
             "input/button always paints at least one solid, whatever is configured on it");
@@ -296,25 +297,25 @@ internal static class KernelArchitectureProbeTests
 
         using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla,
             new ProbeMetrics(), new ProbeTranslation());
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(400f, 120f));
-        Rect classicRect = snapshot.RectById["classic"];
-        Rect railRect = snapshot.RectById["rail"];
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(400f, 120f));
+        UiLayoutRect classicRect = snapshot.RectById["classic"];
+        UiLayoutRect railRect = snapshot.RectById["rail"];
 
-        DrivePointer(classicRect.center);
+        DrivePointer(classicRect.Center);
         ClearPaint();
-        host.DrawFrame(new Rect(0f, 0f, 400f, 120f));
+        NativeEvents.Click(NativeFixture.DebugMousePosition,()=>{ClearPaint();NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 400f, 120f));});
         Check(classic == 1 && rail == 0, "a click on visual A fires A's command only");
         Check(BoxColoursIn(classicRect).Count > 0 && LabelColoursIn(classicRect).Count > 0,
             "visual A is a surface plus a caption");
 
         classic = 0;
         rail = 0;
-        DrivePointer(railRect.center);
+        DrivePointer(railRect.Center);
         ClearPaint();
-        host.DrawFrame(new Rect(0f, 0f, 400f, 120f));
-        List<Rect> railBoxes = BoxRectsIn(railRect);
+        NativeEvents.Click(NativeFixture.DebugMousePosition,()=>{ClearPaint();NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 400f, 120f));});
+        List<UiLayoutRect> railBoxes = BoxRectsIn(railRect);
         Check(rail == 1 && classic == 0, "a click on visual B fires B's command only: one click mechanism");
-        Check(railBoxes.Count == 1 && Math.Abs(railBoxes[0].height - 3f) < 0.001f,
+        Check(railBoxes.Count == 1 && Math.Abs(railBoxes[0].Height - 3f) < 0.001f,
             "visual B paints one 3px rail instead of a surface: a different structure, not a re-tint");
         Check(LabelColoursIn(railRect).Count == 0, "visual B writes no text inside its own rect");
 
@@ -413,38 +414,38 @@ internal static class KernelArchitectureProbeTests
         // The caller's whole vocabulary: one available size, then a frame. Nothing here sets a rect.
         var sizes = new[]
         {
-            new Vector2(400f, 300f), new Vector2(800f, 600f),
-            new Vector2(500f, 350f), new Vector2(1000f, 500f)
+            new UiLayoutPoint(400f, 300f), new UiLayoutPoint(800f, 600f),
+            new UiLayoutPoint(500f, 350f), new UiLayoutPoint(1000f, 500f)
         };
 
-        Vector2? previousCentre = null;
+        UiLayoutPoint? previousCentre = null;
         UiLayoutSnapshot? previous = null;
-        foreach (Vector2 size in sizes)
+        foreach (UiLayoutPoint size in sizes)
         {
-            string at = "at " + size.x + "x" + size.y + ": ";
+            string at = "at " + size.X + "x" + size.Y + ": ";
             UiLayoutSnapshot snapshot = host.MeasureAndArrange(size);
-            Rect root = snapshot.RectById["root"];
-            Rect title = snapshot.RectById["title"];
-            Rect content = snapshot.RectById["content"];
-            Rect button = snapshot.RectById["bottomButton"];
+            UiLayoutRect root = snapshot.RectById["root"];
+            UiLayoutRect title = snapshot.RectById["title"];
+            UiLayoutRect content = snapshot.RectById["content"];
+            UiLayoutRect button = snapshot.RectById["bottomButton"];
 
-            Check(Math.Abs(title.x - 10f) < 0.001f && Math.Abs(title.width - (size.x - 20f)) < 0.001f,
+            Check(Math.Abs(title.X - 10f) < 0.001f && Math.Abs(title.Width - (size.X - 20f)) < 0.001f,
                 at + "the title tracks the parent's width through padding alone");
-            Check(Math.Abs(content.y - (title.yMax + 8f)) < 0.001f,
+            Check(Math.Abs(content.Y - (title.YMax + 8f)) < 0.001f,
                 at + "content sits below the title by the declared gap");
-            Check(Math.Abs(button.center.x - root.center.x) < 0.5f,
+            Check(Math.Abs(button.Center.X - root.Center.X) < 0.5f,
                 at + "the button is centred with no business code doing it");
-            Check(Math.Abs(button.yMax - (root.yMax - 10f)) < 0.5f,
+            Check(Math.Abs(button.YMax - (root.YMax - 10f)) < 0.5f,
                 at + "the button ends on the parent's bottom padding");
-            Check(Math.Abs(button.width - 120f) < 0.001f, at + "its declared width survives");
+            Check(Math.Abs(button.Width - 120f) < 0.001f, at + "its declared width survives");
 
             // The frame draws the arrangement it just made, so nothing can be a frame late.
-            DrivePointer(new Vector2(-5000f, -5000f));
+            DrivePointer(new UiLayoutPoint(-5000f, -5000f));
             ClearPaint();
-            host.DrawFrame(new Rect(0f, 0f, size.x, size.y));
-            List<Rect> painted = BoxRectsIn(button);
+            NativeEvents.Click(NativeFixture.DebugMousePosition,()=>{ClearPaint();NativeFixture.DrawFrame(            host,new UiLayoutRect(0f, 0f, size.X, size.Y));});
+            List<UiLayoutRect> painted = BoxRectsIn(button);
             bool paintedHere = false;
-            foreach (Rect candidate in painted)
+            foreach (UiLayoutRect candidate in painted)
             {
                 if (SameRect(candidate, button)) paintedHere = true;
             }
@@ -456,23 +457,23 @@ internal static class KernelArchitectureProbeTests
             {
                 fired = 0;
                 DrivePointer(previousCentre.Value);
-                host.DrawFrame(new Rect(0f, 0f, size.x, size.y));
+                NativeEvents.Click(NativeFixture.DebugMousePosition,()=>{ClearPaint();NativeFixture.DrawFrame(                host,new UiLayoutRect(0f, 0f, size.X, size.Y));});
                 Check(fired == 0, at + "the previous size's centre is no longer a hit target");
             }
 
             fired = 0;
-            DrivePointer(button.center);
-            host.DrawFrame(new Rect(0f, 0f, size.x, size.y));
+            DrivePointer(button.Center);
+            NativeEvents.Click(NativeFixture.DebugMousePosition,()=>{ClearPaint();NativeFixture.DrawFrame(            host,new UiLayoutRect(0f, 0f, size.X, size.Y));});
             Check(fired == 1, at + "the hit test uses this pass's rect");
 
-            previousCentre = button.center;
+            previousCentre = button.Center;
             previous = snapshot;
         }
 
         UiLayoutSnapshot repeated = host.MeasureAndArrange(sizes[sizes.Length - 1]);
         Note("same size twice returns the same snapshot instance: " + ReferenceEquals(previous, repeated));
         UiLayoutSnapshot changed = host.MeasureAndArrange(
-            new Vector2(sizes[sizes.Length - 1].x + 1f, sizes[sizes.Length - 1].y));
+            new UiLayoutPoint(sizes[sizes.Length - 1].X + 1f, sizes[sizes.Length - 1].Y));
         Check(!ReferenceEquals(previous, changed), "a changed available size produces a new arrangement");
 
         bool writable = false;
@@ -560,8 +561,8 @@ internal static class KernelArchitectureProbeTests
         return attributes;
     }
 
-    private static UiWidgetContext MakeContext(UiSession session, IUiBindings bindings, UiTheme theme) =>
-        new(Scope, session, new ProbeMetrics(), theme, new ProbeTranslation(), bindings, 400f, "root");
+    private static UiWidgetContext MakeContext(UiSession session, IUiBindingReader bindings, UiTheme theme) =>
+        NativeFixture.Context(Scope, session, new ProbeMetrics(), theme, new ProbeTranslation(), bindings, 400f, "root");
 
     private static string Read(UiElementSpec spec, string name) =>
         spec.TryGetAttribute(name, out string value) ? value : "";
@@ -573,28 +574,28 @@ internal static class KernelArchitectureProbeTests
             System.Globalization.CultureInfo.InvariantCulture, out float value) && value > 0f ? value : fallback;
     }
 
-    private static void DrivePointer(Vector2 position)
+    private static void DrivePointer(UiLayoutPoint position)
     {
-        UiNative.DebugMousePositionEnabled = true;
-        UiNative.DebugMousePosition = position;
-        UiNative.ButtonOverride = rect =>
-            position.x >= rect.x && position.x <= rect.xMax && position.y >= rect.y && position.y <= rect.yMax;
-        UiNative.SliderOverride = (rect, current, min, max) => current;
-        UiNative.TextFieldOverride = (rect, text) => text;
+        NativeFixture.DebugMousePositionEnabled = true;
+        NativeFixture.DebugMousePosition = position;
+        NativeFixture.ButtonOverride = rect =>
+            position.X >= rect.X && position.X <= rect.XMax && position.Y >= rect.Y && position.Y <= rect.YMax;
+        NativeFixture.SliderOverride = (rect, current, min, max) => current;
+        NativeFixture.TextFieldOverride = (rect, text) => text;
     }
 
     private static void ResetSeams()
     {
-        UiNative.DebugMousePositionEnabled = false;
-        UiNative.DebugMousePosition = Vector2.zero;
-        UiNative.DebugMouseDown = false;
-        UiNative.DebugMouseDrag = false;
-        UiNative.DebugMouseUp = false;
-        UiNative.DebugEnter = false;
-        UiNative.DebugFocusLost = false;
-        UiNative.ButtonOverride = null;
-        UiNative.SliderOverride = null;
-        UiNative.TextFieldOverride = null;
+        NativeFixture.DebugMousePositionEnabled = false;
+        NativeFixture.DebugMousePosition = UiLayoutPoint.Zero;
+        NativeFixture.DebugMouseDown = false;
+        NativeFixture.DebugMouseDrag = false;
+        NativeFixture.DebugMouseUp = false;
+        NativeFixture.DebugEnter = false;
+        NativeFixture.DebugFocusLost = false;
+        NativeFixture.ButtonOverride = null;
+        NativeFixture.SliderOverride = null;
+        NativeFixture.TextFieldOverride = null;
     }
 
     private static void ClearPaint()
@@ -616,60 +617,60 @@ internal static class KernelArchitectureProbeTests
 
     private static IList LabelColours() => (IList)StubField("LabelColors");
 
-    private static List<Rect> BoxRectsIn(Rect area)
+    private static List<UiLayoutRect> BoxRectsIn(UiLayoutRect area)
     {
-        var inside = new List<Rect>();
+        var inside = new List<UiLayoutRect>();
         foreach (object candidate in BoxRects())
         {
-            if (candidate is Rect rect && Intersects(rect, area)) inside.Add(rect);
+            UiLayoutRect rect=NativeFixture.Record<UiLayoutRect>(candidate);if (Intersects(rect, area)) inside.Add(rect);
         }
 
         return inside;
     }
 
-    private static List<Color> BoxColoursIn(Rect area)
+    private static List<UiColour> BoxColoursIn(UiLayoutRect area)
     {
-        var inside = new List<Color>();
+        var inside = new List<UiColour>();
         IList rects = BoxRects();
         IList colours = BoxColours();
         for (int i = 0; i < rects.Count && i < colours.Count; i++)
         {
-            if (rects[i] is Rect rect && colours[i] is Color colour && Intersects(rect, area)) inside.Add(colour);
+            UiLayoutRect rect=NativeFixture.Record<UiLayoutRect>(rects[i]);UiColour colour=NativeFixture.Record<UiColour>(colours[i]);if(Intersects(rect,area))inside.Add(colour);
         }
 
         return inside;
     }
 
-    private static List<Color> LabelColoursIn(Rect area)
+    private static List<UiColour> LabelColoursIn(UiLayoutRect area)
     {
-        var inside = new List<Color>();
+        var inside = new List<UiColour>();
         IList rects = LabelRects();
         IList colours = LabelColours();
         for (int i = 0; i < rects.Count && i < colours.Count; i++)
         {
-            if (rects[i] is Rect rect && colours[i] is Color colour && Intersects(rect, area)) inside.Add(colour);
+            UiLayoutRect rect=NativeFixture.Record<UiLayoutRect>(rects[i]);UiColour colour=NativeFixture.Record<UiColour>(colours[i]);if(Intersects(rect,area))inside.Add(colour);
         }
 
         return inside;
     }
 
-    private static bool AllAlphaZero(List<Color> colours)
+    private static bool AllAlphaZero(List<UiColour> colours)
     {
         if (colours.Count == 0) return false;
-        foreach (Color colour in colours)
+        foreach (UiColour colour in colours)
         {
-            if (colour.a > 0.0001f) return false;
+            if (colour.Alpha > 0.0001f) return false;
         }
 
         return true;
     }
 
-    private static bool Intersects(Rect one, Rect other) =>
-        one.x < other.xMax && one.xMax > other.x && one.y < other.yMax && one.yMax > other.y;
+    private static bool Intersects(UiLayoutRect one, UiLayoutRect other) =>
+        one.X < other.XMax && one.XMax > other.X && one.Y < other.YMax && one.YMax > other.Y;
 
-    private static bool SameRect(Rect one, Rect other) =>
-        Math.Abs(one.x - other.x) < 0.001f && Math.Abs(one.y - other.y) < 0.001f
-        && Math.Abs(one.width - other.width) < 0.001f && Math.Abs(one.height - other.height) < 0.001f;
+    private static bool SameRect(UiLayoutRect one, UiLayoutRect other) =>
+        Math.Abs(one.X - other.X) < 0.001f && Math.Abs(one.Y - other.Y) < 0.001f
+        && Math.Abs(one.Width - other.Width) < 0.001f && Math.Abs(one.Height - other.Height) < 0.001f;
 
     private static object StubField(string name)
     {

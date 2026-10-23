@@ -289,7 +289,7 @@ internal static class KernelPageLifecycleTests
 
         UiNode? panel = session.GetNodeByElementId("panel");
         Check(panel != null, "the page arranged the element the draft hangs on");
-        panel!.State.EditText = "uncommitted-draft";
+        NativeFixture.Custom(        panel!).EditText = "uncommitted-draft";
 
         int mappedBefore = adapter.MappedPropertyCount;
         File.WriteAllText(layoutPath, layoutTwo);
@@ -307,7 +307,7 @@ internal static class KernelPageLifecycleTests
         Check(commandRuns == 0, "a reload never invokes a command");
         Check(ReferenceEquals(session.GetNodeByElementId("panel"), panel),
             "the stable identity keeps its node object across both reloads");
-        Check(panel.State.EditText == "uncommitted-draft", "and the uncommitted draft survived both reloads");
+        Check(NativeFixture.Custom(panel).EditText == "uncommitted-draft", "and the uncommitted draft survived both reloads");
 
         vm.Raise("Value");
         Check(bindings.GetRevision("value.key") == 1, "the view model's subscription is still live after the reloads");
@@ -326,7 +326,7 @@ internal static class KernelPageLifecycleTests
         string kindOne = "page-" + Guid.NewGuid().ToString("N");
         string scopeOne = Consumer + "/" + kindOne;
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(scopeOne, ProbeWidget.KindName, () => new ProbeWidget(scopeOne));
+UiWidgetRegistry.Define(new UiWidgetDefinition(scopeOne, ProbeWidget.KindName, () => new ProbeWidget(scopeOne)));
 
         var bindingsOne = new UiBindings();
         bindingsOne.BindReadOnly("value.key", () => 0f);
@@ -354,7 +354,7 @@ internal static class KernelPageLifecycleTests
         // The path that already existed: subscribe after the first draw and reach the host through PageHost.
         string kindTwo = "page-" + Guid.NewGuid().ToString("N");
         string scopeTwo = Consumer + "/" + kindTwo;
-        UiWidgetRegistry.Register(scopeTwo, ProbeWidget.KindName, () => new ProbeWidget(scopeTwo));
+UiWidgetRegistry.Define(new UiWidgetDefinition(scopeTwo, ProbeWidget.KindName, () => new ProbeWidget(scopeTwo)));
 
         var bindingsTwo = new UiBindings();
         bindingsTwo.BindReadOnly("value.key", () => 0f);
@@ -405,8 +405,8 @@ internal static class KernelPageLifecycleTests
         string scope = Consumer + "/" + kind;
         string otherScope = Consumer + "/" + otherKind;
         UiWidgetRegistry.InitializeCore();
-        UiWidgetRegistry.Register(scope, ProbeWidget.KindName, () => new ProbeWidget(scope));
-        UiWidgetRegistry.Register(otherScope, ProbeWidget.KindName, () => new ProbeWidget(otherScope));
+UiWidgetRegistry.Define(new UiWidgetDefinition(scope, ProbeWidget.KindName, () => new ProbeWidget(scope)));
+UiWidgetRegistry.Define(new UiWidgetDefinition(otherScope, ProbeWidget.KindName, () => new ProbeWidget(otherScope)));
 
         var bindings = new UiBindings();
         var stack = new WindowStack();
@@ -472,8 +472,8 @@ internal static class KernelPageLifecycleTests
         {
             catalog.CloseAll();
             Event.current = null;
-            UiNative.ButtonOverride = null;
-            UiNative.DebugMousePositionEnabled = false;
+            NativeFixture.ButtonOverride = null;
+            NativeFixture.DebugMousePositionEnabled = false;
         }
     }
 
@@ -605,8 +605,8 @@ internal static class KernelPageLifecycleTests
         {
             catalog.CloseAll();
             Event.current = null;
-            UiNative.ButtonOverride = null;
-            UiNative.DebugMousePositionEnabled = false;
+            NativeFixture.ButtonOverride = null;
+            NativeFixture.DebugMousePositionEnabled = false;
         }
 
         return outcome;
@@ -614,7 +614,7 @@ internal static class KernelPageLifecycleTests
 
     // --- helpers --------------------------------------------------------------------------------
 
-    private static UiPageWindow NewPageWindow(string consumer, string kind, string source, IUiBindings bindings)
+    private static UiPageWindow NewPageWindow(string consumer, string kind, string source, IUiBindingReader bindings)
     {
         UiLayoutManifest manifest = UiLayoutManifest.Parse(
             Page(source, "<Column Id=\"root\">" + ProbeWidgetXml + "</Column>"));
@@ -735,17 +735,17 @@ internal static class KernelPageLifecycleTests
         {
         }
 
-        public void Validate(IUiBindings bindings, string elementPath)
+        public void Validate(IUiBindingReader bindings, string elementPath)
         {
             // This page is about lifecycle, not values, so it declares no binding of its own.
         }
 
         public float Measure(UiWidgetContext ctx) => 24f;
 
-        public void Draw(Rect rect, UiWidgetContext ctx)
+        public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
             DrawCounts[scope] = DrawCounts.TryGetValue(scope, out int count) ? count + 1 : 1;
-            UiThemeDraw.Label(rect, "page", ctx.Theme);
+            UiThemeDraw.Label(ctx.Drawing,rect, "page", ctx.Theme);
             if (DrawHooks.TryGetValue(scope, out Action? hook) && hook != null)
             {
                 hook();
@@ -763,18 +763,18 @@ internal static class KernelPageLifecycleTests
         private readonly string scope;
         private readonly UiLayoutManifest manifest;
 
-        internal ProbeShell(string scope, string? manifestXml = null, IUiBindings? bindings = null)
+        internal ProbeShell(string scope, string? manifestXml = null, IUiBindingReader? bindings = null)
         {
             this.scope = scope;
             Bindings = bindings ?? new UiBindings();
             manifest = UiLayoutManifest.Parse(manifestXml ?? DefaultManifest(scope));
             UiWidgetRegistry.InitializeCore();
-            UiWidgetRegistry.Register(scope, ProbeWidget.KindName, () => new ProbeWidget(scope));
+UiWidgetRegistry.Define(new UiWidgetDefinition(scope, ProbeWidget.KindName, () => new ProbeWidget(scope)));
             HostAttached += OnHostAttached;
             HostDetached += OnHostDetached;
         }
 
-        internal IUiBindings Bindings { get; }
+        internal IUiBindingReader Bindings { get; }
 
         internal readonly List<string> Events = new();
 
@@ -824,10 +824,10 @@ internal static class KernelPageLifecycleTests
             return new UiHost(scope, manifest, Bindings, Theme, new LaneMetrics(), new LaneTranslation());
         }
 
-        protected override void DrawNotice(Rect rect, UiWindowNotice notice)
+        protected override void DrawNotice(Rect rect,UiWindowNotice notice)
         {
             Notices.Add(notice);
-            UiThemeDraw.Label(rect, NoticeText, Theme, singleLine: true);
+            UiThemeDraw.Label(NativeFixture.Paint,VerseUiExecution.Rect(rect), NoticeText, Theme, singleLine: true);
         }
 
         protected override void OnDrawFailure(Exception error)

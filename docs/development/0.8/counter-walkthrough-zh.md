@@ -57,7 +57,7 @@ var list = runtime.List(new[] { first, second }, (a, b) => ReferenceEquals(a, b)
 var current = runtime.Value(list, (a, b) => ReferenceEquals(a, b));
 var total = business.Compute("total", () => current.Value.Sum(item => item.Count));
 bindings.BindTracked("caption", () => "Total " + total.Value);
-bindings.BindTrackedOptions("selected", () => current.Value
+bindings.BindTrackedChoices("selected", () => current.Value
     .Select(item => new UiChoice<int>(item.Key + ": " + item.Count, item.Code))
     .ToList().AsReadOnly(), (a, b) => a.Text == b.Text && a.Value == b.Value);
 ```

@@ -1,3 +1,6 @@
+using System.Linq;
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -5,7 +8,6 @@ using System.Reflection;
 
 using FerriteLib.UiKit.Kernel;
 using FerriteLib.UiKit.Kernel.Widgets;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -33,7 +35,7 @@ internal static class KernelDevGeometryTests
 {
     private const string Scope = "dev-geometry-lane";
 
-    private static readonly Rect Viewport = new Rect(0f, 0f, 200f, 200f);
+    private static readonly UiLayoutRect Viewport = new UiLayoutRect(0f, 0f, 200f, 200f);
 
     /// <summary>
     /// net472 has no Split(char, StringSplitOptions) overload, and the one-argument call binds to it under
@@ -117,21 +119,21 @@ internal static class KernelDevGeometryTests
             "the band's recorded height is the sibling's measured height: " + Text(bandHeight) + " vs " + Text(captionHeight));
 
         // Not a second source of truth: what it reports is the snapshot's own geometry.
-        Rect fromSnapshot = snapshot.RectById["band"];
-        TryRect(band, "arranged=", out Rect arranged);
+        UiLayoutRect fromSnapshot = snapshot.RectById["band"];
+        TryRect(band, "arranged=", out UiLayoutRect arranged);
         Check(SameRect(arranged, fromSnapshot),
             "and its reported arranged rect is the snapshot's own rect for that element: " + Show(arranged) + " vs " + Show(fromSnapshot));
 
         // At the page level the two spaces coincide, and a reader can now see that instead of assuming it.
-        TryRect(band, "window=", out Rect bandWindow);
+        TryRect(band, "window=", out UiLayoutRect bandWindow);
         Check(SameRect(arranged, bandWindow),
             "at the page level the arranged and drawn rects agree: " + Show(arranged) + " vs " + Show(bandWindow));
 
         // The trap the instrument exists for: inside the scoped container the two spaces genuinely differ,
         // and the dump says so with both numbers and the origin between them.
         string inner = Require(dump, "path=root/list/inner ");
-        TryRect(inner, "arranged=", out Rect innerArranged);
-        TryRect(inner, "draw=", out Rect innerDraw);
+        TryRect(inner, "arranged=", out UiLayoutRect innerArranged);
+        TryRect(inner, "draw=", out UiLayoutRect innerDraw);
         Check(!SameRect(innerArranged, innerDraw),
             "an element inside the scoped container is reported in the other space, not in the page's: "
             + Show(innerArranged) + " vs " + Show(innerDraw));
@@ -141,9 +143,9 @@ internal static class KernelDevGeometryTests
         foreach (string line in dump.Split(Lines, StringSplitOptions.None))
         {
             if (line.Length == 0 || line[0] == '[' || line.StartsWith("input ", StringComparison.Ordinal)) continue;
-            if (!TryRect(line, "draw=", out Rect draw) || !TryRect(line, "window=", out Rect window)) continue;
-            if (!TryPoint(line, "origin=", out Vector2 origin)) continue;
-            Check(Same(window.x, draw.x + origin.x) && Same(window.y, draw.y + origin.y),
+            if (!TryRect(line, "draw=", out UiLayoutRect draw) || !TryRect(line, "window=", out UiLayoutRect window)) continue;
+            if (!TryPoint(line, "origin=", out UiLayoutPoint origin)) continue;
+            Check(Same(window.X, draw.X + origin.X) && Same(window.Y, draw.Y + origin.Y),
                 "guard: the window rect is the drawn rect plus the reported origin: " + line);
         }
 
@@ -151,8 +153,8 @@ internal static class KernelDevGeometryTests
         string list = Require(dump, "path=root/list ");
         Check(list.StartsWith("viewport ", StringComparison.Ordinal),
             "a scoped container is reported as a viewport rather than as an ordinary rect: " + list);
-        TryRect(list, "window=", out Rect viewport);
-        Check(TryRect(list, "content=", out Rect content) && content.height > viewport.height,
+        TryRect(list, "window=", out UiLayoutRect viewport);
+        Check(TryRect(list, "content=", out UiLayoutRect content) && content.Height > viewport.Height,
             "and its content extent is the scrollable extent, not the visible band: " + Show(content) + " over " + Show(viewport));
     }
 
@@ -161,40 +163,43 @@ internal static class KernelDevGeometryTests
         using UiHost host = NewHost(Page);
         host.Diagnostics.GeometryEnabled = true;
         UiLayoutSnapshot snapshot = Pass(host);
-        Rect band = snapshot.RectById["band"];
+        UiLayoutRect band = snapshot.RectById["band"];
 
         string bandLine = Require(host.Diagnostics.DumpGeometry(), "path=root/row/band ");
-        TryRect(bandLine, "window=", out Rect bandWindow);
+        TryRect(bandLine, "window=", out UiLayoutRect bandWindow);
 
         try
         {
-            UiNative.DebugMousePositionEnabled = true;
-            UiNative.DebugMouseDown = true;
+            NativeFixture.DebugMousePositionEnabled = true;
+            NativeFixture.DebugMouseDown = true;
 
             // A press that lands: the native control fires inside the band's own rect.
-            UiNative.DebugMousePosition = band.center;
-            UiNative.ButtonOverride = rect => true;
-            host.DrawFrame(Viewport);
+            NativeFixture.DebugMousePosition = band.Center;
+            NativeFixture.ButtonOverride = rect => true;
+            NativeFixture.BeginDebugEvent();
+            NativeFixture.DrawFrame(            host,Viewport);
             string hit = Require(host.Diagnostics.DumpGeometry(), "verdict=hit");
             PrintInputs(host.Diagnostics.DumpGeometry());
             Check(hit.IndexOf("path=root/row/band ", StringComparison.Ordinal) >= 0,
                 "a claimed press names the element that claimed it: " + hit);
-            TryPoint(hit, "point=", out Vector2 hitPoint);
-            Check(Same(hitPoint.x, bandWindow.center.x) && Same(hitPoint.y, bandWindow.center.y),
+            TryPoint(hit, "point=", out UiLayoutPoint hitPoint);
+            Check(Same(hitPoint.X, bandWindow.Center.X) && Same(hitPoint.Y, bandWindow.Center.Y),
                 "in the pointer's own space, so the two can be compared instead of guessed at: "
-                + Show(hitPoint) + " vs " + Show(bandWindow.center));
+                + Show(hitPoint) + " vs " + Show(bandWindow.Center));
 
             // The chokepoint agreement that matters for "the click did nothing": the rect the funnel
             // queried is the same window-space rect the engine reported drawing.
-            TryRect(hit, "rect=", out Rect queried);
+            TryRect(hit, "rect=", out UiLayoutRect queried);
             Check(SameRect(queried, bandWindow),
                 "and the queried rect is the drawn rect the engine reported, in one space: "
                 + Show(queried) + " vs " + Show(bandWindow));
 
             // A press that misses: still sampled, because the pointer is down. This is what answers
             // "the click did nothing" instead of an empty log that answers nothing.
-            UiNative.ButtonOverride = _ => false;
-            host.DrawFrame(Viewport);
+            NativeEvents.Begin(EventType.MouseUp,band.Center);NativeFixture.DrawFrame(host,Viewport);
+            NativeFixture.DebugMousePosition = new UiLayoutPoint(-10,-10);
+            NativeFixture.BeginDebugEvent();
+            NativeFixture.DrawFrame(            host,Viewport);
             string miss = Require(host.Diagnostics.DumpGeometry(), "verdict=miss");
             PrintInputs(host.Diagnostics.DumpGeometry());
             Check(miss.IndexOf("path=root/row/band ", StringComparison.Ordinal) >= 0,
@@ -202,10 +207,10 @@ internal static class KernelDevGeometryTests
         }
         finally
         {
-            UiNative.ButtonOverride = null;
-            UiNative.DebugMousePosition = default;
-            UiNative.DebugMouseDown = false;
-            UiNative.DebugMousePositionEnabled = false;
+            NativeFixture.ButtonOverride = null;
+            NativeFixture.DebugMousePosition = default;
+            NativeFixture.DebugMouseDown = false;
+            NativeFixture.DebugMousePositionEnabled = false;
         }
 
         // A refusal reports its reason: the funnel's own disabled rule.
@@ -213,10 +218,11 @@ internal static class KernelDevGeometryTests
         disabled.Diagnostics.GeometryEnabled = true;
         try
         {
-            UiNative.DebugMousePositionEnabled = true;
-            UiNative.DebugMouseDown = true;
-            UiNative.DebugMousePosition = band.center;
-            disabled.DrawFrame(Viewport);
+            NativeFixture.DebugMousePositionEnabled = true;
+            NativeFixture.DebugMouseDown = true;
+            NativeFixture.DebugMousePosition = band.Center;
+            NativeFixture.BeginDebugEvent();
+            NativeFixture.DrawFrame(            disabled,Viewport);
             string blocked = Require(disabled.Diagnostics.DumpGeometry(), "verdict=disabled");
             PrintInputs(disabled.Diagnostics.DumpGeometry());
             Check(blocked.IndexOf("path=root/row/band ", StringComparison.Ordinal) >= 0,
@@ -224,9 +230,9 @@ internal static class KernelDevGeometryTests
         }
         finally
         {
-            UiNative.DebugMousePosition = default;
-            UiNative.DebugMouseDown = false;
-            UiNative.DebugMousePositionEnabled = false;
+            NativeFixture.DebugMousePosition = default;
+            NativeFixture.DebugMouseDown = false;
+            NativeFixture.DebugMousePositionEnabled = false;
         }
     }
 
@@ -273,14 +279,14 @@ internal static class KernelDevGeometryTests
         // binding moving to "x" is what proves the ROW consumed the click rather than the trigger.
         string current = "y";
         bindings.BindValue("trigger", () => current, value => current = value);
-        bindings.BindOptions("Options", () => new List<string> { "x", "y" });
+        bindings.BindChoices("Options", ()=> (new List<string> { "x", "y" }).Select(value=>new UiChoice<string>(value,value,value)).ToArray());
         bindings.BindCommand("under-act", () => underActions++);
 
         using UiHost host = new UiHost(
             Scope, UiLayoutManifest.Parse(xml), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.Diagnostics.GeometryEnabled = true;
 
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(Viewport.width, Viewport.height));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(Viewport.Width, Viewport.Height));
         host.Session.OpenPopup("trigger", snapshot.RectById["trigger"]);
 
         // A pass the engine is not part of must not decide what this lane measures: a leftover Event.current
@@ -293,28 +299,36 @@ internal static class KernelDevGeometryTests
             // One frame publishes the popup layer; dispatch reads the pass that just finished, so the covered
             // decision is only reachable from the second frame on. That ordering is the mechanism, not a
             // detail of this lane.
-            host.DrawFrame(Viewport);
-            Rect? popup = PopupLayer(host.Session);
+            NativeFixture.BeginDebugEvent();
+            NativeFixture.DrawFrame(            // One frame publishes the popup layer; dispatch reads the pass that just finished, so the covered
+            // decision is only reachable from the second frame on. That ordering is the mechanism, not a
+            // detail of this lane.
+            host,Viewport);
+            UiLayoutRect? popup = PopupLayer(host.Session);
             if (!popup.HasValue)
             {
                 throw new Exception("the open popup pushed no hit layer, so nothing can be covered");
             }
 
-            Rect under = snapshot.RectById["under"];
-            Vector2 point = new(under.center.x, Math.Max(popup.Value.y + 2f, under.y + 2f));
+            UiLayoutRect under = snapshot.RectById["under"];
+            UiLayoutPoint point = new(under.Center.X, Math.Max(popup.Value.Y + 2f, under.Y + 2f));
             if (!Over(popup.Value, point) || !Over(under, point))
             {
                 throw new Exception("test premise broken: " + Show(point) + " is not inside both the popup "
                     + Show(popup.Value) + " and the element it covers " + Show(under));
             }
 
-            UiNative.DebugMousePositionEnabled = true;
-            UiNative.DebugMouseDown = true;
-            UiNative.DebugMousePosition = point;
-            UiNative.ButtonOverride = rect => Over(rect, point);
+            NativeFixture.DebugMousePositionEnabled = true;
+            NativeFixture.DebugMouseDown = true;
+            NativeFixture.DebugMousePosition = point;
+            NativeFixture.ButtonOverride = rect => Over(rect, point);
 
             // Frame two: the press lands inside the popup layer AND inside the covered element.
-            host.DrawFrame(Viewport);
+            NativeFixture.BeginDebugEvent();
+            NativeFixture.DrawFrame(
+            // Frame two: the press lands inside the popup layer AND inside the covered element.
+            host,Viewport);
+            NativeEvents.Begin(EventType.MouseUp,point);NativeFixture.DrawFrame(host,Viewport);
             string dump = host.Diagnostics.DumpGeometry();
             PrintInputs(dump);
             string covered = Require(dump, "verdict=covered");
@@ -336,7 +350,12 @@ internal static class KernelDevGeometryTests
 
             // Frame three: the counterfactual. The same press with no popup layer left must hit the element
             // and dispatch exactly once, which is what makes the covered verdict a property of the layer.
-            host.DrawFrame(Viewport);
+            NativeFixture.BeginDebugEvent();
+            NativeFixture.DrawFrame(
+            // Frame three: the counterfactual. The same press with no popup layer left must hit the element
+            // and dispatch exactly once, which is what makes the covered verdict a property of the layer.
+            host,Viewport);
+            NativeEvents.Begin(EventType.MouseUp,point);NativeFixture.DrawFrame(host,Viewport);
             string after = host.Diagnostics.DumpGeometry();
             PrintInputs(after);
             string hit = Require(after, "verdict=hit");
@@ -346,10 +365,10 @@ internal static class KernelDevGeometryTests
         }
         finally
         {
-            UiNative.ButtonOverride = null;
-            UiNative.DebugMousePosition = default;
-            UiNative.DebugMouseDown = false;
-            UiNative.DebugMousePositionEnabled = false;
+            NativeFixture.ButtonOverride = null;
+            NativeFixture.DebugMousePosition = default;
+            NativeFixture.DebugMouseDown = false;
+            NativeFixture.DebugMousePositionEnabled = false;
             Event.current = previousEvent;
         }
     }
@@ -358,7 +377,7 @@ internal static class KernelDevGeometryTests
     /// The topmost popup layer of the session's hit stack, or null when none is pushed. The lane reads the
     /// stack directly, the way the popup lanes do, because the covered rule is a property of the layer.
     /// </summary>
-    private static Rect? PopupLayer(UiSession session)
+    private static UiLayoutRect? PopupLayer(UiSession session)
     {
         for (int i = session.HitLayers.Count - 1; i >= 0; i--)
         {
@@ -369,9 +388,9 @@ internal static class KernelDevGeometryTests
     }
 
     /// <summary>Point containment, written out because the stub Rect has no Contains to lean on.</summary>
-    private static bool Over(Rect rect, Vector2 point)
+    private static bool Over(UiLayoutRect rect, UiLayoutPoint point)
     {
-        return point.x >= rect.x && point.x <= rect.xMax && point.y >= rect.y && point.y <= rect.yMax;
+        return point.X >= rect.X && point.X <= rect.XMax && point.Y >= rect.Y && point.Y <= rect.YMax;
     }
 
     /// <summary>True when that pass recorded an input sample for that element carrying that verdict.</summary>
@@ -415,7 +434,8 @@ internal static class KernelDevGeometryTests
         bindings.BindCommand("other", () => otherActions++);
         using var host = new UiHost(Scope, UiLayoutManifest.Parse(xml), bindings,
             UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
-        Rect first = Pass(host).RectById["first"];
+        NativeEvents.Begin(EventType.Repaint);
+        UiLayoutRect first = Pass(host).RectById["first"];
         try
         {
             foreach (bool enabled in new[] { true, false })
@@ -426,9 +446,9 @@ internal static class KernelDevGeometryTests
                     Event raised = Event.KeyboardEvent("");
                     raised.type = phase;
                     raised.button = 0;
-                    raised.mousePosition = first.center;
+                    raised.mousePosition = VerseUiExecution.Point(first.Center);
                     Event.current = raised;
-                    host.DrawFrame(Viewport);
+                    NativeFixture.DrawFrame(                    host,Viewport);
                     Check(raised.type == EventType.Used, "the native button consumes the event with diagnostics=" + enabled);
                     if (!enabled) continue;
                     string dump = host.Diagnostics.DumpGeometry();
@@ -447,7 +467,7 @@ internal static class KernelDevGeometryTests
             Event repaint = Event.KeyboardEvent("");
             repaint.type = EventType.Repaint;
             Event.current = repaint;
-            host.DrawFrame(Viewport);
+            NativeFixture.DrawFrame(            host,Viewport);
             Check(!host.Diagnostics.DumpGeometry().Contains("input path="), "a repaint does not inherit consumed input from the previous pass");
         }
         finally { Event.current = null; GUIUtility.hotControl = 0; }
@@ -668,14 +688,14 @@ internal static class KernelDevGeometryTests
         // from the core one while the element declares nothing at all.
         try
         {
-            UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
                 Scope,
                 CheckboxWidget.Kind,
                 () => new CheckboxWidget(),
                 new[] { "Id", "Kind", "Bind", "Appearance", "Height" },
                 null,
                 null,
-                new UiAppearanceResolver(CheckboxWidget.CheckboxLook, CheckboxWidget.SwitchLook));
+                new UiAppearanceResolver(CheckboxWidget.CheckboxLook, CheckboxWidget.SwitchLook)));
 
             using UiHost host = NewBoolHost(AliasPage);
             host.Diagnostics.GeometryEnabled = true;
@@ -732,9 +752,9 @@ internal static class KernelDevGeometryTests
         Check(ContainsRect(root.Clip.Rect, inner.Clip.Rect),
             "the effective clip is the intersection, so the nested one stays inside the outer one: "
             + Show(inner.Clip.Rect) + " inside " + Show(root.Clip.Rect));
-        Check(inner.Clip.Rect.height < root.Clip.Rect.height,
+        Check(inner.Clip.Rect.Height < root.Clip.Rect.Height,
             "the scroll's own viewport constrains its children - a boundary the innermost rect alone does not "
-            + "describe: " + Text(inner.Clip.Rect.height) + " < " + Text(root.Clip.Rect.height));
+            + "describe: " + Text(inner.Clip.Rect.Height) + " < " + Text(root.Clip.Rect.Height));
         Check(SameRect(list.Clip.Rect, root.Clip.Rect),
             "and a scoped container's own sample carries the clip it was drawn INSIDE, while its viewport "
             + "appears on its children: " + Show(list.Clip.Rect));
@@ -759,14 +779,14 @@ internal static class KernelDevGeometryTests
         string current = "y";
         var bindings = new UiBindings();
         bindings.BindValue("trigger", () => current, value => current = value);
-        bindings.BindOptions("Options", () => new List<string> { "x", "y" });
+        bindings.BindChoices("Options", ()=> (new List<string> { "x", "y" }).Select(value=>new UiChoice<string>(value,value,value)).ToArray());
         bindings.BindCommand("act", () => { });
         using UiHost popupHost = new UiHost(
             Scope, UiLayoutManifest.Parse(PopupPage), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         popupHost.Diagnostics.GeometryEnabled = true;
-        UiLayoutSnapshot arranged = popupHost.MeasureAndArrange(new Vector2(Viewport.width, Viewport.height));
+        UiLayoutSnapshot arranged = popupHost.MeasureAndArrange(new UiLayoutPoint(Viewport.Width, Viewport.Height));
         popupHost.Session.OpenPopup("trigger", arranged.RectById["trigger"]);
-        popupHost.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        popupHost,Viewport);
         UiDevGeometrySnapshot withPopup = SnapshotOf(popupHost.Diagnostics);
 
         UiDevNodeSnapshot trigger = RequireNode(withPopup, "root/trigger");
@@ -869,11 +889,11 @@ internal static class KernelDevGeometryTests
         // The overlay is the third rendering of the same capture, so it must paint exactly what was RETAINED:
         // measured as the difference the overlay switch makes, because the widgets paint their own solids too.
         ClearSolids();
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
         int withoutOverlay = SolidCount();
         host.Diagnostics.GeometryOverlay = true;
         ClearSolids();
-        host.DrawFrame(Viewport);
+        NativeFixture.DrawFrame(        host,Viewport);
         int withOverlay = SolidCount();
         host.Diagnostics.GeometryOverlay = false;
         UiDevGeometrySnapshot overlayPass = SnapshotOf(host.Diagnostics);
@@ -965,7 +985,7 @@ internal static class KernelDevGeometryTests
             + " (A band=" + (first.NodeByPath("root/row/band") != null) + ", A other="
             + (first.NodeByPath("root/other") != null) + ")");
 
-        UiLayoutSnapshot aBefore = a.MeasureAndArrange(new Vector2(Viewport.width, Viewport.height));
+        UiLayoutSnapshot aBefore = a.MeasureAndArrange(new UiLayoutPoint(Viewport.Width, Viewport.Height));
         Pass(b);
         UiDevGeometrySnapshot afterOtherHost = SnapshotOf(aSubscription);
         UiDevGeometrySnapshot bSnapshot = SnapshotOf(bSubscription);
@@ -1032,8 +1052,8 @@ internal static class KernelDevGeometryTests
                 label + ": the dump carries the same canonical key for " + node.Path);
             Check(line.IndexOf("kind=" + node.Kind + " ", StringComparison.Ordinal) >= 0,
                 label + ": and the same kind for " + node.Path);
-            TryRect(line, "arranged=", out Rect arranged);
-            TryRect(line, "draw=", out Rect draw);
+            TryRect(line, "arranged=", out UiLayoutRect arranged);
+            TryRect(line, "draw=", out UiLayoutRect draw);
             Check(SameRect(arranged, node.Arranged) && SameRect(draw, node.Draw),
                 label + ": and the same arranged/draw rects for " + node.Path);
             Check(line.IndexOf("scope-font=" + node.ScopeFont.ToString() + " ", StringComparison.Ordinal) >= 0,
@@ -1144,10 +1164,10 @@ internal static class KernelDevGeometryTests
     }
 
     /// <summary>Rect containment, written out because the stub Rect has no Contains to lean on.</summary>
-    private static bool ContainsRect(Rect outer, Rect inner)
+    private static bool ContainsRect(UiLayoutRect outer, UiLayoutRect inner)
     {
-        return inner.x >= outer.x - 0.001f && inner.y >= outer.y - 0.001f
-            && inner.xMax <= outer.xMax + 0.001f && inner.yMax <= outer.yMax + 0.001f;
+        return inner.X >= outer.X - 0.001f && inner.Y >= outer.Y - 0.001f
+            && inner.XMax <= outer.XMax + 0.001f && inner.YMax <= outer.YMax + 0.001f;
     }
 
     /// <summary>The non-default scope: a scheme with a selected font and a named density, on a container.</summary>
@@ -1246,7 +1266,7 @@ internal static class KernelDevGeometryTests
         UiWidgetRegistry.InitializeCore();
 
         ChromeWindow window = new ChromeWindow();
-        window.windowRect = new Rect(0f, 0f, 200f, 200f);
+        window.windowRect = VerseUiExecution.Rect(new UiLayoutRect(0f, 0f, 200f, 200f));
 
         window.DriveProductionPass();
         Check(window.BeforeDrawDumps.Count == 1 && window.BeforeDrawDumps[0].Length == 0,
@@ -1264,10 +1284,10 @@ internal static class KernelDevGeometryTests
             "and the scoped viewport node of the same pass");
         UiDevGeometrySnapshot copyOne = SnapshotOf(subscription);
         Check(copyOne.ShellChrome is UiWindowChrome oneChrome
-                && SameChrome(oneChrome.Outer, new Rect(0f, 0f, 200f, 200f)),
+                && SameChrome(oneChrome.Outer, new UiLayoutRect(0f, 0f, 200f, 200f)),
             "the data rendering hands out the same frame-one chrome as the text one");
 
-        window.windowRect = new Rect(30f, 40f, 220f, 210f); // drag + resize between frames
+        window.windowRect = VerseUiExecution.Rect(new UiLayoutRect(30f, 40f, 220f, 210f)); // drag + resize between frames
         window.DriveProductionPass();
 
         string prior = window.BeforeDrawDumps[1];
@@ -1282,7 +1302,7 @@ internal static class KernelDevGeometryTests
             "each read hands out a fresh copy, never a live view");
         UiDevGeometrySnapshot afterTwo = SnapshotOf(subscription);
         Check(copyOne.ShellChrome is UiWindowChrome stillOne
-                && SameChrome(stillOne.Outer, new Rect(0f, 0f, 200f, 200f))
+                && SameChrome(stillOne.Outer, new UiLayoutRect(0f, 0f, 200f, 200f))
                 && copyOne.Pass == passOne && afterTwo.Pass != passOne
                 && afterTwo.ShellChrome is UiWindowChrome nowChrome
                 && !SameChrome(nowChrome.Outer, stillOne.Outer),
@@ -1317,23 +1337,23 @@ internal static class KernelDevGeometryTests
         System.Collections.IList inkRects = SolidRectsRecorded();
         int first = inkRects.Count - 12;
         Check(first >= 0, "the overlay pass recorded the twelve chrome hairlines");
-        Rect outerTop = (Rect)inkRects[first]!;
-        Rect titleBottom = (Rect)inkRects[first + 5]!;
+        UiLayoutRect outerTop = NativeFixture.Record<UiLayoutRect>(inkRects[first]!);
+        UiLayoutRect titleBottom = NativeFixture.Record<UiLayoutRect>(inkRects[first + 5]!);
         UiWindowChrome recordedChrome = inkPass.ShellChrome!.Value;
-        Check(Same(outerTop.x, 0f) && Same(outerTop.y, 0f) && Same(outerTop.width, 220f)
-                && Same(titleBottom.y, 55f) && Same(titleBottom.width, 220f),
+        Check(Same(outerTop.X, 0f) && Same(outerTop.Y, 0f) && Same(outerTop.Width, 220f)
+                && Same(titleBottom.Y, 55f) && Same(titleBottom.Width, 220f),
             "the chrome bands paint FACE-LOCAL - the window position never leaks into a draw-local rect: "
-            + "outerTop=(" + outerTop.x + "," + outerTop.y + "," + outerTop.width + ") titleBottom.y="
-            + titleBottom.y);
+            + "outerTop=(" + outerTop.X + "," + outerTop.Y + "," + outerTop.Width + ") titleBottom.y="
+            + titleBottom.Y);
         Check(SameChrome(
-                new Rect(outerTop.x + recordedChrome.Outer.x, outerTop.y + recordedChrome.Outer.y,
-                    outerTop.width, outerTop.height),
-                new Rect(recordedChrome.Outer.x, recordedChrome.Outer.y, recordedChrome.Outer.width, 1f))
+                new UiLayoutRect(outerTop.X + recordedChrome.Outer.X, outerTop.Y + recordedChrome.Outer.Y,
+                    outerTop.Width, outerTop.Height),
+                new UiLayoutRect(recordedChrome.Outer.X, recordedChrome.Outer.Y, recordedChrome.Outer.Width, 1f))
                 && SameChrome(
-                new Rect(titleBottom.x + recordedChrome.Outer.x, titleBottom.y + recordedChrome.Outer.y,
-                    titleBottom.width, titleBottom.height),
-                new Rect(recordedChrome.Outer.x, recordedChrome.Outer.y + recordedChrome.TitleBarHeight - 1f,
-                    recordedChrome.Outer.width, 1f)),
+                new UiLayoutRect(titleBottom.X + recordedChrome.Outer.X, titleBottom.Y + recordedChrome.Outer.Y,
+                    titleBottom.Width, titleBottom.Height),
+                new UiLayoutRect(recordedChrome.Outer.X, recordedChrome.Outer.Y + recordedChrome.TitleBarHeight - 1f,
+                    recordedChrome.Outer.Width, 1f)),
             "draw-local outline + the real window origin == the screen chrome the same pass recorded "
             + "- one geometry, two renderings, through the production space conversion");
         Check(subscription.DumpGeometry().IndexOf("chrome space=window", StringComparison.Ordinal) >= 0,
@@ -1374,10 +1394,10 @@ internal static class KernelDevGeometryTests
         return line.Length > 140 ? line.Substring(0, 140) : line;
     }
 
-    private static bool SameChrome(Rect left, Rect right)
+    private static bool SameChrome(UiLayoutRect left, UiLayoutRect right)
     {
-        return Math.Abs(left.x - right.x) <= 0.01f && Math.Abs(left.y - right.y) <= 0.01f
-            && Math.Abs(left.width - right.width) <= 0.01f && Math.Abs(left.height - right.height) <= 0.01f;
+        return Math.Abs(left.X - right.X) <= 0.01f && Math.Abs(left.Y - right.Y) <= 0.01f
+            && Math.Abs(left.Width - right.Width) <= 0.01f && Math.Abs(left.Height - right.Height) <= 0.01f;
     }
 
     /// <summary>
@@ -1434,11 +1454,11 @@ internal static class KernelDevGeometryTests
                 new StubTranslation());
         }
 
-        protected override void DrawNotice(Rect rect, UiWindowNotice notice)
+        protected override void DrawNotice(UnityEngine.Rect rect,UiWindowNotice notice)
         {
         }
 
-        protected override void BeforeDraw(Rect contentRect)
+        protected override void BeforeDraw(UnityEngine.Rect contentRect)
         {
             UiDiagnosticSubscription? ambient = UiDiagnosticHub.ActiveSubscription;
             BeforeDrawDumps.Add(ambient == null ? "" : ambient.DumpGeometry());
@@ -1555,8 +1575,8 @@ internal static class KernelDevGeometryTests
     /// <summary>One complete frame (draw included), then the snapshot the same geometry produced.</summary>
     private static UiLayoutSnapshot Pass(UiHost host)
     {
-        host.DrawFrame(Viewport);
-        return host.MeasureAndArrange(new Vector2(Viewport.width, Viewport.height));
+        NativeFixture.DrawFrame(        host,Viewport);
+        return host.MeasureAndArrange(new UiLayoutPoint(Viewport.Width, Viewport.Height));
     }
 
     private static void Print(string dump)
@@ -1596,19 +1616,19 @@ internal static class KernelDevGeometryTests
         return null;
     }
 
-    private static bool TryRect(string line, string name, out Rect rect)
+    private static bool TryRect(string line, string name, out UiLayoutRect rect)
     {
         rect = default;
         if (!Slice(line, name, 4, out string[] parts)) return false;
-        rect = new Rect(Value(parts[0]), Value(parts[1]), Value(parts[2]), Value(parts[3]));
+        rect = new UiLayoutRect(Value(parts[0]), Value(parts[1]), Value(parts[2]), Value(parts[3]));
         return true;
     }
 
-    private static bool TryPoint(string line, string name, out Vector2 point)
+    private static bool TryPoint(string line, string name, out UiLayoutPoint point)
     {
         point = default;
         if (!Slice(line, name, 2, out string[] parts)) return false;
-        point = new Vector2(Value(parts[0]), Value(parts[1]));
+        point = new UiLayoutPoint(Value(parts[0]), Value(parts[1]));
         return true;
     }
 
@@ -1644,10 +1664,10 @@ internal static class KernelDevGeometryTests
         return Math.Abs(left - right) <= 0.001f;
     }
 
-    private static bool SameRect(Rect left, Rect right)
+    private static bool SameRect(UiLayoutRect left, UiLayoutRect right)
     {
-        return Same(left.x, right.x) && Same(left.y, right.y)
-            && Same(left.width, right.width) && Same(left.height, right.height);
+        return Same(left.X, right.X) && Same(left.Y, right.Y)
+            && Same(left.Width, right.Width) && Same(left.Height, right.Height);
     }
 
     private static string Text(float value)
@@ -1655,14 +1675,14 @@ internal static class KernelDevGeometryTests
         return value.ToString("0.###", CultureInfo.InvariantCulture);
     }
 
-    private static string Show(Rect rect)
+    private static string Show(UiLayoutRect rect)
     {
-        return "(" + Text(rect.x) + "," + Text(rect.y) + "," + Text(rect.width) + "," + Text(rect.height) + ")";
+        return "(" + Text(rect.X) + "," + Text(rect.Y) + "," + Text(rect.Width) + "," + Text(rect.Height) + ")";
     }
 
-    private static string Show(Vector2 point)
+    private static string Show(UiLayoutPoint point)
     {
-        return "(" + Text(point.x) + "," + Text(point.y) + ")";
+        return "(" + Text(point.X) + "," + Text(point.Y) + ")";
     }
 
     private static void Check(bool condition, string name)

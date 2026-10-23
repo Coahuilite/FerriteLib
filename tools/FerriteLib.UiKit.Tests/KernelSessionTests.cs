@@ -1,8 +1,8 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
-using Verse;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -46,18 +46,18 @@ internal static class KernelSessionTests
         using UiSession session1 = new();
         using UiSession session2 = new();
 
-        Rect anchor1 = new(10f, 20f, 100f, 30f);
+        UiLayoutRect anchor1 = new(10f, 20f, 100f, 30f);
         session1.OpenPopup("owner-a", anchor1);
 
         Check(session1.OpenPopupId == "owner-a", "session1 owns its popup id");
         Check(session1.OpenPopupAnchor.HasValue
-            && session1.OpenPopupAnchor.Value.x == 10f
-            && session1.OpenPopupAnchor.Value.y == 20f,
+            && session1.OpenPopupAnchor.Value.X == 10f
+            && session1.OpenPopupAnchor.Value.Y == 20f,
             "session1 stores the popup anchor");
         Check(session2.OpenPopupId == null && !session2.OpenPopupAnchor.HasValue,
             "session2 starts with no popup state");
 
-        session2.OpenPopup("owner-b", new Rect(1f, 2f, 3f, 4f));
+        session2.OpenPopup("owner-b", new UiLayoutRect(1f, 2f, 3f, 4f));
         Check(session1.IsPopupOpen("owner-a") && !session1.IsPopupOpen("owner-b"),
             "session1 popup is unaffected by session2");
         Check(session2.IsPopupOpen("owner-b") && !session2.IsPopupOpen("owner-a"),
@@ -71,7 +71,7 @@ internal static class KernelSessionTests
     private static void VerifyDisposeClearsPopupState()
     {
         UiSession session = new();
-        session.OpenPopup("owner", new Rect(0f, 0f, 50f, 20f));
+        session.OpenPopup("owner", new UiLayoutRect(0f, 0f, 50f, 20f));
         session.RegisterPopupDraw(() => { });
 
         Check(session.OpenPopupId == "owner", "popup is open before dispose");
@@ -89,12 +89,13 @@ internal static class KernelSessionTests
     private static void VerifyGuardLogsOncePerSessionAndClearsOnNewSession()
     {
         var messages = new List<string>();
-        UiSessionGuard.LogWarningOverride = messages.Add;
 
         using UiSession session1 = new();
+        session1.Warning=messages.Add;
+        UiWidgetContext firstContext=NativeFixture.Context(session1);
         Exception first = new InvalidOperationException("first boom");
         float fallback = UiSessionGuard.MeasureOrFallback(
-            session1,
+            firstContext,
             "slider",
             "input/stepper-slider",
             "root/slider",
@@ -105,9 +106,9 @@ internal static class KernelSessionTests
         Check(messages.Count == 1, "first failure logs once");
         // The guard keys a recovery slot on the node whose pass is running; called outside a tree that is
         // the session's own node, and the diagnostic still carries the consumer's element id.
-        Check(session1.IsTripped(session1.ActiveNode), "failure marks the session slot tripped");
+        Check(session1.IsTripped(firstContext.Node), "failure marks the explicitly named node slot tripped");
 
-        Check(session1.TryGetTripLog(session1.ActiveNode, out string diagnostic)
+        Check(session1.TryGetTripLog(firstContext.Node, out string diagnostic)
             && diagnostic.Contains("slider")
             && diagnostic.Contains("input/stepper-slider")
             && diagnostic.Contains("root/slider")
@@ -116,7 +117,7 @@ internal static class KernelSessionTests
             "trip log records element id, kind, path and full stack");
 
         UiSessionGuard.MeasureOrFallback(
-            session1,
+            firstContext,
             "slider",
             "input/stepper-slider",
             "root/slider",
@@ -125,8 +126,9 @@ internal static class KernelSessionTests
         Check(messages.Count == 1, "same session does not log the same component again");
 
         using UiSession session2 = new();
+        session2.Warning=messages.Add;
         UiSessionGuard.MeasureOrFallback(
-            session2,
+            NativeFixture.Context(session2),
             "slider",
             "input/stepper-slider",
             "root/slider",
@@ -139,29 +141,29 @@ internal static class KernelSessionTests
     {
         using UiSession session = new();
         Text.Font = GameFont.Medium;
-        GUI.color = new Color(1f, 0f, 0f, 1f);
+        GUI.color = VerseUiExecution.Colour(new UiColour(1f, 0f, 0f, 1f));
 
         GameFont seenFont = GameFont.Small;
-        Color seenColor = Color.white;
+        UiColour seenColor = UiColour.White;
         bool fallbackDrawn = false;
 
         UiSessionGuard.DrawOrFallback(
-            session,
+            NativeFixture.Context(session),
             "draw-control",
             "input/dropdown",
             "root/draw-control",
-            new Rect(0f, 0f, 10f, 10f),
+            new UiLayoutRect(0f, 0f, 10f, 10f),
             () => throw new InvalidOperationException("draw boom"),
             rect =>
             {
                 fallbackDrawn = true;
                 seenFont = Text.Font;
-                seenColor = GUI.color;
+                seenColor = VerseUiExecution.Colour(GUI.color);
             });
 
         Check(fallbackDrawn, "DrawOrFallback invokes the fallback");
         Check(seenFont == GameFont.Medium, "fallback sees the caller's Text.Font restored");
-        Check(seenColor.r == 1f && seenColor.g == 0f && seenColor.b == 0f,
+        Check(seenColor.Red == 1f && seenColor.Green == 0f && seenColor.Blue == 0f,
             "fallback sees the caller's GUI.color restored");
         Check(Text.Font == GameFont.Medium
             && GUI.color.r == 1f && GUI.color.g == 0f && GUI.color.b == 0f,
@@ -191,72 +193,74 @@ internal static class KernelSessionTests
 
     private static void VerifyHotControlOwnershipIsSessionScoped()
     {
-        UiNative.DebugMousePositionEnabled = true;
-        UiNative.DebugHotControl = 0;
+        NativeFixture.DebugMousePositionEnabled = true;
+        NativeFixture.DebugHotControl = 0;
         try
         {
             using UiSession session1 = new();
             using UiSession session2 = new();
 
-            session1.CaptureHotControl(111);
-            Check(UiNative.DebugHotControl == 111 && session1.OwnedHotControl == 111,
+            NativeFixture.Capture(session1,NativeFixture.Key(111));
+            Check(NativeFixture.HasHotControl(session1,NativeFixture.Key(111)) && session1.OwnedHotControl == NativeFixture.Key(111),
                 "capture records session ownership and takes the native slot");
 
-            session2.CaptureHotControl(222);
-            Check(UiNative.DebugHotControl == 222 && session2.OwnedHotControl == 222,
+            NativeFixture.Capture(session2,NativeFixture.Key(222));
+            int secondNative=GUIUtility.hotControl;
+            Check(NativeFixture.HasHotControl(session2,NativeFixture.Key(222)) && session2.OwnedHotControl == NativeFixture.Key(222),
                 "second session capture takes the native slot");
 
-            session1.ReleaseHotControl(222);
-            Check(UiNative.DebugHotControl == 222,
+            session1.ReleaseHotControl(NativeFixture.Key(222));
+            Check(NativeFixture.DebugHotControl == secondNative,
                 "session cannot release a hot control it does not own");
 
-            session1.ReleaseHotControl(111);
-            Check(UiNative.DebugHotControl == 222 && session1.OwnedHotControl == null,
+            session1.ReleaseHotControl(NativeFixture.Key(111));
+            Check(NativeFixture.DebugHotControl == secondNative && session1.OwnedHotControl == null,
                 "owning session ends its record without touching another session's native slot");
 
-            session2.ReleaseHotControl(111);
-            Check(UiNative.DebugHotControl == 222,
+            session2.ReleaseHotControl(NativeFixture.Key(111));
+            Check(NativeFixture.DebugHotControl == secondNative,
                 "session cannot release another session's ownership record");
 
-            session2.ReleaseHotControl(222);
-            Check(UiNative.DebugHotControl == 0 && session2.OwnedHotControl == null,
+            session2.ReleaseHotControl(NativeFixture.Key(222));
+            Check(NativeFixture.DebugHotControl == 0 && session2.OwnedHotControl == null,
                 "owning session releases its capture and clears its record");
         }
         finally
         {
-            UiNative.DebugMousePositionEnabled = false;
-            UiNative.DebugHotControl = 0;
+            NativeFixture.DebugMousePositionEnabled = false;
+            NativeFixture.DebugHotControl = 0;
         }
     }
 
     private static void VerifyDisposeReleasesOnlyOwnedCapture()
     {
-        UiNative.DebugMousePositionEnabled = true;
-        UiNative.DebugHotControl = 0;
+        NativeFixture.DebugMousePositionEnabled = true;
+        NativeFixture.DebugHotControl = 0;
         try
         {
             UiSession session1 = new();
             UiSession session2 = new();
 
-            session1.CaptureHotControl(111);
-            session2.CaptureHotControl(222);
+            NativeFixture.Capture(session1,NativeFixture.Key(111));
+            NativeFixture.Capture(session2,NativeFixture.Key(222));
+            int secondNative=GUIUtility.hotControl;
 
             session1.Dispose();
-            Check(UiNative.DebugHotControl == 222,
+            Check(NativeFixture.DebugHotControl == secondNative,
                 "disposing session1 does not release session2's native capture");
             Check(session1.OwnedHotControl == null && !session1.IsActive,
                 "disposing session1 clears its ownership record and deactivates it");
 
             session2.Dispose();
-            Check(UiNative.DebugHotControl == 0,
+            Check(NativeFixture.DebugHotControl == 0,
                 "disposing session2 releases its own native capture");
             Check(session2.OwnedHotControl == null && !session2.IsActive,
                 "disposing session2 clears its ownership record");
         }
         finally
         {
-            UiNative.DebugMousePositionEnabled = false;
-            UiNative.DebugHotControl = 0;
+            NativeFixture.DebugMousePositionEnabled = false;
+            NativeFixture.DebugHotControl = 0;
         }
     }
 
@@ -265,30 +269,22 @@ internal static class KernelSessionTests
         using UiSession session1 = new();
         using UiSession session2 = new();
 
-        Rect trigger = new(0f, 0f, 100f, 28f);
-        Rect row = new(0f, 28f, 100f, 24f);
-        UiNative.ButtonOverride = _ => true;
-
-        Check(UiNative.DropdownButton(trigger, "dropdown", session1), "dropdown trigger click opens popup");
-        Check(session1.IsPopupOpen("dropdown")
-            && session1.OpenPopupAnchor.HasValue
-            && session1.OpenPopupAnchor.Value.width == 100f,
-            "DropdownButton stores session-owned popup state");
-        Check(!session2.IsPopupOpen("dropdown"), "other session is not affected by dropdown open");
-
-        Check(UiNative.DropdownOptionRow(row, "dropdown", session1),
-            "open popup row hit-test succeeds");
-        Check(!UiNative.DropdownOptionRow(row, "dropdown", session2),
-            "popup row hit-test is session-scoped");
-
-        Check(UiNative.DropdownButton(trigger, "dropdown", session1), "dropdown trigger click closes popup");
-        Check(!session1.IsPopupOpen("dropdown"), "same trigger click closes the session popup");
-
-        UiNative.ButtonOverride = null;
-        Check(!UiNative.DropdownButton(trigger, "dropdown", session1),
-            "no native button hit does not open the popup");
+        UiLayoutRect trigger = new(0f, 0f, 100f, 28f);
+        UiLayoutRect row = new(0f, 28f, 100f, 24f);
+        UiWidgetContext first=NativeFixture.Context(session1),second=NativeFixture.Context(session2);
+        void EventAt(EventType phase,float y){Event.current=new Event{type=phase,button=0,mousePosition=new Vector2(10,y)};}
+        bool Trigger(){EventAt(EventType.MouseDown,10);NativeFixture.DropdownButton(trigger,"dropdown",first);EventAt(EventType.MouseUp,10);return NativeFixture.DropdownButton(trigger,"dropdown",first);}
+        Check(Trigger(),"real qualified trigger release opens popup");
+        Check(session1.IsPopupOpen("dropdown")&&session1.OpenPopupAnchor!.Value.Width==100,"trigger stores session-owned popup state");
+        Check(!session2.IsPopupOpen("dropdown"),"other session is unaffected");
+        EventAt(EventType.MouseDown,35);var pressed=NativeFixture.PopupOption(row,"dropdown",first,"row");
+        var other=NativeFixture.PopupOption(row,"dropdown",second,"row");
+        EventAt(EventType.MouseUp,35);var selected=NativeFixture.PopupOption(row,"dropdown",first,"row");
+        Check(pressed.Captured&&selected.Request&&!other.Captured&&!other.Request,"popup row uses actual qualified release and refuses the other session");
+        Check(Trigger()&&!session1.IsPopupOpen("dropdown"),"same trigger click closes only the owning session popup");
+        EventAt(EventType.Repaint,10);
+        Check(!NativeFixture.DropdownButton(trigger,"dropdown",first),"paint alone does not open popup");
     }
-
 
     // ---- P3: the session-owned hover-claim machine ----------------------------------------
     // These pin the two rules the consumer had to hand-roll, and the one distinction that is easy
@@ -376,10 +372,10 @@ internal static class KernelSessionTests
     }
     private static void ResetStaticTestSeams()
     {
-        UiSessionGuard.LogWarningOverride = null;
-        UiNative.ButtonOverride = null;
+
+        NativeFixture.ButtonOverride = null;
         Text.Font = GameFont.Small;
-        GUI.color = Color.white;
+        GUI.color = VerseUiExecution.Colour(UiColour.White);
     }
 
     private static void Check(bool condition, string name)

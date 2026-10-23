@@ -1,9 +1,10 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections;
 using System.Reflection;
 
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
@@ -34,10 +35,10 @@ internal static class KernelWritabilityTests
 
     private static void VerifyInterfacePublishesTheRead()
     {
-        MethodInfo? member = typeof(IUiBindings).GetMethod("IsWritable");
+        MethodInfo? member = typeof(IUiBindingReader).GetMethod("IsWritable");
         Check(
             member != null && member.ReturnType == typeof(bool),
-            "IUiBindings exposes a bool IsWritable(string) read (the breaking interface addition)");
+            "IUiBindingReader exposes a bool IsWritable(string) read (the breaking interface addition)");
         Check(typeof(UiBindings).GetMethod("IsWritable") != null, "the reference implementation carries it");
     }
 
@@ -103,12 +104,12 @@ internal static class KernelWritabilityTests
         // The producer this task owes: an authored tone plus a read-only binding resolves to Disabled.
         ClearRecordedBoxes();
         UiThemeDraw.StatusTreatment(
-            new Rect(0f, 0f, 60f, 20f), theme, UiStatusTone.Active, writable: bindings.IsWritable("published"));
+NativeFixture.Paint,            new UiLayoutRect(0f, 0f, 60f, 20f), theme, UiStatusTone.Active, writable: bindings.IsWritable("published"));
         CheckPaint(0, theme[UiPaletteRole.WindowSurface], theme[UiPaletteRole.Divider], "a read-only binding paints the disabled plane whatever tone was authored");
 
         ClearRecordedBoxes();
         UiThemeDraw.StatusTreatment(
-            new Rect(0f, 0f, 60f, 20f), theme, UiStatusTone.Active, writable: bindings.IsWritable("editable"));
+NativeFixture.Paint,            new UiLayoutRect(0f, 0f, 60f, 20f), theme, UiStatusTone.Active, writable: bindings.IsWritable("editable"));
         CheckPaint(0, theme[UiPaletteRole.SelectedSurface], theme[UiPaletteRole.Accent], "a writable binding keeps the authored tone");
 
         Check(
@@ -117,7 +118,7 @@ internal static class KernelWritabilityTests
 
         ClearRecordedBoxes();
         UiThemeDraw.StatusBadge(
-            new Rect(0f, 0f, 60f, 20f), "value", theme, UiStatusTone.Danger, null, writable: bindings.IsWritable("published"));
+NativeFixture.Paint,            new UiLayoutRect(0f, 0f, 60f, 20f), "value", theme, UiStatusTone.Danger, null, writable: bindings.IsWritable("published"));
         CheckPaint(0, theme[UiPaletteRole.WindowSurface], theme[UiPaletteRole.Divider], "the badge plane follows the same rule");
         CheckLastLabel(theme[UiPaletteRole.DisabledForeground], "and the badge writes the disabled text colour");
     }
@@ -127,11 +128,11 @@ internal static class KernelWritabilityTests
         UiTheme theme = UiTheme.Vanilla;
 
         ClearRecordedBoxes();
-        UiThemeDraw.StatusTreatment(new Rect(0f, 0f, 60f, 20f), theme, UiStatusTone.Danger);
+        UiThemeDraw.StatusTreatment(NativeFixture.Paint,new UiLayoutRect(0f, 0f, 60f, 20f), theme, UiStatusTone.Danger);
         CheckPaint(0, theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerSurface], "no writability argument means the tone decides alone");
 
         ClearRecordedBoxes();
-        UiThemeDraw.StatusBadge(new Rect(0f, 0f, 60f, 20f), "value", theme, UiStatusTone.Danger);
+        UiThemeDraw.StatusBadge(NativeFixture.Paint,new UiLayoutRect(0f, 0f, 60f, 20f), "value", theme, UiStatusTone.Danger);
         CheckPaint(0, theme[UiPaletteRole.DangerSurface], theme[UiPaletteRole.DangerSurface], "and the same holds for the badge");
     }
 
@@ -139,7 +140,7 @@ internal static class KernelWritabilityTests
     /// Asserts the five solids one painted surface emits — the fill plus four edges — start at
     /// <paramref name="offset"/> in the recorder.
     /// </summary>
-    private static void CheckPaint(int offset, Color fill, Color border, string name)
+    private static void CheckPaint(int offset, UiColour fill, UiColour border, string name)
     {
         IList colors = RecordedBoxColors();
         if (colors.Count < offset + 5)
@@ -150,18 +151,18 @@ internal static class KernelWritabilityTests
             return;
         }
 
-        Check(SameColor((Color)colors[offset], fill), name + " (fill)");
+        Check(SameColor(NativeFixture.Record<UiColour>(colors[offset]), fill), name + " (fill)");
 
         bool edgesMatch = true;
         for (int i = 1; i < 5; i++)
         {
-            edgesMatch &= SameColor((Color)colors[offset + i], border);
+            edgesMatch &= SameColor(NativeFixture.Record<UiColour>(colors[offset + i]), border);
         }
 
         Check(edgesMatch, name + " (border)");
     }
 
-    private static void CheckLastLabel(Color expected, string name)
+    private static void CheckLastLabel(UiColour expected, string name)
     {
         IList colors = RecordedLabelColors();
         if (colors.Count == 0)
@@ -171,7 +172,7 @@ internal static class KernelWritabilityTests
             return;
         }
 
-        Color actual = (Color)colors[colors.Count - 1];
+        UiColour actual = NativeFixture.Record<UiColour>(colors[colors.Count - 1]);
         Check(SameColor(actual, expected), name + " (expected " + Describe(expected) + ", got " + Describe(actual) + ")");
     }
 
@@ -199,9 +200,9 @@ internal static class KernelWritabilityTests
         return (IList)colors.GetValue(null)!;
     }
 
-    private static bool SameColor(Color left, Color right)
+    private static bool SameColor(UiColour left, UiColour right)
     {
-        return Near(left.r, right.r) && Near(left.g, right.g) && Near(left.b, right.b) && Near(left.a, right.a);
+        return Near(left.Red, right.Red) && Near(left.Green, right.Green) && Near(left.Blue, right.Blue) && Near(left.Alpha, right.Alpha);
     }
 
     private static bool Near(float expected, float actual)
@@ -209,9 +210,9 @@ internal static class KernelWritabilityTests
         return Math.Abs(expected - actual) <= 0.0001f;
     }
 
-    private static string Describe(Color color)
+    private static string Describe(UiColour color)
     {
-        return "(" + color.r + ", " + color.g + ", " + color.b + ", " + color.a + ")";
+        return "(" + color.Red + ", " + color.Green + ", " + color.Blue + ", " + color.Alpha + ")";
     }
 
     private static void Check(bool condition, string name)

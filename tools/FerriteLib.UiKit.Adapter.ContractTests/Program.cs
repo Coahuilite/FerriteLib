@@ -59,16 +59,39 @@ static class Program
             Check(lower==0&&upper==1,"real Host hit ordering uses the offset changed by BeginScrollView in this same call");
             Field(typeof(NativeWidgets),"ScrollOffsetOverride").SetValue(null,null);
         }
+        StandaloneNative();
+        FerriteLib.UiKit.Tests.KernelNativeEventConsumptionTests.Run(Check);
         Check(FerriteLib.UiKit.Tests.KernelCloseoutEditingTests.RunAll()==0,"unchanged closeout E/N/composite/readback counterexamples migrate through actual 1.6 execution");
         int readonlyChecks=0;
         FerriteLib.UiKit.AuthorExamples.ReadOnlyOutputs.Verify(new Metrics(),new Translation(),(value,label)=>{Check(value,"READONLY "+label);readonlyChecks++;});
         Check(readonlyChecks==92,"all original 92 public-only readonly-view counterexamples execute on the changed product");
         Console.WriteLine("ADAPTER PASS "+checks+" protocol assertions; native font/IME/window acceptance remains pending human playtest");
     }
+    static void StandaloneNative()
+    {
+        GUI.FocusControl(null);GUIUtility.hotControl=0;
+        float model=10;int writes=0;bool failRead=false;
+        var author=new FerriteLib.UiKit.AuthorExamples.StandaloneNativeNumber(new Metrics(),new Translation(),()=>failRead?throw new Exception("display-fault"):model,v=>{model=v;writes++;failRead=true;});
+        var rect=new UiLayoutRect(0,0,200,30);
+        int calls=(int)Field(typeof(NativeWidgets),"TextControlCalls").GetValue(null)!;
+        Field(typeof(NativeWidgets),"TextControlOverride").SetValue(null,new Func<Rect,string,string>((r,t)=>"23"));
+        Event.current=new Event{type=EventType.MouseDown,button=0,mousePosition=new Vector2(20,10)};
+        author.OnGUI(rect);
+        Check(author.Editor.Draft=="23"&&author.Editor.Focused&&model==10&&writes==0&&(int)Field(typeof(NativeWidgets),"TextControlCalls").GetValue(null)! == calls+1,"external no-friend independent native author uses public session scope and the actual synchronous deferred editor");
+        Field(typeof(NativeWidgets),"TextControlOverride").SetValue(null,null);
+        Event.current=new Event{type=EventType.KeyDown,keyCode=KeyCode.Return};
+        bool failed=false;try{author.OnGUI(rect);}catch(Exception e){failed=e.Message=="display-fault";}
+        Check(failed&&model==23&&writes==1,"standalone native scope commits once before display read failure");
+        failRead=false;Event.current=new Event{type=EventType.Repaint};author.OnGUI(rect);
+        Check(writes==1&&author.Editor.Draft=="23","standalone native repaint reads recovered actual model without replay");
+        Event.current=new Event{type=EventType.MouseDown,button=0,mousePosition=new Vector2(20,10)};
+        Field(typeof(NativeWidgets),"TextControlDuring").SetValue(null,new Action(()=>{GUI.color=Color.white;Text.Font=GameFont.Tiny;throw new Exception("standalone-native-fault");}));
+        GUI.color=new Color(.2f,.3f,.4f,1);Text.Font=GameFont.Medium;
+        failed=false;try{author.OnGUI(rect);}catch(Exception e){failed=e.Message=="standalone-native-fault";}
+        Check(failed&&GUI.color.r==.2f&&Text.Font==GameFont.Medium&&author.Editor.Focused,"standalone real native failure restores temporary GUI state without rolling back valid focus");
+        Field(typeof(NativeWidgets),"TextControlDuring").SetValue(null,null);
+        author.Dispose();bool stale=false;try{_ = author.Editor;}catch(ObjectDisposedException){stale=true;}
+        Check(stale&&GUI.GetNameOfFocusedControl()=="","standalone scope disposal releases native focus and rejects stale owner handle");
+    }
+
 }
-
-
-
-
-
-

@@ -68,9 +68,9 @@ internal sealed class InventoryPageExample : IDisposable
     {
         if (!registered.Add(key)) return;
         // Resolve the current target by stable business identity, not a captured mutable item reference.
-        Bindings.BindTracked("items." + key + ".caption", () => { InventoryItem? item = Find(key); return item == null ? "" : item.Key + ": " + item.Count; });
-        Bindings.BindTracked("items." + key + ".count", () => (float)(Find(key)?.Count ?? 0), value => { InventoryItem? item = Find(key); if (item != null) item.Count = (int)value; }, (a, b) => a == b);
-        Bindings.BindCommand("items." + key + ".increment", () => { Requests++; InventoryItem? item = Find(key); if (item != null) item.Count++; });
+        Bindings.BindTracked(new UiBindingAddress("items",key,"caption").Key, () => { InventoryItem? item = Find(key); return item == null ? "" : item.Key + ": " + item.Count; });
+        Bindings.BindTracked(new UiBindingAddress("items",key,"count").Key, () => (float)(Find(key)?.Count ?? 0), value => { InventoryItem? item = Find(key); if (item != null) item.Count = (int)value; }, (a, b) => a == b);
+        Bindings.BindCommand(new UiBindingAddress("items",key,"increment").Key, () => { Requests++; InventoryItem? item = Find(key); if (item != null) item.Count++; });
     }
     public void Dispose() => BusinessOwner.Dispose();
 }

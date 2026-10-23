@@ -11,15 +11,35 @@ namespace FerriteLib.UiKit.Kernel;
 public sealed class UiSession : IDisposable
 {
     public UiControls Controls { get; }
+    /// <summary>
+    /// Creates an explicit control scope owned by this session, without a page, registry or Host.
+    /// Keep the session for the control lifetime and use Child(name) for separate control identities.
+    /// At each native callback capture one frame on the execution owner and call SetFrame once before
+    /// operating controls. Context creation itself needs neither native execution nor reactive bindings.
+    /// Dispose the session before disposing its execution owner.
+    /// </summary>
+    public UiWidgetContext CreateContext(string source, string scope, ITextMetrics metrics, UiTheme theme,
+        IUiTranslation translation, IUiBindingReader bindings, float viewWidth)
+    {
+        if (!IsActive) throw new ObjectDisposedException(nameof(UiSession));
+        UiNode node = GetOrCreateSubNode(Root, scope);
+        return new UiWidgetContext(source, this, metrics, theme, translation, bindings, viewWidth, node.Path, node: node);
+    }
     public Action<string>? Warning { get; set; }
     internal void ReportWarning(string message){if(Warning!=null)Warning(message);else if(execution!=null)execution.Warning(message);else System.Diagnostics.Trace.TraceWarning(message);}
     public UiFrame Input { get; private set; } = new UiFrame(UiFramePhase.None, inputAllowed:false);
     private IUiExecution? execution;
+    internal IUiExecution? CurrentExecution => execution;
     public IUiExecution Execution => execution ?? throw new InvalidOperationException("Drawing or native input requires an explicit execution scope.");
     public IUiDrawing Drawing => Execution;
     public void SetFrame(UiFrame frame, IUiExecution execution)
     {
         if (!IsActive) throw new ObjectDisposedException(nameof(UiSession));
+        if(frame==null)throw new ArgumentNullException(nameof(frame));
+        // Capture this once at the actual owner callback boundary, before an earlier control consumes
+        // the shared frame. Independent C# editing uses the same fact without a Host/hit-pass prerequisite.
+        if(!ReferenceEquals(Input,frame))
+            passBeganWithPrimaryPress=frame.Phase==UiFramePhase.MouseDown&&frame.Button==0;
         Input = frame ?? throw new ArgumentNullException(nameof(frame));
         this.execution = execution ?? throw new ArgumentNullException(nameof(execution));
         PointerInputAllowed = frame.InputAllowed;
@@ -257,13 +277,6 @@ public sealed class UiSession : IDisposable
         hitPassOpen = true;
         popupOwnerDrawn = false;
         captureOwnerDrawn = false;
-
-        // Recorded before any element draws: whether THIS pass is a primary-button press at all. A field needs
-        // that fact to end an edit on a click outside it, but by the time the field draws, a control drawn
-        // EARLIER in the same pass may already have consumed the event, and IMGUI leaves nothing in the type to
-        // tell "a press that was taken" from "a frame with no press". Reading it at the pass boundary is the
-        // only moment that cannot depend on draw order (§3.4: an outside click ends the edit, whoever ate it).
-        passBeganWithPrimaryPress = Controls.IsPointerDown();
 
         CurrentClip = hostViewport.Width > 0f && hostViewport.Height > 0f ? hostViewport : (UiLayoutRect?)null;
         contentInputLayers.Clear();
