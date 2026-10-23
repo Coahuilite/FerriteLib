@@ -109,7 +109,7 @@ public sealed partial class UiStyleDocument
 
     private readonly Dictionary<string, SchemeDefinition> schemes;
     private readonly Dictionary<string, DensityDefinition> densities;
-    private readonly List<UiStyleIssue> issues;
+    private readonly IReadOnlyList<UiStyleIssue> issues;
 
     private UiStyleDocument(
         string? defaultScheme,
@@ -122,7 +122,7 @@ public sealed partial class UiStyleDocument
         DefaultDensity = defaultDensity;
         this.schemes = schemes;
         this.densities = densities;
-        this.issues = issues;
+        this.issues = issues.AsReadOnly();
     }
 
     /// <summary>Page-level scheme every scope starts from, or null when the document declares none.</summary>

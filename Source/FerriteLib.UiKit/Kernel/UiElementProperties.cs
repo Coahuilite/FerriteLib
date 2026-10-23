@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 
 namespace FerriteLib.UiKit.Kernel;
@@ -14,6 +15,8 @@ public sealed class UiElementProperties
         LocalFont = new UiPropertyDeclaration<UiFont>(changed);
         Density = new UiPropertyDeclaration<UiDensity>(changed);
         LocalDensity = new UiPropertyDeclaration<UiDensity>(changed);
+        resolvedColoursView = new ReadOnlyDictionary<string, UiResolvedProperty<UiColour?>>(resolvedColours);
+        resolvedMetricsView = new ReadOnlyDictionary<string, UiResolvedProperty<float>>(resolvedMetrics);
     }
 
     public UiPropertyDeclaration<UiFont> Font { get; }
@@ -36,9 +39,11 @@ public sealed class UiElementProperties
     private readonly Dictionary<string, UiPropertyDeclaration<UiColour?>> localColours = new(StringComparer.Ordinal);
     private readonly Dictionary<string, UiResolvedProperty<UiColour?>> resolvedColours = new(StringComparer.Ordinal);
     private readonly Dictionary<string, UiResolvedProperty<float>> resolvedMetrics = new(StringComparer.Ordinal);
+    private readonly IReadOnlyDictionary<string, UiResolvedProperty<UiColour?>> resolvedColoursView;
+    private readonly IReadOnlyDictionary<string, UiResolvedProperty<float>> resolvedMetricsView;
     public IReadOnlyList<string> ColourNames => Array.AsReadOnly(UiAppearanceProperties.Colours);
-    public IReadOnlyDictionary<string, UiResolvedProperty<UiColour?>> ResolvedColours => resolvedColours;
-    public IReadOnlyDictionary<string, UiResolvedProperty<float>> ResolvedMetrics => resolvedMetrics;
+    public IReadOnlyDictionary<string, UiResolvedProperty<UiColour?>> ResolvedColours => resolvedColoursView;
+    public IReadOnlyDictionary<string, UiResolvedProperty<float>> ResolvedMetrics => resolvedMetricsView;
     public UiPropertyDeclaration<UiColour?> Palette(UiPaletteRole role) => ColourDeclaration(colours, role.ToString());
     public UiPropertyDeclaration<UiColour?> LocalPalette(UiPaletteRole role) => ColourDeclaration(localColours, role.ToString());
 

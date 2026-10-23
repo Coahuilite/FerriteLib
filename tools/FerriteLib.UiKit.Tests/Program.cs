@@ -17,6 +17,10 @@ internal static class Program
     {
         if (args.Length == 2 && args[0] == "--write-stable-surface")
         { FerriteLibApiTierTests.WriteStableSurface(args[1]); return 0; }
+        if (args.Length == 1 && args[0] == "--readonly-outputs")
+            return RunReadOnlyOutputs();
+        if (args.Length == 1 && args[0] == "--readonly-api")
+            return RunApiContract();
         if (args.Length == 1 && args[0] == "--closeout-editing")
             return RunEditing();
         if (args.Length == 1 && args[0] == "--closeout-appearance")
@@ -50,7 +54,9 @@ internal static class Program
     private static int RunEditing() => KernelSharedEditingTests.RunAll() + KernelCloseoutEditingTests.RunAll();
     private static int RunAppearance() => KernelPaletteTests.RunAll() + KernelStyleScopeTests.RunAll() + KernelCloseoutAppearanceTests.RunAll();
     private static int RunItems() => KernelItemBindingTests.RunAll();
-    private static int RunApi() => FerriteLibApiTierTests.RunAll() + KernelContainmentTests.RunAll() + KernelPublicAuthorTests.RunAll();
+    private static int RunApiContract() => FerriteLibApiTierTests.RunAll() + KernelContainmentTests.RunAll();
+    private static int RunApi() => RunApiContract() + KernelPublicAuthorTests.RunAll();
+    private static int RunReadOnlyOutputs() => KernelReadOnlyOutputTests.RunAll();
     private static int RunInventory() => KernelCloseoutInventoryTests.RunAll();
 
     private static void RunAll()
@@ -65,6 +71,7 @@ internal static class Program
         failures += KernelSharedBehaviorTests.RunAll();
         failures += RunEditing();
         failures += RunAppearance();
+        failures += RunReadOnlyOutputs();
         failures += RunItems();
         failures += RunInventory();
         failures += KernelSharedChartTests.RunAll();

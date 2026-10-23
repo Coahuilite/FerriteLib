@@ -62,6 +62,7 @@ public sealed class UiStyleResolver
     private readonly UiStyleDocument document;
     private readonly Dictionary<string, UiTheme> regionThemes = new(StringComparer.Ordinal);
     private readonly List<UiStyleIssue> issues = new();
+    private readonly IReadOnlyList<UiStyleIssue> issuesView;
 
     // The baseline's paint-side revision as this resolver last saw it. It exists because a cached clone
     // holds values, not a reference: a palette change on the injected theme has to drop the clones or every
@@ -77,6 +78,7 @@ public sealed class UiStyleResolver
     {
         this.baseline = baseline ?? throw new ArgumentNullException(nameof(baseline));
         this.document = document ?? throw new ArgumentNullException(nameof(document));
+        issuesView = issues.AsReadOnly();
         observedBaselineRevision = this.baseline.LayoutRevision;
         observedPropertyRevision = this.baseline.PropertyRevision;
         observedBaselineColourRevision = this.baseline.ColourRevision;
@@ -92,7 +94,7 @@ public sealed class UiStyleResolver
     /// Resolution-time drops, in the order they happened. Parse-time drops are on
     /// <see cref="UiStyleDocument.Issues"/>; neither list is ever allowed to stay silent about a fallback.
     /// </summary>
-    public IReadOnlyList<UiStyleIssue> Issues => issues;
+    public IReadOnlyList<UiStyleIssue> Issues => issuesView;
 
     /// <summary>How many distinct region themes have been built (bounded by <see cref="MaxScopes"/>).</summary>
     public int ScopeCount => regionThemes.Count;

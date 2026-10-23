@@ -79,6 +79,14 @@ remain closer sources than the supplied host theme.
 individual metrics can come from different sources, in which case ResolvedDensity reports Mixed and
 the metric facts carry the details. Named-source facts identify Scheme/Density; ancestor facts identify
 the actual node. Equal-valued explicit declarations retain their source/following intent.
+
+The resolved dictionaries are cached read-only views, not the writable resolver stores. Holding a view
+continues to observe normal resolution updates, including override removal. Generic and nongeneric
+dictionary writes through a cast are refused. Write intent through declaration entries, not resolved
+facts. Layout snapshot collections and document/resolver style issues likewise expose only reads;
+snapshot constructor sources retain their existing read-through/comparer behavior, and a held resolver
+issue view continues to see later resolution drops.
+
 Colours affect paint and do not dirty measurement. Font/density changes dirty measurement. Draw resolves
 paint from current declarations even when the layout snapshot remains cached. Each unassigned role reads its own immutable default; shared default values do not imply coupled overrides.
 

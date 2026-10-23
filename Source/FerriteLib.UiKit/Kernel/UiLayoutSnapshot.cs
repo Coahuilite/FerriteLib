@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -44,24 +45,44 @@ public sealed class UiLayoutSnapshot
     }
 
     public UiLayoutSnapshot(Vector2 contentSize, IReadOnlyDictionary<string, Rect> rectById, IReadOnlyList<string> visibleIds, IReadOnlyDictionary<string, Rect> viewports, IReadOnlyDictionary<string, Rect> scrollContents, int definitionRevision)
+        : this(contentSize, rectById, visibleIds, viewports, scrollContents, definitionRevision, System.Array.Empty<UiLayoutDiagnostic>())
     {
-        ContentSize = contentSize;
-        RectById = rectById;
-        VisibleIds = visibleIds;
-        Viewports = viewports;
-        ScrollContents = scrollContents;
-        DefinitionRevision = definitionRevision;
-        Diagnostics = System.Array.Empty<UiLayoutDiagnostic>();
     }
 
     public UiLayoutSnapshot(Vector2 contentSize, IReadOnlyDictionary<string, Rect> rectById, IReadOnlyList<string> visibleIds, IReadOnlyDictionary<string, Rect> viewports, IReadOnlyDictionary<string, Rect> scrollContents, int definitionRevision, IReadOnlyList<UiLayoutDiagnostic> diagnostics)
     {
-        Diagnostics = diagnostics;
+        Diagnostics = new ListView<UiLayoutDiagnostic>(diagnostics);
         ContentSize = contentSize;
-        RectById = rectById;
-        VisibleIds = visibleIds;
-        Viewports = viewports;
-        ScrollContents = scrollContents;
+        RectById = new RectView(rectById);
+        VisibleIds = new ListView<string>(visibleIds);
+        Viewports = new RectView(viewports);
+        ScrollContents = new RectView(scrollContents);
         DefinitionRevision = definitionRevision;
+    }
+
+    // Accept every existing IReadOnly* source without copying, changing its comparer or exposing
+    // mutable interfaces. The producer still owns updates; the published outlet grants reads only.
+    private sealed class RectView : IReadOnlyDictionary<string, Rect>
+    {
+        private readonly IReadOnlyDictionary<string, Rect> source;
+        internal RectView(IReadOnlyDictionary<string, Rect> source) => this.source = source;
+        public Rect this[string key] => source[key];
+        public IEnumerable<string> Keys => source.Keys;
+        public IEnumerable<Rect> Values => source.Values;
+        public int Count => source.Count;
+        public bool ContainsKey(string key) => source.ContainsKey(key);
+        public bool TryGetValue(string key, out Rect value) => source.TryGetValue(key, out value);
+        public IEnumerator<KeyValuePair<string, Rect>> GetEnumerator() => source.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    private sealed class ListView<T> : IReadOnlyList<T>
+    {
+        private readonly IReadOnlyList<T> source;
+        internal ListView(IReadOnlyList<T> source) => this.source = source;
+        public T this[int index] => source[index];
+        public int Count => source.Count;
+        public IEnumerator<T> GetEnumerator() => source.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

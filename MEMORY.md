@@ -16,6 +16,8 @@ The complete 18-use/nine-container/non-kind inventory remains only in `migration
 `docs/api-tiers.md`, `public-contract.md` and `stable-api.txt` define the supported complete author paths,
 required signature dependencies and explicit advanced-member exceptions. Session/Node are not blanket
 promoted; graphs, queues, caches, default private implementations and routing tables stay internal.
+Resolved-property views and adjacent snapshot/style read outlets are protected without changing their
+signatures or read/update semantics; the exact boundary is in `property-contract.md`.
 The separate AuthorExamples assembly has no internals grant. Public compatibility protects source, DLL,
 XML, meaning and legal conditions in the same adapter target; deprecation retains two complete subsequent
 published minors (0.9 → retain0.10/0.11 → earliest removal0.12), without a 1.x shortcut.
