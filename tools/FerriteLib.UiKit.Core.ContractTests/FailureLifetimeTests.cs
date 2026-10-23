@@ -75,4 +75,3 @@ internal static class FailureLifetimeTests
         Console.WriteLine("RU3-FACT branch-runs="+runs+" first-runs="+initialRuns+" explicit-runs="+retryRuns+" cycle-runs="+cycleRuns+" callback-runs="+callbacks+" finite-runs="+finiteRuns+" feedback-writes="+writes+" many="+many+" stopped="+(zero.Fault??one.Fault)!.StoppedScope+" recovery="+(zero.Fault??one.Fault)!.Recovery);
     }
 }
-

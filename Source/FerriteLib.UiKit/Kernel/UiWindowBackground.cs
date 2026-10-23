@@ -14,4 +14,3 @@ public sealed class UiWindowBackground
     public string Bind { get; }
     public UiImageOptions Options { get; }
 }
-

@@ -75,8 +75,7 @@ internal static class AtomVocabulary
     /// <summary>Declared number, or <paramref name="fallback"/> when absent or malformed.</summary>
     internal static float ReadFloat(UiElementSpec spec, string name, float fallback)
     {
-        return spec.TryGetAttribute(name, out string raw)
-            && float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float value)
+        return spec.TryGetNumber(name, out float value)
             ? value
             : fallback;
     }
@@ -84,10 +83,7 @@ internal static class AtomVocabulary
     /// <summary>Declared boolean ("true"/"1"), or <paramref name="fallback"/> when absent.</summary>
     internal static bool ReadBool(UiElementSpec spec, string name, bool fallback)
     {
-        if (!spec.TryGetAttribute(name, out string raw)) return fallback;
-        string value = raw.Trim();
-        return string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(value, "1", StringComparison.Ordinal);
+        return spec.TryGetBoolean(name,out bool value)?value:fallback;
     }
 
     /// <summary>The kind's own band height, or <paramref name="fallback"/> when none is declared.</summary>
@@ -344,5 +340,3 @@ internal static class AtomVocabulary
         UiFitAudit.ReportStyleFallback(ctx.ElementPath, spec.Kind, attribute, authored, resolved);
     }
 }
-
-

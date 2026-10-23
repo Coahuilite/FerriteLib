@@ -107,7 +107,7 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
 
     internal static void Register()
     {
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new CheckboxWidget(),
@@ -116,7 +116,7 @@ internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPoin
                 "Bind", "ActionBind", "Label", "LabelKey", "Height", UiAppearanceResolver.Attribute),
             new[] { "Label", "LabelKey" },
             NaturalBodyWidth,
-            Looks);
+            Looks));
     }
 
     public void Configure(UiElementSpec spec)
@@ -443,6 +443,3 @@ drawing,                new UiLayoutRect(box.X + inset, box.Y + inset, Math.Max(
         return AtomVocabulary.ReadBindKey(spec);
     }
 }
-
-
-

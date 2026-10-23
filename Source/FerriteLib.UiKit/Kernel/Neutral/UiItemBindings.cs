@@ -127,6 +127,3 @@ public sealed class UiItemBindings<T> : IDisposable where T : class
         }
     }
 }
-
-
-

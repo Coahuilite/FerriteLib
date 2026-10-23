@@ -72,5 +72,3 @@ public sealed class UiReloadPolicy
     /// </summary>
     public double MaxDeferSeconds { get; }
 }
-
-

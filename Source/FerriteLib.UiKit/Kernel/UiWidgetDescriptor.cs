@@ -91,5 +91,3 @@ public readonly struct UiWidgetDescriptor
         return Scope + "/" + Kind;
     }
 }
-
-

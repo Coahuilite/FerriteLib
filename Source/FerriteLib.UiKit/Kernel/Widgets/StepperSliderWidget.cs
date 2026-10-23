@@ -32,12 +32,12 @@ internal sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IU
 
     public static void Register()
     {
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new StepperSliderWidget(),
             new[] { "Id", "Kind", "Bind", "Min", "Max", "Step", "Format", "Live", "ButtonWidth", "FieldWidth", "Height", "Label", "LabelKey", "Tab", "Hidden" },
-            new[] { "Label", "LabelKey" });
+            new[] { "Label", "LabelKey" }));
     }
 
     public void Configure(UiElementSpec spec)
@@ -135,12 +135,8 @@ internal sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IU
             ctx.Controls.Edit(fieldRect, ctx, bindKey, ReadModel(), numeric.Format, numeric.Parse, live, false, Set, ReadModel);
         if (!ctx.Session.IsActive)
             return;
-        UiValueState state = ctx.Session.GetOrCreateValueState(ctx.Node.Id, bindKey);
-        state.EditText = editor.Draft;
-        state.Focused = editor.Focused;
+        UiControlState state = ctx.Session.GetControlState(ctx.Node.Id, bindKey);
         if (!editor.Focused) ctx.Controls.SuspendEditor(ctx, bindKey);
-        if (numeric.Parse(editor.Draft, out float parsed))
-            state.FloatValue = parsed;
         // Only presentation follows established requests; a label failure cannot swallow an operation.
         if (label.Length > 0)
         {
@@ -249,5 +245,3 @@ internal sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IU
             || string.Equals(raw, "1", StringComparison.Ordinal);
     }
 }
-
-

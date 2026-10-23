@@ -14,7 +14,6 @@ public sealed partial class UiControls
     public UiInteractionResult Activation(UiLayoutRect rect, UiWidgetContext ctx, string binding = "activation") => Activation(rect, ctx, binding, "", null, true);
     public UiInteractionResult Activation(UiLayoutRect rect, UiWidgetContext ctx, string binding, string part, object? itemKey = null, bool writable = true)
     {
-
         return PointerInteraction(rect, ctx.Session, ctx.Node, InteractionTarget(ctx, binding, part, itemKey), CanReceivePointerPress(rect, ctx), !IsInputDisabled(ctx.Node) && writable, false, default, 0, ctx);
     }
 
@@ -27,15 +26,15 @@ public sealed partial class UiControls
     {
         UiNode node = ctx.Node;
         var geometry = new UiHitGeometry(hit.X, hit.Y, hit.Width, hit.Height, plot.X, plot.Width, plot.Y, plot.Height, true);
-        return PointerInteraction(hit, ctx.Session, node, InteractionTarget(ctx, binding, "chart-point", key),
-            CanReceivePointer(ctx), !IsInputDisabled(node) && writable, false, default, x, ctx, true, y, geometry);
+        return PointerInteraction(hit, ctx.Session, node, InteractionTarget(ctx, binding, "chart-point", key), CanReceivePointer(ctx), !IsInputDisabled(node) && writable, false, default, x, ctx, true, y, geometry);
     }
 
     internal void EndPointCapture(UiWidgetContext ctx, UiInteractionEnd reason)
     {
         UiNode node = ctx.Node;
         UiInteractionTarget? owner = ctx.Session.Interactions.CaptureOwner;
-        if (owner?.Node != node.Id.Key || owner?.Part != "chart-point") return;
+        if (owner?.Node != node.Id.Key || owner?.Part != "chart-point")
+            return;
         ctx.Session.Interactions.End(reason);
         bool ownNative = ReferenceEquals(ctx.Session.OwnedHotControlOwner, node) || (node.Id.IsNone && ctx.Session.OwnedHotControlOwner == null);
         if (ownNative && ctx.Session.OwnedHotControl.HasValue)
@@ -49,8 +48,7 @@ public sealed partial class UiControls
         return PointerInteraction(rect, session, node, InteractionTarget(ctx, binding), CanReceivePointerPress(rect, ctx), !IsInputDisabled(node) && writable, range, limits, value, ctx);
     }
 
-    private UiInteractionResult PointerInteraction(UiLayoutRect rect, UiSession session, UiNode node, UiInteractionTarget target, bool canReceive, bool canOperate, bool range, UiRange limits, float value, UiWidgetContext? ctx = null,
-        bool pointOperation = false, float currentY = 0, UiHitGeometry? pointGeometry = null)
+    private UiInteractionResult PointerInteraction(UiLayoutRect rect, UiSession session, UiNode node, UiInteractionTarget target, bool canReceive, bool canOperate, bool range, UiRange limits, float value, UiWidgetContext? ctx = null, bool pointOperation = false, float currentY = 0, UiHitGeometry? pointGeometry = null)
     {
 #if FER_DEV
         string eventBefore = DiagnosticEventName();
@@ -72,9 +70,12 @@ public sealed partial class UiControls
         UiInteractionResult result;
         try
         {
-            if (pointOperation) result = session.Interactions.PointerPoint(target, input, geometry, eligibility, value, currentY);
-            else if (range) result = session.Interactions.PointerRange(target, input, geometry, eligibility, limits, value);
-            else result = session.Interactions.PointerActivation(target, input, geometry, eligibility);
+            if (pointOperation)
+                result = session.Interactions.PointerPoint(target, input, geometry, eligibility, value, currentY);
+            else if (range)
+                result = session.Interactions.PointerRange(target, input, geometry, eligibility, limits, value);
+            else
+                result = session.Interactions.PointerActivation(target, input, geometry, eligibility);
         }
         catch
         {
@@ -106,6 +107,7 @@ public sealed partial class UiControls
             string verdict = !canOperate ? "disabled" : covered ? "covered" : result.Consume || result.Request ? "hit" : "miss";
             UiDevGeometryProbe.NoteInput(ctx, node, rect, verdict, eventBefore);
         }
+
 #endif
         return result;
     }
@@ -151,9 +153,7 @@ public sealed partial class UiControls
         float fraction = max == min ? 0 : UiMath.Clamp01((value - min) / (max - min));
         float thumb = Math.Min(12, rect.Width / 2);
         float inset = thumb / 2;
-        UiThemeDraw.Surface(Drawing,new UiLayoutRect(rect.X + inset, rect.Y + rect.Height / 2 - 1, Math.Max(1, rect.Width - inset * 2), 2), theme.RaisedSurface, theme.Geometry.Hairline);
-        UiThemeDraw.Surface(Drawing,new UiLayoutRect(rect.X + fraction * (rect.Width - thumb), rect.Y + Math.Max(0, (rect.Height - 16) / 2), thumb, Math.Min(16, rect.Height)), theme.SelectedSurface, theme.Geometry.Hairline);
+        UiThemeDraw.Surface(Drawing, new UiLayoutRect(rect.X + inset, rect.Y + rect.Height / 2 - 1, Math.Max(1, rect.Width - inset * 2), 2), theme.RaisedSurface, theme.Geometry.Hairline);
+        UiThemeDraw.Surface(Drawing, new UiLayoutRect(rect.X + fraction * (rect.Width - thumb), rect.Y + Math.Max(0, (rect.Height - 16) / 2), thumb, Math.Min(16, rect.Height)), theme.SelectedSurface, theme.Geometry.Hairline);
     }
 }
-
-

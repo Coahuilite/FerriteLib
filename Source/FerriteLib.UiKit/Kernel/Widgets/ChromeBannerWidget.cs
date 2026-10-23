@@ -27,7 +27,7 @@ internal sealed class ChromeBannerWidget : IUiWidget, IUiMeasureParticipant, IUi
 
     public static void Register()
     {
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new ChromeBannerWidget(),
@@ -36,7 +36,7 @@ internal sealed class ChromeBannerWidget : IUiWidget, IUiMeasureParticipant, IUi
             // emphasis is Muted (ParseEmphasis below) - which is what keeps an untone banner's colour exactly
             // what it was before the role pair arrived.
             AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "Text", "TextKey", "Height"),
-            new[] { "Text", "TextKey" }, null, BandFont);
+            new[] { "Text", "TextKey" }, null, BandFont));
     }
 
     public void Configure(UiElementSpec spec)
@@ -101,5 +101,3 @@ ctx.Drawing,            rect,
         return DefaultHeight;
     }
 }
-
-

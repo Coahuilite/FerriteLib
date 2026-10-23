@@ -147,6 +147,3 @@ public sealed class UiPageWindow : UiWindowHost
         UiThemeDraw.Label(Execution,VerseUiExecution.Rect(rect),noticeText(notice),theme,singleLine: false);
     }
 }
-
-
-

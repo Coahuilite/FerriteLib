@@ -41,12 +41,12 @@ internal sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiD
 
     public static void Register()
     {
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new WrappedTextWidget(),
             AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "Text", "TextKey", "Height"),
-            new[] { "Text", "TextKey" });
+            new[] { "Text", "TextKey" }));
     }
 
     public void Configure(UiElementSpec spec)
@@ -159,5 +159,3 @@ ctx.Drawing,            new UiLayoutRect(rect.X, rect.Y + pad, rect.Width, Math.
     private string ResolveText(UiWidgetContext ctx) =>
         AtomVocabulary.DescribeText(spec, ctx, UiDescriptionRole.Text, "Text", "TextKey", reportMissing: true).Text;
 }
-
-

@@ -32,11 +32,11 @@ internal sealed class ImageWidget : IUiWidget, IUiMeasureParticipant, IUiDescrip
 
     internal static void Register()
     {
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new ImageWidget(),
-            AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "Height", "Description", "DescriptionKey", "Decorative", "Fit", "ImageAlignX", "ImageAlignY", "AspectHeight"));
+            AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "Height", "Description", "DescriptionKey", "Decorative", "Fit", "ImageAlignX", "ImageAlignY", "AspectHeight")));
         // Deliberately no label set: the kind paints no text, so Width="Auto" has nothing honest to measure.
     }
 
@@ -139,6 +139,3 @@ internal sealed class ImageWidget : IUiWidget, IUiMeasureParticipant, IUiDescrip
         return default;
     }
 }
-
-
-

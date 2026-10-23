@@ -513,4 +513,3 @@ public sealed class UiWindowCatalog
         }
     }
 }
-

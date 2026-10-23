@@ -11,6 +11,8 @@ namespace FerriteLib.UiKit.Kernel;
 public sealed class UiSession : IDisposable
 {
     public UiControls Controls { get; }
+    public Action<string>? Warning { get; set; }
+    internal void ReportWarning(string message){if(Warning!=null)Warning(message);else if(execution!=null)execution.Warning(message);else System.Diagnostics.Trace.TraceWarning(message);}
     public UiFrame Input { get; private set; } = new UiFrame(UiFramePhase.None, inputAllowed:false);
     private IUiExecution? execution;
     public IUiExecution Execution => execution ?? throw new InvalidOperationException("Drawing or native input requires an explicit execution scope.");
@@ -27,8 +29,8 @@ public sealed class UiSession : IDisposable
 
     /// <summary>Native window qualification. Embedded hosts default to their existing input scope.</summary>
     public bool PointerInputAllowed { get; set; } = true;
-    private static readonly IReadOnlyDictionary<string, UiValueState> NoValueStates =
-        new Dictionary<string, UiValueState>(StringComparer.Ordinal);
+    private static readonly IReadOnlyDictionary<string, UiControlState> NoValueStates =
+        new Dictionary<string, UiControlState>(StringComparer.Ordinal);
 
     // Identity is per session, not per node: a diagnostic subscription is keyed by it, and the whole point
     // of that key is that it survives as a number after the session itself is gone. A counter is bounded
@@ -100,7 +102,7 @@ public sealed class UiSession : IDisposable
     // already owns identity. They are cleared at the pass boundary when their node stops being arranged, and
     // with the session.
     private UiNode? activeEditNode;
-    private UiValueState? activeEditState;
+    private UiControlState? activeEditState;
     private UiNode? lastInteractionNode;
     private UiNode? cancelTargetNode;
     internal UiLayoutRect? CurrentClip { get; set; }
@@ -116,7 +118,7 @@ public sealed class UiSession : IDisposable
 
     /// <summary>
     /// Creates one session and its session-level node: the identity an element-less caller (a host-level
-    /// call, a popup pass) resolves into, which keeps <see cref="GetOrCreateValueState(string)"/> total
+    /// call, a popup pass) resolves into, which keeps <see cref="GetControlState(string)"/> total
     /// outside a tree exactly as it was before the node step.
     /// </summary>
     public UiSession()
@@ -194,7 +196,7 @@ public sealed class UiSession : IDisposable
     /// <summary>
     /// The element whose Measure/Draw is running, or <see cref="UiNodeId.None"/> between elements.
     /// The engine enters an element's node around its own widget calls, and
-    /// <see cref="GetOrCreateValueState(string)"/> resolves against it: that is how a widget written
+    /// <see cref="GetControlState(string)"/> resolves against it: that is how a widget written
     /// against the old bare-string key gets a per-element state namespace without changing a line.
     /// </summary>
     public UiNodeId ActiveElement => activeNode.Id;
@@ -204,7 +206,7 @@ public sealed class UiSession : IDisposable
     /// object a widget reads its own state from and marks dirty; the engine enters it in a
     /// <c>finally</c> around every element's Measure and Draw.
     /// </summary>
-    public UiNode ActiveNode => activeNode;
+    internal UiNode ActiveNode => activeNode;
 
     /// <summary>Session-scoped scroll positions, keyed by the scroll container's node.</summary>
     internal IReadOnlyDictionary<UiNode, UiLayoutPoint> ScrollPositions => scrollPositions;
@@ -519,16 +521,9 @@ public sealed class UiSession : IDisposable
     /// The state of the open edit, so the window's hooks can mark it without reaching into the widget that
     /// owns it. Null exactly when <see cref="ActiveEditNode"/> is.
     /// </summary>
-    internal UiValueState? ActiveEditState => activeEditState;
+    internal UiControlState? ActiveEditState => activeEditState;
 
-    /// <summary>
-    /// Records that the element being drawn opened an edit. Called by the funnel, never by a widget: the
-    /// funnel is the one place that knows a native control was actually handed the keyboard, which is the
-    /// same evidence rule that makes it the only place the disabled and covered refusals can be enforced.
-    /// </summary>
-    internal void NoteEditOpened(UiValueState state) => NoteEditOpened(state, activeNode);
-
-    internal void NoteEditOpened(UiValueState state, UiNode node)
+    internal void NoteEditOpened(UiControlState state, UiNode node)
     {
         EnsureActive();
         if (state == null) throw new ArgumentNullException(nameof(state));
@@ -541,7 +536,7 @@ public sealed class UiSession : IDisposable
     /// Records that an edit ended. Only the edit the session still points at can clear the pointer, so an
     /// older field finishing after a newer one opened cannot drop the newer record.
     /// </summary>
-    internal void NoteEditClosed(UiValueState state)
+    internal void NoteEditClosed(UiControlState state)
     {
         if (state == null || !ReferenceEquals(state, activeEditState)) return;
         activeEditNode = null;
@@ -596,10 +591,9 @@ public sealed class UiSession : IDisposable
     {
         if (activeEditNode != null && (!InPlay(activeEditNode) || activeEditState == null))
         {
-            UiValueState? dropped = activeEditState;
+            UiControlState? dropped = activeEditState;
             if (dropped != null)
             {
-                dropped.Focused = false;
                 if (dropped.Editor is IUiEditState editor) editor.Suspend();
                 Controls.ReleaseEditFocus(dropped, this);
                 dropped.CommitRequested = false;
@@ -836,40 +830,7 @@ public sealed class UiSession : IDisposable
         EnsureActive();
         ContentRevision++;
     }
-
-    /// <summary>
-    /// The value state for <paramref name="stateKey"/> inside the element currently being arranged or
-    /// drawn (<see cref="ActiveElement"/>). This is what the backend funnels and every existing widget
-    /// call; resolving it against the element is what keeps two unnamed same-kind siblings from sharing
-    /// one slot the way the bare key did.
-    /// <para>
-    /// That element scope lasts for one element's Measure or Draw inside one arrange/draw traversal and
-    /// is restored in a <c>finally</c>, so it is never observable between passes. Called outside such a
-    /// traversal - a host-level call, a popup pass, a harness driving a widget by hand - the overload
-    /// resolves against <see cref="UiNodeId.None"/> rather than throwing: that is the session-level
-    /// namespace, which is what an element-less caller had before the identity layer and what keeps the
-    /// old call shape working for code that never was inside a tree.
-    /// </para>
-    /// </summary>
-    public UiValueState GetOrCreateValueState(string stateKey)
-    {
-        if (stateKey == null) throw new ArgumentNullException(nameof(stateKey));
-        EnsureActive();
-        return activeNode.GetOrCreateState(stateKey);
-    }
-
-    /// <summary>The element's own value state, i.e. the slot it owns without naming a sub-key.</summary>
-    public UiValueState GetOrCreateValueState(UiNodeId element)
-    {
-        return GetOrCreateValueState(element, "");
-    }
-
-    /// <summary>
-    /// The value state for one named slot of one element. A composite that drives several stateful
-    /// controls inside a single element (the consumer's interval row drives a slider and a number field)
-    /// keeps them apart by name; two elements never share a slot whatever names they use.
-    /// </summary>
-    public UiValueState GetOrCreateValueState(UiNodeId element, string stateKey)
+internal UiControlState GetControlState(UiNodeId element, string stateKey)
     {
         if (stateKey == null) throw new ArgumentNullException(nameof(stateKey));
         EnsureActive();
@@ -881,7 +842,7 @@ public sealed class UiSession : IDisposable
     /// element holds none. The read is by identity because that is the primary key; the old flat
     /// property could not name both dimensions.
     /// </summary>
-    internal IReadOnlyDictionary<string, UiValueState> GetValueStates(UiNodeId element)
+    internal IReadOnlyDictionary<string, UiControlState> GetValueStates(UiNodeId element)
     {
         return nodes.TryGetValue(element, out UiNode? node) ? node.ValueStates : NoValueStates;
     }
@@ -1007,6 +968,7 @@ public sealed class UiSession : IDisposable
         {
             released.Add(node);
             SuspendNodeEditors(node);
+            node.ReleaseState();
             nodes.Remove(node.Id);
             dirtyNodes.Remove(node);
             trippedNodes.Remove(node);
@@ -1069,6 +1031,7 @@ public sealed class UiSession : IDisposable
         {
             if (!IsActive)
                 return;
+            foreach(var entry in nodes)if(!priorNodes.ContainsKey(entry.Key))entry.Value.ReleaseState();
             nodes.Clear();
             foreach (KeyValuePair<UiNodeId, UiNode> entry in priorNodes)
                 nodes.Add(entry.Key, entry.Value);
@@ -1296,13 +1259,6 @@ public sealed class UiSession : IDisposable
         return ownedHotControl.HasValue && ownedHotControl.Value == controlId;
     }
 
-    /// <summary>
-    /// Captures the native hot control for <paramref name="controlId"/> and records session ownership
-    /// beside the element that is drawing. Only the owning session may release it; closing/disposing the
-    /// host releases exactly this session's capture and never another session's.
-    /// </summary>
-    public void CaptureHotControl(UiControlKey controlId) => CaptureHotControlForNode(controlId, activeNode);
-
     internal void CaptureHotControlForNode(UiControlKey controlId, UiNode owner)
     {
         EnsureActive();
@@ -1342,10 +1298,9 @@ public sealed class UiSession : IDisposable
 
     private static void SuspendNodeEditors(UiNode node)
     {
-        foreach (UiValueState state in node.ValueStates.Values)
+        foreach (UiControlState state in node.ValueStates.Values)
         {
             if (state.Editor is IUiEditState editor) editor.Suspend();
-            state.Focused = false;
             state.CommitRequested = state.DiscardRequested = false;
         }
         node.EditingState = null;
@@ -1392,7 +1347,7 @@ public sealed class UiSession : IDisposable
         }
 
         scrollPositions.Clear();
-        foreach (UiNode node in nodes.Values) SuspendNodeEditors(node);
+        foreach (UiNode node in nodes.Values) {SuspendNodeEditors(node);node.ReleaseState();}
         nodes.Clear();
         dirtyNodes.Clear();
         trippedNodes.Clear();
@@ -1434,6 +1389,3 @@ public sealed class UiSession : IDisposable
         }
     }
 }
-
-
-

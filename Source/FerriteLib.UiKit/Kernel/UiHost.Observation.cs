@@ -61,5 +61,3 @@ public sealed partial class UiHost
             absenceUnknown, Array.AsReadOnly(Array.Empty<UiObservedNode>()));
     }
 }
-
-

@@ -108,5 +108,3 @@ internal static class UiHostLedger
         }
     }
 }
-
-

@@ -23,12 +23,12 @@ internal sealed class EmptyStateWidget : IUiWidget, IUiMeasureParticipant, IUiDe
 
     public static void Register()
     {
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new EmptyStateWidget(),
             new[] { "Id", "Kind", "Text", "TextKey", "Height", "Tab", "Hidden" },
-            new[] { "Text", "TextKey" });
+            new[] { "Text", "TextKey" }));
     }
 
     public void Configure(UiElementSpec spec)
@@ -92,5 +92,3 @@ internal sealed class EmptyStateWidget : IUiWidget, IUiMeasureParticipant, IUiDe
         return DefaultHeight;
     }
 }
-
-

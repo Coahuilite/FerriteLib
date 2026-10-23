@@ -44,8 +44,8 @@ internal sealed partial class UiLayoutEngine
     private LayoutScope? activeLayoutScope;
     private bool layoutRequested, forceMeasurement;
     private int layoutPass;
-    private bool pendingLegacyValidation;
-    internal void ValidateLegacyPresentation() { pendingLegacyValidation = true; }
+    private bool pendingInputValidation;
+    internal void RequestInputValidation() { pendingInputValidation = true; }
     private UiTextMetricsCache? textMetricsCache;
     private int cachedHostLayoutRevision = -1;
 
@@ -108,7 +108,7 @@ internal sealed partial class UiLayoutEngine
         if (prior != null && !ctx.Session.IsTripped(node) && !enrolled && prior.Pass == layoutPass) return prior.Height;
         UiMeasureInputs? environment = (ctx.Metrics as IUiTextMetricsEnvironment)?.CaptureEnvironment(ctx.Theme.DefaultFont);
         bool environmentEqual = prior != null && (!prior.Inputs.UsesTextMetrics || environment != null && environment.Equals(prior.Environment));
-        bool validation = ctx.Session.IsTripped(node) || pendingLegacyValidation || forceMeasurement || node.IsDirty || prior == null || !contextEqual || !environmentEqual || enrolled && !sources.Equals(prior.Sources);
+        bool validation = ctx.Session.IsTripped(node) || pendingInputValidation || forceMeasurement || node.IsDirty || prior == null || !contextEqual || !environmentEqual || enrolled && !sources.Equals(prior.Sources);
         if (prior != null && !validation && (enrolled || !layoutRequested)) return prior.Height;
         // An old metrics implementation keeps its original idle-snapshot condition, not a new promise
         // that its unknown mutable environment is cacheable at a subsequent synchronization point.
@@ -197,5 +197,3 @@ internal sealed partial class UiLayoutEngine
         return next.Plan;
     }
 }
-
-

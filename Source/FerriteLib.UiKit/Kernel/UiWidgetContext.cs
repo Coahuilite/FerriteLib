@@ -60,7 +60,7 @@ public sealed class UiWidgetContext
     public bool IsDisabled => Node.IsDisabled;
     public float SharedLabelWidth => Node.SharedLabelWidth;
     public UiElementProperties Properties => Node.Properties;
-    public UiValueState State(string key) => Session.GetOrCreateValueState(Node.Id, key);
+    public T State<T>(string key,Func<T> create,Action<T>? release=null) where T:class => Node.GetState(key,create,release);
     public void Invalidate() => Node.MarkDirty();
     public string InteractionScope
     {
@@ -184,6 +184,7 @@ public sealed class UiWidgetContext
     public UiWidgetContext WithNode(UiNode node)
     {
         if (node == null) throw new ArgumentNullException(nameof(node));
+        if(!ReferenceEquals(node.Owner,Session))throw new InvalidOperationException("Context node belongs to another session.");
         return new UiWidgetContext(
             Source, Session, Metrics, Theme, Translation, Bindings, ViewWidth,
             node.Path, WindowOrigin, node.Id, node, StyleChain);
@@ -264,6 +265,3 @@ public sealed class UiWidgetContext
         return new UiLayoutRect(rect.X + WindowOrigin.X, rect.Y + WindowOrigin.Y, rect.Width, rect.Height);
     }
 }
-
-
-

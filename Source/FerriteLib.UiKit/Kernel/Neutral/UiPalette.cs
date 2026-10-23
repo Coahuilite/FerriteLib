@@ -158,5 +158,3 @@ public sealed class UiPalette
         _ => throw new ArgumentOutOfRangeException(nameof(role))
     };
 }
-
-

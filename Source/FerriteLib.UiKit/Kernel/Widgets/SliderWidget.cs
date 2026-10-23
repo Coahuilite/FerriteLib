@@ -13,7 +13,7 @@ internal sealed class SliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabell
 
     public static void Register()
     {
-        UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, Kind, () => new SliderWidget(), AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "Min", "Max", "Label", "LabelKey", "Height"), new[] { "Label", "LabelKey" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, Kind, () => new SliderWidget(), AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "Min", "Max", "Label", "LabelKey", "Height"), new[] { "Label", "LabelKey" }));
     }
 
     public void Configure(UiElementSpec spec)
@@ -99,5 +99,3 @@ internal sealed class SliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabell
         });
     }
 }
-
-

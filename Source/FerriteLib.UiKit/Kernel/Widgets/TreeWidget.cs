@@ -51,11 +51,11 @@ internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
 
     internal static void Register()
     {
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new TreeWidget(),
-            AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "ActionBind", "DisclosureBind", "CheckBind", "RowHeight"));
+            AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "ActionBind", "DisclosureBind", "CheckBind", "RowHeight")));
         // Deliberately no label set: this kind's labels are row data, not attributes, so Width="Auto" has
         // nothing honest to measure and falls back to the unsized distribution.
     }
@@ -268,7 +268,3 @@ internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerL
         return AtomVocabulary.ReadBindKey(spec);
     }
 }
-
-
-
-

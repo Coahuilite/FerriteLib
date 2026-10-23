@@ -9,5 +9,3 @@ public static class UiKinds
         SectionHeader = "section/header", Banner = "chrome/banner", Empty = "state/empty", Rule = "chrome/rule",
         Image = "display/image", Progress = "display/progress", Tree = "container/tree", LineChart = "chart/line", Repeat = "Repeat";
 }
-
-

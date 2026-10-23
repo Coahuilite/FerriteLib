@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.AuthorExamples;
 
@@ -20,7 +19,8 @@ public static class ReadOnlyOutputs
             + "<Widget Id=\"range\" Kind=\"input/slider\" Bind=\"value\" Label=\"Range\"/></Scroll></Column></UiPage>";
         UiLayoutManifest manifest = UiLayoutManifest.Parse(xml);
         using var host = new UiHost("readonly-author", manifest, bindings, new UiTheme(), metrics, translation);
-        void Pump() { Event.current = new Event { type = EventType.Repaint }; host.DrawFrame(new Rect(0, 0, 400, 300)); }
+        using var execution = new VerseUiExecution();
+        void Pump() { host.DrawFrame(new UiLayoutRect(0,0,400,300),new UiFrame(UiFramePhase.Repaint),execution); }
         Pump();
         UiElementProperties field = host.ElementProperties("range"), parent = host.ElementProperties("parent");
         var resolvedMetrics = field.ResolvedMetrics; var colours = field.ResolvedColours;
@@ -42,7 +42,7 @@ public static class ReadOnlyOutputs
         check(ReferenceEquals(resolverIssues, resolver.Issues) && resolverIssues.Count == 2
             && resolverIssues[1].Message.Contains("missing-two"), "same readonly resolver issue view observes subsequent normal resolution drop");
 
-        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new Vector2(400, 300));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(400, 300));
         Console.WriteLine("READONLY-SNAPSHOT-INPUT viewports=" + snapshot.Viewports.Count + " contents=" + snapshot.ScrollContents.Count + " diagnostics=" + snapshot.Diagnostics.Count);
         check(snapshot.Viewports.Count == 1 && snapshot.ScrollContents.Count == 1,
             "real arranged snapshot includes actual scroll viewport/content maps");
@@ -52,10 +52,10 @@ public static class ReadOnlyOutputs
         ListWrites(snapshot.VisibleIds, check, "snapshot.VisibleIds");
         using var diagnosticHost = new UiHost("readonly-author", UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"readonly-author\"><Widget Id=\"narrow\" Kind=\"input/stepper-slider\" Bind=\"value\"/></UiPage>"),
             bindings, new UiTheme(), metrics, translation);
-        UiLayoutSnapshot withDiagnostic = diagnosticHost.MeasureAndArrange(new Vector2(80, 100));
+        UiLayoutSnapshot withDiagnostic = diagnosticHost.MeasureAndArrange(new UiLayoutPoint(80, 100));
         check(withDiagnostic.Diagnostics.Count > 0, "real constrained Host produces nonempty insufficient-width diagnostics");
         ListWrites(withDiagnostic.Diagnostics, check, "snapshot.Diagnostics (engine already supplied a protected list)");
-        Rect oldRange = snapshot.RectById["range"];
+        UiLayoutRect oldRange = snapshot.RectById["range"];
 
         parent.Metric("RowHeight").Set(52); parent.Palette(UiPaletteRole.Foreground).Set(new UiColour(0, 1, 0)); Pump();
         check(ReferenceEquals(resolvedMetrics, field.ResolvedMetrics) && ReferenceEquals(colours, field.ResolvedColours)
@@ -69,21 +69,21 @@ public static class ReadOnlyOutputs
         check(resolvedMetrics["RowHeight"].Value == 64 && resolvedMetrics["RowHeight"].Origin == UiPropertyOrigin.Ancestor
             && colours["Foreground"].Value == new UiColour(1, 0, 0) && colours["Foreground"].Origin == UiPropertyOrigin.Ancestor,
             "normal remove reveals current ancestor64/red, not a readonly-view creation snapshot");
-        UiLayoutSnapshot next = host.MeasureAndArrange(new Vector2(400, 300));
-        check(next.RectById["range"].height == 64 && snapshot.RectById["range"].x == oldRange.x
-            && snapshot.RectById["range"].y == oldRange.y && snapshot.RectById["range"].width == oldRange.width && snapshot.RectById["range"].height == oldRange.height
+        UiLayoutSnapshot next = host.MeasureAndArrange(new UiLayoutPoint(400, 300));
+        check(next.RectById["range"].Height == 64 && snapshot.RectById["range"].X == oldRange.X
+            && snapshot.RectById["range"].Y == oldRange.Y && snapshot.RectById["range"].Width == oldRange.Width && snapshot.RectById["range"].Height == oldRange.Height
             && manifest.Styles.Issues.Count == 1, "new arrangement exposes current geometry while retained old snapshot/issues stay intact");
         // Public snapshot constructors also accept caller-owned read sources. Keep their existing read-through semantics.
-        var rects = new Dictionary<string, Rect>(StringComparer.OrdinalIgnoreCase) { ["entry"] = oldRange };
+        var rects = new Dictionary<string, UiLayoutRect>(StringComparer.OrdinalIgnoreCase) { ["entry"] = oldRange };
         var visible = new List<string> { "entry" }; var diagnostics = new List<UiLayoutDiagnostic> { withDiagnostic.Diagnostics[0] };
-        var authored = new UiLayoutSnapshot(Vector2.zero, rects, visible, rects, rects, 0, diagnostics);
+        var authored = new UiLayoutSnapshot(UiLayoutPoint.Zero, rects, visible, rects, rects, 0, diagnostics);
         DictionaryWrites(authored.RectById, check, "constructed snapshot map"); ListWrites(authored.VisibleIds, check, "constructed snapshot ids");
         ListWrites(authored.Diagnostics, check, "constructed snapshot diagnostics");
-        rects["entry"] = new Rect(1, 2, 3, 4); visible.Add("later");
-        check(authored.RectById["ENTRY"].width == 3 && authored.VisibleIds.Count == 2,
+        rects["entry"] = new UiLayoutRect(1, 2, 3, 4); visible.Add("later");
+        check(authored.RectById["ENTRY"].Width == 3 && authored.VisibleIds.Count == 2,
             "constructor-owner source updates and custom comparer retain their original legal reading semantics");
         Console.WriteLine("READONLY-TRACE metrics-view=same colours-view=same row=40->52->60->64 source=Ancestor->Instance->Ancestor colour=green->blue->red old-snapshot="
-            + oldRange + " current-height=" + next.RectById["range"].height + " issues=" + manifest.Styles.Issues.Count);
+            + oldRange + " current-height=" + next.RectById["range"].Height + " issues=" + manifest.Styles.Issues.Count);
     }
 
     private static void Reject(Action write, Action<bool, string> check, string name)

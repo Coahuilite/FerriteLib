@@ -74,4 +74,3 @@ internal sealed class InventoryPageExample : IDisposable
     }
     public void Dispose() => BusinessOwner.Dispose();
 }
-

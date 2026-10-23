@@ -94,5 +94,3 @@ internal static class UiMeasureValidity
         UiMeasureInputs? priorEnvironment, UiMeasureInputs? currentEnvironment)
         => current.Equals(prior) && (!current.UsesTextMetrics || currentEnvironment != null && currentEnvironment.Equals(priorEnvironment));
 }
-
-

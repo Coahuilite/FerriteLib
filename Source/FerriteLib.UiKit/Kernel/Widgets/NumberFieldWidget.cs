@@ -20,12 +20,12 @@ internal sealed class NumberFieldWidget : IUiWidget, IUiMeasureParticipant, IUiL
 
     public static void Register()
     {
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new NumberFieldWidget(),
             AtomVocabulary.Schema(AtomRoles.ToneAndEmphasis, "Bind", "Min", "Max", "Format", "Live", "Label", "LabelKey", "Height"),
-            new[] { "Label", "LabelKey" });
+            new[] { "Label", "LabelKey" }));
     }
 
     public void Configure(UiElementSpec spec)
@@ -80,8 +80,7 @@ internal sealed class NumberFieldWidget : IUiWidget, IUiMeasureParticipant, IUiL
         ctx.Controls.Edit(field, ctx, bindKey, current, numeric.Format, numeric.Parse,
             live, false, value => ctx.Bindings.Set(bindKey, value), () => ctx.Bindings.Get<float>(bindKey));
         if (!ctx.Session.IsActive) return;
-        UiValueState state = ctx.Session.GetOrCreateValueState(ctx.Node.Id, bindKey);
-        if (numeric.Parse(state.EditText, out float parsed)) state.FloatValue = parsed;
+        UiControlState state = ctx.Session.GetControlState(ctx.Node.Id, bindKey);
         UiEditSession<float> retainedEditor = ctx.Controls.Editor<float>(ctx,bindKey,numeric.Format,numeric.Parse);
         AtomVocabulary.PaintEditFeedback(field, ctx, retainedEditor);
         string retainedLabel=AtomVocabulary.ResolveText(spec,ctx,"Label","LabelKey");
@@ -127,5 +126,3 @@ internal sealed class NumberFieldWidget : IUiWidget, IUiMeasureParticipant, IUiL
         UiThemeDraw.Label(ctx.Drawing,new UiLayoutRect(rect.X, rect.Y, layout.LabelWidth, layout.Stacked ? layout.LabelHeight : rect.Height), label, ctx.Theme, style.Text, AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft);
     }
 }
-
-

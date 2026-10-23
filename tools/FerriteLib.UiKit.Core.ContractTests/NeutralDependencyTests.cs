@@ -12,11 +12,12 @@ internal static class NeutralDependencyTests
         var attributes=new Dictionary<string,string>{{"Text","first"}};
         var spec=new UiElementSpec("caption",UiKinds.WrappedText,attributes);attributes["Text"]="outside";
         var program=UiLayoutManifest.Create("neutral-page",new[]{spec});
-        var xml=UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"neutral-page\"><Styles Schema=\"1\"><Scheme Name=\"base\"><Font Value=\"Tiny\"/><Metric Token=\"RowHeight\" Value=\"40\"/></Scheme></Styles><Widget Id=\"caption\" Kind=\"text/wrapped\" Text=\"first\"/></UiPage>");
+        var xml=UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"neutral-page\"><Styles Schema=\"1\"><Scheme Name=\"base\"><Metric Token=\"Font\" Value=\"Tiny\"/><Metric Token=\"Gap\" Value=\"bad\"/><Metric Token=\"RowHeight\" Value=\"40\"/></Scheme></Styles><Widget Id=\"caption\" Kind=\"text/wrapped\" Text=\"first\"/></UiPage>");
         check(program.Roots[0].TryGetAttribute("Text",out string text) && text=="first" && xml.Roots[0].Kind==UiKinds.WrappedText,
             "NEUTRAL actual program/XML page definitions parse and copy without any engine assembly");
         check(xml.Styles.TryGetScheme("base",out var scheme) && scheme.Font==UiFont.Tiny && scheme.Metrics["RowHeight"]==40 && xml.Styles.Issues.Count==1,
-            "NEUTRAL actual style/font/metric parser retains redirect issue while adapter owns native reporting");
+            "NEUTRAL actual style/font/metric parser uses one typography declaration and retains located invalid-metric issue");
+        var retired=UiStyleDocument.Parse("<Styles Schema=\"1\"><Scheme Name=\"base\"><Font Value=\"Tiny\"/></Scheme></Styles>");check(retired.StructurallyInvalid&&retired.Issues[0].Message.Contains("retired"),"NEUTRAL retired Font XML is diagnosed and refused, never redirected or silently ignored");
         string[] sources=File.ReadAllLines(Path.Combine(AppContext.BaseDirectory,"production-sources.txt"));
         check(sources.Length>0 && sources.All(File.Exists),"NEUTRAL actual recorded production source inventory exists");
         string[] forbidden={"UnityEngine","UnityStubs","Verse","RimWorld","Waylith","Harmony","Assembly.Load","Type.GetType"};
@@ -44,5 +45,3 @@ internal static class NeutralDependencyTests
         foreach(string name in seen.OrderBy(s=>s,StringComparer.Ordinal))Console.WriteLine("NEUTRAL-DEPENDENCY "+name);
     }
 }
-
-

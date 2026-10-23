@@ -53,5 +53,3 @@ public readonly struct UiWindowChrome
     /// <summary>The title height the shell applied. The same number <see cref="TitleBand"/> was built with.</summary>
     public float TitleBarHeight { get; }
 }
-
-

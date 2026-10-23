@@ -21,7 +21,7 @@ internal sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointe
 
     public static void Register()
     {
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new ButtonWidget(),
@@ -30,7 +30,7 @@ internal sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointe
             // from its content instead of the theme's row height.
             AtomVocabulary.Schema(
                 AtomRoles.ToneAndEmphasis, "ActionBind", "Text", "TextKey", "Height", "PayloadKey", "Chrome"),
-            new[] { "Text", "TextKey" });
+            new[] { "Text", "TextKey" }));
     }
 
     public void Configure(UiElementSpec spec)
@@ -191,5 +191,3 @@ ctx.Drawing,            new UiLayoutRect(rect.X + theme.Geometry.Padding, rect.Y
         return AtomVocabulary.Read(spec, "ActionBind");
     }
 }
-
-

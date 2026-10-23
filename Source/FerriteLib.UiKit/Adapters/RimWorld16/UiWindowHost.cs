@@ -394,6 +394,7 @@ public abstract class UiWindowHost : Window
     {
         if (!displayRequired) return;
         UiHost? page = host;
+        if(page!=null)page.Session.SetFrame(Execution.CaptureFrame(!IsOpen || Find.WindowStack.GetsInput(this)),Execution);
         if (page != null && page.TryHandleCancel()) return;
 
         if (TryHandleUnansweredCancel())
@@ -436,6 +437,7 @@ public abstract class UiWindowHost : Window
     {
         if (!displayRequired) return;
         UiHost? page = host;
+        if(page!=null)page.Session.SetFrame(Execution.CaptureFrame(!IsOpen || Find.WindowStack.GetsInput(this)),Execution);
         if (page != null && page.TryHandleAccept()) return;
 
         base.OnAcceptKeyPressed();
@@ -862,6 +864,3 @@ VerseUiExecution.Rect(windowRect),VerseUiExecution.Rect(ToWindowRect(TitleBandRe
         return new Rect(windowRect.x + local.x, windowRect.y + local.y, local.width, local.height);
     }
 }
-
-
-

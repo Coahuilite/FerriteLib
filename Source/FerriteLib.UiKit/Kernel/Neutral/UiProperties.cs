@@ -87,5 +87,3 @@ public readonly struct UiSliderLayout
         return new UiSliderLayout(stacked ? width : natural, labelHeight, stacked ? labelHeight + density.Gap + density.RowHeight : Math.Max(labelHeight, density.RowHeight), stacked);
     }
 }
-
-

@@ -561,5 +561,3 @@ public sealed class UiDevGeometrySnapshot
             + " inputs=" + Inputs.Count.ToString(CultureInfo.InvariantCulture);
     }
 }
-
-

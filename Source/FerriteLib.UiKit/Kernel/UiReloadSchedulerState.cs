@@ -34,5 +34,3 @@ public readonly struct UiReloadSchedulerState
     /// <summary>How long the oldest pending signal has been waiting, in seconds.</summary>
     public double OldestPendingSeconds { get; }
 }
-
-

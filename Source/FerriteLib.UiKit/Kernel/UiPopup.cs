@@ -307,5 +307,3 @@ drawing,            new UiLayoutRect(rowRect.X + padding, rowRect.Y, rowRect.Wid
             singleLine: true);
     }
 }
-
-

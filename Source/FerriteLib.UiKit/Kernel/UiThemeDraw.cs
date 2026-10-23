@@ -301,6 +301,3 @@ drawing,            new UiLayoutRect(rect.X + 6f, rect.Y, Math.Max(1f, rect.Widt
     /// <summary>Draws a supplier-owned texture with explicit fit and inner alignment. Cover clips to the slot.</summary>
     public static bool Image(IUiDrawing drawing,UiLayoutRect rect,UiImage image,UiColour tint,UiImageOptions options){if(image.IsEmpty)return false;UiLayoutRect fitted=UiImageLayout.Arrange(rect,image.Width,image.Height,options);if(fitted.Width<=1||fitted.Height<=1)return false;if(options.Fit==UiImageFit.Cover)drawing.Clip(rect,()=>drawing.Image(new UiLayoutRect(fitted.X-rect.X,fitted.Y-rect.Y,fitted.Width,fitted.Height),image,tint));else drawing.Image(fitted,image,tint);return true;}
 }
-
-
-

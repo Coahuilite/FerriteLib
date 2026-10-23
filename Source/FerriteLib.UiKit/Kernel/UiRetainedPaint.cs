@@ -34,6 +34,3 @@ internal sealed class UiRetainedPaint
         UiThemeDraw.Label(ctx.Drawing,new UiLayoutRect(rect.X+pad,rect.Y,Math.Max(1,rect.Width-pad*2),rect.Height),draft,ctx.Theme,ctx.Theme[UiPaletteRole.Foreground],ctx.Theme.Styles.Font);
     }
 }
-
-
-

@@ -51,5 +51,3 @@ public static class UiPointerLayers
     private static bool Contains(UiLayoutRect rect, float x, float y)
         => rect.Width > 0 && rect.Height > 0 && x >= rect.X && x < rect.X + rect.Width && y >= rect.Y && y < rect.Y + rect.Height;
 }
-
-

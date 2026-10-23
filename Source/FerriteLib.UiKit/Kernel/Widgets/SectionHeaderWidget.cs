@@ -29,12 +29,12 @@ internal sealed class SectionHeaderWidget : IUiWidget, IUiMeasureParticipant, IU
 
     public static void Register()
     {
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new SectionHeaderWidget(),
             new[] { "Id", "Kind", "Title", "TitleKey", "Height", "Tab", "Hidden", "Chrome" },
-            new[] { "Title", "TitleKey" });
+            new[] { "Title", "TitleKey" }));
     }
 
     public void Configure(UiElementSpec spec)
@@ -117,5 +117,3 @@ ctx.Drawing,            new UiLayoutRect(rect.X, rect.YMax - 1f, rect.Width, 1f)
 
     private string Title(UiWidgetContext ctx) => AtomVocabulary.ResolveText(spec, ctx, "Title", "TitleKey");
 }
-
-

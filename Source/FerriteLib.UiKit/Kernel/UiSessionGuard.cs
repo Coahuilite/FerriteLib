@@ -24,10 +24,7 @@ public static class UiSessionGuard
     /// <summary>Restores native paint state while leaving a shell-background failure to the existing window recovery boundary.</summary>
     internal static void DrawWindowBackground(IUiExecution execution, UiLayoutRect rect, Action<UiLayoutRect> draw)
     {
-        try { execution.WithState(() => draw(rect)); }
-        finally
-        {
-        }
+        execution.WithState(() => draw(rect));
     }
 
     /// <summary>
@@ -40,7 +37,7 @@ public static class UiSessionGuard
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
         if (node == null) throw new ArgumentNullException(nameof(node));
 
-        using UiBindings.DisplayScope? display = widget is IUiDescriptiveWidget && widget is not IUiPointerLayout ? (ctx.Bindings as UiBindings)?.DisplayOnly() : null;
+        using UiBindings.DisplayScope? display = UiWidgetCapabilities.Description(widget) != null && UiWidgetCapabilities.Pointer(widget) == null ? (ctx.Bindings as UiBindings)?.DisplayOnly() : null;
         try
         {
             ctx.Session.Execution.WithState(() => widget.Draw(rect, ctx));
@@ -97,7 +94,7 @@ public static class UiSessionGuard
     /// prints, because that is the consumer's own vocabulary.
     /// </summary>
     public static void DrawOrFallback(
-        UiSession session,
+        UiWidgetContext ctx,
         string elementId,
         string kind,
         string elementPath,
@@ -105,7 +102,8 @@ public static class UiSessionGuard
         Action draw,
         Action<UiLayoutRect>? fallback)
     {
-        if (session == null) throw new ArgumentNullException(nameof(session));
+        if (ctx == null) throw new ArgumentNullException(nameof(ctx));
+        UiSession session = ctx.Session;
         if (string.IsNullOrEmpty(elementId)) throw new ArgumentException("Element id is required.", nameof(elementId));
         if (draw == null) throw new ArgumentNullException(nameof(draw));
 
@@ -115,8 +113,8 @@ public static class UiSessionGuard
         }
         catch (UiReactiveFault failure)
         {
-            session.ActiveNode.PresentationFault = failure;
-            session.ActiveNode.PresentationUnavailable = true;
+            ctx.Node.PresentationFault = failure;
+            ctx.Node.PresentationUnavailable = true;
             fallback?.Invoke(rect);
         }
         catch (UiRequestFailure)
@@ -125,21 +123,22 @@ public static class UiSessionGuard
         }
         catch (Exception ex)
         {
-            Record(session, session.ActiveNode, elementId, kind, elementPath, ex);
+            Record(session, ctx.Node, elementId, kind, elementPath, ex);
             fallback?.Invoke(rect);
         }
     }
 
     /// <summary>Measure-side twin of <see cref="DrawOrFallback"/>.</summary>
     public static float MeasureOrFallback(
-        UiSession session,
+        UiWidgetContext ctx,
         string elementId,
         string kind,
         string elementPath,
         float fallbackHeight,
         Func<float> measure)
     {
-        if (session == null) throw new ArgumentNullException(nameof(session));
+        if (ctx == null) throw new ArgumentNullException(nameof(ctx));
+        UiSession session = ctx.Session;
         if (string.IsNullOrEmpty(elementId)) throw new ArgumentException("Element id is required.", nameof(elementId));
         if (measure == null) throw new ArgumentNullException(nameof(measure));
 
@@ -149,7 +148,7 @@ public static class UiSessionGuard
         }
         catch (Exception ex) when (ex is not UiReactiveFault)
         {
-            Record(session, session.ActiveNode, elementId, kind, elementPath, ex);
+            Record(session, ctx.Node, elementId, kind, elementPath, ex);
             return fallbackHeight;
         }
     }
@@ -166,7 +165,7 @@ public static class UiSessionGuard
         session.Trip(key, diagnostic);
         if (first)
         {
-            session.Execution.Warning(diagnostic);
+            session.ReportWarning(diagnostic);
 
             // The session-scoped record is where the trip is attributed: the session owns the subscription,
             // so one window's recovery lands on that window's subscriber and on nobody else's. A session
@@ -190,7 +189,3 @@ public static class UiSessionGuard
     }
 
 }
-
-
-
-

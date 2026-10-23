@@ -111,6 +111,3 @@ public interface IUiBindingReader
     UiValueEndpoint Value(string key);
     UiChoiceEndpoint Choices(string key);
 }
-
-
-

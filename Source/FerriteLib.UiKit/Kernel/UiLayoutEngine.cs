@@ -109,86 +109,6 @@ internal sealed partial class UiLayoutEngine
     // PruneNodesExcept reaps against, so a removed item's node - and its state, its sub-nodes and its hit
     // layers - is released rather than merely zeroed.
     private readonly List<MaterializedRepeat> materializedRepeats = new();
-    // The template subtree is deliberately outside the Host's creation-time walk, because its binding keys
-    // are item-scoped and cannot exist as page bindings. Its attribute vocabulary therefore has to be
-    // enforced here, and these two sets are UiHost's own lists, copied because UiHost's are private.
-    // KernelRepeatTests reflects the private originals and fails when the copies drift, so the duplication
-    // cannot rot silently - which is the reason it is duplication rather than a hole.
-    private static readonly HashSet<string> TemplateContainerAttributes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "Id",
-        "Kind",
-        "Gap",
-        "Padding",
-        "Height",
-        "Title",
-        "TitleKey",
-        "Hidden",
-        "Tab",
-        "Width",
-        "WidthKey",
-        "Fill",
-        "MinWidth",
-        "MaxWidth",
-        "Breakpoint",
-        "Narrow",
-        "Cols",
-        "NarrowCols",
-        "NarrowHidden",
-        "WideHidden",
-        // D4: same vocabulary the page-level container gate keeps; KernelRepeatTests reflects both private
-        // originals and fails when the copies drift, so the attribute is added in lockstep or not at all.
-        "VisibleRows",
-        "Scheme",
-        "Density",
-        "Visible",
-        "VisibleKey",
-        "AlignX",
-        "OffsetX",
-        "AlignY",
-        "OffsetY",
-        "AnchorX",
-        "AnchorY",
-        "Font",
-        "SharedLabels",
-        // FL-IC2: the Cancel layer of the tree walk. Engine-wide on a container as well as a widget, because
-        // the ladder walks the TREE and a section is a legitimate layer to return from — the element that
-        // owns no drawing of its own still names a business action. UiHost keeps the mirrored pair; the
-        // drift lane refuses one-sided edits.
-        "CancelBind",
-        "UpdateScope"
-    };
-    private static readonly HashSet<string> EngineWideWidgetAttributes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "Id",
-        "Kind",
-        "Hidden",
-        "Tab",
-        "Width",
-        "WidthKey",
-        "MinWidth",
-        "MaxWidth",
-        "NarrowHidden",
-        "WideHidden",
-        "SelectedKey",
-        "Scheme",
-        "Density",
-        "Visible",
-        "VisibleKey",
-        "HelpKey",
-        "AlignX",
-        "OffsetX",
-        "AlignY",
-        "OffsetY",
-        "AnchorX",
-        "AnchorY",
-        "Font",
-        // FL-IC2: see the container list above; the two move together or the drift lane fails.
-        "CancelBind",
-        "UpdateScope"
-    };
-
-    private static readonly string[] NoSchema = Array.Empty<string>();
 
     // Widget instances are keyed by element identity, not by path text: two unnamed same-kind siblings
     // used to collide here, so the second one drew with the first one's spec.
@@ -239,7 +159,7 @@ internal sealed partial class UiLayoutEngine
         this.templates = templates ?? new Dictionary<string, UiElementSpec>(StringComparer.Ordinal);
         if (this.templates.Count > 0)
         {
-            ValidateTemplates();
+            new UiDefinitionCompiler(scope).ValidateTemplates(this.templates);
         }
     }
 
@@ -262,7 +182,7 @@ internal sealed partial class UiLayoutEngine
         // A dirty node is the per-element invalidation signal: a widget that marked its own node dirty
         // asks for a re-measure even when size, content revision, definition and language all stand still.
         layoutPass++;
-        layoutRequested = pendingLegacyValidation || cachedSnapshot == null || ctx.Session.HasDirtyNodes || cachedContentRevision != ctx.Session.ContentRevision
+        layoutRequested = pendingInputValidation || cachedSnapshot == null || ctx.Session.HasDirtyNodes || cachedContentRevision != ctx.Session.ContentRevision
             || cachedAvailable.X != width || cachedAvailable.Y != height || cachedDefinitionRevision != DefinitionRevision(ctx)
             || cachedTranslationRevision != ctx.Translation.TranslationRevision || cachedHostLayoutRevision != ctx.Theme.LayoutRevision;
         forceMeasurement = cachedSnapshot != null && (externalContentChanged || cachedDefinitionRevision != DefinitionRevision(ctx)
@@ -402,7 +322,7 @@ internal sealed partial class UiLayoutEngine
             lastEntries = box.Entries;
             observationLayoutFrame = ctx.Session.Frame;
             observationLayoutAtUtc = DateTime.UtcNow;
-            pendingLegacyValidation = false;
+            pendingInputValidation = false;
             ctx.Session.ClearDirtyNodes();
             return cachedSnapshot;
         }
@@ -537,31 +457,7 @@ internal sealed partial class UiLayoutEngine
     /// against its nearest arranged ancestor by the caller, which is how a hidden element's VisibleKey
     /// or Tab still brings it back.
     /// </summary>
-    private void RecordDeclaredKeys(UiElementSpec spec, UiNode owner, IUiBindingReader bindings)
-    {
-        RecordKey(ReadDeclaredBindKey(spec), owner, bindings);
-        RecordKey(ReadAttribute(spec, ActionBindAttribute), owner, bindings);
-        RecordKey(ReadAttribute(spec, OptionsBindAttribute), owner, bindings);
-        if (ReadAttribute(spec, TabAttribute).Length > 0)
-        {
-            // A Tab-gated element does not depend on its own tab name; it depends on the one shared
-            // active-tab binding, whatever name the author wrote.
-            RecordKey(UiBindings.ActiveTabKey, owner, bindings);
-        }
-
-        RecordKey(ReadAttribute(spec, VisibleKeyAttribute), owner, bindings);
-
-        // B5: a WidthKey declaration depends on its own binding, so an announcement on it re-arranges the
-        // node that carries it - the same registration VisibleKey gets, one line, and the reason the numeric
-        // form is not a second mechanism.
-        RecordKey(ReadAttribute(spec, WidthKeyAttribute), owner, bindings);
-
-        // A collection element declares the binding its row set comes from. Without it an announcement on
-        // that key would reach no node, and an insert, removal or reorder would leave the arranged rows as
-        // stale as a page that announced nothing - the exact refresh the keyed repeater exists to remove.
-        // Every other element answers "" here, so this costs one lookup on each.
-        RecordKey(ReadAttribute(spec, RepeatItemsAttribute), owner, bindings);
-    }
+    private void RecordDeclaredKeys(UiElementSpec spec,UiNode owner,IUiBindingReader bindings){RecordKey(ReadDeclaredBindKey(spec),owner,bindings);foreach(var attribute in spec.Attributes)if(UiDefinitionCompiler.BindingRole(scope,spec,attribute.Key)!=UiBindingRole.None)RecordKey(attribute.Value,owner,bindings);if(ReadAttribute(spec,TabAttribute).Length>0)RecordKey(UiBindings.ActiveTabKey,owner,bindings);}
 
     private void RecordKey(string key, UiNode owner, IUiBindingReader bindings)
     {
@@ -646,7 +542,7 @@ internal sealed partial class UiLayoutEngine
             var contentLayers = new List<UiPointerLayer>();
             CollectPointerLayers(lastEntries, 0, lastEntries.Count, ctx, new UiLayoutPoint(viewport.X, viewport.Y), null, UiLayoutPoint.Zero, ctx.Session.CurrentClip, contentLayers);
             ctx.Session.SetContentInputLayers(contentLayers);
-            DrawEntries(lastEntries, 0, lastEntries.Count, ctx, new UiLayoutPoint(viewport.X, viewport.Y), null, UiLayoutPoint.Zero);
+            DrawEntries(lastEntries, 0, lastEntries.Count, ctx, new UiLayoutPoint(viewport.X, viewport.Y), null, UiLayoutPoint.Zero,ctx);
             if (ctx.Session.IsActive) ctx.Session.EndHitPass();
         }
         catch
@@ -669,13 +565,13 @@ internal sealed partial class UiLayoutEngine
             {
                 // Even an undescribed node has a paint-order marker; it does not acquire an opaque hit box.
                 layers.Add(new UiPointerLayer(entry.Node.Id.Key, default, hasOperation: false));
-                if (entry.Widget is IUiPointerLayout layout && !ctx.Session.IsTripped(entry.Node) && !entry.Node.PresentationUnavailable)
+                if (UiWidgetCapabilities.Pointer(entry.Widget) is IUiPointerLayout layout && !ctx.Session.IsTripped(entry.Node) && !entry.Node.PresentationUnavailable)
                 {
                     var regions = new List<UiPointerRegion>();
                     UiNode previous = ctx.Session.EnterNode(entry.Node);
                     try
                     {
-                        UiSessionGuard.MeasureOrFallback(ctx.Session, entry.Node.Path, entry.Widget.Kind,
+                        UiSessionGuard.MeasureOrFallback(local, entry.Node.Path, entry.Widget.Kind,
                             entry.Node.Path, 0, () =>
                             {
                                 regions.AddRange(layout.PointerRegions(local, new UiLayoutRect(0, 0, rect.Width, rect.Height)));
@@ -749,7 +645,7 @@ internal sealed partial class UiLayoutEngine
         UiWidgetContext ctx,
         UiLayoutPoint viewportPosition,
         UiLayoutPoint? nativeOrigin,
-        UiLayoutPoint windowOrigin)
+        UiLayoutPoint windowOrigin,UiWidgetContext rootContext)
     {
         int index = start;
         while (index < end)
@@ -827,7 +723,7 @@ internal sealed partial class UiLayoutEngine
                     index + entry.SubtreeCount,
                     viewportPosition,
                     nativeOrigin,
-                    windowOrigin);
+                    windowOrigin,rootContext);
                 if (!ctx.Session.IsActive) return;
 #if FER_DEV
                 // DT1: the viewport's OWN band is outlined here, after its content has drawn and in this
@@ -923,7 +819,7 @@ internal sealed partial class UiLayoutEngine
         int childEnd,
         UiLayoutPoint viewportPosition,
         UiLayoutPoint? nativeOrigin,
-        UiLayoutPoint windowOrigin)
+        UiLayoutPoint windowOrigin,UiWidgetContext rootContext)
     {
         string kind = entry.ContainerKind;
 
@@ -942,10 +838,18 @@ internal sealed partial class UiLayoutEngine
             try
             {
                 ctx.Session.Execution.Scroll(outRect, contentRect, scrollPosition, true, current => {
+                bool moved = scrollPosition != current;
                 scrollPosition = current;
+                ctx.Session.SetScrollPosition(entry.Node,current);
+                if(moved)
+                {
+                    var layers=new List<UiPointerLayer>();
+                    CollectPointerLayers(lastEntries,0,lastEntries.Count,rootContext,viewportPosition,null,UiLayoutPoint.Zero,ctx.Session.HostViewport,layers);
+                    ctx.Session.SetContentInputLayers(layers);
+                }
                 // BeginScrollView may consume a wheel event and change the offset in this very pass.
                 UiLayoutPoint childWindowOrigin = new(scopeWindowOrigin.X - scrollPosition.X, scopeWindowOrigin.Y - scrollPosition.Y);
-                DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.Position, childWindowOrigin);
+                DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.Position, childWindowOrigin,rootContext);
                 });
             }
             finally
@@ -970,7 +874,7 @@ internal sealed partial class UiLayoutEngine
         try
         {
             ctx.Drawing.Clip(outRect, () => {
-            DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.Position, groupWindowOrigin);
+            DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.Position, groupWindowOrigin,rootContext);
             });
         }
         finally
@@ -1138,12 +1042,11 @@ internal sealed partial class UiLayoutEngine
                 // never reach here. Unknown old custom readers retain conservative all-key service.
                 if (widget is IUiPresentationDemand declared)
                     foreach (string key in declared.PresentationKeys(ctx.WithNode(node))) reactive.PreparePresentation(key);
-                else if (!KernelCoreWidgetRegistrar.HasKnownPresentation(widget)) reactive.PrepareAllPresentation();
                 else
                 {
                     reactive.PreparePresentation(ReadDeclaredBindKey(spec));
                     foreach (var attribute in spec.Attributes)
-                        if (attribute.Key.EndsWith("Bind", StringComparison.Ordinal) || attribute.Key is "SelectedKey" or "PayloadKey" or "WidthKey" or "VisibleKey")
+                        if (UiDefinitionCompiler.BindingRole(scope,spec,attribute.Key)!=UiBindingRole.None)
                             reactive.PreparePresentation(attribute.Value);
                 }
             }
@@ -1162,7 +1065,7 @@ internal sealed partial class UiLayoutEngine
                 height = ResolveHeight(spec, widget, measureCtx, width, node, matchContent ? reference : null);
                 if (!ctx.Session.IsTripped(node) && widget is IUiLayoutDiagnosticSource diagnosticSource)
                 {
-                    UiSessionGuard.MeasureOrFallback(ctx.Session, node.Path, widget.Kind, node.Path, 0, () =>
+                    UiSessionGuard.MeasureOrFallback(measureCtx, node.Path, widget.Kind, node.Path, 0, () =>
                     {
                         UiLayoutDiagnostic? diagnostic = diagnosticSource.DiagnoseLayout(measureCtx, height);
                         if (diagnostic.HasValue) ReportLayout(node, diagnostic.Value.Code, diagnostic.Value.Message);
@@ -1985,14 +1888,14 @@ internal sealed partial class UiLayoutEngine
     /// the next row.
     /// </para>
     /// </summary>
-    private static UiElementSpec BuildItemSpec(UiElementSpec template, string itemsKey, string itemKey, int declaredIndex)
+    private UiElementSpec BuildItemSpec(UiElementSpec template, string itemsKey, string itemKey, int declaredIndex)
     {
         string segment = template.Id.Length > 0 ? template.Id : UiNodeId.GeneratedSegment(template.Kind, declaredIndex);
         string id = segment + UiLayoutManifest.ItemKeySeparator + itemKey;
         var attributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (KeyValuePair<string, string> pair in template.Attributes)
         {
-            string value = QualifyItemBinding(pair.Key, pair.Value, itemsKey, itemKey);
+            string value = QualifyItemBinding(template,pair.Key, pair.Value, itemsKey, itemKey);
             if (string.Equals(pair.Key, "AnchorX", StringComparison.OrdinalIgnoreCase) || string.Equals(pair.Key, "AnchorY", StringComparison.OrdinalIgnoreCase))
             {
                 UiPlacement.ParseAnchor(value, pair.Key.Equals("AnchorX", StringComparison.OrdinalIgnoreCase) ? UiPlacement.Axis.Horizontal : UiPlacement.Axis.Vertical, out string target, out _);
@@ -2025,35 +1928,7 @@ internal sealed partial class UiLayoutEngine
     /// table as <c>Bind</c>, <c>ActionBind</c>, <c>OptionsBind</c>, <c>VisibleKey</c> and <c>PayloadKey</c>
     /// rather than resolving the page-level key of that name on every row.
     /// </summary>
-    private static string QualifyItemBinding(string attribute, string value, string itemsKey, string itemKey)
-    {
-        if (!string.Equals(attribute, BindAttribute, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(attribute, ActionBindAttribute, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(attribute, OptionsBindAttribute, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(attribute, VisibleKeyAttribute, StringComparison.OrdinalIgnoreCase)
-            // G2: a button's payload is per item inside a template, so it is scoped exactly like the other
-            // binding roles - that is what makes "this row's key" answerable at all.
-            && !string.Equals(attribute, "PayloadKey", StringComparison.OrdinalIgnoreCase)
-            // B1: SelectedKey is the binding-driven SELECTED state, and "which row is selected" is an
-            // answer about one row - leaving it page-scoped made every row resolve one page-level key,
-            // which is how a data-driven row set lost the ability to show which of its rows was selected.
-            && !string.Equals(attribute, "SelectedKey", StringComparison.OrdinalIgnoreCase)
-            // FL-IC2: "return from this row" is an answer about one row for exactly the same reason, and the
-            // contract asks for the tree walk to reuse the existing scope resolution rather than invent a
-            // second one - a Cancel declared inside a row template names the row's own command.
-            && !string.Equals(attribute, CancelBindAttribute, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(attribute, "PointKeysBind", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(attribute, "DisclosureBind", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(attribute, "CheckBind", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(attribute, "WidthKey", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(attribute, Widgets.OptionHelp.Attribute, StringComparison.OrdinalIgnoreCase))
-        {
-            return value;
-        }
-
-        string declared = (value ?? "").Trim();
-        return declared.Length == 0 ? value ?? "" : new UiBindingAddress(itemsKey,itemKey,declared).Key;
-    }
+    private string QualifyItemBinding(UiElementSpec spec,string attribute,string value,string itemsKey,string itemKey){if(UiDefinitionCompiler.BindingRole(scope,spec,attribute)==UiBindingRole.None)return value;string field=(value??"").Trim();return field.Length==0?value??"":new UiBindingAddress(itemsKey,itemKey,field).Key;}
 
     /// <summary>
     /// The item identity set this arrange materialized, added to the declared set the session's prune uses.
@@ -2148,114 +2023,6 @@ internal sealed partial class UiLayoutEngine
         UiWidgetContext ctx, UiNode node, string attribute, string authored, string resolved)
     {
         UiFitAudit.ReportStyleFallback(node.Path, "Repeat", attribute, authored, resolved);
-    }
-
-    // --- the template contract (P3) -------------------------------------------------------------
-
-    /// <summary>
-    /// The structural contract of the definition's templates, checked once when the engine is built - which
-    /// is Host creation, and each document commit that rebuilds the engine. The template subtree is outside
-    /// the Host's own walk on purpose (its binding keys are item-scoped and provably cannot exist as page
-    /// bindings), so its kinds and attribute vocabulary are enforced here, with the template name and the
-    /// element path in the refusal.
-    /// <para>
-    /// What this covers: an unknown widget kind, an attribute outside the kind's registered schema (plus the
-    /// engine-wide names every element accepts), and an attribute outside the container vocabulary for a
-    /// container. What it deliberately does not re-implement: UiHost's numeric and narrow-state grammar, which
-    /// needs the parent chain and the Bindings the Host holds. A malformed number inside a template therefore
-    /// degrades the way a programmatically built spec degrades instead of failing creation, and that boundary
-    /// is written in <c>docs/development/0.5/20-api-and-xml.md</c> rather than implied here.
-    /// </para>
-    /// </summary>
-    private void ValidateTemplates()
-    {
-        foreach (KeyValuePair<string, UiElementSpec> entry in templates)
-        {
-            // A template root is validated with no parent: the collection element owns the row slot, so the
-            // root is not a child of a placement or flow container and the placement vocabulary is refused
-            // there rather than accepted and then ignored by the row arrangement.
-            ValidateTemplateElement(entry.Value, entry.Key, "<Templates>/" + entry.Key, parent: null);
-        }
-    }
-
-    private void ValidateTemplateElement(UiElementSpec spec, string templateName, string path, UiElementSpec? parent)
-    {
-        // The same creation-time refusal matrix the Host runs over the page tree, run here because a template
-        // subtree is outside that walk. Element, attribute and path are all still known, which is what makes
-        // the located error possible.
-        UiPlacement.ValidateChild(spec, path, scope, parent);
-        UiPlacement.ValidateSiblingAnchors(spec, path, scope);
-
-        if (IsContainerElementName(spec.Kind))
-        {
-            RejectUnknownTemplateAttributes(spec, templateName, path, TemplateContainerAttributes, engineWide: false);
-        }
-        else
-        {
-            try
-            {
-                UiWidgetRegistry.Resolve(scope, spec.Kind);
-            }
-            catch (UiUnknownWidgetKindException ex)
-            {
-                throw TemplateContract(templateName, path, spec, ex.Message);
-            }
-
-            RejectUnknownTemplateAttributes(
-                spec,
-                templateName,
-                path,
-                UiWidgetRegistry.GetAttributeSchema(scope, spec.Kind) ?? NoSchema,
-                engineWide: true);
-        }
-
-        for (int i = 0; i < spec.Children.Count; i++)
-        {
-            UiElementSpec child = spec.Children[i];
-            ValidateTemplateElement(child, templateName, path + "/" + (child.Id.Length > 0 ? child.Id : child.Kind), spec);
-        }
-    }
-
-    private void RejectUnknownTemplateAttributes(
-        UiElementSpec spec, string templateName, string path, IReadOnlyCollection<string> allowed, bool engineWide)
-    {
-        foreach (KeyValuePair<string, string> pair in spec.Attributes)
-        {
-            if (UiAppearanceProperties.IsMetricAttribute(pair.Key))
-            {
-                if (!UiAppearanceProperties.TryMetric(pair.Value, out _))
-                    throw TemplateContract(templateName, path, spec, "Invalid " + pair.Key + ": expected a finite non-negative metric.");
-                continue;
-            }
-            if (ContainsAttribute(allowed, pair.Key) || UiAppearanceProperties.IsPaletteAttribute(pair.Key)) continue;
-            if (engineWide && EngineWideWidgetAttributes.Contains(pair.Key)) continue;
-
-            throw TemplateContract(
-                templateName,
-                path,
-                spec,
-                "Unknown attribute '" + pair.Key + "' on " + spec.Kind + " is not part of the creation-time contract.");
-        }
-    }
-
-    private static bool ContainsAttribute(IReadOnlyCollection<string> allowed, string name)
-    {
-        foreach (string candidate in allowed)
-        {
-            if (string.Equals(candidate, name, StringComparison.OrdinalIgnoreCase)) return true;
-        }
-
-        return false;
-    }
-
-    private UiContractException TemplateContract(string templateName, string path, UiElementSpec spec, string message)
-    {
-        return new UiContractException(
-            "Template '" + templateName + "' is invalid at '" + path + "': " + message,
-            scope,
-            spec.Id,
-            spec.Kind,
-            path);
     }
 
     private IUiWidget GetOrCreateWidget(UiElementSpec spec, UiNodeId id)
@@ -2590,10 +2357,10 @@ internal sealed partial class UiLayoutEngine
         // arrange pass with it, and the tree — not the control — owns whether the page survives that.
         // The fallback keeps the element's slot instead of collapsing it, so a trip cannot reshuffle
         // the rest of the page.
-        using UiBindings.DisplayScope? display = KernelCoreWidgetRegistrar.HasKnownPresentation(widget) && widget is IUiDescriptiveWidget && widget is not IUiPointerLayout ? (ctx.Bindings as UiBindings)?.DisplayOnly() : null;
+        using UiBindings.DisplayScope? display = UiWidgetCapabilities.Description(widget) != null && UiWidgetCapabilities.Pointer(widget) == null ? (ctx.Bindings as UiBindings)?.DisplayOnly() : null;
         try
         {
-            float height = Math.Max(0f, UiSessionGuard.MeasureOrFallback(ctx.Session, node.Path, widget.Kind, node.Path, RecoveryBandHeight, () => MeasureWidgetWithReuse(spec, widget, ctx, node)));
+            float height = Math.Max(0f, UiSessionGuard.MeasureOrFallback(ctx, node.Path, widget.Kind, node.Path, RecoveryBandHeight, () => MeasureWidgetWithReuse(spec, widget, ctx, node)));
             node.PresentationFault = display?.Fault;
             node.PresentationUnavailable = false;
             return height;
@@ -2930,9 +2697,3 @@ internal sealed partial class UiLayoutEngine
         }
     }
 }
-
-
-
-
-
-

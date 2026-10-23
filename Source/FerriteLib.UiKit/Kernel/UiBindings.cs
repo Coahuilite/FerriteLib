@@ -702,7 +702,3 @@ internal sealed class UiRequestFailure : InvalidOperationException
     internal UiRequestFailure(Exception cause) : base("Explicit UI request failed. Applied business writes remain applied; a new request uses current qualification.", cause) { }
     internal UiRequestFailure(string message, Exception cause) : base(message, cause) { }
 }
-
-
-
-

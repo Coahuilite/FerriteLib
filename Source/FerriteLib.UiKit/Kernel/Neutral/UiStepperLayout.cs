@@ -41,5 +41,3 @@ internal readonly struct UiStepperLayout
         return new UiStepperLayout(minus, range, field, plus, requiredWidth, width);
     }
 }
-
-

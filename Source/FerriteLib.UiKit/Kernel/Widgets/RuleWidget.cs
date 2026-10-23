@@ -32,11 +32,11 @@ internal sealed class RuleWidget : IUiWidget, IUiMeasureParticipant, IUiDescript
 
     public static void Register()
     {
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new RuleWidget(),
-            AtomVocabulary.Schema(AtomRoles.Tone, "Thickness", "Inset", "Height"));
+            AtomVocabulary.Schema(AtomRoles.Tone, "Thickness", "Inset", "Height")));
         // Deliberately no label set: a rule carries no text, so Width="Auto" has nothing honest to
         // measure here and falls back to the unsized distribution. Registering a label set for it
         // would make the Auto seam report a width this kind never draws.
@@ -90,5 +90,3 @@ ctx.Drawing,            new UiLayoutRect(rect.X + inset, rect.Y + (rect.Height -
         return Math.Max(1f, AtomVocabulary.ReadFloat(spec, "Thickness", ctx.Theme.Geometry.Hairline));
     }
 }
-
-

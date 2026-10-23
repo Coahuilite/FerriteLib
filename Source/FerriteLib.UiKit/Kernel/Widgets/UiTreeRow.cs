@@ -107,6 +107,3 @@ public readonly struct UiTreeRow
     /// </summary>
     public UiLayoutPoint ImageSize { get; }
 }
-
-
-

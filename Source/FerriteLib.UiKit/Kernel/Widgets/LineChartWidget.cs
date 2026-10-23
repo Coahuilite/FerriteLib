@@ -23,7 +23,7 @@ internal sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDes
 
     public static void Register()
     {
-        UiWidgetRegistry.Register(UiWidgetRegistry.CoreScope, Kind, () => new LineChartWidget(), new[] { "Id", "Kind", "Bind", "Points", "PointKeysBind", "Height", "Editable", "EditablePoints", "ActionBind", "Tab", "Hidden" });
+UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, Kind, () => new LineChartWidget(), new[] { "Id", "Kind", "Bind", "Points", "PointKeysBind", "Height", "Editable", "EditablePoints", "ActionBind", "Tab", "Hidden" }));
     }
 
     public void Configure(UiElementSpec spec)
@@ -148,7 +148,7 @@ internal sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDes
     private void HandleDrag(UiLayoutRect plotRect, List<UiLayoutPoint> points, HashSet<int>? editablePoints, UiWidgetContext ctx)
     {
         UiNode node = ctx.Node;
-        UiValueState state = ctx.Session.GetOrCreateValueState(ctx.Node.Id, "chart-identity");
+        UiControlState state = ctx.Session.GetControlState(ctx.Node.Id, "chart-identity");
         UiChartIdentity identity = state.ChartIdentity ??= new UiChartIdentity();
         string keysBinding = spec.TryGetAttribute("PointKeysBind", out string keysKey) ? keysKey : "";
         IReadOnlyList<string>? keys;
@@ -359,6 +359,3 @@ internal sealed class LineChartWidget : IUiWidget, IUiMeasureParticipant, IUiDes
         return value;
     }
 }
-
-
-

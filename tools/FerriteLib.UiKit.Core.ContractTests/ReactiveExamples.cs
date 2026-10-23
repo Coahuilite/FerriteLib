@@ -48,4 +48,3 @@ internal sealed class ResponseListPageExample : IDisposable
     }
     public void Dispose() => owner.Dispose();
 }
-

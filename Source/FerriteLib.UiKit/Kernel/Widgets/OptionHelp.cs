@@ -73,5 +73,3 @@ internal static class OptionHelp
         ctx.Bindings.Set(sinkKey, identity);
     }
 }
-
-

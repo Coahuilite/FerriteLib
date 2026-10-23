@@ -3,10 +3,7 @@ using System;
 namespace FerriteLib.UiKit.Kernel;
 public sealed partial class UiControls
 {
-    private bool ContentCoversEditor(UiLayoutRect rect, UiSession session, UiNode node, UiLayoutPoint windowPoint)
-        => (session.PassBeganWithPrimaryPress || PointerPhase() != UiPointerPhase.None)
-            && IsMouseOver(rect) && session.IsPointerOverHigherLayer(node, windowPoint);
-
+    private bool ContentCoversEditor(UiLayoutRect rect, UiSession session, UiNode node, UiLayoutPoint windowPoint) => (session.PassBeganWithPrimaryPress || PointerPhase() != UiPointerPhase.None) && IsMouseOver(rect) && session.IsPointerOverHigherLayer(node, windowPoint);
     public UiEditSession<T> Editor<T>(UiWidgetContext ctx, string binding, Func<T, string> format, UiEditParser<T> parse)
     {
         UiNode node = ctx.Node;
@@ -17,21 +14,23 @@ public sealed partial class UiControls
     public void SuspendEditor(UiWidgetContext ctx, string binding)
     {
         UiNode node = ctx.Node;
-        UiValueState state = ctx.Session.GetOrCreateValueState(node.Id, binding);
-        if (state.Editor is IUiEditState editor) editor.Suspend();
-        state.Focused = state.CommitRequested = false;
+        UiControlState state = ctx.Session.GetControlState(node.Id, binding);
+        if (state.Editor is IUiEditState editor)
+            editor.Suspend();
+        state.CommitRequested = false;
         ReleaseEditFocus(state, ctx.Session);
         ctx.Session.NoteEditClosed(state);
     }
 
     private UiEditSession<T> Editor<T>(UiSession session, UiNode node, string binding, UiInteractionTarget target, Func<T, string> format, UiEditParser<T> parse)
     {
-        UiValueState state = session.GetOrCreateValueState(node.Id, binding);
+        UiControlState state = session.GetControlState(node.Id, binding);
         if (node.EditingState != null && !ReferenceEquals(node.EditingState, state))
         {
-            UiValueState previous = node.EditingState;
-            previous.Focused = previous.CommitRequested = previous.DiscardRequested = false;
-            if (previous.Editor is IUiEditState previousEditor) previousEditor.Suspend();
+            UiControlState previous = node.EditingState;
+            previous.CommitRequested = previous.DiscardRequested = false;
+            if (previous.Editor is IUiEditState previousEditor)
+                previousEditor.Suspend();
             previous.Editor = null;
             ReleaseEditFocus(previous, session);
             session.NoteEditClosed(previous);
@@ -42,7 +41,8 @@ public sealed partial class UiControls
         {
             session.NoteEditClosed(state);
             ReleaseEditFocus(state, session);
-            if (state.Editor is IUiEditState priorEditor) priorEditor.Suspend();
+            if (state.Editor is IUiEditState priorEditor)
+                priorEditor.Suspend();
             editor = new UiEditSession<T>(format, parse);
             state.Editor = editor;
             state.EditorTarget = target;
@@ -57,7 +57,7 @@ public sealed partial class UiControls
     {
         UiSession session = ctx.Session;
         UiNode node = ctx.Node;
-        UiValueState state = session.GetOrCreateValueState(node.Id, binding);
+        UiControlState state = session.GetControlState(node.Id, binding);
         UiEditSession<T> editor = Editor(ctx, binding, format, parse);
         bool writable = ctx.Bindings.IsWritable(binding);
         bool available = !IsInputDisabled(node) && session.PointerInputAllowed && session.IsInputGeometryReliable;
@@ -67,12 +67,13 @@ public sealed partial class UiControls
             UiInteractionResult operation = session.Interactions.Activate(InteractionTarget(ctx, binding, "editor"), new UiInputEligibility(available, writable));
             UiInteractionRequests.Activation(InteractionTarget(ctx, binding, "editor"), operation, () => request(candidate));
         }
+
         {
             DriveEditor(rect, session, node, state, editor, model, available, covered, writable, CanReceivePointerPress(rect, ctx) && IsPointerDown(), live, multiline, ctx.Theme.Styles.Font, Request, readModel);
         }
     }
 
-    private void DriveEditor<T>(UiLayoutRect rect, UiSession session, UiNode node, UiValueState state, UiEditSession<T> editor, T model, bool available, bool covered, bool writable, bool focus, bool live, bool multiline, UiFont font, Action<T> request, Func<T> readModel)
+    private void DriveEditor<T>(UiLayoutRect rect, UiSession session, UiNode node, UiControlState state, UiEditSession<T> editor, T model, bool available, bool covered, bool writable, bool focus, bool live, bool multiline, UiFont font, Action<T> request, Func<T> readModel)
     {
         state.EditorMultiline = multiline;
         string previousDraft = editor.Draft;
@@ -125,11 +126,10 @@ public sealed partial class UiControls
 
             if (!session.IsActive)
                 return;
-            
-            
             UiNativeEditResult native = Execution.Edit(new UiNativeEdit(controlName, rect, editor.Draft, font, multiline, writable, editor.Focused, composing));
             string typed = native.Text;
-            if(native.Consumed) Input.Consume();
+            if (native.Consumed)
+                Input.Consume();
             if (!confirm && !blur && native.Focused)
                 editor.Focus();
             // Preserve the original primitive condition: a native change without a held edit is immediate.
@@ -146,9 +146,8 @@ public sealed partial class UiControls
                 ReleaseEditFocus(state, session);
             if (session.IsActive)
             {
-                if (multiline && !string.Equals(previousDraft, editor.Draft, StringComparison.Ordinal)) node.MarkDirty();
-                state.EditText = editor.Draft;
-                state.Focused = editor.Focused;
+                if (multiline && !string.Equals(previousDraft, editor.Draft, StringComparison.Ordinal))
+                    node.MarkDirty();
                 if (editor.Focused)
                     session.NoteEditOpened(state, node);
                 else
@@ -159,15 +158,12 @@ public sealed partial class UiControls
 
     internal bool NativeCompositionActive => Input.Composing;
 
-    internal bool NativeMultilineReturn(UiValueState edit) => edit.EditorMultiline && IsEnterPressed() && !Input.Control;
+    internal bool NativeMultilineReturn(UiControlState edit) => edit.EditorMultiline && IsEnterPressed() && !Input.Control;
     private bool IsCompositionKey() => Input.Phase == UiFramePhase.KeyDown && (IsEnterPressed() || Input.Key == UiKey.Escape);
-    private UiControlKey EditControlName(UiSession session, UiValueState state) => new UiControlKey("fl-edit/" + session.Identity + "/" + state.EditorTarget?.Node + "/" + state.EditorTarget?.TargetScope);
-    internal void ReleaseEditFocus(UiValueState state, UiSession session)
+    private UiControlKey EditControlName(UiSession session, UiControlState state) => new UiControlKey("fl-edit/" + session.Identity + "/" + state.EditorTarget?.Node + "/" + state.EditorTarget?.TargetScope);
+    internal void ReleaseEditFocus(UiControlState state, UiSession session)
     {
         if (Execution.HasFocus(EditControlName(session, state)))
             Execution.ReleaseFocus(EditControlName(session, state));
     }
 }
-
-
-

@@ -556,5 +556,3 @@ public static class UiLayout
 
     private static UiLayoutPlan Plan(UiLayoutFrame frame, UiLayoutRect[] slots, float natural) => new UiLayoutPlan(new UiLayoutSize(frame.Width, frame.Height.Resolve(natural, frame.AvailableHeight)), slots, natural);
 }
-
-

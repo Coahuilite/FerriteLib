@@ -210,7 +210,7 @@ internal sealed partial class UiLayoutEngine
             return;
         }
 
-        if (entry.Widget is IUiDescriptiveWidget descriptive)
+        if (entry.Widget != null && UiWidgetCapabilities.Description(entry.Widget) is IUiDescriptiveWidget descriptive)
         {
             UiDescription description = descriptive.Describe(ctx);
             Add("role", description.Role.ToString(), "wrapper");

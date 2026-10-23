@@ -3,12 +3,6 @@ namespace FerriteLib.UiKit.Kernel;
 /// <summary>Explicit registration for greenfield core widget kinds.</summary>
 internal static class KernelCoreWidgetRegistrar
 {
-    internal static bool HasKnownPresentation(IUiWidget widget) => widget is
-        Widgets.StepperSliderWidget or Widgets.ChromeBannerWidget or Widgets.InputModeRowWidget or
-        Widgets.DropdownWidget or Widgets.SectionHeaderWidget or Widgets.LineChartWidget or
-        Widgets.EmptyStateWidget or Widgets.WrappedTextWidget or Widgets.ButtonWidget or
-        Widgets.RuleWidget or Widgets.SliderWidget or Widgets.NumberFieldWidget or Widgets.TextFieldWidget or
-        Widgets.CheckboxWidget or Widgets.ProgressWidget or Widgets.ImageWidget or Widgets.TreeWidget or Widgets.RepeatTemplateWidget;
     public static void RegisterAll()
     {
         Widgets.StepperSliderWidget.Register();
@@ -36,5 +30,3 @@ internal static class KernelCoreWidgetRegistrar
         Widgets.RepeatTemplateWidget.Register();
     }
 }
-
-

@@ -161,5 +161,3 @@ public sealed class UiEditSession<T> : IUiEditState
         observed = false;
     }
 }
-
-

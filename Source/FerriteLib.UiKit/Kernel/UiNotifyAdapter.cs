@@ -460,7 +460,3 @@ public sealed class UiNotifyAdapter : IDisposable
         }
     }
 }
-
-
-
-

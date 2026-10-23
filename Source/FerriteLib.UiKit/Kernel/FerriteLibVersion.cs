@@ -241,5 +241,3 @@ public static class FerriteLibVersion
         }
     }
 }
-
-

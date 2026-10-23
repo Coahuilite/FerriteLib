@@ -37,13 +37,11 @@ internal sealed class ProgressWidget : IUiWidget, IUiMeasureParticipant, IUiDesc
 
     internal static void Register()
     {
-        // Tone only: this kind paints no text, and an attribute that cannot move a pixel is the silent
-        // no-op the creation-time contract exists to refuse.
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new ProgressWidget(),
-            AtomVocabulary.Schema(AtomRoles.Tone, "Bind", "Max", "Height"));
+            AtomVocabulary.Schema(AtomRoles.Tone, "Bind", "Max", "Height")));
         // Deliberately no label set: the proportion is drawn as a fill, so Width="Auto" has no honest text
         // to measure here and falls back to the unsized distribution.
     }
@@ -144,5 +142,3 @@ internal sealed class ProgressWidget : IUiWidget, IUiMeasureParticipant, IUiDesc
         return AtomVocabulary.ReadBindKey(spec);
     }
 }
-
-

@@ -1,44 +1,50 @@
+using UnityEngine;
+using Verse;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
 
 namespace FerriteLib.UiKit.Tests;
 
 // Real Host/layout/native event pump. Stub rendering is not target-game input or IME acceptance.
 internal static class KernelCloseoutEditingTests
 {
-    private static readonly Rect View = new(0, 0, 400, 160);
+    private static readonly Dictionary<UiHost,VerseUiExecution> executions=new();
+    private static void SetText(Func<UiLayoutRect,string,string>? read)
+    {
+        typeof(Verse.Widgets).GetField("TextControlOverride")!.SetValue(null,read==null?null:new Func<Rect,string,string>((r,t)=>read(VerseUiExecution.Rect(r),t)));
+    }
+    private static readonly UiLayoutRect View = new(0, 0, 400, 160);
     private static void Check(bool value, string name)
     { if (!value) throw new Exception(name); Console.WriteLine("  ok: CLOSEOUT-EDIT " + name); }
-    private static UiHost Host(string kind, UiBindings bindings) => new("closeout-edit",
+    private static UiHost Host(string kind, UiBindings bindings) { var host = new UiHost("closeout-edit",
         UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"closeout-edit\"><Widget Id=\"field\" Kind=\"" + kind + "\" Bind=\"value\" Min=\"0\" Max=\"100\" Height=\"28\" /></UiPage>"),
-        bindings, UiTheme.Vanilla, new Metrics(), new Translation());
+        bindings, UiTheme.Vanilla, new Metrics(), new Translation());executions.Add(host,new VerseUiExecution());return host; }
     private static void Pump(UiHost host, EventType phase = EventType.Repaint, float x = -10)
-    { Event.current = new Event { type = phase, button = 0, mousePosition = new Vector2(x, 14) }; host.DrawFrame(View); }
+    { Event.current = new Event { type = phase, button = 0, mousePosition = new Vector2(x, 14) };var native=executions[host]; host.DrawFrame(View,native.CaptureFrame(),native); }
     private static UiEditSession<float> Draft(UiHost host)
     {
         var codec = new UiNumericEdit(0, 100);
-        return UiNative.Editor<float>(host.CreateContext(400).WithNode(host.Session.GetNodeByElementId("field")!), "value", codec.Format, codec.Parse);
+        return host.Session.Controls.Editor<float>(host.CreateContext(400).WithNode(host.Session.GetNodeByElementId("field")!), "value", codec.Format, codec.Parse);
     }
     private static void Type(UiHost host, string text, float x = 330)
     {
-        UiNative.TextFieldOverride = (_, _) => text;
+        SetText((_,_)=>text);
         Pump(host, EventType.MouseDown, x);
-        UiNative.TextFieldOverride = (_, shown) => shown;
+        SetText((_,shown)=>shown);
         Pump(host, EventType.MouseUp, x);
     }
     internal static int RunAll()
     {
         try
         {
-            UiWidgetRegistry.Clear(); UiWidgetRegistry.InitializeCore();
+            UiWidgetRegistry.InitializeCore();
             CompositePress(); RangeSamples(); ReturnedRequestReadFailure(); ModelAuthority();
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine("  FAIL: CLOSEOUT-EDIT " + ex); return 1; }
-        finally { UiNative.TextFieldOverride = null; Event.current = null; GUIUtility.hotControl = 0; UiNative.DebugHotControl = 0; }
+        finally { SetText(null); Event.current=null;GUIUtility.hotControl=0;GUI.FocusControl(null);foreach(var execution in executions.Values)execution.Dispose();executions.Clear(); }
     }
     private static void CompositePress()
     {
@@ -50,7 +56,7 @@ internal static class KernelCloseoutEditingTests
         Pump(host, EventType.MouseDown, 388);
         Check(requests.Count == 0 && editor.Draft == "20", "declared plus capture outranks ordinary blur and does not publish20");
         Pump(host, EventType.MouseUp, 388);
-        Check(requests.SequenceEqual(new[] { 21f }) && !editor.HasDraft && host.Session.ActiveEditState == null,
+        Check(requests.SequenceEqual(new[] { 21f }) && !editor.HasDraft && !host.InputState.IsEditing,
             "qualified plus release requests only21 and closes this editor's active record");
         Check(ReferenceEquals(editor, Draft(host)) && host.Session.GetNodeByElementId("field")!.Id.Key == node,
             "composite takeover keeps Host and editor instance identity");
@@ -112,3 +118,5 @@ internal static class KernelCloseoutEditingTests
     private sealed class Translation : IUiTranslation
     { public int TranslationRevision => 0; public string Translate(string key) => key; }
 }
+
+

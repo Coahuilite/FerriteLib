@@ -22,4 +22,3 @@ public sealed class VerseFerriteMainThread : IUiMainThread
 
     public bool IsCurrent => UnityData.IsInMainThread;
 }
-

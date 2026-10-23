@@ -338,5 +338,3 @@ public sealed class UiStyleResolver
         issues.Add(new UiStyleIssue(message, line, elementPath));
     }
 }
-
-

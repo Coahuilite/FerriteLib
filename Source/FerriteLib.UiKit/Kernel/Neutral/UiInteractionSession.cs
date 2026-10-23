@@ -318,5 +318,3 @@ public sealed class UiInteractionSession : IDisposable
             throw new ObjectDisposedException(nameof(UiInteractionSession));
     }
 }
-
-

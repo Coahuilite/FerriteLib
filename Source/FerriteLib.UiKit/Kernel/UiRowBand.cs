@@ -288,5 +288,3 @@ public readonly struct UiRowBandActions
     public string DisclosureTarget { get; }
     public string CheckboxTarget { get; }
 }
-
-

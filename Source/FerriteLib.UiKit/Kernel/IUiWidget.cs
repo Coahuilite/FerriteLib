@@ -25,5 +25,3 @@ public interface IUiWidget
     /// <summary>Draws into the arranged rect and handles the current IMGUI event synchronously.</summary>
     void Draw(UiLayoutRect rect, UiWidgetContext ctx);
 }
-
-

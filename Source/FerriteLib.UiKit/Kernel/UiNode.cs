@@ -18,7 +18,29 @@ namespace FerriteLib.UiKit.Kernel;
 public sealed class UiNode
 {
     private readonly UiSession session;
-    private readonly Dictionary<string, UiValueState> slots = new(StringComparer.Ordinal);
+    internal UiSession Owner => session;
+    private readonly Dictionary<string,object> customState = new(StringComparer.Ordinal);
+    private readonly Dictionary<string,Action> customRelease = new(StringComparer.Ordinal);
+    private bool released;
+    public T GetState<T>(string name,Func<T> create,Action<T>? release=null) where T:class
+    {
+        if(!session.IsActive||released)throw new ObjectDisposedException(nameof(UiNode));
+        if(create==null)throw new ArgumentNullException(nameof(create));
+        if(!customState.TryGetValue(name,out object? state)){state=create()??throw new InvalidOperationException("Node state factory returned null.");customState.Add(name,state);if(release!=null){T owned=(T)state;customRelease.Add(name,()=>release(owned));}}
+        return state as T??throw new InvalidOperationException("Node state '"+name+"' has another declared type.");
+    }
+    internal void ResetCustomState()
+    {
+        var releases=new List<Action>(customRelease.Values);customRelease.Clear();customState.Clear();
+        foreach(var release in releases)try{release();}catch(Exception error){session.ReportWarning("[FerriteLib.UiKit] node state release failed at '"+Path+"': "+error);}
+    }
+    internal void ReleaseState()
+    {
+        if(released)return;released=true;ResetCustomState();
+        foreach(var slot in slots.Values){if(slot.Editor is IUiEditState editor)editor.Suspend();slot.Editor=null;slot.EditorTarget=null;slot.ChartIdentity=null;}
+        slots.Clear();EditingState=null;children.Clear();Parent=null;
+    }
+    private readonly Dictionary<string, UiControlState> slots = new(StringComparer.Ordinal);
     private readonly List<UiNode> children = new();
 
     internal UiNode(UiSession session, UiNodeId id, string kind, int ordinal, bool needsMeasure = true, string elementId = "")
@@ -29,7 +51,7 @@ public sealed class UiNode
         Ordinal = ordinal;
         ElementId = elementId ?? "";
         Properties = new UiElementProperties(MarkDirty);
-        State = new UiValueState();
+        State = new UiControlState();
         slots.Add("", State);
 
         // An element node that has never been measured is dirty by definition; the session clears every
@@ -77,7 +99,7 @@ public sealed class UiNode
     public bool IsArranged => Rect.HasValue;
 
     /// <summary>The element's own value state - the unnamed slot every node has.</summary>
-    public UiValueState State { get; }
+    internal UiControlState State { get; }
 
     public UiElementProperties Properties { get; }
 
@@ -94,11 +116,11 @@ public sealed class UiNode
 
     /// <summary>Explicit business identity; change when a getter switches logical objects.</summary>
     public string InteractionScope { get; set; } = "";
-    internal UiValueState? EditingState;
+    internal UiControlState? EditingState;
     public float SharedLabelWidth { get; internal set; }
 
     /// <summary>Every named state slot this node owns, keyed by the name the widget used.</summary>
-    internal IReadOnlyDictionary<string, UiValueState> ValueStates => slots;
+    internal IReadOnlyDictionary<string, UiControlState> ValueStates => slots;
 
     /// <summary>
     /// True while this node's own Measure must run again. The engine re-arranges when any element node is
@@ -137,22 +159,17 @@ public sealed class UiNode
     /// <summary>Marks this node's Measure as needed. Idempotent.</summary>
     public void MarkDirty()
     {
+        if(released||!session.IsActive)throw new ObjectDisposedException(nameof(UiNode));
         if (IsDirty) return;
         IsDirty = true;
         session.NodeMarkedDirty(this);
     }
-
-    /// <summary>
-    /// The node's named state slot, created on first use. A composite that drives several stateful controls
-    /// inside one element (a slider and a number field), or a widget that minted a sub-node for one of its
-    /// own controls, keeps them apart by name; two nodes never share a slot whatever names they use.
-    /// </summary>
-    public UiValueState GetOrCreateState(string stateKey)
+internal UiControlState GetOrCreateState(string stateKey)
     {
         if (stateKey == null) throw new ArgumentNullException(nameof(stateKey));
-        if (!slots.TryGetValue(stateKey, out UiValueState? state))
+        if (!slots.TryGetValue(stateKey, out UiControlState? state))
         {
-            state = new UiValueState();
+            state = new UiControlState();
             slots.Add(stateKey, state);
         }
 
@@ -236,6 +253,3 @@ public sealed class UiNode
         ContentRect = null;
     }
 }
-
-
-

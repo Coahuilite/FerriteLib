@@ -765,5 +765,3 @@ public static class UiDiagnosticHub
         }
     }
 }
-
-

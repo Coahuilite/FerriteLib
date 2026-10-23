@@ -85,5 +85,3 @@ public sealed class UiLayoutSnapshot
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }
-
-

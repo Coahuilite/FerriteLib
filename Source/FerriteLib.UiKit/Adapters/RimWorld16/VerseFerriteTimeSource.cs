@@ -18,4 +18,3 @@ public sealed class VerseFerriteTimeSource : IUiTimeSource
 
     public double NowSeconds => Time.realtimeSinceStartup;
 }
-

@@ -708,6 +708,3 @@ public sealed class UiLayoutManifest
         public bool HasLineInfo() => false;
     }
 }
-
-
-

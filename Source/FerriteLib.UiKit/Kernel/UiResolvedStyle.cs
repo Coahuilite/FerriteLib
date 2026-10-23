@@ -148,5 +148,3 @@ public sealed class UiStyleTable
         lastFallback = diagnostic;
     }
 }
-
-

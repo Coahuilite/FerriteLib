@@ -23,6 +23,7 @@ public sealed class Event
 {
     public bool control { get; set; }
     public bool command { get; set; }
+    public bool shift { get; set; }
     public string commandName { get; set; } = "";
     public static Event? current { get; set; }
 
@@ -177,17 +178,20 @@ public static class GUI
     }
 
     public static Color color { get; set; } = Color.white;
+    public static Color backgroundColor { get; set; } = Color.white;
+    public static Color contentColor { get; set; } = Color.white;
+    public static bool enabled { get; set; } = true;
+    public static string NextControlName = "";
+    private static string focusedControl = "";
 
-    public static void SetNextControlName(string name)
-    {
-    }
+    public static void SetNextControlName(string name) { NextControlName = name; }
 
     public static string GetNameOfFocusedControl()
     {
-        return "";
+        return focusedControl;
     }
 
-    public static void FocusControl(string? name) { }
+    public static void FocusControl(string? name) { focusedControl = name ?? ""; }
 
     private static readonly System.Collections.Generic.Stack<Vector2> groupOrigins = new();
     private static readonly System.Collections.Generic.Stack<Rect> groupClips = new();
@@ -247,3 +251,5 @@ public sealed class GUIStyle
     public RectOffset padding { get; set; } = new();
     public RectOffset border { get; set; } = new();
 }
+
+

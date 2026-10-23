@@ -188,5 +188,3 @@ internal static class ReactiveInventoryTests
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }
-
-

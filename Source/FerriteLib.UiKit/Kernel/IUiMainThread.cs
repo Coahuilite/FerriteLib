@@ -20,5 +20,3 @@ public interface IUiMainThread
     /// <summary>True when the caller may touch the game's own objects.</summary>
     bool IsCurrent { get; }
 }
-
-

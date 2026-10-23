@@ -32,7 +32,7 @@ internal sealed class RepeatTemplateWidget : IUiWidget, IUiMeasureParticipant
 
     internal static void Register()
     {
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new RepeatTemplateWidget(),
@@ -40,7 +40,7 @@ internal sealed class RepeatTemplateWidget : IUiWidget, IUiMeasureParticipant
             {
                 "Id", "Kind", "Items", "Template", "Padding", "Gap", "Height",
                 "Hidden", "Tab", "Visible", "VisibleKey"
-            });
+            }));
         // No label set: the rows' labels live in the template's own kinds, and Width="Auto" on the repeat
         // itself would be measuring a box that draws no text.
     }
@@ -86,5 +86,3 @@ internal sealed class RepeatTemplateWidget : IUiWidget, IUiMeasureParticipant
     {
     }
 }
-
-

@@ -264,6 +264,3 @@ public sealed class UiTheme
     public UiSurfaceStyle WarningSurface => Surface(UiPaletteRole.WarningSurface, UiPaletteRole.WarningBorder);
     public UiSurfaceStyle DangerSurface => Surface(UiPaletteRole.DangerSurface, UiPaletteRole.DangerBorder);
 }
-
-
-

@@ -9,5 +9,3 @@ public interface IUiMeasureParticipant
 {
     UiMeasurement CaptureMeasurement(UiWidgetContext context);
 }
-
-

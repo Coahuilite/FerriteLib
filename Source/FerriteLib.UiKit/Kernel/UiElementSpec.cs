@@ -4,77 +4,49 @@ using System.Collections.ObjectModel;
 using System.Linq;
 
 namespace FerriteLib.UiKit.Kernel;
-
-/// <summary>
-/// Parsed XML element spec for a widget. Attribute lookup is case-insensitive; the stored
-/// dictionaries are read-only snapshots.
-/// </summary>
+/// <summary>One immutable, typed declaration used by both XML and C# authoring.</summary>
 public sealed class UiElementSpec
 {
-    private readonly IReadOnlyDictionary<string, string> attributes;
-
-    /// <summary>Stable XML id; empty for non-interactive elements.</summary>
     public string Id { get; }
-
-    /// <summary>Widget Kind tag as written in the manifest.</summary>
     public string Kind { get; }
-
-    /// <summary>All XML attributes (including Id and Kind) keyed case-insensitively.</summary>
-    public IReadOnlyDictionary<string, string> Attributes => attributes;
-
-    /// <summary>Child specs. Flat manifests produce an empty list.</summary>
+    public IReadOnlyDictionary<string, UiAttributeValue> Values { get; }
+    public IReadOnlyDictionary<string, string> Attributes { get; }
     public IReadOnlyList<UiElementSpec> Children { get; }
     public IReadOnlyList<UiChoice<string>> Choices { get; }
 
-    public UiElementSpec(
-        string id,
-        string kind,
-        IReadOnlyDictionary<string, string>? attributes = null,
-        IReadOnlyList<UiElementSpec>? children = null, IReadOnlyList<UiChoice<string>>? choices = null)
+    public UiElementSpec(string id, string kind, IReadOnlyDictionary<string, UiAttributeValue>? values = null, IReadOnlyList<UiElementSpec>? children = null, IReadOnlyList<UiChoice<string>>? choices = null)
     {
-        if (kind == null) throw new ArgumentNullException(nameof(kind));
-        if (kind.Length == 0) throw new ArgumentException("Widget Kind must not be empty.", nameof(kind));
-
         Id = id ?? "";
-        Kind = kind;
-
-        var attributeCopy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        if (attributes != null)
-        {
-            foreach (KeyValuePair<string, string> pair in attributes)
-                attributeCopy[pair.Key] = pair.Value;
-        }
-        this.attributes = new ReadOnlyDictionary<string, string>(attributeCopy);
-
-        Choices = choices == null ? Array.Empty<UiChoice<string>>() : Array.AsReadOnly(choices.ToArray());
-        Children = children == null
-            ? Array.Empty<UiElementSpec>()
-            : Array.AsReadOnly(children.ToArray());
+        Kind = kind ?? throw new ArgumentNullException(nameof(kind));
+        if (kind.Length == 0)
+            throw new ArgumentException("Widget kind must not be empty.", nameof(kind));
+        var copy = new Dictionary<string, UiAttributeValue>(StringComparer.OrdinalIgnoreCase);
+        if (values != null)
+            foreach (var p in values)
+                copy[p.Key] = p.Value;
+        Values = new ReadOnlyDictionary<string, UiAttributeValue>(copy);
+        Attributes = new ReadOnlyDictionary<string, string>(copy.ToDictionary(p => p.Key, p => p.Value.Text, StringComparer.OrdinalIgnoreCase));
+        Children = Array.AsReadOnly((children ?? Array.Empty<UiElementSpec>()).ToArray());
+        Choices = Array.AsReadOnly((choices ?? Array.Empty<UiChoice<string>>()).ToArray());
     }
 
-    /// <summary>Case-insensitive attribute lookup.</summary>
-    public bool TryGetAttribute(string name, out string value)
+    // XML boundary and internal derived declarations. Public C# authors construct typed values directly.
+    internal UiElementSpec(string id, string kind, IReadOnlyDictionary<string, string>? attributes, IReadOnlyList<UiElementSpec>? children = null, IReadOnlyList<UiChoice<string>>? choices = null) : this(id, kind, attributes?.ToDictionary(p => p.Key, p => UiAttributeValue.Literal(p.Value), StringComparer.OrdinalIgnoreCase), children, choices)
     {
-        if (name == null)
-        {
-            value = null!;
-            return false;
-        }
-        return attributes.TryGetValue(name, out value!);
     }
 
-    public static UiElementSpec Empty { get; } = new UiElementSpec();
-
-    private UiElementSpec()
+    public bool TryGetAttribute(string name, out string value) => Attributes.TryGetValue(name, out value!);
+    public bool TryGetNumber(string name, out float value)
     {
-        Id = "";
-        Kind = "";
-        attributes = new ReadOnlyDictionary<string, string>(
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
-        Children = Array.Empty<UiElementSpec>();
-        Choices = Array.Empty<UiChoice<string>>();
+        value = 0;
+        return Values.TryGetValue(name, out var literal) && literal.TryNumber(out value);
     }
+
+    public bool TryGetBoolean(string name, out bool value)
+    {
+        value = false;
+        return Values.TryGetValue(name, out var literal) && literal.TryBoolean(out value);
+    }
+
+    public static UiElementSpec Empty { get; } = new UiElementSpec("", "empty");
 }
-
-
-

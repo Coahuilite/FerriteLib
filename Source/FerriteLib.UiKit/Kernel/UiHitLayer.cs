@@ -44,5 +44,3 @@ public readonly struct UiHitLayer
     /// <summary>True for a popup layer, which always sits above content.</summary>
     public bool IsPopup { get; }
 }
-
-

@@ -11,11 +11,12 @@ static class Program
         var binding=new UiBindings();float number=10;int writes=0,choice=1;
         binding.BindValue("number",()=>number,v=>{number=v;writes++;});
         binding.BindValue("choice",()=>choice,v=>choice=v);
+        string uiSelection="a";binding.BindReadOnly("uiSelection",()=>uiSelection);binding.BindChoices("uiSelection",()=>new[]{new UiChoice<string>("Visible A","a"),new UiChoice<string>("Visible B","b")});
         binding.BindChoices("choice",()=>new[]{new UiChoice<int>("First",1,"first-help"),new UiChoice<int>("Second",2,"second-help")});
         var a=new Row{Key="a",Text="old-a"};var b=new Row{Key="b",Text="b"};IReadOnlyList<Row> rows=new[]{a,b};
         using var items=new UiItemBindings<Row>(binding,"rows",()=>rows,r=>r.Key,s=>{s.Value("name",r=>r.Text,(r,v)=>r.Text=v);s.Command("apply",r=>r.Hits++);});
-        UiWidgetRegistry.Register("author","author/visual",()=>new CustomVisual(),new[]{"Id","Kind"});
-        var xml="<UiPage Schema='2' Source='author'><Templates><Row Id='row'><Widget Id='name' Kind='input/text-field' Bind='name'/></Row></Templates><Stack Id='body'><Widget Id='editor' Kind='input/number-field' Bind='number' Min='0' Max='100'/><Widget Id='choice-ui' Kind='input/dropdown' Bind='choice'/><Repeat Id='repeat' Items='rows' Template='row'/><Widget Id='custom' Kind='author/visual'/></Stack></UiPage>";
+UiWidgetRegistry.Define(new UiWidgetDefinition("author","author/visual",()=>new UiWidgetParts("author/visual",paint:(r,c)=>{CustomVisual.Draws++;UiThemeDraw.Label(c.Drawing,r,"custom-public",c.Theme);}),new UiAttributeSchema()));
+        var xml="<UiPage Schema='2' Source='author'><Templates><Row Id='row'><Widget Id='name' Kind='input/text-field' Bind='name'/><Widget Id='apply' Kind='input/button' ActionBind='apply' Text='Apply'/></Row></Templates><Stack Id='body'><Widget Id='editor' Kind='input/number-field' Bind='number' Min='0' Max='100'/><Widget Id='choice-ui' Kind='input/dropdown' Bind='choice'/><Repeat Id='repeat' Items='rows' Template='row'/><Widget Id='selected-object' Kind='input/dropdown' Bind='uiSelection'/><Widget Id='custom' Kind='author/visual' Height='30'/></Stack></UiPage>";
         using var host=new UiHost("author",UiLayoutManifest.Parse(xml),binding,new UiTheme(),new Metrics(),new Translation());
         var execution=new Execution();var viewport=new UiLayoutRect(0,0,600,600);
         void Frame(UiFramePhase phase,UiLayoutPoint pointer=default,UiKey key=UiKey.None) => host.DrawFrame(viewport,new UiFrame(phase,pointer,key:key),execution);
@@ -43,6 +44,25 @@ static class Program
         Check(execution.Texts.Count>paints&&independent==1,"independent C# visual and headless behavior require neither Host nor fabricated node/rect");
         var staticXml=UiLayoutManifest.Parse("<UiPage Schema='2' Source='author'><Widget Id='static' Kind='input/dropdown'><Choice Value='a' Text='Alpha' Help='a-help'/></Widget></UiPage>");
         Check(staticXml.Roots[0].Choices[0].Value=="a"&&staticXml.Roots[0].Choices[0].Help=="a-help","XML static choices normalize into same label/value/help carrier");
+        var currentB=new Row{Key="b",Text="current-b"};rows=new[]{replacement,new Row{Key="c",Text="c"},currentB};items.Refresh();
+        var operation=Layout().RectById["apply#b"];var operationPoint=new UiLayoutPoint(operation.X+operation.Width/2,operation.Y+operation.Height/2);
+        Frame(UiFramePhase.MouseDown,operationPoint);Frame(UiFramePhase.MouseUp,operationPoint);
+        Check(uiSelection=="a"&&currentB.Hits==1&&b.Hits==0&&replacement.Hits==1,"actual Repeat button targets current b at index2 while visible selection stays a; neither stale b nor selected a is commanded");
+        int released=0;UiNode customNode=host.Session.GetNodeByElementId("custom")!;object owned=customNode.GetState("owned",()=>new object(),_=>released++);
+        var identity=host.Session.Identity;var numeric=new UiNumericEdit(0,100);execution.NextText="55";
+        edit=Layout().RectById["editor"];Frame(UiFramePhase.MouseDown,new UiLayoutPoint(edit.X+edit.Width/2,edit.Y+edit.Height/2));
+        UiEditSession<float> draft=host.Session.Controls.Editor<float>(host.CreateContext(600).WithNode(host.Session.GetNodeByElementId("editor")!),"number",numeric.Format,numeric.Parse);
+        host.SetDisplayDemand(false);number=30;binding.NotifyChanged("number");
+        using(var other=new UiHost("author",UiLayoutManifest.Parse("<UiPage Schema='2' Source='author'><Widget Id='other' Kind='input/number-field' Bind='number' Min='0' Max='100'/></UiPage>"),binding,new UiTheme(),new Metrics(),new Translation()))
+        {
+            var otherExecution=new Execution();other.DrawFrame(viewport,new UiFrame(UiFramePhase.Repaint),otherExecution);
+            Check(draft.Draft=="55"&&otherExecution.Edits==1&&released==0&&ReferenceEquals(owned,customNode.GetState("owned",()=>new object())),"hidden first panel retains draft and local ownership while another Host continues shared current business");
+        }
+        host.SetDisplayDemand(true);Frame(UiFramePhase.Repaint);
+        Check(host.Session.Identity==identity&&draft.Draft=="55"&&draft.Conflict&&released==0,"restoring the same panel preserves actual identity and reliable conflicting draft; hide is not destruction");
+        host.UpdateDefinition(UiLayoutManifest.Parse(xml.Replace("<Widget Id='custom' Kind='author/visual' Height='30'/>","")));Frame(UiFramePhase.Repaint);
+        bool oldHandle=false;try{customNode.GetState("owned",()=>new object());}catch(ObjectDisposedException){oldHandle=true;}
+        Check(released==1&&oldHandle,"actual removal releases explicitly owned local resources once and diagnoses stale node use");
         Console.WriteLine("REFACTOR-AUTHOR assertions="+assertions+" writes="+writes+" choice="+choice+" replacement-hits="+replacement.Hits);
     }
     sealed class Row { public string Key="",Text="";public int Hits; }
@@ -80,4 +100,3 @@ static class Program
         public void Warning(string text)=>Console.WriteLine("WARNING "+text);
     }
 }
-

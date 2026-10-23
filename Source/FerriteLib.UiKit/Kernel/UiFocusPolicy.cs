@@ -32,5 +32,3 @@ public enum UiFocusPolicy
     /// <summary>Only an explicit <see cref="UiWindowCatalog.Activate(UiWindowKey)"/> moves the target.</summary>
     Manual = 2
 }
-
-

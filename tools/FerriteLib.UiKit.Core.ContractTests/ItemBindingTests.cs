@@ -30,4 +30,3 @@ internal static class ItemBindingTests
         Console.WriteLine("ITEM-TRACE same-key=a old-count=" + old.Count + " current-count=" + replacement.Count + " requests=" + replacement.Requests + " removed=b subscriptions=0");
     }
 }
-

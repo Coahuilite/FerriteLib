@@ -93,4 +93,3 @@ public readonly struct UiWindowKey : IEquatable<UiWindowKey>
         return Consumer + "/" + WindowKind + "/" + ContextKey;
     }
 }
-

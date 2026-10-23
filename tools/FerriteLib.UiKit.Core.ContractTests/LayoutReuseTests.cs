@@ -94,4 +94,3 @@ internal static class LayoutReuseTests
         Console.WriteLine($"RU2-NEUTRAL workshop a={bands["a"].Calculations} b={bands["b"].Calculations} c={bands["c"].Calculations} arrangements={arrangements} slots={prior!.Plan.Slots.Count}");
     }
 }
-

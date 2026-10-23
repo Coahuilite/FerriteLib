@@ -457,6 +457,7 @@ public static class Widgets
     public static readonly List<string> LabelTexts = new();
     public static readonly List<Color> LabelColors = new();
     public static int ScrollViewDepth;
+    public static Func<Vector2,Vector2>? ScrollOffsetOverride;
     public static int BeginScrollViewCalls;
     public static int EndScrollViewCalls;
 
@@ -535,11 +536,22 @@ public static class Widgets
         return value;
     }
 
-    public static string TextArea(Rect rect, string text, bool readOnly = false) => text;
+    public static int TextControlCalls;
+    public static Func<Rect,string,string>? TextControlOverride;
+    public static Action? TextControlDuring;
+    public static string TextArea(Rect rect, string text, bool readOnly = false) => EditText(rect,text,readOnly);
+    private static string EditText(Rect rect,string text,bool readOnly)
+    {
+        TextControlCalls++;TextControlDuring?.Invoke();
+        if(Event.current?.type==EventType.MouseDown && Mouse.IsOver(rect))GUI.FocusControl(GUI.NextControlName);
+        string result=TextControlOverride?.Invoke(rect,text)??text;
+        return readOnly?text:result;
+    }
+    public static void DrawLine(Vector2 from,Vector2 to,Color colour,float width) { GUI.PaintTrace.Add("line"); }
 
     public static string TextField(Rect rect, string text)
     {
-        return text ?? "";
+        return EditText(rect,text??"",false);
     }
 
     public static void BeginScrollView(Rect outRect, ref Vector2 scrollPosition, Rect viewRect)
@@ -549,6 +561,7 @@ public static class Widgets
 
     public static void BeginScrollView(Rect outRect, ref Vector2 scrollPosition, Rect viewRect, bool showVerticalScrollbar)
     {
+        if(ScrollOffsetOverride!=null)scrollPosition=ScrollOffsetOverride(scrollPosition);
         ScrollViewDepth++;
         BeginScrollViewCalls++;
         // Real scroll views open a GUI group whose origin is the visible out rect minus the scroll
@@ -1128,3 +1141,4 @@ public static class Find
 {
     public static WindowStack WindowStack { get; set; } = new WindowStack();
 }
+

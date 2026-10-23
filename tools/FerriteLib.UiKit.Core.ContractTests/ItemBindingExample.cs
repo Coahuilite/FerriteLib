@@ -27,4 +27,3 @@ internal sealed class ItemBindingExample : IDisposable
     }
     public void Dispose() => Items.Dispose();
 }
-

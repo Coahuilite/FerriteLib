@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using FerriteLib.UiKit.Kernel;
-using UnityEngine;
-using Verse;
 
 namespace FerriteLib.UiKit.AuthorExamples;
 
@@ -25,14 +23,14 @@ public sealed class CounterPage : IDisposable
         Host = new UiHost("author", Manifest(), Bindings, Theme(), metrics, translation);
     }
     public static UiLayoutManifest Manifest() => UiLayoutManifest.Create("author", new[] {
-        new UiElementSpec("page", "Column", new Dictionary<string,string> { ["Padding"]="0" }, new[] {
-            new UiElementSpec("caption", UiKinds.WrappedText, new Dictionary<string,string> { ["Bind"]="caption" }),
-            new UiElementSpec("add", UiKinds.Button, new Dictionary<string,string> { ["ActionBind"]="add", ["Text"]="Add" }) }) });
+        new UiElementSpec("page", "Column", new Dictionary<string,UiAttributeValue> { ["Padding"]=UiAttributeValue.Number(0) }, new[] {
+            new UiElementSpec("caption", UiKinds.WrappedText, new Dictionary<string,UiAttributeValue> { ["Bind"]=UiAttributeValue.Literal("caption") }),
+            new UiElementSpec("add", UiKinds.Button, new Dictionary<string,UiAttributeValue> { ["ActionBind"]=UiAttributeValue.Literal("add"), ["Text"]=UiAttributeValue.Literal("Add") }) }) });
     public static UiTheme Theme()
     { var theme = new UiTheme(); theme.DefaultFont = UiFont.Small; theme.Metric("RowHeight").Set(32); theme.Palette[UiPaletteRole.Accent] = new UiColour(.2f,.5f,.8f); return theme; }
     public UiPageWindow Standard(IUiTranslation translation) => new(new UiWindowKey("author", "settings", "one"),
         Manifest(), Bindings, Theme(), translation, "Settings", "Close", notice => notice.ToString());
-    public void Embedded(Rect rect, Window surroundingOwner) => Host.DrawFrame(rect, surroundingOwner);
+    public void Embedded(UiLayoutRect rect, UiFrame frame,IUiExecution execution) => Host.DrawFrame(rect,frame,execution);
     public void Dispose() { Host.Dispose(); owner.Dispose(); }
 }
 
@@ -41,26 +39,27 @@ public sealed class CustomControl : IUiWidget, IUiPointerLayout
     private string binding = "";
     public string Kind => "author/control";
     public void Configure(UiElementSpec spec) { if (!spec.TryGetAttribute("Bind", out binding)) binding = spec.Id; }
-    public void Validate(IUiBindings bindings, string path) => bindings.ValidateValue<float>(binding, path);
+    public void Validate(IUiBindingReader bindings, string path) => bindings.ValidateValue<float>(binding, path);
     public float Measure(UiWidgetContext ctx) => ctx.Theme.Geometry.RowHeight;
     public IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds) { yield return new UiPointerRegion(bounds); }
-    public void Draw(Rect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
     {
         var codec = new UiNumericEdit(0, 100);
-        UiNative.Edit(rect, ctx, binding, ctx.Bindings.Get<float>(binding), codec.Format, codec.Parse,
+        ctx.Controls.Edit(rect, ctx, binding, ctx.Bindings.Get<float>(binding), codec.Format, codec.Parse,
             false, false, value => ctx.Bindings.Set(binding, value), () => ctx.Bindings.Get<float>(binding));
-        if (ctx.IsActive) ctx.State("own-paint-count").FloatValue++;
+        if (ctx.IsActive) ctx.State("own-paint-count",()=>new PaintCount()).Value++;
     }
-    public static void Register() => UiWidgetRegistry.Register("author", "author/control", () => new CustomControl(), new[] { "Id", "Kind", "Bind" }, Array.Empty<string>());
+    private sealed class PaintCount { internal int Value; }
+    public static void Register() => UiWidgetRegistry.Define(new UiWidgetDefinition("author", "author/control", () => new CustomControl(), new UiAttributeSchema(new UiAttributeDefinition("Bind",binding:UiBindingRole.Value)), Array.Empty<string>()));
 }
 
 public static class IndependentVisual
 {
-    public static UiLayoutRect Draw(Rect rect, ITextMetrics metrics)
+    public static UiLayoutRect Draw(IUiDrawing drawing,UiLayoutRect rect, ITextMetrics metrics)
     {
         var theme = CounterPage.Theme(); theme.Metric("Gap").Set(7); theme.Metric("Gap").Remove();
-        UiThemeDraw.StatusBadge(rect, "Ready", theme, UiStatusTone.Success);
-        return UiImageLayout.Arrange(new UiLayoutRect(rect.x, rect.y, rect.width, rect.height), 100, 50);
+        UiThemeDraw.StatusBadge(drawing,rect, "Ready", theme, UiStatusTone.Success);
+        return UiImageLayout.Arrange(new UiLayoutRect(rect.X, rect.Y, rect.Width, rect.Height), 100, 50);
     }
 }
 

@@ -18,7 +18,7 @@ internal sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLab
 
     public static void Register()
     {
-        UiWidgetRegistry.Register(
+UiWidgetRegistry.Define(new UiWidgetDefinition(
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new TextFieldWidget(),
@@ -29,7 +29,7 @@ internal sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLab
             AtomVocabulary.Schema(
                 AtomRoles.ToneAndEmphasis,
                 "Bind", "Live", "Multiline", "Placeholder", "PlaceholderKey", "Label", "LabelKey", "Height"),
-            new[] { "Label", "LabelKey" });
+            new[] { "Label", "LabelKey" }));
     }
 
     public void Configure(UiElementSpec spec)
@@ -61,7 +61,7 @@ internal sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLab
             string binding = AtomVocabulary.ReadBindKey(spec);
             text = ctx.Bindings.Get<string>(binding) ?? "";
             UiNode node = ctx.Node;
-            if (node.ValueStates.TryGetValue(binding, out UiValueState? state) && state.Editor is IUiEditState edit && (edit.Focused || edit.Modified || edit.Conflict)) text = edit.Draft;
+            if (node.ValueStates.TryGetValue(binding, out UiControlState? state) && state.Editor is IUiEditState edit && (edit.Focused || edit.Modified || edit.Conflict)) text = edit.Draft;
         }
         retained.SetMeasure(c=>CaptureText(c,text,label,multiline));
         return CaptureText(ctx,text,label,multiline);
@@ -134,7 +134,7 @@ internal sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLab
     {
         if (writable == false) return;
         if (typed.Length != 0) return;
-        if (ctx.Session.GetOrCreateValueState(ctx.Node.Id, AtomVocabulary.ReadBindKey(spec)).Focused) return;
+        if (ctx.Session.GetControlState(ctx.Node.Id, AtomVocabulary.ReadBindKey(spec)).Editor is IUiEditState edit && edit.Focused) return;
 
         string placeholder = AtomVocabulary.ResolveText(spec, ctx, "Placeholder", "PlaceholderKey");
         if (placeholder.Length == 0) return;
@@ -183,5 +183,3 @@ ctx.Drawing,            new UiLayoutRect(field.X + inset, field.Y, Math.Max(1f, 
         UiThemeDraw.Label(ctx.Drawing,new UiLayoutRect(rect.X, rect.Y, layout.LabelWidth, layout.Stacked ? layout.LabelHeight : rect.Height), label, ctx.Theme, style.Text, AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft);
     }
 }
-
-
