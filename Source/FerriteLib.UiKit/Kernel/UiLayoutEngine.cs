@@ -1036,10 +1036,11 @@ internal sealed partial class UiLayoutEngine
         if (containerKind.Length == 0)
         {
             IUiWidget widget = GetOrCreateWidget(spec, node.Id);
-            if (ctx.Bindings is UiBindings reactive)
+            UiBindings reactive = UiBindings.OwnerOf(ctx.Bindings);
             {
                 // Freeze every known consumer input before any input request in Draw. Hidden elements
-                // never reach here. Unknown old custom readers retain conservative all-key service.
+                // never reach here. Custom readers declare demand through schema roles or the
+                // explicit presentation-demand capability; a forwarding reader keeps its backing.
                 if (widget is IUiPresentationDemand declared)
                     foreach (string key in declared.PresentationKeys(ctx.WithNode(node))) reactive.PreparePresentation(key);
                 else
@@ -1804,6 +1805,7 @@ internal sealed partial class UiLayoutEngine
                 state.DerivedByKey.Add(key, derived);
             }
 
+            UiDefinitionCompiler.VerifyReaderSubtree(scope,ctx.Bindings,derived,node.Path+"/"+derived.Id);
             state.Rows.Add(new ItemRow { Key = key, Index = i, Spec = derived });
         }
 
@@ -2357,7 +2359,7 @@ internal sealed partial class UiLayoutEngine
         // arrange pass with it, and the tree — not the control — owns whether the page survives that.
         // The fallback keeps the element's slot instead of collapsing it, so a trip cannot reshuffle
         // the rest of the page.
-        using UiBindings.DisplayScope? display = UiWidgetCapabilities.Description(widget) != null && UiWidgetCapabilities.Pointer(widget) == null ? (ctx.Bindings as UiBindings)?.DisplayOnly() : null;
+        using UiBindings.DisplayScope? display = UiWidgetCapabilities.Description(widget) != null && UiWidgetCapabilities.Pointer(widget) == null ? UiBindings.OwnerOf(ctx.Bindings).DisplayOnly() : null;
         try
         {
             float height = Math.Max(0f, UiSessionGuard.MeasureOrFallback(ctx, node.Path, widget.Kind, node.Path, RecoveryBandHeight, () => MeasureWidgetWithReuse(spec, widget, ctx, node)));
@@ -2508,6 +2510,10 @@ internal sealed partial class UiLayoutEngine
     private bool IsHidden(
         UiElementSpec spec, UiWidgetContext ctx, bool narrow, UiNode? parent, int declaredIndex)
     {
+        // Item templates acquire real scoped endpoints only after materialization. Check the same
+        // declared roles before either visibility or width can read them, including hidden roots.
+        string path=parent==null ? (spec.Id.Length>0?spec.Id:spec.Kind) : parent.Path+"/"+(spec.Id.Length>0?spec.Id:spec.Kind);
+        UiDefinitionCompiler.VerifyReaderKeys(scope,ctx.Bindings,spec,path);
         if (narrow
             && spec.TryGetBoolean("NarrowHidden", out bool narrowHidden) && narrowHidden)
         {

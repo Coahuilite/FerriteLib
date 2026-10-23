@@ -37,7 +37,7 @@ public static class UiSessionGuard
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
         if (node == null) throw new ArgumentNullException(nameof(node));
 
-        using UiBindings.DisplayScope? display = UiWidgetCapabilities.Description(widget) != null && UiWidgetCapabilities.Pointer(widget) == null ? (ctx.Bindings as UiBindings)?.DisplayOnly() : null;
+        using UiBindings.DisplayScope? display = UiWidgetCapabilities.Description(widget) != null && UiWidgetCapabilities.Pointer(widget) == null ? UiBindings.OwnerOf(ctx.Bindings).DisplayOnly() : null;
         try
         {
             ctx.Session.Execution.WithState(() => widget.Draw(rect, ctx));

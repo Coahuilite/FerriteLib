@@ -12,7 +12,8 @@ public sealed partial class UiHost : IDisposable
 {
     private readonly string source;
     private readonly IUiBindingReader bindings;
-    private readonly UiBindingPresentation? reactivePresentation;
+    private UiBindingPresentation? reactivePresentation;
+    private UiBindings bindingOwner;
     private readonly UiTheme theme;
     private readonly ITextMetrics metrics;
     private readonly IUiTranslation translation;
@@ -85,6 +86,7 @@ public sealed partial class UiHost : IDisposable
         this.source = source ?? throw new ArgumentNullException(nameof(source));
         this.manifest = manifest ?? throw new ArgumentNullException(nameof(manifest));
         this.bindings = bindings ?? throw new ArgumentNullException(nameof(bindings));
+        bindingOwner = UiBindings.OwnerOf(bindings);
         this.theme = theme ?? throw new ArgumentNullException(nameof(theme));
         this.metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         this.translation = translation ?? throw new ArgumentNullException(nameof(translation));
@@ -122,7 +124,7 @@ public sealed partial class UiHost : IDisposable
 
         engine = new UiLayoutEngine(source, styleResolver, manifest.Templates);
         session = new UiSession();
-        reactivePresentation = (bindings as UiBindings)?.CreateHostPresentation(source + "/" + session.Identity);
+        reactivePresentation = bindingOwner.CreateHostPresentation(source + "/" + session.Identity);
 
         // A document that went wrong must not go quiet, and the consumer must not have to remember to ask:
         // every drop the parser or the resolver recorded is published on the fit audit's appearance
@@ -220,6 +222,7 @@ public sealed partial class UiHost : IDisposable
 
     public UiLayoutSnapshot MeasureAndArrange(UiLayoutPoint available)
     {
+        RefreshBindingOwner();
         reactivePresentation?.Synchronize(false);
         if (reactivePresentation != null && presentationRevision != reactivePresentation.DemandRevision)
         {
@@ -263,6 +266,7 @@ public sealed partial class UiHost : IDisposable
 
     public void Draw(UiLayoutRect viewport, UiLayoutSnapshot snapshot)
     {
+        RefreshBindingOwner();
         using IDisposable? inputs = reactivePresentation?.Enter();
         // The draw runs inside this host's diagnostic scope: a fit-audit finding comes out of a static text
         // outlet with no session argument, and the scope is what says which host's text it was. Popups draw
@@ -490,6 +494,22 @@ public sealed partial class UiHost : IDisposable
         return true;
     }
 
+    private void RefreshBindingOwner()
+    {
+        UiBindings current = UiBindings.OwnerOf(bindings);
+        if (ReferenceEquals(current, bindingOwner)) return;
+        // Validate before dropping the previous projection. A caller can restore its backing after
+        // a failed definition update; an ordinary proxy still uses ordinary getters, not tracking.
+        ValidateManifest(manifest);
+        UiBindingPresentation? replacement = current.CreateHostPresentation(source + "/" + session.Identity);
+        reactivePresentation?.Dispose();
+        reactivePresentation = replacement;
+        bindingOwner = current;
+        presentationRevision = -1;
+        session.BumpContentRevision();
+        engine.RequestInputValidation();
+    }
+
     public void Close()
     {
         reactivePresentation?.Dispose();
@@ -505,8 +525,8 @@ public sealed partial class UiHost : IDisposable
         diagnostics?.Dispose();
         diagnostics = null;
 
-        session.Dispose();
-        engine.ReleaseLayoutCaches();
+        try { session.Dispose(); }
+        finally { engine.ReleaseLayoutCaches(); }
     }
 
     public void Dispose()

@@ -326,8 +326,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
             string actionKey = ReadActionKey();
             if (actionKey.Length > 0) ctx.Bindings.Invoke(actionKey);
         };
-        if (ctx.Bindings is UiBindings reactive) UiValueBehavior.Request(target, operation, reactive, request);
-        else UiValueBehavior.Request(target, operation, request);
+        UiValueBehavior.Request(target, operation, UiBindings.OwnerOf(ctx.Bindings), request);
     }
     private void Paint(UiLayoutRect rect, UiResolvedStyle style, bool state, string look, UiWidgetContext ctx, string label, float band)
     {

@@ -621,9 +621,12 @@ public abstract class UiWindowHost : Window
         catalog?.NotifyPreClose(this);
 
         // Closing disposes the session with the host, so reopening gets a clean retry.
-        ReleaseHost();
-        Execution.Dispose();
-        base.PreClose();
+        try { ReleaseHost(); }
+        finally
+        {
+            try { Execution.Dispose(); }
+            finally { base.PreClose(); }
+        }
     }
 
     public override void PostClose()

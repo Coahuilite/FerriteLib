@@ -6,6 +6,7 @@ namespace FerriteLib.UiKit.Kernel;
 public sealed class UiValueEndpoint
 {
     private readonly UiBindings bindings;
+    internal UiBindings Owner => bindings;
     private readonly string key;
     internal UiValueEndpoint(UiBindings bindings, string key)
     {
@@ -26,6 +27,7 @@ public sealed class UiValueEndpoint
 public sealed class UiChoiceEndpoint
 {
     private readonly UiBindings bindings;
+    internal UiBindings Owner => bindings;
     private readonly string key;
     internal UiChoiceEndpoint(UiBindings bindings, string key)
     {

@@ -17,6 +17,12 @@ namespace FerriteLib.UiKit.Kernel;
 /// </summary>
 public interface IUiBindingReader
 {
+    /// <summary>
+    /// The current registry owning endpoints and optional tracked presentation capabilities.
+    /// A forwarding reader returns its current backing, while reads/commands still go through the
+    /// reader. Ordinary bindings need no tracked registration. This is not ownership transfer.
+    /// </summary>
+    UiBindings BindingOwner { get; }
 
     T Get<T>(string elementId);
 

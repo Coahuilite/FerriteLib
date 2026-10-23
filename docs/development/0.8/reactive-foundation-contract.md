@@ -153,8 +153,10 @@ using (bindings.BeginOperation())
 All four actual binding operation entrances create implicit nested batches; external projection application
 can use `runtime.Batch()`. Automatic responses wait for the outer boundary. The shared
 `UiValueBehavior.Request(..., UiBindings, request)` boundary is used by the real Checkbox for its compound
-Set-before-Invoke operation, as well as the no-platform behavior E2E. Hand-written `IUiBindingReader` keeps the
-existing callback route; other shared extensions must choose the new operation overload explicitly when
+Set-before-Invoke operation, as well as the no-platform behavior E2E. Forwarding `IUiBindingReader`
+names its current `BindingOwner`; the real Checkbox uses that owner's same operation boundary while
+requests still pass through the reader. Ordinary registries keep the untracked RunOperation route.
+Other shared extensions must choose the operation overload explicitly when
 they compose multiple operations. Single-binding requests already enter the same runtime batch.
 
 `UiNotifyAdapter` remains an explicit mapping/notification adapter. Its capacity-driven Flush is not the

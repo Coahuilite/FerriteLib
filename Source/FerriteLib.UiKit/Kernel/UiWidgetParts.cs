@@ -41,7 +41,7 @@ public sealed class UiWidgetParts : IUiWidget, IUiMeasureParticipant, IUiWidgetC
         operate?.Invoke(rect, ctx);
         if (!ctx.IsActive)
             return;
-        using UiBindings.DisplayScope? display = (ctx.Bindings as UiBindings)?.DisplayOnly();
+        using UiBindings.DisplayScope display = UiBindings.OwnerOf(ctx.Bindings).DisplayOnly();
         paint?.Invoke(rect, ctx);
     }
 

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using FerriteLib.UiKit.Kernel;
 
-static class Program
+static partial class Program
 {
     static int assertions;
     static void Check(bool condition,string name) { if(!condition)throw new Exception(name);assertions++;Console.WriteLine("PASS "+name); }
@@ -64,6 +64,8 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("author","author/visual",()=>new 
         bool oldHandle=false;try{customNode.GetState("owned",()=>new object());}catch(ObjectDisposedException){oldHandle=true;}
         Check(released==1&&oldHandle,"actual removal releases explicitly owned local resources once and diagnoses stale node use");
         TypedLayout();
+        ProxyContracts();
+        RootOwnerContracts();
         Console.WriteLine("REFACTOR-AUTHOR assertions="+assertions+" writes="+writes+" choice="+choice+" replacement-hits="+replacement.Hits);
     }
     static void TypedLayout()

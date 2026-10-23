@@ -35,7 +35,7 @@ public sealed class StandaloneNativeNumber : IDisposable
 
     public void Dispose()
     {
-        session.Dispose();
-        execution.Dispose();
+        try { session.Dispose(); }
+        finally { execution.Dispose(); }
     }
 }

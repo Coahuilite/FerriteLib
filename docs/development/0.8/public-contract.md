@@ -29,6 +29,19 @@ value reads/writes, commands/actions/eligibility, revisions/validation and value
 Registration and `NotifyChanged` belong to the registry, not the reader. A custom reader can delegate
 to an owned registry as the real isolated consumer does. No reflection/type-probing fallback exists.
 
+A forwarding reader implements `BindingOwner => Current`, naming the registry that owns its sealed
+endpoints and optional tracked capabilities. Host still reads/invokes through the reader. Ordinary
+registrations remain ordinary; this member does not activate tracking or impose reactive thread rules.
+Keep one backing during a synchronous pass; replace it between passes. Host validates before replacing
+its per-view projection, then invalidates cached input/layout and releases old source demand.
+A failed definition can restore the previous backing without losing its prior projection.
+Missing owner or mismatched declared Value/Choices endpoints is a located contract error, including
+container/root attributes and materialized item declarations. Collection internals are not inferred.
+Endpoints retained by author code belong to the registry that minted them: reacquire them from the
+proxy after changing backing. The no-friend `ForwardingBindings` example implements the complete route.
+Changing the backing does not identify a new business target: stable item/InteractionScope conditions
+still distinguish a compatible refresh from retargeting an editor.
+
 - `BindValue/BindReadOnly`, `BindAction/BindCommand` and `NotifyChanged` retain ordinary getter and
   explicit invalidation conditions. `Set` requests the owner's mutation; it does not imply acceptance.
 - `BindChoices<T>` carries `UiChoice<T>(text,value,help,textKey)`. String is just T=string. Dynamic
@@ -83,7 +96,7 @@ configured operation regions. Descriptions/labels use `IUiDescriptiveWidget`, `I
 For **native controls without a Host**, retain a `UiSession` and create a named control context with
 `session.CreateContext(source,scope,metrics,theme,translation,reader,width)`. Capture one frame on the
 actual execution owner and call `SetFrame` once per native callback, then operate any number of controls
-on that same frame. Dispose session before execution. The complete no-friend example is
+on that same frame. Dispose session before execution, with execution disposal in a `finally`. The complete no-friend example is
 `tools/FerriteLib.UiKit.AuthorExamples/StandaloneNativeNumber.cs`. Pure semantic operations use
 `UiInteractionSession`/`UiInteractionRequests` directly, without invented Nodes/Rects.
 
@@ -112,6 +125,16 @@ owner-free overload remains. Manual frame/measure/draw requires that same explic
 SetDisplayDemand is reliable visibility, not focus; actual close disposes the owner. InputState,
 ElementProperties, scroll/interaction scope/invalidation, Accept/Cancel and attachment hooks avoid
 runtime tables. Compatible update, current scroll offset and cross-Host rollback use the same core.
+
+Execution is borrowed by Host/Session. Idle replacement is legal, and sessions can share an outer
+execution. `SetFrame` rejects a different execution during an open draw pass, capture or active/focused
+edit before changing input, qualification or ownership. End the interaction or explicitly suspend its
+editor on the old execution first; a reliable suspended draft survives an idle replacement.
+No native focus/capture or image token is transferred. Register images in their new execution scope.
+Closing Host/Session never disposes the borrowed execution; its platform owner does so in `finally`.
+Session closes logically and attempts every owned release even if native cleanup throws, then reports
+aggregate cleanup failures. Native focus names and pointer mappings are execution-scoped, including
+when two public callers use the same logical key; disposing one cannot release the other's focus.
 
 ## S7 — find errors and inspect bounded facts
 

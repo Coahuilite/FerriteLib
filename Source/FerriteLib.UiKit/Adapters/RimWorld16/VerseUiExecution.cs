@@ -11,6 +11,7 @@ public sealed class VerseUiExecution : IUiExecution, IDisposable
     private readonly Dictionary<UiControlKey, int> controls = new();
     private UiFrame? frame;
     private UiControlKey? captureOwner;
+    private UiControlKey? focusedEdit;
     public VerseUiImages Images { get; } = new VerseUiImages();
 
     public UiFrame CaptureFrame(bool inputAllowed = true)
@@ -68,7 +69,8 @@ public sealed class VerseUiExecution : IUiExecution, IDisposable
             captureOwner = null;
     }
 
-    public bool HasFocus(UiControlKey key) => GUI.GetNameOfFocusedControl() == key.Key;
+    private string FocusName(UiControlKey key) => "fl-native/" + Images.Scope.ToString(System.Globalization.CultureInfo.InvariantCulture) + "/" + key.Key;
+    public bool HasFocus(UiControlKey key) => GUI.GetNameOfFocusedControl() == FocusName(key);
     public void ReleaseFocus(UiControlKey key)
     {
         if (HasFocus(key))
@@ -81,9 +83,11 @@ public sealed class VerseUiExecution : IUiExecution, IDisposable
         WithState(() =>
         {
             Verse.Text.Font = UiKitFonts.ToGameFont(request.Font);
-            GUI.SetNextControlName(request.Control.Key);
+            GUI.SetNextControlName(FocusName(request.Control));
             if (request.Focus && !HasFocus(request.Control))
-                GUI.FocusControl(request.Control.Key);
+                GUI.FocusControl(FocusName(request.Control));
+            if (HasFocus(request.Control))
+                focusedEdit = request.Control;
             Event? current = Event.current;
             if (HasFocus(request.Control) && !request.Writable)
             {
@@ -196,11 +200,21 @@ public sealed class VerseUiExecution : IUiExecution, IDisposable
     public void Warning(string message) => Log.Warning(message);
     public void Dispose()
     {
-        foreach (var key in controls.Keys)
-            Release(key);
-        controls.Clear();
-        Images.Dispose();
-        frame = null;
+        try
+        {
+            if (focusedEdit.HasValue) ReleaseFocus(focusedEdit.Value);
+        }
+        finally
+        {
+            try { foreach (var key in controls.Keys) Release(key); }
+            finally
+            {
+                controls.Clear();
+                captureOwner = focusedEdit = null;
+                Images.Dispose();
+                frame = null;
+            }
+        }
     }
 }
 

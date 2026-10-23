@@ -7,6 +7,24 @@ internal sealed class UiDefinitionCompiler
     internal static UiBindingRole BindingRole(string scope,UiElementSpec spec,string attribute) { var role=UiWidgetRegistry.Schema(scope,spec.Kind)?.Binding(attribute)??UiBindingRole.None;return role!=UiBindingRole.None?role:UiAttributeSchema.StandardBinding(attribute); }
     private readonly string source;
     private readonly IUiBindingReader? bindings;
+    internal static void VerifyReaderKeys(string source,IUiBindingReader reader,UiElementSpec spec,string path)
+    {
+        try
+        {
+            foreach(var attribute in spec.Attributes)
+                UiBindings.VerifyReaderKey(reader,attribute.Value,BindingRole(source,spec,attribute.Key));
+        }
+        catch(InvalidOperationException error)
+        {
+            throw new UiContractException("Binding owner validation failed at '"+path+"': "+error.Message,source,spec.Id,spec.Kind,path,error);
+        }
+    }
+    internal static void VerifyReaderSubtree(string source,IUiBindingReader reader,UiElementSpec spec,string path)
+    {
+        VerifyReaderKeys(source,reader,spec,path);
+        foreach(UiElementSpec child in spec.Children)
+            VerifyReaderSubtree(source,reader,child,path+"/"+(child.Id.Length>0?child.Id:child.Kind));
+    }
     internal UiDefinitionCompiler(string source,IUiBindingReader? bindings=null){this.source=source;this.bindings=bindings;}
     internal void ValidateTemplates(IReadOnlyDictionary<string,UiElementSpec> templates)
     { foreach(var entry in templates)ValidateElement(entry.Value,"<Templates>/"+entry.Key,false,null); }    internal void ValidateManifest(UiLayoutManifest candidate)
@@ -423,6 +441,7 @@ internal sealed class UiDefinitionCompiler
         if (isContainer && spec.TryGetAttribute("Padding", out _) && !spec.TryGetNumbers("Padding", out _))
             throw new UiContractException("Invalid Padding at '" + path + "'; expected one, two or four finite numbers.", source, spec.Id, spec.Kind, path);
         if(!isContainer)UiWidgetRegistry.Schema(source,spec.Kind)?.Validate(spec,source,path);
+        if(bindings!=null) VerifyReaderKeys(source,bindings,spec,path);
         IReadOnlyCollection<string>? allowed = isContainer
             ? ContainerAttributes
             : UiWidgetRegistry.GetAttributeSchema(source, spec.Kind);

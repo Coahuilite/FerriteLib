@@ -74,6 +74,12 @@ Application code owns external delivery, tasks and result freshness; Batch does 
 
 ## Scoped layout reuse without changing business ownership
 
+For an existing forwarding reader, return its current registry from `BindingOwner` as well as
+forwarding reads/requests/endpoints. Host then preserves tracked display/DisplayOnly semantics and
+refreshes its projection on a between-pass backing switch. Ordinary getters remain untracked.
+See the [public contract](../development/0.8/public-contract.md) for missing/mismatched capability
+diagnostics and borrowed Execution's legal idle-switch/active-refusal/cleanup conditions.
+
 Declare `UpdateScope="true"` at meaningful composition roots, including a custom subtree or Repeat
 row template. Roots and default Section/Surface/Scroll/Clip/Repeat are already connected; nesting does
 not rebuild node/editor/capture identity. The library captures its default wrappers' real measurement

@@ -1386,13 +1386,13 @@ internal static class KernelCoreWidgetTests
     }
 
     /// <summary>
-    /// An <see cref="IUiBindingReader"/> implementation with NO typed seam, written against the surface as it stood
-    /// before R4-A. It compiles only while the typed path stays on the OPTIONAL companion interface, and it is
-    /// what proves a consumer that implements the surface itself keeps building and keeps working string-only.
+    /// An ordinary string-choice forwarding reader. The explicit backing capability does not require
+    /// tracked registration or replace the reader with a concrete-only Host contract.
     /// </summary>
     private sealed class StringOnlyBindings : IUiBindingReader
     {
         private readonly IUiBindingReader inner;
+        public UiBindings BindingOwner => inner.BindingOwner;
         public bool TryValue(string key,out UiValueEndpoint? value)=>inner.TryValue(key,out value);
         public UiValueEndpoint Value(string key)=>inner.Value(key);
         public UiChoiceEndpoint Choices(string key)=>inner.Choices(key);

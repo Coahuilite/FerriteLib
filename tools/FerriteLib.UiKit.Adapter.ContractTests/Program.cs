@@ -12,7 +12,7 @@ static class Program
     static FieldInfo Field(Type type,string name)=>type.GetField(name,BindingFlags.Public|BindingFlags.Static)??throw new Exception("Missing stub fact: "+name);
     sealed class Metrics:ITextMetrics { public float MeasureWidth(string text,UiFont font)=>text.Length*7;public float MeasureText(string text,UiFont font,float width)=>20; }
     sealed class Translation:IUiTranslation {public int TranslationRevision=>0;public string Translate(string key)=>key;}
-    static int Main(){try{Run();return 0;}catch(Exception e){Console.Error.WriteLine(e.GetType().FullName+": "+e.Message);return 1;}}
+    static int Main(string[] args){try{if(args.Length==1&&args[0]=="--execution-lifetime"){ExecutionLifetime.Run(Check);Console.WriteLine("LIFETIME PASS "+checks);return 0;}Run();return 0;}catch(Exception e){Console.Error.WriteLine(e.GetType().FullName+": "+e.Message);return 1;}}
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     static void Run()
     {
@@ -60,6 +60,7 @@ static class Program
             Field(typeof(NativeWidgets),"ScrollOffsetOverride").SetValue(null,null);
         }
         StandaloneNative();
+        ExecutionLifetime.Run(Check);
         FerriteLib.UiKit.Tests.KernelNativeEventConsumptionTests.Run(Check);
         Check(FerriteLib.UiKit.Tests.KernelCloseoutEditingTests.RunAll()==0,"unchanged closeout E/N/composite/readback counterexamples migrate through actual 1.6 execution");
         int readonlyChecks=0;

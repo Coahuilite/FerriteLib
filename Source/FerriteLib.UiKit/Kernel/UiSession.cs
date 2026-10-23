@@ -22,6 +22,7 @@ public sealed class UiSession : IDisposable
         IUiTranslation translation, IUiBindingReader bindings, float viewWidth)
     {
         if (!IsActive) throw new ObjectDisposedException(nameof(UiSession));
+        UiBindings.OwnerOf(bindings);
         UiNode node = GetOrCreateSubNode(Root, scope);
         return new UiWidgetContext(source, this, metrics, theme, translation, bindings, viewWidth, node.Path, node: node);
     }
@@ -32,16 +33,33 @@ public sealed class UiSession : IDisposable
     internal IUiExecution? CurrentExecution => execution;
     public IUiExecution Execution => execution ?? throw new InvalidOperationException("Drawing or native input requires an explicit execution scope.");
     public IUiDrawing Drawing => Execution;
+    /// <summary>
+    /// Borrows execution for one actual callback. Idle replacement is legal; active capture/edit or an
+    /// open hit pass must finish on the old execution. Rejection changes neither input nor ownership.
+    /// The caller owns execution disposal and its scoped images, including after session cleanup fails.
+    /// </summary>
     public void SetFrame(UiFrame frame, IUiExecution execution)
     {
         if (!IsActive) throw new ObjectDisposedException(nameof(UiSession));
         if(frame==null)throw new ArgumentNullException(nameof(frame));
+        if(execution==null)throw new ArgumentNullException(nameof(execution));
+        // Execution is borrowed, not owned. Idle owners may change it, including owners that share
+        // an outer execution. A held interaction cannot silently migrate to another native mapping.
+        if(this.execution!=null && !ReferenceEquals(this.execution,execution))
+        {
+            bool focused=false;
+            foreach(UiNode node in nodes.Values)
+                foreach(UiControlState state in node.ValueStates.Values)
+                    focused |= state.IsFocused;
+            if(hitPassOpen || ownedHotControl.HasValue || Interactions.CaptureOwner.HasValue || focused || activeEditState!=null)
+                throw new InvalidOperationException("Cannot replace borrowed execution during a draw pass or active capture/edit. End the interaction on its current execution first.");
+        }
         // Capture this once at the actual owner callback boundary, before an earlier control consumes
         // the shared frame. Independent C# editing uses the same fact without a Host/hit-pass prerequisite.
         if(!ReferenceEquals(Input,frame))
             passBeganWithPrimaryPress=frame.Phase==UiFramePhase.MouseDown&&frame.Button==0;
-        Input = frame ?? throw new ArgumentNullException(nameof(frame));
-        this.execution = execution ?? throw new ArgumentNullException(nameof(execution));
+        Input = frame;
+        this.execution = execution;
         PointerInputAllowed = frame.InputAllowed;
     }
     internal UiNode Root => unscopedNode;
@@ -1341,26 +1359,37 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
     public void Dispose()
     {
         if (!IsActive) return;
-        Interactions.Dispose();
-        if (activeEditState != null) Controls.ReleaseEditFocus(activeEditState, this);
         IsActive = false;
+        var errors = new List<Exception>();
+        void Cleanup(Action action)
+        {
+            try { action(); }
+            catch (Exception error) when (error is not OutOfMemoryException) { errors.Add(error); }
+        }
+        // Close logically before calling external/native cleanup; even a throwing release must not
+        // leave a reusable owner or skip the other owned resources. Dispose never commits a draft.
+        Cleanup(Interactions.Dispose);
+        foreach (UiNode node in nodes.Values)
+            foreach (UiControlState state in node.ValueStates.Values)
+                Cleanup(() => Controls.ReleaseEditFocus(state, this));
 
         // The session is the subscription's owner: disposing it releases the subscription, its bounded
         // buffers and its registry entry, and never a sibling session's. This is the torn-down-window
         // half of the isolation contract.
-        UiDiagnosticHub.ReleaseSession(this);
+        Cleanup(() => UiDiagnosticHub.ReleaseSession(this));
 
         if (ownedHotControl.HasValue)
         {
             // Dispose is the close path: release only this session's capture, then clear the
             // ownership record together with popup/focus/drag transient state.
-            Execution.Release(ownedHotControl.Value);
+            UiControlKey captured = ownedHotControl.Value;
+            Cleanup(() => Execution.Release(captured));
             ownedHotControl = null;
             ownedHotControlOwner = null;
         }
 
         scrollPositions.Clear();
-        foreach (UiNode node in nodes.Values) {SuspendNodeEditors(node);node.ReleaseState();}
+        foreach (UiNode node in nodes.Values) Cleanup(() => {SuspendNodeEditors(node);node.ReleaseState();});
         nodes.Clear();
         dirtyNodes.Clear();
         trippedNodes.Clear();
@@ -1392,6 +1421,10 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
         contentInputLayers.Clear();
         currentWindowOrigin = default;
         scrollTargetElementId = null;
+        execution = null;
+        Input = new UiFrame(UiFramePhase.None, inputAllowed: false);
+        PointerInputAllowed = false;
+        if (errors.Count != 0) throw new AggregateException("Session closed; one or more owned resource releases failed.", errors);
     }
 
     private void EnsureActive()

@@ -408,7 +408,7 @@ internal sealed partial class UiLayoutEngine
     {
         IReadOnlyList<UiChoice<object?>> choices;int count;string source;
         if(entry.Spec.Choices.Count>0){count=entry.Spec.Choices.Count;var prefix=new List<UiChoice<object?>>();for(int i=0;i<Math.Min(count,budget.Items);i++){var c=entry.Spec.Choices[i];prefix.Add(new UiChoice<object?>(c.Text,c.Value,c.Help,c.TextKey));}choices=prefix;source="static-options";}
-        else {choices=ctx.Bindings.Choices(UiChoiceSource.ChoiceKey(entry.Spec)).Prefix(budget.Items,out count);source="current-typed-options";}
+        else {UiBindings.VerifyReaderKey(ctx.Bindings,UiChoiceSource.ChoiceKey(entry.Spec),UiBindingRole.Choices);choices=ctx.Bindings.Choices(UiChoiceSource.ChoiceKey(entry.Spec)).Prefix(budget.Items,out count);source="current-typed-options";}
         facts.Add(new UiObservedFact("option-count",count.ToString(CultureInfo.InvariantCulture),source:source));
         for(int i=0;i<choices.Count;i++){var c=choices[i];ObserveOption(ctx,budget,facts,binding,i,UiChoiceSource.Label(c,ctx.Translation),c.Value,source);facts.Add(new UiObservedFact("option."+i+".help",budget.Limit(c.Help),source:source,truncated:c.Help.Length>budget.Text));}
         if(count>choices.Count)facts.Add(new UiObservedFact("options","",reason:"item-budget",truncated:true));

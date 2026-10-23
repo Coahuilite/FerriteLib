@@ -9,6 +9,8 @@ internal static class UiChoiceSource
     internal static string ChoiceKey(UiElementSpec spec) => spec.TryGetAttribute("OptionsBind", out string key) && key.Length > 0 ? key : ValueKey(spec);
     internal static void Validate(IUiBindingReader reader, UiElementSpec spec, string path)
     {
+        UiBindings.VerifyReaderKey(reader,ValueKey(spec),UiBindingRole.Value);
+        if(spec.Choices.Count==0)UiBindings.VerifyReaderKey(reader,ChoiceKey(spec),UiBindingRole.Choices);
         UiValueEndpoint value = reader.Value(ValueKey(spec));
         Type type = spec.Choices.Count > 0 ? typeof(string) : reader.Choices(ChoiceKey(spec)).ValueType;
         if (type != value.ValueType)
@@ -22,6 +24,7 @@ internal static class UiChoiceSource
         var result = new List<UiChoice<object?>>();
         if(spec.Choices.Count==0)
         {
+            UiBindings.VerifyReaderKey(reader,ChoiceKey(spec),UiBindingRole.Choices);
             foreach(var choice in reader.Choices(ChoiceKey(spec)).Read())
                 result.Add(new UiChoice<object?>(Label(choice,translation),choice.Value,choice.Help));
         }

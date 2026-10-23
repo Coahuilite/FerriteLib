@@ -16,6 +16,21 @@ namespace FerriteLib.UiKit.Kernel;
 /// </summary>
 public sealed partial class UiBindings : IUiBindingReader
 {
+    public UiBindings BindingOwner => this;
+    internal static UiBindings OwnerOf(IUiBindingReader reader) =>
+        reader.BindingOwner ?? throw new InvalidOperationException("IUiBindingReader must identify its current BindingOwner; forwarding without the backing capabilities cannot preserve tracked presentation or DisplayOnly.");
+    internal static void VerifyReaderKey(IUiBindingReader reader, string key, UiBindingRole role)
+    {
+        if (key.Length == 0 || (role != UiBindingRole.Value && role != UiBindingRole.Choices)) return;
+        UiBindings owner = OwnerOf(reader);
+        UiBindings? endpointOwner = null;
+        if (role == UiBindingRole.Value && reader.TryValue(key, out UiValueEndpoint? value))
+            endpointOwner = value!.Owner;
+        else if (role == UiBindingRole.Choices)
+            endpointOwner = reader.Choices(key).Owner;
+        if (endpointOwner != null && !ReferenceEquals(endpointOwner, owner))
+            throw new InvalidOperationException("Binding endpoint '" + key + "' does not belong to the reader's current BindingOwner. Forward endpoints and capabilities from the same backing.");
+    }
 
     /// <summary>
     /// The value-binding key the layout engine reads to decide which <c>Tab</c>-attributed elements are

@@ -156,7 +156,7 @@ The type census and stable set are pinned in `FerriteLibApiTierTests`. Its depen
 
 - `VerseUiExecution` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
 - `VerseUiImages` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
-- `IUiBindingReader` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
+- `IUiBindingReader` — forwards reads/requests and explicitly names its current `BindingOwner`; ordinary and tracked proxy conditions are in the refactor migration contract.
 - `UiBindingRole` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
 - `UiAttributeKind` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.
 - `UiAttributeValue` — explicit author/adapter contract; current consumers and ownership are in the refactor migration contract.

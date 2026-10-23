@@ -19,6 +19,14 @@ The payload remains one net472 DLL. Native1.6 validation and1.7 research remain 
 | Font XML redirect | Metric Token="Font"; retired Font element is a located invalid document, last-good kept |
 | Drawing helpers using global GUI | UiThemeDraw takes IUiDrawing; independent visuals do not acquire a page prerequisite |
 
+Forwarding IUiBindingReader implementations now return their current registry from BindingOwner.
+This names existing endpoint/presentation capabilities; it does not replace the reader with UiBindings
+or enroll ordinary getters in tracking. Host and DisplayOnly/demand/compound operations consume that
+same owner. Switch backing only between synchronous passes and reacquire retained endpoints.
+Missing or mismatched declared endpoint ownership is diagnosed on widgets, containers/roots and
+materialized item subtrees. The shared compiler keeps source/id/path on the error; it does not guess
+arbitrary collection internals. Public ForwardingBindings and the isolated Raven reader use this path.
+
 The current Choice.Help omission yields empty for every value type. This changes two old Dropdown
 HoverHelpKey defaults: string/static rows published Value, while typed rows published Text.
 Preserving either old output requires explicit Help=oldValue or Help=oldText at the author boundary.
@@ -78,6 +86,15 @@ Rebuild against the fixed candidate. For an existing IMGUI callback retain its e
 translate native rects once and capture/set once at the callback boundary. A session-owned standalone
 context provides the same editor without Host/XML/reactive. Use Child names for distinct parts; don't
 reuse an editor identity for a different target. Session disposal precedes execution disposal.
+
+Execution is borrowed, not automatically fixed forever. Idle owners may change it, including an idle
+session sharing another session's outer execution. SetFrame rejects replacement during the owner's
+open pass/capture/active edit before changing frame or input qualification; use the current execution
+to end capture or SuspendEditor first. Drafts survive a legal idle switch. Native mappings and tokens
+do not migrate; supplier resources remain with their original execution scope.
+Dispose the borrowed execution in finally after Session/Host disposal. Session remains closed and
+attempts all releases if one native release throws; the outer owner still clears its mappings/images.
+VerseUiExecution derives native focus names from its existing scope plus the unchanged logical key.
 
 Native images must be registered in that execution's Images scope. Store only UiImage in bindings;
 release references at owner close without destroying supplier objects. Ordinary getter notifications,
