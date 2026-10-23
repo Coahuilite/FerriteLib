@@ -36,7 +36,9 @@ against that file and pins the stable list, so an addition to the public surface
 in two places.
 
 Stable source, already compiled consumer DLLs, XML vocabulary, legal use conditions and documented behavior
-are protected within the same supported game/adapter target. After a working replacement and deprecation,
+are protected within the same supported game/adapter target. After publication, breaking a supported stable contract requires a major release. The two-minor
+deprecation window is an additional minimum, not permission to remove it in a minor release.
+After a working replacement and deprecation,
 retain the old contract through two complete subsequent published minors: deprecate in 0.9, retain through
 0.10/0.11, remove no earlier than 0.12. RC/patch numbers do not count, and 1.x cannot shorten an existing
 window. Deprecated XML redirects rather than silently doing nothing. Experimental entries may change in a

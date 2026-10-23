@@ -6,6 +6,9 @@ The stable target covers S1–S7 and their necessary parameter, return, callback
 - **Public-unstable:** usable experimental/advanced adapter or diagnostic surface. Later minor changes need an explicit migration; a frozen 0.8.x patch cannot arbitrarily break it.
 - **Internalize-candidate:** no exported types remain in this tier after the explicit prepublication migration below.
 
+After publication, breaking a supported stable contract requires a major release. The two-minor
+deprecation window is an additional minimum, not permission to remove it in a minor release.
+
 Consumer `[min,max)` checks remain binding even when old signatures are retained. No 0.7 lockstep exemption is inherited. This prepublication 0.8 development change may migrate controlled internal consumers directly; it does not establish a permanent dual API or erase configuration/save data.
 
 The type census and stable set are pinned in `FerriteLibApiTierTests`. Its dependency-closure check covers exported/protected signatures, generic arguments and extension interfaces; explicit advanced-member exceptions are listed below. A stable implementation never requires those advanced members.

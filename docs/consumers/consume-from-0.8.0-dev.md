@@ -121,6 +121,10 @@ your UI owner. Business Move refusal retains the actual business order. For comp
 use `UpdateDefinition`, not disposal/new Host and private-table copying. The isolated real-source cases
 and 1.6/1.7 support limits are in [platform evidence](../development/0.8/platform-and-real-integrations.md).
 
+After publication a breaking change to the supported stable contract requires a major release; the
+two-minor retirement window remains an additional minimum, with no1.x shortcut. The0.12 example
+is a time floor, not permission to delete a stable contract in a minor.
+
 Published same-adapter source, DLL, XML and behavioral contracts retain the supported signatures and
 legal conditions within the consumer's `[min,max)` range. A deprecated0.9 entry works through the two
 complete subsequent published minors0.10/0.11; earliest removal is0.12. This development-line internal

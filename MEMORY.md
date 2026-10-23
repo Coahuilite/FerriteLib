@@ -28,7 +28,9 @@ Resolved-property views and adjacent snapshot/style read outlets are protected w
 signatures or read/update semantics; the exact boundary is in `property-contract.md`.
 The separate AuthorExamples assembly has no internals grant. Public compatibility protects source, DLL,
 XML, meaning and legal conditions in the same adapter target; deprecation retains two complete subsequent
-published minors (0.9 → retain0.10/0.11 → earliest removal0.12), without a 1.x shortcut.
+published minors (0.9 → retain0.10/0.11 → time floor0.12), without a 1.x shortcut. The approved r2
+publication rule additionally requires a major release for breaking supported stable contracts; the
+retirement time floor alone never permits breaking removal at a minor.
 
 The isolated real-source cases, measured1.6/1.7 seams and complete neutral dependency closure are
 recorded in `docs/development/0.8/platform-and-real-integrations.md`. Fixed clean-source candidate identity
