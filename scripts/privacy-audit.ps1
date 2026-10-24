@@ -291,7 +291,7 @@ try {
 
     # ---- vector5：扫描器自匿名（2026-10-05 校准）----
     # 维护隐私的表不得自身成为隐私：扫描器源码、台账、注释里不得存任何真实个人值。
-    # 本门从运行时环境派生 token（用户名、机器名）—— 源码只引用 $env 变量、绝不写字面量 ——
+    # 本门从运行时身份派生 token（用户名、机器名）；缺失环境变量时使用 .NET 实际身份，绝不写字面量。
     # 再反查全部已跟踪文本：个人 token 以独立词出现即判定"有人把隐私写进了仓库"（可能就是本脚本）。
     # 结构性保证：个人值只活在跑门的这台机器上，从不落进门的文本或仓库。
     # 只在真正的托管 runner 上跳过：GitHub/Azure runner 的用户名是通用构建账号（常是 "admin"、
@@ -301,7 +301,12 @@ try {
         Write-Host 'vector5 (scanner anonymity): SKIPPED on hosted runner (runner identity is not the maintainer secret)'
     }
     else {
-        $anonTokens = @($env:USERNAME, $env:COMPUTERNAME) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+        $userToken = if ([string]::IsNullOrWhiteSpace($env:USERNAME)) { [Environment]::UserName } else { $env:USERNAME }
+        $machineToken = if ([string]::IsNullOrWhiteSpace($env:COMPUTERNAME)) { [Environment]::MachineName } else { $env:COMPUTERNAME }
+        if ([string]::IsNullOrWhiteSpace($userToken) -or [string]::IsNullOrWhiteSpace($machineToken)) {
+            throw 'vector5 anonymity: effective user and machine identities are required; cannot audit anonymity.'
+        }
+        $anonTokens = @(@($userToken, $machineToken) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
         $anonLeaks = New-Object 'System.Collections.Generic.List[string]'
         foreach ($tok in $anonTokens) {
             # -F 定值搜（避开 ERE 转义地狱），再在 PowerShell 侧用 .NET 词边界精判，
