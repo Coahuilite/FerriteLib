@@ -8,7 +8,7 @@ no patches, no languages, no textures: enabling it alone changes nothing in the 
 your mod list without a consumer installed, that consumer was uninstalled or disabled; the mod is safe
 to disable only when no enabled mod depends on it.
 
-**Development line: 0.8.0 technical candidate.** See the [active specification](docs/development/0.8/README.md), [complete migration inventory](docs/development/0.8/migration-status.md) and [candidate usage](docs/consumers/consume-from-0.8.0-dev.md). The complete retained core is now same-source engine-free, with explicit1.6 execution and the full capability inventory. See the [breaking author migration](docs/development/0.8/refactor-migration.md). A compiled/native1.7 adapter remains open. Native 1.6 acceptance and US consumption of 0.8 remain open.
+**Development line: 0.8.0 release-candidate preparation.** See the [active specification](docs/development/0.8/README.md), [complete migration inventory](docs/development/0.8/migration-status.md) and [candidate usage](docs/consumers/consume-from-0.8.0-dev.md). The complete retained core is now same-source engine-free, with explicit1.6 execution and the full capability inventory. See the [breaking author migration](docs/development/0.8/refactor-migration.md). Fixed-source US integration is accepted; published RC-asset consumption remains the next step. Native1.6/UIUX acceptance and a compiled/native1.7 adapter remain open. Known headless game errors are accepted as non-blocking for this RC transition, not as error-free gameplay.
 
 ## What the library provides
 
@@ -46,8 +46,11 @@ the fit audit and session recovery, which is the whole point of the tree.
 RimWorld's `modDependencies` cannot express a version, so every consumer must assert the API range in
 its own constructor — `FerriteLibVersion.Require(min, max, packageId, out report)` enumerates loaded
 carriers, reports collisions, and fails readable. Compile against the DLL from a GitHub Release asset
-of this repository (the release body quotes its SHA-256); the assembly is `net472`. The public API is
-**pre-1.0**: treat a minor bump as a compatibility boundary and compile against the version you tested.
+of this repository (the release body quotes the ZIP asset's SHA-256; `version.txt` records the extracted
+DLL's digest); the assembly is `net472`. Compile against the version and API range you tested.
+After publication, breaking a supported stable contract requires a major release. Deprecation also
+retains the old contract through two complete subsequent published minors; that minimum does not
+authorize a breaking minor removal or a shorter window at 1.x. See [API tiers](docs/api-tiers.md).
 **API stabilization is not gated on a second wired consumer** (maintainer ruling 2026-09-17). Establish
 an explicit, verified compatibility commitment so consumers can adopt it; use integration as validation,
 not permission to stabilize. Existing type tiers are unchanged by this ruling, and missing consumer/game
@@ -66,7 +69,7 @@ provisional, and `CONTRIBUTING.md` is written when the freeze lands.
 ```powershell
 pwsh -NoProfile -File scripts/verify-local.ps1            # the gate suite (harness + builds + payload + content-free + licence + identity + net472 trap scan)
 pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev   # + staged dev folder dist/dev/FerriteLib (no archive; you place it)
-pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory   # three-vector privacy gate, run before any push
+pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory   # full-history privacy gate, run before any push
 ```
 
 - Protocol / invariants: `AGENTS.md` · durable facts: `MEMORY.md` · action surface: `TODO.md`

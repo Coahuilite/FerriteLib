@@ -3,6 +3,11 @@
 Use a fixed Dev package from this line, not a moving sibling build output. Only FerriteLib ships the
 runtime DLL; a consumer references it with `Private=false` and does not bundle another copy.
 
+PM has accepted the current technical contract and US has consumed the fixed source input. The next
+RC step uses the published v0.8.0-rc1 GitHub Release asset after PM completes publication, not a local
+Dev DLL relabeled as Release. Native acceptance and next-session UI/UX work remain separate; known
+headless game errors are accepted as non-blocking for this transition, not as an error-free game result.
+
 ```csharp
 if (!FerriteLibVersion.Require(new Version(0, 8, 0), new Version(0, 9, 0),
     "your.package.id", out string diagnostic))

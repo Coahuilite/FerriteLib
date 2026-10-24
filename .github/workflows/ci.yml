@@ -1,6 +1,6 @@
 name: CI
 
-# Push/PR check for the prerequisite mod: the seven local gates, on a clean checkout, with nothing
+# Push/PR check for the prerequisite mod: the ten local gates, on a clean checkout, with nothing
 # assumed about a sibling repository. US's own CI is the place that pair is verified; a green run here
 # means the library is internally sound, not that a consumer still compiles against it.
 

@@ -1,11 +1,16 @@
 # TODO
 
-## 0.8 refactor candidate
+## 0.8 RC closeout
 
-- [ ] PM accepts the fixed HelpRef/output-lifetime and adjacent-name candidate before public freeze
-      or downstream consumption. Implementation is authorized; explicit omission is already decided.
-- [ ] Collect native1.6 text/IME/fonts/window/input/scroll/clip/popup/image acceptance against that fixed
-      candidate; native1.7 remains separately awaiting human. Do not start/install the game automatically.
+The HelpRef/output-lifetime and adjacent-name contract is accepted by PM; US has completed actual
+consumption of the fixed 0.8 technical input. That acceptance is not waiting for another approval.
+
+- [ ] PM integrates the prepared source on main and publishes v0.8.0-rc1 through the existing Release
+      workflow as a non-latest prerelease; US then consumes the fixed remote Release asset and runs its CI.
+- [ ] Continue UI/UX integration and player-facing acceptance in the next session. Native1.6
+      text/IME/fonts/window/input/scroll/clip/popup/image and native1.7 remain separately unaccepted.
+      Known headless game errors are accepted as non-blocking for this RC transition, not erased.
+      Do not start/install the game automatically.
 
 E/N defaults, L1, finite appearance, S1–S7/R9 grading, two-subsequent-minor protection and platform priority
 are decided, not pending user choices. K1 added library focus/key system is approved for deferral, not
@@ -15,6 +20,9 @@ implemented. Detailed implementation and acceptance states live in `docs/develop
 > and `OBLIVIONIS.md`; a closed item is a pointer here, not a paragraph.
 
 ## Retained 0.7 checkpoint objective and execution order
+
+Historical context only: the following 0.7 checkpoint and its checks do not accept the current 0.8
+candidate or authorize this RC's publication. Current actions are the 0.8 closeout items above.
 
 Branch `0.7.x`, API `0.7.0`, consumer range `[0.7.0,0.8.0)`. Source HEAD `d5af4d8209823bb19f7c112805fcb1b8caf56bbc`,
 clean; the compatibility carrier and the Release payload are both `648f5769…`, the Dev payload `5b331379…`.

@@ -6,7 +6,7 @@ RimWorld 1.6 的**无内容前置模组**。FerriteLib 只携带一个程序集�
 模组编译与运行时绑定。它不添加任何 Def、补丁、语言、贴图：单独启用它对游戏零影响。如果你的模组列表里
 出现了它而没有任何依赖它的模组，说明消费者已被卸载或禁用；只有在没有已启用模组依赖它时，才可以禁用本模组。
 
-**开发线：0.8.0 技术候选。** 见[活动规格](docs/development/0.8/README.md)、[完整迁移状态](docs/development/0.8/migration-status.md)与[候选消费指南](docs/consumers/consume-from-0.8.0-dev.md)。完整 retained 核心已同源脱离引擎，1.6 显式执行与完整能力库存已接通；见[发布前作者迁移](docs/development/0.8/refactor-migration.md)。1.7 编译／原生适配器仍未交付。真实1.6验收与US消费0.8仍待完成。
+**开发线：0.8.0 Release Candidate 准备。** 见[活动规格](docs/development/0.8/README.md)、[完整迁移状态](docs/development/0.8/migration-status.md)与[候选消费指南](docs/consumers/consume-from-0.8.0-dev.md)。完整 retained 核心已同源脱离引擎，1.6 显式执行与完整能力库存已接通；见[发布前作者迁移](docs/development/0.8/refactor-migration.md)。US 固定源码接入已接受，发布 RC 资产消费是下一步。原生1.6／UIUX验收与1.7编译／原生适配器仍未完成。已知 headless 游戏错误被接受为本轮 RC 过渡的非阻断项，不代表游戏零错误。
 
 ## 库提供什么
 
@@ -39,8 +39,10 @@ RimWorld 1.6 的**无内容前置模组**。FerriteLib 只携带一个程序集�
 
 RimWorld 的 `modDependencies` 无法表达版本，消费者必须在自己的构造函数里断言 API 区间——
 `FerriteLibVersion.Require(min, max, packageId, out report)` 会枚举已加载载体并报告冲突，失败信息可读。
-编译请针对本仓库 GitHub Release 资产中的 DLL（发布页正文标注其 SHA-256）；程序集目标 `net472`。
-公共 API 处于 **1.0 之前**：将 minor 递增视为兼容边界，针对实际验证过的版本编译。
+编译请针对本仓库 GitHub Release 资产中的 DLL（发布页正文标注 ZIP 资产的 SHA-256；解压后的
+`version.txt` 另记 DLL 摘要）；程序集目标 `net472`。针对实际验证过的版本与 API 区间编译。
+发布后，破坏受支持的 stable 合同必须升 major；弃用后还须保留两个完整后续已发布 minor，
+该时间下限不允许在 minor 破坏性移除，升至1.x也不能缩短。见[API 分层](docs/api-tiers.md)。
 **API 稳定不再以第二个消费者接入为前提（维护者裁定 2026-09-17）。** 先建立明确、经过验证的兼容承诺，
 让消费者据此接入；接入是验证，不是允许稳定的先决条件。此次裁定不改变现有类型分层，消费者/实机证据
 不足仍须如实说明。
@@ -56,7 +58,7 @@ RimWorld 的 `modDependencies` 无法表达版本，消费者必须在自己的�
 ```powershell
 pwsh -NoProfile -File scripts/verify-local.ps1            # 门禁套件（harness + 双 flavor 构建 + 载荷 + 无内容 + 许可 + 身份）
 pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev   # + 暂存的 dev 目录 dist/dev/FerriteLib（不产出归档；放哪个 Mods 目录自己动手）
-pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory   # 三向量隐私门禁，任何 push 前执行
+pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory   # 完整历史隐私门禁，任何 push 前执行
 ```
 
 ## 文档索引

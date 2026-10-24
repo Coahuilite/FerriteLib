@@ -1,6 +1,6 @@
 # MEMORY
 
-## 0.8 development line (2026-10-24)
+## 0.8 development line (2026-10-25)
 
 The single product specification is `docs/development/0.8/README.md`. E1–E5/N1–N3, L1, finite appearance,
 S1–S7 stability, experimental R9, migration protection and platform priority are confirmed. Engineering
@@ -15,6 +15,10 @@ old-chain removals and author prerequisites. No0.7 compatibility shape is silent
 The confirmed explicit-only Choice.HelpRef policy, adjacent Ref/Key/Bind naming and both old-default
 migration paths are in that contract. Session topic/grace and optional owned endpoint output have
 different lifetimes; public-contract.md describes them without a panel or access-capture framework.
+PM has accepted that technical contract and US has consumed the fixed source input. RC preparation
+now follows the existing CI/Release path; remote RC-asset consumption is distinct from that completed
+integration. Current publication actions are in TODO.md. Known headless game errors are accepted as
+non-blocking for this transition; native acceptance and the next-session UI/UX work remain open.
 
 Accepted RU1–RU3 production foundations and their applicable evidence remain in the reactive, layout-reuse
 and failure-lifetime contracts. Closeout adds native composite-capture precedence, normal-return-before-
@@ -40,7 +44,7 @@ is checked in the same stage and reported independently. Native1.6/1.7 remain aw
 human evidence below does not accept0.8. New-engine1.7 adapter then direct drawing is a later route, not a
 1.6-first delivery prerequisite. Consumer migration uses a fixed supplied package, never moving outputs.
 
-## Current state (2026-10-09)
+## Historical 0.7 checkpoint (2026-10-09)
 
 - **Build and delivery identity.** The line's last **source** commit is
   `d5af4d8209823bb19f7c112805fcb1b8caf56bbc` on `0.7.x` (committed as `worker <worker@localhost>`, the accepted

@@ -187,9 +187,9 @@ jobs:
           | Release | ``$env:RELEASE_TAG`` |
           | Game | RimWorld 1.6 |
           | Built from commit | ``$env:ASSET_COMMIT`` |
-          | Asset SHA-256 | ``$env:ASSET_SHA256`` |
+          | ZIP asset SHA-256 | ``$env:ASSET_SHA256`` |
 
-          The consumer repository links to this release instead of shipping its own copy, so the SHA-256 above is the one true digest of ``FerriteLib.UiKit.dll`` for this version. The full source of this exact build is ``$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY`` at tag ``$env:RELEASE_TAG`` (commit ``$env:ASSET_COMMIT``); the license terms travel inside the package as ``LICENSE``.
+          The SHA-256 above identifies the downloaded ``FerriteLib-$env:RELEASE_TAG.zip`` archive, not the DLL inside it. The extracted ``version.txt`` separately records the payload DLL's SHA-256. The consumer repository links to this release instead of shipping another copy. The full source of this exact build is ``$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY`` at tag ``$env:RELEASE_TAG`` (commit ``$env:ASSET_COMMIT``); the license terms travel inside the package as ``LICENSE``.
 
           $deltaTitle
 
@@ -197,11 +197,11 @@ jobs:
 
           ## Status
 
-          Pre-1.0: the public API is still provisional and a minor bump is a breaking change. The supported range a consumer asserts lives in its own code, because RimWorld's ``modDependencies`` cannot express a version at all.
+          Supported stable contracts protect source, compiled consumers, XML vocabulary, behavior and legal use conditions within the same game/adapter target. After publication, breaking one requires a major release. Deprecation also retains the old contract through two complete subsequent published minors; that minimum does not permit a breaking minor removal, and a 1.x transition cannot shorten it. Experimental surface changes require explicit migration. Consumers still assert their tested API range in code, because RimWorld's ``modDependencies`` cannot express a version.
 
-          This build targets **RimWorld 1.6** and is a testing RC: UI/UX and copy work on the library surface continues after this trial, and this page does not claim complete compatibility coverage. FerriteLib adds nothing to saves and stores no settings of its own; keep it installed while any consumer mod (currently Universal Squeaker) depends on it.
+          This build targets **RimWorld 1.6**. UI/UX integration and player-facing acceptance continue in the next stage. FerriteLib adds nothing to saves and stores no settings of its own; keep it installed while any consumer mod (currently Universal Squeaker) depends on it.
 
-          Testing status: the accepted native checks (seven interaction scenarios, the diagnostics checks and a quick kernel smoke) ran on the local development (Dev) build of this line; this archive is a fresh CI build of the Release configuration from the same accepted product source (plus release plumbing/docs) and has not been independently repeated in native gameplay.
+          Testing status: current 0.8 technical evidence covers the complete engine-free core, retained controls and containers, editing/recovery protocols, public author paths and fixed-source consumer integration. This workflow runs the existing verification gates, including the Dev-only instrument, before building this fresh Release-configuration archive. Automated protocol/stub and source-integration results do not establish complete native gameplay acceptance. Headless game checks reported errors that the user accepted as non-blocking for this RC transition; they were not error-free. Native 1.6 font/IME/window/input/rendering acceptance and UI/UX remain open. A compiled/native 1.7 adapter is not delivered. Earlier 0.7 native checks do not accept this 0.8 package.
           "@
           $body | Out-File -FilePath release-body.md -Encoding utf8NoBOM
 
@@ -215,6 +215,7 @@ jobs:
           # generate_release_notes here: the body above is written for a player, not a changelog,
           # and the auto-generated notes would bury the install steps under commit titles.
           prerelease: ${{ contains(github.ref_name, '-') }}
+          make_latest: false
 
       # Close the loop. Everything above verifies inputs; this verifies the OUTPUT as the platform
       # actually holds it: published (not draft), the prerelease boolean matches the tag dialect
