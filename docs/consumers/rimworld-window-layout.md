@@ -5,7 +5,7 @@ A 1920×1080 display does not give a page 1920×1080 units, and a wide aspect ra
 height for a two-column settings panel.
 
 This guide covers FerriteLib.UiKit **0.8.0-rc1** and the **RimWorld 1.6 adapter**. It brings together the
-window and scaling findings recorded on 2026-10-25. For wiring a page, use the
+window and scaling findings and desktop interaction guidance recorded on 2026-10-25. For wiring a page, use the
 [ordinary settings recipe](ordinary-settings.md); for supported signatures and ownership, use
 [S6 in the public contract](../development/0.8/public-contract.md#s6--use-a-standard-window-or-embed-in-an-existing-callback).
 
@@ -105,7 +105,8 @@ does not create a feedback loop that repeatedly changes the mode.
 
 The existing page engine provides the pieces:
 
-- `Row` with `Breakpoint` and `Narrow="Column"` handles a width-driven stack.
+- `Row` with `Breakpoint` and `Narrow="Column"` handles a width-driven stack. A declared breakpoint
+  must be positive; `0` is rejected, not a way to disable responsive behavior.
 - `Wrap` with `Cols`/`NarrowCols` provides finite wrapping; those column attributes belong to `Wrap`.
 - `Column`, `Scroll`, `Clip`, measured wrapped text and min/max/fill sizing provide readable overflow.
 - Typed bindings and conditional groups can express a consumer-owned compact mode or detail view.
@@ -117,9 +118,80 @@ and follow [definition-update](../development/0.8/public-contract.md) and
 [editing](../development/0.8/editing-contract.md) rules. Removing a node and creating a different editor
 is not the same as retaining its draft while hidden.
 
-Put low-frequency controls on a secondary page or in a conditional group. When filters are collapsed,
-leave their active state and a clear action visible. Use long help in the content area instead of
-permanently subtracting a large help band from every page. Neither policy needs a custom widget.
+When filters are collapsed, leave their active state and a clear action visible. Content being hidden
+does not mean its effects have stopped.
+
+## Make the main page useful before adding navigation
+
+A frequent task and its relevant status can share the main page. Put infrequent editing tools on a
+secondary page or in a conditional group. More desktop space should support comparison and direct
+actions, not justify a permanent navigation rail or a wall of status cards. This applies the use of
+space and precise input described in [Apple's macOS guidance](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos/)
+and [Android's desktop design principles](https://developer.android.com/design/ui/desktop/guides/foundations/design-principles)
+to a game settings window. RimWorld's window and input conventions remain the host contract.
+
+### Describe the player's state, not the implementation
+
+Answer three questions near the affected control: **what am I changing, what is effective now, and what
+can I do next?** Reserve internal state codes, transaction ordering and service ownership for diagnostics.
+For example, “Couldn't save these changes. Retry” is useful when a disk write failed; “Saved, but not yet
+active” describes a different result and must not share the same success indicator.
+
+Use a compact status line for ordinary progress. Give an actual blocker readable emphasis and a relevant
+next action; do not style it as muted background explanation. Keep detailed diagnostics behind a labeled
+route. A `Banner`, `WrappedText` and an explicit `Button` can present these states using existing theme
+roles. The consumer's save/publication owner supplies the facts; the UI does not invent a successful
+outcome or a recovery action the product cannot perform.
+
+### Use the list to find and compare, and detail to explain
+
+Keep each list row's name, short disambiguating source, essential summary and direct action. Put full
+metadata and diagnostic detail in the selected object's detail view. Removing every source label makes
+two identically named objects impossible to distinguish; copying full metadata into both panes makes
+both harder to scan. Gain density by removing repetition and unnecessary spacing, not by shrinking text
+or hit targets.
+
+Compose the list with `Repeat` and ordinary rows; use the same selected-object model for side-by-side
+detail and compact drill-down. Google's [adaptive list-detail guidance](https://developer.android.com/develop/ui/compose/layouts/adaptive/canonical-layouts)
+describes the useful relationship between these arrangements. Its toolkit APIs and breakpoint values
+are not FL capabilities or defaults.
+
+Keep **viewed object**, **edited target**, **enabled state** and **keyboard focus** distinct. A selected
+row can mean “show this detail”; it does not also mean “enabled.” Use explicit labels and existing state
+styles alongside the actual enable control. [Apple's focus and selection guidance](https://developer.apple.com/design/human-interface-guidelines/focus-and-selection/)
+is a useful distinction, not a reason to replace the host's input behavior. FL's additional K1 keyboard
+navigation is deferred; native editing does not imply a complete keyboard-navigation system.
+
+### Let secondary tools switch directly without becoming the main architecture
+
+Once inside a secondary group, keep its category control available. A short `Button` group in a
+`Row`/`Wrap` can work at wide sizes; a `Dropdown` showing the current category can retain the same route
+at compact sizes. This is a composition of existing controls, not a requirement for a new tab widget.
+Do not make every sibling switch travel back through a directory of large buttons.
+
+Keep a clear return to the original main-page context. Sibling switches should not create a long trail
+of meaningless Back entries. Help and detail are temporary destinations: return to the original object,
+filters, list position and valid draft. Preserve compatible editor identity and the existing commit/cancel
+contract; changing categories must not silently retarget an unfinished edit.
+
+### Give help buttons an explicit destination
+
+The page header's Help action should open that page's topic deterministically. A complex field or group
+can have its own labeled explanation action carrying an explicit opaque topic and relevant object
+context. Use `Button` with existing `BindAction`/`BindCommand` bindings; the consumer owns topic lookup,
+the pinned topic and the return context.
+
+`HelpRef` and the Session's `CurrentHelpRef` support contextual publication; a newly hovered control can
+replace the current topic. Reading the last hover at click time therefore does not define a stable page
+Help command. Hover help may supplement explicit actions, but must not change a topic the player opened
+deliberately. An element's `HelpRef` alone does not implement the click destination. See the
+[help publication contract](../development/0.8/public-contract.md#publish-a-topic-without-installing-a-help-panel)
+for the separate lifetimes and explicit per-choice references.
+
+Show long help in the existing content area with a return action, rather than permanently reserving a
+large help band or opening another main window. Keep short, necessary guidance next to its control.
+These arrangements need no custom widget, additional window API, drag-and-drop system or desktop visual
+effects.
 
 ## Keep one window when several entry points open it
 
@@ -177,6 +249,10 @@ column width; a long product name is not a reason to widen or replace the whole 
 | Reopen the window on a mode change | An active edit, search or list position disappears | Cross the breakpoint with state present, retaining the host and compatible identities. |
 | Assume activating a catalog key raises the window | A native dialog still covers it | Exercise the real window stack, not only the catalog's active flag. |
 | Treat a canceled resolution change as finished | The old scale/viewport returns | Verify the restored window geometry and popup/input positions. |
+| Reduce a list to names alone | Two objects have the same name | Retain a short source label while moving full metadata to detail. |
+| Quiet every status to save space | A blocked primary task looks available | Keep the blocker readable and its next action reachable at the minimum size. |
+| Return to a directory for every tool switch | Comparing two related settings repeatedly loses context | Keep local category switching and a meaningful return to the main page. |
+| Open Help from the last hovered field | The same page Help button opens different topics | Give page and field actions explicit destinations; retain pinned help and return state. |
 
 Inspect the rendered page with representative long labels, nonempty lists, an open detail and a visible
 status/error message. Exercise the primary action, return, close and an active editor. Check popup
@@ -191,9 +267,14 @@ The platform findings above come from these named source methods, not a screensh
 | Evidence | Scope |
 | --- | --- |
 | RimSage 1.6 source: `ResolutionUtility`, `Dialog_Options`, `UI.ApplyUIScale`, `Window` and `MainMenuDrawer` | Platform mechanisms and extension points; source dataset identified as 1.6.4850. |
-| Target assembly `1.6.9676.17735`: focused inspection of `ResolutionUtility`, `Dialog_Options`, `MainMenuDrawer` | Confirms the scale predicate, options and menu/category constraints on the target 1.6.4871 build. |
+| Target assembly `1.6.9676.17735`: focused inspection of `ResolutionUtility`, `Dialog_Options`, `MainMenuDrawer`, `Window.Notify_ResolutionChanged` and `WindowStack.InsertAtCorrectPositionInList` | Confirms scale/menu constraints, initial-size reapplication and layer-ordered insertion on the target 1.6.4871 build; not a rendered overlap check. |
 | FL source at RC commit `a0b5b983c3c13a099c62d936305eaebaf1deb5a8` | Window ownership, chrome, catalog and page capabilities. |
 | Executed calculations from the scale predicate | Accepted scale table and logical-size examples; not native render acceptance. |
+
+The linked Apple and Google guidance informs the interaction recommendations. Those recommendations are
+design reasoning applied to the existing FL contract, not observed player outcomes or a promise to
+reproduce another operating system's UI. Record native observations separately from source facts and
+design choices.
 
 The target-game window, font, IME, overlap and scaling observations for 0.8 remain open. Record the actual
 candidate, resolution, scale, language, page state and observed result when a game pass is performed.
