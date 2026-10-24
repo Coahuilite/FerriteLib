@@ -44,7 +44,7 @@ author must keep in mind:
 - **Paint-only content** — a value that moves no rect: a slider thumb, a number field's text, a progress
   fill. Announce with `UiInvalidation.Paint`; the arranged snapshot is reused as it stands.
 - **Measured content** — a string whose width/height feeds the layout: a label, a wrapped explanation, a
-  visible-key group, an options list that changes the popup's rows. Announce the key the *element
+  VisibleBind group, an options list that changes the popup's rows. Announce the key the *element
   declares*, with `Measure`/`Structure` (or the conservative `Everything` default). Notifying an internal
   key the page never declares invalidates nothing: the announcement must reach the dependency the layout
   actually recorded.
@@ -54,7 +54,7 @@ three classes in one file.
 
 ## Show/hide, narrow layout, scrolling
 
-A conditional group is a container with `VisibleKey="show-advanced"` bound to a `bool` — toggling it does
+A conditional group is a container with `VisibleBind="show-advanced"` bound to a `bool` — toggling it does
 not reopen the page. Narrow behavior is the containers' own vocabulary, not a second framework:
 `Breakpoint` + `Narrow="Column"` flips a `Row` to a stack, `NarrowHidden` drops children in the narrow
 state, and a `Scroll` around the column gives overflowing content a viewport instead of a cut-off. Grid

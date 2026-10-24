@@ -7,7 +7,7 @@ internal sealed partial class UiLayoutEngine
 {
     private sealed class BoundInput<T>
     {
-        internal IUiBindingReader Bindings = null!;
+        internal IUiBindingAccess Bindings = null!;
         internal int Revision, Pass;
         internal bool Found;
         internal T Value = default!;
@@ -54,10 +54,10 @@ internal sealed partial class UiLayoutEngine
         foreach (string key in records.Keys) if (!keyNodes.ContainsKey(key)) gone.Add(key);
         foreach (string key in gone) records.Remove(key);
     }
-    private bool InputCurrent<T>(BoundInput<T> prior, IUiBindingReader bindings, string key)
+    private bool InputCurrent<T>(BoundInput<T> prior, IUiBindingAccess bindings, string key)
         => ReferenceEquals(prior.Bindings, bindings) && prior.Revision == bindings.GetRevision(key)
             && (!layoutRequested || prior.Pass == layoutPass);
-    private bool TryLayoutBool(IUiBindingReader bindings, string key, out bool value)
+    private bool TryLayoutBool(IUiBindingAccess bindings, string key, out bool value)
     {
         if (!visibleInputs.TryGetValue(key, out BoundInput<bool>? input) || !InputCurrent(input, bindings, key))
         {
@@ -66,7 +66,7 @@ internal sealed partial class UiLayoutEngine
         }
         value = input.Value; return input.Found;
     }
-    private bool TryLayoutFloat(IUiBindingReader bindings, string key, out float value)
+    private bool TryLayoutFloat(IUiBindingAccess bindings, string key, out float value)
     {
         if (!widthInputs.TryGetValue(key, out BoundInput<float>? input) || !InputCurrent(input, bindings, key))
         {
@@ -75,9 +75,9 @@ internal sealed partial class UiLayoutEngine
         }
         value = input.Value; return input.Found;
     }
-    private bool TryLayoutTab(IUiBindingReader bindings, out string value)
+    private bool TryLayoutTab(IUiBindingAccess bindings, out string value)
     {
-        string key = UiBindings.ActiveTabKey;
+        string key = UiBindings.ActiveTabBind;
         if (!tabInputs.TryGetValue(key, out BoundInput<string>? input) || !InputCurrent(input, bindings, key))
         {
             input = new BoundInput<string> { Bindings = bindings, Revision = bindings.GetRevision(key), Pass = layoutPass };

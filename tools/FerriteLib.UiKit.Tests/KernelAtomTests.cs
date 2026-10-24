@@ -491,7 +491,7 @@ internal static class KernelAtomTests
         return attributes;
     }
 
-    private static UiWidgetContext MakeContext(UiSession session, IUiBindingReader bindings, UiTheme theme)
+    private static UiWidgetContext MakeContext(UiSession session, IUiBindingAccess bindings, UiTheme theme)
     {
         return NativeFixture.Context(Scope, session, new WrappedMetrics(), theme, new StubTranslation(), bindings, 400f, "root");
     }

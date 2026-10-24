@@ -25,11 +25,11 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
             UiWidgetRegistry.CoreScope,
             Kind,
             () => new ButtonWidget(),
-            // G2/G3 (0.7.x): PayloadKey gives the command a data payload (the row's own key inside a
+            // G2/G3 (0.7.x): PayloadBind gives the command a data payload (the row's own key inside a
             // template), and Chrome="none" makes the button a bare hit area whose Height="Auto" is measured
             // from its content instead of the theme's row height.
             AtomVocabulary.Schema(
-                AtomRoles.ToneAndEmphasis, "ActionBind", "Text", "TextKey", "Height", "PayloadKey", "Chrome"),
+                AtomRoles.ToneAndEmphasis, "ActionBind", "Text", "TextKey", "Height", "PayloadBind", "Chrome"),
             new[] { "Text", "TextKey" }));
     }
 
@@ -38,7 +38,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindingReader bindings, string elementPath)
+    public void Validate(IUiBindingAccess bindings, string elementPath)
     {
         string actionKey = ReadActionKey();
         if (actionKey.Length == 0)
@@ -50,7 +50,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
 
         // The two shapes are different contracts, so the creation-time check must know which one this
         // element declares: with a payload the consumer binds BindAction<string>, without one BindCommand.
-        string payloadKey = AtomVocabulary.Read(spec, "PayloadKey").Trim();
+        string payloadKey = AtomVocabulary.Read(spec, "PayloadBind").Trim();
         if (payloadKey.Length > 0)
         {
             bindings.ValidateValue<string>(payloadKey, elementPath);
@@ -112,9 +112,9 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
 
         UiInteractionRequests.Activation(ctx.Controls.InteractionTarget(ctx, ReadActionKey()), interaction, () =>
         {
-            // G2: with a PayloadKey the command receives the bound payload - the row's own key, which is what
+            // G2: with a PayloadBind the command receives the bound payload - the row's own key, which is what
             // a repeated row needs to say which item it is. Without one the call is exactly what it was.
-            string payloadKey = AtomVocabulary.Read(spec, "PayloadKey").Trim();
+            string payloadKey = AtomVocabulary.Read(spec, "PayloadBind").Trim();
             string payload = "";
             bool hasPayload = payloadKey.Length > 0;
             if (hasPayload)

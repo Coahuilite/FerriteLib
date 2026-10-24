@@ -72,7 +72,7 @@ internal static class KernelContainerTabTests
 
         string tab = "Packs";
         var bindings = new UiBindings();
-        bindings.BindValue(UiBindings.ActiveTabKey, () => tab, value => tab = value);
+        bindings.BindValue(UiBindings.ActiveTabBind, () => tab, value => tab = value);
 
         using UiHost host = Host(xml, bindings);
         UiLayoutSnapshot packs = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
@@ -82,7 +82,7 @@ internal static class KernelContainerTabTests
             "the gated container and its whole subtree are arranged; the other tab's are not");
 
         tab = "Basic";
-        bindings.NotifyChanged(UiBindings.ActiveTabKey);
+        bindings.NotifyChanged(UiBindings.ActiveTabBind);
         UiLayoutSnapshot basic = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(
             basic.RectById.ContainsKey("basic") && basic.RectById.ContainsKey("basic-child")
@@ -90,7 +90,7 @@ internal static class KernelContainerTabTests
             "and the switch mirrors it: the subtree goes with its container, both ways");
 
         tab = "Packs";
-        bindings.NotifyChanged(UiBindings.ActiveTabKey);
+        bindings.NotifyChanged(UiBindings.ActiveTabBind);
         UiLayoutSnapshot again = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(
             again.RectById.ContainsKey("packs") && again.RectById.ContainsKey("packs-child"),
@@ -115,7 +115,7 @@ internal static class KernelContainerTabTests
         Prepare();
         string tab = "Packs";
         var bindings = new UiBindings();
-        bindings.BindValue(UiBindings.ActiveTabKey, () => tab, value => tab = value);
+        bindings.BindValue(UiBindings.ActiveTabBind, () => tab, value => tab = value);
 
         using UiHost host = Host(
             "<Section Id=\"card\" Title=\"Card\" Tab=\"Packs\">" + Child("inside") + "</Section>",
@@ -126,7 +126,7 @@ internal static class KernelContainerTabTests
         NativeFixture.Custom(        card,"draft").EditText = "typed";
 
         tab = "Other";
-        bindings.NotifyChanged(UiBindings.ActiveTabKey);
+        bindings.NotifyChanged(UiBindings.ActiveTabBind);
         UiLayoutSnapshot hidden = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(!hidden.RectById.ContainsKey("card"), "announcing active-tab hides the gated container");
 
@@ -137,7 +137,7 @@ internal static class KernelContainerTabTests
             "so its state survives the hide rather than being handed to another element");
 
         tab = "Packs";
-        bindings.NotifyChanged(UiBindings.ActiveTabKey);
+        bindings.NotifyChanged(UiBindings.ActiveTabBind);
         host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
         Check(
             ReferenceEquals(host.Session.GetNodeByElementId("card"), card)
@@ -167,7 +167,7 @@ internal static class KernelContainerTabTests
     {
         string tab = initial;
         var bindings = new UiBindings();
-        bindings.BindValue(UiBindings.ActiveTabKey, () => tab, value => tab = value);
+        bindings.BindValue(UiBindings.ActiveTabBind, () => tab, value => tab = value);
         return bindings;
     }
 
@@ -267,7 +267,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new Probe
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 

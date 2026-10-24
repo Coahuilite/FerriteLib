@@ -324,7 +324,7 @@ internal static class KernelWindowHostTests
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
             bindings.ValidateValue<bool>("explode", elementPath);
         }

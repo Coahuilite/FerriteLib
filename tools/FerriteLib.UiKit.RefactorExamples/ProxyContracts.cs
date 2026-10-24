@@ -92,7 +92,7 @@ static partial class Program
         }
         var choiceRuntime=new UiReactiveRuntime();var label=choiceRuntime.Int(1);var choices=new UiBindings(choiceRuntime);
         choices.BindReadOnly("pick",()=>1);
-        choices.BindTrackedChoices<int>("pick",()=>new[]{new UiChoice<int>("tracked-choice-"+label.Value,1,"explicit-help")},(a,b)=>a.Text==b.Text&&a.Value==b.Value&&a.Help==b.Help);
+        choices.BindTrackedChoices<int>("pick",()=>new[]{new UiChoice<int>("tracked-choice-"+label.Value,1,"explicit-help")},(a,b)=>a.Text==b.Text&&a.Value==b.Value&&a.HelpRef==b.HelpRef);
         var choicePage=UiLayoutManifest.Parse("<UiPage Schema='2' Source='author'><Widget Id='choices' Kind='input/mode-row' Bind='pick'/></UiPage>");
         using(var host=new UiHost("author",choicePage,new ForwardingBindings(choices),new UiTheme(),new Metrics(),new Translation()))
         {

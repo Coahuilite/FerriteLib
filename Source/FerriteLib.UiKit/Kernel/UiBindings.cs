@@ -14,12 +14,53 @@ namespace FerriteLib.UiKit.Kernel;
 /// Neither path polls arbitrary business objects. The engine folds announcements at arrangement boundaries.
 /// </para>
 /// </summary>
-public sealed partial class UiBindings : IUiBindingReader
+public sealed partial class UiBindings : IUiBindingAccess
 {
     public UiBindings BindingOwner => this;
-    internal static UiBindings OwnerOf(IUiBindingReader reader) =>
-        reader.BindingOwner ?? throw new InvalidOperationException("IUiBindingReader must identify its current BindingOwner; forwarding without the backing capabilities cannot preserve tracked presentation or DisplayOnly.");
-    internal static void VerifyReaderKey(IUiBindingReader reader, string key, UiBindingRole role)
+    internal void PublishOptionHelp(UiValueEndpoint endpoint, UiNode node, string binding, string helpRef)
+        => RunOperation(() =>
+        {
+            ValueDescriptor descriptor = values[binding];
+            long stamp = descriptor.OptionHelpStamp;
+            string current = endpoint.Read<string>();
+            if (descriptor.OptionHelpStamp != stamp || !values.TryGetValue(binding, out ValueDescriptor? currentDescriptor)
+                || !ReferenceEquals(descriptor, currentDescriptor)) return;
+            if (!string.Equals(current, helpRef, StringComparison.Ordinal))
+            {
+                if (!endpoint.TryWrite(helpRef)) throw new InvalidOperationException("Option help output is no longer writable: '" + binding + "'.");
+                // A nested publisher/write takes precedence, even for the same topic.
+                if (descriptor.OptionHelpStamp != stamp + 1) return;
+                if (!string.Equals(endpoint.Read<string>(), helpRef, StringComparison.Ordinal)) return;
+                if (descriptor.OptionHelpStamp != stamp + 1) return;
+            }
+            descriptor.OptionHelpStamp++;
+            descriptor.OptionHelpPublisher = new WeakReference<UiNode>(node);
+            node.OptionHelpOwner = this;
+            node.OptionHelpEndpoint = endpoint;
+            node.OptionHelpBind = binding;
+            node.OptionHelpRef = helpRef;
+            if (!node.Owner.IsActive) Widgets.OptionHelp.Release(node);
+        });
+
+    internal void ReleaseOptionHelp(UiValueEndpoint endpoint, UiNode node, string binding, string helpRef)
+    {
+        bool Owns(ValueDescriptor descriptor) => values.TryGetValue(binding, out ValueDescriptor? currentDescriptor)
+            && ReferenceEquals(currentDescriptor, descriptor) && descriptor.OptionHelpPublisher != null
+            && descriptor.OptionHelpPublisher.TryGetTarget(out UiNode? publisher) && ReferenceEquals(node, publisher);
+        if (!values.TryGetValue(binding, out ValueDescriptor? descriptor) || !Owns(descriptor)) return;
+        RunOperation(() =>
+        {
+            string current = endpoint.Read<string>();
+            // Getters/notifications may invoke consumer code. Recheck actual publisher after reading.
+            if (!Owns(descriptor)) return;
+            descriptor.OptionHelpPublisher = null;
+            if (string.Equals(current, helpRef, StringComparison.Ordinal) && !endpoint.TryWrite(""))
+                throw new InvalidOperationException("Option help output is no longer writable: '" + binding + "'.");
+        });
+    }
+    internal static UiBindings OwnerOf(IUiBindingAccess reader) =>
+        reader.BindingOwner ?? throw new InvalidOperationException("IUiBindingAccess must identify its current BindingOwner; forwarding without the backing capabilities cannot preserve tracked presentation or DisplayOnly.");
+    internal static void VerifyReaderKey(IUiBindingAccess reader, string key, UiBindingRole role)
     {
         if (key.Length == 0 || (role != UiBindingRole.Value && role != UiBindingRole.Choices)) return;
         UiBindings owner = OwnerOf(reader);
@@ -39,9 +80,13 @@ public sealed partial class UiBindings : IUiBindingReader
     /// invisible page (US→FL round 1, P4). Register it as a <c>string</c> value binding; a consumer that
     /// never registers it is not broken — <c>Tab</c> simply reads as no active tab, as before.
     /// </summary>
-    public const string ActiveTabKey = "active-tab";
+    public const string ActiveTabBind = "active-tab";
     private abstract class ValueDescriptor
     {
+        // Output ownership is binding-local, never process-wide. A write/announcement (even the same
+        // value) invalidates an old option publisher; weak identity cannot keep its Host alive.
+        public long OptionHelpStamp;
+        public WeakReference<UiNode>? OptionHelpPublisher;
         public abstract Type ValueType { get; }
         public abstract bool CanWrite { get; }
         public bool Tracked;
@@ -172,65 +217,65 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
     private readonly Dictionary<string, int> revisions = new(StringComparer.Ordinal);
 
     public void BindValue<T>(
-        string elementId, Func<T> get, Action<T> set, UiInvalidation invalidates = UiInvalidation.Everything)
+        string binding, Func<T> get, Action<T> set, UiInvalidation invalidates = UiInvalidation.Everything)
     {
-        if (elementId == null) throw new ArgumentNullException(nameof(elementId));
+        if (binding == null) throw new ArgumentNullException(nameof(binding));
         if (get == null) throw new ArgumentNullException(nameof(get));
         if (set == null) throw new ArgumentNullException(nameof(set));
-        AddValue(elementId, new ValueDescriptor<T>(get, set), invalidates);
+        AddValue(binding, new ValueDescriptor<T>(get, set), invalidates);
     }
 
     public void BindReadOnly<T>(
-        string elementId, Func<T> get, UiInvalidation invalidates = UiInvalidation.Everything)
+        string binding, Func<T> get, UiInvalidation invalidates = UiInvalidation.Everything)
     {
-        if (elementId == null) throw new ArgumentNullException(nameof(elementId));
+        if (binding == null) throw new ArgumentNullException(nameof(binding));
         if (get == null) throw new ArgumentNullException(nameof(get));
-        AddValue(elementId, new ValueDescriptor<T>(get, null), invalidates);
+        AddValue(binding, new ValueDescriptor<T>(get, null), invalidates);
     }
 
     public void BindOptions<T>(
-        string elementId, Func<IReadOnlyList<T>> get, UiInvalidation invalidates = UiInvalidation.Everything)
+        string binding, Func<IReadOnlyList<T>> get, UiInvalidation invalidates = UiInvalidation.Everything)
     {
-        if (elementId == null) throw new ArgumentNullException(nameof(elementId));
+        if (binding == null) throw new ArgumentNullException(nameof(binding));
         if (get == null) throw new ArgumentNullException(nameof(get));
-        if (options.ContainsKey(elementId))
+        if (options.ContainsKey(binding))
         {
-            throw new InvalidOperationException($"Duplicate options binding '{elementId}'.");
+            throw new InvalidOperationException($"Duplicate options binding '{binding}'.");
         }
 
-        options.Add(elementId, new OptionsDescriptor<T>(get));
-        DeclareInvalidation(elementId, invalidates);
+        options.Add(binding, new OptionsDescriptor<T>(get));
+        DeclareInvalidation(binding, invalidates);
     }
 
     public void BindAction<T>(
-        string actionId, Action<T> action, UiInvalidation invalidates = UiInvalidation.Everything)
+        string actionBind, Action<T> action, UiInvalidation invalidates = UiInvalidation.Everything)
     {
-        if (actionId == null) throw new ArgumentNullException(nameof(actionId));
+        if (actionBind == null) throw new ArgumentNullException(nameof(actionBind));
         if (action == null) throw new ArgumentNullException(nameof(action));
-        if (actions.ContainsKey(actionId))
+        if (actions.ContainsKey(actionBind))
         {
-            throw new InvalidOperationException($"Duplicate action binding '{actionId}'.");
+            throw new InvalidOperationException($"Duplicate action binding '{actionBind}'.");
         }
 
-        actions.Add(actionId, new ActionDescriptor<T>(action));
-        DeclareInvalidation(actionId, invalidates);
+        actions.Add(actionBind, new ActionDescriptor<T>(action));
+        DeclareInvalidation(actionBind, invalidates);
     }
 
     public void BindCommand(
-        string actionId,
+        string actionBind,
         Action action,
         Func<bool>? canExecute = null,
         UiInvalidation invalidates = UiInvalidation.Paint)
     {
-        if (actionId == null) throw new ArgumentNullException(nameof(actionId));
+        if (actionBind == null) throw new ArgumentNullException(nameof(actionBind));
         if (action == null) throw new ArgumentNullException(nameof(action));
-        if (commands.ContainsKey(actionId))
+        if (commands.ContainsKey(actionBind))
         {
-            throw new InvalidOperationException($"Duplicate command binding '{actionId}'.");
+            throw new InvalidOperationException($"Duplicate command binding '{actionBind}'.");
         }
 
-        commands.Add(actionId, new CommandDescriptor(action, canExecute));
-        DeclareInvalidation(actionId, invalidates);
+        commands.Add(actionBind, new CommandDescriptor(action, canExecute));
+        DeclareInvalidation(actionBind, invalidates);
     }
 
     public UiReactiveRuntime Reactive { get; }
@@ -364,32 +409,32 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
         return descriptor.CaptureBoxed();
     }
 
-    public T Get<T>(string elementId)
+    public T Get<T>(string binding)
     {
-        if (!TryGetValueDescriptor(elementId, out ValueDescriptor? descriptor))
+        if (!TryGetValueDescriptor(binding, out ValueDescriptor? descriptor))
         {
-            throw new KeyNotFoundException($"No value binding registered for '{elementId}'.");
+            throw new KeyNotFoundException($"No value binding registered for '{binding}'.");
         }
 
-        EnsureType<T>(descriptor!.ValueType, elementId, "value");
-        return (T)ReadValue(elementId, descriptor)!;
+        EnsureType<T>(descriptor!.ValueType, binding, "value");
+        return (T)ReadValue(binding, descriptor)!;
     }
 
-    public bool TryGet<T>(string elementId, out T value)
+    public bool TryGet<T>(string binding, out T value)
     {
-        if (!values.TryGetValue(elementId, out ValueDescriptor? descriptor))
+        if (!values.TryGetValue(binding, out ValueDescriptor? descriptor))
         {
             value = default!;
             return false;
         }
 
-        EnsureType<T>(descriptor!.ValueType, elementId, "value");
-        value = (T)ReadValue(elementId, descriptor)!;
+        EnsureType<T>(descriptor!.ValueType, binding, "value");
+        value = (T)ReadValue(binding, descriptor)!;
         return true;
     }
 
     /// <summary>
-    /// The probe <see cref="IUiBindingReader.TryGetBool"/> documents: a missing key and a key bound to another
+    /// The probe <see cref="IUiBindingAccess.TryGetBool"/> documents: a missing key and a key bound to another
     /// type are both "not resolved", because the caller here is a per-frame visibility query rather than
     /// a caller that knows what it bound.
     /// </summary>
@@ -406,16 +451,18 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
         return false;
     }
 
-    public void Set<T>(string elementId, T value) => RunOperation(() => SetCore(elementId, value));
+    public void Set<T>(string binding, T value) => RunOperation(() => SetCore(binding, value));
 
-    private void SetCore<T>(string elementId, T value)
+    private void SetCore<T>(string binding, T value)
     {
-        if (!TryGetValueDescriptor(elementId, out ValueDescriptor? descriptor))
+        if (!TryGetValueDescriptor(binding, out ValueDescriptor? descriptor))
         {
-            throw new KeyNotFoundException($"No value binding registered for '{elementId}'.");
+            throw new KeyNotFoundException($"No value binding registered for '{binding}'.");
         }
 
-        EnsureType<T>(descriptor!.ValueType, elementId, "value");
+        EnsureType<T>(descriptor!.ValueType, binding, "value");
+        descriptor.OptionHelpPublisher = null;
+        descriptor.OptionHelpStamp++;
         descriptor.SetBoxed(value);
     }
 
@@ -424,17 +471,17 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
     /// answers false, a key nobody bound answers false (the conservative answer for "may this write?"),
     /// and a null key throws like the rest of the surface.
     /// </summary>
-    public bool IsWritable(string elementId)
+    public bool IsWritable(string binding)
     {
-        if (elementId == null) throw new ArgumentNullException(nameof(elementId));
-        return values.TryGetValue(elementId, out ValueDescriptor? descriptor) && descriptor!.CanWrite;
+        if (binding == null) throw new ArgumentNullException(nameof(binding));
+        return values.TryGetValue(binding, out ValueDescriptor? descriptor) && descriptor!.CanWrite;
     }
 
-    public IReadOnlyList<T> GetOptions<T>(string elementId)
+    public IReadOnlyList<T> GetOptions<T>(string binding)
     {
-        if (!options.TryGetValue(elementId, out OptionsDescriptor? descriptor))
+        if (!options.TryGetValue(binding, out OptionsDescriptor? descriptor))
         {
-            throw new KeyNotFoundException($"No options binding registered for '{elementId}'.");
+            throw new KeyNotFoundException($"No options binding registered for '{binding}'.");
         }
 
         if (descriptor!.ItemType != typeof(T))
@@ -444,12 +491,12 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
             // refusal is unchanged; what is added is that it is REPORTED, once per distinct mismatch, on the
             // same fail-soft channel the appearance and overflow findings use (FL-21/FL-22).
             ReportStyleFallback(
-                elementId, "binding", "OptionsBind", descriptor.ItemType.Name, typeof(T).Name);
+                binding, "binding", "OptionsBind", descriptor.ItemType.Name, typeof(T).Name);
             throw new InvalidOperationException(
-                $"Options binding '{elementId}' is '{descriptor.ItemType.Name}', not '{typeof(T).Name}'.");
+                $"Options binding '{binding}' is '{descriptor.ItemType.Name}', not '{typeof(T).Name}'.");
         }
 
-        return (IReadOnlyList<T>)ReadOptions(elementId, descriptor);
+        return (IReadOnlyList<T>)ReadOptions(binding, descriptor);
     }
 internal bool TryGetTypedValue(string key, out object? value)
     {
@@ -475,6 +522,8 @@ internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => 
         if (key == null) throw new ArgumentNullException(nameof(key));
         if (!values.TryGetValue(key, out ValueDescriptor? descriptor) || !descriptor!.CanWrite) return false;
         if (!Accepts(descriptor.ValueType, value)) return false;
+        descriptor.OptionHelpPublisher = null;
+        descriptor.OptionHelpStamp++;
         descriptor.SetBoxed(value);
         return true;
     }
@@ -509,13 +558,13 @@ internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => 
         return (underlying ?? declared).IsInstanceOfType(value);
     }
 
-    public void Invoke<T>(string actionId, T payload) => RunOperation(() => InvokeCore(actionId, payload));
+    public void Invoke<T>(string actionBind, T payload) => RunOperation(() => InvokeCore(actionBind, payload));
 
-    private void InvokeCore<T>(string actionId, T payload)
+    private void InvokeCore<T>(string actionBind, T payload)
     {
-        if (!actions.TryGetValue(actionId, out ActionDescriptor? descriptor))
+        if (!actions.TryGetValue(actionBind, out ActionDescriptor? descriptor))
         {
-            throw new KeyNotFoundException($"No action binding registered for '{actionId}'.");
+            throw new KeyNotFoundException($"No action binding registered for '{actionBind}'.");
         }
 
         if (descriptor!.PayloadType != typeof(T))
@@ -523,9 +572,9 @@ internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => 
             // FL-23, the same silence one member over: an action payload read as the wrong type is refused
             // and now also reported, so a caught exception is still visible to whoever reads the audit.
             ReportStyleFallback(
-                actionId, "binding", "ActionBind", descriptor.PayloadType.Name, typeof(T).Name);
+                actionBind, "binding", "ActionBind", descriptor.PayloadType.Name, typeof(T).Name);
             throw new InvalidOperationException(
-                $"Action binding '{actionId}' expects '{descriptor.PayloadType.Name}', not '{typeof(T).Name}'.");
+                $"Action binding '{actionBind}' expects '{descriptor.PayloadType.Name}', not '{typeof(T).Name}'.");
         }
 
         descriptor.InvokeBoxed(payload);
@@ -536,13 +585,13 @@ internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => 
     /// no-op here and not an exception - but it is enforced on the execution path, which is what keeps a
     /// control that forgot to ask from firing a command its owner has taken away.
     /// </summary>
-    public void Invoke(string actionId) => RunOperation(() => InvokeCore(actionId));
+    public void Invoke(string actionBind) => RunOperation(() => InvokeCore(actionBind));
 
-    private void InvokeCore(string actionId)
+    private void InvokeCore(string actionBind)
     {
-        if (!commands.TryGetValue(actionId, out CommandDescriptor? descriptor))
+        if (!commands.TryGetValue(actionBind, out CommandDescriptor? descriptor))
         {
-            throw new KeyNotFoundException($"No command binding registered for '{actionId}'.");
+            throw new KeyNotFoundException($"No command binding registered for '{actionBind}'.");
         }
 
         if (!CanRun(descriptor!)) return;
@@ -554,10 +603,10 @@ internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => 
     /// with a predicate follows it; a key with no command binding answers true so an action-bound or
     /// value-bound element is never mistaken for a disabled command.
     /// </summary>
-    public bool CanExecute(string actionId)
+    public bool CanExecute(string actionBind)
     {
-        if (actionId == null) throw new ArgumentNullException(nameof(actionId));
-        return !commands.TryGetValue(actionId, out CommandDescriptor? descriptor) || CanRun(descriptor!);
+        if (actionBind == null) throw new ArgumentNullException(nameof(actionBind));
+        return !commands.TryGetValue(actionBind, out CommandDescriptor? descriptor) || CanRun(descriptor!);
     }
 
     /// <summary>
@@ -567,12 +616,12 @@ internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => 
     /// because it answers true for an unbound key on purpose, and <see cref="Invoke(string)"/> cannot because
     /// it throws for one.
     /// </summary>
-    public bool TryInvokeCommand(string actionId) => RunOperation(() => TryInvokeCommandCore(actionId));
+    public bool TryInvokeCommand(string actionBind) => RunOperation(() => TryInvokeCommandCore(actionBind));
 
-    private bool TryInvokeCommandCore(string actionId)
+    private bool TryInvokeCommandCore(string actionBind)
     {
-        if (actionId == null) throw new ArgumentNullException(nameof(actionId));
-        if (!commands.TryGetValue(actionId, out CommandDescriptor? descriptor)) return false;
+        if (actionBind == null) throw new ArgumentNullException(nameof(actionBind));
+        if (!commands.TryGetValue(actionBind, out CommandDescriptor? descriptor)) return false;
         if (!CanRun(descriptor!)) return false;
 
         descriptor!.Action();
@@ -620,75 +669,79 @@ internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => 
             }
 
             revisions[key] = (revisions.TryGetValue(key, out int revision) ? revision : 0) + 1;
+            if (values.TryGetValue(key, out ValueDescriptor? descriptor))
+            {
+                descriptor.OptionHelpPublisher = null;
+            }
         }
     }
 
-    public void ValidateValue<T>(string elementId, string elementPath)
+    public void ValidateValue<T>(string binding, string elementPath)
     {
-        if (!TryGetValueDescriptor(elementId, out ValueDescriptor? descriptor))
+        if (!TryGetValueDescriptor(binding, out ValueDescriptor? descriptor))
         {
-            throw new InvalidOperationException($"Required value binding '{elementId}' is missing at '{elementPath}'.");
+            throw new InvalidOperationException($"Required value binding '{binding}' is missing at '{elementPath}'.");
         }
 
-        EnsureType<T>(descriptor!.ValueType, elementId, "value");
+        EnsureType<T>(descriptor!.ValueType, binding, "value");
     }
 
-    public void ValidateOptions<T>(string elementId, string elementPath)
+    public void ValidateOptions<T>(string binding, string elementPath)
     {
-        if (!options.TryGetValue(elementId, out OptionsDescriptor? descriptor))
+        if (!options.TryGetValue(binding, out OptionsDescriptor? descriptor))
         {
             // A5 (0.7): when the SAME key is registered as a value the "missing" message names the
             // wrong cause - BindReadOnly<IReadOnlyList<T>> compiles, passes value validation, and
             // then the dropdown creation blames an options table nobody ever claimed to write
             // (found by the demo mod 2026-09-16). Explain the category error and name the fix.
             // Diagnose only: no value registration is ever coerced into an options one.
-            if (values.TryGetValue(elementId, out ValueDescriptor? valueDescriptor))
+            if (values.TryGetValue(binding, out ValueDescriptor? valueDescriptor))
             {
                 throw new InvalidOperationException(
-                    $"Required options binding '{elementId}' is missing at '{elementPath}': the same key is registered as a {(valueDescriptor!.CanWrite ? "writable" : "read-only")} value of type '{valueDescriptor.ValueType.Name}', not as options. Register the option list with BindOptions<{valueDescriptor.ValueType.Name}>('{elementId}', ...).");
+                    $"Required options binding '{binding}' is missing at '{elementPath}': the same key is registered as a {(valueDescriptor!.CanWrite ? "writable" : "read-only")} value of type '{valueDescriptor.ValueType.Name}', not as options. Register the option list with BindOptions<{valueDescriptor.ValueType.Name}>('{binding}', ...).");
             }
 
-            throw new InvalidOperationException($"Required options binding '{elementId}' is missing at '{elementPath}'.");
+            throw new InvalidOperationException($"Required options binding '{binding}' is missing at '{elementPath}'.");
         }
 
         if (descriptor!.ItemType != typeof(T))
         {
             throw new InvalidOperationException(
-                $"Options binding '{elementId}' at '{elementPath}' is '{descriptor.ItemType.Name}', not '{typeof(T).Name}'.");
+                $"Options binding '{binding}' at '{elementPath}' is '{descriptor.ItemType.Name}', not '{typeof(T).Name}'.");
         }
     }
 
-    public void ValidateAction<T>(string actionId, string elementPath)
+    public void ValidateAction<T>(string actionBind, string elementPath)
     {
-        if (!actions.TryGetValue(actionId, out ActionDescriptor? descriptor))
+        if (!actions.TryGetValue(actionBind, out ActionDescriptor? descriptor))
         {
-            throw new InvalidOperationException($"Required action binding '{actionId}' is missing at '{elementPath}'.");
+            throw new InvalidOperationException($"Required action binding '{actionBind}' is missing at '{elementPath}'.");
         }
 
         if (descriptor!.PayloadType != typeof(T))
         {
             throw new InvalidOperationException(
-                $"Action binding '{actionId}' at '{elementPath}' expects '{descriptor.PayloadType.Name}', not '{typeof(T).Name}'.");
+                $"Action binding '{actionBind}' at '{elementPath}' expects '{descriptor.PayloadType.Name}', not '{typeof(T).Name}'.");
         }
     }
 
-    public void ValidateCommand(string actionId, string elementPath)
+    public void ValidateCommand(string actionBind, string elementPath)
     {
-        if (!commands.TryGetValue(actionId, out _))
+        if (!commands.TryGetValue(actionBind, out _))
         {
-            throw new InvalidOperationException($"Required command binding '{actionId}' is missing at '{elementPath}'.");
+            throw new InvalidOperationException($"Required command binding '{actionBind}' is missing at '{elementPath}'.");
         }
     }
 
-    private void AddValue(string elementId, ValueDescriptor descriptor, UiInvalidation invalidates)
+    private void AddValue(string binding, ValueDescriptor descriptor, UiInvalidation invalidates)
     {
-        if (values.ContainsKey(elementId))
+        if (values.ContainsKey(binding))
         {
-            throw new InvalidOperationException($"Duplicate value binding '{elementId}'.");
+            throw new InvalidOperationException($"Duplicate value binding '{binding}'.");
         }
 
-        values.Add(elementId, descriptor);
-        DeclareInvalidation(elementId, invalidates);
+        values.Add(binding, descriptor);
+        DeclareInvalidation(binding, invalidates);
     }
 
     private void DeclareInvalidation(string key, UiInvalidation invalidates)
@@ -696,17 +749,17 @@ internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => 
         declaredInvalidation[key] = invalidates;
     }
 
-    private bool TryGetValueDescriptor(string elementId, out ValueDescriptor? descriptor)
+    private bool TryGetValueDescriptor(string binding, out ValueDescriptor? descriptor)
     {
-        return values.TryGetValue(elementId, out descriptor);
+        return values.TryGetValue(binding, out descriptor);
     }
 
-    private static void EnsureType<T>(Type actual, string elementId, string kind)
+    private static void EnsureType<T>(Type actual, string binding, string kind)
     {
         if (actual != typeof(T))
         {
             throw new InvalidOperationException(
-                $"Binding '{elementId}' ({kind}) is '{actual.Name}', not '{typeof(T).Name}'.");
+                $"Binding '{binding}' ({kind}) is '{actual.Name}', not '{typeof(T).Name}'.");
         }
     }
 }

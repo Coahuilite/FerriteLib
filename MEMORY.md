@@ -12,8 +12,9 @@ sources now share the no-platform target; explicit native execution and standalo
 typed declarations, unified choices/descriptors/item addresses and optional capability composition are
 specified in docs/development/0.8/refactor-migration.md. It also records current abstraction consumers,
 old-chain removals and author prerequisites. No0.7 compatibility shape is silently carried forward.
-The confirmed explicit-only Choice.Help policy and both old-default migration paths are in that
-migration contract; element HelpKey and consumer help-panel policy remain independent.
+The confirmed explicit-only Choice.HelpRef policy, adjacent Ref/Key/Bind naming and both old-default
+migration paths are in that contract. Session topic/grace and optional owned endpoint output have
+different lifetimes; public-contract.md describes them without a panel or access-capture framework.
 
 Accepted RU1–RU3 production foundations and their applicable evidence remain in the reactive, layout-reuse
 and failure-lifetime contracts. Closeout adds native composite-capture precedence, normal-return-before-

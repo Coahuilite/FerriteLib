@@ -822,7 +822,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, "sche
             label = spec.TryGetAttribute("Text", out string text) ? text : "";
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 
@@ -1049,12 +1049,12 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, "sche
         return dir;
     }
 
-    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindingReader bindings)
+    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindingAccess bindings)
     {
         return new UiHost(source, manifest, bindings, UiTheme.Vanilla, new FixedMetrics(), new FixedTranslation());
     }
 
-    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindingReader bindings, UiTheme theme)
+    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindingAccess bindings, UiTheme theme)
     {
         return new UiHost(source, manifest, bindings, theme, new FixedMetrics(), new FixedTranslation());
     }

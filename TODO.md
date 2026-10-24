@@ -2,8 +2,8 @@
 
 ## 0.8 refactor candidate
 
-- [ ] PM owns the read-only Help mechanism/naming assessment and final public-mechanism freeze.
-      Explicit omitted/empty Choice.Help semantics are decided; keep current interfaces while it is assessed.
+- [ ] PM accepts the fixed HelpRef/output-lifetime and adjacent-name candidate before public freeze
+      or downstream consumption. Implementation is authorized; explicit omission is already decided.
 - [ ] Collect native1.6 text/IME/fonts/window/input/scroll/clip/popup/image acceptance against that fixed
       candidate; native1.7 remains separately awaiting human. Do not start/install the game automatically.
 

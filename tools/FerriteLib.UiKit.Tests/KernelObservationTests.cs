@@ -42,7 +42,7 @@ internal static class KernelObservationTests
         });
         bindings.BindCommand("run", () => writes++);
         bindings.BindReadOnly("show", () => visible);
-        var manifest = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"r9\"><Stack Id=\"root\">" + "<Widget Id=\"text\" Kind=\"input/text-field\" Bind=\"text\" Label=\"Name\" VisibleKey=\"show\"/>" + "<Widget Id=\"button\" Kind=\"input/button\" ActionBind=\"run\" Text=\"Run\"/>" + "<Widget Id=\"note\" Kind=\"text/wrapped\" Text=\"readable\"/></Stack></UiPage>");
+        var manifest = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"r9\"><Stack Id=\"root\">" + "<Widget Id=\"text\" Kind=\"input/text-field\" Bind=\"text\" Label=\"Name\" VisibleBind=\"show\"/>" + "<Widget Id=\"button\" Kind=\"input/button\" ActionBind=\"run\" Text=\"Run\"/>" + "<Widget Id=\"note\" Kind=\"text/wrapped\" Text=\"readable\"/></Stack></UiPage>");
         using var host = new UiHost("r9", manifest, bindings, UiTheme.Vanilla, new Metrics(), new Translation());
         Check(host.Observe().Status == UiObservationStatus.NotSampled, "unarranged host reports unsampled without materialization");
         Check(UiHost.ObserveLiveHosts(128).Hosts.Any(item => item.Host == host.Session.Identity), "live host discovered by stable session identity");
@@ -205,7 +205,7 @@ internal static class KernelObservationTests
         bindings.BindReadOnly<UiImage>("picture", () => texture);
         bindings.BindReadOnly("progress", () => progressUnavailable ? throw new InvalidOperationException("unavailable") : progress);
         bindings.BindAction<UiChartPointChange>("point", _ => writes++);
-        var manifest = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"r9-facts\"><Stack Id=\"root\" Padding=\"0\" Gap=\"0\"><Widget Id=\"first\" Kind=\"input/dropdown\" Bind=\"typed\" OptionsBind=\"choices\"/><Widget Id=\"second\" Kind=\"input/dropdown\" Bind=\"typed\" OptionsBind=\"choices\"/><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\"/><Widget Id=\"sparse\" Kind=\"input/dropdown\" Bind=\"sparse\"   ><Choice Value=\"later\" Text=\"later label\" Help=\"later\"/><Choice Value=\"fourth\" Text=\"fourth\" Help=\"fourth\"/></Widget><Widget Id=\"sparse-mode\" Kind=\"input/mode-row\" Bind=\"sparse-mode\"   ><Choice Value=\"later\" Text=\"later label\" Help=\"later\"/><Choice Value=\"fourth\" Text=\"fourth\" Help=\"fourth\"/></Widget><Widget Id=\"image\" Kind=\"display/image\" Bind=\"picture\" Height=\"28\"/><Widget Id=\"progress\" Kind=\"display/progress\" Bind=\"progress\" Max=\"2\"/><Widget Id=\"chart\" Kind=\"chart/line\" Points=\"0,0;1,1\" Editable=\"0\" ActionBind=\"point\"/></Stack></UiPage>");
+        var manifest = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"r9-facts\"><Stack Id=\"root\" Padding=\"0\" Gap=\"0\"><Widget Id=\"first\" Kind=\"input/dropdown\" Bind=\"typed\" OptionsBind=\"choices\"/><Widget Id=\"second\" Kind=\"input/dropdown\" Bind=\"typed\" OptionsBind=\"choices\"/><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\"/><Widget Id=\"sparse\" Kind=\"input/dropdown\" Bind=\"sparse\"   ><Choice Value=\"later\" Text=\"later label\" HelpRef=\"later\"/><Choice Value=\"fourth\" Text=\"fourth\" HelpRef=\"fourth\"/></Widget><Widget Id=\"sparse-mode\" Kind=\"input/mode-row\" Bind=\"sparse-mode\"   ><Choice Value=\"later\" Text=\"later label\" HelpRef=\"later\"/><Choice Value=\"fourth\" Text=\"fourth\" HelpRef=\"fourth\"/></Widget><Widget Id=\"image\" Kind=\"display/image\" Bind=\"picture\" Height=\"28\"/><Widget Id=\"progress\" Kind=\"display/progress\" Bind=\"progress\" Max=\"2\"/><Widget Id=\"chart\" Kind=\"chart/line\" Points=\"0,0;1,1\" Editable=\"0\" ActionBind=\"point\"/></Stack></UiPage>");
         using var host = new UiHost("r9-facts", manifest, bindings, UiTheme.Vanilla, new Metrics(), new Translation());
         host.Session.SetFrame(native.CaptureFrame(),native);
         Event previousEvent = Event.current;
@@ -343,7 +343,7 @@ internal static class KernelObservationTests
         bindings.BindChoices("choices", () => options);
         bindings.BindValue("static", () => "kept", _ => throw new Exception("observation cannot select"));
         bindings.BindOptions("static", () => (IReadOnlyList<string>)new[] { "ignored decoy" });
-        var manifest = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"r9-options\"><Widget Id=\"choice\" Kind=\"input/dropdown\" Bind=\"choice\" OptionsBind=\"choices\"/><Widget Id=\"static\" Kind=\"input/dropdown\" Bind=\"static\" ><Choice Value=\"static label\" Text=\"static label\" Help=\"static label\"/></Widget></UiPage>");
+        var manifest = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"r9-options\"><Widget Id=\"choice\" Kind=\"input/dropdown\" Bind=\"choice\" OptionsBind=\"choices\"/><Widget Id=\"static\" Kind=\"input/dropdown\" Bind=\"static\" ><Choice Value=\"static label\" Text=\"static label\" HelpRef=\"static label\"/></Widget></UiPage>");
         using var host = new UiHost("r9-options", manifest, bindings, UiTheme.Vanilla, new Metrics(), new Translation());
         host.MeasureAndArrange(new UiLayoutPoint(320, 240));
         options.MaximumRead = 2;

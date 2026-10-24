@@ -11,7 +11,7 @@ namespace FerriteLib.UiKit.Kernel;
 public sealed partial class UiHost : IDisposable
 {
     private readonly string source;
-    private readonly IUiBindingReader bindings;
+    private readonly IUiBindingAccess bindings;
     private UiBindingPresentation? reactivePresentation;
     private UiBindings bindingOwner;
     private readonly UiTheme theme;
@@ -77,7 +77,7 @@ public sealed partial class UiHost : IDisposable
     public UiHost(
         string source,
         UiLayoutManifest manifest,
-        IUiBindingReader bindings,
+        IUiBindingAccess bindings,
         UiTheme theme,
         ITextMetrics metrics,
         IUiTranslation translation,
@@ -137,7 +137,7 @@ public sealed partial class UiHost : IDisposable
         TrackObservationHost(this);
     }
 
-    public IUiBindingReader Bindings => bindings;
+    public IUiBindingAccess Bindings => bindings;
 
     public UiSession Session => session;
     public UiHostInputState InputState => new(session.IsActive, session.ActiveEditNode != null, session.OwnedHotControl.HasValue || session.Interactions.CaptureOwner.HasValue);
@@ -463,7 +463,7 @@ public sealed partial class UiHost : IDisposable
             node != null;
             node = node.Parent)
         {
-            string key = node.CancelBindingKey;
+            string key = node.CancelBind;
             if (key.Length == 0) continue;
             if (bindings.TryInvokeCommand(key))
             {
@@ -501,6 +501,7 @@ public sealed partial class UiHost : IDisposable
         // Validate before dropping the previous projection. A caller can restore its backing after
         // a failed definition update; an ordinary proxy still uses ordinary getters, not tracking.
         ValidateManifest(manifest);
+        session.ReleaseOptionHelpOutputs();
         UiBindingPresentation? replacement = current.CreateHostPresentation(source + "/" + session.Identity);
         reactivePresentation?.Dispose();
         reactivePresentation = replacement;
@@ -978,6 +979,7 @@ public sealed partial class UiHost : IDisposable
 
     private void ResetDetachedState(UiNode node, Dictionary<UiNodeId, string> survivors)
     {
+        Widgets.OptionHelp.Release(node);
         node.EditingState = null;
         node.ResetCustomState();
         ResetState(node.State);

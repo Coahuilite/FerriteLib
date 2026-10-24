@@ -114,15 +114,15 @@ public static class UiPopup
     /// <see cref="ctx.Controls.TakePopupWheelIfCovering"/>.
     /// </para>
     /// </summary>
-    public static int DrawChoices<T>(UiLayoutRect popupRect,string elementId,UiWidgetContext ctx,
+    public static int DrawChoices<T>(UiLayoutRect popupRect,string popupId,UiWidgetContext ctx,
         IReadOnlyList<UiChoice<T>> options,T current,Action<T> onSelected,bool selectable=true)
     {
-        if (string.IsNullOrEmpty(elementId)) throw new ArgumentException("Popup element id is required.", nameof(elementId));
+        if (string.IsNullOrEmpty(popupId)) throw new ArgumentException("Popup element id is required.", nameof(popupId));
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
         if (options == null) throw new ArgumentNullException(nameof(options));
         if (onSelected == null) throw new ArgumentNullException(nameof(onSelected));
 
-        PushPopupLayer(popupRect, elementId, ctx);
+        PushPopupLayer(popupRect, popupId, ctx);
         PopupWindow window = RowsOf(popupRect, ctx, options.Count);
 
         int hovered = -1;
@@ -136,12 +136,20 @@ public static class UiPopup
             }
 
             DrawRow(ctx.Drawing,rowRect, UiChoiceSource.Label(options[index],ctx.Translation), EqualityComparer<T>.Default.Equals(options[index].Value,current), ctx.Theme);
-            UiInteractionResult input = ctx.Controls.PopupOption(rowRect, elementId, ctx, options[index].Value, selectable);
+            UiInteractionResult input = ctx.Controls.PopupOption(rowRect, popupId, ctx, options[index].Value, selectable);
             if (input.Request)
             {
-                ctx.Session.ClosePopup();
-                UiInteractionTarget target = ctx.Controls.InteractionTarget(ctx, elementId, "popup-option", options[index].Value);
-                UiValueBehavior.Request(target, UiValueBehavior.Selection(input, options[index].Value), onSelected);
+                ctx.Session.ClosePopup(releaseHelp: false);
+                UiInteractionTarget target = ctx.Controls.InteractionTarget(ctx, popupId, "popup-option", options[index].Value);
+                try { UiValueBehavior.Request(target, UiValueBehavior.Selection(input, options[index].Value), onSelected); }
+                catch (Exception businessFailure) when (businessFailure is not OutOfMemoryException)
+                {
+                    try { Widgets.OptionHelp.Release(ctx.Node); }
+                    catch (Exception outputFailure) when (outputFailure is not OutOfMemoryException)
+                    { throw new AggregateException("Choice request and help withdrawal both failed. Neither is retried.", businessFailure, outputFailure); }
+                    throw;
+                }
+                Widgets.OptionHelp.Release(ctx.Node);
                 return hovered;
             }
         }
@@ -193,14 +201,14 @@ public static class UiPopup
     /// cannot express any of this: a composite draws several dropdowns under one UiNode. Both option lists go
     /// through here, so the rule stays in one place.
     /// </summary>
-    private static void PushPopupLayer(UiLayoutRect popupRect, string elementId, UiWidgetContext ctx)
+    private static void PushPopupLayer(UiLayoutRect popupRect, string popupId, UiWidgetContext ctx)
     {
-        ctx.Session.PushHitLayer(ctx.Node, popupRect, isPopup: true, popupOwnerId: elementId);
+        ctx.Session.PushHitLayer(ctx.Node, popupRect, isPopup: true, popupOwnerId: popupId);
         if (ctx.Controls.Trace != null)
         {
             // The published rect and the scroll that picked which rows live inside it, in one line: a real-game
             // log has to be able to say which option was reachable where, not only that a menu was open.
-            ctx.Controls.Trace("publish id=" + elementId + " rect=" + UiControls.Describe(popupRect)
+            ctx.Controls.Trace("publish id=" + popupId + " rect=" + UiControls.Describe(popupRect)
                 + " firstRow=" + ctx.Session.OpenPopupScrollRows);
         }
 

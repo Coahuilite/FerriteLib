@@ -434,7 +434,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ThrowingProbeKind, () => n
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 
@@ -456,7 +456,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ThrowingProbeKind, () => n
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 

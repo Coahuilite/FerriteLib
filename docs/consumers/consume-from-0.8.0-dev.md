@@ -32,6 +32,27 @@ See [S0/S1 contract](../development/0.8/s01-contract.md) for per-property remove
 composition, headless entry points, capture ownership and error handling. Supported S1–S7 paths and required dependencies are stable; detailed R9 stays experimental.
 Keep the exact selected source/configuration/package identity with your development evidence.
 
+## Read a help topic from the Session
+
+Use element/choice `HelpRef` for an opaque consumer catalog reference, and read
+`host.Session.CurrentHelpRef` plus `CurrentHelpSource` for your panel. A choice's explicit reference
+overrides its element; empty HelpRef falls back to general element help without inferring Value/Text.
+`HelpGracePasses` retains pass-based grace (US uses15); `Tooltip` still draws text you translate.
+
+Rename old HelpKey/Choice.Help/XML Help to HelpRef, HoverClaim/HoverClaimElement/ClaimHover to
+CurrentHelpRef/CurrentHelpSource/PublishHelp, and IUiBindingReader to IUiBindingAccess. Binding reads
+VisibleKey/WidthKey/SelectedKey/PayloadKey become VisibleBind/WidthBind/SelectedBind/PayloadBind.
+TextKey/LabelKey and real element identities keep their meanings. Old string/static default Value
+and typed default Text outputs require explicit HelpRef to preserve either old result.
+
+An optional `HoveredOptionHelpOutputBind` replaces HoverHelpKey when you separately need observable
+per-control output. It is not needed by the unified panel. Cleanup withdraws only the last owned
+publication; initial/consumer-written values or a newer same-address publisher are not erased.
+Publication and cleanup use the existing access-supplied owner-bound value endpoint, including across
+proxy backing switches. No new proxy-capture interface or switching prerequisite is required.
+The complete [migration map](../development/0.8/refactor-migration.md) records named-argument changes,
+ownership, grace sequencing and actual unsupported old spellings.
+
 ## Edit first, publish once
 
 TextField, NumberField and StepperSlider now default to `Live="false"`. Declare `Live="true"` if your

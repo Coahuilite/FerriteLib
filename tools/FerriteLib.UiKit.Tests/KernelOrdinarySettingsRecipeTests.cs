@@ -122,7 +122,7 @@ internal static class KernelOrdinarySettingsRecipeTests
         }
 
         private string help = "Keeps the output between the limits the hardware reports.";
-        internal string Help => help;
+        internal string HelpRef => help;
 
         /// <summary>
         /// A changed LABEL is measured content: the text atom's band depends on the string, so this
@@ -184,7 +184,7 @@ internal static class KernelOrdinarySettingsRecipeTests
             + "<Widget Id=\"quality\" Kind=\"input/dropdown\" Bind=\"quality\" OptionsBind=\"quality-options\" Label=\"Quality\" />"
             + "<Widget Id=\"status\" Kind=\"text/wrapped\" Bind=\"level-status\" />"
             + "<Widget Id=\"toggle\" Kind=\"input/button\" ActionBind=\"toggle-advanced\" Text=\"Advanced\" />"
-            + "<Section Id=\"advanced\" Title=\"Advanced\" VisibleKey=\"show-advanced\">"
+            + "<Section Id=\"advanced\" Title=\"Advanced\" VisibleBind=\"show-advanced\">"
             + "<Widget Id=\"advanced-note\" Kind=\"text/wrapped\" Text=\"Extra room for later settings.\" />"
             + "</Section>"
             + "</Column>"
@@ -201,7 +201,7 @@ internal static class KernelOrdinarySettingsRecipeTests
     {
         bindings.BindValue("level", () => model.Level, v => model.SetLevel(v), UiInvalidation.Paint);
         bindings.BindValue("balance", () => model.Balance, v => model.SetBalance(v), UiInvalidation.Paint);
-        bindings.BindReadOnly("level-help", () => model.Help, UiInvalidation.Measure);
+        bindings.BindReadOnly("level-help", () => model.HelpRef, UiInvalidation.Measure);
         bindings.BindReadOnly("level-status", () => model.Status, UiInvalidation.Paint);
         bindings.BindValue("quality", () => model.Quality, v => model.Quality = v);
         bindings.BindChoices("quality-options", ()=> (model.QualityOptions).Select(value=>new UiChoice<string>(value,value,value)).ToArray());
@@ -226,7 +226,7 @@ internal static class KernelOrdinarySettingsRecipeTests
         Check(Near(theme.Geometry.RowHeight, wide.RectById["level"].Height),
             "the slider's band is the theme's density row height, not a page literal");
         Check(!wide.RectById.ContainsKey("advanced"),
-            "the hidden group is not laid out at all (its VisibleKey is false)");
+            "the hidden group is not laid out at all (its VisibleBind is false)");
     }
 
     private static void VerifySecondSettingNeedsNoNewCodeShape()

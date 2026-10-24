@@ -165,9 +165,9 @@ internal sealed partial class UiLayoutEngine
                 ctx.Session.PopupTarget.HasValue ? UiObservationStatus.Sampled : UiObservationStatus.NotSampled, "session/popup-target"),
             new UiObservedFact("popup-target-scope", ctx.Session.PopupTarget?.TargetScope ?? "", source: "session/popup-target"),
             new UiObservedFact("popup-item-key", ctx.Session.PopupTarget?.ItemKey as string ?? "", source: "session/popup-target"),
-            new UiObservedFact("hover-help", budget.Limit(ctx.Session.HoverClaim ?? ""), source: "last-frame",
-                truncated: (ctx.Session.HoverClaim?.Length ?? 0) > budget.Text),
-            new UiObservedFact("hover-owner", ctx.Session.HoverClaimElement?.Key ?? "", source: "last-frame"),
+            new UiObservedFact("hover-help", budget.Limit(ctx.Session.CurrentHelpRef ?? ""), source: "last-frame",
+                truncated: (ctx.Session.CurrentHelpRef?.Length ?? 0) > budget.Text),
+            new UiObservedFact("hover-owner", ctx.Session.CurrentHelpSource?.Key ?? "", source: "last-frame"),
             new UiObservedFact("last-layout-frame", observationLayoutFrame.ToString(CultureInfo.InvariantCulture), source: "last-arrangement"),
             new UiObservedFact("last-layout-time-utc", observationLayoutAtUtc?.ToString("O", CultureInfo.InvariantCulture) ?? "", source: "last-arrangement")
         };
@@ -176,7 +176,7 @@ internal sealed partial class UiLayoutEngine
             Array.AsReadOnly(output.ToArray()), Array.AsReadOnly(hostFacts));
     }
 
-    private bool ObservationHasPendingLayoutNotification(IUiBindingReader bindings)
+    private bool ObservationHasPendingLayoutNotification(IUiBindingAccess bindings)
     {
         foreach (var committed in committedRevisions)
             if (committed.Value != bindings.GetRevision(committed.Key) && (bindings.GetInvalidation(committed.Key) & (UiInvalidation.Measure | UiInvalidation.Structure)) != 0)
@@ -407,10 +407,10 @@ internal sealed partial class UiLayoutEngine
     private static void ObserveDropdownOptions(PlacedEntry entry,UiWidgetContext ctx,UiObservationBudget budget,List<UiObservedFact> facts,string binding)
     {
         IReadOnlyList<UiChoice<object?>> choices;int count;string source;
-        if(entry.Spec.Choices.Count>0){count=entry.Spec.Choices.Count;var prefix=new List<UiChoice<object?>>();for(int i=0;i<Math.Min(count,budget.Items);i++){var c=entry.Spec.Choices[i];prefix.Add(new UiChoice<object?>(c.Text,c.Value,c.Help,c.TextKey));}choices=prefix;source="static-options";}
+        if(entry.Spec.Choices.Count>0){count=entry.Spec.Choices.Count;var prefix=new List<UiChoice<object?>>();for(int i=0;i<Math.Min(count,budget.Items);i++){var c=entry.Spec.Choices[i];prefix.Add(new UiChoice<object?>(c.Text,c.Value,c.HelpRef,c.TextKey));}choices=prefix;source="static-options";}
         else {UiBindings.VerifyReaderKey(ctx.Bindings,UiChoiceSource.ChoiceKey(entry.Spec),UiBindingRole.Choices);choices=ctx.Bindings.Choices(UiChoiceSource.ChoiceKey(entry.Spec)).Prefix(budget.Items,out count);source="current-typed-options";}
         facts.Add(new UiObservedFact("option-count",count.ToString(CultureInfo.InvariantCulture),source:source));
-        for(int i=0;i<choices.Count;i++){var c=choices[i];ObserveOption(ctx,budget,facts,binding,i,UiChoiceSource.Label(c,ctx.Translation),c.Value,source);facts.Add(new UiObservedFact("option."+i+".help",budget.Limit(c.Help),source:source,truncated:c.Help.Length>budget.Text));}
+        for(int i=0;i<choices.Count;i++){var c=choices[i];ObserveOption(ctx,budget,facts,binding,i,UiChoiceSource.Label(c,ctx.Translation),c.Value,source);facts.Add(new UiObservedFact("option."+i+".help",budget.Limit(c.HelpRef),source:source,truncated:c.HelpRef.Length>budget.Text));}
         if(count>choices.Count)facts.Add(new UiObservedFact("options","",reason:"item-budget",truncated:true));
     }
     private static void ObserveModeOptions(PlacedEntry entry,UiWidgetContext ctx,UiObservationBudget budget,List<UiObservedFact> facts,string binding)

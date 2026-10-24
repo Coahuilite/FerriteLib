@@ -34,11 +34,11 @@ do not create another file or update service.
 
 A named template is instantiated under each accepted stable item key. Reorder moves geometry without
 changing the item's node, editor, pointer target or business key. Translation/catalog keys remain global.
-The exact binding roles qualified to items.itemKey are Bind, ActionBind, OptionsBind, VisibleKey,
-PayloadKey, SelectedKey, CancelBind, PointKeysBind, DisclosureBind, CheckBind, WidthKey and HoverHelpKey.
+The exact binding roles qualified to items.itemKey are Bind, ActionBind, OptionsBind, VisibleBind,
+PayloadBind, SelectedBind, CancelBind, PointKeysBind, DisclosureBind, CheckBind, WidthBind and HoveredOptionHelpOutputBind.
 The latter five were missing from the old explicit role list: previously they accidentally resolved a
 page-level key (or a missing key); now the real per-item bindings are consumed. No suffix heuristic is
-used: TextKey/LabelKey/HelpKey are not reinterpreted as value bindings.
+used: TextKey/LabelKey/HelpRef are not reinterpreted as value bindings.
 
 No new per-item registration prerequisite is introduced. The established missing/mistyped/late item
 binding fail-soft contracts remain: the affected wrapper reports its real unavailable/default fact or

@@ -114,22 +114,22 @@ public sealed partial class UiControls
     }
 
     /// <summary>Popup rows are already in window space and belong to the open menu, not its covered trigger.</summary>
-    public UiInteractionResult PopupOption(UiLayoutRect rect, string elementId, UiWidgetContext ctx, object? key, bool selectable = true)
+    public UiInteractionResult PopupOption(UiLayoutRect rect, string popupId, UiWidgetContext ctx, object? key, bool selectable = true)
     {
         UiSession session = ctx.Session;
         UiNode node = ctx.Node;
-        var target = InteractionTarget(ctx, elementId, "popup-option", key);
-        UiInteractionResult result = PopupPointer(rect, elementId, session, target, true, selectable, node);
+        var target = InteractionTarget(ctx, popupId, "popup-option", key);
+        UiInteractionResult result = PopupPointer(rect, popupId, session, target, true, selectable, node);
         session.NotePopupOptionCapture(target, result.Captured);
         if (result.Request)
-            Trace?.Invoke("option fired id=" + elementId + " row=" + Describe(rect));
+            Trace?.Invoke("option fired id=" + popupId + " row=" + Describe(rect));
         return result;
     }
 
-    private UiInteractionResult PopupPointer(UiLayoutRect rect, string elementId, UiSession session, UiInteractionTarget target, bool option, bool selectable, UiNode ownerNode)
+    private UiInteractionResult PopupPointer(UiLayoutRect rect, string popupId, UiSession session, UiInteractionTarget target, bool option, bool selectable, UiNode ownerNode)
     {
         UiNode node = ownerNode;
-        bool enabled = selectable && !IsInputDisabled(node) && (!option || session.IsPopupOpen(elementId, node));
+        bool enabled = selectable && !IsInputDisabled(node) && (!option || session.IsPopupOpen(popupId, node));
         return PointerInteraction(rect, session, node, target, enabled && IsWindowMouseOver(rect), enabled, false, default, 0,windowSpace:true);
     }
 

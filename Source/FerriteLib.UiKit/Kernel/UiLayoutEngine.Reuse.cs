@@ -85,11 +85,11 @@ internal sealed partial class UiLayoutEngine
         ctx.ViewWidth, (float)ctx.Theme.DefaultFont, ctx.Theme.Geometry.Padding, ctx.Theme.Geometry.Spacing,
         ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.RowHeight, ctx.Theme.Geometry.Hairline, ctx.Node?.SharedLabelWidth ?? 0
     });
-    private static UiMeasureInputs MeasureSources(UiElementSpec spec, IUiBindingReader bindings)
+    private static UiMeasureInputs MeasureSources(UiElementSpec spec, IUiBindingAccess bindings)
     {
         string[] keys = { ReadDeclaredBindKey(spec), ReadAttribute(spec, ActionBindAttribute), ReadAttribute(spec, OptionsBindAttribute),
-            ReadAttribute(spec, WidthKeyAttribute), ReadAttribute(spec, VisibleKeyAttribute), ReadAttribute(spec, "SelectedKey"),
-            ReadAttribute(spec, TabAttribute).Length > 0 ? UiBindings.ActiveTabKey : "" };
+            ReadAttribute(spec, WidthBindAttribute), ReadAttribute(spec, VisibleBindAttribute), ReadAttribute(spec, "SelectedBind"),
+            ReadAttribute(spec, TabAttribute).Length > 0 ? UiBindings.ActiveTabBind : "" };
         var values = new List<string>();
         foreach (string key in keys) if (key.Length > 0) { values.Add(key); values.Add(bindings.GetRevision(key).ToString(CultureInfo.InvariantCulture)); }
         return new UiMeasureInputs(values.ToArray());

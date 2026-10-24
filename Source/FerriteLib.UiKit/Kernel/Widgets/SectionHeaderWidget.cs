@@ -42,7 +42,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindingReader bindings, string elementPath)
+    public void Validate(IUiBindingAccess bindings, string elementPath)
     {
         // No required binding. The one attribute this kind does not merely read but implements a closed set of
         // values for is Chrome: a value it would ignore is an inert declaration, refused here where the element

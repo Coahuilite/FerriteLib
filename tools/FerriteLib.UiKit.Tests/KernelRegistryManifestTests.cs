@@ -218,7 +218,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("dupe-scope", "test/probe", () =>
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 

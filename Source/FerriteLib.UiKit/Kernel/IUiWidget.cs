@@ -17,7 +17,7 @@ public interface IUiWidget
     /// Called by the Host during creation. Implementations must check every binding/action they
     /// need and throw <see cref="UiContractException"/> with the element path on mismatch.
     /// </summary>
-    void Validate(IUiBindingReader bindings, string elementPath);
+    void Validate(IUiBindingAccess bindings, string elementPath);
 
     /// <summary>Returns the natural content height for the current context.</summary>
     float Measure(UiWidgetContext ctx);

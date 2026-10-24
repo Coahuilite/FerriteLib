@@ -27,7 +27,7 @@ internal static class KernelCoreWidgetTests
         failures += Run("Composites draw text/font/rect through the one outlet", VerifyCompositeOutletTriple);
         failures += Run("Composite kinds keep their vocabulary and their manifests", VerifyCompositeVocabularyUnchanged);
         failures += Run("chrome/banner takes the role pair and keeps its ink (G5)", VerifyBannerRole);
-        failures += Run("SelectedKey resolves the element to the active state (0.7.x)", VerifySelectedKey);
+        failures += Run("SelectedBind resolves the element to the active state (0.7.x)", VerifySelectedBind);
         failures += Run("A button command receives the payload its row declares (G2)", VerifyButtonPayload);
         failures += Run("Chrome=\"none\" paints no surface and Auto height measures the content (G3)", VerifyBareHitArea);
         failures += Run("A binding element-type mismatch is reported, not just thrown (FL-23)", VerifyBindingMismatchIsReported);
@@ -58,7 +58,7 @@ internal static class KernelCoreWidgetTests
         UiWidgetRegistry.InitializeCore();
 
         string xml =
-            "<UiPage Schema=\"2\" Source=\"test\"><Stack Id=\"root\" Gap=\"8\" Padding=\"8\"><Widget Id=\"banner\" Kind=\"chrome/banner\" Bind=\"BannerText\" /><Widget Id=\"mode\" Kind=\"input/mode-row\"     ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/><Choice Value=\"B\" Text=\"B\" Help=\"B\"/></Widget><Widget Id=\"dropdown\" Kind=\"input/dropdown\" OptionsBind=\"Options\" /><Widget Id=\"volume\" Kind=\"input/stepper-slider\" Min=\"0\" Max=\"1\" /><Widget Id=\"chart\" Kind=\"chart/line\" Points=\"0,0;1,1\" /></Stack></UiPage>";
+            "<UiPage Schema=\"2\" Source=\"test\"><Stack Id=\"root\" Gap=\"8\" Padding=\"8\"><Widget Id=\"banner\" Kind=\"chrome/banner\" Bind=\"BannerText\" /><Widget Id=\"mode\" Kind=\"input/mode-row\"     ><Choice Value=\"A\" Text=\"A\" HelpRef=\"A\"/><Choice Value=\"B\" Text=\"B\" HelpRef=\"B\"/></Widget><Widget Id=\"dropdown\" Kind=\"input/dropdown\" OptionsBind=\"Options\" /><Widget Id=\"volume\" Kind=\"input/stepper-slider\" Min=\"0\" Max=\"1\" /><Widget Id=\"chart\" Kind=\"chart/line\" Points=\"0,0;1,1\" /></Stack></UiPage>";
 
         UiLayoutManifest manifest = UiLayoutManifest.Parse(xml);
         var bindings = new UiBindings();
@@ -133,17 +133,17 @@ internal static class KernelCoreWidgetTests
 
     private static void VerifyDropdownValuePrecedence()
     {
-        Check("Second" == FieldDrawnText("<Choice Text=\"b\" Value=\"a\" Help=\"a\"/><Choice Text=\"Second\" Value=\"b\" Help=\"b\"/>", "b"),
+        Check("Second" == FieldDrawnText("<Choice Text=\"b\" Value=\"a\" HelpRef=\"a\"/><Choice Text=\"Second\" Value=\"b\" HelpRef=\"b\"/>", "b"),
             "the required case: a later exact value beats an earlier text collision");
-        Check("One" == FieldDrawnText("<Choice Text=\"One\" Value=\"x\" Help=\"x\"/><Choice Text=\"Two\" Value=\"y\" Help=\"y\"/>", "x"),
+        Check("One" == FieldDrawnText("<Choice Text=\"One\" Value=\"x\" HelpRef=\"x\"/><Choice Text=\"Two\" Value=\"y\" HelpRef=\"y\"/>", "x"),
             "value-only match still resolves");
-        Check("One" == FieldDrawnText("<Choice Text=\"One\" Value=\"x\" Help=\"x\"/><Choice Text=\"Two\" Value=\"y\" Help=\"y\"/>", "One"),
+        Check("One" == FieldDrawnText("<Choice Text=\"One\" Value=\"x\" HelpRef=\"x\"/><Choice Text=\"Two\" Value=\"y\" HelpRef=\"y\"/>", "One"),
             "the legacy display-text fallback still runs when no value matches");
-        Check("zzz" == FieldDrawnText("<Choice Text=\"One\" Value=\"x\" Help=\"x\"/><Choice Text=\"Two\" Value=\"y\" Help=\"y\"/>", "zzz"),
+        Check("zzz" == FieldDrawnText("<Choice Text=\"One\" Value=\"x\" HelpRef=\"x\"/><Choice Text=\"Two\" Value=\"y\" HelpRef=\"y\"/>", "zzz"),
             "no match still displays the raw value");
-        Check("First" == FieldDrawnText("<Choice Text=\"First\" Value=\"d\" Help=\"d\"/><Choice Text=\"Second\" Value=\"d\" Help=\"d\"/>", "d"),
+        Check("First" == FieldDrawnText("<Choice Text=\"First\" Value=\"d\" HelpRef=\"d\"/><Choice Text=\"Second\" Value=\"d\" HelpRef=\"d\"/>", "d"),
             "two value matches: the first in option order wins, unchanged");
-        Check("Alpha" == FieldDrawnText("<Choice Text=\"Alpha\" Value=\"Alpha\" Help=\"Alpha\"/><Choice Text=\"Beta\" Value=\"Beta\" Help=\"Beta\"/>", "Alpha"),
+        Check("Alpha" == FieldDrawnText("<Choice Text=\"Alpha\" Value=\"Alpha\" HelpRef=\"Alpha\"/><Choice Text=\"Beta\" Value=\"Beta\" HelpRef=\"Beta\"/>", "Alpha"),
             "static pairs without Value keep working (value defaults to the text)");
 
         // Dynamic options (BindOptions) are value==text pairs; precedence must not shift their result.
@@ -152,7 +152,7 @@ internal static class KernelCoreWidgetTests
 
         // Writeback is untouched: drawing resolves for display only; the bound value survives the pass.
         string stored = "b";
-        FieldDrawnText("<Choice Text=\"b\" Value=\"a\" Help=\"a\"/><Choice Text=\"Second\" Value=\"b\" Help=\"b\"/>", "b", keepValue: s => stored = s);
+        FieldDrawnText("<Choice Text=\"b\" Value=\"a\" HelpRef=\"a\"/><Choice Text=\"Second\" Value=\"b\" HelpRef=\"b\"/>", "b", keepValue: s => stored = s);
         Check(stored == "b", "the draw pass committed nothing to the binding");
     }
 
@@ -428,7 +428,7 @@ internal static class KernelCoreWidgetTests
     /// declared label sets are the frozen vocabulary, and a manifest that used every declared attribute
     /// must still create, arrange and draw.
     /// </summary>
-    /// <summary>G2: PayloadKey hands the command the bound payload, so a repeated row can say which item it
+    /// <summary>G2: PayloadBind hands the command the bound payload, so a repeated row can say which item it
     /// is; a button without one still fires the payload-free command it always did.</summary>
     private static void VerifyButtonPayload()
     {
@@ -442,7 +442,7 @@ internal static class KernelCoreWidgetTests
         using UiHost host = new(
             "payload", UiLayoutManifest.Parse(
                 "<UiPage Schema=\"2\" Source=\"payload\">"
-                + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" PayloadKey=\"row-payload\" Text=\"go\" Height=\"24\" />"
+                + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" PayloadBind=\"row-payload\" Text=\"go\" Height=\"24\" />"
                 + "</UiPage>"),
             bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.MeasureAndArrange(new UiLayoutPoint(300f, 100f));
@@ -699,16 +699,16 @@ internal static class KernelCoreWidgetTests
         return NativeFixture.Record<UiColour>(colors[colors.Count - 1]!);
     }
 
-    /// <summary>SelectedKey: a bound boolean resolves the element to the active treatment, and an
+    /// <summary>SelectedBind: a bound boolean resolves the element to the active treatment, and an
     /// unresolvable key is fail-soft (the authored look stands) with one recorded note.</summary>
-    private static void VerifySelectedKey()
+    private static void VerifySelectedBind()
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
 
         if (ButtonFill(true) is UiColour selected && ButtonFill(false) is UiColour idle && SameColor(selected, idle))
         {
-            throw new Exception("SelectedKey=true did not change the button's treatment");
+            throw new Exception("SelectedBind=true did not change the button's treatment");
         }
 
         bool selectedNow = false;
@@ -719,14 +719,14 @@ internal static class KernelCoreWidgetTests
         using UiHost host = new(
             "selected-key", UiLayoutManifest.Parse(
                 "<UiPage Schema=\"2\" Source=\"selected-key\">"
-                + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" Text=\"x\" Height=\"24\" SelectedKey=\"missing-key\" />"
+                + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" Text=\"x\" Height=\"24\" SelectedBind=\"missing-key\" />"
                 + "</UiPage>"),
             bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.MeasureAndArrange(new UiLayoutPoint(300f, 100f));
         NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 300f, 100f));
         if (UiFitAudit.StyleFallbackCount != 1)
         {
-            throw new Exception("an unresolvable SelectedKey recorded " + UiFitAudit.StyleFallbackCount + " note(s), expected exactly one");
+            throw new Exception("an unresolvable SelectedBind recorded " + UiFitAudit.StyleFallbackCount + " note(s), expected exactly one");
         }
     }
 
@@ -741,7 +741,7 @@ internal static class KernelCoreWidgetTests
         using UiHost host = new(
             "selected-key", UiLayoutManifest.Parse(
                 "<UiPage Schema=\"2\" Source=\"selected-key\">"
-                + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" Text=\"x\" Height=\"24\" SelectedKey=\"sel\" />"
+                + "<Widget Id=\"b\" Kind=\"input/button\" ActionBind=\"act\" Text=\"x\" Height=\"24\" SelectedBind=\"sel\" />"
                 + "</UiPage>"),
             bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.MeasureAndArrange(new UiLayoutPoint(300f, 100f));
@@ -791,7 +791,7 @@ internal static class KernelCoreWidgetTests
         // Tone/Emphasis plus its own four names - the vocabulary move, pinned.
         CheckSchema(ChromeBannerWidget.Kind, new[]
         {
-            "Id", "Kind", "Tab", "Hidden", "Visible", "VisibleKey", "HelpKey", "SelectedKey", "WidthKey",
+            "Id", "Kind", "Tab", "Hidden", "Visible", "VisibleBind", "HelpRef", "SelectedBind", "WidthBind",
             "WideHidden", "Tone", "Emphasis", "Bind", "Text", "TextKey", "Height"
         });
         CheckSchema(EmptyStateWidget.Kind, new[] { "Id", "Kind", "Text", "TextKey", "Height", "Tab", "Hidden" });
@@ -1113,7 +1113,7 @@ internal static class KernelCoreWidgetTests
         var inner=new UiBindings();string mode="a";
         inner.BindValue("mode",()=>mode,value=>mode=value);
         inner.BindChoices("Options",()=>new List<UiChoice<string>>{new("a","a"),new("b","b")});
-        IUiBindingReader stringOnly=new StringOnlyBindings(inner);
+        IUiBindingAccess stringOnly=new StringOnlyBindings(inner);
         Check(stringOnly.Choices("Options").ValueType==typeof(string),"a runtime-only reader forwards the same canonical typed endpoint");
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
@@ -1389,15 +1389,15 @@ internal static class KernelCoreWidgetTests
     /// An ordinary string-choice forwarding reader. The explicit backing capability does not require
     /// tracked registration or replace the reader with a concrete-only Host contract.
     /// </summary>
-    private sealed class StringOnlyBindings : IUiBindingReader
+    private sealed class StringOnlyBindings : IUiBindingAccess
     {
-        private readonly IUiBindingReader inner;
+        private readonly IUiBindingAccess inner;
         public UiBindings BindingOwner => inner.BindingOwner;
         public bool TryValue(string key,out UiValueEndpoint? value)=>inner.TryValue(key,out value);
         public UiValueEndpoint Value(string key)=>inner.Value(key);
         public UiChoiceEndpoint Choices(string key)=>inner.Choices(key);
 
-        internal StringOnlyBindings(IUiBindingReader inner) => this.inner = inner;
+        internal StringOnlyBindings(IUiBindingAccess inner) => this.inner = inner;
 
         public T Get<T>(string elementId) => inner.Get<T>(elementId);
 

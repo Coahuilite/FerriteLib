@@ -137,12 +137,12 @@ public sealed class UiAttributeSchema
         switch (name.ToLowerInvariant())
         {
             case "bind":
-            case "visiblekey":
-            case "widthkey":
-            case "selectedkey":
-            case "payloadkey":
+            case "visiblebind":
+            case "widthbind":
+            case "selectedbind":
+            case "payloadbind":
             case "pointkeysbind":
-            case "hoverhelpkey":
+            case "hoveredoptionhelpoutputbind":
                 return UiBindingRole.Value;
             case "actionbind":
             case "cancelbind":

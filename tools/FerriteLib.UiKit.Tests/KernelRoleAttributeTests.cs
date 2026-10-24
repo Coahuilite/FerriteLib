@@ -573,7 +573,7 @@ internal static class KernelRoleAttributeTests
 
     // --- harness --------------------------------------------------------------------------------
 
-    private static UiLayoutSnapshot Arrange(string xml, IUiBindingReader bindings, UiTheme theme)
+    private static UiLayoutSnapshot Arrange(string xml, IUiBindingAccess bindings, UiTheme theme)
     {
         using UiHost host = new(Scope, UiLayoutManifest.Parse(xml), bindings, theme, new WrappingMetrics(), new StubTranslation());
         return host.MeasureAndArrange(new UiLayoutPoint(400f, 400f));
@@ -614,7 +614,7 @@ internal static class KernelRoleAttributeTests
         return attributes;
     }
 
-    private static UiWidgetContext Context(UiSession session, UiTheme theme, IUiBindingReader bindings, float viewWidth)
+    private static UiWidgetContext Context(UiSession session, UiTheme theme, IUiBindingAccess bindings, float viewWidth)
     {
         return NativeFixture.Context(Scope, session, new WrappingMetrics(), theme, new StubTranslation(), bindings, viewWidth, "root");
     }

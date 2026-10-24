@@ -13,9 +13,9 @@ namespace FerriteLib.UiKit.Tests;
 /// <list type="bullet">
 /// <item><c>Visible="true|false"</c> is static and engine-wide; <c>Hidden</c> keeps its old meaning; a
 /// malformed <c>Visible</c> is refused at creation rather than interpreted per frame.</item>
-/// <item><c>VisibleKey</c> is dynamic: the element follows a bool value binding, and announcing that key
+/// <item><c>VisibleBind</c> is dynamic: the element follows a bool value binding, and announcing that key
 /// hides or shows it without reopening the page.</item>
-/// <item>An unresolvable <c>VisibleKey</c> is not fatal - the element stays visible and one
+/// <item>An unresolvable <c>VisibleBind</c> is not fatal - the element stays visible and one
 /// <b>deduplicated</b> report reaches the fail-soft appearance channel, so fail-soft is not silent and a
 /// 60 fps page does not record sixty findings.</item>
 /// <item>Hiding does not renumber identity: an unnamed sibling keeps the declared ordinal it was
@@ -40,8 +40,8 @@ internal static class KernelVisibilityTests
     {
         failures = 0;
         Run("Visible is static and its grammar is a creation-time contract", VerifyStaticVisibilityAndGrammar);
-        Run("VisibleKey follows its bool binding without reopening the page", VerifyVisibleKeyToggles);
-        Run("An unresolvable VisibleKey stays visible and reports once", VerifyUnresolvableKeyIsSoftAndDeduplicated);
+        Run("VisibleBind follows its bool binding without reopening the page", VerifyVisibleBindToggles);
+        Run("An unresolvable VisibleBind stays visible and reports once", VerifyUnresolvableKeyIsSoftAndDeduplicated);
         Run("Hiding a sibling does not renumber identity", VerifyHiddenSiblingKeepsDeclaredOrdinal);
         Run("Hiding keeps the hidden element's state and spares its siblings", VerifyHideKeepsState);
         Run("A removed identity releases its node; a hidden one keeps it", VerifyRemovedIdentityReleasesItsNode);
@@ -76,7 +76,7 @@ internal static class KernelVisibilityTests
             "a malformed Visible is refused at creation");
     }
 
-    private static void VerifyVisibleKeyToggles()
+    private static void VerifyVisibleBindToggles()
     {
         bool show = false;
         var bindings = new UiBindings();
@@ -85,14 +85,14 @@ internal static class KernelVisibilityTests
         using UiHost host = Host(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
             + "<Column Id=\"column\" Gap=\"2\">"
-            + "<Widget Id=\"keeper\" Kind=\"" + ProbeKind + "\" Tag=\"keeper\" Height=\"12\" VisibleKey=\"show-keeper\" />"
+            + "<Widget Id=\"keeper\" Kind=\"" + ProbeKind + "\" Tag=\"keeper\" Height=\"12\" VisibleBind=\"show-keeper\" />"
             + "<Widget Id=\"other\" Kind=\"" + ProbeKind + "\" Tag=\"other\" Height=\"12\" />"
             + "</Column>"
             + "</UiPage>",
             bindings);
 
         UiLayoutSnapshot hidden = host.MeasureAndArrange(new UiLayoutPoint(200f, 200f));
-        Check(!hidden.RectById.ContainsKey("keeper"), "a false VisibleKey hides the element on the first arrange");
+        Check(!hidden.RectById.ContainsKey("keeper"), "a false VisibleBind hides the element on the first arrange");
         Check(hidden.RectById.ContainsKey("other"), "and leaves its sibling alone");
 
         show = true;
@@ -114,7 +114,7 @@ internal static class KernelVisibilityTests
         using UiHost host = Host(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
             + "<Column Id=\"column\">"
-            + "<Widget Id=\"keeper\" Kind=\"" + ProbeKind + "\" Tag=\"keeper\" Height=\"12\" VisibleKey=\"never-bound\" />"
+            + "<Widget Id=\"keeper\" Kind=\"" + ProbeKind + "\" Tag=\"keeper\" Height=\"12\" VisibleBind=\"never-bound\" />"
             + "</Column>"
             + "</UiPage>",
             new UiBindings());
@@ -125,7 +125,7 @@ internal static class KernelVisibilityTests
 
         Check(
             first.RectById.ContainsKey("keeper"),
-            "an unresolvable VisibleKey leaves the element visible: a page must not fail to exist because a model key is missing");
+            "an unresolvable VisibleBind leaves the element visible: a page must not fail to exist because a model key is missing");
         Check(reported == 1, "and it is reported once through the fail-soft appearance channel");
         Check(
             UiFitAudit.LastStyleFallbackDiagnostic != null
@@ -153,7 +153,7 @@ internal static class KernelVisibilityTests
             // widget is handed.
             + "<Row Id=\"row\" Gap=\"2\">"
             + "<Widget Kind=\"" + ProbeKind + "\" Tag=\"a\" />"
-            + "<Widget Kind=\"" + ProbeKind + "\" Tag=\"b\" VisibleKey=\"show-middle\" />"
+            + "<Widget Kind=\"" + ProbeKind + "\" Tag=\"b\" VisibleBind=\"show-middle\" />"
             + "<Widget Kind=\"" + ProbeKind + "\" Tag=\"c\" />"
             + "</Row>"
             + "</UiPage>",
@@ -190,7 +190,7 @@ internal static class KernelVisibilityTests
         using UiHost host = Host(
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
             + "<Column Id=\"column\" Gap=\"2\">"
-            + "<Widget Id=\"keeper\" Kind=\"" + ProbeKind + "\" Tag=\"keeper\" Height=\"12\" VisibleKey=\"show-keeper\" />"
+            + "<Widget Id=\"keeper\" Kind=\"" + ProbeKind + "\" Tag=\"keeper\" Height=\"12\" VisibleBind=\"show-keeper\" />"
             + "<Widget Id=\"other\" Kind=\"" + ProbeKind + "\" Tag=\"other\" Height=\"12\" />"
             + "</Column>"
             + "</UiPage>",
@@ -313,14 +313,14 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new Probe
 
     private static string Element(string id)
     {
-        string visible = id == "c" ? " VisibleKey=\"show-c\"" : "";
+        string visible = id == "c" ? " VisibleBind=\"show-c\"" : "";
         // Tall enough that even one surviving element overflows the 40-high viewport, so the scroll
         // position under test is never clamped away for a reason the lane did not mean to test.
         return "<Widget Id=\"" + id + "\" Kind=\"" + ProbeKind + "\" Tag=\"" + id + "\" Height=\"60\""
             + visible + " />";
     }
 
-    private static UiHost Host(string xml, IUiBindingReader bindings)
+    private static UiHost Host(string xml, IUiBindingAccess bindings)
     {
         UiWidgetRegistry.Clear();
         UiWidgetRegistry.InitializeCore();
@@ -394,7 +394,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new Probe
             this.spec = spec;
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 

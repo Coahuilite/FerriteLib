@@ -22,6 +22,11 @@ public sealed class UiNode
     private readonly Dictionary<string,object> customState = new(StringComparer.Ordinal);
     private readonly Dictionary<string,Action> customRelease = new(StringComparer.Ordinal);
     private bool released;
+    internal UiBindings? OptionHelpOwner;
+    internal UiValueEndpoint? OptionHelpEndpoint;
+    internal string OptionHelpBind = "", OptionHelpRef = "";
+    internal int OptionHelpPass;
+    internal bool OptionHelpPopup;
     internal void RequireActive()
     {
         if (released || !session.IsActive) throw new ObjectDisposedException(nameof(UiNode));
@@ -40,9 +45,14 @@ public sealed class UiNode
     }
     internal void ReleaseState()
     {
-        if(released)return;released=true;ResetCustomState();
-        foreach(var slot in slots.Values){if(slot.Editor is IUiEditState editor)editor.Suspend();slot.Editor=null;slot.EditorTarget=null;slot.ChartIdentity=null;}
-        slots.Clear();EditingState=null;children.Clear();Parent=null;
+        if(released)return;released=true;
+        try { Widgets.OptionHelp.Release(this); }
+        finally
+        {
+            ResetCustomState();
+            foreach(var slot in slots.Values){if(slot.Editor is IUiEditState editor)editor.Suspend();slot.Editor=null;slot.EditorTarget=null;slot.ChartIdentity=null;}
+            slots.Clear();EditingState=null;children.Clear();Parent=null;
+        }
     }
     private readonly Dictionary<string, UiControlState> slots = new(StringComparer.Ordinal);
     private readonly List<UiNode> children = new();
@@ -135,7 +145,7 @@ public sealed class UiNode
 
     /// <summary>
     /// True while this element is disabled for input: the command it declares answers
-    /// <see cref="IUiBindingReader.CanExecute"/> false. The engine resolves it once per element per draw and
+    /// <see cref="IUiBindingAccess.CanExecute"/> false. The engine resolves it once per element per draw and
     /// publishes it here because the node is the identity carrier every arranged element owns; the
     /// funnel's interactive entry points consult it, so a disabled element neither executes nor captures
     /// the pointer - one rule for every kind instead of a per-widget branch. Always false for an element
@@ -158,7 +168,7 @@ public sealed class UiNode
     /// rather than inside a kind. Executability is NOT cached here — the ladder asks the live binding, which
     /// is the same reason a disabled element's grey-out is resolved per draw and not stored.
     /// </summary>
-    public string CancelBindingKey { get; internal set; } = "";
+    public string CancelBind { get; internal set; } = "";
 
     /// <summary>Marks this node's Measure as needed. Idempotent.</summary>
     public void MarkDirty()
@@ -204,7 +214,7 @@ internal UiControlState GetOrCreateState(string stateKey)
         string kind = Kind;
         int ordinal = Ordinal;
         string elementId = ElementId;
-        string cancelBinding = CancelBindingKey;
+        string cancelBinding = CancelBind;
         float sharedLabelWidth = SharedLabelWidth;
         UiNodeId updateScope = UpdateScopeRoot;
         return () =>
@@ -216,7 +226,7 @@ internal UiControlState GetOrCreateState(string stateKey)
             Rect = rect;
             ContentRect = content;
             RefreshIdentity(kind, ordinal, elementId);
-            CancelBindingKey = cancelBinding;
+            CancelBind = cancelBinding;
             SharedLabelWidth = sharedLabelWidth;
             UpdateScopeRoot = updateScope;
         };

@@ -33,7 +33,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindingReader bindings, string elementPath)
+    public void Validate(IUiBindingAccess bindings, string elementPath)
     {
         string bindKey = AtomVocabulary.ReadBindKey(spec);
         if (string.IsNullOrEmpty(bindKey))

@@ -62,7 +62,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <para>
 /// A missing or mistyped item-local key is deliberately fail-soft at draw: the control paints its default
 /// (off) state and one deduplicated appearance fallback is recorded, which is the same answer P2 chose for an
-/// unresolvable <c>VisibleKey</c>. A control inside a repeater template resolves its key against the
+/// unresolvable <c>VisibleBind</c>. A control inside a repeater template resolves its key against the
 /// per-item binding scope, so "not yet bound" is a legal frame there and must not take the page down.
 /// </para>
 /// </summary>
@@ -131,7 +131,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     /// appearance is refused rather than falling back, which is the same fail-closed rule the closed
     /// <c>Height</c> vocabulary uses: a look that silently degraded would be a page nobody authored.
     /// </summary>
-    public void Validate(IUiBindingReader bindings, string elementPath)
+    public void Validate(IUiBindingAccess bindings, string elementPath)
     {
         string key = ReadBindKey();
         if (key.Length == 0)

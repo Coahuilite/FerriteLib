@@ -9,7 +9,7 @@ namespace FerriteLib.UiKit.Tests;
 
 /// <summary>
 /// The height axis' content-relative mode: <c>Height="MatchContent"</c> (0.7.x). The width axis has carried a
-/// whole family (Width/WidthKey/MinWidth/MaxWidth) while the height axis accepted only a number or Auto, so a
+/// whole family (Width/WidthBind/MinWidth/MaxWidth) while the height axis accepted only a number or Auto, so a
 /// consumer whose hit area had to COVER a sibling's measured height could only stack hand-sized bare bands and
 /// under-covered the moment the text wrapped. The claims, in the order this lane checks them:
 /// <list type="bullet">

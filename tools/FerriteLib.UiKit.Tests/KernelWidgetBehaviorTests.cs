@@ -239,7 +239,7 @@ internal static class KernelWidgetBehaviorTests
     }
 
     private static UiElementSpec MakeModeRowSpec()=>new("mode",InputModeRowWidget.Kind,choices:new[]{new UiChoice<string>("A","A"),new UiChoice<string>("B","B"),new UiChoice<string>("C","C"),new UiChoice<string>("D","D")});
-    private static UiWidgetContext MakeContext(UiSession session, IUiBindingReader bindings)
+    private static UiWidgetContext MakeContext(UiSession session, IUiBindingAccess bindings)
     {
         return NativeFixture.Context(
             "test", session, new FixedMetrics(), UiTheme.Vanilla,

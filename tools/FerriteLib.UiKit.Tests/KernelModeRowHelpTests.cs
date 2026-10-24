@@ -14,7 +14,7 @@ namespace FerriteLib.UiKit.Tests;
 /// and deliberately not a tooltip.
 /// <para>
 /// The contract in consumer terms: each option carries its own help identity in its <c>DescriptionN</c>, and a
-/// row that declares <c>HoverHelpKey</c> publishes <b>which option is hovered</b> — the identity itself, or the
+/// row that declares <c>HoveredOptionHelpOutputBind</c> publishes <b>which option is hovered</b> — the identity itself, or the
 /// option's value when it declares no description — through that binding, clearing it when the pointer leaves.
 /// A consumer renders the help wherever it likes (the wired consumer's own help panel is the pattern vanilla's
 /// mode selectors also follow) and never re-derives this kind's cell geometry, which is the whole point of
@@ -41,9 +41,9 @@ internal static class KernelModeRowHelpTests
     public static int RunAll()
     {
         failures = 0;
-        Run("input/mode-row declares HoverHelpKey and keeps its label set", VerifyRegistration);
+        Run("input/mode-row declares HoveredOptionHelpOutputBind and keeps its label set", VerifyRegistration);
         Run("A per-option declaration with no option is refused at creation", VerifyInertOptionRefusal);
-        Run("HoverHelpKey must name a writable string binding", VerifyHoverKeyRefusal);
+        Run("HoveredOptionHelpOutputBind must name a writable string binding", VerifyHoverKeyRefusal);
         Run("Hovering an option publishes its declared help identity", VerifyHoverPublishesIdentity);
         Run("Moving the hover changes the identity, once per transition", VerifyHoverTransitionWritesOnce);
         Run("Leaving the row clears the published identity", VerifyLeavingClears);
@@ -67,7 +67,7 @@ internal static class KernelModeRowHelpTests
             return;
         }
 
-        Check(Contains(schema, InputModeRowWidget.HoverHelpKeyAttribute), "the schema allows HoverHelpKey");
+        Check(Contains(schema, InputModeRowWidget.HoveredOptionHelpOutputBindAttribute), "the schema allows HoveredOptionHelpOutputBind");
         Check(!Contains(schema,"Description3")&&!Contains(schema,"Value3"),"per-choice help and value are carried together, never numbered widget attributes");
         var labels=UiWidgetRegistry.GetLabelAttributes(UiWidgetRegistry.CoreScope,InputModeRowWidget.Kind);
         Check(labels==null||!Contains(labels,"Description1"),"help identities are published rather than treated as painted labels");
@@ -77,19 +77,19 @@ internal static class KernelModeRowHelpTests
         PrepareCore();
 
         Reject(
-            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  Description3=\"orphan help\" ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget>",
+            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  Description3=\"orphan help\" ><Choice Value=\"A\" Text=\"A\" HelpRef=\"A\"/></Widget>",
             "Description3",
             "a description whose index has no option");
 
         Reject(
-            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  Title2=\"orphan title\" ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget>",
+            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  Title2=\"orphan title\" ><Choice Value=\"A\" Text=\"A\" HelpRef=\"A\"/></Widget>",
             "Title2",
             "a title whose index has no option");
 
         // The refusal is not a blanket ban on gaps in the numbering: an option with a description and no
         // title, and an option 4 after an absent option 3, are both ordinary manifests.
         Host(
-            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"     ><Choice Value=\"A\" Text=\"A\" Help=\"help a\"/><Choice Value=\"D\" Text=\"Dee\" Help=\"D\"/></Widget>");
+            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"     ><Choice Value=\"A\" Text=\"A\" HelpRef=\"help a\"/><Choice Value=\"D\" Text=\"Dee\" HelpRef=\"D\"/></Widget>");
         Check(true, "a description without a title, and a gap in the option numbering, still create");
     }
 
@@ -99,9 +99,9 @@ internal static class KernelModeRowHelpTests
 
         // Unbound: the row would write through a key nothing answers.
         Reject(
-            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  HoverHelpKey=\"nobody-bound-this\" ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget>",
+            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  HoveredOptionHelpOutputBind=\"nobody-bound-this\" ><Choice Value=\"A\" Text=\"A\" HelpRef=\"A\"/></Widget>",
             "nobody-bound-this",
-            "a HoverHelpKey nothing is bound to");
+            "a HoveredOptionHelpOutputBind nothing is bound to");
 
         // Read-only: the write would be refused mid-frame and trip the recovery band.
         var bindings = new UiBindings();
@@ -109,9 +109,9 @@ internal static class KernelModeRowHelpTests
         bindings.BindReadOnly("published", () => "help");
         Check(RejectWithBindings(
                 bindings,
-                "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  HoverHelpKey=\"published\" ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget>",
+                "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  HoveredOptionHelpOutputBind=\"published\" ><Choice Value=\"A\" Text=\"A\" HelpRef=\"A\"/></Widget>",
                 "not writable"),
-            "a read-only HoverHelpKey is refused, because the publication is a write");
+            "a read-only HoveredOptionHelpOutputBind is refused, because the publication is a write");
 
         // Wrong type: the key exists but cannot hold a string.
         var wrong = new UiBindings();
@@ -120,9 +120,9 @@ internal static class KernelModeRowHelpTests
         wrong.BindValue("numeric", () => number, value => number = value);
         Check(RejectWithBindings(
                 wrong,
-                "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  HoverHelpKey=\"numeric\" ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget>",
+                "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  HoveredOptionHelpOutputBind=\"numeric\" ><Choice Value=\"A\" Text=\"A\" HelpRef=\"A\"/></Widget>",
                 "numeric"),
-            "a HoverHelpKey bound to a non-string value is refused by the typed validation");
+            "a HoveredOptionHelpOutputBind bound to a non-string value is refused by the typed validation");
 
         // And the well-formed declaration creates.
         var good = new UiBindings();
@@ -131,8 +131,8 @@ internal static class KernelModeRowHelpTests
         good.BindValue<string>("help", () => help, value => help = value);
         HostWithBindings(
             good,
-            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  HoverHelpKey=\"help\" ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget>");
-        Check(true, "a writable string HoverHelpKey creates");
+            "<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  HoveredOptionHelpOutputBind=\"help\" ><Choice Value=\"A\" Text=\"A\" HelpRef=\"A\"/></Widget>");
+        Check(true, "a writable string HoveredOptionHelpOutputBind creates");
     }
 
     // --- the publication ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ internal static class KernelModeRowHelpTests
         {NativeFixture.BeginDebugEvent();NativeFixture.Draw(
         fixture.Widget,fixture.Rect, fixture.Context);}
 
-        Check(fixture.Help == "help B", "hovering option 2 publishes its declared description");
+        Check(fixture.HelpRef == "help B", "hovering option 2 publishes its declared description");
         Check(fixture.Writes == 1, "and publishes it once");
     }
 
@@ -155,7 +155,7 @@ internal static class KernelModeRowHelpTests
 
         EnablePointer(CellCenter(fixture, 0));
         {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        fixture.Widget,fixture.Rect, fixture.Context);}
-        Check(fixture.Help == "help A" && fixture.Writes == 1, "hovering option 1 publishes its identity");
+        Check(fixture.HelpRef == "help A" && fixture.Writes == 1, "hovering option 1 publishes its identity");
 
         {NativeFixture.BeginDebugEvent();NativeFixture.Draw(
         fixture.Widget,fixture.Rect, fixture.Context);}
@@ -163,11 +163,11 @@ internal static class KernelModeRowHelpTests
 
         NativeFixture.DebugMousePosition = CellCenter(fixture, 1);
         {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        fixture.Widget,fixture.Rect, fixture.Context);}
-        Check(fixture.Help == "help B" && fixture.Writes == 2, "moving the hover to option 2 changes the identity and writes once");
+        Check(fixture.HelpRef == "help B" && fixture.Writes == 2, "moving the hover to option 2 changes the identity and writes once");
 
         NativeFixture.DebugMousePosition = CellCenter(fixture, 0);
         {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        fixture.Widget,fixture.Rect, fixture.Context);}
-        Check(fixture.Help == "help A" && fixture.Writes == 3, "and moving back changes it again");
+        Check(fixture.HelpRef == "help A" && fixture.Writes == 3, "and moving back changes it again");
     }
 
     private static void VerifyLeavingClears()
@@ -176,11 +176,11 @@ internal static class KernelModeRowHelpTests
 
         EnablePointer(CellCenter(fixture, 1));
         {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        fixture.Widget,fixture.Rect, fixture.Context);}
-        Check(fixture.Help == "help B", "the hover starts published");
+        Check(fixture.HelpRef == "help B", "the hover starts published");
 
         NativeFixture.DebugMousePosition = new UiLayoutPoint(fixture.Rect.XMax + 40f, fixture.Rect.YMax + 40f);
         {NativeFixture.BeginDebugEvent();NativeFixture.Draw(        fixture.Widget,fixture.Rect, fixture.Context);}
-        Check(fixture.Help == "", "leaving the row clears the published identity");
+        Check(fixture.HelpRef == "", "leaving the row clears the published identity");
         Check(fixture.Writes == 2, "and the clear is one write, not a per-frame stream of empties");
 
         {NativeFixture.BeginDebugEvent();NativeFixture.Draw(
@@ -196,7 +196,7 @@ internal static class KernelModeRowHelpTests
         {NativeFixture.BeginDebugEvent();NativeFixture.Draw(
         fixture.Widget,fixture.Rect, fixture.Context);}
 
-        Check(fixture.Help == "C", "an option that declares no description publishes its value, so the hovered option is always named");
+        Check(fixture.HelpRef == "C", "an option that declares no description publishes its value, so the hovered option is always named");
     }
 
     private static void VerifyHoverDoesNotConsumeTheClick()
@@ -205,7 +205,7 @@ internal static class KernelModeRowHelpTests
         EnablePointer(CellCenter(fixture, 1));
         NativeEvents.Click(NativeFixture.DebugMousePosition,()=>NativeFixture.Draw(fixture.Widget,fixture.Rect,fixture.Context));
         Check(fixture.Mode == "B", "a click on the hovered option still selects it");
-        Check(fixture.Help == "help B", "and the same frame publishes the hover: the claim consumed nothing");
+        Check(fixture.HelpRef == "help B", "and the same frame publishes the hover: the claim consumed nothing");
     }
 
     /// <summary>
@@ -227,7 +227,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new Probe
         using UiHost host = new(
             Scope,
             UiLayoutManifest.Parse(
-                "<UiPage Schema=\"2\" Source=\""+(Scope)+"\"><Widget Id=\"gate\" Kind=\""+(ProbeKind)+"\" ActionBind=\"gate\" Height=\"20\" /><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget></UiPage>"),
+                "<UiPage Schema=\"2\" Source=\""+(Scope)+"\"><Widget Id=\"gate\" Kind=\""+(ProbeKind)+"\" ActionBind=\"gate\" Height=\"20\" /><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  ><Choice Value=\"A\" Text=\"A\" HelpRef=\"A\"/></Widget></UiPage>"),
             bindings,
             UiTheme.Vanilla,
             new StubMetrics(),
@@ -277,7 +277,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new Probe
         public UiWidgetContext Context = null!;
         public UiLayoutRect Rect;
         public string Mode = "A";
-        public string Help = "";
+        public string HelpRef = "";
         public int Writes;
     }
 
@@ -292,13 +292,13 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new Probe
         var fixture = new Fixture();
         var bindings = new UiBindings();
         bindings.BindValue<string>("mode", () => fixture.Mode, value => fixture.Mode = value);
-        bindings.BindValue<string>("help", () => fixture.Help, value =>
+        bindings.BindValue<string>("help", () => fixture.HelpRef, value =>
         {
-            fixture.Help = value;
+            fixture.HelpRef = value;
             fixture.Writes++;
         });
 
-        var attrs=new Dictionary<string,string>{{"Bind","mode"},{"HoverHelpKey","help"},{"Height","20"}};
+        var attrs=new Dictionary<string,string>{{"Bind","mode"},{"HoveredOptionHelpOutputBind","help"},{"Height","20"}};
         var choices=new[]{new UiChoice<string>("A","A","help A"),new UiChoice<string>("B","B","help B"),new UiChoice<string>("C","C","C"),new UiChoice<string>("D","D","help D")};
         fixture.Widget=new InputModeRowWidget();fixture.Widget.Configure(new UiElementSpec("mode",InputModeRowWidget.Kind,attrs,choices:choices));        fixture.Session = new UiSession();
         fixture.Context = MakeContext(fixture.Session, bindings);
@@ -332,7 +332,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new Probe
         UiWidgetRegistry.InitializeCore();
     }
 
-    private static UiWidgetContext MakeContext(UiSession session, IUiBindingReader bindings)
+    private static UiWidgetContext MakeContext(UiSession session, IUiBindingAccess bindings)
     {
         return NativeFixture.Context(
             Scope, session, new StubMetrics(), UiTheme.Vanilla,
@@ -478,7 +478,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new Probe
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 

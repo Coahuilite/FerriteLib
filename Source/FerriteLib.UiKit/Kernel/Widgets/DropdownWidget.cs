@@ -55,7 +55,7 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindingReader bindings, string elementPath)
+    public void Validate(IUiBindingAccess bindings, string elementPath)
     {
         if (!Looks.Resolve(spec).Declared && DeclaresAppearance(spec))
             throw new InvalidOperationException("Unknown dropdown Appearance='"+spec.Attributes[UiAppearanceResolver.Attribute]+"' at '"+elementPath+"'; accepted: "+string.Join(", ",Looks.Supported)+".");
@@ -95,7 +95,11 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
             values.Add(choice.Value);
         ctx.Node.Selection = UiValueBehavior.Observe(values, current, _ => endpoint.Writable);
         if (choices.Count == 0)
+        {
+            OptionHelp.Publish(ctx, OptionHelp.SinkKey(spec), "");
+            if (ctx.Session.IsPopupOpen(key, ctx.Node)) ctx.Session.ClosePopup();
             return;
+        }
         string display = FindChoiceText(choices, current), label = ReadLabel(ctx);
         UiLayoutRect field = ResolveField(rect, ctx, label);
         ctx.Controls.DropdownButton(field, key, ctx, ctx.Node.Id.Key);
@@ -111,10 +115,11 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
             {
                 int hover = UiPopup.DrawChoices(UiPopup.RectFor(anchor, choices.Count, ctx.Session.HostViewport), key, ctx, choices, current, v => endpoint.TryWrite(v), endpoint.Writable);
                 if(!ctx.Session.IsActive)return;
-                string help = hover >= 0 && hover < choices.Count ? choices[hover].Help : "";
-                OptionHelp.Publish(ctx, OptionHelp.SinkKey(spec), help);
-                if (help.Length > 0)
-                    ctx.Session.ClaimHover(help);
+                bool hovered = hover >= 0 && hover < choices.Count && ctx.Session.IsPopupOpen(key, ctx.Node);
+                string help = hovered ? choices[hover].HelpRef : "";
+                OptionHelp.Publish(ctx, OptionHelp.SinkKey(spec), help, popup: true);
+                string topic = help.Length > 0 ? help : hovered && spec.TryGetAttribute("HelpRef", out string general) ? general : "";
+                if (topic.Length > 0) ctx.Session.PublishHelp(ctx.Node, topic);
             });
         }
         else

@@ -690,7 +690,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, "diag
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 
@@ -725,7 +725,7 @@ ctx.Drawing,                new UiLayoutRect(rect.X, rect.Y, 4f, 4f),
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 
@@ -769,7 +769,7 @@ ctx.Drawing,                new UiLayoutRect(rect.X, rect.Y, 100f, 16f),
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 
@@ -796,7 +796,7 @@ ctx.Drawing,                new UiLayoutRect(rect.X, rect.Y, 4f, 4f),
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 

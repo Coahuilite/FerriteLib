@@ -436,7 +436,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, HeightWidgetKind, () => ne
             + "<Column Padding=\"0\" Gap=\"0\"><Widget Kind=\"" + HeightWidgetKind + "\" Height=\"60\" />"
             + "<Scroll Id=\"scroll\" Padding=\"0\" Gap=\"0\" Height=\"200\">"
             + "<Widget Id=\"spacer\" Kind=\"" + HeightWidgetKind + "\" Height=\"100\" />"
-            + "<Widget Id=\"dropdown\" Kind=\"input/dropdown\" OptionsBind=\"Options\" VisibleKey=\"dropdown-visible\" />"
+            + "<Widget Id=\"dropdown\" Kind=\"input/dropdown\" OptionsBind=\"Options\" VisibleBind=\"dropdown-visible\" />"
             + "<Widget Id=\"tail\" Kind=\"" + HeightWidgetKind + "\" Height=\"300\" />"
             + "</Scroll></Column>"
             + "</UiPage>";
@@ -497,7 +497,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, HeightWidgetKind, () => ne
             }
 
             // Frame 3: the owner is no longer arranged, so no call site can report it. The announce is
-            // explicit because a read-only VisibleKey cannot invalidate the arrange cache by itself.
+            // explicit because a read-only VisibleBind cannot invalidate the arrange cache by itself.
             visible = false;
             host.Session.BumpContentRevision();
             NativeEvents.Begin(EventType.Repaint,new UiLayoutPoint(-10,-10));NativeFixture.DrawFrame(host,viewport);
@@ -693,7 +693,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, "test/composite", () => wi
         public UiLayoutRect First;
         public UiLayoutRect Sibling;
         public void Configure(UiElementSpec spec) { }
-        public void Validate(IUiBindingReader bindings, string elementPath) { }
+        public void Validate(IUiBindingAccess bindings, string elementPath) { }
         public float Measure(UiWidgetContext ctx) => 220f;
         public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
         {
@@ -724,7 +724,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, "test/composite", () => wi
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 

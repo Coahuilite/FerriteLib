@@ -475,7 +475,7 @@ internal static class KernelResolvedStyleTests
 
         UiTheme theme = TestPalettes.DarkGold;
         UiLayoutManifest manifest = UiLayoutManifest.Parse(
-            "<UiPage Schema=\"2\" Source=\"density-test\"><Widget Id=\"dd\" Kind=\"input/dropdown\"   ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget></UiPage>");
+            "<UiPage Schema=\"2\" Source=\"density-test\"><Widget Id=\"dd\" Kind=\"input/dropdown\"   ><Choice Value=\"A\" Text=\"A\" HelpRef=\"A\"/></Widget></UiPage>");
         var bindings = new UiBindings();
         bindings.BindValue("dd", () => "A", _ => { });
         using UiHost host = new("density-test", manifest, bindings, theme, new ModelMetrics(), new FixedTranslation());
@@ -551,7 +551,7 @@ internal static class KernelResolvedStyleTests
         UiWidgetRegistry.InitializeCore();
 
         string xml =
-            "<UiPage Schema=\"2\" Source=\"retint-test\"><Styles Schema=\"1\"><Scheme Name=\"tint\"/></Styles><Column Id=\"c\" Scheme=\"tint\" Padding=\"0\" Gap=\"0\"><Scroll Id=\"scroll\" Height=\"120\" Padding=\"0\" Gap=\"0\"><Widget Kind=\"text/wrapped\" Text=\"\" Height=\"40\" /><Widget Id=\"dd\" Kind=\"input/dropdown\"     Width=\"120\" ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/><Choice Value=\"B\" Text=\"B\" Help=\"B\"/></Widget><Widget Kind=\"text/wrapped\" Text=\"\" Height=\"200\" /></Scroll></Column></UiPage>";
+            "<UiPage Schema=\"2\" Source=\"retint-test\"><Styles Schema=\"1\"><Scheme Name=\"tint\"/></Styles><Column Id=\"c\" Scheme=\"tint\" Padding=\"0\" Gap=\"0\"><Scroll Id=\"scroll\" Height=\"120\" Padding=\"0\" Gap=\"0\"><Widget Kind=\"text/wrapped\" Text=\"\" Height=\"40\" /><Widget Id=\"dd\" Kind=\"input/dropdown\"     Width=\"120\" ><Choice Value=\"A\" Text=\"A\" HelpRef=\"A\"/><Choice Value=\"B\" Text=\"B\" HelpRef=\"B\"/></Widget><Widget Kind=\"text/wrapped\" Text=\"\" Height=\"200\" /></Scroll></Column></UiPage>";
         UiLayoutManifest manifest = UiLayoutManifest.Parse(xml);
         var bindings = new UiBindings();
         string selected = "B";
@@ -1055,7 +1055,7 @@ internal static class KernelResolvedStyleTests
             _ => { });
     }
 
-    private static UiWidgetContext MakeContext(UiSession session, UiTheme theme, IUiBindingReader bindings, float width)
+    private static UiWidgetContext MakeContext(UiSession session, UiTheme theme, IUiBindingAccess bindings, float width)
     {
         return NativeFixture.Context("style-test", session, new ModelMetrics(), theme, new FixedTranslation(), bindings, width, "root");
     }

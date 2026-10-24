@@ -17,7 +17,7 @@ namespace FerriteLib.UiKit.Kernel;
 /// </para>
 /// <para>
 /// <b>A plain C# object is a VM.</b> There is no base class to inherit, no container to configure and no
-/// reflection: the adapter is ordinary event plumbing over <see cref="IUiBindingReader.NotifyChanged"/>, which
+/// reflection: the adapter is ordinary event plumbing over <see cref="IUiBindingAccess.NotifyChanged"/>, which
 /// already coalesces announcements into one commit at the next frame boundary. What the adapter adds is the
 /// explicit mapping, a bounded pending set, a nesting batch scope, and one honest answer about threads.
 /// </para>

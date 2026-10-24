@@ -119,7 +119,7 @@ internal static class KernelAssemblyTests
     {
         var keys = new List<string> { "a", "b" };
         var requests = new List<string>();
-        var help = new Dictionary<string, string> { ["a"] = "stale", ["b"] = "stale" };
+        var help = new Dictionary<string, string> { ["a"] = "consumer-a", ["b"] = "consumer-b" };
         var bindings = new UiBindings();
         bindings.BindReadOnly<IReadOnlyList<string>>("items", () => keys, UiInvalidation.Structure);
         bindings.BindReadOnly("width", () => 120f);
@@ -142,7 +142,7 @@ internal static class KernelAssemblyTests
             bindings.BindValue(Address("help"), () => help[key], value => help[key] = value);
             bindings.BindReadOnly(Address("width"), () => key == "a" ? 45f : 65f);
         }
-        const string page = "<UiPage Schema=\"2\" Source=\"assembly\"><Templates><Column Id=\"item\" Padding=\"0\" Gap=\"0\"><Widget Id=\"tree\" Kind=\"container/tree\" Bind=\"tree\" CheckBind=\"check\" DisclosureBind=\"disclose\"/><Widget Id=\"chart\" Kind=\"chart/line\" Bind=\"points\" PointKeysBind=\"pointkeys\" ActionBind=\"change\" Height=\"60\"/><Widget Id=\"choice\" Kind=\"input/dropdown\" Bind=\"choice\" HoverHelpKey=\"help\" ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget><Row Id=\"width-row\" Padding=\"0\"><Widget Id=\"caption\" Kind=\"chrome/banner\" TextKey=\"catalog\" WidthKey=\"width\" Height=\"10\"/></Row><Overlay Id=\"anchored-group\" Padding=\"0\" Height=\"10\"><Widget Id=\"anchor-base\" Kind=\"chrome/rule\" Width=\"20\" AlignX=\"Left\"/><Widget Id=\"anchored\" Kind=\"chrome/rule\" Width=\"10\" AlignX=\"Left\" AnchorX=\"anchor-base.Right\" OffsetX=\"5\"/></Overlay></Column></Templates><Repeat Id=\"rows\" Items=\"items\" Template=\"item\" Padding=\"0\" Gap=\"4\"/></UiPage>";
+        const string page = "<UiPage Schema=\"2\" Source=\"assembly\"><Templates><Column Id=\"item\" Padding=\"0\" Gap=\"0\"><Widget Id=\"tree\" Kind=\"container/tree\" Bind=\"tree\" CheckBind=\"check\" DisclosureBind=\"disclose\"/><Widget Id=\"chart\" Kind=\"chart/line\" Bind=\"points\" PointKeysBind=\"pointkeys\" ActionBind=\"change\" Height=\"60\"/><Widget Id=\"choice\" Kind=\"input/dropdown\" Bind=\"choice\" HoveredOptionHelpOutputBind=\"help\" ><Choice Value=\"A\" Text=\"A\" HelpRef=\"A\"/></Widget><Row Id=\"width-row\" Padding=\"0\"><Widget Id=\"caption\" Kind=\"chrome/banner\" TextKey=\"catalog\" WidthBind=\"width\" Height=\"10\"/></Row><Overlay Id=\"anchored-group\" Padding=\"0\" Height=\"10\"><Widget Id=\"anchor-base\" Kind=\"chrome/rule\" Width=\"20\" AlignX=\"Left\"/><Widget Id=\"anchored\" Kind=\"chrome/rule\" Width=\"10\" AlignX=\"Left\" AnchorX=\"anchor-base.Right\" OffsetX=\"5\"/></Overlay></Column></Templates><Repeat Id=\"rows\" Items=\"items\" Template=\"item\" Padding=\"0\" Gap=\"4\"/></UiPage>";
         var translation = new Translation();
         using var host = new UiHost("assembly", UiLayoutManifest.Parse(page), bindings, UiTheme.Vanilla, new Metrics(), translation);
         UiLayoutRect viewport = new(0, 0, 300, 600);
@@ -154,8 +154,18 @@ internal static class KernelAssemblyTests
         Drive(EventType.Repaint);
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(300, 600));
         Check(snapshot.RectById["caption#a"].Width == 45 && snapshot.RectById["caption#b"].Width == 65
-            && help.Values.All(value => value == "") && globalHelp == "global" && translation.Keys.All(key => key == "catalog"),
-            "actual Repeat consumes per-item WidthKey/HoverHelpKey while translation catalog keys stay global");
+            && help["a"] == "consumer-a" && help["b"] == "consumer-b" && globalHelp == "global" && translation.Keys.All(key => key == "catalog"),
+            "actual Repeat consumes per-item WidthBind while idle output preserves unowned consumer values and translation keys stay global");
+        UiLayoutRect choice = snapshot.RectById["choice#a"];
+        Drive(EventType.MouseDown, choice.X + 20, choice.Y + 12);
+        Drive(EventType.MouseUp, choice.X + 20, choice.Y + 12);
+        UiLayoutRect popup = UiPopup.RectFor(host.Session.OpenPopupAnchor!.Value, 1, viewport);
+        Drive(EventType.Repaint, popup.X + 20, popup.Y + 12);
+        Check(help["a"] == "A" && help["b"] == "consumer-b" && globalHelp == "global",
+            "actual Repeat option publishes through its scoped output endpoint, not another item's or global address");
+        host.Session.ClosePopup();
+        Check(help["a"] == "" && help["b"] == "consumer-b" && globalHelp == "global",
+            "actual scoped popup withdrawal clears only its owned item output");
         Check(snapshot.RectById["anchored#a"].X == snapshot.RectById["anchor-base#a"].XMax + 5
             && snapshot.RectById["anchored#b"].X == snapshot.RectById["anchor-base#b"].XMax + 5,
             "finite sibling relations in actual Repeat instances stay within each exact item");

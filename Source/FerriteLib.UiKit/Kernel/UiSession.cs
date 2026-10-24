@@ -19,7 +19,7 @@ public sealed class UiSession : IDisposable
     /// Dispose the session before disposing its execution owner.
     /// </summary>
     public UiWidgetContext CreateContext(string source, string scope, ITextMetrics metrics, UiTheme theme,
-        IUiTranslation translation, IUiBindingReader bindings, float viewWidth)
+        IUiTranslation translation, IUiBindingAccess bindings, float viewWidth)
     {
         if (!IsActive) throw new ObjectDisposedException(nameof(UiSession));
         UiBindings.OwnerOf(bindings);
@@ -184,7 +184,7 @@ public sealed class UiSession : IDisposable
     /// <see cref="Frame"/> units. Part of the claim machine's contract rather than a library default:
     /// the consumer that needed the grace picks its length, the library only owns the rule.
     /// </summary>
-    public int HoverGraceFrames { get; set; }
+    public int HelpGracePasses { get; set; }
 
     /// <summary>
     /// Monotonic per-pass counter, incremented once by <see cref="BeginFrame"/>. This is the clock the
@@ -201,7 +201,7 @@ public sealed class UiSession : IDisposable
     /// <see cref="UiInvalidation.Structure"/> announcement the engine committed at a frame boundary.
     /// <para>
     /// It is deliberately <b>not</b> the library's invalidation API. A consumer announces a model change
-    /// per key through <see cref="IUiBindingReader.NotifyChanged"/>, and a <see cref="UiInvalidation.Paint"/>
+    /// per key through <see cref="IUiBindingAccess.NotifyChanged"/>, and a <see cref="UiInvalidation.Paint"/>
     /// announcement leaves this clock alone on purpose: a fixed-size readout must not re-arrange the page.
     /// There is exactly one such clock; do not add a second.
     /// </para>
@@ -209,27 +209,26 @@ public sealed class UiSession : IDisposable
     public int ContentRevision { get; private set; }
 
     /// <summary>
-    /// The claim the hover surface is currently presenting, or null when nothing is claimed. Read it after
-    /// <see cref="BeginFrame"/>; the engine and widgets refresh it during the pass with
-    /// <see cref="ClaimHover"/>.
+    /// The current effective consumer topic reference, including retained grace, or null. Read the completed
+    /// pass; the engine and widgets refresh it with
+    /// <see cref="PublishHelp"/>.
     /// <para>
-    /// The token is <b>opaque to this library</b> and deliberately so: a caller passes whatever identity its own
-    /// help surface is keyed by — the wired consumer's catalog keys and option values are the shipped examples,
-    /// and the engine passes an element's declared <c>HelpKey</c>. It is not an element id; the element that
-    /// made the claim is <see cref="HoverClaimElement"/>.
+    /// The reference is opaque: FL does not resolve text, translation resources or bindings from it. The
+    /// engine passes an element/choice's explicit HelpRef, never an inferred Value/Text. The element that
+    /// made the claim is <see cref="CurrentHelpSource"/>.
     /// </para>
     /// </summary>
-    public string? HoverClaim => hoverClaim.Length > 0 ? hoverClaim : null;
+    public string? CurrentHelpRef => hoverClaim.Length > 0 ? hoverClaim : null;
 
     /// <summary>
-    /// The element that made the claim <see cref="HoverClaim"/> is presenting, or null when nothing is
+    /// The element that made the claim <see cref="CurrentHelpRef"/> is presenting, or null when nothing is
     /// claimed. The claim string stays the consumer's vocabulary (a section key it compares against),
     /// so two unnamed siblings claiming the same string are still indistinguishable through
-    /// <see cref="HoverClaim"/> - this is the axis that tells them apart, and the grace machine carries
+    /// <see cref="CurrentHelpRef"/> - this is the axis that tells them apart, and the grace machine carries
     /// it together with the string so a held claim is attributed to the element that made it.
     /// <see cref="UiNodeId.None"/> means the claim was made outside any element (a host-level caller).
     /// </summary>
-    public UiNodeId? HoverClaimElement => hoverClaim.Length > 0 ? hoverClaimElement : null;
+    public UiNodeId? CurrentHelpSource => hoverClaim.Length > 0 ? hoverClaimElement : null;
 
     /// <summary>
     /// The element whose Measure/Draw is running, or <see cref="UiNodeId.None"/> between elements.
@@ -494,6 +493,9 @@ public sealed class UiSession : IDisposable
 
     internal void EndPopupPass()
     {
+        foreach (UiNode node in new List<UiNode>(nodes.Values))
+            if (node.OptionHelpOwner != null && node.OptionHelpPass != Frame)
+                Widgets.OptionHelp.Release(node);
         if (ownedHotControl.HasValue && HasPopupOptionCapture && !captureOwnerDrawn)
         {
             Interactions.End(UiInteractionEnd.Hidden);
@@ -599,7 +601,7 @@ public sealed class UiSession : IDisposable
     /// <summary>
     /// The third arm of the pass-boundary reconcile, next to the popup and the capture: an open edit, an
     /// interaction record and a business target all point at nodes, and a node that has left the page (hidden
-    /// by a Tab or a VisibleKey, removed from the manifest, or switched away from) owns no live interaction.
+    /// by a Tab or a VisibleBind, removed from the manifest, or switched away from) owns no live interaction.
     /// Leaving them would be the failure the contract names — a Cancel that acts on a subject the player can no
     /// longer see.
     /// <para>
@@ -801,9 +803,15 @@ public sealed class UiSession : IDisposable
     /// Closes the session-owned popup, if any. Its hit layers go with it: a popup that is gone must not keep
     /// blocking clicks on what it used to cover, not even for the pass that closed it.
     /// </summary>
-    public void ClosePopup()
+    public void ClosePopup() => ClosePopup(releaseHelp: true);
+
+    internal void ClosePopup(bool releaseHelp)
     {
         EnsureActive();
+        UiNode? helpOwner = null;
+        foreach (UiNode node in nodes.Values)
+            if (node.OptionHelpPopup && node.OptionHelpOwner != null)
+                helpOwner = node;
         if (HasPopupOptionCapture)
         {
             Interactions.End(UiInteractionEnd.Hidden);
@@ -818,6 +826,7 @@ public sealed class UiSession : IDisposable
         popupOwnerDrawn = false;
         DropPopupLayers(hitLayers);
         DropPopupLayers(dispatchLayers);
+        if (releaseHelp && helpOwner != null) Widgets.OptionHelp.Release(helpOwner);
     }
 
     private static void DropPopupLayers(List<UiHitLayer> layers)
@@ -839,7 +848,7 @@ public sealed class UiSession : IDisposable
     {
         EnsureActive();
         Frame++;
-        BeginHoverClaimFrame();
+        BeginHelpPass();
         // Per-frame transient flags are reset by each control as it reads/writes its own state;
         // no global reset is needed because state is session-owned.
     }
@@ -901,7 +910,7 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
     /// identity everything else keys on; it is a lookup, not a second key space.
     /// <para>
     /// The answer is about the identity, not about the current arrangement, and the difference is
-    /// load-bearing. A declared element hidden by <c>Visible</c>/<c>VisibleKey</c>/<c>Tab</c> is not
+    /// load-bearing. A declared element hidden by <c>Visible</c>/<c>VisibleBind</c>/<c>Tab</c> is not
     /// arranged but still exists in the definition and keeps its node and state, so this finds it - that
     /// is what keeps a hidden element's draft or scroll position reachable. A null answer means the
     /// identity is <b>gone from the session</b>: the current definition no longer declares it and
@@ -1179,14 +1188,14 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
     }
 
     /// <summary>
-    /// Runs the hover-claim frame boundary: a claim refreshed by <see cref="ClaimHover"/> during the
+    /// Runs the hover-claim frame boundary: a claim refreshed by <see cref="PublishHelp"/> during the
     /// previous pass is held and cleared (widgets re-claim as they draw, so a stationary pointer never
-    /// reads as stale); with no fresh claim the held one is restored for <see cref="HoverGraceFrames"/>
+    /// reads as stale); with no fresh claim the held one is restored for <see cref="HelpGracePasses"/>
     /// more passes, which is what stops the pointer crossing a gap between two controls from flashing
     /// the overview. A live claim always replaces the held one in the same pass, so nothing pins.
     /// Called by <see cref="BeginFrame"/>; exposed for hosts that drive passes by hand.
     /// </summary>
-    public void BeginHoverClaimFrame()
+    public void BeginHelpPass()
     {
         EnsureActive();
         bool claimedLastFrame = hoverClaim.Length > 0 && hoverClaimStamp == Frame - 1;
@@ -1194,7 +1203,7 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
         {
             hoverHeld = hoverClaim;
             hoverHeldElement = hoverClaimElement;
-            hoverGraceLeft = HoverGraceFrames;
+            hoverGraceLeft = HelpGracePasses;
             hoverClaim = "";
             hoverClaimElement = default;
         }
@@ -1212,23 +1221,26 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
     }
 
     /// <summary>
-    /// Claims the hover-help surface with an opaque <paramref name="claim"/> for this pass. Frame-stamped, so
-    /// <see cref="BeginHoverClaimFrame"/> can tell a claim made this pass from one it restored itself —
+    /// Publishes an opaque <paramref name="helpRef"/> for this pass. Frame-stamped, so
+    /// <see cref="BeginHelpPass"/> can tell a claim made this pass from one it restored itself —
     /// the distinction a consumer had to hand-roll before this existed.
     /// <para>
-    /// The parameter is a <b>claim token</b>, not an element id: the caller supplies the identity its own help
-    /// surface is keyed by (a catalog key, an option value, or an element's declared <c>HelpKey</c>), and this
+    /// The parameter is a consumer topic reference, not text, a translation key, binding or element id.
+    /// The caller supplies its own catalog reference, and this
     /// library never interprets it. The element that made the claim is recorded separately as
-    /// <see cref="HoverClaimElement"/>, which is what tells two unnamed siblings apart when they claim the same
+    /// <see cref="CurrentHelpSource"/>, which is what tells two unnamed siblings apart when they claim the same
     /// token.
     /// </para>
     /// </summary>
-    public void ClaimHover(string claim)
+    public void PublishHelp(string helpRef) => PublishHelp(activeNode, helpRef);
+
+    internal void PublishHelp(UiNode source, string helpRef)
     {
-        if (claim == null) throw new ArgumentNullException(nameof(claim));
+        if (helpRef == null) throw new ArgumentNullException(nameof(helpRef));
         EnsureActive();
-        hoverClaim = claim;
-        hoverClaimElement = activeNode.Id;
+        if (!ReferenceEquals(source.Owner, this)) throw new ArgumentException("Help source belongs to another Session.", nameof(source));
+        hoverClaim = helpRef;
+        hoverClaimElement = source.Id;
         hoverClaimStamp = Frame;
     }
 
@@ -1354,6 +1366,16 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
         foreach(UiNode node in nodes.Values) SuspendNodeEditors(node);
         activeEditNode=null;activeEditState=null;
         ClosePopup();
+        ReleaseOptionHelpOutputs();
+    }
+
+    internal void ReleaseOptionHelpOutputs()
+    {
+        List<Exception>? errors = null;
+        foreach (UiNode node in new List<UiNode>(nodes.Values))
+            try { Widgets.OptionHelp.Release(node); }
+            catch (Exception error) when (error is not OutOfMemoryException) { (errors ??= new()).Add(error); }
+        if (errors != null) throw new AggregateException("Option help outputs released; one or more writes failed.", errors);
     }
 
     public void Dispose()

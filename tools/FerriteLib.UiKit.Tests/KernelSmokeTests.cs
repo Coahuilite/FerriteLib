@@ -151,7 +151,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, "test
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 

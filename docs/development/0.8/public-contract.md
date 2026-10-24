@@ -24,7 +24,7 @@ prepare/stage/seal transaction, compatible identities and last-good rollback. Fi
 
 ## S2 — connect ordinary or tracked data and requests
 
-`UiBindings` is the author registry. `IUiBindingReader` is the runtime capability given to widgets:
+`UiBindings` is the author registry. `IUiBindingAccess` is the runtime capability given to widgets:
 value reads/writes, commands/actions/eligibility, revisions/validation and value/choice endpoints.
 Registration and `NotifyChanged` belong to the registry, not the reader. A custom reader can delegate
 to an owned registry as the real isolated consumer does. No reflection/type-probing fallback exists.
@@ -44,14 +44,11 @@ still distinguish a compatible refresh from retargeting an editor.
 
 - `BindValue/BindReadOnly`, `BindAction/BindCommand` and `NotifyChanged` retain ordinary getter and
   explicit invalidation conditions. `Set` requests the owner's mutation; it does not imply acceptance.
-- `BindChoices<T>` carries `UiChoice<T>(text,value,help,textKey)`. String is just T=string. Dynamic
-  labels, help and real identity use this same representation; XML `<Choice Value Text Help TextKey/>`
-  normalizes into it. Omitted/empty Help means no option-specific help; neither Value nor Text is
-  inferred. Old Dropdown string/static Value and typed Text outputs each require explicit Help to
-  preserve them (see refactor migration). HoverHelpKey clears for a no-help option; element HelpKey
-  and the consumer's unified panel/page-overview fallback remain independent.
-  The explicit omission policy is settled; final freeze of the public help mechanism/naming remains
-  a separate PM decision. This technical candidate retains HelpKey/HoverHelpKey/Tooltip unchanged.
+- `BindChoices<T>` carries `UiChoice<T>(text,value,helpRef,textKey)`. String is just T=string. Dynamic
+  labels, opaque help references and real identity use this representation; XML
+  `<Choice Value Text HelpRef TextKey/>` normalizes into it. Omitted/empty HelpRef means no option-specific
+  help; neither Value nor Text is inferred. Old Dropdown string/static Value and typed Text outputs
+  each require explicit HelpRef to preserve them (see refactor migration).
   BindOptions/GetOptions remain generic collection facilities
   for tree/chart and other collection consumers, not a second selection protocol.
 - `UiValueEndpoint` resolves current registration/type/writability/read/write; `UiChoiceEndpoint`
@@ -66,6 +63,33 @@ still distinguish a compatible refresh from retargeting an editor.
 - `UiNotifyAdapter` explicitly maps subscriptions and releases them on disposal.
 
 See [reactive](reactive-foundation-contract.md) and [failure/lifetime](failure-lifetime-contract.md).
+
+### Publish a topic without installing a help panel
+
+Declare element `HelpRef="catalog/general"` and optional per-choice `HelpRef="catalog/specific"`.
+The Session exposes `CurrentHelpRef` and `CurrentHelpSource: UiNodeId?` for the consumer's unified
+panel. A hovered choice overrides the element; a no-help choice retains the general element topic.
+Refs are opaque: FL does not read a same-named binding, translate them or interpret body text/catalogs.
+Custom draw code may call `session.PublishHelp(helpRef)` under its current element context.
+`HelpGracePasses` retains the existing pass-based algorithm and source: the first unclaimed boundary
+resets the live claim, then the held topic is presented for the configured number of passes. A new live
+publisher overrides held help immediately. US's15-pass use is retained, not converted into elapsed time
+or fresh-publisher-only state. `Tooltip(rect,text)` is a separate explicit text presentation call.
+
+For a separately observable per-control output, declare `HoveredOptionHelpOutputBind="help-output"`
+and register a writable string value. Missing/read-only outputs fail at creation. Writes are change-
+detected and can feed ordinary notifications or tracked subscriptions. Empty choices/no hovered option,
+popup close, reliable hide, removal/disposal and a successful backing switch withdraw only the last
+still-owned output. Another publisher at the same address (even the same topic), or a consumer Set/
+announcement, is not erased. Therefore a shared output is not an unconditional current-hover mirror.
+No output binding is required for Session publication or the consumer's panel/overview fallback.
+
+Publication and cleanup both use the sealed owner-bound endpoint supplied by `access.Value`, as
+selection controls already do. A node retains it for old-owner cleanup across a proxy backing switch;
+there is no new switch prerequisite or universal proxy.Get/Set interception promise. Registered value
+setters/notifications and reactive purity/operation rules remain effective. Unexpected output failures
+are reported; a completed selection and a failed withdrawal are not retried on later paint or close.
+Final affected public freeze and downstream fixed consumption remain PM acceptance actions.
 
 ## S3 — connect stable items to current business targets
 

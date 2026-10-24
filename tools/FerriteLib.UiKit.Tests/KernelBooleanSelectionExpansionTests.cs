@@ -178,7 +178,7 @@ internal static class KernelBooleanSelectionExpansionTests
             writes++;
         });
         bindings.BindChoices("items", ()=> (new[] { "a", "b" }).Select(value=>new UiChoice<string>(value,value,value)).ToArray());
-        using var host = Host("<Widget Id=\"first\" Kind=\"input/dropdown\" Bind=\"shared\" OptionsBind=\"items\" /><Widget Id=\"second\" Kind=\"input/dropdown\" Bind=\"shared\" OptionsBind=\"items\" /><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"shared\"   ><Choice Value=\"a\" Text=\"a\" Help=\"a\"/><Choice Value=\"b\" Text=\"b\" Help=\"b\"/></Widget>", bindings);
+        using var host = Host("<Widget Id=\"first\" Kind=\"input/dropdown\" Bind=\"shared\" OptionsBind=\"items\" /><Widget Id=\"second\" Kind=\"input/dropdown\" Bind=\"shared\" OptionsBind=\"items\" /><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"shared\"   ><Choice Value=\"a\" Text=\"a\" HelpRef=\"a\"/><Choice Value=\"b\" Text=\"b\" HelpRef=\"b\"/></Widget>", bindings);
         UiLayoutPoint first = Centre(RectOf(host, "first"));
         Pump(host, EventType.MouseDown, first);
         Pump(host, EventType.MouseUp, first);
@@ -449,7 +449,7 @@ internal static class KernelBooleanSelectionExpansionTests
             selected = value;
             requests++;
         });
-        using var host = Host("<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\"   ><Choice Value=\"a\" Text=\"a\" Help=\"a\"/><Choice Value=\"b\" Text=\"b\" Help=\"b\"/></Widget>", bindings);
+        using var host = Host("<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\"   ><Choice Value=\"a\" Text=\"a\" HelpRef=\"a\"/><Choice Value=\"b\" Text=\"b\" HelpRef=\"b\"/></Widget>", bindings);
         UiLayoutRect rect = RectOf(host, "mode");
         UiLayoutPoint point = new(rect.X + rect.Width * 0.75f, rect.Y + rect.Height / 2);
         Pump(host, EventType.MouseDown, point);

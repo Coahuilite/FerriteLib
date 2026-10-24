@@ -426,7 +426,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
             this.spec = spec;
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
             if (spec.TryGetAttribute("ActionBind", out string declared) && declared.Trim().Length > 0)
             {
@@ -459,7 +459,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
             this.spec = spec;
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
             bindings.ValidateAction<float>(spec.TryGetAttribute("ActionBind", out string key) ? key : "", elementPath);
         }

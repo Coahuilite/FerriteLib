@@ -11,7 +11,7 @@ namespace FerriteLib.UiKit.Kernel;
 /// typed binding validation happen later in <see cref="UiHost"/> so parsing stays independent.
 /// <para>
 /// Contract on the <c>Tab</c> attribute: an element carrying <c>Tab="X"</c> is hidden unless the
-/// consumer exposes <see cref="UiBindings.ActiveTabKey"/> as a <c>string</c> value binding whose current
+/// consumer exposes <see cref="UiBindings.ActiveTabBind"/> as a <c>string</c> value binding whose current
 /// value equals <c>X</c> (case-insensitive). The engine reads that one key and no other; elements
 /// without <c>Tab</c> are always visible.
 /// <para>
@@ -606,9 +606,9 @@ public sealed class UiLayoutManifest
                         if (kind != UiKinds.Dropdown && kind != UiKinds.ModeRow) throw ParseError(lineInfo,"Choice is only valid on a selection widget.");
                         string value = reader.GetAttribute("Value") ?? throw ParseError(lineInfo,"Choice needs Value.");
                         string text = reader.GetAttribute("Text") ?? value;
-                        string help = reader.GetAttribute("Help") ?? "";
+                        string help = reader.GetAttribute("HelpRef") ?? "";
                         string textKey = reader.GetAttribute("TextKey") ?? "";
-                        for(int a=0;a<reader.AttributeCount;a++){reader.MoveToAttribute(a);if(reader.Name!="Value"&&reader.Name!="Text"&&reader.Name!="Help"&&reader.Name!="TextKey")throw ParseError(lineInfo,"Unknown Choice attribute '"+reader.Name+"'.");}reader.MoveToElement();
+                        for(int a=0;a<reader.AttributeCount;a++){reader.MoveToAttribute(a);if(reader.Name!="Value"&&reader.Name!="Text"&&reader.Name!="HelpRef"&&reader.Name!="TextKey")throw ParseError(lineInfo,"Unknown Choice attribute '"+reader.Name+"'.");}reader.MoveToElement();
                         choices.Add(new UiChoice<string>(text,value,help,textKey));
                         break;
                     }

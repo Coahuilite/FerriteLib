@@ -38,7 +38,7 @@ internal static class KernelCloseoutInventoryTests
         else if(kind==UiKinds.TextField || kind==UiKinds.WrappedText || kind==UiKinds.Banner)
         {b.BindTracked("value",()=>{reads++;return text.Value;},v=>text.Value=v);attributes="Bind=\"value\"";}
         else if(kind==UiKinds.Dropdown || kind==UiKinds.ModeRow)
-        {b.BindTracked("value",()=>{reads++;return text.Value;},v=>text.Value=v);b.BindTrackedChoices(kind==UiKinds.ModeRow?"value":"options",()=> (new[]{text.Value,"other"}).Select(value=>new UiChoice<string>(value,value,value)).ToArray(),(a,c)=>a.Text==c.Text&&a.Value==c.Value&&a.Help==c.Help);attributes="Bind=\"value\""+(kind==UiKinds.Dropdown?" OptionsBind=\"options\"":"");}
+        {b.BindTracked("value",()=>{reads++;return text.Value;},v=>text.Value=v);b.BindTrackedChoices(kind==UiKinds.ModeRow?"value":"options",()=> (new[]{text.Value,"other"}).Select(value=>new UiChoice<string>(value,value,value)).ToArray(),(a,c)=>a.Text==c.Text&&a.Value==c.Value&&a.HelpRef==c.HelpRef);attributes="Bind=\"value\""+(kind==UiKinds.Dropdown?" OptionsBind=\"options\"":"");}
         else if(kind==UiKinds.Tree)
         {b.BindTracked<IReadOnlyList<UiTreeRow>>("value",()=>{reads++;return new[]{new UiTreeRow("row",0,text.Value)};},equal:(a,c)=>a[0].Text==c[0].Text);attributes="Bind=\"value\"";}
         else if(kind==UiKinds.LineChart)

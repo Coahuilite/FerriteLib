@@ -50,7 +50,7 @@ internal static class KernelCancelLadderTests
         + "<Widget Id=\"menu\" Kind=\"input/dropdown\" OptionsBind=\"Options\" Height=\"28\" />"
         + "<Widget Id=\"chart\" Kind=\"chart/line\" Bind=\"points\" ActionBind=\"changed\" Editable=\"true\""
         + " EditablePoints=\"1\" Height=\"120\" />"
-        + "<Section Id=\"detail\" VisibleKey=\"showDetail\" CancelBind=\"closeDetail\" Gap=\"2\">"
+        + "<Section Id=\"detail\" VisibleBind=\"showDetail\" CancelBind=\"closeDetail\" Gap=\"2\">"
         + "<Column Id=\"plain\" Gap=\"2\">"
         + "<Repeat Id=\"rows\" Items=\"items\" Template=\"row\" />"
         + "</Column>"
@@ -245,8 +245,8 @@ internal static class KernelCancelLadderTests
         {
             page.PressRow("b");
             UiNode rowNode = page.Session.LastInteractionNode!;
-            Check(rowNode.CancelBindingKey == new UiBindingAddress("items","b","closeRow").Key,
-                "the row publishes ITS OWN scoped key, not the declared one: " + rowNode.CancelBindingKey);
+            Check(rowNode.CancelBind == new UiBindingAddress("items","b","closeRow").Key,
+                "the row publishes ITS OWN scoped key, not the declared one: " + rowNode.CancelBind);
 
             shell.PumpKey(KeyCode.Escape);
             Check(page.ClosedRow == "b", "and the press closed that row: " + page.ClosedRow);
@@ -293,7 +293,7 @@ internal static class KernelCancelLadderTests
         try
         {
             page.PressRow("c");
-            Check(page.Session.LastInteractionNode!.CancelBindingKey == new UiBindingAddress("items","c","closeRow").Key,
+            Check(page.Session.LastInteractionNode!.CancelBind == new UiBindingAddress("items","c","closeRow").Key,
                 "the row declares a key the consumer never registered as a command");
 
             shell.PumpKey(KeyCode.Escape);
@@ -807,7 +807,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, BranchComposite.KindName, 
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 

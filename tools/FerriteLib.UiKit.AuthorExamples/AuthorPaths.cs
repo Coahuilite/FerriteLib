@@ -39,7 +39,7 @@ public sealed class CustomControl : IUiWidget, IUiPointerLayout
     private string binding = "";
     public string Kind => "author/control";
     public void Configure(UiElementSpec spec) { if (!spec.TryGetAttribute("Bind", out binding)) binding = spec.Id; }
-    public void Validate(IUiBindingReader bindings, string path) => bindings.ValidateValue<float>(binding, path);
+    public void Validate(IUiBindingAccess bindings, string path) => bindings.ValidateValue<float>(binding, path);
     public float Measure(UiWidgetContext ctx) => ctx.Theme.Geometry.RowHeight;
     public IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds) { yield return new UiPointerRegion(bounds); }
     public void Draw(UiLayoutRect rect, UiWidgetContext ctx)

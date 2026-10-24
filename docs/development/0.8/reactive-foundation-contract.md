@@ -78,7 +78,7 @@ by reading sources from another runtime. Cross-runtime reads/writes inside a tra
 `[ThreadStatic]` current-runtime marker is saved/restored through nested calls and `finally`; no graph,
 business data, subscriptions or scheduler live in static state. The outermost exit leaves no marker.
 Ordinary `BindValue`, `BindReadOnly`, `BindOptions`, hand-written
-`IUiBindingReader` and custom `IUiWidget` retain their original live-getter conditions, including serially handed-off untracked registry calls
+`IUiBindingAccess` and custom `IUiWidget` retain their original live-getter conditions, including serially handed-off untracked registry calls
 without a new creation-thread prerequisite. Explicit runtime/BindTracked/BeginOperation use activates the
 new serial-access contract. Binding diagnostics use the explicit neutral execution warning outlet when present; the complete
 Kernel has no platform reference.
@@ -153,7 +153,7 @@ using (bindings.BeginOperation())
 All four actual binding operation entrances create implicit nested batches; external projection application
 can use `runtime.Batch()`. Automatic responses wait for the outer boundary. The shared
 `UiValueBehavior.Request(..., UiBindings, request)` boundary is used by the real Checkbox for its compound
-Set-before-Invoke operation, as well as the no-platform behavior E2E. Forwarding `IUiBindingReader`
+Set-before-Invoke operation, as well as the no-platform behavior E2E. Forwarding `IUiBindingAccess`
 names its current `BindingOwner`; the real Checkbox uses that owner's same operation boundary while
 requests still pass through the reader. Ordinary registries keep the untracked RunOperation route.
 Other shared extensions must choose the operation overload explicitly when

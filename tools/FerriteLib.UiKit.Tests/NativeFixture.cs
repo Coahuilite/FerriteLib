@@ -86,7 +86,7 @@ internal static class NativeFixture
     // Only the test boundary that just captured an external frame can attest it belongs to Event.current.
     internal static void AttachCurrentFrame(UiSession session)
     {Owner owner=Of(session);owner.Execution=ExistingExecution(session)??throw new InvalidOperationException("No externally captured frame to attach.");owner.Frame=session.Input;owner.NativeEvent=Event.current;}
-    internal static UiWidgetContext Context(string source,UiSession session,ITextMetrics metrics,UiTheme theme,IUiTranslation translation,IUiBindingReader bindings,float viewWidth,string elementPath,UiLayoutPoint windowOrigin=default,UiNodeId elementId=default,UiNode? node=null,IReadOnlyList<UiStyleDeclaration>? styleChain=null)
+    internal static UiWidgetContext Context(string source,UiSession session,ITextMetrics metrics,UiTheme theme,IUiTranslation translation,IUiBindingAccess bindings,float viewWidth,string elementPath,UiLayoutPoint windowOrigin=default,UiNodeId elementId=default,UiNode? node=null,IReadOnlyList<UiStyleDeclaration>? styleChain=null)
     {
         Owner owner=Of(session);
         node??=elementId.IsNone?session.GetOrCreateNode(UiNodeId.Root(new UiElementSpec(elementPath.Replace('/','_'),"fixture"),0),"fixture",0):session.GetOrCreateNode(elementId,"fixture",0);

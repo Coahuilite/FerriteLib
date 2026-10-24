@@ -49,7 +49,7 @@ internal static class KernelEditTransactionTests
         + "<Column Id=\"col\" Padding=\"0\" Gap=\"2\">"
         + "<Widget Id=\"menu\" Kind=\"input/dropdown\" OptionsBind=\"Options\" Height=\"28\" />"
         + "<Widget Id=\"num\" Kind=\"input/number-field\" Bind=\"num\" Min=\"0\" Max=\"1\" Live=\"false\""
-        + " VisibleKey=\"showNum\" Height=\"24\" />"
+        + " VisibleBind=\"showNum\" Height=\"24\" />"
         + "<Widget Id=\"live\" Kind=\"input/number-field\" Bind=\"live\" Min=\"0\" Max=\"1\" Live=\"true\" Height=\"24\" />"
         + "<Widget Id=\"gated\" Kind=\"" + GatedNumber.KindName + "\" ActionBind=\"gate\" Height=\"24\" />"
         + "<Widget Id=\"text\" Kind=\"input/text-field\" Bind=\"text\" Live=\"false\" Height=\"24\" />"
@@ -702,7 +702,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, GatedNumber.KindName, () =
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
             bindings.ValidateValue<float>("gated", elementPath);
             bindings.ValidateCommand("gate", elementPath);

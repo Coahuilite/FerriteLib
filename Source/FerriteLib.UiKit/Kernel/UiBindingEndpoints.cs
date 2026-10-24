@@ -137,7 +137,7 @@ public sealed partial class UiBindings
         {
             var result = new List<UiChoice<object?>>();
             foreach (var c in (IReadOnlyList<UiChoice<T>>)list)
-                result.Add(new UiChoice<object?>(c.Text, c.Value, c.Help,c.TextKey));
+                result.Add(new UiChoice<object?>(c.Text, c.Value, c.HelpRef,c.TextKey));
             return result.AsReadOnly();
         }
 
@@ -149,7 +149,7 @@ public sealed partial class UiBindings
             for (int i = 0; i < Math.Min(count, maximum); i++)
             {
                 var c = source[i];
-                result.Add(new UiChoice<object?>(c.Text, c.Value, c.Help,c.TextKey));
+                result.Add(new UiChoice<object?>(c.Text, c.Value, c.HelpRef,c.TextKey));
             }
 
             return result.AsReadOnly();

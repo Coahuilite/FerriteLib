@@ -614,7 +614,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(otherScope, ProbeWidget.KindName,
 
     // --- helpers --------------------------------------------------------------------------------
 
-    private static UiPageWindow NewPageWindow(string consumer, string kind, string source, IUiBindingReader bindings)
+    private static UiPageWindow NewPageWindow(string consumer, string kind, string source, IUiBindingAccess bindings)
     {
         UiLayoutManifest manifest = UiLayoutManifest.Parse(
             Page(source, "<Column Id=\"root\">" + ProbeWidgetXml + "</Column>"));
@@ -735,7 +735,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(otherScope, ProbeWidget.KindName,
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
             // This page is about lifecycle, not values, so it declares no binding of its own.
         }
@@ -763,7 +763,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(otherScope, ProbeWidget.KindName,
         private readonly string scope;
         private readonly UiLayoutManifest manifest;
 
-        internal ProbeShell(string scope, string? manifestXml = null, IUiBindingReader? bindings = null)
+        internal ProbeShell(string scope, string? manifestXml = null, IUiBindingAccess? bindings = null)
         {
             this.scope = scope;
             Bindings = bindings ?? new UiBindings();
@@ -774,7 +774,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(scope, ProbeWidget.KindName, () =
             HostDetached += OnHostDetached;
         }
 
-        internal IUiBindingReader Bindings { get; }
+        internal IUiBindingAccess Bindings { get; }
 
         internal readonly List<string> Events = new();
 

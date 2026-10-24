@@ -113,7 +113,7 @@ host.SetDisplayDemand(true);   // next DrawFrame adopts latest demanded input be
 `UiWindowHost.SetDisplayDemand` provides the same ordinary standard-shell entrance, including before its
 Host is created. This is explicit visibility information, not catalog focus, a clock or inferred occlusion.
 Hidden frame calls do no presentation evaluation or measurement/arrangement. Hidden default subtrees
-also do not prepare their exclusive tracked inputs; VisibleKey/Tab and other actual layout consumers
+also do not prepare their exclusive tracked inputs; VisibleBind/Tab and other actual layout consumers
 continue to be read. Shared lazy computations still serve any visible or explicit consumer. Source
 invalidation and subscriptions survive hiding; no intermediate refresh or operation is replayed on show.
 R1 failure and R2 pause survive hide/show. FL never disconnects an independent service because of visibility.

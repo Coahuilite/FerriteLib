@@ -96,7 +96,7 @@ internal static class KernelModeRowLocalizationTests
         // while the literal "abcdefgh" would be 64px and the value "A" 8px. Only a seam that resolves the
         // key before measuring can produce 88.
         string xml =
-            "<UiPage Schema=\"2\" Source=\""+(Scope)+"\"><Row Id=\"row\" Padding=\"0\" Gap=\"0\"><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Width=\"Auto\" Height=\"20\"    ><Choice Value=\"A\" Text=\"abcdefgh\" TextKey=\"US.Mode.A\" Help=\"A\"/></Widget><Widget Id=\"rest\" Kind=\""+(LabelKind)+"\" Height=\"10\" /></Row></UiPage>";
+            "<UiPage Schema=\"2\" Source=\""+(Scope)+"\"><Row Id=\"row\" Padding=\"0\" Gap=\"0\"><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Width=\"Auto\" Height=\"20\"    ><Choice Value=\"A\" Text=\"abcdefgh\" TextKey=\"US.Mode.A\" HelpRef=\"A\"/></Widget><Widget Id=\"rest\" Kind=\""+(LabelKind)+"\" Height=\"10\" /></Row></UiPage>";
 
         UiLayoutSnapshot snapshot = Arrange(xml);
 
@@ -115,7 +115,7 @@ internal static class KernelModeRowLocalizationTests
     {
         PrepareCore();
 
-        Check(Reject("<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  TitleKey3=\"US.Orphan\" ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget>", "TitleKey3"),
+        Check(Reject("<Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\"  TitleKey3=\"US.Orphan\" ><Choice Value=\"A\" Text=\"A\" HelpRef=\"A\"/></Widget>", "TitleKey3"),
             "a TitleKeyN whose index has no option is refused at creation, naming the attribute");
     }
 
@@ -304,7 +304,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, LabelKind, () => new Heigh
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 

@@ -136,10 +136,10 @@ internal sealed partial class UiLayoutEngine
     private const string BindAttribute = "Bind";
     private const string ActionBindAttribute = "ActionBind";
     private const string OptionsBindAttribute = "OptionsBind";
-    private const string VisibleKeyAttribute = "VisibleKey";
-    private const string WidthKeyAttribute = "WidthKey";
-    private const string HelpKeyAttribute = "HelpKey";
-    // FL-IC2: the tree's Cancel layer. Engine-wide like VisibleKey/HelpKey because the ENGINE reads it and
+    private const string VisibleBindAttribute = "VisibleBind";
+    private const string WidthBindAttribute = "WidthBind";
+    private const string HelpRefAttribute = "HelpRef";
+    // FL-IC2: the tree's Cancel layer. Engine-wide like VisibleBind/HelpRef because the ENGINE reads it and
     // publishes it on the node; no kind owns it, so no kind's schema has to grow for a page to declare it.
     private const string CancelBindAttribute = "CancelBind";
     private const string TabAttribute = "Tab";
@@ -227,7 +227,7 @@ internal sealed partial class UiLayoutEngine
                 {
                     // A hidden root has no arranged ancestor, so its declared keys report to the session-level
                     // node - the same owner a host-level caller's state resolves into. That is what lets its
-                    // VisibleKey/Tab come back and re-arrange the page when the model says so.
+                    // VisibleBind/Tab come back and re-arrange the page when the model says so.
                     RecordDeclaredKeys(root, ctx.Session.ActiveNode, ctx.Bindings);
                     continue;
                 }
@@ -454,12 +454,12 @@ internal sealed partial class UiLayoutEngine
     /// <summary>
     /// Records which announced binding keys one element declares and who owns them, so the next commit
     /// can target nodes instead of the page. An element that is not arranged this pass is recorded
-    /// against its nearest arranged ancestor by the caller, which is how a hidden element's VisibleKey
+    /// against its nearest arranged ancestor by the caller, which is how a hidden element's VisibleBind
     /// or Tab still brings it back.
     /// </summary>
-    private void RecordDeclaredKeys(UiElementSpec spec,UiNode owner,IUiBindingReader bindings){RecordKey(ReadDeclaredBindKey(spec),owner,bindings);foreach(var attribute in spec.Attributes)if(UiDefinitionCompiler.BindingRole(scope,spec,attribute.Key)!=UiBindingRole.None)RecordKey(attribute.Value,owner,bindings);if(ReadAttribute(spec,TabAttribute).Length>0)RecordKey(UiBindings.ActiveTabKey,owner,bindings);}
+    private void RecordDeclaredKeys(UiElementSpec spec,UiNode owner,IUiBindingAccess bindings){RecordKey(ReadDeclaredBindKey(spec),owner,bindings);foreach(var attribute in spec.Attributes)if(UiDefinitionCompiler.BindingRole(scope,spec,attribute.Key)!=UiBindingRole.None)RecordKey(attribute.Value,owner,bindings);if(ReadAttribute(spec,TabAttribute).Length>0)RecordKey(UiBindings.ActiveTabBind,owner,bindings);}
 
-    private void RecordKey(string key, UiNode owner, IUiBindingReader bindings)
+    private void RecordKey(string key, UiNode owner, IUiBindingAccess bindings)
     {
         if (key.Length == 0) return;
         if (!committedRevisions.ContainsKey(key))
@@ -498,7 +498,7 @@ internal sealed partial class UiLayoutEngine
 
     /// <summary>
     /// The element's disabled state: the command it declares as <c>ActionBind</c> answers
-    /// <see cref="IUiBindingReader.CanExecute"/> false. An element that declares no command is never
+    /// <see cref="IUiBindingAccess.CanExecute"/> false. An element that declares no command is never
     /// disabled, so this cannot change the behaviour of a page that binds no commands. The answer is
     /// published on the node because that is where the funnel's interactive entry points read it: one
     /// rule for every kind instead of a per-widget branch.
@@ -668,7 +668,7 @@ internal sealed partial class UiLayoutEngine
             // FL-IC2: the same one-per-draw publication for the Cancel ladder. Read from the entry's own spec,
             // which inside a Repeat row is the item-scoped one, so a row's Cancel names that row's command and
             // not a page-level key the row happens to share a name with.
-            entry.Node.CancelBindingKey = ReadAttribute(entry.Spec, CancelBindAttribute);
+            entry.Node.CancelBind = ReadAttribute(entry.Spec, CancelBindAttribute);
 
             // The element's content layer, in window space (draw rect plus the context's offset), and the
             // origin the funnel lifts a draw-local pointer by. Only widgets are hit surfaces: a container
@@ -764,7 +764,7 @@ internal sealed partial class UiLayoutEngine
                         try
                         {
                             // The element's declared help identity, claimed while the pointer is over it and
-                            // BEFORE the widget draws - one rule for every kind, so a page that declares HelpKey
+                            // BEFORE the widget draws - one rule for every kind, so a page that declares HelpRef
                             // gets an inspect overlay without a line of per-widget code. It is claimed inside
                             // EnterNode because that is what attributes the claim to THIS element: a claim made
                             // outside would be attributed to whatever node was active before. A widget that owns
@@ -776,10 +776,10 @@ internal sealed partial class UiLayoutEngine
                             // activating it, and the disabled refusal stays where input is refused
                             // (ctx.Controls.Button). Only widgets claim: a container is not a hit surface, which is
                             // why the attribute is refused on one at creation instead of being inert here.
-                            string helpKey = ReadAttribute(entry.Spec, HelpKeyAttribute);
+                            string helpKey = ReadAttribute(entry.Spec, HelpRefAttribute);
                             if (helpKey.Length > 0 && entryCtx.Controls.IsMouseOver(drawRect, entryCtx))
                             {
-                                ctx.Session.ClaimHover(helpKey);
+                                ctx.Session.PublishHelp(helpKey);
                             }
 
                             UiSessionGuard.DrawWidget(entry.Widget, drawRect, entryCtx, entry.Node);
@@ -1230,7 +1230,7 @@ internal sealed partial class UiLayoutEngine
             if (IsHidden(child, ctx, narrow, parent, i))
             {
                 // A hidden element owns no arranged node, so its declared keys report to the container
-                // that would hold its slot. That is what makes its VisibleKey (or Tab) able to bring it
+                // that would hold its slot. That is what makes its VisibleBind (or Tab) able to bring it
                 // back: the container is marked dirty and the page re-arranges with the element in it.
                 RecordDeclaredKeys(child, parent, ctx.Bindings);
                 continue;
@@ -1536,7 +1536,7 @@ internal sealed partial class UiLayoutEngine
     /// pass's countable entries in flow order: one Repeat expands transparently to its materialized
     /// row roots - never the Repeat as one blob, never a row's title/detail/hover/hit pieces as
     /// several - while any other visible direct child counts as exactly its root entry. A child the
-    /// <c>IsHidden</c> pass refuses (the consumer empty-state's VisibleKey half included) contributes no
+    /// <c>IsHidden</c> pass refuses (the consumer empty-state's VisibleBind half included) contributes no
     /// entry and nothing to count.
     /// </summary>
     private float MeasureScrollContent(UiWidgetContext ctx, UiElementSpec spec, float contentInnerWidth, Padding padding, float gap, float innerY, float availableHeight, UiNode node, List<PlacedEntry> entries, bool narrow, List<PlacedEntry> countableTops)
@@ -1596,7 +1596,7 @@ internal sealed partial class UiLayoutEngine
     /// <summary>
     /// The <c>VisibleRows</c> gate (D4). A Scroll-only attribute (UiHost refuses the name elsewhere and
     /// refuses bad numbers at creation; the checks here are the belt to that braces), consulted only when
-    /// no usable numeric <c>Height</c> is written - the same static-first order <c>WidthKey</c> keeps
+    /// no usable numeric <c>Height</c> is written - the same static-first order <c>WidthBind</c> keeps
     /// against <c>Width</c>. Absent, blank or malformed answers "not declared" so a programmatically
     /// built spec can never crash a frame.
     /// </summary>
@@ -1926,8 +1926,8 @@ internal sealed partial class UiLayoutEngine
     /// <c>&lt;itemsKey&gt;.&lt;itemKey&gt;.done</c>. Every binding role is scoped; <c>Tab</c> is
     /// deliberately not, because a tab is a page-level answer and not an item's, and every other attribute
     /// is layout or appearance with nothing to resolve against bindings. The criterion is "is this an
-    /// answer about one row?": <c>SelectedKey</c> answers which row is selected, so it sits in the same
-    /// table as <c>Bind</c>, <c>ActionBind</c>, <c>OptionsBind</c>, <c>VisibleKey</c> and <c>PayloadKey</c>
+    /// answer about one row?": <c>SelectedBind</c> answers which row is selected, so it sits in the same
+    /// table as <c>Bind</c>, <c>ActionBind</c>, <c>OptionsBind</c>, <c>VisibleBind</c> and <c>PayloadBind</c>
     /// rather than resolving the page-level key of that name on every row.
     /// </summary>
     private string QualifyItemBinding(UiElementSpec spec,string attribute,string value,string itemsKey,string itemKey){if(UiDefinitionCompiler.BindingRole(scope,spec,attribute)==UiBindingRole.None)return value;string field=(value??"").Trim();return field.Length==0?value??"":new UiBindingAddress(itemsKey,itemKey,field).Key;}
@@ -1955,7 +1955,7 @@ internal sealed partial class UiLayoutEngine
 
     /// <summary>
     /// The last materialization of every Repeat element the definition still declares but this arrange did not
-    /// visit (a <c>Visible</c>/<c>VisibleKey</c>/<c>Tab</c>-hidden one). Without it the prune would reap the
+    /// visit (a <c>Visible</c>/<c>VisibleBind</c>/<c>Tab</c>-hidden one). Without it the prune would reap the
     /// rows of an element that is merely hidden, and a Tab switch would throw away scroll, selection, drafts
     /// and expansion the definition never removed - the one lifetime distinction P2 wrote down for elements.
     /// A key the binding dropped while the element was hidden stays until the next arrange that visits it, so
@@ -2142,7 +2142,7 @@ internal sealed partial class UiLayoutEngine
 
     /// <summary>
     /// Numeric Width on a child; Auto and malformed values are not fixed. The static declaration comes
-    /// first, exactly like Visible/VisibleKey: <c>WidthKey</c> is consulted only when no usable Width is
+    /// first, exactly like Visible/VisibleBind: <c>WidthBind</c> is consulted only when no usable Width is
     /// written, and it answers the same question through a float value binding (B5).
     /// </summary>
     private bool TryFixedWidth(UiElementSpec spec, UiWidgetContext ctx, out float width)
@@ -2159,14 +2159,14 @@ internal sealed partial class UiLayoutEngine
     }
 
     /// <summary>
-    /// The <c>WidthKey</c> half of the rule: a numeric value binding answers the declared width. Fail-soft
-    /// and loud, like <c>VisibleKey</c> - a key that is missing or bound to another type leaves the static
+    /// The <c>WidthBind</c> half of the rule: a numeric value binding answers the declared width. Fail-soft
+    /// and loud, like <c>VisibleBind</c> - a key that is missing or bound to another type leaves the static
     /// answer in place and records one deduplicated appearance note, so a typo cannot silently size a column.
     /// </summary>
     private bool TryBoundWidth(UiElementSpec spec, UiWidgetContext ctx, out float width)
     {
         width = 0f;
-        string key = ReadAttribute(spec, WidthKeyAttribute);
+        string key = ReadAttribute(spec, WidthBindAttribute);
         if (key.Length == 0) return false;
 
         try
@@ -2182,7 +2182,7 @@ internal sealed partial class UiLayoutEngine
             // A key bound to another type: the fallback and its note below, not an exception per frame.
         }
 
-        UiFitAudit.ReportStyleFallback(ctx.ElementPath, spec.Kind, WidthKeyAttribute, key, "unsized");
+        UiFitAudit.ReportStyleFallback(ctx.ElementPath, spec.Kind, WidthBindAttribute, key, "unsized");
         return false;
     }
 
@@ -2502,10 +2502,10 @@ internal sealed partial class UiLayoutEngine
 
     /// <summary>
     /// The element's authored visibility, and with it the three visibility mechanisms the page
-    /// vocabulary has: the static <c>Visible</c>, the dynamic <c>VisibleKey</c>, and the legacy static
+    /// vocabulary has: the static <c>Visible</c>, the dynamic <c>VisibleBind</c>, and the legacy static
     /// <c>Hidden</c>. An element is hidden when any of them says so; <paramref name="parent"/> and
     /// <paramref name="declaredIndex"/> exist only to name the element in the one diagnostic
-    /// <see cref="VisibleKeyAttribute"/> can produce, and are not part of the decision.
+    /// <see cref="VisibleBindAttribute"/> can produce, and are not part of the decision.
     /// </summary>
     private bool IsHidden(
         UiElementSpec spec, UiWidgetContext ctx, bool narrow, UiNode? parent, int declaredIndex)
@@ -2547,8 +2547,8 @@ internal sealed partial class UiLayoutEngine
     }
 
     /// <summary>
-    /// <c>Visible</c> (default true) and <c>VisibleKey</c>: the static declaration first, then a bool
-    /// value binding resolved through <see cref="IUiBindingReader.TryGetBool"/>.
+    /// <c>Visible</c> (default true) and <c>VisibleBind</c>: the static declaration first, then a bool
+    /// value binding resolved through <see cref="IUiBindingAccess.TryGetBool"/>.
     /// <para>
     /// An unresolvable key is deliberately not fatal: a page must not fail to exist because a model key
     /// is missing or not yet bound, so the element stays visible. It is not silent either - the key is
@@ -2561,12 +2561,12 @@ internal sealed partial class UiLayoutEngine
     {
         if (spec.TryGetBoolean("Visible", out bool visible) && !visible) return false;
 
-        string key = ReadAttribute(spec, VisibleKeyAttribute);
+        string key = ReadAttribute(spec, VisibleBindAttribute);
         if (key.Length == 0) return true;
         if (TryLayoutBool(ctx.Bindings, key, out bool boundVisible)) return boundVisible;
 
         UiNodeId id = parent == null ? UiNodeId.Root(spec, declaredIndex) : parent.Id.Child(spec, declaredIndex);
-        UiFitAudit.ReportStyleFallback(id.Path, spec.Kind, VisibleKeyAttribute, key, "visible");
+        UiFitAudit.ReportStyleFallback(id.Path, spec.Kind, VisibleBindAttribute, key, "visible");
         return true;
     }
 

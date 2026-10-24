@@ -70,7 +70,7 @@ internal static class KernelTextFieldTests
 
         foreach (string name in new[]
         {
-            "Id", "Kind", "Tab", "Hidden", "Visible", "VisibleKey", "Tone", "Emphasis",
+            "Id", "Kind", "Tab", "Hidden", "Visible", "VisibleBind", "Tone", "Emphasis",
             "Bind", "Live", "Placeholder", "PlaceholderKey", "Label", "LabelKey", "Height"
         })
         {
@@ -408,7 +408,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new Probe
         return attrs;
     }
 
-    private static UiWidgetContext MakeContext(UiSession session, IUiBindingReader bindings)
+    private static UiWidgetContext MakeContext(UiSession session, IUiBindingAccess bindings)
     {
         return NativeFixture.Context(
             "text-field-test", session, new StubMetrics(), UiTheme.Vanilla,
@@ -562,7 +562,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new Probe
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 

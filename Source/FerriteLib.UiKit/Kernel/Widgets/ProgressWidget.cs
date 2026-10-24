@@ -56,7 +56,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     /// to be a positive number if it is written at all. A malformed <c>Max</c> is refused here rather than
     /// degraded per frame, because the element still knows its own path at creation time.
     /// </summary>
-    public void Validate(IUiBindingReader bindings, string elementPath)
+    public void Validate(IUiBindingAccess bindings, string elementPath)
     {
         string key = ReadBindKey();
         if (key.Length == 0)

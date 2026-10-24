@@ -52,7 +52,7 @@ internal static class KernelLayoutTests
         Run("Height is validated at creation, not at arrange (A2)", VerifyHeightValidation);
         Run("Cols/NarrowCols are Wrap-only vocabulary (A3)", VerifyColsWrapOnly);
         Run("WideHidden children vanish only in the wide state (B2(2))", VerifyWideHidden);
-        Run("WidthKey answers the declared width and re-arranges on announcement (B5)", VerifyWidthKey);
+        Run("WidthBind answers the declared width and re-arranges on announcement (B5)", VerifyWidthBind);
         Run("Responsive vocabulary is rejected before it can silently no-op (N2 grammar)", VerifyResponsiveValidation);
         Run("Density reaches container spacing (CP-0)", VerifyDensityReachesContainers);
         Run("Padding=\"0\"/Gap=\"0\" keeps the pre-CP-0 result exactly (CP-0 escape hatch)", VerifyDensityEscapeHatch);
@@ -623,7 +623,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         RegisterTestWidget(10f, null, false);
 
         string ModeRow(string title, string description) =>
-            "<UiPage Schema=\"2\" Source=\""+(Scope)+"\"><Row Id=\"row\" Padding=\"0\" Gap=\"0\"><Widget Id=\"mode\" Kind=\"input/mode-row\" Width=\"Auto\" Height=\"28\"    ><Choice Value=\"A\" Text=\""+(title)+"\" Help=\""+(description)+"\"/></Widget><Widget Id=\"rest\" Kind=\""+(TestWidgetKind)+"\" Height=\"10\" /></Row></UiPage>";
+            "<UiPage Schema=\"2\" Source=\""+(Scope)+"\"><Row Id=\"row\" Padding=\"0\" Gap=\"0\"><Widget Id=\"mode\" Kind=\"input/mode-row\" Width=\"Auto\" Height=\"28\"    ><Choice Value=\"A\" Text=\""+(title)+"\" HelpRef=\""+(description)+"\"/></Widget><Widget Id=\"rest\" Kind=\""+(TestWidgetKind)+"\" Height=\"10\" /></Row></UiPage>";
 
         UiLayoutSnapshot longDescription = Arrange(ModeRow("ab", "WWWWWWWWWWWW"), 400f, 600f).Snapshot;
         Check(Near(longDescription.RectById["mode"].Width, 16f),
@@ -940,9 +940,9 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
             "WideHidden under a parent with no Breakpoint is refused at creation");
     }
 
-    /// <summary>B5: WidthKey answers the declared width through a float binding, wins nothing over a written
+    /// <summary>B5: WidthBind answers the declared width through a float binding, wins nothing over a written
     /// Width, re-arranges on announcement, and falls back loudly when it cannot answer.</summary>
-    private static void VerifyWidthKey()
+    private static void VerifyWidthBind()
     {
         RegisterTestWidget(10f, null, false);
         float bound = 120f;
@@ -952,7 +952,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
             + "<Row Id=\"row\" Padding=\"0\" Gap=\"0\">"
-            + "<Widget Id=\"keyed\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" WidthKey=\"col-width\" />"
+            + "<Widget Id=\"keyed\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" WidthBind=\"col-width\" />"
             + "<Widget Id=\"rest\" Kind=\"" + TestWidgetKind + "\" Height=\"10\" />"
             + "</Row></UiPage>";
 
@@ -978,7 +978,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         var ctx2 = NativeFixture.Context(
             Scope, new UiSession(), new StubMetrics(), UiTheme.Vanilla, new StubTranslation(), mismatched, 400f, "root");
         Check(Near(new UiLayoutEngine(Scope).ArrangeRoots(ctx2, new UiLayoutPoint(400f, 600f), Parse(xml).Roots).RectById["keyed"].Width, 200f),
-            "an unanswerable WidthKey falls back to the unsized distribution rather than guessing");
+            "an unanswerable WidthBind falls back to the unsized distribution rather than guessing");
         Check(UiFitAudit.StyleFallbackCount == 1, "and it is reported once through the fail-soft appearance channel");
     }
 
@@ -1310,7 +1310,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, TestWidgetKind, () => new 
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 

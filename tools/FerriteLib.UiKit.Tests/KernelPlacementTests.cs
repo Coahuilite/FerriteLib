@@ -545,7 +545,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 

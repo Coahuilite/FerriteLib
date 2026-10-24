@@ -15,13 +15,13 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// </para>
 /// <para>
 /// <b>Per-option help, published rather than painted.</b> Each option may carry its own help identity in
-/// its explicit <c>Choice.Help</c>; omitted/empty Help means no option-specific help, never Value/Text
+/// its explicit <c>Choice.HelpRef</c>; omitted/empty Help means no option-specific help, never Value/Text
 /// inference. The kind does not draw it (a tooltip is the consumer's call, and vanilla's own
 /// mode selectors render the help in a panel of their own). Two reads exist, and they are complementary:
-/// declare <c>HoverHelpKey</c> and the row writes the hovered option's identity into that binding
+/// declare <c>HoveredOptionHelpOutputBind</c> and the row writes the hovered option's identity into that binding
 /// (<see cref = "OptionHelp"/>), and the hovered option's declared help text is also claimed on the session's
-/// hover surface (<c>UiSession.ClaimHover</c>), which is the general read the element-level <c>HelpKey</c>
-/// uses too. An option that declares no help text claims nothing, so the row's own <c>HelpKey</c> topic
+/// hover surface (<c>UiSession.PublishHelp</c>), which is the general read the element-level <c>HelpRef</c>
+/// uses too. An option that declares no help text claims nothing, so the row's own <c>HelpRef</c> topic
 /// stands while the pointer is over it.
 /// </para>
 /// </summary>
@@ -33,7 +33,7 @@ internal sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUi
     /// because the option-level contract is shared with <c>input/dropdown</c> (see <see cref = "OptionHelp"/>),
     /// and this is where it was first declared.
     /// </summary>
-    public const string HoverHelpKeyAttribute = "HoverHelpKey";
+    public const string HoveredOptionHelpOutputBindAttribute = "HoveredOptionHelpOutputBind";
     private UiElementSpec spec = UiElementSpec.Empty;
     private readonly UiRetainedPaint retained = new();
     bool IUiRetainedDisplay.PaintLast(UiLayoutRect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
@@ -58,7 +58,7 @@ internal sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUi
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindingReader bindings, string elementPath)
+    public void Validate(IUiBindingAccess bindings, string elementPath)
     {
         UiChoiceSource.Validate(bindings, spec, elementPath);
         OptionHelp.Validate(bindings, spec, elementPath, Kind);
@@ -125,9 +125,9 @@ internal sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUi
             DrawOption(ctx.Drawing, cell, choice, selected[i], ctx.Theme);
             if (ctx.Controls.IsMouseOver(cell, ctx))
             {
-                help = choice.Help;
+                help = choice.HelpRef;
                 if (help.Length > 0)
-                    ctx.Session.ClaimHover(help);
+                    ctx.Session.PublishHelp(ctx.Node, help);
             }
 
             var target = ctx.Controls.InteractionTarget(ctx, key, "option", choice.Value);

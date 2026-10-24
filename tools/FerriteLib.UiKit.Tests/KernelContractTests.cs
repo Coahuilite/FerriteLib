@@ -727,7 +727,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("theme-test", "test/height", () =
             "UiLayoutEngine",
             "UiLayoutSnapshot",
             "UiLayoutManifest",
-            "IUiBindingReader",
+            "IUiBindingAccess",
             "UiBindings",
             "UiWidgetRegistry",
             "IUiWidget",
@@ -874,7 +874,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("recover-test", "test/recording",
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 
@@ -896,7 +896,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("recover-test", "test/recording",
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 
@@ -934,7 +934,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("recover-test", "test/recording",
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 
@@ -1166,7 +1166,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("recover-test", "test/recording",
 
     private static void RegisterNeutralSectionKinds(string scope)
     {
-        string[] sectionSchema = { "Id", "Kind", "Title", "TitleKey", "HelpKey", "Tab", "Hidden", "Height" };
+        string[] sectionSchema = { "Id", "Kind", "Title", "TitleKey", "HelpRef", "Tab", "Hidden", "Height" };
         string[] footerSchema = { "Id", "Kind", "Height", "Tab", "Hidden" };
 UiWidgetRegistry.Define(new UiWidgetDefinition(scope, "neutral/section", () => new StubWidget("neutral/section"), sectionSchema));
 UiWidgetRegistry.Define(new UiWidgetDefinition(scope, "neutral/footer", () => new StubWidget("neutral/footer"), footerSchema));
@@ -1214,7 +1214,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("dup-test", "test/kind", () => ne
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 

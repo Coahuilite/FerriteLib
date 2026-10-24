@@ -157,7 +157,7 @@ internal static class Program
         Console.WriteLine("Kernel command state (canExecute, one disabled interaction)...");
         failures += RunSuite(()=>KernelCommandStateTests.RunAll(),"KernelCommandStateTests.RunAll");
 
-        Console.WriteLine("Kernel visibility (Visible/VisibleKey, identity, structural prune)...");
+        Console.WriteLine("Kernel visibility (Visible/VisibleBind, identity, structural prune)...");
         failures += RunSuite(()=>KernelVisibilityTests.RunAll(),"KernelVisibilityTests.RunAll");
 
         Console.WriteLine("Kernel role attributes (Tone/Emphasis, fallback recording, density)...");
@@ -235,13 +235,13 @@ internal static class Program
         Console.WriteLine("Kernel mode-row hover help (per-option identity published, never painted)...");
         failures += RunSuite(()=>KernelModeRowHelpTests.RunAll(),"KernelModeRowHelpTests.RunAll");
 
-        Console.WriteLine("Kernel element help (engine-wide HelpKey claimed on hover)...");
+        Console.WriteLine("Kernel element help (engine-wide HelpRef claimed on hover)...");
         failures += RunSuite(()=>KernelElementHelpTests.RunAll(),"KernelElementHelpTests.RunAll");
 
         Console.WriteLine("Kernel mode-row localization (TitleKeyN through the translation seam)...");
         failures += RunSuite(()=>KernelModeRowLocalizationTests.RunAll(),"KernelModeRowLocalizationTests.RunAll");
 
-        Console.WriteLine("Kernel option help (the shared HoverHelpKey contract, mode-row and dropdown)...");
+        Console.WriteLine("Kernel option help (the shared HoveredOptionHelpOutputBind contract, mode-row and dropdown)...");
         failures += RunSuite(()=>KernelOptionHelpTests.RunAll(),"KernelOptionHelpTests.RunAll");
 
         Console.WriteLine("Kernel container Tab (the coherence fix: the contract now admits the engine's read)...");

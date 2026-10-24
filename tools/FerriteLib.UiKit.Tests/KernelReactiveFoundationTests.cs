@@ -160,7 +160,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("reactive","probe",()=>probe,Arra
         public IEnumerable<string> PresentationKeys(UiWidgetContext ctx){yield return "value";}
         internal int Measured,Drawn; internal float Height; internal Action? OnDraw; internal Action? OnMeasure;
         public void Configure(UiElementSpec spec) { }
-        public void Validate(IUiBindingReader bindings,string path)=>bindings.ValidateValue<int>("value",path);
+        public void Validate(IUiBindingAccess bindings,string path)=>bindings.ValidateValue<int>("value",path);
         public float Measure(UiWidgetContext ctx) { OnMeasure?.Invoke(); Measured=ctx.Bindings.Get<int>("value");return Measured*10; }
         public void Draw(UiLayoutRect rect,UiWidgetContext ctx) { OnDraw?.Invoke(); Drawn=ctx.Bindings.Get<int>("value"); Height=rect.Height; }
     }
@@ -169,7 +169,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("reactive","probe",()=>probe,Arra
         public IEnumerable<string> PresentationKeys(UiWidgetContext ctx){yield return "completed";yield return "text";}
         public string Kind=>"workshop"; internal int Completed;internal float Height;
         public void Configure(UiElementSpec spec) { }
-        public void Validate(IUiBindingReader bindings,string path)=>bindings.ValidateValue<int>("completed",path);
+        public void Validate(IUiBindingAccess bindings,string path)=>bindings.ValidateValue<int>("completed",path);
         public float Measure(UiWidgetContext ctx)=>ctx.Bindings.Get<string>("text").Length;
         public void Draw(UiLayoutRect rect,UiWidgetContext ctx) { Completed=ctx.Bindings.Get<int>("completed");Height=rect.Height; }
     }

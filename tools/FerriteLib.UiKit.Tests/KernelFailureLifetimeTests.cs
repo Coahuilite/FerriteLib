@@ -60,7 +60,7 @@ internal static class KernelFailureLifetimeTests
         var width=owner.Compute("shared-width",()=>{reads++;float w=size.Value;if(broken.Value)throw new Exception("geometry");return w;});
         var eligible=owner.Compute("eligibility",()=>{if(broken.Value)throw new Exception("qualification");return true;});
         var b=new UiBindings(rt);b.BindTracked("width",()=>width.Value,equal:(a,c)=>a==c);int requests=0;b.BindCommand("act",()=>requests++,()=>eligible.Value);
-        using var host=Host("<Row Padding=\"0\"><Widget Kind=\"input/button\" Id=\"a\" WidthKey=\"width\" ActionBind=\"act\" Text=\"A\"/><Widget Kind=\"text/wrapped\" Id=\"after\" Text=\"After\"/></Row>",b);
+        using var host=Host("<Row Padding=\"0\"><Widget Kind=\"input/button\" Id=\"a\" WidthBind=\"width\" ActionBind=\"act\" Text=\"A\"/><Widget Kind=\"text/wrapped\" Id=\"after\" Text=\"After\"/></Row>",b);
         Pump(host);UiLayoutRect before=Node(host,"a").Rect!.Value;broken.Value=true;Pump(host);
         Console.WriteLine("RU3-DIAG layout="+host.LayoutFault+" width="+Node(host,"a").Rect!.Value.Width+" before="+before.Width+" reliable="+host.Session.IsInputGeometryReliable);
         C(host.LayoutFault?.Identity=="layout/shared-width" && Node(host,"a").Rect!.Value.Width==before.Width && !host.Session.IsInputGeometryReliable,"shared failed geometry retains complete old arrangement but cannot publish a current hit pass");
@@ -74,7 +74,7 @@ internal static class KernelFailureLifetimeTests
     {
         var rt=new UiReactiveRuntime();var source=rt.Int(1);var visible=rt.Boolean(true);var text=rt.Text("model");var b=new UiBindings(rt);int textRuns=0;
         b.BindTracked("caption",()=>{textRuns++;return "Value "+source.Value;});b.BindTracked("visible",()=>visible.Value);b.BindTracked("edit",()=>text.Value,v=>text.Value=v);
-        using var host=Host("<Column Padding=\"0\" Gap=\"0\"><Surface Id=\"panel\" VisibleKey=\"visible\" Padding=\"0\"><Widget Kind=\"text/wrapped\" Id=\"caption\" Bind=\"caption\"/><Widget Kind=\"input/text-field\" Id=\"field\" Bind=\"edit\"/></Surface><Widget Kind=\"text/wrapped\" Id=\"independent\" Text=\"Independent\"/></Column>",b);
+        using var host=Host("<Column Padding=\"0\" Gap=\"0\"><Surface Id=\"panel\" VisibleBind=\"visible\" Padding=\"0\"><Widget Kind=\"text/wrapped\" Id=\"caption\" Bind=\"caption\"/><Widget Kind=\"input/text-field\" Id=\"field\" Bind=\"edit\"/></Surface><Widget Kind=\"text/wrapped\" Id=\"independent\" Text=\"Independent\"/></Column>",b);
         Pump(host);UiNode field=Node(host,"field");bool Parse(string t,out string v){v=t;return true;}
         var editor=NativeFixture.Editor<string>(host.CreateContext(320).WithNode(field),"edit",v=>v,Parse);editor.Observe("model");editor.Focus();editor.Input("uncommitted",true,false,false,_=>throw new Exception("unexpected submit"),()=>"model");
         visible.Value=false;source.Value=2;Pump(host);int hidden=textRuns;source.Value=3;source.Value=4;Pump(host);Pump(host);
@@ -88,12 +88,12 @@ internal static class KernelFailureLifetimeTests
     }
     private sealed class OldCustom:IUiWidget
     {
-        public string Kind=>"old-custom";public void Configure(UiElementSpec spec){}public void Validate(IUiBindingReader b,string path){}
+        public string Kind=>"old-custom";public void Configure(UiElementSpec spec){}public void Validate(IUiBindingAccess b,string path){}
         public float Measure(UiWidgetContext c)=>20;public void Draw(UiLayoutRect r,UiWidgetContext c){_=c.Bindings.Get<string>("unknown");}
     }
     private sealed class DeclaredCustom:IUiWidget,IUiPresentationDemand
     {
-        public string Kind=>"declared-custom";public void Configure(UiElementSpec spec){}public void Validate(IUiBindingReader b,string path){}
+        public string Kind=>"declared-custom";public void Configure(UiElementSpec spec){}public void Validate(IUiBindingAccess b,string path){}
         public IEnumerable<string> PresentationKeys(UiWidgetContext c){yield return "known";}
         public float Measure(UiWidgetContext c)=>20;public void Draw(UiLayoutRect r,UiWidgetContext c){_=c.Bindings.Get<string>("known");}
     }
@@ -195,7 +195,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("failure","old-custom",()=>new Ol
             else if(kind=="input/mode-row")
             {b.BindTracked("data",()=>1,_=>writes++);var choices=owner.Compute<IReadOnlyList<UiChoice<int>>>("choices",()=>{reads++;if(fail.Value)throw new Exception("options");return new[]{new UiChoice<int>("Retained choice",1)};});b.BindTrackedChoices("data",()=>choices.Value,(a,c)=>a.Text==c.Text && a.Value==c.Value);}
             else
-            {extra=" OptionsBind=\"data\"";b.BindTracked("data",()=>"alpha",_=>writes++);var options=owner.Compute<IReadOnlyList<string>>("options",()=>{reads++;if(fail.Value)throw new Exception("options");return new[]{"alpha","beta"};});b.BindTrackedChoices("data",()=> (options.Value).Select(value=>new UiChoice<string>(value,value,value)).ToArray(),(a,c)=>a.Text==c.Text&&a.Value==c.Value&&a.Help==c.Help);}
+            {extra=" OptionsBind=\"data\"";b.BindTracked("data",()=>"alpha",_=>writes++);var options=owner.Compute<IReadOnlyList<string>>("options",()=>{reads++;if(fail.Value)throw new Exception("options");return new[]{"alpha","beta"};});b.BindTrackedChoices("data",()=> (options.Value).Select(value=>new UiChoice<string>(value,value,value)).ToArray(),(a,c)=>a.Text==c.Text&&a.Value==c.Value&&a.HelpRef==c.HelpRef);}
             using var host=Host("<Widget Kind=\""+kind+"\" Id=\"value\" Bind=\"data\""+extra+"/>",b);Pump(host);float height=Node(host,"value").Rect!.Value.Height;
             if(kind=="input/dropdown"){Click(host,"value");Pump(host);}
             fail.Value=true;int start=Labels.Count;int fillStart=Fills.Count;Pump(host);

@@ -15,9 +15,9 @@ public sealed class UiWidgetParts : IUiWidget, IUiMeasureParticipant, IUiWidgetC
 {
     private readonly Func<UiWidgetContext, UiMeasurement>? measure;
     private readonly Action<UiLayoutRect, UiWidgetContext>? paint, operate;
-    private readonly Action<UiElementSpec, IUiBindingReader, string>? validate;
+    private readonly Action<UiElementSpec, IUiBindingAccess, string>? validate;
     private UiElementSpec spec = UiElementSpec.Empty;
-    public UiWidgetParts(string kind, Func<UiWidgetContext, UiMeasurement>? measure = null, Action<UiLayoutRect, UiWidgetContext>? paint = null, Action<UiLayoutRect, UiWidgetContext>? operate = null, Func<UiWidgetContext, UiLayoutRect, IEnumerable<UiPointerRegion>>? pointer = null, Func<UiWidgetContext, UiDescription>? describe = null, Action<UiElementSpec, IUiBindingReader, string>? validate = null)
+    public UiWidgetParts(string kind, Func<UiWidgetContext, UiMeasurement>? measure = null, Action<UiLayoutRect, UiWidgetContext>? paint = null, Action<UiLayoutRect, UiWidgetContext>? operate = null, Func<UiWidgetContext, UiLayoutRect, IEnumerable<UiPointerRegion>>? pointer = null, Func<UiWidgetContext, UiDescription>? describe = null, Action<UiElementSpec, IUiBindingAccess, string>? validate = null)
     {
         Kind = kind ?? throw new ArgumentNullException(nameof(kind));
         this.measure = measure;
@@ -33,7 +33,7 @@ public sealed class UiWidgetParts : IUiWidget, IUiMeasureParticipant, IUiWidgetC
     public IUiDescriptiveWidget? Description { get; }
 
     public void Configure(UiElementSpec spec) => this.spec = spec;
-    public void Validate(IUiBindingReader bindings, string path) => validate?.Invoke(spec, bindings, path);
+    public void Validate(IUiBindingAccess bindings, string path) => validate?.Invoke(spec, bindings, path);
     public UiMeasurement CaptureMeasurement(UiWidgetContext ctx) => measure?.Invoke(ctx) ?? new UiMeasurement(new UiMeasureInputs(), () => 0);
     public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
     public void Draw(UiLayoutRect rect, UiWidgetContext ctx)

@@ -93,7 +93,7 @@ public sealed class UiDevNodeSnapshot
 {
     /// <summary>
     /// Why <see cref="Hover"/> is unknown at a geometry sample. The hover claim is written during an
-    /// element's own Draw (<c>UiSession.ClaimHover</c>), and a geometry sample is taken before that Draw runs,
+    /// element's own Draw (<c>UiSession.PublishHelp</c>), and a geometry sample is taken before that Draw runs,
     /// so a value read here would belong to whichever element claimed last - usually another one.
     /// </summary>
     public const string HoverUnknownReason =

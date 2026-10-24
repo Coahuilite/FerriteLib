@@ -21,7 +21,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, Kind,
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindingReader bindings, string elementPath)
+    public void Validate(IUiBindingAccess bindings, string elementPath)
     {
         string key = AtomVocabulary.ReadBindKey(spec);
         if (string.IsNullOrEmpty(key))

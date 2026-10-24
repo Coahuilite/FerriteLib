@@ -628,7 +628,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, HeightKind, () => new Spac
         const string xml =
             "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
             + "<Widget Id=\"chart\" Kind=\"chart/line\" Bind=\"points\" ActionBind=\"changed\" Editable=\"true\""
-            + " EditablePoints=\"1\" Height=\"120\" VisibleKey=\"chart-visible\" />"
+            + " EditablePoints=\"1\" Height=\"120\" VisibleBind=\"chart-visible\" />"
             + "</UiPage>";
 
         var bindings = new UiBindings();
@@ -974,7 +974,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, HeightKind, () => new Spac
             this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath) { }
+        public void Validate(IUiBindingAccess bindings, string elementPath) { }
 
         public float Measure(UiWidgetContext ctx)
         {

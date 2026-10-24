@@ -6,8 +6,8 @@ internal sealed class UiDefinitionCompiler
 {
     internal static UiBindingRole BindingRole(string scope,UiElementSpec spec,string attribute) { var role=UiWidgetRegistry.Schema(scope,spec.Kind)?.Binding(attribute)??UiBindingRole.None;return role!=UiBindingRole.None?role:UiAttributeSchema.StandardBinding(attribute); }
     private readonly string source;
-    private readonly IUiBindingReader? bindings;
-    internal static void VerifyReaderKeys(string source,IUiBindingReader reader,UiElementSpec spec,string path)
+    private readonly IUiBindingAccess? bindings;
+    internal static void VerifyReaderKeys(string source,IUiBindingAccess reader,UiElementSpec spec,string path)
     {
         try
         {
@@ -19,13 +19,13 @@ internal sealed class UiDefinitionCompiler
             throw new UiContractException("Binding owner validation failed at '"+path+"': "+error.Message,source,spec.Id,spec.Kind,path,error);
         }
     }
-    internal static void VerifyReaderSubtree(string source,IUiBindingReader reader,UiElementSpec spec,string path)
+    internal static void VerifyReaderSubtree(string source,IUiBindingAccess reader,UiElementSpec spec,string path)
     {
         VerifyReaderKeys(source,reader,spec,path);
         foreach(UiElementSpec child in spec.Children)
             VerifyReaderSubtree(source,reader,child,path+"/"+(child.Id.Length>0?child.Id:child.Kind));
     }
-    internal UiDefinitionCompiler(string source,IUiBindingReader? bindings=null){this.source=source;this.bindings=bindings;}
+    internal UiDefinitionCompiler(string source,IUiBindingAccess? bindings=null){this.source=source;this.bindings=bindings;}
     internal void ValidateTemplates(IReadOnlyDictionary<string,UiElementSpec> templates)
     { foreach(var entry in templates)ValidateElement(entry.Value,"<Templates>/"+entry.Key,false,null); }    internal void ValidateManifest(UiLayoutManifest candidate)
     {
@@ -48,26 +48,21 @@ internal sealed class UiDefinitionCompiler
     // name existed, so an author could not reach the document's schemes at all.
     private static readonly HashSet<string> CommonWidgetAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Id", "Kind", "Hidden", "Tab", "Height", "Width", "WidthKey", "MinWidth", "MaxWidth", "NarrowHidden",
-        "WideHidden", "SelectedKey", "Scheme", "Density",
-        "Visible", "VisibleKey",
-        // The element's help identity (0.7.x): engine-wide like Visible/VisibleKey, because the ENGINE -
-        // not the kind - claims a hovered element's help. Deliberately NOT in the container list: only
-        // widgets are hit surfaces, so a declaration on a container or a template root could never claim,
-        // and the unknown-attribute gate refuses it there instead of leaving it silently inert. A
-        // binding-resolved sibling (a HelpBind) is CONTINGENT on the Route A decision and deliberately not
-        // built: the only two data-dependent sites live in a widget that will not be migrated
-        // declaratively unless Route A lands, so the need is not established yet (0.7 contract).
-        "HelpKey",
+        "Id", "Kind", "Hidden", "Tab", "Height", "Width", "WidthBind", "MinWidth", "MaxWidth", "NarrowHidden",
+        "WideHidden", "SelectedBind", "Scheme", "Density",
+        "Visible", "VisibleBind",
+        // Opaque element topic reference, not a binding/translation lookup. Only widgets are hit surfaces;
+        // containers refuse the declaration rather than silently ignoring it. Choices refine this topic.
+        "HelpRef",
         // CP-1 placement vocabulary (0.7.x, Batch 1): valid only for a child of a placement container.
         // The engine refuses them elsewhere and refuses contradictory combinations; these two lists are
         // the attribute-NAME gate, and UiLayoutEngine keeps a mirrored pair for template subtrees that a
         // lane reflects against these, so the two must move together.
         "AlignX", "OffsetX", "AlignY", "OffsetY", "AnchorX", "AnchorY",
         "Font",
-        // FL-IC2 (interaction contract §3.6): the tree's Cancel layer. Engine-wide like VisibleKey and HelpKey,
+        // FL-IC2 (interaction contract §3.6): the tree's Cancel layer. Engine-wide like VisibleBind and HelpRef,
         // because the ENGINE reads it and publishes it on the node for the ladder to walk - no widget kind owns
-        // it, so no kind's attribute schema has to grow for a page to declare a return layer. Unlike HelpKey it
+        // it, so no kind's attribute schema has to grow for a page to declare a return layer. Unlike HelpRef it
         // IS allowed on a container: a section that draws nothing of its own is still a layer a player can
         // return from, which is the whole difference between a hit surface and a tree node.
         "CancelBind",
@@ -81,10 +76,10 @@ internal sealed class UiDefinitionCompiler
         // shared active-tab key for any declarer. Omitting it here forbade a capability the engine
         // implemented; the 0.7 contract records the ruling (2026-09-20). A Tab-gated container hides its
         // whole subtree, like every other hidden element.
-        "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Tab", "Width", "WidthKey",
+        "Id", "Kind", "Gap", "Padding", "Height", "Title", "TitleKey", "Hidden", "Tab", "Width", "WidthBind",
         "Fill", "MinWidth", "MaxWidth", "Breakpoint", "Narrow", "Cols", "NarrowCols", "NarrowHidden", "WideHidden",
         "VisibleRows",
-        "Scheme", "Density", "Visible", "VisibleKey",
+        "Scheme", "Density", "Visible", "VisibleBind",
         "AlignX", "OffsetX", "AlignY", "OffsetY", "AnchorX", "AnchorY",
         "Font", "SharedLabels",
         // FL-IC2: see the widget list; UiLayoutEngine's mirrored pair carries the same addition, and the drift
@@ -288,7 +283,7 @@ internal sealed class UiDefinitionCompiler
 
         // Visible is engine-wide and static, so its value is part of the creation-time contract like
         // Width: a malformed value would otherwise be interpreted per frame by the engine, and the one
-        // place that still knows the element, the attribute and the path is here. VisibleKey is
+        // place that still knows the element, the attribute and the path is here. VisibleBind is
         // deliberately NOT resolved against the injected bindings: a page must not fail to exist because
         // a model key is missing or not yet bound. The engine keeps such an element visible and records
         // one deduplicated appearance fallback instead - fail-soft, but not silent.

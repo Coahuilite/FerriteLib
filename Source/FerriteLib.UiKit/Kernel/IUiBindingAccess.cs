@@ -4,18 +4,13 @@ using System.Collections.Generic;
 namespace FerriteLib.UiKit.Kernel;
 
 /// <summary>
-/// Typed binding/action surface. All access is generic and validated at Host creation time;
-/// no arbitrary reflection or object-dictionary conversion is used by widgets.
-/// <para>
-/// There are three operations, not two. <see cref="Get{T}"/>/<see cref="Set{T}"/> read and write the
-/// authoritative model; <see cref="NotifyChanged"/> is the third, and it is how a consumer says "the
-/// model behind these keys moved" without the library ever polling or diffing it. Every key carries a
-/// monotonic revision, and the <see cref="UiInvalidation"/> class declared when the binding was
-/// registered decides what an announcement actually invalidates - so a page no longer hand-rolls a
-/// refresh or an enablement decision.
-/// </para>
+/// Typed runtime binding access: reads, writes, requests and owner-bound value/choice endpoints.
+/// Binding arguments are registry addresses, not element identities. Registration and NotifyChanged
+/// belong to UiBindings; ordinary getters gain no reactive prerequisite. Widgets may use the supplied
+/// sealed endpoints (including TryWrite) rather than Get/Set. Forward both endpoints and BindingOwner
+/// from the same current registry; Get/Set alone are not a universal interception hook.
 /// </summary>
-public interface IUiBindingReader
+public interface IUiBindingAccess
 {
     /// <summary>
     /// The current registry owning endpoints and optional tracked presentation capabilities.
@@ -24,9 +19,9 @@ public interface IUiBindingReader
     /// </summary>
     UiBindings BindingOwner { get; }
 
-    T Get<T>(string elementId);
+    T Get<T>(string binding);
 
-    bool TryGet<T>(string elementId, out T value);
+    bool TryGet<T>(string binding, out T value);
 
     /// <summary>
     /// Reads a bool value binding for a query that must be able to answer "not resolvable" instead of
@@ -38,10 +33,10 @@ public interface IUiBindingReader
     /// </summary>
     bool TryGetBool(string key, out bool value);
 
-    void Set<T>(string elementId, T value);
+    void Set<T>(string binding, T value);
 
     /// <summary>
-    /// Answers whether the value bound to <paramref name="elementId"/> may be written back through
+    /// Answers whether the value bound to <paramref name="binding"/> may be written back through
     /// <see cref="Set{T}"/>. A read-only binding is a value its owner publishes but does not accept
     /// changes for, and without this query a widget cannot tell such an element from a writable one: it
     /// draws the same control and only finds out by throwing, or by silently doing nothing while the
@@ -53,23 +48,23 @@ public interface IUiBindingReader
     /// the rest of the surface does.
     /// </para>
     /// </summary>
-    bool IsWritable(string elementId);
+    bool IsWritable(string binding);
 
-    IReadOnlyList<T> GetOptions<T>(string elementId);
+    IReadOnlyList<T> GetOptions<T>(string binding);
 
-    void Invoke<T>(string actionId, T payload);
+    void Invoke<T>(string actionBind, T payload);
 
     /// <summary>
-    /// Runs the command bound to <paramref name="actionId"/> only when it may run. A registered command
+    /// Runs the command bound to <paramref name="actionBind"/> only when it may run. A registered command
     /// whose executability predicate answers false is a legal no-op here rather than an error: the
     /// disabled state is the owner's declared answer about the command, not a caller's mistake - and the
     /// guard lives on the execution path so that a control which forgot to ask still cannot fire a
     /// command its owner said is unavailable. A key nobody bound still throws, exactly as before.
     /// </summary>
-    void Invoke(string actionId);
+    void Invoke(string actionBind);
 
     /// <summary>
-    /// Answers whether the command bound to <paramref name="actionId"/> may run now: a registered command
+    /// Answers whether the command bound to <paramref name="actionBind"/> may run now: a registered command
     /// with no predicate does, one with a predicate follows it, and a key with no command binding answers
     /// true. That last answer is deliberate, because this read is the veto a disabled decision consults
     /// rather than an existence check: an action-bound element (a chart publishing a point through
@@ -77,10 +72,10 @@ public interface IUiBindingReader
     /// behave exactly as it did. Existence is <see cref="Invoke(string)"/>'s answer - it throws for a key
     /// nobody bound.
     /// </summary>
-    bool CanExecute(string actionId);
+    bool CanExecute(string actionBind);
 
     /// <summary>
-    /// Runs the command bound to <paramref name="actionId"/> when — and only when — such a command is
+    /// Runs the command bound to <paramref name="actionBind"/> when — and only when — such a command is
     /// registered AND may run now, and reports whether it ran. The existence-aware sibling of
     /// <see cref="CanExecute"/> and <see cref="Invoke(string)"/>, added for the one caller that must ask both
     /// questions and is not allowed to throw: the Cancel ladder walks the element tree looking for the nearest
@@ -88,7 +83,7 @@ public interface IUiBindingReader
     /// thrown <see cref="System.Collections.Generic.KeyNotFoundException"/> there would take the window down
     /// instead of moving one layer up the tree.
     /// </summary>
-    bool TryInvokeCommand(string actionId);
+    bool TryInvokeCommand(string actionBind);
 
     /// <summary>
     /// The revision of one binding key: monotonic, starts at zero, and moves when the consumer announces
@@ -106,13 +101,13 @@ public interface IUiBindingReader
     /// </summary>
     UiInvalidation GetInvalidation(string key);
 
-    void ValidateValue<T>(string elementId, string elementPath);
+    void ValidateValue<T>(string binding, string elementPath);
 
-    void ValidateOptions<T>(string elementId, string elementPath);
+    void ValidateOptions<T>(string binding, string elementPath);
 
-    void ValidateAction<T>(string actionId, string elementPath);
+    void ValidateAction<T>(string actionBind, string elementPath);
 
-    void ValidateCommand(string actionId, string elementPath);
+    void ValidateCommand(string actionBind, string elementPath);
     bool TryValue(string key,out UiValueEndpoint? endpoint);
     UiValueEndpoint Value(string key);
     UiChoiceEndpoint Choices(string key);

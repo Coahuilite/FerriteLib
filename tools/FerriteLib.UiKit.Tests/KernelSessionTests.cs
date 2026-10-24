@@ -28,10 +28,10 @@ internal static class KernelSessionTests
             VerifyPopupDrawCallbacksAreSessionScoped();
             VerifyDropdownHelpersUseSessionState();
             VerifyHotControlOwnershipIsSessionScoped();
-            VerifyHoverClaimHoldsAcrossATransitGap();
-            VerifyHoverClaimReleasesAfterItsGraceWindow();
-            VerifyLiveHoverClaimReplacesTheHeldOne();
-            VerifyZeroGraceHoverClaimClearsEveryPass();
+            VerifyCurrentHelpRefHoldsAcrossATransitGap();
+            VerifyCurrentHelpRefReleasesAfterItsGraceWindow();
+            VerifyLiveCurrentHelpRefReplacesTheHeldOne();
+            VerifyZeroGraceCurrentHelpRefClearsEveryPass();
         }
         finally
         {
@@ -291,36 +291,36 @@ internal static class KernelSessionTests
     // to lose in a rewrite: a claim the boundary restored is NOT the same as a claim a widget made,
     // so restoring must not re-arm the grace window forever.
 
-    private static void VerifyHoverClaimHoldsAcrossATransitGap()
+    private static void VerifyCurrentHelpRefHoldsAcrossATransitGap()
     {
         using UiSession session = new();
-        session.HoverGraceFrames = 2;
+        session.HelpGracePasses = 2;
 
         session.BeginFrame();
-        session.ClaimHover("control-a");
-        Check(session.HoverClaim == "control-a", "the claim is visible in the pass that made it");
+        session.PublishHelp("control-a");
+        Check(session.CurrentHelpRef == "control-a", "the claim is visible in the pass that made it");
 
         session.BeginFrame();
-        Check(session.HoverClaim == null, "the frame boundary clears the claim so widgets must re-claim");
+        Check(session.CurrentHelpRef == null, "the frame boundary clears the claim so widgets must re-claim");
 
         // Pointer crossing the gap between two controls: nobody claims this pass.
         session.BeginFrame();
-        Check(session.HoverClaim == "control-a", "a gap pass re-presents the held claim instead of flashing the overview");
+        Check(session.CurrentHelpRef == "control-a", "a gap pass re-presents the held claim instead of flashing the overview");
     }
 
-    private static void VerifyHoverClaimReleasesAfterItsGraceWindow()
+    private static void VerifyCurrentHelpRefReleasesAfterItsGraceWindow()
     {
         using UiSession session = new();
-        session.HoverGraceFrames = 2;
+        session.HelpGracePasses = 2;
 
         session.BeginFrame();
-        session.ClaimHover("control-a");
+        session.PublishHelp("control-a");
 
         string?[] seen = new string?[4];
         for (int i = 0; i < seen.Length; i++)
         {
             session.BeginFrame();
-            seen[i] = session.HoverClaim;
+            seen[i] = session.CurrentHelpRef;
         }
 
         Check(seen[0] == null, "pass 1 after the claim is the boundary pass, which clears");
@@ -328,47 +328,47 @@ internal static class KernelSessionTests
         Check(seen[3] == null, "the claim is released once the grace window is spent");
     }
 
-    private static void VerifyLiveHoverClaimReplacesTheHeldOne()
+    private static void VerifyLiveCurrentHelpRefReplacesTheHeldOne()
     {
         using UiSession session = new();
-        session.HoverGraceFrames = 3;
+        session.HelpGracePasses = 3;
 
         session.BeginFrame();
-        session.ClaimHover("control-a");
+        session.PublishHelp("control-a");
 
         session.BeginFrame();
-        session.ClaimHover("control-b");
-        Check(session.HoverClaim == "control-b", "a live claim replaces the held one in the same pass");
+        session.PublishHelp("control-b");
+        Check(session.CurrentHelpRef == "control-b", "a live claim replaces the held one in the same pass");
 
         // Three gap passes with no claims. The first is the boundary pass that follows a real claim,
         // so it is blank by design (a still-hovered widget re-claims inside it); the grace window
         // carries from the second. None of them may show a: if a restored claim re-armed the window,
         // the superseded one would come back and pin the panel.
         session.BeginFrame();
-        string? gap1 = session.HoverClaim;
+        string? gap1 = session.CurrentHelpRef;
         session.BeginFrame();
-        string? gap2 = session.HoverClaim;
+        string? gap2 = session.CurrentHelpRef;
         session.BeginFrame();
-        string? gap3 = session.HoverClaim;
+        string? gap3 = session.CurrentHelpRef;
 
         Check(gap2 == "control-b" && gap3 == "control-b", "the grace window carries the newer claim");
         Check(gap1 != "control-a" && gap2 != "control-a" && gap3 != "control-a",
             "the superseded claim never comes back");
     }
 
-    private static void VerifyZeroGraceHoverClaimClearsEveryPass()
+    private static void VerifyZeroGraceCurrentHelpRefClearsEveryPass()
     {
         using UiSession session = new();
-        Check(session.HoverGraceFrames == 0, "grace defaults to zero, so a host that opts out behaves as before");
+        Check(session.HelpGracePasses == 0, "grace defaults to zero, so a host that opts out behaves as before");
 
         session.BeginFrame();
-        session.ClaimHover("control-a");
+        session.PublishHelp("control-a");
 
         session.BeginFrame();
-        Check(session.HoverClaim == null, "with no grace the machine is the plain per-pass clear");
+        Check(session.CurrentHelpRef == null, "with no grace the machine is the plain per-pass clear");
 
         session.BeginFrame();
-        Check(session.HoverClaim == null, "and nothing is carried into a later pass");
+        Check(session.CurrentHelpRef == null, "and nothing is carried into a later pass");
     }
     private static void ResetStaticTestSeams()
     {

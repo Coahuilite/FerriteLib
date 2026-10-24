@@ -177,7 +177,7 @@ internal static class KernelImagePlacementTests
         bindings.BindReadOnly("choice", () => "one");
         int calls = 0;
         bindings.BindCommand("act", () => calls++);
-        var page = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"layered-shell\" BackgroundBind=\"back\"><Column Id=\"body\" Padding=\"0\"><Widget Id=\"button\" Kind=\"input/button\" Text=\"content\" ActionBind=\"act\" Height=\"30\"/><Widget Id=\"menu\" Kind=\"input/dropdown\" Bind=\"choice\"   Height=\"30\"><Choice Value=\"one\" Text=\"one\" Help=\"one\"/><Choice Value=\"two\" Text=\"two\" Help=\"two\"/></Widget></Column></UiPage>");
+        var page = UiLayoutManifest.Parse("<UiPage Schema=\"2\" Source=\"layered-shell\" BackgroundBind=\"back\"><Column Id=\"body\" Padding=\"0\"><Widget Id=\"button\" Kind=\"input/button\" Text=\"content\" ActionBind=\"act\" Height=\"30\"/><Widget Id=\"menu\" Kind=\"input/dropdown\" Bind=\"choice\"   Height=\"30\"><Choice Value=\"one\" Text=\"one\" HelpRef=\"one\"/><Choice Value=\"two\" Text=\"two\" HelpRef=\"two\"/></Widget></Column></UiPage>");
         var window = new UiPageWindow(new UiWindowKey("image-test", "content", "one"), page, bindings,
             new UiTheme(), new Translation(), "title", "close", _ => "notice", new Metrics());
         background=window.Images.Add(new Texture2D(200,100));

@@ -45,7 +45,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindingReader bindings, string elementPath)
+    public void Validate(IUiBindingAccess bindings, string elementPath)
     {
         string key = ReadBindKey();
         if (key.Length == 0)

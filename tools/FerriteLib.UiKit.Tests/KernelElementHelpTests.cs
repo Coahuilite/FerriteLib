@@ -10,13 +10,13 @@ using FerriteLib.UiKit.Kernel.Widgets;
 namespace FerriteLib.UiKit.Tests;
 
 /// <summary>
-/// G1: the element-level help hook, engine-wide. A page declares <c>HelpKey</c> on any widget element and the
+/// G1: the element-level help hook, engine-wide. A page declares <c>HelpRef</c> on any widget element and the
 /// ENGINE claims it while the pointer is over that element, so a declarative page carries help with no
 /// per-widget code — which is what the consumer's 30 static claim sites need before any of them can migrate.
 /// <para>
 /// The publication is the session's existing claim machine, not a new channel: the engine calls
-/// <c>UiSession.ClaimHover</c> during its draw walk, and the consumer reads <c>HoverClaim</c> /
-/// <c>HoverClaimElement</c> exactly as it already does. Two deliberate properties are pinned here because they
+/// <c>UiSession.PublishHelp</c> during its draw walk, and the consumer reads <c>CurrentHelpRef</c> /
+/// <c>CurrentHelpSource</c> exactly as it already does. Two deliberate properties are pinned here because they
 /// are the ones a reader would guess wrong: the claim is <b>not translated or interpreted</b> (it is the
 /// identity a consumer's own catalog is keyed by), and a <b>disabled</b> element still claims — help explains
 /// why a control is unavailable rather than activating it, which is why the hover test dropped its disabled
@@ -42,9 +42,9 @@ internal static class KernelElementHelpTests
     public static int RunAll()
     {
         failures = 0;
-        Run("HelpKey is engine-wide on widgets and refused on containers", VerifyAttributeGate);
-        Run("Hovering an element publishes its declared help identity", VerifyHoverClaims);
-        Run("An element without HelpKey claims nothing", VerifyNoDeclarationClaimsNothing);
+        Run("HelpRef is engine-wide on widgets and refused on containers", VerifyAttributeGate);
+        Run("Hovering an element publishes its declared help identity", VerifyCurrentHelpRefs);
+        Run("An element without HelpRef claims nothing", VerifyNoDeclarationClaimsNothing);
         Run("The claim is the declared token, verbatim", VerifyClaimIsOpaque);
         Run("A disabled element still claims: help explains, it does not activate", VerifyDisabledStillClaims);
         Run("An element under a higher layer does not claim", VerifyCoveredDoesNotClaim);
@@ -60,24 +60,24 @@ internal static class KernelElementHelpTests
     {
         PrepareCore();
 UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new ProbeWidget(), new[] { "Id", "Kind", "Height" }));
-        Host(ProbeKind, "HelpKey=\"help/probe\"");
-        Check(true, "a kind whose schema never listed HelpKey still creates with one");
+        Host(ProbeKind, "HelpRef=\"help/probe\"");
+        Check(true, "a kind whose schema never listed HelpRef still creates with one");
 
         // The atoms inherit the engine-wide set through their shared schema — chrome/rule needs nothing else,
         // so this check is about the help attribute rather than about some other required binding.
-        Host("chrome/rule", "HelpKey=\"help/rule\"");
+        Host("chrome/rule", "HelpRef=\"help/rule\"");
         Check(true, "and a core atom accepts it too");
 
         // Containers are not hit surfaces, so a declaration there could never claim: refused, not inert.
-        Check(Reject("<Row Id=\"r\" HelpKey=\"help/row\"><Widget Id=\"w\" Kind=\"" + ProbeKind + "\" Height=\"24\" /></Row>", "HelpKey"),
-            "a container declaring HelpKey is refused at creation");
-        Check(Reject("<Section Id=\"s\" HelpKey=\"help/section\"><Widget Id=\"w\" Kind=\"" + ProbeKind + "\" Height=\"24\" /></Section>", "HelpKey"),
+        Check(Reject("<Row Id=\"r\" HelpRef=\"help/row\"><Widget Id=\"w\" Kind=\"" + ProbeKind + "\" Height=\"24\" /></Row>", "HelpRef"),
+            "a container declaring HelpRef is refused at creation");
+        Check(Reject("<Section Id=\"s\" HelpRef=\"help/section\"><Widget Id=\"w\" Kind=\"" + ProbeKind + "\" Height=\"24\" /></Section>", "HelpRef"),
             "and so is a section");
     }
 
     // --- the claim --------------------------------------------------------------------------------
 
-    private static void VerifyHoverClaims()
+    private static void VerifyCurrentHelpRefs()
     {
         using UiHost host = TwoHelpElements();
         NativeFixture.BeginDebugEvent();
@@ -88,19 +88,19 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new Probe
         EnablePointer(new UiLayoutPoint(10f, 10f));
         NativeFixture.BeginDebugEvent();
         NativeFixture.DrawFrame(        host,Viewport());
-        Check(host.Session.HoverClaim == "help/a", "hovering the first element claims its declared identity");
-        Check(host.Session.HoverClaimElement == a.Id, "and the claim is attributed to that element");
+        Check(host.Session.CurrentHelpRef == "help/a", "hovering the first element claims its declared identity");
+        Check(host.Session.CurrentHelpSource == a.Id, "and the claim is attributed to that element");
 
         NativeFixture.DebugMousePosition = new UiLayoutPoint(10f, RowHeight + 10f);
         NativeFixture.BeginDebugEvent();
         NativeFixture.DrawFrame(        host,Viewport());
-        Check(host.Session.HoverClaim == "help/b", "moving the pointer to the second element re-claims in the same pass");
-        Check(host.Session.HoverClaimElement == b.Id, "with its own attribution");
+        Check(host.Session.CurrentHelpRef == "help/b", "moving the pointer to the second element re-claims in the same pass");
+        Check(host.Session.CurrentHelpSource == b.Id, "with its own attribution");
 
         NativeFixture.DebugMousePosition = new UiLayoutPoint(10f, 400f);
         NativeFixture.BeginDebugEvent();
         NativeFixture.DrawFrame(        host,Viewport());
-        Check(host.Session.HoverClaim == null, "leaving both releases the claim (the grace window is zero here)");
+        Check(host.Session.CurrentHelpRef == null, "leaving both releases the claim (the grace window is zero here)");
     }
 
     private static void VerifyNoDeclarationClaimsNothing()
@@ -120,7 +120,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new Probe
         EnablePointer(new UiLayoutPoint(10f, 10f));
         NativeFixture.BeginDebugEvent();
         NativeFixture.DrawFrame(        host,Viewport());
-        Check(host.Session.HoverClaim == null, "an element that declares no HelpKey claims nothing, however hovered it is");
+        Check(host.Session.CurrentHelpRef == null, "an element that declares no HelpRef claims nothing, however hovered it is");
     }
 
     private static void VerifyClaimIsOpaque()
@@ -130,7 +130,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new Probe
             UiLayoutManifest.Parse(
                 "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
                 + "<Column Id=\"col\" Padding=\"0\" Gap=\"0\">"
-                + "<Widget Id=\"a\" Kind=\"" + ProbeKind + "\" Height=\"24\" HelpKey=\"us/Whatever/Exact-Token\" />"
+                + "<Widget Id=\"a\" Kind=\"" + ProbeKind + "\" Height=\"24\" HelpRef=\"us/Whatever/Exact-Token\" />"
                 + "</Column></UiPage>"),
             new UiBindings(),
             UiTheme.Vanilla,
@@ -140,7 +140,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new Probe
         EnablePointer(new UiLayoutPoint(10f, 10f));
         NativeFixture.BeginDebugEvent();
         NativeFixture.DrawFrame(        host,Viewport());
-        Check(host.Session.HoverClaim == "us/Whatever/Exact-Token",
+        Check(host.Session.CurrentHelpRef == "us/Whatever/Exact-Token",
             "the declared token arrives verbatim: the library neither translates it nor rewrites it");
     }
 
@@ -158,7 +158,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, CommandKind, () => new Pro
             UiLayoutManifest.Parse(
                 "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
                 + "<Column Id=\"col\" Padding=\"0\" Gap=\"0\">"
-                + "<Widget Id=\"gate\" Kind=\"" + CommandKind + "\" ActionBind=\"gate\" Height=\"24\" HelpKey=\"help/unavailable\" />"
+                + "<Widget Id=\"gate\" Kind=\"" + CommandKind + "\" ActionBind=\"gate\" Height=\"24\" HelpRef=\"help/unavailable\" />"
                 + "</Column></UiPage>"),
             bindings,
             UiTheme.Vanilla,
@@ -170,7 +170,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, CommandKind, () => new Pro
         NativeFixture.DrawFrame(        host,Viewport());
         UiNode gate = host.Session.GetNodeByElementId("gate") ?? throw new Exception("'gate' was not arranged");
         Check(gate.IsDisabled, "the command-bound element is published disabled while its predicate answers false");
-        Check(host.Session.HoverClaim == "help/unavailable",
+        Check(host.Session.CurrentHelpRef == "help/unavailable",
             "and it still claims: the help explains why the control is unavailable, which is when a player needs it");
     }
 
@@ -190,7 +190,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, CommandKind, () => new Pro
         NativeFixture.BeginDebugEvent();
         NativeFixture.DrawFrame(        host,Viewport());
 
-        Check(host.Session.HoverClaim != "help/a", "an element under another element's popup does not claim its own help");
+        Check(host.Session.CurrentHelpRef != "help/a", "an element under another element's popup does not claim its own help");
         Check(a != b, "and the two nodes really are distinct, so the check above is about coverage rather than identity");
     }
 
@@ -203,7 +203,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, CommandKind, () => new Pro
         using UiHost host = new(
             Scope,
             UiLayoutManifest.Parse(
-                "<UiPage Schema=\"2\" Source=\""+(Scope)+"\"><Column Id=\"col\" Padding=\"0\" Gap=\"0\"><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\" HelpKey=\"help/row\"    ><Choice Value=\"A\" Text=\"A\" Help=\"help/row/option-a\"/></Widget></Column></UiPage>"),
+                "<UiPage Schema=\"2\" Source=\""+(Scope)+"\"><Column Id=\"col\" Padding=\"0\" Gap=\"0\"><Widget Id=\"mode\" Kind=\"input/mode-row\" Bind=\"mode\" Height=\"20\" HelpRef=\"help/row\"    ><Choice Value=\"A\" Text=\"A\" HelpRef=\"help/row/option-a\"/></Widget></Column></UiPage>"),
             bindings,
             UiTheme.Vanilla,
             new StubMetrics(),
@@ -215,19 +215,19 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, CommandKind, () => new Pro
         NativeFixture.BeginDebugEvent();
         NativeFixture.DrawFrame(        host,Viewport());
 
-        Check(host.Session.HoverClaim == "help/row/option-a",
+        Check(host.Session.CurrentHelpRef == "help/row/option-a",
             "the kind's option claim refines the engine's element claim: the specific topic wins while an option is hovered");
     }
 
     private static void VerifyGraceHoldsTheClaim()
     {
         using UiHost host = TwoHelpElements();
-        host.Session.HoverGraceFrames = 2;
+        host.Session.HelpGracePasses = 2;
 
         EnablePointer(new UiLayoutPoint(10f, 10f));
         NativeFixture.BeginDebugEvent();
         NativeFixture.DrawFrame(        host,Viewport());
-        Check(host.Session.HoverClaim == "help/a", "the claim starts live");
+        Check(host.Session.CurrentHelpRef == "help/a", "the claim starts live");
 
         // The machine's own sequence, measured rather than assumed: the boundary after a live claim clears it so
         // widgets must re-claim, and only a pass that re-claims nothing restores the held claim for the grace
@@ -235,22 +235,22 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, CommandKind, () => new Pro
         NativeFixture.DebugMousePosition = new UiLayoutPoint(10f, 400f);
         NativeFixture.BeginDebugEvent();
         NativeFixture.DrawFrame(        host,Viewport());
-        Check(host.Session.HoverClaim == null, "the first gap pass re-claims nothing, which is the boundary's job");
+        Check(host.Session.CurrentHelpRef == null, "the first gap pass re-claims nothing, which is the boundary's job");
 
         NativeFixture.BeginDebugEvent();
         NativeFixture.DrawFrame(
         host,Viewport());
-        Check(host.Session.HoverClaim == "help/a", "the next pass re-presents the held claim");
+        Check(host.Session.CurrentHelpRef == "help/a", "the next pass re-presents the held claim");
 
         NativeFixture.BeginDebugEvent();
         NativeFixture.DrawFrame(
         host,Viewport());
-        Check(host.Session.HoverClaim == "help/a", "and it holds for the second grace pass");
+        Check(host.Session.CurrentHelpRef == "help/a", "and it holds for the second grace pass");
 
         NativeFixture.BeginDebugEvent();
         NativeFixture.DrawFrame(
         host,Viewport());
-        Check(host.Session.HoverClaim == null, "then releases it, so the machine carries the engine's claim like any other");
+        Check(host.Session.CurrentHelpRef == null, "then releases it, so the machine carries the engine's claim like any other");
     }
 
     // --- fixtures ---------------------------------------------------------------------------------
@@ -265,8 +265,8 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new Probe
             UiLayoutManifest.Parse(
                 "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
                 + "<Column Id=\"col\" Padding=\"0\" Gap=\"0\">"
-                + "<Widget Id=\"a\" Kind=\"" + ProbeKind + "\" Height=\"24\" HelpKey=\"help/a\" />"
-                + "<Widget Id=\"b\" Kind=\"" + ProbeKind + "\" Height=\"24\" HelpKey=\"help/b\" />"
+                + "<Widget Id=\"a\" Kind=\"" + ProbeKind + "\" Height=\"24\" HelpRef=\"help/a\" />"
+                + "<Widget Id=\"b\" Kind=\"" + ProbeKind + "\" Height=\"24\" HelpRef=\"help/b\" />"
                 + "</Column></UiPage>"),
             new UiBindings(),
             UiTheme.Vanilla,
@@ -399,7 +399,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ProbeKind, () => new Probe
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 

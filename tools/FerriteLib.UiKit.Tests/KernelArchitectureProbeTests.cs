@@ -83,7 +83,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, Kind, () => new HeadlessBu
 
         public void Configure(UiElementSpec element) => spec = element ?? throw new ArgumentNullException(nameof(element));
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
             string key = Read(spec, "ActionBind");
             if (key.Length == 0)
@@ -123,7 +123,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, Kind, () => new RailButton
 
         public void Configure(UiElementSpec element) => spec = element ?? throw new ArgumentNullException(nameof(element));
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
             string key = Read(spec, "ActionBind");
             if (key.Length == 0)
@@ -561,7 +561,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, Kind, () => new RailButton
         return attributes;
     }
 
-    private static UiWidgetContext MakeContext(UiSession session, IUiBindingReader bindings, UiTheme theme) =>
+    private static UiWidgetContext MakeContext(UiSession session, IUiBindingAccess bindings, UiTheme theme) =>
         NativeFixture.Context(Scope, session, new ProbeMetrics(), theme, new ProbeTranslation(), bindings, 400f, "root");
 
     private static string Read(UiElementSpec spec, string name) =>

@@ -199,7 +199,7 @@ internal static class KernelStyleDocumentTests
         Check(theme.LayoutRevision > revisionBefore, "applying a document moves the layout clock the host compares");
 
         UiLayoutManifest manifest = UiLayoutManifest.Parse(
-            "<UiPage Schema=\"2\" Source=\"style-doc\"><Widget Id=\"dd\" Kind=\"input/dropdown\"  ><Choice Value=\"A\" Text=\"A\" Help=\"A\"/></Widget><Widget Id=\"banner\" Kind=\"chrome/banner\" Text=\"ok\" Height=\"30\"/></UiPage>");
+            "<UiPage Schema=\"2\" Source=\"style-doc\"><Widget Id=\"dd\" Kind=\"input/dropdown\"  ><Choice Value=\"A\" Text=\"A\" HelpRef=\"A\"/></Widget><Widget Id=\"banner\" Kind=\"chrome/banner\" Text=\"ok\" Height=\"30\"/></UiPage>");
         var bindings = new UiBindings();
         bindings.BindValue("dd", () => "A", _ => { });
 

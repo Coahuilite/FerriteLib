@@ -218,7 +218,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("layers-more", "test/precise", ()
         var bindings = new UiBindings();
         bindings.BindCommand("large", () => large++);
         bindings.BindReadOnly("choice", () => "one");
-        string upper = "<Widget Id=\"dropdown\" Kind=\"input/dropdown\" Bind=\"choice\"  Width=\"30\" Height=\"30\" AlignX=\"Left\" AlignY=\"Top\" OffsetX=\"100\" OffsetY=\"10\"><Choice Value=\"one\" Text=\"one\" Help=\"one\"/></Widget>";
+        string upper = "<Widget Id=\"dropdown\" Kind=\"input/dropdown\" Bind=\"choice\"  Width=\"30\" Height=\"30\" AlignX=\"Left\" AlignY=\"Top\" OffsetX=\"100\" OffsetY=\"10\"><Choice Value=\"one\" Text=\"one\" HelpRef=\"one\"/></Widget>";
         using (var host = Host(bindings, upper))
         {
             Frame(host, EventType.MouseDown);
@@ -284,7 +284,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("layer-child", "test/child", () =
     {
         public string Kind => "test/child";
         public void Configure(UiElementSpec spec) { }
-        public void Validate(IUiBindingReader bindings, string path) => bindings.ValidateCommand("child", path);
+        public void Validate(IUiBindingAccess bindings, string path) => bindings.ValidateCommand("child", path);
         public float Measure(UiWidgetContext ctx) => 80;
         public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)
         { yield return new UiPointerRegion(bounds); }
@@ -300,7 +300,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("layer-child", "test/child", () =
     {
         public string Kind => "test/precise";
         public void Configure(UiElementSpec spec) { }
-        public void Validate(IUiBindingReader bindings, string path) => bindings.ValidateCommand("custom", path);
+        public void Validate(IUiBindingAccess bindings, string path) => bindings.ValidateCommand("custom", path);
         public float Measure(UiWidgetContext ctx) => 80;
         private static UiLayoutRect Region(float x, float y) => new(x + 100, y + 10, 30,30);
         public System.Collections.Generic.IEnumerable<UiPointerRegion> PointerRegions(UiWidgetContext ctx, UiLayoutRect bounds)

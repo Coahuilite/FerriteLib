@@ -398,7 +398,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ReadoutKind, () => new Rea
             this.spec = spec;
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
             bindings.ValidateValue<float>(Key(), elementPath);
         }

@@ -1488,13 +1488,13 @@ internal static class KernelDocumentReloadTests
         return dir;
     }
 
-    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindingReader bindings)
+    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindingAccess bindings)
     {
         return new UiHost(source, manifest, bindings, UiTheme.Vanilla, new FixedMetrics(), new FixedTranslation());
     }
 
     /// <summary>A host built on a theme the lane holds, so a page-level application is observable.</summary>
-    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindingReader bindings, UiTheme theme)
+    private static UiHost NewHost(string source, UiLayoutManifest manifest, IUiBindingAccess bindings, UiTheme theme)
     {
         return new UiHost(source, manifest, bindings, theme, new FixedMetrics(), new FixedTranslation());
     }

@@ -25,7 +25,7 @@ public sealed class UiPageWindow : UiWindowHost
 {
     private readonly UiWindowKey key;
     private readonly UiLayoutManifest manifest;
-    private readonly IUiBindingReader bindings;
+    private readonly IUiBindingAccess bindings;
     private readonly UiTheme theme;
     private readonly IUiTranslation translation;
     private readonly ITextMetrics metrics;
@@ -37,7 +37,7 @@ public sealed class UiPageWindow : UiWindowHost
     public UiPageWindow(
         UiWindowKey key,
         UiLayoutManifest manifest,
-        IUiBindingReader bindings,
+        IUiBindingAccess bindings,
         UiTheme theme,
         IUiTranslation translation,
         string title,

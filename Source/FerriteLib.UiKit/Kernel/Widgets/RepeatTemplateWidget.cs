@@ -39,7 +39,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
             new[]
             {
                 "Id", "Kind", "Items", "Template", "Padding", "Gap", "Height",
-                "Hidden", "Tab", "Visible", "VisibleKey"
+                "Hidden", "Tab", "Visible", "VisibleBind"
             }));
         // No label set: the rows' labels live in the template's own kinds, and Width="Auto" on the repeat
         // itself would be measuring a box that draws no text.
@@ -50,7 +50,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindingReader bindings, string elementPath)
+    public void Validate(IUiBindingAccess bindings, string elementPath)
     {
         string items = AtomVocabulary.Read(spec, "Items").Trim();
         if (items.Length == 0)

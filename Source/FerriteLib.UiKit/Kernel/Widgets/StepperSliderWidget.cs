@@ -4,7 +4,7 @@ using System.Globalization;
 namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>
 /// Greenfield stepper-slider composite. Uses the session-owned <see cref = "UiNative"/> primitives
-/// and writes through the typed <see cref = "IUiBindingReader"/>; no neutral command bridge.
+/// and writes through the typed <see cref = "IUiBindingAccess"/>; no neutral command bridge.
 /// The typed value-binding key is the <c>Bind</c> attribute when present, otherwise the element Id.
 /// </summary>
 internal sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiLayoutDiagnosticSource, IUiPointerLayout, IUiRetainedDisplay
@@ -45,7 +45,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindingReader bindings, string elementPath)
+    public void Validate(IUiBindingAccess bindings, string elementPath)
     {
         string bindKey = ReadBindKey();
         if (string.IsNullOrEmpty(bindKey))

@@ -242,7 +242,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("ru2", "invalid", () => new Inval
         var bindings = new UiBindings(); bindings.BindReadOnly("visible", () => { visibleReads++; return visible; });
         bindings.BindReadOnly("width", () => { widthReads++; return width; });
 UiWidgetRegistry.Define(new UiWidgetDefinition("ru2", "legacy", () => new LegacyWidget(), Array.Empty<string>(), Array.Empty<string>(), (_, _) => { naturalReads++; return natural; }));
-        using var host = Host("<Column Id=\"root\" Padding=\"0\" Gap=\"0\"><Widget Id=\"conditional\" Kind=\"text/wrapped\" Text=\"visible\" VisibleKey=\"visible\" WidthKey=\"width\" AlignX=\"Left\"/><Widget Id=\"auto\" Kind=\"legacy\" Width=\"Auto\"/></Column>", bindings);
+        using var host = Host("<Column Id=\"root\" Padding=\"0\" Gap=\"0\"><Widget Id=\"conditional\" Kind=\"text/wrapped\" Text=\"visible\" VisibleBind=\"visible\" WidthBind=\"width\" AlignX=\"Left\"/><Widget Id=\"auto\" Kind=\"legacy\" Width=\"Auto\"/></Column>", bindings);
         Arrange(host); int vr = visibleReads, wr = widthReads, nr = naturalReads;
         visible = false; width = 100; natural = 90; Arrange(host);
         Check(Node(host, "conditional").Rect!.Value.Width == 80 && Node(host, "auto").Rect!.Value.Width == 70 && visibleReads == vr && widthReads == wr && naturalReads == nr,
@@ -255,7 +255,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("ru2", "legacy", () => new Legacy
     }
     private sealed class LegacyWidget : IUiWidget
     {
-        public string Kind => "legacy"; public void Configure(UiElementSpec s) { } public void Validate(IUiBindingReader b, string p) { }
+        public string Kind => "legacy"; public void Configure(UiElementSpec s) { } public void Validate(IUiBindingAccess b, string p) { }
         public float Measure(UiWidgetContext ctx) => 20; public void Draw(UiLayoutRect rect, UiWidgetContext ctx) { }
     }
     private static void AllUses()
@@ -276,7 +276,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("ru2", "legacy", () => new Legacy
     {
         public string Kind => "custom"; internal int Calculations;
         public void Configure(UiElementSpec spec) { }
-        public void Validate(IUiBindingReader bindings, string path) { bindings.ValidateValue<float>("h", path); }
+        public void Validate(IUiBindingAccess bindings, string path) { bindings.ValidateValue<float>("h", path); }
         public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
         public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
         { float input = ctx.Bindings.Get<float>("h"); return new UiMeasurement(new UiMeasureInputs(numbers: new[] { input }), () => { Calculations++; return input; }); }
@@ -284,7 +284,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("ru2", "legacy", () => new Legacy
     }
     private sealed class Invalid : IUiWidget, IUiMeasureParticipant
     {
-        public string Kind => "invalid"; public void Configure(UiElementSpec spec) { } public void Validate(IUiBindingReader b, string p) { }
+        public string Kind => "invalid"; public void Configure(UiElementSpec spec) { } public void Validate(IUiBindingAccess b, string p) { }
         public float Measure(UiWidgetContext ctx) => 20; public UiMeasurement CaptureMeasurement(UiWidgetContext ctx) => null!; public void Draw(UiLayoutRect rect, UiWidgetContext ctx) { }
     }
     internal sealed class Metrics : ITextMetrics, IUiTextMetricsEnvironment

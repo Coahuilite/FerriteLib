@@ -54,7 +54,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ClickKind, () => new Click
             Run("a declared Id may not forge a deeper path with '/'", VerifyDeclaredIdMayNotForgeADeeperPath);
             Run("per-element state does not cross between unnamed siblings", VerifyStateIsIsolatedBetweenSiblings);
             Run("a throwing sibling does not move the next element's state slot", VerifyThrowerDoesNotLeakTheScope);
-            Run("hover claims carry the element that made them", VerifyHoverClaimCarriesItsElement);
+            Run("hover claims carry the element that made them", VerifyCurrentHelpRefCarriesItsElement);
             Run("a node owns its element's state and survives a re-arrange", VerifyNodeOwnsItsState);
             Run("a namespaced kind no longer shares identity or state", VerifySeparatorKindDoesNotAliasState);
             Run("a node marked dirty forces the next arrange to re-measure", VerifyDirtyNodeForcesReArrange);
@@ -206,7 +206,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ClickKind, () => new Click
         ResetProbe();
         string tab = "TabB";
         var bindings = new UiBindings();
-        bindings.BindValue(UiBindings.ActiveTabKey, () => tab, value => tab = value);
+        bindings.BindValue(UiBindings.ActiveTabBind, () => tab, value => tab = value);
 
         using UiHost host = Host(TabSiblingPage(), bindings);
         NativeFixture.DrawFrame(        host,Viewport);
@@ -393,7 +393,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ClickKind, () => new Click
         }
     }
 
-    private static void VerifyHoverClaimCarriesItsElement()
+    private static void VerifyCurrentHelpRefCarriesItsElement()
     {
         ResetProbe();
         using UiHost host = Host(TwoSiblingPage());
@@ -403,30 +403,30 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ClickKind, () => new Click
         IdentityProbeWidget.ClaimingTag = "A";
         NativeFixture.DrawFrame(        host,Viewport);
         UiNodeId a = IdentityOf("A", "draw");
-        if (!string.Equals(host.Session.HoverClaim, IdentityProbeWidget.HelpKey, StringComparison.Ordinal))
+        if (!string.Equals(host.Session.CurrentHelpRef, IdentityProbeWidget.HelpRef, StringComparison.Ordinal))
         {
             throw new Exception("the hover claim was not presented in the pass that made it");
         }
 
-        if (host.Session.HoverClaimElement != a)
+        if (host.Session.CurrentHelpSource != a)
         {
-            throw new Exception("the claim is not attributed to A: " + host.Session.HoverClaimElement);
+            throw new Exception("the claim is not attributed to A: " + host.Session.CurrentHelpSource);
         }
 
-        host.Session.HoverGraceFrames = 2;
+        host.Session.HelpGracePasses = 2;
         ResetProbe();
         IdentityProbeWidget.ClaimingTag = "B";
         NativeFixture.DrawFrame(        host,Viewport);
         UiNodeId b = IdentityOf("B", "draw");
 
-        if (!string.Equals(host.Session.HoverClaim, IdentityProbeWidget.HelpKey, StringComparison.Ordinal))
+        if (!string.Equals(host.Session.CurrentHelpRef, IdentityProbeWidget.HelpRef, StringComparison.Ordinal))
         {
             throw new Exception("both siblings claim the same string, so the string read cannot distinguish them");
         }
 
-        if (host.Session.HoverClaimElement != b || host.Session.HoverClaimElement == a)
+        if (host.Session.CurrentHelpSource != b || host.Session.CurrentHelpSource == a)
         {
-            throw new Exception("a live claim was not re-attributed to B: " + host.Session.HoverClaimElement);
+            throw new Exception("a live claim was not re-attributed to B: " + host.Session.CurrentHelpSource);
         }
 
         // Two claim-free passes: the first is the boundary that holds the finished claim, the second is
@@ -435,14 +435,14 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ClickKind, () => new Click
         NativeFixture.DrawFrame(        host,Viewport);
         NativeFixture.DrawFrame(        host,Viewport);
 
-        if (!string.Equals(host.Session.HoverClaim, IdentityProbeWidget.HelpKey, StringComparison.Ordinal))
+        if (!string.Equals(host.Session.CurrentHelpRef, IdentityProbeWidget.HelpRef, StringComparison.Ordinal))
         {
             throw new Exception("the grace window did not re-present the held claim");
         }
 
-        if (host.Session.HoverClaimElement != b)
+        if (host.Session.CurrentHelpSource != b)
         {
-            throw new Exception("the held claim lost its element attribution: " + host.Session.HoverClaimElement);
+            throw new Exception("the held claim lost its element attribution: " + host.Session.CurrentHelpSource);
         }
     }
 
@@ -917,7 +917,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ClickKind, () => new Click
 
     // --- fixture -------------------------------------------------------------------------------
 
-    private static UiHost Host(string xml, IUiBindingReader? bindings = null)
+    private static UiHost Host(string xml, IUiBindingAccess? bindings = null)
     {
         return new UiHost(
             Scope,
@@ -1116,7 +1116,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ClickKind, () => new Click
     /// </summary>
     private sealed class IdentityProbeWidget : IUiWidget
     {
-        internal const string HelpKey = "identity-test/help";
+        internal const string HelpRef = "identity-test/help";
 
         private readonly string kind;
 
@@ -1151,7 +1151,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ClickKind, () => new Click
                 : 14f;
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 
@@ -1196,7 +1196,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ClickKind, () => new Click
 
             if (string.Equals(tag, ClaimingTag, StringComparison.Ordinal))
             {
-                ctx.Session.ClaimHover(HelpKey);
+                ctx.Session.PublishHelp(HelpRef);
             }
         }
     }
@@ -1215,7 +1215,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ClickKind, () => new Click
             this.spec = spec;
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
             if (spec.TryGetAttribute("ActionBind", out string action) && action.Length > 0)
             {
@@ -1247,7 +1247,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(Scope, ClickKind, () => new Click
         {
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 

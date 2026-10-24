@@ -31,7 +31,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, Kind,
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindingReader bindings, string elementPath)
+    public void Validate(IUiBindingAccess bindings, string elementPath)
     {
         string bindKey = ReadBindKey();
         bool hasStatic = spec.TryGetAttribute("Points", out string raw) && raw.Trim().Length > 0;

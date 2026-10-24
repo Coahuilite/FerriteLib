@@ -35,10 +35,10 @@ internal static class KernelWritabilityTests
 
     private static void VerifyInterfacePublishesTheRead()
     {
-        MethodInfo? member = typeof(IUiBindingReader).GetMethod("IsWritable");
+        MethodInfo? member = typeof(IUiBindingAccess).GetMethod("IsWritable");
         Check(
             member != null && member.ReturnType == typeof(bool),
-            "IUiBindingReader exposes a bool IsWritable(string) read (the breaking interface addition)");
+            "IUiBindingAccess exposes a bool IsWritable(string) read (the breaking interface addition)");
         Check(typeof(UiBindings).GetMethod("IsWritable") != null, "the reference implementation carries it");
     }
 

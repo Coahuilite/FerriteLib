@@ -8,7 +8,7 @@ The payload remains one net472 DLL. Native1.6 validation and1.7 research remain 
 
 | Previous entry | Current entry and condition |
 | --- | --- |
-| IUiBindings author+reader / IUiTypedChoices companion | UiBindings registration; IUiBindingReader runtime view; UiValueEndpoint/UiChoiceEndpoint |
+| IUiBindings author+reader / IUiTypedChoices companion | UiBindings registration; IUiBindingAccess runtime view; UiValueEndpoint/UiChoiceEndpoint |
 | UiOption, string/typed probes, OptionN XML | UiChoice<T> and BindChoices/BindTrackedChoices; XML Choice child values normalize at the boundary |
 | Register overloads / known-widget prepare whitelist | One UiWidgetDefinition + UiAttributeSchema via Define; complete tracked roles or IUiPresentationDemand |
 | String layout reparsing | UiAttributeValue results shared by compiler/layout/placement/default consumers; diagnostic Text retained |
@@ -18,8 +18,22 @@ The payload remains one net472 DLL. Native1.6 validation and1.7 research remain 
 | Writable UiValueState projections | Shared editor/interaction state machine; explicit typed node-local State for custom-only data |
 | Font XML redirect | Metric Token="Font"; retired Font element is a located invalid document, last-good kept |
 | Drawing helpers using global GUI | UiThemeDraw takes IUiDrawing; independent visuals do not acquire a page prerequisite |
+| IUiBindingReader | IUiBindingAccess: the same read/write/request capability, including ordinary/tracked proxies |
+| HelpKey / Choice.Help / XML Choice Help | HelpRef; constructor named argument helpRef; opaque consumer topic reference |
+| HoverClaim / HoverClaimElement / ClaimHover | CurrentHelpRef / CurrentHelpSource / PublishHelp |
+| HoverGraceFrames / BeginHoverClaimFrame | HelpGracePasses / BeginHelpPass; retain the original pass-based grace sequence |
+| HoverHelpKey | HoveredOptionHelpOutputBind; optional writable string output, not a prerequisite for Session help |
+| VisibleKey / WidthKey / SelectedKey / PayloadKey | VisibleBind / WidthBind / SelectedBind / PayloadBind; actual binding addresses |
+| ActiveTabKey / UiNode.CancelBindingKey | ActiveTabBind / UiNode.CancelBind; literal active-tab address unchanged |
 
-Forwarding IUiBindingReader implementations now return their current registry from BindingOwner.
+Translation TextKey/LabelKey/TitleKey/PlaceholderKey/DescriptionKey stay keys. Real element identity
+parameters and UiNodeId/UiControlKey/item keys stay identities. Registry/access parameters formerly
+called elementId/actionId now say binding/actionBind; migrate named arguments. UiPopup.DrawChoices
+and Controls.PopupOption use popupId because that value is a session-local popup identity, not
+necessarily a declared element or binding. No old aliases remain. Tooltip still takes explicit
+presentable text; the caller translates it, and FL never resolves a help catalog.
+
+Forwarding IUiBindingAccess implementations now return their current registry from BindingOwner.
 This names existing endpoint/presentation capabilities; it does not replace the reader with UiBindings
 or enroll ordinary getters in tracking. Host and DisplayOnly/demand/compound operations consume that
 same owner. Switch backing only between synchronous passes and reacquire retained endpoints.
@@ -27,20 +41,35 @@ Missing or mismatched declared endpoint ownership is diagnosed on widgets, conta
 materialized item subtrees. The shared compiler keeps source/id/path on the error; it does not guess
 arbitrary collection internals. Public ForwardingBindings and the isolated Raven reader use this path.
 
-Omitted or empty Choice.Help means no option-specific help for every value type; Value and Text are
+Omitted or empty Choice.HelpRef means no option-specific help for every value type; Value and Text are
 never inferred as help. This confirmed policy changes two old Dropdown
 HoverHelpKey defaults: string/static rows published Value, while typed rows published Text.
-Preserving either old output requires explicit Help=oldValue or Help=oldText at the author boundary.
-For example, use `new UiChoice<string>(text, value, help: value)` for the old string output, or
-`new UiChoice<int>(text, value, help: text)` for the old typed output. XML authors explicitly set
-`<Choice Value="a" Text="Alpha" Help="a"/>` to preserve the old static value output.
-This is a semantic migration, not a rename. Per-row explicit Help, hover transitions/clearing and
-typed value identity remain supported by the same runtime protocol. An option with no Help clears
-HoverHelpKey and makes no option-level hover claim. Element HelpKey remains available; a consumer's
+Preserving either old output requires explicit HelpRef=oldValue or HelpRef=oldText at the author boundary.
+For example, use `new UiChoice<string>(text, value, helpRef: value)` for the old string output, or
+`new UiChoice<int>(text, value, helpRef: text)` for the old typed output. XML authors explicitly set
+`<Choice Value="a" Text="Alpha" HelpRef="a"/>` to preserve the old static value output.
+This is a semantic migration, not a rename. Per-row explicit HelpRef, hover transitions/clearing and
+typed value identity remain supported by the same runtime protocol. An option with no HelpRef withdraws
+its owned output and falls back to the element HelpRef, including a hovered popup row. A consumer's
 unified help panel and page-overview fallback are not disabled by an option having no help.
 TextKey resolution follows the same normal draw/popup/bounded observation
 label path. BindOptions/GetOptions still serve arbitrary non-choice collections; selection widgets
 require the actual typed choice endpoint and diagnose a value registered in its place.
+
+The optional output is a publisher connection, not an unconditional mirror of whichever pointer the
+last Host saw. An empty/unvisited option only withdraws that publisher's last still-owned value.
+Initial/consumer-written values and another element/Host's newer publication survive, even when the
+topic strings match. This corrects old stale/overbroad clearing behavior. Hide, empty choices, removal,
+popup/Host close and successful backing replacement release the existing connection; failed backing
+validation keeps the prior one. A consumer Set or NotifyChanged relinquishes old publication ownership.
+Unannounced ordinary getter changes retain their ordinary notification conditions; cleanup also compares
+the actual value before writing. A later actual hover can publish again.
+
+Both publication and withdrawal use the owner-bound UiValueEndpoint obtained through access.Value.
+This is the same existing capability selection widgets use, not a universal proxy.Set interception
+promise. The node retains that endpoint so a proxy backing switch cannot redirect old cleanup into
+the new registry. Proxies must forward endpoint and BindingOwner consistently; no access-capture API,
+new switch prerequisite, global publisher table or general lease framework is introduced.
 
 ## Four questions share facts, not four state machines
 
@@ -73,7 +102,7 @@ native contacts by complete relative path and member, including wrong-path negat
 | --- | --- |
 | UiFrame, IUiExecution, UiControlKey, native edit request/result | UiHost/UiSession/UiControls + VerseUiExecution; Adapter.ContractTests and StandaloneNativeNumber |
 | IUiDrawing, UiTextAnchor, UiImage | UiThemeDraw/default+retained paint, image/background layout; VerseUiExecution and independent public author visuals |
-| IUiBindingReader, value/choice endpoints, Choice<T> | All default/custom widgets, UiBindings/presentation/item scopes/observation; public author and isolated source reader |
+| IUiBindingAccess, value/choice endpoints, Choice<T> | All default/custom widgets, UiBindings/presentation/item scopes/observation; public author and isolated source reader |
 | UiAttributeValue/schema/definition/binding roles | Manifest/Create, common root/template compiler, registry/default wrappers, custom author descriptor and Repeat |
 | UiWidgetParts/capability selectors | Public custom author paint and chosen pointer/description composition; engine dispatch reads those selected parts |
 | UiBindingAddress | UiItemBindings, actual Repeat qualification, shared inventory sample and three real-source probes |
@@ -107,7 +136,7 @@ release references at owner close without destroying supplier objects. Ordinary 
 tracked purity/equality, native WindowStack qualification and font validity remain distinct conditions.
 Old custom tracked readers now declare their actual demand; ordinary untracked access is not enrolled.
 
-The three current source migrations do not declare HoverHelpKey: Camera has no selection list;
+The three current source migrations do not declare HoveredOptionHelpOutputBind: Camera has no selection list;
 Nivarian uses typed project choices without a help sink; Raven ToolUi.Select uses typed choices
 without a help sink. Consequently neither old fallback is consumed by these three actual pages.
 Other authors must apply the explicit migration above if they need either old output.

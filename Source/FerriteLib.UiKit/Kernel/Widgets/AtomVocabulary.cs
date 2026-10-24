@@ -46,10 +46,10 @@ internal static class AtomVocabulary
     // vocabulary) plus the two identity names. Listed explicitly so an atom's schema reads as the
     // complete contract instead of "whatever the engine adds on the side" — the shape the six
     // pre-existing core kinds use as well.
-    // Visible/VisibleKey are engine-wide like Hidden: the engine reads them for every kind, so an
+    // Visible/VisibleBind are engine-wide like Hidden: the engine reads them for every kind, so an
     // atom that refused them would reject a page its container accepted.
     private static readonly string[] EngineWideAttributes =
-        { "Id", "Kind", "Tab", "Hidden", "Visible", "VisibleKey", "HelpKey", "SelectedKey", "WidthKey", "WideHidden" };
+        { "Id", "Kind", "Tab", "Hidden", "Visible", "VisibleBind", "HelpRef", "SelectedBind", "WidthBind", "WideHidden" };
 
     /// <summary>
     /// The allowed-attribute array a core atom registers: the engine-wide names, the role names the kind
@@ -157,9 +157,9 @@ internal static class AtomVocabulary
     /// "the value is not there yet" and "the model hands back another type" are ordinary states of a page
     /// that is still drawing, not a reason to replace the slot.
     /// <para>
-    /// The bool read goes through <see cref="IUiBindingReader.TryGetBool"/>, the query P2 added for exactly this
+    /// The bool read goes through <see cref="IUiBindingAccess.TryGetBool"/>, the query P2 added for exactly this
     /// shape, so it needs no exception at all. The generic one has to catch, because
-    /// <see cref="IUiBindingReader.TryGet{T}"/> reports a type mismatch as an <see cref="InvalidOperationException"/>
+    /// <see cref="IUiBindingAccess.TryGet{T}"/> reports a type mismatch as an <see cref="InvalidOperationException"/>
     /// and the surface has no non-throwing typed read for anything else. The catch is narrowed to that one
     /// exception type and the fallback is recorded, so a consumer getter that throws anything else still
     /// reaches the tree's recovery path, and one that throws this type is answered - not silently.
@@ -235,7 +235,7 @@ internal static class AtomVocabulary
     internal static UiResolvedStyle ResolveRole(
         UiElementSpec spec, UiWidgetContext ctx, bool? writable, UiEmphasis defaultEmphasis = UiEmphasis.Normal)
     {
-        // SelectedKey (0.7.x) is the binding-driven SELECTED state, and state beats the author for the same
+        // SelectedBind (0.7.x) is the binding-driven SELECTED state, and state beats the author for the same
         // reason writability does: a consumer that knows the element is selected must not have to re-author
         // its Tone per state. Deliberately not a ToneKey - a binding that hands back "Active" would
         // re-authorise a name this line retired, and the treatment is a state the library already owns.
@@ -248,14 +248,14 @@ internal static class AtomVocabulary
     }
 
     /// <summary>
-    /// The element's bound selected state: true only when <c>SelectedKey</c> is declared and its bool
+    /// The element's bound selected state: true only when <c>SelectedBind</c> is declared and its bool
     /// binding answers true. An unresolvable key is fail-soft (the authored role stands) and is reported
-    /// once through the appearance channel, exactly like <c>VisibleKey</c> - a misspelled key that silently
+    /// once through the appearance channel, exactly like <c>VisibleBind</c> - a misspelled key that silently
     /// painted the unselected look would be the "accepted but did nothing" shape this contract refuses.
     /// </summary>
     internal static bool Selected(UiElementSpec spec, UiWidgetContext ctx)
     {
-        string key = Read(spec, "SelectedKey").Trim();
+        string key = Read(spec, "SelectedBind").Trim();
         if (key.Length == 0) return false;
         if (ctx.Bindings.TryGetBool(key, out bool selected)) return selected;
 

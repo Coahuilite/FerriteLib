@@ -19,7 +19,7 @@ namespace FerriteLib.UiKit.Tests;
 /// <item>one arranged element per accepted item key, published under <c>&lt;templateId&gt;#&lt;itemKey&gt;</c>;</item>
 /// <item>a row's controls resolve <c>done</c> against <c>&lt;items&gt;.&lt;key&gt;.done</c>, never against a
 /// page-level key of the same name - the "row reads its own item, not a global selection" claim;</item>
-/// <item>the same for <c>SelectedKey</c>: "which row is selected" is one row's answer, so exactly one row
+/// <item>the same for <c>SelectedBind</c>: "which row is selected" is one row's answer, so exactly one row
 /// carries the active treatment even while the page-level binding of the same name answers <c>true</c>;</item>
 /// <item>a reorder moves the geometry and leaves each key's node and state where they were;</item>
 /// <item>an insert touches only the inserted key;</item>
@@ -54,7 +54,7 @@ internal static class KernelRepeatTests
         RegisterProbeKind();
         Run("A row set renders one element per item key", VerifyRowSetRendersPerKey);
         Run("A row reads its own item scope, not the page's key of the same name", VerifyItemLocalScope);
-        Run("SelectedKey answers per row, not for the page the row set sits on", VerifySelectedKeyIsPerRow);
+        Run("SelectedBind answers per row, not for the page the row set sits on", VerifySelectedBindIsPerRow);
         Run("Reordering moves the geometry and keeps each key's node and state", VerifyReorderKeepsState);
         Run("Inserting a key does not renumber the rows that already exist", VerifyInsertDoesNotRenumber);
         Run("Insert/remove cycles accumulate no nodes, widget instances or materialization", VerifyCyclesDoNotAccumulate);
@@ -114,15 +114,15 @@ internal static class KernelRepeatTests
     }
 
     /// <summary>
-    /// B1 (2026-09-22): the item-scope table carries <c>SelectedKey</c> too, because "which row is
+    /// B1 (2026-09-22): the item-scope table carries <c>SelectedBind</c> too, because "which row is
     /// selected" is one row's answer and not the page's - the same criterion that deliberately keeps
     /// <c>Tab</c> out of that table. The observable is the number of rows painted with the active
-    /// treatment: the template declares <c>SelectedKey="selected"</c> once, every row reads it, and the
+    /// treatment: the template declares <c>SelectedBind="selected"</c> once, every row reads it, and the
     /// page-level binding of that very name is a decoy answering <c>true</c>. A row that resolved against
     /// the page instead of its own item scope lights every row - which is the defect the consumer hit,
     /// where a data-driven row set could not say which of its rows was the selected one.
     /// </summary>
-    private static void VerifySelectedKeyIsPerRow()
+    private static void VerifySelectedBindIsPerRow()
     {
         UiFitAudit.Reset();
         UiTheme theme = UiTheme.Vanilla;
@@ -138,7 +138,7 @@ internal static class KernelRepeatTests
         };
         var bindings = new UiBindings();
         bindings.BindReadOnly<IReadOnlyList<string>>("items", () => keys, UiInvalidation.Structure);
-        // The decoy: the page-level key the template's SelectedKey names. It answers true, so every row
+        // The decoy: the page-level key the template's SelectedBind names. It answers true, so every row
         // that reads the page scope instead of its own item scope goes active.
         bindings.BindReadOnly<bool>("selected", () => true);
         for (int i = 0; i < keys.Count; i++)
@@ -148,7 +148,7 @@ internal static class KernelRepeatTests
         }
 
         using var host = new UiHost(
-            Scope, UiLayoutManifest.Parse(SelectedKeyPageXml), bindings, theme, new StubMetrics(), new StubTranslation());
+            Scope, UiLayoutManifest.Parse(SelectedBindPageXml), bindings, theme, new StubMetrics(), new StubTranslation());
 
         UiLayoutSnapshot snapshot = Arrange(host);
         List<UiLayoutRect> active = ActiveRuleRects(activeEdge);
@@ -171,7 +171,7 @@ internal static class KernelRepeatTests
         // A future-regression guard rather than the mutation-proving half: with every item key bound,
         // nothing takes the fail-soft path - the silence a correctly scoped page has to keep.
         Check(UiFitAudit.StyleFallbackCount == 0,
-            "no row needed the fail-soft path: every SelectedKey resolved in its own item scope");
+            "no row needed the fail-soft path: every SelectedBind resolved in its own item scope");
     }
 
     /// <summary>
@@ -615,19 +615,19 @@ internal static class KernelRepeatTests
         + "</Row>"
         + "</Templates>"
         + "<Column Id=\"page\" Gap=\"4\">"
-        + "<Repeat Id=\"rows\" Items=\"items\" Template=\"row\" Gap=\"4\" VisibleKey=\"show-rows\" />"
+        + "<Repeat Id=\"rows\" Items=\"items\" Template=\"row\" Gap=\"4\" VisibleBind=\"show-rows\" />"
         + "</Column>"
         + "</UiPage>";
 
     /// <summary>
-    /// The B1 page: one rule per row, and the only key the row declares is <c>SelectedKey</c>. A rule
+    /// The B1 page: one rule per row, and the only key the row declares is <c>SelectedBind</c>. A rule
     /// carries no binding of its own, so the active border is the sole thing a row can be telling us.
     /// </summary>
-    private const string SelectedKeyPageXml =
+    private const string SelectedBindPageXml =
         "<UiPage Schema=\"2\" Source=\"" + Scope + "\">"
         + "<Templates>"
         + "<Row Id=\"row\" Gap=\"2\" Padding=\"2\">"
-        + "<Widget Id=\"pick\" Kind=\"chrome/rule\" Height=\"8\" SelectedKey=\"selected\" />"
+        + "<Widget Id=\"pick\" Kind=\"chrome/rule\" Height=\"8\" SelectedBind=\"selected\" />"
         + "</Row>"
         + "</Templates>"
         + "<Column Id=\"page\" Gap=\"4\">"
@@ -942,7 +942,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
             this.spec = spec;
         }
 
-        public void Validate(IUiBindingReader bindings, string elementPath)
+        public void Validate(IUiBindingAccess bindings, string elementPath)
         {
         }
 
@@ -986,7 +986,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     /// <summary>
     /// D4's viewport count, pinned on the real structures: the budget is read from the SAME round's
     /// measured row roots - the Repeat transparently expands to one entry per materialized row, a hidden
-    /// sibling (the consumer's empty-state under VisibleKey) contributes nothing, a declared numeric Height
+    /// sibling (the consumer's empty-state under VisibleBind) contributes nothing, a declared numeric Height
     /// keeps its static priority, bad declarations are creation refusals, and an items change re-budgets
     /// through the existing invalidation.
     /// <list type="bullet">
@@ -1083,13 +1083,13 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
                 "and the reservation happened: content is 16 narrower than the viewport");
         }
 
-        // (4) the consumer's real shape: Repeat plus an empty state behind VisibleKey. Three rows and a
+        // (4) the consumer's real shape: Repeat plus an empty state behind VisibleBind. Three rows and a
         // hidden empty under k=3.5 -> the count sees three rows -> natural. Count the hidden widget and the
         // viewport lands mid-empty instead of at natural; count the Repeat as one blob and it lands at the
         // first row's bottom - both redder than this equality.
         using (UiHost host = RowsHost(
                    VisibleRowsPage(" VisibleRows=\"3.5\"",
-                       "<Widget Id=\"empty\" Kind=\"state/empty\" Text=\"nothing\" VisibleKey=\"has-items\" />"),
+                       "<Widget Id=\"empty\" Kind=\"state/empty\" Text=\"nothing\" VisibleBind=\"has-items\" />"),
                    new List<string> { "a", "b", "c" }, false))
         {
             UiLayoutSnapshot s = host.MeasureAndArrange(new UiLayoutPoint(400f, 400f));
@@ -1107,7 +1107,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         // (5) empty list, visible empty state: one countable entry under k=4.5 -> natural, no reservation.
         using (UiHost host = RowsHost(
                    VisibleRowsPage(" VisibleRows=\"4.5\"",
-                       "<Widget Id=\"empty\" Kind=\"state/empty\" Text=\"nothing\" VisibleKey=\"has-items\" />"),
+                       "<Widget Id=\"empty\" Kind=\"state/empty\" Text=\"nothing\" VisibleBind=\"has-items\" />"),
                    new List<string>(), true))
         {
             UiLayoutSnapshot s = host.MeasureAndArrange(new UiLayoutPoint(400f, 400f));

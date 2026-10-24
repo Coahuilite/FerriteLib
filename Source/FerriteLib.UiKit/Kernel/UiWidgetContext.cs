@@ -55,7 +55,7 @@ public sealed class UiWidgetContext
 
     public IUiTranslation Translation { get; }
 
-    public IUiBindingReader Bindings { get; }
+    public IUiBindingAccess Bindings { get; }
     public bool IsActive => Session.IsActive;
     public bool IsDisabled => Node.IsDisabled;
     public float SharedLabelWidth => Node.SharedLabelWidth;
@@ -130,7 +130,7 @@ public sealed class UiWidgetContext
         ITextMetrics metrics,
         UiTheme theme,
         IUiTranslation translation,
-        IUiBindingReader bindings,
+        IUiBindingAccess bindings,
         float viewWidth,
         string elementPath,
         UiLayoutPoint windowOrigin = default,

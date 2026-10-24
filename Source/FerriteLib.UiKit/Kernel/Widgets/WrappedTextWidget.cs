@@ -54,7 +54,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
     }
 
-    public void Validate(IUiBindingReader bindings, string elementPath)
+    public void Validate(IUiBindingAccess bindings, string elementPath)
     {
         if (spec.TryGetAttribute("Bind", out string bindKey) && bindKey.Length > 0)
         {
@@ -150,7 +150,7 @@ ctx.Drawing,            new UiLayoutRect(rect.X, rect.Y + pad, rect.Width, Math.
     /// leaf paints its empty default, keeps the band it reserves for an empty string, and records one
     /// deduplicated report through the same bounded channel the collection kinds use
     /// (<see cref="AtomVocabulary.ReportUnresolved"/>). A key bound to another type is an authoring defect and
-    /// keeps its own answer: <see cref="IUiBindingReader.TryGet{T}"/> raises it, the tree's guard replaces the slot
+    /// keeps its own answer: <see cref="IUiBindingAccess.TryGet{T}"/> raises it, the tree's guard replaces the slot
     /// with one recovery band, and the trip is recorded once per slot. A <b>page-level</b> <c>Bind</c> nobody
     /// registered reaches neither branch, because <see cref="Validate"/> refuses it at Host creation - the
     /// fail-soft rule is about keys that can be unresolved at runtime, not about tolerating a manifest typo.

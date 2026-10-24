@@ -416,7 +416,7 @@ internal static class KernelToneVocabularyTests
         return attributes;
     }
 
-    private static UiWidgetContext Context(UiSession session, UiTheme theme, IUiBindingReader bindings, float viewWidth)
+    private static UiWidgetContext Context(UiSession session, UiTheme theme, IUiBindingAccess bindings, float viewWidth)
     {
         return NativeFixture.Context(Scope, session, new StubMetrics(), theme, new StubTranslation(), bindings, viewWidth, "root");
     }

@@ -70,7 +70,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     /// <c>string</c> payload - the row key, which is the only thing the consumer cannot already know),
     /// and a declared <c>RowHeight</c> that has to be a positive number if it is written at all.
     /// </summary>
-    public void Validate(IUiBindingReader bindings, string elementPath)
+    public void Validate(IUiBindingAccess bindings, string elementPath)
     {
         string key = ReadBindKey();
         if (key.Length == 0)

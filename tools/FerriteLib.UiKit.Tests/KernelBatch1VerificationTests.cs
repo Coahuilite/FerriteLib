@@ -856,7 +856,7 @@ internal static class KernelBatch1VerificationTests
         return template.Replace("{0}", first).Replace("{1}", second);
     }
 
-    private static UiHost NewHost(string xml, UiStyleDocument? document = null, IUiBindingReader? bindings = null, UiTheme? theme = null)
+    private static UiHost NewHost(string xml, UiStyleDocument? document = null, IUiBindingAccess? bindings = null, UiTheme? theme = null)
     {
         return new UiHost(
             Scope,
@@ -899,7 +899,7 @@ internal static class KernelBatch1VerificationTests
         Check(Near(rect.Y, expectedY), what + " (y=" + rect.Y + ", expected " + expectedY + ")");
     }
 
-    private static void ExpectRejected(string xml, string attribute, string value, string pathFragment, IUiBindingReader? bindings = null, bool requireValue = true)
+    private static void ExpectRejected(string xml, string attribute, string value, string pathFragment, IUiBindingAccess? bindings = null, bool requireValue = true)
     {
         try
         {
@@ -917,7 +917,7 @@ internal static class KernelBatch1VerificationTests
         }
     }
 
-    private static void ExpectAccepted(string xml, IUiBindingReader? bindings, string what)
+    private static void ExpectAccepted(string xml, IUiBindingAccess? bindings, string what)
     {
         try
         {
@@ -930,7 +930,7 @@ internal static class KernelBatch1VerificationTests
         }
     }
 
-    private static void CheckAccepted(string xml, IUiBindingReader? bindings, string what)
+    private static void CheckAccepted(string xml, IUiBindingAccess? bindings, string what)
     {
         ExpectAccepted(xml, bindings, what);
     }

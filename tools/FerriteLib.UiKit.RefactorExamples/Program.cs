@@ -42,8 +42,8 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("author","author/visual",()=>new 
         var interactions=new UiInteractionSession();var target=new UiInteractionTarget("business","operation");int independent=0;
         UiInteractionRequests.Activation(target,interactions.Activate(target,new UiInputEligibility(true)),()=>independent++);
         Check(execution.Texts.Count>paints&&independent==1,"independent C# visual and headless behavior require neither Host nor fabricated node/rect");
-        var staticXml=UiLayoutManifest.Parse("<UiPage Schema='2' Source='author'><Widget Id='static' Kind='input/dropdown'><Choice Value='a' Text='Alpha' Help='a-help'/></Widget></UiPage>");
-        Check(staticXml.Roots[0].Choices[0].Value=="a"&&staticXml.Roots[0].Choices[0].Help=="a-help","XML static choices normalize into same label/value/help carrier");
+        var staticXml=UiLayoutManifest.Parse("<UiPage Schema='2' Source='author'><Widget Id='static' Kind='input/dropdown'><Choice Value='a' Text='Alpha' HelpRef='a-help'/></Widget></UiPage>");
+        Check(staticXml.Roots[0].Choices[0].Value=="a"&&staticXml.Roots[0].Choices[0].HelpRef=="a-help","XML static choices normalize into same label/value/help carrier");
         var currentB=new Row{Key="b",Text="current-b"};rows=new[]{replacement,new Row{Key="c",Text="c"},currentB};items.Refresh();
         var operation=Layout().RectById["apply#b"];var operationPoint=new UiLayoutPoint(operation.X+operation.Width/2,operation.Y+operation.Height/2);
         Frame(UiFramePhase.MouseDown,operationPoint);Frame(UiFramePhase.MouseUp,operationPoint);
@@ -66,6 +66,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("author","author/visual",()=>new 
         TypedLayout();
         ProxyContracts();
         RootOwnerContracts();
+        HelpContracts();
         Console.WriteLine("REFACTOR-AUTHOR assertions="+assertions+" writes="+writes+" choice="+choice+" replacement-hits="+replacement.Hits);
     }
     static void TypedLayout()
@@ -103,7 +104,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("author","author/visual",()=>new 
         public static int Draws;
         public string Kind=>"author/visual";
         public void Configure(UiElementSpec spec){}
-        public void Validate(IUiBindingReader bindings,string path){}
+        public void Validate(IUiBindingAccess bindings,string path){}
         public float Measure(UiWidgetContext ctx)=>30;
         public void Draw(UiLayoutRect rect,UiWidgetContext ctx){Draws++;UiThemeDraw.Label(ctx.Drawing,rect,"custom-public",ctx.Theme);}
     }
