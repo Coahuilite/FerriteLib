@@ -30,6 +30,13 @@ successful seal; snapshots carry the accepted revision. File-backed UiDocumentSe
 bounded watcher/scheduler, preflight-across-hosts, batch rollback and last-good behavior; program updates
 do not create another file or update service.
 
+Owned option-output withdrawal during seal uses the same warning policy as node-owned release callbacks.
+Its setter may fail; that cleanup error is reported after the remaining node/capture cleanup, without
+pretending an already sealed tree was rolled back. A successful UpdateDefinition / accepted document
+report still means the new tree committed across all affected hosts. Compatible reliable drafts stay;
+failed output cleanup is not retried. Prepare/staging refusal and whole-batch rollback are unchanged.
+Dynamic Repeat node removal applies the same owned-release rule and finishes all doomed nodes.
+
 ## Repeat keeps the item scope and its old failure conditions
 
 A named template is instantiated under each accepted stable item key. Reorder moves geometry without

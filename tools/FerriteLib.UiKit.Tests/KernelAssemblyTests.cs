@@ -23,6 +23,8 @@ internal static class KernelAssemblyTests
             UiWidgetRegistry.InitializeCore();
             ProgramAndUpdate();
             KeyedBindingRoles();
+            RemovalOutputFailure();
+            DynamicRemovalOutputFailure();
             return 0;
         }
         catch (Exception ex)
@@ -35,6 +37,108 @@ internal static class KernelAssemblyTests
             Event.current = null;
             GUIUtility.hotControl = 0;
             NativeFixture.DebugMousePositionEnabled = false;
+        }
+    }
+    private static void DynamicRemovalOutputFailure()
+    {
+        var keys = new List<string> { "a", "b" };
+        var values = new Dictionary<string, string> { ["a"] = "", ["b"] = "" };
+        int clears = 0, releases = 0;
+        var warnings = new List<string>();
+        var bindings = new UiBindings();
+        bindings.BindReadOnly<IReadOnlyList<string>>("items", () => keys);
+        foreach (string key in keys)
+        {
+            string item = key;
+            bindings.BindReadOnly(new UiBindingAddress("items", item, "choice").Key, () => "a");
+            bindings.BindValue(new UiBindingAddress("items", item, "help").Key, () => values[item], next =>
+            { values[item] = next; if (next.Length == 0) { clears++; throw new InvalidOperationException("dynamic-output-clear-fault"); } });
+        }
+        var page = UiLayoutManifest.Parse("<UiPage Schema='2' Source='dynamic-help'><Templates><Column Id='item' Padding='0' Gap='0'><Widget Id='pick' Kind='input/mode-row' Bind='choice' HoveredOptionHelpOutputBind='help'><Choice Text='Alpha' Value='a' HelpRef='topic'/></Widget></Column></Templates><Repeat Id='rows' Items='items' Template='item' Padding='0' Gap='0'/></UiPage>");
+        using var host = new UiHost("dynamic-help", page, bindings, UiTheme.Vanilla, new Metrics(), new Translation());
+        host.Session.Warning = warnings.Add;
+        Event.current = new Event { type = EventType.Repaint, mousePosition = VerseUiExecution.Point(new UiLayoutPoint(20, 18)) };
+        NativeFixture.DrawFrame(host, new UiLayoutRect(0, 0, 300, 600));
+        host.Session.GetNodeByElementId("pick#a")!.GetState("owned", () => new object(), _ => releases++);
+        host.Session.GetNodeByElementId("pick#b")!.GetState("owned", () => new object(), _ => releases++);
+        keys.Clear(); bindings.NotifyChanged("items");
+        Exception? failure = null;
+        try { Event.current = new Event { type = EventType.Repaint }; NativeFixture.DrawFrame(host, new UiLayoutRect(0, 0, 300, 600)); }
+        catch (Exception error) { failure = error; }
+        Check(failure == null && releases == 2 && host.Session.GetNodeByElementId("pick#a") == null
+            && host.Session.GetNodeByElementId("pick#b") == null, "dynamic Repeat removal completes every doomed node even if one owned output setter throws");
+        Check(warnings.Any(w => w.Contains("dynamic-output-clear-fault")) && clears == 1 && values["a"] == "",
+            "dynamic removal reports its actual release fault without a partial layout rollback");
+        Event.current = new Event { type = EventType.Repaint }; NativeFixture.DrawFrame(host, new UiLayoutRect(0, 0, 300, 600));
+        Check(clears == 1 && releases == 2, "next dynamic frame cannot replay already-ended release effects");
+    }
+    private static void RemovalOutputFailure()
+    {
+        const string beforeXml = "<UiPage Schema='2' Source='remove-help'><Column Id='root' Padding='0' Gap='0'><Widget Id='mode' Kind='input/mode-row' Bind='choice' HoveredOptionHelpOutputBind='help'/><Widget Id='other' Kind='chrome/rule' Height='24'/><Widget Id='keep' Kind='input/number-field' Bind='value' Max='100'/><Widget Id='drag' Kind='input/slider' Bind='value' Min='0' Max='100'/></Column></UiPage>";
+        const string afterXml = "<UiPage Schema='2' Source='remove-help'><Column Id='root' Padding='0' Gap='0'><Widget Id='keep' Kind='input/number-field' Bind='value' Max='100'/><Widget Id='drag' Kind='input/slider' Bind='value' Min='0' Max='100'/></Column></UiPage>";
+        foreach (bool batch in new[] { false, true })
+        {
+            string help = ""; float value = 10; int clears = 0, writes = 0, releases = 0;
+            var warnings = new List<string>();
+            var bindings = new UiBindings();
+            bindings.BindValue("value", () => value, next => { value = next; writes++; });
+            bindings.BindReadOnly("choice", () => "a");
+            bindings.BindChoices("choice", () => new[] { new UiChoice<string>("Alpha", "a", "topic/a") });
+            bindings.BindValue("help", () => help, next => { help = next; if (next.Length == 0) { clears++; throw new InvalidOperationException("remove-output-clear-fault"); } });
+            using var host = new UiHost("remove-help", UiLayoutManifest.Parse(beforeXml), bindings, UiTheme.Vanilla, new Metrics(), new Translation());
+            using var other = new UiHost("remove-help", UiLayoutManifest.Parse(beforeXml), bindings, UiTheme.Vanilla, new Metrics(), new Translation());
+            using var service = new UiDocumentService(autoWatch: false);
+            string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "fl08-help-seal-" + Guid.NewGuid().ToString("N") + ".xml");
+            try
+            {
+                if (batch)
+                {
+                    System.IO.File.WriteAllText(path, beforeXml);
+                    Check(service.Add(new UiDocumentSource("help", UiDocumentKind.Layout, path), beforeXml)
+                        && service.Attach(host, "help") && service.Attach(other, "help"), "real multi-Host document transaction attaches both owners");
+                }
+                host.Session.Warning = warnings.Add;
+                Event.current = new Event { type = EventType.Repaint, mousePosition = VerseUiExecution.Point(new UiLayoutPoint(20, 18)) };
+                NativeFixture.DrawFrame(host, new UiLayoutRect(0, 0, 300, 600));
+                UiNode mode = host.Session.GetNodeByElementId("mode")!, removedOther = host.Session.GetNodeByElementId("other")!;
+                mode.GetState("owned", () => new object(), _ => releases++);
+                removedOther.GetState("owned", () => new object(), _ => releases++);
+                UiNode keep = host.Session.GetNodeByElementId("keep")!;
+                var numeric = new UiNumericEdit(0, 100);
+                UiEditSession<float> editor = NativeFixture.Editor<float>(host.CreateContext(300).WithNode(keep), "value", numeric.Format, numeric.Parse);
+                editor.Observe(value); editor.Focus(); editor.Input("20", true, false, false, _ => writes++, () => value);
+                host.Session.NoteEditOpened(keep.GetOrCreateState("value"), keep);
+                UiControlKey capture = host.Session.Controls.GetControlId("help-seal-capture");
+                host.Session.CaptureHotControlForNode(capture, host.Session.GetNodeByElementId("drag")!);
+                UiLayoutManifest previous = host.Manifest;
+                int revision = host.DefinitionRevision, otherRevision = other.DefinitionRevision;
+                Exception? failure = null;
+                UiReloadReport? report = null;
+                try
+                {
+                    if (batch) { System.IO.File.WriteAllText(path, afterXml); report = service.Reload("help"); }
+                    else host.UpdateDefinition(UiLayoutManifest.Parse(afterXml));
+                }
+                catch (Exception error) { failure = error; }
+                bool rolledBack = ReferenceEquals(host.Manifest, previous);
+                Console.WriteLine("  SEAL-OBS batch=" + batch + " threw=" + failure?.GetType().Name + " oldTree=" + rolledBack
+                    + " revision=" + revision + "->" + host.DefinitionRevision + " releases=" + releases
+                    + " capture=" + host.Session.OwnedHotControl.HasValue + " clearAttempts=" + clears + " warnings=" + warnings.Count);
+                Check(rolledBack ? host.DefinitionRevision == revision && releases == 0
+                    : host.DefinitionRevision == revision + 1 && releases == 2 && !host.Session.OwnedHotControl.HasValue,
+                    "output cleanup fault cannot leave old definition with advanced revision or skip sibling cleanup/capture release");
+                Check(failure == null && !rolledBack && (!batch || (report?.Accepted == true && report.HostsCommitted == 2
+                    && other.DefinitionRevision == otherRevision + 1 && !other.Manifest.Roots[0].Children.Any(c => c.Id == "mode"))),
+                    "owned release warning follows existing cleanup policy: program success / accepted entire document batch means the new tree is committed");
+                Check(warnings.Any(w => w.Contains("remove-output-clear-fault")) && help == "" && clears == 1
+                    && ReferenceEquals(keep.GetOrCreateState("value").Editor, editor) && editor.Draft == "20" && writes == 0,
+                    "cleanup error is visible, compatible reliable draft survives and no draft/model request is published");
+                if (batch) service.Reload("help"); else host.UpdateDefinition(UiLayoutManifest.Parse(afterXml));
+                Event.current = new Event { type = EventType.Repaint };
+                NativeFixture.DrawFrame(host, new UiLayoutRect(0, 0, 300, 600));
+                Check(clears == 1 && releases == 2 && writes == 0, "same-version/update/paint does not replay failed release or already-ended owned cleanup");
+            }
+            finally { if (System.IO.File.Exists(path)) System.IO.File.Delete(path); }
         }
     }
     private static UiElementSpec Spec(string id, string kind, params (string Key, string Value)[] attributes)

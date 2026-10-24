@@ -33,6 +33,17 @@ internal static class KernelDocumentReloadTests
 
     private static int failures;
 
+    internal static int RunCommitBoundaries()
+    {
+        failures = 0;
+        string sandbox = Path.Combine(Path.GetTempPath(), "ferritelib-commit-boundaries-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(sandbox);
+        Run("Original staging rollback keeps interaction state", () => VerifyRolledBackBatchKeepsInteractionState(sandbox));
+        Run("Original shared style preflight/rollback is atomic", () => VerifyStyleBatchAtomicity(sandbox));
+        Run("Original disposed-between-stage-and-seal boundary", () => VerifyDisposedHostBetweenStageAndSeal(sandbox));
+        return failures;
+    }
+
     public static int RunAll()
     {
         failures = 0;
@@ -1668,4 +1679,10 @@ internal static class KernelDocumentReloadTests
             Console.Error.WriteLine("  FAIL: " + name);
         }
     }
+}
+
+// Directed entry only: reuses original assertions without running watcher/scheduler/file matrices.
+internal static class KernelDocumentCommitBoundaryTests
+{
+    public static int RunAll() => KernelDocumentReloadTests.RunCommitBoundaries();
 }

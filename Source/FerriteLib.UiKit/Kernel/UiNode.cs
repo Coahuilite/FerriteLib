@@ -43,16 +43,20 @@ public sealed class UiNode
         var releases=new List<Action>(customRelease.Values);customRelease.Clear();customState.Clear();
         foreach(var release in releases)try{release();}catch(Exception error){session.ReportWarning("[FerriteLib.UiKit] node state release failed at '"+Path+"': "+error);}
     }
-    internal void ReleaseState()
+    internal void ReleaseState(bool throwOutputFailure = false)
     {
         if(released)return;released=true;
+        string? outputWarning = null;
         try { Widgets.OptionHelp.Release(this); }
+        catch (Exception outputFailure) when (!throwOutputFailure && outputFailure is not OutOfMemoryException)
+        { outputWarning = "[FerriteLib.UiKit] node removed; option output release failed at '" + Path + "': " + outputFailure; }
         finally
         {
             ResetCustomState();
             foreach(var slot in slots.Values){if(slot.Editor is IUiEditState editor)editor.Suspend();slot.Editor=null;slot.EditorTarget=null;slot.ChartIdentity=null;}
             slots.Clear();EditingState=null;children.Clear();Parent=null;
         }
+        if (outputWarning != null) session.ReportCleanupWarning(outputWarning);
     }
     private readonly Dictionary<string, UiControlState> slots = new(StringComparer.Ordinal);
     private readonly List<UiNode> children = new();

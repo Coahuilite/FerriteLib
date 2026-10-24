@@ -28,6 +28,12 @@ public sealed class UiSession : IDisposable
     }
     public Action<string>? Warning { get; set; }
     internal void ReportWarning(string message){if(Warning!=null)Warning(message);else if(execution!=null)execution.Warning(message);else System.Diagnostics.Trace.TraceWarning(message);}
+    internal void ReportCleanupWarning(string message)
+    {
+        try { ReportWarning(message); }
+        catch (Exception observerFailure) when (observerFailure is not OutOfMemoryException)
+        { System.Diagnostics.Trace.TraceError(message + "\nThe cleanup warning observer also failed: " + observerFailure); }
+    }
     public UiFrame Input { get; private set; } = new UiFrame(UiFramePhase.None, inputAllowed:false);
     private IUiExecution? execution;
     internal IUiExecution? CurrentExecution => execution;
@@ -1411,7 +1417,7 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
         }
 
         scrollPositions.Clear();
-        foreach (UiNode node in nodes.Values) Cleanup(() => {SuspendNodeEditors(node);node.ReleaseState();});
+        foreach (UiNode node in nodes.Values) Cleanup(() => {SuspendNodeEditors(node);node.ReleaseState(throwOutputFailure: true);});
         nodes.Clear();
         dirtyNodes.Clear();
         trippedNodes.Clear();

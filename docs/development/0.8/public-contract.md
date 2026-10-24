@@ -89,6 +89,12 @@ selection controls already do. A node retains it for old-owner cleanup across a 
 there is no new switch prerequisite or universal proxy.Get/Set interception promise. Registered value
 setters/notifications and reactive purity/operation rules remain effective. Unexpected output failures
 are reported; a completed selection and a failed withdrawal are not retried on later paint or close.
+At definition seal or dynamic node removal, withdrawal follows the existing node-owned release-warning
+policy: finish the other releases and report the failed cleanup through Session.Warning/native logging.
+UpdateDefinition success and UiReloadReport.Accepted still mean the new definition committed; cleanup
+does not turn that into a failed return plus a tree-only rollback. Compatible drafts remain, reload
+capture is released, and prepare/staging failures retain the original all-host rollback. Session.Close
+still aggregates its own cleanup failures after logical close.
 Final affected public freeze and downstream fixed consumption remain PM acceptance actions.
 
 ## S3 — connect stable items to current business targets

@@ -739,13 +739,19 @@ public sealed partial class UiHost : IDisposable
         pendingDocumentCommit = false;
         if (SessionDisposed) return;
         if (committed) session.DefinitionRevision++;
+        var outputReleaseWarnings = new List<string>();
 
         if (previous != null)
         {
-            PruneDetachedState(previous, manifest);
+            PruneDetachedState(previous, manifest, outputReleaseWarnings);
         }
 
         ReleaseHotControlForReload();
+        // Like node-owned custom release callbacks, an output withdrawal is cleanup, not a new
+        // prepare/stage refusal. Finish every node/capture before reporting it; accepted still means
+        // the new definition is committed, never an exception followed by a tree-only "rollback".
+        foreach (string warning in outputReleaseWarnings)
+            session.ReportCleanupWarning(warning);
     }
 
     /// <summary>
@@ -957,7 +963,7 @@ public sealed partial class UiHost : IDisposable
     /// different control. A widget's own sub-nodes - minted under the element and absent from the element
     /// map - go with their element. A node that survives both identity and kind keeps everything.
     /// </summary>
-    private void PruneDetachedState(UiLayoutManifest previous, UiLayoutManifest next)
+    private void PruneDetachedState(UiLayoutManifest previous, UiLayoutManifest next, List<string> outputReleaseWarnings)
     {
         Dictionary<UiNodeId, string> before = ElementKinds(previous);
         if (before.Count == 0) return;
@@ -972,14 +978,16 @@ public sealed partial class UiHost : IDisposable
             UiNode? node = session.GetNode(entry.Key);
             if (node != null)
             {
-                ResetDetachedState(node, after);
+                ResetDetachedState(node, after, outputReleaseWarnings);
             }
         }
     }
 
-    private void ResetDetachedState(UiNode node, Dictionary<UiNodeId, string> survivors)
+    private void ResetDetachedState(UiNode node, Dictionary<UiNodeId, string> survivors, List<string> outputReleaseWarnings)
     {
-        Widgets.OptionHelp.Release(node);
+        try { Widgets.OptionHelp.Release(node); }
+        catch (Exception outputFailure) when (outputFailure is not OutOfMemoryException)
+        { outputReleaseWarnings.Add("[FerriteLib.UiKit] definition committed; option output release failed at '" + node.Path + "': " + outputFailure); }
         node.EditingState = null;
         node.ResetCustomState();
         ResetState(node.State);
@@ -1000,7 +1008,7 @@ public sealed partial class UiHost : IDisposable
             // An element child the new tree still carries keeps its own state; everything else under a
             // removed or kind-changed element - sub-nodes included - is part of what has to be cleaned up.
             if (survivors.ContainsKey(child.Id)) continue;
-            ResetDetachedState(child, survivors);
+            ResetDetachedState(child, survivors, outputReleaseWarnings);
         }
     }
 
