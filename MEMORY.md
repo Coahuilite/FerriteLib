@@ -15,10 +15,12 @@ old-chain removals and author prerequisites. No0.7 compatibility shape is silent
 The confirmed explicit-only Choice.HelpRef policy, adjacent Ref/Key/Bind naming and both old-default
 migration paths are in that contract. Session topic/grace and optional owned endpoint output have
 different lifetimes; public-contract.md describes them without a panel or access-capture framework.
-PM has accepted that technical contract and US has consumed the fixed source input. RC preparation
-now follows the existing CI/Release path; remote RC-asset consumption is distinct from that completed
-integration. Current publication actions are in TODO.md. Known headless game errors are accepted as
-non-blocking for this transition; native acceptance and the next-session UI/UX work remain open.
+PM has accepted that technical contract and US has consumed the fixed source input.
+[v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1) is published as a non-latest prerelease from
+`a0b5b983c3c13a099c62d936305eaebaf1deb5a8`. US acceptance against that published RC remains in
+progress, separate from the completed fixed-input integration. Current follow-up actions are in TODO.md.
+Known headless game errors are accepted as non-blocking for this transition; native acceptance and the
+next-session UI/UX work remain open.
 
 Accepted RU1–RU3 production foundations and their applicable evidence remain in the reactive, layout-reuse
 and failure-lifetime contracts. Closeout adds native composite-capture precedence, normal-return-before-

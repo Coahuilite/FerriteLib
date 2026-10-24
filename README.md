@@ -8,7 +8,9 @@ no patches, no languages, no textures: enabling it alone changes nothing in the 
 your mod list without a consumer installed, that consumer was uninstalled or disabled; the mod is safe
 to disable only when no enabled mod depends on it.
 
-**Development line: 0.8.0 release-candidate preparation.** See the [active specification](docs/development/0.8/README.md), [complete migration inventory](docs/development/0.8/migration-status.md) and [candidate usage](docs/consumers/consume-from-0.8.0-dev.md). The complete retained core is now same-source engine-free, with explicit1.6 execution and the full capability inventory. See the [breaking author migration](docs/development/0.8/refactor-migration.md). Fixed-source US integration is accepted; published RC-asset consumption remains the next step. Native1.6/UIUX acceptance and a compiled/native1.7 adapter remain open. Known headless game errors are accepted as non-blocking for this RC transition, not as error-free gameplay.
+**Released: [v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1)**, a non-latest prerelease from commit [`a0b5b983`](https://github.com/Coahuilite/FerriteLib/commit/a0b5b983c3c13a099c62d936305eaebaf1deb5a8). Fixed-source US integration is accepted; US acceptance against the published RC asset is in progress. Native1.6/UIUX acceptance and a compiled/native1.7 adapter remain open. Known headless game errors are accepted as non-blocking for this RC transition, not as error-free gameplay.
+
+See the [active specification](docs/development/0.8/README.md), [complete migration inventory](docs/development/0.8/migration-status.md), [RC consumption guide](docs/consumers/consume-from-0.8.0-dev.md) and [breaking author migration](docs/development/0.8/refactor-migration.md). The complete retained core is same-source engine-free, with explicit1.6 execution and the full capability inventory.
 
 ## What the library provides
 

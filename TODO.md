@@ -1,12 +1,12 @@
 # TODO
 
-## 0.8 RC closeout
+## 0.8 RC follow-up
 
-The HelpRef/output-lifetime and adjacent-name contract is accepted by PM; US has completed actual
-consumption of the fixed 0.8 technical input. That acceptance is not waiting for another approval.
+[v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1) is published as a non-latest prerelease from
+`a0b5b983c3c13a099c62d936305eaebaf1deb5a8`. The HelpRef/output-lifetime and adjacent-name contract
+is accepted; US fixed-input integration is complete. US acceptance against the published RC is in progress.
 
-- [ ] PM integrates the prepared source on main and publishes v0.8.0-rc1 through the existing Release
-      workflow as a non-latest prerelease; US then consumes the fixed remote Release asset and runs its CI.
+- [ ] Complete US acceptance against the published RC asset and its consumer CI.
 - [ ] Continue UI/UX integration and player-facing acceptance in the next session. Native1.6
       text/IME/fonts/window/input/scroll/clip/popup/image and native1.7 remain separately unaccepted.
       Known headless game errors are accepted as non-blocking for this RC transition, not erased.

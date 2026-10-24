@@ -1,12 +1,14 @@
-# Consume the 0.8.0 development candidate
+# Consume the 0.8.0 release candidate
 
-Use a fixed Dev package from this line, not a moving sibling build output. Only FerriteLib ships the
-runtime DLL; a consumer references it with `Private=false` and does not bundle another copy.
+Compile against the DLL from the published [v0.8.0-rc1 Release asset](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1),
+a non-latest prerelease built from `a0b5b983c3c13a099c62d936305eaebaf1deb5a8`, rather than a moving
+sibling output or a relabeled Dev DLL. Only FerriteLib ships the runtime DLL; a consumer references it
+with `Private=false` and does not bundle another copy.
 
-PM has accepted the current technical contract and US has consumed the fixed source input. The next
-RC step uses the published v0.8.0-rc1 GitHub Release asset after PM completes publication, not a local
-Dev DLL relabeled as Release. Native acceptance and next-session UI/UX work remain separate; known
-headless game errors are accepted as non-blocking for this transition, not as an error-free game result.
+The current technical contract and US fixed-input integration are accepted. US acceptance against
+the published RC asset is still in progress. Native acceptance and next-session UI/UX work remain
+separate; known headless game errors are accepted as non-blocking for this transition, not as an
+error-free game result.
 
 ```csharp
 if (!FerriteLibVersion.Require(new Version(0, 8, 0), new Version(0, 9, 0),
@@ -14,7 +16,7 @@ if (!FerriteLibVersion.Require(new Version(0, 8, 0), new Version(0, 9, 0),
     throw new InvalidOperationException(diagnostic);
 ```
 
-The old `[0.7.0,0.8.0)` range excludes this candidate. Explicitly adopt the new development input, compile,
+The old `[0.7.0,0.8.0)` range excludes 0.8. Explicitly adopt the published RC input, compile,
 then run the consumer's own harness and native UI checks; widening the range alone is not a migration.
 
 This is the approved prepublication breaking refactor. Start with [the exact migration](../development/0.8/refactor-migration.md)
@@ -89,7 +91,7 @@ Choice endpoint and bounded reads select the same synchronized inputs. Project m
 properties to immutable presentation data during tracking; an outer list copy alone does not freeze them.
 Repeat consumes an immutable ordered key projection through the existing stable-node reconciliation.
 `BindTracked(..., equal: ...)` can suppress same-result presentation announcements without retaining old
-dependency edges. Existing source calls remain valid; rebuild against the fixed 0.8 Dev API.
+dependency edges. Existing source calls remain valid; rebuild against the fixed 0.8 RC API.
 Ordinary getters/options retain their existing conditions. Start with the
 [counter walkthrough](../development/0.8/counter-walkthrough-zh.md) and the
 [actual runtime/host contract](../development/0.8/reactive-foundation-contract.md); the
