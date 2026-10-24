@@ -54,6 +54,9 @@ three classes in one file.
 
 ## Show/hide, narrow layout, scrolling
 
+Choose the outer window size and the available logical page space using the
+[RimWorld window guide](rimworld-window-layout.md), including the game's UI-scale restrictions.
+
 A conditional group is a container with `VisibleBind="show-advanced"` bound to a `bool` — toggling it does
 not reopen the page. Narrow behavior is the containers' own vocabulary, not a second framework:
 `Breakpoint` + `Narrow="Column"` flips a `Row` to a stack, `NarrowHidden` drops children in the narrow
