@@ -5,17 +5,15 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>
 /// The option-level help contract shared by the kinds whose options are parts of ONE element rather than
 /// elements of their own: <c>input/mode-row</c>'s cells and <c>input/dropdown</c>'s popup rows. The engine's
-/// element-level <c>HelpKey</c> cannot reach these — an option is not an element, so no manifest attribute can
-/// sit on it and the draw walk has nothing to walk — which is why the option level owns its own attribute and
-/// its own rule, and why the two kinds that have options share one implementation instead of two copies.
+/// element-level <c>HelpKey</c> describes the element, not an individual option. Both kinds read each option's
+/// explicit <c>Choice.Help</c> through the same publication contract.
 /// <para>
 /// The contract: the element declares <c>HoverHelpKey</c>, a <b>writable string</b> value binding, and the kind
-/// writes the hovered option's identity there — clearing it (an empty string) when no option is hovered, and
+/// writes the hovered option's explicit Help there — clearing it (an empty string) when no option is hovered
+/// or that option has omitted/empty Help, and
 /// only when the answer changes, so a consumer sees one write per hover transition rather than one per frame.
-/// The identity itself is the kind's own business and is documented on each kind: the mode row publishes the
-/// option's declared help text (<c>DescriptionN</c>), or its value when it declares none; the dropdown
-/// publishes the option's value, because a dropdown's options come from the consumer's data and the value is
-/// the machine token a help catalog is keyed by.
+/// Neither kind infers help from Value or Text. An option without Help makes no option-level session claim;
+/// the element's own HelpKey remains independent.
 /// </para>
 /// <para>
 /// Why a binding rather than the session claim the element level uses: the claim carries ONE live topic for the

@@ -36,8 +36,83 @@ internal static class KernelOptionHelpTests
         Run("Leaving the rows clears it, and so does closing", VerifyClearing);
         Run("A re-hovered row writes nothing", VerifyNoChurn);
         Run("Typed choices preserve explicit legacy label help without converting their business values", VerifyTypedLabelHelp);
+        foreach (string kind in new[] { DropdownWidget.Kind, InputModeRowWidget.Kind })
+        {
+            foreach (string source in new[] { "string", "typed", "XML" })
+                Run(kind + " " + source + " omitted/empty Help clears actual publication", () => VerifyAbsentHelp(kind, source));
+        }
         ResetSeams();
         return failures;
+    }
+
+    private static void VerifyAbsentHelp(string kind, string source)
+    {
+        PrepareCore();
+        string help = "", stringValue = "a";
+        int typedValue = 1, writes = 0, valueWrites = 0;
+        var bindings = new UiBindings();
+        if (source == "typed")
+        {
+            bindings.BindValue("choice", () => typedValue, value => { typedValue = value; valueWrites++; });
+            bindings.BindChoices("choice", () => new[] {
+                new UiChoice<int>("Explicit label", 1, "option-topic"),
+                new UiChoice<int>("Omitted label", 2),
+                new UiChoice<int>("Empty label", 3, help: "") });
+        }
+        else
+        {
+            bindings.BindValue("choice", () => stringValue, value => { stringValue = value; valueWrites++; });
+            if (source == "string")
+                bindings.BindChoices("choice", () => new[] {
+                    new UiChoice<string>("Explicit label", "a", "option-topic"),
+                    new UiChoice<string>("Omitted label", "b"),
+                    new UiChoice<string>("Empty label", "c", help: "") });
+        }
+        bindings.BindValue("help", () => help, value => { help = value; writes++; });
+        string choices = source == "XML"
+            ? "<Choice Value='a' Text='Explicit label' Help='option-topic'/>"
+              + "<Choice Value='b' Text='Omitted label'/><Choice Value='c' Text='Empty label' Help=''/>"
+            : "";
+        using var host = new UiHost(Scope, UiLayoutManifest.Parse(
+            "<UiPage Schema='2' Source='" + Scope + "'><Widget Id='choice' Kind='" + kind
+            + "' Bind='choice'" + (kind == DropdownWidget.Kind ? " Height='24'" : "")
+            + " HoverHelpKey='help' HelpKey='element-topic'>"
+            + choices + "</Widget></UiPage>"), bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
+        host.Session.HoverGraceFrames = 0;
+        if (kind == DropdownWidget.Kind)
+            NativeEvents.Click(Trigger().Center, () => NativeFixture.DrawFrame(host, Viewport()));
+
+        void HoverOption(int index)
+        {
+            UiLayoutPoint point;
+            if (kind == DropdownWidget.Kind)
+            {
+                UiLayoutRect popup = UiPopup.RectFor(Trigger(), 3, Viewport());
+                point = new UiLayoutPoint(popup.X + popup.Width / 2, popup.Y + (index + 0.5f) * OptionHeight);
+            }
+            else
+            {
+                UiGeometry geometry = UiTheme.Vanilla.Geometry;
+                point = new UiLayoutPoint(Width / 2, geometry.Spacing + index * (OptionHeight + geometry.Gap) + OptionHeight / 2);
+            }
+            NativeEvents.Begin(EventType.Repaint, point);
+            NativeFixture.DrawFrame(host, Viewport());
+        }
+
+        foreach (int absent in new[] { 1, 2 })
+        {
+            HoverOption(0);
+            Check(help == "option-topic", "explicit Help is really published before the no-help transition");
+            int before = writes;
+            HoverOption(absent);
+            Check(help == "" && writes == before + 1,
+                (absent == 1 ? "omitted" : "empty") + " Help clears the published topic, without Value/Text inference");
+            Check(host.Session.HoverClaim == (kind == InputModeRowWidget.Kind ? "element-topic" : null),
+                "no option claim is invented; a hovered mode row retains its element HelpKey");
+            HoverOption(absent);
+            Check(writes == before + 1, "remaining over a no-help option does not republish");
+        }
+        Check(valueWrites == 0 && typedValue == 1 && stringValue == "a", "help-only hover never writes a business selection");
     }
 
     private static void VerifyTypedLabelHelp()

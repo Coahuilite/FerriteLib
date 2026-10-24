@@ -27,12 +27,18 @@ Missing or mismatched declared endpoint ownership is diagnosed on widgets, conta
 materialized item subtrees. The shared compiler keeps source/id/path on the error; it does not guess
 arbitrary collection internals. Public ForwardingBindings and the isolated Raven reader use this path.
 
-The current Choice.Help omission yields empty for every value type. This changes two old Dropdown
+Omitted or empty Choice.Help means no option-specific help for every value type; Value and Text are
+never inferred as help. This confirmed policy changes two old Dropdown
 HoverHelpKey defaults: string/static rows published Value, while typed rows published Text.
 Preserving either old output requires explicit Help=oldValue or Help=oldText at the author boundary.
-PM is deciding the unified omission policy; this candidate does not claim those defaults are
-semantically unchanged. Per-row explicit Help, hover transitions/clearing and typed value identity
-remain supported by the same runtime protocol. TextKey resolution follows the same normal draw/popup/bounded observation
+For example, use `new UiChoice<string>(text, value, help: value)` for the old string output, or
+`new UiChoice<int>(text, value, help: text)` for the old typed output. XML authors explicitly set
+`<Choice Value="a" Text="Alpha" Help="a"/>` to preserve the old static value output.
+This is a semantic migration, not a rename. Per-row explicit Help, hover transitions/clearing and
+typed value identity remain supported by the same runtime protocol. An option with no Help clears
+HoverHelpKey and makes no option-level hover claim. Element HelpKey remains available; a consumer's
+unified help panel and page-overview fallback are not disabled by an option having no help.
+TextKey resolution follows the same normal draw/popup/bounded observation
 label path. BindOptions/GetOptions still serve arbitrary non-choice collections; selection widgets
 require the actual typed choice endpoint and diagnose a value registered in its place.
 
@@ -104,7 +110,7 @@ Old custom tracked readers now declare their actual demand; ordinary untracked a
 The three current source migrations do not declare HoverHelpKey: Camera has no selection list;
 Nivarian uses typed project choices without a help sink; Raven ToolUi.Select uses typed choices
 without a help sink. Consequently neither old fallback is consumed by these three actual pages.
-Their successful traces do not accept the changed omission policy for other consumers.
+Other authors must apply the explicit migration above if they need either old output.
 
 Three isolated real-source migrations are rebuilt under the new refactor evidence, while old closeout
 packages/logs stay read-only. Nivarian explicitly proves hidden/restored owner versus continuing shared

@@ -101,8 +101,8 @@ public static class UiPopup
     /// value after closing the popup. Option rows are single-line surfaces: a wrapping option means a too-narrow
     /// popup, which the fitting audit must see on the width axis rather than absorb silently.
     /// <para>
-    /// Returns the <b>hovered</b> option's value, or an empty string when no visible row is hovered, so the
-    /// caller can publish an option-level fact - the dropdown's <c>HoverHelpKey</c> identity - without
+    /// Returns the <b>hovered</b> option's source index, or -1 when no visible row is hovered, so the
+    /// caller can read that choice's explicit Help without
     /// re-deriving this helper's row geometry. The hover test is the raw rect form on purpose: the popup is the
     /// topmost layer and these rows are its own. <see cref="ctx.Controls.PopupOption"/> applies the shared
     /// capture protocol with that row's stable value identity. Hover consumes nothing.
@@ -114,7 +114,6 @@ public static class UiPopup
     /// <see cref="ctx.Controls.TakePopupWheelIfCovering"/>.
     /// </para>
     /// </summary>
-    /// <summary>Draw one typed choice source; return the hovered source index, or -1 outside visible rows.</summary>
     public static int DrawChoices<T>(UiLayoutRect popupRect,string elementId,UiWidgetContext ctx,
         IReadOnlyList<UiChoice<T>> options,T current,Action<T> onSelected,bool selectable=true)
     {

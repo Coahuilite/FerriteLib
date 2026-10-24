@@ -4,20 +4,19 @@ using System.Globalization;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>
-/// Greenfield mode-row selector. Reads a string value binding (keyed by <c>Bind</c>, falling back
-/// to the element Id) and writes the selected mode string through the same binding. Layout is
+/// Mode-row selector. Reads a typed value binding (keyed by <c>Bind</c>, falling back
+/// to the element Id) and writes the chosen value through the same binding. Options come from
+/// <c>BindChoices&lt;T&gt;</c> or XML <c>Choice</c> children. Layout is
 /// responsive: wide uses one row, medium uses two columns, narrow stacks vertically, and the cell
 /// metrics come from the theme's <see cref = "UiGeometry"/> so density is one knob for the whole tree.
 /// <para>
-/// <b>Localized option labels.</b> Each slot's label is <c>TitleKeyN</c> resolved through the translation
-/// seam when declared, else the literal <c>TitleN</c>, else the option's value — the same key-wins rule
-/// every other <c>*Key</c> pair in the library uses, and the reason a bilingual page can use this kind at
-/// all. Both name families are in the declared label set, so <c>Width="Auto"</c> measures the TRANSLATED
-/// title rather than the literal one.
+/// <b>Localized option labels.</b> A choice's nonempty <c>TextKey</c> resolves through the translation
+/// seam instead of its literal <c>Text</c>. Natural width measures that resolved label.
 /// </para>
 /// <para>
 /// <b>Per-option help, published rather than painted.</b> Each option may carry its own help identity in
-/// its <c>DescriptionN</c>; the kind does not draw it (a tooltip is the consumer's call, and vanilla's own
+/// its explicit <c>Choice.Help</c>; omitted/empty Help means no option-specific help, never Value/Text
+/// inference. The kind does not draw it (a tooltip is the consumer's call, and vanilla's own
 /// mode selectors render the help in a panel of their own). Two reads exist, and they are complementary:
 /// declare <c>HoverHelpKey</c> and the row writes the hovered option's identity into that binding
 /// (<see cref = "OptionHelp"/>), and the hovered option's declared help text is also claimed on the session's

@@ -4,9 +4,10 @@ using System.Globalization;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>
-/// Greenfield dropdown/select control. The current value is a typed string binding keyed by
-/// <c>Bind</c> (falling back to the element Id); options come from a typed
-/// <c>BindOptions&lt;string&gt;</c> binding or static OptionN/Values attributes. The field's plane and
+/// Dropdown/select control. The current typed value binding is keyed by
+/// <c>Bind</c> (falling back to the element Id); options come from <c>BindChoices&lt;T&gt;</c>
+/// or XML <c>Choice</c> children. Each choice carries Text/TextKey, the actual Value and explicit Help;
+/// omitted/empty Help means no option-specific help, without Value/Text inference. The field's plane and
 /// its text come from the theme's <see cref = "UiStyleTable"/>; its height and text inset from the
 /// theme's <see cref = "UiGeometry"/>. Popup state lives in <see cref = "UiSession"/> and is drawn by
 /// <see cref = "UiHost"/> after content.

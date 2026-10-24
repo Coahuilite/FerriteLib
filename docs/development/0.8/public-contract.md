@@ -46,9 +46,13 @@ still distinguish a compatible refresh from retargeting an editor.
   explicit invalidation conditions. `Set` requests the owner's mutation; it does not imply acceptance.
 - `BindChoices<T>` carries `UiChoice<T>(text,value,help,textKey)`. String is just T=string. Dynamic
   labels, help and real identity use this same representation; XML `<Choice Value Text Help TextKey/>`
-  normalizes into it. The current empty-Help omission differs from old Dropdown Value/string and
-  Text/typed outputs; PM policy confirmation is pending (see refactor migration). Explicit Help
-  preserves either old per-item output. BindOptions/GetOptions remain generic collection facilities
+  normalizes into it. Omitted/empty Help means no option-specific help; neither Value nor Text is
+  inferred. Old Dropdown string/static Value and typed Text outputs each require explicit Help to
+  preserve them (see refactor migration). HoverHelpKey clears for a no-help option; element HelpKey
+  and the consumer's unified panel/page-overview fallback remain independent.
+  The explicit omission policy is settled; final freeze of the public help mechanism/naming remains
+  a separate PM decision. This technical candidate retains HelpKey/HoverHelpKey/Tooltip unchanged.
+  BindOptions/GetOptions remain generic collection facilities
   for tree/chart and other collection consumers, not a second selection protocol.
 - `UiValueEndpoint` resolves current registration/type/writability/read/write; `UiChoiceEndpoint`
   reads the same choices or a bounded prefix without enumerating the rest.

@@ -2,10 +2,8 @@
 
 ## 0.8 refactor candidate
 
-- [ ] PM must decide unified omitted Choice.Help semantics before final candidate/API acceptance.
-      Old Dropdown string/static published Value and typed published Text; the current carrier omits to
-      empty. Explicit Help preserves either output. See refactor-migration.md. Finish fixed delivery
-      after that decision; a prepared checkpoint is not US consumption authorization.
+- [ ] PM owns the read-only Help mechanism/naming assessment and final public-mechanism freeze.
+      Explicit omitted/empty Choice.Help semantics are decided; keep current interfaces while it is assessed.
 - [ ] Collect native1.6 text/IME/fonts/window/input/scroll/clip/popup/image acceptance against that fixed
       candidate; native1.7 remains separately awaiting human. Do not start/install the game automatically.
 
