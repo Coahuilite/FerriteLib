@@ -87,7 +87,7 @@ public interface IUiBindingAccess
 
     /// <summary>
     /// The revision of one binding key: monotonic, starts at zero, and moves when the consumer announces
-    /// that the authoritative model behind the key changed (<see cref="NotifyChanged"/>). This is the
+    /// that the authoritative model behind the key changed (<see cref="UiBindings.NotifyChanged"/>). This is the
     /// per-key replacement for one global counter, and it is what a widget, a diagnostic or a test reads
     /// to know whether the key it cares about moved.
     /// </summary>

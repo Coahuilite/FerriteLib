@@ -207,7 +207,7 @@ public sealed class UiSession : IDisposable
     /// <see cref="UiInvalidation.Structure"/> announcement the engine committed at a frame boundary.
     /// <para>
     /// It is deliberately <b>not</b> the library's invalidation API. A consumer announces a model change
-    /// per key through <see cref="IUiBindingAccess.NotifyChanged"/>, and a <see cref="UiInvalidation.Paint"/>
+    /// per key through <see cref="UiBindings.NotifyChanged"/>, and a <see cref="UiInvalidation.Paint"/>
     /// announcement leaves this clock alone on purpose: a fixed-size readout must not re-arrange the page.
     /// There is exactly one such clock; do not add a second.
     /// </para>
