@@ -324,7 +324,7 @@ and scale.
 
 ## Evidence and maintenance
 
-The platform findings above come from these named source methods, not a screenshot-derived rule:
+The evidence below separates platform mechanisms, local corrections and user observations:
 
 | Evidence | Scope |
 | --- | --- |
@@ -333,6 +333,7 @@ The platform findings above come from these named source methods, not a screensh
 | FL source at RC commit `a0b5b983c3c13a099c62d936305eaebaf1deb5a8` | Window ownership, chrome, catalog and page capabilities. |
 | Target Unity `EventType` and Mono `RuntimeType.GetEnumName` / `Enum` source; local fix `069b88a` | Confirms same-value aliases and name-selection risk; explicit event mapping removes that dependency. Existing adapter checks passed, not a native event trace. |
 | Local fix `f362c99`, including `069b88a` | Restores template-root visibility through the ordinary hidden/read-invalidation path. Existing Repeat, visibility, invalidation and layout-reuse suites passed; no native hide/show acceptance. |
+| Later 2026-10-25 user feedback: consumer `9ee0703` + FL `f362c99`; subsequent cost observation at consumer `6c51c72` uses the same FL | Page input reported working again, while all consumer buttons remained slow. Font, IME, overlap and scaling acceptance remains open. |
 | Local candidate `0.8.0-local.paletteperf1`, following `f362c99` | Removes repeated enum parsing/reflection/string conversion for canonical palette lookups and reflection from palette enum validation. Native responsiveness remains to be measured against the matched consumer. |
 | Executed calculations from the scale predicate | Accepted scale table and logical-size examples; not native render acceptance. |
 
@@ -348,9 +349,12 @@ layer was not established by that observation. The installed FL was subsequently
 not the consumer's fixed RC1 dependency `a0b5b9`; their production source trees are identical, but the
 observation is not a test of the intended artifact pairing. The event-mapping and Repeat fixes address
 confirmed contract defects; the palette candidate removes redundant work on the identified hot path.
-Their effect on the reported severe lag remains unmeasured. Native input revalidation and remaining
-font, IME, overlap and scaling acceptance are open. Record the actual candidate, resolution, scale,
-language, page state and result for each game pass.
+
+Later user feedback with consumer `9ee0703` and FL `f362c99` reported page input working again, while all
+consumer buttons remained slow. The subsequent cost observation at consumer `6c51c72` used the same FL.
+This is user-reported page-input recovery for that pairing; performance and remaining font, IME, overlap
+and scaling acceptance are open. The palette candidate has not been tested in game. Record the actual
+candidate, resolution, scale, language, page state and result for each game pass.
 Keep a design breakpoint labeled as a proposal until its rendered layout and key interactions have been
 checked. Earlier-version human observations do not validate a new adapter or candidate.
 
