@@ -4,8 +4,9 @@ Use the game's **logical UI space**, then choose a layout that fits the window's
 A 1920×1080 display does not give a page 1920×1080 units, and a wide aspect ratio does not guarantee enough
 height for a two-column settings panel.
 
-This guide covers FerriteLib.UiKit **0.8.0-rc1** and the **RimWorld 1.6 adapter**. It brings together the
-window and scaling findings and desktop interaction guidance recorded on 2026-10-25. For wiring a page, use the
+This guide covers FerriteLib.UiKit **0.8.0-rc1**, the separately identified local fixes below, and the
+**RimWorld 1.6 adapter**. It brings together the window, scaling and desktop interaction findings recorded
+on 2026-10-25. For wiring a page, use the
 [ordinary settings recipe](ordinary-settings.md); for supported signatures and ownership, use
 [S6 in the public contract](../development/0.8/public-contract.md#s6--use-a-standard-window-or-embed-in-an-existing-callback).
 
@@ -162,6 +163,13 @@ detail and compact drill-down. Google's [adaptive list-detail guidance](https://
 describes the useful relationship between these arrangements. Its toolkit APIs and breakpoint values
 are not FL capabilities or defaults.
 
+The template root of a `Repeat` follows the same visibility rules as an ordinary child. A hidden row
+contributes no arranged box or gap; its stable item identity and existing state remain while its key is
+still present. Visibility-binding changes must invalidate the owning container so the row can return.
+The local `f362c99` fix restores this path, which RC1 omitted for template roots. Do not compensate by
+removing item keys or adding a wrapper solely to make root visibility work: removal has a different
+state lifetime.
+
 Keep **viewed object**, **edited target**, **enabled state** and **keyboard focus** distinct. A selected
 row can mean “show this detail”; it does not also mean “enabled.” Use explicit labels and existing state
 styles alongside the actual enable control. [Apple's focus and selection guidance](https://developer.apple.com/design/human-interface-guidelines/focus-and-selection/)
@@ -230,6 +238,13 @@ First separate shell interaction from page execution. A working native entry poi
 coexist with a page that draws but never accepts input. Follow one actual click through native input
 eligibility, event type and coordinates, capture, page hit testing, binding invocation and the owner's
 mutation. Locate the first missing transition before changing bindings or replacing controls.
+
+Convert native event types by explicit enum constants, not by `ToString()` followed by name parsing.
+The inspected Unity `EventType` contains obsolete same-value aliases such as `MouseDown`/`mouseDown`;
+Mono need not choose the canonical spelling. Case-sensitive parsing can therefore discard a supported
+event. The local `069b88a` fix maps both `type` and `rawType` explicitly, leaving unsupported events as
+`None`; a numeric cast is also unsuitable because the native and neutral enum values differ. The shell's
+Close button uses a direct native path, so verify it separately from page press/release and editor input.
 
 If the page also stalls, measure the hot path rather than attributing it to a disconnected button.
 Look for repeated host/definition creation, full-directory projection or text measurement on every GUI
@@ -304,6 +319,8 @@ The platform findings above come from these named source methods, not a screensh
 | RimSage 1.6 source: `ResolutionUtility`, `Dialog_Options`, `UI.ApplyUIScale`, `Window` and `MainMenuDrawer` | Platform mechanisms and extension points; source dataset identified as 1.6.4850. |
 | Target assembly `1.6.9676.17735`: focused inspection of `ResolutionUtility`, `Dialog_Options`, `MainMenuDrawer`, `Window.Notify_ResolutionChanged` and `WindowStack.InsertAtCorrectPositionInList` | Confirms scale/menu constraints, initial-size reapplication and layer-ordered insertion on the target 1.6.4871 build; not a rendered overlap check. |
 | FL source at RC commit `a0b5b983c3c13a099c62d936305eaebaf1deb5a8` | Window ownership, chrome, catalog and page capabilities. |
+| Target Unity `EventType` and Mono `RuntimeType.GetEnumName` / `Enum` source; local fix `069b88a` | Confirms same-value aliases and name-selection risk; explicit event mapping removes that dependency. Existing adapter checks passed, not a native event trace. |
+| Local fix `f362c99`, including `069b88a` | Restores template-root visibility through the ordinary hidden/read-invalidation path. Existing Repeat, visibility, invalidation and layout-reuse suites passed; no native hide/show acceptance. |
 | Executed calculations from the scale predicate | Accepted scale table and logical-size examples; not native render acceptance. |
 
 The linked Apple and Google guidance informs the interaction recommendations. Those recommendations are
@@ -314,7 +331,11 @@ design choices.
 The first 2026-10-25 consumer observation on RimWorld 1.6.4871 showed both native entries opening the
 window and a rendered page; the player reported severe lag and no page-control response while Close
 remained usable, then ended the pass. Input/performance acceptance therefore failed; the responsible
-layer was not established by that observation. Remaining font, IME, overlap and scaling acceptance is
+layer was not established by that observation. The installed FL was subsequently identified as `c3c3070`,
+not the consumer's fixed RC1 dependency `a0b5b9`; their production source trees are identical, but the
+observation is not a test of the intended artifact pairing. The two local fixes above address confirmed
+contract defects, not a proven explanation of all symptoms or the severe lag. Neither fix has completed
+native revalidation. Remaining font, IME, overlap and scaling acceptance is
 open. Record the actual candidate, resolution, scale, language, page state and result for each game pass.
 Keep a design breakpoint labeled as a proposal until its rendered layout and key interactions have been
 checked. Earlier-version human observations do not validate a new adapter or candidate.
@@ -328,4 +349,5 @@ Relevant implementation: [window host](../../Source/FerriteLib.UiKit/Adapters/Ri
 [catalog](../../Source/FerriteLib.UiKit/Adapters/RimWorld16/UiWindowCatalog.cs),
 [options](../../Source/FerriteLib.UiKit/Adapters/RimWorld16/UiWindowOptions.cs),
 [page window](../../Source/FerriteLib.UiKit/Adapters/RimWorld16/UiPageWindow.cs) and
-[layout engine](../../Source/FerriteLib.UiKit/Kernel/UiLayoutEngine.cs).
+[layout engine](../../Source/FerriteLib.UiKit/Kernel/UiLayoutEngine.cs); native event conversion lives in
+[VerseUiExecution](../../Source/FerriteLib.UiKit/Adapters/RimWorld16/VerseUiExecution.cs).
