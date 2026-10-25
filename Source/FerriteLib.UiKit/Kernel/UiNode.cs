@@ -52,6 +52,7 @@ public sealed class UiNode
         { outputWarning = "[FerriteLib.UiKit] node removed; option output release failed at '" + Path + "': " + outputFailure; }
         finally
         {
+            Properties.ReleaseResolutionCache();
             ResetCustomState();
             foreach(var slot in slots.Values){if(slot.Editor is IUiEditState editor)editor.Suspend();slot.Editor=null;slot.EditorTarget=null;slot.ChartIdentity=null;}
             slots.Clear();EditingState=null;children.Clear();Parent=null;

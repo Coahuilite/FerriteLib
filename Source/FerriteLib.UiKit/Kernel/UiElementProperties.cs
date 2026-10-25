@@ -11,10 +11,10 @@ public sealed class UiElementProperties
     internal UiElementProperties(Action changed)
     {
         this.changed = changed;
-        Font = new UiPropertyDeclaration<UiFont>(changed);
-        LocalFont = new UiPropertyDeclaration<UiFont>(changed);
-        Density = new UiPropertyDeclaration<UiDensity>(changed);
-        LocalDensity = new UiPropertyDeclaration<UiDensity>(changed);
+        Font = new UiPropertyDeclaration<UiFont>(LayoutDeclarationChanged);
+        LocalFont = new UiPropertyDeclaration<UiFont>(LayoutDeclarationChanged);
+        Density = new UiPropertyDeclaration<UiDensity>(LayoutDeclarationChanged);
+        LocalDensity = new UiPropertyDeclaration<UiDensity>(LayoutDeclarationChanged);
         resolvedColoursView = new ReadOnlyDictionary<string, UiResolvedProperty<UiColour?>>(resolvedColours);
         resolvedMetricsView = new ReadOnlyDictionary<string, UiResolvedProperty<float>>(resolvedMetrics);
     }
@@ -24,6 +24,22 @@ public sealed class UiElementProperties
     public UiPropertyDeclaration<UiDensity> Density { get; }
     public UiPropertyDeclaration<UiDensity> LocalDensity { get; }
     private readonly Action changed;
+    private object inputGeneration = new();
+    private ResolutionReuse? resolutionReuse;
+
+    private void InvalidateResolution()
+    {
+        inputGeneration = new object();
+        if (resolutionReuse != null) resolutionReuse.Valid = false;
+    }
+    private void LayoutDeclarationChanged()
+    {
+        // A second write still changes resolution inputs when MarkDirty is already satisfied.
+        InvalidateResolution();
+        changed();
+    }
+    internal void ReleaseResolutionCache() => resolutionReuse = null;
+
     private readonly Dictionary<string, UiPropertyDeclaration<float>> metrics = new(StringComparer.Ordinal);
     private readonly Dictionary<string, UiPropertyDeclaration<float>> localMetrics = new(StringComparer.Ordinal);
     private readonly Dictionary<string, UiPropertyDeclaration<float>> inlineMetrics = new(StringComparer.Ordinal);
@@ -32,7 +48,7 @@ public sealed class UiElementProperties
     private UiPropertyDeclaration<float> MetricDeclaration(Dictionary<string, UiPropertyDeclaration<float>> store, string name)
     {
         if (!store.TryGetValue(name, out var declaration))
-        { declaration = UiAppearanceProperties.MetricDeclaration(name, changed); store.Add(name, declaration); }
+        { declaration = UiAppearanceProperties.MetricDeclaration(name, LayoutDeclarationChanged); store.Add(name, declaration); }
         return declaration;
     }
     private readonly Dictionary<string, UiPropertyDeclaration<UiColour?>> colours = new(StringComparer.Ordinal);
@@ -44,15 +60,15 @@ public sealed class UiElementProperties
     public IReadOnlyList<string> ColourNames => Array.AsReadOnly(UiAppearanceProperties.Colours);
     public IReadOnlyDictionary<string, UiResolvedProperty<UiColour?>> ResolvedColours => resolvedColoursView;
     public IReadOnlyDictionary<string, UiResolvedProperty<float>> ResolvedMetrics => resolvedMetricsView;
-    public UiPropertyDeclaration<UiColour?> Palette(UiPaletteRole role) => ColourDeclaration(colours, role.ToString());
-    public UiPropertyDeclaration<UiColour?> LocalPalette(UiPaletteRole role) => ColourDeclaration(localColours, role.ToString());
+    public UiPropertyDeclaration<UiColour?> Palette(UiPaletteRole role) => ColourDeclaration(colours, role.ToString(), InvalidateResolution);
+    public UiPropertyDeclaration<UiColour?> LocalPalette(UiPaletteRole role) => ColourDeclaration(localColours, role.ToString(), InvalidateResolution);
 
-    private static UiPropertyDeclaration<UiColour?> ColourDeclaration(Dictionary<string, UiPropertyDeclaration<UiColour?>> declarations, string token)
+    private static UiPropertyDeclaration<UiColour?> ColourDeclaration(Dictionary<string, UiPropertyDeclaration<UiColour?>> declarations, string token, Action? changed = null)
     {
         if (!UiAppearanceProperties.IsColour(token)) throw new ArgumentException("Unknown colour token '" + token + "'.", nameof(token));
         if (!declarations.TryGetValue(token, out UiPropertyDeclaration<UiColour?>? declaration))
         {
-            declaration = new UiPropertyDeclaration<UiColour?>(null, value =>
+            declaration = new UiPropertyDeclaration<UiColour?>(changed, value =>
             {
                 if (!value.HasValue) throw new ArgumentException(token + " cannot be null.");
             });
@@ -80,6 +96,8 @@ public sealed class UiElementProperties
         var priorMetrics = new Dictionary<string, UiResolvedProperty<float>>(resolvedMetrics, StringComparer.Ordinal);
         return () =>
         {
+            // Restored derived facts must not reuse a candidate's inputs or rewind runtime writes.
+            InvalidateResolution();
             authoredSpec = null;
             if (priorSpec != null) Authoring(priorSpec, priorDocument);
             else
@@ -104,6 +122,7 @@ public sealed class UiElementProperties
     internal void Authoring(UiElementSpec spec, UiStyleDocument? document)
     {
         if (ReferenceEquals(spec, authoredSpec) && ReferenceEquals(document, authoredDocument)) return;
+        InvalidateResolution();
         authoredSpec = spec;
         authoredDocument = document;
         inlineFont.Remove();
@@ -195,8 +214,61 @@ public sealed class UiElementProperties
     private UiDensity lastDensity;
     private readonly Dictionary<string, UiColour?> lastColours = new(StringComparer.Ordinal);
 
+    private sealed class ResolutionReuse
+    {
+        internal bool Valid;
+        internal object? Generation;
+        internal UiTheme? Host, Result;
+        internal int ColourRevision, LayoutRevision, PropertyRevision;
+        internal UiFont FallbackFont;
+        internal readonly List<(UiNode Node, object Generation)> Ancestors = new();
+    }
+
+    private bool TryReuseResolution(UiNode node, UiTheme host, UiFont fallbackFont, out UiTheme theme)
+    {
+        theme = null!;
+        ResolutionReuse? reuse = resolutionReuse;
+        if (reuse?.Valid != true || !ReferenceEquals(reuse.Generation, inputGeneration)
+            || !ReferenceEquals(reuse.Host, host) || reuse.ColourRevision != host.ColourRevision
+            || reuse.LayoutRevision != host.LayoutRevision || reuse.PropertyRevision != host.PropertyRevision
+            || reuse.FallbackFont != fallbackFont) return false;
+
+        int index = 0;
+        for (UiNode? parent = node.Parent; parent != null; parent = parent.Parent)
+        {
+            if (index >= reuse.Ancestors.Count) return false;
+            var prior = reuse.Ancestors[index++];
+            if (!ReferenceEquals(prior.Node, parent)
+                || !ReferenceEquals(prior.Generation, parent.Properties.inputGeneration)) return false;
+        }
+        if (index != reuse.Ancestors.Count) return false;
+        // Preserve the existing mutable output theme; only the host is a resolution input.
+        theme = reuse.Result!;
+        return true;
+    }
+
+    private UiTheme RetainResolution(UiNode node, UiTheme host, UiFont fallbackFont, UiTheme result)
+    {
+        ResolutionReuse reuse = resolutionReuse ??= new ResolutionReuse();
+        reuse.Ancestors.Clear();
+        for (UiNode? parent = node.Parent; parent != null; parent = parent.Parent)
+            reuse.Ancestors.Add((parent, parent.Properties.inputGeneration));
+        reuse.Generation = inputGeneration;
+        reuse.Host = host;
+        reuse.ColourRevision = host.ColourRevision;
+        reuse.LayoutRevision = host.LayoutRevision;
+        reuse.PropertyRevision = host.PropertyRevision;
+        reuse.FallbackFont = fallbackFont;
+        reuse.Result = result;
+        reuse.Valid = true;
+        return result;
+    }
+
     internal UiTheme Apply(UiNode node, UiTheme host, UiFont fallbackFont = UiFont.Small)
     {
+        if (TryReuseResolution(node, host, fallbackFont, out UiTheme retained)) return retained;
+        // A failed resolution cannot leave a reusable partial set of source facts.
+        if (resolutionReuse != null) resolutionReuse.Valid = false;
         UiPropertyDeclaration<UiFont>? pageFont = PageScheme?.Font is UiFont page ? Declared(page) : null;
         ResolvedFont = UiPropertyResolver.Resolve(Prefer(Font, inlineFont), Prefer(LocalFont, namedFont),
             WithPage(Ancestors(node, p => Prefer(p.Font, p.inlineFont), p => Prefer(p.LocalFont, p.namedFont), p => p.LocalFont.IsDeclared ? "local-style" : p.NamedSource("Font")), pageFont),
@@ -244,7 +316,7 @@ public sealed class UiElementProperties
             // Preserve the existing page-level theme identity, without promoting its values to declarations.
             lastHost = null;
             appliedTheme = null;
-            return host;
+            return RetainResolution(node, host, fallbackFont, host);
         }
         bool reuse = ReferenceEquals(lastHost, host) && hostColourRevision == host.ColourRevision
             && hostLayoutRevision == host.LayoutRevision && hostPropertyRevision == host.PropertyRevision
@@ -269,7 +341,7 @@ public sealed class UiElementProperties
             lastFont = ResolvedFont.Value;
             lastDensity = d;
         }
-        return appliedTheme!;
+        return RetainResolution(node, host, fallbackFont, appliedTheme!);
     }
 
     public UiResolvedProperty<UiFont> ResolvedFont { get; private set; }

@@ -262,7 +262,24 @@ than skipping resolution or caching an entire GUI frame.
 The separate `0.8.0-local.paletteperf1` candidate applies this correction and includes the earlier
 event-mapping and Repeat fixes. It retains the public case-sensitive role names and rejection behavior,
 including the parsed `out` value on failure. It is a local candidate, not an update to the published RC1
-asset. Native responsiveness and FPS still need validation with its matched consumer build.
+asset. Its later A006 native observation still failed the performance expectation; see the evidence below.
+
+For a page that stays open, retain its host, theme and node declarations rather than rebuilding them or
+reassigning unchanged declarations just to redraw. The separate `0.8.0-local.propertyreuse1` candidate
+reuses resolved appearance when the actual inputs match: local declaration intent, the complete ordered
+ancestor identity/declaration chain, host identity and colour/layout/property revisions, and fallback
+font. The public interface is unchanged. Paint-only changes still avoid geometric recalculation, and
+held read-only resolved views continue to observe normal updates and removals.
+
+This check runs on every resolution call, including between pointer collection and painting; it is not
+a once-per-frame snapshot. A changed source or ancestor invalidates it even when the effective value
+stays equal. Failure rollback invalidates candidate reuse without undoing runtime declarations. The new
+candidate includes the palette/event/Repeat fixes and awaits matched native validation.
+
+Native IMGUI callback frequency is not a business-update clock. Keep model updates on their existing
+owner's schedule while drawing and input continue to follow the native callback contract. Low-cost
+unchanged redraws should come from retaining valid results, not from throttling input or skipping
+callbacks to hide a slow page.
 
 Check the actual loaded build and available diagnostic capability before expecting Dev output. A quiet
 log does not show whether a click reached an action. Prefer existing diagnostics; any additional
@@ -334,7 +351,8 @@ The evidence below separates platform mechanisms, local corrections and user obs
 | Target Unity `EventType` and Mono `RuntimeType.GetEnumName` / `Enum` source; local fix `069b88a` | Confirms same-value aliases and name-selection risk; explicit event mapping removes that dependency. Existing adapter checks passed, not a native event trace. |
 | Local fix `f362c99`, including `069b88a` | Restores template-root visibility through the ordinary hidden/read-invalidation path. Existing Repeat, visibility, invalidation and layout-reuse suites passed; no native hide/show acceptance. |
 | Later 2026-10-25 user feedback: consumer `9ee0703` + FL `f362c99`; subsequent cost observation at consumer `6c51c72` uses the same FL | Page input reported working again, while all consumer buttons remained slow. Font, IME, overlap and scaling acceptance remains open. |
-| Local candidate `0.8.0-local.paletteperf1`, following `f362c99` | Removes repeated enum parsing/reflection/string conversion for canonical palette lookups and reflection from palette enum validation. Native responsiveness remains to be measured against the matched consumer. |
+| Local candidate `0.8.0-local.paletteperf1` at `6f0238d`, following `f362c99` | Removes repeated enum parsing/reflection/string conversion for canonical palette lookups and reflection from palette enum validation. Later A006 native performance still failed. |
+| Local candidate `0.8.0-local.propertyreuse1`, following `6f0238d` | Retains appearance resolution only while its complete declaration/ancestry/host/fallback inputs match. Native performance remains unmeasured for this candidate. |
 | Executed calculations from the scale predicate | Accepted scale table and logical-size examples; not native render acceptance. |
 
 The linked Apple and Google guidance informs the interaction recommendations. Those recommendations are
@@ -353,7 +371,14 @@ confirmed contract defects; the palette candidate removes redundant work on the 
 Later user feedback with consumer `9ee0703` and FL `f362c99` reported page input working again, while all
 consumer buttons remained slow. The subsequent cost observation at consumer `6c51c72` used the same FL.
 This is user-reported page-input recovery for that pairing; performance and remaining font, IME, overlap
-and scaling acceptance are open. The palette candidate has not been tested in game. Record the actual
+and scaling acceptance are open.
+
+The later A006 observation used the fixed palette candidate `6f0238d`. The user reported about 22 FPS;
+the screenshot displayed 18 FPS, compared with a reported 60 FPS in vanilla under the same condition.
+Performance acceptance still failed. Its last complete 32-pass cost window recorded arrange
+`397.380 ms` and draw `253.921 ms`; native text-metrics calls totalled `7.183 ms` and consumer custom
+drawing totalled `2.433 ms`. Those stage costs identify remaining work without attributing all of it to
+property resolution. The new property-reuse candidate has not been tested in game. Record the actual
 candidate, resolution, scale, language, page state and result for each game pass.
 Keep a design breakpoint labeled as a proposal until its rendered layout and key interactions have been
 checked. Earlier-version human observations do not validate a new adapter or candidate.
