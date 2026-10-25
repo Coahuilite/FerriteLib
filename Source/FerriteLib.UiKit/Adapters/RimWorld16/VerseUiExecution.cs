@@ -27,7 +27,24 @@ public sealed class VerseUiExecution : IUiExecution, IDisposable
         return frame;
     }
 
-    private static UiFramePhase Phase(EventType type) => Enum.TryParse(type.ToString(), out UiFramePhase p) ? p : UiFramePhase.None;
+    // Native values have obsolete same-value aliases; Enum.ToString() need not choose the canonical name.
+    private static UiFramePhase Phase(EventType type) => type switch
+    {
+        EventType.Layout => UiFramePhase.Layout,
+        EventType.Repaint => UiFramePhase.Repaint,
+        EventType.MouseDown => UiFramePhase.MouseDown,
+        EventType.MouseUp => UiFramePhase.MouseUp,
+        EventType.MouseDrag => UiFramePhase.MouseDrag,
+        EventType.MouseMove => UiFramePhase.MouseMove,
+        EventType.ScrollWheel => UiFramePhase.ScrollWheel,
+        EventType.KeyDown => UiFramePhase.KeyDown,
+        EventType.KeyUp => UiFramePhase.KeyUp,
+        EventType.ValidateCommand => UiFramePhase.ValidateCommand,
+        EventType.ExecuteCommand => UiFramePhase.ExecuteCommand,
+        EventType.Used => UiFramePhase.Used,
+        EventType.Ignore => UiFramePhase.Ignore,
+        _ => UiFramePhase.None
+    };
     private static UiKey Key(KeyCode key) => key switch
     {
         KeyCode.UpArrow => UiKey.Up,
