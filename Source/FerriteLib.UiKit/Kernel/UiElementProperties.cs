@@ -38,7 +38,11 @@ public sealed class UiElementProperties
         InvalidateResolution();
         changed();
     }
-    internal void ReleaseResolutionCache() => resolutionReuse = null;
+    internal void ReleaseResolutionCache()
+    {
+        resolutionReuse = null;
+        resolvedSnapshot = null;
+    }
 
     private readonly Dictionary<string, UiPropertyDeclaration<float>> metrics = new(StringComparer.Ordinal);
     private readonly Dictionary<string, UiPropertyDeclaration<float>> localMetrics = new(StringComparer.Ordinal);
@@ -85,6 +89,22 @@ public sealed class UiElementProperties
     private readonly Dictionary<string, UiPropertyDeclaration<float>> namedMetrics = new(StringComparer.Ordinal);
     private UiElementSpec? authoredSpec;
     private UiStyleDocument? authoredDocument;
+    private ResolvedSnapshot? resolvedSnapshot;
+
+    private sealed class ResolvedSnapshot
+    {
+        internal readonly IReadOnlyDictionary<string, UiResolvedProperty<UiColour?>> Colours;
+        internal readonly IReadOnlyDictionary<string, UiResolvedProperty<float>> Metrics;
+        internal ResolvedSnapshot(Dictionary<string, UiResolvedProperty<UiColour?>> colours,
+            Dictionary<string, UiResolvedProperty<float>> metrics)
+        {
+            // Detached read-only backups can be shared by captures while the live facts stay unchanged.
+            Colours = new ReadOnlyDictionary<string, UiResolvedProperty<UiColour?>>(
+                new Dictionary<string, UiResolvedProperty<UiColour?>>(colours, StringComparer.Ordinal));
+            Metrics = new ReadOnlyDictionary<string, UiResolvedProperty<float>>(
+                new Dictionary<string, UiResolvedProperty<float>>(metrics, StringComparer.Ordinal));
+        }
+    }
 
     internal Action CaptureAuthoring()
     {
@@ -92,12 +112,12 @@ public sealed class UiElementProperties
         UiStyleDocument? priorDocument = authoredDocument;
         UiResolvedProperty<UiFont> priorFont = ResolvedFont;
         UiResolvedProperty<UiDensity> priorDensity = ResolvedDensity;
-        var priorColours = new Dictionary<string, UiResolvedProperty<UiColour?>>(resolvedColours, StringComparer.Ordinal);
-        var priorMetrics = new Dictionary<string, UiResolvedProperty<float>>(resolvedMetrics, StringComparer.Ordinal);
+        ResolvedSnapshot priorResolved = resolvedSnapshot ??= new ResolvedSnapshot(resolvedColours, resolvedMetrics);
         return () =>
         {
             // Restored derived facts must not reuse a candidate's inputs or rewind runtime writes.
             InvalidateResolution();
+            resolvedSnapshot = null;
             authoredSpec = null;
             if (priorSpec != null) Authoring(priorSpec, priorDocument);
             else
@@ -113,10 +133,11 @@ public sealed class UiElementProperties
             ResolvedFont = priorFont;
             ResolvedDensity = priorDensity;
             resolvedColours.Clear();
-            foreach (var pair in priorColours) resolvedColours.Add(pair.Key, pair.Value);
+            foreach (var pair in priorResolved.Colours) resolvedColours.Add(pair.Key, pair.Value);
             resolvedMetrics.Clear();
-            foreach (var pair in priorMetrics) resolvedMetrics.Add(pair.Key, pair.Value);
+            foreach (var pair in priorResolved.Metrics) resolvedMetrics.Add(pair.Key, pair.Value);
             lastHost = null;
+            resolvedSnapshot = priorResolved;
         };
     }
     internal void Authoring(UiElementSpec spec, UiStyleDocument? document)
@@ -269,6 +290,7 @@ public sealed class UiElementProperties
         if (TryReuseResolution(node, host, fallbackFont, out UiTheme retained)) return retained;
         // A failed resolution cannot leave a reusable partial set of source facts.
         if (resolutionReuse != null) resolutionReuse.Valid = false;
+        resolvedSnapshot = null;
         UiPropertyDeclaration<UiFont>? pageFont = PageScheme?.Font is UiFont page ? Declared(page) : null;
         ResolvedFont = UiPropertyResolver.Resolve(Prefer(Font, inlineFont), Prefer(LocalFont, namedFont),
             WithPage(Ancestors(node, p => Prefer(p.Font, p.inlineFont), p => Prefer(p.LocalFont, p.namedFont), p => p.LocalFont.IsDeclared ? "local-style" : p.NamedSource("Font")), pageFont),

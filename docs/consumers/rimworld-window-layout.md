@@ -273,8 +273,16 @@ held read-only resolved views continue to observe normal updates and removals.
 
 This check runs on every resolution call, including between pointer collection and painting; it is not
 a once-per-frame snapshot. A changed source or ancestor invalidates it even when the effective value
-stays equal. Failure rollback invalidates candidate reuse without undoing runtime declarations. The new
-candidate includes the palette/event/Repeat fixes and awaits matched native validation.
+stays equal. Failure rollback invalidates candidate reuse without undoing runtime declarations. The
+property-reuse candidate includes the palette/event/Repeat fixes. Its A007 observation approached the reported vanilla
+baseline but retained fluctuations and first-opening transients; performance acceptance remains open.
+
+Rollback protection can also repeat work after resolution has become cheap. The separate
+`0.8.0-local.residualcost1` candidate retains a detached read-only backup of resolved colour/metric facts
+until those facts are written. Capture actions can share that backup without sharing the mutable live
+stores; failed arrangement still restores the same stores and source facts. This is narrower than
+dropping transaction snapshots or sharing mutable layout-cache lists, which a failed candidate can
+change. The new candidate awaits matched native validation.
 
 Native IMGUI callback frequency is not a business-update clock. Keep model updates on their existing
 owner's schedule while drawing and input continue to follow the native callback contract. Low-cost
@@ -352,7 +360,8 @@ The evidence below separates platform mechanisms, local corrections and user obs
 | Local fix `f362c99`, including `069b88a` | Restores template-root visibility through the ordinary hidden/read-invalidation path. Existing Repeat, visibility, invalidation and layout-reuse suites passed; no native hide/show acceptance. |
 | Later 2026-10-25 user feedback: consumer `9ee0703` + FL `f362c99`; subsequent cost observation at consumer `6c51c72` uses the same FL | Page input reported working again, while all consumer buttons remained slow. Font, IME, overlap and scaling acceptance remains open. |
 | Local candidate `0.8.0-local.paletteperf1` at `6f0238d`, following `f362c99` | Removes repeated enum parsing/reflection/string conversion for canonical palette lookups and reflection from palette enum validation. Later A006 native performance still failed. |
-| Local candidate `0.8.0-local.propertyreuse1`, following `6f0238d` | Retains appearance resolution only while its complete declaration/ancestry/host/fallback inputs match. Native performance remains unmeasured for this candidate. |
+| Local candidate `0.8.0-local.propertyreuse1` at `2309cd3`, following `6f0238d` | Retains appearance resolution only while its complete declaration/ancestry/host/fallback inputs match. A007 approached the reported vanilla baseline, with fluctuations and first-opening transients still unresolved. |
+| Local candidate `0.8.0-local.residualcost1`, following `2309cd3` | Reuses detached read-only rollback backups while resolved facts remain unwritten. Native performance remains unmeasured for this candidate. |
 | Executed calculations from the scale predicate | Accepted scale table and logical-size examples; not native render acceptance. |
 
 The linked Apple and Google guidance informs the interaction recommendations. Those recommendations are
@@ -378,8 +387,17 @@ the screenshot displayed 18 FPS, compared with a reported 60 FPS in vanilla unde
 Performance acceptance still failed. Its last complete 32-pass cost window recorded arrange
 `397.380 ms` and draw `253.921 ms`; native text-metrics calls totalled `7.183 ms` and consumer custom
 drawing totalled `2.433 ms`. Those stage costs identify remaining work without attributing all of it to
-property resolution. The new property-reuse candidate has not been tested in game. Record the actual
-candidate, resolution, scale, language, page state and result for each game pass.
+property resolution.
+
+A007 paired the same consumer `6c51c72` with property-reuse candidate `2309cd3`. The user reported near
+60 FPS with continued small fluctuations, and roughly 30 FPS on first opening the window or Help before
+recovering. Its first sampled group recorded arrange `302.895 ms` (maximum `144.054 ms`) and draw
+`63.250 ms` over 32 Host passes; the final group recorded `131.118 ms` and `31.501 ms`. Host passes are
+not rendering frames, and these stages are not exclusively FL work. The log has no dedicated first-Help
+summary, so its complete transient cannot be attributed to one source path. Performance and the
+remaining native checks stay open. The new residual-cost candidate has not been tested in game.
+
+Record the actual candidate, resolution, scale, language, page state and result for each game pass.
 Keep a design breakpoint labeled as a proposal until its rendered layout and key interactions have been
 checked. Earlier-version human observations do not validate a new adapter or candidate.
 
