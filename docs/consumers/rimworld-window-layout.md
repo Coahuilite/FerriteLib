@@ -6,7 +6,7 @@ height for a two-column settings panel.
 
 This guide covers FerriteLib.UiKit **0.8.0-rc1**, the separately identified local fixes below, and the
 **RimWorld 1.6 adapter**. It brings together the window, scaling and desktop interaction findings recorded
-on 2026-10-25. For wiring a page, use the
+on 2026-10-25–26. For wiring a page, use the
 [ordinary settings recipe](ordinary-settings.md); for supported signatures and ownership, use
 [S6 in the public contract](../development/0.8/public-contract.md#s6--use-a-standard-window-or-embed-in-an-existing-callback).
 
@@ -150,6 +150,18 @@ every label. Judge the rendered colors over the actual window background, includ
 native GUI state. A theme selector belongs to the consumer's appearance settings and should update that
 window without changing layout, scroll or editing state. It must not recolor unrelated native menus.
 
+### Keep palette choices and named roles in one source
+
+Derive palette IDs, selector options and named role values from one consumer-owned data catalog. Load
+and validate it once: require unique IDs, complete valid roles and a stable default located by ID, not
+by array position. Do not hardcode the number of palettes independently of that catalog.
+
+Retint the retained host through its existing palette properties and colour revision. A colour-only
+change must not replace the host or alter font, density, geometry, drafts or scroll. If a removed saved
+ID needs repair, use the consumer's existing settings/save owner. Loading settings off the main thread
+may record the repair, but queue its persistence after the native main-thread owner is ready; do not
+reach Unity timing or GUI state from the load callback.
+
 ### Use the list to find and compare, and detail to explain
 
 Keep each list row's name, short disambiguating source, essential summary and direct action. Put full
@@ -178,15 +190,17 @@ navigation is deferred; native editing does not imply a complete keyboard-naviga
 
 ### Let secondary tools switch directly without becoming the main architecture
 
-Once inside a secondary group, keep its category control available. A short `Button` group in a
-`Row`/`Wrap` can work at wide sizes; a `Dropdown` showing the current category can retain the same route
-at compact sizes. This is a composition of existing controls, not a requirement for a new tab widget.
-Do not make every sibling switch travel back through a directory of large buttons.
+If a secondary directory merely repeats the available categories, open a useful tool directly and keep
+sibling switching available there. Remember the last tool for the window's lifetime; navigation alone
+does not need a persisted setting. Compose equal-width sibling `Button` controls with `Wrap` and
+`SelectedBind`. At compact widths use a fixed column count, preserving that column width in an incomplete
+last row rather than stretching its remaining buttons. This needs no new tab widget or navigation
+framework. Do not make every sibling switch travel back through a directory of large buttons.
 
 Keep a clear return to the original main-page context. Sibling switches should not create a long trail
-of meaningless Back entries. Help and detail are temporary destinations: return to the original object,
-filters, list position and valid draft. Preserve compatible editor identity and the existing commit/cancel
-contract; changing categories must not silently retarget an unfinished edit.
+of meaningless Back entries. Return from detail to the original object, filters, list position and valid
+draft; opening help should leave the task available. Preserve compatible editor identity and the existing
+commit/cancel contract; changing categories must not silently retarget an unfinished edit.
 
 ### Give help buttons an explicit destination
 
@@ -202,10 +216,30 @@ deliberately. An element's `HelpRef` alone does not implement the click destinat
 [help publication contract](../development/0.8/public-contract.md#publish-a-topic-without-installing-a-help-panel)
 for the separate lifetimes and explicit per-choice references.
 
-Show long help in the existing content area with a return action, rather than permanently reserving a
-large help band or opening another main window. Keep short, necessary guidance next to its control.
-These arrangements need no custom widget, additional window API, drag-and-drop system or desktop visual
-effects.
+Open help on demand as a bottom sibling of the task body, not as a replacement for it or another main
+window. Keep the body operable with its own scroll. Give long help an independent `Scroll`, with its
+title and Close action outside the scrolling text. Inner popups, capture and active editors consume Esc
+first; only an unconsumed Esc should close help. Keep short, necessary guidance next to its control.
+
+Budget the help region from the actual allocated content rectangle, the body's start and the footer's
+height, subtracting the page's padding and gaps in the same coordinate space. Do not derive the budget
+from a footer position already pushed below the viewport by overflowing content. A cap such as one third
+of the remaining body/help space is a consumer policy, not an FL default. Compose the region with the
+existing layout, scroll and drawing seams; no additional window API is needed.
+
+### Draw the help text that was actually measured
+
+Measure only the current topic's actual translated title, label and body, not the maximum across the
+whole help catalog. Measure and Draw must agree on text, width, font and translation environment. A
+consumer widget can retain a node-owned measured display for each bounded layout context, including the
+scrollbar-reserved width, rather than treating its last Measure call as valid at every width.
+
+Preserve legitimate unpinned hover consumers as well as explicit pinned topics. A changed topic or
+expired session claim must invalidate that node so the next layout boundary measures the new display.
+Never draw a newly resolved long body into the previous topic's measured band. If the width or font
+environment no longer matches, invalidate instead of painting mismatched text. Keep grace/source timing
+with the existing session; do not introduce a second expiry clock. A pin takes precedence over hover,
+and a changed pin must not repaint the old topic while awaiting its new measurement.
 
 ## Keep one window when several entry points open it
 
@@ -322,7 +356,11 @@ column width; a long product name is not a reason to widen or replace the whole 
 Match the control family at the insertion point. An Options category is not styled like a main-menu
 command button merely because both can open the same window. Use the category's shape, spacing and
 hover treatment without showing a false selected category while the original category's content remains
-visible. Consumer palette changes stay inside the consumer window.
+visible. On the inspected 1.6.4871 target, `Dialog_Options.DoCategoryRow` uses
+`Widgets.DrawOptionBackground` with `Widgets.ButtonInvisible`; a command-button skin is not an
+equivalent insertion. Keep these native draw/hit primitives in the adapter, and restore any changed GUI
+colour, enabled state and text font/anchor/wrapping in `finally`. Consumer palette changes stay inside
+the consumer window.
 
 ## Use counterexamples to check the design
 
@@ -339,6 +377,8 @@ visible. Consumer palette changes stay inside the consumer window.
 | Quiet every status to save space | A blocked primary task looks available | Keep the blocker readable and its next action reachable at the minimum size. |
 | Return to a directory for every tool switch | Comparing two related settings repeatedly loses context | Keep local category switching and a meaningful return to the main page. |
 | Open Help from the last hovered field | The same page Help button opens different topics | Give page and field actions explicit destinations; retain pinned help and return state. |
+| Draw fresh help without invalidating its measured node | A longer hover topic paints into the old short band | Draw the matching measured display and request layout for the changed topic. |
+| Budget help from the arranged footer position | Overflow has already pushed that footer below the screen | Use allocated content bounds, body start and footer height. |
 | Treat opening and closing as proof that controls work | The shell responds but the drawn page ignores clicks | Trace a real page action through native input to its binding and owner. |
 
 Inspect the rendered page with representative long labels, nonempty lists, an open detail and a visible
@@ -362,12 +402,20 @@ The evidence below separates platform mechanisms, local corrections and user obs
 | Local candidate `0.8.0-local.paletteperf1` at `6f0238d`, following `f362c99` | Removes repeated enum parsing/reflection/string conversion for canonical palette lookups and reflection from palette enum validation. Later A006 native performance still failed. |
 | Local candidate `0.8.0-local.propertyreuse1` at `2309cd3`, following `6f0238d` | Retains appearance resolution only while its complete declaration/ancestry/host/fallback inputs match. A007 approached the reported vanilla baseline, with fluctuations and first-opening transients still unresolved. |
 | Local candidate `0.8.0-local.residualcost1`, following `2309cd3` | Reuses detached read-only rollback backups while resolved facts remain unwritten. Native performance remains unmeasured for this candidate. |
+| Consumer A009 r2 at `68b30e3`, paired with fixed FL `36fa7ad` (2026-10-26) | Implements direct equal-width tool navigation, on-demand sibling help, measured-display invalidation, data-backed palettes and native category-row entry. Existing managed page/layout/editing and save-double checks support these paths; the staged ZIP records the actual pair. No native visual, sound or performance acceptance. |
 | Executed calculations from the scale predicate | Accepted scale table and logical-size examples; not native render acceptance. |
 
 The linked Apple and Google guidance informs the interaction recommendations. Those recommendations are
 design reasoning applied to the existing FL contract, not observed player outcomes or a promise to
 reproduce another operating system's UI. Record native observations separately from source facts and
 design choices.
+
+The A009 managed evidence includes retained editor state, independent body/help scrolling, unchanged
+geometry on retint and consumer save-owner round trips. Save doubles do not establish native Scribe or
+real player-configuration behavior. The implementation removes redundant catalog measurement, but does
+not establish that all first-opening spikes are fixed, that HUD performance is unaffected, or that the
+new layout has passed native checks across resolutions. Earlier performance observations below retain
+their original candidate identities.
 
 The first 2026-10-25 consumer observation on RimWorld 1.6.4871 showed both native entries opening the
 window and a rendered page; the player reported severe lag and no page-control response while Close
