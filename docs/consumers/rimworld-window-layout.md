@@ -252,6 +252,18 @@ event, and invalidation that continually defeats reuse. Record the relevant call
 time and whether it came from the game or platform doubles; a static screenshot cannot establish input
 latency.
 
+Palette conversion also belongs in that inspection. `UiElementProperties.Apply` resolves the finite
+colour vocabulary during arrangement and again during pointer-layer collection and drawing. Repeating
+enum parsing, reflection-based validation and enum-to-string conversion for each known role multiplies
+small costs across the tree. Use exact canonical-name dispatch and reflection-free enum validation on
+this path; keep declaration precedence, removal, source attribution and theme revisions intact rather
+than skipping resolution or caching an entire GUI frame.
+
+The separate `0.8.0-local.paletteperf1` candidate applies this correction and includes the earlier
+event-mapping and Repeat fixes. It retains the public case-sensitive role names and rejection behavior,
+including the parsed `out` value on failure. It is a local candidate, not an update to the published RC1
+asset. Native responsiveness and FPS still need validation with its matched consumer build.
+
 Check the actual loaded build and available diagnostic capability before expecting Dev output. A quiet
 log does not show whether a click reached an action. Prefer existing diagnostics; any additional
 observation should be explicitly enabled and bounded, not a per-frame log stream. Do not make a broken
@@ -321,6 +333,7 @@ The platform findings above come from these named source methods, not a screensh
 | FL source at RC commit `a0b5b983c3c13a099c62d936305eaebaf1deb5a8` | Window ownership, chrome, catalog and page capabilities. |
 | Target Unity `EventType` and Mono `RuntimeType.GetEnumName` / `Enum` source; local fix `069b88a` | Confirms same-value aliases and name-selection risk; explicit event mapping removes that dependency. Existing adapter checks passed, not a native event trace. |
 | Local fix `f362c99`, including `069b88a` | Restores template-root visibility through the ordinary hidden/read-invalidation path. Existing Repeat, visibility, invalidation and layout-reuse suites passed; no native hide/show acceptance. |
+| Local candidate `0.8.0-local.paletteperf1`, following `f362c99` | Removes repeated enum parsing/reflection/string conversion for canonical palette lookups and reflection from palette enum validation. Native responsiveness remains to be measured against the matched consumer. |
 | Executed calculations from the scale predicate | Accepted scale table and logical-size examples; not native render acceptance. |
 
 The linked Apple and Google guidance informs the interaction recommendations. Those recommendations are
@@ -333,10 +346,11 @@ window and a rendered page; the player reported severe lag and no page-control r
 remained usable, then ended the pass. Input/performance acceptance therefore failed; the responsible
 layer was not established by that observation. The installed FL was subsequently identified as `c3c3070`,
 not the consumer's fixed RC1 dependency `a0b5b9`; their production source trees are identical, but the
-observation is not a test of the intended artifact pairing. The two local fixes above address confirmed
-contract defects, not a proven explanation of all symptoms or the severe lag. Neither fix has completed
-native revalidation. Remaining font, IME, overlap and scaling acceptance is
-open. Record the actual candidate, resolution, scale, language, page state and result for each game pass.
+observation is not a test of the intended artifact pairing. The event-mapping and Repeat fixes address
+confirmed contract defects; the palette candidate removes redundant work on the identified hot path.
+Their effect on the reported severe lag remains unmeasured. Native input revalidation and remaining
+font, IME, overlap and scaling acceptance are open. Record the actual candidate, resolution, scale,
+language, page state and result for each game pass.
 Keep a design breakpoint labeled as a proposal until its rendered layout and key interactions have been
 checked. Earlier-version human observations do not validate a new adapter or candidate.
 
