@@ -143,6 +143,12 @@ route. A `Banner`, `WrappedText` and an explicit `Button` can present these stat
 roles. The consumer's save/publication owner supplies the facts; the UI does not invent a successful
 outcome or a recovery action the product cannot perform.
 
+Give the base surface, raised controls, primary text and supporting text distinct roles. A dark palette
+still needs bright readable text; an accent belongs on selected states and important actions, not on
+every label. Judge the rendered colors over the actual window background, including alpha and inherited
+native GUI state. A theme selector belongs to the consumer's appearance settings and should update that
+window without changing layout, scroll or editing state. It must not recolor unrelated native menus.
+
 ### Use the list to find and compare, and detail to explain
 
 Keep each list row's name, short disambiguating source, essential summary and direct action. Put full
@@ -218,6 +224,29 @@ Attach model subscriptions through `HostAttached`, detach through `HostDetached`
 save policy in the consumer. A click, a setter request, a successful publication and a disk save are
 different events; a library editor cannot decide what counts as a successfully saved product setting.
 
+### When Close responds but the page does not
+
+First separate shell interaction from page execution. A working native entry point and Close button can
+coexist with a page that draws but never accepts input. Follow one actual click through native input
+eligibility, event type and coordinates, capture, page hit testing, binding invocation and the owner's
+mutation. Locate the first missing transition before changing bindings or replacing controls.
+
+If the page also stalls, measure the hot path rather than attributing it to a disconnected button.
+Look for repeated host/definition creation, full-directory projection or text measurement on every GUI
+event, and invalidation that continually defeats reuse. Record the relevant call frequency or elapsed
+time and whether it came from the game or platform doubles; a static screenshot cannot establish input
+latency.
+
+Check the actual loaded build and available diagnostic capability before expecting Dev output. A quiet
+log does not show whether a click reached an action. Prefer existing diagnostics; any additional
+observation should be explicitly enabled and bounded, not a per-frame log stream. Do not make a broken
+page's diagnostic button the only way to collect evidence about that page.
+
+After an input blocker, stop the broad player checklist. The next native pass should first establish
+that opening remains responsive, a page button and editor accept input, and Close still works. Resume
+the remaining checks only after that path works. Keep the original failure alongside any headless
+checks, which describe a different execution boundary.
+
 ## Make native entry points discoverable without replacing native menus
 
 A startup-menu item, an Options category and an in-game bottom main button are different surfaces.
@@ -238,6 +267,11 @@ independent visibility settings and the ordinary Mod Settings route retained for
 the startup menu must not require a loaded map or world. Check translated labels against the real native
 column width; a long product name is not a reason to widen or replace the whole Options window.
 
+Match the control family at the insertion point. An Options category is not styled like a main-menu
+command button merely because both can open the same window. Use the category's shape, spacing and
+hover treatment without showing a false selected category while the original category's content remains
+visible. Consumer palette changes stay inside the consumer window.
+
 ## Use counterexamples to check the design
 
 | Tempting shortcut | Counterexample | Check that changes the design |
@@ -253,6 +287,7 @@ column width; a long product name is not a reason to widen or replace the whole 
 | Quiet every status to save space | A blocked primary task looks available | Keep the blocker readable and its next action reachable at the minimum size. |
 | Return to a directory for every tool switch | Comparing two related settings repeatedly loses context | Keep local category switching and a meaningful return to the main page. |
 | Open Help from the last hovered field | The same page Help button opens different topics | Give page and field actions explicit destinations; retain pinned help and return state. |
+| Treat opening and closing as proof that controls work | The shell responds but the drawn page ignores clicks | Trace a real page action through native input to its binding and owner. |
 
 Inspect the rendered page with representative long labels, nonempty lists, an open detail and a visible
 status/error message. Exercise the primary action, return, close and an active editor. Check popup
@@ -276,8 +311,11 @@ design reasoning applied to the existing FL contract, not observed player outcom
 reproduce another operating system's UI. Record native observations separately from source facts and
 design choices.
 
-The target-game window, font, IME, overlap and scaling observations for 0.8 remain open. Record the actual
-candidate, resolution, scale, language, page state and observed result when a game pass is performed.
+The first 2026-10-25 consumer observation on RimWorld 1.6.4871 showed both native entries opening the
+window and a rendered page; the player reported severe lag and no page-control response while Close
+remained usable, then ended the pass. Input/performance acceptance therefore failed; the responsible
+layer was not established by that observation. Remaining font, IME, overlap and scaling acceptance is
+open. Record the actual candidate, resolution, scale, language, page state and result for each game pass.
 Keep a design breakpoint labeled as a proposal until its rendered layout and key interactions have been
 checked. Earlier-version human observations do not validate a new adapter or candidate.
 
