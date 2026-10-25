@@ -1162,7 +1162,7 @@ internal sealed partial class UiLayoutEngine
 
         if (string.Equals(kind, "Repeat", StringComparison.Ordinal))
         {
-            return MeasureRepeat(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, node);
+            return MeasureRepeat(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, node, narrow);
         }
 
         // Stack, Column, Section, Surface and Clip are vertical stacks. Clip additionally becomes
@@ -1713,7 +1713,7 @@ internal sealed partial class UiLayoutEngine
     /// that identity, and release is the same <c>PruneNodesExcept</c> pass the definition walk feeds.
     /// </para>
     /// </summary>
-    private MeasuredBox MeasureRepeat(UiWidgetContext ctx, UiElementSpec spec, string kind, float width, Padding padding, float gap, float titleHeight, float innerWidth, float innerY, float availableHeight, UiNode node)
+    private MeasuredBox MeasureRepeat(UiWidgetContext ctx, UiElementSpec spec, string kind, float width, Padding padding, float gap, float titleHeight, float innerWidth, float innerY, float availableHeight, UiNode node, bool narrow)
     {
         RepeatState state = GetOrCreateRepeatState(node);
         string itemsKey = ReadAttribute(spec, RepeatItemsAttribute);
@@ -1737,13 +1737,24 @@ internal sealed partial class UiLayoutEngine
             state.Initialized = true; state.MaterializedPass = layoutPass; state.ItemsRevision = ctx.Bindings.GetRevision(itemsKey);
         }
         var rows = new List<ChildSlot>(state.Rows.Count);
-        var children = new UiLayoutChild[state.Rows.Count];
-        var measured = new MeasuredBox[state.Rows.Count];
         for (int i = 0; i < state.Rows.Count; i++)
         {
             ItemRow row = state.Rows[i];
+            if (IsHidden(row.Spec, ctx, narrow, node, row.Index))
+            {
+                // Keep the materialized identity, but let the owning Repeat observe visibility changes.
+                RecordDeclaredKeys(row.Spec, node, ctx.Bindings);
+                continue;
+            }
             rows.Add(new ChildSlot(row.Spec, row.Index));
-            UiNode rowNode = ChildNode(ctx, node, row.Spec, row.Index);
+        }
+
+        var children = new UiLayoutChild[rows.Count];
+        var measured = new MeasuredBox[rows.Count];
+        for (int i = 0; i < rows.Count; i++)
+        {
+            ChildSlot row = rows[i];
+            UiNode rowNode = ChildNode(ctx, node, row.Spec, row.DeclaredIndex);
             UiWidgetContext rowCtx = ElementScope(ctx.WithNode(rowNode), row.Spec, rowNode);
             bool stretch = UiPlacement.ParseAlign(row.Spec, UiPlacement.AlignXAttribute, UiPlacement.Axis.Horizontal).IsStretch;
             float rowWidth = stretch ? ResolveStackChildWidth(row.Spec, innerWidth, rowCtx) : ResolveWrapWidth(row.Spec, innerWidth, rowCtx);
