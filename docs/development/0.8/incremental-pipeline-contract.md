@@ -35,8 +35,10 @@ and publication, not a promise of O(changed-nodes) total callback cost or retain
   affected font's retained records, not every font on every callback.
 - Stable ordered geometry shares its base table and replaces touched 32-entry pages. The small page
   directory is copied, but unchanged entries and stable id indexes are shared. A published snapshot
-  never points at a mutable candidate patch map. Previous snapshots remain readable after a later
-  full update or Close; release replaces indexes rather than clearing indexes held by those snapshots.
+  contains only rectangle values and stable read-only metadata, not runtime entries, nodes or widgets.
+  It never points at a mutable candidate patch map or wraps a previous snapshot on each publication.
+  Previous snapshots remain readable after a later full update or Close; release replaces indexes
+  rather than clearing indexes held by those snapshots.
 - Caches, node geometry and the snapshot are committed synchronously after candidate calculation.
   Abandonment restores derived node facts and discards candidate cache records. A same-synchronization
   memo prevents a complete fallback from repeating already validated enrolled work at the same actual

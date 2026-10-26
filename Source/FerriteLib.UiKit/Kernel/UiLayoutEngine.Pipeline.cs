@@ -33,6 +33,10 @@ internal sealed partial class UiLayoutEngine
     private Dictionary<UiNodeId, StackRecipe> stackRecipes = new(), candidateStackRecipes = new();
     private readonly Dictionary<UiNodeId, int> entryIndex = new();
     private Dictionary<string, int> namedIndex = new(StringComparer.Ordinal), scrollIndex = new(StringComparer.Ordinal), contentIndex = new(StringComparer.Ordinal);
+    private PageTable<UiLayoutRect> publishedRects = new PageTable<UiLayoutRect>(Array.Empty<UiLayoutRect>());
+    private IReadOnlyList<string> stableVisibleIds = Array.Empty<string>();
+    private IReadOnlyList<UiLayoutDiagnostic> stableDiagnostics = Array.Empty<UiLayoutDiagnostic>();
+    private IReadOnlyDictionary<string, UiLayoutRect> stableScrollContents = new Dictionary<string, UiLayoutRect>();
     private readonly List<int> rootEntries = new();
     private readonly HashSet<string> visibleDemand = new(StringComparer.Ordinal);
     private readonly HashSet<UiNode> invalidatedInputs = new();
@@ -59,9 +63,10 @@ internal sealed partial class UiLayoutEngine
         entryIndex.Clear(); rootEntries.Clear(); visibleDemand.Clear();
         namedIndex = new(StringComparer.Ordinal); scrollIndex = new(StringComparer.Ordinal); contentIndex = new(StringComparer.Ordinal);
         hasLegacyMeasure = false; hasCustomDemand = false; hasReferenceHeight = false; hasDiagnosticCallbacks = false;
+        var rectValues = new UiLayoutRect[lastEntries.Count];
         for (int i = 0; i < lastEntries.Count; i++)
         {
-            PlacedEntry entry = lastEntries[i]; entryIndex.Add(entry.Id, i);
+            PlacedEntry entry = lastEntries[i]; entryIndex.Add(entry.Id, i); rectValues[i] = entry.Rect;
             if (entry.Node.Parent == null) rootEntries.Add(i);
             if (entry.Spec.Id.Length > 0) namedIndex[entry.Spec.Id] = i;
             if (entry.ContainerKind == "Scroll")
@@ -76,6 +81,7 @@ internal sealed partial class UiLayoutEngine
                 if (UiDefinitionCompiler.BindingRole(scope, entry.Spec, attribute.Key) != UiBindingRole.None)
                     visibleDemand.Add(attribute.Value);
         }
+        publishedRects = new PageTable<UiLayoutRect>(rectValues);
         stackRecipes = candidateStackRecipes;
     }
     private static bool FixedLeaf(UiElementSpec spec) => spec.TryGetNumber("Height", out _);
@@ -174,18 +180,21 @@ internal sealed partial class UiLayoutEngine
             // change its independent reference. Do not infer that dependency from an outer rectangle.
             if (hasReferenceHeight && (staged.Count != 0 || heights.Count != 0 || invalidatedInputs.Count != 0)) return false;
             if (heights.Count > 0 && !ReflowStableStacks(heights, changes, plans)) return false;
-            EntryPages next = changes.Count == 0 ? lastEntries : lastEntries.Replace(changes);
+            PageTable<PlacedEntry> next = changes.Count == 0 ? lastEntries : lastEntries.Replace(changes);
             foreach (var pair in changes)
             {
                 PlacedEntry entry = pair.Value; journal.Touch(entry.Node);
                 entry.Node.Rect = entry.Rect; entry.Node.ContentRect = entry.ContentRect;
             }
+            var rectChanges = new Dictionary<int, UiLayoutRect>();
+            foreach (var pair in changes) rectChanges.Add(pair.Key, pair.Value.Rect);
+            PageTable<UiLayoutRect> nextRects = changes.Count == 0 ? publishedRects : publishedRects.Replace(rectChanges);
             float totalHeight = 0;
             foreach (int root in rootEntries) totalHeight += next[root].Rect.Height;
             UiLayoutSnapshot result = changes.Count == 0 ? cachedSnapshot
-                : new UiLayoutSnapshot(new UiLayoutPoint(width, Math.Max(1, totalHeight)), new GeometryView(namedIndex, next),
-                    cachedSnapshot.VisibleIds, new GeometryView(scrollIndex, next), new GeometryView(contentIndex, next, true),
-                    cachedDefinitionRevision, cachedSnapshot.Diagnostics);
+                : new UiLayoutSnapshot(new UiLayoutPoint(width, Math.Max(1, totalHeight)), new GeometryView(namedIndex, nextRects),
+                    stableVisibleIds, new GeometryView(scrollIndex, nextRects), stableScrollContents,
+                    cachedDefinitionRevision, stableDiagnostics);
             foreach (int scroll in contentIndex.Values)
             { PlacedEntry entry = next[scroll]; ctx.Session.SetScrollPosition(entry.Node, ClampScroll(ctx.Session.GetScrollPosition(entry.Node), entry.ContentRect!.Value, entry.Rect)); }
             ApplyScrollTarget(ctx, next);
@@ -196,7 +205,7 @@ internal sealed partial class UiLayoutEngine
                 StackRecipe recipe = pair.Value; stackRecipes[pair.Key] = recipe;
                 layoutScopes[recipe.Scope].Plans[recipe.Key] = recipe.Reuse;
             }
-            lastEntries = next; cachedSnapshot = result;
+            lastEntries = next; publishedRects = nextRects; cachedSnapshot = result;
             cachedContentRevision = ctx.Session.ContentRevision;
             observationLayoutFrame = ctx.Session.Frame; observationLayoutAtUtc = DateTime.UtcNow;
             pendingInputValidation = false; ctx.Session.ClearDirtyNodes();
@@ -225,6 +234,9 @@ internal sealed partial class UiLayoutEngine
         namedIndex = new(StringComparer.Ordinal); scrollIndex = new(StringComparer.Ordinal); contentIndex = new(StringComparer.Ordinal);
         rootEntries.Clear(); visibleDemand.Clear(); validatedLeaves.Clear(); invalidatedInputs.Clear();
         pipelineRoots = null; rootDefinitions = Array.Empty<UiElementSpec>();
+        publishedRects = new PageTable<UiLayoutRect>(Array.Empty<UiLayoutRect>());
+        stableVisibleIds = Array.Empty<string>(); stableDiagnostics = Array.Empty<UiLayoutDiagnostic>();
+        stableScrollContents = new Dictionary<string, UiLayoutRect>();
         pipelineBindings = null; pipelineMetrics = null; pipelineTheme = null; pipelineTranslation = null;
     }
     private UiWidgetContext PipelineContext(PlacedEntry entry, UiWidgetContext ctx, UiSession.ArrangementJournal journal)

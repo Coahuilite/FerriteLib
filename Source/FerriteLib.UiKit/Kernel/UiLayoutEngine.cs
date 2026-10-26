@@ -121,7 +121,7 @@ internal sealed partial class UiLayoutEngine
     private int cachedContentRevision = -1;
     private int cachedDefinitionRevision;
     private int cachedTranslationRevision = int.MinValue;
-    private EntryPages lastEntries = new EntryPages(Array.Empty<PlacedEntry>());
+    private PageTable<PlacedEntry> lastEntries = new PageTable<PlacedEntry>(Array.Empty<PlacedEntry>());
 
     // Per-key notification state. keyNodes is the last arrange's map from an announced binding key to the
     // nodes whose elements declare it; committedRevisions is the revision this engine has already folded
@@ -329,13 +329,15 @@ internal sealed partial class UiLayoutEngine
             cachedContentRevision = ctx.Session.ContentRevision;
             cachedDefinitionRevision = DefinitionRevision(ctx);
             cachedTranslationRevision = ctx.Translation.TranslationRevision;
-            UiLayoutSnapshot nextSnapshot = new UiLayoutSnapshot(new UiLayoutPoint(width, box.Height), rects, visible, viewports, scrollContents, cachedDefinitionRevision, Array.AsReadOnly(layoutDiagnostics.ToArray()));
+            IReadOnlyList<UiLayoutDiagnostic> nextDiagnostics = Array.AsReadOnly(layoutDiagnostics.ToArray());
+            UiLayoutSnapshot nextSnapshot = new UiLayoutSnapshot(new UiLayoutPoint(width, box.Height), rects, visible, viewports, scrollContents, cachedDefinitionRevision, nextDiagnostics);
             if (layoutRequested || cachedSnapshot == null || !SameGeometry(lastEntries, box.Entries) || !SameDiagnostics(cachedSnapshot.Diagnostics, nextSnapshot.Diagnostics)) cachedSnapshot = nextSnapshot;
-            lastEntries = new EntryPages(box.Entries);
+            lastEntries = new PageTable<PlacedEntry>(box.Entries);
             observationLayoutFrame = ctx.Session.Frame;
             observationLayoutAtUtc = DateTime.UtcNow;
             pendingInputValidation = false;
             ctx.Session.ClearDirtyNodes();
+            stableVisibleIds = visible; stableDiagnostics = nextDiagnostics; stableScrollContents = scrollContents;
             RetainPipeline(ctx, roots);
             return cachedSnapshot;
         }
