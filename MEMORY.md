@@ -46,6 +46,12 @@ is checked in the same stage and reported independently. Native1.6/1.7 remain aw
 human evidence below does not accept0.8. New-engine1.7 adapter then direct drawing is a later route, not a
 1.6-first delivery prerequisite. Consumer migration uses a fixed supplied package, never moving outputs.
 
+The 2026-10-26 local incremental-pipeline candidate connects stable-domain validation, first-touch
+candidate backups and sparse geometry publication in the shared Release path. Exact conservative
+legacy/structure/environment/callback fallbacks and fixed Qz reference decisions are in
+`docs/development/0.8/incremental-pipeline-contract.md`. Managed work observations are separate from
+native acceptance; the currently held A009r2 pair is unchanged. Fixed consumer integration remains open.
+
 ## Historical 0.7 checkpoint (2026-10-09)
 
 - **Build and delivery identity.** The line's last **source** commit is

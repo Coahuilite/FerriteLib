@@ -54,6 +54,11 @@ Leaf/plan/text calculation records are staged and committed with the complete ar
 candidate restores the prior complete geometry and caches, ends unreliable input and never replays a
 business request. RU3 adds per-node retained display and current-invalid facts; required shared layout failure restores the complete prior arrangement and stops that Host input until a successful hit pass. See the [failure/lifetime contract](failure-lifetime-contract.md).
 
+The default production path now also avoids complete transaction preparation/publication for a validated
+stable domain. Its first sparse geometry domain is natural vertical flow; legacy synchronization and
+unsupported dependencies retain the complete path. See the [incremental pipeline contract](incremental-pipeline-contract.md)
+for candidate ownership, exact fallbacks, work counters and the fixed reference mechanisms.
+
 ## Follow the output its consumer actually uses
 
 The page does not enumerate an output schema:

@@ -16,17 +16,26 @@ internal sealed class UiTextMetricsCache : ITextMetrics, IUiTextMetricsEnvironme
     internal ITextMetrics Source { get; }
     private readonly Dictionary<UiFont, FontCache> fonts = new();
     internal UiTextMetricsCache(ITextMetrics source) { Source = source; }
+    // The candidate shares read-only font records. Only an actual miss/replacement owns a copy.
+    private readonly HashSet<UiFont> owned = new();
     internal UiTextMetricsCache Copy()
     {
+        owned.Clear(); // Both owners must fork before a later write.
         var copy = new UiTextMetricsCache(Source);
-        foreach (var pair in fonts)
-        {
-            var cache = new FontCache { Environment = pair.Value.Environment, Entries = pair.Value.Entries };
-            foreach (var width in pair.Value.Widths) cache.Widths.Add(width.Key, width.Value);
-            foreach (var height in pair.Value.Heights) cache.Heights.Add(height.Key, new Dictionary<float, float>(height.Value));
-            copy.fonts.Add(pair.Key, cache);
-        }
+        foreach (var pair in fonts) copy.fonts.Add(pair.Key, pair.Value);
         return copy;
+    }
+    private FontCache Writable(UiFont font, FontCache cache)
+    {
+        if (owned.Add(font))
+        {
+            var next = new FontCache { Environment = cache.Environment, Entries = cache.Entries };
+            foreach (var width in cache.Widths) next.Widths.Add(width.Key, width.Value);
+            foreach (var height in cache.Heights) next.Heights.Add(height.Key, new Dictionary<float, float>(height.Value));
+            fonts[font] = cache = next;
+        }
+        if (cache.Entries >= 512) { cache.Widths.Clear(); cache.Heights.Clear(); cache.Entries = 0; }
+        return cache;
     }
     public UiMeasureInputs? CaptureEnvironment(UiFont font) => (Source as IUiTextMetricsEnvironment)?.CaptureEnvironment(font);
     private FontCache? Current(UiFont font)
@@ -34,8 +43,7 @@ internal sealed class UiTextMetricsCache : ITextMetrics, IUiTextMetricsEnvironme
         UiMeasureInputs? environment = CaptureEnvironment(font);
         if (environment == null) { fonts.Remove(font); return null; }
         if (!fonts.TryGetValue(font, out FontCache? cache) || !environment.Equals(cache.Environment))
-            fonts[font] = cache = new FontCache { Environment = environment };
-        if (cache.Entries >= 512) { cache.Widths.Clear(); cache.Heights.Clear(); cache.Entries = 0; }
+        { fonts[font] = cache = new FontCache { Environment = environment }; owned.Add(font); }
         return cache;
     }
     public float MeasureWidth(string text, UiFont font)
@@ -43,7 +51,7 @@ internal sealed class UiTextMetricsCache : ITextMetrics, IUiTextMetricsEnvironme
         FontCache? cache = Current(font);
         if (cache != null && cache.Widths.TryGetValue(text, out float prior)) return prior;
         float result = Source.MeasureWidth(text, font);
-        if (cache != null) { cache.Widths[text] = result; cache.Entries++; }
+        if (cache != null) { cache = Writable(font, cache); cache.Widths[text] = result; cache.Entries++; }
         return result;
     }
     public float MeasureText(string text, UiFont font, float width)
@@ -53,6 +61,7 @@ internal sealed class UiTextMetricsCache : ITextMetrics, IUiTextMetricsEnvironme
         float result = Source.MeasureText(text, font, width);
         if (cache != null)
         {
+            cache = Writable(font, cache);
             if (!cache.Heights.TryGetValue(text, out Dictionary<float, float>? values)) cache.Heights.Add(text, values = new Dictionary<float, float>());
             values[width] = result; cache.Entries++;
         }

@@ -21,6 +21,7 @@ internal sealed partial class UiLayoutEngine
         internal IUiTranslation Translation = null!;
         internal int TranslationRevision;
         internal float Value;
+        internal UiFont Font;
     }
     private Dictionary<UiNodeId, RoleInput> autoWidths = new(), labelContributions = new();
     private float ReadLayoutRole(Dictionary<UiNodeId, RoleInput> records, UiElementSpec spec, UiWidgetContext ctx, bool shared, Func<float> calculate)
@@ -36,7 +37,7 @@ internal sealed partial class UiLayoutEngine
             && context.Equals(prior.Context) && (environment == null ? prior.Environment == null : environment.Equals(prior.Environment))) return prior.Value;
         float result = calculate();
         records[ctx.Node.Id] = new RoleInput { Spec = spec, Context = context, Environment = environment, Metrics = textMetricsCache!.Source,
-            Translation = ctx.Translation, TranslationRevision = ctx.Translation.TranslationRevision, Value = result };
+            Translation = ctx.Translation, TranslationRevision = ctx.Translation.TranslationRevision, Font = ctx.Theme.DefaultFont, Value = result };
         return result;
     }
     private Dictionary<string, BoundInput<bool>> visibleInputs = new(StringComparer.Ordinal);

@@ -35,8 +35,9 @@ internal sealed partial class UiLayoutEngine
     private Dictionary<UiNodeId, LayoutScope> layoutScopes = new();
     internal void ReleaseLayoutCaches()
     {
+        ReleasePipeline();
         layoutScopes.Clear(); textMetricsCache = null; activeLayoutScope = null;
-        cachedSnapshot = null; lastEntries.Clear(); widgetInstances.Clear(); repeatStates.Clear();
+        cachedSnapshot = null; lastEntries = new EntryPages(Array.Empty<PlacedEntry>()); widgetInstances.Clear(); repeatStates.Clear();
         materializedRepeats.Clear(); keyNodes.Clear(); committedRevisions.Clear();
         visibleInputs.Clear(); widthInputs.Clear(); tabInputs.Clear(); autoWidths.Clear(); labelContributions.Clear();
     }
@@ -107,18 +108,37 @@ internal sealed partial class UiLayoutEngine
         if (prior == null && enrolled) prior = records.FindLast(value => ReferenceEquals(value.Spec, spec) && ReferenceEquals(value.Metrics, textMetricsCache!.Source));
         if (prior != null && !ctx.Session.IsTripped(node) && !enrolled && prior.Pass == layoutPass) return prior.Height;
         UiMeasureInputs? environment = (ctx.Metrics as IUiTextMetricsEnvironment)?.CaptureEnvironment(ctx.Theme.DefaultFont);
+        if (validatedLeaves.TryGetValue(node.Id, out List<LeafMeasure>? validated))
+        {
+            LeafMeasure? ready = validated.FindLast(value => value.Pass == layoutPass && ReferenceEquals(value.Spec, spec)
+                && ReferenceEquals(value.Metrics, textMetricsCache!.Source) && context.Equals(value.Context) && sources.Equals(value.Sources)
+                && (!value.Inputs.UsesTextMetrics || value.Environment != null && value.Environment.Equals(environment)));
+            if (ready != null)
+            {
+                records = WritableLeaves(scope, node, records);
+                records.RemoveAll(value => ReferenceEquals(value.Spec, spec) && context.Equals(value.Context));
+                records.Add(ready);
+                return ready.Height;
+            }
+        }
+
+
         bool environmentEqual = prior != null && (!prior.Inputs.UsesTextMetrics || environment != null && environment.Equals(prior.Environment));
-        bool validation = ctx.Session.IsTripped(node) || pendingInputValidation || forceMeasurement || node.IsDirty || prior == null || !contextEqual || !environmentEqual || enrolled && !sources.Equals(prior.Sources);
+        bool validation = ctx.Session.IsTripped(node) || pendingInputValidation && !incrementalValidation || forceMeasurement || node.IsDirty || incrementalValidation && invalidatedInputs.Contains(node) || prior == null || !contextEqual || !environmentEqual || enrolled && !sources.Equals(prior.Sources);
         if (prior != null && !validation && (enrolled || !layoutRequested)) return prior.Height;
         // An old metrics implementation keeps its original idle-snapshot condition, not a new promise
         // that its unknown mutable environment is cacheable at a subsequent synchronization point.
         if (contextEqual && prior != null && !ctx.Session.IsTripped(node) && !layoutRequested && !forceMeasurement && !node.IsDirty && (!enrolled || sources.Equals(prior.Sources)) && prior.Environment == null && environment == null) return prior.Height;
+
+        if (incrementalValidation && (conservativeValidation || !enrolled))
+        { validationRequiresFull = true; return prior?.Height ?? 0; }
 
         UiMeasurement? request = enrolled ? ((IUiMeasureParticipant)widget).CaptureMeasurement(ctx) : null;
         if (request == null && enrolled) throw new InvalidOperationException("CaptureMeasurement returned null at " + node.Path + ".");
         UiMeasureInputs inputs = request?.Inputs ?? new UiMeasureInputs(usesTextMetrics: true);
         if (prior != null && !ctx.Session.IsTripped(node) && enrolled && UiMeasureValidity.CanReuse(prior.Inputs, inputs, prior.Environment, environment))
         {
+            records = WritableLeaves(scope, node, records);
             if (contextEqual) records.Remove(prior);
             records.Add(new LeafMeasure(spec, textMetricsCache!.Source, context, sources, inputs, environment, prior.Height, layoutPass));
             if (records.Count > 4) records.RemoveAt(0);
@@ -130,11 +150,23 @@ internal sealed partial class UiLayoutEngine
         // Tripped/failing work is never promoted to a reusable result. The session guard owns recovery.
         if (!ctx.Session.IsTripped(node))
         {
+            records = WritableLeaves(scope, node, records);
             if (contextEqual && prior != null) records.Remove(prior);
             records.Add(new LeafMeasure(spec, textMetricsCache!.Source, context, sources, inputs, environment, height, layoutPass));
             if (records.Count > 4) records.RemoveAt(0);
         }
         return height;
+    }
+    private List<LeafMeasure> WritableLeaves(LayoutScope scope, UiNode node, List<LeafMeasure> records)
+    {
+        if (incrementalValidation && layoutScopes.TryGetValue(node.UpdateScopeRoot, out var committed)
+            && committed.Leaves.TryGetValue(node.Id, out var original) && ReferenceEquals(original, records))
+        {
+            records = new List<LeafMeasure>(records);
+            scope.Leaves[node.Id] = records;
+            node.Owner.LayoutWork.CopiedLeaves += records.Count;
+        }
+        return records;
     }
     private static bool SameDiagnostics(IReadOnlyList<UiLayoutDiagnostic> before, IReadOnlyList<UiLayoutDiagnostic> after)
     {
@@ -182,7 +214,9 @@ internal sealed partial class UiLayoutEngine
         string key = node.Id.Key + ":" + phase + ":" + frame.Width.ToString("R", CultureInfo.InvariantCulture);
         LayoutScope scope = activeLayoutScope!;
         scope.Plans.TryGetValue(key, out UiLayoutReuse? prior);
-        UiLayoutReuse next = UiLayoutReuse.Resolve(prior, new UiMeasureInputs(text.ToArray(), values.ToArray()), measure, calculate, out bool reused);
+        UiMeasureInputs inputs = new UiMeasureInputs(text.ToArray(), values.ToArray());
+        UiLayoutReuse next = UiLayoutReuse.Resolve(prior, inputs, measure, calculate, out bool reused);
+        RecordStack(node, phase, frame, visible, children, inputs, next, key);
         if (!reused) node.LayoutArrangeCount++;
         scope.Plans[key] = next;
         scope.PlanNodes[key] = node.Id;

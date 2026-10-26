@@ -201,10 +201,24 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
     private readonly HashSet<UiBindingPresentation> presentations = new();
     internal void AttachPresentation(UiBindingPresentation value) => presentations.Add(value);
     internal void DetachPresentation(UiBindingPresentation value) => presentations.Remove(value);
+    // Unenrolled value/option reads retain their original synchronization call conditions.
+    // Command predicates keep the separate immediate eligibility path in CanRun/Draw.
+    private bool? ordinaryReads;
+    internal bool HasOrdinaryReads
+    {
+        get
+        {
+            if (ordinaryReads.HasValue) return ordinaryReads.Value;
+            foreach (var value in values.Values) if (!value.Tracked) { ordinaryReads = true; return true; }
+            foreach (var option in options.Values) if (!option.Tracked) { ordinaryReads = true; return true; }
+            ordinaryReads = false; return false;
+        }
+    }
     internal bool ContainsBinding(string key) => values.ContainsKey(key) || options.ContainsKey(key) || actions.ContainsKey(key) || commands.ContainsKey(key);
     internal void RemoveItemBinding(string key)
     {
         Reactive.AssertWritable();
+        trackedReads = null; ordinaryReads = null;
         values.Remove(key); options.Remove(key); actions.Remove(key); commands.Remove(key);
         declaredInvalidation.Remove(key); revisions.Remove(key);
         foreach (var view in presentations) view.Forget(key);
@@ -382,14 +396,16 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
         presentation = value;
         return new UiReactiveScope(() => presentation = previous);
     }
+    private Dictionary<string, UiTrackedBindingRead>? trackedReads;
     internal Dictionary<string, UiTrackedBindingRead> TrackedReads()
     {
+        if (trackedReads != null) return trackedReads;
         var reads = new Dictionary<string, UiTrackedBindingRead>(StringComparer.Ordinal);
         foreach (var item in values) if (item.Value.Tracked)
             reads.Add("value:" + item.Key, new UiTrackedBindingRead(item.Key, item.Value.GetBoxed, item.Value.Equal));
         foreach (var item in options) if (item.Value.Tracked)
             reads.Add("options:" + item.Key, new UiTrackedBindingRead(item.Key, () => item.Value.CaptureBoxed(), item.Value.Equal));
-        return reads;
+        return trackedReads = reads;
     }
     private object? ReadValue(string key, ValueDescriptor descriptor)
     {
@@ -746,6 +762,7 @@ internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => 
 
     private void DeclareInvalidation(string key, UiInvalidation invalidates)
     {
+        trackedReads = null; ordinaryReads = null;
         declaredInvalidation[key] = invalidates;
     }
 

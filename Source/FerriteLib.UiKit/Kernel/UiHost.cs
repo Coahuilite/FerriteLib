@@ -324,7 +324,7 @@ public sealed partial class UiHost : IDisposable
         if (window < 1) window = 1;
         if (samples < window) return;
 
-        subscription.PublishTiming(name, samples, total, max);
+        subscription.PublishTiming(name, samples, total, max, name == "arrange" ? "work-total " + session.LayoutWork : "");
         samples = 0;
         total = 0d;
         max = 0d;

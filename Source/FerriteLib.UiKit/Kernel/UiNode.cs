@@ -246,6 +246,8 @@ internal UiControlState GetOrCreateState(string stateKey)
     /// <summary>Hands the child its parent and keeps it once, in declared order.</summary>
     internal void AddChild(UiNode child)
     {
+        if (!ReferenceEquals(child.Parent, this) || !children.Contains(child))
+        { session.TouchArrangement(this); session.TouchArrangement(child); }
         child.Parent = this;
         if (!children.Contains(child))
         {

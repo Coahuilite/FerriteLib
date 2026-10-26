@@ -1067,8 +1067,44 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
     }
 
     // Capture derived arrangement facts; recovery never restores business state or ended capture.
+    internal UiLayoutWork LayoutWork { get; } = new UiLayoutWork();
+    internal IReadOnlyCollection<UiNode> DirtyNodes => dirtyNodes;
+    private ArrangementJournal? arrangementJournal;
+    internal ArrangementJournal BeginIncrementalArrangement()
+    {
+        if (arrangementJournal != null) throw new InvalidOperationException("Nested incremental arrangement.");
+        return arrangementJournal = new ArrangementJournal(this);
+    }
+    internal void TouchArrangement(UiNode node) => arrangementJournal?.Touch(node);
+    internal sealed class ArrangementJournal
+    {
+        private readonly UiSession owner;
+        private readonly Dictionary<UiNode, Action> restores = new();
+        private readonly List<UiNode> created = new();
+        internal ArrangementJournal(UiSession owner) => this.owner = owner;
+        internal void Created(UiNode node) => created.Add(node);
+        internal void Touch(UiNode node)
+        {
+            if (restores.ContainsKey(node) || created.Contains(node)) return;
+            restores.Add(node, node.CaptureArrangement());
+            owner.LayoutWork.CapturedNodes++;
+        }
+        internal void Commit() => owner.arrangementJournal = null;
+        internal void Rollback()
+        {
+            owner.arrangementJournal = null;
+            if (!owner.IsActive) return;
+            foreach (UiNode node in created)
+            {
+                node.ReleaseState(); owner.nodes.Remove(node.Id); owner.dirtyNodes.Remove(node);
+            }
+            foreach (Action restore in restores.Values) restore();
+        }
+    }
+
     internal Action CaptureArrangement()
     {
+        LayoutWork.CapturedNodes += nodes.Count;
         var priorNodes = new Dictionary<UiNodeId, UiNode>(nodes);
         var restoreNodes = new List<Action>();
         foreach (UiNode node in nodes.Values)
@@ -1119,6 +1155,7 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
     {
         if (spec == null) throw new ArgumentNullException(nameof(spec));
         UiNode node = GetOrCreateNode(element, spec.Kind, ordinal, spec.Id);
+        if (node.Kind != spec.Kind || node.Ordinal != ordinal || node.ElementId != spec.Id) TouchArrangement(node);
         node.RefreshIdentity(spec.Kind, ordinal, spec.Id);
         return node;
     }
@@ -1133,6 +1170,7 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
 
         node = new UiNode(this, element, kind, ordinal, needsMeasure: true, elementId: elementId);
         nodes.Add(element, node);
+        arrangementJournal?.Created(node);
         dirtyNodes.Add(node);
         return node;
     }

@@ -37,6 +37,7 @@ internal sealed partial class UiLayoutEngine
         /// </summary>
         internal IReadOnlyList<UiStyleDeclaration>? StyleChain;
 
+        internal LayoutStamp LayoutInputs;
         internal IUiWidget? Widget;
         internal bool IsContainer;
         internal string ContainerKind = "";
@@ -119,7 +120,7 @@ internal sealed partial class UiLayoutEngine
     private int cachedContentRevision = -1;
     private int cachedDefinitionRevision;
     private int cachedTranslationRevision = int.MinValue;
-    private List<PlacedEntry> lastEntries = new();
+    private EntryPages lastEntries = new EntryPages(Array.Empty<PlacedEntry>());
 
     // Per-key notification state. keyNodes is the last arrange's map from an announced binding key to the
     // nodes whose elements declare it; committedRevisions is the revision this engine has already folded
@@ -169,6 +170,15 @@ internal sealed partial class UiLayoutEngine
             throw new ArgumentNullException(nameof(ctx));
         if (roots == null)
             throw new ArgumentNullException(nameof(roots));
+        ctx.Session.LayoutWork.Passes++;
+        layoutPass++;
+        validatedLeaves.Clear(); invalidatedInputs.Clear(); notificationsCommitted = false; layoutInputChanged = false;
+        bool externalContentChanged = cachedSnapshot != null && cachedContentRevision != ctx.Session.ContentRevision;
+        try { if (TryIncremental(ctx, available, roots, externalContentChanged, out UiLayoutSnapshot retained)) return retained; }
+        catch { ctx.Session.AbortHitPass(); throw; }
+        candidateStackRecipes = new();
+        ctx.Session.LayoutWork.FullCandidates++;
+        ctx.Session.LayoutWork.Last = "full";
         UiTextMetricsCache? priorTextMetrics = textMetricsCache;
         textMetricsCache = priorTextMetrics != null && ReferenceEquals(priorTextMetrics.Source, ctx.Metrics) ? priorTextMetrics.Copy() : new UiTextMetricsCache(ctx.Metrics);
         ctx = ctx.WithMetrics(textMetricsCache);
@@ -177,11 +187,10 @@ internal sealed partial class UiLayoutEngine
         // The frame boundary: announcements raised during the previous pass are folded into one commit
         // before the cache is consulted, so a Paint-class key leaves the cache alone while a
         // Measure/Structure-class key marks its elements and moves the arrangement clock.
-        bool externalContentChanged = cachedSnapshot != null && cachedContentRevision != ctx.Session.ContentRevision;
-        CommitNotifications(ctx);
+
+        if (!notificationsCommitted) CommitNotifications(ctx);
         // A dirty node is the per-element invalidation signal: a widget that marked its own node dirty
         // asks for a re-measure even when size, content revision, definition and language all stand still.
-        layoutPass++;
         layoutRequested = pendingInputValidation || cachedSnapshot == null || ctx.Session.HasDirtyNodes || cachedContentRevision != ctx.Session.ContentRevision
             || cachedAvailable.X != width || cachedAvailable.Y != height || cachedDefinitionRevision != DefinitionRevision(ctx)
             || cachedTranslationRevision != ctx.Translation.TranslationRevision || cachedHostLayoutRevision != ctx.Theme.LayoutRevision;
@@ -196,7 +205,7 @@ internal sealed partial class UiLayoutEngine
         labelContributions = new Dictionary<UiNodeId, RoleInput>(labelContributions);
         var priorScopes = layoutScopes;
         layoutScopes = new Dictionary<UiNodeId, LayoutScope>();
-        foreach (var pair in priorScopes) layoutScopes.Add(pair.Key, pair.Value.Copy());
+        foreach (var pair in priorScopes) { layoutScopes.Add(pair.Key, pair.Value.Copy()); ctx.Session.LayoutWork.CopiedScopes++; foreach(var records in pair.Value.Leaves.Values) ctx.Session.LayoutWork.CopiedLeaves += records.Count; }
         activeLayoutScope = null;
         Action restoreArrangement = ctx.Session.CaptureArrangement();
         var priorKeys = new Dictionary<string, List<UiNode>>(keyNodes, StringComparer.Ordinal);
@@ -244,6 +253,8 @@ internal sealed partial class UiLayoutEngine
             var visible = new List<string>();
             var viewports = new Dictionary<string, UiLayoutRect>(StringComparer.Ordinal);
             var scrollContents = new Dictionary<string, UiLayoutRect>(StringComparer.Ordinal);
+            ctx.Session.LayoutWork.GeometryEntries += box.Entries.Count;
+            ctx.Session.LayoutWork.PublishedEntries += box.Entries.Count;
             foreach (PlacedEntry entry in box.Entries)
             {
                 if (entry.Spec.Id.Length > 0)
@@ -319,11 +330,12 @@ internal sealed partial class UiLayoutEngine
             cachedTranslationRevision = ctx.Translation.TranslationRevision;
             UiLayoutSnapshot nextSnapshot = new UiLayoutSnapshot(new UiLayoutPoint(width, box.Height), rects, visible, viewports, scrollContents, cachedDefinitionRevision, Array.AsReadOnly(layoutDiagnostics.ToArray()));
             if (layoutRequested || cachedSnapshot == null || !SameGeometry(lastEntries, box.Entries) || !SameDiagnostics(cachedSnapshot.Diagnostics, nextSnapshot.Diagnostics)) cachedSnapshot = nextSnapshot;
-            lastEntries = box.Entries;
+            lastEntries = new EntryPages(box.Entries);
             observationLayoutFrame = ctx.Session.Frame;
             observationLayoutAtUtc = DateTime.UtcNow;
             pendingInputValidation = false;
             ctx.Session.ClearDirtyNodes();
+            RetainPipeline(ctx, roots);
             return cachedSnapshot;
         }
         catch
@@ -420,6 +432,7 @@ internal sealed partial class UiLayoutEngine
                 continue;
             }
 
+            NotePipelineNotification(entry.Key, entry.Value);
             committedRevisions[entry.Key] = current;
 
             UiInvalidation invalidates = ctx.Bindings.GetInvalidation(entry.Key);
@@ -552,7 +565,7 @@ internal sealed partial class UiLayoutEngine
         }
     }
 
-    private void CollectPointerLayers(List<PlacedEntry> entries, int start, int end, UiWidgetContext ctx,
+    private void CollectPointerLayers(IReadOnlyList<PlacedEntry> entries, int start, int end, UiWidgetContext ctx,
         UiLayoutPoint viewportPosition, UiLayoutPoint? nativeOrigin, UiLayoutPoint windowOrigin, UiLayoutRect? clip, List<UiPointerLayer> layers)
     {
         for (int index = start; index < end; index++)
@@ -639,7 +652,7 @@ internal sealed partial class UiLayoutEngine
         return new UiLayoutRect(left, top, Math.Max(0, right - left), Math.Max(0, bottom - top));
     }
     private void DrawEntries(
-        List<PlacedEntry> entries,
+        IReadOnlyList<PlacedEntry> entries,
         int start,
         int end,
         UiWidgetContext ctx,
@@ -814,7 +827,7 @@ internal sealed partial class UiLayoutEngine
         PlacedEntry entry,
         UiLayoutRect outRect,
         UiWidgetContext ctx,
-        List<PlacedEntry> entries,
+        IReadOnlyList<PlacedEntry> entries,
         int childStart,
         int childEnd,
         UiLayoutPoint viewportPosition,
@@ -907,7 +920,7 @@ internal sealed partial class UiLayoutEngine
     /// It reads the entries rather than the snapshot's string-keyed viewports on purpose: the snapshot
     /// keeps its declared-id view for consumers, while the state itself belongs to the node.
     /// </summary>
-    private static void ClampScrollPositions(UiSession session, List<PlacedEntry> entries)
+    private static void ClampScrollPositions(UiSession session, IReadOnlyList<PlacedEntry> entries)
     {
         foreach (PlacedEntry entry in entries)
         {
@@ -1085,6 +1098,7 @@ internal sealed partial class UiLayoutEngine
                 Id = node.Id,
                 Node = node,
                 StyleChain = ctx.StyleChain,
+                LayoutInputs = new LayoutStamp(measureCtx),
                 Widget = widget,
                 IsContainer = false,
                 MeasureWidth = width,
@@ -1102,6 +1116,7 @@ internal sealed partial class UiLayoutEngine
             StretchToContent(container, node.Id, reference.Value);
         }
 
+        if (container.Entries.Count > 0) container.Entries[0].LayoutInputs = new LayoutStamp(ctx.WithViewWidth(width).WithNode(node));
         return container;
     }
 
@@ -2075,6 +2090,7 @@ internal sealed partial class UiLayoutEngine
                 Id = entry.Id,
                 Node = entry.Node,
                 StyleChain = entry.StyleChain,
+                LayoutInputs = entry.LayoutInputs,
                 Widget = entry.Widget,
                 IsContainer = entry.IsContainer,
                 ContainerKind = entry.ContainerKind,

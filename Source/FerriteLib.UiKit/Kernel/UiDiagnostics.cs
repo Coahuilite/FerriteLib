@@ -522,13 +522,13 @@ public sealed class UiDiagnosticSubscription : IDisposable
             elementPath, "", kind, reason, null, null, null, null));
     }
 
-    internal void PublishTiming(string name, int samples, double totalMilliseconds, double maxMilliseconds)
+    internal void PublishTiming(string name, int samples, double totalMilliseconds, double maxMilliseconds, string work = "")
     {
         if (!active) return;
         var timing = new UiDiagnosticTiming(name, samples, totalMilliseconds, maxMilliseconds);
         Append(new UiDiagnosticEvent(
             UiDiagnosticKind.Timing, "timing", "", sequence + 1, Host, SessionId, UiNodeId.None, "",
-            "", "", "", null, null, null, timing));
+            "", "", work, null, null, null, timing));
     }
 
     private void Append(UiDiagnosticEvent value)

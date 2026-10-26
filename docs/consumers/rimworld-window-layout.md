@@ -443,7 +443,9 @@ recovering. Its first sampled group recorded arrange `302.895 ms` (maximum `144.
 `63.250 ms` over 32 Host passes; the final group recorded `131.118 ms` and `31.501 ms`. Host passes are
 not rendering frames, and these stages are not exclusively FL work. The log has no dedicated first-Help
 summary, so its complete transient cannot be attributed to one source path. Performance and the
-remaining native checks stay open. The new residual-cost candidate has not been tested in game.
+remaining native checks stay open. A009r2 retains consumer `68b30e3` / FL `36fa7ad` for its independent
+human pass. The new [incremental-pipeline candidate](../development/0.8/incremental-pipeline-contract.md)
+has not been run in game; its managed work evidence does not accept that fixed native pair or establish FPS.
 
 Record the actual candidate, resolution, scale, language, page state and result for each game pass.
 Keep a design breakpoint labeled as a proposal until its rendered layout and key interactions have been

@@ -285,6 +285,9 @@ public sealed class UiElementProperties
         return result;
     }
 
+    internal bool TryCurrentResolution(UiNode node, UiTheme host, UiFont fallbackFont, out UiTheme theme)
+        => TryReuseResolution(node, host, fallbackFont, out theme);
+
     internal UiTheme Apply(UiNode node, UiTheme host, UiFont fallbackFont = UiFont.Small)
     {
         if (TryReuseResolution(node, host, fallbackFont, out UiTheme retained)) return retained;
