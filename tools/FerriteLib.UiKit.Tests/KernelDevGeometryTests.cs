@@ -1576,7 +1576,9 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     private static UiLayoutSnapshot Pass(UiHost host)
     {
         NativeFixture.DrawFrame(        host,Viewport);
-        return host.MeasureAndArrange(new UiLayoutPoint(Viewport.Width, Viewport.Height));
+        UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(Viewport.Width, Viewport.Height));
+        Console.WriteLine("DEV-PIPELINE " + host.Session.LayoutWork);
+        return snapshot;
     }
 
     private static void Print(string dump)

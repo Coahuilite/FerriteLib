@@ -107,7 +107,8 @@ internal sealed partial class UiLayoutEngine
             || cachedHostLayoutRevision != ctx.Theme.LayoutRevision || pipelinePropertyRevision != ctx.Theme.PropertyRevision
             || !ReferenceEquals(pipelineBindings, ctx.Bindings) || !ReferenceEquals(pipelineMetrics, ctx.Metrics)
             || !ReferenceEquals(pipelineTheme, ctx.Theme) || !ReferenceEquals(pipelineTranslation, ctx.Translation)
-            || hasCustomDemand || hasReferenceHeight || hasDiagnosticCallbacks || hasLegacyMeasure && pendingInputValidation) return false;
+            || hasCustomDemand || hasDiagnosticCallbacks || hasLegacyMeasure && pendingInputValidation) return false;
+        if (hasReferenceHeight && (pendingInputValidation || ctx.Session.HasDirtyNodes)) return false;
         if (pendingInputValidation && (visibleInputs.Count != 0 || widthInputs.Count != 0 || tabInputs.Count != 0 || repeatStates.Count != 0)) return false;
 
         foreach (UiNode node in ctx.Session.DirtyNodes)
@@ -153,7 +154,7 @@ internal sealed partial class UiLayoutEngine
                 PlacedEntry entry = lastEntries[index];
                 UiWidgetContext local = PipelineContext(entry, baseContext, journal);
                 if (!entry.LayoutInputs.Matches(local)) return false;
-                if (entry.Widget == null || FixedLeaf(entry.Spec)) continue;
+                if (entry.Widget == null || FixedLeaf(entry.Spec) || entry.HasContentHeightReference) continue;
                 if (!layoutScopes.TryGetValue(entry.Node.UpdateScopeRoot, out LayoutScope? ownerScope)
                     || !ownerScope.Leaves.TryGetValue(entry.Id, out List<LeafMeasure>? records)) return false;
                 validationScope.Leaves.Clear();
@@ -169,6 +170,9 @@ internal sealed partial class UiLayoutEngine
                 { staged[entry.Id] = nextRecords; validatedLeaves[entry.Id] = nextRecords; }
                 if (measured != entry.Rect.Height) heights[index] = measured;
             }
+            // A retained MatchContent allocation is valid on idle, but any newly validated result can
+            // change its independent reference. Do not infer that dependency from an outer rectangle.
+            if (hasReferenceHeight && (staged.Count != 0 || heights.Count != 0 || invalidatedInputs.Count != 0)) return false;
             if (heights.Count > 0 && !ReflowStableStacks(heights, changes, plans)) return false;
             EntryPages next = changes.Count == 0 ? lastEntries : lastEntries.Replace(changes);
             foreach (var pair in changes)

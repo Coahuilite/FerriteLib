@@ -56,8 +56,12 @@ another view's descriptor inventory. There is no second reactive graph or proces
 | Legacy `IUiWidget.Measure` requires validation | Complete path before invoking it. New input purity is not retrofitted onto it. |
 | Unknown legacy metrics | Original unchanged-snapshot rule remains; new synchronization revalidates normally. Optional effective-font stamps keep their real invalidation meaning. |
 | Visibility/width/tab/Repeat demand or membership changes, non-leaf dirty domain, explicit content invalidation | Complete path, retaining keyed identity, hidden drafts, lifetime cleanup and declared getter conditions. |
-| Shared-label/Auto-width roles at synchronization, MatchContent, changed-height propagation through Fill/unsupported ancestry, existing layout diagnostics in a changed-height domain | Complete path. Scroll range/scrollbar reservation and peer widths are not inferred from an unchanged outer rectangle. |
+| Shared-label/Auto-width roles at synchronization, changed MatchContent reference domain, changed-height propagation through Fill/unsupported ancestry, existing layout diagnostics in a changed-height domain | Complete path. Scroll range/scrollbar reservation and peer widths are not inferred from an unchanged outer rectangle. |
 | Dynamic `IUiPresentationDemand`, or `IUiLayoutDiagnosticSource` callbacks | Complete path. Their existing traversal/callback schedule is not silently replaced by one flat-entry callback. |
+
+An idle MatchContent allocation retains its already committed independent reference. Pending demand,
+dirty nodes or any newly validated measurement in that domain use the complete path before publishing
+a changed reference; MatchContent is not an unconditional whole-page idle barrier.
 
 Pure retint/hover does not become a measurement invalidation. Property resolution still checks the actual
 mutable host/declarations/ancestors; live resolved views and mutable returned themes remain live.
@@ -68,7 +72,9 @@ instead of reusing an old placement merely because an outer band stayed the same
 
 The existing opt-in arrange timing event adds `Reason = "work-total ..."`. These are cumulative
 Host/session work totals, **not** the timing event's sampling-window deltas. Subtract successive totals
-for the same Host/session. Timing samples remain Host passes, not render frames or FPS.
+for the same Host/session. `passes` counts ArrangeRoots synchronizations, including an explicit extra
+MeasureAndArrange call; it is not Session.Frame or a GUI/render-frame counter. Timing samples remain
+Host stage samples, not FPS.
 
 - `full`: complete candidate attempts; `reused`/`sparse`: successful retained/sparse commits. Other work
   totals include work already done by a candidate that later falls back or fails.
@@ -85,6 +91,12 @@ Its moved Button still captures/releases exactly one command. Existing Scroll an
 also retain geometry without full preparation; shared-column, ordinary changed-input and membership
 scenarios explicitly retain their complete fallbacks. These are managed work/contract observations, not
 native allocation bytes, frame timings or an acceptance of the new fixed FL/consumer pair.
+
+The existing geometry-instrument page also combines MatchContent, Scroll and a real Button. Its
+unchanged helper already performs DrawFrame followed by an explicit MeasureAndArrange. The stage
+summary now shows two synchronizations with one full preparation and one retained result; repeated
+existing calls retain the same six geometry entries. The Release half keeps its no-instrument behavior.
+This observation adds no test scenario and does not treat those synchronizations as game frames.
 
 ## Reference mechanisms, not a backend transplant
 

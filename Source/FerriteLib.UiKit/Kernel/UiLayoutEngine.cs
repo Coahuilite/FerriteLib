@@ -38,6 +38,7 @@ internal sealed partial class UiLayoutEngine
         internal IReadOnlyList<UiStyleDeclaration>? StyleChain;
 
         internal LayoutStamp LayoutInputs;
+        internal bool HasContentHeightReference;
         internal IUiWidget? Widget;
         internal bool IsContainer;
         internal string ContainerKind = "";
@@ -1099,6 +1100,7 @@ internal sealed partial class UiLayoutEngine
                 Node = node,
                 StyleChain = ctx.StyleChain,
                 LayoutInputs = new LayoutStamp(measureCtx),
+                HasContentHeightReference = matchContent && reference.HasValue,
                 Widget = widget,
                 IsContainer = false,
                 MeasureWidth = width,
@@ -1116,7 +1118,11 @@ internal sealed partial class UiLayoutEngine
             StretchToContent(container, node.Id, reference.Value);
         }
 
-        if (container.Entries.Count > 0) container.Entries[0].LayoutInputs = new LayoutStamp(ctx.WithViewWidth(width).WithNode(node));
+        if (container.Entries.Count > 0)
+        {
+            container.Entries[0].LayoutInputs = new LayoutStamp(ctx.WithViewWidth(width).WithNode(node));
+            container.Entries[0].HasContentHeightReference = matchContent && reference.HasValue;
+        }
         return container;
     }
 
@@ -2091,6 +2097,7 @@ internal sealed partial class UiLayoutEngine
                 Node = entry.Node,
                 StyleChain = entry.StyleChain,
                 LayoutInputs = entry.LayoutInputs,
+                HasContentHeightReference = entry.HasContentHeightReference,
                 Widget = entry.Widget,
                 IsContainer = entry.IsContainer,
                 ContainerKind = entry.ContainerKind,
