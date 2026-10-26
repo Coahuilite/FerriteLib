@@ -11,6 +11,13 @@ internal sealed partial class UiLayoutEngine
         Dictionary<UiNodeId, StackRecipe> plans)
     {
         if (cachedSnapshot!.Diagnostics.Count != 0) return false;
+        // Roots are a vertical sequence too: the complete path passes height - prior root heights
+        // to each later root. Moving a retained root cannot update its Fill/descendant Fill budget.
+        // Until that external constraint is propagated, preserve the complete transaction on growth
+        // or shrinkage. Idle validation and natural multi-root flow still retain their geometry.
+        if (rootEntries.Count > 1)
+            foreach (int root in rootEntries)
+                if (ConsumesAvailableHeight(lastEntries[root].Spec)) return false;
         var parents = new SortedSet<int>();
         foreach (int index in heights.Keys)
         {

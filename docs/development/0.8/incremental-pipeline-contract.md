@@ -61,6 +61,14 @@ another view's descriptor inventory. There is no second reactive graph or proces
 | Shared-label/Auto-width roles at synchronization, changed MatchContent reference domain, changed-height propagation through Fill/unsupported ancestry, existing layout diagnostics in a changed-height domain | Complete path. Scroll range/scrollbar reservation and peer widths are not inferred from an unchanged outer rectangle. |
 | Dynamic `IUiPresentationDemand`, or `IUiLayoutDiagnosticSource` callbacks | Complete path. Their existing traversal/callback schedule is not silently replaced by one flat-entry callback. |
 
+Multiple roots remain supported. The complete traversal gives each later root the viewport height minus
+the preceding roots' current heights. If a multi-root page contains a root/subtree that consumes this
+remaining height (Fill="true", including descendant/template Fill), any changed measured height takes
+the complete transaction rather than merely moving later roots. This conservative boundary also covers
+shrinkage; unchanged outputs/idle retain the existing fast path. It does not add an XML or author
+prerequisite. Existing multi-root placement and Fill allocation checks cover their original calls;
+the combined tracked-root-growth followed by Fill sequence has no existing targeted regression case.
+
 An idle MatchContent allocation retains its already committed independent reference. Pending demand,
 dirty nodes or any newly validated measurement in that domain use the complete path before publishing
 a changed reference; MatchContent is not an unconditional whole-page idle barrier.
