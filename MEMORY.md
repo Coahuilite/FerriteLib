@@ -50,7 +50,8 @@ The 2026-10-26 local incremental-pipeline candidate connects stable-domain valid
 candidate backups and sparse geometry publication in the shared Release path. Exact conservative
 legacy/structure/environment/callback fallbacks and fixed Qz reference decisions are in
 `docs/development/0.8/incremental-pipeline-contract.md`. Managed work observations are separate from
-native acceptance; the currently held A009r2 pair is unchanged. Fixed consumer integration remains open.
+native acceptance; the currently held A009r2 pair is unchanged. Fixed consumer integration of FL
+833c14f4 and its separate matched candidate are complete; native acceptance remains open.
 
 ## Historical 0.7 checkpoint (2026-10-09)
 

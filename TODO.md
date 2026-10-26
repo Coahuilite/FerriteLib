@@ -7,9 +7,6 @@
 is accepted; US fixed-input integration is complete. US acceptance against the published RC is in progress.
 
 - [ ] Complete US acceptance against the published RC asset and its consumer CI.
-- [ ] Consume the new fixed incremental-pipeline FL candidate through CO's serialized FL-to-US build
-      handoff and prepare a separate matched consumer candidate. The pipeline contract records the
-      bounded implementation/fallbacks; A009r2 human acceptance remains independent and unchanged.
 - [ ] Continue UI/UX integration and player-facing acceptance in the next session. Native1.6
       text/IME/fonts/window/input/scroll/clip/popup/image and native1.7 remain separately unaccepted.
       Known headless game errors are accepted as non-blocking for this RC transition, not erased.
