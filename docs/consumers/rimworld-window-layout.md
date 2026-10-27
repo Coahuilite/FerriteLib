@@ -6,7 +6,7 @@ height for a two-column settings panel.
 
 This guide covers FerriteLib.UiKit **0.8.0-rc1**, the separately identified local fixes below, and the
 **RimWorld 1.6 adapter**. It brings together the window, scaling and desktop interaction findings recorded
-on 2026-10-25–26. For wiring a page, use the
+on 2026-10-25–27. For wiring a page, use the
 [ordinary settings recipe](ordinary-settings.md); for supported signatures and ownership, use
 [S6 in the public contract](../development/0.8/public-contract.md#s6--use-a-standard-window-or-embed-in-an-existing-callback).
 
@@ -84,6 +84,10 @@ and its left/right/bottom inset is 20 units. Thus an outer `W × H` initially le
 page, before page-specific padding. These are overridable chrome values, not space a page can reclaim
 by drawing underneath the title.
 
+Consumer `ea610fa` requests an **864×640 outer window at a logical 1024×768 viewport** and bounds
+requests at other viewport sizes to the available logical space. This is that consumer's opening-size
+policy, not an FL default or a change to the player's UI scale.
+
 For current geometry, use `UiWindowHost.ShellChrome` rather than duplicating chrome constants.
 Its rectangles are in logical window/screen space, not page-local coordinates. For a completed Dev
 observation, use that pass's `UiDevGeometrySnapshot.ShellChrome`; attaching a later live measurement to
@@ -118,6 +122,10 @@ mechanisms. No new host, global state machine or UI toolkit is needed. Keep comp
 and follow [definition-update](../development/0.8/public-contract.md) and
 [editing](../development/0.8/editing-contract.md) rules. Removing a node and creating a different editor
 is not the same as retaining its draft while hidden.
+
+Consumer `ea610fa` retains its **1100-wide, 640-high content threshold**, checking both axes of the
+actual allocated content rectangle after page padding and before the common header. Bounding the outer
+window and selecting the page arrangement are separate decisions; neither substitutes for the other.
 
 When filters are collapsed, leave their active state and a clear action visible. Content being hidden
 does not mean its effects have stopped.
@@ -167,13 +175,24 @@ reach Unity timing or GUI state from the load callback.
 Keep each list row's name, short disambiguating source, essential summary and direct action. Put full
 metadata and diagnostic detail in the selected object's detail view. Removing every source label makes
 two identically named objects impossible to distinguish; copying full metadata into both panes makes
-both harder to scan. Gain density by removing repetition and unnecessary spacing, not by shrinking text
-or hit targets.
+both harder to scan. Before making the window smaller, remove repeated headings/subtitles and merge
+ordinary runtime status into an existing summary. Keep blockers and their actions visible. Gain density
+by removing repetition and unnecessary spacing, not by shrinking text or hit targets.
 
 Compose the list with `Repeat` and ordinary rows; use the same selected-object model for side-by-side
 detail and compact drill-down. Google's [adaptive list-detail guidance](https://developer.android.com/develop/ui/compose/layouts/adaptive/canonical-layouts)
 describes the useful relationship between these arrangements. Its toolkit APIs and breakpoint values
 are not FL capabilities or defaults.
+
+Build the **complete eligible inventory**, apply category, source and keyword filters together, then
+sort deterministically with a stable identity tie-breaker before taking a bounded result page. Taking
+the first few entries before filtering makes later matches unreachable. Keep the source selector itself
+searchable and paginated; use source IDs to distinguish equal display names without widening eligibility.
+
+Give each list its own query, filters, result page and source-search/page state. A directory, existing
+objects, creation candidates and a resource picker must not overwrite each other's browsing context.
+When results shrink, clamp to a valid page and base Previous/Next on that effective page, not a stale
+requested index. Keep these projections and view state with the consumer.
 
 The template root of a `Repeat` follows the same visibility rules as an ordinary child. A hidden row
 contributes no arranged box or gap; its stable item identity and existing state remain while its key is
@@ -187,6 +206,16 @@ row can mean “show this detail”; it does not also mean “enabled.” Use ex
 styles alongside the actual enable control. [Apple's focus and selection guidance](https://developer.apple.com/design/human-interface-guidelines/focus-and-selection/)
 is a useful distinction, not a reason to replace the host's input behavior. FL's additional K1 keyboard
 navigation is deferred; native editing does not imply a complete keyboard-navigation system.
+
+Keep the edited target's stable business identity separate from the visible page. Filtering or paging
+must not redirect an unfinished write to the first visible row; show the editing target even when it is
+off-page. Retain authoritative item membership separately from the filtered presentation when connections
+must survive filtering; removing a Repeat key can release that row's state. See the
+[item-binding identity contract](../development/0.8/item-binding-contract.md#keys-identify-current-targets-not-row-numbers).
+
+Selecting a creation candidate changes browsing state, not persisted settings. An explicit Create or
+Save action owns the store write and its outcome. Displaying an off-page candidate or current value
+must not silently add it to the eligible writable options.
 
 ### Let secondary tools switch directly without becoming the main architecture
 
@@ -308,15 +337,22 @@ held read-only resolved views continue to observe normal updates and removals.
 This check runs on every resolution call, including between pointer collection and painting; it is not
 a once-per-frame snapshot. A changed source or ancestor invalidates it even when the effective value
 stays equal. Failure rollback invalidates candidate reuse without undoing runtime declarations. The
-property-reuse candidate includes the palette/event/Repeat fixes. Its A007 observation approached the reported vanilla
-baseline but retained fluctuations and first-opening transients; performance acceptance remains open.
+property-reuse candidate includes the palette/event/Repeat fixes. Its A007 observation approached the
+reported vanilla baseline but retained fluctuations and first-opening transients; that observation did
+not close performance acceptance.
 
 Rollback protection can also repeat work after resolution has become cheap. The separate
 `0.8.0-local.residualcost1` candidate retains a detached read-only backup of resolved colour/metric facts
 until those facts are written. Capture actions can share that backup without sharing the mutable live
 stores; failed arrangement still restores the same stores and source facts. This is narrower than
 dropping transaction snapshots or sharing mutable layout-cache lists, which a failed candidate can
-change. The new candidate awaits matched native validation.
+change. That candidate's native performance was not established by the managed checks.
+
+Retain the complete eligible definition snapshot and reproject lists/options only when their actual
+inputs change: model/configuration or definition revisions, filters, search and page state. In consumer
+`ea610fa`, the view is cached against those inputs and the full resource inventory is captured per
+published definition snapshot; stable Draw calls do not rediscover all Defs or rebuild every option.
+This consumer-side reuse leaves ordinary getter and native execution contracts unchanged.
 
 Native IMGUI callback frequency is not a business-update clock. Keep model updates on their existing
 owner's schedule while drawing and input continue to follow the native callback contract. Low-cost
@@ -402,7 +438,9 @@ The evidence below separates platform mechanisms, local corrections and user obs
 | Local candidate `0.8.0-local.paletteperf1` at `6f0238d`, following `f362c99` | Removes repeated enum parsing/reflection/string conversion for canonical palette lookups and reflection from palette enum validation. Later A006 native performance still failed. |
 | Local candidate `0.8.0-local.propertyreuse1` at `2309cd3`, following `6f0238d` | Retains appearance resolution only while its complete declaration/ancestry/host/fallback inputs match. A007 approached the reported vanilla baseline, with fluctuations and first-opening transients still unresolved. |
 | Local candidate `0.8.0-local.residualcost1`, following `2309cd3` | Reuses detached read-only rollback backups while resolved facts remain unwritten. Native performance remains unmeasured for this candidate. |
-| Consumer A009 r2 at `68b30e3`, paired with fixed FL `36fa7ad` (2026-10-26) | Implements direct equal-width tool navigation, on-demand sibling help, measured-display invalidation, data-backed palettes and native category-row entry. Existing managed page/layout/editing and save-double checks support these paths; the staged ZIP records the actual pair. No native visual, sound or performance acceptance. |
+| Consumer A009 r2 at `68b30e3`, paired with fixed FL `36fa7ad` (2026-10-26) | Implements direct equal-width tool navigation, on-demand sibling help, measured-display invalidation, data-backed palettes and native category-row entry. Existing managed page/layout/editing and save-double checks support these paths; the staged ZIP records the actual pair. Managed evidence is not native acceptance; this pair remains distinct from the later accepted performance pair. |
+| Consumer `2f22bec` + FL incremental r4 `833c14f4` (2026-10-27 user feedback) | User accepted stable FPS for this fixed pair. Bounded Host summaries support the improvement direction; cold-opening peaks and the other native gaps below remain. |
+| Consumer `ea610fa108f101b33fac55fe41ae607484fc718c` + fixed FL `833c14f4` | Source-reviewed compact/filter implementation and existing managed layout/editing paths; native acceptance for this candidate remains open. |
 | Executed calculations from the scale predicate | Accepted scale table and logical-size examples; not native render acceptance. |
 
 The linked Apple and Google guidance informs the interaction recommendations. Those recommendations are
@@ -427,8 +465,8 @@ confirmed contract defects; the palette candidate removes redundant work on the 
 
 Later user feedback with consumer `9ee0703` and FL `f362c99` reported page input working again, while all
 consumer buttons remained slow. The subsequent cost observation at consumer `6c51c72` used the same FL.
-This is user-reported page-input recovery for that pairing; performance and remaining font, IME, overlap
-and scaling acceptance are open.
+This is user-reported page-input recovery for that pairing; it did not accept performance or the remaining
+font, IME, overlap and scaling conditions.
 
 The later A006 observation used the fixed palette candidate `6f0238d`. The user reported about 22 FPS;
 the screenshot displayed 18 FPS, compared with a reported 60 FPS in vanilla under the same condition.
@@ -442,10 +480,22 @@ A007 paired the same consumer `6c51c72` with property-reuse candidate `2309cd3`.
 recovering. Its first sampled group recorded arrange `302.895 ms` (maximum `144.054 ms`) and draw
 `63.250 ms` over 32 Host passes; the final group recorded `131.118 ms` and `31.501 ms`. Host passes are
 not rendering frames, and these stages are not exclusively FL work. The log has no dedicated first-Help
-summary, so its complete transient cannot be attributed to one source path. Performance and the
-remaining native checks stay open. A009r2 retains consumer `68b30e3` / FL `36fa7ad` for its independent
-human pass. The new [incremental-pipeline candidate](../development/0.8/incremental-pipeline-contract.md)
-has not been run in game; its managed work evidence does not accept that fixed native pair or establish FPS.
+summary, so its complete transient cannot be attributed to one source path. A007 did not close performance
+acceptance. A009r2 retains consumer `68b30e3` / FL `36fa7ad` as a separate experience/comparison pair;
+neither record is relabeled as the later incremental-pipeline result.
+
+On 2026-10-27, the user **accepted stable FPS for the [incremental-pipeline](../development/0.8/incremental-pipeline-contract.md)
+pair: consumer `2f22bec` + FL `833c14f4`** (`0.8.0-local.incremental4`). The captured session reports the
+consumer identity, and installed-file metadata identifies the matching FL. Its bounded 32-Host-call
+summaries support the reported improvement but are not a controlled whole-frame benchmark.
+The first arrange still reached a `54.424 ms` maximum: stable FPS acceptance does not erase cold-opening
+peaks or establish unaffected HUD performance.
+
+Font/IME, overlap, scaling/narrow-screen fit, audio-response behavior and real configuration-save
+acceptance remain incomplete.
+The later `ea610fa` compact/filter changes have source and managed-path evidence, not native acceptance;
+precise long-list combinations and three-pack fit at logical **1024×768** remain unverified. These gaps
+are separate from the accepted stable-FPS result.
 
 Record the actual candidate, resolution, scale, language, page state and result for each game pass.
 Keep a design breakpoint labeled as a proposal until its rendered layout and key interactions have been
