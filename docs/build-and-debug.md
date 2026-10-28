@@ -65,7 +65,10 @@ its own build after committing; verification's -dev bytes are not the release pa
 
 Each invocation retains complete group logs, Dev output and summary.json under a new dist/verification
 directory, or the supplied -LogDirectory. The summary records source/dirty inputs, configuration,
-command, exit and elapsed time. Failed dependencies block only groups that need them; independent
+exit and elapsed time. Its action field contains the invoked scriptblock text, including its flags
+and variable references; it is null for a BLOCKED group. retry_hint is separate recovery guidance,
+not an execution record. Older command fields held that retry text; use their full logs and source
+actions to establish execution. Failed dependencies block only groups that need them; independent
 content/license/identity checks still run. CI uploads the complete logs even on failure. Historical
 gate names remain searchable although setup/build/execute groups no longer target a fixed gate count.
 

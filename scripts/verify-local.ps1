@@ -48,6 +48,8 @@ function Invoke-Check {
     $started = [DateTime]::UtcNow
     $watch = [Diagnostics.Stopwatch]::StartNew()
     $status = 'PASS'; $code = 0; $message = ''
+    # Record the invoked source body, not the independently worded retry guidance.
+    $actionText = if ($Ready) { $Action.ToString().Trim() } else { $null }
     if (-not $Ready) {
         $status = 'BLOCKED'; $code = $null
         'Not executed: required restore/build group failed.' | Set-Content -LiteralPath $log
@@ -59,7 +61,7 @@ function Invoke-Check {
     $watch.Stop()
     if ($status -ne 'PASS') { $script:failed++ }
     $script:gateResults += "$Name=$status"
-    $script:groups += [ordered]@{ name=$Name; status=$status; exit=$code; configuration=$Configuration; source_head=$sourceHead; started_utc=$started.ToString('o'); elapsed_ms=$watch.Elapsed.TotalMilliseconds; command=$Retry; log=$log }
+    $script:groups += [ordered]@{ name=$Name; status=$status; exit=$code; configuration=$Configuration; source_head=$sourceHead; started_utc=$started.ToString('o'); elapsed_ms=$watch.Elapsed.TotalMilliseconds; action=$actionText; retry_hint=$Retry; log=$log }
     Write-Summary
     Write-Host ("[{0}] {1} ({2:N0} ms) -> {3}" -f $status,$Name,$watch.Elapsed.TotalMilliseconds,$log)
     if ($status -eq 'FAIL') { Get-Content -LiteralPath $log -Tail 12 | ForEach-Object { Write-Host "    $_" }; Write-Host "  [hint] retry: $Retry" }
