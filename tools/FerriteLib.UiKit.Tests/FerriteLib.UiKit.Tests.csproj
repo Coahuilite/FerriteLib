@@ -43,18 +43,14 @@
 
   <!-- Krafs.Rimworld.Ref 只提供编译期 ref 程序集（不可执行）。测试运行时需要可执行的最小
        UnityEngine.CoreModule / Assembly-CSharp 桩程序集。它们不参与本项目的编译引用，因此
-       不写成 ProjectReference，而是在主构建后显式构建并复制到输出目录。 -->
+       以 build-only ProjectReference 构建，再复制到输出目录；不进入编译引用。 -->
+  <!-- Build-only references put stub restore/build in the existing graph, never in compilation.
+       Verse owns Core/IMGUI/TextRendering; InputLegacy is its independent sibling. -->
+  <ItemGroup>
+    <ProjectReference Include="Stubs/VerseStub/VerseStub.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="Stubs/UnityEngineInputLegacyModuleStub/UnityEngineInputLegacyModuleStub.csproj" ReferenceOutputAssembly="false" Private="false" />
+  </ItemGroup>
   <Target Name="BuildAndCopyUiKitRuntimeStubs" AfterTargets="Build">
-    <Exec Command="dotnet build &quot;Stubs\UnityEngineInputLegacyModuleStub\UnityEngineInputLegacyModuleStub.csproj&quot; -c $(Configuration) --nologo -v quiet -m:1"
-          WorkingDirectory="$(MSBuildProjectDirectory)" />
-    <Exec Command="dotnet build &quot;Stubs\UnityEngineStub\UnityEngineStub.csproj&quot; -c $(Configuration) --nologo -v quiet -m:1"
-          WorkingDirectory="$(MSBuildProjectDirectory)" />
-    <Exec Command="dotnet build &quot;Stubs\UnityEngineImGuiStub\UnityEngineImGuiStub.csproj&quot; -c $(Configuration) --nologo -v quiet -m:1"
-          WorkingDirectory="$(MSBuildProjectDirectory)" />
-    <Exec Command="dotnet build &quot;Stubs\UnityEngineTextRenderingModuleStub\UnityEngineTextRenderingModuleStub.csproj&quot; -c $(Configuration) --nologo -v quiet -m:1"
-          WorkingDirectory="$(MSBuildProjectDirectory)" />
-    <Exec Command="dotnet build &quot;Stubs\VerseStub\VerseStub.csproj&quot; -c $(Configuration) --nologo -v quiet -m:1"
-          WorkingDirectory="$(MSBuildProjectDirectory)" />
     <ItemGroup>
       <UiKitRuntimeStub Include="$(MSBuildProjectDirectory)\bin\stubs\unityengine-input\UnityEngine.InputLegacyModule.dll" />
       <UiKitRuntimeStub Include="$(MSBuildProjectDirectory)\bin\stubs\unityengine\UnityEngine.CoreModule.dll" />

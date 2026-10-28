@@ -1,14 +1,18 @@
 # Consume the 0.8.0 release candidate
 
-Compile against the DLL from the published [v0.8.0-rc1 Release asset](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1),
-a non-latest prerelease built from `a0b5b983c3c13a099c62d936305eaebaf1deb5a8`, rather than a moving
-sibling output or a relabeled Dev DLL. Only FerriteLib ships the runtime DLL; a consumer references it
-with `Private=false` and does not bundle another copy.
+The published asset is still [v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1),
+a non-latest prerelease from a0b5b983c3c13a099c62d936305eaebaf1deb5a8. **rc2 is prepared locally,
+not published**; its [release/upgrade notes](../release-notes/v0.8.0-rc2.md) describe the delta.
 
-The current technical contract and US fixed-input integration are accepted. US acceptance against
-the published RC asset is still in progress. Native acceptance and next-session UI/UX work remain
-separate; known headless game errors are accepted as non-blocking for this transition, not as an
-error-free game result.
+For rc2 integration, use the explicitly delivered immutable local Release input until the real cloud
+asset exists. Record its actual source/configuration/DLL identity; do not silently fall back to rc1,
+a moving sibling output or a relabeled Dev DLL. After publication, select the real repo/tag/full SHA
+and exact asset. Only FerriteLib ships the runtime DLL; consumers reference it with Private=false.
+
+The user accepted US ea610fa/FL833c14f4 in an overall internal trial for RC preparation. Earlier fixed
+integration and stable-FPS evidence remain valid at their own identities. Unrecorded native detail and
+known headless errors are retained as RC limits, not a requirement to repeat the accepted trial.
+1.6 is the delivered adapter; 1.7/new-window work is not a gate for this release.
 
 ```csharp
 if (!FerriteLibVersion.Require(new Version(0, 8, 0), new Version(0, 9, 0),

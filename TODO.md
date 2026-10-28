@@ -2,15 +2,16 @@
 
 ## 0.8 RC follow-up
 
-[v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1) is published as a non-latest prerelease from
-`a0b5b983c3c13a099c62d936305eaebaf1deb5a8`. The HelpRef/output-lifetime and adjacent-name contract
-is accepted; US fixed-input integration is complete. US acceptance against the published RC is in progress.
+The accepted US ea610fa/FL833c14f4 internal trial permits RC preparation. FL v0.8.0-rc2 is not yet
+published; rc1 remains the published non-latest asset. Release/upgrade notes and the explicit local
+input versus real cloud sequence are in docs/build-and-debug.md.
 
-- [ ] Complete US acceptance against the published RC asset and its consumer CI.
-- [ ] Continue UI/UX integration and player-facing acceptance in the next session. Native1.6
-      text/IME/fonts/window/input/scroll/clip/popup/image and native1.7 remain separately unaccepted.
-      Known headless game errors are accepted as non-blocking for this RC transition, not erased.
-      Do not start/install the game automatically.
+- [ ] Under separate cloud authorization, land the reviewed FL CI/rc2 preparation through PR/main
+      CI and full-history privacy, then resolve real main SHA and publish rc2 through release CI.
+- [ ] Consume the actual published rc2 asset in US by repo/tag/full SHA/asset identity before US
+      main/rc1 publication; retain separate local producer delivery and consumer receipt.
+- [ ] Keep unrecorded native1.6 details as RC limitations. New1.7 adapter/window capabilities are
+      deferred, not RC blockers. Do not install or start the game automatically.
 
 E/N defaults, L1, finite appearance, S1–S7/R9 grading, two-subsequent-minor protection and platform priority
 are decided, not pending user choices. K1 added library focus/key system is approved for deferral, not

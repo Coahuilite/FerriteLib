@@ -42,6 +42,60 @@ intended revision first. Publication packers and downstream release verification
 Consumers compiling against a staged Dev DLL must install that same FL package;
 they must not ship another copy of the library in their own package.
 
+## One owner for restore, then build and execute
+
+The complete existing entry is scripts/verify-local.ps1. It restores three roots: the no-platform
+Core, the main harness (including payload/authors/stub references), and the adapter contract executable.
+The workflow no longer restores the same graphs before calling that entry. With -NoRestore, all
+three roots skip restore; builds always use --no-restore and fail on missing assets rather than
+silently repairing them. Use SDK10 for the net10.0 Core target and net472 reference packages.
+
+Verification rebuilds each selected executable from current sources without incremental outputs; only
+NuGet downloads are cached. Core Release, main Release and main Dev remain distinct builds. Build-only stub references preserve
+the canonical bin/stubs paths without adding native doubles to compile references. Verse's graph
+builds Core/IMGUI/TextRendering together; InputLegacy is its independent sibling. Main Release already
+builds the payload and external-author assembly; the adapter entry compiles separately with
+BuildProjectReferences=false against those same inputs. The old separate payload Release/Dev builds,
+five nested stub dotnet-build commands on every harness build and dotnet-run rebuilds are removed.
+The Dev reader executes the already-built Dev harness and retains its named-assertion/control checks.
+
+These are deterministic duplicate-command reductions, not a claimed speedup. Keep separate configurations,
+compile constants, dependency variants and execution processes. Final clean release identity still needs
+its own build after committing; verification's -dev bytes are not the release payload.
+
+Each invocation retains complete group logs, Dev output and summary.json under a new dist/verification
+directory, or the supplied -LogDirectory. The summary records source/dirty inputs, configuration,
+command, exit and elapsed time. Failed dependencies block only groups that need them; independent
+content/license/identity checks still run. CI uploads the complete logs even on failure. Historical
+gate names remain searchable although setup/build/execute groups no longer target a fixed gate count.
+
+NuGet download caching is shared CI practice; stale bin/obj output is not cached as proof.
+The same method can serve a consumer's distinct project variants, but FL's Core, public-author,
+native-stub, single-carrier and Dev-instrument assertions remain product-specific. Consumer audio,
+configuration and UI-identity gates belong to that consumer, not a copied FL test platform.
+
+## RC2 local input and later publication
+
+The planned next prerelease is v0.8.0-rc2, non-latest, for RimWorld1.6. Its
+[notes](release-notes/v0.8.0-rc2.md) preserve the accepted runtime contracts. A local fixed Release
+input has a real local source commit, not a future merge SHA. Stage it into an unused dist directory
+with the existing stage-package.ps1 and RequireReleaseIdentity; use a local preparation label.
+Do not create a tag or relax ancestry checks just to invoke the formal cloud path.
+
+Under later explicit cloud authorization:
+1. Push/review the FL branch and PR; main CI and the full-history privacy gate must pass.
+2. Resolve the actual final main SHA, then create v0.8.0-rc2 there. The existing ordered-tag/ancestry
+   checks remain. Release CI verifies again, runs privacy, builds a clean base-version Release payload,
+   stages it and publishes a CI-built prerelease asset with make_latest=false.
+3. US selects that actual repo/tag/full SHA/asset and records its compiler/runtime input. Run US CI,
+   review/main integration, then its v0.6.0-rc1 publication.
+4. Execute the existing post-release verification against the real asset.
+
+The DLL's base ProductVersion and About.xml remain0.8.0; the tag/archive owns rc2 identity and the DLL
+embeds source HEAD. Keeping the same suffix for rc/final tags preserves the tested-rc/final byte rule.
+Neither future rc2 main SHA nor asset exists during local preparation. No rc1 or moving-branch fallback
+is substituted. Publication and installation remain separate authorized operations.
+
 ## What a click report establishes
 
 The instrument remains opt-in, bounded, per-host, and observation-only. A Dev consumer enables

@@ -8,7 +8,15 @@ no patches, no languages, no textures: enabling it alone changes nothing in the 
 your mod list without a consumer installed, that consumer was uninstalled or disabled; the mod is safe
 to disable only when no enabled mod depends on it.
 
-**Released: [v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1)**, a non-latest prerelease from commit [`a0b5b983`](https://github.com/Coahuilite/FerriteLib/commit/a0b5b983c3c13a099c62d936305eaebaf1deb5a8). Fixed-source US integration is accepted; US acceptance against the published RC asset is in progress. Native1.6/UIUX acceptance and a compiled/native1.7 adapter remain open. Known headless game errors are accepted as non-blocking for this RC transition, not as error-free gameplay.
+**Published: [v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1)** from
+[a0b5b983](https://github.com/Coahuilite/FerriteLib/commit/a0b5b983c3c13a099c62d936305eaebaf1deb5a8),
+a non-latest prerelease. **v0.8.0-rc2 is in local preparation, not published**; see its
+[release and upgrade notes](docs/release-notes/v0.8.0-rc2.md).
+
+The user accepted the overall internal trial of US ea610fa + FL833c14f4 for RC preparation, following
+the separately accepted stable-FPS result. This is not a granular all-action/IME/resolution record.
+RimWorld1.6 remains the delivered target; a compiled/native1.7 adapter is not delivered and does not
+block this RC. Known headless game errors remain accepted as non-blocking for the transition.
 
 See the [active specification](docs/development/0.8/README.md), [complete migration inventory](docs/development/0.8/migration-status.md), [RC consumption guide](docs/consumers/consume-from-0.8.0-dev.md) and [breaking author migration](docs/development/0.8/refactor-migration.md). The complete retained core is same-source engine-free, with explicit1.6 execution and the full capability inventory.
 

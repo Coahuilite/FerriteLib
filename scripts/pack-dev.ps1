@@ -6,7 +6,10 @@ param(
     [switch]$Zip,
     # The NuGet package is a compile-time convenience for repositories on this machine; consumers bind
     # to the payload by sibling path, and a feed is deliberately on hold (MEMORY). So it is opt-in.
-    [switch]$Nupkg
+    [switch]$Nupkg,
+    # Caller already built this exact Dev configuration.
+    [switch]$NoBuild,
+    [switch]$NoRestore
 )
 
 Set-StrictMode -Version Latest
@@ -26,9 +29,12 @@ $root = [System.IO.Path]::GetFullPath($ProjectRoot)
 $projectFile = Join-Path $root 'Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj'
 $stageDir = Join-Path $root 'dist\dev\FerriteLib'
 
+$restoreArgs = @(); if ($NoRestore) { $restoreArgs += '--no-restore' }
 # Build the selected configuration in dist/build/Dev; staging never reads a shared build slot.
-& dotnet build $projectFile -c Dev --no-incremental --nologo -v minimal
-if ($LASTEXITCODE -ne 0) { throw 'Dev build failed.' }
+if (-not $NoBuild) {
+    & dotnet build $projectFile -c Dev --no-incremental --nologo -v minimal @restoreArgs
+    if ($LASTEXITCODE -ne 0) { throw 'Dev build failed.' }
+}
 
 # The label comes from the build axis, exactly like the artifact name in pack-release: one source for
 # the number, or the folder and the DLL inside it can disagree.
@@ -36,7 +42,13 @@ $prefixMatch = Select-String -LiteralPath $projectFile -Pattern '<VersionPrefix>
 if (-not $prefixMatch) { throw 'csproj carries no <VersionPrefix>; the build axis has no home.' }
 $label = $prefixMatch.Matches[0].Groups[1].Value.Trim() + '-dev'
 
-$shortCommit = (& git -C $root rev-parse --short=12 HEAD).Trim()
+$commit = (& git -C $root rev-parse HEAD).Trim()
+$shortCommit = $commit.Substring(0, 12)
+if ($NoBuild) {
+    $inputDll = Join-Path $root 'dist/build/Dev/FerriteLib.UiKit.dll'
+    $actual = [Diagnostics.FileVersionInfo]::GetVersionInfo($inputDll).ProductVersion
+    if ($actual -notlike "*+$commit") { throw "NoBuild requires the Dev input built from current HEAD; found $actual" }
+}
 if ($LASTEXITCODE -ne 0 -or -not $shortCommit) { throw 'Cannot resolve the current commit for the dev label.' }
 
 # A dev folder built from uncommitted work is normal; it just has to say so. The suffix is the reason
@@ -60,7 +72,7 @@ if ($LASTEXITCODE -ne 0) { throw "stage-package failed with exit code $LASTEXITC
 Write-Host "[pack-dev] staged folder -> $stageDir  (moving it into a game Mods directory is your step, not this script's)"
 
 if ($Nupkg) {
-    & dotnet pack $projectFile -c Release --nologo -v minimal
+    & dotnet pack $projectFile -c Release --nologo -v minimal @restoreArgs
     if ($LASTEXITCODE -ne 0) { throw 'dotnet pack failed.' }
     Write-Host "[pack-dev] nupkg -> $root\dist\package (not published anywhere; see MEMORY for why a feed is on hold)"
 }

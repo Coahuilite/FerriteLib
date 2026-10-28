@@ -16,11 +16,12 @@ The confirmed explicit-only Choice.HelpRef policy, adjacent Ref/Key/Bind naming 
 migration paths are in that contract. Session topic/grace and optional owned endpoint output have
 different lifetimes; public-contract.md describes them without a panel or access-capture framework.
 PM has accepted that technical contract and US has consumed the fixed source input.
-[v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1) is published as a non-latest prerelease from
-`a0b5b983c3c13a099c62d936305eaebaf1deb5a8`. US acceptance against that published RC remains in
-progress, separate from the completed fixed-input integration. Current follow-up actions are in TODO.md.
-Known headless game errors are accepted as non-blocking for this transition; native acceptance and the
-next-session UI/UX work remain open.
+[v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1) remains the published
+non-latest prerelease from a0b5b983c3c13a099c62d936305eaebaf1deb5a8. The user accepted the overall
+US ea610fa/FL833c14f4 internal trial for RC preparation on2026-10-28; granular unrecorded native
+coverage is a known limit, not a repeat-trial gate. The next planned prerelease is v0.8.0-rc2,
+not yet published. Notes are in docs/release-notes/v0.8.0-rc2.md and the local/cloud separation and
+verification ownership in docs/build-and-debug.md. Known headless errors remain non-blocking.
 
 Accepted RU1–RU3 production foundations and their applicable evidence remain in the reactive, layout-reuse
 and failure-lifetime contracts. Closeout adds native composite-capture precedence, normal-return-before-
@@ -42,7 +43,7 @@ retirement time floor alone never permits breaking removal at a minor.
 The isolated real-source cases, measured1.6/1.7 seams and complete neutral dependency closure are
 recorded in `docs/development/0.8/platform-and-real-integrations.md`. Fixed clean-source candidate identity
 is carried with delivery, not inferred from a later HEAD. 1.6 is primary; 1.7 compatibility
-is checked in the same stage and reported independently. Native1.6/1.7 remain awaiting human; legacy0.7
+is checked in the same stage and reported independently. Detailed1.6 native coverage remains incomplete; no1.7 adapter is delivered. Legacy0.7
 human evidence below does not accept0.8. New-engine1.7 adapter then direct drawing is a later route, not a
 1.6-first delivery prerequisite. Consumer migration uses a fixed supplied package, never moving outputs.
 
@@ -51,7 +52,7 @@ candidate backups and sparse geometry publication in the shared Release path. Ex
 legacy/structure/environment/callback fallbacks and fixed Qz reference decisions are in
 `docs/development/0.8/incremental-pipeline-contract.md`. Managed work observations are separate from
 native acceptance; the currently held A009r2 pair is unchanged. Fixed consumer integration of FL
-833c14f4 and its separate matched candidate are complete; native acceptance remains open.
+833c14f4 and its matched candidates are complete; overall internal-trial acceptance is recorded above.
 
 ## Historical 0.7 checkpoint (2026-10-09)
 

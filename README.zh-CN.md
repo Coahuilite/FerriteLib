@@ -6,7 +6,13 @@ RimWorld 1.6 的**无内容前置模组**。FerriteLib 只携带一个程序集�
 模组编译与运行时绑定。它不添加任何 Def、补丁、语言、贴图：单独启用它对游戏零影响。如果你的模组列表里
 出现了它而没有任何依赖它的模组，说明消费者已被卸载或禁用；只有在没有已启用模组依赖它时，才可以禁用本模组。
 
-**已发布：[v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1)**，为非 latest 预发布，构建源提交为 [`a0b5b983`](https://github.com/Coahuilite/FerriteLib/commit/a0b5b983c3c13a099c62d936305eaebaf1deb5a8)。US 固定源码接入已接受，针对已发布 RC 资产的实际验收仍在进行。原生1.6／UIUX验收与1.7编译／原生适配器仍未完成。已知 headless 游戏错误被接受为本轮 RC 过渡的非阻断项，不代表游戏零错误。
+**已发布：[v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1)**，构建源为
+[a0b5b983](https://github.com/Coahuilite/FerriteLib/commit/a0b5b983c3c13a099c62d936305eaebaf1deb5a8)，
+仍是非 latest 预发布。**v0.8.0-rc2 正在本地准备，尚未发布**；见[发布与升级说明](docs/release-notes/v0.8.0-rc2.md)。
+
+用户已在稳定FPS接受之后，总体接受 US ea610fa＋FL833c14f4 的内部试玩，并准许进入RC准备。
+这不补写逐项全动作／IME／分辨率通过记录。仅交付RimWorld1.6；1.7编译／原生适配器尚未交付，
+不阻断本RC。已知headless游戏错误仍按既有决定作为本轮过渡的非阻断项。
 
 见[活动规格](docs/development/0.8/README.md)、[完整迁移状态](docs/development/0.8/migration-status.md)、[RC 消费指南](docs/consumers/consume-from-0.8.0-dev.md)与[发布前作者迁移](docs/development/0.8/refactor-migration.md)。完整 retained 核心已同源脱离引擎，1.6 显式执行与完整能力库存已接通。
 

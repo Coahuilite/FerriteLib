@@ -1,6 +1,8 @@
 param(
     [string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot),
-    [string]$LogPath = ''
+    [string]$LogPath = '',
+    # Use the exact Dev build supplied by the complete entry.
+    [switch]$NoBuild
 )
 
 Set-StrictMode -Version Latest
@@ -266,7 +268,16 @@ foreach ($case in $controlCases) {
 
 # --- the real run ------------------------------------------------------------------------------------
 $log = Join-Path ([System.IO.Path]::GetTempPath()) ("fl-dev-instrument-" + [guid]::NewGuid().ToString('N') + '.log')
-dotnet run --no-restore --project $testsProject -c Dev *> $log
+if (-not $NoBuild) {
+    dotnet build $testsProject -c Dev --no-restore --nologo -m:1 *> $log
+    if ($LASTEXITCODE -ne 0) {
+        if ($LogPath) { Copy-Item -LiteralPath $log -Destination $LogPath }
+        throw "Dev harness build failed; full log: $log"
+    }
+}
+$executable = Join-Path $root 'tools/FerriteLib.UiKit.Tests/bin/Dev/net472/FerriteLib.UiKit.Tests.exe'
+if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw "Missing Dev harness: $executable" }
+& $executable *> $log
 $code = $LASTEXITCODE
 try {
     $output = if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log -Raw } else { '' }
