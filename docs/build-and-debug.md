@@ -1,8 +1,8 @@
 # Build inputs, diagnostics, and development slices
 
 This is the operational guide for the existing toolchain. **0.7.x is frozen.** These commands describe
-mechanisms; running a build, export, install or publication still needs task authorization. The next design
-is [the 0.8 specification](development/0.8/README.md).
+mechanisms; running a build, export, install or publication still needs task authorization. The current product contract
+is [the 0.8 specification](specification.md).
 
 ## Build once, select the input explicitly
 
@@ -79,7 +79,8 @@ configuration and UI-identity gates belong to that consumer, not a copied FL tes
 
 ## RC2 local input and later publication
 
-The planned next prerelease is v0.8.0-rc2, non-latest, for RimWorld1.6. Its
+The planned next prerelease is v0.8.0-rc2, non-latest, with RimWorld1.6 and basic1.7 compatibility.
+The 1.7 native rendering/interaction acceptance limits below still apply. Its
 [notes](release-notes/v0.8.0-rc2.md) preserve the accepted runtime contracts. A local fixed Release
 input has a real local source commit, not a future merge SHA. Stage it into an unused dist directory
 with the existing stage-package.ps1 and RequireReleaseIdentity; use a local preparation label.
@@ -98,6 +99,30 @@ The DLL's base ProductVersion and About.xml remain0.8.0; the tag/archive owns rc
 embeds source HEAD. Keeping the same suffix for rc/final tags preserves the tested-rc/final byte rule.
 Neither future rc2 main SHA nor asset exists during local preparation. No rc1 or moving-branch fallback
 is substituted. Publication and installation remain separate authorized operations.
+
+## Basic 1.7 compatibility candidate
+
+The local basic-compatibility candidate keeps the net472 payload and public API. Both 1.6 and 1.7
+load the single DLL under `1.6/Assemblies`; the explicit 1.7 load-folder entry does not add a second carrier.
+Its isolated fixed input and measured receipt live under `dist/rw17-basic-compat-20261030/`.
+This is a local candidate whose native rendering and main interactions still await human acceptance.
+
+The inspected 1.7.4990 rev1069 `UnityStubs` Font has no `fontNames` getter. Calling it while capturing
+the metric environment threw before ordinary text measurement and caused recovery-height bands.
+The adapter checks the defining assembly of its already-bound Font type once. Unity's
+`UnityEngine.TextRenderingModule` keeps the original complete fingerprint; other providers return null
+through the existing optional environment contract. This conservatively revokes metric reuse instead of
+inventing a stable font-data revision. The Unity-only getter body is marked NoInlining so the 1.7 JIT
+does not resolve its unavailable members on the common path. Normal measurement still calls Verse
+CalcHeight/CalcSize, and drawing, clipping, font choice, text content and GUI-state restoration keep
+their existing owners. There is no reflection-based member lookup or invocation.
+
+The Local17 source evidence also preserves TextAnchor values and the Label/BeginGroup/EndGroup entry
+points. It does not prove native rendering. Stub checks and the adapter executable remain 1.6 contract
+evidence; an installed reference set from a different game version cannot stand in for 1.7 compilation.
+Use the exact fixed DLL with `Private=false`, and distribute its complete FerriteLib folder separately
+from a consumer. A new build from the same HEAD can include different uncommitted source, so keep the
+dirty-source declaration and measured MVID with the selected package.
 
 ## What a click report establishes
 
@@ -129,4 +154,4 @@ without changing the held delivery. These checks belong to the existing build/di
 The bounded 2026-10-09 input/popup candidate was accepted in game; see the
 [0.7 verification record](development/0.7/40-verification.md). That pass is not an acceptance of every
 current source path. Automated contracts, artifact identity, and real-game observations answer different
-questions. Development priorities for the next line belong to the [0.8 specification](development/0.8/README.md).
+questions. Current requirements and open deviations are reached through the [0.8 specification](specification.md).
