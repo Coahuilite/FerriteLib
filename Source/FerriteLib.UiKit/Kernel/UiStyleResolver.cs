@@ -215,7 +215,19 @@ public sealed class UiStyleResolver
                     else ApplyColour(theme, pair.Key, pair.Value);
                 }
 
+                foreach (var pair in definition.TextColours)
+                {
+                    if (preserveHostDeclarations) theme.ApplyStyleTextColour(pair.Key, pair.Value);
+                    else theme.TextColourDeclaration(pair.Key).Set(pair.Value);
+                }
+
                 if (definition.Font.HasValue) ApplyFont(theme, definition.Font.Value, preserveHostDeclarations);
+                if (definition.Font.HasValue || definition.FontSize.HasValue)
+                {
+                    if (preserveHostDeclarations) theme.ApplyStyleFontSize(definition.FontSize);
+                    else if (definition.FontSize.HasValue) theme.FontSizeDeclaration.Set(definition.FontSize.Value);
+                    else theme.RemoveFontSizeOverride();
+                }
 
                 foreach (KeyValuePair<string, float> pair in definition.Metrics)
                 {

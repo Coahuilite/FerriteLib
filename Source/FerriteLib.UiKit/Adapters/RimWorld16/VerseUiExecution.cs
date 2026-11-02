@@ -95,6 +95,12 @@ public sealed class VerseUiExecution : IUiExecution, IDisposable
     }
 
     public UiNativeEditResult Edit(UiNativeEdit request)
+        => EditCore(request, null, null);
+
+    internal UiNativeEditResult EditText(UiTextEdit request)
+        => EditCore(request.Edit, request.Font.Size, request.Colour);
+
+    private UiNativeEditResult EditCore(UiNativeEdit request, int? size, UiColour? ink)
     {
         string result = request.Text;
         WithState(() =>
@@ -122,12 +128,27 @@ public sealed class VerseUiExecution : IUiExecution, IDisposable
                     current.Use();
             }
 
-            result = request.Multiline ? Verse.Widgets.TextArea(Rect(request.Rect), request.Text, !request.Writable) : Verse.Widgets.TextField(Rect(request.Rect), request.Text);
+            if (ink.HasValue)
+            {
+                GUI.color = Colour(UiColour.White);
+                GUI.contentColor = Colour(ink.Value);
+            }
+            string DrawEditor() => request.Multiline ? Verse.Widgets.TextArea(Rect(request.Rect), request.Text, !request.Writable) : Verse.Widgets.TextField(Rect(request.Rect), request.Text);
+            result = size.HasValue ? SizedEditor(request.Multiline, size.Value, DrawEditor) : DrawEditor();
         });
         bool consumed = Event.current?.type == EventType.Used;
         if (consumed)
             frame?.Consume();
         return new UiNativeEditResult(result, HasFocus(request.Control), consumed);
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static string SizedEditor(bool multiline, int size, Func<string> draw)
+    {
+        GUIStyle style = multiline ? Verse.Text.CurTextAreaStyle : Verse.Text.CurTextFieldStyle;
+        int previous = style.fontSize;
+        try { style.fontSize = size; return draw(); }
+        finally { style.fontSize = previous; }
     }
 
     public void ConsumeEvent()
@@ -199,6 +220,13 @@ public sealed class VerseUiExecution : IUiExecution, IDisposable
             GUI.color = Colour(colour);
             Verse.Widgets.Label(Rect(rect), text);
         });
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    internal void TextSized(UiLayoutRect rect, string text, UiTextFont font, UiColour colour, UiTextAnchor anchor, bool wrap)
+    {
+        if (!font.Size.HasValue) { Text(rect, text, font.Alias, colour, anchor, wrap); return; }
+        VerseFerriteTextMetrics.WithFontSize(font, wrap, () => { Text(rect, text, font.Alias, colour, anchor, wrap); return 0; });
     }
 
     public void Line(UiLayoutPoint from, UiLayoutPoint to, UiColour colour, float width) => WithState(() => Verse.Widgets.DrawLine(Point(from), Point(to), Colour(colour), width));

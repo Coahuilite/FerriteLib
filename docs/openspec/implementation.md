@@ -5,6 +5,96 @@
 cf1cf6456096171fb47c012369bcd0c2f29e968f。FL-F01/F02/F03 已在该 HEAD 的 dirty 工作树修复；
 下列对应段落区分实际源码机制、已执行既有检查及未执行原生／精确故障组合。
 
+<a id="appearance-freedom"></a>
+## 2026-11-03 外观自由度：作者入口与组合生产链
+
+当前 c1a5091 基线的 dirty 源码实现七个独立 TextColor 槽、只读 text/wrapped 默认修正和
+FontSize 1..96。新入口为 public-unstable，不给旧 Stable 类型增加公开／protected 成员或
+implements，不改冻结签名、API 区间或闭合检查。作者写法见[消费指南](../consumers/consume-from-0.8.0-dev.md#choose-one-effective-font-for-measurement-and-drawing)。
+
+### 作者书写仍由原属性 owner 解析
+
+- XML：TextColor 及六个状态槽、FontSize；UiDefinitionCompiler 定位拒绝非法 inline 值。
+  Scheme：同名 TextColor 元素，Metric Token="Font"／"FontSize"；非法数字令 style 候选
+  StructurallyInvalid，正常更新流程报告并保留 last-good。
+- UiTextColours.Theme/Instance/Local 与 UiTextFonts.Theme/Instance/Local 返回现有
+  UiPropertyDeclaration；Set 保存同值意图，Remove 只揭示当前下一来源，透明色不是 absence。
+  Theme／ElementProperties 自己持有数据，没有全局服务表。
+- TextColours partial 复用 UiPropertyResolver，七槽独立解析后才按有效状态选色。FontSize
+  partial 与原 Font 来源共同确定描述；Font-only 的最近层重置外层数字，size-only 继续找别名。
+  authoring capture／rollback、Clone／Restore／page application 和 resolution reuse 同时维护新值。
+- UiTextColours.Resolved 返回活只读槽／来源；UiTextFonts.ResolvedSize 与 Requested 分开
+  数字来源和请求描述。旧 ResolvedFont／Styles.Font 继续只读资源别名。
+- 独立 Session 的 CreateContext 不改变条件。新属性作者调用 UiTextFonts.Apply（同
+  UiTextColours.Resolve）及权威 host theme，返回同 node/session 的 resolved context；测绘共用
+  它，变更声明后重新解析。retained Host 在原 pipeline 自动做这一步。
+- 无 Session 的视觉作者直接配置 Theme，以 UiTextFonts.Requested／Resolve 成对使用实际
+  ruler/drawing；最终颜色取 theme.Styles.Resolve(...).Text。旧 IUiDrawing.Text 的显式 colour／
+  font 参数仍是原含义，旧 UiThemeDraw.Label 不被重解释为数字调用。
+
+### 一个 native owner，标准和独立入口实际采用
+
+VerseTextExecution 组合唯一 VerseUiExecution，委托 identity、PrepareControl、Capture、Focus、
+Frame、Images、Edit、WithState 和 Dispose；不复制控制表或 session 状态。无参构造拥有 owner，
+传入 owner 默认借用，关闭先 Session/Host 后 owner。VerseTextMetrics 组合原
+VerseFerriteTextMetrics singleton；旧 singleton、旧接口和合法使用条件不变。
+
+标准 UiWindowHost/UiPageWindow 的 SetFrame、Accept/Cancel、DrawFrame 实际供应组合端口，
+Host.AdoptTextMetrics 只替换同一原生 ruler 引用；旧自定义 Metrics override/自带 Host ruler
+不被绕过。protected Execution 仍为原 owner。chrome 标题／副标题／关闭、notice、页内容、
+Host audit 用同一对能力；数字可增加自然 chrome 行高／关闭尺寸，显式几何 override 仍负责分配。
+独立 Host 使用同一新 ruler 与 execution；Session/custom widget 使用其实际 context 和
+UiTextFonts.Resolve(context)，不需创建示范框架或额外 Host。
+
+原生编辑链：UiControls.Edit 解析 Editor run 和有效状态色 → UiTextEdit（旧 UiNativeEdit +
+生效 UiTextFont + optional colour）→ VerseTextExecution.Edit → 同 owner.EditText/EditCore →
+GUI.contentColor 与真实 Widgets.TextField/TextArea。显式字色清除外层 GUI.color 的乘色，
+无显式颜色保留原 native preset ink。数字临时设置 CurTextFieldStyle／CurTextAreaStyle.fontSize；
+标签仍经 CurFontStyle 与 Widgets.Label，不绘后缩放、不插 rich-text size。
+WithState、WithFontSize、SizedEditor 在 finally 恢复共享样式／GUI 状态；focus、caret、selection、
+IME、只读复制和 Cancel 仍由原编辑 funnel/native owner 持有。
+
+### 测量、布局、绘制与观察使用生效描述
+
+UiTextRun 只有 metrics 和 drawing 都声明该用途能力才保留数字；Editor 还要求编辑载体能力。
+否则同一 run 回别名预设，报告请求／生效／用途／原因，按元素路径与原因去重。
+内置 text/banner/empty/header/button/checkbox/slider/number/text-field/stepper/dropdown/mode/tree、
+container title、Auto、SharedLabels、换行、自然行高及 popup 行／命中几何均消费这一生效描述；
+显式 Height/FieldWidth 等分配不被擅自改写，空间不足仍由 fit／layout 报告。
+
+- UiLayoutEngine 的 context/stamp、role 与 measure inputs 包含有效数字及适用 Editor 描述。
+  UiTextMetricsCache 的键为资源别名／有效字号／用途／文字／宽度，按实际环境失效。
+  CaptureEnvironment=null 不授予跨同步的 text/role reuse；原先 !layoutRequested 的 idle-snapshot
+  条件对 numeric 和 legacy 一致保留，不把无 FontSize 当作已知字体环境。
+- UiFitAudit.CheckText 以同一生效字体和真实 audit ruler 计量；ruler 缺数字能力时明确报告，
+  不用预设测数字。旧 UiOverflowReport 外形不改，UiTextFonts.FontOf/ColourOf 读新并行元数据。
+- UiRetainedPaint 捕获成功绘制的 theme/生效字体/最终色及编辑 draft；retained field 是
+  display-only，不调用 native edit 或业务请求。它与 native-editor 的来源标记分开。
+- Host.Observe 有界 facts 输出请求字号来源、各用途请求／生效／降级和最后 paint 描述／色。
+  Dev capture 的 ScopeTextFont 为请求，LabelFont/EditorFont 和对应 Colour/Source 为本次最后
+  outlet 事实；未触达仍 not-sampled。旧 PaintedFont 保留原 unknown 语义；不把 scope 推断成像素。
+
+WrappedTextWidget 只将展示角色入口改为 writable:null；共享 Resolve(writable:false) 与交互资格
+不变。H1 仅两条指定期望修为只读文字保留 Danger／正常 Neutral。A、B 与重用新 FL 的 delivery-r8
+共同变亮，即便其调用方源码未改。
+
+### 证据与宿主边界
+
+1.6 数值标签／输入均为 **静态候选、待原生**。1.7.4995 rev309 标签链为源码候选，
+VerseFerriteTextMetrics.NumericLabels17 是唯一标签开关（当前 true）；输入数值不支持，
+回预设并报告。1.7 字体环境无可靠指纹，仍 null，不借字段增加假定纯度。未宣称1.7引用编译、
+JIT 或原生接受；原平台证据保身份。
+
+复用已完成干净基线和颜色切片。当前源码完整原 verify-local 在
+`dist/verification/a004-complete-20261103-0359/summary.json` 记录18组通过、0失败／阻塞；
+Core391、adapter140，Release/Dev构建零警告零错误。Dev仪器实际执行40项指定断言，
+4188条 ok、11行节点 dump；已有按钮／banner输出实际preset字体／字色，并未触达新数值分支。
+既有 checks
+不逐一动态覆盖七槽／来源撤销、数值解析边界、成对降级、native glyph、style 异常还原及
+新 retained/fit 元数据分支。只维护批准的 containment 两个 getter、Verse.Text 独立 field/area
+backing 与 NativeFixture 的具体 Owner/实际 supplied port 兼容，不改业务断言或增加 case。
+原生数值测绘、caret/selection/IME、语言回退、UIScale、极端字号与1.7绑定/开关仍待用户确认。
+
 ## 真实生产管线与责任
 
     model / sources / BindingOwner / revisions

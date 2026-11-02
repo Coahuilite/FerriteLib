@@ -186,3 +186,5 @@ public interface IUiDrawing
     void Image(UiLayoutRect rect, UiImage image, UiColour tint);
     void Tooltip(UiLayoutRect rect, string text);
 }
+
+internal interface IUiExecutionOwner { IUiExecution NativeOwner { get; } }

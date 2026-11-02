@@ -45,6 +45,48 @@ ResolvedFont/Metrics/Colours SHALL 给当前有效值和来源；不同度量来
 - **THEN** 当前 paint 可采用新 tint，几何无需因此重排
 - **AND** 持有来源视图继续更新，不变成可写 resolver store
 
+### Requirement: FL08-TEXT-COLOUR 七个独立文字色槽
+TextColor 与 TextColor.Muted/Active/Success/Warning/Danger/Disabled SHALL 是主题文字色，
+不扩展 UiPaletteRole。各槽先独立按 FL08-PROP 解析，再由有效状态选择。
+Disabled 只取 TextColor.Disabled 或 DisabledForeground，不取普通 TextColor；
+Active/Success/Warning/Danger 依次取对应槽、TextColor、对应 semantic foreground；
+中性 Muted 取 TextColor.Muted、TextColor、SecondaryForeground；其余取 TextColor、Foreground。
+透明 RGBA 是明确值。只改色 SHALL 只推进 ColourRevision，不推进 LayoutRevision 或强制重排。
+实例／局部 Remove 只揭示下一当前来源；resolved 视图保留每槽来源。
+独立视觉使用同一 Theme/Styles.Resolve，无 Host 或 Session 前提。
+
+#### Scenario: 近处普通色与远处状态色
+- **WHEN** 实例只写 TextColor，祖先写 TextColor.Warning，当前有效 tone 为 Warning
+- **THEN** 使用祖先的 Warning 槽；撤销该槽后才回落实例普通色
+- **AND** 真的禁用时普通色不覆盖禁用提示，Disabled 槽不恢复任何输入资格
+
+### Requirement: FL08-READONLY-TEXT 纯展示绑定不是禁用
+text/wrapped SHALL 不把绑定可写性传入展示状态；只读 Bind 默认使用正常前景，
+Tone/Emphasis/TextColor 仍可决定文字色。不做 opt-in。共享 Resolve(..., writable:false)、
+StatusBadge/StatusTreatment 的显式 writable 语义与所有交互控件的禁用、输入禁止保持原合同。
+
+#### Scenario: 只读状态文字
+- **WHEN** text/wrapped 读取 BindReadOnly，且没有额外样式声明
+- **THEN** 文字由禁用灰变为正常前景
+- **AND** 同一只读绑定用于交互控件时仍按原输入和禁用政策处理
+
+### Requirement: FL08-TEXT-FONT 数值字号的已采用合同
+FontSize SHALL 是 1..96 的无符号十进制正整数逻辑 GUI 字号，不是物理像素。
+零、负数、小数、符号、指数、空串、超范围或 int 溢出须拒绝；manifest 创建定位报错，
+style 更新报告并保留 last-good，runtime 声明抛 ArgumentOutOfRangeException。
+可在 Font 的所有来源声明。最近一个声明 Font 或 FontSize 的层决定描述：该层有 Font 时，
+字号只取同层 FontSize；该层只有 FontSize 时，别名继续向外找。Remove 揭示下一来源。
+旧 Font 读取器保留别名语义，完整描述／有效字号与来源另行读取；无数字保留原三档路径。
+新测量／绘制能力 SHALL 可选，不给旧实现者增加前提；不近似三档、不用 rich-text size 或绘后缩放。
+测量、绘制、Auto/SharedLabels、换行、自然行高、编辑／popup、fit、retained 和缓存一律使用
+生效字体；不支持用途时回到别名预设，按元素路径／原因去重报告请求值、生效值和用途。
+字体环境未知时仍撤销跨同步复用；未请求同步的原 idle-snapshot 条件对数值和旧路径一致保留，
+不将无数字视为可靠环境。新入口 SHALL 通过 public-unstable 组合提供，保留旧 Stable 签名、
+implements、singleton、旧 override 与合法使用条件；不得借新能力重解释旧 drawing 的显式参数。
+标准 Window/Host、独立视觉及 Session/custom widget SHALL 有实际采用路线。
+原生 editor glyph SHALL 消费生效描述和最终状态色，不以 placeholder/retained label 代替。
+实现与证据边界见[开发映射](../../../implementation.md#appearance-freedom)。
+
 ### Requirement: FL08-PAGE-STYLE 页面应用不抹宿主意图
 page style SHALL 分开其实际声明与 host 当前声明，撤页面应用揭示宿主现值；不能把一个 Gap 应用提升为整个 density override。显式 ApplyTo 的原 caller-owned-theme 应用条件保留。更新／排列失败 SHALL 恢复精确有效应用及声明来源，而不撤回作者 runtime override 或业务副作用。
 

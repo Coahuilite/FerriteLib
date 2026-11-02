@@ -86,7 +86,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     {
         // One fixed band: the value is a fraction of it and never a measurement input, which is what makes
         // a progress announcement a Paint-class change rather than a re-arrange.
-        return AtomVocabulary.ReadHeight(spec, ctx.Theme.Geometry.RowHeight);
+        return AtomVocabulary.ReadHeight(spec, UiTextFonts.RowHeight(ctx));
     }
 
     public void Draw(UiLayoutRect rect, UiWidgetContext ctx)

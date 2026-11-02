@@ -2,6 +2,12 @@
 
 ## 0.8 development line (2026-10-25)
 
+The 2026-11-03 appearance-freedom source adds seven TextColor slots, normal read-only text presentation
+and FontSize1..96 through public-unstable composed production entries, preserving Stable signatures,
+singletons and old override conditions. The standard and independent author routes, single native owner,
+effective-font pipeline and managed/native evidence limits are in
+`docs/openspec/implementation.md#appearance-freedom`; no new native acceptance or fixed package exists.
+
 The 2026-11-01 release-gate repairs restore request-failure attribution, same-owner late reactive
 presentation adoption and initial document-attach staging recovery. Their production paths and
 managed/native evidence limits are in `docs/openspec/implementation.md` (release-gate narrow repairs).

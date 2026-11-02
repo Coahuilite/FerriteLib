@@ -6,7 +6,7 @@ using System.Collections.ObjectModel;
 namespace FerriteLib.UiKit.Kernel;
 
 /// <summary>Written per-property intent. Colours affect paint; font/density changes invalidate measure.</summary>
-public sealed class UiElementProperties
+public sealed partial class UiElementProperties
 {
     internal UiElementProperties(Action changed)
     {
@@ -17,6 +17,7 @@ public sealed class UiElementProperties
         LocalDensity = new UiPropertyDeclaration<UiDensity>(LayoutDeclarationChanged);
         resolvedColoursView = new ReadOnlyDictionary<string, UiResolvedProperty<UiColour?>>(resolvedColours);
         resolvedMetricsView = new ReadOnlyDictionary<string, UiResolvedProperty<float>>(resolvedMetrics);
+        resolvedTextColoursView = new ReadOnlyDictionary<string, UiResolvedProperty<UiColour?>>(resolvedTextColours);
     }
 
     public UiPropertyDeclaration<UiFont> Font { get; }
@@ -112,7 +113,10 @@ public sealed class UiElementProperties
         UiStyleDocument? priorDocument = authoredDocument;
         UiResolvedProperty<UiFont> priorFont = ResolvedFont;
         UiResolvedProperty<UiDensity> priorDensity = ResolvedDensity;
+        UiResolvedProperty<int?> priorFontSize = ResolvedFontSize;
+        var priorTextRuns = new Dictionary<UiTextPurpose, UiTextFontFact>(TextRuns);
         ResolvedSnapshot priorResolved = resolvedSnapshot ??= new ResolvedSnapshot(resolvedColours, resolvedMetrics);
+        Action restoreTextColours = CaptureTextColourAuthoring();
         return () =>
         {
             // Restored derived facts must not reuse a candidate's inputs or rewind runtime writes.
@@ -129,9 +133,16 @@ public sealed class UiElementProperties
                 namedColours.Clear();
                 namedMetrics.Clear();
                 inlineMetrics.Clear();
+                inlineTextColours.Clear();
+                namedTextColours.Clear();
+                inlineFontSize.Remove(); namedFontSize.Remove();
             }
             ResolvedFont = priorFont;
             ResolvedDensity = priorDensity;
+            ResolvedFontSize = priorFontSize;
+            TextRuns.Clear();
+            foreach (var pair in priorTextRuns) TextRuns.Add(pair.Key, pair.Value);
+            restoreTextColours();
             resolvedColours.Clear();
             foreach (var pair in priorResolved.Colours) resolvedColours.Add(pair.Key, pair.Value);
             resolvedMetrics.Clear();
@@ -152,6 +163,8 @@ public sealed class UiElementProperties
         namedColours.Clear();
         namedMetrics.Clear();
         inlineMetrics.Clear();
+        AuthorTextColours(spec, document);
+        AuthorFontSize(spec, document);
         foreach (string token in UiAppearanceProperties.Metrics)
             if (spec.TryGetNumber("Metric." + token, out float metric) && metric >= 0)
                 inlineMetrics[token] = Declared(metric);
@@ -301,6 +314,7 @@ public sealed class UiElementProperties
         if (ResolvedFont.Origin == UiPropertyOrigin.LocalStyle && !LocalFont.IsDeclared)
             ResolvedFont = new UiResolvedProperty<UiFont>(ResolvedFont.Value, ResolvedFont.Origin, NamedSource("Font"));
         UiDensity defaults = DensityOf(host);
+        ResolveFontSize(node, host);
         foreach (string token in UiAppearanceProperties.Metrics)
         {
             resolvedMetrics[token] = UiPropertyResolver.Resolve(Metric(token, false), Metric(token, true),
@@ -319,6 +333,7 @@ public sealed class UiElementProperties
             uniformSource &= metric.Origin == first.Origin && metric.Source == first.Source;
         ResolvedDensity = new UiResolvedProperty<UiDensity>(d, uniformSource ? first.Origin : UiPropertyOrigin.Mixed, uniformSource ? first.Source : "per-metric");
         bool paletteChanged = false;
+        bool textColoursChanged = ResolveTextColours(node, host);
         foreach (string token in UiAppearanceProperties.Colours)
         {
             UiResolvedProperty<UiColour?> resolved = UiPropertyResolver.Resolve(Prefer(Find(colours, token), Find(inlineColours, token)),
@@ -334,6 +349,8 @@ public sealed class UiElementProperties
             if (!lastColours.TryGetValue(token, out UiColour? prior) || !Nullable.Equals(prior, resolved.Value)) paletteChanged = true;
         }
         bool equalsHost = ResolvedFont.Value == host.DefaultFont && d.Equals(defaults);
+        equalsHost &= ResolvedFontSize.Value == host.ReadFontSize;
+        equalsHost &= TextColoursEqual(host);
         foreach (var colour in resolvedColours)
             equalsHost &= Nullable.Equals(colour.Value.Value, UiAppearanceProperties.ReadColour(host, colour.Key));
         if (equalsHost)
@@ -345,11 +362,13 @@ public sealed class UiElementProperties
         }
         bool reuse = ReferenceEquals(lastHost, host) && hostColourRevision == host.ColourRevision
             && hostLayoutRevision == host.LayoutRevision && hostPropertyRevision == host.PropertyRevision
-            && lastFont == ResolvedFont.Value && lastDensity.Equals(d) && !paletteChanged;
+            && lastFont == ResolvedFont.Value && lastFontSize == ResolvedFontSize.Value && lastDensity.Equals(d) && !paletteChanged && !textColoursChanged;
         if (!reuse)
         {
             UiTheme theme = host.Clone();
+            ApplyTextColours(theme);
             theme.ApplyStyleFont(ResolvedFont.Value);
+            theme.ApplyStyleFontSize(ResolvedFontSize.Value);
             theme.ApplyStyleGeometry(new UiGeometry(d.Padding, d.Spacing, d.Gap, d.RowHeight, d.Hairline));
             lastColours.Clear();
             foreach (var colour in resolvedColours)
@@ -364,6 +383,7 @@ public sealed class UiElementProperties
             hostLayoutRevision = host.LayoutRevision;
             hostPropertyRevision = host.PropertyRevision;
             lastFont = ResolvedFont.Value;
+            lastFontSize = ResolvedFontSize.Value;
             lastDensity = d;
         }
         return RetainResolution(node, host, fallbackFont, appliedTheme!);

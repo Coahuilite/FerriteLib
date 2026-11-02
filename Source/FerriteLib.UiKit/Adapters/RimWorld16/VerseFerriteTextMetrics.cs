@@ -28,6 +28,27 @@ public sealed class VerseFerriteTextMetrics : ITextMetrics, IUiTextMetricsEnviro
     // Unknown backends revoke optional measurement reuse rather than publish an incomplete stamp.
     private static readonly bool HasUnityFontEnvironment =
         string.Equals(typeof(Font).Assembly.GetName().Name, "UnityEngine.TextRenderingModule", StringComparison.Ordinal);
+    private static readonly bool Has17FontProvider = string.Equals(typeof(Font).Assembly.GetName().Name, "UnityStubs", StringComparison.Ordinal);
+    private const bool NumericLabels17 = true;
+    internal static bool SupportsTextPurpose(UiTextPurpose purpose) => purpose == UiTextPurpose.Label
+        ? HasUnityFontEnvironment || Has17FontProvider && NumericLabels17 : purpose == UiTextPurpose.Editor && HasUnityFontEnvironment;
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    internal static T WithFontSize<T>(UiTextFont font, bool wrap, Func<T> action)
+    {
+        GameFont previousFont = Text.Font; TextAnchor previousAnchor = Text.Anchor; bool previousWrap = Text.WordWrap;
+        try
+        {
+            Text.Font = UiKitFonts.ToGameFont(font.Alias); Text.Anchor = TextAnchor.UpperLeft; Text.WordWrap = wrap;
+            GUIStyle style = Text.CurFontStyle;
+            int previousSize = style.fontSize;
+            try { if (font.Size.HasValue) style.fontSize = font.Size.Value; return action(); }
+            finally { style.fontSize = previousSize; }
+        }
+        finally { Text.Font = previousFont; Text.Anchor = previousAnchor; Text.WordWrap = previousWrap; }
+    }
+    internal UiMeasureInputs? NumericEnvironment(UiTextFont font)
+        => HasUnityFontEnvironment ? WithFontSize(font, true, () => CaptureUnityEnvironment(font.Alias)) : null;
 
     UiMeasureInputs? IUiTextMetricsEnvironment.CaptureEnvironment(UiFont font)
         => HasUnityFontEnvironment ? CaptureUnityEnvironment(font) : null;

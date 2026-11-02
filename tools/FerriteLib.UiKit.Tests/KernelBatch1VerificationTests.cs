@@ -193,9 +193,8 @@ internal static class KernelBatch1VerificationTests
     }
 
     /// <summary>
-    /// The contract calls <c>Disabled</c> a data-derived state. This probe makes that operational: an
-    /// authored <c>Tone="Disabled"</c> and a leaf whose read-only binding derives the same state must be
-    /// indistinguishable, and both must differ from the neutral treatment an unknown value falls back to.
+    /// An authored <c>Tone="Disabled"</c> keeps its disabled treatment. A read-only text binding is
+    /// presentation, not an input restriction, and keeps the normal neutral treatment instead.
     /// </summary>
     private static void VerifyDisabledRedirectIsTheDataState()
     {
@@ -212,8 +211,8 @@ internal static class KernelBatch1VerificationTests
         UiColour fromBinding = DrawLeaf(ctx, ("Bind", "ro"), ("Tone", "Neutral"));
         UiColour neutral = DrawLeaf(ctx, ("Text", "x"), ("Tone", "Neutral"));
 
-        Check(SameColor(authored, fromBinding),
-            "Tone=\"Disabled\" paints exactly what a read-only binding derives");
+        Check(SameColor(neutral, fromBinding),
+            "a read-only text binding paints the normal neutral treatment");
         Check(!SameColor(authored, neutral),
             "and it is not the neutral treatment an unknown value falls back to");
     }

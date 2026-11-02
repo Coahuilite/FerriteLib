@@ -70,7 +70,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     }
     private UiMeasurement CaptureText(UiWidgetContext ctx,string text)
     {
-        return new UiMeasurement(new UiMeasureInputs(new[] { text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx), ctx.Theme.Geometry.Padding }, text.Length > 0), () =>
+        return new UiMeasurement(new UiMeasureInputs(new[] { text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx), (float)(UiTextFonts.For(ctx).Font.Size ?? 0), ctx.Theme.Geometry.Padding }, text.Length > 0), () =>
         {
             float band = MeasureBand(ctx, text, AtomVocabulary.TextFont(ctx), ctx.Theme.Geometry.Padding * 2f);
             return band > 0 ? band : EmptyBandHeight;
@@ -97,7 +97,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     {
         if (string.IsNullOrEmpty(text)) return 0f;
 
-        float wrapped = ctx.Metrics.MeasureText(text, font, Math.Max(1f, ctx.ViewWidth));
+        float wrapped = UiTextFonts.For(ctx, font).MeasureText(text, Math.Max(1f, ctx.ViewWidth));
         return Math.Max(1f, wrapped) + verticalLead;
     }
 
@@ -109,7 +109,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
 
         // Resolved before the empty-string return: an authored role typo is recorded on the pass that
         // draws this element, whether or not it has text to paint.
-        UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, Writable(ctx));
+        UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, writable: null);
 
         string text = ResolveText(ctx);
         if (text.Length == 0) return;
@@ -122,23 +122,11 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         // single text outlet is the rect the wrapped height was computed for. The fit audit then
         // reports a real defect only, never this atom's own padding.
         float pad = Math.Min(ctx.Theme.Geometry.Padding, Math.Max(0f, (rect.Height - 1f) * 0.5f));
-        UiThemeDraw.Label(
-ctx.Drawing,            new UiLayoutRect(rect.X, rect.Y + pad, rect.Width, Math.Max(1f, rect.Height - pad * 2f)),
+        UiTextFonts.Label(ctx,            new UiLayoutRect(rect.X, rect.Y + pad, rect.Width, Math.Max(1f, rect.Height - pad * 2f)),
             text,
-            ctx.Theme,
             style.Text,
             AtomVocabulary.TextFont(ctx),
             UiTextAnchor.UpperLeft);
-    }
-
-    /// <summary>
-    /// The data side's writability when this leaf reads a bound string, else "not known". A read-only
-    /// binding is state, and state beats the authored role: the text paints disabled whatever tone was
-    /// written. An unbound leaf has no data side to ask, so it resolves by role alone.
-    /// </summary>
-    private bool? Writable(UiWidgetContext ctx)
-    {
-        return AtomVocabulary.WritableOf(ctx, AtomVocabulary.Read(spec, "Bind"));
     }
 
     /// <summary>

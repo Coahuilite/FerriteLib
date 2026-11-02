@@ -72,12 +72,25 @@ public sealed partial class UiControls
         }
 
         {
-            DriveEditor(rect, session, node, state, editor, model, available, covered, writable, CanReceivePointerPress(rect, ctx) && IsPointerDown(), live, multiline, ctx.Theme.Styles.Font, Request, readModel);
+            UiTextRun text = UiTextFonts.For(ctx, purpose: UiTextPurpose.Editor);
+            UiColour? colour = null;
+            foreach (string slot in UiTextColourProperties.Names)
+                if (ctx.Theme.ReadTextColour(slot).HasValue)
+                {
+                    colour = ctx.Properties.TextStyleSpec is UiElementSpec written
+                        ? Widgets.AtomVocabulary.ResolveRole(written, ctx, node.IsDisabled ? false : writable).Text
+                        : ctx.Theme.Styles.Resolve(node.IsDisabled ? UiStatusTone.Disabled : UiStatusTone.Neutral, writable: writable).Text;
+                    break;
+                }
+            if (colour.HasValue && Execution is not IUiTextFontEditing)
+                UiFitAudit.ReportStyleFallback(ctx.ElementPath, "Editor", "TextColor", "explicit colour", "host does not support Editor colour");
+            DriveEditor(rect, session, node, state, editor, model, available, covered, writable, CanReceivePointerPress(rect, ctx) && IsPointerDown(), live, multiline, text, colour, Request, readModel);
         }
     }
 
-    private void DriveEditor<T>(UiLayoutRect rect, UiSession session, UiNode node, UiControlState state, UiEditSession<T> editor, T model, bool available, bool covered, bool writable, bool focus, bool live, bool multiline, UiFont font, Action<T> request, Func<T> readModel)
+    private void DriveEditor<T>(UiLayoutRect rect, UiSession session, UiNode node, UiControlState state, UiEditSession<T> editor, T model, bool available, bool covered, bool writable, bool focus, bool live, bool multiline, UiTextRun textRun, UiColour? colour, Action<T> request, Func<T> readModel)
     {
+        UiTextFont font = textRun.Font;
         state.EditorMultiline = multiline;
         string previousDraft = editor.Draft;
         editor.Observe(model);
@@ -129,7 +142,15 @@ public sealed partial class UiControls
 
             if (!session.IsActive)
                 return;
-            UiNativeEditResult native = Execution.Edit(new UiNativeEdit(controlName, rect, editor.Draft, font, multiline, writable, editor.Focused, composing));
+            UiNativeEdit nativeRequest = new UiNativeEdit(controlName, rect, editor.Draft, font.Alias, multiline, writable, editor.Focused, composing);
+            UiNativeEditResult native = Execution is IUiTextFontEditing sized
+                ? sized.Edit(new UiTextEdit(nativeRequest, font, colour)) : Execution.Edit(nativeRequest);
+            UiColour? actualColour = Execution is IUiTextFontEditing ? colour : null;
+            if (textRun.Requested.Size.HasValue || colour.HasValue) UiFitAudit.CheckText(rect, native.Text, textRun, actualColour, !multiline);
+            node.Properties.TextPaints[UiTextPurpose.Editor] = new UiTextPaintFact(font, actualColour, "native-editor");
+#if FER_DEV
+            UiDiagnosticHub.ActiveSubscription?.Geometry?.NoteText(node.Id.Key, UiTextPurpose.Editor, font, actualColour, "native-editor");
+#endif
             string typed = native.Text;
             if (native.Consumed)
                 Input.Consume();

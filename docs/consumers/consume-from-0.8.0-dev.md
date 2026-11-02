@@ -102,6 +102,164 @@ Five metrics are Padding/Spacing/Gap/RowHeight/Hairline; container Padding/Gap a
 than becoming every child's density. Retint does not replace the Host or clear drafts/scroll.
 Use scoped UiImage for images/backgrounds. See [appearance](../openspec/specs/core/appearance/spec.md).
 
+### Set a text colour without retinting other surfaces
+
+Use TextColor for ordinary text, or one of TextColor.Muted/Active/Success/Warning/Danger/Disabled
+for a state-specific colour. Each slot inherits independently; a more distant state slot beats a nearer
+ordinary slot. Colour syntax is #RGB/#RGBA/#RRGGBB/#RRGGBBAA or invariant r,g,b[,a] in0..1.
+An alpha of0 is an explicit transparent colour, not removal.
+
+```xml
+<Widget Kind="text/wrapped" Text="Ready" Tone="Success"
+        TextColor="#E6E0D4" TextColor.Success="#8FCB9B" />
+```
+
+Inside a style Scheme, write the same slot as an element, for example
+`<TextColor.Success Value="#8FCB9B" />`. Scheme, ancestor and page sources use the same per-slot
+precedence as Palette roles; the slots are not new UiPaletteRole values.
+
+The optional **public-unstable** UiTextColours facade keeps the stable Theme/ElementProperties surface
+unchanged. Theme changes reach independent drawing directly. Instance/local changes in a retained-page
+custom widget reach its supplied context through the Host's next normal property resolution:
+
+```csharp
+UiTextColours.Theme(theme).Set(new UiColour(0.9f, 0.9f, 0.8f));
+UiTextColours.Instance(ctx.Properties, "TextColor.Warning").Set(new UiColour(1f, 0.7f, 0.3f));
+UiTextColours.Instance(ctx.Properties, "TextColor.Warning").Remove();
+```
+
+UiTextColours.Local supplies runtime local-style declarations. UiTextColours.Resolved(ctx.Properties)
+is the live read-only slot/source view from normal resolution.
+
+For an independent Session context, CreateContext does not run Host property resolution. After writing
+instance/local declarations, call UiTextColours.Resolve(ctx, hostTheme) and use the returned context for
+both measurement and drawing. Keep hostTheme as the authoritative base; do not feed back the resolved
+element theme as its host. Repeat this resolution after changing declarations. It uses the existing
+property owner and ancestor rules, not a second style resolver. Existing standalone callers that do not
+adopt these new declarations keep their original conditions.
+
+For drawing without any Session, use UiTextColours.Theme(theme), then
+theme.Styles.Resolve(tone, emphasis, writable).Text or UiThemeDraw.Label. A custom widget using
+ctx.Drawing.Text directly passes that resolved colour explicitly; the low-level drawing interface has
+no Theme argument. An explicit Label colour still wins.
+A real disabled treatment ignores ordinary TextColor, using only TextColor.Disabled or
+DisabledForeground. Setting the Disabled colour does not make a control writable or clickable.
+Retint advances only the colour clock, not layout.
+
+**Default change:** read-only Bind on text/wrapped now paints normal foreground, subject to its own
+Tone/Emphasis/colour. Use Emphasis="Muted" or an explicit TextColor for subdued presentation.
+Interactive read-only controls and shared Resolve(..., writable:false) retain their old meaning.
+
+### Choose one effective font for measurement and drawing
+
+FontSize is an unsigned decimal integer in1..96, in logical GUI units, not physical pixels. Omit it to
+keep Tiny/Small/Medium and the host's preset rendering. Zero, negative, fractional, signed, exponential,
+blank, out-of-range and overflowing values are refused. Inline errors name the element at creation;
+an invalid style candidate reports an issue and retains last-good; runtime Set throws
+ArgumentOutOfRangeException before changing the declaration.
+
+```xml
+<Widget Id="summary" Kind="text/wrapped" Text="Ready" Font="Small" FontSize="18"
+        TextColor="#E6E0D4" />
+```
+
+In a style Scheme use `<Metric Token="FontSize" Value="18" />`, alongside
+`<Metric Token="Font" Value="Small" />` if needed. FontSize is typography, not a Density distance token.
+Both properties follow runtime instance → inline → runtime local → named local → nearest ancestor's
+same layers → page style → host → fallback. The nearest layer declaring either Font or FontSize decides
+the size: a Font-only layer resets an outer numeric size; a size-only layer keeps looking outward for
+the alias. Remove reveals the current next layer.
+
+```csharp
+UiTextFonts.Theme(theme).Set(18);
+UiTextFonts.Instance(ctx.Properties).Set(20);
+UiTextFonts.Instance(ctx.Properties).Remove();
+// UiTextFonts.Local(ctx.Properties) is the runtime local-style layer.
+```
+
+UiTextFonts.Requested(theme) returns the alias/optional-size pair. UiTextFonts.ResolvedSize(properties)
+returns the requested size and source; old ResolvedFont and Styles.Font still mean the alias.
+A UiTextRun exposes Requested, Font (effective), Purpose and FallbackReason. Only a matching optional
+metrics/drawing pair supporting that purpose may retain the number. Editor also requires
+IUiTextFontEditing. Unsupported use reports the request, effective preset, purpose and reason; there
+is no nearest-preset approximation, rich-text sizing or post-draw scale.
+
+### Adopt the production pair without changing old callers
+
+UiPageWindow/UiWindowHost supply the new pair automatically: VerseTextExecution over the window's
+existing protected VerseUiExecution and VerseTextMetrics over its native ruler. Custom Metrics overrides
+and independently supplied Host rulers remain the actual rulers; the shell does not replace them with a
+native singleton. An old custom ruler without numeric capability therefore gets explicit preset fallback.
+The same native owner still owns focus, capture, frames, images, editing and cleanup.
+
+For an embedded Host or standalone visual, create and retain this pair for the UI lifetime:
+
+```csharp
+var execution = new VerseTextExecution(); // Owns exactly one native owner.
+var metrics = new VerseTextMetrics(VerseFerriteTextMetrics.Instance);
+```
+
+Pass metrics to the existing UiHost constructor. At each native callback call
+`host.DrawFrame(contentRect, execution.CaptureFrame(nativeInputAllowed), execution)` once, preserving
+that actual composed port. Close Host/Session before disposing execution, in finally. If composing an
+already-owned VerseUiExecution, `new VerseTextExecution(owner)` borrows it; its Dispose does not dispose
+the owner. Do not create a second owner or switch ports mid-edit/capture. The original singleton,
+VerseUiExecution, ITextMetrics/IUiDrawing/IUiExecution and no-number usage remain legal unchanged.
+
+Without any Host or Session, use the pair directly:
+
+```csharp
+UiTextRun text = UiTextFonts.Resolve(metrics, execution, UiTextFonts.Requested(theme),
+    elementPath: "summary");
+float height = text.MeasureText(caption, rect.Width);
+text.Draw(rect, caption, theme.Styles.Resolve(UiStatusTone.Neutral).Text);
+```
+
+Use that run for measurement and painting, and pass the same capable metrics to an attached fit audit.
+For a standalone Session, SetFrame with the composed execution before measurement/drawing. CreateContext
+still does not resolve element declarations: call `ctx = UiTextFonts.Apply(ctx, hostTheme)` after writing
+them, then use the returned context. A retained-page custom widget already receives resolved properties:
+
+```csharp
+UiTextRun text = UiTextFonts.Resolve(ctx);
+float height = text.MeasureText(caption, ctx.ViewWidth);
+text.Draw(rect, caption, ctx.Theme.Styles.Resolve(UiStatusTone.Warning).Text);
+```
+
+Custom Measure/Draw should request the same purpose and provide complete UiMeasureInputs through the
+existing IUiMeasureParticipant. UiTextFonts.RowHeight supplies a numeric-aware natural row floor, and
+UiTextFonts.PopupRect pairs with UiPopup.DrawChoices for numeric option geometry. Explicit allocations
+remain the author's responsibility; a large font does not silently override an explicit Height or FieldWidth.
+Old UiThemeDraw.Label and direct drawing's explicit UiFont parameters keep their preset meaning; choose
+the new run when requesting numeric text.
+
+### Editors, retained display and actual metadata
+
+Existing ctx.Controls.Edit resolves Editor font and the effective state ink, then passes UiTextEdit through
+the composed port to the same owner's real Widgets.TextField/TextArea. It preserves draft/commit/Cancel,
+focus, selection, copy and IME authority. Native glyph colour is not implemented as a placeholder/label.
+For lower-level editing resolve `UiTextFonts.Resolve(ctx, UiTextPurpose.Editor)` and call its Edit with
+your existing UiNativeEdit request and the resolved colour; the request alias must equal run.Font.Alias.
+A null colour preserves native preset ink. Custom hosts implement the optional interfaces rather than
+changing old interface members.
+
+Auto/SharedLabels, wrapping, natural row heights, fields, buttons, dropdowns/popups, layout inputs and
+text-cache keys use effective font and purpose. Null CaptureEnvironment revokes reuse at a synchronization;
+the old unchanged idle snapshot is still legal for numeric and legacy alike. Last-success retained drawing
+captures the font, ink and draft but is display-only, never a second native editor.
+
+UiTextFonts.FontOf/ColourOf read actual font/optional ink from overflow reports. Host observation facts
+separate requested/effective per-purpose fonts, source and last paint colour; the Dev snapshot adds
+ScopeTextFont (request), LabelFont/Colour and EditorFont/Colour with paint-source fields. They describe
+last recorded outlets, not every glyph or current native pixels; not-sampled remains explicit, and the
+old PaintedFont unknown field is unchanged.
+
+**Host limits:**1.6 labels and editors are **静态候选、待原生**.1.7 label numeric rendering is a source-level
+candidate behind the single NumericLabels17 switch; editor numbers are unsupported and use reported
+preset fallback.1.7 has no reliable font-environment fingerprint, so it grants no cross-synchronization
+text reuse. Native screenshot/IME/selection/UIScale/font-fallback and1.7 binding/JIT checks remain open;
+see the [implementation status](../openspec/implementation.md#appearance-freedom).
+
 ## Publish help without owning a panel
 
 Declare opaque HelpRef on elements/choices. Empty choice help does not infer Value/Text and can fall back to

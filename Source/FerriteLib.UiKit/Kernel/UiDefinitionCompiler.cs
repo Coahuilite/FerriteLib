@@ -441,10 +441,21 @@ internal sealed class UiDefinitionCompiler
             ? ContainerAttributes
             : UiWidgetRegistry.GetAttributeSchema(source, spec.Kind);
 
-        if (allowed == null) return;
-
         foreach (KeyValuePair<string, string> pair in spec.Attributes)
         {
+            if (string.Equals(pair.Key, "FontSize", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!UiTextFont.TrySize(pair.Value, out _))
+                    throw new UiContractException("Invalid FontSize at '" + path + "': expected an unsigned integer from 1 to 96.", source, spec.Id, spec.Kind, path);
+                continue;
+            }
+            if (UiTextColourProperties.XmlSlot(pair.Key) is string slot)
+            {
+                if (!UiStyleDocument.TryParseColour(pair.Value, out _))
+                    throw new UiContractException("Invalid " + slot + " at '" + path + "': expected a finite colour in 0..1.", source, spec.Id, spec.Kind, path);
+                continue;
+            }
+            if (allowed == null) continue;
             if (UiAppearanceProperties.IsMetricAttribute(pair.Key))
             {
                 if (!spec.TryGetNumber(pair.Key, out float metric) || metric < 0)

@@ -66,8 +66,12 @@ public static class UiPopup
     /// </para>
     /// </summary>
     public static UiLayoutRect RectFor(UiLayoutRect anchor, int optionCount, UiLayoutRect viewport)
+        => RectFor(anchor, optionCount, viewport, OptionHeight);
+
+    internal static UiLayoutRect RectFor(UiLayoutRect anchor, int optionCount, UiLayoutRect viewport, float rowHeight)
     {
-        float height = VisibleRowCount(optionCount, viewport) * OptionHeight;
+        int fits = Math.Max(1, (int)(viewport.Height / rowHeight));
+        float height = Math.Min(optionCount, fits) * rowHeight;
         float y = anchor.YMax;
         float x = anchor.X;
         if (viewport.Height <= 0f) return new UiLayoutRect(x, y, anchor.Width, height);
@@ -123,19 +127,20 @@ public static class UiPopup
         if (onSelected == null) throw new ArgumentNullException(nameof(onSelected));
 
         PushPopupLayer(popupRect, popupId, ctx);
-        PopupWindow window = RowsOf(popupRect, ctx, options.Count);
+        float rowHeight = UiTextFonts.RowHeight(ctx, minimum: OptionHeight);
+        PopupWindow window = RowsOf(popupRect, ctx, options.Count, rowHeight);
 
         int hovered = -1;
         for (int slot = 0; slot < window.RowCount; slot++)
         {
             int index = window.FirstRow + slot;
-            UiLayoutRect rowRect = RowRect(popupRect, slot);
+            UiLayoutRect rowRect = RowRect(popupRect, slot, rowHeight);
             if (ctx.Controls.IsWindowMouseOver(rowRect))
             {
                 hovered = index;
             }
 
-            DrawRow(ctx.Drawing,rowRect, UiChoiceSource.Label(options[index],ctx.Translation), EqualityComparer<T>.Default.Equals(options[index].Value,current), ctx.Theme);
+            DrawRow(ctx,rowRect, UiChoiceSource.Label(options[index],ctx.Translation), EqualityComparer<T>.Default.Equals(options[index].Value,current));
             UiInteractionResult input = ctx.Controls.PopupOption(rowRect, popupId, ctx, options[index].Value, selectable);
             if (input.Request)
             {
@@ -168,9 +173,9 @@ public static class UiPopup
     /// that is not there.
     /// </para>
     /// </summary>
-    private static PopupWindow RowsOf(UiLayoutRect popupRect, UiWidgetContext ctx, int optionCount)
+    private static PopupWindow RowsOf(UiLayoutRect popupRect, UiWidgetContext ctx, int optionCount, float rowHeight)
     {
-        int visible = (int)(popupRect.Height / OptionHeight);
+        int visible = (int)(popupRect.Height / rowHeight);
         if (visible < 1) visible = 1;
         if (visible > optionCount) visible = optionCount;
 
@@ -221,9 +226,9 @@ public static class UiPopup
     /// WITHIN the visible window (not the index into the caller's option list - the window's first row is what
     /// turns one into the other, and only rows inside the menu's own rect may be painted or hit).
     /// </summary>
-    private static UiLayoutRect RowRect(UiLayoutRect popupRect, int slot)
+    private static UiLayoutRect RowRect(UiLayoutRect popupRect, int slot, float height)
     {
-        return new UiLayoutRect(popupRect.X, popupRect.Y + slot * OptionHeight, popupRect.Width, OptionHeight);
+        return new UiLayoutRect(popupRect.X, popupRect.Y + slot * height, popupRect.Width, height);
     }
 
     /// <summary>
@@ -232,15 +237,15 @@ public static class UiPopup
     /// (this row used to re-derive the mapping verbatim, which is the fourth copy the one-table rule exists to
     /// delete), and both option lists paint through here.
     /// </summary>
-    private static void DrawRow(IUiDrawing drawing,UiLayoutRect rowRect, string label, bool selected, UiTheme theme)
+    private static void DrawRow(UiWidgetContext ctx,UiLayoutRect rowRect, string label, bool selected)
     {
+        UiTheme theme = ctx.Theme;
         UiResolvedStyle style = theme.Styles.Resolve(selected ? UiStatusTone.Active : UiStatusTone.Neutral);
         float padding = theme.Geometry.Padding;
-        UiThemeDraw.Surface(drawing,rowRect, style.Surface, theme.Geometry.Hairline);
-        UiThemeDraw.Label(
-drawing,            new UiLayoutRect(rowRect.X + padding, rowRect.Y, rowRect.Width - padding * 2f, rowRect.Height),
+        UiThemeDraw.Surface(ctx.Drawing,rowRect, style.Surface, theme.Geometry.Hairline);
+        UiTextFonts.Label(
+ctx,            new UiLayoutRect(rowRect.X + padding, rowRect.Y, rowRect.Width - padding * 2f, rowRect.Height),
             label,
-            theme,
             style.Text,
             theme.Styles.Font,
             UiTextAnchor.MiddleLeft,

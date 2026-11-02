@@ -36,6 +36,33 @@
 - **WHEN** 当前展示有效
 - **THEN** 继续画当前 UI，不因不能新输入而留旧像素
 
+### Requirement: FL16-NUMERIC-TEXT 已采用的按用途数值能力
+数值文字 SHALL 分开标签类与输入框类能力；只有实际宿主声明支持该用途才下发数字。
+1.6 标签与输入框路径的证据等级均为 **静态候选、待原生**；临时改共享 GUIStyle.fontSize
+必须在 finally 还原，标签保留 Widgets.Label 的缩放网格对齐和 contentOffset，不重复乘 UIScale。
+旧别名路径和无数字调用保留原行为。
+
+生产能力 SHALL 由 public-unstable VerseTextExecution／VerseTextMetrics 组合提供，不给旧 Stable
+类型追加公开／protected 成员或 implements。执行组合只有一个 VerseUiExecution owner，
+frame、capture、focus、native identity、images、edit、cleanup 仍委托该 owner；Session 保留实际
+供应端口。标准 Window 的旧 protected Execution 与自定义 Metrics override 不被绕过。
+独立 Host/Session/custom widget 可直接供应同一组合对；关闭先逻辑 Session 再自有 native owner。
+新 UiTextEdit 组合旧请求、有效字体与可选字色，实际 TextField/TextArea 消费字色和字体，
+无显式字色保留 native preset。其实现 helper 可内部扩展，旧 UiNativeEdit 外形不变。
+
+1.7.4995 rev309 的源码链仅支持标签数值候选；GUI.TextField/TextArea 固定传默认字号，
+输入类 SHALL 回到别名预设并报告。标签能力须有独立明确开关，关闭即可让该宿主全部回到预设。
+判断宿主沿用 Font 的定义程序集，不用反射；Unity 独有成员隔离在 NoInlining 私有方法。
+未知字体环境仍返回 null、撤销跨同步复用，不因数字字段放宽有效性；未请求同步时保留
+原 idle-snapshot 条件，不宣称 null 环境已可靠。
+两宿主的数值新路径均未原生验证；当前实现状态见
+[开发映射](../../../implementation.md#appearance-freedom)。
+
+#### Scenario: 宿主不支持请求的用途
+- **WHEN** 作者请求字号 N，宿主声明该用途不支持
+- **THEN** 测量、绘制、缓存和 fit 同用别名预设，并报告“请求 N，生效 预设，原因：宿主不支持（用途）”
+- **AND** 每个元素路径每种原因只报一次，请求值不冒充生效字号
+
 ### Requirement: FL16-EXECUTION 借用资源不能默迁 active 状态
 Host/Session SHALL 借用 execution；idle replacement 合法，且独立 session 可共用外层 execution。open pass/capture/active或focused edit 时，SetFrame 更换 execution SHALL 在改 frame／qualification／ownership 前拒绝；先在旧 execution 结束或 SuspendEditor。可靠挂起稿可保留，但原生 focus IDs、capture mapping、image token 不迁移。
 

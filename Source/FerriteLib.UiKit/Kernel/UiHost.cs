@@ -15,7 +15,9 @@ public sealed partial class UiHost : IDisposable
     private UiBindingPresentation? reactivePresentation;
     private UiBindings bindingOwner;
     private readonly UiTheme theme;
-    private readonly ITextMetrics metrics;
+    private ITextMetrics metrics;
+    internal void AdoptTextMetrics(ITextMetrics previous, ITextMetrics composed)
+    { if (ReferenceEquals(metrics, previous)) metrics = composed; }
     private readonly IUiTranslation translation;
     private readonly UiSession session;
 

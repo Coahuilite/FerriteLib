@@ -33,7 +33,13 @@ public readonly struct UiOverflowReport
         Available = available;
         RectWidth = rectWidth;
         TextLength = (text ?? "").Length;
+        ActualFont = null; ActualColour = null;
     }
+    internal UiTextFont? ActualFont { get; }
+    internal UiColour? ActualColour { get; }
+    internal UiOverflowReport(string path, string text, UiTextFont font, UiColour? colour, UiOverflowAxis axis, float needed, float available, float width)
+        : this(path, text, font.Alias, axis, needed, available, width)
+    { ActualFont = font; ActualColour = colour; }
 
     public string ElementPath { get; }
 
@@ -104,7 +110,8 @@ public readonly struct UiStyleFallbackReport
 
     /// <summary>The one line a host logs when it wants this finding in a log rather than in a sink.</summary>
     public string Diagnostic =>
-        ElementPath + ": " + Kind + " " + Attribute + "=\"" + Authored + "\" is not a declared value; fell back to " + Resolved + ".";
+        Attribute == "FontSize" || Attribute == "TextColor" ? ElementPath + ": requested " + Authored + ", effective preset, reason: " + Resolved + "."
+        : ElementPath + ": " + Kind + " " + Attribute + "=\"" + Authored + "\" is not a declared value; fell back to " + Resolved + ".";
 }
 
 /// <summary>
@@ -314,15 +321,21 @@ public static class UiFitAudit
         UiOverflowAxis axis,
         float needed,
         float available,
-        UiDiagnosticSubscription? subscription)
+        UiDiagnosticSubscription? subscription, UiTextFont? actualFont = null, UiColour? actualColour = null, string? pathOverride = null)
     {
         string key;
         UiOverflowReport report;
         try
         {
-            key = currentPath + "|" + (int)axis + "|" + (int)font + "|" + Shorten(text);
-            string path = currentPath.Length == 0 ? "(unscoped)" : currentPath;
+            string scope = pathOverride ?? currentPath;
+            key = scope + "|" + (int)axis + "|" + (int)font + "|" + Shorten(text);
+            string path = scope.Length == 0 ? "(unscoped)" : scope;
             report = new UiOverflowReport(path, text, font, axis, needed, available, rect.Width);
+            if (actualFont.HasValue)
+            {
+                report = new UiOverflowReport(path, text, actualFont.Value, actualColour, axis, needed, available, rect.Width);
+                key += "|" + actualFont.Value + "|" + (actualColour.HasValue ? actualColour.Value.Red + "," + actualColour.Value.Green + "," + actualColour.Value.Blue + "," + actualColour.Value.Alpha : "native-preset");
+            }
         }
         catch (Exception error) when (UiObservationBoundary.IsOrdinary(error))
         { sink?.ReportFailure(error); return; }
@@ -346,6 +359,27 @@ public static class UiFitAudit
         return text.Length <= TextKeyBudget ? text : text.Substring(0, TextKeyBudget);
     }
 
+    internal static void CheckText(UiLayoutRect rect, string text, UiTextRun run, UiColour? colour, bool singleLine)
+    {
+        if (!Enabled || string.IsNullOrEmpty(text) || rect.Width <= 1 || rect.Height <= 1) return;
+        UiDiagnosticSubscription? subscription = UiDiagnosticHub.ActiveSubscription;
+        ITextMetrics? ruler = subscription == null ? metrics : UiDiagnosticHub.ActiveMetrics;
+        if (ruler == null || subscription == null && Saturated) return;
+        UiTextRun measured = run.WithMetrics(ruler);
+        if (measured.Font != run.Font)
+        {
+            ReportStyleFallback(run.Path, run.Purpose.ToString(), "FontSize", run.Font.Size!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), "fit metrics do not support " + run.Purpose);
+            return;
+        }
+        float needed = singleLine ? measured.MeasureWidth(text) : measured.MeasureText(text, rect.Width);
+        float available = singleLine ? rect.Width : rect.Height;
+        if (needed > available + Tolerance)
+            Report(rect, text, run.Font.Alias, singleLine ? UiOverflowAxis.Width : UiOverflowAxis.Height, needed, available, subscription, run.Font, colour, run.Path);
+    }
+
+    internal static void ReportFontFallback(string path, UiTextRun run)
+        => ReportStyleFallback(path, run.Purpose.ToString(), "FontSize", run.Requested.ToString(), "effective " + run.Font + "; " + run.FallbackReason);
+
     /// <summary>
     /// Records one appearance fallback: an authored role value outside the vocabulary, resolved to the
     /// default row. Called by the atom vocabulary as it resolves a role, which is the only layer that
@@ -367,7 +401,7 @@ public static class UiFitAudit
                 resolved ?? "");
 
             lastStyleFallback = report.Diagnostic;
-            key = report.ElementPath + "|" + report.Kind + "|" + report.Attribute + "|" + report.Authored;
+            key = report.ElementPath + "|" + report.Kind + "|" + report.Attribute + "|" + (report.Attribute == "FontSize" || report.Attribute == "TextColor" ? report.Resolved : report.Authored);
         }
         catch (Exception error) when (UiObservationBoundary.IsOrdinary(error))
         { styleSink?.ReportFailure(error); return; }

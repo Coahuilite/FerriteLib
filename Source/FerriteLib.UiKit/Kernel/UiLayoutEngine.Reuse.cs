@@ -83,7 +83,7 @@ internal sealed partial class UiLayoutEngine
     }
     private static UiMeasureInputs MeasureContext(UiWidgetContext ctx) => new(numbers: new[]
     {
-        ctx.ViewWidth, (float)ctx.Theme.DefaultFont, ctx.Theme.Geometry.Padding, ctx.Theme.Geometry.Spacing,
+        ctx.ViewWidth, (float)ctx.Theme.DefaultFont, (float)(UiTextFonts.For(ctx).Font.Size ?? 0), ctx.Theme.Geometry.Padding, ctx.Theme.Geometry.Spacing,
         ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.RowHeight, ctx.Theme.Geometry.Hairline, ctx.Node?.SharedLabelWidth ?? 0
     });
     private static UiMeasureInputs MeasureSources(UiElementSpec spec, IUiBindingAccess bindings)
@@ -107,7 +107,7 @@ internal sealed partial class UiLayoutEngine
         UiMeasureInputs sources = MeasureSources(spec, ctx.Bindings);
         if (prior == null && enrolled) prior = records.FindLast(value => ReferenceEquals(value.Spec, spec) && ReferenceEquals(value.Metrics, textMetricsCache!.Source));
         if (prior != null && !ctx.Session.IsTripped(node) && !enrolled && prior.Pass == layoutPass) return prior.Height;
-        UiMeasureInputs? environment = (ctx.Metrics as IUiTextMetricsEnvironment)?.CaptureEnvironment(ctx.Theme.DefaultFont);
+        UiMeasureInputs? environment = UiTextFonts.Environment(ctx);
         if (validatedLeaves.TryGetValue(node.Id, out List<LeafMeasure>? validated))
         {
             LeafMeasure? ready = validated.FindLast(value => value.Pass == layoutPass && ReferenceEquals(value.Spec, spec)
@@ -126,8 +126,9 @@ internal sealed partial class UiLayoutEngine
         bool environmentEqual = prior != null && (!prior.Inputs.UsesTextMetrics || environment != null && environment.Equals(prior.Environment));
         bool validation = ctx.Session.IsTripped(node) || pendingInputValidation && !incrementalValidation || forceMeasurement || node.IsDirty || incrementalValidation && invalidatedInputs.Contains(node) || prior == null || !contextEqual || !environmentEqual || enrolled && !sources.Equals(prior.Sources);
         if (prior != null && !validation && (enrolled || !layoutRequested)) return prior.Height;
-        // An old metrics implementation keeps its original idle-snapshot condition, not a new promise
-        // that its unknown mutable environment is cacheable at a subsequent synchronization point.
+        // Preserve the pre-existing idle snapshot, for numeric and legacy alike. No synchronization
+        // was requested here. At a synchronization (layoutRequested), unknown environments still
+        // cannot authorize text reuse; the normal environment/CanReuse guards above and below apply.
         if (contextEqual && prior != null && !ctx.Session.IsTripped(node) && !layoutRequested && !forceMeasurement && !node.IsDirty && (!enrolled || sources.Equals(prior.Sources)) && prior.Environment == null && environment == null) return prior.Height;
 
         if (incrementalValidation && (conservativeValidation || !enrolled))
@@ -135,7 +136,7 @@ internal sealed partial class UiLayoutEngine
 
         UiMeasurement? request = enrolled ? ((IUiMeasureParticipant)widget).CaptureMeasurement(ctx) : null;
         if (request == null && enrolled) throw new InvalidOperationException("CaptureMeasurement returned null at " + node.Path + ".");
-        UiMeasureInputs inputs = request?.Inputs ?? new UiMeasureInputs(usesTextMetrics: true);
+        UiMeasureInputs inputs = UiTextFonts.MeasureInputs(ctx, request?.Inputs ?? new UiMeasureInputs(usesTextMetrics: true));
         if (prior != null && !ctx.Session.IsTripped(node) && enrolled && UiMeasureValidity.CanReuse(prior.Inputs, inputs, prior.Environment, environment))
         {
             records = WritableLeaves(scope, node, records);

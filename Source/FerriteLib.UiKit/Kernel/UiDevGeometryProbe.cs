@@ -92,6 +92,13 @@ internal struct UiDevGeometrySample
     /// them asserting it.
     /// </summary>
     internal UiFont? PaintedFont { get; set; }
+    internal UiTextFont? ScopeTextFont { get; set; }
+    internal UiTextFont? LabelFont { get; set; }
+    internal UiColour? LabelColour { get; set; }
+    internal UiTextFont? EditorFont { get; set; }
+    internal UiColour? EditorColour { get; set; }
+    internal string LabelPaintSource { get; set; }
+    internal string EditorPaintSource { get; set; }
 
     /// <summary>
     /// The element's effective appearance, resolved through the registry's own seam at the observation site:
@@ -230,6 +237,17 @@ internal struct UiDevInputSample
 /// </summary>
 internal sealed class UiDevGeometryCapture
 {
+    internal void NoteText(string nodeKey, UiTextPurpose purpose, UiTextFont font, UiColour? ink, string source)
+    {
+        for (int i = geometry.Count - 1; i >= 0; i--)
+        {
+            UiDevGeometrySample sample = geometry[i];
+            if (sample.NodeKey != nodeKey) continue;
+            if (purpose == UiTextPurpose.Label) { sample.LabelFont = font; sample.LabelColour = ink; sample.LabelPaintSource = source; }
+            else { sample.EditorFont = font; sample.EditorColour = ink; sample.EditorPaintSource = source; }
+            geometry[i] = sample; return;
+        }
+    }
     /// <summary>Geometry samples one pass keeps; the rest of the pass is counted, never silently lost.</summary>
     internal const int MaxGeometrySamples = 512;
 
@@ -386,6 +404,11 @@ internal sealed class UiDevGeometryCapture
                 .Append(" popup=").Append(Sample(sample.OpenPopupId))
                 .Append(" popup-anchor=").Append(Boundary(sample.PopupAnchor, UiDevNodeSnapshot.NoOpenPopupUnknownReason))
                 .Append(" owns-popup=").Append(sample.OwnsOpenPopup ? "yes" : "no")
+                .Append(" scope-text-font=").Append(sample.ScopeTextFont?.ToString() ?? "unknown")
+                .Append(" label-font=").Append(sample.LabelFont?.ToString() ?? "unknown")
+                .Append(" label-colour=").Append(TextInk(sample.LabelFont, sample.LabelColour))
+                .Append(" editor-font=").Append(sample.EditorFont?.ToString() ?? "unknown")
+                .Append(" editor-colour=").Append(TextInk(sample.EditorFont, sample.EditorColour))
                 .Append('\n');
         }
 
@@ -468,6 +491,10 @@ internal sealed class UiDevGeometryCapture
                 ResolvedHeight = sample.ResolvedHeight,
                 ScopeFont = sample.ScopeFont,
                 PaintedFont = sample.PaintedFont,
+                ScopeTextFont = sample.ScopeTextFont,
+                LabelFont = sample.LabelFont, LabelColour = sample.LabelColour,
+                EditorFont = sample.EditorFont, EditorColour = sample.EditorColour,
+                LabelPaintSource = sample.LabelPaintSource, EditorPaintSource = sample.EditorPaintSource,
                 Appearance = sample.Appearance,
                 AppearanceDeclared = sample.AppearanceDeclared,
                 AppearanceDefault = sample.AppearanceDefault,
@@ -595,6 +622,8 @@ internal sealed class UiDevGeometryCapture
     {
         return font.HasValue ? font.Value.ToString() : "unknown(" + unknownReason + ")";
     }
+    private static string TextInk(UiTextFont? font, UiColour? ink)
+        => !font.HasValue ? "unknown" : !ink.HasValue ? "native-preset" : Number(ink.Value.Red) + "," + Number(ink.Value.Green) + "," + Number(ink.Value.Blue) + "," + Number(ink.Value.Alpha);
 }
 
 /// <summary>
@@ -700,6 +729,8 @@ internal static class UiDevGeometryProbe
             HeightMode = HeightMode(spec),
             ResolvedHeight = arranged.Height,
             ScopeFont = theme.DefaultFont,
+            ScopeTextFont = UiTextFonts.Requested(theme),
+            LabelPaintSource = "not-sampled", EditorPaintSource = "not-sampled",
             // The transparent case, recorded as the fact it is: the font a label finally paints with is chosen
             // inside the element's own draw, so nothing here may stand in for it.
             PaintedFont = null,

@@ -66,10 +66,10 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     }
     private UiMeasurement CaptureText(UiWidgetContext ctx,string text)
     {
-        return new UiMeasurement(new UiMeasureInputs(new[] { text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx) }, true), () =>
+        return new UiMeasurement(new UiMeasureInputs(new[] { text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx), (float)(UiTextFonts.For(ctx).Font.Size ?? 0) }, true), () =>
         {
             float declared = AtomVocabulary.ReadHeight(spec, 0);
-            return declared > 0 ? declared : Math.Max(ReadHeight(), ctx.Metrics.MeasureText(text, AtomVocabulary.TextFont(ctx), Math.Max(1, ctx.ViewWidth)));
+            return declared > 0 ? declared : Math.Max(ReadHeight(), UiTextFonts.For(ctx, AtomVocabulary.TextFont(ctx)).MeasureText(text, Math.Max(1, ctx.ViewWidth)));
         });
     }
 
@@ -87,7 +87,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     }
     private void PaintText(UiLayoutRect rect,UiWidgetContext ctx,string title)
     {
-        UiThemeDraw.Label(ctx.Drawing,rect, title, ctx.Theme, ctx.Theme[UiPaletteRole.Foreground], AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft);
+        UiTextFonts.Label(ctx,rect, title, ctx.Theme.Styles.Resolve(UiStatusTone.Neutral).Text, AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft);
 
         // Chrome="none": the title without the rule under it. Read here rather than cached in Configure so the
         // decision sits next to the paint it suppresses and a reloaded spec needs no second path.

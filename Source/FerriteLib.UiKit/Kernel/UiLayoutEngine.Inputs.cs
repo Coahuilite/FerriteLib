@@ -21,23 +21,25 @@ internal sealed partial class UiLayoutEngine
         internal IUiTranslation Translation = null!;
         internal int TranslationRevision;
         internal float Value;
-        internal UiFont Font;
+        internal UiTextFont Font;
+        internal UiTextFont? EditorFont;
     }
     private Dictionary<UiNodeId, RoleInput> autoWidths = new(), labelContributions = new();
     private float ReadLayoutRole(Dictionary<UiNodeId, RoleInput> records, UiElementSpec spec, UiWidgetContext ctx, bool shared, Func<float> calculate)
     {
         if (ctx.Node == null) return calculate();
         UiMeasureInputs context = shared ? MeasureContext(ctx) : new UiMeasureInputs(numbers: new[] {
-            ctx.ViewWidth, (float)ctx.Theme.DefaultFont, ctx.Theme.Geometry.Padding, ctx.Theme.Geometry.Spacing,
+            ctx.ViewWidth, (float)ctx.Theme.DefaultFont, (float)(UiTextFonts.For(ctx).Font.Size ?? 0), ctx.Theme.Geometry.Padding, ctx.Theme.Geometry.Spacing,
             ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.RowHeight, ctx.Theme.Geometry.Hairline });
-        UiMeasureInputs? environment = (ctx.Metrics as IUiTextMetricsEnvironment)?.CaptureEnvironment(ctx.Theme.DefaultFont);
+        UiMeasureInputs? environment = UiTextFonts.Environment(ctx);
         if (!layoutRequested && !ctx.Node.IsDirty && records.TryGetValue(ctx.Node.Id, out RoleInput? prior)
             && ReferenceEquals(prior.Spec, spec) && ReferenceEquals(prior.Metrics, textMetricsCache!.Source)
             && ReferenceEquals(prior.Translation, ctx.Translation) && prior.TranslationRevision == ctx.Translation.TranslationRevision
-            && context.Equals(prior.Context) && (environment == null ? prior.Environment == null : environment.Equals(prior.Environment))) return prior.Value;
+            && context.Equals(prior.Context) && (environment != null ? environment.Equals(prior.Environment) : prior.Environment == null)) return prior.Value;
         float result = calculate();
         records[ctx.Node.Id] = new RoleInput { Spec = spec, Context = context, Environment = environment, Metrics = textMetricsCache!.Source,
-            Translation = ctx.Translation, TranslationRevision = ctx.Translation.TranslationRevision, Font = ctx.Theme.DefaultFont, Value = result };
+            Translation = ctx.Translation, TranslationRevision = ctx.Translation.TranslationRevision, Font = UiTextFonts.For(ctx).Font,
+            EditorFont = UiTextFonts.UsesEditor(ctx) ? UiTextFonts.For(ctx, purpose: UiTextPurpose.Editor).Font : null, Value = result };
         return result;
     }
     private Dictionary<string, BoundInput<bool>> visibleInputs = new(StringComparer.Ordinal);

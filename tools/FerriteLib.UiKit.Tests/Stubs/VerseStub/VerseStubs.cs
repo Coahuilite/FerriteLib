@@ -358,6 +358,10 @@ public static class Text
 {
     public static readonly GUIStyle[] fontStyles = { new(), new(), new() };
     public static GUIStyle CurFontStyle => fontStyles[(int)Font];
+    private static readonly GUIStyle[] textFieldStyles = { new(), new(), new() };
+    private static readonly GUIStyle[] textAreaStyles = { new(), new(), new() };
+    public static GUIStyle CurTextFieldStyle => textFieldStyles[(int)Font];
+    public static GUIStyle CurTextAreaStyle => textAreaStyles[(int)Font];
     public static GameFont Font { get; set; }
 
     public static TextAnchor Anchor { get; set; }

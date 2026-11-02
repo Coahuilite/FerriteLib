@@ -250,6 +250,8 @@ public sealed partial class UiStyleDocument
 
         string? defaultScheme = ReadOptionalName(root, "Scheme");
         string? defaultDensity = ReadOptionalName(root, "Density");
+        foreach (var scheme in schemes.Values)
+            if (scheme.InvalidFontSize) return Invalid(schemes, densities, issues);
         return new UiStyleDocument(defaultScheme, defaultDensity, schemes, densities, issues);
     }
 
@@ -343,12 +345,29 @@ public sealed partial class UiStyleDocument
         foreach (XmlNode child in element.ChildNodes)
         {
             if (child is not XmlElement entry) continue;
+            if (UiTextColourProperties.IsSlot(entry.Name))
+            {
+                ReadTextColour(name, entry, definition, issues);
+                continue;
+            }
             switch (entry.Name)
             {
                 case "Palette":
                     ReadPalette(name, entry, definition, issues);
                     break;
                 case "Metric":
+                    if (string.Equals(ReadOptionalName(entry, "Token"), "FontSize", StringComparison.Ordinal))
+                    {
+                        string rawSize = entry.GetAttribute("Value");
+                        if (!UiTextFont.TrySize(rawSize, out int size))
+                        {
+                            definition.InvalidFontSize = true;
+                            Record(issues, "Scheme '" + name + "' has invalid FontSize; expected an unsigned integer from 1 to 96.");
+                        }
+                        else if (definition.FontSize.HasValue) Record(issues, "FontSize is set twice in scheme '" + name + "'; the first is kept.");
+                        else definition.FontSize = size;
+                        break;
+                    }
                     // A scheme may carry the DENSITY metric vocabulary, which is what makes the premeasure
                     // style axis one vocabulary instead of two: the spacing numbers that move a rect are
                     // declared the same way in a scheme and in a named density. The Font key is the one
@@ -401,6 +420,22 @@ public sealed partial class UiStyleDocument
         }
 
         definition.Colours.Add(token, colour);
+    }
+
+    private static void ReadTextColour(string scheme, XmlElement element, SchemeDefinition definition, List<UiStyleIssue> issues)
+    {
+        string property = element.Name;
+        if (definition.TextColours.ContainsKey(property))
+        {
+            Record(issues, property + " is set twice in scheme '" + scheme + "'; the first value is kept.");
+            return;
+        }
+        if (!TryParseColour(element.GetAttribute("Value"), out UiColour colour))
+        {
+            Record(issues, "Scheme '" + scheme + "' sets " + property + " to an unreadable colour; the declaration is ignored.");
+            return;
+        }
+        definition.TextColours.Add(property, colour);
     }
 
     /// <summary>The successor of the legacy <c>&lt;Font&gt;</c> declaration: one key of the scheme's metric
@@ -605,6 +640,9 @@ public sealed partial class UiStyleDocument
         /// receives, so it is the font every text measurement and every painted label in the scope resolves.
         /// </summary>
         internal UiFont? Font { get; set; }
+        internal int? FontSize { get; set; }
+        internal bool InvalidFontSize { get; set; }
+        internal Dictionary<string, UiColour> TextColours { get; } = new(StringComparer.Ordinal);
     }
 
     internal sealed class DensityDefinition

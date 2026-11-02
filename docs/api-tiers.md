@@ -183,6 +183,28 @@ The type census and stable set are pinned in `FerriteLibApiTierTests`. Its depen
 
 ## Public-unstable
 
+- `UiTextFont` — resource alias plus optional logical GUI size, validated in1..96.
+- `UiTextPurpose` — label/editor capability and fallback discriminator.
+- `IUiTextFontMetrics` — optional numeric measurement and truthful environment capability.
+- `IUiTextFontDrawing` — optional numeric label painting with explicit final colour.
+- `IUiTextFontEditing` — optional composed editor request, independent of legacy execution signatures.
+- `UiTextEdit` — legacy edit identity/data plus effective font and optional explicit glyph colour.
+- `UiTextRun` — borrowed paired metrics/drawing and one effective font for measure/paint/fit.
+- `UiTextFonts` — numeric declarations, source/effective-font resolution, sizing and fit metadata readers.
+- `VerseTextMetrics` — numeric production composition over the unchanged Verse ruler.
+- `VerseTextExecution` — optional production text capabilities over one unchanged native owner.
+
+These entries compose the old Stable ruler/execution without changing their signatures, implements,
+singleton or legal-use conditions. Standard Window/Host supplies the pair; independent authors opt in
+through the [font guide](consumers/consume-from-0.8.0-dev.md#choose-one-effective-font-for-measurement-and-drawing).
+The parallel Dev node font/colour/source fields report last per-purpose outlets; the old PaintedFont
+field keeps its unknown semantics. No new type is promoted to Stable by this implementation.
+
+- `UiTextColours` — optional seven-slot text-colour declarations for host, instance and local styles,
+  explicit existing-owner resolution for independent Session contexts, and live resolved source facts.
+  Slots are separate from the closed semantic palette; they do not
+  change input eligibility or add members to the stable theme/property types.
+
 - `UiNode` — advanced adapter/runtime inspection; not required by the stable author paths.
 - `UiHitLayer` — advanced adapter/runtime inspection; not required by the stable author paths.
 - `UiPopup` — advanced adapter/runtime inspection; not required by the stable author paths.

@@ -8,15 +8,18 @@ internal sealed partial class UiLayoutEngine
     private readonly struct LayoutStamp
     {
         private readonly float width, shared, padding, spacing, gap, row, hairline;
-        private readonly UiFont font;
+        private readonly UiTextFont font;
+        private readonly UiTextFont? editorFont;
         internal LayoutStamp(UiWidgetContext ctx)
         {
-            width = ctx.ViewWidth; shared = ctx.Node.SharedLabelWidth; font = ctx.Theme.DefaultFont;
+            width = ctx.ViewWidth; shared = ctx.Node.SharedLabelWidth; font = UiTextFonts.For(ctx).Font;
+            editorFont = UiTextFonts.UsesEditor(ctx) ? UiTextFonts.For(ctx, purpose: UiTextPurpose.Editor).Font : null;
             var g = ctx.Theme.Geometry; padding = g.Padding; spacing = g.Spacing;
             gap = g.Gap; row = g.RowHeight; hairline = g.Hairline;
         }
         internal bool Matches(UiWidgetContext ctx) => width == ctx.ViewWidth && shared == ctx.Node.SharedLabelWidth
-            && font == ctx.Theme.DefaultFont && padding == ctx.Theme.Geometry.Padding && spacing == ctx.Theme.Geometry.Spacing
+            && font == UiTextFonts.For(ctx).Font && padding == ctx.Theme.Geometry.Padding && spacing == ctx.Theme.Geometry.Spacing
+            && editorFont == (UiTextFonts.UsesEditor(ctx) ? UiTextFonts.For(ctx, purpose: UiTextPurpose.Editor).Font : (UiTextFont?)null)
             && gap == ctx.Theme.Geometry.Gap && row == ctx.Theme.Geometry.RowHeight && hairline == ctx.Theme.Geometry.Hairline;
     }
     private sealed class StackRecipe
@@ -225,8 +228,14 @@ internal sealed partial class UiLayoutEngine
     {
         if (!ReferenceEquals(input.Metrics, ctx.Metrics) || !ReferenceEquals(input.Translation, ctx.Translation)
             || input.TranslationRevision != ctx.Translation.TranslationRevision) return false;
-        UiMeasureInputs? environment = (ctx.Metrics as IUiTextMetricsEnvironment)?.CaptureEnvironment(input.Font);
-        return environment == null ? input.Environment == null : environment.Equals(input.Environment);
+        UiMeasureInputs? environment = UiTextFonts.Resolve(ctx.Metrics, ctx.Session.CurrentExecution, input.Font).CaptureEnvironment();
+        if (environment != null && input.EditorFont.HasValue)
+        {
+            UiMeasureInputs? editor = UiTextFonts.Resolve(ctx.Metrics, ctx.Session.CurrentExecution, input.EditorFont.Value, UiTextPurpose.Editor).CaptureEnvironment();
+            environment = editor == null ? null : UiMeasureInputs.Join(environment, editor);
+        }
+        // The old idle snapshot does not promise environment purity at the next synchronization.
+        return environment != null ? environment.Equals(input.Environment) : !layoutRequested && input.Environment == null;
     }
     private void ReleasePipeline()
     {

@@ -92,8 +92,8 @@ public readonly struct UiGeometry : IEquatable<UiGeometry>
     public static bool operator !=(UiGeometry left, UiGeometry right) => !left.Equals(right);
 }
 
-/// <summary>Platform paint adapter and existing typography/density settings. Colours live only in Palette.</summary>
-public sealed class UiTheme
+/// <summary>Typography, density, semantic palette and independently declared text-colour slots.</summary>
+public sealed partial class UiTheme
 {
     private readonly Dictionary<UiPaletteRole, UiColour> appliedColours = new();
     private readonly Dictionary<string, float> styleMetrics = new(StringComparer.Ordinal);
@@ -196,6 +196,8 @@ public sealed class UiTheme
         UiGeometry priorGeometry = Geometry;
         if (appliedColours.Count > 0) applicationRevision++;
         appliedColours.Clear();
+        ClearTextColourApplications();
+        ClearFontSizeApplication();
         styleFont = null;
         styleMetrics.Clear();
         if (DefaultFont != priorFont || Geometry != priorGeometry) LayoutRevision++;
@@ -225,6 +227,8 @@ public sealed class UiTheme
         UiFont priorFont = DefaultFont;
         UiGeometry priorGeometry = Geometry;
         Palette.RestoreFrom(source.Palette);
+        RestoreTextColours(source);
+        RestoreFontSize(source);
         appliedColours.Clear();
         foreach (var pair in source.appliedColours) appliedColours.Add(pair.Key, pair.Value);
         styleMetrics.Clear();

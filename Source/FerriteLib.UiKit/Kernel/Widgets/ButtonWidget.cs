@@ -81,10 +81,10 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     }
     private UiMeasurement CaptureCaption(UiWidgetContext ctx,string text,bool automatic)
     {
-        return new UiMeasurement(new UiMeasureInputs(new[] { text }, automatic && text.Length > 0 ? new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx), ctx.Theme.Geometry.Padding } : new[] { ctx.Theme.Geometry.RowHeight }, automatic && text.Length > 0), () =>
+        return new UiMeasurement(new UiMeasureInputs(new[] { text }, automatic && text.Length > 0 ? new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx), (float)(UiTextFonts.For(ctx).Font.Size ?? 0), ctx.Theme.Geometry.Padding } : new[] { ctx.Theme.Geometry.RowHeight }, automatic && text.Length > 0), () =>
             automatic && text.Length > 0
-                ? Math.Max(1, ctx.Metrics.MeasureText(text, AtomVocabulary.TextFont(ctx), Math.Max(1, ctx.ViewWidth - ctx.Theme.Geometry.Padding * 2)))
-                : AtomVocabulary.ReadHeight(spec, ctx.Theme.Geometry.RowHeight));
+                ? Math.Max(1, UiTextFonts.For(ctx, AtomVocabulary.TextFont(ctx)).MeasureText(text, Math.Max(1, ctx.ViewWidth - ctx.Theme.Geometry.Padding * 2)))
+                : AtomVocabulary.ReadHeight(spec, UiTextFonts.RowHeight(ctx)));
     }
 
     public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
@@ -176,10 +176,9 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
             UiThemeDraw.Surface(ctx.Drawing,rect, shown.Surface, theme.Geometry.Hairline);
         }
 
-        UiThemeDraw.Label(
-ctx.Drawing,            new UiLayoutRect(rect.X + theme.Geometry.Padding, rect.Y, Math.Max(1f, rect.Width - theme.Geometry.Padding * 2f), rect.Height),
+        UiTextFonts.Label(
+ctx,            new UiLayoutRect(rect.X + theme.Geometry.Padding, rect.Y, Math.Max(1f, rect.Width - theme.Geometry.Padding * 2f), rect.Height),
             caption,
-            theme,
             shown.Text,
             AtomVocabulary.TextFont(ctx),
             UiTextAnchor.MiddleCenter,

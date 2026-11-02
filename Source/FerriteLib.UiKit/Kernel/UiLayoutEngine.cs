@@ -1152,7 +1152,7 @@ internal sealed partial class UiLayoutEngine
         string declaredKind = GetContainerKind(spec);
         Padding padding = ParsePadding(spec, ctx.Theme);
         float gap = ReadGap(spec, ctx.Theme);
-        float titleHeight = HasTitle(spec) ? SectionTitleHeight : 0f;
+        float titleHeight = HasTitle(spec) ? UiTextFonts.RowHeight(ctx, minimum: SectionTitleHeight) : 0f;
         float innerWidth = Math.Max(1f, width - padding.Left - padding.Right);
         float innerY = padding.Top + titleHeight;
 
@@ -2262,7 +2262,7 @@ internal sealed partial class UiLayoutEngine
             string text = IsTranslationKeyAttribute(attribute)
                 ? ctx.Translation.Translate(value)
                 : value;
-            widest = Math.Max(widest, ctx.Metrics.MeasureWidth(text, ctx.Theme.DefaultFont));
+            widest = Math.Max(widest, UiTextFonts.For(ctx, ctx.Theme.DefaultFont).MeasureWidth(text));
         }
 
         return widest <= 0f ? body : widest + body;
@@ -2668,11 +2668,11 @@ internal sealed partial class UiLayoutEngine
             // were arranged against.
             Padding padding = ParsePadding(entry.Spec, ctx.Theme);
             float innerWidth = Math.Max(1f, rect.Width - padding.Left - padding.Right);
-            var headerRect = new UiLayoutRect(rect.X + padding.Left, rect.Y + padding.Top, innerWidth, SectionTitleHeight);
+            var headerRect = new UiLayoutRect(rect.X + padding.Left, rect.Y + padding.Top, innerWidth, UiTextFonts.RowHeight(ctx, minimum: SectionTitleHeight));
             // One text outlet: routing the container title through UiThemeDraw.Label is what makes it
             // visible to the fit audit (BeginElement above already attributes by path), which the
             // engine's own private Label copy could never do.
-            UiThemeDraw.Label(ctx.Drawing,headerRect, ReadTitle(entry.Spec, ctx), ctx.Theme, ctx.Theme[UiPaletteRole.Foreground]);
+            UiTextFonts.Label(ctx,headerRect, ReadTitle(entry.Spec, ctx), ctx.Theme.Styles.Resolve(UiStatusTone.Neutral).Text);
         }
     }
 

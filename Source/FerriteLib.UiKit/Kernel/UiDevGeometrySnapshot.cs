@@ -218,15 +218,15 @@ public sealed class UiDevNodeSnapshot
 
     /// <summary>
     /// The <b>scope's</b> font: <c>UiTheme.DefaultFont</c> as the resolved theme answers it for this element's
-    /// scope. This is an observation, and it is the font the engine's own text measurement uses.
+    /// scope. This legacy observation reports the alias, not an explicit numeric size.
     /// <para>
     /// <b>Deliberately not called the painted font.</b> The label outlet resolves
     /// <c>font ?? theme.Styles.Font</c>, and <c>Styles.Font</c> is this same value - so a label that names no
     /// font paints with it. Several kinds do name one (a band or header constant), and that choice is made
-    /// inside their own draw, so <see cref="PaintedFont"/> is the member that answers "what is painted" and it
-    /// is null here. Reporting this value as the painted font would be the misreport this split exists to
-    /// prevent. There is no per-element <c>Font</c> attribute in this library: the scope selection is the only
-    /// font input a page can express.
+    /// inside their own draw. The legacy <see cref="PaintedFont"/> remains unknown; the parallel
+    /// <see cref="LabelFont"/> and <see cref="EditorFont"/> record actual outlets after drawing.
+    /// Per-element Font/FontSize declarations are reflected in <see cref="ScopeTextFont"/> as requests,
+    /// never inferred to be the effective painted descriptor.
     /// </para>
     /// </summary>
     public UiFont ScopeFont { get; internal set; }
@@ -237,6 +237,16 @@ public sealed class UiDevNodeSnapshot
     /// <see cref="PaintedFontUnknownReason"/>, which the dump prints beside it.
     /// </summary>
     public UiFont? PaintedFont { get; internal set; }
+    /// <summary>Requested alias/size at the scope; separate from the successful leaf calls below.</summary>
+    public UiTextFont? ScopeTextFont { get; internal set; }
+    /// <summary>Last successful label call in this node/pass, not a prediction from the scope.</summary>
+    public UiTextFont? LabelFont { get; internal set; }
+    public UiColour? LabelColour { get; internal set; }
+    public UiTextFont? EditorFont { get; internal set; }
+    /// <summary>Null with an EditorFont means native preset ink; null without a font means not sampled.</summary>
+    public UiColour? EditorColour { get; internal set; }
+    public string LabelPaintSource { get; internal set; } = "";
+    public string EditorPaintSource { get; internal set; } = "";
 
     /// <summary>
     /// The element's <b>effective appearance</b>: the canonical look name its kind's resolver selected for it,

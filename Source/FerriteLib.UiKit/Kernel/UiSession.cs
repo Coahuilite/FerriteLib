@@ -94,7 +94,8 @@ public sealed class UiSession : IDisposable
         if(execution==null)throw new ArgumentNullException(nameof(execution));
         // Execution is borrowed, not owned. Idle owners may change it, including owners that share
         // an outer execution. A held interaction cannot silently migrate to another native mapping.
-        if(this.execution!=null && !ReferenceEquals(this.execution,execution))
+        if(this.execution!=null && !ReferenceEquals(this.execution,execution)
+            && !ReferenceEquals((this.execution as IUiExecutionOwner)?.NativeOwner ?? this.execution, (execution as IUiExecutionOwner)?.NativeOwner ?? execution))
         {
             bool focused=false;
             foreach(UiNode node in nodes.Values)

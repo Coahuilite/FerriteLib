@@ -2,6 +2,11 @@
 
 ## 0.8 RC follow-up
 
+- [ ] Receive the appearance-freedom source checkpoint, then commit and build a clean fixed input for
+      paired consumer adoption. Numeric label/editor1.6 and label1.7 native acceptance remain open;
+      editor1.7 uses reported preset fallback. Author routes and evidence limits:
+      `docs/openspec/implementation.md#appearance-freedom`.
+
 The accepted US ea610fa/FL833c14f4 internal trial permits RC preparation. FL v0.8.0-rc2 is not yet
 published; rc1 remains the published non-latest asset. Release/upgrade notes and the explicit local
 input versus real cloud sequence are in docs/build-and-debug.md.

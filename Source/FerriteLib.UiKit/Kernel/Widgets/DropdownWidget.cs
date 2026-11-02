@@ -66,13 +66,18 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
     public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
         string label = ReadLabel(ctx);
-        return new UiMeasurement(ctx.Node?.SharedLabelWidth > 0 ? AtomVocabulary.LabelMeasureInputs(ctx, label) : new UiMeasureInputs(numbers: new[] { ctx.Theme.Geometry.RowHeight }), () => ReadHeight(ctx.Node?.SharedLabelWidth > 0 ? UiSliderLayout.Measure(label, ctx.ViewWidth, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node.SharedLabelWidth).Height : ctx.Theme.Geometry.RowHeight));
+        return new UiMeasurement(UiMeasureInputs.Join(AtomVocabulary.LabelMeasureInputs(ctx, label), new UiMeasureInputs(numbers: new[] { UiTextFonts.RowHeight(ctx) }, usesTextMetrics: UiTextFonts.For(ctx).Font.Size.HasValue)), () =>
+        {
+            float row = UiTextFonts.RowHeight(ctx);
+            UiSliderLayout? shared = SharedLabelLayout(ctx, ctx.ViewWidth, label);
+            return ReadHeight(shared.HasValue ? UiTextFonts.ControlHeight(ctx, shared.Value, row) : row);
+        });
     }
 
     public float MeasureLabel(UiWidgetContext ctx)
     {
         string label = ReadLabel(ctx);
-        return label.Length == 0 ? 0 : ctx.Metrics.MeasureWidth(label, AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing;
+        return label.Length == 0 ? 0 : UiTextFonts.For(ctx, AtomVocabulary.TextFont(ctx)).MeasureWidth(label) + ctx.Theme.Geometry.Spacing;
     }
 
     public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
@@ -113,7 +118,7 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
             UiLayoutRect anchor = ctx.Session.OpenPopupAnchor.Value;
             ctx.Session.RegisterPopupDraw(() =>
             {
-                int hover = UiPopup.DrawChoices(UiPopup.RectFor(anchor, choices.Count, ctx.Session.HostViewport), key, ctx, choices, current, v => endpoint.TryWrite(v), endpoint.Writable);
+                int hover = UiPopup.DrawChoices(UiTextFonts.PopupRect(ctx, anchor, choices.Count, ctx.Session.HostViewport), key, ctx, choices, current, v => endpoint.TryWrite(v), endpoint.Writable);
                 if(!ctx.Session.IsActive)return;
                 bool hovered = hover >= 0 && hover < choices.Count && ctx.Session.IsPopupOpen(key, ctx.Node);
                 string help = hovered ? choices[hover].HelpRef : "";
@@ -126,7 +131,7 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
             OptionHelp.Publish(ctx, OptionHelp.SinkKey(spec), "");
     }
 
-    private UiSliderLayout? SharedLabelLayout(UiWidgetContext ctx, float width, string? capturedLabel = null) => ctx.Node?.SharedLabelWidth > 0 ? UiSliderLayout.Measure(capturedLabel ?? ReadLabel(ctx), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node.SharedLabelWidth) : null;
+    private UiSliderLayout? SharedLabelLayout(UiWidgetContext ctx, float width, string? capturedLabel = null) => ctx.Node?.SharedLabelWidth > 0 ? UiSliderLayout.Measure(capturedLabel ?? ReadLabel(ctx), width, UiTextFonts.For(ctx, AtomVocabulary.TextFont(ctx)), UiElementProperties.DensityOf(ctx.Theme), ctx.Node.SharedLabelWidth) : null;
     private UiLayoutRect ResolveField(UiLayoutRect rect, UiWidgetContext ctx, string? capturedLabel = null)
     {
         UiSliderLayout? shared = SharedLabelLayout(ctx, rect.Width, capturedLabel);
@@ -152,10 +157,10 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
             UiSliderLayout? shared = SharedLabelLayout(ctx, rect.Width, capturedLabel);
             float width = shared?.LabelWidth ?? LabelWidth;
             float height = shared?.Stacked == true ? shared.Value.LabelHeight : rect.Height;
-            UiThemeDraw.Label(ctx.Drawing, new UiLayoutRect(rect.X, rect.Y, width, height), label, ctx.Theme, ctx.Theme[UiPaletteRole.Foreground], AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft, singleLine: !shared.HasValue);
+            UiTextFonts.Label(ctx, new UiLayoutRect(rect.X, rect.Y, width, height), label, ctx.Theme.Styles.Resolve(UiStatusTone.Neutral).Text, AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft, singleLine: !shared.HasValue);
         }
 
-        DrawField(ctx.Drawing, field, display, selected, ctx.Theme, Looks.Resolve(spec).Value, AtomVocabulary.TextFont(ctx));
+        DrawField(ctx, field, display, selected, Looks.Resolve(spec).Value, AtomVocabulary.TextFont(ctx));
     }
 
     /// <summary>True when the resolved look is the selector field; the name is matched case-insensitively.</summary>
@@ -198,8 +203,9 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
         return spec.TryGetAttribute("OptionsBind", out string optionsKey) && optionsKey.Length > 0 ? optionsKey : bindKey;
     }
 
-    private static void DrawField(IUiDrawing drawing, UiLayoutRect rect, string display, bool selected, UiTheme theme, string look, UiFont font)
+    private static void DrawField(UiWidgetContext ctx, UiLayoutRect rect, string display, bool selected, string look, UiFont font)
     {
+        UiTheme theme = ctx.Theme; IUiDrawing drawing = ctx.Drawing;
         // The mapping is a table query, not a second copy of it: this method used to re-derive the
         // three tokens the status outlet already computes, which is how the two drifted apart. The style
         // ladder below is ONE resolution for both looks - the selector changes the field's SHAPE, never
@@ -207,13 +213,15 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
         UiResolvedStyle style = theme.Styles.Resolve(selected ? UiStatusTone.Active : UiStatusTone.Neutral);
         if (IsSelector(look))
         {
-            DrawSelectorField(drawing, rect, display, style, theme, font);
+            // Keep the existing selector geometry/surface, and paint its text with the paired font.
+            UiThemeDraw.SelectorField(drawing, rect, "", theme, style, font);
+            UiTextFonts.Label(ctx, UiThemeDraw.SelectorTextOutlet(rect, theme), display, style.Text, font, singleLine: true);
             return;
         }
 
         float padding = theme.Geometry.Padding;
         UiThemeDraw.Surface(drawing, rect, style.Surface, theme.Geometry.Hairline);
-        UiThemeDraw.Label(drawing, new UiLayoutRect(rect.X + padding, rect.Y, rect.Width - padding * 2f, rect.Height), display, theme, style.Text, font, UiTextAnchor.MiddleLeft, singleLine: true);
+        UiTextFonts.Label(ctx, new UiLayoutRect(rect.X + padding, rect.Y, rect.Width - padding * 2f, rect.Height), display, style.Text, font, UiTextAnchor.MiddleLeft, singleLine: true);
     }
 
     /// <summary>
@@ -221,11 +229,6 @@ internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabe
     /// composes through the very method a consumer composite calls, so "the same outlets" means the same
     /// CODE, not two spellings of the same arithmetic. No question-mark slot exists in either look.
     /// </summary>
-    private static void DrawSelectorField(IUiDrawing drawing, UiLayoutRect rect, string display, UiResolvedStyle style, UiTheme theme, UiFont font)
-    {
-        UiThemeDraw.SelectorField(drawing, rect, display, theme, style, font);
-    }
-
     private string ReadBindKey()
     {
         if (spec.TryGetAttribute("Bind", out string bindKey) && bindKey.Length > 0)

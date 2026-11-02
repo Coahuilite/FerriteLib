@@ -213,7 +213,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
 
     private float ReadRowHeight(UiWidgetContext ctx)
     {
-        return Math.Max(1f, AtomVocabulary.ReadFloat(spec, "RowHeight", ctx.Theme.Geometry.RowHeight));
+        return Math.Max(1f, AtomVocabulary.ReadFloat(spec, "RowHeight", UiTextFonts.RowHeight(ctx)));
     }
 
     /// <summary>

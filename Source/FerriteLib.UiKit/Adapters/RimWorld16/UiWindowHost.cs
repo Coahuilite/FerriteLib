@@ -44,6 +44,19 @@ public abstract class UiWindowHost : Window
 {
     private UiHost? host;
     protected VerseUiExecution Execution { get; } = new VerseUiExecution();
+    private VerseTextExecution? textExecution;
+    private VerseTextExecution TextExecution => textExecution ??= new VerseTextExecution(Execution);
+    private ITextMetrics? originalTextMetrics, composedTextMetrics;
+    private ITextMetrics TextMetrics
+    {
+        get
+        {
+            ITextMetrics current = Metrics;
+            if (!ReferenceEquals(current, originalTextMetrics))
+            { originalTextMetrics = current; composedTextMetrics = VerseTextMetrics.Compose(current); }
+            return composedTextMetrics!;
+        }
+    }
     /// <summary>Window-owned native image references. Bind the returned neutral tokens; closing drops references, never supplier textures.</summary>
     public VerseUiImages Images => Execution.Images;
     private bool pageUnavailable;
@@ -138,7 +151,9 @@ public abstract class UiWindowHost : Window
     // ---- chrome geometry: this shell's own layout, overridable, not consumer policy ----
 
     /// <summary>Vertical space reserved for title, subtitle and close affordance.</summary>
-    protected virtual float TitleBarHeight => 56f;
+    protected virtual float TitleBarHeight => Theme.ReadFontSize.HasValue
+        ? Math.Max(56f, Math.Max(6f + ChromeTextHeight(TitleFont, 30f) + (Subtitle.Length > 0 ? ChromeTextHeight(SubtitleFont, 18f) : 0f), ChromeTextHeight(CloseFont, CloseButtonHeight) + 16f))
+        : 56f;
 
     /// <summary>Left/right/bottom inset of the page inside the window.</summary>
     protected virtual float SidePadding => 20f;
@@ -158,7 +173,7 @@ public abstract class UiWindowHost : Window
     /// <summary>Narrowest the close affordance may be: the shipped width for a short label.</summary>
     private const float CloseButtonMinWidth = 110f;
 
-    /// <summary>Height of the close affordance. Text moves the width only; the band is fixed.</summary>
+    /// <summary>Preset minimum height. Explicit numeric text can grow the natural band.</summary>
     private const float CloseButtonHeight = 30f;
 
     /// <summary>Breathing room left around the close label, per side.</summary>
@@ -187,10 +202,11 @@ public abstract class UiWindowHost : Window
     {
         get
         {
-            float measured = Metrics.MeasureWidth(CloseText, CloseFont);
+            UiTextRun text = UiTextFonts.Resolve(TextMetrics, TextExecution, new UiTextFont(CloseFont, Theme.ReadFontSize), elementPath: ChromeScope);
+            float measured = text.MeasureWidth(CloseText);
             return new Vector2(
                 Math.Max(CloseButtonMinWidth, measured + CloseButtonPadding * 2f),
-                CloseButtonHeight);
+                text.Font.Size.HasValue ? Math.Max(CloseButtonHeight, text.MeasureText("Ag", 100000) + Theme.Geometry.Spacing * 2) : CloseButtonHeight);
         }
     }
 
@@ -354,7 +370,7 @@ public abstract class UiWindowHost : Window
     /// </summary>
     public sealed override void DoWindowContents(Rect inRect)
     {
-        using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, host == null ? null : Metrics))
+        using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, host == null ? null : TextMetrics))
         {
             DrawShell(inRect);
         }
@@ -394,7 +410,7 @@ public abstract class UiWindowHost : Window
     {
         if (!displayRequired) return;
         UiHost? page = host;
-        if(page!=null)page.Session.SetFrame(Execution.CaptureFrame(!IsOpen || Find.WindowStack.GetsInput(this)),Execution);
+        if(page!=null)page.Session.SetFrame(Execution.CaptureFrame(!IsOpen || Find.WindowStack.GetsInput(this)),TextExecution);
         if (page != null && page.TryHandleCancel()) return;
 
         if (TryHandleUnansweredCancel())
@@ -437,7 +453,7 @@ public abstract class UiWindowHost : Window
     {
         if (!displayRequired) return;
         UiHost? page = host;
-        if(page!=null)page.Session.SetFrame(Execution.CaptureFrame(!IsOpen || Find.WindowStack.GetsInput(this)),Execution);
+        if(page!=null)page.Session.SetFrame(Execution.CaptureFrame(!IsOpen || Find.WindowStack.GetsInput(this)),TextExecution);
         if (page != null && page.TryHandleAccept()) return;
 
         base.OnAcceptKeyPressed();
@@ -488,6 +504,7 @@ public abstract class UiWindowHost : Window
             if (host == null)
             {
                 UiHost created = CreateHost();
+                created.AdoptTextMetrics(Metrics, TextMetrics);
                 created.SetDisplayDemand(displayRequired);
                 host = created;
                 // Before the first draw of that host, which is the whole point of the door: a subscription
@@ -506,11 +523,11 @@ public abstract class UiWindowHost : Window
                 return;
             }
 
-            host.DrawFrame(VerseUiExecution.Rect(content), Execution.CaptureFrame(!IsOpen || Find.WindowStack.GetsInput(this)), Execution);
+            host.DrawFrame(VerseUiExecution.Rect(content), Execution.CaptureFrame(!IsOpen || Find.WindowStack.GetsInput(this)), TextExecution);
 #if FER_DEV
             // The host can be created on this first pass, or released by a close during DrawFrame.
             // Resolve its own subscription now; never inherit the outer scope's pre-creation null.
-            using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, Metrics))
+            using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, TextMetrics))
             {
                 UiDevGeometryProbe.RecordShellChrome(chromeNow);
                 UiDevGeometryProbe.OutlineShellChrome(Execution, VerseUiExecution.Rect(inRect), VerseUiExecution.Rect(chromeTitleNow), VerseUiExecution.Rect(chromeCloseNow));
@@ -782,14 +799,14 @@ public abstract class UiWindowHost : Window
 
         if (Title.Length > 0)
         {
-            UiThemeDraw.Label(
-Execution,VerseUiExecution.Rect(new Rect(rect.x + SidePadding, rect.y + 6f, Math.Max(1f, rect.width * 0.6f), 30f)),                Title,                theme,                theme[UiPaletteRole.Foreground],                TitleFont,                singleLine: true);
+            DrawShellText(new Rect(rect.x + SidePadding, rect.y + 6f, Math.Max(1f, rect.width * 0.6f), ChromeTextHeight(TitleFont, 30f)),
+                Title, theme.Styles.Resolve(UiStatusTone.Neutral).Text, TitleFont, ChromeScope);
         }
 
         if (Subtitle.Length > 0)
         {
-            UiThemeDraw.Label(
-Execution,VerseUiExecution.Rect(new Rect(rect.x + SidePadding, rect.y + 36f, Math.Max(1f, rect.width * 0.6f), 18f)),                Subtitle,                theme,                theme[UiPaletteRole.SecondaryForeground],                SubtitleFont,                singleLine: true);
+            DrawShellText(new Rect(rect.x + SidePadding, rect.y + 6f + ChromeTextHeight(TitleFont, 30f), Math.Max(1f, rect.width * 0.6f), ChromeTextHeight(SubtitleFont, 18f)),
+                Subtitle, theme.Styles.Resolve(UiStatusTone.Neutral, UiEmphasis.Muted).Text, SubtitleFont, ChromeScope);
         }
 
         DrawCloseButton(rect);
@@ -803,14 +820,31 @@ Execution,VerseUiExecution.Rect(new Rect(rect.x + SidePadding, rect.y + 36f, Mat
         bool hovered = Mouse.IsOver(button);
         UiThemeDraw.Surface(
 Execution,VerseUiExecution.Rect(button),            theme,            hovered ? theme[UiPaletteRole.HoverSurface] : theme[UiPaletteRole.PanelSurface],            hovered ? theme[UiPaletteRole.StrongBorder] : theme[UiPaletteRole.Border]);
-        UiThemeDraw.Label(
-Execution,VerseUiExecution.Rect(button),            CloseText,            theme,            hovered ? theme[UiPaletteRole.Foreground] : theme[UiPaletteRole.SecondaryForeground],            CloseFont,            UiTextAnchor.MiddleCenter,            singleLine: true);
+        DrawShellText(button, CloseText, theme.Styles.Resolve(UiStatusTone.Neutral, hovered ? UiEmphasis.Normal : UiEmphasis.Muted).Text,
+            CloseFont, ChromeScope, UiTextAnchor.MiddleCenter);
 
         if (Verse.Widgets.ButtonInvisible(button))
         {
             Close();
         }
     }
+
+    private void DrawShellText(Rect rect, string text, UiColour colour, UiFont alias, string path,
+        UiTextAnchor anchor = UiTextAnchor.MiddleLeft, bool singleLine = true)
+    {
+        UiTextRun run = UiTextFonts.Resolve(TextMetrics, TextExecution, new UiTextFont(alias, Theme.ReadFontSize), elementPath: path);
+        run.Draw(VerseUiExecution.Rect(rect), text, colour, anchor, singleLine);
+    }
+
+    private float ChromeTextHeight(UiFont alias, float minimum)
+    {
+        if (!Theme.ReadFontSize.HasValue) return minimum;
+        UiTextRun text = UiTextFonts.Resolve(TextMetrics, TextExecution, new UiTextFont(alias, Theme.ReadFontSize), elementPath: ChromeScope);
+        return text.Font.Size.HasValue ? Math.Max(minimum, text.MeasureText("Ag", 100000) + Theme.Geometry.Spacing * 2) : minimum;
+    }
+
+    internal void DrawPageNotice(Rect rect, string text)
+        => DrawShellText(rect, text, Theme.Styles.Resolve(UiStatusTone.Neutral).Text, Theme.Styles.Font, NoticeScope, singleLine: false);
 
     /// <summary>
     /// Where the close affordance sits for a given window-face rect: the ONE arithmetic the shell uses -

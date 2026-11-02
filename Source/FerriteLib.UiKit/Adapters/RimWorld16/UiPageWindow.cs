@@ -144,6 +144,6 @@ public sealed class UiPageWindow : UiWindowHost
 
     protected override void DrawNotice(Rect rect, UiWindowNotice notice)
     {
-        UiThemeDraw.Label(Execution,VerseUiExecution.Rect(rect),noticeText(notice),theme,singleLine: false);
+        DrawPageNotice(rect, noticeText(notice));
     }
 }

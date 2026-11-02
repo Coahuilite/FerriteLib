@@ -49,7 +49,7 @@ internal sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUi
     {
         float width=0;
         foreach(var choice in UiChoiceSource.Read(ctx.Bindings,spec,ctx.Translation))
-            width=Math.Max(width,ctx.Metrics.MeasureWidth(choice.Text,AtomVocabulary.TextFont(ctx)));
+            width=Math.Max(width,UiTextFonts.For(ctx,AtomVocabulary.TextFont(ctx)).MeasureWidth(choice.Text));
         return width;
     }
 
@@ -74,11 +74,11 @@ internal sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUi
     private UiMeasurement CaptureCount(UiWidgetContext ctx, int count)
     {
         int columns = ColumnsFor(ctx.ViewWidth);
-        return new UiMeasurement(new UiMeasureInputs(numbers: new[] { (float)count, columns, ctx.Theme.Geometry.RowHeight, ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.Spacing }), () =>
+        return new UiMeasurement(new UiMeasureInputs(numbers: new[] { (float)count, columns, UiTextFonts.RowHeight(ctx), ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.Spacing }, usesTextMetrics: UiTextFonts.For(ctx).Font.Size.HasValue), () =>
         {
             int rows = (count + columns - 1) / columns;
             UiGeometry geometry = ctx.Theme.Geometry;
-            return Math.Max(1, rows * ReadFloat("Height", geometry.RowHeight) + Math.Max(0, rows - 1) * geometry.Gap + geometry.Spacing * 2);
+            return Math.Max(1, rows * ReadFloat("Height", UiTextFonts.RowHeight(ctx)) + Math.Max(0, rows - 1) * geometry.Gap + geometry.Spacing * 2);
         });
     }
 
@@ -97,7 +97,7 @@ internal sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUi
     {
         UiGeometry geometry = ctx.Theme.Geometry;
         int columns = ColumnsFor(rect.Width);
-        float rowHeight = ReadFloat("Height", geometry.RowHeight);
+        float rowHeight = ReadFloat("Height", UiTextFonts.RowHeight(ctx));
         float innerWidth = Math.Max(1, rect.Width - geometry.Spacing * 2);
         float columnWidth = (innerWidth - (columns - 1) * geometry.Gap) / columns;
         int row = index / columns;
@@ -122,7 +122,7 @@ internal sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUi
             var choice = options[i];
             var cell = OptionRect(rect, ctx, i);
             selected[i] = Equals(choice.Value, current);
-            DrawOption(ctx.Drawing, cell, choice, selected[i], ctx.Theme);
+            DrawOption(ctx, cell, choice, selected[i]);
             if (ctx.Controls.IsMouseOver(cell, ctx))
             {
                 help = choice.HelpRef;
@@ -141,7 +141,7 @@ internal sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUi
         retained.Capture(ctx, (r, c) =>
         {
             for (int i = 0; i < options.Count; i++)
-                DrawOption(c.Drawing, OptionRect(r, c, i), options[i], selected[i], c.Theme);
+                DrawOption(c, OptionRect(r, c, i), options[i], selected[i]);
         });
     }
 
@@ -155,14 +155,15 @@ internal sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUi
         return spec.Id;
     }
 
-    private void DrawOption(IUiDrawing drawing, UiLayoutRect rect, UiChoice<object?> option, bool selected, UiTheme theme)
+    private void DrawOption(UiWidgetContext ctx, UiLayoutRect rect, UiChoice<object?> option, bool selected)
     {
+        UiTheme theme = ctx.Theme; IUiDrawing drawing = ctx.Drawing;
         // One table query for the plane and the text, and the text inset spelled once in the theme
         // instead of as a bare 6f/12f here and a named constant in the dropdown.
         UiResolvedStyle style = theme.Styles.Resolve(selected ? UiStatusTone.Active : UiStatusTone.Neutral);
         float padding = theme.Geometry.Padding;
         UiThemeDraw.Surface(drawing, rect, style.Surface, theme.Geometry.Hairline);
-        UiThemeDraw.Label(drawing, new UiLayoutRect(rect.X + padding, rect.Y, rect.Width - padding * 2f, rect.Height), option.Text, theme, style.Text, theme.Styles.Font, UiTextAnchor.MiddleLeft);
+        UiTextFonts.Label(ctx, new UiLayoutRect(rect.X + padding, rect.Y, rect.Width - padding * 2f, rect.Height), option.Text, style.Text, theme.Styles.Font, UiTextAnchor.MiddleLeft);
     }
 
     private int ColumnsFor(float width)

@@ -148,7 +148,22 @@ internal sealed partial class UiLayoutEngine
 
             foreach (var colour in entry.Node.Properties.ResolvedColours)
                 Fact("colour." + colour.Key, colour.Value.Value.HasValue ? ColourText(colour.Value.Value.Value) : "none", colour.Value.Origin + ":" + colour.Value.Source, UiObservationStatus.Sampled, "last-property-resolution-not-current-pixels");
+            foreach (var colour in UiTextColours.Resolved(entry.Node.Properties))
+                Fact("colour." + colour.Key, colour.Value.Value.HasValue ? ColourText(colour.Value.Value.Value) : "none", colour.Value.Origin + ":" + colour.Value.Source, UiObservationStatus.Sampled, "last-property-resolution-not-current-pixels");
             Fact("font", entry.Node.Properties.ResolvedFont.Value.ToString(), entry.Node.Properties.ResolvedFont.Origin + ":" + entry.Node.Properties.ResolvedFont.Source, UiObservationStatus.Sampled, "last-property-resolution");
+            var size = entry.Node.Properties.ResolvedFontSize;
+            Fact("font-size", size.Value?.ToString(CultureInfo.InvariantCulture) ?? "preset", size.Origin + ":" + size.Source, UiObservationStatus.Sampled, "requested-property-not-pixels");
+            foreach (var run in entry.Node.Properties.TextRuns)
+            {
+                Fact("text-font." + run.Key + ".requested", run.Value.Requested.ToString(), "text-capability-resolution");
+                Fact("text-font." + run.Key + ".effective", run.Value.Font.ToString(), "text-capability-resolution");
+                if (run.Value.Reason != null) Fact("text-font." + run.Key + ".fallback", run.Value.Reason, "host-capability");
+            }
+            foreach (var paint in entry.Node.Properties.TextPaints)
+            {
+                Fact("text-paint." + paint.Key + ".font", paint.Value.Font.ToString(), paint.Value.Source);
+                Fact("text-paint." + paint.Key + ".colour", paint.Value.Colour.HasValue ? ColourText(paint.Value.Colour.Value) : "native-preset", paint.Value.Source);
+            }
             foreach (var metric in entry.Node.Properties.ResolvedMetrics)
                 Fact("metric." + metric.Key, metric.Value.Value.ToString(CultureInfo.InvariantCulture), metric.Value.Origin + ":" + metric.Value.Source, UiObservationStatus.Sampled, "last-property-resolution");
             output.Add(new UiObservedNode(entry.Id.Key, entry.Id.Path, entry.Node.Kind, entry.Node.Parent?.Id.Key, depth, Array.AsReadOnly(facts.ToArray())));
