@@ -1,5 +1,7 @@
 # Platform and real-source integration evidence
 
+This page preserves the original source-integration evidence. Current requirements and later fixed-pair acceptance are in [the specification](../../specification.md) and [implementation map](../../openspec/implementation.md); neither re-signs these source snapshots.
+
 ## Neutral means no engine in the complete dependency closure
 
 `NeutralSources.props` is the actual shared production source inventory, not a rewritten simulation.
@@ -48,7 +50,7 @@ No real UnityStubs/Waylith/RimUnity runtime reference set was present in the nam
 read scope; the inspected copies contain the consumer assemblies/embedded compatibility component,
 not a complete new-engine adapter SDK. Current support axes are consequently:
 
-- **1.6:** production adapter/source compile and controlled-host evidence delivered; native awaiting human.
+- **1.6:** production adapter/source compile and controlled-host evidence delivered; detailed native coverage remains incomplete; later internal-trial acceptance retains its own pair.
 - **1.7:** real seam/metadata inspection delivered; neutral production contracts run engine-free;
   a compiled/running 1.7 FL adapter and native acceptance are not delivered.
 - **Direct drawing:** no new backend; it follows the genuine new-engine adapter later.
@@ -59,5 +61,5 @@ Record candidate `version.txt`, game build, language, UI scale and screenshot/lo
 single/multiline selection, clipboard, IME, Accept/Cancel/ordinary blur and explicit takeover; refusal,
 normalization and post-request display failure without replay; real fonts and five-metric wrapping;
 multiple windows/occlusion, capture beyond clip, scroll, popup anchoring, keyed reorder/retarget/hide/close,
-image/background resource lifetime, and all retained uses in `migration-status.md`.
+image/background resource lifetime, and the current [use inventory](../../openspec/specs/policies/default-wrappers/spec.md).
 Run 1.6 and 1.7 as separate records. This work does not install, launch or configure the game.

@@ -2,7 +2,17 @@
 
 ## 0.8 development line (2026-10-25)
 
-The single product specification is `docs/development/0.8/README.md`. E1–E5/N1–N3, L1, finite appearance,
+The 2026-11-01 release-gate repairs restore request-failure attribution, same-owner late reactive
+presentation adoption and initial document-attach staging recovery. Their production paths and
+managed/native evidence limits are in `docs/openspec/implementation.md` (release-gate narrow repairs).
+No API tier or ordinary/standalone adoption condition changes.
+
+The 2026-10-29 contract-repair authorization adopted the two narrow Trace/legacy-fit observation
+failure guarantees. The single current contract is `docs/openspec/specs/contracts/observation-boundary/spec.md`;
+its adoption record and source/stub/native evidence boundaries are in `docs/openspec/implementation.md`.
+This does not promote API tiers or change ordinary/no-Host/headless/visual-only adoption conditions.
+
+The single product specification is `docs/specification.md`. E1–E5/N1–N3, L1, finite appearance,
 S1–S7 stability, experimental R9, migration protection and platform priority are confirmed. Engineering
 status is separate from design approval and native acceptance. K1 added focus/key navigation is deferred;
 native editing/IME/Accept/Cancel remains required. No 0.7 version exception carries into this line.
@@ -10,11 +20,11 @@ native editing/IME/Accept/Cancel remains required. No 0.7 version exception carr
 The approved prepublication refactor replaces unpublished API/XML/ambient bridges. Complete Kernel
 sources now share the no-platform target; explicit native execution and standalone session contexts,
 typed declarations, unified choices/descriptors/item addresses and optional capability composition are
-specified in docs/development/0.8/refactor-migration.md. It also records current abstraction consumers,
+mapped in docs/openspec/implementation.md; docs/openspec/source-coverage.md records the original clauses,
 old-chain removals and author prerequisites. No0.7 compatibility shape is silently carried forward.
 The confirmed explicit-only Choice.HelpRef policy, adjacent Ref/Key/Bind naming and both old-default
 migration paths are in that contract. Session topic/grace and optional owned endpoint output have
-different lifetimes; public-contract.md describes them without a panel or access-capture framework.
+different lifetimes; docs/openspec/specs/contracts/help-output/spec.md describes them without a panel or access-capture framework.
 PM has accepted that technical contract and US has consumed the fixed source input.
 [v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1) remains the published
 non-latest prerelease from a0b5b983c3c13a099c62d936305eaebaf1deb5a8. The user accepted the overall
@@ -26,14 +36,14 @@ verification ownership in docs/build-and-debug.md. Known headless errors remain 
 Accepted RU1–RU3 production foundations and their applicable evidence remain in the reactive, layout-reuse
 and failure-lifetime contracts. Closeout adds native composite-capture precedence, normal-return-before-
 display-failure completion, individual finite metric declarations/removal, and owned current-target item
-bindings. `editing-contract.md`, `property-contract.md` and `item-binding-contract.md` own these details.
-The complete 18-use/nine-container/non-kind inventory remains only in `migration-status.md`.
+bindings. `docs/openspec/specs/policies/default-wrappers/spec.md`, `docs/openspec/specs/core/appearance/spec.md` and `docs/openspec/specs/core/structure/spec.md` own these details.
+The complete use inventory is in `docs/openspec/specs/policies/default-wrappers/spec.md`; implementation and evidence remain in `docs/openspec/implementation.md`.
 
-`docs/api-tiers.md`, `public-contract.md` and `stable-api.txt` define the supported complete author paths,
+`docs/api-tiers.md`, `docs/openspec/specs/policies/public-authoring/spec.md` and `docs/development/0.8/stable-api.txt` define the supported complete author paths,
 required signature dependencies and explicit advanced-member exceptions. Session/Node are not blanket
 promoted; graphs, queues, caches, default private implementations and routing tables stay internal.
 Resolved-property views and adjacent snapshot/style read outlets are protected without changing their
-signatures or read/update semantics; the exact boundary is in `property-contract.md`.
+signatures or read/update semantics; the exact boundary is in `docs/openspec/specs/core/appearance/spec.md`.
 The separate AuthorExamples assembly has no internals grant. Public compatibility protects source, DLL,
 XML, meaning and legal conditions in the same adapter target; deprecation retains two complete subsequent
 published minors (0.9 → retain0.10/0.11 → time floor0.12), without a 1.x shortcut. The approved r2
@@ -49,8 +59,7 @@ human evidence below does not accept0.8. New-engine1.7 adapter then direct drawi
 
 The 2026-10-26 local incremental-pipeline candidate connects stable-domain validation, first-touch
 candidate backups and sparse geometry publication in the shared Release path. Exact conservative
-legacy/structure/environment/callback fallbacks and fixed Qz reference decisions are in
-`docs/development/0.8/incremental-pipeline-contract.md`. Managed work observations are separate from
+legacy/structure/environment/callback fallbacks are in `docs/openspec/specs/core/layout/spec.md`; fixed Qz reference decisions are in `docs/openspec/implementation.md`. Managed work observations are separate from
 native acceptance; the currently held A009r2 pair is unchanged. Fixed consumer integration of FL
 833c14f4 and its matched candidates are complete; overall internal-trial acceptance is recorded above.
 

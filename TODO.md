@@ -6,6 +6,8 @@ The accepted US ea610fa/FL833c14f4 internal trial permits RC preparation. FL v0.
 published; rc1 remains the published non-latest asset. Release/upgrade notes and the explicit local
 input versus real cloud sequence are in docs/build-and-debug.md.
 
+- [ ] Finish the 2026-10-29 contract-repair paired consumer receipt and bounded native menu/input pass;
+      current implementation and evidence limits are in docs/openspec/implementation.md.
 - [ ] Under separate cloud authorization, land the reviewed FL CI/rc2 preparation through PR/main
       CI and full-history privacy, then resolve real main SHA and publish rc2 through release CI.
 - [ ] Consume the actual published rc2 asset in US by repo/tag/full SHA/asset identity before US
@@ -15,7 +17,7 @@ input versus real cloud sequence are in docs/build-and-debug.md.
 
 E/N defaults, L1, finite appearance, S1–S7/R9 grading, two-subsequent-minor protection and platform priority
 are decided, not pending user choices. K1 added library focus/key system is approved for deferral, not
-implemented. Detailed implementation and acceptance states live in `docs/development/0.8/`.
+implemented. Current requirements are reached through `docs/specification.md`; implementation, acceptance limits and open deviations live in `docs/openspec/implementation.md`.
 
 > The action surface only. Settled rulings, done work and the release/round history live in `MEMORY.md`
 > and `OBLIVIONIS.md`; a closed item is a pointer here, not a paragraph.

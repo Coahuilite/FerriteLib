@@ -8,7 +8,7 @@ This guide covers FerriteLib.UiKit **0.8.0-rc1**, the separately identified loca
 **RimWorld 1.6 adapter**. It brings together the window, scaling and desktop interaction findings recorded
 on 2026-10-25–27. For wiring a page, use the
 [ordinary settings recipe](ordinary-settings.md); for supported signatures and ownership, use
-[S6 in the public contract](../development/0.8/public-contract.md#s6--use-a-standard-window-or-embed-in-an-existing-callback).
+[S6 in the public contract](../openspec/specs/policies/public-authoring/spec.md#s6).
 
 ## Start with the logical viewport
 
@@ -92,7 +92,7 @@ For current geometry, use `UiWindowHost.ShellChrome` rather than duplicating chr
 Its rectangles are in logical window/screen space, not page-local coordinates. For a completed Dev
 observation, use that pass's `UiDevGeometrySnapshot.ShellChrome`; attaching a later live measurement to
 an earlier pass can misreport a moved or resized window. The observation surface's tier and limits remain
-those of the [public contract](../development/0.8/public-contract.md).
+those of the [public contract](../openspec/specs/policies/public-authoring/spec.md).
 
 ## Choose a layout breakpoint from the content it must hold
 
@@ -119,8 +119,8 @@ The existing page engine provides the pieces:
 The manifest's width breakpoint is not a built-in two-axis media query. If height changes the product's
 mode, compute that mode at the consumer's layout boundary and compose it using the supported page
 mechanisms. No new host, global state machine or UI toolkit is needed. Keep compatible node identities
-and follow [definition-update](../development/0.8/public-contract.md) and
-[editing](../development/0.8/editing-contract.md) rules. Removing a node and creating a different editor
+and follow [definition-update](../openspec/specs/contracts/definition-update/spec.md) and
+[editing](../openspec/specs/policies/default-wrappers/spec.md) rules. Removing a node and creating a different editor
 is not the same as retaining its draft while hidden.
 
 Consumer `ea610fa` retains its **1100-wide, 640-high content threshold**, checking both axes of the
@@ -211,7 +211,7 @@ Keep the edited target's stable business identity separate from the visible page
 must not redirect an unfinished write to the first visible row; show the editing target even when it is
 off-page. Retain authoritative item membership separately from the filtered presentation when connections
 must survive filtering; removing a Repeat key can release that row's state. See the
-[item-binding identity contract](../development/0.8/item-binding-contract.md#keys-identify-current-targets-not-row-numbers).
+[item-binding identity contract](../openspec/specs/core/structure/spec.md).
 
 Selecting a creation candidate changes browsing state, not persisted settings. An explicit Create or
 Save action owns the store write and its outcome. Displaying an off-page candidate or current value
@@ -242,7 +242,7 @@ the pinned topic and the return context.
 replace the current topic. Reading the last hover at click time therefore does not define a stable page
 Help command. Hover help may supplement explicit actions, but must not change a topic the player opened
 deliberately. An element's `HelpRef` alone does not implement the click destination. See the
-[help publication contract](../development/0.8/public-contract.md#publish-a-topic-without-installing-a-help-panel)
+[help publication contract](../openspec/specs/contracts/help-output/spec.md)
 for the separate lifetimes and explicit per-choice references.
 
 Open help on demand as a bottom sibling of the task body, not as a replacement for it or another main
@@ -301,6 +301,13 @@ First separate shell interaction from page execution. A working native entry poi
 coexist with a page that draws but never accepts input. Follow one actual click through native input
 eligibility, event type and coordinates, capture, page hit testing, binding invocation and the owner's
 mutation. Locate the first missing transition before changing bindings or replacing controls.
+
+An open menu owns wheel input only while its current native qualification and effective geometry are
+reliable and the pointer is inside the menu. It still consumes eligible wheel input at either endpoint;
+an ineligible callback must neither move its rows nor consume the event. Keep owned capture termination
+reachable when qualification is lost or a raw release was already consumed. The 2026-10-29 local repair
+and its source/stub/native evidence limits are recorded in the [implementation map](../openspec/implementation.md#fl-f01);
+this does not add a draggable menu scrollbar or change window policy.
 
 Convert native event types by explicit enum constants, not by `ToString()` followed by name parsing.
 The inspected Unity `EventType` contains obsolete same-value aliases such as `MouseDown`/`mouseDown`;
@@ -440,7 +447,7 @@ The evidence below separates platform mechanisms, local corrections and user obs
 | Local candidate `0.8.0-local.residualcost1`, following `2309cd3` | Reuses detached read-only rollback backups while resolved facts remain unwritten. Native performance remains unmeasured for this candidate. |
 | Consumer A009 r2 at `68b30e3`, paired with fixed FL `36fa7ad` (2026-10-26) | Implements direct equal-width tool navigation, on-demand sibling help, measured-display invalidation, data-backed palettes and native category-row entry. Existing managed page/layout/editing and save-double checks support these paths; the staged ZIP records the actual pair. Managed evidence is not native acceptance; this pair remains distinct from the later accepted performance pair. |
 | Consumer `2f22bec` + FL incremental r4 `833c14f4` (2026-10-27 user feedback) | User accepted stable FPS for this fixed pair. Bounded Host summaries support the improvement direction; cold-opening peaks and the other native gaps below remain. |
-| Consumer `ea610fa108f101b33fac55fe41ae607484fc718c` + fixed FL `833c14f4` | Source-reviewed compact/filter implementation and existing managed layout/editing paths; native acceptance for this candidate remains open. |
+| Consumer `ea610fa108f101b33fac55fe41ae607484fc718c` + fixed FL `833c14f4` | Source-reviewed compact/filter and managed layout/editing paths; later overall internal trial accepted for RC preparation, while granular native combinations remain unrecorded. |
 | Executed calculations from the scale predicate | Accepted scale table and logical-size examples; not native render acceptance. |
 
 The linked Apple and Google guidance informs the interaction recommendations. Those recommendations are
@@ -484,7 +491,7 @@ summary, so its complete transient cannot be attributed to one source path. A007
 acceptance. A009r2 retains consumer `68b30e3` / FL `36fa7ad` as a separate experience/comparison pair;
 neither record is relabeled as the later incremental-pipeline result.
 
-On 2026-10-27, the user **accepted stable FPS for the [incremental-pipeline](../development/0.8/incremental-pipeline-contract.md)
+On 2026-10-27, the user **accepted stable FPS for the [incremental-pipeline](../openspec/specs/core/layout/spec.md)
 pair: consumer `2f22bec` + FL `833c14f4`** (`0.8.0-local.incremental4`). The captured session reports the
 consumer identity, and installed-file metadata identifies the matching FL. Its bounded 32-Host-call
 summaries support the reported improvement but are not a controlled whole-frame benchmark.
@@ -493,7 +500,7 @@ peaks or establish unaffected HUD performance.
 
 Font/IME, overlap, scaling/narrow-screen fit, audio-response behavior and real configuration-save
 acceptance remain incomplete.
-The later `ea610fa` compact/filter changes have source and managed-path evidence, not native acceptance;
+The later `ea610fa` / FL833c14f4 overall internal trial was accepted for RC preparation; this does not add granular native coverage for the compact/filter changes;
 precise long-list combinations and three-pack fit at logical **1024×768** remain unverified. These gaps
 are separate from the accepted stable-FPS result.
 

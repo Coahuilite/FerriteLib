@@ -1,171 +1,139 @@
-# Consume the 0.8.0 release candidate
+# Consume FerriteLib 0.8.x
 
-The published asset is still [v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1),
-a non-latest prerelease from a0b5b983c3c13a099c62d936305eaebaf1deb5a8. **rc2 is prepared locally,
-not published**; its [release/upgrade notes](../release-notes/v0.8.0-rc2.md) describe the delta.
+Select one fixed DLL, assert its API range, and retain the same Host for an open UI. Then choose ordinary
+notifications or explicitly tracked sources; neither requires a model base class. Start with the
+[settings recipe](ordinary-settings.md) for a page, or [S1–S7](../openspec/specs/policies/public-authoring/spec.md)
+for partial/custom adoption. Current requirements are in the [specification](../specification.md).
 
-For rc2 integration, use the explicitly delivered immutable local Release input until the real cloud
-asset exists. Record its actual source/configuration/DLL identity; do not silently fall back to rc1,
-a moving sibling output or a relabeled Dev DLL. After publication, select the real repo/tag/full SHA
-and exact asset. Only FerriteLib ships the runtime DLL; consumers reference it with Private=false.
+## Select the actual input
 
-The user accepted US ea610fa/FL833c14f4 in an overall internal trial for RC preparation. Earlier fixed
-integration and stable-FPS evidence remain valid at their own identities. Unrecorded native detail and
-known headless errors are retained as RC limits, not a requirement to repeat the accepted trial.
-1.6 is the delivered adapter; 1.7/new-window work is not a gate for this release.
+The published asset is [v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1),
+from a0b5b983c3c13a099c62d936305eaebaf1deb5a8, a non-latest prerelease.
+**rc2 is prepared locally, not published**; see its [notes](../release-notes/v0.8.0-rc2.md).
+Until a real cloud asset exists, rc2 integration uses the explicitly delivered immutable local Release input.
+Record actual source/configuration/DLL identity; do not substitute a moving output, rc1 fallback or relabeled Dev.
+After publication select the real repo/tag/full SHA/asset.
 
-```csharp
-if (!FerriteLibVersion.Require(new Version(0, 8, 0), new Version(0, 9, 0),
-    "your.package.id", out string diagnostic))
-    throw new InvalidOperationException(diagnostic);
-```
+Only FerriteLib distributes the runtime DLL. Reference it with Private=false and install no second carrier.
+Every consumer checks its own tested range; game dependency metadata cannot express a version:
 
-The old `[0.7.0,0.8.0)` range excludes 0.8. Explicitly adopt the published RC input, compile,
-then run the consumer's own harness and native UI checks; widening the range alone is not a migration.
+    if (!FerriteLibVersion.Require(new Version(0, 8, 0), new Version(0, 9, 0),
+        "your.package.id", out string diagnostic))
+        throw new InvalidOperationException(diagnostic);
 
-This is the approved prepublication breaking refactor. Start with [the exact migration](../development/0.8/refactor-migration.md)
-and [supported S1–S7 paths](../development/0.8/public-contract.md), including explicit frame/execution,
-UiChoice<T>, typed declarations and structured item addresses. Existing Button/Slider kinds remain usable. Button now activates on valid
-primary release rather than delegating timing to the native compound button. Slider selects immediately
-through shared range behavior and does not edit a neighboring NumberField draft. Keyboard/edit defaults
-include the confirmed editing migration below. Other 0.8 requirements are not implied by this candidate.
+The first public author baseline is0.8.x. Prior internal ranges and vocabulary are historical references,
+not prerequisites for learning current use. Source, compiled DLL, XML, meaning and legal conditions have
+the [stable compatibility promise](../api-tiers.md); public-unstable/advanced exceptions remain explicit.
 
-Checkbox (both looks), InputModeRow, Dropdown trigger/options and Tree parts now use qualified primary
-release (F2). Explicit same-value choices still request once. Dropdown outside primary press closes
-and consumes the gesture (F3), without executing the covered/underlying command on its later release.
-Checkbox's declared ActionBind still runs after Set. String/typed choice identity and display fallback
-remain; missing values are observed, never silently repaired. No keyboard/global Cancel or synthetic
-focus-return behavior is added. See the [BSE contract](../development/0.8/bse-contract.md) for independent
-composition and headless examples and the [complete inventory](../development/0.8/migration-status.md)
-for the complete retained first-version scope.
+## Declare and connect once
 
-See [S0/S1 contract](../development/0.8/s01-contract.md) for per-property remove/following, independent
-composition, headless entry points, capture ownership and error handling. Supported S1–S7 paths and required dependencies are stable; detailed R9 stays experimental.
-Keep the exact selected source/configuration/package identity with your development evidence.
+Use XML Schema2 or immutable UiElementSpec/Create definitions; both use the same compiler and typed checks.
+Default kinds cover ordinary controls, descriptions, images and keyed Repeat. A compatible UpdateDefinition
+keeps the Host/session; deleting and recreating an editor is not equivalent to hiding a retained one.
 
-## Read a help topic from the Session
+For ordinary data use BindValue/BindReadOnly, BindCommand/BindAction and NotifyChanged at the model mutation
+boundary. Set requests the owner's write; it neither guarantees acceptance nor sends the notification.
+Notify the actual declared key with its real invalidation class. Mutable Theme and ordinary/legacy Measure
+remain legal under their original conditions.
 
-Use element/choice `HelpRef` for an opaque consumer catalog reference, and read
-`host.Session.CurrentHelpRef` plus `CurrentHelpSource` for your panel. A choice's explicit reference
-overrides its element; empty HelpRef falls back to general element help without inferring Value/Text.
-`HelpGracePasses` retains pass-based grace (US uses15); `Tooltip` still draws text you translate.
+For automatic dependencies explicitly use ReactiveRuntime.Int/Text/Boolean and BindTracked.
+Other Value/List types require caller equality. Structural lists and item properties are separate sources;
+immutable choices project all mutable data while tracking, not later in Draw. A shared model owner can outlive
+multiple Hosts. External services deliver safe results in the projection's owning context; FL does not supply
+tasks, thread dispatch or freshness policy. See the [counter walkthrough](../development/0.8/counter-walkthrough-zh.md)
+and [binding contract](../openspec/specs/core/binding-reactivity/spec.md).
 
-Rename old HelpKey/Choice.Help/XML Help to HelpRef, HoverClaim/HoverClaimElement/ClaimHover to
-CurrentHelpRef/CurrentHelpSource/PublishHelp, and IUiBindingReader to IUiBindingAccess. Binding reads
-VisibleKey/WidthKey/SelectedKey/PayloadKey become VisibleBind/WidthBind/SelectedBind/PayloadBind.
-TextKey/LabelKey and real element identities keep their meanings. Old string/static default Value
-and typed default Text outputs require explicit HelpRef to preserve either old result.
+Forwarding IUiBindingAccess names its actual BindingOwner and consistently forwards endpoints and operations.
+Switch backing between passes; Host validates before replacing its projection. Reacquire minting-registry
+endpoints after switching. Ordinary forwarding does not activate tracking or change target identity.
+Use optional UiItemBindings for current-key fields/commands; authoritative membership may outlive a filtered
+Repeat key view. Filtering/paging/business Move and object disposal remain consumer-owned.
 
-An optional `HoveredOptionHelpOutputBind` replaces HoverHelpKey when you separately need observable
-per-control output. It is not needed by the unified panel. Cleanup withdraws only the last owned
-publication; initial/consumer-written values or a newer same-address publisher are not erased.
-Publication and cleanup use the existing access-supplied owner-bound value endpoint, including across
-proxy backing switches. No new proxy-capture interface or switching prerequisite is required.
-The complete [migration map](../development/0.8/refactor-migration.md) records named-argument changes,
-ownership, grace sequencing and actual unsupported old spellings.
+## Use one UI lifecycle
 
-## Edit first, publish once
+For a standard shell construct UiPageWindow, optionally register it in UiWindowCatalog with a stable key.
+For an existing native callback retain UiHost plus VerseUiExecution and call DrawFrame with the actual content
+rect, execution.CaptureFrame(nativeInputAllowed), and that execution. Capture once per native callback.
+For native controls without Host retain Session/CreateContext/SetFrame; for headless operations or independent
+visuals no fabricated Host/node is required. See the [adapter](../openspec/specs/adapters/rimworld16/spec.md).
 
-TextField, NumberField and StepperSlider now default to `Live="false"`. Declare `Live="true"` if your
-old page relied on implicit immediate writes (including the later US migration). Ordinary valid,
-nonconflicting blur commits; invalid/conflicting drafts remain. Cancel discards only local input.
-Normal callback return ends a confirmation even when business refuses or normalizes the value;
-the next display reads the real model. Setter exceptions do not cause rollback or automatic retries.
+Host/Session borrow execution. Idle switching is legal, but an open pass/capture/active editor refuses a different
+execution before changing frame or qualification. End or explicitly SuspendEditor on the old one first.
+Close Session before execution, and dispose execution in finally. Image tokens are execution-scoped;
+the supplier retains texture lifetime. Host close does not destroy business services.
 
-```xml
-<Widget Id="amount" Kind="input/number-field" Bind="amount" Min="0" Max="100" Live="true" />
-```
+SetDisplayDemand communicates reliable hidden demand, not input focus. Hidden drafts remain under the same
+target; closing the real UI disposes its connections. Subscriptions attach/detach through the existing hooks,
+whose explicit failure conditions still apply. No library-wide keyboard navigation or global window manager
+is implied by the native shell.
 
-Within StepperSlider, a draft20 over model10 plus Step1 requests only21. A selected Slider30 replaces
-that draft with only30; a thumb capture alone keeps it. Each real drag sample remains a business
-request. An unrelated Button or same-Bind field cannot clear the draft. Custom native composites
-explicitly suspend their participating editor with `ctx.Controls.SuspendEditor(ctx, binding)` before
-ordinary blur, and use the same shared `Step`/`TakeOver` transitions. See the
-[editing contract](../development/0.8/editing-contract.md) for the full end/failure and IME rules.
+## Edit first, publish deliberately
 
-## Explicit reactive binding and RU1 sources
+TextField, NumberField and StepperSlider default Live=false; explicitly set Live=true when wanted.
+Valid, nonconflicting ordinary blur confirms; invalid/conflicting drafts remain. Cancel changes only the local
+draft, not earlier Live writes. A normal request return ends that request even if business rejects/normalizes;
+paint/readback failure cannot replay it. Setter failure preserves actual side effects without rollback.
 
-Use `UiReactiveRuntime.Int/Text/Boolean` and `UiBindings.BindTracked` for explicitly connected
-scalar inputs. `Value<T>(initial, equal)` requires an explicit policy for other values/references;
-ordinary classes can wrap sources in C# properties without an FL base class. `List<T>(items, equal)`
-controls structure; item properties are independently observed. Four actual operation entries share nested batches; Host owns the presentation read
-view, not your business owner/service. Declare tracked bindings before constructing the Host.
-Use `BindTrackedChoices` for a pure immutable choice projection with explicit item equality. Actual
-Choice endpoint and bounded reads select the same synchronized inputs. Project mutable item
-properties to immutable presentation data during tracking; an outer list copy alone does not freeze them.
-Repeat consumes an immutable ordered key projection through the existing stable-node reconciliation.
-`BindTracked(..., equal: ...)` can suppress same-result presentation announcements without retaining old
-dependency edges. Existing source calls remain valid; rebuild against the fixed 0.8 RC API.
-Ordinary getters/options retain their existing conditions. Start with the
-[counter walkthrough](../development/0.8/counter-walkthrough-zh.md) and the
-[actual runtime/host contract](../development/0.8/reactive-foundation-contract.md); the
-[complete inventory](../development/0.8/migration-status.md) distinguishes connected uses from
-editor/tree/chart/custom integration and separate native acceptance. The compiled `InventoryPageExample` and
-`OrderBoardProjectionExample` demonstrate local object/list composition and externally owned safe results.
-Application code owns external delivery, tasks and result freshness; Batch does not marshal a result.
+Within StepperSlider, model10/draft20/Step1 requests only21 on plus; an actual Slider30 requests only30.
+Capture alone preserves the draft. Only declared local participants can take it over, not every same-Bind field.
+Shared ctx.Controls.Edit/Editor/SuspendEditor support custom composites.
+Composition owns its key first; single-line Return confirms, multiline Return inserts newline and Ctrl+Return
+confirms. Read-only preserves selection/copy while preventing mutation.
+See [default policy](../openspec/specs/policies/default-wrappers/spec.md) and
+[interaction/editing](../openspec/specs/core/interaction-editing/spec.md) for the exact outcomes.
 
-## Scoped layout reuse without changing business ownership
+## Retain valid work without retaining stale geometry
 
-For an existing forwarding reader, return its current registry from `BindingOwner` as well as
-forwarding reads/requests/endpoints. Host then preserves tracked display/DisplayOnly semantics and
-refreshes its projection on a between-pass backing switch. Ordinary getters remain untracked.
-See the [public contract](../development/0.8/public-contract.md) for missing/mismatched capability
-diagnostics and borrowed Execution's legal idle-switch/active-refusal/cleanup conditions.
+Meaningful UpdateScope=true roots can be nested; root/Section/Surface/Scroll/Clip/Repeat already participate.
+Defaults capture their measurement inputs; new IUiMeasureParticipant declares complete pure inputs,
+and optional IUiTextMetricsEnvironment supplies truthful per-font validity without changing ITextMetrics.
+Old widgets/metrics receive no new purity condition. Stable-domain publication can be sparse, while unknown
+or unsupported dependencies take the correct full path.
 
-Declare `UpdateScope="true"` at meaningful composition roots, including a custom subtree or Repeat
-row template. Roots and default Section/Surface/Scroll/Clip/Repeat are already connected; nesting does
-not rebuild node/editor/capture identity. The library captures its default wrappers' real measurement
-inputs and retains unchanged leaf calculations and local container plans. Actual parent size,
-Scroll content/range and shared-column consumers still propagate changes across scopes. Effective
-positions/clip/hit/popup anchors are republished when a subtree moves.
+Positions, scroll ranges, clip/hit and popup anchors still change when their actual dependency changes.
+Pure tint/hover does not require layout. This is not retained IMGUI pixels: required Repaint continues.
+Use the [layout contract](../openspec/specs/core/layout/spec.md), not an every-frame rebuild or input throttle.
 
-Ordinary getters keep their original notification conditions. Old custom `IUiWidget` is revalidated at
-its original legal synchronization before dependent parent reuse; no new purity prerequisite is
-inferred. New custom `IUiMeasureParticipant` supplies complete actual values and a calculation over
-those captured values. Optional `IUiTextMetricsEnvironment` supplies truthful per-font metric validity,
-without adding members to `ITextMetrics`. Unknown legacy metrics receive no new text-cache guarantee.
+## Configure only the appearance you mean
 
-Use the [single reuse contract](../development/0.8/layout-reuse-contract.md) for a compilable custom
-method and exact inputs/diagnostics, and the [inventory](../development/0.8/migration-status.md) for
-all18 uses/nine containers and retained old conditions. The supported paths protect source/DLL/XML/behavior under the documented migration window; API grading does not establish native acceptance.
+A new UiTheme works without palette assignments. Override one neutral UiColour role or one Font/metric
+declaration; Remove reveals the current remaining source, not a creation-time theme snapshot.
+Five metrics are Padding/Spacing/Gap/RowHeight/Hairline; container Padding/Gap allocate that container rather
+than becoming every child's density. Retint does not replace the Host or clear drafts/scroll.
+Use scoped UiImage for images/backgrounds. See [appearance](../openspec/specs/core/appearance/spec.md).
 
-## Managed faults and retained views
+## Publish help without owning a panel
 
-Use `computed.Fault/Retry()` for pure R1 work and `owner.RespondManaged(...)` with `IsPaused/Fault/Resume()` for consumer R2 callbacks. Related inputs can retry pure work; source changes cannot resume a paused callback. Default wrappers retain successful control paint with fault feedback, while current derived reads still fail and dependent input stops. A first failure is unavailable, not zero/empty.
+Declare opaque HelpRef on elements/choices. Empty choice help does not infer Value/Text and can fall back to
+the general element topic. Session CurrentHelpRef/CurrentHelpSource and HelpGracePasses retain their advanced
+grade and pass-based timing (library default0; a consumer's15 is not the default).
+Tooltip takes explicit translated text.
 
-For reliably hidden retained views call `UiHost.SetDisplayDemand` or `UiWindowHost.SetDisplayDemand`; focus is not visibility. Keep shared computations under a shared owner. Custom tracked readers declare actual binding roles or IUiPresentationDemand. Ordinary untracked
-getters retain their original conditions; no prepare-all compatibility path remains. The [failure/lifetime contract](../development/0.8/failure-lifetime-contract.md) has recovery, draft, two-host and captured-target confirmation examples and the actual fixture/native limits.
+Optional HoveredOptionHelpOutputBind targets a writable string endpoint. It withdraws only the last publication
+still owned by that control; a newer same-address publisher or consumer write survives cleanup, including
+across proxy switches. A failed withdrawal does not replay selection or uncommit a sealed definition.
+See the [help connection](../openspec/specs/contracts/help-output/spec.md).
 
-## Replace old implementation/table access
+## Diagnose failures without inventing acceptance
 
-Before publication this development migration internalizes default widget implementations, the layout
-engine and writable Session tables. Keep existing manifest kinds and bindings; use `UiKinds` instead of
-implementation-class constants. Use `host.ElementProperties(id)`, `Get/SetScrollPosition(id)`,
-`SetInteractionScope(id, scope)`, `Invalidate()` and `InputState`; custom widgets use the supplied context's
-`State/Properties/InteractionScope/Invalidate` and shared `ctx.Controls` behavior. Do not move a draft into a
-shared binding-key cache. S1–S7 and complete dependencies are supported; explicitly listed Session/Node
-and detailed R9 members are experimental. The separate `tools/FerriteLib.UiKit.AuthorExamples` assembly
-compiles these paths without an internals grant.
+Pure faults use Fault/Retry; managed writable responses use IsPaused/Fault/Resume after their owner checks
+the actual business result. Related inputs can retry pure work but cannot resume a paused callback.
+Retained paint is display-only; invalid current geometry/input cannot execute. See
+[lifetime/recovery](../openspec/specs/core/lifetime-recovery/spec.md) and [open deviations](../openspec/implementation.md):
+popup wheel qualification, Warning/release/seal and unaccepted Trace/fit isolation remain visible.
 
-The old26 colour-property bag becomes `theme.Palette[UiPaletteRole.*]` (or the Color indexer on theme),
-with the explicit mapping in [theme migration](../development/0.8/theme-migration.md). Existing fonts and
-`Metric.Padding/Spacing/Gap/RowHeight/Hairline` are finite declarations; remove an override to reveal its
-current source. Ordinary container Padding/Gap still allocate that container, not inherited density.
-Retired `<Font Value="..."/>` is a located invalid style document. Use `<Metric Token="Font" Value="..."/>`; last-good style recovery is retained.
+S1–S7 and necessary dependencies are stable as listed in API tiers. Node/Session runtime tables and detailed
+R9 are not blanket stable. Surrounding authors use ElementProperties, scroll/scope/invalidation and InputState;
+custom authors use their supplied context, not private tables. The external AuthorExamples assembly demonstrates
+public-only usage without an internals grant.
 
-Use `UiItemBindings<T>` for optional current-key fields/commands over safe snapshots or active services;
-plain existing bindings remain valid. Refresh explicitly at the real change boundary and dispose only
-your UI owner. Business Move refusal retains the actual business order. For compatible definition refresh
-use `UpdateDefinition`, not disposal/new Host and private-table copying. The isolated real-source cases
-and 1.6/1.7 support limits are in [platform evidence](../development/0.8/platform-and-real-integrations.md).
+The accepted stable-FPS pair2f22bec/833c14f4 and overall internal trialea610fa/833c14f4 retain their identities.
+Later fixed compilation uses US3e42cc1 with FL6ec0c31; this guide neither rebuilds nor re-identifies them.
+Unrecorded font/IME/overlap/scaling/native details and known headless errors remain limits.
+1.6 is delivered; compiled/native1.7 is not. See [platform evidence](../development/0.8/platform-and-real-integrations.md)
+and the [window guide](rimworld-window-layout.md).
 
-After publication a breaking change to the supported stable contract requires a major release; the
-two-minor retirement window remains an additional minimum, with no1.x shortcut. The0.12 example
-is a time floor, not permission to delete a stable contract in a minor.
-
-Published same-adapter source, DLL, XML and behavioral contracts retain the supported signatures and
-legal conditions within the consumer's `[min,max)` range. A deprecated0.9 entry works through the two
-complete subsequent published minors0.10/0.11; earliest removal is0.12. This development-line internal
-migration is explicit, not a precedent for silently breaking published contracts. The0.7 temporary minor
-exception does not apply. Added focus/key navigation is deferred; existing native editing/IME/Accept/Cancel
-is not removed.
+For maintainers comparing older internal code, preserved
+[author-vocabulary](../archive/specs-before-20261029/refactor-migration.md) and
+[theme](../archive/specs-before-20261029/theme-migration.md) migration tables are historical aids,
+not a parallel API or an upgrade-first route.

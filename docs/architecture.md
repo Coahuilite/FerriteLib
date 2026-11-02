@@ -1,8 +1,6 @@
 # FerriteLib UiKit — one retained core, explicit platform execution
 
-The active 0.8 [specification](development/0.8/README.md) and [author migration](development/0.8/refactor-migration.md)
-describe the approved prepublication refactor. The payload is still one DLL. Core source/dependency,
-stub protocol and native game acceptance are separate evidence classes.
+The [current specification](specification.md) defines capability, connection, adapter and policy ownership. This page maps the production source rather than duplicating those requirements. The payload is still one DLL. Core source/dependency, stub protocol and native acceptance are separate evidence classes.
 
 ## Four parallel questions share stable identities
 
@@ -52,7 +50,7 @@ reactive. SetFrame once at the actual callback boundary, then use ctx.Controls o
 StandaloneNativeNumber is an external no-friend real author. Pure visuals take IUiDrawing/theme/neutral
 geometry; pure semantics take interaction target/eligibility and need no fabricated node/rect.
 
-Detailed public paths and stable-member exceptions are in [S1–S7](development/0.8/public-contract.md).
-Every retained use remains in the [complete inventory](development/0.8/migration-status.md). Native1.6
+Detailed public paths and stable-member exceptions are in [S1–S7](openspec/specs/policies/public-authoring/spec.md).
+Every retained use remains in the [complete inventory](openspec/specs/policies/default-wrappers/spec.md). Native1.6
 fonts/IME/window checks require human playtest;1.7 uses the separately identified real snapshot and has
 no delivered compiled/native adapter. Historical0.7 evidence remains under its versioned documents.

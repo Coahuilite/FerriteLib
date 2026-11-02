@@ -1,44 +1,34 @@
 # FerriteLib.UiKit documentation
 
-**0.8.0-rc1 is a published prerelease; 0.7.x is the frozen previous line.** Choose the document for the
-version and task you actually have. Native acceptance remains separate from the published API and source
-evidence. Consumer documentation is versioned with this source tree; the installable Release archive
-is the runtime carrier, not a copy of the documentation tree.
+Start with the current **0.8.x** library. Earlier lines are internal development archives, not a public
+legacy-user prerequisite. The published runtime is v0.8.0-rc1; rc2 remains locally prepared, not published.
+Source documentation, a held DLL and a native observation each retain their own identity.
 
-## Use the 0.8 library
+| Task | Read |
+|---|---|
+| Find current requirements and responsibility | [Specification](specification.md) |
+| Use the public author paths | [S1–S7](openspec/specs/policies/public-authoring/spec.md) |
+| Connect a release candidate | [0.8 consumer guide](consumers/consume-from-0.8.0-dev.md) |
+| Write an ordinary page | [Settings recipe](consumers/ordinary-settings.md) |
+| Fit a native window and compact layout | [Window guide](consumers/rimworld-window-layout.md) |
+| Trace the current source | [Architecture map](architecture.md) and [implementation/deviations](openspec/implementation.md) |
+| Check supported members | [API tiers](api-tiers.md) and [unchanged signature list](development/0.8/stable-api.txt) |
+| Build/select a DLL or read diagnostics | [Build and debug](build-and-debug.md) |
+| Understand source lineage and open promises | [Source coverage](openspec/source-coverage.md) |
+| Maintain specifications manually | [Writing/change workflow](openspec/README.md) |
 
-| Need | Read |
-| --- | --- |
-| Integrate or migrate a consumer | [0.8 RC consumer guide](consumers/consume-from-0.8.0-dev.md) |
-| Author an ordinary settings page | [Settings recipe](consumers/ordinary-settings.md) |
-| Fit a native window, handle UI scaling and choose compact layouts | [RimWorld window guide](consumers/rimworld-window-layout.md) |
-| Understand the current architecture | [Architecture map](architecture.md) |
-| Check compatibility commitments | [Public API tiers](api-tiers.md) |
-| Look up supported 0.8 author paths | [Public contract](development/0.8/public-contract.md) |
-| Build, select a DLL, or read diagnostics | [Build and debugging](build-and-debug.md) |
-| Plan a real-game observation | [In-game walkthrough](in-game-walkthrough.md) |
+## Evidence and history
 
-## Read the 0.8 specification
+The [preserved pre-rebuild specifications](archive/specs-before-20261029/INDEX.md) are sources, not current.
+The [0.7](development/0.7/README.md), [0.6](development/0.6/README.md) and [0.5](development/0.5/README.md)
+records retain their historical contracts and observations. The [dated consumer comparison](handoff-ngs-uikit-delta-2026-09-25-zh.md)
+retains unique comparison evidence. They do not instruct a new author to adopt an old API first.
 
-[UiKit 0.8 first-edition specification](development/0.8/README.md) separates confirmed architecture,
-default-wrapper contracts, implementation evidence and remaining acceptance. It does not require
-maintainer-local project-management records to be understood.
+A source trace describes implementation; stub execution describes modeled behavior; a game pass covers
+only its fixed candidate and observed conditions. Neither a document check nor an old runtime receipt
+closes the current [open deviations](openspec/implementation.md).
+Native checks use the [existing walkthrough](in-game-walkthrough.md); publication privacy uses its
+[separate procedure](push-privacy-gate.md).
 
-## Trace evidence without treating it as current behavior
-
-- [0.7 consumer guide](consumers/consume-from-0.7.0.md) and [line record](development/0.7/README.md):
-  frozen usage, bounded acceptance, and remaining evidence gaps.
-- [0.6 record](development/0.6/README.md) and [0.5 record](development/0.5/README.md): versioned usage and
-  historical verification. Their old work packages are not a live execution queue.
-- [Dated consumer-impact report](handoff-ngs-uikit-delta-2026-09-25-zh.md): historical source comparison,
-  with the current migration route linked rather than duplicated.
-- [Push privacy gate](push-privacy-gate.md): publication-time privacy procedure, not product acceptance.
-
-Source inspection establishes what code says; a stub run establishes the named modeled behavior; a game
-pass establishes only the candidate and scenarios observed. A held DLL identifies its own build, not the
-current checkout. Publication decisions and actual publication are separate events.
-
-Document ownership: consumer instructions live under `consumers/`; compatibility membership lives only in
-`api-tiers.md`; line contracts and scoped evidence live under `development/<version>/`. Keep one current
-statement of a rule and link it from other entries. Preserve historical evidence where it explains a
-result, not as a second set of current instructions.
+Current requirements live under openspec/specs, exact compatibility membership stays in api-tiers.md,
+consumer techniques stay under consumers, and dated runtime evidence stays with its original identity.

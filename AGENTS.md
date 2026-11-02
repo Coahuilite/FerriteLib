@@ -56,6 +56,20 @@ old→new instructions; this is not a permanent compatibility bypass.
 The split is enforced (`KernelContractTests.VerifyVisualCoreIsPageModelFree`). The current payload has one
 assembly and no `FerriteLib.Core`; the 0.8 target does not predefine physical assembly count.
 
+## Maintain complete owner boundaries
+
+- Production callers use the existing owner for state, eligibility, commit/publication and lifetime
+  results, through the real consumer. A stored/view value is not proof of runtime adoption. Legal
+  backends, adapters, registry composition, independent author roots and complete synchronous fallbacks
+  remain supported; the existing native funnel defines containment, not a blanket ban on native calls.
+- Diagnostics follow the specific adopted [observation boundary](docs/openspec/specs/contracts/observation-boundary/spec.md).
+  Do not give them business control, broadly catch business/native work, or add a caller-NoThrow condition.
+- When an owner cannot express a real need, use the existing [change route](docs/openspec/README.md):
+  state the need, authority/lifetime, adjacent guarantees and smallest complete adoption/exit slice.
+  Internal extension, an independent module, a new core or responsibility migration are valid proposals;
+  the incumbent owner supplies concrete constraints rather than an unlimited veto. Update actual callers,
+  recovery/cleanup and the single current contract together.
+
 ## Invariants (stop and ask before violating)
 
 - **Single carrier.** Only this mod ships `FerriteLib.UiKit.dll`. Two copies bind by load order through
@@ -79,7 +93,7 @@ assembly and no `FerriteLib.Core`; the 0.8 target does not predefine physical as
   must not expose Unity, UnityStubs, Verse, RimWorld, Waylith or Harmony types, including via object or
   reflection. Native callback counts do not define business update timing. Direct/GPU drawing seams do
   not commit to a backend, RenderTexture-only composition, assembly count or completed 1.7 support.
-  Target contracts and pending delivery choices live in `docs/development/0.8/README.md`.
+  Target contracts and pending delivery choices live in `docs/specification.md`.
 - **Map-layer rendering is permanently outside UiKit.** `GenMapUI` and its family carry no session and
   no hit-test semantics to bind to, so world-space text (pawn-head marks and friends) is something this
   library cannot provide — a non-goal, not a backlog item. A consumer's whitelist entry for it is
@@ -129,7 +143,7 @@ Close/Dispose removes; queries may discard dead entries. No permanent strong hos
 copies, business state or second identity authority are permitted. Capacity refusals and incomplete
 results are explicit. This is the narrow lifecycle index needed to locate real hosts without an author
 registration prerequisite; all other process-wide-static restrictions remain. See
-`docs/development/0.8/host-observation-contract.md`. The R9 read surface and budgets remain Dev candidates.
+`docs/openspec/specs/core/observation/spec.md`. The R9 read surface and budgets remain Dev candidates.
 
 **The gate governs *new specialized kinds*, not confirmed public capabilities** (2026-09-15, superseding
 the broader reading of the rule above). Registering a kind freezes vocabulary, which is why it waits for a
