@@ -90,7 +90,8 @@ public sealed partial class UiControls
     internal void TakePopupWheelIfCovering(UiSession owner)
     {
         float notches = PointerWheelNotches();
-        if (notches == 0 || owner.OpenPopupId == null || !owner.OpenPopupCoversPointer(Input.Pointer))
+        if (!owner.PointerInputAllowed || !owner.IsInputGeometryReliable || notches == 0
+            || owner.OpenPopupId == null || !owner.OpenPopupCoversPointer(Input.Pointer))
             return;
         int rows = (int)Math.Round(notches * UiPopup.WheelRowsPerNotch, MidpointRounding.AwayFromZero);
         owner.ScrollPopupByRows(rows == 0 ? (notches > 0 ? 1 : -1) : rows);

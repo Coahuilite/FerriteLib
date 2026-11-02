@@ -222,7 +222,7 @@ public sealed partial class UiHost : IDisposable
 
     public UiLayoutSnapshot MeasureAndArrange(UiLayoutPoint available)
     {
-        RefreshBindingOwner();
+        RefreshBindingOwner(allowPresentationEnrollment: true);
         reactivePresentation?.Synchronize(false);
         if (reactivePresentation != null && presentationRevision != reactivePresentation.DemandRevision)
         {
@@ -494,10 +494,24 @@ public sealed partial class UiHost : IDisposable
         return true;
     }
 
-    private void RefreshBindingOwner()
+    private void RefreshBindingOwner(bool allowPresentationEnrollment = false)
     {
         UiBindings current = UiBindings.OwnerOf(bindings);
-        if (ReferenceEquals(current, bindingOwner)) return;
+        if (ReferenceEquals(current, bindingOwner))
+        {
+            // A plain registry may explicitly enroll after Host construction. Adopt it only at the
+            // next measure/synchronization boundary, never halfway through the paired draw.
+            if (allowPresentationEnrollment && reactivePresentation == null && session.IsActive)
+            {
+                reactivePresentation = current.CreateHostPresentation(source + "/" + session.Identity);
+                if (reactivePresentation != null)
+                {
+                    presentationRevision = -1;
+                    engine.RequestInputValidation();
+                }
+            }
+            return;
+        }
         // Validate before dropping the previous projection. A caller can restore its backing after
         // a failed definition update; an ordinary proxy still uses ordinary getters, not tracking.
         ValidateManifest(manifest);
@@ -652,13 +666,14 @@ public sealed partial class UiHost : IDisposable
         try
         {
             CommitLayoutCandidate(candidate);
-            SealDocumentCommit();
         }
         catch
         {
             RestoreDocumentRollback(rollback);
             throw;
         }
+        // Only staging is reversible. Retirement cannot be undone by restoring the old tree.
+        SealDocumentCommit();
     }
 
     /// <summary>
@@ -720,8 +735,9 @@ public sealed partial class UiHost : IDisposable
     internal void CommitStyleCandidate(UiStyleDocument candidate)
     {
         attachedStyleDocument = candidate ?? throw new ArgumentNullException(nameof(candidate));
+        // Initial Attach may stage layout and style together. Do not discard its pending retirement.
+        if (!pendingDocumentCommit) pendingPrune = null;
         pendingDocumentCommit = true;
-        pendingPrune = null;
         RebuildTree();
     }
 
@@ -739,19 +755,19 @@ public sealed partial class UiHost : IDisposable
         pendingDocumentCommit = false;
         if (SessionDisposed) return;
         if (committed) session.DefinitionRevision++;
-        var outputReleaseWarnings = new List<string>();
+        var cleanupFailures = new List<(string Context, Exception Error)>();
 
         if (previous != null)
         {
-            PruneDetachedState(previous, manifest, outputReleaseWarnings);
+            PruneDetachedState(previous, manifest, cleanupFailures);
         }
 
-        ReleaseHotControlForReload();
+        AttemptDocumentCleanup(ReleaseHotControlForReload, "definition committed; capture release failed", cleanupFailures);
         // Like node-owned custom release callbacks, an output withdrawal is cleanup, not a new
         // prepare/stage refusal. Finish every node/capture before reporting it; accepted still means
         // the new definition is committed, never an exception followed by a tree-only "rollback".
-        foreach (string warning in outputReleaseWarnings)
-            session.ReportCleanupWarning(warning);
+        foreach (var failure in cleanupFailures)
+            session.ReportCleanupFailure(failure.Context, failure.Error);
     }
 
     /// <summary>
@@ -963,11 +979,18 @@ public sealed partial class UiHost : IDisposable
     /// different control. A widget's own sub-nodes - minted under the element and absent from the element
     /// map - go with their element. A node that survives both identity and kind keeps everything.
     /// </summary>
-    private void PruneDetachedState(UiLayoutManifest previous, UiLayoutManifest next, List<string> outputReleaseWarnings)
+    private void PruneDetachedState(UiLayoutManifest previous, UiLayoutManifest next, List<(string Context, Exception Error)> failures)
     {
         Dictionary<UiNodeId, string> before = ElementKinds(previous);
         if (before.Count == 0) return;
         Dictionary<UiNodeId, string> after = ElementKinds(next);
+        var doomed = new HashSet<UiNode>();
+        void Collect(UiNode node)
+        {
+            if (!doomed.Add(node)) return;
+            foreach (UiNode child in node.Children)
+                if (!after.ContainsKey(child.Id)) Collect(child);
+        }
 
         foreach (KeyValuePair<UiNodeId, string> entry in before)
         {
@@ -978,50 +1001,47 @@ public sealed partial class UiHost : IDisposable
             UiNode? node = session.GetNode(entry.Key);
             if (node != null)
             {
-                ResetDetachedState(node, after, outputReleaseWarnings);
+                Collect(node);
             }
         }
+        // Snapshot the complete retirement set before the first external callback can close an owner.
+        foreach (UiNode node in doomed) ResetDetachedState(node, failures);
     }
 
-    private void ResetDetachedState(UiNode node, Dictionary<UiNodeId, string> survivors, List<string> outputReleaseWarnings)
+    private static void AttemptDocumentCleanup(Action cleanup, string context, List<(string Context, Exception Error)> failures)
     {
-        try { Widgets.OptionHelp.Release(node); }
-        catch (Exception outputFailure) when (outputFailure is not OutOfMemoryException)
-        { outputReleaseWarnings.Add("[FerriteLib.UiKit] definition committed; option output release failed at '" + node.Path + "': " + outputFailure); }
+        try { cleanup(); }
+        catch (Exception error) when (UiObservationBoundary.IsOrdinary(error)) { failures.Add((context, error)); }
+    }
+
+    private void ResetDetachedState(UiNode node, List<(string Context, Exception Error)> failures)
+    {
+        AttemptDocumentCleanup(() => Widgets.OptionHelp.Release(node), "definition committed; option output release failed at '" + node.Path + "'", failures);
         node.EditingState = null;
         node.ResetCustomState();
-        ResetState(node.State);
         foreach (KeyValuePair<string, UiControlState> slot in node.ValueStates)
         {
-            ResetState(slot.Value);
+            AttemptDocumentCleanup(() => ResetState(slot.Value), "definition committed; editor release failed at '" + node.Path + "'", failures);
         }
 
         // A scroll position is state too, and it is keyed by the node for exactly this reason: a removed
         // scroll container must not leave a position behind for whatever identity claims that slot next.
-        if (session.ScrollPositions.ContainsKey(node))
-        {
-            session.SetScrollPosition(node, new UiLayoutPoint(0f, 0f));
-        }
-
-        foreach (UiNode child in node.Children)
-        {
-            // An element child the new tree still carries keeps its own state; everything else under a
-            // removed or kind-changed element - sub-nodes included - is part of what has to be cleaned up.
-            if (survivors.ContainsKey(child.Id)) continue;
-            ResetDetachedState(child, survivors, outputReleaseWarnings);
-        }
+        session.ReleaseScrollPosition(node);
     }
 
     private void ResetState(UiControlState state)
     {
-        session.Controls.ReleaseEditFocus(state, session);
-        session.NoteEditClosed(state);
-        if (state.Editor is IUiEditState editor) editor.Suspend();
-        state.Editor = null;
-        state.EditorTarget = null;
-        state.ChartIdentity = null;
-        state.CommitRequested = false;
-        state.DiscardRequested = false;
+        try { session.Controls.ReleaseEditFocus(state, session); }
+        finally
+        {
+            session.NoteEditClosed(state);
+            if (state.Editor is IUiEditState editor) editor.Suspend();
+            state.Editor = null;
+            state.EditorTarget = null;
+            state.ChartIdentity = null;
+            state.CommitRequested = false;
+            state.DiscardRequested = false;
+        }
     }
 
     private static Dictionary<UiNodeId, string> ElementKinds(UiLayoutManifest value)

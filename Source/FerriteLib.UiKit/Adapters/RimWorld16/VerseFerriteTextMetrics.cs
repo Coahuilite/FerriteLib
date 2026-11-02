@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using Verse;
 
@@ -17,13 +18,23 @@ namespace FerriteLib.UiKit.Kernel;
 public sealed class VerseFerriteTextMetrics : ITextMetrics, IUiTextMetricsEnvironment
 {
     /// <summary>
-    /// Shared instance; the type holds no state. A host and its text-fit audit must be handed the same
+    /// Shared instance; the type retains no UI state. A host and its text-fit audit must be handed the same
     /// metrics *model* - a wrap-aware one like this - or layout and audit measure against two different
     /// rulers and the audit goes quietly vacuous.
     /// </summary>
     public static readonly VerseFerriteTextMetrics Instance = new();
 
+    // The 1.7 host resolves Font to UnityStubs, which has no fontNames or complete font-data revision.
+    // Unknown backends revoke optional measurement reuse rather than publish an incomplete stamp.
+    private static readonly bool HasUnityFontEnvironment =
+        string.Equals(typeof(Font).Assembly.GetName().Name, "UnityEngine.TextRenderingModule", StringComparison.Ordinal);
+
     UiMeasureInputs? IUiTextMetricsEnvironment.CaptureEnvironment(UiFont font)
+        => HasUnityFontEnvironment ? CaptureUnityEnvironment(font) : null;
+
+    // Keep unavailable Unity members out of the 1.7 caller's JIT body, including under inlining.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static UiMeasureInputs? CaptureUnityEnvironment(UiFont font)
     {
         GameFont previous = Text.Font;
         try

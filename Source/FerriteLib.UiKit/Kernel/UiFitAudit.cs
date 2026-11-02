@@ -146,10 +146,22 @@ public static class UiFitAudit
     private static readonly HashSet<string> StyleFallbacks = new(StringComparer.Ordinal);
 
     private static ITextMetrics? metrics;
-    private static Action<UiOverflowReport>? sink;
-    private static Action<UiStyleFallbackReport>? styleSink;
+    private static LegacyObserver<UiOverflowReport>? sink;
+    private static LegacyObserver<UiStyleFallbackReport>? styleSink;
     private static string? lastStyleFallback;
     private static string currentPath = string.Empty;
+
+    // The existing legacy attachment owns its failure budget, not a new process-wide registry.
+    private sealed class LegacyObserver<T>
+    {
+        private readonly Action<T> callback;
+        private bool failureReported;
+        internal LegacyObserver(Action<T> callback) => this.callback = callback;
+        internal void Invoke(T report) => callback(report);
+        internal void Reset() => failureReported = false;
+        internal void ReportFailure(Exception error)
+            => UiObservationBoundary.ReportOnce(ref failureReported, "legacy fit observation failed", error);
+    }
 
     /// <summary>Master switch. Off means the audit does not measure anything at all.</summary>
     public static bool Enabled { get; set; }
@@ -186,7 +198,7 @@ public static class UiFitAudit
     public static void Attach(ITextMetrics textMetrics, Action<UiOverflowReport> reportSink)
     {
         metrics = textMetrics ?? throw new ArgumentNullException(nameof(textMetrics));
-        sink = reportSink ?? throw new ArgumentNullException(nameof(reportSink));
+        sink = new LegacyObserver<UiOverflowReport>(reportSink ?? throw new ArgumentNullException(nameof(reportSink)));
     }
 
     /// <summary>
@@ -197,7 +209,7 @@ public static class UiFitAudit
     /// </summary>
     public static void AttachStyleFallback(Action<UiStyleFallbackReport> styleReportSink)
     {
-        styleSink = styleReportSink ?? throw new ArgumentNullException(nameof(styleReportSink));
+        styleSink = new LegacyObserver<UiStyleFallbackReport>(styleReportSink ?? throw new ArgumentNullException(nameof(styleReportSink)));
     }
 
     /// <summary>Drops the bindings and disables the audit, so a disposed host cannot leave a dangling sink.</summary>
@@ -218,6 +230,8 @@ public static class UiFitAudit
         StyleFallbacks.Clear();
         lastStyleFallback = null;
         currentPath = string.Empty;
+        sink?.Reset();
+        styleSink?.Reset();
     }
 
     /// <summary>
@@ -302,19 +316,29 @@ public static class UiFitAudit
         float available,
         UiDiagnosticSubscription? subscription)
     {
-        string key = currentPath + "|" + (int)axis + "|" + (int)font + "|" + Shorten(text);
-        string path = currentPath.Length == 0 ? "(unscoped)" : currentPath;
+        string key;
+        UiOverflowReport report;
+        try
+        {
+            key = currentPath + "|" + (int)axis + "|" + (int)font + "|" + Shorten(text);
+            string path = currentPath.Length == 0 ? "(unscoped)" : currentPath;
+            report = new UiOverflowReport(path, text, font, axis, needed, available, rect.Width);
+        }
+        catch (Exception error) when (UiObservationBoundary.IsOrdinary(error))
+        { sink?.ReportFailure(error); return; }
 
         if (subscription != null)
         {
-            subscription.PublishOverflow(
-                new UiOverflowReport(path, text, font, axis, needed, available, rect.Width), key);
+            subscription.PublishOverflow(report, key);
             return;
         }
 
-        if (!Reported.Add(key)) return;
-
-        sink?.Invoke(new UiOverflowReport(path, text, font, axis, needed, available, rect.Width));
+        try
+        {
+            if (!Reported.Add(key)) return;
+            sink?.Invoke(report);
+        }
+        catch (Exception error) when (UiObservationBoundary.IsOrdinary(error)) { sink?.ReportFailure(error); }
     }
 
     private static string Shorten(string text)
@@ -331,16 +355,22 @@ public static class UiFitAudit
     /// </summary>
     internal static void ReportStyleFallback(string elementPath, string kind, string attribute, string authored, string resolved)
     {
-        var report = new UiStyleFallbackReport(
-            string.IsNullOrEmpty(elementPath) ? "(unscoped)" : elementPath,
-            kind ?? "",
-            attribute ?? "",
-            authored ?? "",
-            resolved ?? "");
+        UiStyleFallbackReport report;
+        string key;
+        try
+        {
+            report = new UiStyleFallbackReport(
+                string.IsNullOrEmpty(elementPath) ? "(unscoped)" : elementPath,
+                kind ?? "",
+                attribute ?? "",
+                authored ?? "",
+                resolved ?? "");
 
-        lastStyleFallback = report.Diagnostic;
-
-        string key = report.ElementPath + "|" + report.Kind + "|" + report.Attribute + "|" + report.Authored;
+            lastStyleFallback = report.Diagnostic;
+            key = report.ElementPath + "|" + report.Kind + "|" + report.Attribute + "|" + report.Authored;
+        }
+        catch (Exception error) when (UiObservationBoundary.IsOrdinary(error))
+        { styleSink?.ReportFailure(error); return; }
 
         // Same routing rule as the text half: a live subscription owns the finding, and the process-wide
         // cap and dedup set stay out of it so one host's appearance noise cannot spend another's budget.
@@ -351,9 +381,12 @@ public static class UiFitAudit
             return;
         }
 
-        if (StyleFallbacks.Count >= MaxReports) return;
-        if (!StyleFallbacks.Add(key)) return;
-
-        styleSink?.Invoke(report);
+        try
+        {
+            if (StyleFallbacks.Count >= MaxReports) return;
+            if (!StyleFallbacks.Add(key)) return;
+            styleSink?.Invoke(report);
+        }
+        catch (Exception error) when (UiObservationBoundary.IsOrdinary(error)) { styleSink?.ReportFailure(error); }
     }
 }

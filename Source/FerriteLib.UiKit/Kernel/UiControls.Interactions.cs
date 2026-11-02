@@ -100,7 +100,10 @@ public sealed partial class UiControls
         if (result.Consume || result.Request)
             session.NoteInteractionTarget(node);
         if (result.Ended != UiInteractionEnd.None)
-            Trace?.Invoke("interaction end node=" + target.Node + " part=" + target.Part + " reason=" + result.Ended);
+        {
+            try { Trace?.Invoke("interaction end node=" + target.Node + " part=" + target.Part + " reason=" + result.Ended); }
+            catch (Exception error) when (UiObservationBoundary.IsOrdinary(error)) { session.ReportObservationFailure("interaction Trace failed", error); }
+        }
 #if FER_DEV
         if (ctx != null)
         {
@@ -122,7 +125,10 @@ public sealed partial class UiControls
         UiInteractionResult result = PopupPointer(rect, popupId, session, target, true, selectable, node);
         session.NotePopupOptionCapture(target, result.Captured);
         if (result.Request)
-            Trace?.Invoke("option fired id=" + popupId + " row=" + Describe(rect));
+        {
+            try { Trace?.Invoke("option fired id=" + popupId + " row=" + Describe(rect)); }
+            catch (Exception error) when (UiObservationBoundary.IsOrdinary(error)) { session.ReportObservationFailure("option Trace failed", error); }
+        }
         return result;
     }
 

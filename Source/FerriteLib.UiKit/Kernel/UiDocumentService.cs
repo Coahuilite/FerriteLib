@@ -476,21 +476,16 @@ public sealed class UiDocumentService : IDisposable
         RefreshBeforeAttach(layoutId);
         RefreshBeforeAttach(styleId);
 
-        Detach(host);
-        if (dependencies.Count >= MaxDependencies) return false;
+        bool replacing = dependencies.Exists(dependency => ReferenceEquals(dependency.Host, host));
+        if (!replacing && dependencies.Count >= MaxDependencies) return false;
 
-        var dependency = new Dependency(host, layoutId, styleId);
-        dependencies.Add(dependency);
-        host.AttachDocumentService(this);
-
+        bool applyLayout = false;
+        bool applyStyle = false;
         if (layout != null && layout.GoodVersion.Length > 0 && layout.GoodLayout != null)
         {
             if (host.TryPrepareLayoutCandidate(layout.GoodLayout, out string element, out string reason))
             {
-                // Stage, then seal: the initial application is a one-host batch, so the destructive half
-                // still only runs once the candidate has been accepted for every host it touches.
-                host.CommitLayoutCandidate(layout.GoodLayout);
-                host.SealDocumentCommit();
+                applyLayout = true;
             }
             else
             {
@@ -512,8 +507,7 @@ public sealed class UiDocumentService : IDisposable
         {
             if (host.TryPrepareStyleCandidate(style.GoodStyle, out string element, out string reason))
             {
-                host.CommitStyleCandidate(style.GoodStyle);
-                host.SealDocumentCommit();
+                applyStyle = true;
             }
             else
             {
@@ -527,6 +521,32 @@ public sealed class UiDocumentService : IDisposable
             }
         }
 
+        if (applyLayout || applyStyle)
+        {
+            UiHost.DocumentRollback rollback = host.CaptureDocumentRollback();
+            try
+            {
+                if (applyLayout) host.CommitLayoutCandidate(layout!.GoodLayout!);
+                if (host.SessionDisposed) return true;
+                if (applyStyle) host.CommitStyleCandidate(style!.GoodStyle!);
+            }
+            catch
+            {
+                host.RestoreDocumentRollback(rollback);
+                // No dependency or service ownership changed: a failed initial stage does not enroll
+                // this host, and a failed reattach leaves its previous connection intact.
+                throw;
+            }
+        }
+
+        // Stage callbacks may close the host. Never resurrect a dependency its Close already released.
+        if (host.SessionDisposed) return true;
+        Detach(host);
+        dependencies.Add(new Dependency(host, layoutId, styleId));
+        host.AttachDocumentService(this);
+        // Only staging is reversible. Register the committed lifetime before fallible retirement;
+        // cleanup/reporting must not restore a tree whose old resources have already been released.
+        if (applyLayout || applyStyle) host.SealDocumentCommit();
         return true;
     }
 

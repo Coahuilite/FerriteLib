@@ -27,12 +27,55 @@ public sealed class UiSession : IDisposable
         return new UiWidgetContext(source, this, metrics, theme, translation, bindings, viewWidth, node.Path, node: node);
     }
     public Action<string>? Warning { get; set; }
+    private bool observationFailureReported;
+    internal void ReportObservationFailure(string boundary, Exception error)
+        => UiObservationBoundary.ReportOnce(ref observationFailureReported, boundary, error);
     internal void ReportWarning(string message){if(Warning!=null)Warning(message);else if(execution!=null)execution.Warning(message);else System.Diagnostics.Trace.TraceWarning(message);}
     internal void ReportCleanupWarning(string message)
     {
         try { ReportWarning(message); }
-        catch (Exception observerFailure) when (observerFailure is not OutOfMemoryException)
-        { System.Diagnostics.Trace.TraceError(message + "\nThe cleanup warning observer also failed: " + observerFailure); }
+        catch (Exception observerFailure) when (UiObservationBoundary.IsOrdinary(observerFailure))
+        { ReportObservationFailure("cleanup warning failed", observerFailure); }
+    }
+    internal void ReportCleanupFailure(string context, Exception original)
+    {
+        // Exception.ToString is author code too. Keep its preparation within the reporting boundary.
+        try { ReportWarning("[FerriteLib.UiKit] " + context + ": " + original); }
+        catch (Exception observerFailure) when (UiObservationBoundary.IsOrdinary(observerFailure))
+        { UiObservationBoundary.ReportOnce(ref observationFailureReported, context, original, observerFailure); }
+    }
+    // One latest request failure, not a trip or an unbounded history. Keep the exception/typed target
+    // before optional formatting/reporting; neither observation failure nor a later paint retries it.
+    internal UiRequestFailure? LastRequestFailure { get; private set; }
+    internal UiNodeId? LastRequestFailureNode { get; private set; }
+    private bool reportingRequestFailure;
+    internal void RecordRequestFailure(UiNode node, UiRequestFailure failure)
+    {
+        if (IsActive)
+        {
+            LastRequestFailure = failure;
+            LastRequestFailureNode = node.Id;
+        }
+        if (reportingRequestFailure) return;
+        reportingRequestFailure = true;
+        try
+        {
+            UiInteractionTarget? target = failure.Target;
+            string context = "request failed in session " + Identity + " at guard node '" + node.Id.Key
+                + "' (path='" + node.Path + "')";
+            if (target.HasValue)
+                context += "; request node='" + target.Value.Node + "', target='" + target.Value.TargetScope
+                    + "', business scope='" + target.Value.BusinessScope + "', part='" + target.Value.Part
+                    + "', item='" + target.Value.ItemKey + "'";
+            else
+                context += "; operation='" + failure.Operation + "', binding='" + failure.Binding
+                    + "', guard business scope='" + node.InteractionScope + "'; no explicit interaction target was supplied";
+            ReportWarning("[FerriteLib.UiKit] " + context
+                + ". The callback threw; side effects are not rolled back and their extent is not known to UiKit. No automatic retry or compensation. " + failure);
+        }
+        catch (Exception reporting) when (UiObservationBoundary.IsOrdinary(reporting))
+        { UiObservationBoundary.ReportOnce(ref observationFailureReported, "request failure reporting failed", failure, reporting); }
+        finally { reportingRequestFailure = false; }
     }
     public UiFrame Input { get; private set; } = new UiFrame(UiFramePhase.None, inputAllowed:false);
     private IUiExecution? execution;
@@ -253,6 +296,7 @@ public sealed class UiSession : IDisposable
 
     /// <summary>Session-scoped scroll positions, keyed by the scroll container's node.</summary>
     internal IReadOnlyDictionary<UiNode, UiLayoutPoint> ScrollPositions => scrollPositions;
+    internal void ReleaseScrollPosition(UiNode node) => scrollPositions.Remove(node);
 
     /// <summary>
     /// Nodes currently tripped into session fallback. Keyed by node, so the display path a diagnostic
@@ -448,8 +492,9 @@ public sealed class UiSession : IDisposable
             // Caller-agnostic facts only, like every other line the funnel reports: which menu moved, where
             // it stands, how far it can go. This session cannot read the backend - the event phase belongs to
             // the funnel's own trace lines, not to a session that has no business touching Event.current.
-            Controls.Trace("wheel popup id=" + openPopupId + " rows=" + openPopupScrollRows
-                + " of " + openPopupMaxScrollRows);
+            try { Controls.Trace("wheel popup id=" + openPopupId + " rows=" + openPopupScrollRows
+                + " of " + openPopupMaxScrollRows); }
+            catch (Exception error) when (UiObservationBoundary.IsOrdinary(error)) { ReportObservationFailure("wheel Trace failed", error); }
         }
 
         return true;
@@ -1377,9 +1422,10 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
         if (ownedHotControl.HasValue && ownedHotControl.Value == controlId)
         {
             Interactions.End(UiInteractionEnd.CaptureLost);
-            Execution.Release(controlId);
+            // End ownership before a fallible native release; a failure must never replay it.
             ownedHotControl = null;
             ownedHotControlOwner = null;
+            Execution.Release(controlId);
         }
     }
 
@@ -1473,6 +1519,8 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
         hoverClaimStamp = 0;
         hoverGraceLeft = 0;
         trippedLogs.Clear();
+        LastRequestFailure = null;
+        LastRequestFailureNode = null;
         popupDrawActions.Clear();
         popupTarget = null;
         popupCaptureTarget = null;

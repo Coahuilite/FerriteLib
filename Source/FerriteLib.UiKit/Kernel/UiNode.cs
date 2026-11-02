@@ -38,26 +38,35 @@ public sealed class UiNode
         if(!customState.TryGetValue(name,out object? state)){state=create()??throw new InvalidOperationException("Node state factory returned null.");customState.Add(name,state);if(release!=null){T owned=(T)state;customRelease.Add(name,()=>release(owned));}}
         return state as T??throw new InvalidOperationException("Node state '"+name+"' has another declared type.");
     }
-    internal void ResetCustomState()
+    internal void ResetCustomState(List<Exception>? errors = null)
     {
         var releases=new List<Action>(customRelease.Values);customRelease.Clear();customState.Clear();
-        foreach(var release in releases)try{release();}catch(Exception error){session.ReportWarning("[FerriteLib.UiKit] node state release failed at '"+Path+"': "+error);}
+        foreach (Action release in releases)
+            try { release(); }
+            catch (Exception error) when (UiObservationBoundary.IsOrdinary(error))
+            {
+                errors?.Add(error);
+                session.ReportCleanupFailure("node state release failed at '" + Path + "'", error);
+            }
     }
     internal void ReleaseState(bool throwOutputFailure = false)
     {
         if(released)return;released=true;
-        string? outputWarning = null;
+        List<Exception>? errors = throwOutputFailure ? new List<Exception>() : null;
         try { Widgets.OptionHelp.Release(this); }
-        catch (Exception outputFailure) when (!throwOutputFailure && outputFailure is not OutOfMemoryException)
-        { outputWarning = "[FerriteLib.UiKit] node removed; option output release failed at '" + Path + "': " + outputFailure; }
+        catch (Exception outputFailure) when (UiObservationBoundary.IsOrdinary(outputFailure))
+        {
+            if (errors != null) errors.Add(outputFailure);
+            else session.ReportCleanupFailure("node removed; option output release failed at '" + Path + "'", outputFailure);
+        }
         finally
         {
             Properties.ReleaseResolutionCache();
-            ResetCustomState();
+            ResetCustomState(errors);
             foreach(var slot in slots.Values){if(slot.Editor is IUiEditState editor)editor.Suspend();slot.Editor=null;slot.EditorTarget=null;slot.ChartIdentity=null;}
             slots.Clear();EditingState=null;children.Clear();Parent=null;
         }
-        if (outputWarning != null) session.ReportCleanupWarning(outputWarning);
+        if (errors?.Count > 0) throw new AggregateException("Node released; one or more owned releases failed at '" + Path + "'.", errors);
     }
     private readonly Dictionary<string, UiControlState> slots = new(StringComparer.Ordinal);
     private readonly List<UiNode> children = new();

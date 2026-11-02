@@ -208,8 +208,9 @@ public static class UiPopup
         {
             // The published rect and the scroll that picked which rows live inside it, in one line: a real-game
             // log has to be able to say which option was reachable where, not only that a menu was open.
-            ctx.Controls.Trace("publish id=" + popupId + " rect=" + UiControls.Describe(popupRect)
-                + " firstRow=" + ctx.Session.OpenPopupScrollRows);
+            try { ctx.Controls.Trace("publish id=" + popupId + " rect=" + UiControls.Describe(popupRect)
+                + " firstRow=" + ctx.Session.OpenPopupScrollRows); }
+            catch (Exception error) when (UiObservationBoundary.IsOrdinary(error)) { ctx.Session.ReportObservationFailure("popup Trace failed", error); }
         }
 
         UiThemeDraw.Panel(ctx.Drawing,popupRect, ctx.Theme);
