@@ -1,7 +1,13 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project>
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>obj/$(UiKitTarget)/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
 
   <PropertyGroup>
-    <TargetFramework>net472</TargetFramework>
+    <TargetFramework Condition="'$(UiKitTarget)' == ''">net472</TargetFramework>
+    <TargetFramework Condition="'$(UiKitTarget)' == 'Neutral' Or '$(UiKitTarget)' == 'RimWorld17'">net10.0</TargetFramework>
+    <DefineConstants>$(DefineConstants);FER_TOOLS</DefineConstants>
     <PlatformTarget>x64</PlatformTarget>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
@@ -19,6 +25,7 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <!-- Build output is private to its configuration. Only explicit staging writes a mod payload. -->
     <OutputPath>..\..\dist\build\$(Configuration)\</OutputPath>
+    <OutputPath Condition="'$(UiKitTarget)' != ''">..\..\dist\build\$(Configuration)\$(UiKitTarget)\</OutputPath>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- 本地离线环境：禁用 NuGet 漏洞审计，避免无网时被提升为错误。 -->
     <NuGetAudit>false</NuGetAudit>
@@ -51,13 +58,29 @@
   <ItemGroup>
     <!-- Reference-only: the game's managed surface. PrivateAssets keeps it out of the package's
          dependency list, so a consumer's own pinned RimRef version is never overridden from here. -->
-    <PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4871" PrivateAssets="all" />
+    <PackageReference Condition="'$(UiKitTarget)' == ''" Include="Krafs.Rimworld.Ref" Version="1.6.4871" PrivateAssets="all" />
   </ItemGroup>
 
+  <PropertyGroup Condition="'$(UiKitTarget)' == 'RimWorld17'">
+    <DefineConstants>$(DefineConstants);FER_RW17</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(UiKitTarget)' == 'RimWorld17'">
+    <Reference Include="Assembly-CSharp"><HintPath>$(RimWorld17Dir)/Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityStubs"><HintPath>$(RimWorld17Dir)/UnityStubs.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="RimWorld"><HintPath>$(RimWorld17Dir)/RimWorld.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Waylith"><HintPath>$(RimWorld17Dir)/Waylith.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <Target Name="RequireLocalRimWorld17" BeforeTargets="ResolveReferences" Condition="'$(UiKitTarget)' == 'RimWorld17'">
+    <Error Condition="!Exists('$(RimWorld17Dir)/Assembly-CSharp.dll') Or !Exists('$(RimWorld17Dir)/UnityStubs.dll')" Text="Supply the exact local RimWorld17Dir. This is a 0.8-core / 1.7 rendering reference, not a 1.6 standalone host." />
+  </Target>
+
   <ItemGroup>
+    <Compile Remove="obj\**\*.cs" />
     <Compile Remove="Kernel\**\*.cs" />
+    <Compile Remove="Adapters\**\*.cs" Condition="'$(UiKitTarget)' == 'Neutral'" />
   </ItemGroup>
   <Import Project="NeutralSources.props" />
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
 </Project>
 
 

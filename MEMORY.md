@@ -1,12 +1,26 @@
 # MEMORY
 
+Current development policy: follow RimWorld **1.7** APIs/namespaces without a game minor-build whitelist. Normative tooling/stage boundaries: `docs/openspec/specs/contracts/developer-tools/spec.md`; implementation gaps remain in the specification's linked status page. Historical fixed-input evidence is not a support ceiling.
+
 ## 0.8 development line (2026-10-25)
+
+The authorized 2026-11-06 offline-workbench maintenance extension keeps API0.8.0 and the ordinary
+net472/1.6 route. Its explicit Legacy08 capability, optional owner/semantic/prepare seams and transactional
+author projection/source contract are in `docs/development/0.8/offline-workbench.md`. Current consumer
+pairing and native acceptance remain separate; API range alone does not grant this capability.
+
+The 2026-11-05 implementation adds Auto/placeholder measurement consistency, effective-clip content
+hover and creation-first native domain output through the existing Host/Session lifecycle. Old factories,
+metrics overrides and standalone callers remain legal. The current API, budgets, migration and managed/
+native evidence boundaries are in `docs/development/0.8/ui-diagnostics.md` and `docs/openspec/implementation.md`.
+Fixed dirty-source producers carry their own source form and identity; they are not new commits or native acceptance.
 
 The 2026-11-03 appearance-freedom source adds seven TextColor slots, normal read-only text presentation
 and FontSize1..96 through public-unstable composed production entries, preserving Stable signatures,
-singletons and old override conditions. The standard and independent author routes, single native owner,
-effective-font pipeline and managed/native evidence limits are in
-`docs/openspec/implementation.md#appearance-freedom`; no new native acceptance or fixed package exists.
+singletons and old override conditions. Its fixed source checkpoint and consumer adoption were supplied
+as accepted inputs to the 2026-11-05 work; native acceptance remains separate. The standard and independent
+author routes, single native owner, effective-font pipeline and evidence limits are in
+`docs/openspec/implementation.md#appearance-freedom`.
 
 The 2026-11-01 release-gate repairs restore request-failure attribution, same-owner late reactive
 presentation adoption and initial document-attach staging recovery. Their production paths and
@@ -66,7 +80,7 @@ human evidence below does not accept0.8. New-engine1.7 adapter then direct drawi
 The 2026-10-26 local incremental-pipeline candidate connects stable-domain validation, first-touch
 candidate backups and sparse geometry publication in the shared Release path. Exact conservative
 legacy/structure/environment/callback fallbacks are in `docs/openspec/specs/core/layout/spec.md`; fixed Qz reference decisions are in `docs/openspec/implementation.md`. Managed work observations are separate from
-native acceptance; the currently held A009r2 pair is unchanged. Fixed consumer integration of FL
+native acceptance; the A009r2 pair was unchanged at that historical checkpoint. Fixed consumer integration of FL
 833c14f4 and its matched candidates are complete; overall internal-trial acceptance is recorded above.
 
 ## Historical 0.7 checkpoint (2026-10-09)
@@ -489,8 +503,9 @@ and delivery procedures do not override the current scripts or the next-stage ha
   its own content, or a hit/geometry rule. The promotion gate (provenance cited; neutral, no consumer
   numbers as library defaults; no new process-wide mutable statics; a harness-drivable lane) governs *new
   specialized kinds*, not confirmed general capabilities. Our own demo is never consumption.
-- **Growth has one legal source**: a real consumer was forced to hand-roll something. A request is not
-  evidence; a transcription into this file (`owner/repo@sha:path:line` + excerpt + what it proved) is.
+- **Specialized-kind provenance** uses a real consumer's hand-rolled code and a checkable transcription;
+  the current promotion process and the separate route for general capabilities are in `AGENTS.md` and
+  `docs/openspec/specs/policies/public-authoring/spec.md`.
 - **Nothing persists into a save**, and the Squeaky Ratkin repo is never a write target.
 
 ## Carrier identity and build isolation
@@ -632,15 +647,11 @@ and delivery procedures do not override the current scripts or the next-stage ha
   re-derived against its published tree at a pinned revision — the measured census is the archived 2026-09-04
   record in `OBLIVIONIS.md`, and quoting it as current is the stale-anchor error this ledger already names.
   Until a citation raises the number, the honest validated-surface statement stays **"3 of 7 kinds"**.
-- **Memory protocol**: `AGENTS.md` stable · `MEMORY.md` this ledger · `TODO.md` action surface ·
-  `OBLIVIONIS.md` cold archive. Two compactions have run: the 2026-09-20 one moved this file's
-  pre-2026-09-17 body (consumer coverage and the kind census, the Charter and its surveys, the style-layer
-  argument, the structure narrative, the consumer contract, the cross-repo round couplings), and the
-  2026-10-09 one moved the 2026-09-17..10-07 dated round narratives. Both moved **verbatim**, each with its own
-  index entry and frozen-block markers. Read them there only for a historical conflict; they cannot override
-  current sources.
-- **Inbound `HANDOFF.md` is transient and is not a memory tier.** Durable content is promoted here at the
-  moment of a round; an open round keeps a pointer line in `TODO.md`, a closed round leaves nothing behind.
+- **Memory history.** The 2026-09-20 compaction moved the pre-2026-09-17 body: consumer coverage and kind
+  census, Charter and surveys, style-layer argument, structure narrative, consumer contract and cross-repo
+  round couplings. The 2026-10-09 compaction moved the 2026-09-17..10-07 dated round narratives. Both are
+  verbatim in `OBLIVIONIS.md`, with separate index entries and frozen markers. Current reading and handoff
+  rules are in `AGENTS.md`; the archive is historical evidence.
 
 ## Environment facts (cheap to get wrong, expensive to re-learn)
 

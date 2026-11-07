@@ -67,6 +67,9 @@ public sealed class UiEditSession<T> : IUiEditState
 
     public void Focus() => Focused = true;
     public void Suspend() => Focused = false;
+    // A semantic draft is not a native typing event. Reuse the existing automatic-publication hold;
+    // a real subsequent Input change or explicit confirmation/cancellation releases it normally.
+    internal void HoldSemanticDraft() { if (HasDraft) automaticSuspended = true; }
     /// <summary>Native composition can update the visible draft, but cannot publish it.</summary>
     public void Input(string text, bool writable, bool composing, bool live, Action<T> request, Func<T> readModel)
     {

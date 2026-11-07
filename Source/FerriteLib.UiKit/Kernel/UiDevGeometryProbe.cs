@@ -1,4 +1,4 @@
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -630,7 +630,7 @@ internal sealed class UiDevGeometryCapture
 /// The development-only numeric instrument: where every arranged element actually is, which identity and
 /// appearance it drew with, what a press landed on, and - on request - an outline of the sampled rects.
 /// <para>
-/// <b>Compiled out of a release build.</b> The whole capture side of this file is inside <c>#if FER_DEV</c>,
+/// <b>Compiled out of a release build.</b> The whole capture side of this file is inside <c>#if FER_DEV || FER_TOOLS</c>,
 /// and every call site is guarded the same way, so a release payload carries no capture, no buffer and no
 /// call: the enable path on <see cref="UiDiagnosticSubscription.GeometryEnabled"/> refuses rather than
 /// degrading into a tool that reports nothing and looks fine. The gate is the build configuration, and a

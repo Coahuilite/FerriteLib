@@ -370,7 +370,7 @@ public abstract class UiWindowHost : Window
     /// </summary>
     public sealed override void DoWindowContents(Rect inRect)
     {
-        using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, host == null ? null : TextMetrics))
+        using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, host == null ? null : TextMetrics, host?.Session))
         {
             DrawShell(inRect);
         }
@@ -544,6 +544,7 @@ public abstract class UiWindowHost : Window
     {
         noticeDueNextFrame = true;
         lastFailure = error;
+        host?.PublishWindowFailure(error);
         ReleaseHost();
         OnDrawFailure(error);
     }
@@ -624,6 +625,7 @@ public abstract class UiWindowHost : Window
         catch (Exception detachError)
         {
             if (lastFailure == null) lastFailure = detachError;
+            released.PublishWindowFailure(detachError, cleanup: true);
         }
         finally
         {

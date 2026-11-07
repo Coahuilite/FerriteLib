@@ -47,19 +47,11 @@ jobs:
           #    the release page speaks exactly two dialects. SemVer-compatible: rcN is still a valid
           #    prerelease label, so GitHub's "is this a prerelease" rule and any version parser keep
           #    working, and rc1 < rc2 < BASE orders correctly.
-          $pattern = '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc([1-9]\d*))?$'
-          if ($tag -notmatch $pattern) { throw "Release tag must be vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-rcN (N >= 1): $tag" }
-          $base = "$($Matches[1]).$($Matches[2]).$($Matches[3])"
-          $rc = $Matches[4]
-
-          # 2. The tag must name the build axis, which is what the artifact gets called.
-          [xml]$csproj = Get-Content -LiteralPath 'Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj' -Raw
-          $prefix = @($csproj.SelectNodes('/Project/PropertyGroup/VersionPrefix'))
-          if ($prefix.Count -ne 1) { throw "Expected exactly one <VersionPrefix>, found $($prefix.Count)." }
-          $buildAxis = $prefix[0].InnerText.Trim()
-          if ($buildAxis -ne $base) {
-            throw "Tag v$base does not match <VersionPrefix>$buildAxis. Retag, or bump the build axis and rebuild; do not rename the artifact."
-          }
+          Import-Module ./scripts/Release.Identity.psm1
+          $releaseVersion = Get-FerriteReleaseVersion -Version $tag
+          $base = $releaseVersion.Base
+          $rc = $releaseVersion.Rc
+          Assert-FerriteReleaseAxis -ProjectFile 'Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj' -BaseVersion $base
 
           # 3. Tag the merge commit on main, not a feature branch tip: a release whose commit is not
           #    in main's history is a build of code that is not in the trunk anyone reads.

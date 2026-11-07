@@ -218,10 +218,10 @@ internal static class KernelAtomTests
         UiLayoutSnapshot snapshot = host.MeasureAndArrange(new UiLayoutPoint(400f, 200f));
 
         Check(Near(32f, snapshot.RectById["note"].Width), "text/wrapped Auto = 2 ideographs x 16px");
-        Check(Near(16f, snapshot.RectById["apply"].Width), "input/button Auto = 2 Latin characters x 8px");
+        Check(Near(28f, snapshot.RectById["apply"].Width), "input/button Auto = 2 Latin characters x 8px + 2 caption insets x 6px");
         Check(Near(32f, snapshot.RectById["level"].Width), "input/slider Auto measures its Label");
         Check(Near(16f, snapshot.RectById["count"].Width), "input/number-field Auto measures its Label");
-        Check(Near(304f, snapshot.RectById["rest"].Width), "the unlabeled rule takes the remainder");
+        Check(Near(292f, snapshot.RectById["rest"].Width), "the unlabeled rule takes 400 - (32 + 28 + 32 + 16) remaining pixels");
     }
 
     // --- input/button ---------------------------------------------------------------------------

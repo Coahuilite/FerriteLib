@@ -286,6 +286,6 @@ public sealed class VerseUiImages : IDisposable
             textures.Remove(image.Key);
     }
 
-    internal Texture? Resolve(UiImage image) => image.Scope == scope && textures.TryGetValue(image.Key, out Texture texture) ? texture : null;
+    internal Texture? Resolve(UiImage image) => image.Scope == scope && textures.TryGetValue(image.Key, out Texture? texture) ? texture : null;
     public void Dispose() => textures.Clear();
 }

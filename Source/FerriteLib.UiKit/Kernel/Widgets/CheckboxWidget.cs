@@ -66,7 +66,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// per-item binding scope, so "not yet bound" is a legal frame there and must not take the page down.
 /// </para>
 /// </summary>
-internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
+internal sealed partial class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
 {
     internal const string Kind = "input/checkbox";
 

@@ -274,6 +274,16 @@ See the [help connection](../openspec/specs/contracts/help-output/spec.md).
 
 ## Diagnose failures without inventing acceptance
 
+For native framework diagnostics use `VerseUiDiagnosticLog.CreateHost(consumer, source, manifest,
+bindings, theme, metrics, translation, document, options)` in the actual factory, before Host construction.
+The original constructor/factories remain legal, and supplied metrics are unchanged. `UiPageWindow` adopts
+this route with its key consumer. `VerseUiDiagnosticLog.Attach(host, consumer)` retrieves that binding or
+adopts future facts on an existing Host; it cannot recover missed constructor facts. Configure updates
+DetailEnabled live, independently of fit/timing/geometry. Host/Session close releases its binding.
+Keep Controls.Trace null when detail is off, and do not reprint the same FL facts from a consumer logger.
+Standalone callbacks, exact lifecycle, normal/warning/error, daily/detail and bounded output semantics are
+in the [domain diagnostic guide](../development/0.8/ui-diagnostics.md). Both new types are public-unstable.
+
 Pure faults use Fault/Retry; managed writable responses use IsPaused/Fault/Resume after their owner checks
 the actual business result. Related inputs can retry pure work but cannot resume a paused callback.
 Retained paint is display-only; invalid current geometry/input cannot execute. See

@@ -84,6 +84,10 @@ public sealed partial class UiHost : IDisposable
         ITextMetrics metrics,
         IUiTranslation translation,
         UiStyleDocument? document = null)
+        : this(source, manifest, bindings, theme, metrics, translation, document, null) { }
+
+    internal UiHost(string source, UiLayoutManifest manifest, IUiBindingAccess bindings, UiTheme theme,
+        ITextMetrics metrics, IUiTranslation translation, UiStyleDocument? document, IUiDiagnosticOutput? output)
     {
         this.source = source ?? throw new ArgumentNullException(nameof(source));
         this.manifest = manifest ?? throw new ArgumentNullException(nameof(manifest));
@@ -95,6 +99,10 @@ public sealed partial class UiHost : IDisposable
 
         UiWidgetRegistry.InitializeCore();
         ValidateManifest(manifest);
+
+        session = new UiSession { DiagnosticOutput = output };
+        output?.BindSession(session.Identity);
+        using UiDiagnosticHub.UiDiagnosticScope? creationScope = output == null ? null : UiDiagnosticHub.EnterHost(null, metrics, session);
 
         // The style document enters here, and the host owns it: a caller hands in a standalone document
         // (the appearance-authoring origin) or, when it hands in none, the manifest's own <Styles>
@@ -124,8 +132,7 @@ public sealed partial class UiHost : IDisposable
         styleResolver = new UiStyleResolver(theme, styleDocument);
         styleResolver.ApplyPageTo(theme);
 
-        engine = new UiLayoutEngine(source, styleResolver, manifest.Templates);
-        session = new UiSession();
+        engine = new UiLayoutEngine(source, styleResolver, manifest.Templates, layoutInputs);
         reactivePresentation = bindingOwner.CreateHostPresentation(source + "/" + session.Identity);
 
         // A document that went wrong must not go quiet, and the consumer must not have to remember to ask:
@@ -197,8 +204,25 @@ public sealed partial class UiHost : IDisposable
     /// <see cref="Close"/> and therefore by <see cref="Dispose"/> as well; the session that owns it
     /// releases it a second time, idempotently.
     /// </summary>
-    public UiDiagnosticSubscription Diagnostics =>
-        diagnostics ?? UiDiagnosticHub.Subscribe(this, UiDiagnosticHub.DefaultBudget);
+    public UiDiagnosticSubscription Diagnostics
+    {
+        get { NoteDiagnosticsBorrowed(); return diagnostics ?? UiDiagnosticHub.Subscribe(this, UiDiagnosticHub.DefaultBudget); }
+    }
+    private bool diagnosticsBorrowed, toolSubscribing;
+    internal void NoteDiagnosticsBorrowed() { if (!toolSubscribing) diagnosticsBorrowed = true; }
+    internal UiDiagnosticSubscription AcquireToolDiagnostics()
+    {
+        if (diagnostics?.IsActive != true) diagnosticsBorrowed = false;
+        toolSubscribing = true;
+        try { return UiDiagnosticHub.Subscribe(this, UiDiagnosticHub.DefaultBudget); }
+        finally { toolSubscribing = false; }
+    }
+    internal void ReleaseToolDiagnostics(UiDiagnosticSubscription subscription)
+    {
+        if (diagnosticsBorrowed || !ReferenceEquals(diagnostics, subscription)) return;
+        diagnostics = null;
+        subscription.Dispose();
+    }
 
     /// <summary>The subscription this host already holds, or null. The hub reads it to stay idempotent.</summary>
     internal UiDiagnosticSubscription? CurrentDiagnostics => diagnostics;
@@ -238,7 +262,7 @@ public sealed partial class UiHost : IDisposable
         UiDiagnosticSubscription? subscription = diagnostics;
         bool timing = subscription != null && subscription.TimingEnabled;
         long started = timing ? Stopwatch.GetTimestamp() : 0L;
-        UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription, metrics);
+        UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription, metrics, session);
         try
         {
             // The engine validates effective inputs per stage; presentation changes no longer bump
@@ -254,6 +278,8 @@ public sealed partial class UiHost : IDisposable
             PublishStyleIssues();
             lastLayoutRevision = theme.LayoutRevision;
             lastSuccessfulSnapshot = snapshot;
+            session.DiagnosticArrangedContentRevision = engine.ArrangedContentRevision;
+            session.DiagnosticArrangedDefinitionRevision = engine.ArrangedDefinitionRevision;
             return snapshot;
         }
         finally
@@ -276,12 +302,12 @@ public sealed partial class UiHost : IDisposable
         UiDiagnosticSubscription? subscription = diagnostics;
         bool timing = subscription != null && subscription.TimingEnabled;
         long started = timing ? Stopwatch.GetTimestamp() : 0L;
-        UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription, metrics);
+        UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription, metrics, session);
         try
         {
             // Popups are drawn after content and must clamp themselves into the frame's usable window
             // space; publish it here, the one place that knows both the viewport and the session.
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
             subscription?.Geometry?.BeginPass(session.Frame, session.Controls.DiagnosticEventName());
 #endif
             session.SetHostViewport(viewport);
@@ -327,6 +353,8 @@ public sealed partial class UiHost : IDisposable
         if (samples < window) return;
 
         subscription.PublishTiming(name, samples, total, max, name == "arrange" ? "work-total " + session.LayoutWork : "");
+        UiDomainDiagnostics.Publish(session.DiagnosticOutput, session, new UiDomainDiagnostic("timing", UiDiagnosticLevel.Normal,
+            "unknown", name, "observation-only", "none", timing: new UiDiagnosticTiming(name, samples, total, max)));
         samples = 0;
         total = 0d;
         max = 0d;
@@ -357,6 +385,7 @@ public sealed partial class UiHost : IDisposable
     public void DrawFrame(UiLayoutRect viewport, UiFrame frame, IUiExecution execution)
     {
         if (!DisplayRequired) return;
+        if (preparingPreview) throw new InvalidOperationException("Author preparation cannot recursively advance its Host.");
         session.SetFrame(frame, execution);
         BeginFrame();
         try
@@ -364,7 +393,17 @@ public sealed partial class UiHost : IDisposable
             // The engine consumes a pending scroll-target request at the end of its own arrange, by node
             // (task-18): resolution belongs where the entries and the nodes are, so the host does not
             // re-derive it from string-keyed snapshot views.
-            UiLayoutSnapshot snapshot = MeasureAndArrange(new UiLayoutPoint(viewport.Width, viewport.Height));
+            var available = new UiLayoutPoint(viewport.Width, viewport.Height);
+            if (!PreparePreview(available)) return;
+            UiLayoutSnapshot snapshot = MeasureAndArrange(available);
+            PumpTools();
+            if (!session.IsActive) return;
+            // A semantic operation may change structure. Pair drawing with the current arrangement.
+            if (toolOperationAttempted)
+            {
+                if (!PreparePreview(available)) return;
+                snapshot = MeasureAndArrange(available);
+            }
             Draw(viewport, snapshot);
         }
         catch (UiReactiveFault failure)
@@ -372,6 +411,7 @@ public sealed partial class UiHost : IDisposable
             // The layout engine restores the complete previous geometry transaction. It is not
             // current hit geometry: retain the session/drafts, but publish no partial input pass.
             LayoutFault = failure;
+            UiDomainDiagnostics.Reactive(session, null, "layout.fault", failure);
             session.AbortHitPass();
             try
             {
@@ -529,21 +569,41 @@ public sealed partial class UiHost : IDisposable
 
     public void Close()
     {
-        reactivePresentation?.Dispose();
+        previewPreparation = null;
+        costSampleProvider = null;
+        toolConnection?.Dispose();
+        toolConnection = null;
+        var failures = new List<Exception>();
+        void Cleanup(Action action)
+        {
+            try { action(); }
+            catch (Exception error) when (UiObservationBoundary.IsOrdinary(error))
+            {
+                failures.Add(error);
+                UiDomainDiagnostics.Publish(session.DiagnosticOutput, session, new UiDomainDiagnostic("host.cleanup-failed", UiDiagnosticLevel.Error,
+                    "unknown", error.GetType().Name, "host-closed-release-incomplete", "inspect-original-cleanup-failure"));
+            }
+        }
+        UiBindingPresentation? presentation = reactivePresentation;
+        reactivePresentation = null;
+        Cleanup(() => presentation?.Dispose());
         ForgetObservationHost(this);
         // A closed host must not stay referenced by a live document service, and the service's documents
         // must survive the host: the dependency is released, the last valid version is not.
         UiDocumentService? service = documentService;
         documentService = null;
-        service?.Detach(this);
+        Cleanup(() => service?.Detach(this));
 
         // The host's own diagnostic subscription goes with the host, before the session the hub keyed it
         // by is disposed: a torn-down window leaves no buffer, no registry entry and no ambient reference.
-        diagnostics?.Dispose();
+        UiDiagnosticSubscription? subscription = diagnostics;
         diagnostics = null;
+        Cleanup(() => subscription?.Dispose());
 
-        try { session.Dispose(); }
-        finally { engine.ReleaseLayoutCaches(); }
+        try { Cleanup(session.Dispose); }
+        finally { Cleanup(engine.ReleaseLayoutCaches); }
+        if (failures.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1) throw new AggregateException("Host closed; one or more owned resource releases failed.", failures);
     }
 
     public void Dispose()
@@ -559,6 +619,8 @@ public sealed partial class UiHost : IDisposable
     /// </summary>
     private void PublishStyleIssues()
     {
+        using UiDiagnosticHub.UiDiagnosticScope? scope = UiDomainDiagnostics.OwnsOutput(session.DiagnosticOutput)
+            ? UiDiagnosticHub.EnterHost(diagnostics, metrics, session) : null;
         IReadOnlyList<UiStyleIssue> parseIssues = styleResolver.Document.Issues;
         WarnIfStyleDocumentWasDropped(parseIssues);
         for (; publishedDocumentIssues < parseIssues.Count; publishedDocumentIssues++)
@@ -587,6 +649,10 @@ public sealed partial class UiHost : IDisposable
         if (!styleResolver.Document.IsEmpty) return;
 
         warnedDroppedStyleDocument = true;
+        // Parser issues are the original retained facts; do not format their free text for daily output.
+        UiDomainDiagnostics.Publish(session.DiagnosticOutput, session, new UiDomainDiagnostic("style.document-dropped", UiDiagnosticLevel.Warning,
+            source + "#styles", "document", "default-appearance", "correct-style-document"));
+        if (UiDomainDiagnostics.OwnsOutput(session.DiagnosticOutput) && StyleWarningOverride == null && session.Warning == null) return;
         string warning = "[FerriteLib.UiKit] the <Styles> section was dropped and none of its styles took "
             + "effect (source '" + source + "'): " + parseIssues[0];
 
@@ -654,9 +720,18 @@ public sealed partial class UiHost : IDisposable
     internal void PublishReloadReport(UiReloadReport? report)
     {
         UiDiagnosticSubscription? subscription = diagnostics;
-        if (subscription == null || !subscription.IsActive || report == null) return;
-        subscription.PublishReload(report);
+        if (report == null) return;
+        if (subscription?.IsActive == true) subscription.PublishReload(report);
+        string code = report.Accepted ? "reload.accepted" : report.Skipped ? "reload.skipped" : "reload.rejected";
+        UiDomainDiagnostics.Publish(session.DiagnosticOutput, session, new UiDomainDiagnostic(code,
+            report.Accepted || report.Skipped ? UiDiagnosticLevel.Normal : UiDiagnosticLevel.Warning,
+            report.Element, report.DocumentId, report.Accepted ? "definition-committed" : "last-good-definition-retained",
+            report.Accepted || report.Skipped ? "none" : "correct-document-before-reloading"));
     }
+
+    internal void PublishWindowFailure(Exception error, bool cleanup = false)
+        => UiDomainDiagnostics.Publish(session.DiagnosticOutput, session, new UiDomainDiagnostic(cleanup ? "window.detach-failed" : "window.failed", UiDiagnosticLevel.Error,
+            "unknown", error.GetType().Name, cleanup ? "window-closing-cleanup-failed" : "page-unavailable", "inspect-original-failure-before-reopening"));
 
     /// <summary>Replace an immutable XML/program definition through the existing prepare/stage/seal boundary.</summary>
     public void UpdateDefinition(UiLayoutManifest candidate)
@@ -761,6 +836,7 @@ public sealed partial class UiHost : IDisposable
 
         if (previous != null)
         {
+            PruneLayoutInputs(previous, manifest);
             PruneDetachedState(previous, manifest, cleanupFailures);
         }
 
@@ -903,7 +979,7 @@ public sealed partial class UiHost : IDisposable
         // A fresh engine has no cached arrangement, so the next ArrangeRoots measures the new tree. This is
         // the invalidation the reload needs and it is strictly local: no second revision counter is
         // introduced anywhere - the engine instance itself is the invalidated thing.
-        engine = new UiLayoutEngine(source, styleResolver, manifest.Templates);
+        engine = new UiLayoutEngine(source, styleResolver, manifest.Templates, layoutInputs);
 
         publishedDocumentIssues = 0;
         publishedResolutionIssues = 0;
@@ -1018,6 +1094,7 @@ public sealed partial class UiHost : IDisposable
 
     private void ResetDetachedState(UiNode node, List<(string Context, Exception Error)> failures)
     {
+        node.RenewMountLifetime();
         AttemptDocumentCleanup(() => Widgets.OptionHelp.Release(node), "definition committed; option output release failed at '" + node.Path + "'", failures);
         node.EditingState = null;
         node.ResetCustomState();

@@ -25,7 +25,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// attribute already carries; a reserved help slot is deliberately NOT part of either look.
 /// </para>
 /// </summary>
-internal sealed class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
+internal sealed partial class DropdownWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/dropdown";
     /// <summary>This kind's default look: the plain status-toned field, drawn exactly as before.</summary>

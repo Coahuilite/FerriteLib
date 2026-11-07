@@ -67,7 +67,7 @@ public static class UiTextFonts
     internal static void RecordPaint(UiWidgetContext ctx, UiTextPurpose purpose, UiTextFont font, UiColour? ink, string source)
     {
         ctx.Properties.TextPaints[purpose] = new UiTextPaintFact(font, ink, source);
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
         UiDiagnosticHub.ActiveSubscription?.Geometry?.NoteText(ctx.Node.Id.Key, purpose, font, ink, source);
 #endif
     }

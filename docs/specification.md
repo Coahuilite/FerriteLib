@@ -2,7 +2,7 @@
 
 本入口及下列能力／连接／适配／policy 正文是 **0.8.x 当前产品规格**。它面向通用 UI 作者，不只设置页。
 采用现成包装、选择能力组合、独立 native、headless 和 visual-only 均是正常路线。
-当前载荷以 RimWorld 1.6 adapter 为基础；1.7 共用 GUI 路线已有基础兼容候选，原生渲染与主要交互仍待用户验收，完整 1.7 adapter 与新增后端未交付。候选范围见[构建／诊断说明](build-and-debug.md#basic-17-compatibility-candidate)。
+普通载荷以 RimWorld 1.6 adapter 为基础，保持维护。已选的[脱机工作台维护扩展](development/0.8/offline-workbench.md)使用0.8核心、显式neutral／1.7构建；不要求普通玩家安装Tools或Dev。新原生开发跟随1.7当前接口、不锁小构建号；原1.7共用GUI候选、独立参考绘制与游戏实机仍分层，完整舞台接入尚待实现。旧候选范围见[构建／诊断说明](build-and-debug.md#basic-17-compatibility-candidate)。
 
 规格表达应有保证；源码是否全部满足、已知偏差及证据身份在[开发映射](openspec/implementation.md)。
 [Trace／legacy-fit 两项新保证](openspec/specs/contracts/observation-boundary/spec.md)于2026-10-29获准采用，
@@ -33,6 +33,7 @@ Structure／Layout／Semantics／Appearance 是四项平行职责，不是新建
 | 逐属性继承／撤销、活视图、颜色／文字／图像／背景 | [外观](openspec/specs/core/appearance/spec.md) |
 | hide／retarget／remove／Close、保留故障展示、逐项释放 | [寿命与恢复](openspec/specs/core/lifetime-recovery/spec.md) |
 | bounded diagnostics、R9 facts／budgets、fit | [观察能力](openspec/specs/core/observation/spec.md) |
+| 可选Tools、agent语义、同源headless、文档／prepare／cost与虚拟视口接缝 | [开发工具连接](openspec/specs/contracts/developer-tools/spec.md) |
 | reader/owner → 一致展示 → 当前执行 | [展示执行连接](openspec/specs/contracts/presentation-execution/spec.md) |
 | definition/style producer → prepare/stage/seal → 所有 Host | [更新连接](openspec/specs/contracts/definition-update/spec.md) |
 | opaque topic／Session grace／owned endpoint → 消费者帮助 | [帮助连接](openspec/specs/contracts/help-output/spec.md) |

@@ -1,6 +1,7 @@
 param(
     [string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot),
-    [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][string]$Version
+    [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][string]$Version,
+    [string]$StageDir = 'dist/steam/FerriteLib'
 )
 
 Set-StrictMode -Version Latest
@@ -17,48 +18,12 @@ $ErrorActionPreference = "Stop"
 $root = [System.IO.Path]::GetFullPath($ProjectRoot)
 $projectFile = Join-Path $root 'Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj'
 $payloadDll = Join-Path $root 'dist\build\Release\FerriteLib.UiKit.dll'
-$stageDir = Join-Path $root 'dist\steam\FerriteLib'
+$stageDir = [IO.Path]::GetFullPath($StageDir, $root)
 
-# Same tag grammar as the GitHub channel, deliberately: a Workshop item and a release page carrying
-# different version shapes of one library is how a "which one do I install" question gets asked.
-$tagPattern = '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc([1-9]\d*))?$'
-if ($Version -notmatch $tagPattern) {
-    throw "Version must be vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-rcN (N >= 1): $Version"
-}
-$baseVersion = "$($Matches[1]).$($Matches[2]).$($Matches[3])"
-
-# The build axis must name the same version this folder claims. Read from the csproj rather than
-# About.xml, because a Release build is what carries the number into the DLL's version resource.
-$prefixMatch = Select-String -LiteralPath $projectFile -Pattern '<VersionPrefix>(.*?)</VersionPrefix>'
-if (-not $prefixMatch) { throw 'csproj carries no <VersionPrefix>; the build axis has no home.' }
-$buildAxis = $prefixMatch.Matches[0].Groups[1].Value.Trim()
-if ($buildAxis -ne $baseVersion) {
-    throw "v$baseVersion does not match the build axis <VersionPrefix>$buildAxis. Bump the axes and rebuild, or retag; do not rename the artifact."
-}
-
-# Clean tree, with no escape hatch: Steam is the last step of a release, and an item built from
-# uncommitted work carries a commit nobody can check out. Rehearsing a build is pack-dev's job, and it
-# writes a different folder.
-$commit = (& git -C $root rev-parse HEAD).Trim()
-if ($LASTEXITCODE -ne 0 -or -not $commit) { throw 'Cannot resolve the current commit; refusing to publish an unattributable item.' }
-
-$status = @(& git -C $root status --porcelain)
-if ($LASTEXITCODE -ne 0) { throw 'git status failed; cannot prove the tree is clean.' }
-if ($status.Count -gt 0) {
-    throw ("Working tree is dirty ({0} path(s)); commit before staging for Steam." -f $status.Count)
-}
-
-# The payload has to be the commit being uploaded, built without the dev suffix. The base-version and
-# dev-suffix halves live in the staging engine; this one is about provenance rather than identity, so
-# it stays here.
-if (-not (Test-Path -LiteralPath $payloadDll -PathType Leaf)) {
-    throw "No payload at $payloadDll. Build it first: dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release -p:VersionSuffix="
-}
-
-$informational = ([System.Diagnostics.FileVersionInfo]::GetVersionInfo($payloadDll)).ProductVersion
-if ($informational -notlike "*$commit*") {
-    throw "Payload was built from a different commit than HEAD: its version resource says '$informational', HEAD is $commit. Rebuild after committing."
-}
+Import-Module (Join-Path $PSScriptRoot 'Release.Identity.psm1')
+$releaseVersion = Get-FerriteReleaseVersion -Version $Version
+Assert-FerriteReleaseAxis -ProjectFile $projectFile -BaseVersion $releaseVersion.Base
+$commit = Get-FerriteReleaseCommit -Root $root -PayloadDll $payloadDll -Channel steam
 
 $stageArgs = @{
     ProjectRoot            = $root

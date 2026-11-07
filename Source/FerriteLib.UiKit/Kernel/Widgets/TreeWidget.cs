@@ -38,7 +38,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <see cref="UiTreeRow.Expanded"/>: both are the model's answers, re-read every pass.
 /// </para>
 /// </summary>
-internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
+internal sealed partial class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
 {
     internal const string Kind = "container/tree";
 

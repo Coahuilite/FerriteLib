@@ -3,6 +3,65 @@ using System;
 namespace FerriteLib.UiKit.Kernel;
 public sealed partial class UiControls
 {
+    /// <summary>Runs a custom field's semantic draft/completion on its original editor and Session owner.</summary>
+    /// <remarks>
+    /// Public-unstable. Use the same binding, formatter, parser, native Live policy and typed callbacks as Edit.
+    /// SetDraft is always local, including when live is true; only explicit CommitEdit submits it.
+    /// This synchronous owner-thread entry needs no Tools connection. Host dispatch still owns visibility,
+    /// target lifetime and current command qualification. False means the intent was not handled, not saved.
+    /// </remarks>
+    public bool EditSemantic<T>(UiWidgetContext ctx, string binding, UiToolOperation operation, string? text,
+        Func<T, string> format, UiEditParser<T> parse, bool live, Action<T> request, Func<T> readModel)
+    {
+        RequireOwner(ctx);
+        if (operation != UiToolOperation.SetDraft && operation != UiToolOperation.CommitEdit && operation != UiToolOperation.CancelEdit) return false;
+        if (operation == UiToolOperation.SetDraft && text == null) return false;
+        if (Input.Composing || IsInputDisabled(ctx.Node) || !ctx.Session.PointerInputAllowed || !ctx.Session.IsInputGeometryReliable
+            || ctx.Session.OpenPopupId != null || ctx.Session.Interactions.CaptureOwner.HasValue) return false;
+        for (UiNode? owner = ctx.Node; owner != null; owner = owner.Parent)
+            if (owner.Kind.Length > 0 && !owner.IsArranged) return false;
+        if (ctx.Session.ActiveEditNode != null && !ReferenceEquals(ctx.Session.ActiveEditNode, ctx.Node)) return false;
+        UiControlState state = ctx.Session.GetControlState(ctx.Node.Id, binding);
+        if (operation != UiToolOperation.SetDraft && state.Editor is not UiEditSession<T>) return false;
+        if (operation != UiToolOperation.CancelEdit && !ctx.Bindings.IsWritable(binding)) return false;
+        UiEditSession<T> editor = Editor(ctx, binding, format, parse);
+        state.CommitRequested = state.DiscardRequested = false;
+        try
+        {
+            editor.Observe(readModel());
+            if (operation == UiToolOperation.SetDraft)
+            {
+                editor.Focus();
+                // Setting a draft is deliberately local; only the explicit completion submits it.
+                editor.Input(text!, true, false, false, request, readModel);
+                editor.HoldSemanticDraft();
+                return true;
+            }
+            if (operation == UiToolOperation.CancelEdit) editor.Cancel(readModel());
+            else
+            {
+                if (!editor.Valid) return false;
+                var target = InteractionTarget(ctx, binding, "editor");
+                editor.Confirm(true, candidate => UiInteractionRequests.Activation(target,
+                    ctx.Session.Interactions.Activate(target, new UiInputEligibility(true, ctx.Bindings.IsWritable(binding))), () => request(candidate)), readModel);
+            }
+            return true;
+        }
+        finally
+        {
+            // Match the native editor exit even when a parser/request/readback throws or closes the Host.
+            try { if (!editor.Focused) ReleaseEditFocus(state, ctx.Session); }
+            finally
+            {
+                if (ctx.Session.IsActive)
+                {
+                    if (editor.Focused) ctx.Session.NoteEditOpened(state, ctx.Node);
+                    else ctx.Session.NoteEditClosed(state);
+                    ctx.Node.MarkDirty();
+                }
+            }
+        }
+    }
     private bool ContentCoversEditor(UiLayoutRect rect, UiSession session, UiNode node, UiLayoutPoint windowPoint) => (session.PassBeganWithPrimaryPress || PointerPhase() != UiPointerPhase.None) && IsMouseOver(rect) && session.IsPointerOverHigherLayer(node, windowPoint);
     public UiEditSession<T> Editor<T>(UiWidgetContext ctx, string binding, Func<T, string> format, UiEditParser<T> parse)
     {
@@ -148,7 +207,7 @@ public sealed partial class UiControls
             UiColour? actualColour = Execution is IUiTextFontEditing ? colour : null;
             if (textRun.Requested.Size.HasValue || colour.HasValue) UiFitAudit.CheckText(rect, native.Text, textRun, actualColour, !multiline);
             node.Properties.TextPaints[UiTextPurpose.Editor] = new UiTextPaintFact(font, actualColour, "native-editor");
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
             UiDiagnosticHub.ActiveSubscription?.Geometry?.NoteText(node.Id.Key, UiTextPurpose.Editor, font, actualColour, "native-editor");
 #endif
             string typed = native.Text;

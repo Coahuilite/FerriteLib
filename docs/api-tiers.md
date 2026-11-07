@@ -183,6 +183,39 @@ The type census and stable set are pinned in `FerriteLibApiTierTests`. Its depen
 
 ## Public-unstable
 
+- `UiToolSelection` — selected original draw-walk geometry/clip/status; no per-frame capture.
+
+- `UiPreviewContext` — optional immutable author registration root/watch/startup-language inputs; no Tools dependency.
+
+- `UiOfflineWorkbench` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiPreviewKind` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiPreviewRegistration` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiPreviewInstance` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiLayoutInput` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiToolAccess` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiToolOperation` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiToolRequestStatus` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiSemanticAction` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `IUiSemanticWidget` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiToolValue` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiToolTarget` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiToolSnapshot` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiToolRequestResult` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiToolDiagnostics` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiToolConnection` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiCostSampleState` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiCostSampleRequest` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `IUiCostSampleProvider` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiCostMetric` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiCostSampleSnapshot` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiDocumentSnapshot` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+- `UiDocumentLocation` — opt-in public-unstable maintenance extension; see [offline workbench](development/0.8/offline-workbench.md).
+
+
+- `VerseUiDiagnosticLog` — optional adapter-owned native output; creation-first and existing-Host adoption,
+  standalone callbacks and lifecycle are in [domain diagnostics](development/0.8/ui-diagnostics.md).
+- `UiDiagnosticLogOptions` — output detail policy only; never enables fit/timing/geometry or changes old callers.
+
 - `UiTextFont` — resource alias plus optional logical GUI size, validated in1..96.
 - `UiTextPurpose` — label/editor capability and fallback discriminator.
 - `IUiTextFontMetrics` — optional numeric measurement and truthful environment capability.
@@ -228,6 +261,12 @@ field keeps its unknown semantics. No new type is promoted to Stable by this imp
 None. The former registrar, layout engine and default implementation classes are internal. Use `UiWidgetRegistry.InitializeCore`, `UiKinds`/XML and public shared behaviors rather than instantiating a default widget type. Custom widgets implement `IUiWidget`; they do not inherit a default renderer.
 
 ## Advanced members on otherwise stable types
+
+- `UiHost.ConnectTools`, `.ConnectLiveTools`, `.AdvanceHeadless`, `.SetLayoutInput`, `.CompleteEdit`,
+  `.EndElementLifetime`, `.SetCostSampleProvider` and `UiControls.EditSemantic` are opt-in
+  public-unstable workbench/author seams. Old Host/native/R9/diagnostic use needs no Tools connection.
+- `UiDocumentService.StatusRevision`, `UiDocumentService.AddProjectedLayout`, `.GetSnapshot` and `.Snapshots` are public-unstable author
+  projection/source outlets. The original `Add`/`Attach`/reload contracts remain stable.
 
 - `UiWidgetContext.Session`, `.Node`, `.WithNode` and constructors taking a Session/Node remain advanced adapter construction seams. Ordinary custom widgets receive a context; use ElementId/ElementPath, Child, State, Properties, InteractionScope, Invalidate, SharedLabelWidth and IsActive/IsDisabled instead.
 - `UiHost.Session` and `UiWindowHost.Session` remain advanced legacy adapter access. Stable surrounding windows use InputState, ElementProperties, Get/SetScrollPosition, SetInteractionScope, Invalidate, DrawFrame, Accept/Cancel and Close/Dispose.

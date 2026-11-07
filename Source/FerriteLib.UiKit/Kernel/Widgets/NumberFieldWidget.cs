@@ -5,7 +5,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Native numeric text editing over the common draft/model observation and finite numeric codec.
 /// Invalid or conflicting drafts remain local; accepted requests are not assumed business acceptance.
 /// </summary>
-internal sealed class NumberFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
+internal sealed partial class NumberFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/number-field";
 

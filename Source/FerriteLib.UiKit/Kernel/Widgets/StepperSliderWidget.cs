@@ -7,7 +7,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// and writes through the typed <see cref = "IUiBindingAccess"/>; no neutral command bridge.
 /// The typed value-binding key is the <c>Bind</c> attribute when present, otherwise the element Id.
 /// </summary>
-internal sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiLayoutDiagnosticSource, IUiPointerLayout, IUiRetainedDisplay
+internal sealed partial class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiLayoutDiagnosticSource, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/stepper-slider";
 

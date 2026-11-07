@@ -119,6 +119,8 @@ internal sealed partial class UiLayoutEngine
     private UiLayoutSnapshot? cachedSnapshot;
     private UiLayoutPoint cachedAvailable;
     private int cachedContentRevision = -1;
+    internal int ArrangedContentRevision => cachedContentRevision;
+    internal int ArrangedDefinitionRevision => cachedDefinitionRevision;
     private int cachedDefinitionRevision;
     private int cachedTranslationRevision = int.MinValue;
     private PageTable<PlacedEntry> lastEntries = new PageTable<PlacedEntry>(Array.Empty<PlacedEntry>());
@@ -154,9 +156,11 @@ internal sealed partial class UiLayoutEngine
     public UiLayoutEngine(
         string scope,
         UiStyleResolver? styleResolver = null,
-        IReadOnlyDictionary<string, UiElementSpec>? templates = null)
+        IReadOnlyDictionary<string, UiElementSpec>? templates = null,
+        IReadOnlyDictionary<string, UiLayoutInput>? dynamicLayoutInputs = null)
     {
         this.scope = scope ?? throw new ArgumentNullException(nameof(scope));
+        this.dynamicLayoutInputs = dynamicLayoutInputs ?? new Dictionary<string, UiLayoutInput>();
         this.styleResolver = styleResolver;
         this.templates = templates ?? new Dictionary<string, UiElementSpec>(StringComparer.Ordinal);
         if (this.templates.Count > 0)
@@ -531,6 +535,7 @@ internal sealed partial class UiLayoutEngine
         catch (UiReactiveFault failure)
         {
             if (ctx.Node != null) ctx.Node.QualificationFault = failure;
+            UiDomainDiagnostics.Reactive(ctx.Session, ctx.Node, "qualification.fault", failure);
             return true;
         }
     }
@@ -543,6 +548,7 @@ internal sealed partial class UiLayoutEngine
         // One hit pass per draw: the previous pass's complete paint order becomes the stack input dispatch
         // reads, and this pass builds the next one as its elements draw.
         ctx.Session.BeginHitPass();
+        ctx.Session.BeginToolSelectionPass();
 
         // The wheel belongs to the open menu before it belongs to anything under it: a layer covering the point
         // outranks what is beneath it. Asking here - after the pass opened, so the layers are the ones
@@ -599,6 +605,7 @@ internal sealed partial class UiLayoutEngine
                         regions.Clear();
                         entry.Node.PresentationFault = failure;
                         entry.Node.PresentationUnavailable = true;
+                        UiDomainDiagnostics.Reactive(ctx.Session, entry.Node, "presentation.fault", failure);
                     }
                     finally
                     {
@@ -699,7 +706,7 @@ internal sealed partial class UiLayoutEngine
                     isPopup: false);
             }
 
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
             // The development-only numeric instrument reads the geometry from this one point per entry:
             // the arranged rect and the draw rect disagree exactly when a scroll/group origin is involved,
             // which is the disagreement a reader must be able to see rather than infer. Identity, appearance
@@ -741,7 +748,7 @@ internal sealed partial class UiLayoutEngine
                     nativeOrigin,
                     windowOrigin,rootContext);
                 if (!ctx.Session.IsActive) return;
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
                 // DT1: the viewport's OWN band is outlined here, after its content has drawn and in this
                 // scope's own draw-local space - the same rect, the same entry, the same `sampled` answer
                 // Note() gave above. The nested walk below never had a step at this entry, which is how
@@ -749,6 +756,7 @@ internal sealed partial class UiLayoutEngine
                 // this entry too, and no second collector exists to disagree with the capture.
                 UiDevGeometryProbe.Outline(ctx.Drawing, drawRect, sampled);
 #endif
+                OutlineSelected(entry, entryCtx, drawRect);
                 index += entry.SubtreeCount;
             }
             else
@@ -812,7 +820,7 @@ internal sealed partial class UiLayoutEngine
                     UiFitAudit.EndElement();
                 }
 
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
                 // The optional outline is painted LAST for this entry, after the fit audit closed and after
                 // the element drew, in the element's own draw-local space: an outline that could feed back
                 // into the thing it measures would be the instrument changing the measurement. It paints only
@@ -820,6 +828,7 @@ internal sealed partial class UiLayoutEngine
                 // and with capture off (SA1.5) it paints this same walk and stores nothing.
                 UiDevGeometryProbe.Outline(ctx.Drawing, drawRect, sampled);
 #endif
+                OutlineSelected(entry, entryCtx, drawRect);
 
                 index++;
             }
@@ -1037,7 +1046,7 @@ internal sealed partial class UiLayoutEngine
         // content resolved to (the declaring element contributed nothing to it); everywhere else - a vertical
         // flow, a Wrap line, a template the Host does not walk - the mode degrades to the element's own measured
         // content, exactly as Auto does, so a programmatic spec cannot take a frame down.
-        bool matchContent = UiPlacement.IsMatchContentHeight(spec);
+        bool matchContent = DynamicInput(spec)?.Height.HasValue != true && UiPlacement.IsMatchContentHeight(spec);
         float? reference = contentHeightReference >= 0f ? contentHeightReference : null;
         if (matchContent && !reference.HasValue)
             ReportLayout(node, "ContentHeightUnavailable", "The retained raw/template entry uses natural height because this parent supplies no independent content-height reference.");
@@ -1265,8 +1274,9 @@ internal sealed partial class UiLayoutEngine
         return visible;
     }
 
-    private static bool IsNarrow(UiElementSpec spec, float innerWidth)
+    private bool IsNarrow(UiElementSpec spec, float innerWidth)
     {
+        if (DynamicInput(spec)?.Narrow is bool narrow) return narrow;
         if (!spec.TryGetAttribute("Breakpoint", out string raw))
         {
             return false;
@@ -1312,8 +1322,8 @@ internal sealed partial class UiLayoutEngine
         return declaredKind;
     }
 
-    private static UiLayoutFrame LayoutFrame(UiElementSpec spec, float width, float availableHeight, Padding padding, float title, float gap) => new(width, availableHeight, padding.Left, padding.Top, padding.Right, padding.Bottom, title, gap, ReadLayoutHeight(spec));
-    private static UiLayoutChild LayoutChild(UiElementSpec spec, float width) => new(width, IsFlexibleFill(spec), UiPlacement.ParseAlign(spec, UiPlacement.AlignXAttribute, UiPlacement.Axis.Horizontal).Fraction, UiPlacement.ParseAlign(spec, UiPlacement.AlignYAttribute, UiPlacement.Axis.Vertical).Fraction, UiPlacement.ParseOffsetValue(spec, UiPlacement.OffsetXAttribute), UiPlacement.ParseOffsetValue(spec, UiPlacement.OffsetYAttribute), UiPlacement.IsMatchContentHeight(spec));
+    private UiLayoutFrame LayoutFrame(UiElementSpec spec, float width, float availableHeight, Padding padding, float title, float gap) => new(width, availableHeight, padding.Left, padding.Top, padding.Right, padding.Bottom, title, gap, ReadLayoutHeight(spec));
+    private UiLayoutChild LayoutChild(UiElementSpec spec, float width) => new(width, IsFlexibleFill(spec), UiPlacement.ParseAlign(spec, UiPlacement.AlignXAttribute, UiPlacement.Axis.Horizontal).Fraction, UiPlacement.ParseAlign(spec, UiPlacement.AlignYAttribute, UiPlacement.Axis.Vertical).Fraction, UiPlacement.ParseOffsetValue(spec, UiPlacement.OffsetXAttribute), UiPlacement.ParseOffsetValue(spec, UiPlacement.OffsetYAttribute), DynamicInput(spec)?.Height.HasValue != true && UiPlacement.IsMatchContentHeight(spec));
     private void ReportLayout(UiNode node, string code, string message)
     {
         const int limit = 128;
@@ -1623,9 +1633,10 @@ internal sealed partial class UiLayoutEngine
     /// against <c>Width</c>. Absent, blank or malformed answers "not declared" so a programmatically
     /// built spec can never crash a frame.
     /// </summary>
-    private static bool TryViewportRows(UiElementSpec spec, out float rows)
+    private bool TryViewportRows(UiElementSpec spec, out float rows)
     {
         rows = 0f;
+        if (DynamicInput(spec)?.Height.HasValue == true) return false;
         if (!spec.TryGetAttribute("VisibleRows", out string raw)) return false;
         string value = (raw ?? "").Trim();
         if (value.Length == 0) return false;
@@ -2256,12 +2267,11 @@ internal sealed partial class UiLayoutEngine
         foreach (string attribute in labels)
         {
             if (!spec.TryGetAttribute(attribute, out string value)) continue;
-            value = value.Trim();
+            bool translationKey = IsTranslationKeyAttribute(attribute);
+            if (translationKey) value = value.Trim();
             if (value.Length == 0) continue;
 
-            string text = IsTranslationKeyAttribute(attribute)
-                ? ctx.Translation.Translate(value)
-                : value;
+            string text = translationKey ? ctx.Translation.Translate(value) : value;
             widest = Math.Max(widest, UiTextFonts.For(ctx, ctx.Theme.DefaultFont).MeasureWidth(text));
         }
 
@@ -2401,20 +2411,23 @@ internal sealed partial class UiLayoutEngine
             float height = Math.Max(0f, UiSessionGuard.MeasureOrFallback(ctx, node.Path, widget.Kind, node.Path, RecoveryBandHeight, () => MeasureWidgetWithReuse(spec, widget, ctx, node)));
             node.PresentationFault = display?.Fault;
             node.PresentationUnavailable = false;
+            UiDomainDiagnostics.Reactive(ctx.Session, node, "presentation.fault", node.PresentationFault);
             return height;
         }
         catch (UiReactiveFault failure)
         {
             node.PresentationFault = failure; node.PresentationUnavailable = true;
+            UiDomainDiagnostics.Reactive(ctx.Session, node, "presentation.fault", failure);
             UiMeasurement? retained = (widget as IUiRetainedDisplay)?.MeasureLast(ctx);
             if (retained != null) return retained.Calculate();
             return RecoveryBandHeight; // a complete, unavailable placeholder, never a failed measurement result
         }
     }
 
-    private static float ResolveContainerHeight(UiElementSpec spec, float naturalHeight, float availableHeight) => ReadLayoutHeight(spec).Resolve(naturalHeight, availableHeight);
-    private static UiLayoutHeight ReadLayoutHeight(UiElementSpec spec)
+    private float ResolveContainerHeight(UiElementSpec spec, float naturalHeight, float availableHeight) => ReadLayoutHeight(spec).Resolve(naturalHeight, availableHeight);
+    private UiLayoutHeight ReadLayoutHeight(UiElementSpec spec)
     {
+        if (DynamicInput(spec)?.Height is float dynamicHeight) return new UiLayoutHeight(dynamicHeight, false);
         if (spec.TryGetAttribute("Height", out string raw) && raw.Trim().Length > 0 && !string.Equals(raw.Trim(), "Auto", StringComparison.OrdinalIgnoreCase) && !UiPlacement.IsMatchContentHeight(spec))
         {
             if (spec.TryGetNumber("Height", out float fixedHeight))
@@ -2436,8 +2449,9 @@ internal sealed partial class UiLayoutEngine
     /// declares Fill="true" and has no explicit fixed Height. Such children share the stack's
     /// remaining inner height instead of contributing to the natural flow.
     /// </summary>
-    private static bool IsFlexibleFill(UiElementSpec spec)
+    private bool IsFlexibleFill(UiElementSpec spec)
     {
+        if (DynamicInput(spec)?.Height.HasValue == true) return false;
         if (GetContainerKind(spec).Length == 0 || !IsFill(spec)) return false;
         if (spec.TryGetAttribute("Height", out string raw))
         {

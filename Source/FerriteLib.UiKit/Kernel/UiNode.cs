@@ -15,7 +15,7 @@ namespace FerriteLib.UiKit.Kernel;
 /// engine's flat entry table is still what draws; the node is what everything else keys on.
 /// </para>
 /// </summary>
-public sealed class UiNode
+public sealed partial class UiNode
 {
     private readonly UiSession session;
     internal UiSession Owner => session;
@@ -51,6 +51,7 @@ public sealed class UiNode
     }
     internal void ReleaseState(bool throwOutputFailure = false)
     {
+        ClearToolItems();
         if(released)return;released=true;
         List<Exception>? errors = throwOutputFailure ? new List<Exception>() : null;
         try { Widgets.OptionHelp.Release(this); }
@@ -74,6 +75,7 @@ public sealed class UiNode
     internal UiNode(UiSession session, UiNodeId id, string kind, int ordinal, bool needsMeasure = true, string elementId = "")
     {
         this.session = session ?? throw new ArgumentNullException(nameof(session));
+        MountLifetime = session.AllocateMountLifetime();
         Id = id;
         Kind = kind ?? "";
         Ordinal = ordinal;
@@ -89,6 +91,9 @@ public sealed class UiNode
 
     /// <summary>This element's stable identity.</summary>
     public UiNodeId Id { get; }
+    /// <summary>Session-local incarnation. Removal or incompatible replacement never revives old addresses.</summary>
+    public long MountLifetime { get; private set; }
+    internal void RenewMountLifetime() { ClearToolItems(); MountLifetime = session.AllocateMountLifetime(); }
 
     /// <summary>The display path of <see cref="Id"/>, for diagnostics.</summary>
     public string Path => Id.Path;

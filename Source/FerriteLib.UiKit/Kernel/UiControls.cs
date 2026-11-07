@@ -124,7 +124,7 @@ public sealed partial class UiControls
     public bool IsMouseUpOver(UiLayoutRect rect) => IsPointerUp() && IsMouseOver(rect);
     public bool IsMouseOver(UiLayoutRect rect) => Input.Phase!=UiFramePhase.None && Input.InputAllowed && rect.Contains(PointerPosition());
     internal bool IsWindowMouseOver(UiLayoutRect rect) => Input.Phase!=UiFramePhase.None && Input.InputAllowed && rect.Contains(Input.Pointer);
-    public bool IsMouseOver(UiLayoutRect rect, UiWidgetContext ctx) => !session.IsPointerOverHigherLayer(ctx.Node, WindowPointer(ctx)) && IsMouseOver(rect);
+    public bool IsMouseOver(UiLayoutRect rect, UiWidgetContext ctx) => session.IsPointInEffectiveClip(WindowPointer(ctx)) && !session.IsPointerOverHigherLayer(ctx.Node, WindowPointer(ctx)) && IsMouseOver(rect);
     public bool IsEnterPressed() => Input.Phase == UiFramePhase.KeyDown && (Input.Key == UiKey.Return || Input.Key == UiKey.KeypadEnter);
     public bool IsLayoutEvent() => Input.Phase == UiFramePhase.Layout;
     internal bool IsFocusLost(UiLayoutRect rect, UiSession owner) => owner.PassBeganWithPrimaryPress && !IsMouseOver(rect);

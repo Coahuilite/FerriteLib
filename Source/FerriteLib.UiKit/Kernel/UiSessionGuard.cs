@@ -43,12 +43,14 @@ public static class UiSessionGuard
             ctx.Session.Execution.WithState(() => widget.Draw(rect, ctx));
             node.PresentationFault = display?.Fault;
             node.PresentationUnavailable = false;
+            UiDomainDiagnostics.Reactive(ctx.Session, node, "presentation.fault", node.PresentationFault);
             if (node.ReactiveFault != null)
                 UiThemeDraw.FailureMarker(ctx.Drawing,rect, ctx.Theme, node.ReactiveFault.Identity);
         }
         catch (UiReactiveFault failure)
         {
             node.PresentationFault = failure; node.PresentationUnavailable = true;
+            UiDomainDiagnostics.Reactive(ctx.Session, node, "presentation.fault", failure);
             node.Selection = null;
             ctx.Session.SuspendFailedInput(node);
             if (widget is IUiRetainedDisplay last && last.PaintLast(rect, ctx))
@@ -116,6 +118,7 @@ public static class UiSessionGuard
         {
             ctx.Node.PresentationFault = failure;
             ctx.Node.PresentationUnavailable = true;
+            UiDomainDiagnostics.Reactive(session, ctx.Node, "presentation.fault", failure);
             fallback?.Invoke(rect);
         }
         catch (UiRequestFailure failure)
@@ -183,6 +186,8 @@ public static class UiSessionGuard
             try { UiDiagnosticHub.PublishRecovery(session, key, kind, elementPath, diagnostic); }
             catch (Exception reporting) when (UiObservationBoundary.IsOrdinary(reporting))
             { session.ReportObservationFailure("recovery diagnostic publication failed", reporting); }
+            UiDomainDiagnostics.Publish(session.DiagnosticOutput, session, new UiDomainDiagnostic("recovery.trip", UiDiagnosticLevel.Warning,
+                key.Id.Key, kind + "/" + ex.GetType().Name, "recovery-display-input-suspended", "inspect-original-fault-before-reopening"));
         }
     }
 

@@ -1,11 +1,19 @@
 # TODO
 
+These are product work and acceptance items, not authorization to start them. Select work only under the
+current task and applicable permissions; preserve the separate 1.6/native and 1.7 evidence boundaries.
+
 ## 0.8 RC follow-up
 
-- [ ] Receive the appearance-freedom source checkpoint, then commit and build a clean fixed input for
-      paired consumer adoption. Numeric label/editor1.6 and label1.7 native acceptance remain open;
-      editor1.7 uses reported preset fallback. Author routes and evidence limits:
-      `docs/openspec/implementation.md#appearance-freedom`.
+- [ ] Preserve the delivered Legacy08 workbench while connecting the approved virtual stage through only
+      genuinely missing neutral seams; keep accurate 1.6/native acceptance separate. Current contract:
+      `docs/openspec/specs/contracts/developer-tools/spec.md`. Native development follows current 1.7 APIs.
+
+- [ ] Paired consumer adoption of the 2026-11-05 measurement/hover/domain diagnostic candidate was locally
+      accepted; carry its remaining native acceptance with the selected fixed producer, not moving build outputs. Current contract
+      and limits: `docs/development/0.8/ui-diagnostics.md`. The preceding appearance checkpoint is an
+      accepted input; numeric label/editor1.6 and label1.7 native acceptance remain open, and editor1.7
+      uses reported preset fallback.
 
 The accepted US ea610fa/FL833c14f4 internal trial permits RC preparation. FL v0.8.0-rc2 is not yet
 published; rc1 remains the published non-latest asset. Release/upgrade notes and the explicit local

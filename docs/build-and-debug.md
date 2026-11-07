@@ -22,6 +22,18 @@ The second command builds Dev and stages `dist/dev/FerriteLib`. Its installable 
 Staging records `payload-sha256` in `version.txt` and verifies the copied DLL before replacing the previous package.
 Do not build and pack the same configuration concurrently.
 
+The Dev, GitHub and Steam packers share `scripts/Release.Identity.psm1` for the build axis;
+GitHub/Steam and the release workflow also share the `vBASE` / `vBASE-rcN` tag grammar.
+The two publication packers use the same source-commit checks. Only GitHub's explicit
+`-AllowDirtyTree` local rehearsal can omit clean-tree/source-commit attribution; it still requires
+a Release-configured payload without the dev suffix. Steam has no dirty-tree exception and never
+archives. Shared `stage-package.ps1` retains the content, licence and measured-configuration rules.
+
+To stage beside a held package, supply a new `-StageDir 'dist/<fresh-attempt>/FerriteLib'` to any
+packer; omitted, the original channel paths are unchanged. This retained stager requires metadata
+that loads its `1.6` carrier root; it cannot label a different target's bytes as a 1.6 package.
+The scripts and CI retain their pwsh/.NET prerequisites, with no Node dependency.
+
 The conditional RC route recorded on 2026-10-09 uses integrated main and the existing release workflow;
 the earlier backup-only phase is historical. No documentation edit authorizes publication or refreshes a
 held payload. For a bounded local rehearsal, select its named candidate rather than rebuilding by habit.
@@ -41,6 +53,24 @@ also printed; it does not assert that the artifact represents current HEAD or a 
 intended revision first. Publication packers and downstream release verification retain their stricter checks.
 Consumers compiling against a staged Dev DLL must install that same FL package;
 they must not ship another copy of the library in their own package.
+For the current1.6 step-Dev handoff, use the [instrument guide](development/0.8/dev-step.md):
+switch the complete consumer/FL Dev pair, keep cost sampling separate from geometry, and select one
+live Host/session for capture, independent outline and explicit reports. A Release carrier cannot be
+renamed into this capability.
+
+## Check the affected contract
+
+For a change to the platform-neutral Kernel, this existing entry compiles and exercises the production
+sources without a game or a carrier:
+
+```powershell
+dotnet run --project tools/FerriteLib.UiKit.Core.ContractTests -c Release
+```
+
+It covers neutral behavior, layout, failure/lifetime and dependency boundaries, not native input or drawing.
+Exercise affected adapter, Dev/Release, consumer or package paths separately; keep the complete
+`verify-local.ps1` entry for its CI and release purpose. A documentation-only edit does not by itself
+invalidate unchanged code evidence.
 
 ## One owner for restore, then build and execute
 

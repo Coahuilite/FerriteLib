@@ -5,6 +5,35 @@
 cf1cf6456096171fb47c012369bcd0c2f29e968f。FL-F01/F02/F03 已在该 HEAD 的 dirty 工作树修复；
 下列对应段落区分实际源码机制、已执行既有检查及未执行原生／精确故障组合。
 
+## 2026-11-06 维护工具合同与虚拟视口接续
+
+[开发工具连接](specs/contracts/developer-tools/spec.md)补录已选的0.8维护能力；现有源码已提供语义／headless、作者文档、prepare、布局输入、来源与可选cost接缝，实际调用见[维护指南](../development/0.8/offline-workbench.md)。普通net472／1.6和Stable范围不变。完整游戏视口／观看映射接入尚未实施，独立工具持产品与合成层；库只补真实中立缺口。1.7新开发跟随当前接口，不锁小构建号；现有构建记录保原身份，1.7参考不代签1.6。本文以下按各段日期保已有证据，不因本次doc-only修订重签。
+
+## 2026-11-05 尺寸、content hover 与领域日志
+
+当前8c6d0ff基线的 dirty 源码实现 Button NaturalBody／同源 caption inset、literal Auto 原串、
+单行 placeholder，以及 context-aware hover 的自身 effective clip。press／capture／editor 与
+popup window-space 路线不改；follow／reading-hold／显式 pin 仍由 consumer 持有。
+
+public-unstable VerseUiDiagnosticLog／UiDiagnosticLogOptions 经真实 UiHost internal constructor
+在创建前绑定 consumer，UiPageWindow 实际采用，旧构造／factory／metrics override 保持。
+原有动态诊断 route 在 push/pop 内借 Session，不新增持久 logger index／事实 ring／native owner。
+Trip／LastRequestFailure／parser issues／reload reports／已有 subscription 先记录，再可选原生三级
+输出；默认 daily、detail 早 gate、有限输出账本与采样／原 facts 预算独立。Host 关闭会完成后续
+清理后保原单异常或聚合，Session 在清理结果后释放 binding。可用 API、预算／摘要及迁移写法
+集中在[领域诊断](../development/0.8/ui-diagnostics.md)。
+
+本轮复用已有 layout/widget/help/input/edit/invalidation、Diagnostics／FailureLifetime／Reload／
+Style／WindowHost／Catalog／Observation、containment／Stable API 及 neutral Core 入口；不新增或
+弱化测试。具体实际命令／候选身份随固定交付保存。新 logger 的精确 quota、sink-failure、创建
+异常组合没有专用新 case，源码／既有路径检查不冒称这些分支的独立行为覆盖。真实字形、hover／
+阅读、IME／caret／selection／copy、稳定 Repaint／高级展开热点及1.7 native 均未由本轮签绿。
+更广 metrics 缓存／culling 和条件性空文本恢复未据新实测扩张；没有 FPS 改善数字。
+A001 的 Dev instrument 整体 gate 和 Release KernelAtomTests 曾保留两条旧精确期望失败
+（:221／:224，button16／余量304 未含 caption inset）。WO r3 明确授权后，A003 仅将这两处
+期望及说明按独立合同推导纠正为28／292；场景、断言数量、Near精度及其他断言不变。
+原 Atom suite／Dev instrument gate 已通过，旧失败日志保留；产品 runtime 未重编译，复用 r3 DLL。
+
 <a id="appearance-freedom"></a>
 ## 2026-11-03 外观自由度：作者入口与组合生产链
 
