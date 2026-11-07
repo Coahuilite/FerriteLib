@@ -5,7 +5,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Single-line or basic plain-text multiline native editing, with one instance-local neutral draft.
 /// Selection, clipboard and character composition belong to Verse/Unity, not to this wrapper.
 /// </summary>
-internal sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
+internal sealed partial class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/text-field";
 
@@ -146,7 +146,8 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
             placeholder,
             ctx.Theme.Styles.Resolve(UiStatusTone.Neutral, UiEmphasis.Muted).Text,
             AtomVocabulary.TextFont(ctx),
-            UiTextAnchor.MiddleLeft);
+            UiTextAnchor.MiddleLeft,
+            singleLine: !AtomVocabulary.ReadBool(spec, "Multiline", false));
     }
 
     /// <summary>

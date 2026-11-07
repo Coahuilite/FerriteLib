@@ -1,11 +1,26 @@
 # TODO
 
+These are product work and acceptance items, not authorization to start them. Select work only under the
+current task and applicable permissions; preserve the separate 1.6/native and 1.7 evidence boundaries.
+
+## 0.9 current integration
+
+- Connect the approved virtual stage through genuinely needed neutral seams; Tools owns its products,
+  viewport and viewing transform. Contract: `docs/openspec/specs/contracts/developer-tools/spec.md`.
+- Follow current RimWorld 1.7 APIs/namespaces without a minor-build whitelist; preserve the single
+  carrier and FL API contract. Historical builds and accepted workflows keep their actual identities.
+- Retain outstanding native Window/Settings, physical input/IME and actual window-cost acceptance.
+  Reuse valid delivered Tools/semantic/headless and performance evidence; do not restart completed work.
+- Keep unresolved TEMP positive-control evidence distinct from valid checks. Capability extensions
+  beyond the approved stage remain planning-only: `docs/development/0.9/extension-plan.md`.
+
 ## 0.8 RC follow-up
 
-- [ ] Receive the appearance-freedom source checkpoint, then commit and build a clean fixed input for
-      paired consumer adoption. Numeric label/editor1.6 and label1.7 native acceptance remain open;
-      editor1.7 uses reported preset fallback. Author routes and evidence limits:
-      `docs/openspec/implementation.md#appearance-freedom`.
+- [ ] Paired consumer adoption of the 2026-11-05 measurement/hover/domain diagnostic candidate was locally
+      accepted; carry its remaining native acceptance with the selected fixed producer, not moving build outputs. Current contract
+      and limits: `docs/development/0.8/ui-diagnostics.md`. The preceding appearance checkpoint is an
+      accepted input; numeric label/editor1.6 and label1.7 native acceptance remain open, and editor1.7
+      uses reported preset fallback.
 
 The accepted US ea610fa/FL833c14f4 internal trial permits RC preparation. FL v0.8.0-rc2 is not yet
 published; rc1 remains the published non-latest asset. Release/upgrade notes and the explicit local

@@ -1,7 +1,13 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project>
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>obj/$(UiKitTarget)/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
 
   <PropertyGroup>
-    <TargetFramework>net472</TargetFramework>
+    <TargetFramework Condition="'$(UiKitTarget)' == ''">net472</TargetFramework>
+    <TargetFramework Condition="'$(UiKitTarget)' == 'Neutral' Or '$(UiKitTarget)' == 'RimWorld17'">net10.0</TargetFramework>
+    <DefineConstants>$(DefineConstants);FER_TOOLS</DefineConstants>
     <PlatformTarget>x64</PlatformTarget>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
@@ -12,13 +18,16 @@
          the contract axis (FerriteLibVersion.Api) and the release axis (About.xml <modVersion>).
          FerriteLibVersionTests locks all three, because a published package whose label contradicts
          the DLL inside it is invisible to the two gates that only read the other two axes. -->
-    <VersionPrefix>0.8.0</VersionPrefix>
+    <VersionPrefix>0.9.0</VersionPrefix>
     <VersionSuffix>dev</VersionSuffix>
     <AssemblyVersion>$(VersionPrefix).0</AssemblyVersion>
     <FileVersion>$(VersionPrefix).0</FileVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <!-- Build output is private to its configuration. Only explicit staging writes a mod payload. -->
-    <OutputPath>..\..\dist\build\$(Configuration)\</OutputPath>
+    <OutputPath>..\..\dist\build\$(Configuration)\$(UiKitTarget)\</OutputPath>
+    <IntermediateOutputPath>obj\$(Configuration)\$(UiKitTarget)\</IntermediateOutputPath>
+    <OutputPath Condition="'$(FerriteTestHooks)' == 'true'">..\..\dist\build\$(Configuration)\harness\$(UiKitTarget)\</OutputPath>
+    <IntermediateOutputPath Condition="'$(FerriteTestHooks)' == 'true'">obj\$(Configuration)\harness\$(UiKitTarget)\</IntermediateOutputPath>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- 本地离线环境：禁用 NuGet 漏洞审计，避免无网时被提升为错误。 -->
     <NuGetAudit>false</NuGetAudit>
@@ -47,17 +56,35 @@
   <PropertyGroup Condition="'$(Configuration)' == 'Dev'">
     <DefineConstants>$(DefineConstants);FER_DEV</DefineConstants>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(UiKitTarget)' == 'RimWorld17'">
+    <DefineConstants>$(DefineConstants);FER_RW17</DefineConstants>
+  </PropertyGroup>
 
   <ItemGroup>
     <!-- Reference-only: the game's managed surface. PrivateAssets keeps it out of the package's
          dependency list, so a consumer's own pinned RimRef version is never overridden from here. -->
-    <PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4871" PrivateAssets="all" />
+    <PackageReference Condition="'$(UiKitTarget)' == ''" Include="Krafs.Rimworld.Ref" Version="1.6.4871" PrivateAssets="all" />
   </ItemGroup>
+  <ItemGroup Condition="'$(UiKitTarget)' == 'RimWorld17'">
+    <Reference Include="Assembly-CSharp"><HintPath>$(RimWorld17Dir)/Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityStubs"><HintPath>$(RimWorld17Dir)/UnityStubs.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="RimWorld"><HintPath>$(RimWorld17Dir)/RimWorld.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Waylith"><HintPath>$(RimWorld17Dir)/Waylith.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <Target Name="RequireLocalRimWorld17" BeforeTargets="ResolveReferences" Condition="'$(UiKitTarget)' == 'RimWorld17'">
+    <Error Condition="!Exists('$(RimWorld17Dir)/Assembly-CSharp.dll') Or !Exists('$(RimWorld17Dir)/UnityStubs.dll')" Text="RimWorld17 requires an explicit local RimWorld17Dir with the chosen build's assemblies. No dependency is downloaded or bundled." />
+  </Target>
 
+  <PropertyGroup Condition="'$(FerriteTestHooks)' == 'true'">
+    <DefineConstants>$(DefineConstants);FER_TEST</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="obj\**\*.cs" />
     <Compile Remove="Kernel\**\*.cs" />
+<Compile Remove="Adapters\**\*.cs" Condition="'$(UiKitTarget)' == 'Neutral'" />
   </ItemGroup>
   <Import Project="NeutralSources.props" />
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
 </Project>
 
 

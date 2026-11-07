@@ -9,11 +9,11 @@ mod authors. It adds no Defs, patches, languages or textures; enabling it alone 
 
 | Item | Status |
 | --- | --- |
-| Version | 0.8.0, API range `[0.8.0, 0.9.0)` |
+| Development | 0.9.0, API range `[0.9.0, 0.10.0)`; [Tools/semantic/headless guide](docs/development/0.9/tools.md) |
 | Published | [v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1) (GitHub prerelease, not latest) |
-| In preparation | v0.8.0-rc2, local only, not published; see the [release notes](docs/release-notes/v0.8.0-rc2.md) |
-| RimWorld 1.6 | Primary target |
-| RimWorld 1.7 | Basic-compatibility candidate: reuses the 1.6 payload and has not been verified in game; there is no separate 1.7 adapter |
+| Local only | 0.9 normal carrier; not published. The separate 0.8 maintenance candidate remains unreleased. |
+| RimWorld 1.6 | 0.8 maintenance/recovery only; retained r6 native acceptance remains open |
+| RimWorld 1.7 | 0.9 net10.0 target compiled against local 1.7.4998 rev1299; public Window/Settings path compiled, native execution not verified |
 
 Per-item evidence and known deviations live in [implementation and open deviations](docs/openspec/implementation.md), not here.
 
@@ -43,7 +43,7 @@ UiHost ───────── composition entry for one page: adopts defini
    └─ Widgets / Controls ── default controls: handle eligible input first, then paint
           │
           ▼  neutral ports: IUiExecution / IUiDrawing / ITextMetrics
-RimWorld16 adapter ── real events, windows, font metrics, native editing and IME, drawing
+Public Verse adapter (1.7 target) ── real events, windows, font metrics, native editing and IME, drawing
 ```
 
 | Role | Owns | Does not own |
@@ -82,7 +82,7 @@ animation clock, so it may run several times in one displayed frame.
 | `Source/FerriteLib.UiKit/Kernel/` | the whole neutral core, with no game references: definitions and compiler, bindings, Host/Session/Node, layout, appearance, diagnostics and recovery |
 | `Kernel/Neutral/` | the lowest pure-logic layer: layout math, interaction and editing state machines, reactive runtime, palettes |
 | `Kernel/Widgets/` | default controls: Button, Checkbox, Dropdown, Slider, TextField, WrappedText and others |
-| `Adapters/RimWorld16/` | the only native adapter: window host, `VerseUiExecution`, font metrics, clock and main thread |
+| `Adapters/RimWorld16/` | shared public Verse adapter source, also compiled for 1.7: window host, `VerseUiExecution`, font metrics, clock and main thread |
 | `NeutralSources.props` | compiles the whole Kernel into both the runtime DLL and the platform-free contract tests |
 | `tools/` | core and adapter contract tests, author examples |
 
@@ -93,18 +93,20 @@ For more detail see the [architecture page](docs/architecture.md) and the compos
 
 - **Assert the version range in your own startup code:** `FerriteLibVersion.Require(min, max, packageId, out report)`.
   RimWorld's `modDependencies` cannot express a version; this call enumerates loaded carriers, reports collisions and fails readably.
-- Compile against the DLL from a GitHub Release asset (the release body quotes the ZIP's SHA-256), targeting `net472`.
+- For 0.9, compile against the supplied fixed 1.7 DLL, targeting `net10.0`. Published 0.8 assets remain the `net472` maintenance input.
   Do not ship a copy of the DLL with your mod.
 - Only types marked **stable** in the [API tiers](docs/api-tiers.md) keep their signatures inside the `[min, max)` range you
   compiled against; **public-unstable** types need a recompile at each minor. After publication, breaking a stable contract
   requires a major release, and a deprecation keeps the old contract through at least two later published minors.
 - Start here: [ordinary settings recipe](docs/consumers/ordinary-settings.md) →
   [public author paths S1–S7](docs/openspec/specs/policies/public-authoring/spec.md) →
-  [window layout guide](docs/consumers/rimworld-window-layout.md) → [0.8 consumer guide](docs/consumers/consume-from-0.8.0-dev.md).
+  [window layout guide](docs/consumers/rimworld-window-layout.md) → [0.9 connection/target guide](docs/development/0.9/tools.md).
 - Third-party use is welcome. When the library forced you to hand-roll something, open an issue with a citation into your own
   working code. Bug reports are always welcome.
 
 ## For contributors
+
+The 0.9 target commands are in the connection guide. The following retained maintenance verification/packing commands do not stage a 0.9 1.7 delivery.
 
 ```powershell
 pwsh -NoProfile -File scripts/verify-local.ps1                  # gate suite: tests, both build flavors, payload, content-free, licence, identity
@@ -118,7 +120,7 @@ pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory    # full-history p
 | [docs/openspec/specs/](docs/openspec/specs/) | specification text, one folder per capability |
 | [docs/openspec/implementation.md](docs/openspec/implementation.md) | source-to-specification mapping and known deviations |
 | [docs/api-tiers.md](docs/api-tiers.md) | stability tier of every public type |
-| [docs/build-and-debug.md](docs/build-and-debug.md) | building, diagnostics, and the 1.7 basic-compatibility candidate |
+| [docs/build-and-debug.md](docs/build-and-debug.md) | explicit 0.9 targets, diagnostics, and retained maintenance mechanisms |
 | [docs/in-game-walkthrough.md](docs/in-game-walkthrough.md) | checks that can only be done in the game |
 | [docs/release-notes/](docs/release-notes/) | per-version release notes |
 | `AGENTS.md`, `MEMORY.md`, `TODO.md` | working rules, durable facts and open actions for development agents, not user documentation |

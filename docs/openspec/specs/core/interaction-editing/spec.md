@@ -104,3 +104,30 @@ Button的背景／图标不是多个按钮，Slider的方向／行程／数值�
 - **WHEN** 同一组合随后本来有paint
 - **THEN** 不继续正常paint或提交下一请求
 - **AND** 不把Close后的未访问子项误当正常删除遍历
+
+## 0.9 public named completion and semantic editing
+
+Named completion/cancellation is owned by the existing field wrapper and UiEditSession, without a Tools
+prerequisite. It preserves parsing, conflicts, composition ownership and the existing one-request
+boundary. A semantic SetDraft is local; explicit completion submits through the same typed request,
+and cancellation reads the actual model without writing it. Another active editor, unavailable/readonly
+submission, composition, modal state and host eligibility are rechecked by the owner. Existing native
+pointer blur, Live and Accept/Cancel behavior remains unchanged. A handled edit result is not a save.
+
+### Custom wrappers use the same public completion owner
+
+`UiControls.EditSemantic<T>(context, binding, operation, text, format, parse, live, request, readModel)`
+is public-unstable. Custom authors provide the same typed binding, codec, native Live policy and
+callbacks used by their normal `Edit<T>` call. It owns editor creation/configuration, local SetDraft,
+CommitEdit/CancelEdit, Session focus registration/release and node invalidation. No state table or
+second edit state machine is exposed. SetDraft remains local even for a native Live field; this explicit
+intent does not become a native typing event. The original editor's automatic-publication hold keeps an unchanged later native Live/blur pass from submitting the semantic draft; actual subsequent typing or explicit completion follows its original policy. Invalid drafts remain focused for correction, explicit
+confirmation keeps the original conflict policy, and cancel restores the current model without a write.
+
+The entry rechecks composition, effective disabled state, Host input/reliable transaction state,
+modal/capture ownership, arranged declaration ancestry and another active editor; readonly submission
+is refused. Host semantic dispatch retains target/visibility/command authority. Pending native completion
+flags are consumed before the semantic attempt; callback failure cannot leave one queued for automatic
+replay. Focus bookkeeping/release and invalidation run on exit, including ordinary callback failure;
+no normal frame work is resumed after Host disposal. Existing native Edit/Live/Accept/Cancel callers do
+not gain a Tools prerequisite. A handled result is distinct from business acceptance or persistence.

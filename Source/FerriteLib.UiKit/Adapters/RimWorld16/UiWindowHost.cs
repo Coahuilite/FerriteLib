@@ -370,7 +370,7 @@ public abstract class UiWindowHost : Window
     /// </summary>
     public sealed override void DoWindowContents(Rect inRect)
     {
-        using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, host == null ? null : TextMetrics))
+        using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, host == null ? null : TextMetrics, host?.Session))
         {
             DrawShell(inRect);
         }
@@ -464,7 +464,7 @@ public abstract class UiWindowHost : Window
         if (!displayRequired) return;
         ResolvePointerDown();
         if (!DrawChrome(inRect)) return;
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
         // DT1 (r2 reading): the shell's chrome joins the instrument's TWO channels from this one place.
         // Keep the geometry the chrome just drew. BeforeDraw may publish the PREVIOUS completed pass;
         // do not overwrite its capture here. Publish these bands after this host's DrawFrame completes.
@@ -524,7 +524,7 @@ public abstract class UiWindowHost : Window
             }
 
             host.DrawFrame(VerseUiExecution.Rect(content), Execution.CaptureFrame(!IsOpen || Find.WindowStack.GetsInput(this)), TextExecution);
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
             // The host can be created on this first pass, or released by a close during DrawFrame.
             // Resolve its own subscription now; never inherit the outer scope's pre-creation null.
             using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, TextMetrics))
@@ -544,6 +544,7 @@ public abstract class UiWindowHost : Window
     {
         noticeDueNextFrame = true;
         lastFailure = error;
+        host?.PublishWindowFailure(error);
         ReleaseHost();
         OnDrawFailure(error);
     }
@@ -624,6 +625,7 @@ public abstract class UiWindowHost : Window
         catch (Exception detachError)
         {
             if (lastFailure == null) lastFailure = detachError;
+            released.PublishWindowFailure(detachError, cleanup: true);
         }
         finally
         {

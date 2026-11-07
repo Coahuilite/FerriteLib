@@ -108,7 +108,7 @@ public static class ReadOnlyOutputs
             Reject(raw.Clear, check, name + " nongeneric Clear");
         }
         else check(true, name + " has no nongeneric writable dictionary interface");
-        check(view.Count == before.Length && before.All(pair => view.TryGetValue(pair.Key, out T value)
+        check(view.Count == before.Length && before.All(pair => view.TryGetValue(pair.Key, out T? value)
             && EqualityComparer<T>.Default.Equals(pair.Value, value)), name + " content remains unchanged");
     }
     private static void ListWrites<T>(IReadOnlyList<T> view, Action<bool, string> check, string name)

@@ -2,7 +2,7 @@
 
 Audience: an author wiring a plain settings group (labeled values, a dropdown, a conditional section,
 explanatory text) into a consumer mod. Nothing here needs a custom widget, a VM base class, a builder DSL,
-or a new library type. This guide describes the current 0.8 recipe; see the
+or a new library type. This retained 0.8 recipe remains legal on the same public author path; use the [0.9 target guide](../development/0.9/tools.md) for the new compiler input. See the
 [0.8 consumer guide](consume-from-0.8.0-dev.md) for package and author paths. The runnable, compile-checked source
 is the harness file
 

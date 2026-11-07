@@ -8,7 +8,7 @@ namespace FerriteLib.UiKit.Kernel;
 /// <see cref = "UiSession"/>; closing the host disposes the session and all transient state is lost.
 /// This type intentionally replaces the old process-wide <c>UiValueStore</c>/<c>UiPageState</c>.
 /// </summary>
-public sealed class UiSession : IDisposable
+public sealed partial class UiSession : IDisposable
 {
     public UiControls Controls { get; }
     /// <summary>
@@ -27,10 +27,13 @@ public sealed class UiSession : IDisposable
         return new UiWidgetContext(source, this, metrics, theme, translation, bindings, viewWidth, node.Path, node: node);
     }
     public Action<string>? Warning { get; set; }
+    internal IUiDiagnosticOutput? DiagnosticOutput { get; set; }
+    internal int DiagnosticArrangedContentRevision { get; set; } = -1;
+    internal int DiagnosticArrangedDefinitionRevision { get; set; } = -1;
     private bool observationFailureReported;
     internal void ReportObservationFailure(string boundary, Exception error)
         => UiObservationBoundary.ReportOnce(ref observationFailureReported, boundary, error);
-    internal void ReportWarning(string message){if(Warning!=null)Warning(message);else if(execution!=null)execution.Warning(message);else System.Diagnostics.Trace.TraceWarning(message);}
+    internal void ReportWarning(string message){if(Warning!=null)Warning(message);else if(UiDomainDiagnostics.OwnsOutput(DiagnosticOutput))return;else if(execution!=null)execution.Warning(message);else System.Diagnostics.Trace.TraceWarning(message);}
     internal void ReportCleanupWarning(string message)
     {
         try { ReportWarning(message); }
@@ -39,6 +42,9 @@ public sealed class UiSession : IDisposable
     }
     internal void ReportCleanupFailure(string context, Exception original)
     {
+        UiDomainDiagnostics.Publish(DiagnosticOutput, this, new UiDomainDiagnostic("cleanup.failed", UiDiagnosticLevel.Error,
+            activeNode?.Id.Key ?? "unknown", original.GetType().Name, "resource-release-incomplete", "inspect-original-cleanup-failure"));
+        if (UiDomainDiagnostics.OwnsOutput(DiagnosticOutput) && Warning == null) return;
         // Exception.ToString is author code too. Keep its preparation within the reporting boundary.
         try { ReportWarning("[FerriteLib.UiKit] " + context + ": " + original); }
         catch (Exception observerFailure) when (UiObservationBoundary.IsOrdinary(observerFailure))
@@ -56,6 +62,10 @@ public sealed class UiSession : IDisposable
             LastRequestFailure = failure;
             LastRequestFailureNode = node.Id;
         }
+        UiDomainDiagnostics.Publish(DiagnosticOutput, this, new UiDomainDiagnostic("request.failed", UiDiagnosticLevel.Error,
+            node.Id.Key, failure.Operation + "/" + failure.InnerException?.GetType().Name,
+            "request-not-completed-side-effects-unknown", "inspect-consumer-state-before-explicit-retry"));
+        if (UiDomainDiagnostics.OwnsOutput(DiagnosticOutput) && Warning == null) return;
         if (reportingRequestFailure) return;
         reportingRequestFailure = true;
         try
@@ -124,6 +134,9 @@ public sealed class UiSession : IDisposable
     // of that key is that it survives as a number after the session itself is gone. A counter is bounded
     // state (an int wraps in 2^31 sessions), never a table of live objects.
     private static int nextIdentity;
+    private long nextMountLifetime;
+    internal long AllocateMountLifetime() => ++nextMountLifetime;
+    internal Action? ToolsClosing;
 
     // Scroll state is keyed by the scroll container's node, not by a display path: two scroll elements
     // whose display paths collide still hold two scroll positions (0.4.0 node step 2).
@@ -1481,6 +1494,9 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
         }
         // Close logically before calling external/native cleanup; even a throwing release must not
         // leave a reusable owner or skip the other owned resources. Dispose never commits a draft.
+        Action? closeTools = ToolsClosing;
+        ToolsClosing = null;
+        if (closeTools != null) Cleanup(closeTools);
         Cleanup(Interactions.Dispose);
         foreach (UiNode node in nodes.Values)
             foreach (UiControlState state in node.ValueStates.Values)
@@ -1536,6 +1552,12 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
         contentInputLayers.Clear();
         currentWindowOrigin = default;
         scrollTargetElementId = null;
+        if (errors.Count != 0)
+            UiDomainDiagnostics.Publish(DiagnosticOutput, this, new UiDomainDiagnostic("session.cleanup-failed", UiDiagnosticLevel.Error,
+                "unknown", "owned-resources", "session-closed-release-incomplete", "inspect-original-aggregate-before-reopening"));
+        IUiDiagnosticOutput? output = DiagnosticOutput;
+        DiagnosticOutput = null;
+        output?.Dispose();
         execution = null;
         Input = new UiFrame(UiFramePhase.None, inputAllowed: false);
         PointerInputAllowed = false;

@@ -62,6 +62,13 @@ foreach ($required in @($projectFile, $payloadDll, $aboutXml, $loadFolders, $lic
         throw "Missing packaging input: $required"
     }
 }
+# This retained stager writes the 1.6 carrier layout. Do not produce an unreachable
+# package when a development line's metadata selects only a different target.
+[xml] $loadMap = Get-Content -LiteralPath $loadFolders -Raw
+$legacyFolders = @($loadMap.SelectNodes('/loadFolders/v1.6/li') | ForEach-Object { $_.InnerText.Trim().Trim('/') })
+if ('1.6' -notin $legacyFolders) {
+    throw 'This retained packer requires a 1.6 load root; use the selected target delivery path, not a relabelled legacy package.'
+}
 # --- measure the flavor, do not trust the caller's word ------------------------------------------
 # -BuildFlavor is a claim made by whichever packer invoked this engine; the DLL has its own record of
 # which configuration produced it (MSBuild stamps AssemblyConfigurationAttribute from $(Configuration)).

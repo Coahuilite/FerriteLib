@@ -1,9 +1,8 @@
-# FerriteLib 0.8.x 现行规格
+# FerriteLib 0.9.x 现行规格
 
-本入口及下列能力／连接／适配／policy 正文是 **0.8.x 当前产品规格**。它面向通用 UI 作者，不只设置页。
-采用现成包装、选择能力组合、独立 native、headless 和 visual-only 均是正常路线。
-当前载荷以 RimWorld 1.6 adapter 为基础；1.7 共用 GUI 路线已有基础兼容候选，原生渲染与主要交互仍待用户验收，完整 1.7 adapter 与新增后端未交付。候选范围见[构建／诊断说明](build-and-debug.md#basic-17-compatibility-candidate)。
+0.9开发线采用[开发工具连接](openspec/specs/contracts/developer-tools/spec.md)：可选Tools、agent语义访问、同源headless、作者文档、prepare、动态布局输入和原window-cost接缝；签名与用法在[连接指南](development/0.9/tools.md)。正常单一载体含休眠工具能力，不要求第二份Dev库。既有Stable、部分采用、原观察和独立合法入口保持。
 
+新原生开发统一面向 **RimWorld 1.7**，跟随当前命名空间／API，不锁小构建号；0.8／1.6另行维护。独立Tools承担脱机图形宿主、游戏内工具和虚拟舞台，FL只提供中立接缝。完整舞台尚待实施，旧构建、真实预览和原生验收按各自实际输入留在实现记录。
 规格表达应有保证；源码是否全部满足、已知偏差及证据身份在[开发映射](openspec/implementation.md)。
 [Trace／legacy-fit 两项新保证](openspec/specs/contracts/observation-boundary/spec.md)于2026-10-29获准采用，
 [变更记录](openspec/changes/isolate-observation/proposal.md)保存采用来源；实现证据与固定产物仍分别记录，不替代原生接受。
@@ -33,6 +32,7 @@ Structure／Layout／Semantics／Appearance 是四项平行职责，不是新建
 | 逐属性继承／撤销、活视图、颜色／文字／图像／背景 | [外观](openspec/specs/core/appearance/spec.md) |
 | hide／retarget／remove／Close、保留故障展示、逐项释放 | [寿命与恢复](openspec/specs/core/lifetime-recovery/spec.md) |
 | bounded diagnostics、R9 facts／budgets、fit | [观察能力](openspec/specs/core/observation/spec.md) |
+| 可选Tools、agent语义、同源headless、文档／prepare／cost与虚拟视口接缝 | [开发工具连接](openspec/specs/contracts/developer-tools/spec.md) |
 | reader/owner → 一致展示 → 当前执行 | [展示执行连接](openspec/specs/contracts/presentation-execution/spec.md) |
 | definition/style producer → prepare/stage/seal → 所有 Host | [更新连接](openspec/specs/contracts/definition-update/spec.md) |
 | opaque topic／Session grace／owned endpoint → 消费者帮助 | [帮助连接](openspec/specs/contracts/help-output/spec.md) |

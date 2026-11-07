@@ -9,7 +9,8 @@ param(
     [switch]$Nupkg,
     # Caller already built this exact Dev configuration.
     [switch]$NoBuild,
-    [switch]$NoRestore
+    [switch]$NoRestore,
+    [string]$StageDir = 'dist/dev/FerriteLib'
 )
 
 Set-StrictMode -Version Latest
@@ -27,7 +28,7 @@ $ErrorActionPreference = "Stop"
 
 $root = [System.IO.Path]::GetFullPath($ProjectRoot)
 $projectFile = Join-Path $root 'Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj'
-$stageDir = Join-Path $root 'dist\dev\FerriteLib'
+$stageDir = [IO.Path]::GetFullPath($StageDir, $root)
 
 $restoreArgs = @(); if ($NoRestore) { $restoreArgs += '--no-restore' }
 # Build the selected configuration in dist/build/Dev; staging never reads a shared build slot.
@@ -38,9 +39,8 @@ if (-not $NoBuild) {
 
 # The label comes from the build axis, exactly like the artifact name in pack-release: one source for
 # the number, or the folder and the DLL inside it can disagree.
-$prefixMatch = Select-String -LiteralPath $projectFile -Pattern '<VersionPrefix>(.*?)</VersionPrefix>'
-if (-not $prefixMatch) { throw 'csproj carries no <VersionPrefix>; the build axis has no home.' }
-$label = $prefixMatch.Matches[0].Groups[1].Value.Trim() + '-dev'
+Import-Module (Join-Path $PSScriptRoot 'Release.Identity.psm1')
+$label = (Get-FerriteBuildAxis -ProjectFile $projectFile) + '-dev'
 
 $commit = (& git -C $root rev-parse HEAD).Trim()
 $shortCommit = $commit.Substring(0, 12)

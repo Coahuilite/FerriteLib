@@ -51,3 +51,25 @@ legacy fit SHALL 默认为 disabled，MaxReports48、Tolerance1.5逻辑单位；
 - **WHEN** 作者未开启 fit
 - **THEN** Attach 不自行启用采样，独立视觉仍不需 Host
 - **AND** 不把未报 overflow 当已验证像素适配
+
+### Requirement: FL08-DOMAIN-OUTPUT 可选领域出口不接管事实或采样
+采用的 native domain binding SHALL 在原 Trip／请求失败／文档报告／fit 等事实 owner 之后输出，
+不另建事实 ring，不通过 Attach／Configure 开启 fit、timing、geometry 或订阅。创建期 consumer／出口
+须在真实 Host 构造前传入；旧构造、factory、metrics override 与独立无 Host 用法保持合法。
+normal／warning／error 与 daily／detail 分开；合法拒绝不自动是 error，detail 在可选采集及格式化前 gate。
+native sink 普通失败只隔离出站，不重试业务或改变确定结果。实际 adapter 入口及预算见
+[领域诊断](../../../../development/0.8/ui-diagnostics.md)。
+
+#### Scenario: 输出额度已满后出现独立错误
+- **WHEN** binding 的 error 输出预算耗尽，新类别被拒绝
+- **THEN** 首次额度通知及边界摘要明确未打印身份／计数，下一窗口恢复资格
+- **AND** 不把输出账本与原 ring 的保留／丢弃规则合并，也不永久屏蔽新错误
+
+#### Scenario: 创建失败或关闭清理失败
+- **WHEN** consumer 已通过创建入口绑定，实际构造／清理失败
+- **THEN** 原失败先归原 owner，native 输出带可信 consumer／可用 session，未知上下文为 NotSampled
+- **AND** 创建失败仍抛原异常；关闭尝试完整清理并释放自身输出，Host 不 dispose 借用 execution
+
+## 可选工具连接
+
+R9仍按本文独立纯读，原用途不增加Tools前提。可选语义操作、同源headless、作者prepare与原窗口cost的唯一规范已归入[开发工具连接](../../contracts/developer-tools/spec.md)；[连接指南](../../../../development/0.9/tools.md)保当前签名与用法。

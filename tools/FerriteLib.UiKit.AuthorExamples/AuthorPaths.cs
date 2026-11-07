@@ -14,7 +14,7 @@ public sealed class CounterPage : IDisposable
     private readonly UiReactiveOwner owner;
     public CounterPage(ITextMetrics metrics, IUiTranslation translation)
     {
-        if (!FerriteLibVersion.Require(new Version(0, 8, 0), new Version(0, 9, 0), "author.example", out string message))
+        if (!FerriteLibVersion.Require(new Version(0, 9, 0), new Version(0, 10, 0), "author.example", out string message))
             throw new InvalidOperationException(message);
         Count = Runtime.Int(1); Bindings = new UiBindings(Runtime); owner = Runtime.CreateOwner("counter");
         var caption = owner.Compute("caption", () => "Count " + Count.Value);
@@ -34,7 +34,7 @@ public sealed class CounterPage : IDisposable
     public void Dispose() { Host.Dispose(); owner.Dispose(); }
 }
 
-public sealed class CustomControl : IUiWidget, IUiPointerLayout
+public sealed class CustomControl : IUiWidget, IUiPointerLayout, IUiSemanticWidget
 {
     private string binding = "";
     public string Kind => "author/control";
@@ -48,6 +48,19 @@ public sealed class CustomControl : IUiWidget, IUiPointerLayout
         ctx.Controls.Edit(rect, ctx, binding, ctx.Bindings.Get<float>(binding), codec.Format, codec.Parse,
             false, false, value => ctx.Bindings.Set(binding, value), () => ctx.Bindings.Get<float>(binding));
         if (ctx.IsActive) ctx.State("own-paint-count",()=>new PaintCount()).Value++;
+    }
+    public IReadOnlyList<UiSemanticAction> ReadActions(UiWidgetContext ctx, int maximum)
+    {
+        var actions = new List<UiSemanticAction>();
+        foreach (UiToolOperation operation in new[] { UiToolOperation.SetDraft, UiToolOperation.CommitEdit, UiToolOperation.CancelEdit })
+            if (actions.Count < maximum) actions.Add(new UiSemanticAction(operation, "editor"));
+        return actions.AsReadOnly();
+    }
+    public bool ExecuteAction(UiWidgetContext ctx, UiSemanticAction action, UiToolValue value)
+    {
+        var codec = new UiNumericEdit(0, 100); // Same codec and callbacks as the normal Draw entry.
+        return ctx.Controls.EditSemantic<float>(ctx, binding, action.Operation, value.Text,
+            codec.Format, codec.Parse, false, candidate => ctx.Bindings.Set(binding, candidate), () => ctx.Bindings.Get<float>(binding));
     }
     private sealed class PaintCount { internal int Value; }
     public static void Register() => UiWidgetRegistry.Define(new UiWidgetDefinition("author", "author/control", () => new CustomControl(), new UiAttributeSchema(new UiAttributeDefinition("Bind",binding:UiBindingRole.Value)), Array.Empty<string>()));

@@ -2,12 +2,50 @@
 
 This is the operational guide for the existing toolchain. **0.7.x is frozen.** These commands describe
 mechanisms; running a build, export, install or publication still needs task authorization. The current product contract
-is [the 0.8 specification](specification.md).
+is [the 0.9 specification](specification.md).
+
+## 0.9 normal carrier and explicit targets
+
+Use [the current target/connection guide](development/0.9/tools.md) for Neutral/net10.0 headless
+compilation and RimWorld17/net10.0 compilation against an explicit local game directory. Both compile
+the same Kernel. Normal Release includes FER_TOOLS but no FER_DEV or FER_TEST; it keeps instruments
+dormant until a selected compatible connection opts in. Legacy basic logging, timing, R9 and Dev calls
+retain their conditions. `-p:FerriteTestHooks=true` belongs only to existing harness builds, never a
+normal delivered carrier. The exact 0.9 fixed producer carries its own complete root/source/check/USE.
+No 0.9 installation/publication pack is inferred from the legacy packer commands below. New 0.9 roots
+contain one 1.7 carrier, and do not replace the old 0.8/1.6 r6 native acceptance/recovery responsibility.
+
+The retained packers share `scripts/Release.Identity.psm1`: Dev reads the same build axis,
+GitHub/Steam and the release workflow share tag grammar, and both publication channels share source
+attribution. GitHub alone permits the explicit `-AllowDirtyTree` local rehearsal; Steam requires a
+clean tree and never archives. `-StageDir 'dist/<fresh-attempt>/FerriteLib'` can select a new local
+destination without changing the original channel defaults or pwsh/.NET prerequisites.
+
+These legacy packers still write a `1.6` carrier layout. Staging now refuses metadata without that
+load root before writing, so this line's current 1.7-only metadata cannot produce an unreachable
+legacy package. Use the explicit target delivery described above; the shared identity refactor does
+not supply a new 0.9/1.7 release packer. No Node dependency is introduced.
+
+## Check the affected neutral contract
+
+For a change to this checkout's platform-neutral Kernel, this existing entry compiles and exercises the
+production sources without a game or a carrier:
+
+```powershell
+dotnet run --project tools/FerriteLib.UiKit.Core.ContractTests -c Release
+```
+
+It covers neutral behavior, layout, failure/lifetime and dependency boundaries, not native input or drawing.
+Exercise affected adapter, profile, consumer or package paths separately; the retained maintenance
+`verify-local.ps1` below does not by itself certify the 0.9 native carrier. A documentation-only edit does
+not by itself invalidate unchanged code evidence.
+
+## Retained 0.8 maintenance mechanisms
 
 ## Build once, select the input explicitly
 
 Ordinary builds and harnesses write `dist/build/<Configuration>/FerriteLib.UiKit.dll`.
-`Dev` includes `FER_DEV` instrumentation; `Release` excludes it. They no longer overwrite each other.
+On the retained 0.8 line, `Dev` includes `FER_DEV` instrumentation and `Release` excludes it. They no longer overwrite each other.
 Harness executables and the existing canonical `tools/FerriteLib.UiKit.Tests/bin/stubs` remain in place.
 Serialize harness builds because the stub outputs are still shared.
 
@@ -41,6 +79,10 @@ also printed; it does not assert that the artifact represents current HEAD or a 
 intended revision first. Publication packers and downstream release verification retain their stricter checks.
 Consumers compiling against a staged Dev DLL must install that same FL package;
 they must not ship another copy of the library in their own package.
+For the current1.6 step-Dev handoff, use the [instrument guide](development/0.8/dev-step.md):
+switch the complete consumer/FL Dev pair, keep cost sampling separate from geometry, and select one
+live Host/session for capture, independent outline and explicit reports. A Release carrier cannot be
+renamed into this capability.
 
 ## One owner for restore, then build and execute
 

@@ -57,6 +57,10 @@ public sealed class VerseFerriteTextMetrics : ITextMetrics, IUiTextMetricsEnviro
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static UiMeasureInputs? CaptureUnityEnvironment(UiFont font)
     {
+#if FER_RW17
+        // UnityStubs has no complete native font revision. Revoke reuse instead of inventing a stamp.
+        return null;
+#else
         GameFont previous = Text.Font;
         try
         {
@@ -75,6 +79,7 @@ public sealed class VerseFerriteTextMetrics : ITextMetrics, IUiTextMetricsEnviro
                 style.border.left, style.border.right, style.border.top, style.border.bottom });
         }
         finally { Text.Font = previous; }
+#endif
     }
 
     public float MeasureText(string text, UiFont font, float width)

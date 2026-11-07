@@ -9,11 +9,11 @@ FerriteLib 是 RimWorld 的**无内容前置模组**，只携带一个程序集 
 
 | 项目 | 状态 |
 | --- | --- |
-| 版本 | 0.8.0，API 区间 `[0.8.0, 0.9.0)` |
+| 开发线 | 0.9.0，API 区间 `[0.9.0, 0.10.0)`；见[当前工具合同](docs/development/0.9/tools.md) |
 | 已发布 | [v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1)（GitHub 预发布，非 latest） |
-| 准备中 | v0.8.0-rc2，本地准备，尚未发布；见[发布说明](docs/release-notes/v0.8.0-rc2.md) |
-| RimWorld 1.6 | 主要目标 |
-| RimWorld 1.7 | 基础兼容候选：复用 1.6 载荷，尚未经实机验收；没有独立的 1.7 adapter |
+| 本地候选 | 0.9 正常单载体，尚未发布；0.8 维护候选单独保留 |
+| RimWorld 1.6 | 0.8 维护／恢复线；r6 仍待原生验收 |
+| RimWorld 1.7 | 0.9 net10.0 已对本机 1.7.4998 rev1299 编译完整库及公共 Window／Settings 作者路径；native 未验证 |
 
 逐项证据与已知偏差不写在 README，见[实现与开放偏差](docs/openspec/implementation.md)。
 
@@ -42,7 +42,7 @@ UiHost ──────── 一个页面的组合入口：采用定义、同
    └─ Widgets / Controls ── 默认控件：先处理合格输入，再绘制
           │
           ▼  中立端口：IUiExecution / IUiDrawing / ITextMetrics
-RimWorld16 Adapter ── 真实事件、窗口、字体度量、原生编辑与 IME、绘制
+公开 Verse Adapter（1.7 目标）── 真实事件、窗口、字体度量、原生编辑与 IME、绘制
 ```
 
 | 角色 | 拥有 | 不拥有 |
@@ -78,7 +78,7 @@ RimWorld16 Adapter ── 真实事件、窗口、字体度量、原生编辑与
 | `Source/FerriteLib.UiKit/Kernel/` | 整个中立核心，不引用游戏：定义与编译、绑定、Host／Session／Node、布局、外观、诊断与恢复 |
 | `Kernel/Neutral/` | 最底层的纯逻辑：布局数学、交互与编辑状态机、响应式运行时、调色板 |
 | `Kernel/Widgets/` | 默认控件：Button、Checkbox、Dropdown、Slider、TextField、WrappedText 等 |
-| `Adapters/RimWorld16/` | 唯一的原生适配：窗口宿主、`VerseUiExecution`、字体度量、时钟与主线程 |
+| `Adapters/RimWorld16/` | 同源公开 Verse 适配，亦用于 1.7 编译：窗口宿主、`VerseUiExecution`、字体度量、时钟与主线程 |
 | `NeutralSources.props` | 把整个 Kernel 同时编进运行时 DLL 和无平台合同测试 |
 | `tools/` | 核心与 adapter 合同测试、作者示例 |
 
@@ -87,12 +87,14 @@ RimWorld16 Adapter ── 真实事件、窗口、字体度量、原生编辑与
 ## 给模组作者
 
 - **在自己的启动代码里断言版本区间：**`FerriteLibVersion.Require(min, max, packageId, out report)`。RimWorld 的 `modDependencies` 无法表达版本；它会枚举已加载载体、报告冲突，并给出可读的失败信息。
-- 针对 GitHub Release 资产中的 DLL 编译（发布页给出 ZIP 的 SHA-256），目标 `net472`。不要随你的模组复制这个 DLL。
+- 0.9 针对提供的固定 1.7 DLL 编译，目标 `net10.0`；已发布 0.8 资产仍是 `net472` 维护输入。不要随你的模组复制这个 DLL。
 - 只有 [API 分层](docs/api-tiers.md)中标为 **stable** 的类型在你编译时的 `[min, max)` 区间内保持签名；**public-unstable** 类型每个 minor 都需要重新编译。发布后破坏 stable 合同须升 major，弃用后至少保留两个后续已发布 minor。
-- 起步顺序：[普通设置页配方](docs/consumers/ordinary-settings.md) → [公开作者路径 S1–S7](docs/openspec/specs/policies/public-authoring/spec.md) → [窗口布局指南](docs/consumers/rimworld-window-layout.md) → [0.8 消费指南](docs/consumers/consume-from-0.8.0-dev.md)。
+- 起步顺序：[普通设置页配方](docs/consumers/ordinary-settings.md) → [公开作者路径 S1–S7](docs/openspec/specs/policies/public-authoring/spec.md) → [窗口布局指南](docs/consumers/rimworld-window-layout.md) → [0.9 连接／目标指南](docs/development/0.9/tools.md)。
 - 欢迎第三方使用。当你被迫手写了本该由库提供的东西，请附上你自己可运行代码的引用开 issue；缺陷报告随时欢迎。
 
 ## 给贡献者
+
+0.9 目标命令见当前连接指南；以下保留的维护校验／打包命令不生成 0.9 的 1.7 交付。
 
 ```powershell
 pwsh -NoProfile -File scripts/verify-local.ps1                  # 门禁套件：测试、双配置构建、载荷、无内容、许可、身份
@@ -106,7 +108,7 @@ pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory    # 完整历史�
 | [docs/openspec/specs/](docs/openspec/specs/) | 按能力拆分的规格正文 |
 | [docs/openspec/implementation.md](docs/openspec/implementation.md) | 源码与规格的对应及已知偏差 |
 | [docs/api-tiers.md](docs/api-tiers.md) | 公开类型的稳定等级 |
-| [docs/build-and-debug.md](docs/build-and-debug.md) | 构建、诊断与 1.7 基础兼容说明 |
+| [docs/build-and-debug.md](docs/build-and-debug.md) | 明确的 0.9 构建目标、诊断与旧维护机制 |
 | [docs/in-game-walkthrough.md](docs/in-game-walkthrough.md) | 只能在游戏里完成的检查 |
 | [docs/release-notes/](docs/release-notes/) | 各版本发布说明 |
 | `AGENTS.md`、`MEMORY.md`、`TODO.md` | 开发代理的工作规则、持久事实与待办，不是用户文档 |

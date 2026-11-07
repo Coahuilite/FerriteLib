@@ -43,7 +43,7 @@ public static class FerriteLibVersion
     /// The controlled prepublication 0.8 development migration is explicit; the historical 0.7 lockstep
     /// exception is not inherited. Stable and experimental entries are listed in docs/api-tiers.md.
     /// </summary>
-    public static readonly Version Api = new Version(0, 8, 0);
+    public static readonly Version Api = new Version(0, 9, 0);
 
     /// <summary>Human-readable identity for logs.</summary>
     public static string Describe()

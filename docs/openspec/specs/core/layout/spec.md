@@ -105,3 +105,13 @@ ITextMetrics SHALL 保持原两成员。可选环境能力 SHALL 按有效 font 
 - **WHEN** 候选已做部分验证或局部写入
 - **THEN** 完整旧结果仍可读，下一次合法成功可恢复输入
 - **AND** 不把部分 work 计作成功 publication
+
+## 0.9 explicit owner constraints
+
+A Host may provide a finite nonnegative runtime Height and/or responsive Narrow decision for a named
+structural container. Leaf appearance/editor sizing is unchanged; Narrow selects an already declared Breakpoint variant. Null restores the declaration/automatic policy. Changed inputs take effect at the next
+complete geometry transaction, without replacing XML, definition or Session; normal compatible draft,
+focus and scroll identity remains. Runtime height outranks the declaration's sizing mode and row budget.
+The initial implementation deliberately takes the conservative full fallback. Removing or incompatibly
+replacing a declaration removes its constraint. Existing calls without runtime input retain their meaning.
+Public usage: [owner layout input](../../../../development/0.9/tools.md#owner-layout-budgets-and-edit-completion).

@@ -25,7 +25,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// stands while the pointer is over it.
 /// </para>
 /// </summary>
-internal sealed class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
+internal sealed partial class InputModeRowWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/mode-row";
     /// <summary>

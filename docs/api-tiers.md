@@ -1,4 +1,4 @@
-# Public API tiers — 0.8 prepublication refactor
+# Public API tiers — 0.9 development, retained stable author contracts
 
 The stable target covers S1–S7 and their necessary parameter, return, callback and implementation-interface dependencies. It protects a supported game/adapter target, not a native acceptance result. Current 1.6 and pending 1.7 evidence remain separate.
 
@@ -183,6 +183,41 @@ The type census and stable set are pinned in `FerriteLibApiTierTests`. Its depen
 
 ## Public-unstable
 
+- `UiToolSelection` — selected original draw-walk geometry/clip/status; no per-frame capture.
+
+- `UiDocumentSnapshot` — accepted full author source and projected definition revision.
+- `UiDocumentLocation` — declared element/template location in that accepted text.
+
+- `UiPreviewContext` — optional immutable author registration root/watch/startup-language inputs; no Tools dependency.
+
+- `UiCostSampleState` — projection of an optional original-window sampler, not a new sampling owner.
+- `UiCostSampleRequest` — explicit bounded owner-pass request, without a default pass count.
+- `IUiCostSampleProvider` — optional pure read and once-queued request peer on the actual Host.
+- `UiCostMetric` — detached source-classified accumulator facts with nullable unknown quantities.
+- `UiCostSampleSnapshot` — bounded original-owner identity, progress, metrics and environment facts.
+
+- `UiToolDiagnostics` — detached 0.9 tool instrument results; same-host geometry carries its own pass identity.
+
+- `UiLayoutInput` — 0.9 owner height/variant candidate; see [tool contract](development/0.9/tools.md).
+
+- `UiToolAccess` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
+- `UiToolOperation` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
+- `UiToolRequestStatus` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
+- `UiSemanticAction` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
+- `IUiSemanticWidget` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
+- `UiToolValue` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
+- `UiToolTarget` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
+- `UiToolSnapshot` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
+- `UiToolRequestResult` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
+- `UiToolConnection` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
+- `UiPreviewKind` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
+- `UiPreviewRegistration` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
+- `UiPreviewInstance` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
+
+- `VerseUiDiagnosticLog` — optional adapter-owned native output; creation-first and existing-Host adoption,
+  standalone callbacks and lifecycle are in [domain diagnostics](development/0.8/ui-diagnostics.md).
+- `UiDiagnosticLogOptions` — output detail policy only; never enables fit/timing/geometry or changes old callers.
+
 - `UiTextFont` — resource alias plus optional logical GUI size, validated in1..96.
 - `UiTextPurpose` — label/editor capability and fallback discriminator.
 - `IUiTextFontMetrics` — optional numeric measurement and truthful environment capability.
@@ -229,10 +264,15 @@ None. The former registrar, layout engine and default implementation classes are
 
 ## Advanced members on otherwise stable types
 
+- `UiDocumentService.StatusRevision`, `UiDocumentService.AddProjectedLayout`, `.GetSnapshot` and `.Snapshots` are optional public-unstable author projection/source extensions; original document calls retain their contract.
+
+- `UiHost.ConnectTools`, `.ConnectLiveTools` and `.AdvanceHeadless`, `.SetLayoutInput`, `.CompleteEdit` and `.EndElementLifetime` are 0.9 public-unstable tool seams. Their dependencies are not promoted into stable author paths.
+- `UiHost.SetCostSampleProvider` is the optional 0.9 public-unstable actual-window sampler attachment; ordinary sampling/logging does not require it or Tools.
+
 - `UiWidgetContext.Session`, `.Node`, `.WithNode` and constructors taking a Session/Node remain advanced adapter construction seams. Ordinary custom widgets receive a context; use ElementId/ElementPath, Child, State, Properties, InteractionScope, Invalidate, SharedLabelWidth and IsActive/IsDisabled instead.
 - `UiHost.Session` and `UiWindowHost.Session` remain advanced legacy adapter access. Stable surrounding windows use InputState, ElementProperties, Get/SetScrollPosition, SetInteractionScope, Invalidate, DrawFrame, Accept/Cancel and Close/Dispose.
 - `UiHost.Observe`, `.ObserveLiveHosts`, `.ObserveLiveHost` and their R9 result/budget dependencies are experimental. So are `UiDiagnosticSubscription.GeometryEnabled`, `.GeometryOverlay`, `.DumpGeometry` and `.TryGetGeometrySnapshot`; basic bounded diagnostic records/subscription/disposal are stable.
-- `UiControls.Trace` is advanced diagnostic instrumentation. `UiSession` supports only construction, `CreateContext`, `SetFrame`, `Controls`, `IsActive`, `Identity`, `Dispose` and the inherited IDisposable contract as stable. All other Session members remain advanced Host/runtime plumbing. No Session/Node tables are promoted.
+- `UiControls.EditSemantic<T>` is the 0.9 public-unstable complete custom-editor operation, including original focus registration/release and invalidation; it does not require Tools. `UiControls.Trace` is advanced diagnostic instrumentation. `UiSession` supports only construction, `CreateContext`, `SetFrame`, `Controls`, `IsActive`, `Identity`, `Dispose` and the inherited IDisposable contract as stable. All other Session members remain advanced Host/runtime plumbing. No Session/Node tables are promoted.
 
 Mutable dependency graphs, queues, caches, default private nodes, geometry staging and event-routing tables are internal. R9 returns detached bounded facts, never those tables or business write handles. Detailed budgets and sampled fields remain experimental while the read facility is delivered.
 

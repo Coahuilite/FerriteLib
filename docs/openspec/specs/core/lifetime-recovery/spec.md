@@ -68,3 +68,10 @@ widget 原错误 SHALL 保留路径／节点归因并进入既定 record／fallb
 - **WHEN** widget 原错误已触发 guard
 - **THEN** 原始原因、恢复记录及 fallback 尝试仍可达
 - **AND** 不因 Warning 代替原错误而遗漏恢复
+
+## 0.9 local mounted lifetime
+
+An owner may explicitly end a named subtree's UI lifetime. The existing Session releases only that
+subtree's editor/capture/popup/output/custom resources without business completion. Its next mount has
+a new incarnation, even when the declaration key is unchanged; old requests close rather than move.
+Siblings keep compatible state. The Host retains its identity and takes a complete layout fallback.

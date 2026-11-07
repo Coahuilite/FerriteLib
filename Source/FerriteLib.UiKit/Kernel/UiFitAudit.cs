@@ -282,8 +282,10 @@ public static class UiFitAudit
         // its dedup set, its callback and its ruler - is not consulted at all. An unsubscribed host keeps
         // exactly the legacy path it had.
         UiDiagnosticSubscription? subscription = UiDiagnosticHub.ActiveSubscription;
+        bool domainOutput = UiDomainDiagnostics.OwnsOutput(UiDiagnosticHub.ActiveOutput);
+        if (subscription == null && Saturated) return;
         ITextMetrics? textMetrics;
-        if (subscription != null)
+        if (subscription != null || domainOutput)
         {
             textMetrics = UiDiagnosticHub.ActiveMetrics;
         }
@@ -343,11 +345,18 @@ public static class UiFitAudit
         if (subscription != null)
         {
             subscription.PublishOverflow(report, key);
+            UiDomainDiagnostics.Overflow(UiDiagnosticHub.ActiveOutput, UiDiagnosticHub.ActiveSession, report);
             return;
         }
 
         try
         {
+            if (UiDomainDiagnostics.OwnsOutput(UiDiagnosticHub.ActiveOutput))
+            {
+                if (Reported.Count < MaxReports) Reported.Add(key);
+                UiDomainDiagnostics.Overflow(UiDiagnosticHub.ActiveOutput, UiDiagnosticHub.ActiveSession, report);
+                return;
+            }
             if (!Reported.Add(key)) return;
             sink?.Invoke(report);
         }
@@ -363,7 +372,8 @@ public static class UiFitAudit
     {
         if (!Enabled || string.IsNullOrEmpty(text) || rect.Width <= 1 || rect.Height <= 1) return;
         UiDiagnosticSubscription? subscription = UiDiagnosticHub.ActiveSubscription;
-        ITextMetrics? ruler = subscription == null ? metrics : UiDiagnosticHub.ActiveMetrics;
+        bool domainOutput = UiDomainDiagnostics.OwnsOutput(UiDiagnosticHub.ActiveOutput);
+        ITextMetrics? ruler = subscription == null && !domainOutput ? metrics : UiDiagnosticHub.ActiveMetrics;
         if (ruler == null || subscription == null && Saturated) return;
         UiTextRun measured = run.WithMetrics(ruler);
         if (measured.Font != run.Font)
@@ -412,11 +422,18 @@ public static class UiFitAudit
         if (subscription != null)
         {
             subscription.PublishStyleFallback(report, key);
+            UiDomainDiagnostics.Style(UiDiagnosticHub.ActiveOutput, UiDiagnosticHub.ActiveSession, report);
             return;
         }
 
         try
         {
+            if (UiDomainDiagnostics.OwnsOutput(UiDiagnosticHub.ActiveOutput))
+            {
+                if (StyleFallbacks.Count < MaxReports) StyleFallbacks.Add(key);
+                UiDomainDiagnostics.Style(UiDiagnosticHub.ActiveOutput, UiDiagnosticHub.ActiveSession, report);
+                return;
+            }
             if (StyleFallbacks.Count >= MaxReports) return;
             if (!StyleFallbacks.Add(key)) return;
             styleSink?.Invoke(report);

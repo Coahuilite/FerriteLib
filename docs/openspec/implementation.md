@@ -5,6 +5,93 @@
 cf1cf6456096171fb47c012369bcd0c2f29e968f。FL-F01/F02/F03 已在该 HEAD 的 dirty 工作树修复；
 下列对应段落区分实际源码机制、已执行既有检查及未执行原生／精确故障组合。
 
+## 2026-11-06 工具合同归并与舞台接续
+
+[开发工具连接](specs/contracts/developer-tools/spec.md)是语义／headless、作者文档、prepare与cost的唯一规范正文；[指南](../development/0.9/tools.md)保签名和用法。正常单一载体已有休眠接缝；独立工具已有原生预览，但完整虚拟游戏视口接入尚未实施。跟随当前1.7接口、取消外部工具小构建号锁定是已采用目标，不重标历史编译／运行证据。旧TEMP阳性对照拒绝与native输入／游戏宿主缺口保持，本文以下阶段事实保原输入。
+
+## 0.9 preview preparation and original-window cost peers (consumer feedback)
+
+The actual author's dynamic help budget required preparation before both initial and post-operation
+arrangement. The additive UiPreviewInstance overload attaches a repeat-safe callback to its existing
+Host, invoked only by explicit AdvanceHeadless / real DrawFrame, never by reads. Its original constructor
+metadata remains unchanged for already compiled providers. Callback failure/close follows the original
+owner; no extra Host, registry or scheduler exists.
+
+The optional IUiCostSampleProvider attaches the actual window's existing sampler to that Host.
+ReadCostSample projects retained bounded facts without enabling sampling. QueueCostSample shares the
+existing queue, ID ledger and one-entry owner budget; an attachment incarnation prevents replacement
+from retargeting work. Counts/metrics/context remain author facts with nullable unknowns. This peer
+adds no sample accumulator/state machine and no Tools prerequisite to ordinary logging/sampling.
+Independent AuthorExamples compile the callback adapter and real native Host attachment. Actual
+author/Tools preparation and window-sampler consumption remain with those consumers; local compile
+and existing checks do not sign their new native or cost results. This is A001/DSP1/WO1 ordinary repair.
+
+## 0.9 custom-editor public repair (consumer feedback)
+
+The actual sparse-field consumer could describe and operate boolean/selection values but could not
+call the internal complete editor operation from its own assembly. The same Controls.EditSemantic<T>
+production entry is now public-unstable. It retains the original editor, codec/callbacks and focus owner,
+adds no Tools prerequisite and exposes no state table. Explicit SetDraft remains local; finally-based
+focus bookkeeping/invalidation and early completion-flag consumption preserve the request/failure exit.
+The existing separately compiled CustomControl forwards its native float codec through this public peer.
+The exact public signature and current adoption instructions are in the connection guide.
+
+CO has reported actual p1-r2 Tools/US provider workflows and a separately authorized Tools native bridge.
+Those results are not p4 custom numeric-editor acceptance; new consumer adoption/readback remains with US.
+FL does not wait for or implement the Tools bridge under this repair. Old fixed inputs and their failed/
+valid evidence remain unchanged. The repair still executes A001/DSP1/WO1; no new worker is introduced.
+## 0.9 selected core (2026-11-05)
+
+The 0.9 source adds Host-owned compatible tool connections, bounded semantic addresses/results,
+original-wrapper operations, same-source explicit non-rendering advance and preview registration.
+Node mount and semantic part/item incarnations prevent requests from reviving after a bounded owner
+view retires them. Only explicitly captured/pending nodes are followed while connected; a connected
+but uncaptured Host has no semantic polling. Disconnect removes that interest and tool-owned
+subscription/resources; old borrowed subscriptions, R9 and normal logs retain their conditions.
+Normal Release includes FER_TOOLS; document fault injection is compiled only with FER_TEST.
+
+UiHost.SetLayoutInput changes owner height/variant constraints through the established full layout
+transaction without swapping the definition/session. CompleteEdit uses the existing field parser,
+conflict/IME and one-request boundary; EndElementLifetime uses the existing subtree release path.
+API/release/build axes are 0.9.0. New advanced entries are public-unstable; existing stable signatures
+and defaults are not redefined. The public author range and separate preview registration sample are
+compiled with the current axes.
+
+The explicit net10.0 RimWorld17 target references the actual local 1.7.4998 rev1299 game assemblies,
+with Private=false; the full library and separate public Window/Settings AuthorExamples compile.
+The same source also builds an official platform-free net10.0 target. Numeric editor1.7 retains
+reported preset fallback; unavailable font revision revokes optional reuse. Native/render/IME,
+actual Tools/consumer semantic workflow, last-good tool reload and CO performance acceptance remain
+separate. The separately authorized Tools bridge/native owner supplies standalone visual evidence.
+
+The current [connection/target guide](../development/0.9/tools.md) carries usage; individual fixed
+producers carry their actual source form, command results and coverage. Prior 0.8/1.6 r6 evidence and
+pending native responsibility remain attached to that line, not silently superseded by this target.
+## 2026-11-05 尺寸、content hover 与领域日志
+
+当前8c6d0ff基线的 dirty 源码实现 Button NaturalBody／同源 caption inset、literal Auto 原串、
+单行 placeholder，以及 context-aware hover 的自身 effective clip。press／capture／editor 与
+popup window-space 路线不改；follow／reading-hold／显式 pin 仍由 consumer 持有。
+
+public-unstable VerseUiDiagnosticLog／UiDiagnosticLogOptions 经真实 UiHost internal constructor
+在创建前绑定 consumer，UiPageWindow 实际采用，旧构造／factory／metrics override 保持。
+原有动态诊断 route 在 push/pop 内借 Session，不新增持久 logger index／事实 ring／native owner。
+Trip／LastRequestFailure／parser issues／reload reports／已有 subscription 先记录，再可选原生三级
+输出；默认 daily、detail 早 gate、有限输出账本与采样／原 facts 预算独立。Host 关闭会完成后续
+清理后保原单异常或聚合，Session 在清理结果后释放 binding。可用 API、预算／摘要及迁移写法
+集中在[领域诊断](../development/0.8/ui-diagnostics.md)。
+
+本轮复用已有 layout/widget/help/input/edit/invalidation、Diagnostics／FailureLifetime／Reload／
+Style／WindowHost／Catalog／Observation、containment／Stable API 及 neutral Core 入口；不新增或
+弱化测试。具体实际命令／候选身份随固定交付保存。新 logger 的精确 quota、sink-failure、创建
+异常组合没有专用新 case，源码／既有路径检查不冒称这些分支的独立行为覆盖。真实字形、hover／
+阅读、IME／caret／selection／copy、稳定 Repaint／高级展开热点及1.7 native 均未由本轮签绿。
+更广 metrics 缓存／culling 和条件性空文本恢复未据新实测扩张；没有 FPS 改善数字。
+A001 的 Dev instrument 整体 gate 和 Release KernelAtomTests 曾保留两条旧精确期望失败
+（:221／:224，button16／余量304 未含 caption inset）。WO r3 明确授权后，A003 仅将这两处
+期望及说明按独立合同推导纠正为28／292；场景、断言数量、Near精度及其他断言不变。
+原 Atom suite／Dev instrument gate 已通过，旧失败日志保留；产品 runtime 未重编译，复用 r3 DLL。
+
 <a id="appearance-freedom"></a>
 ## 2026-11-03 外观自由度：作者入口与组合生产链
 

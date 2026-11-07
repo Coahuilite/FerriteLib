@@ -221,9 +221,10 @@ internal static class FerriteLibApiTierTests
         string name = member.Name.StartsWith("get_", StringComparison.Ordinal) || member.Name.StartsWith("set_", StringComparison.Ordinal) ? member.Name.Substring(4) : member.Name;
         if (type == "UiWidgetContext" && (name == "Session" || name == "Node" || name == "WithNode" || member is ConstructorInfo)) return true;
         if ((type == "UiHost" || type == "UiWindowHost") && name == "Session") return true;
-        if (type == "UiHost" && (name == "Observe" || name == "ObserveLiveHosts" || name == "ObserveLiveHost")) return true;
+        if (type == "UiHost" && (name == "Observe" || name == "ObserveLiveHosts" || name == "ObserveLiveHost" || name == "ConnectTools" || name == "ConnectLiveTools" || name == "AdvanceHeadless" || name == "SetLayoutInput" || name == "CompleteEdit" || name == "EndElementLifetime" || name == "SetCostSampleProvider")) return true;
         if (type == "UiDiagnosticSubscription" && new[] { "GeometryEnabled", "GeometryOverlay", "DumpGeometry", "TryGetGeometrySnapshot" }.Contains(name)) return true;
-        if (type == "UiControls" && name == "Trace") return true;
+        if (type == "UiDocumentService" && new[] { "AddProjectedLayout", "GetSnapshot", "Snapshots", "StatusRevision" }.Contains(name)) return true;
+        if (type == "UiControls" && (name == "Trace" || name == "EditSemantic")) return true;
         if (type == "UiSession" && member is not ConstructorInfo && !new[] { "CreateContext", "SetFrame", "Controls", "IsActive", "Identity", "Dispose" }.Contains(name)) return true;
         return false;
     }
