@@ -81,6 +81,13 @@
   </ItemGroup>
   <Import Project="NeutralSources.props" />
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+
+  <!-- Evaluate after the SDK has resolved the intermediate directory. Dev's portable PDB also
+       records that directory in the DLL's CodeView entry, even when no PDB is staged. Map both
+       source and out-of-tree intermediates; an explicit caller PathMap remains authoritative. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Dev' And '$(UiKitTarget)' == '' And '$(PathMap)' == ''">
+    <PathMap>$(MSBuildProjectDirectory)=/_/FerriteLib.UiKit,$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)'))=/_/FerriteLib.UiKit/obj</PathMap>
+  </PropertyGroup>
 </Project>
 
 

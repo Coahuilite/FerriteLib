@@ -6,6 +6,14 @@ cannot provide geometry by changing a label: its enable setters refuse and its s
 false. FL's existing Dev configuration defines FER_DEV; the consumer needs its own actual Dev wiring.
 FL adds no settings window, developer-panel button or translation key.
 
+The accurate 1.6 maintenance producer supplies separate fixed Release and FER_DEV roots from the
+accepted R1 production source. The repaired Dev carrier removes the old DLL's personal CodeView PDB
+path; the accepted Release carrier is reused unchanged. Exact inputs and evidence are in the
+[current producer entry](../../openspec/implementation.md#fl08-dev-path-delivery); its USE.md selects
+the matching DLL. After Coordinator release, US A002 r2 actually compiled and ran against that Dev
+carrier and supplied the accepted complete pair. This local pair is not a published Release asset.
+This does not replace native acceptance or relabel the old c3-dev carrier as containing R1.
+
 ## Keep cost sampling separate from geometry evidence
 
 For a pure cost sample, leave geometry capture and outline off on the participating windows. Record the
@@ -99,8 +107,10 @@ The carried-forward r5 local-delivery record already accepts the complete US UiL
 N1 follow-on, B grouped-navigation479, and Close30 bilingual/positive fit-hit11 evidence on their valid
 candidate or unchanged paths. These are closed managed checks, not unrun gates and not new A004 runs.
 
-Remaining gaps are the old O5 editor-injection entry; legacy author popup/LongAuthor red gates without
-the same current contract; direct current source-list search/selection/paging/long-text coverage; the new
+US A002 r2 completed the corrected O5 editor-injection entry and actual consumption of the repaired
+Dev carrier. O5's32 assertions are not the original32-Host-pass sample. Other retained gaps are legacy
+author popup/LongAuthor red gates without the same current contract; direct current source-list
+search/selection/paging/long-text coverage; the new
 Queued/32-pass/partial sampling branches; native glyphs, overlay alignment, editor/IME/input and lifecycle;
 independent1.7 reference/JIT/native coverage; and the original release specification/migration-document
 gates. No game was run here. Screenshot-review limits are unchanged.

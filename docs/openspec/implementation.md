@@ -5,9 +5,111 @@
 cf1cf6456096171fb47c012369bcd0c2f29e968f。FL-F01/F02/F03 已在该 HEAD 的 dirty 工作树修复；
 下列对应段落区分实际源码机制、已执行既有检查及未执行原生／精确故障组合。
 
+<a id="fl08-reliability"></a>
+## 2026-11-09 R1 当前依赖与成功 publication
+
+WO-RELIABILITY-CLOSEOUT-20261109 r1 的双线窄修已落本线源码；RPT-RELIABILITY-TOOLS-A001 r2
+补齐准确新载体的合法 Legacy08 caller 消费。FL owner 已核原件；PM 已按该 WO r3 接受其
+实施／允许验证范围，原生与精确故障证据限制保留。
+
+- `UiLayoutEngine.CommitNotifications` 只采样本 engine 当前依赖的通知，标记真实 owner 与 content
+  revision；不再把接收通知当作成功提交。`candidateRevisions` 是本次尝试的稀疏账，不改变 bindings。
+- full 与 stable incremental 两个成功边界通过 `PublishBindingRevisions` 发布读取前采样值。
+  full 成功才退休退出 `keyNodes` 的 revision；失败保留旧成功域，下一次尝试重新采样。
+  新出现／复显键在首次读取前采样；同键多位置及增量转 full 不覆盖较早采样，晚通知仍使观察 Stale。
+- `UiLayoutEngine.Inputs` 的 visibility／width／tab 读取同样先采样；隐藏后代退出当前域，
+  复显经原读取／缓存失效路径取得最新值。Close 的原 cache release 同时释放候选账。
+  observation 仍检查成功 revision、dirty、content、definition、translation；last-good 不授予输入。
+- 两线无新增公开 API／版本／能力门，也未改变宽通知、旧 Measure、provider、Live=false 或
+  无 Tools 的使用条件。没有移入 09 的窗壳、HitTest、selection suppression 或 MeasureBudget。
+
+本线隔离输入在 `dist/reliability-20261109/fl-a001-r1/`，含 `carrier`、`source-form`、身份和日志。
+Release Neutral、RimWorld17 参考及 net472 均构建成功；既有 Core 391 项通过，既有 net472
+LayoutReuse／Visibility／FailureLifetime／Observation／Invalidation／ContainerTab／API tier suites
+均通过。Core 是 source-linked 中立证据，net472 suites 是 managed stub 证据，不是固定工件的
+真实 consumer 或 1.6 native 接受。
+
+后续真实消费转录：RPT-RELIABILITY-TOOLS-A001 r2 的 `r1-legacy08-us/caller.json`、
+`readback-summary.json`，实际加载本线 Native17 MVID `818e0df5-0467-48d1-883c-957dba84545b`。
+合法 US B C4 page-only provider MVID `d0fae9fc-7754-4f77-974a-12f0f3a31334` 通过原范围／
+maintenance 能力检查；149节点未截断，原完整 key／opaque Select 请求经 Queued→同ID Handled，
+同 mount35 的实际 value 从 `null`（继承）读回 `Disabled`。不是保存／音频／运行发布接受。
+Background Native17 的 visible=false／focused=false，正常 close cleanupCompleted=true、exit0，
+descriptor closed。此为08合法 consumer 兼容及一次闭环，不是08原域差故障的 before/after；
+08原缺口仍有静态与既有检查证据，准确1.6、Neutral真实caller、游戏／物理输入／IME及异常退出不由此补签。
+本次未发现需追加代码修复的反例，未重跑未变检查；旧冻结载体及包未更新。
+
+### 准确 1.6 双配置固定载体
+
+WO-FL08-RW16-CONVERGENCE-20261109 r1 / TASK-RW16-FL A001 从本线实际 dirty 源生产
+`dist/rw16-convergence-20261109/fl-a001-r1/`：Release 与 Dev 各含完整五文件 FerriteLib 根。
+生产源与已接受 R1 固定 source-form 的164个文件逐内容及清单一致，无新增 C#／API 修复。
+两个目标均为 net472／x64，引用 Krafs.Rimworld.Ref 1.6.4871；没有构建 Neutral／RimWorld17 或09。
+Release MVID `834c0905-f327-49d4-8dc1-51866467608b`；Dev MVID
+`457e6bd8-6722-4e48-a5e2-b584b1a6867f`。Dev 实际定义 FER_DEV，Release 不含；dirty 来源标签
+及基线 HEAD 不代表干净提交，准确源、求值配置、构建／staging 原件和复建入口随固定交付。
+
+两次生产构建及两次隔离 harness 构建均零警告／错误。既有 harness 实际执行前换入准确生产
+DLL：Dev Geometry284、LayoutReuse76、Visibility31、FailureLifetime77、Observation44、
+Invalidation41、ContainerTab15、WindowHost40、WindowCatalog183、NativeEventConsumption8、
+API-tier6均通过；Release Geometry16确认拒绝启用仪器。未变 R1 Core／Release 证据按原身份复用。
+这是准确载体的 managed-stub 证据，不是1.6游戏运行。该次 producer 交付未运行 PageLifecycle、
+Diagnostics、containment 及完整 Dev reader：其临时清理与当时禁删范围冲突。该历史缺口由下列
+新授权下的独立运行承接，旧结果不回写。
+
+CO 的 SUM-FL08-RW16-CONVERGENCE-20261109 r1 已记录 US owner 实际消费上述准确双配置，
+并交付 US B a001-r2 完整配对；该消费依据来自 CO 收取的 US 报告，不从 FL ready 推定。
+Dev 根承接原 US_DEV + FER_DEV 入口，Release 用于普通入口，不新增 Dev／Tools 前提。
+原32 Host-pass采样、Capture／Outline／Report连续链、游戏字体／输入／IME、关闭与
+真实生命周期验收仍由原门承接；旧 c3-dev／C4／r6 及 R1 固定工件不替换。
+
+### 准确 1.6 既有检查缺口收敛
+
+WO-RW16-VALIDATION-CLOSURE-20261109 r1 / TASK-VC-FL A001 在全新独占系统 TEMP 中，
+逐路径核清理、链接及子进程后执行原入口。Release 的 KernelPageLifecycleTests90、
+KernelDiagnosticsTests89、KernelContainmentTests5 均通过；原 verify-dev-instrument.ps1
+以 NoBuild 读取准确 Dev harness 的完整运行，通过4188项、40/40指定开发断言及11条几何节点。
+完整 Dev 运行也覆盖上述 lifecycle／diagnostics／containment suites，没有抽取私有 case。
+
+生产与既有检查源码逐内容匹配上轮固定 source-form；复用上轮两配置 harness，分别换入上述
+准确生产 DLL。未发现需改生产或夹具的反例，没有重编或重包未变产品。隔离副本首次漏复制
+reader 脚本，补齐后又暴露缺 canonical bin/stubs；补入原有脚本／stub 输出后原入口通过。
+这是执行输入修正，不是产品故障的 before/after；场景、断言及清理正文未改。
+
+本轮日志、执行载体 metadata、输入对比及清理审计在
+`dist/rw16-validation-closure-20261109/fl-a001-r1/`，保留独立身份；全部被观察的删除目标位于
+本轮独占 runtime 子目录，结束时这些目录为空。结果只补 managed-stub 检查缺口，原1.6游戏、
+输入／IME、真实生命周期及 consumer 32-pass／Report 门不变。该次 US 消费沿原固定身份；
+后续 Dev 路径修复与新的消费依赖如下。
+
+<a id="fl08-dev-path-delivery"></a>
+### 准确 1.6 Dev CodeView 路径修复
+
+WO-RW16-VALIDATION-CLOSURE-20261109 r3 / DSP-VC-FL-A002 r1 处理 US A002 实际发现的分发
+隐私缺口：原 Dev DLL 的 CodeView 项含个人构建根下的 PDB 绝对路径；不随包携 PDB 仍会泄露。
+本次只改生产 csproj：在 SDK 解析 intermediate 后，为普通1.6 Dev 默认映射 source 与
+intermediate 到中立虚拟路径，保显式 caller PathMap。164个生产输入中仅该项目文件变化，
+C#、API、Dev仪器、Live、无Tools路线及原使用条件不变。
+
+固定交付为 `dist/rw16-validation-closure-20261109/fl-a002-r1/`：
+
+- Dev/FerriteLib：新 MVID `bf3ca125-fb06-46a1-b3d5-52289260434e`，net472/x64、FER_DEV、
+  Krafs.Rimworld.Ref1.6.4871；SDK10.0.204隔离构建零警告／错误。实际CodeView路径为
+  `/_/FerriteLib.UiKit/obj/FerriteLib.UiKit.pdb`，个人路径字节匹配由旧Dev的1项降为0。
+- Release/FerriteLib：直接复用已接受 MVID `834c0905-f327-49d4-8dc1-51866467608b` 的原五文件根，
+  无CodeView项／个人路径匹配；Release构建条件未变，未重建或重跑未受影响检查。
+- 新Dev通过原 `--suite KernelDevGeometryTests`（284 passing、0 FAIL、exit0）及原staging
+  引擎的配置／五文件闭合集／许可／复制完整性门。A001已接受的PageLifecycle、Diagnostics、
+  containment及完整reader保其原身份／证据，不重复执行；本次不把旧结果改签为新DLL运行。
+
+交付附准确Source Form、原Release来源、真实构建方法和脱敏证据。FL producer原报告止于交CO放行；
+后续US A002 r2已实际以同一固定Dev DLL完成编译／运行消费及完整配对，原O5 32与manifest479通过。
+此下游结果由SUM-RW16-VALIDATION-CLOSURE-20261109 r2及WO-RW16-VALIDATION-CLOSURE-20261109 r4核收，不改签FL原producer报告或Release复用证据。
+旧Dev、兼容载体及历史包原样保留。准确1.6游戏／输入／IME／真实生命周期、32-pass与Report门不变。
+
 ## 2026-11-06 维护工具合同与虚拟视口接续
 
-[开发工具连接](specs/contracts/developer-tools/spec.md)补录已选的0.8维护能力；现有源码已提供语义／headless、作者文档、prepare、布局输入、来源与可选cost接缝，实际调用见[维护指南](../development/0.8/offline-workbench.md)。普通net472／1.6和Stable范围不变。完整游戏视口／观看映射接入尚未实施，独立工具持产品与合成层；库只补真实中立缺口。1.7新开发跟随当前接口，不锁小构建号；现有构建记录保原身份，1.7参考不代签1.6。本文以下按各段日期保已有证据，不因本次doc-only修订重签。
+[开发工具连接](specs/contracts/developer-tools/spec.md)补录已选的0.8维护能力；现有源码已提供语义／headless、作者文档、prepare、布局输入、来源与可选cost接缝，实际调用见[维护指南](../development/0.8/offline-workbench.md)。普通net472／1.6和Stable范围不变。此处只记FL08：没有移入FL09的UiWindowShell、SuppressSelectionOutline、HitTest或MeasureBudget；独立工具持视口／观看合成层。FL09后续完整窗运行不补成本线的准确1.6接受。1.7新开发跟随当前接口，不锁小构建号；现有构建记录保原身份，1.7参考不代签1.6。本文以下按各段日期保已有证据，不因本次doc-only修订重签。2026-11-08仅静态对账；原page／provider及MeasureAndArrange成功发布／合法scroll clamp保原条件，IUiMeasureParticipant仍是原可选能力，不为旧调用增设预算纯读前提。
 
 ## 2026-11-05 尺寸、content hover 与领域日志
 

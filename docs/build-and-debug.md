@@ -22,6 +22,18 @@ The second command builds Dev and stages `dist/dev/FerriteLib`. Its installable 
 Staging records `payload-sha256` in `version.txt` and verifies the copied DLL before replacing the previous package.
 Do not build and pack the same configuration concurrently.
 
+### Keep Dev debug paths virtual
+
+The retained 1.6 Dev project maps its source and resolved intermediate directories to
+`/_/FerriteLib.UiKit` and `/_/FerriteLib.UiKit/obj`. This default also covers an isolated, out-of-tree
+`IntermediateOutputPath`; it is evaluated after the SDK resolves that path. An explicit caller
+`PathMap` is preserved and must cover both locations. Release's existing `DebugType=none` is unchanged.
+
+Omitting the PDB from a mod root does not remove the DLL's CodeView PDB path. Before distributing a
+new Dev carrier, inspect the actual DLL's CodeView entry and personal-path bytes, not just its staged
+file names. The repaired fixed producer and its before/after evidence are linked from the
+[implementation map](openspec/implementation.md#fl08-dev-path-delivery).
+
 The Dev, GitHub and Steam packers share `scripts/Release.Identity.psm1` for the build axis;
 GitHub/Steam and the release workflow also share the `vBASE` / `vBASE-rcN` tag grammar.
 The two publication packers use the same source-commit checks. Only GitHub's explicit
@@ -122,7 +134,9 @@ Under later explicit cloud authorization:
    checks remain. Release CI verifies again, runs privacy, builds a clean base-version Release payload,
    stages it and publishes a CI-built prerelease asset with make_latest=false.
 3. US selects that actual repo/tag/full SHA/asset and records its compiler/runtime input. Run US CI,
-   review/main integration, then its v0.6.0-rc1 publication.
+   or the affected existing local consumer checks for an authorized working-branch baseline. US main
+   integration and its v0.6.0-rc1 publication require separate authorization; neither is part of a
+   baseline-only working-branch push. Keep the exact independent Dev pair for its original uses.
 4. Execute the existing post-release verification against the real asset.
 
 The DLL's base ProductVersion and About.xml remain0.8.0; the tag/archive owns rc2 identity and the DLL

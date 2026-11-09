@@ -8,6 +8,12 @@
 ### Requirement: FL08-ORDINARY 普通读取保持原采用条件
 普通值／只读／options 注册、手写访问器和旧自定义 Measure SHALL 保持原通知及合法执行条件；Set 请求业务 mutation，不等于存储成功，也不自动 NotifyChanged。显式通知默认 Everything；None=0、Paint=1、Measure=2、Structure=4，Everything 为后三者并集。公告须到达真实消费者声明的 binding；尺寸／可见性等依赖不能被误归为纯 paint。未登记 getter 不因快路获得 pure、订阅或创建线程前提。
 
+普通公告 SHALL 容纳已注册键的同值、冗余、批内重复及非当前布局键，不要求作者过滤当前可见项；
+这不把 tracked equality 的抑制政策加给普通通知。每 Host 按其实际完整依赖验证，不由共享 bindings
+的一次公告／另一 Host 提交代确认。待布局义务属于该 engine 最后成功 publication 的当前依赖域；
+只有成功 publication 才确认其读取前采样的 revision，并退休已退出该域的键。隐藏不清模型通知，
+复显读取当前值；读取或测量期间的新公告、失败候选均不能冒充已成功覆盖的 revision。
+
 #### Scenario: 普通字段在 UI 外改变
 - **WHEN** 业务改变影响文字测量的普通字段并按原注册 key 通知
 - **THEN** 真实依赖在下次合法同步验证

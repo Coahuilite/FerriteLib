@@ -38,7 +38,7 @@ internal sealed partial class UiLayoutEngine
         ReleasePipeline();
         layoutScopes.Clear(); textMetricsCache = null; activeLayoutScope = null;
         cachedSnapshot = null; lastEntries = new PageTable<PlacedEntry>(Array.Empty<PlacedEntry>()); widgetInstances.Clear(); repeatStates.Clear();
-        materializedRepeats.Clear(); keyNodes.Clear(); committedRevisions.Clear();
+        materializedRepeats.Clear(); keyNodes.Clear(); committedRevisions.Clear(); candidateRevisions.Clear();
         visibleInputs.Clear(); widthInputs.Clear(); tabInputs.Clear(); autoWidths.Clear(); labelContributions.Clear();
     }
     private UiNodeId activeUpdateScope;
