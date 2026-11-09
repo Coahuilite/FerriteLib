@@ -49,7 +49,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     }
     private UiMeasurement CaptureText(UiWidgetContext ctx,string text)
     {
-        return new UiMeasurement(new UiMeasureInputs(new[] { text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx, BandFont), ctx.Theme.Geometry.Padding }, text.Length > 0), () => Math.Max(ReadHeight(), WrappedTextWidget.MeasureBand(ctx, text, AtomVocabulary.TextFont(ctx, BandFont), ctx.Theme.Geometry.Padding * 2)));
+        return new UiMeasurement(new UiMeasureInputs(new[] { text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx, BandFont), (float)(UiTextFonts.For(ctx).Font.Size ?? 0), ctx.Theme.Geometry.Padding }, text.Length > 0), () => Math.Max(ReadHeight(), WrappedTextWidget.MeasureBand(ctx, text, AtomVocabulary.TextFont(ctx, BandFont), ctx.Theme.Geometry.Padding * 2)));
     }
 
     public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
@@ -66,7 +66,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     }
     private void PaintText(UiLayoutRect rect,UiWidgetContext ctx,string text)
     {
-        UiThemeDraw.Label(ctx.Drawing,rect, text, ctx.Theme, ctx.Theme[UiPaletteRole.SecondaryForeground], AtomVocabulary.TextFont(ctx, BandFont), UiTextAnchor.MiddleCenter);
+        UiTextFonts.Label(ctx,rect, text, ctx.Theme.Styles.Resolve(UiStatusTone.Neutral, UiEmphasis.Muted).Text, AtomVocabulary.TextFont(ctx, BandFont), UiTextAnchor.MiddleCenter);
     }
 
     /// <summary>Shared by Measure and Draw so the allocated band always matches the drawn string.</summary>

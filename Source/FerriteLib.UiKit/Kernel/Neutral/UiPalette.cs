@@ -128,10 +128,48 @@ public sealed class UiPalette
         Revision++;
     }
     public static bool TryRole(string? name, out UiPaletteRole role)
-        => Enum.TryParse(name, false, out role) && Enum.IsDefined(typeof(UiPaletteRole), role) && role.ToString() == name;
+    {
+        // Canonical names recur for every element's palette during arrange and draw.
+        switch (name)
+        {
+            case nameof(UiPaletteRole.WindowSurface): role = UiPaletteRole.WindowSurface; return true;
+            case nameof(UiPaletteRole.PanelSurface): role = UiPaletteRole.PanelSurface; return true;
+            case nameof(UiPaletteRole.ControlSurface): role = UiPaletteRole.ControlSurface; return true;
+            case nameof(UiPaletteRole.HoverSurface): role = UiPaletteRole.HoverSurface; return true;
+            case nameof(UiPaletteRole.SelectedSurface): role = UiPaletteRole.SelectedSurface; return true;
+            case nameof(UiPaletteRole.SuccessSurface): role = UiPaletteRole.SuccessSurface; return true;
+            case nameof(UiPaletteRole.WarningSurface): role = UiPaletteRole.WarningSurface; return true;
+            case nameof(UiPaletteRole.DangerSurface): role = UiPaletteRole.DangerSurface; return true;
+            case nameof(UiPaletteRole.WorkspaceSurface): role = UiPaletteRole.WorkspaceSurface; return true;
+            case nameof(UiPaletteRole.SectionSurface): role = UiPaletteRole.SectionSurface; return true;
+            case nameof(UiPaletteRole.Foreground): role = UiPaletteRole.Foreground; return true;
+            case nameof(UiPaletteRole.SecondaryForeground): role = UiPaletteRole.SecondaryForeground; return true;
+            case nameof(UiPaletteRole.SelectedForeground): role = UiPaletteRole.SelectedForeground; return true;
+            case nameof(UiPaletteRole.SuccessForeground): role = UiPaletteRole.SuccessForeground; return true;
+            case nameof(UiPaletteRole.WarningForeground): role = UiPaletteRole.WarningForeground; return true;
+            case nameof(UiPaletteRole.DangerForeground): role = UiPaletteRole.DangerForeground; return true;
+            case nameof(UiPaletteRole.DisabledForeground): role = UiPaletteRole.DisabledForeground; return true;
+            case nameof(UiPaletteRole.Accent): role = UiPaletteRole.Accent; return true;
+            case nameof(UiPaletteRole.SwitchOff): role = UiPaletteRole.SwitchOff; return true;
+            case nameof(UiPaletteRole.Border): role = UiPaletteRole.Border; return true;
+            case nameof(UiPaletteRole.StrongBorder): role = UiPaletteRole.StrongBorder; return true;
+            case nameof(UiPaletteRole.Divider): role = UiPaletteRole.Divider; return true;
+            case nameof(UiPaletteRole.WindowBorder): role = UiPaletteRole.WindowBorder; return true;
+            case nameof(UiPaletteRole.PanelBorder): role = UiPaletteRole.PanelBorder; return true;
+            case nameof(UiPaletteRole.ControlBorder): role = UiPaletteRole.ControlBorder; return true;
+            case nameof(UiPaletteRole.HoverBorder): role = UiPaletteRole.HoverBorder; return true;
+            case nameof(UiPaletteRole.SelectedBorder): role = UiPaletteRole.SelectedBorder; return true;
+            case nameof(UiPaletteRole.SuccessBorder): role = UiPaletteRole.SuccessBorder; return true;
+            case nameof(UiPaletteRole.WarningBorder): role = UiPaletteRole.WarningBorder; return true;
+            case nameof(UiPaletteRole.DangerBorder): role = UiPaletteRole.DangerBorder; return true;
+        }
+        // Preserve the parsed out value even when a numeric or noncanonical spelling is rejected.
+        return Enum.TryParse(name, false, out role) && Enum.IsDefined(typeof(UiPaletteRole), role) && role.ToString() == name;
+    }
     private static void Validate(UiPaletteRole role)
     {
-        if (!Enum.IsDefined(typeof(UiPaletteRole), role)) throw new ArgumentOutOfRangeException(nameof(role));
+        // The closed role vocabulary is contiguous from zero through DangerBorder.
+        if ((uint)role > (uint)UiPaletteRole.DangerBorder) throw new ArgumentOutOfRangeException(nameof(role));
     }
     public static UiColour Default(UiPaletteRole role) => role switch
     {

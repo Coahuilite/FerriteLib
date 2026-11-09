@@ -139,11 +139,13 @@ public sealed class UiPageWindow : UiWindowHost
         // The page's identity for contract errors, the audit and the host ledger is the registration,
         // not the context key: two contexts of one page are one authored document.
         string source = key.Consumer + "/" + key.WindowKind;
-        return new UiHost(source, manifest, bindings, theme, metrics, translation, document);
+        // Diagnostic identity cannot add a new key prerequisite to the existing standalone shell.
+        string consumer = string.IsNullOrWhiteSpace(key.Consumer) ? "unknown" : key.Consumer;
+        return VerseUiDiagnosticLog.CreateHost(consumer, source, manifest, bindings, theme, metrics, translation, document);
     }
 
     protected override void DrawNotice(Rect rect, UiWindowNotice notice)
     {
-        UiThemeDraw.Label(Execution,VerseUiExecution.Rect(rect),noticeText(notice),theme,singleLine: false);
+        DrawPageNotice(rect, noticeText(notice));
     }
 }

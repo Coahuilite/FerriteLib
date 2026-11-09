@@ -5,7 +5,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Native numeric text editing over the common draft/model observation and finite numeric codec.
 /// Invalid or conflicting drafts remain local; accepted requests are not assumed business acceptance.
 /// </summary>
-internal sealed class NumberFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
+internal sealed partial class NumberFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/number-field";
 
@@ -49,7 +49,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     {
         string label = AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
         return new UiMeasurement(AtomVocabulary.LabelMeasureInputs(ctx, label), () => AtomVocabulary.ReadHeight(spec,
-            UiSliderLayout.Measure(label, ctx.ViewWidth, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0).Height));
+            UiTextFonts.ControlHeight(ctx, UiSliderLayout.Measure(label, ctx.ViewWidth, UiTextFonts.For(ctx, AtomVocabulary.TextFont(ctx)), UiElementProperties.DensityOf(ctx.Theme), ctx.Node?.SharedLabelWidth ?? 0), UiTextFonts.RowHeight(ctx, UiTextPurpose.Editor))));
     }
 
     public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
@@ -85,10 +85,12 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         AtomVocabulary.PaintEditFeedback(field, ctx, retainedEditor);
         string retainedLabel=AtomVocabulary.ResolveText(spec,ctx,"Label","LabelKey");
         DrawLabel(rect, ctx, style,retainedLabel);
+        UiColour? retainedInk = UiTextFonts.AnyInk(ctx.Theme) ? style.Text : null;
+        string retainedDraft = retainedEditor.Draft;
         retained.Capture(ctx, (r,c) =>
         {
             ResolveLabelBand(r,c,out UiLayoutRect slot,retainedLabel);
-            UiRetainedPaint.Field(slot,c,retainedEditor.Draft);
+            UiRetainedPaint.Field(slot,c,retainedDraft,retainedInk);
             DrawLabel(r,c,style,retainedLabel);
         });
     }
@@ -100,10 +102,10 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     public float MeasureLabel(UiWidgetContext ctx)
     {
         string label = AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
-        return label.Length == 0 ? 0 : ctx.Metrics.MeasureWidth(label, AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing;
+        return label.Length == 0 ? 0 : UiTextFonts.For(ctx, AtomVocabulary.TextFont(ctx)).MeasureWidth(label) + ctx.Theme.Geometry.Spacing;
     }
 
-    private UiSliderLayout LabelLayout(UiWidgetContext ctx, float width, string? capturedLabel = null) => UiSliderLayout.Measure(capturedLabel ?? AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey"), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0);
+    private UiSliderLayout LabelLayout(UiWidgetContext ctx, float width, string? capturedLabel = null) => UiSliderLayout.Measure(capturedLabel ?? AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey"), width, UiTextFonts.For(ctx, AtomVocabulary.TextFont(ctx)), UiElementProperties.DensityOf(ctx.Theme), ctx.Node?.SharedLabelWidth ?? 0);
     private void ResolveLabelBand(UiLayoutRect rect, UiWidgetContext ctx, out UiLayoutRect field, string? capturedLabel = null)
     {
         UiSliderLayout layout = LabelLayout(ctx, rect.Width, capturedLabel);
@@ -123,6 +125,6 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         if (label.Length == 0)
             return;
         UiSliderLayout layout = LabelLayout(ctx, rect.Width, capturedLabel);
-        UiThemeDraw.Label(ctx.Drawing,new UiLayoutRect(rect.X, rect.Y, layout.LabelWidth, layout.Stacked ? layout.LabelHeight : rect.Height), label, ctx.Theme, style.Text, AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft);
+        UiTextFonts.Label(ctx,new UiLayoutRect(rect.X, rect.Y, layout.LabelWidth, layout.Stacked ? layout.LabelHeight : rect.Height), label, style.Text, AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft);
     }
 }

@@ -97,15 +97,15 @@ public sealed class UiStyleTable
         switch (tone)
         {
             case UiStatusTone.Active:
-                return From(theme.SelectedSurface, theme[UiPaletteRole.SelectedForeground]);
+                return From(theme.SelectedSurface, Text("TextColor.Active", UiPaletteRole.SelectedForeground));
             case UiStatusTone.Success:
-                return From(theme.SuccessSurface, theme[UiPaletteRole.SuccessForeground]);
+                return From(theme.SuccessSurface, Text("TextColor.Success", UiPaletteRole.SuccessForeground));
             case UiStatusTone.Warning:
-                return From(theme.WarningSurface, theme[UiPaletteRole.WarningForeground]);
+                return From(theme.WarningSurface, Text("TextColor.Warning", UiPaletteRole.WarningForeground));
             case UiStatusTone.Danger:
-                return From(theme.DangerSurface, theme[UiPaletteRole.DangerForeground]);
+                return From(theme.DangerSurface, Text("TextColor.Danger", UiPaletteRole.DangerForeground));
             case UiStatusTone.Disabled:
-                return new UiResolvedStyle(theme.BaseSurface.Fill, theme[UiPaletteRole.Divider], theme[UiPaletteRole.DisabledForeground]);
+                return new UiResolvedStyle(theme.BaseSurface.Fill, theme[UiPaletteRole.Divider], theme.ReadTextColour("TextColor.Disabled") ?? theme[UiPaletteRole.DisabledForeground]);
             case UiStatusTone.Neutral:
                 return Neutral(emphasis);
             default:
@@ -120,8 +120,11 @@ public sealed class UiStyleTable
         return new UiResolvedStyle(
             surface.Fill,
             surface.Border,
-            emphasis == UiEmphasis.Muted ? theme[UiPaletteRole.SecondaryForeground] : theme[UiPaletteRole.Foreground]);
+            emphasis == UiEmphasis.Muted ? Text("TextColor.Muted", UiPaletteRole.SecondaryForeground) : Text("TextColor", UiPaletteRole.Foreground));
     }
+
+    private UiColour Text(string slot, UiPaletteRole fallback)
+        => theme.ReadTextColour(slot) ?? theme.ReadTextColour("TextColor") ?? theme[fallback];
 
     private static UiResolvedStyle From(UiSurfaceStyle surface, UiColour text)
     {

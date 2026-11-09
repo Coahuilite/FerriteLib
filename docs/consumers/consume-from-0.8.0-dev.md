@@ -1,165 +1,307 @@
-# Consume the 0.8.0 development candidate
+# Consume FerriteLib 0.8.x
 
-Use a fixed Dev package from this line, not a moving sibling build output. Only FerriteLib ships the
-runtime DLL; a consumer references it with `Private=false` and does not bundle another copy.
+Select one fixed DLL, assert its API range, and retain the same Host for an open UI. Then choose ordinary
+notifications or explicitly tracked sources; neither requires a model base class. Start with the
+[settings recipe](ordinary-settings.md) for a page, or [S1–S7](../openspec/specs/policies/public-authoring/spec.md)
+for partial/custom adoption. Current requirements are in the [specification](../specification.md).
 
-PM has accepted the current technical contract and US has consumed the fixed source input. The next
-RC step uses the published v0.8.0-rc1 GitHub Release asset after PM completes publication, not a local
-Dev DLL relabeled as Release. Native acceptance and next-session UI/UX work remain separate; known
-headless game errors are accepted as non-blocking for this transition, not as an error-free game result.
+## Select the actual input
 
-```csharp
-if (!FerriteLibVersion.Require(new Version(0, 8, 0), new Version(0, 9, 0),
-    "your.package.id", out string diagnostic))
-    throw new InvalidOperationException(diagnostic);
-```
+The published asset is [v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1),
+from a0b5b983c3c13a099c62d936305eaebaf1deb5a8, a non-latest prerelease.
+**rc2 is prepared locally, not published**; see its [notes](../release-notes/v0.8.0-rc2.md).
+Until a real cloud asset exists, rc2 integration uses the explicitly delivered immutable local Release input.
+Record actual source/configuration/DLL identity; do not substitute a moving output, rc1 fallback or relabeled Dev.
+After publication select the real repo/tag/full SHA/asset.
 
-The old `[0.7.0,0.8.0)` range excludes this candidate. Explicitly adopt the new development input, compile,
-then run the consumer's own harness and native UI checks; widening the range alone is not a migration.
+Only FerriteLib distributes the runtime DLL. Reference it with Private=false and install no second carrier.
+Every consumer checks its own tested range; game dependency metadata cannot express a version:
 
-This is the approved prepublication breaking refactor. Start with [the exact migration](../development/0.8/refactor-migration.md)
-and [supported S1–S7 paths](../development/0.8/public-contract.md), including explicit frame/execution,
-UiChoice<T>, typed declarations and structured item addresses. Existing Button/Slider kinds remain usable. Button now activates on valid
-primary release rather than delegating timing to the native compound button. Slider selects immediately
-through shared range behavior and does not edit a neighboring NumberField draft. Keyboard/edit defaults
-include the confirmed editing migration below. Other 0.8 requirements are not implied by this candidate.
+    if (!FerriteLibVersion.Require(new Version(0, 8, 0), new Version(0, 9, 0),
+        "your.package.id", out string diagnostic))
+        throw new InvalidOperationException(diagnostic);
 
-Checkbox (both looks), InputModeRow, Dropdown trigger/options and Tree parts now use qualified primary
-release (F2). Explicit same-value choices still request once. Dropdown outside primary press closes
-and consumes the gesture (F3), without executing the covered/underlying command on its later release.
-Checkbox's declared ActionBind still runs after Set. String/typed choice identity and display fallback
-remain; missing values are observed, never silently repaired. No keyboard/global Cancel or synthetic
-focus-return behavior is added. See the [BSE contract](../development/0.8/bse-contract.md) for independent
-composition and headless examples and the [complete inventory](../development/0.8/migration-status.md)
-for the complete retained first-version scope.
+The first public author baseline is0.8.x. Prior internal ranges and vocabulary are historical references,
+not prerequisites for learning current use. Source, compiled DLL, XML, meaning and legal conditions have
+the [stable compatibility promise](../api-tiers.md); public-unstable/advanced exceptions remain explicit.
 
-See [S0/S1 contract](../development/0.8/s01-contract.md) for per-property remove/following, independent
-composition, headless entry points, capture ownership and error handling. Supported S1–S7 paths and required dependencies are stable; detailed R9 stays experimental.
-Keep the exact selected source/configuration/package identity with your development evidence.
+## Declare and connect once
 
-## Read a help topic from the Session
+Use XML Schema2 or immutable UiElementSpec/Create definitions; both use the same compiler and typed checks.
+Default kinds cover ordinary controls, descriptions, images and keyed Repeat. A compatible UpdateDefinition
+keeps the Host/session; deleting and recreating an editor is not equivalent to hiding a retained one.
 
-Use element/choice `HelpRef` for an opaque consumer catalog reference, and read
-`host.Session.CurrentHelpRef` plus `CurrentHelpSource` for your panel. A choice's explicit reference
-overrides its element; empty HelpRef falls back to general element help without inferring Value/Text.
-`HelpGracePasses` retains pass-based grace (US uses15); `Tooltip` still draws text you translate.
+For ordinary data use BindValue/BindReadOnly, BindCommand/BindAction and NotifyChanged at the model mutation
+boundary. Set requests the owner's write; it neither guarantees acceptance nor sends the notification.
+Notify the actual declared key with its real invalidation class. Mutable Theme and ordinary/legacy Measure
+remain legal under their original conditions.
 
-Rename old HelpKey/Choice.Help/XML Help to HelpRef, HoverClaim/HoverClaimElement/ClaimHover to
-CurrentHelpRef/CurrentHelpSource/PublishHelp, and IUiBindingReader to IUiBindingAccess. Binding reads
-VisibleKey/WidthKey/SelectedKey/PayloadKey become VisibleBind/WidthBind/SelectedBind/PayloadBind.
-TextKey/LabelKey and real element identities keep their meanings. Old string/static default Value
-and typed default Text outputs require explicit HelpRef to preserve either old result.
+For automatic dependencies explicitly use ReactiveRuntime.Int/Text/Boolean and BindTracked.
+Other Value/List types require caller equality. Structural lists and item properties are separate sources;
+immutable choices project all mutable data while tracking, not later in Draw. A shared model owner can outlive
+multiple Hosts. External services deliver safe results in the projection's owning context; FL does not supply
+tasks, thread dispatch or freshness policy. See the [counter walkthrough](../development/0.8/counter-walkthrough-zh.md)
+and [binding contract](../openspec/specs/core/binding-reactivity/spec.md).
 
-An optional `HoveredOptionHelpOutputBind` replaces HoverHelpKey when you separately need observable
-per-control output. It is not needed by the unified panel. Cleanup withdraws only the last owned
-publication; initial/consumer-written values or a newer same-address publisher are not erased.
-Publication and cleanup use the existing access-supplied owner-bound value endpoint, including across
-proxy backing switches. No new proxy-capture interface or switching prerequisite is required.
-The complete [migration map](../development/0.8/refactor-migration.md) records named-argument changes,
-ownership, grace sequencing and actual unsupported old spellings.
+Forwarding IUiBindingAccess names its actual BindingOwner and consistently forwards endpoints and operations.
+Switch backing between passes; Host validates before replacing its projection. Reacquire minting-registry
+endpoints after switching. Ordinary forwarding does not activate tracking or change target identity.
+Use optional UiItemBindings for current-key fields/commands; authoritative membership may outlive a filtered
+Repeat key view. Filtering/paging/business Move and object disposal remain consumer-owned.
 
-## Edit first, publish once
+## Use one UI lifecycle
 
-TextField, NumberField and StepperSlider now default to `Live="false"`. Declare `Live="true"` if your
-old page relied on implicit immediate writes (including the later US migration). Ordinary valid,
-nonconflicting blur commits; invalid/conflicting drafts remain. Cancel discards only local input.
-Normal callback return ends a confirmation even when business refuses or normalizes the value;
-the next display reads the real model. Setter exceptions do not cause rollback or automatic retries.
+For a standard shell construct UiPageWindow, optionally register it in UiWindowCatalog with a stable key.
+For an existing native callback retain UiHost plus VerseUiExecution and call DrawFrame with the actual content
+rect, execution.CaptureFrame(nativeInputAllowed), and that execution. Capture once per native callback.
+For native controls without Host retain Session/CreateContext/SetFrame; for headless operations or independent
+visuals no fabricated Host/node is required. See the [adapter](../openspec/specs/adapters/rimworld16/spec.md).
+
+Host/Session borrow execution. Idle switching is legal, but an open pass/capture/active editor refuses a different
+execution before changing frame or qualification. End or explicitly SuspendEditor on the old one first.
+Close Session before execution, and dispose execution in finally. Image tokens are execution-scoped;
+the supplier retains texture lifetime. Host close does not destroy business services.
+
+SetDisplayDemand communicates reliable hidden demand, not input focus. Hidden drafts remain under the same
+target; closing the real UI disposes its connections. Subscriptions attach/detach through the existing hooks,
+whose explicit failure conditions still apply. No library-wide keyboard navigation or global window manager
+is implied by the native shell.
+
+## Edit first, publish deliberately
+
+TextField, NumberField and StepperSlider default Live=false; explicitly set Live=true when wanted.
+Valid, nonconflicting ordinary blur confirms; invalid/conflicting drafts remain. Cancel changes only the local
+draft, not earlier Live writes. A normal request return ends that request even if business rejects/normalizes;
+paint/readback failure cannot replay it. Setter failure preserves actual side effects without rollback.
+
+Within StepperSlider, model10/draft20/Step1 requests only21 on plus; an actual Slider30 requests only30.
+Capture alone preserves the draft. Only declared local participants can take it over, not every same-Bind field.
+Shared ctx.Controls.Edit/Editor/SuspendEditor support custom composites.
+Composition owns its key first; single-line Return confirms, multiline Return inserts newline and Ctrl+Return
+confirms. Read-only preserves selection/copy while preventing mutation.
+See [default policy](../openspec/specs/policies/default-wrappers/spec.md) and
+[interaction/editing](../openspec/specs/core/interaction-editing/spec.md) for the exact outcomes.
+
+## Retain valid work without retaining stale geometry
+
+Meaningful UpdateScope=true roots can be nested; root/Section/Surface/Scroll/Clip/Repeat already participate.
+Defaults capture their measurement inputs; new IUiMeasureParticipant declares complete pure inputs,
+and optional IUiTextMetricsEnvironment supplies truthful per-font validity without changing ITextMetrics.
+Old widgets/metrics receive no new purity condition. Stable-domain publication can be sparse, while unknown
+or unsupported dependencies take the correct full path.
+
+Positions, scroll ranges, clip/hit and popup anchors still change when their actual dependency changes.
+Pure tint/hover does not require layout. This is not retained IMGUI pixels: required Repaint continues.
+Use the [layout contract](../openspec/specs/core/layout/spec.md), not an every-frame rebuild or input throttle.
+
+## Configure only the appearance you mean
+
+A new UiTheme works without palette assignments. Override one neutral UiColour role or one Font/metric
+declaration; Remove reveals the current remaining source, not a creation-time theme snapshot.
+Five metrics are Padding/Spacing/Gap/RowHeight/Hairline; container Padding/Gap allocate that container rather
+than becoming every child's density. Retint does not replace the Host or clear drafts/scroll.
+Use scoped UiImage for images/backgrounds. See [appearance](../openspec/specs/core/appearance/spec.md).
+
+### Set a text colour without retinting other surfaces
+
+Use TextColor for ordinary text, or one of TextColor.Muted/Active/Success/Warning/Danger/Disabled
+for a state-specific colour. Each slot inherits independently; a more distant state slot beats a nearer
+ordinary slot. Colour syntax is #RGB/#RGBA/#RRGGBB/#RRGGBBAA or invariant r,g,b[,a] in0..1.
+An alpha of0 is an explicit transparent colour, not removal.
 
 ```xml
-<Widget Id="amount" Kind="input/number-field" Bind="amount" Min="0" Max="100" Live="true" />
+<Widget Kind="text/wrapped" Text="Ready" Tone="Success"
+        TextColor="#E6E0D4" TextColor.Success="#8FCB9B" />
 ```
 
-Within StepperSlider, a draft20 over model10 plus Step1 requests only21. A selected Slider30 replaces
-that draft with only30; a thumb capture alone keeps it. Each real drag sample remains a business
-request. An unrelated Button or same-Bind field cannot clear the draft. Custom native composites
-explicitly suspend their participating editor with `ctx.Controls.SuspendEditor(ctx, binding)` before
-ordinary blur, and use the same shared `Step`/`TakeOver` transitions. See the
-[editing contract](../development/0.8/editing-contract.md) for the full end/failure and IME rules.
+Inside a style Scheme, write the same slot as an element, for example
+`<TextColor.Success Value="#8FCB9B" />`. Scheme, ancestor and page sources use the same per-slot
+precedence as Palette roles; the slots are not new UiPaletteRole values.
 
-## Explicit reactive binding and RU1 sources
+The optional **public-unstable** UiTextColours facade keeps the stable Theme/ElementProperties surface
+unchanged. Theme changes reach independent drawing directly. Instance/local changes in a retained-page
+custom widget reach its supplied context through the Host's next normal property resolution:
 
-Use `UiReactiveRuntime.Int/Text/Boolean` and `UiBindings.BindTracked` for explicitly connected
-scalar inputs. `Value<T>(initial, equal)` requires an explicit policy for other values/references;
-ordinary classes can wrap sources in C# properties without an FL base class. `List<T>(items, equal)`
-controls structure; item properties are independently observed. Four actual operation entries share nested batches; Host owns the presentation read
-view, not your business owner/service. Declare tracked bindings before constructing the Host.
-Use `BindTrackedChoices` for a pure immutable choice projection with explicit item equality. Actual
-Choice endpoint and bounded reads select the same synchronized inputs. Project mutable item
-properties to immutable presentation data during tracking; an outer list copy alone does not freeze them.
-Repeat consumes an immutable ordered key projection through the existing stable-node reconciliation.
-`BindTracked(..., equal: ...)` can suppress same-result presentation announcements without retaining old
-dependency edges. Existing source calls remain valid; rebuild against the fixed 0.8 Dev API.
-Ordinary getters/options retain their existing conditions. Start with the
-[counter walkthrough](../development/0.8/counter-walkthrough-zh.md) and the
-[actual runtime/host contract](../development/0.8/reactive-foundation-contract.md); the
-[complete inventory](../development/0.8/migration-status.md) distinguishes connected uses from
-editor/tree/chart/custom integration and separate native acceptance. The compiled `InventoryPageExample` and
-`OrderBoardProjectionExample` demonstrate local object/list composition and externally owned safe results.
-Application code owns external delivery, tasks and result freshness; Batch does not marshal a result.
+```csharp
+UiTextColours.Theme(theme).Set(new UiColour(0.9f, 0.9f, 0.8f));
+UiTextColours.Instance(ctx.Properties, "TextColor.Warning").Set(new UiColour(1f, 0.7f, 0.3f));
+UiTextColours.Instance(ctx.Properties, "TextColor.Warning").Remove();
+```
 
-## Scoped layout reuse without changing business ownership
+UiTextColours.Local supplies runtime local-style declarations. UiTextColours.Resolved(ctx.Properties)
+is the live read-only slot/source view from normal resolution.
 
-For an existing forwarding reader, return its current registry from `BindingOwner` as well as
-forwarding reads/requests/endpoints. Host then preserves tracked display/DisplayOnly semantics and
-refreshes its projection on a between-pass backing switch. Ordinary getters remain untracked.
-See the [public contract](../development/0.8/public-contract.md) for missing/mismatched capability
-diagnostics and borrowed Execution's legal idle-switch/active-refusal/cleanup conditions.
+For an independent Session context, CreateContext does not run Host property resolution. After writing
+instance/local declarations, call UiTextColours.Resolve(ctx, hostTheme) and use the returned context for
+both measurement and drawing. Keep hostTheme as the authoritative base; do not feed back the resolved
+element theme as its host. Repeat this resolution after changing declarations. It uses the existing
+property owner and ancestor rules, not a second style resolver. Existing standalone callers that do not
+adopt these new declarations keep their original conditions.
 
-Declare `UpdateScope="true"` at meaningful composition roots, including a custom subtree or Repeat
-row template. Roots and default Section/Surface/Scroll/Clip/Repeat are already connected; nesting does
-not rebuild node/editor/capture identity. The library captures its default wrappers' real measurement
-inputs and retains unchanged leaf calculations and local container plans. Actual parent size,
-Scroll content/range and shared-column consumers still propagate changes across scopes. Effective
-positions/clip/hit/popup anchors are republished when a subtree moves.
+For drawing without any Session, use UiTextColours.Theme(theme), then
+theme.Styles.Resolve(tone, emphasis, writable).Text or UiThemeDraw.Label. A custom widget using
+ctx.Drawing.Text directly passes that resolved colour explicitly; the low-level drawing interface has
+no Theme argument. An explicit Label colour still wins.
+A real disabled treatment ignores ordinary TextColor, using only TextColor.Disabled or
+DisabledForeground. Setting the Disabled colour does not make a control writable or clickable.
+Retint advances only the colour clock, not layout.
 
-Ordinary getters keep their original notification conditions. Old custom `IUiWidget` is revalidated at
-its original legal synchronization before dependent parent reuse; no new purity prerequisite is
-inferred. New custom `IUiMeasureParticipant` supplies complete actual values and a calculation over
-those captured values. Optional `IUiTextMetricsEnvironment` supplies truthful per-font metric validity,
-without adding members to `ITextMetrics`. Unknown legacy metrics receive no new text-cache guarantee.
+**Default change:** read-only Bind on text/wrapped now paints normal foreground, subject to its own
+Tone/Emphasis/colour. Use Emphasis="Muted" or an explicit TextColor for subdued presentation.
+Interactive read-only controls and shared Resolve(..., writable:false) retain their old meaning.
 
-Use the [single reuse contract](../development/0.8/layout-reuse-contract.md) for a compilable custom
-method and exact inputs/diagnostics, and the [inventory](../development/0.8/migration-status.md) for
-all18 uses/nine containers and retained old conditions. The supported paths protect source/DLL/XML/behavior under the documented migration window; API grading does not establish native acceptance.
+### Choose one effective font for measurement and drawing
 
-## Managed faults and retained views
+FontSize is an unsigned decimal integer in1..96, in logical GUI units, not physical pixels. Omit it to
+keep Tiny/Small/Medium and the host's preset rendering. Zero, negative, fractional, signed, exponential,
+blank, out-of-range and overflowing values are refused. Inline errors name the element at creation;
+an invalid style candidate reports an issue and retains last-good; runtime Set throws
+ArgumentOutOfRangeException before changing the declaration.
 
-Use `computed.Fault/Retry()` for pure R1 work and `owner.RespondManaged(...)` with `IsPaused/Fault/Resume()` for consumer R2 callbacks. Related inputs can retry pure work; source changes cannot resume a paused callback. Default wrappers retain successful control paint with fault feedback, while current derived reads still fail and dependent input stops. A first failure is unavailable, not zero/empty.
+```xml
+<Widget Id="summary" Kind="text/wrapped" Text="Ready" Font="Small" FontSize="18"
+        TextColor="#E6E0D4" />
+```
 
-For reliably hidden retained views call `UiHost.SetDisplayDemand` or `UiWindowHost.SetDisplayDemand`; focus is not visibility. Keep shared computations under a shared owner. Custom tracked readers declare actual binding roles or IUiPresentationDemand. Ordinary untracked
-getters retain their original conditions; no prepare-all compatibility path remains. The [failure/lifetime contract](../development/0.8/failure-lifetime-contract.md) has recovery, draft, two-host and captured-target confirmation examples and the actual fixture/native limits.
+In a style Scheme use `<Metric Token="FontSize" Value="18" />`, alongside
+`<Metric Token="Font" Value="Small" />` if needed. FontSize is typography, not a Density distance token.
+Both properties follow runtime instance → inline → runtime local → named local → nearest ancestor's
+same layers → page style → host → fallback. The nearest layer declaring either Font or FontSize decides
+the size: a Font-only layer resets an outer numeric size; a size-only layer keeps looking outward for
+the alias. Remove reveals the current next layer.
 
-## Replace old implementation/table access
+```csharp
+UiTextFonts.Theme(theme).Set(18);
+UiTextFonts.Instance(ctx.Properties).Set(20);
+UiTextFonts.Instance(ctx.Properties).Remove();
+// UiTextFonts.Local(ctx.Properties) is the runtime local-style layer.
+```
 
-Before publication this development migration internalizes default widget implementations, the layout
-engine and writable Session tables. Keep existing manifest kinds and bindings; use `UiKinds` instead of
-implementation-class constants. Use `host.ElementProperties(id)`, `Get/SetScrollPosition(id)`,
-`SetInteractionScope(id, scope)`, `Invalidate()` and `InputState`; custom widgets use the supplied context's
-`State/Properties/InteractionScope/Invalidate` and shared `ctx.Controls` behavior. Do not move a draft into a
-shared binding-key cache. S1–S7 and complete dependencies are supported; explicitly listed Session/Node
-and detailed R9 members are experimental. The separate `tools/FerriteLib.UiKit.AuthorExamples` assembly
-compiles these paths without an internals grant.
+UiTextFonts.Requested(theme) returns the alias/optional-size pair. UiTextFonts.ResolvedSize(properties)
+returns the requested size and source; old ResolvedFont and Styles.Font still mean the alias.
+A UiTextRun exposes Requested, Font (effective), Purpose and FallbackReason. Only a matching optional
+metrics/drawing pair supporting that purpose may retain the number. Editor also requires
+IUiTextFontEditing. Unsupported use reports the request, effective preset, purpose and reason; there
+is no nearest-preset approximation, rich-text sizing or post-draw scale.
 
-The old26 colour-property bag becomes `theme.Palette[UiPaletteRole.*]` (or the Color indexer on theme),
-with the explicit mapping in [theme migration](../development/0.8/theme-migration.md). Existing fonts and
-`Metric.Padding/Spacing/Gap/RowHeight/Hairline` are finite declarations; remove an override to reveal its
-current source. Ordinary container Padding/Gap still allocate that container, not inherited density.
-Retired `<Font Value="..."/>` is a located invalid style document. Use `<Metric Token="Font" Value="..."/>`; last-good style recovery is retained.
+### Adopt the production pair without changing old callers
 
-Use `UiItemBindings<T>` for optional current-key fields/commands over safe snapshots or active services;
-plain existing bindings remain valid. Refresh explicitly at the real change boundary and dispose only
-your UI owner. Business Move refusal retains the actual business order. For compatible definition refresh
-use `UpdateDefinition`, not disposal/new Host and private-table copying. The isolated real-source cases
-and 1.6/1.7 support limits are in [platform evidence](../development/0.8/platform-and-real-integrations.md).
+UiPageWindow/UiWindowHost supply the new pair automatically: VerseTextExecution over the window's
+existing protected VerseUiExecution and VerseTextMetrics over its native ruler. Custom Metrics overrides
+and independently supplied Host rulers remain the actual rulers; the shell does not replace them with a
+native singleton. An old custom ruler without numeric capability therefore gets explicit preset fallback.
+The same native owner still owns focus, capture, frames, images, editing and cleanup.
 
-After publication a breaking change to the supported stable contract requires a major release; the
-two-minor retirement window remains an additional minimum, with no1.x shortcut. The0.12 example
-is a time floor, not permission to delete a stable contract in a minor.
+For an embedded Host or standalone visual, create and retain this pair for the UI lifetime:
 
-Published same-adapter source, DLL, XML and behavioral contracts retain the supported signatures and
-legal conditions within the consumer's `[min,max)` range. A deprecated0.9 entry works through the two
-complete subsequent published minors0.10/0.11; earliest removal is0.12. This development-line internal
-migration is explicit, not a precedent for silently breaking published contracts. The0.7 temporary minor
-exception does not apply. Added focus/key navigation is deferred; existing native editing/IME/Accept/Cancel
-is not removed.
+```csharp
+var execution = new VerseTextExecution(); // Owns exactly one native owner.
+var metrics = new VerseTextMetrics(VerseFerriteTextMetrics.Instance);
+```
+
+Pass metrics to the existing UiHost constructor. At each native callback call
+`host.DrawFrame(contentRect, execution.CaptureFrame(nativeInputAllowed), execution)` once, preserving
+that actual composed port. Close Host/Session before disposing execution, in finally. If composing an
+already-owned VerseUiExecution, `new VerseTextExecution(owner)` borrows it; its Dispose does not dispose
+the owner. Do not create a second owner or switch ports mid-edit/capture. The original singleton,
+VerseUiExecution, ITextMetrics/IUiDrawing/IUiExecution and no-number usage remain legal unchanged.
+
+Without any Host or Session, use the pair directly:
+
+```csharp
+UiTextRun text = UiTextFonts.Resolve(metrics, execution, UiTextFonts.Requested(theme),
+    elementPath: "summary");
+float height = text.MeasureText(caption, rect.Width);
+text.Draw(rect, caption, theme.Styles.Resolve(UiStatusTone.Neutral).Text);
+```
+
+Use that run for measurement and painting, and pass the same capable metrics to an attached fit audit.
+For a standalone Session, SetFrame with the composed execution before measurement/drawing. CreateContext
+still does not resolve element declarations: call `ctx = UiTextFonts.Apply(ctx, hostTheme)` after writing
+them, then use the returned context. A retained-page custom widget already receives resolved properties:
+
+```csharp
+UiTextRun text = UiTextFonts.Resolve(ctx);
+float height = text.MeasureText(caption, ctx.ViewWidth);
+text.Draw(rect, caption, ctx.Theme.Styles.Resolve(UiStatusTone.Warning).Text);
+```
+
+Custom Measure/Draw should request the same purpose and provide complete UiMeasureInputs through the
+existing IUiMeasureParticipant. UiTextFonts.RowHeight supplies a numeric-aware natural row floor, and
+UiTextFonts.PopupRect pairs with UiPopup.DrawChoices for numeric option geometry. Explicit allocations
+remain the author's responsibility; a large font does not silently override an explicit Height or FieldWidth.
+Old UiThemeDraw.Label and direct drawing's explicit UiFont parameters keep their preset meaning; choose
+the new run when requesting numeric text.
+
+### Editors, retained display and actual metadata
+
+Existing ctx.Controls.Edit resolves Editor font and the effective state ink, then passes UiTextEdit through
+the composed port to the same owner's real Widgets.TextField/TextArea. It preserves draft/commit/Cancel,
+focus, selection, copy and IME authority. Native glyph colour is not implemented as a placeholder/label.
+For lower-level editing resolve `UiTextFonts.Resolve(ctx, UiTextPurpose.Editor)` and call its Edit with
+your existing UiNativeEdit request and the resolved colour; the request alias must equal run.Font.Alias.
+A null colour preserves native preset ink. Custom hosts implement the optional interfaces rather than
+changing old interface members.
+
+Auto/SharedLabels, wrapping, natural row heights, fields, buttons, dropdowns/popups, layout inputs and
+text-cache keys use effective font and purpose. Null CaptureEnvironment revokes reuse at a synchronization;
+the old unchanged idle snapshot is still legal for numeric and legacy alike. Last-success retained drawing
+captures the font, ink and draft but is display-only, never a second native editor.
+
+UiTextFonts.FontOf/ColourOf read actual font/optional ink from overflow reports. Host observation facts
+separate requested/effective per-purpose fonts, source and last paint colour; the Dev snapshot adds
+ScopeTextFont (request), LabelFont/Colour and EditorFont/Colour with paint-source fields. They describe
+last recorded outlets, not every glyph or current native pixels; not-sampled remains explicit, and the
+old PaintedFont unknown field is unchanged.
+
+**Host limits:**1.6 labels and editors are **静态候选、待原生**.1.7 label numeric rendering is a source-level
+candidate behind the single NumericLabels17 switch; editor numbers are unsupported and use reported
+preset fallback.1.7 has no reliable font-environment fingerprint, so it grants no cross-synchronization
+text reuse. Native screenshot/IME/selection/UIScale/font-fallback and1.7 binding/JIT checks remain open;
+see the [implementation status](../openspec/implementation.md#appearance-freedom).
+
+## Publish help without owning a panel
+
+Declare opaque HelpRef on elements/choices. Empty choice help does not infer Value/Text and can fall back to
+the general element topic. Session CurrentHelpRef/CurrentHelpSource and HelpGracePasses retain their advanced
+grade and pass-based timing (library default0; a consumer's15 is not the default).
+Tooltip takes explicit translated text.
+
+Optional HoveredOptionHelpOutputBind targets a writable string endpoint. It withdraws only the last publication
+still owned by that control; a newer same-address publisher or consumer write survives cleanup, including
+across proxy switches. A failed withdrawal does not replay selection or uncommit a sealed definition.
+See the [help connection](../openspec/specs/contracts/help-output/spec.md).
+
+## Diagnose failures without inventing acceptance
+
+For native framework diagnostics use `VerseUiDiagnosticLog.CreateHost(consumer, source, manifest,
+bindings, theme, metrics, translation, document, options)` in the actual factory, before Host construction.
+The original constructor/factories remain legal, and supplied metrics are unchanged. `UiPageWindow` adopts
+this route with its key consumer. `VerseUiDiagnosticLog.Attach(host, consumer)` retrieves that binding or
+adopts future facts on an existing Host; it cannot recover missed constructor facts. Configure updates
+DetailEnabled live, independently of fit/timing/geometry. Host/Session close releases its binding.
+Keep Controls.Trace null when detail is off, and do not reprint the same FL facts from a consumer logger.
+Standalone callbacks, exact lifecycle, normal/warning/error, daily/detail and bounded output semantics are
+in the [domain diagnostic guide](../development/0.8/ui-diagnostics.md). Both new types are public-unstable.
+
+Pure faults use Fault/Retry; managed writable responses use IsPaused/Fault/Resume after their owner checks
+the actual business result. Related inputs can retry pure work but cannot resume a paused callback.
+Retained paint is display-only; invalid current geometry/input cannot execute. See
+[lifetime/recovery](../openspec/specs/core/lifetime-recovery/spec.md) and [open deviations](../openspec/implementation.md):
+popup wheel qualification, Warning/release/seal and unaccepted Trace/fit isolation remain visible.
+
+S1–S7 and necessary dependencies are stable as listed in API tiers. Node/Session runtime tables and detailed
+R9 are not blanket stable. Surrounding authors use ElementProperties, scroll/scope/invalidation and InputState;
+custom authors use their supplied context, not private tables. The external AuthorExamples assembly demonstrates
+public-only usage without an internals grant.
+
+The accepted stable-FPS pair2f22bec/833c14f4 and overall internal trialea610fa/833c14f4 retain their identities.
+Later fixed compilation uses US3e42cc1 with FL6ec0c31; this guide neither rebuilds nor re-identifies them.
+Unrecorded font/IME/overlap/scaling/native details and known headless errors remain limits.
+1.6 is delivered; compiled/native1.7 is not. See [platform evidence](../development/0.8/platform-and-real-integrations.md)
+and the [window guide](rimworld-window-layout.md).
+
+For maintainers comparing older internal code, preserved
+[author-vocabulary](../archive/specs-before-20261029/refactor-migration.md) and
+[theme](../archive/specs-before-20261029/theme-migration.md) migration tables are historical aids,
+not a parallel API or an upgrade-first route.

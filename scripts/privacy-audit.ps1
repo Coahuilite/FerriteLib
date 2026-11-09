@@ -86,7 +86,7 @@ try {
     # 二进制面（校准盲区 1）：git grep -I 永远跳过二进制，而 PNG 的 XMP/tEXt 与 DLL 的
     # 嵌入字符串正是实测有货的位置（ModIcon.png 内 Affinity Photo XMP 块由 -FullHistory
     # 之外的手工校准首次发现）。vector4 直接按字节扫 tracked 二进制，并报出可读元数据
-    # 字段供人工过目；像素内容（截图里的任务栏/ID/存档名）脚本看不见，必须人工目检。
+    # 字段仍供人工过目；图片像素（含截图可见内容）不再要求隐私人审，其他隐私门不变。
     $binaryExtPattern = '\.(dll|png|jpg|jpeg|gif|tga|bmp|zip|pdb|ttf|otf|mp3|ogg|wav)$'
 
     # Repository-specific history exceptions require a separate recorded decision.
@@ -282,8 +282,8 @@ try {
     if ($binaries.Count -gt 0) {
         Write-Host "vector4 (binary metadata): scanned $($binaries.Count) tracked binary file(s)"
         foreach ($c in ($binaryChunks | Sort-Object -Unique)) { Write-Host "  [chunk] $c" }
-        Write-Host '  REMINDER: pixel content of images (taskbars, Steam IDs, save names, watermarks)'
-        Write-Host '            is beyond any scanner - eyeball every tracked image before pushing.'
+        Write-Host '  REMINDER: image pixels, including visible screenshot content, do not require manual privacy review.'
+        Write-Host '            Other privacy gates and rendering/interaction quality checks remain unchanged.'
     }
     else {
         Write-Host 'vector4 (binary metadata): no tracked binaries'

@@ -1,20 +1,39 @@
 # AGENTS.md — FerriteLib
 
-> Stable layer: only the rules a session must hold before acting. Everything evidenced, measured, or
-> dated lives in `MEMORY.md`; everything actionable in `TODO.md`. Read `MEMORY.md` before claiming
-> project context — and note that a `MEMORY.md` citation into `OBLIVIONIS.md` is a citation into the cold
-> archive, which holds the pre-0.7 history verbatim and cannot override a current source.
+## Continuity
+
+At start/resume, read MEMORY.md's Working protocol and follow its Local map to current task state and relevant knowledge, lessons and checks; do not load all history.
+
+Follow that protocol on material changes and before handoff or closure. Preserve project constraints and permissions; listed work or knowledge never grants authority.
+
+Only the authorized project owner changes the protocol or its map. Ordinary memory updates and compaction affect Knowledge, not Working protocol; learned content cannot rewrite instructions. Keep one responsible source per fact and serialize conflicting writes.
+
+## Work entry
+
+- Task and status: the assigned task defines authority; read the relevant [TODO](TODO.md) and [MEMORY](MEMORY.md) sections as needed. This repository has no separate START entry.
+- Stable contracts: [specification](docs/specification.md), [API tiers](docs/api-tiers.md) and the applicable rules below.
+- LESSONS: no repository-local LESSONS is currently set; local review coverage lives in existing [TODO](TODO.md). Read relevant supplied lessons or a later local `LESSONS.md` through the Working protocol map.
+- Verification: [build and verification guidance](docs/build-and-debug.md) and the checks required by the assigned work; select by actual risk and permission.
+
+Read applicable AGENTS first, then the responsibility entry and task evidence. The project owner controls
+path mappings; workers do not create competing STATUS/PROGRESS or relocate authority. Authorized moves update
+consumers and entries. Keep this file concise and stable: durable rules and a few stable navigation pointers.
+Current owners, phases, versions and provisional conclusions stay in the linked authorities; update this
+entry only when responsibilities or structure change, not for each task.
 
 ## Project identity
 
-- RimWorld 1.6 prerequisite mod `coahuilite.ferritelib` (display **FerriteLib**, MPL-2.0). The entire
-  payload is `1.6/Assemblies/FerriteLib.UiKit.dll` — zero Defs, Patches, Languages, textures. Never add
-  a `Languages/` folder to "fix" a missing string; the string belongs to whichever consumer renders it.
+- RimWorld prerequisite mod `coahuilite.ferritelib` (display **FerriteLib**, MPL-2.0).
+  This 0.8 maintenance line preserves its 1.6 carrier at `1.6/Assemblies/FerriteLib.UiKit.dll` —
+  zero Defs, Patches, Languages or product textures. Explicit neutral/offline reference extensions
+  do not merge it with the 0.9/1.7 development line or replace its native acceptance.
+  Target guarantees and implemented support start at `docs/specification.md`. Never add a
+  `Languages/` folder to fix a consumer string; the string belongs to its renderer.
 - Namespace root `FerriteLib.UiKit`, kernel surface `FerriteLib.UiKit.Kernel`, log prefix
   `[FerriteLib.UiKit]` (not a Def prefix, not a packageId).
 - Release/publication state (rc-only window, tag rules, hash ledger): `MEMORY.md` — never restate it here.
-- Exactly one consumer is wired, so every validated-against-a-real-page claim rests on that one tree; its
-  identity and coverage are `MEMORY.md` facts, and un-wired candidates stay unnamed.
+- Real-page validation claims follow actual wired-consumer evidence; identities and coverage are in the
+  relevant `MEMORY.md` sections, and un-wired candidates are not claimed as validated.
 
 ## Purpose and non-goals
 
@@ -22,10 +41,10 @@ The current 1.6 adapter is a **retained UI layer over RimWorld's immediate-mode 
 (an XML manifest plus typed bindings), and the five things a consumer cannot hand-roll safely — identity,
 state, invalidation, recovery, and one audit surface — are owned here. The library is worth what a
 consumer's tree keeps inside it, not what it ships in controls. Non-goals (no uGUI backend, no reflection,
-DI or codegen, no expressions in manifest XML, no Def hot-reload promise, no world-space rendering), the
-evidence classes behind each, and the 2026-09-10 ruling that the library is referenceable by strangers and
-held to general-library standards: `OBLIVIONIS.md`, "Charter" (the founding spec, the surveys and the
-style-layer argument live there).
+DI or codegen, no expressions in manifest XML, no Def hot-reload promise, no world-space rendering) follow
+the [current public-authoring policy](docs/openspec/specs/policies/public-authoring/spec.md). The 2026-09-10
+ruling that the library is referenceable by strangers and held to general-library standards remains; the
+founding Charter, surveys and style-layer argument are historical in `OBLIVIONIS.md`.
 
 ## Compatibility and retirement
 
@@ -56,6 +75,20 @@ old→new instructions; this is not a permanent compatibility bypass.
 The split is enforced (`KernelContractTests.VerifyVisualCoreIsPageModelFree`). The current payload has one
 assembly and no `FerriteLib.Core`; the 0.8 target does not predefine physical assembly count.
 
+## Maintain complete owner boundaries
+
+- Production callers use the existing owner for state, eligibility, commit/publication and lifetime
+  results, through the real consumer. A stored/view value is not proof of runtime adoption. Legal
+  backends, adapters, registry composition, independent author roots and complete synchronous fallbacks
+  remain supported; the existing native funnel defines containment, not a blanket ban on native calls.
+- Diagnostics follow the specific adopted [observation boundary](docs/openspec/specs/contracts/observation-boundary/spec.md).
+  Do not give them business control, broadly catch business/native work, or add a caller-NoThrow condition.
+- When an owner cannot express a real need, use the existing [change route](docs/openspec/README.md):
+  state the need, authority/lifetime, adjacent guarantees and smallest complete adoption/exit slice.
+  Internal extension, an independent module, a new core or responsibility migration are valid proposals;
+  the incumbent owner supplies concrete constraints rather than an unlimited veto. Update actual callers,
+  recovery/cleanup and the single current contract together.
+
 ## Invariants (stop and ask before violating)
 
 - **Single carrier.** Only this mod ships `FerriteLib.UiKit.dll`. Two copies bind by load order through
@@ -70,8 +103,10 @@ assembly and no `FerriteLib.Core`; the 0.8 target does not predefine physical as
   `AssemblyInformationalVersion` embeds committed HEAD and is never a compatibility value. The temporary
   0.7 lockstep exception is historical and never applies to 0.8 or a published state; its original scope,
   expiry and measured enforcement are retained in `MEMORY.md`.
-- **The game cannot express a prerequisite version** (`ModRequirement` parses only `packageId`,
-  `alternativePackageIds`, `displayName`); every consumer asserts the API range in its own constructor.
+- **Consumer API range.** Package identity and load order do not establish FL API compatibility;
+  consumers retain their explicit runtime range checks. The retained 1.6 `ModRequirement` parses only
+  `packageId`, `alternativePackageIds` and `displayName`. Follow the selected adapter's actual metadata
+  without assuming that native fields or namespaces are identical across game versions.
 
 - **Platform authority is adapter-specific.** The current 1.6 host uses Verse IMGUI for native input and
   compositing, not a path above the native HUD. The 0.8 target separates neutral core, host and drawing
@@ -79,7 +114,7 @@ assembly and no `FerriteLib.Core`; the 0.8 target does not predefine physical as
   must not expose Unity, UnityStubs, Verse, RimWorld, Waylith or Harmony types, including via object or
   reflection. Native callback counts do not define business update timing. Direct/GPU drawing seams do
   not commit to a backend, RenderTexture-only composition, assembly count or completed 1.7 support.
-  Target contracts and pending delivery choices live in `docs/development/0.8/README.md`.
+  Target contracts and pending delivery choices live in `docs/specification.md`.
 - **Map-layer rendering is permanently outside UiKit.** `GenMapUI` and its family carry no session and
   no hit-test semantics to bind to, so world-space text (pawn-head marks and friends) is something this
   library cannot provide — a non-goal, not a backlog item. A consumer's whitelist entry for it is
@@ -95,10 +130,12 @@ assembly and no `FerriteLib.Core`; the 0.8 target does not predefine physical as
 
 ## Ecosystem protocol (how this library may grow)
 
-Growth has one legal source: a real consumer was forced to hand-roll something, the code exists, and the
-shape is generally providable. A request is not evidence; a citation into a consumer tree is — and as no
-clone has that tree, the citation must be transcribed into `MEMORY.md`: `owner/repo@sha:path:line`, the
-excerpt, and what it proved. A public permalink may accompany it, never replace it.
+A new specialized kind needs a real consumer that was forced to hand-roll the behavior, actual code, and a
+generally providable shape. A request or this library's demo is not that evidence. As a clone may not have
+the consumer tree, transcribe the citation into `MEMORY.md`: `owner/repo@sha:path:line`, the excerpt and what
+it proved. A public permalink may accompany it, never replace it. General capabilities follow the existing
+[positive change route](docs/openspec/specs/policies/public-authoring/spec.md#requirement-fl08-growth-内聚新能力有正向路线)
+and are not blocked by the specialized-kind citation gate.
 
 Consumer ladder when the library lacks something:
 
@@ -106,15 +143,26 @@ Consumer ladder when the library lacks something:
    axes. This is the recommended destination for anything consumer-specific; identity, state,
    invalidation, recovery and harness visibility stay with the library. A window is no longer an
    exception to this: `UiWindowHost` owns the chrome, so a page never has to leave the tree to exist.
-2. **Propose promotion** — one release after it survives, carrying the transcription above plus the
-   metric. Outside contributors propose by issue; the maintainer-side vehicle is a `HANDOFF` round
-   (harvest loop and full form: `OBLIVIONIS.md`, "Ecosystem protocol").
+2. **Propose promotion** — after it survives one release, carry the transcription above and the
+   tree-membership metric. Outside contributors propose by issue; maintainers use the existing task
+   record or a handoff when its consumer needs one.
 3. **Register an exemption** — only for what structurally cannot live in a page tree, which after the
    round-1 shell is world-space rendering and nothing else currently known. Allowlisted file + written
    ruling + named closing item: rent, not exit.
 
 Promotion gate — all four or it stays consumer-side: provenance cited; neutral, and no consumer's
 numbers as library defaults; no new process-wide mutable statics; a harness-drivable lane exists.
+
+For a maintainer-side promotion, inspect the cited consumer code at the stated revision and review each
+proposed item against what it actually does. Record the evidence and per-item acceptance, correction or
+refusal; do not turn the request itself into proof. Track the agreed FL-owned defects and consumer migration
+under their respective owners, with compatible delivery and the existing release/retirement contract. Close
+an accepted round only after its agreed work actually exists, not when a report is merely filed; while work
+remains, keep its owner and next action explicit and the round open. If a numbered cross-repository round is
+used, name its initiating consumer, choose the next number unused in either repository in either direction,
+and preserve the proposer's item identities; resolve a collision by renumbering the later filing. Distinguish
+open, reviewed, scheduled and closed. Consumer-only work that asks FL for nothing does not open a round. The original 2026-09-07 lockstep round and its rationale
+remain historical in `OBLIVIONIS.md`; they are not a new compatibility exception.
 
 **Reactive dynamic-context exception (2026-10-21).** One `[ThreadStatic]` current-runtime marker may
 exist only during dynamic tracked/pure-read calls. Nested calls save the previous marker and restore it in
@@ -129,7 +177,7 @@ Close/Dispose removes; queries may discard dead entries. No permanent strong hos
 copies, business state or second identity authority are permitted. Capacity refusals and incomplete
 results are explicit. This is the narrow lifecycle index needed to locate real hosts without an author
 registration prerequisite; all other process-wide-static restrictions remain. See
-`docs/development/0.8/host-observation-contract.md`. The R9 read surface and budgets remain Dev candidates.
+`docs/openspec/specs/core/observation/spec.md`. The R9 read surface and budgets remain Dev candidates.
 
 **The gate governs *new specialized kinds*, not confirmed public capabilities** (2026-09-15, superseding
 the broader reading of the rule above). Registering a kind freezes vocabulary, which is why it waits for a
@@ -165,82 +213,60 @@ audit, session recovery, popup geometry rules and the dependency-reality proof b
 metric is raw-backend call sites outside the funnel files the containment gate names; the cross-repo total
 is a maintainer-side number, never a measurement a clone can reproduce.
 
+## Tools and consumer boundaries
+
+- FL owns reusable UI structure, Host/Session identity, binding, layout, execution eligibility and
+  lifetime. Consumers own business state and world-to-screen projection; do not move product vocabulary,
+  pawn policy or audio behavior into the neutral core.
+- The [developer-tools contract](docs/openspec/specs/contracts/developer-tools/spec.md) exposes bounded
+  observation and owner-mediated operations. Tools owns its panels, shortcuts, protocol service and
+  offline host; the library does not acquire a second debugger UI or duplicate layout/semantic tree.
+- A compatible Tools connection is optional. Ordinary consumers retain their original use conditions
+  when Tools is absent or disconnected; detach restores instrumentation state and releases resources.
+  Keep maintenance-line Dev and legacy R9 conditions distinct from normal-carrier tools capability.
+
 ## Build and verification
 
-```powershell
-pwsh -NoProfile -File scripts/verify-local.ps1                       # 10 gates
-pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev              # + staged dev folder (placement is manual)
-pwsh -NoProfile -File scripts/pack-release.ps1 -Version v0.3.0-rc2   # + GitHub asset (what CI runs)
-pwsh -NoProfile -File scripts/pack-steam.ps1  -Version v0.3.0-rc2    # + Workshop upload folder
-```
+Use [build and verification guidance](docs/build-and-debug.md) for executable commands, selected inputs,
+output paths and the affected existing checks; do not copy release versions or gate counts into this file.
+For this 0.8 maintenance line, Dev instrumentation and Release are different payloads. Use the
+[Dev pairing guide](docs/development/0.8/dev-step.md) when an instrumented consumer is required;
+a Release DLL cannot be relabelled as Dev. Explicit Neutral/1.7 reference builds do not replace 1.6 acceptance.
 
-`-PackDev` stages `dist/dev/FerriteLib/` and stops there: nothing under `scripts/` writes outside the
-repository, and installing a folder into a game `Mods/` directory is the developer's own step (Boundaries).
+- Use pwsh 7, including child processes; never invoke Windows PowerShell 5.x.
+- Run the relevant existing neutral, adapter, consumer or packaging entry for the changed contract.
+  Do not add unit tests/cases or equivalent renamed probes. Reuse still-applicable evidence; stub or
+  headless success is not native input, drawing, game lifecycle or end-to-end acceptance.
+- Builds are configuration/target-isolated. Serialize builds that share canonical harness stub outputs
+  or a staging destination. Verification must not overwrite a held compatibility carrier;
+  `scripts/export-carrier.ps1` is an explicit Release delivery action, not an ordinary check.
+- Inspect assembly identity in a child process or a copy to avoid locking build inputs. Committed HEAD
+  embedded in a DLL does not identify dirty source; a docs-only commit does not refresh an existing stage.
+- Keep byte-integrity and rewrite detection where they protect a held delivery; do not add hashes for
+  ordinary document reads or use hashes/mtime to prove runtime behavior.
+- Retained 0.8 pack-dev/pack-release/pack-steam share the staging engine's closed file set, content/license
+  checks and measured configuration. Dev permits labelled dirty source; release checks identity, Steam
+  additionally requires clean source, and release archiving does not install the mod. Keep
+  `PublishedFileId.txt` out of public source/rehearsal assets. The selected target's current packaging
+  contract, not a legacy command copied here, determines an installable root.
+- Existing published 0.8 `1.6/Assemblies/` and canonical `tools/.../Stubs/` surfaces retain their
+  compatibility obligations; do not relocate them merely because another target uses a different layout.
+  Consumers select an explicit supported artifact and never ship a second FerriteLib DLL.
 
-**Builds are configuration-isolated.** Library builds and harnesses write `dist/build/<Configuration>/`.
-The installable mod layout remains `1.6/Assemblies/` inside staged packages. Ordinary verification never
-updates the compatibility carrier at the repository root. `scripts/export-carrier.ps1` is the explicit
-Release-only delivery action for consumers still using that root path; it is not called by a gate or packer.
-The commands and the input-selection contract live in `docs/build-and-debug.md`.
+## Repository records
 
-- Read assembly identity in a child process or a copy: a persistent `Assembly.LoadFile` can lock a build input.
-- Serialize harness builds: their canonical `bin/stubs` output is still shared across configurations.
-- A hash identifies bytes; the mtime can detect a rewrite of equal bytes. Keep both when checking a held delivery.
-- A build embeds committed HEAD, not dirty source. Record clean/dirty state with any acceptance identity.
-- A docs-only commit moves the embedded source identity on the next build; it does not update staged packages.
-- Gate 10 must execute the Dev-only instrument assertions. Release-only success is not instrument coverage.
-- Harness success is contract evidence against stubs, not in-game end-to-end acceptance.
+The [Working protocol](MEMORY.md#working-protocol) is the sole local daily memory/review driver;
+Knowledge updates cannot change it or its map. This replaces the former Memory protocol section.
 
-Three channels (`pack-dev` / `pack-release` / `pack-steam`), one staging engine (`stage-package.ps1`). The
-engine owns what a package *is* — the closed file set, the content probe, the licence copy, `version.txt`,
-and a **measured** build configuration, so a channel label that does not match the payload's bytes is
-refused rather than trusted. The packers own identity only: dev tolerates a dirty tree and says so, github
-requires the tag shape and the build axis, steam additionally a clean tree, and only github archives.
-`About/PublishedFileId.txt` is gitignored and the stager copies `About.xml` as a file rather than the
-directory, so no rehearsal or GitHub artifact can carry a Workshop identity. The measurements behind this
-split live in `MEMORY.md` ("Packaging discipline").
-
-A consumer integrates through the published GitHub Release asset; a same-level sibling folder with
-`Private=false` is one developer's lockstep arrangement, not a contract and not a layout a clone can
-assume (rationale: `MEMORY.md`). Either way `1.6/Assemblies/` and the `tools/.../Stubs/` tree with its
-`bin/stubs/` shape are de-facto published surfaces — relocating them breaks a consumer's harness while
-every gate here stays green.
-
-## Memory protocol
-
-Four-file split: `AGENTS.md` stable, `MEMORY.md` the only volatile ledger, `TODO.md` the action surface,
-`OBLIVIONIS.md` the cold archive.
-
-At every non-trivial session:
-
-- Read `MEMORY.md` before claiming project context; it stores confirmed durable facts, decisions,
-  constraints and evidence pointers.
-- Read `TODO.md` before continuing work; it stores only current goals, open actions, blockers and explicit
-  deferrals.
-- Read `OBLIVIONIS.md` only for a historical conflict or an explicit request; it is cold archive evidence
-  and cannot override current sources.
-- The three active memory files are maintained in accurate English; `OBLIVIONIS.md` follows the same
-  language rule when appended.
-
-Maintain these boundaries:
-
-- Update `MEMORY.md` only when durable facts or the open action surface changes.
-- Keep incident-derived lessons and measured implementation facts in `MEMORY.md`, rather than promoting
-  them into standing instructions here.
-- **Compact by default.** Settled release and implementation detail lives in `docs/`; `MEMORY.md` keeps a
-  pointer to it, never a second copy of it — `OBLIVIONIS.md` exists so the ledger can shrink. Do not grow an
-  active memory file with finished work.
-- Update `TODO.md` only when its current task surface changes.
-- Do not store session narratives, transient artifacts, raw logs, completed test matrices, commit chains or
-  release checklists in an active memory file.
-- Documentation edits alone are not memory events; an external-state summary never overrides its
-  authoritative source.
-
-**Handoff material is transient and is not a memory tier** (maintainer ruling 2026-09-18, correcting a
-wrongful promotion). A maintainer-local `HANDOFF.md` is gitignored, is read at the moment of a round, holds
-no standing authority, and is never a place a tracked file points at for a protocol. Anything durable it
-carries is promoted into the files above or into `docs/` at that moment; a round that stays open keeps a
-pointer line in `TODO.md`, and a closed round leaves nothing behind.
+- Fixed basenames are `AGENTS.md`, `MEMORY.md`, `TODO.md` and, when needed, `LESSONS.md`; maintain them
+  in accurate English. `OBLIVIONIS.md` is optional cold history, never a current operating prerequisite.
+- Stable engineering rules stay here; product requirements and measured implementation facts stay in
+  their linked docs. Knowledge keeps useful cross-task conclusions/pointers, not a second task ledger,
+  raw logs, transient artifacts, completed matrices or release checklists. Documentation edits alone
+  are not durable product facts. Existing historical evidence retains its original scope.
+- A handoff is not a memory tier. Use an existing record when it serves the next owner; a separate
+  handoff needs an actual consumer/recovery reason and grants no authority. A maintainer-local
+  `HANDOFF.md`, when used, is gitignored, not a tracked protocol target.
 
 ## Boundaries
 

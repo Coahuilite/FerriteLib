@@ -20,8 +20,7 @@ permissions:
 jobs:
   release:
     runs-on: windows-latest
-    # 15 covers gates (~10s measured) plus runner setup slack; the default 360 only ever
-    # converts a hung runner into an hours-long ghost.
+    # Bound hung runners; elapsed time depends on restore and the actual contract inventory.
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -48,19 +47,11 @@ jobs:
           #    the release page speaks exactly two dialects. SemVer-compatible: rcN is still a valid
           #    prerelease label, so GitHub's "is this a prerelease" rule and any version parser keep
           #    working, and rc1 < rc2 < BASE orders correctly.
-          $pattern = '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc([1-9]\d*))?$'
-          if ($tag -notmatch $pattern) { throw "Release tag must be vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-rcN (N >= 1): $tag" }
-          $base = "$($Matches[1]).$($Matches[2]).$($Matches[3])"
-          $rc = $Matches[4]
-
-          # 2. The tag must name the build axis, which is what the artifact gets called.
-          [xml]$csproj = Get-Content -LiteralPath 'Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj' -Raw
-          $prefix = @($csproj.SelectNodes('/Project/PropertyGroup/VersionPrefix'))
-          if ($prefix.Count -ne 1) { throw "Expected exactly one <VersionPrefix>, found $($prefix.Count)." }
-          $buildAxis = $prefix[0].InnerText.Trim()
-          if ($buildAxis -ne $base) {
-            throw "Tag v$base does not match <VersionPrefix>$buildAxis. Retag, or bump the build axis and rebuild; do not rename the artifact."
-          }
+          Import-Module ./scripts/Release.Identity.psm1
+          $releaseVersion = Get-FerriteReleaseVersion -Version $tag
+          $base = $releaseVersion.Base
+          $rc = $releaseVersion.Rc
+          Assert-FerriteReleaseAxis -ProjectFile 'Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj' -BaseVersion $base
 
           # 3. Tag the merge commit on main, not a feature branch tip: a release whose commit is not
           #    in main's history is a build of code that is not in the trunk anyone reads.
@@ -101,23 +92,30 @@ jobs:
             }
           }
 
-      - name: Restore
-        shell: pwsh
-        run: |
-          dotnet restore Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj --nologo
-          dotnet restore tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj --nologo
+
+      # Download cache only: every graph is restored and every executable is built from source.
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-fl-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: ${{ runner.os }}-fl-nuget-
 
       # Order matters. verify-local's Release output in dist/build/Release carries a
       # -dev version suffix, and pack-release.ps1 refuses to publish that identity. So the gates run
       # first, on the tree exactly as tagged, and only then is the payload rebuilt as the artifact.
-      - name: Verify (10 gates)
+      - name: Verify complete contracts
         shell: pwsh
-        run: ./scripts/verify-local.ps1
+        run: ./scripts/verify-local.ps1 -EvidenceFooter -LogDirectory dist/verification/release
 
-      # Build fresh with the publication version suffix. Staging independently verifies that identity.
+      - name: Audit current tree and complete reachable history
+        shell: pwsh
+        run: ./scripts/privacy-audit.ps1 -FullHistory
+      # Keep the base suffix for both rc/final tags: the final tag must ship its tested rc bytes.
+      # This final clean identity build remains separate from verification.
       - name: Build the release payload
         shell: pwsh
-        run: dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release -p:VersionSuffix= --no-incremental --nologo
+        run: dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release -p:VersionSuffix= --no-restore --no-incremental --nologo
 
       - name: Pack the release asset
         id: pack
@@ -134,7 +132,7 @@ jobs:
           $hash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash
           "asset=$zip" >> $env:GITHUB_OUTPUT
           "sha256=$hash" >> $env:GITHUB_OUTPUT
-          "commit=$((git rev-parse --short=12 HEAD))" >> $env:GITHUB_OUTPUT
+          "commit=$((git rev-parse HEAD))" >> $env:GITHUB_OUTPUT
 
       - name: Write the release body
         id: body
@@ -166,6 +164,8 @@ jobs:
           $isRc = $tag -match '-rc[1-9]\d*$'
           $trialNote = if ($isRc) { "This is a **release candidate**: an early-testing build. Try it, and report what breaks - problems found here are problems not shipped to everyone. UI/UX and copy work on this line is still in progress." } else { "This is the stable release. It carries the same bytes as its last release candidate; the identity table below names the commit." }
           $deltaTitle = if ($prevTag) { "## Changes since $prevTag" } else { "## Changes" }
+          $notesPath = "docs/release-notes/$tag.md"
+          $releaseNotes = if (Test-Path -LiteralPath $notesPath) { Get-Content -LiteralPath $notesPath -Raw } else { '' }
           $body = @"
           $trialNote
 
@@ -191,6 +191,8 @@ jobs:
 
           The SHA-256 above identifies the downloaded ``FerriteLib-$env:RELEASE_TAG.zip`` archive, not the DLL inside it. The extracted ``version.txt`` separately records the payload DLL's SHA-256. The consumer repository links to this release instead of shipping another copy. The full source of this exact build is ``$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY`` at tag ``$env:RELEASE_TAG`` (commit ``$env:ASSET_COMMIT``); the license terms travel inside the package as ``LICENSE``.
 
+          $releaseNotes
+
           $deltaTitle
 
           $delta
@@ -199,9 +201,9 @@ jobs:
 
           Supported stable contracts protect source, compiled consumers, XML vocabulary, behavior and legal use conditions within the same game/adapter target. After publication, breaking one requires a major release. Deprecation also retains the old contract through two complete subsequent published minors; that minimum does not permit a breaking minor removal, and a 1.x transition cannot shorten it. Experimental surface changes require explicit migration. Consumers still assert their tested API range in code, because RimWorld's ``modDependencies`` cannot express a version.
 
-          This build targets **RimWorld 1.6**. UI/UX integration and player-facing acceptance continue in the next stage. FerriteLib adds nothing to saves and stores no settings of its own; keep it installed while any consumer mod (currently Universal Squeaker) depends on it.
+          This build targets **RimWorld 1.6**. Internal playtesting of US ea610fa with FL833c14f4 was reported to work well. FerriteLib adds nothing to saves and stores no settings of its own; keep it installed while any consumer mod (currently Universal Squeaker) depends on it.
 
-          Testing status: current 0.8 technical evidence covers the complete engine-free core, retained controls and containers, editing/recovery protocols, public author paths and fixed-source consumer integration. This workflow runs the existing verification gates, including the Dev-only instrument, before building this fresh Release-configuration archive. Automated protocol/stub and source-integration results do not establish complete native gameplay acceptance. Headless game checks reported errors that the user accepted as non-blocking for this RC transition; they were not error-free. Native 1.6 font/IME/window/input/rendering acceptance and UI/UX remain open. A compiled/native 1.7 adapter is not delivered. Earlier 0.7 native checks do not accept this 0.8 package.
+          Testing status: automated 0.8 checks cover the complete engine-free core, retained controls and containers, editing/recovery protocols, public author paths and fixed-source consumer integration. This workflow runs those checks, including the Dev-only instrument, before building this fresh Release-configuration archive. The internal trial has no detailed per-action, font/IME, language or resolution record. Cold-opening peaks, independent HUD cost, overlap/scaling and real configuration-save coverage remain incompletely characterized. Some earlier headless game checks reported errors. A compiled/native 1.7 adapter is not delivered. Earlier 0.7 native observations apply to their original builds.
           "@
           $body | Out-File -FilePath release-body.md -Encoding utf8NoBOM
 
@@ -232,3 +234,11 @@ jobs:
           ./scripts/verify-release.ps1 -Tag $env:RELEASE_TAG `
             -Repo "$env:GITHUB_REPOSITORY" `
             -ZipLocal "dist/github/FerriteLib-$env:RELEASE_TAG.zip"
+
+      - name: Retain complete verification logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fl-verification-${{ github.run_id }}
+          path: dist/verification/
+          if-no-files-found: warn

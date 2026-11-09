@@ -48,13 +48,17 @@ public sealed class UiBindingPresentation : IDisposable
     {
         bindings.Reactive.VerifyAccess();
         if (disposed) throw new ObjectDisposedException(nameof(UiBindingPresentation));
-        reads = bindings.TrackedReads(); synchronized.Clear();
-        foreach (var entry in reads)
+        Dictionary<string, UiTrackedBindingRead> descriptors = bindings.TrackedReads(); synchronized.Clear();
+        if (!ReferenceEquals(reads, descriptors))
         {
-            if (calculations.ContainsKey(entry.Key)) continue;
-            UiReactiveComputed<object?> calculation = owner.Compute(entry.Value.Key, entry.Value.Read);
-            calculation.Invalidated = () => DemandRevision++;
-            calculations.Add(entry.Key, calculation);
+            reads = descriptors;
+            foreach (var entry in reads)
+            {
+                if (calculations.ContainsKey(entry.Key)) continue;
+                UiReactiveComputed<object?> calculation = owner.Compute(entry.Value.Key, entry.Value.Read);
+                calculation.Invalidated = () => DemandRevision++;
+                calculations.Add(entry.Key, calculation);
+            }
         }
         if (eager) foreach (string key in calculations.Keys) SynchronizeKey(key);
     }
@@ -127,7 +131,7 @@ public sealed class UiBindingPresentation : IDisposable
         {
             if (calculations.TryGetValue(identity, out var calculation))
             { calculations.Remove(identity); owner.Release(calculation); }
-            reads.Remove(identity); current.Remove(identity); faults.Remove(identity);
+            current.Remove(identity); faults.Remove(identity);
             synchronized.Remove(identity); evaluations.Remove(identity);
         }
         DemandRevision++;
@@ -135,6 +139,6 @@ public sealed class UiBindingPresentation : IDisposable
     public void Dispose()
     {
         bindings.Reactive.VerifyAccess(); if (disposed) return;
-        disposed = true; bindings.DetachPresentation(this); owner.Dispose(); calculations.Clear(); current.Clear(); faults.Clear(); reads.Clear(); synchronized.Clear();
+        disposed = true; bindings.DetachPresentation(this); owner.Dispose(); calculations.Clear(); current.Clear(); faults.Clear(); reads = new(StringComparer.Ordinal); synchronized.Clear();
     }
 }

@@ -1,7 +1,7 @@
 # 计数器：从手工通知到自动更新
 
-0.8 Dev 已提供下面的实际入口。计数器用于看清一条链，不代表全部 FL 用途已迁完；
-[完整用途表](migration-status.md)分别记录新响应接入、自动证据和原生状态。
+0.8 已提供下面的实际入口。计数器用于看清一条链，不代替完整用途与证据边界；
+[完整用途表](../../openspec/implementation.md)分别记录新响应接入、自动证据和原生状态。
 
 ## 先连接一次，之后普通赋值
 
@@ -111,7 +111,7 @@ Count:0→Count:1仍是一行时，只验证变化的真实输入并计算该文
 工坊的每个Repeat行可在模板组合根声明范围，Add／Remove／Move继续用业务key和原节点／草稿／捕获。
 只改a时，b的属性求值和测量／局部排列可分别复用；服务仍独立运行，范围不取得业务调度权。
 新自定义控件通过可选`IUiMeasureParticipant`提供完整捕获输入；旧getter／IUiWidget保原通知和合法同步条件。
-具体有效性及作者示例见[布局局部复用合同](layout-reuse-contract.md)。
+具体有效性见[布局局部复用合同](../../openspec/specs/core/layout/spec.md)。
 
 ## 失败时重试显示，不重放业务
 
@@ -122,7 +122,7 @@ Count:0→Count:1仍是一行时，只验证变化的真实输入并计算该文
 - 默认 Checkbox、编辑／选择／Tree／Chart 的旧控件展示通过专用纯 paint 入口保留，不重跑 Draw、Observe 或请求。编辑草稿仍属于同一目标；故障期间停止不可靠操作，独立 reset 仍可用。
 - `host.SetDisplayDemand(false/true)` 或标准 shell 同名入口表达可靠隐藏／复显，不是失焦。共享 owner 让 A／B 各按需求读同一计算；关 B 不释放 A 或服务。确认在打开时捕获 A17，不能在确认时读取后来选择的 B23；业务入口仍核最新资格。
 
-完整作者用法、实际停止范围、循环诊断和旧 custom 等级见[失败与寿命合同](failure-lifetime-contract.md)。
+完整作者用法、实际停止范围、循环诊断和旧 custom 等级见[失败与寿命合同](../../openspec/specs/core/lifetime-recovery/spec.md)。
 
 ## 本包已证明什么
 
@@ -132,7 +132,7 @@ Count:0→Count:1仍是一行时，只验证变化的真实输入并计算该文
 下个合法同步点实际文字和内容相关几何更新，并覆盖 Checkbox。资格谓词即使用 bindings.Get
 也读最新业务值，不改变本轮普通展示读；异常恢复相同。原生输入、字体、IME 和合成仍需实机。
 
-RU1 另用默认 Dropdown／ModeRow／Repeat／NumberField 验证对象列表、typed options、同值选择、
+既有 RU1 证据另用默认 Dropdown／ModeRow／Repeat／NumberField 验证对象列表、typed options、同值选择、
 增删重排及同 key 节点／草稿／捕获；同步后修改 Count 和结构，本轮仍绘旧投影，下轮才一起采用。
 独立多项安全投影走同一生产图、真实包装及有界 Host 观察。数据计算与实际订阅数量见本轮验证记录。
 
@@ -140,4 +140,4 @@ RU2的同源`LayoutReuseTests`与真实`KernelLayoutReuseTests`另报每个实�
 覆盖同结果换源、计数同尺寸／新增行、独立安全多项投影、Scroll80→140且视口100、共享60→70→120、
 宽度／字体环境／纯颜色／整体搬动、增删重排、草稿／捕获／弹层及失败不发布半份。
 18用途／9容器的具体新缓存等级与未变旧条件仍以唯一用途表为准，不用双例替代整库覆盖。
-任意引用隐式缺省、最终集合API／粒度、RU3 的 `FailureLifetimeTests`／`KernelFailureLifetimeTests` 另证首次／新分支／标签失败、纯重试、回调 owner 恢复、有限及超限反馈、旧展示／草稿／资格、真实隐藏及双 Host 所有权。RU4剩余迁移和RU5平台承诺仍分项保留。
+一般引用仍须显式相等政策；RU3 的 `FailureLifetimeTests`／`KernelFailureLifetimeTests` 另证首次／新分支／标签失败、纯重试、回调 owner 恢复、有限及超限反馈、旧展示／草稿／资格、真实隐藏及双 Host 所有权。未知旧环境保正确full路径；未交付1.7等平台范围见现行规格。

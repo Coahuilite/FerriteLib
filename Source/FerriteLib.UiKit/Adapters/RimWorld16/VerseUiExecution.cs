@@ -27,7 +27,24 @@ public sealed class VerseUiExecution : IUiExecution, IDisposable
         return frame;
     }
 
-    private static UiFramePhase Phase(EventType type) => Enum.TryParse(type.ToString(), out UiFramePhase p) ? p : UiFramePhase.None;
+    // Native values have obsolete same-value aliases; Enum.ToString() need not choose the canonical name.
+    private static UiFramePhase Phase(EventType type) => type switch
+    {
+        EventType.Layout => UiFramePhase.Layout,
+        EventType.Repaint => UiFramePhase.Repaint,
+        EventType.MouseDown => UiFramePhase.MouseDown,
+        EventType.MouseUp => UiFramePhase.MouseUp,
+        EventType.MouseDrag => UiFramePhase.MouseDrag,
+        EventType.MouseMove => UiFramePhase.MouseMove,
+        EventType.ScrollWheel => UiFramePhase.ScrollWheel,
+        EventType.KeyDown => UiFramePhase.KeyDown,
+        EventType.KeyUp => UiFramePhase.KeyUp,
+        EventType.ValidateCommand => UiFramePhase.ValidateCommand,
+        EventType.ExecuteCommand => UiFramePhase.ExecuteCommand,
+        EventType.Used => UiFramePhase.Used,
+        EventType.Ignore => UiFramePhase.Ignore,
+        _ => UiFramePhase.None
+    };
     private static UiKey Key(KeyCode key) => key switch
     {
         KeyCode.UpArrow => UiKey.Up,
@@ -78,6 +95,12 @@ public sealed class VerseUiExecution : IUiExecution, IDisposable
     }
 
     public UiNativeEditResult Edit(UiNativeEdit request)
+        => EditCore(request, null, null);
+
+    internal UiNativeEditResult EditText(UiTextEdit request)
+        => EditCore(request.Edit, request.Font.Size, request.Colour);
+
+    private UiNativeEditResult EditCore(UiNativeEdit request, int? size, UiColour? ink)
     {
         string result = request.Text;
         WithState(() =>
@@ -105,12 +128,27 @@ public sealed class VerseUiExecution : IUiExecution, IDisposable
                     current.Use();
             }
 
-            result = request.Multiline ? Verse.Widgets.TextArea(Rect(request.Rect), request.Text, !request.Writable) : Verse.Widgets.TextField(Rect(request.Rect), request.Text);
+            if (ink.HasValue)
+            {
+                GUI.color = Colour(UiColour.White);
+                GUI.contentColor = Colour(ink.Value);
+            }
+            string DrawEditor() => request.Multiline ? Verse.Widgets.TextArea(Rect(request.Rect), request.Text, !request.Writable) : Verse.Widgets.TextField(Rect(request.Rect), request.Text);
+            result = size.HasValue ? SizedEditor(request.Multiline, size.Value, DrawEditor) : DrawEditor();
         });
         bool consumed = Event.current?.type == EventType.Used;
         if (consumed)
             frame?.Consume();
         return new UiNativeEditResult(result, HasFocus(request.Control), consumed);
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static string SizedEditor(bool multiline, int size, Func<string> draw)
+    {
+        GUIStyle style = multiline ? Verse.Text.CurTextAreaStyle : Verse.Text.CurTextFieldStyle;
+        int previous = style.fontSize;
+        try { style.fontSize = size; return draw(); }
+        finally { style.fontSize = previous; }
     }
 
     public void ConsumeEvent()
@@ -184,6 +222,13 @@ public sealed class VerseUiExecution : IUiExecution, IDisposable
         });
     }
 
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    internal void TextSized(UiLayoutRect rect, string text, UiTextFont font, UiColour colour, UiTextAnchor anchor, bool wrap)
+    {
+        if (!font.Size.HasValue) { Text(rect, text, font.Alias, colour, anchor, wrap); return; }
+        VerseFerriteTextMetrics.WithFontSize(font, wrap, () => { Text(rect, text, font.Alias, colour, anchor, wrap); return 0; });
+    }
+
     public void Line(UiLayoutPoint from, UiLayoutPoint to, UiColour colour, float width) => WithState(() => Verse.Widgets.DrawLine(Point(from), Point(to), Colour(colour), width));
     public void Image(UiLayoutRect rect, UiImage image, UiColour tint)
     {
@@ -241,6 +286,6 @@ public sealed class VerseUiImages : IDisposable
             textures.Remove(image.Key);
     }
 
-    internal Texture? Resolve(UiImage image) => image.Scope == scope && textures.TryGetValue(image.Key, out Texture texture) ? texture : null;
+    internal Texture? Resolve(UiImage image) => image.Scope == scope && textures.TryGetValue(image.Key, out Texture? texture) ? texture : null;
     public void Dispose() => textures.Clear();
 }

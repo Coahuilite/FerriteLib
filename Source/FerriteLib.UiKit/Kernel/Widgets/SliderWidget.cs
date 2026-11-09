@@ -2,7 +2,7 @@ using System;
 
 namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <summary>Default range wrapper: shared behavior, measured label/track, typed request binding.</summary>
-internal sealed class SliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
+internal sealed partial class SliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/slider";
     private UiElementSpec spec = UiElementSpec.Empty;
@@ -32,13 +32,13 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, Kind,
 
     private UiRange Limits() => new UiRange(AtomVocabulary.ReadFloat(spec, "Min", 0), AtomVocabulary.ReadFloat(spec, "Max", 1));
     private string Label(UiWidgetContext ctx) => AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
-    private UiSliderLayout Layout(UiWidgetContext ctx, float width, string? capturedLabel = null) => UiSliderLayout.Measure(capturedLabel ?? Label(ctx), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0);
-    public float MeasureLabel(UiWidgetContext ctx) => Label(ctx).Length == 0 ? 0 : ctx.Metrics.MeasureWidth(Label(ctx), AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing;
+    private UiSliderLayout Layout(UiWidgetContext ctx, float width, string? capturedLabel = null) => UiSliderLayout.Measure(capturedLabel ?? Label(ctx), width, UiTextFonts.For(ctx, AtomVocabulary.TextFont(ctx)), UiElementProperties.DensityOf(ctx.Theme), ctx.Node?.SharedLabelWidth ?? 0);
+    public float MeasureLabel(UiWidgetContext ctx) => Label(ctx).Length == 0 ? 0 : UiTextFonts.For(ctx, AtomVocabulary.TextFont(ctx)).MeasureWidth(Label(ctx)) + ctx.Theme.Geometry.Spacing;
     public UiMeasurement CaptureMeasurement(UiWidgetContext ctx)
     {
         string label = Label(ctx);
         return new UiMeasurement(AtomVocabulary.LabelMeasureInputs(ctx, label), () => AtomVocabulary.ReadHeight(spec,
-            UiSliderLayout.Measure(label, ctx.ViewWidth, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0).Height));
+            UiSliderLayout.Measure(label, ctx.ViewWidth, UiTextFonts.For(ctx, AtomVocabulary.TextFont(ctx)), UiElementProperties.DensityOf(ctx.Theme), ctx.Node?.SharedLabelWidth ?? 0).Height));
     }
 
     public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
@@ -89,12 +89,12 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(UiWidgetRegistry.CoreScope, Kind,
             return;
         UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, writable);
         if (layout.LabelWidth > 0)
-            UiThemeDraw.Label(ctx.Drawing,new UiLayoutRect(rect.X, rect.Y, layout.LabelWidth, layout.Stacked ? layout.LabelHeight : rect.Height), Label(ctx), ctx.Theme, style.Text, AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft);
+            UiTextFonts.Label(ctx,new UiLayoutRect(rect.X, rect.Y, layout.LabelWidth, layout.Stacked ? layout.LabelHeight : rect.Height), Label(ctx), style.Text, AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft);
         ctx.Controls.PaintRange(track, ctx.Theme, range.Clamp(current), range.Min, range.Max);
         retained.Capture(ctx, (r,c) =>
         {
             UiSliderLayout lastLayout=Layout(c,r.Width,retainedLabel);
-            if(lastLayout.LabelWidth>0) UiThemeDraw.Label(c.Drawing,new UiLayoutRect(r.X,r.Y,lastLayout.LabelWidth,lastLayout.Stacked?lastLayout.LabelHeight:r.Height),retainedLabel,c.Theme,style.Text,AtomVocabulary.TextFont(c),UiTextAnchor.MiddleLeft);
+            if(lastLayout.LabelWidth>0) UiTextFonts.Label(c,new UiLayoutRect(r.X,r.Y,lastLayout.LabelWidth,lastLayout.Stacked?lastLayout.LabelHeight:r.Height),retainedLabel,style.Text,AtomVocabulary.TextFont(c),UiTextAnchor.MiddleLeft);
             ctx.Controls.PaintRange(TrackRect(r,c,lastLayout),c.Theme,range.Clamp(current),range.Min,range.Max);
         });
     }

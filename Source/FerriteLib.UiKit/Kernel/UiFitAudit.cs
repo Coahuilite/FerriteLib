@@ -33,7 +33,13 @@ public readonly struct UiOverflowReport
         Available = available;
         RectWidth = rectWidth;
         TextLength = (text ?? "").Length;
+        ActualFont = null; ActualColour = null;
     }
+    internal UiTextFont? ActualFont { get; }
+    internal UiColour? ActualColour { get; }
+    internal UiOverflowReport(string path, string text, UiTextFont font, UiColour? colour, UiOverflowAxis axis, float needed, float available, float width)
+        : this(path, text, font.Alias, axis, needed, available, width)
+    { ActualFont = font; ActualColour = colour; }
 
     public string ElementPath { get; }
 
@@ -104,7 +110,8 @@ public readonly struct UiStyleFallbackReport
 
     /// <summary>The one line a host logs when it wants this finding in a log rather than in a sink.</summary>
     public string Diagnostic =>
-        ElementPath + ": " + Kind + " " + Attribute + "=\"" + Authored + "\" is not a declared value; fell back to " + Resolved + ".";
+        Attribute == "FontSize" || Attribute == "TextColor" ? ElementPath + ": requested " + Authored + ", effective preset, reason: " + Resolved + "."
+        : ElementPath + ": " + Kind + " " + Attribute + "=\"" + Authored + "\" is not a declared value; fell back to " + Resolved + ".";
 }
 
 /// <summary>
@@ -146,10 +153,22 @@ public static class UiFitAudit
     private static readonly HashSet<string> StyleFallbacks = new(StringComparer.Ordinal);
 
     private static ITextMetrics? metrics;
-    private static Action<UiOverflowReport>? sink;
-    private static Action<UiStyleFallbackReport>? styleSink;
+    private static LegacyObserver<UiOverflowReport>? sink;
+    private static LegacyObserver<UiStyleFallbackReport>? styleSink;
     private static string? lastStyleFallback;
     private static string currentPath = string.Empty;
+
+    // The existing legacy attachment owns its failure budget, not a new process-wide registry.
+    private sealed class LegacyObserver<T>
+    {
+        private readonly Action<T> callback;
+        private bool failureReported;
+        internal LegacyObserver(Action<T> callback) => this.callback = callback;
+        internal void Invoke(T report) => callback(report);
+        internal void Reset() => failureReported = false;
+        internal void ReportFailure(Exception error)
+            => UiObservationBoundary.ReportOnce(ref failureReported, "legacy fit observation failed", error);
+    }
 
     /// <summary>Master switch. Off means the audit does not measure anything at all.</summary>
     public static bool Enabled { get; set; }
@@ -186,7 +205,7 @@ public static class UiFitAudit
     public static void Attach(ITextMetrics textMetrics, Action<UiOverflowReport> reportSink)
     {
         metrics = textMetrics ?? throw new ArgumentNullException(nameof(textMetrics));
-        sink = reportSink ?? throw new ArgumentNullException(nameof(reportSink));
+        sink = new LegacyObserver<UiOverflowReport>(reportSink ?? throw new ArgumentNullException(nameof(reportSink)));
     }
 
     /// <summary>
@@ -197,7 +216,7 @@ public static class UiFitAudit
     /// </summary>
     public static void AttachStyleFallback(Action<UiStyleFallbackReport> styleReportSink)
     {
-        styleSink = styleReportSink ?? throw new ArgumentNullException(nameof(styleReportSink));
+        styleSink = new LegacyObserver<UiStyleFallbackReport>(styleReportSink ?? throw new ArgumentNullException(nameof(styleReportSink)));
     }
 
     /// <summary>Drops the bindings and disables the audit, so a disposed host cannot leave a dangling sink.</summary>
@@ -218,6 +237,8 @@ public static class UiFitAudit
         StyleFallbacks.Clear();
         lastStyleFallback = null;
         currentPath = string.Empty;
+        sink?.Reset();
+        styleSink?.Reset();
     }
 
     /// <summary>
@@ -261,8 +282,10 @@ public static class UiFitAudit
         // its dedup set, its callback and its ruler - is not consulted at all. An unsubscribed host keeps
         // exactly the legacy path it had.
         UiDiagnosticSubscription? subscription = UiDiagnosticHub.ActiveSubscription;
+        bool domainOutput = UiDomainDiagnostics.OwnsOutput(UiDiagnosticHub.ActiveOutput);
+        if (subscription == null && Saturated) return;
         ITextMetrics? textMetrics;
-        if (subscription != null)
+        if (subscription != null || domainOutput)
         {
             textMetrics = UiDiagnosticHub.ActiveMetrics;
         }
@@ -300,27 +323,72 @@ public static class UiFitAudit
         UiOverflowAxis axis,
         float needed,
         float available,
-        UiDiagnosticSubscription? subscription)
+        UiDiagnosticSubscription? subscription, UiTextFont? actualFont = null, UiColour? actualColour = null, string? pathOverride = null)
     {
-        string key = currentPath + "|" + (int)axis + "|" + (int)font + "|" + Shorten(text);
-        string path = currentPath.Length == 0 ? "(unscoped)" : currentPath;
+        string key;
+        UiOverflowReport report;
+        try
+        {
+            string scope = pathOverride ?? currentPath;
+            key = scope + "|" + (int)axis + "|" + (int)font + "|" + Shorten(text);
+            string path = scope.Length == 0 ? "(unscoped)" : scope;
+            report = new UiOverflowReport(path, text, font, axis, needed, available, rect.Width);
+            if (actualFont.HasValue)
+            {
+                report = new UiOverflowReport(path, text, actualFont.Value, actualColour, axis, needed, available, rect.Width);
+                key += "|" + actualFont.Value + "|" + (actualColour.HasValue ? actualColour.Value.Red + "," + actualColour.Value.Green + "," + actualColour.Value.Blue + "," + actualColour.Value.Alpha : "native-preset");
+            }
+        }
+        catch (Exception error) when (UiObservationBoundary.IsOrdinary(error))
+        { sink?.ReportFailure(error); return; }
 
         if (subscription != null)
         {
-            subscription.PublishOverflow(
-                new UiOverflowReport(path, text, font, axis, needed, available, rect.Width), key);
+            subscription.PublishOverflow(report, key);
+            UiDomainDiagnostics.Overflow(UiDiagnosticHub.ActiveOutput, UiDiagnosticHub.ActiveSession, report);
             return;
         }
 
-        if (!Reported.Add(key)) return;
-
-        sink?.Invoke(new UiOverflowReport(path, text, font, axis, needed, available, rect.Width));
+        try
+        {
+            if (UiDomainDiagnostics.OwnsOutput(UiDiagnosticHub.ActiveOutput))
+            {
+                if (Reported.Count < MaxReports) Reported.Add(key);
+                UiDomainDiagnostics.Overflow(UiDiagnosticHub.ActiveOutput, UiDiagnosticHub.ActiveSession, report);
+                return;
+            }
+            if (!Reported.Add(key)) return;
+            sink?.Invoke(report);
+        }
+        catch (Exception error) when (UiObservationBoundary.IsOrdinary(error)) { sink?.ReportFailure(error); }
     }
 
     private static string Shorten(string text)
     {
         return text.Length <= TextKeyBudget ? text : text.Substring(0, TextKeyBudget);
     }
+
+    internal static void CheckText(UiLayoutRect rect, string text, UiTextRun run, UiColour? colour, bool singleLine)
+    {
+        if (!Enabled || string.IsNullOrEmpty(text) || rect.Width <= 1 || rect.Height <= 1) return;
+        UiDiagnosticSubscription? subscription = UiDiagnosticHub.ActiveSubscription;
+        bool domainOutput = UiDomainDiagnostics.OwnsOutput(UiDiagnosticHub.ActiveOutput);
+        ITextMetrics? ruler = subscription == null && !domainOutput ? metrics : UiDiagnosticHub.ActiveMetrics;
+        if (ruler == null || subscription == null && Saturated) return;
+        UiTextRun measured = run.WithMetrics(ruler);
+        if (measured.Font != run.Font)
+        {
+            ReportStyleFallback(run.Path, run.Purpose.ToString(), "FontSize", run.Font.Size!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), "fit metrics do not support " + run.Purpose);
+            return;
+        }
+        float needed = singleLine ? measured.MeasureWidth(text) : measured.MeasureText(text, rect.Width);
+        float available = singleLine ? rect.Width : rect.Height;
+        if (needed > available + Tolerance)
+            Report(rect, text, run.Font.Alias, singleLine ? UiOverflowAxis.Width : UiOverflowAxis.Height, needed, available, subscription, run.Font, colour, run.Path);
+    }
+
+    internal static void ReportFontFallback(string path, UiTextRun run)
+        => ReportStyleFallback(path, run.Purpose.ToString(), "FontSize", run.Requested.ToString(), "effective " + run.Font + "; " + run.FallbackReason);
 
     /// <summary>
     /// Records one appearance fallback: an authored role value outside the vocabulary, resolved to the
@@ -331,16 +399,22 @@ public static class UiFitAudit
     /// </summary>
     internal static void ReportStyleFallback(string elementPath, string kind, string attribute, string authored, string resolved)
     {
-        var report = new UiStyleFallbackReport(
-            string.IsNullOrEmpty(elementPath) ? "(unscoped)" : elementPath,
-            kind ?? "",
-            attribute ?? "",
-            authored ?? "",
-            resolved ?? "");
+        UiStyleFallbackReport report;
+        string key;
+        try
+        {
+            report = new UiStyleFallbackReport(
+                string.IsNullOrEmpty(elementPath) ? "(unscoped)" : elementPath,
+                kind ?? "",
+                attribute ?? "",
+                authored ?? "",
+                resolved ?? "");
 
-        lastStyleFallback = report.Diagnostic;
-
-        string key = report.ElementPath + "|" + report.Kind + "|" + report.Attribute + "|" + report.Authored;
+            lastStyleFallback = report.Diagnostic;
+            key = report.ElementPath + "|" + report.Kind + "|" + report.Attribute + "|" + (report.Attribute == "FontSize" || report.Attribute == "TextColor" ? report.Resolved : report.Authored);
+        }
+        catch (Exception error) when (UiObservationBoundary.IsOrdinary(error))
+        { styleSink?.ReportFailure(error); return; }
 
         // Same routing rule as the text half: a live subscription owns the finding, and the process-wide
         // cap and dedup set stay out of it so one host's appearance noise cannot spend another's budget.
@@ -348,12 +422,22 @@ public static class UiFitAudit
         if (subscription != null)
         {
             subscription.PublishStyleFallback(report, key);
+            UiDomainDiagnostics.Style(UiDiagnosticHub.ActiveOutput, UiDiagnosticHub.ActiveSession, report);
             return;
         }
 
-        if (StyleFallbacks.Count >= MaxReports) return;
-        if (!StyleFallbacks.Add(key)) return;
-
-        styleSink?.Invoke(report);
+        try
+        {
+            if (UiDomainDiagnostics.OwnsOutput(UiDiagnosticHub.ActiveOutput))
+            {
+                if (StyleFallbacks.Count < MaxReports) StyleFallbacks.Add(key);
+                UiDomainDiagnostics.Style(UiDiagnosticHub.ActiveOutput, UiDiagnosticHub.ActiveSession, report);
+                return;
+            }
+            if (StyleFallbacks.Count >= MaxReports) return;
+            if (!StyleFallbacks.Add(key)) return;
+            styleSink?.Invoke(report);
+        }
+        catch (Exception error) when (UiObservationBoundary.IsOrdinary(error)) { styleSink?.ReportFailure(error); }
     }
 }

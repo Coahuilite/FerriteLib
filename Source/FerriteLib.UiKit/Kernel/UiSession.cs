@@ -8,7 +8,7 @@ namespace FerriteLib.UiKit.Kernel;
 /// <see cref = "UiSession"/>; closing the host disposes the session and all transient state is lost.
 /// This type intentionally replaces the old process-wide <c>UiValueStore</c>/<c>UiPageState</c>.
 /// </summary>
-public sealed class UiSession : IDisposable
+public sealed partial class UiSession : IDisposable
 {
     public UiControls Controls { get; }
     /// <summary>
@@ -27,12 +27,65 @@ public sealed class UiSession : IDisposable
         return new UiWidgetContext(source, this, metrics, theme, translation, bindings, viewWidth, node.Path, node: node);
     }
     public Action<string>? Warning { get; set; }
-    internal void ReportWarning(string message){if(Warning!=null)Warning(message);else if(execution!=null)execution.Warning(message);else System.Diagnostics.Trace.TraceWarning(message);}
+    internal IUiDiagnosticOutput? DiagnosticOutput { get; set; }
+    internal int DiagnosticArrangedContentRevision { get; set; } = -1;
+    internal int DiagnosticArrangedDefinitionRevision { get; set; } = -1;
+    private bool observationFailureReported;
+    internal void ReportObservationFailure(string boundary, Exception error)
+        => UiObservationBoundary.ReportOnce(ref observationFailureReported, boundary, error);
+    internal void ReportWarning(string message){if(Warning!=null)Warning(message);else if(UiDomainDiagnostics.OwnsOutput(DiagnosticOutput))return;else if(execution!=null)execution.Warning(message);else System.Diagnostics.Trace.TraceWarning(message);}
     internal void ReportCleanupWarning(string message)
     {
         try { ReportWarning(message); }
-        catch (Exception observerFailure) when (observerFailure is not OutOfMemoryException)
-        { System.Diagnostics.Trace.TraceError(message + "\nThe cleanup warning observer also failed: " + observerFailure); }
+        catch (Exception observerFailure) when (UiObservationBoundary.IsOrdinary(observerFailure))
+        { ReportObservationFailure("cleanup warning failed", observerFailure); }
+    }
+    internal void ReportCleanupFailure(string context, Exception original)
+    {
+        UiDomainDiagnostics.Publish(DiagnosticOutput, this, new UiDomainDiagnostic("cleanup.failed", UiDiagnosticLevel.Error,
+            activeNode?.Id.Key ?? "unknown", original.GetType().Name, "resource-release-incomplete", "inspect-original-cleanup-failure"));
+        if (UiDomainDiagnostics.OwnsOutput(DiagnosticOutput) && Warning == null) return;
+        // Exception.ToString is author code too. Keep its preparation within the reporting boundary.
+        try { ReportWarning("[FerriteLib.UiKit] " + context + ": " + original); }
+        catch (Exception observerFailure) when (UiObservationBoundary.IsOrdinary(observerFailure))
+        { UiObservationBoundary.ReportOnce(ref observationFailureReported, context, original, observerFailure); }
+    }
+    // One latest request failure, not a trip or an unbounded history. Keep the exception/typed target
+    // before optional formatting/reporting; neither observation failure nor a later paint retries it.
+    internal UiRequestFailure? LastRequestFailure { get; private set; }
+    internal UiNodeId? LastRequestFailureNode { get; private set; }
+    private bool reportingRequestFailure;
+    internal void RecordRequestFailure(UiNode node, UiRequestFailure failure)
+    {
+        if (IsActive)
+        {
+            LastRequestFailure = failure;
+            LastRequestFailureNode = node.Id;
+        }
+        UiDomainDiagnostics.Publish(DiagnosticOutput, this, new UiDomainDiagnostic("request.failed", UiDiagnosticLevel.Error,
+            node.Id.Key, failure.Operation + "/" + failure.InnerException?.GetType().Name,
+            "request-not-completed-side-effects-unknown", "inspect-consumer-state-before-explicit-retry"));
+        if (UiDomainDiagnostics.OwnsOutput(DiagnosticOutput) && Warning == null) return;
+        if (reportingRequestFailure) return;
+        reportingRequestFailure = true;
+        try
+        {
+            UiInteractionTarget? target = failure.Target;
+            string context = "request failed in session " + Identity + " at guard node '" + node.Id.Key
+                + "' (path='" + node.Path + "')";
+            if (target.HasValue)
+                context += "; request node='" + target.Value.Node + "', target='" + target.Value.TargetScope
+                    + "', business scope='" + target.Value.BusinessScope + "', part='" + target.Value.Part
+                    + "', item='" + target.Value.ItemKey + "'";
+            else
+                context += "; operation='" + failure.Operation + "', binding='" + failure.Binding
+                    + "', guard business scope='" + node.InteractionScope + "'; no explicit interaction target was supplied";
+            ReportWarning("[FerriteLib.UiKit] " + context
+                + ". The callback threw; side effects are not rolled back and their extent is not known to UiKit. No automatic retry or compensation. " + failure);
+        }
+        catch (Exception reporting) when (UiObservationBoundary.IsOrdinary(reporting))
+        { UiObservationBoundary.ReportOnce(ref observationFailureReported, "request failure reporting failed", failure, reporting); }
+        finally { reportingRequestFailure = false; }
     }
     public UiFrame Input { get; private set; } = new UiFrame(UiFramePhase.None, inputAllowed:false);
     private IUiExecution? execution;
@@ -51,7 +104,8 @@ public sealed class UiSession : IDisposable
         if(execution==null)throw new ArgumentNullException(nameof(execution));
         // Execution is borrowed, not owned. Idle owners may change it, including owners that share
         // an outer execution. A held interaction cannot silently migrate to another native mapping.
-        if(this.execution!=null && !ReferenceEquals(this.execution,execution))
+        if(this.execution!=null && !ReferenceEquals(this.execution,execution)
+            && !ReferenceEquals((this.execution as IUiExecutionOwner)?.NativeOwner ?? this.execution, (execution as IUiExecutionOwner)?.NativeOwner ?? execution))
         {
             bool focused=false;
             foreach(UiNode node in nodes.Values)
@@ -80,6 +134,9 @@ public sealed class UiSession : IDisposable
     // of that key is that it survives as a number after the session itself is gone. A counter is bounded
     // state (an int wraps in 2^31 sessions), never a table of live objects.
     private static int nextIdentity;
+    private long nextMountLifetime;
+    internal long AllocateMountLifetime() => ++nextMountLifetime;
+    internal Action? ToolsClosing;
 
     // Scroll state is keyed by the scroll container's node, not by a display path: two scroll elements
     // whose display paths collide still hold two scroll positions (0.4.0 node step 2).
@@ -253,6 +310,7 @@ public sealed class UiSession : IDisposable
 
     /// <summary>Session-scoped scroll positions, keyed by the scroll container's node.</summary>
     internal IReadOnlyDictionary<UiNode, UiLayoutPoint> ScrollPositions => scrollPositions;
+    internal void ReleaseScrollPosition(UiNode node) => scrollPositions.Remove(node);
 
     /// <summary>
     /// Nodes currently tripped into session fallback. Keyed by node, so the display path a diagnostic
@@ -448,8 +506,9 @@ public sealed class UiSession : IDisposable
             // Caller-agnostic facts only, like every other line the funnel reports: which menu moved, where
             // it stands, how far it can go. This session cannot read the backend - the event phase belongs to
             // the funnel's own trace lines, not to a session that has no business touching Event.current.
-            Controls.Trace("wheel popup id=" + openPopupId + " rows=" + openPopupScrollRows
-                + " of " + openPopupMaxScrollRows);
+            try { Controls.Trace("wheel popup id=" + openPopupId + " rows=" + openPopupScrollRows
+                + " of " + openPopupMaxScrollRows); }
+            catch (Exception error) when (UiObservationBoundary.IsOrdinary(error)) { ReportObservationFailure("wheel Trace failed", error); }
         }
 
         return true;
@@ -1067,8 +1126,44 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
     }
 
     // Capture derived arrangement facts; recovery never restores business state or ended capture.
+    internal UiLayoutWork LayoutWork { get; } = new UiLayoutWork();
+    internal IReadOnlyCollection<UiNode> DirtyNodes => dirtyNodes;
+    private ArrangementJournal? arrangementJournal;
+    internal ArrangementJournal BeginIncrementalArrangement()
+    {
+        if (arrangementJournal != null) throw new InvalidOperationException("Nested incremental arrangement.");
+        return arrangementJournal = new ArrangementJournal(this);
+    }
+    internal void TouchArrangement(UiNode node) => arrangementJournal?.Touch(node);
+    internal sealed class ArrangementJournal
+    {
+        private readonly UiSession owner;
+        private readonly Dictionary<UiNode, Action> restores = new();
+        private readonly List<UiNode> created = new();
+        internal ArrangementJournal(UiSession owner) => this.owner = owner;
+        internal void Created(UiNode node) => created.Add(node);
+        internal void Touch(UiNode node)
+        {
+            if (restores.ContainsKey(node) || created.Contains(node)) return;
+            restores.Add(node, node.CaptureArrangement());
+            owner.LayoutWork.CapturedNodes++;
+        }
+        internal void Commit() => owner.arrangementJournal = null;
+        internal void Rollback()
+        {
+            owner.arrangementJournal = null;
+            if (!owner.IsActive) return;
+            foreach (UiNode node in created)
+            {
+                node.ReleaseState(); owner.nodes.Remove(node.Id); owner.dirtyNodes.Remove(node);
+            }
+            foreach (Action restore in restores.Values) restore();
+        }
+    }
+
     internal Action CaptureArrangement()
     {
+        LayoutWork.CapturedNodes += nodes.Count;
         var priorNodes = new Dictionary<UiNodeId, UiNode>(nodes);
         var restoreNodes = new List<Action>();
         foreach (UiNode node in nodes.Values)
@@ -1119,6 +1214,7 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
     {
         if (spec == null) throw new ArgumentNullException(nameof(spec));
         UiNode node = GetOrCreateNode(element, spec.Kind, ordinal, spec.Id);
+        if (node.Kind != spec.Kind || node.Ordinal != ordinal || node.ElementId != spec.Id) TouchArrangement(node);
         node.RefreshIdentity(spec.Kind, ordinal, spec.Id);
         return node;
     }
@@ -1133,6 +1229,7 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
 
         node = new UiNode(this, element, kind, ordinal, needsMeasure: true, elementId: elementId);
         nodes.Add(element, node);
+        arrangementJournal?.Created(node);
         dirtyNodes.Add(node);
         return node;
     }
@@ -1339,9 +1436,10 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
         if (ownedHotControl.HasValue && ownedHotControl.Value == controlId)
         {
             Interactions.End(UiInteractionEnd.CaptureLost);
-            Execution.Release(controlId);
+            // End ownership before a fallible native release; a failure must never replay it.
             ownedHotControl = null;
             ownedHotControlOwner = null;
+            Execution.Release(controlId);
         }
     }
 
@@ -1396,6 +1494,9 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
         }
         // Close logically before calling external/native cleanup; even a throwing release must not
         // leave a reusable owner or skip the other owned resources. Dispose never commits a draft.
+        Action? closeTools = ToolsClosing;
+        ToolsClosing = null;
+        if (closeTools != null) Cleanup(closeTools);
         Cleanup(Interactions.Dispose);
         foreach (UiNode node in nodes.Values)
             foreach (UiControlState state in node.ValueStates.Values)
@@ -1435,6 +1536,8 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
         hoverClaimStamp = 0;
         hoverGraceLeft = 0;
         trippedLogs.Clear();
+        LastRequestFailure = null;
+        LastRequestFailureNode = null;
         popupDrawActions.Clear();
         popupTarget = null;
         popupCaptureTarget = null;
@@ -1449,6 +1552,12 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
         contentInputLayers.Clear();
         currentWindowOrigin = default;
         scrollTargetElementId = null;
+        if (errors.Count != 0)
+            UiDomainDiagnostics.Publish(DiagnosticOutput, this, new UiDomainDiagnostic("session.cleanup-failed", UiDiagnosticLevel.Error,
+                "unknown", "owned-resources", "session-closed-release-incomplete", "inspect-original-aggregate-before-reopening"));
+        IUiDiagnosticOutput? output = DiagnosticOutput;
+        DiagnosticOutput = null;
+        output?.Dispose();
         execution = null;
         Input = new UiFrame(UiFramePhase.None, inputAllowed: false);
         PointerInputAllowed = false;

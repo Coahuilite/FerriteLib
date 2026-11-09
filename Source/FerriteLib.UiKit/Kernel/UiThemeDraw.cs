@@ -17,7 +17,7 @@ public static class UiThemeDraw
     /// single-line label is clipped horizontally instead of wrapping out of its row. The fitting audit
     /// then checks width instead of height, because for those labels wrapping is not an available answer.
     /// </param>
-    public static void Label(IUiDrawing drawing, UiLayoutRect rect,string text,UiTheme theme,UiColour? color=null,UiFont? font=null,UiTextAnchor anchor=UiTextAnchor.MiddleLeft,bool singleLine=false){UiFont resolved=font??theme.Styles.Font;UiFitAudit.Check(rect,text,resolved,singleLine);drawing.Text(rect,text,resolved,color??theme[UiPaletteRole.Foreground],anchor,!singleLine);}
+    public static void Label(IUiDrawing drawing, UiLayoutRect rect,string text,UiTheme theme,UiColour? color=null,UiFont? font=null,UiTextAnchor anchor=UiTextAnchor.MiddleLeft,bool singleLine=false){UiFont resolved=font??theme.Styles.Font;UiFitAudit.Check(rect,text,resolved,singleLine);drawing.Text(rect,text,resolved,color??theme.Styles.Resolve(UiStatusTone.Neutral).Text,anchor,!singleLine);}
 
     /// <summary>
     /// Paints one surface treatment: the fill plus its hairline edge. This is the pair-shaped entry a
@@ -86,7 +86,7 @@ public static class UiThemeDraw
         SectionBand(drawing,rect, theme);
         if (!string.IsNullOrEmpty(title))
         {
-            Label(drawing,rect, title, theme, color ?? theme[UiPaletteRole.Foreground], font ?? UiFont.Small);
+            Label(drawing,rect, title, theme, color, font ?? UiFont.Small);
         }
     }
 

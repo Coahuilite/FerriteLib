@@ -51,7 +51,7 @@ public sealed partial class UiControls
 
     private UiInteractionResult PointerInteraction(UiLayoutRect rect, UiSession session, UiNode node, UiInteractionTarget target, bool canReceive, bool canOperate, bool range, UiRange limits, float value, UiWidgetContext? ctx = null, bool pointOperation = false, float currentY = 0, UiHitGeometry? pointGeometry = null,bool windowSpace=false)
     {
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
         string eventBefore = DiagnosticEventName();
 #endif
         UiControlKey allocatedControl = GetControlId(target.Node + "\u001f" + target.TargetScope + "\u001f" + target.Part + "\u001f" + target.GetHashCode());
@@ -100,8 +100,11 @@ public sealed partial class UiControls
         if (result.Consume || result.Request)
             session.NoteInteractionTarget(node);
         if (result.Ended != UiInteractionEnd.None)
-            Trace?.Invoke("interaction end node=" + target.Node + " part=" + target.Part + " reason=" + result.Ended);
-#if FER_DEV
+        {
+            try { Trace?.Invoke("interaction end node=" + target.Node + " part=" + target.Part + " reason=" + result.Ended); }
+            catch (Exception error) when (UiObservationBoundary.IsOrdinary(error)) { session.ReportObservationFailure("interaction Trace failed", error); }
+        }
+#if FER_DEV || FER_TOOLS
         if (ctx != null)
         {
             bool covered = session.IsPointerOverHigherLayer(node, WindowPointer(ctx));
@@ -122,7 +125,10 @@ public sealed partial class UiControls
         UiInteractionResult result = PopupPointer(rect, popupId, session, target, true, selectable, node);
         session.NotePopupOptionCapture(target, result.Captured);
         if (result.Request)
-            Trace?.Invoke("option fired id=" + popupId + " row=" + Describe(rect));
+        {
+            try { Trace?.Invoke("option fired id=" + popupId + " row=" + Describe(rect)); }
+            catch (Exception error) when (UiObservationBoundary.IsOrdinary(error)) { session.ReportObservationFailure("option Trace failed", error); }
+        }
         return result;
     }
 

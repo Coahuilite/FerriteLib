@@ -5,7 +5,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// Single-line or basic plain-text multiline native editing, with one instance-local neutral draft.
 /// Selection, clipboard and character composition belong to Verse/Unity, not to this wrapper.
 /// </summary>
-internal sealed class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
+internal sealed partial class TextFieldWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/text-field";
 
@@ -68,14 +68,14 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     }
     private UiMeasurement CaptureText(UiWidgetContext ctx,string text,string label,bool multiline)
     {
-        return new UiMeasurement(new UiMeasureInputs(new[] { label, text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx), ctx.Theme.Geometry.Spacing, ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.RowHeight, ctx.Node?.SharedLabelWidth ?? 0 }, multiline || label.Length > 0), () =>
+        return new UiMeasurement(new UiMeasureInputs(new[] { label, text }, new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx), (float)(UiTextFonts.For(ctx).Font.Size ?? 0), (float)(UiTextFonts.For(ctx, purpose: UiTextPurpose.Editor).Font.Size ?? 0), ctx.Theme.Geometry.Spacing, ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.RowHeight, ctx.Node?.SharedLabelWidth ?? 0 }, multiline || label.Length > 0 || UiTextFonts.For(ctx, purpose: UiTextPurpose.Editor).Font.Size.HasValue), () =>
         {
             float declared = AtomVocabulary.ReadHeight(spec, 0);
             if (declared > 0) return declared;
-            UiSliderLayout layout = UiSliderLayout.Measure(label, ctx.ViewWidth, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0);
-            if (!multiline) return layout.Height;
+            UiSliderLayout layout = UiSliderLayout.Measure(label, ctx.ViewWidth, UiTextFonts.For(ctx, AtomVocabulary.TextFont(ctx)), UiElementProperties.DensityOf(ctx.Theme), ctx.Node?.SharedLabelWidth ?? 0);
+            if (!multiline) return UiTextFonts.ControlHeight(ctx, layout, UiTextFonts.RowHeight(ctx, UiTextPurpose.Editor));
             float fieldWidth = layout.Stacked || layout.LabelWidth <= 0 ? ctx.ViewWidth : Math.Max(1, ctx.ViewWidth - layout.LabelWidth - ctx.Theme.Geometry.Gap);
-            return (layout.Stacked ? layout.LabelHeight + ctx.Theme.Geometry.Gap : 0) + Math.Max(ctx.Theme.Geometry.RowHeight, ctx.Metrics.MeasureText(text, AtomVocabulary.TextFont(ctx), fieldWidth) + ctx.Theme.Geometry.Spacing * 2);
+            return (layout.Stacked ? layout.LabelHeight + ctx.Theme.Geometry.Gap : 0) + Math.Max(ctx.Theme.Geometry.RowHeight, UiTextFonts.For(ctx, purpose: UiTextPurpose.Editor).MeasureText(text, fieldWidth) + ctx.Theme.Geometry.Spacing * 2);
         });
     }
 
@@ -112,12 +112,14 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         UiEditSession<string> editor = ctx.Controls.Editor<string>(ctx, bindKey, value => value, Parse);
         AtomVocabulary.PaintEditFeedback(field, ctx, editor);
         DrawPlaceholder(field, editor.Draft, ctx, writable);
+        UiColour? retainedInk = UiTextFonts.AnyInk(ctx.Theme) ? style.Text : null;
+        string retainedDraft = editor.Draft;
         // Native input may have changed the reliable draft after this pass's measurement.
-        retained.SetMeasure(c => CaptureText(c,editor.Draft,retainedLabel,multiline));
+        retained.SetMeasure(c => CaptureText(c,retainedDraft,retainedLabel,multiline));
         retained.Capture(ctx, (r,c) =>
         {
             ResolveLabelBand(r,c,out UiLayoutRect slot,retainedLabel);
-            UiRetainedPaint.Field(slot,c,editor.Draft);
+            UiRetainedPaint.Field(slot,c,retainedDraft,retainedInk);
             DrawLabel(r,c,style,retainedLabel);
         });
     }
@@ -140,13 +142,12 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         if (placeholder.Length == 0) return;
 
         float inset = ctx.Theme.Geometry.Spacing;
-        UiThemeDraw.Label(
-ctx.Drawing,            new UiLayoutRect(field.X + inset, field.Y, Math.Max(1f, field.Width - inset * 2f), field.Height),
+        UiTextFonts.Label(ctx,            new UiLayoutRect(field.X + inset, field.Y, Math.Max(1f, field.Width - inset * 2f), field.Height),
             placeholder,
-            ctx.Theme,
-            ctx.Theme[UiPaletteRole.SecondaryForeground],
+            ctx.Theme.Styles.Resolve(UiStatusTone.Neutral, UiEmphasis.Muted).Text,
             AtomVocabulary.TextFont(ctx),
-            UiTextAnchor.MiddleLeft);
+            UiTextAnchor.MiddleLeft,
+            singleLine: !AtomVocabulary.ReadBool(spec, "Multiline", false));
     }
 
     /// <summary>
@@ -157,10 +158,10 @@ ctx.Drawing,            new UiLayoutRect(field.X + inset, field.Y, Math.Max(1f, 
     public float MeasureLabel(UiWidgetContext ctx)
     {
         string label = AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey");
-        return label.Length == 0 ? 0 : ctx.Metrics.MeasureWidth(label, AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing;
+        return label.Length == 0 ? 0 : UiTextFonts.For(ctx, AtomVocabulary.TextFont(ctx)).MeasureWidth(label) + ctx.Theme.Geometry.Spacing;
     }
 
-    private UiSliderLayout LabelLayout(UiWidgetContext ctx, float width, string? capturedLabel = null) => UiSliderLayout.Measure(capturedLabel ?? AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey"), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0);
+    private UiSliderLayout LabelLayout(UiWidgetContext ctx, float width, string? capturedLabel = null) => UiSliderLayout.Measure(capturedLabel ?? AtomVocabulary.ResolveText(spec, ctx, "Label", "LabelKey"), width, UiTextFonts.For(ctx, AtomVocabulary.TextFont(ctx)), UiElementProperties.DensityOf(ctx.Theme), ctx.Node?.SharedLabelWidth ?? 0);
     private void ResolveLabelBand(UiLayoutRect rect, UiWidgetContext ctx, out UiLayoutRect field, string? capturedLabel = null)
     {
         UiSliderLayout layout = LabelLayout(ctx, rect.Width, capturedLabel);
@@ -180,6 +181,6 @@ ctx.Drawing,            new UiLayoutRect(field.X + inset, field.Y, Math.Max(1f, 
         if (label.Length == 0)
             return;
         UiSliderLayout layout = LabelLayout(ctx, rect.Width, capturedLabel);
-        UiThemeDraw.Label(ctx.Drawing,new UiLayoutRect(rect.X, rect.Y, layout.LabelWidth, layout.Stacked ? layout.LabelHeight : rect.Height), label, ctx.Theme, style.Text, AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft);
+        UiTextFonts.Label(ctx,new UiLayoutRect(rect.X, rect.Y, layout.LabelWidth, layout.Stacked ? layout.LabelHeight : rect.Height), label, style.Text, AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft);
     }
 }

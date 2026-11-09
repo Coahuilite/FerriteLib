@@ -350,8 +350,8 @@ internal static class KernelRoleAttributeTests
             Attributes(("Bind", "publishedText"), ("Text", "x"), ("Tone", "Danger"))));
         before = LabelCount();
         NativeFixture.Draw(        bound,new UiLayoutRect(0f, 0f, 200f, 40f), Context(session, theme, bindings, 200f));
-        Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DisabledForeground]),
-            "a text leaf reading a read-only binding is disabled too");
+        Check(SameColor(LastLabelColor(before), theme[UiPaletteRole.DangerForeground]),
+            "a text leaf reading a read-only binding keeps the authored tone");
 
         WrappedTextWidget literal = new();
         literal.Configure(new UiElementSpec("note", WrappedTextWidget.Kind, Attributes(("Text", "x"), ("Tone", "Danger"))));

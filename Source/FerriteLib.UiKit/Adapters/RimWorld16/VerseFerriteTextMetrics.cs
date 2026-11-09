@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using Verse;
 
@@ -17,14 +18,49 @@ namespace FerriteLib.UiKit.Kernel;
 public sealed class VerseFerriteTextMetrics : ITextMetrics, IUiTextMetricsEnvironment
 {
     /// <summary>
-    /// Shared instance; the type holds no state. A host and its text-fit audit must be handed the same
+    /// Shared instance; the type retains no UI state. A host and its text-fit audit must be handed the same
     /// metrics *model* - a wrap-aware one like this - or layout and audit measure against two different
     /// rulers and the audit goes quietly vacuous.
     /// </summary>
     public static readonly VerseFerriteTextMetrics Instance = new();
 
-    UiMeasureInputs? IUiTextMetricsEnvironment.CaptureEnvironment(UiFont font)
+    // The 1.7 host resolves Font to UnityStubs, which has no fontNames or complete font-data revision.
+    // Unknown backends revoke optional measurement reuse rather than publish an incomplete stamp.
+    private static readonly bool HasUnityFontEnvironment =
+        string.Equals(typeof(Font).Assembly.GetName().Name, "UnityEngine.TextRenderingModule", StringComparison.Ordinal);
+    private static readonly bool Has17FontProvider = string.Equals(typeof(Font).Assembly.GetName().Name, "UnityStubs", StringComparison.Ordinal);
+    private const bool NumericLabels17 = true;
+    internal static bool SupportsTextPurpose(UiTextPurpose purpose) => purpose == UiTextPurpose.Label
+        ? HasUnityFontEnvironment || Has17FontProvider && NumericLabels17 : purpose == UiTextPurpose.Editor && HasUnityFontEnvironment;
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    internal static T WithFontSize<T>(UiTextFont font, bool wrap, Func<T> action)
     {
+        GameFont previousFont = Text.Font; TextAnchor previousAnchor = Text.Anchor; bool previousWrap = Text.WordWrap;
+        try
+        {
+            Text.Font = UiKitFonts.ToGameFont(font.Alias); Text.Anchor = TextAnchor.UpperLeft; Text.WordWrap = wrap;
+            GUIStyle style = Text.CurFontStyle;
+            int previousSize = style.fontSize;
+            try { if (font.Size.HasValue) style.fontSize = font.Size.Value; return action(); }
+            finally { style.fontSize = previousSize; }
+        }
+        finally { Text.Font = previousFont; Text.Anchor = previousAnchor; Text.WordWrap = previousWrap; }
+    }
+    internal UiMeasureInputs? NumericEnvironment(UiTextFont font)
+        => HasUnityFontEnvironment ? WithFontSize(font, true, () => CaptureUnityEnvironment(font.Alias)) : null;
+
+    UiMeasureInputs? IUiTextMetricsEnvironment.CaptureEnvironment(UiFont font)
+        => HasUnityFontEnvironment ? CaptureUnityEnvironment(font) : null;
+
+    // Keep unavailable Unity members out of the 1.7 caller's JIT body, including under inlining.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static UiMeasureInputs? CaptureUnityEnvironment(UiFont font)
+    {
+#if FER_RW17
+        // UnityStubs has no complete native font revision. Revoke reuse instead of inventing a stamp.
+        return null;
+#else
         GameFont previous = Text.Font;
         try
         {
@@ -43,6 +79,7 @@ public sealed class VerseFerriteTextMetrics : ITextMetrics, IUiTextMetricsEnviro
                 style.border.left, style.border.right, style.border.top, style.border.bottom });
         }
         finally { Text.Font = previous; }
+#endif
     }
 
     public float MeasureText(string text, UiFont font, float width)

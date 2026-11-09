@@ -201,10 +201,24 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
     private readonly HashSet<UiBindingPresentation> presentations = new();
     internal void AttachPresentation(UiBindingPresentation value) => presentations.Add(value);
     internal void DetachPresentation(UiBindingPresentation value) => presentations.Remove(value);
+    // Unenrolled value/option reads retain their original synchronization call conditions.
+    // Command predicates keep the separate immediate eligibility path in CanRun/Draw.
+    private bool? ordinaryReads;
+    internal bool HasOrdinaryReads
+    {
+        get
+        {
+            if (ordinaryReads.HasValue) return ordinaryReads.Value;
+            foreach (var value in values.Values) if (!value.Tracked) { ordinaryReads = true; return true; }
+            foreach (var option in options.Values) if (!option.Tracked) { ordinaryReads = true; return true; }
+            ordinaryReads = false; return false;
+        }
+    }
     internal bool ContainsBinding(string key) => values.ContainsKey(key) || options.ContainsKey(key) || actions.ContainsKey(key) || commands.ContainsKey(key);
     internal void RemoveItemBinding(string key)
     {
         Reactive.AssertWritable();
+        trackedReads = null; ordinaryReads = null;
         values.Remove(key); options.Remove(key); actions.Remove(key); commands.Remove(key);
         declaredInvalidation.Remove(key); revisions.Remove(key);
         foreach (var view in presentations) view.Forget(key);
@@ -334,7 +348,7 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
         return new UiReactiveScope(() => { try { batch.Dispose(); } finally { presentation = previous; } });
     }
     internal void RunOperation(Action action) => RunOperation(() => { action(); return true; });
-    private T RunOperation<T>(Func<T> action)
+    private T RunOperation<T>(Func<T> action, string? operation = null, string? binding = null)
     {
         if (!reactiveEnabled)
         {
@@ -351,7 +365,7 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
             {
                 throw new AggregateException("Business operation and its response drain both failed. Neither is retried.", businessFailure, responseFailure);
             }
-            throw businessFailure is UiReactiveFault or UiRequestFailure ? businessFailure : new UiRequestFailure(businessFailure);
+            throw businessFailure is UiReactiveFault or UiRequestFailure ? businessFailure : new UiRequestFailure(businessFailure, operation, binding);
         }
         scope.Dispose();
         return result;
@@ -382,14 +396,16 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
         presentation = value;
         return new UiReactiveScope(() => presentation = previous);
     }
+    private Dictionary<string, UiTrackedBindingRead>? trackedReads;
     internal Dictionary<string, UiTrackedBindingRead> TrackedReads()
     {
+        if (trackedReads != null) return trackedReads;
         var reads = new Dictionary<string, UiTrackedBindingRead>(StringComparer.Ordinal);
         foreach (var item in values) if (item.Value.Tracked)
             reads.Add("value:" + item.Key, new UiTrackedBindingRead(item.Key, item.Value.GetBoxed, item.Value.Equal));
         foreach (var item in options) if (item.Value.Tracked)
             reads.Add("options:" + item.Key, new UiTrackedBindingRead(item.Key, () => item.Value.CaptureBoxed(), item.Value.Equal));
-        return reads;
+        return trackedReads = reads;
     }
     private object? ReadValue(string key, ValueDescriptor descriptor)
     {
@@ -451,7 +467,7 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
         return false;
     }
 
-    public void Set<T>(string binding, T value) => RunOperation(() => SetCore(binding, value));
+    public void Set<T>(string binding, T value) => RunOperation(() => { SetCore(binding, value); return true; }, "Set", binding);
 
     private void SetCore<T>(string binding, T value)
     {
@@ -515,7 +531,7 @@ internal bool AcceptsValue(string key, object? value)
         if (key == null) throw new ArgumentNullException(nameof(key));
         return values.TryGetValue(key, out ValueDescriptor? descriptor) && Accepts(descriptor!.ValueType, value);
     }
-internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => TrySetTypedValueCore(key, value));
+internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => TrySetTypedValueCore(key, value), "Set", key);
 
     private bool TrySetTypedValueCore(string key, object? value)
     {
@@ -558,7 +574,7 @@ internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => 
         return (underlying ?? declared).IsInstanceOfType(value);
     }
 
-    public void Invoke<T>(string actionBind, T payload) => RunOperation(() => InvokeCore(actionBind, payload));
+    public void Invoke<T>(string actionBind, T payload) => RunOperation(() => { InvokeCore(actionBind, payload); return true; }, "Invoke", actionBind);
 
     private void InvokeCore<T>(string actionBind, T payload)
     {
@@ -585,7 +601,7 @@ internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => 
     /// no-op here and not an exception - but it is enforced on the execution path, which is what keeps a
     /// control that forgot to ask from firing a command its owner has taken away.
     /// </summary>
-    public void Invoke(string actionBind) => RunOperation(() => InvokeCore(actionBind));
+    public void Invoke(string actionBind) => RunOperation(() => { InvokeCore(actionBind); return true; }, "Invoke", actionBind);
 
     private void InvokeCore(string actionBind)
     {
@@ -616,7 +632,7 @@ internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => 
     /// because it answers true for an unbound key on purpose, and <see cref="Invoke(string)"/> cannot because
     /// it throws for one.
     /// </summary>
-    public bool TryInvokeCommand(string actionBind) => RunOperation(() => TryInvokeCommandCore(actionBind));
+    public bool TryInvokeCommand(string actionBind) => RunOperation(() => TryInvokeCommandCore(actionBind), "TryInvokeCommand", actionBind);
 
     private bool TryInvokeCommandCore(string actionBind)
     {
@@ -746,6 +762,7 @@ internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => 
 
     private void DeclareInvalidation(string key, UiInvalidation invalidates)
     {
+        trackedReads = null; ordinaryReads = null;
         declaredInvalidation[key] = invalidates;
     }
 
@@ -767,6 +784,13 @@ internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => 
 // An explicit request has ended; a subsequent click is a new request, not automatic callback recovery.
 internal sealed class UiRequestFailure : InvalidOperationException
 {
-    internal UiRequestFailure(Exception cause) : base("Explicit UI request failed. Applied business writes remain applied; a new request uses current qualification.", cause) { }
-    internal UiRequestFailure(string message, Exception cause) : base(message, cause) { }
+    internal UiInteractionTarget? Target { get; }
+    internal string? Operation { get; }
+    internal string? Binding { get; }
+    internal UiRequestFailure(Exception cause, string? operation = null, string? binding = null)
+        : base("Explicit UI request failed. Applied business writes remain applied; a new request uses current qualification.", cause)
+    { Operation = operation; Binding = binding; }
+    internal UiRequestFailure(UiInteractionTarget target, Exception cause)
+        : base("Interaction request failed for node '" + target.Node + "', target '" + target.TargetScope + "'. Side effects may already have occurred; the request is not retried.", cause)
+    { Target = target; }
 }

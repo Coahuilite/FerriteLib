@@ -66,7 +66,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// per-item binding scope, so "not yet bound" is a legal frame there and must not take the page down.
 /// </para>
 /// </summary>
-internal sealed class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
+internal sealed partial class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
 {
     internal const string Kind = "input/checkbox";
 
@@ -187,7 +187,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     private float NaturalHeight(UiWidgetContext ctx)
     {
         float pad = ctx.Theme.Geometry.Padding;
-        float row = ctx.Theme.Geometry.RowHeight;
+        float row = UiTextFonts.RowHeight(ctx);
         return IsSwitch(Looks.Resolve(spec).Value)
             ? Math.Max(row, SwitchTrackHeight + pad * 2f)
             : Math.Max(row, CheckboxMinSide + pad * 2f);
@@ -210,7 +210,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
             return SwitchTrackWidth + (HasLabel(spec) ? SwitchLabelGap : 0f);
         }
 
-        float side = CheckboxSide(AtomVocabulary.ReadHeight(spec, ctx.Theme.Geometry.RowHeight), ctx.Theme.Geometry.Padding);
+        float side = CheckboxSide(AtomVocabulary.ReadHeight(spec, UiTextFonts.RowHeight(ctx)), ctx.Theme.Geometry.Padding);
         return side + (HasLabel(spec) ? ContentGap(ctx.Theme, look) : 0f);
     }
 
@@ -354,10 +354,9 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         float labelWidth = rect.XMax - labelX;
         if (labelWidth <= 1f) return;
 
-        UiThemeDraw.Label(
-ctx.Drawing,            new UiLayoutRect(labelX, rect.Y, labelWidth, rect.Height),
+        UiTextFonts.Label(
+ctx,            new UiLayoutRect(labelX, rect.Y, labelWidth, rect.Height),
             label,
-            theme,
             style.Text,
             AtomVocabulary.TextFont(ctx),
             UiTextAnchor.MiddleLeft,

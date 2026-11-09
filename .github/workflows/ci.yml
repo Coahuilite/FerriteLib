@@ -1,6 +1,6 @@
 name: CI
 
-# Push/PR check for the prerequisite mod: the ten local gates, on a clean checkout, with nothing
+# Push/PR check for the prerequisite mod: the complete local entry, on a clean checkout, with nothing
 # assumed about a sibling repository. US's own CI is the place that pair is verified; a green run here
 # means the library is internally sound, not that a consumer still compiles against it.
 
@@ -22,7 +22,6 @@ concurrency:
 jobs:
   gates:
     runs-on: windows-latest
-    # The whole gate suite measures ~10s on a clean clone; the minute is runner startup, not us.
     # A hung runner should burn 10, not the 360 default.
     timeout-minutes: 10
     steps:
@@ -31,25 +30,26 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          # 10.0.x: every gate run in this repo's history used 10.0.204, so the runner reproduces
-          # the machine the evidence was produced on. (8.0.x builds this repo fine on a clean
-          # checkout - measured - but an obj/ restored by one SDK major fails NETSDK1047 when the
-          # other builds it, so mixing majors across CI and local is the trap, and pinning to the
-          # proven major keeps both sides identical. net472 targeting resolves via NuGet either way.)
+          # The no-platform target requires SDK10; do not mix SDK majors within a run.
           dotnet-version: '10.0.x'
 
-      # Required before verify-local: gate 1 runs `dotnet run --no-restore`, and a fresh checkout
-      # has no obj/ to restore from. Two explicit projects, not a solution file: this repo ships
-      # no .sln/.slnx on purpose (slnx additionally needs SDK >= 9.0.200, and a sibling's CI shows
-      # the file buys nothing a pipeline can't do in one more line). net472 reference assemblies
-      # come from the restore graph - Krafs.Rimworld.Ref mirrors the game's Managed folder - so
-      # this step is also what proves the targeting packs resolve from NuGet alone.
-      - name: Restore
-        shell: pwsh
-        run: |
-          dotnet restore Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj --nologo
-          dotnet restore tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj --nologo
 
-      - name: "Verify (10 gates: harness, isolated builds, content-free, LICENSE, identity, stub traps, dependency reality, Dev instrument)"
+      # Download cache only: every graph is restored and every executable is built from source.
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-fl-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: ${{ runner.os }}-fl-nuget-
+
+      - name: Verify complete Core, Release, Dev and adapter contracts
         shell: pwsh
-        run: ./scripts/verify-local.ps1
+        run: ./scripts/verify-local.ps1 -EvidenceFooter -LogDirectory dist/verification/ci
+
+      - name: Retain complete verification logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fl-verification-${{ github.run_id }}
+          path: dist/verification/
+          if-no-files-found: warn

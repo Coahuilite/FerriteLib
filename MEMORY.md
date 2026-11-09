@@ -1,8 +1,86 @@
 # MEMORY
 
-## 0.8 development line (2026-10-25)
+## Working protocol
 
-The single product specification is `docs/development/0.8/README.md`. E1–E5/N1–N3, L1, finite appearance,
+### Local map
+
+Use the adopted Task state, Standards and verification, Lesson promotion and Review timezone entries here. Project state owns global goals, authorization and cross-change responsibilities; scoped records, such as OpenSpec changes, retain their work and evidence. Each fact has one authority at its proper scope: link details instead of maintaining copies. Current focus does not enlarge a record's scope. Preserve existing authorities, including START; use STATE.md only when a needed project-level authority is absent, through authorized adoption/migration. MEMORY / Knowledge holds cross-task knowledge; LESSONS holds active lessons. Optional todos are plans/views. Workers report through responsible owners, not new ledgers.
+
+| Entry | Scoped authority and owner |
+| --- | --- |
+| Task state | The assigned task/work order owns this execution's goal, authorization and acceptance route; its responsible caller owns cross-repository coordination. The maintainer owns repository-level decisions. [TODO](TODO.md) is the repository-scoped action/acceptance view, not a grant of work. Existing [OpenSpec changes](docs/openspec/README.md) retain their own scoped work and evidence. Implementation maps report facts, not permission. There is no separate START; this scoped adoption identifies no missing project authority and creates no STATE. |
+| Standards and verification | The maintainer owns [specification](docs/specification.md), [API tiers](docs/api-tiers.md) and [build/verification guidance](docs/build-and-debug.md). Select relevant existing checks under the assigned task and [repository constraints](AGENTS.md); no new unit tests/cases/equivalent probes or automatic full-suite gate. Static, build, runtime and release evidence remain distinct. |
+| Lesson promotion | The authorized repository owner maintains engineering rules in [AGENTS](AGENTS.md), behavior in the specification's existing capability/connection, and procedures in the build/usage guide. Use LESSONS.md only when an active reusable lesson needs it; none is currently set. The FL documentation owner keeps the local reviewed-through checkpoint in existing TODO. Merge existing equivalents at the responsible entry; never duplicate a shared rule or use a lesson as repair/task state. |
+| Review timezone | Asia/Hong_Kong, adopted for this local update on 2026-11-08. Read an actual clock and record completed reviewed_at with UTC offset. Historical Seen dates retain their meaning; do not backdate or reinterpret them. |
+
+### Resume, update and close
+
+Keep the agreed goal, scope, authorization and completion conditions distinct from findings and plans. State identifies usable artifacts/evidence, unmet conditions, dependencies, owner and next action. Separate facts from hypotheses. Use existing fields or compact prose; retain detailed plans only when order matters to safety, permission or coordination.
+
+Before consequential retries, reconcile uncertain records against actual work. An active label proves neither a live process nor permission; a worker report is not acceptance. Check only uncertainties affecting the next action. Missing permission or unresolved conflict stops the affected operation, not independent authorized work. Explicitly deferred work stays deferred.
+
+Update the responsible source on material changes, not every command. Before interruption/handoff, fill only gaps preventing safe continuation. Defects stay in task state; LESSONS does not replace repair. Blockers name affected work, resolver and resumption condition. Continue while authorized action can advance the goal; otherwise return the blocker without polling unchanged state. The host or existing goal runner supplies activation.
+
+At substantive closeout, compare results with original acceptance and relevant checks; never weaken the contract to fit implementation. Label evidence static, build, runtime, not run or unobservable, with release separate when needed. Reuse it while artifact, inputs and conditions remain applicable; changed premises reopen only affected conclusions. Distinguish implementation, delivery and acceptance. Close satisfied scope, retain outstanding acceptance at its owner, and remove completed activity under retention permissions once results/evidence are accessible. Closing or archiving a scoped record must leave project routing and other obligations reachable. No permanent Done diary or mandatory per-session handoff document.
+
+### Knowledge maintenance
+
+Route work to task state, established specifications/decisions to their existing sources, and reusable failure rules to LESSONS. Admit to Knowledge only facts whose loss could change a future decision or cause costly rediscovery and which no better source sufficiently holds. Keep conclusion, scope/exceptions and necessary evidence; omit cheaply recoverable environment facts and routine success logs.
+
+Merge or replace affected items rather than append session notes. Reassess when relevant versions, implementation, decisions or counterevidence change; age alone does not expire knowledge. Hypotheses stay with investigations. Mature knowledge moves to an existing specification or procedure, leaving a useful pointer only; a small independent fact needs no separate document.
+
+Compact affected Knowledge on update; review remaining content at phase closure or when duplication, staleness or reading cost warrants it. A size budget triggers review, not truncation. Preserve identifiers, values, units, version boundaries, user decisions/exceptions, evidence limits, unmet acceptance and recovery; route obligations to task state rather than discard them. Consult original sources when unclear. Before removing sole necessary conclusions/evidence, establish an accessible responsible source and repair references. Retain history only for concrete evidence, recovery or accountability needs, not an overflow archive. Read the result for the next task; add no compaction diary.
+
+### Review and lessons
+
+Review uncovered work before substantive delivery, handoff or waiting. At start/resume, recover interrupted reviews and uncovered earlier workdays. Across midnight, use the next natural checkpoint, not clock polling. Inspect actual changes, artifacts, existing verification, corrections and rework for avoidable failures or thin verification; reassess relevant lessons. Reuse evidence; no new work means no review or marker rewrite. Issues and comments are optional inputs.
+
+Use one owner and reviewed-through checkpoint per scope, with actual covered work/evidence and reviewed_at. Store it in LESSONS if present, otherwise existing task state; transfer it with a pointer when LESSONS is created. Include uncommitted work and relevant corrections; date or Git HEAD alone is insufficient. Start from the authorized baseline, advance only through reviewed work and expose gaps. Coverage is not acceptance or repair. Create no file solely for a marker without a need for persistent continuation.
+
+Read an actual clock at start/resume and review checkpoints. Use the declared named Review timezone, not worker machine settings; record reviewed_at at completion in ISO 8601 with UTC offset. Count its local calendar date; cross-midnight reviews count only on completion, delayed reviews are not backdated. Record timezone changes without reinterpreting old dates. If clock/timezone is unknown, retain findings and defer date-based counting.
+
+Active lessons need a usable rule, why, evidence and scope from real errors, rework, corrections or verification omissions; apply them immediately within permissions. Existing requirements need no Seen threshold. Merge equivalents. Seen counts distinct completed-review dates finding fresh supporting evidence, at most once per date; rereading one incident, duplicate reports or elapsed days do not count. At three such dates, move a valid, actionable rule into its mapped stable entry; merge existing equivalents or correct/retire invalid rules instead. If authority or destination blocks promotion, retain an owned pending action in task state; do not claim completion.
+
+Promotion connects the rule to its work/review trigger, action and necessary passing evidence in the entry's existing format, without adding testing or other permissions. Keep only useful migration pointers and needed evidence in LESSONS. Later violations attach to the existing rule: check its reach, clarity or validity, without resetting Seen or duplicating it. Lack of recurrence alone does not justify retirement. Maintain lessons within retention permissions; review and ordinary success require no new lesson or report.
+
+## Knowledge
+
+Current routing is the Local map above. Dated material below retains its original line, target and
+evidence scope; historical headings and counts do not select current work or override current docs.
+
+Current development policy: follow RimWorld **1.7** APIs/namespaces without a game minor-build whitelist. Normative tooling/stage boundaries: `docs/openspec/specs/contracts/developer-tools/spec.md`; implementation gaps remain in the specification's linked status page. Historical fixed-input evidence is not a support ceiling.
+
+### 0.8 development line (2026-10-25)
+
+The authorized 2026-11-06 offline-workbench maintenance extension keeps API0.8.0 and the ordinary
+net472/1.6 route. Its explicit Legacy08 capability, optional owner/semantic/prepare seams and transactional
+author projection/source contract are in `docs/development/0.8/offline-workbench.md`. Current consumer
+pairing and native acceptance remain separate; API range alone does not grant this capability.
+
+The 2026-11-05 implementation adds Auto/placeholder measurement consistency, effective-clip content
+hover and creation-first native domain output through the existing Host/Session lifecycle. Old factories,
+metrics overrides and standalone callers remain legal. The current API, budgets, migration and managed/
+native evidence boundaries are in `docs/development/0.8/ui-diagnostics.md` and `docs/openspec/implementation.md`.
+Fixed dirty-source producers carry their own source form and identity; they are not new commits or native acceptance.
+
+The 2026-11-03 appearance-freedom source adds seven TextColor slots, normal read-only text presentation
+and FontSize1..96 through public-unstable composed production entries, preserving Stable signatures,
+singletons and old override conditions. Its fixed source checkpoint and consumer adoption were supplied
+as accepted inputs to the 2026-11-05 work; native acceptance remains separate. The standard and independent
+author routes, single native owner, effective-font pipeline and evidence limits are in
+`docs/openspec/implementation.md#appearance-freedom`.
+
+The 2026-11-01 release-gate repairs restore request-failure attribution, same-owner late reactive
+presentation adoption and initial document-attach staging recovery. Their production paths and
+managed/native evidence limits are in `docs/openspec/implementation.md` (release-gate narrow repairs).
+No API tier or ordinary/standalone adoption condition changes.
+
+The 2026-10-29 contract-repair authorization adopted the two narrow Trace/legacy-fit observation
+failure guarantees. The single current contract is `docs/openspec/specs/contracts/observation-boundary/spec.md`;
+its adoption record and source/stub/native evidence boundaries are in `docs/openspec/implementation.md`.
+This does not promote API tiers or change ordinary/no-Host/headless/visual-only adoption conditions.
+
+The single product specification is `docs/specification.md`. E1–E5/N1–N3, L1, finite appearance,
 S1–S7 stability, experimental R9, migration protection and platform priority are confirmed. Engineering
 status is separate from design approval and native acceptance. K1 added focus/key navigation is deferred;
 native editing/IME/Accept/Cancel remains required. No 0.7 version exception carries into this line.
@@ -10,27 +88,30 @@ native editing/IME/Accept/Cancel remains required. No 0.7 version exception carr
 The approved prepublication refactor replaces unpublished API/XML/ambient bridges. Complete Kernel
 sources now share the no-platform target; explicit native execution and standalone session contexts,
 typed declarations, unified choices/descriptors/item addresses and optional capability composition are
-specified in docs/development/0.8/refactor-migration.md. It also records current abstraction consumers,
+mapped in docs/openspec/implementation.md; docs/openspec/source-coverage.md records the original clauses,
 old-chain removals and author prerequisites. No0.7 compatibility shape is silently carried forward.
 The confirmed explicit-only Choice.HelpRef policy, adjacent Ref/Key/Bind naming and both old-default
 migration paths are in that contract. Session topic/grace and optional owned endpoint output have
-different lifetimes; public-contract.md describes them without a panel or access-capture framework.
-PM has accepted that technical contract and US has consumed the fixed source input. RC preparation
-now follows the existing CI/Release path; remote RC-asset consumption is distinct from that completed
-integration. Current publication actions are in TODO.md. Known headless game errors are accepted as
-non-blocking for this transition; native acceptance and the next-session UI/UX work remain open.
+different lifetimes; docs/openspec/specs/contracts/help-output/spec.md describes them without a panel or access-capture framework.
+PM has accepted that technical contract and US has consumed the fixed source input.
+[v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1) remains the published
+non-latest prerelease from a0b5b983c3c13a099c62d936305eaebaf1deb5a8. The user accepted the overall
+US ea610fa/FL833c14f4 internal trial for RC preparation on2026-10-28; granular unrecorded native
+coverage is a known limit, not a repeat-trial gate. The next planned prerelease is v0.8.0-rc2,
+not yet published. Notes are in docs/release-notes/v0.8.0-rc2.md and the local/cloud separation and
+verification ownership in docs/build-and-debug.md. Known headless errors remain non-blocking.
 
 Accepted RU1–RU3 production foundations and their applicable evidence remain in the reactive, layout-reuse
 and failure-lifetime contracts. Closeout adds native composite-capture precedence, normal-return-before-
 display-failure completion, individual finite metric declarations/removal, and owned current-target item
-bindings. `editing-contract.md`, `property-contract.md` and `item-binding-contract.md` own these details.
-The complete 18-use/nine-container/non-kind inventory remains only in `migration-status.md`.
+bindings. `docs/openspec/specs/policies/default-wrappers/spec.md`, `docs/openspec/specs/core/appearance/spec.md` and `docs/openspec/specs/core/structure/spec.md` own these details.
+The complete use inventory is in `docs/openspec/specs/policies/default-wrappers/spec.md`; implementation and evidence remain in `docs/openspec/implementation.md`.
 
-`docs/api-tiers.md`, `public-contract.md` and `stable-api.txt` define the supported complete author paths,
+`docs/api-tiers.md`, `docs/openspec/specs/policies/public-authoring/spec.md` and `docs/development/0.8/stable-api.txt` define the supported complete author paths,
 required signature dependencies and explicit advanced-member exceptions. Session/Node are not blanket
 promoted; graphs, queues, caches, default private implementations and routing tables stay internal.
 Resolved-property views and adjacent snapshot/style read outlets are protected without changing their
-signatures or read/update semantics; the exact boundary is in `property-contract.md`.
+signatures or read/update semantics; the exact boundary is in `docs/openspec/specs/core/appearance/spec.md`.
 The separate AuthorExamples assembly has no internals grant. Public compatibility protects source, DLL,
 XML, meaning and legal conditions in the same adapter target; deprecation retains two complete subsequent
 published minors (0.9 → retain0.10/0.11 → time floor0.12), without a 1.x shortcut. The approved r2
@@ -40,11 +121,17 @@ retirement time floor alone never permits breaking removal at a minor.
 The isolated real-source cases, measured1.6/1.7 seams and complete neutral dependency closure are
 recorded in `docs/development/0.8/platform-and-real-integrations.md`. Fixed clean-source candidate identity
 is carried with delivery, not inferred from a later HEAD. 1.6 is primary; 1.7 compatibility
-is checked in the same stage and reported independently. Native1.6/1.7 remain awaiting human; legacy0.7
+is checked in the same stage and reported independently. Detailed1.6 native coverage remains incomplete; no1.7 adapter is delivered. Legacy0.7
 human evidence below does not accept0.8. New-engine1.7 adapter then direct drawing is a later route, not a
 1.6-first delivery prerequisite. Consumer migration uses a fixed supplied package, never moving outputs.
 
-## Historical 0.7 checkpoint (2026-10-09)
+The 2026-10-26 local incremental-pipeline candidate connects stable-domain validation, first-touch
+candidate backups and sparse geometry publication in the shared Release path. Exact conservative
+legacy/structure/environment/callback fallbacks are in `docs/openspec/specs/core/layout/spec.md`; fixed Qz reference decisions are in `docs/openspec/implementation.md`. Managed work observations are separate from
+native acceptance; the A009r2 pair was unchanged at that historical checkpoint. Fixed consumer integration of FL
+833c14f4 and its matched candidates are complete; overall internal-trial acceptance is recorded above.
+
+### Historical 0.7 checkpoint (2026-10-09)
 
 - **Build and delivery identity.** The line's last **source** commit is
   `d5af4d8209823bb19f7c112805fcb1b8caf56bbc` on `0.7.x` (committed as `worker <worker@localhost>`, the accepted
@@ -173,14 +260,14 @@ human evidence below does not accept0.8. New-engine1.7 adapter then direct drawi
   needs a citation into a consumer tree; a confirmed public capability does not wait for a second consumer to
   hand-roll it.
 
-## Archived round records
+### Archived round records
 
 The 2026-09-30 PM integration checkpoint, the 2026-09-28/29 R1-R2 palette and R3-A instrument narratives, and
 the 2026-09-17..2026-10-07 landing-narrative family (including the 2026-09-17..09-22 maintainer rulings, whose
 live consequences `AGENTS.md` carries) moved **verbatim** to `OBLIVIONIS.md`, "2026-10-09 — second compaction".
 Read them there only for a historical conflict; they cannot override the current scripts, contracts or ledger.
 
-## Start here — current direction (2026-09-24)
+### Historical 0.7 direction (2026-09-24)
 
 Read `AGENTS.md` for invariants, this file for durable state, and `TODO.md` for the active queue.
 
@@ -194,7 +281,7 @@ Read `AGENTS.md` for invariants, this file for durable state, and `TODO.md` for 
 | `docs/consumers/consume-from-0.7.0.md` | Consumer integration and migration guidance. |
 | `docs/development/0.7/60-capability-dispositions.md` | Existing capability decisions and their conditions; not the current execution order. |
 
-### Maintainer direction and current boundary
+#### Maintainer direction and current boundary
 
 - **Priority:** long-term FL stability and extensibility for shared mod use, accepting a delay to US.
   Use the existing US ModSettings redesign as the real integration surface. Retain the page model over
@@ -221,7 +308,7 @@ Read `AGENTS.md` for invariants, this file for durable state, and `TODO.md` for 
   A docs-only commit does not rebuild them. Any strict embedded-commit-versus-HEAD check needs a fresh
   build before its next acceptance run; previous evidence remains scoped to the artifact actually tested.
 
-### The library-owned development instrument
+#### The library-owned development instrument
 
 `UiDiagnosticSubscription.GeometryEnabled` / `.GeometryOverlay` / `.DumpGeometry()` expose the bounded,
 per-host instrument in `UiDevGeometryProbe.cs`. It observes engine geometry and native input decisions;
@@ -230,13 +317,13 @@ queries report event-before/event-after, and an already-Used entry explicitly ma
 Release excludes the capture and rejects enabling it. Gate 10 executes the Dev assertions, including the
 consumed-input case; gate 1 alone is not Dev coverage. Usage and proof details belong to the operational guide.
 
-## Current durable state
+### Current durable state
 
-The dated records below explain earlier changes and their scoped evidence. Current priorities are above;
+The dated records below explain earlier changes and their scoped evidence. Current routing is in Local map;
 current build behavior is in "Carrier identity and build isolation". Historical gate counts, capture sites,
 and delivery procedures do not override the current scripts or the next-stage handbook.
 
-### Evidence lessons (measured cases, not standing acceptance gates)
+#### Evidence lessons (measured cases, not standing acceptance gates)
 
 - Earlier rounds produced misleading red and green results when the fixture, ruler, screen or observation
   channel differed from the intended input. A named product backout proved specific fixes; a guard that
@@ -373,7 +460,7 @@ and delivery procedures do not override the current scripts or the next-stage ha
   difference, so when the HOST list is the smaller one it prints "missing: " empty; the lane still fires, only
   the message is one-directional.
 
-## Version axes and the compatibility promise
+### Version axes and the compatibility promise
 
 - **Three axes, and the harness pins all three agreeing on major.minor.** Contract
   `FerriteLibVersion.Api`, release `About/About.xml <modVersion>`, build csproj `<VersionPrefix>` (the build
@@ -464,11 +551,12 @@ and delivery procedures do not override the current scripts or the next-stage ha
   its own content, or a hit/geometry rule. The promotion gate (provenance cited; neutral, no consumer
   numbers as library defaults; no new process-wide mutable statics; a harness-drivable lane) governs *new
   specialized kinds*, not confirmed general capabilities. Our own demo is never consumption.
-- **Growth has one legal source**: a real consumer was forced to hand-roll something. A request is not
-  evidence; a transcription into this file (`owner/repo@sha:path:line` + excerpt + what it proved) is.
+- **Specialized-kind provenance** uses a real consumer's hand-rolled code and a checkable transcription;
+  the current promotion process and the separate route for general capabilities are in `AGENTS.md` and
+  `docs/openspec/specs/policies/public-authoring/spec.md`.
 - **Nothing persists into a save**, and the Squeaky Ratkin repo is never a write target.
 
-## Carrier identity and build isolation
+### Carrier identity and build isolation
 
 - **A hash is an identity only with its inputs pinned.** `1.6/Assemblies/FerriteLib.UiKit.dll` is the whole
   payload; a hash quoted without the build command and the clean/dirty state is a machine-local fact.
@@ -536,7 +624,7 @@ and delivery procedures do not override the current scripts or the next-stage ha
   first and asserted afterwards, so a refused pack left a half-written package behind. **Proof:** with a
   post-copy failure planted, the pack exited non-zero and the delivered folder's file-hash fingerprint was
   IDENTICAL before and after; the restored script exits 0 and leaves no `.staging-*` behind.
-## Packaging discipline
+### Packaging discipline
 - **Prior push lessons (moved from AGENTS on 2026-10-08).** The 0.6 first-push round paid for a
   full-history scan before an unpublished line left the machine: a working-tree fix still failed while
   history kept the blob, and a backup tag created after the fix re-exposed that history. Keep recovery
@@ -572,7 +660,7 @@ and delivery procedures do not override the current scripts or the next-stage ha
   and `tools/.../Stubs/` with its `bin/stubs/` shape are de-facto published surfaces: relocating them
   breaks a consumer's harness while every gate here stays green.
 
-## Public surface, structure and the memory protocol
+### Public surface, structure and the memory protocol
 
 - **The payload is exactly `1.6/Assemblies/FerriteLib.UiKit.dll`** — zero Defs, Patches, Languages,
   textures. Gate 5 probes those names rather than filtering an enumeration, so an empty tree cannot pass
@@ -607,17 +695,13 @@ and delivery procedures do not override the current scripts or the next-stage ha
   re-derived against its published tree at a pinned revision — the measured census is the archived 2026-09-04
   record in `OBLIVIONIS.md`, and quoting it as current is the stale-anchor error this ledger already names.
   Until a citation raises the number, the honest validated-surface statement stays **"3 of 7 kinds"**.
-- **Memory protocol**: `AGENTS.md` stable · `MEMORY.md` this ledger · `TODO.md` action surface ·
-  `OBLIVIONIS.md` cold archive. Two compactions have run: the 2026-09-20 one moved this file's
-  pre-2026-09-17 body (consumer coverage and the kind census, the Charter and its surveys, the style-layer
-  argument, the structure narrative, the consumer contract, the cross-repo round couplings), and the
-  2026-10-09 one moved the 2026-09-17..10-07 dated round narratives. Both moved **verbatim**, each with its own
-  index entry and frozen-block markers. Read them there only for a historical conflict; they cannot override
-  current sources.
-- **Inbound `HANDOFF.md` is transient and is not a memory tier.** Durable content is promoted here at the
-  moment of a round; an open round keeps a pointer line in `TODO.md`, a closed round leaves nothing behind.
+- **Memory history.** The 2026-09-20 compaction moved the pre-2026-09-17 body: consumer coverage and kind
+  census, Charter and surveys, style-layer argument, structure narrative, consumer contract and cross-repo
+  round couplings. The 2026-10-09 compaction moved the 2026-09-17..10-07 dated round narratives. Both are
+  verbatim in `OBLIVIONIS.md`, with separate index entries and frozen markers. Current reading and handoff
+  rules are in `AGENTS.md`; the archive is historical evidence.
 
-## Environment facts (cheap to get wrong, expensive to re-learn)
+### Environment facts (cheap to get wrong, expensive to re-learn)
 
 - **RimWorld's minimum window is 1024x768, and UI scale cannot push the logical width below it.**
   `UIScaleSafeWithResolution` requires `w/scale >= 1024` and `h/scale >= 768`, so `UI.screenWidth` is
@@ -639,7 +723,7 @@ and delivery procedures do not override the current scripts or the next-stage ha
 - **Build commands need the project path.** The repository root has no project file; use
   `dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release`. It now writes the isolated Release
   output. Updating a compatibility delivery remains a separate explicit export.
-## Diagnostic coverage — the rulings that shape the channels
+### Diagnostic coverage — the rulings that shape the channels
 
 - **`Available` is the inset label band, not the element rect** (FL-21). An overflow verdict compares the
   band against the content it could not hold (`Needed`).
@@ -684,7 +768,7 @@ and delivery procedures do not override the current scripts or the next-stage ha
   layer": it changes no conclusion today and it is exactly the kind of difference that makes the next lane
   lie.
 
-## Gates and what each actually proves
+### Gates and what each actually proves
 
 Ten gates in `scripts/verify-local.ps1`: 1 harness, 2 Dev build (`FER_DEV`, warnings-as-errors), 3
 Release build (warnings-as-errors), 4 payload present, 5 content-free (named-path probe for `Defs`,
@@ -765,7 +849,7 @@ Honest limit on the theme lane: `VerifyThemeColorsDoNotAffectLayout` has two hal
 half is mutation-proven. The rect-equality half has **no available failing mutation** today, because no
 colour token currently feeds layout — it is a future-regression guard, not present evidence.
 
-## Enduring corrections
+### Enduring corrections
 
 - **The `Warning`/`Danger` collapse rested on a census that read the wire as empty (correction, 2026-09-11).**
   The 2026-09-10 census said the two names had no users, and the 0.4 window deleted `UiTheme.Warning` on that

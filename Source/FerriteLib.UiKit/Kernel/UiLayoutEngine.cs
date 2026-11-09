@@ -37,6 +37,8 @@ internal sealed partial class UiLayoutEngine
         /// </summary>
         internal IReadOnlyList<UiStyleDeclaration>? StyleChain;
 
+        internal LayoutStamp LayoutInputs;
+        internal bool HasContentHeightReference;
         internal IUiWidget? Widget;
         internal bool IsContainer;
         internal string ContainerKind = "";
@@ -117,17 +119,18 @@ internal sealed partial class UiLayoutEngine
     private UiLayoutSnapshot? cachedSnapshot;
     private UiLayoutPoint cachedAvailable;
     private int cachedContentRevision = -1;
+    internal int ArrangedContentRevision => cachedContentRevision;
+    internal int ArrangedDefinitionRevision => cachedDefinitionRevision;
     private int cachedDefinitionRevision;
     private int cachedTranslationRevision = int.MinValue;
-    private List<PlacedEntry> lastEntries = new();
+    private PageTable<PlacedEntry> lastEntries = new PageTable<PlacedEntry>(Array.Empty<PlacedEntry>());
 
-    // Per-key notification state. keyNodes is the last arrange's map from an announced binding key to the
-    // nodes whose elements declare it; committedRevisions is the revision this engine has already folded
-    // into the arrangement. Together they are what makes an announcement target the elements that
-    // declared the key instead of the page: a key no arranged element declares is never polled, and one
-    // that is polled marks only its own nodes.
+    // keyNodes and committedRevisions describe this engine's successful dependency publication.
+    // Candidate revisions are sampled before reads, never acknowledged merely by receiving a notice.
+    // Only successful publication retires absent keys; other Hosts keep their own obligations.
     private readonly Dictionary<string, List<UiNode>> keyNodes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> committedRevisions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> candidateRevisions = new(StringComparer.Ordinal);
 
     // The three attribute names below are the page vocabulary the atoms and the consumer kinds read when
     // they resolve a binding (Bind, ActionBind, OptionsBind), plus the declared Id as the documented
@@ -152,9 +155,11 @@ internal sealed partial class UiLayoutEngine
     public UiLayoutEngine(
         string scope,
         UiStyleResolver? styleResolver = null,
-        IReadOnlyDictionary<string, UiElementSpec>? templates = null)
+        IReadOnlyDictionary<string, UiElementSpec>? templates = null,
+        IReadOnlyDictionary<string, UiLayoutInput>? dynamicLayoutInputs = null)
     {
         this.scope = scope ?? throw new ArgumentNullException(nameof(scope));
+        this.dynamicLayoutInputs = dynamicLayoutInputs ?? new Dictionary<string, UiLayoutInput>();
         this.styleResolver = styleResolver;
         this.templates = templates ?? new Dictionary<string, UiElementSpec>(StringComparer.Ordinal);
         if (this.templates.Count > 0)
@@ -169,6 +174,16 @@ internal sealed partial class UiLayoutEngine
             throw new ArgumentNullException(nameof(ctx));
         if (roots == null)
             throw new ArgumentNullException(nameof(roots));
+        ctx.Session.LayoutWork.Passes++;
+        layoutPass++;
+        candidateRevisions.Clear();
+        validatedLeaves.Clear(); invalidatedInputs.Clear(); notificationsCommitted = false; layoutInputChanged = false;
+        bool externalContentChanged = cachedSnapshot != null && cachedContentRevision != ctx.Session.ContentRevision;
+        try { if (TryIncremental(ctx, available, roots, externalContentChanged, out UiLayoutSnapshot retained)) return retained; }
+        catch { ctx.Session.AbortHitPass(); throw; }
+        candidateStackRecipes = new();
+        ctx.Session.LayoutWork.FullCandidates++;
+        ctx.Session.LayoutWork.Last = "full";
         UiTextMetricsCache? priorTextMetrics = textMetricsCache;
         textMetricsCache = priorTextMetrics != null && ReferenceEquals(priorTextMetrics.Source, ctx.Metrics) ? priorTextMetrics.Copy() : new UiTextMetricsCache(ctx.Metrics);
         ctx = ctx.WithMetrics(textMetricsCache);
@@ -177,11 +192,10 @@ internal sealed partial class UiLayoutEngine
         // The frame boundary: announcements raised during the previous pass are folded into one commit
         // before the cache is consulted, so a Paint-class key leaves the cache alone while a
         // Measure/Structure-class key marks its elements and moves the arrangement clock.
-        bool externalContentChanged = cachedSnapshot != null && cachedContentRevision != ctx.Session.ContentRevision;
-        CommitNotifications(ctx);
+
+        if (!notificationsCommitted) CommitNotifications(ctx);
         // A dirty node is the per-element invalidation signal: a widget that marked its own node dirty
         // asks for a re-measure even when size, content revision, definition and language all stand still.
-        layoutPass++;
         layoutRequested = pendingInputValidation || cachedSnapshot == null || ctx.Session.HasDirtyNodes || cachedContentRevision != ctx.Session.ContentRevision
             || cachedAvailable.X != width || cachedAvailable.Y != height || cachedDefinitionRevision != DefinitionRevision(ctx)
             || cachedTranslationRevision != ctx.Translation.TranslationRevision || cachedHostLayoutRevision != ctx.Theme.LayoutRevision;
@@ -196,7 +210,7 @@ internal sealed partial class UiLayoutEngine
         labelContributions = new Dictionary<UiNodeId, RoleInput>(labelContributions);
         var priorScopes = layoutScopes;
         layoutScopes = new Dictionary<UiNodeId, LayoutScope>();
-        foreach (var pair in priorScopes) layoutScopes.Add(pair.Key, pair.Value.Copy());
+        foreach (var pair in priorScopes) { layoutScopes.Add(pair.Key, pair.Value.Copy()); ctx.Session.LayoutWork.CopiedScopes++; foreach(var records in pair.Value.Leaves.Values) ctx.Session.LayoutWork.CopiedLeaves += records.Count; }
         activeLayoutScope = null;
         Action restoreArrangement = ctx.Session.CaptureArrangement();
         var priorKeys = new Dictionary<string, List<UiNode>>(keyNodes, StringComparer.Ordinal);
@@ -244,6 +258,8 @@ internal sealed partial class UiLayoutEngine
             var visible = new List<string>();
             var viewports = new Dictionary<string, UiLayoutRect>(StringComparer.Ordinal);
             var scrollContents = new Dictionary<string, UiLayoutRect>(StringComparer.Ordinal);
+            ctx.Session.LayoutWork.GeometryEntries += box.Entries.Count;
+            ctx.Session.LayoutWork.PublishedEntries += box.Entries.Count;
             foreach (PlacedEntry entry in box.Entries)
             {
                 if (entry.Spec.Id.Length > 0)
@@ -317,13 +333,17 @@ internal sealed partial class UiLayoutEngine
             cachedContentRevision = ctx.Session.ContentRevision;
             cachedDefinitionRevision = DefinitionRevision(ctx);
             cachedTranslationRevision = ctx.Translation.TranslationRevision;
-            UiLayoutSnapshot nextSnapshot = new UiLayoutSnapshot(new UiLayoutPoint(width, box.Height), rects, visible, viewports, scrollContents, cachedDefinitionRevision, Array.AsReadOnly(layoutDiagnostics.ToArray()));
+            IReadOnlyList<UiLayoutDiagnostic> nextDiagnostics = Array.AsReadOnly(layoutDiagnostics.ToArray());
+            UiLayoutSnapshot nextSnapshot = new UiLayoutSnapshot(new UiLayoutPoint(width, box.Height), rects, visible, viewports, scrollContents, cachedDefinitionRevision, nextDiagnostics);
             if (layoutRequested || cachedSnapshot == null || !SameGeometry(lastEntries, box.Entries) || !SameDiagnostics(cachedSnapshot.Diagnostics, nextSnapshot.Diagnostics)) cachedSnapshot = nextSnapshot;
-            lastEntries = box.Entries;
+            lastEntries = new PageTable<PlacedEntry>(box.Entries);
             observationLayoutFrame = ctx.Session.Frame;
             observationLayoutAtUtc = DateTime.UtcNow;
             pendingInputValidation = false;
             ctx.Session.ClearDirtyNodes();
+            stableVisibleIds = visible; stableDiagnostics = nextDiagnostics; stableScrollContents = scrollContents;
+            RetainPipeline(ctx, roots);
+            PublishBindingRevisions(retireAbsent: true);
             return cachedSnapshot;
         }
         catch
@@ -420,7 +440,8 @@ internal sealed partial class UiLayoutEngine
                 continue;
             }
 
-            committedRevisions[entry.Key] = current;
+            NotePipelineNotification(entry.Key, entry.Value);
+            candidateRevisions[entry.Key] = current;
 
             UiInvalidation invalidates = ctx.Bindings.GetInvalidation(entry.Key);
             if ((invalidates & (UiInvalidation.Measure | UiInvalidation.Structure)) == 0)
@@ -462,12 +483,7 @@ internal sealed partial class UiLayoutEngine
     private void RecordKey(string key, UiNode owner, IUiBindingAccess bindings)
     {
         if (key.Length == 0) return;
-        if (!committedRevisions.ContainsKey(key))
-        {
-            // First sight: this arrange is already using the key's current value, so its revision is
-            // committed here and only a later announcement invalidates the element.
-            committedRevisions[key] = bindings.GetRevision(key);
-        }
+        CaptureBindingRevision(key, bindings);
 
         if (!keyNodes.TryGetValue(key, out List<UiNode>? owners))
         {
@@ -479,6 +495,28 @@ internal sealed partial class UiLayoutEngine
         {
             owners.Add(owner);
         }
+    }
+
+    private void CaptureBindingRevision(string key, IUiBindingAccess bindings)
+    {
+        // Preserve the earliest sample across all positions and an incremental-to-full fallback.
+        // A notice raised by a getter/measure after that sample still needs a later successful pass.
+        if (!committedRevisions.ContainsKey(key) && !candidateRevisions.ContainsKey(key))
+            candidateRevisions.Add(key, bindings.GetRevision(key));
+    }
+
+    private void PublishBindingRevisions(bool retireAbsent)
+    {
+        foreach (var candidate in candidateRevisions)
+            if (keyNodes.ContainsKey(candidate.Key)) committedRevisions[candidate.Key] = candidate.Value;
+        if (retireAbsent)
+        {
+            var retired = new List<string>();
+            foreach (string key in committedRevisions.Keys)
+                if (!keyNodes.ContainsKey(key)) retired.Add(key);
+            foreach (string key in retired) committedRevisions.Remove(key);
+        }
+        candidateRevisions.Clear();
     }
 
     /// <summary>
@@ -515,6 +553,7 @@ internal sealed partial class UiLayoutEngine
         catch (UiReactiveFault failure)
         {
             if (ctx.Node != null) ctx.Node.QualificationFault = failure;
+            UiDomainDiagnostics.Reactive(ctx.Session, ctx.Node, "qualification.fault", failure);
             return true;
         }
     }
@@ -527,6 +566,7 @@ internal sealed partial class UiLayoutEngine
         // One hit pass per draw: the previous pass's complete paint order becomes the stack input dispatch
         // reads, and this pass builds the next one as its elements draw.
         ctx.Session.BeginHitPass();
+        ctx.Session.BeginToolSelectionPass();
 
         // The wheel belongs to the open menu before it belongs to anything under it: a layer covering the point
         // outranks what is beneath it. Asking here - after the pass opened, so the layers are the ones
@@ -552,7 +592,7 @@ internal sealed partial class UiLayoutEngine
         }
     }
 
-    private void CollectPointerLayers(List<PlacedEntry> entries, int start, int end, UiWidgetContext ctx,
+    private void CollectPointerLayers(IReadOnlyList<PlacedEntry> entries, int start, int end, UiWidgetContext ctx,
         UiLayoutPoint viewportPosition, UiLayoutPoint? nativeOrigin, UiLayoutPoint windowOrigin, UiLayoutRect? clip, List<UiPointerLayer> layers)
     {
         for (int index = start; index < end; index++)
@@ -583,6 +623,7 @@ internal sealed partial class UiLayoutEngine
                         regions.Clear();
                         entry.Node.PresentationFault = failure;
                         entry.Node.PresentationUnavailable = true;
+                        UiDomainDiagnostics.Reactive(ctx.Session, entry.Node, "presentation.fault", failure);
                     }
                     finally
                     {
@@ -639,7 +680,7 @@ internal sealed partial class UiLayoutEngine
         return new UiLayoutRect(left, top, Math.Max(0, right - left), Math.Max(0, bottom - top));
     }
     private void DrawEntries(
-        List<PlacedEntry> entries,
+        IReadOnlyList<PlacedEntry> entries,
         int start,
         int end,
         UiWidgetContext ctx,
@@ -683,7 +724,7 @@ internal sealed partial class UiLayoutEngine
                     isPopup: false);
             }
 
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
             // The development-only numeric instrument reads the geometry from this one point per entry:
             // the arranged rect and the draw rect disagree exactly when a scroll/group origin is involved,
             // which is the disagreement a reader must be able to see rather than infer. Identity, appearance
@@ -725,7 +766,7 @@ internal sealed partial class UiLayoutEngine
                     nativeOrigin,
                     windowOrigin,rootContext);
                 if (!ctx.Session.IsActive) return;
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
                 // DT1: the viewport's OWN band is outlined here, after its content has drawn and in this
                 // scope's own draw-local space - the same rect, the same entry, the same `sampled` answer
                 // Note() gave above. The nested walk below never had a step at this entry, which is how
@@ -733,6 +774,7 @@ internal sealed partial class UiLayoutEngine
                 // this entry too, and no second collector exists to disagree with the capture.
                 UiDevGeometryProbe.Outline(ctx.Drawing, drawRect, sampled);
 #endif
+                OutlineSelected(entry, entryCtx, drawRect);
                 index += entry.SubtreeCount;
             }
             else
@@ -796,7 +838,7 @@ internal sealed partial class UiLayoutEngine
                     UiFitAudit.EndElement();
                 }
 
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
                 // The optional outline is painted LAST for this entry, after the fit audit closed and after
                 // the element drew, in the element's own draw-local space: an outline that could feed back
                 // into the thing it measures would be the instrument changing the measurement. It paints only
@@ -804,6 +846,7 @@ internal sealed partial class UiLayoutEngine
                 // and with capture off (SA1.5) it paints this same walk and stores nothing.
                 UiDevGeometryProbe.Outline(ctx.Drawing, drawRect, sampled);
 #endif
+                OutlineSelected(entry, entryCtx, drawRect);
 
                 index++;
             }
@@ -814,7 +857,7 @@ internal sealed partial class UiLayoutEngine
         PlacedEntry entry,
         UiLayoutRect outRect,
         UiWidgetContext ctx,
-        List<PlacedEntry> entries,
+        IReadOnlyList<PlacedEntry> entries,
         int childStart,
         int childEnd,
         UiLayoutPoint viewportPosition,
@@ -907,7 +950,7 @@ internal sealed partial class UiLayoutEngine
     /// It reads the entries rather than the snapshot's string-keyed viewports on purpose: the snapshot
     /// keeps its declared-id view for consumers, while the state itself belongs to the node.
     /// </summary>
-    private static void ClampScrollPositions(UiSession session, List<PlacedEntry> entries)
+    private static void ClampScrollPositions(UiSession session, IReadOnlyList<PlacedEntry> entries)
     {
         foreach (PlacedEntry entry in entries)
         {
@@ -1021,7 +1064,7 @@ internal sealed partial class UiLayoutEngine
         // content resolved to (the declaring element contributed nothing to it); everywhere else - a vertical
         // flow, a Wrap line, a template the Host does not walk - the mode degrades to the element's own measured
         // content, exactly as Auto does, so a programmatic spec cannot take a frame down.
-        bool matchContent = UiPlacement.IsMatchContentHeight(spec);
+        bool matchContent = DynamicInput(spec)?.Height.HasValue != true && UiPlacement.IsMatchContentHeight(spec);
         float? reference = contentHeightReference >= 0f ? contentHeightReference : null;
         if (matchContent && !reference.HasValue)
             ReportLayout(node, "ContentHeightUnavailable", "The retained raw/template entry uses natural height because this parent supplies no independent content-height reference.");
@@ -1085,6 +1128,8 @@ internal sealed partial class UiLayoutEngine
                 Id = node.Id,
                 Node = node,
                 StyleChain = ctx.StyleChain,
+                LayoutInputs = new LayoutStamp(measureCtx),
+                HasContentHeightReference = matchContent && reference.HasValue,
                 Widget = widget,
                 IsContainer = false,
                 MeasureWidth = width,
@@ -1102,6 +1147,11 @@ internal sealed partial class UiLayoutEngine
             StretchToContent(container, node.Id, reference.Value);
         }
 
+        if (container.Entries.Count > 0)
+        {
+            container.Entries[0].LayoutInputs = new LayoutStamp(ctx.WithViewWidth(width).WithNode(node));
+            container.Entries[0].HasContentHeightReference = matchContent && reference.HasValue;
+        }
         return container;
     }
 
@@ -1129,7 +1179,7 @@ internal sealed partial class UiLayoutEngine
         string declaredKind = GetContainerKind(spec);
         Padding padding = ParsePadding(spec, ctx.Theme);
         float gap = ReadGap(spec, ctx.Theme);
-        float titleHeight = HasTitle(spec) ? SectionTitleHeight : 0f;
+        float titleHeight = HasTitle(spec) ? UiTextFonts.RowHeight(ctx, minimum: SectionTitleHeight) : 0f;
         float innerWidth = Math.Max(1f, width - padding.Left - padding.Right);
         float innerY = padding.Top + titleHeight;
 
@@ -1162,7 +1212,7 @@ internal sealed partial class UiLayoutEngine
 
         if (string.Equals(kind, "Repeat", StringComparison.Ordinal))
         {
-            return MeasureRepeat(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, node);
+            return MeasureRepeat(ctx, spec, declaredKind, width, padding, gap, titleHeight, innerWidth, innerY, availableHeight, node, narrow);
         }
 
         // Stack, Column, Section, Surface and Clip are vertical stacks. Clip additionally becomes
@@ -1242,8 +1292,9 @@ internal sealed partial class UiLayoutEngine
         return visible;
     }
 
-    private static bool IsNarrow(UiElementSpec spec, float innerWidth)
+    private bool IsNarrow(UiElementSpec spec, float innerWidth)
     {
+        if (DynamicInput(spec)?.Narrow is bool narrow) return narrow;
         if (!spec.TryGetAttribute("Breakpoint", out string raw))
         {
             return false;
@@ -1289,8 +1340,8 @@ internal sealed partial class UiLayoutEngine
         return declaredKind;
     }
 
-    private static UiLayoutFrame LayoutFrame(UiElementSpec spec, float width, float availableHeight, Padding padding, float title, float gap) => new(width, availableHeight, padding.Left, padding.Top, padding.Right, padding.Bottom, title, gap, ReadLayoutHeight(spec));
-    private static UiLayoutChild LayoutChild(UiElementSpec spec, float width) => new(width, IsFlexibleFill(spec), UiPlacement.ParseAlign(spec, UiPlacement.AlignXAttribute, UiPlacement.Axis.Horizontal).Fraction, UiPlacement.ParseAlign(spec, UiPlacement.AlignYAttribute, UiPlacement.Axis.Vertical).Fraction, UiPlacement.ParseOffsetValue(spec, UiPlacement.OffsetXAttribute), UiPlacement.ParseOffsetValue(spec, UiPlacement.OffsetYAttribute), UiPlacement.IsMatchContentHeight(spec));
+    private UiLayoutFrame LayoutFrame(UiElementSpec spec, float width, float availableHeight, Padding padding, float title, float gap) => new(width, availableHeight, padding.Left, padding.Top, padding.Right, padding.Bottom, title, gap, ReadLayoutHeight(spec));
+    private UiLayoutChild LayoutChild(UiElementSpec spec, float width) => new(width, IsFlexibleFill(spec), UiPlacement.ParseAlign(spec, UiPlacement.AlignXAttribute, UiPlacement.Axis.Horizontal).Fraction, UiPlacement.ParseAlign(spec, UiPlacement.AlignYAttribute, UiPlacement.Axis.Vertical).Fraction, UiPlacement.ParseOffsetValue(spec, UiPlacement.OffsetXAttribute), UiPlacement.ParseOffsetValue(spec, UiPlacement.OffsetYAttribute), DynamicInput(spec)?.Height.HasValue != true && UiPlacement.IsMatchContentHeight(spec));
     private void ReportLayout(UiNode node, string code, string message)
     {
         const int limit = 128;
@@ -1600,9 +1651,10 @@ internal sealed partial class UiLayoutEngine
     /// against <c>Width</c>. Absent, blank or malformed answers "not declared" so a programmatically
     /// built spec can never crash a frame.
     /// </summary>
-    private static bool TryViewportRows(UiElementSpec spec, out float rows)
+    private bool TryViewportRows(UiElementSpec spec, out float rows)
     {
         rows = 0f;
+        if (DynamicInput(spec)?.Height.HasValue == true) return false;
         if (!spec.TryGetAttribute("VisibleRows", out string raw)) return false;
         string value = (raw ?? "").Trim();
         if (value.Length == 0) return false;
@@ -1713,7 +1765,7 @@ internal sealed partial class UiLayoutEngine
     /// that identity, and release is the same <c>PruneNodesExcept</c> pass the definition walk feeds.
     /// </para>
     /// </summary>
-    private MeasuredBox MeasureRepeat(UiWidgetContext ctx, UiElementSpec spec, string kind, float width, Padding padding, float gap, float titleHeight, float innerWidth, float innerY, float availableHeight, UiNode node)
+    private MeasuredBox MeasureRepeat(UiWidgetContext ctx, UiElementSpec spec, string kind, float width, Padding padding, float gap, float titleHeight, float innerWidth, float innerY, float availableHeight, UiNode node, bool narrow)
     {
         RepeatState state = GetOrCreateRepeatState(node);
         string itemsKey = ReadAttribute(spec, RepeatItemsAttribute);
@@ -1737,13 +1789,24 @@ internal sealed partial class UiLayoutEngine
             state.Initialized = true; state.MaterializedPass = layoutPass; state.ItemsRevision = ctx.Bindings.GetRevision(itemsKey);
         }
         var rows = new List<ChildSlot>(state.Rows.Count);
-        var children = new UiLayoutChild[state.Rows.Count];
-        var measured = new MeasuredBox[state.Rows.Count];
         for (int i = 0; i < state.Rows.Count; i++)
         {
             ItemRow row = state.Rows[i];
+            if (IsHidden(row.Spec, ctx, narrow, node, row.Index))
+            {
+                // Keep the materialized identity, but let the owning Repeat observe visibility changes.
+                RecordDeclaredKeys(row.Spec, node, ctx.Bindings);
+                continue;
+            }
             rows.Add(new ChildSlot(row.Spec, row.Index));
-            UiNode rowNode = ChildNode(ctx, node, row.Spec, row.Index);
+        }
+
+        var children = new UiLayoutChild[rows.Count];
+        var measured = new MeasuredBox[rows.Count];
+        for (int i = 0; i < rows.Count; i++)
+        {
+            ChildSlot row = rows[i];
+            UiNode rowNode = ChildNode(ctx, node, row.Spec, row.DeclaredIndex);
             UiWidgetContext rowCtx = ElementScope(ctx.WithNode(rowNode), row.Spec, rowNode);
             bool stretch = UiPlacement.ParseAlign(row.Spec, UiPlacement.AlignXAttribute, UiPlacement.Axis.Horizontal).IsStretch;
             float rowWidth = stretch ? ResolveStackChildWidth(row.Spec, innerWidth, rowCtx) : ResolveWrapWidth(row.Spec, innerWidth, rowCtx);
@@ -2064,6 +2127,8 @@ internal sealed partial class UiLayoutEngine
                 Id = entry.Id,
                 Node = entry.Node,
                 StyleChain = entry.StyleChain,
+                LayoutInputs = entry.LayoutInputs,
+                HasContentHeightReference = entry.HasContentHeightReference,
                 Widget = entry.Widget,
                 IsContainer = entry.IsContainer,
                 ContainerKind = entry.ContainerKind,
@@ -2220,13 +2285,12 @@ internal sealed partial class UiLayoutEngine
         foreach (string attribute in labels)
         {
             if (!spec.TryGetAttribute(attribute, out string value)) continue;
-            value = value.Trim();
+            bool translationKey = IsTranslationKeyAttribute(attribute);
+            if (translationKey) value = value.Trim();
             if (value.Length == 0) continue;
 
-            string text = IsTranslationKeyAttribute(attribute)
-                ? ctx.Translation.Translate(value)
-                : value;
-            widest = Math.Max(widest, ctx.Metrics.MeasureWidth(text, ctx.Theme.DefaultFont));
+            string text = translationKey ? ctx.Translation.Translate(value) : value;
+            widest = Math.Max(widest, UiTextFonts.For(ctx, ctx.Theme.DefaultFont).MeasureWidth(text));
         }
 
         return widest <= 0f ? body : widest + body;
@@ -2365,20 +2429,23 @@ internal sealed partial class UiLayoutEngine
             float height = Math.Max(0f, UiSessionGuard.MeasureOrFallback(ctx, node.Path, widget.Kind, node.Path, RecoveryBandHeight, () => MeasureWidgetWithReuse(spec, widget, ctx, node)));
             node.PresentationFault = display?.Fault;
             node.PresentationUnavailable = false;
+            UiDomainDiagnostics.Reactive(ctx.Session, node, "presentation.fault", node.PresentationFault);
             return height;
         }
         catch (UiReactiveFault failure)
         {
             node.PresentationFault = failure; node.PresentationUnavailable = true;
+            UiDomainDiagnostics.Reactive(ctx.Session, node, "presentation.fault", failure);
             UiMeasurement? retained = (widget as IUiRetainedDisplay)?.MeasureLast(ctx);
             if (retained != null) return retained.Calculate();
             return RecoveryBandHeight; // a complete, unavailable placeholder, never a failed measurement result
         }
     }
 
-    private static float ResolveContainerHeight(UiElementSpec spec, float naturalHeight, float availableHeight) => ReadLayoutHeight(spec).Resolve(naturalHeight, availableHeight);
-    private static UiLayoutHeight ReadLayoutHeight(UiElementSpec spec)
+    private float ResolveContainerHeight(UiElementSpec spec, float naturalHeight, float availableHeight) => ReadLayoutHeight(spec).Resolve(naturalHeight, availableHeight);
+    private UiLayoutHeight ReadLayoutHeight(UiElementSpec spec)
     {
+        if (DynamicInput(spec)?.Height is float dynamicHeight) return new UiLayoutHeight(dynamicHeight, false);
         if (spec.TryGetAttribute("Height", out string raw) && raw.Trim().Length > 0 && !string.Equals(raw.Trim(), "Auto", StringComparison.OrdinalIgnoreCase) && !UiPlacement.IsMatchContentHeight(spec))
         {
             if (spec.TryGetNumber("Height", out float fixedHeight))
@@ -2400,8 +2467,9 @@ internal sealed partial class UiLayoutEngine
     /// declares Fill="true" and has no explicit fixed Height. Such children share the stack's
     /// remaining inner height instead of contributing to the natural flow.
     /// </summary>
-    private static bool IsFlexibleFill(UiElementSpec spec)
+    private bool IsFlexibleFill(UiElementSpec spec)
     {
+        if (DynamicInput(spec)?.Height.HasValue == true) return false;
         if (GetContainerKind(spec).Length == 0 || !IsFill(spec)) return false;
         if (spec.TryGetAttribute("Height", out string raw))
         {
@@ -2632,11 +2700,11 @@ internal sealed partial class UiLayoutEngine
             // were arranged against.
             Padding padding = ParsePadding(entry.Spec, ctx.Theme);
             float innerWidth = Math.Max(1f, rect.Width - padding.Left - padding.Right);
-            var headerRect = new UiLayoutRect(rect.X + padding.Left, rect.Y + padding.Top, innerWidth, SectionTitleHeight);
+            var headerRect = new UiLayoutRect(rect.X + padding.Left, rect.Y + padding.Top, innerWidth, UiTextFonts.RowHeight(ctx, minimum: SectionTitleHeight));
             // One text outlet: routing the container title through UiThemeDraw.Label is what makes it
             // visible to the fit audit (BeginElement above already attributes by path), which the
             // engine's own private Label copy could never do.
-            UiThemeDraw.Label(ctx.Drawing,headerRect, ReadTitle(entry.Spec, ctx), ctx.Theme, ctx.Theme[UiPaletteRole.Foreground]);
+            UiTextFonts.Label(ctx,headerRect, ReadTitle(entry.Spec, ctx), ctx.Theme.Styles.Resolve(UiStatusTone.Neutral).Text);
         }
     }
 

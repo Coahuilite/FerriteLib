@@ -1,141 +1,93 @@
 param(
     [string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot),
-    # Stage the dev folder after the gates. It is a directory by design (pack-dev.ps1), and placing it
-    # in a game Mods directory is never done here — that is the developer's step. -PackZip and
-    # -PackNupkg add the artifacts that only other purposes need.
     [switch]$PackDev,
     [switch]$PackZip,
     [switch]$PackNupkg,
+    # Skip ALL restore roots; missing/stale assets must fail the corresponding build, not self-heal.
     [switch]$NoRestore,
-    # Print the M6/M11 evidence footer as the last output, so a redirected chain log carries its own
-    # identity (HEAD, dirty set, per-gate results, pinned files, and the two carriers as hash+mtime pairs)
-    # instead of being bound to a commit by the reader's inference from file timestamps. The writer is
-    # tools/evidence/Write-EvidenceFooter.ps1 - one shape, shared with the consumer repository.
-    # It runs only on the success path: a RED chain exits from inside Invoke-Check, so bind a red log with
-    # the writer directly, stating the non-zero exit.
-    [switch]$EvidenceFooter
+    [switch]$EvidenceFooter,
+    # Full group logs and a summary survive success or failure. Defaults to a fresh ignored run.
+    [string]$LogDirectory = ''
 )
 
 Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
-
-# One-input local verification for the FerriteLib prerequisite mod.
-# Fail-fast order:
-#   1   FerriteLib.UiKit harness, Release (kernel lanes + version contract + neutrality + boundary)
-#   2   library Dev build (FER_DEV, TreatWarningsAsErrors)
-#   3   library Release build (TreatWarningsAsErrors)
-#   4   Dev/Release outputs exist in distinct configuration-specific build directories
-#   5   payload is content-free: no Defs, Patches, Languages, Sounds or Textures under 1.6
-#   6   LICENSE present, full MPL-2.0 with no applied incompatibility notice, and byte-identical to
-#       the pinned series licence (SHA-256 literal in scripts/verify-license.ps1 - self-contained on
-#       purpose: no sibling path is read)
-#   7   About.xml identity (packageId, modVersion present and parsable as a Version)
-#   8   runtime-resolvability trap scans: no call site uses a member the reference assembly advertises
-#       but the net472 runtime lacks, and no member the payload or the harness takes from a stub-replaced
-#       game assembly is missing from the harness stub (both compile green and both die at run time; the
-#       stub half is reference-driven with a written exemption table -- see each script's own header)
-#   9   the consumer half of the boundary metric is armed and tree-sensitive: rule (c) of
-#       tools/dependency-reality.ps1 fires on a planted bare call outside its allowlist, refuses the
-#       migrated two-argument form, and passes once that file is allowlisted (self-test + fixture)
-#   10  the development-only geometry instrument's DEV half really ran: a Dev harness run whose output
-#       carries the dev-only assertion names, a floor on the assertion and dump-line counts, the absence of
-#       the release-only half's name, and the printed numbers (see scripts/verify-dev-instrument.ps1)
-#       - because gate 1 runs the harness in Release, and a dev-only proof nobody re-runs is a proof that
-#       rots. It writes only the Dev build output; delivered packages remain untouched.
-# -PackDev: after all checks pass, stage the dev folder (a directory, not an archive). Placing it
-#   in a game Mods directory is the developer's own step - no script here writes outside the repository.
-#   -PackZip also writes the dev zip; -PackNupkg also writes the consumer reference package. Both are
-#   opt-in because nothing on the dev path needs them.
-#
-# Builds and harnesses write dist/build/<Configuration>; delivered carriers are read-only here.
-
-# The neutrality guard, the visual-core/page-model boundary and the two version axes all run INSIDE
-# gate 1, from the library's own harness, each with a positive control. There is no second copy of
-# those checks here on purpose: the previous arrangement had a consumer repository asserting the
-# library's neutrality, and that scan silently passed on an empty tree the moment the trees moved.
-
-$root = [System.IO.Path]::GetFullPath($ProjectRoot)
-# Verification and every spawned build/test use repository-local scratch space.
+$ErrorActionPreference = 'Stop'
+$root = [IO.Path]::GetFullPath($ProjectRoot)
 $env:TEMP = Join-Path $root 'dist/test-temp'
 $env:TMP = $env:TEMP
-New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
-$projectFile = Join-Path $root 'Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj'
-$testsProject = Join-Path $root 'tools\FerriteLib.UiKit.Tests\FerriteLib.UiKit.Tests.csproj'
-$assembliesDir = Join-Path $root 'dist\build\Release'
-$tempLog = Join-Path ([System.IO.Path]::GetTempPath()) ("fl-verify-" + [guid]::NewGuid().ToString('N') + '.log')
-
-# C1: same production source set, only standard .NET runtime references, no game or runtime stubs.
-& dotnet run --project (Join-Path $root 'tools/FerriteLib.UiKit.Core.ContractTests/FerriteLib.UiKit.Core.ContractTests.csproj') -c Release --nologo
-if ($LASTEXITCODE -ne 0) { throw 'No-platform production contract tests failed.' }
-# Observe the compatibility delivery without opening it for writing. It may be loaded by a consumer.
-$deliveredPath = Join-Path $root '1.6\Assemblies\FerriteLib.UiKit.dll'
-$deliveredBefore = if (Test-Path -LiteralPath $deliveredPath) {
-    (Get-FileHash -LiteralPath $deliveredPath).Hash + ':' + (Get-Item -LiteralPath $deliveredPath).LastWriteTimeUtc.Ticks
-} else { 'absent' }
-$buildExtraArgs = @()
-if ($NoRestore) { $buildExtraArgs += '--no-restore' }
-
-function Invoke-Check {
-    param([string]$Name, [string]$Retry, [scriptblock]$Action)
-
-    Write-Host -NoNewline "[run] $Name ... "
-    $previousEap = $ErrorActionPreference
-    $ErrorActionPreference = 'Stop'
-    $failed = $false
-    $failureMessage = $null
-    try { & $Action *> $tempLog } catch { $failed = $true; $failureMessage = $_.Exception.Message } finally { $ErrorActionPreference = $previousEap }
-    $code = $LASTEXITCODE
-    if ($failed -or $code -ne 0) {
-        Write-Host 'FAIL'
-        # A gate that enforces a contract without saying which one turns every red into a scavenger
-        # hunt: the throw message used to be swallowed by this catch and never reached the console
-        # (found by the independent verifier, 2026-09-11).
-        if (-not [string]::IsNullOrWhiteSpace($failureMessage)) { Write-Host "    $failureMessage" }
-        if (Test-Path -LiteralPath $tempLog) {
-            Get-Content -LiteralPath $tempLog -Tail 12 | ForEach-Object { Write-Host "    $_" }
-        }
-        Write-Host "  [hint] retry: $Retry"
-        Remove-Item -LiteralPath $tempLog -Force -ErrorAction SilentlyContinue
-        exit 1
-    }
-    Write-Host 'OK'
-    $script:gateResults += ("{0}=OK" -f $Name)
-}
-
+$null = New-Item -ItemType Directory -Force -Path $env:TEMP
+if (-not $LogDirectory) { $LogDirectory = 'dist/verification/' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [guid]::NewGuid().ToString('N').Substring(0,8) }
+$logs = [IO.Path]::GetFullPath($LogDirectory, $root)
+if (-not $logs.StartsWith([IO.Path]::GetFullPath((Join-Path $root 'dist')) + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Verification logs must be under this repository dist/.' }
+if (Test-Path -LiteralPath $logs) { throw "Log directory already exists: $logs" }
+$null = New-Item -ItemType Directory -Path $logs
+$sourceHead = (& git -C $root rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve source identity.' }
+$sourceChanges = @(& git -C $root status --porcelain=v1)
+$projectFile = Join-Path $root 'Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj'
+$testsProject = Join-Path $root 'tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj'
+$coreProject = Join-Path $root 'tools/FerriteLib.UiKit.Core.ContractTests/FerriteLib.UiKit.Core.ContractTests.csproj'
+$adapterProject = Join-Path $root 'tools/FerriteLib.UiKit.Adapter.ContractTests/FerriteLib.UiKit.Adapter.ContractTests.csproj'
+$assembliesDir = Join-Path $root 'dist/build/Release'
 $script:gateResults = @()
+$script:groups = @()
+$script:failed = 0
+$runWatch = [Diagnostics.Stopwatch]::StartNew()
 
-# A fresh clone has no obj/ tree, and every lane below runs --no-restore on purpose (a cross-repo gate
-# must never silently re-resolve a stale graph). So the bootstrap restore happens exactly once, here,
-# measurably, instead of being smuggled into gate 1 where a missing restore surfaced as MSB3644
-# (measured 2026-09-11 by the independent verifier on a git-archive extraction).
-if (-not $NoRestore) {
-    Write-Host -NoNewline '[setup] restore the harness project graph (fresh-tree bootstrap) ... '
-    dotnet restore $testsProject *> $tempLog
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host 'FAIL'
-        if (Test-Path -LiteralPath $tempLog) {
-            Get-Content -LiteralPath $tempLog -Tail 12 | ForEach-Object { Write-Host "    $_" }
-        }
-        Write-Host '  [hint] retry: dotnet restore tools/FerriteLib.UiKit.Tests/FerriteLib.UiKit.Tests.csproj'
-        Remove-Item -LiteralPath $tempLog -Force -ErrorAction SilentlyContinue
-        exit 1
-    }
-    Write-Host 'OK'
+function Write-Summary {
+    [ordered]@{
+        source_head=$sourceHead; source_changes=$sourceChanges; no_restore=[bool]$NoRestore
+        projects=@($coreProject,$testsProject,$adapterProject); runtime=[Environment]::Version.ToString()
+        elapsed_ms=$runWatch.Elapsed.TotalMilliseconds; failures=$script:failed; groups=$script:groups
+    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $logs 'summary.json')
 }
+function Invoke-Check {
+    param([string]$Name, [string]$Retry, [scriptblock]$Action, [bool]$Ready=$true, [string]$Configuration='n/a')
+    $number = $script:groups.Count + 1
+    $log = Join-Path $logs ('{0:d2}-{1}.log' -f $number, ($Name -replace '[^A-Za-z0-9]+','-').Trim('-'))
+    $started = [DateTime]::UtcNow
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    $status = 'PASS'; $code = 0; $message = ''
+    # Record the invoked source body, not the independently worded retry guidance.
+    $actionText = if ($Ready) { $Action.ToString().Trim() } else { $null }
+    if (-not $Ready) {
+        $status = 'BLOCKED'; $code = $null
+        'Not executed: required restore/build group failed.' | Set-Content -LiteralPath $log
+    } else {
+        $global:LASTEXITCODE = 0
+        try { & $Action *> $log; $code = $LASTEXITCODE; if ($code -ne 0) { $status='FAIL' } }
+        catch { $status='FAIL'; $code=1; $message=$_.Exception.ToString(); Add-Content -LiteralPath $log -Value $message }
+    }
+    $watch.Stop()
+    if ($status -ne 'PASS') { $script:failed++ }
+    $script:gateResults += "$Name=$status"
+    $script:groups += [ordered]@{ name=$Name; status=$status; exit=$code; configuration=$Configuration; source_head=$sourceHead; started_utc=$started.ToString('o'); elapsed_ms=$watch.Elapsed.TotalMilliseconds; action=$actionText; retry_hint=$Retry; log=$log }
+    Write-Summary
+    Write-Host ("[{0}] {1} ({2:N0} ms) -> {3}" -f $status,$Name,$watch.Elapsed.TotalMilliseconds,$log)
+    if ($status -eq 'FAIL') { Get-Content -LiteralPath $log -Tail 12 | ForEach-Object { Write-Host "    $_" }; Write-Host "  [hint] retry: $Retry" }
+    return $status -eq 'PASS'
+}
+trap { Write-Summary; throw }
 
-Invoke-Check 'FerriteLib.UiKit harness (kernel + version + neutrality + boundary)' `
-    'dotnet run --no-restore --project tools/FerriteLib.UiKit.Tests -c Release' `
-    { dotnet run --no-restore --project $testsProject -c Release }
-
-Invoke-Check 'library Dev build (warnings as errors)' `
-    'dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Dev' `
-    { dotnet build $projectFile -c Dev @buildExtraArgs }
-
-Invoke-Check 'library Release build (warnings as errors)' `
-    'dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release' `
-    { dotnet build $projectFile -c Release @buildExtraArgs }
-
-Invoke-Check 'configuration-isolated build outputs exist and match evaluated TargetPath' `
+# Preserve the delivery that an already-running consumer may hold.
+$deliveredPath = Join-Path $root '1.6/Assemblies/FerriteLib.UiKit.dll'
+$deliveredBefore = if (Test-Path -LiteralPath $deliveredPath) { (Get-FileHash -LiteralPath $deliveredPath).Hash + ':' + (Get-Item -LiteralPath $deliveredPath).LastWriteTimeUtc.Ticks } else { 'absent' }
+$coreRestored=$true; $testsRestored=$true; $adapterRestored=$true
+if (-not $NoRestore) {
+    $coreRestored = Invoke-Check 'restore no-platform Core' "dotnet restore $coreProject" { dotnet restore $coreProject --nologo }
+    $testsRestored = Invoke-Check 'restore harness including payload authors and stubs' "dotnet restore $testsProject" { dotnet restore $testsProject --nologo }
+    $adapterRestored = Invoke-Check 'restore adapter contract entry' "dotnet restore $adapterProject" { dotnet restore $adapterProject --nologo }
+}
+$coreBuilt = Invoke-Check -Ready $coreRestored -Configuration Release 'build no-platform Core' "dotnet build $coreProject -c Release --no-restore" { dotnet build $coreProject -c Release --no-restore --no-incremental --nologo -m:1 }
+$null = Invoke-Check -Ready $coreBuilt -Configuration Release 'execute no-platform Core' 'dotnet tools/FerriteLib.UiKit.Core.ContractTests/bin/Release/net10.0/FerriteLib.UiKit.Core.ContractTests.dll' { & dotnet (Join-Path $root 'tools/FerriteLib.UiKit.Core.ContractTests/bin/Release/net10.0/FerriteLib.UiKit.Core.ContractTests.dll') }
+$releaseBuilt = Invoke-Check -Ready $testsRestored -Configuration Release 'build Release payload authors harness and stubs' "dotnet build $testsProject -c Release --no-restore" { dotnet build $testsProject -c Release --no-restore --no-incremental --nologo -m:1 }
+$null = Invoke-Check -Ready $releaseBuilt -Configuration Release 'FerriteLib.UiKit harness (kernel + version + neutrality + boundary)' 'tools/FerriteLib.UiKit.Tests/bin/Release/net472/FerriteLib.UiKit.Tests.exe' { & (Join-Path $root 'tools/FerriteLib.UiKit.Tests/bin/Release/net472/FerriteLib.UiKit.Tests.exe') }
+# This entry has its own compilation, but the exact Release payload/authors/stub dependencies above
+# have already been built. Resolve them without re-entering their Build targets.
+$adapterBuilt = Invoke-Check -Ready ($adapterRestored -and $releaseBuilt) -Configuration Release 'build adapter contract entry' "dotnet build $adapterProject -c Release --no-restore -p:BuildProjectReferences=false" { dotnet build $adapterProject -c Release --no-restore -p:BuildProjectReferences=false --no-incremental --nologo -m:1 }
+$null = Invoke-Check -Ready $adapterBuilt -Configuration Release 'execute adapter and public author contracts' 'dist/build/Release/adapter-probe/net472/FerriteLib.UiKit.Adapter.ContractTests.exe' { & (Join-Path $root 'dist/build/Release/adapter-probe/net472/FerriteLib.UiKit.Adapter.ContractTests.exe') }
+$devBuilt = Invoke-Check -Ready $testsRestored -Configuration Dev 'build Dev payload authors harness and stubs' "dotnet build $testsProject -c Dev --no-restore" { dotnet build $testsProject -c Dev --no-restore --no-incremental --nologo -m:1 }
+$null = Invoke-Check -Ready ($releaseBuilt -and $devBuilt) 'configuration-isolated build outputs exist and match evaluated TargetPath' `
     'dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release' `
     {
         foreach ($configuration in @('Dev', 'Release')) {
@@ -150,7 +102,7 @@ Invoke-Check 'configuration-isolated build outputs exist and match evaluated Tar
         & (Join-Path $PSScriptRoot 'verify-carrier-export.ps1') -ProjectRoot $root
     }
 
-Invoke-Check 'carries no game content (assemblies-only mod)' `
+$null = Invoke-Check 'carries no game content (assemblies-only mod)' `
     'dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release' `
     {
         # A prerequisite that also ships Defs silently changes every consumer's game, and the library
@@ -166,7 +118,7 @@ Invoke-Check 'carries no game content (assemblies-only mod)' `
         }
     }
 
-Invoke-Check 'LICENSE present, full MPL-2.0, and the pinned series licence' `
+$null = Invoke-Check 'LICENSE present, full MPL-2.0, and the pinned series licence' `
     'pwsh -NoProfile -File scripts/verify-license.ps1' `
     {
         # The checker is its own script so the mutation proof for this gate ("edit LICENSE and it goes
@@ -181,7 +133,7 @@ Invoke-Check 'LICENSE present, full MPL-2.0, and the pinned series licence' `
         & pwsh -NoProfile -File (Join-Path $root 'scripts\verify-license.ps1') -ProjectRoot $root
     }
 
-Invoke-Check 'About.xml identity is present and well-formed' `
+$null = Invoke-Check 'About.xml identity is present and well-formed' `
     'manually' `
     {
         [xml]$about = Get-Content -LiteralPath (Join-Path $root 'About\About.xml') -Raw
@@ -202,7 +154,7 @@ Invoke-Check 'About.xml identity is present and well-formed' `
         # is actually readable. Here we only prove the release axis is well-formed on its own.
     }
 
-Invoke-Check 'runtime-resolvability traps: net472 surface + harness stub surface' `
+$null = Invoke-Check -Ready ($releaseBuilt -and $devBuilt) 'runtime-resolvability traps: net472 surface + harness stub surface' `
     'pwsh -NoProfile -File scripts/net472-trap-scan.ps1 ; pwsh -NoProfile -File scripts/stub-coverage-scan.ps1 -SelfTest' `
     {
         # The harness compiles against a reference assembly and executes on net472, so a member the
@@ -214,6 +166,7 @@ Invoke-Check 'runtime-resolvability traps: net472 surface + harness stub surface
         & pwsh -NoProfile -File (Join-Path $root 'scripts\net472-trap-scan.ps1') -SelfTest
         if ($LASTEXITCODE -ne 0) { throw 'net472 trap classifier self-test failed.' }
         & pwsh -NoProfile -File (Join-Path $root 'scripts\net472-trap-scan.ps1') -Path $root
+        if ($LASTEXITCODE -ne 0) { throw 'net472 payload scan failed.' }
 
         # Same family, the other surface. The harness compiles against the game's reference assemblies
         # and executes on the stubs, so a member only the reference declares compiles green and dies at
@@ -228,7 +181,7 @@ Invoke-Check 'runtime-resolvability traps: net472 surface + harness stub surface
         & pwsh -NoProfile -File (Join-Path $root 'scripts\stub-coverage-scan.ps1') -Path $root -SelfTest
     }
 
-Invoke-Check 'rule (c) consumer half is armed and tree-sensitive (dependency-reality)' `
+$null = Invoke-Check 'rule (c) consumer half is armed and tree-sensitive (dependency-reality)' `
     'pwsh -NoProfile -File tools/dependency-reality.ps1 -SelfTest' `
     {
         # Why this gate exists: rule (c) - the half a consumer runs over its own tree - was reachable
@@ -294,41 +247,25 @@ Invoke-Check 'rule (c) consumer half is armed and tree-sensitive (dependency-rea
         }
     }
 
-Invoke-Check 'development instrument: the Dev half really ran (numeric geometry + press verdicts)' `
-    'dotnet run --no-restore --project tools/FerriteLib.UiKit.Tests -c Dev' `
-    {
-        # The instrument is compiled only into a Dev build, and gate 1 runs the harness in Release - so
-        # without this gate its lane and its mutation proof would live only for whoever re-runs '-c Dev' by
-        # hand, which is exactly how a proof rots. The reader refuses to accept "the project compiled": it
-        # requires the dev-only assertion names, floors on the assertion and dump-line counts, the absence of
-        # the release-only name, and the numbers themselves. Its checker is control-tested on every run
-        # (four planted fixtures - empty, release-only, green-exit-but-missing-name, and a fully populated
-        # sample that must NOT be rejected).
-        & pwsh -NoProfile -File (Join-Path $root 'scripts\verify-dev-instrument.ps1') -ProjectRoot $root
-    }
-
+$null = Invoke-Check -Ready $devBuilt -Configuration Dev 'development instrument: the Dev half really ran (numeric geometry + press verdicts)' 'pwsh -File scripts/verify-dev-instrument.ps1 -NoBuild' {
+    & pwsh -NoProfile -File (Join-Path $root 'scripts/verify-dev-instrument.ps1') -ProjectRoot $root -NoBuild -LogPath (Join-Path $logs 'dev-harness-output.log')
+}
 if ($PackDev) {
-    $packArgs = @{ ProjectRoot = $root }
-    if ($PackZip) { $packArgs.Zip = $true }
-    if ($PackNupkg) { $packArgs.Nupkg = $true }
-    & (Join-Path $PSScriptRoot 'pack-dev.ps1') @packArgs
-    if ($LASTEXITCODE -ne 0) { throw "pack-dev failed." }
+    $null = Invoke-Check -Ready ($devBuilt -and $script:failed -eq 0) -Configuration Dev 'stage optional Dev package' 'pwsh -File scripts/pack-dev.ps1 -NoBuild' {
+        $packArgs = @{ ProjectRoot=$root; NoBuild=$true; NoRestore=$true }
+        if ($PackZip) { $packArgs.Zip=$true }; if ($PackNupkg) { $packArgs.Nupkg=$true }
+        & (Join-Path $PSScriptRoot 'pack-dev.ps1') @packArgs
+    }
 }
-
-Remove-Item -LiteralPath $tempLog -Force -ErrorAction SilentlyContinue
-$deliveredAfter = if (Test-Path -LiteralPath $deliveredPath) {
-    (Get-FileHash -LiteralPath $deliveredPath).Hash + ':' + (Get-Item -LiteralPath $deliveredPath).LastWriteTimeUtc.Ticks
-} else { 'absent' }
-if ($deliveredBefore -ne $deliveredAfter) { throw 'Verification changed the compatibility carrier (hash or mtime).' }
-Write-Host '[verify] all checks passed; compatibility carrier unchanged (hash and mtime).'
-
+$null = Invoke-Check 'compatibility carrier unchanged (hash and mtime)' 'inspect held delivery' {
+    $deliveredAfter = if (Test-Path -LiteralPath $deliveredPath) { (Get-FileHash -LiteralPath $deliveredPath).Hash + ':' + (Get-Item -LiteralPath $deliveredPath).LastWriteTimeUtc.Ticks } else { 'absent' }
+    if ($deliveredBefore -ne $deliveredAfter) { throw 'Verification changed the compatibility carrier (hash or mtime).' }
+}
+$runWatch.Stop()
+Write-Summary
+Write-Host "[verify] $($script:groups.Count) groups, $($script:failed) failed/blocked; complete logs: $logs"
 if ($EvidenceFooter) {
-    # One shape, invoked in-process so the gate array crosses no process boundary: this is the same file
-    # the consumer repository uses, parameter for parameter.
-    & (Join-Path $root 'tools\evidence\Write-EvidenceFooter.ps1') -ToStdout -Configuration Both `
-        -Subject 'scripts/verify-local.ps1 (the 10-gate chain, Release + Dev)' `
-        -Command 'pwsh -NoProfile -File scripts/verify-local.ps1 -NoRestore -EvidenceFooter' `
-        -ExitCode 0 -Gate $script:gateResults `
-        -PinPath @('scripts/verify-local.ps1', 'scripts/verify-license.ps1', 'scripts/verify-dev-instrument.ps1',
-                   'tools/FerriteLib.UiKit.Tests/StubTextWidth.cs', 'tools/FerriteLib.UiKit.Tests/KernelTextAuditTests.cs')
+    $footerArgs = @{ ToStdout=$true; Configuration='Both'; Subject='scripts/verify-local.ps1 (complete Core + Release + Dev + adapter entry)'; Command='pwsh -File scripts/verify-local.ps1 -EvidenceFooter'; ExitCode=[int]($script:failed -gt 0); Gate=$script:gateResults; PinPath=@('scripts/verify-local.ps1','scripts/verify-license.ps1','scripts/verify-dev-instrument.ps1','tools/FerriteLib.UiKit.Tests/StubTextWidth.cs','tools/FerriteLib.UiKit.Tests/KernelTextAuditTests.cs') }
+    & (Join-Path $root 'tools/evidence/Write-EvidenceFooter.ps1') @footerArgs
 }
+if ($script:failed -gt 0) { exit 1 }

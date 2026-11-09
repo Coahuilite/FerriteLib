@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Xml;
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -68,6 +69,10 @@ public sealed class UiDocumentService : IDisposable
     private readonly IUiTimeSource timeSource;
     private bool overflowed;
     private bool disposed;
+    private long statusRevision;
+    /// <summary>Owner-thread source/status change stamp. Includes a repaired unchanged last-good candidate,
+    /// so observers can refresh without scanning documents every frame. Watcher callbacks only signal.</summary>
+    public long StatusRevision => statusRevision;
 
     // The scheduler's per-document state: which signals the main thread has observed, when, how many retries
     // a transient read failure has used, and whether a ready commit is deferred for the user's own input.
@@ -179,6 +184,7 @@ public sealed class UiDocumentService : IDisposable
             // Deliberately not an early return on an unchanged value: re-setting AutoWatch to true is the
             // documented re-arm after a directory that did not exist yet, so the same value must still do
             // the work. RefreshWatchers arms only the documents that hold no watcher.
+            if (autoWatch != value) statusRevision++;
             autoWatch = value;
             RefreshWatchers();
         }
@@ -204,6 +210,18 @@ public sealed class UiDocumentService : IDisposable
     /// </para>
     /// </summary>
     public bool Add(UiDocumentSource source, string embeddedFallbackXml = "")
+        => AddCore(source, embeddedFallbackXml, null);
+
+    /// <summary>Project one full author document into its layout, templates and styles inside the existing
+    /// candidate transaction. The pure callback receives exactly the bytes' decoded snapshot. A refusal
+    /// keeps the previous definition and source revision; never change business/Host state in this callback.</summary>
+    public bool AddProjectedLayout(UiDocumentSource source, string embeddedFallbackXml, Func<string, UiLayoutManifest> project)
+    {
+        if (source.Kind != UiDocumentKind.Layout) throw new ArgumentException("A layout projection requires a Layout source.", nameof(source));
+        return AddCore(source, embeddedFallbackXml, project ?? throw new ArgumentNullException(nameof(project)));
+    }
+
+    private bool AddCore(UiDocumentSource source, string embeddedFallbackXml, Func<string, UiLayoutManifest>? project)
     {
         EnsureAlive();
         if (documents.ContainsKey(source.Id))
@@ -213,13 +231,33 @@ public sealed class UiDocumentService : IDisposable
 
         if (documents.Count >= MaxDocuments) return false;
 
-        var state = new DocumentState(source, embeddedFallbackXml ?? "");
+        var state = new DocumentState(source, embeddedFallbackXml ?? "", project);
         ReadFirstVersion(state);
 
         documents.Add(source.Id, state);
+        statusRevision++;
         if (autoWatch) Watch(state);
         return true;
     }
+
+    /// <summary>Owner-thread read of the accepted source. Preparation must use this or Host layout inputs,
+    /// not reload an embedded copy. Null means an unregistered document, not fallback success.</summary>
+    public UiDocumentSnapshot? GetSnapshot(string documentId)
+        => documents.TryGetValue(documentId, out DocumentState? state) ? Snapshot(state) : null;
+
+    public IReadOnlyList<UiDocumentSnapshot> Snapshots
+    {
+        get
+        {
+            var result = new List<UiDocumentSnapshot>();
+            foreach (DocumentState state in documents.Values) result.Add(Snapshot(state));
+            return result.AsReadOnly();
+        }
+    }
+
+    private static UiDocumentSnapshot Snapshot(DocumentState state)
+        => new(state.Source, state.GoodVersion, state.GoodText, state.GoodLayout, state.GoodStyle,
+            state.Watcher != null, state.LastFailedVersion);
 
     /// <summary>
     /// Unregisters one source, disarming its watcher. Dependencies that named it are released (their hosts
@@ -232,6 +270,7 @@ public sealed class UiDocumentService : IDisposable
 
         Unwatch(state);
         documents.Remove(documentId);
+        statusRevision++;
         lock (gate)
         {
             pending.Remove(documentId);
@@ -476,23 +515,18 @@ public sealed class UiDocumentService : IDisposable
         RefreshBeforeAttach(layoutId);
         RefreshBeforeAttach(styleId);
 
-        Detach(host);
-        if (dependencies.Count >= MaxDependencies) return false;
+        bool replacing = dependencies.Exists(dependency => ReferenceEquals(dependency.Host, host));
+        if (!replacing && dependencies.Count >= MaxDependencies) return false;
 
-        var dependency = new Dependency(host, layoutId, styleId);
-        dependencies.Add(dependency);
-        host.AttachDocumentService(this);
-
+        bool applyLayout = false;
+        bool applyStyle = false;
         if (layout != null && layout.GoodVersion.Length > 0 && layout.GoodLayout != null)
         {
             if (host.TryPrepareLayoutCandidate(layout.GoodLayout, out string element, out string reason))
             {
-                // Stage, then seal: the initial application is a one-host batch, so the destructive half
-                // still only runs once the candidate has been accepted for every host it touches.
-                host.CommitLayoutCandidate(layout.GoodLayout);
-                host.SealDocumentCommit();
+                applyLayout = layout.Project == null || host.TryPrepareStyleCandidate(layout.GoodLayout.Styles, out element, out reason);
             }
-            else
+            if (!applyLayout)
             {
                 var attachFailure = new UiReloadReport(
                     layout.Source.Id, layout.Source.Kind, layout.Source.Path, layout.GoodVersion,
@@ -512,8 +546,7 @@ public sealed class UiDocumentService : IDisposable
         {
             if (host.TryPrepareStyleCandidate(style.GoodStyle, out string element, out string reason))
             {
-                host.CommitStyleCandidate(style.GoodStyle);
-                host.SealDocumentCommit();
+                applyStyle = true;
             }
             else
             {
@@ -527,6 +560,32 @@ public sealed class UiDocumentService : IDisposable
             }
         }
 
+        if (applyLayout || applyStyle)
+        {
+            UiHost.DocumentRollback rollback = host.CaptureDocumentRollback();
+            try
+            {
+                if (applyLayout) host.CommitLayoutCandidate(layout!.GoodLayout!);
+                if (host.SessionDisposed) return true;
+                if (applyStyle) host.CommitStyleCandidate(style!.GoodStyle!);
+            }
+            catch
+            {
+                host.RestoreDocumentRollback(rollback);
+                // No dependency or service ownership changed: a failed initial stage does not enroll
+                // this host, and a failed reattach leaves its previous connection intact.
+                throw;
+            }
+        }
+
+        // Stage callbacks may close the host. Never resurrect a dependency its Close already released.
+        if (host.SessionDisposed) return true;
+        Detach(host);
+        dependencies.Add(new Dependency(host, layoutId, styleId));
+        host.AttachDocumentService(this);
+        // Only staging is reversible. Register the committed lifetime before fallible retirement;
+        // cleanup/reporting must not restore a tree whose old resources have already been released.
+        if (applyLayout || applyStyle) host.SealDocumentCommit();
         return true;
     }
 
@@ -576,6 +635,7 @@ public sealed class UiDocumentService : IDisposable
         lock (gate)
         {
             disposed = true;
+            statusRevision++;
             pending.Clear();
             schedules.Clear();
         }
@@ -829,6 +889,7 @@ public sealed class UiDocumentService : IDisposable
         if (state.GoodVersion.Length > 0
             && string.Equals(probe.Version, state.GoodVersion, StringComparison.Ordinal))
         {
+            if (state.LastFailedVersion.Length > 0) { state.ClearFailedVersion(); statusRevision++; }
             return;
         }
 
@@ -871,6 +932,7 @@ public sealed class UiDocumentService : IDisposable
             if (deferTransientFailure && candidate.Retryable) return null;
 
             bool duplicate = string.Equals(candidate.Version, state.LastFailedVersion, StringComparison.Ordinal);
+            if (!string.Equals(state.LastFailedVersion, candidate.Version, StringComparison.Ordinal)) statusRevision++;
             state.LastFailedVersion = candidate.Version;
             var failure = new UiReloadReport(
                 state.Source.Id, state.Source.Kind, state.Source.Path, candidate.Version,
@@ -885,6 +947,7 @@ public sealed class UiDocumentService : IDisposable
         {
             // The bytes are back in force, which resolves any failure that was standing: the next refusal of
             // this content is a new event again, not the tail of the previous one.
+            if (state.LastFailedVersion.Length > 0) statusRevision++;
             state.ClearFailedVersion();
             var skipped = new UiReloadReport(
                 state.Source.Id, state.Source.Kind, state.Source.Path, candidate.Version,
@@ -915,6 +978,10 @@ public sealed class UiDocumentService : IDisposable
                     failureReason = "the candidate carried no layout document";
                 }
                 else if (!dependency.Host.TryPrepareLayoutCandidate(layout, out failureElement, out failureReason))
+                {
+                    failureReason = "host '" + dependency.Host.Source + "': " + failureReason;
+                }
+                else if (state.Project != null && !dependency.Host.TryPrepareStyleCandidate(layout.Styles, out failureElement, out failureReason))
                 {
                     failureReason = "host '" + dependency.Host.Source + "': " + failureReason;
                 }
@@ -1007,6 +1074,7 @@ public sealed class UiDocumentService : IDisposable
         }
 
         state.Accept(candidate);
+        statusRevision++;
         state.ClearFailedVersion();
         var accepted = new UiReloadReport(
             state.Source.Id, state.Source.Kind, state.Source.Path, candidate.Version,
@@ -1063,6 +1131,7 @@ public sealed class UiDocumentService : IDisposable
         DocumentState state, Candidate candidate, string element, string reason, int affectedCount)
     {
         bool duplicate = string.Equals(candidate.Version, state.LastFailedVersion, StringComparison.Ordinal);
+        if (!string.Equals(state.LastFailedVersion, candidate.Version, StringComparison.Ordinal)) statusRevision++;
         state.LastFailedVersion = candidate.Version;
         var refused = new UiReloadReport(
             state.Source.Id, state.Source.Kind, state.Source.Path, candidate.Version,
@@ -1148,9 +1217,10 @@ public sealed class UiDocumentService : IDisposable
         {
             try
             {
-                return Candidate.LayoutVersion(version, UiLayoutManifest.Parse(Decode(bytes)));
+                string text = Decode(bytes);
+                return Candidate.LayoutVersion(version, ParseLayout(state, text), text);
             }
-            catch (Exception ex) when (IsParseFailure(ex))
+            catch (Exception ex) when (state.Project != null ? UiObservationBoundary.IsOrdinary(ex) : IsParseFailure(ex))
             {
                 return Candidate.Refused(version, "file '" + path + "' did not parse: " + ex.Message);
             }
@@ -1162,7 +1232,20 @@ public sealed class UiDocumentService : IDisposable
             return Candidate.Refused(version, "file '" + path + "' did not parse: " + style.Issues[0]);
         }
 
-        return Candidate.StyleVersion(version, style);
+        return Candidate.StyleVersion(version, style, Decode(bytes));
+    }
+
+    private static UiLayoutManifest ParseLayout(DocumentState state, string text)
+    {
+        if (state.Project == null) return UiLayoutManifest.Parse(text);
+        // Validate the complete saved XML, including unselected regions, before calling the author.
+        using (var input = new StringReader(text))
+        using (var reader = XmlReader.Create(input, new XmlReaderSettings
+        { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = MaxDocumentBytes }))
+            while (reader.Read()) { }
+        UiLayoutManifest projected = state.Project(text) ?? throw new FormatException("The author projection returned no layout.");
+        if (projected.Styles.StructurallyInvalid) throw new FormatException("The projected styles are structurally invalid: " + projected.Styles.Issues[0]);
+        return projected;
     }
 
     /// <summary>
@@ -1194,9 +1277,9 @@ public sealed class UiDocumentService : IDisposable
         {
             try
             {
-                return Candidate.LayoutVersion(version, UiLayoutManifest.Parse(xml));
+                return Candidate.LayoutVersion(version, ParseLayout(state, xml), xml);
             }
-            catch (Exception ex) when (IsParseFailure(ex))
+            catch (Exception ex) when (state.Project != null ? UiObservationBoundary.IsOrdinary(ex) : IsParseFailure(ex))
             {
                 return Candidate.Refused(version, prefix + "the embedded fallback did not parse: " + ex.Message);
             }
@@ -1208,7 +1291,7 @@ public sealed class UiDocumentService : IDisposable
             return Candidate.Refused(version, prefix + "the embedded fallback did not parse: " + style.Issues[0]);
         }
 
-        return Candidate.StyleVersion(version, style);
+        return Candidate.StyleVersion(version, style, xml);
     }
 
     private DocumentState? RequireDocument(string id)
@@ -1295,6 +1378,7 @@ public sealed class UiDocumentService : IDisposable
         }
 
         state.Watcher = watcher;
+        statusRevision++;
     }
 
     /// <summary>
@@ -1403,11 +1487,15 @@ public sealed class UiDocumentService : IDisposable
 
     private sealed class DocumentState
     {
-        internal DocumentState(UiDocumentSource source, string embeddedFallbackXml)
+        internal DocumentState(UiDocumentSource source, string embeddedFallbackXml, Func<string, UiLayoutManifest>? project)
         {
             Source = source;
             EmbeddedFallbackXml = embeddedFallbackXml;
+            Project = project;
         }
+
+        internal Func<string, UiLayoutManifest>? Project { get; }
+        internal string GoodText { get; private set; } = "";
 
         internal UiDocumentSource Source { get; }
 
@@ -1440,6 +1528,7 @@ public sealed class UiDocumentService : IDisposable
             GoodVersion = candidate.Version;
             GoodLayout = candidate.Layout;
             GoodStyle = candidate.Style;
+            GoodText = candidate.Text;
         }
     }
 
@@ -1508,14 +1597,17 @@ public sealed class UiDocumentService : IDisposable
     private readonly struct Candidate
     {
         private Candidate(
-            string version, UiLayoutManifest? layout, UiStyleDocument? style, string failure, bool retryable)
+            string version, UiLayoutManifest? layout, UiStyleDocument? style, string failure, bool retryable, string text = "")
         {
             Version = version;
             Layout = layout;
             Style = style;
             Failure = failure;
             Retryable = retryable;
+            Text = text;
         }
+
+        internal string Text { get; }
 
         internal string Version { get; }
 
@@ -1534,14 +1626,14 @@ public sealed class UiDocumentService : IDisposable
         /// </summary>
         internal bool Retryable { get; }
 
-        internal static Candidate LayoutVersion(string version, UiLayoutManifest layout)
+        internal static Candidate LayoutVersion(string version, UiLayoutManifest layout, string text)
         {
-            return new Candidate(version, layout, null, "", retryable: false);
+            return new Candidate(version, layout, null, "", retryable: false, text);
         }
 
-        internal static Candidate StyleVersion(string version, UiStyleDocument style)
+        internal static Candidate StyleVersion(string version, UiStyleDocument style, string text)
         {
-            return new Candidate(version, null, style, "", retryable: false);
+            return new Candidate(version, null, style, "", retryable: false, text);
         }
 
         internal static Candidate Refused(string version, string failure)

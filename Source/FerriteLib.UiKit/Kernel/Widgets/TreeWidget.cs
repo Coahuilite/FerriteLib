@@ -38,7 +38,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// <see cref="UiTreeRow.Expanded"/>: both are the model's answers, re-read every pass.
 /// </para>
 /// </summary>
-internal sealed class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
+internal sealed partial class TreeWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
 {
     internal const string Kind = "container/tree";
 
@@ -213,7 +213,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
 
     private float ReadRowHeight(UiWidgetContext ctx)
     {
-        return Math.Max(1f, AtomVocabulary.ReadFloat(spec, "RowHeight", ctx.Theme.Geometry.RowHeight));
+        return Math.Max(1f, AtomVocabulary.ReadFloat(spec, "RowHeight", UiTextFonts.RowHeight(ctx)));
     }
 
     /// <summary>

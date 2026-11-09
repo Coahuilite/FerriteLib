@@ -1,23 +1,113 @@
 # TODO
 
-## 0.8 RC closeout
+These are product work and acceptance items, not authorization to start them. Select work only under the
+current task and applicable permissions; preserve the separate 1.6/native and 1.7 evidence boundaries.
 
-The HelpRef/output-lifetime and adjacent-name contract is accepted by PM; US has completed actual
-consumption of the fixed 0.8 technical input. That acceptance is not waiting for another approval.
+## 0.8 RC follow-up
 
-- [ ] PM integrates the prepared source on main and publishes v0.8.0-rc1 through the existing Release
-      workflow as a non-latest prerelease; US then consumes the fixed remote Release asset and runs its CI.
-- [ ] Continue UI/UX integration and player-facing acceptance in the next session. Native1.6
-      text/IME/fonts/window/input/scroll/clip/popup/image and native1.7 remain separately unaccepted.
-      Known headless game errors are accepted as non-blocking for this RC transition, not erased.
-      Do not start/install the game automatically.
+- [ ] Complete exact 1.6 native acceptance — CO's SUM-FL08-RW16-CONVERGENCE-20261109 r1 records
+      actual US consumption of the fixed net472 Release/FER_DEV roots and the complete paired candidate.
+      TASK-VC-FL A001 closed the selected existing managed-check gaps on those exact DLLs.
+      A002 supplies a repaired Dev CodeView path carrier; Release is reused unchanged. CO released
+      that identity and US A002 r2 actually compiled/ran against it and completed the accepted pair.
+      Original game/32-pass/report-chain acceptance remains open. The original FL08 R1 finding has no
+      defect before/after; old frozen packages remain unchanged. See
+      [producer and evidence](docs/openspec/implementation.md#fl08-reliability).
+
+- Preserve the delivered Legacy08 workbench and its original page/provider/measurement conditions.
+  The completed 0.9 stage is a separate line, not an open FL08 implementation assignment or accurate
+  1.6 acceptance. Contract/evidence: `docs/specification.md` and `docs/openspec/implementation.md`.
+
+- [ ] Paired consumer adoption of the 2026-11-05 measurement/hover/domain diagnostic candidate was locally
+      accepted; carry its remaining native acceptance with the selected fixed producer, not moving build outputs. Current contract
+      and limits: `docs/development/0.8/ui-diagnostics.md`. The preceding appearance checkpoint is an
+      accepted input; numeric label/editor1.6 and label1.7 native acceptance remain open, and editor1.7
+      uses reported preset fallback.
+
+The accepted US ea610fa/FL833c14f4 internal trial permits RC preparation. FL v0.8.0-rc2 is not yet
+published; rc1 remains the published non-latest asset. Release/upgrade notes and the explicit local
+input versus real cloud sequence are in docs/build-and-debug.md.
+
+- [ ] Finish the 2026-10-29 contract-repair paired consumer receipt and bounded native menu/input pass;
+      current implementation and evidence limits are in docs/openspec/implementation.md.
+- [ ] Under explicit release-task authorization, land the reviewed FL CI/rc2 preparation through PR/main
+      CI and full-history privacy, then resolve real main SHA and publish rc2 through release CI.
+- [ ] Consume the actual published rc2 asset in US by repo/tag/full SHA/asset identity and retain its
+      compiler/runtime receipt. US main integration or publication needs its own authorization;
+      a working-branch baseline task does not include either. Keep the local Dev pair separate.
+- [ ] Keep unrecorded native1.6 details as RC limitations. New1.7 adapter/window capabilities are
+      deferred, not RC blockers. Do not install or start the game automatically.
 
 E/N defaults, L1, finite appearance, S1–S7/R9 grading, two-subsequent-minor protection and platform priority
 are decided, not pending user choices. K1 added library focus/key system is approved for deferral, not
-implemented. Detailed implementation and acceptance states live in `docs/development/0.8/`.
+implemented. Current requirements are reached through `docs/specification.md`; implementation, acceptance limits and open deviations live in `docs/openspec/implementation.md`.
 
 > The action surface only. Settled rulings, done work and the release/round history live in `MEMORY.md`
 > and `OBLIVIONIS.md`; a closed item is a pointer here, not a paragraph.
+
+## Local review coverage
+
+### RW1.6 validation-closure scope
+
+- **Owner / reviewed_at:** TASK-VC-FL / A002, 2026-11-09T13:59:56.0034686+08:00 (Asia/Hong_Kong).
+- **Reviewed-through:** A001's accepted exact-carrier lifecycle/diagnostics/containment/full-reader
+  evidence remains scoped to its original DLLs. A002 reviewed the observed Dev CodeView privacy gap,
+  source parity, the default source/intermediate PathMap repair, isolated actual Dev build, exact-DLL
+  original geometry entry and fresh staging, and selected cleanup/subprocess boundaries. C# and test
+  bodies are unchanged; Release remains the accepted original carrier.
+- **Evidence / continuation:** The implementation map links the repaired producer and before/after
+  artifact inspection. CO receives the new identity; US consumes it only after release. Existing
+  artifact-identity, path-isolation and evidence-boundary rules cover this work; no new lesson.
+  Native/game/32-pass/report acceptance stays open.
+
+### Exact 1.6 producer scope
+
+- **Owner / reviewed_at:** TASK-RW16-FL / A001, 2026-11-09T12:06:53.2836460+08:00 (Asia/Hong_Kong).
+- **Reviewed-through:** Actual dirty production-source parity with the accepted R1 fixed source;
+  isolated net472 Release/FER_DEV builds, exact-carrier existing geometry and affected Dev suites,
+  fresh five-file staging, source/configuration/build handoff, and the implementation/dev-guide entry.
+  Relevant R1 Core/Release evidence was reused with its original identity. No production or test source
+  changed in this scope; the new result is the accurate two-configuration producer delivery.
+- **Evidence / continuation:** The implementation map owns artifact identities and evidence limits.
+  In that producer-only scope, cleanup permissions prevented PageLifecycle/Diagnostics/containment/full
+  Dev-reader execution; no assertion or cleanup was changed. CO release and US actual paired consumption
+  were downstream actions, distinct from the retained native/user gates. The existing delivery,
+  startup-chain and evidence-boundary rules cover this work; no new lesson or historical rerun is due.
+
+### R1 implementation scope
+
+- **Owner / reviewed_at:** TASK-RELIABILITY-FL / A001, 2026-11-09T11:21:43.6650087+08:00 (Asia/Hong_Kong).
+- **Reviewed-through:** This scope's four layout-source edits, ordinary-notification contract clarification,
+  implementation/acceptance entries, fixed dirty-source Release Neutral/RimWorld17/net472 artifacts,
+  Core and seven affected existing suites, and the original Raven caller's launch/write boundaries.
+  Continued through Tools RPT-RELIABILITY-TOOLS-A001 r2 and its exact FL08 loaded-MVID, original
+  Legacy08 provider, full-key typed-inheritance/Disabled readback and normal-close raw records;
+  reviewed the exchange contract and corrected the FL r2 report shape without changing r1.
+  Prior unrelated dirty work and the earlier documentation review below retain their own scope.
+- **Evidence / continuation:** Builds/existing managed checks remain valid without rerun; the CO-approved
+  exact-carrier Legacy08 Native17 caller completed. CO/PM acceptance is pending. Two initially mistyped suite names were invocation failures,
+  not product failures; the actual affected suites subsequently passed. Existing instrument-input and
+  evidence-boundary and machine-contract rules cover the corrections; no new lesson. Original 1.6/native
+  obligations remain open; the Native17 caller does not supply an FL08 defect before/after.
+
+### Prior documentation scope
+
+- **Owner:** FL documentation owner, TASK-PRE-FL-20261108 / A001, for this FL08 scope only.
+- **reviewed_at:** 2026-11-08T06:02:48.3197014+08:00 (Asia/Hong_Kong; actual clock read, static retrospective).
+- **reviewed-through:** No earlier local reviewed-through checkpoint or active LESSONS file was found.
+  From the authorized 2026-11-07–08 baseline, reviewed the actual privacy-policy doc/script diff
+  (read-only, not executed), Legacy08 capability/preview constructors and committed-layout clamp path,
+  relevant historical Evidence lessons/Enduring corrections, supplied shared lessons, and this task's
+  protocol/specification/implementation/usage edits and static-check corrections. No new FL08 stage
+  implementation or runtime result was found; FL09 producer/consumer reports are context, not FL08 evidence.
+- **Lesson decision / Seen:** No distinct new local lesson. The shared delivery/current-ledger lesson
+  already owns the source/package drift; existing local boundary and evidence rules cover this review.
+  Historical Knowledge dates are not reconstructed as Seen. No active local three-date promotion is
+  due; supplied shared Seen dates remain unchanged. No LESSONS file is needed solely for this checkpoint.
+- **Limits / continuation:** Earlier unrelated history was not reviewed. Coverage is not repair or
+  acceptance. Original native/RC responsibilities above remain with their owners. This document-only
+  closeout returns to the responsible caller for receipt and PM/user acceptance; no product run or
+  frozen package refresh is authorized here.
 
 ## Retained 0.7 checkpoint objective and execution order
 

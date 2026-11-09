@@ -90,7 +90,8 @@ public sealed partial class UiControls
     internal void TakePopupWheelIfCovering(UiSession owner)
     {
         float notches = PointerWheelNotches();
-        if (notches == 0 || owner.OpenPopupId == null || !owner.OpenPopupCoversPointer(Input.Pointer))
+        if (!owner.PointerInputAllowed || !owner.IsInputGeometryReliable || notches == 0
+            || owner.OpenPopupId == null || !owner.OpenPopupCoversPointer(Input.Pointer))
             return;
         int rows = (int)Math.Round(notches * UiPopup.WheelRowsPerNotch, MidpointRounding.AwayFromZero);
         owner.ScrollPopupByRows(rows == 0 ? (notches > 0 ? 1 : -1) : rows);
@@ -123,7 +124,7 @@ public sealed partial class UiControls
     public bool IsMouseUpOver(UiLayoutRect rect) => IsPointerUp() && IsMouseOver(rect);
     public bool IsMouseOver(UiLayoutRect rect) => Input.Phase!=UiFramePhase.None && Input.InputAllowed && rect.Contains(PointerPosition());
     internal bool IsWindowMouseOver(UiLayoutRect rect) => Input.Phase!=UiFramePhase.None && Input.InputAllowed && rect.Contains(Input.Pointer);
-    public bool IsMouseOver(UiLayoutRect rect, UiWidgetContext ctx) => !session.IsPointerOverHigherLayer(ctx.Node, WindowPointer(ctx)) && IsMouseOver(rect);
+    public bool IsMouseOver(UiLayoutRect rect, UiWidgetContext ctx) => session.IsPointInEffectiveClip(WindowPointer(ctx)) && !session.IsPointerOverHigherLayer(ctx.Node, WindowPointer(ctx)) && IsMouseOver(rect);
     public bool IsEnterPressed() => Input.Phase == UiFramePhase.KeyDown && (Input.Key == UiKey.Return || Input.Key == UiKey.KeypadEnter);
     public bool IsLayoutEvent() => Input.Phase == UiFramePhase.Layout;
     internal bool IsFocusLost(UiLayoutRect rect, UiSession owner) => owner.PassBeganWithPrimaryPress && !IsMouseOver(rect);

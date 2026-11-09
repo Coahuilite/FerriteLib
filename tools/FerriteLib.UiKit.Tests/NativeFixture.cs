@@ -31,7 +31,9 @@ internal static class NativeFixture
     }
     private sealed class Owner
     {
-        internal VerseUiExecution Execution=new();
+        internal VerseUiExecution Execution;
+        internal IUiExecution Port;
+        internal Owner(VerseUiExecution execution,IUiExecution port){Execution=execution;Port=port;}
         internal UiNode? Node;
         internal Event? NativeEvent;
         internal UiFrame? Frame;
@@ -71,21 +73,24 @@ internal static class NativeFixture
     }
     internal static UiControlState Slot(UiSession session,UiNodeId node,string key)=>session.GetControlState(node,key);
     internal static float Number(UiControlState state)=>float.Parse(state.Draft,System.Globalization.CultureInfo.InvariantCulture);
-    private static VerseUiExecution? ExistingExecution(UiSession session)
+    private static IUiExecution? ExistingExecution(UiSession session)
     {
         IUiExecution execution;
         try { execution=session.Execution; }
         catch(InvalidOperationException) { return null; }
-        return execution as VerseUiExecution??throw new InvalidOperationException("Native fixture cannot replace an explicitly supplied non-native execution owner.");
+        NativeOwner(execution);
+        return execution;
     }
+    private static VerseUiExecution NativeOwner(IUiExecution execution)=>execution is VerseTextExecution composed?composed.Owner:
+        execution as VerseUiExecution??throw new InvalidOperationException("Native fixture cannot replace an explicitly supplied non-native execution owner.");
     private static Owner Of(UiSession session)=>owners.GetValue(session,s=>
     {
-        VerseUiExecution? execution=ExistingExecution(s);
-        return execution==null?new Owner():new Owner {Execution=execution};
+        IUiExecution execution=ExistingExecution(s)??new VerseUiExecution();
+        return new Owner(NativeOwner(execution),execution);
     });
     // Only the test boundary that just captured an external frame can attest it belongs to Event.current.
     internal static void AttachCurrentFrame(UiSession session)
-    {Owner owner=Of(session);owner.Execution=ExistingExecution(session)??throw new InvalidOperationException("No externally captured frame to attach.");owner.Frame=session.Input;owner.NativeEvent=Event.current;}
+    {Owner owner=Of(session);owner.Port=ExistingExecution(session)??throw new InvalidOperationException("No externally captured frame to attach.");owner.Execution=NativeOwner(owner.Port);owner.Frame=session.Input;owner.NativeEvent=Event.current;}
     internal static UiWidgetContext Context(string source,UiSession session,ITextMetrics metrics,UiTheme theme,IUiTranslation translation,IUiBindingAccess bindings,float viewWidth,string elementPath,UiLayoutPoint windowOrigin=default,UiNodeId elementId=default,UiNode? node=null,IReadOnlyList<UiStyleDeclaration>? styleChain=null)
     {
         Owner owner=Of(session);
@@ -115,23 +120,24 @@ internal static class NativeFixture
         // never swap its execution for a fixture port or restart its native control allocation.
         if(owner.Frame!=null&&!ReferenceEquals(session.Input,owner.Frame))
         {
-            owner.Execution=ExistingExecution(session)??throw new InvalidOperationException("Lost native execution owner.");
+            owner.Port=ExistingExecution(session)??throw new InvalidOperationException("Lost native execution owner.");
+            owner.Execution=NativeOwner(owner.Port);
             owner.Frame=session.Input;owner.NativeEvent=current;
         }
         if(owner.Frame==null||!ReferenceEquals(current,owner.NativeEvent))
         {
             owner.NativeEvent=current;
             owner.Frame=owner.Execution.CaptureFrame(inputAllowed??session.PointerInputAllowed);
-            session.SetFrame(owner.Frame,owner.Execution);
+            session.SetFrame(owner.Frame,owner.Port);
         }
         // A native control outside this adapter can consume after capture. Preserve the captured
         // raw phase and owner while synchronizing this one-way transition into the SAME frame.
         if(current?.type==EventType.Used)owner.Frame.Consume();
         session.Controls.Trace=Trace;
     }
-    internal static void DrawFrame(UiHost host,UiLayoutRect viewport){Prepare(host.Session);host.DrawFrame(viewport,host.Session.Input,Of(host.Session).Execution);}
+    internal static void DrawFrame(UiHost host,UiLayoutRect viewport){Prepare(host.Session);host.DrawFrame(viewport,host.Session.Input,Of(host.Session).Port);}
     internal static void DrawFrame(UiHost host,Rect viewport)=>DrawFrame(host,VerseUiExecution.Rect(viewport));
-    internal static void DrawFrame(UiHost host,Rect viewport,Window owner){Prepare(host.Session,!owner.IsOpen||Find.WindowStack.GetsInput(owner));host.DrawFrame(VerseUiExecution.Rect(viewport),host.Session.Input,Of(host.Session).Execution);}
+    internal static void DrawFrame(UiHost host,Rect viewport,Window owner){Prepare(host.Session,!owner.IsOpen||Find.WindowStack.GetsInput(owner));host.DrawFrame(VerseUiExecution.Rect(viewport),host.Session.Input,Of(host.Session).Port);}
     internal static void Draw(UiHost host,UiLayoutRect viewport,UiLayoutSnapshot snapshot){Prepare(host.Session);host.Draw(viewport,snapshot);}
     internal static void Draw(IUiWidget widget,UiLayoutRect rect,UiWidgetContext ctx){Prepare(ctx.Session);widget.Draw(rect,ctx);}
     internal static UiEditSession<T> Editor<T>(UiWidgetContext ctx,string binding,Func<T,string> format,UiEditParser<T> parse)=>ctx.Controls.Editor(ctx,binding,format,parse);

@@ -24,7 +24,7 @@ internal static class KernelLayoutReuseTests
     { UiLayoutRect r = Node(host, id).Rect!.Value; return new UiLayoutPoint(View.X + r.X + r.Width / 2, View.Y + r.Y + r.Height / 2); }
     private static string Lines(int count) => string.Join("\n", Enumerable.Repeat("x", count));
     private static void Trace(string name, params UiNode[] nodes)
-    { foreach (UiNode node in nodes) Console.WriteLine("RU2-TRACE " + name + " node=" + node.Path + " scope=" + node.UpdateScopeRoot.Path + " measure=" + node.LayoutMeasureCount + " arrange=" + node.LayoutArrangeCount + " rect=" + R(node.Rect) + " content=" + R(node.ContentRect) + " shared=" + node.SharedLabelWidth); }
+    { if (nodes.Length > 0) Console.WriteLine("RU2-PIPELINE " + name + " " + nodes[0].Owner.LayoutWork); foreach (UiNode node in nodes) Console.WriteLine("RU2-TRACE " + name + " node=" + node.Path + " scope=" + node.UpdateScopeRoot.Path + " measure=" + node.LayoutMeasureCount + " arrange=" + node.LayoutArrangeCount + " rect=" + R(node.Rect) + " content=" + R(node.ContentRect) + " shared=" + node.SharedLabelWidth); }
     private static string R(UiLayoutRect? r) => r.HasValue ? $"({r.Value.X},{r.Value.Y},{r.Value.Width},{r.Value.Height})" : "none";
     internal static int RunAll()
     {
@@ -107,6 +107,7 @@ internal static class KernelLayoutReuseTests
         metrics.Available = false; Arrange(host, 40); Check(text.LayoutMeasureCount == t + 1, "revoking the optional environment removes its previously granted text-measure reuse");
         var oldMetrics = new LegacyMetrics(); using var old = Host("<Widget Id=\"old\" Kind=\"text/wrapped\" Text=\"legacy\"/>", new UiBindings(), oldMetrics);
         Arrange(old); int calls = oldMetrics.Calls; Arrange(old); Check(oldMetrics.Calls == calls, "old two-member ITextMetrics still compiles and retains its original unchanged-snapshot condition");
+        Trace("legacy-metrics-idle", Node(old, "old"));
         old.Session.BumpContentRevision(); Arrange(old); Check(oldMetrics.Calls > calls, "unknown metrics are revalidated at the old legal synchronization point, not silently granted environment purity");
         Trace("environment", text, fixedBand);
     }
@@ -247,6 +248,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("ru2", "legacy", () => new Legacy
         visible = false; width = 100; natural = 90; Arrange(host);
         Check(Node(host, "conditional").Rect!.Value.Width == 80 && Node(host, "auto").Rect!.Value.Width == 70 && visibleReads == vr && widthReads == wr && naturalReads == nr,
             "idle stage validation does not poll ordinary visibility/width getters or the old custom natural-width callback without their original synchronization");
+        Trace("legacy-layout-idle", Node(host, "root"), Node(host, "conditional"), Node(host, "auto"));
         bindings.NotifyChanged("visible", "width"); Arrange(host); Check(Node(host, "conditional").Rect == null && Node(host, "auto").Rect!.Value.Width == 90,
             "ordinary notified structure and the original legal full-sync custom width update still reach current geometry");
         visible = true; bindings.NotifyChanged("visible"); Arrange(host);
@@ -270,6 +272,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition("ru2", "legacy", () => new Legacy
             using var host = Host("<" + kind + " Id=\"group\" UpdateScope=\"true\" Padding=\"0\" Gap=\"0\"><Widget Id=\"leaf\" Kind=\"text/wrapped\" Text=\"same\"/></" + kind + ">", new UiBindings());
             Arrange(host); UiNode leaf = Node(host, "leaf"), group = Node(host, "group"); int m = leaf.LayoutMeasureCount, a = group.LayoutArrangeCount;
             Arrange(host); Check(leaf.LayoutMeasureCount == m && group.LayoutArrangeCount == a && leaf.UpdateScopeRoot.Equals(group.Id), "inventory actual scoped stage reuse " + kind);
+            Trace("idle-" + kind, group, leaf);
         }
     }
     private sealed class Custom : IUiWidget, IUiMeasureParticipant

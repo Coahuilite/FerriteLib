@@ -199,6 +199,7 @@ public sealed class UiDiagnosticSubscription : IDisposable
     private int count;
     private long sequence;
     private bool active = true;
+    internal bool ToolsAttached;
 
     internal UiDiagnosticSubscription(string host, int sessionId, int budget)
     {
@@ -244,7 +245,7 @@ public sealed class UiDiagnosticSubscription : IDisposable
     /// <summary>Frames folded into one timing event. One aggregate per window, never a per-frame line.</summary>
     public int TimingSampleFrames { get; set; } = 60;
 
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
     private UiDevGeometryCapture? geometry;
 
     // SA1.5: the outline switch lives on the SUBSCRIPTION, not inside the capture. A capture owns stored
@@ -277,7 +278,7 @@ public sealed class UiDiagnosticSubscription : IDisposable
     {
         get
         {
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
             return geometry != null;
 #else
             return false;
@@ -285,7 +286,10 @@ public sealed class UiDiagnosticSubscription : IDisposable
         }
         set
         {
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
+#if FER_TOOLS && !FER_DEV
+            if (value && !ToolsAttached) throw new InvalidOperationException("Connect version-compatible Tools to this Host before enabling the normal carrier's geometry instrument.");
+#endif
             geometry = value ? geometry ?? new UiDevGeometryCapture() : null;
 #else
             throw new InvalidOperationException(
@@ -318,7 +322,7 @@ public sealed class UiDiagnosticSubscription : IDisposable
     {
         get
         {
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
             return geometryOverlay;
 #else
             return false;
@@ -326,7 +330,10 @@ public sealed class UiDiagnosticSubscription : IDisposable
         }
         set
         {
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
+#if FER_TOOLS && !FER_DEV
+            if (value && !ToolsAttached) throw new InvalidOperationException("Connect version-compatible Tools to this Host before enabling its geometry overlay.");
+#endif
             geometryOverlay = value;
 #else
             throw new InvalidOperationException(
@@ -343,7 +350,7 @@ public sealed class UiDiagnosticSubscription : IDisposable
     /// </summary>
     public string DumpGeometry()
     {
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
         return geometry == null ? "" : geometry.Dump(Host, SessionId);
 #else
         return "";
@@ -369,7 +376,7 @@ public sealed class UiDiagnosticSubscription : IDisposable
     /// </summary>
     public bool TryGetGeometrySnapshot(out UiDevGeometrySnapshot? snapshot)
     {
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
         UiDevGeometryCapture? capture = geometry;
         if (capture == null || capture.Pass < 0)
         {
@@ -385,7 +392,7 @@ public sealed class UiDiagnosticSubscription : IDisposable
 #endif
     }
 
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
     /// <summary>The capture this subscription carries, or null. Read by the instrument's own chokepoints.</summary>
     internal UiDevGeometryCapture? Geometry => geometry;
 #endif
@@ -457,7 +464,7 @@ public sealed class UiDiagnosticSubscription : IDisposable
         Dropped = 0;
         Suppressed = 0;
         Published = 0;
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
         geometry?.Clear();
 #endif
     }
@@ -482,7 +489,7 @@ public sealed class UiDiagnosticSubscription : IDisposable
         seen.Clear();
         start = 0;
         count = 0;
-#if FER_DEV
+#if FER_DEV || FER_TOOLS
         geometry = null;
 #endif
     }
@@ -522,13 +529,13 @@ public sealed class UiDiagnosticSubscription : IDisposable
             elementPath, "", kind, reason, null, null, null, null));
     }
 
-    internal void PublishTiming(string name, int samples, double totalMilliseconds, double maxMilliseconds)
+    internal void PublishTiming(string name, int samples, double totalMilliseconds, double maxMilliseconds, string work = "")
     {
         if (!active) return;
         var timing = new UiDiagnosticTiming(name, samples, totalMilliseconds, maxMilliseconds);
         Append(new UiDiagnosticEvent(
             UiDiagnosticKind.Timing, "timing", "", sequence + 1, Host, SessionId, UiNodeId.None, "",
-            "", "", "", null, null, null, timing));
+            "", "", work, null, null, null, timing));
     }
 
     private void Append(UiDiagnosticEvent value)
@@ -599,13 +606,21 @@ public static class UiDiagnosticHub
 
     // The subscription of the draw/measure scope currently open, restored by every scope. It is the one
     // ambient static here and it never outlives the call that opened it.
-    private static UiDiagnosticSubscription? active;
+    private static UiDiagnosticRoute active;
 
     // The ruler of the host whose scope is open. It belongs to the same scope as the subscription above,
     // and while a subscription is live UiFitAudit.Check measures with this one and never with the
     // process-wide legacy ruler - which is what stops one host's ruler from deciding another host's
     // overflow verdict.
-    private static ITextMetrics? activeMetrics;
+    // The same existing dynamic route now also carries optional domain output. No lasting logger index.
+    internal readonly struct UiDiagnosticRoute
+    {
+        internal UiDiagnosticRoute(UiDiagnosticSubscription? subscription, ITextMetrics? metrics, UiSession? session)
+        { Subscription=subscription; Metrics=metrics; Session=session; }
+        internal UiDiagnosticSubscription? Subscription { get; }
+        internal ITextMetrics? Metrics { get; }
+        internal UiSession? Session { get; }
+    }
 
     /// <summary>Live subscriptions. It drops back to zero when every host/session is disposed.</summary>
     public static int SubscriptionCount => BySession.Count;
@@ -619,6 +634,7 @@ public static class UiDiagnosticHub
     public static UiDiagnosticSubscription Subscribe(UiHost host, int budget = DefaultBudget)
     {
         if (host == null) throw new ArgumentNullException(nameof(host));
+        host.NoteDiagnosticsBorrowed();
 
         UiDiagnosticSubscription? existing = host.CurrentDiagnostics;
         if (existing != null && existing.IsActive) return existing;
@@ -674,22 +690,23 @@ public static class UiDiagnosticHub
             BySession.Remove(subscription.SessionId);
         }
 
-        if (ReferenceEquals(active, subscription))
+        if (ReferenceEquals(active.Subscription, subscription))
         {
-            active = null;
-            activeMetrics = null;
+            active = new UiDiagnosticRoute(null, null, active.Session);
         }
     }
 
     /// <summary>The subscription of the arrange/draw scope currently open, or null.</summary>
-    internal static UiDiagnosticSubscription? ActiveSubscription => active;
+    internal static UiDiagnosticSubscription? ActiveSubscription => active.Subscription;
+    internal static UiSession? ActiveSession => active.Session;
+    internal static IUiDiagnosticOutput? ActiveOutput => active.Session?.DiagnosticOutput;
 
     /// <summary>
     /// The ruler of the host whose scope is open, or null outside any scope. Only meaningful together with
     /// <see cref="ActiveSubscription"/>: the two are set and restored as one scope, so a live subscription
     /// always carries the ruler of the host it belongs to.
     /// </summary>
-    internal static ITextMetrics? ActiveMetrics => activeMetrics;
+    internal static ITextMetrics? ActiveMetrics => active.Metrics;
 
     /// <summary>
     /// Releases the subscription of a session being disposed. This is the lifetime half of the contract:
@@ -704,10 +721,9 @@ public static class UiDiagnosticHub
         }
 
         BySession.Remove(session.Identity);
-        if (ReferenceEquals(active, subscription))
+        if (ReferenceEquals(active.Subscription, subscription))
         {
-            active = null;
-            activeMetrics = null;
+            active = new UiDiagnosticRoute(null, null, active.Session);
         }
 
         subscription.Deactivate();
@@ -721,12 +737,11 @@ public static class UiDiagnosticHub
     /// <paramref name="textMetrics"/> with a live subscription means the host cannot be measured at all,
     /// which is the truthful answer rather than measuring it with somebody else's ruler.
     /// </summary>
-    internal static UiDiagnosticScope EnterHost(UiDiagnosticSubscription? subscription, ITextMetrics? textMetrics)
+    internal static UiDiagnosticScope EnterHost(UiDiagnosticSubscription? subscription, ITextMetrics? textMetrics, UiSession? session = null)
     {
-        var scope = new UiDiagnosticScope(active, activeMetrics);
+        var scope = new UiDiagnosticScope(active);
         bool live = subscription != null && subscription.IsActive;
-        active = live ? subscription : null;
-        activeMetrics = live ? textMetrics : null;
+        active = new UiDiagnosticRoute(live ? subscription : null, textMetrics, session);
         return scope;
     }
 
@@ -748,20 +763,17 @@ public static class UiDiagnosticHub
     /// </summary>
     internal readonly struct UiDiagnosticScope : IDisposable
     {
-        private readonly UiDiagnosticSubscription? previous;
-        private readonly ITextMetrics? previousMetrics;
+        private readonly UiDiagnosticRoute previous;
 
-        internal UiDiagnosticScope(UiDiagnosticSubscription? previous, ITextMetrics? previousMetrics)
+        internal UiDiagnosticScope(UiDiagnosticRoute previous)
         {
             this.previous = previous;
-            this.previousMetrics = previousMetrics;
         }
 
         /// <summary>Puts the ambient subscription and ruler back to what they were before the scope opened.</summary>
         public void Dispose()
         {
             active = previous;
-            activeMetrics = previousMetrics;
         }
     }
 }

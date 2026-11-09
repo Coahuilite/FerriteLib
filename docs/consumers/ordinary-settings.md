@@ -3,7 +3,7 @@
 Audience: an author wiring a plain settings group (labeled values, a dropdown, a conditional section,
 explanatory text) into a consumer mod. Nothing here needs a custom widget, a VM base class, a builder DSL,
 or a new library type. This guide describes the current 0.8 recipe; see the
-[breaking migration](consume-from-0.8.0-dev.md) when adopting it. The runnable, compile-checked source
+[0.8 consumer guide](consume-from-0.8.0-dev.md) for package and author paths. The runnable, compile-checked source
 is the harness file
 
 `tools/FerriteLib.UiKit.Tests/KernelOrdinarySettingsRecipeTests.cs`
@@ -27,7 +27,7 @@ uses it.)
 
 ## Notification: the model announces, `Set` does not
 
-`UiBindings.Set` **stores a value; it does not notify.** The page's write path and every non-UI write path
+`UiBindings.Set` **requests the model owner's write; it does not imply acceptance or notify.** The page's write path and every non-UI write path
 call the *same* mutation method on the model, and that method calls
 `bindings.NotifyChanged(key)`. That is the whole basic recipe — one place announces, and it is reached from
 both directions:
@@ -54,12 +54,15 @@ three classes in one file.
 
 ## Show/hide, narrow layout, scrolling
 
+Choose the outer window size and the available logical page space using the
+[RimWorld window guide](rimworld-window-layout.md), including the game's UI-scale restrictions.
+
 A conditional group is a container with `VisibleBind="show-advanced"` bound to a `bool` — toggling it does
 not reopen the page. Narrow behavior is the containers' own vocabulary, not a second framework:
 `Breakpoint` + `Narrow="Column"` flips a `Row` to a stack, `NarrowHidden` drops children in the narrow
 state, and a `Scroll` around the column gives overflowing content a viewport instead of a cut-off. Grid
-flow across states is a `Wrap` with `Cols`/`NarrowCols` — from 0.7 those two attributes are refused on any
-other container, because there they never did anything (see the 0.7 contract note).
+flow across states is a `Wrap` with `Cols`/`NarrowCols` — those two attributes are refused on any
+other container; use them only on Wrap.
 
 ## Who owns cleanup
 
@@ -80,7 +83,7 @@ nothing in this guide assumes it.
 
 ## What this recipe is not
 
-It is not a Form framework and there is no plan for one: the page model composes these atoms and you own
-your information architecture, navigation, and workflows. If you find a settings-shaped thing you cannot
-express with the atoms, bindings, containers and the host above, that is a bug report against FL — see
-`consume-from-0.8.0-dev.md` §last for where to file it.
+It is not a Form framework: the page model composes the existing capabilities and you own information
+architecture, navigation and workflows. If they cannot express a real shared requirement, describe the
+missing outcome and existing call path; the [public author policy](../openspec/specs/policies/public-authoring/spec.md)
+provides the route for a new cohesive capability without inventing a separate form system.

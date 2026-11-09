@@ -4,8 +4,8 @@
 历史和既有产物检查**，没有运行构建、测试、打包、变异或游戏。2026-10-18 整理时，将重复的当前 API 清单、
 迁移表和执行步骤收回各自正式入口，保留此处独有的比较范围与产物观察。
 
-现在接入库请读 [0.7 消费指南](consumers/consume-from-0.7.0.md)；当前源码地图见
-[architecture.md](architecture.md)，后续设计见 [0.8 首版规格](development/0.8/README.md)。
+现在接入库请读 [0.8 消费指南](consumers/consume-from-0.8.0-dev.md)；当前源码地图见
+[architecture.md](architecture.md)，当前要求见 [0.8 现行规格](specification.md)。
 
 ## 1. 当时比较的是什么
 

@@ -4,6 +4,22 @@ using System.Collections.Generic;
 namespace FerriteLib.UiKit.Kernel;
 internal static class UiChoiceSource
 {
+    internal static IReadOnlyList<UiChoice<object?>> Prefix(IUiBindingAccess reader, UiElementSpec spec, IUiTranslation translation, int maximum, out int count)
+    {
+        var result = new List<UiChoice<object?>>();
+        if (spec.Choices.Count == 0)
+        {
+            IReadOnlyList<UiChoice<object?>> source = reader.Choices(ChoiceKey(spec)).Prefix(maximum, out count);
+            foreach (var choice in source) result.Add(new UiChoice<object?>(Label(choice, translation), choice.Value, choice.HelpRef));
+        }
+        else
+        {
+            count = spec.Choices.Count;
+            for (int i = 0; i < Math.Min(count, maximum); i++)
+            { var choice = spec.Choices[i]; result.Add(new UiChoice<object?>(Label(choice, translation), choice.Value, choice.HelpRef)); }
+        }
+        return result.AsReadOnly();
+    }
     internal static string Label<T>(UiChoice<T> choice,IUiTranslation translation)=>choice.TextKey.Length==0?choice.Text:translation.Translate(choice.TextKey);
     internal static string ValueKey(UiElementSpec spec) => spec.TryGetAttribute("Bind", out string key) && key.Length > 0 ? key : spec.Id;
     internal static string ChoiceKey(UiElementSpec spec) => spec.TryGetAttribute("OptionsBind", out string key) && key.Length > 0 ? key : ValueKey(spec);

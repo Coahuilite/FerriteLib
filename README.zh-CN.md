@@ -1,69 +1,121 @@
 # FerriteLib
 
-[English](./README.md) | [**中文**](./README.zh-CN.md)
+[English](./README.md) | **中文**
 
-RimWorld 1.6 的**无内容前置模组**。FerriteLib 只携带一个程序集——`FerriteLib.UiKit.dll`——供 Coahuilite
-模组编译与运行时绑定。它不添加任何 Def、补丁、语言、贴图：单独启用它对游戏零影响。如果你的模组列表里
-出现了它而没有任何依赖它的模组，说明消费者已被卸载或禁用；只有在没有已启用模组依赖它时，才可以禁用本模组。
+FerriteLib 是 RimWorld 的**无内容前置模组**，只携带一个程序集 `FerriteLib.UiKit.dll`：一套给模组作者用的界面工具包。
+它不添加任何 Def、补丁、语言或贴图，单独启用不会改变游戏。
 
-**开发线：0.8.0 Release Candidate 准备。** 见[活动规格](docs/development/0.8/README.md)、[完整迁移状态](docs/development/0.8/migration-status.md)与[候选消费指南](docs/consumers/consume-from-0.8.0-dev.md)。完整 retained 核心已同源脱离引擎，1.6 显式执行与完整能力库存已接通；见[发布前作者迁移](docs/development/0.8/refactor-migration.md)。US 固定源码接入已接受，发布 RC 资产消费是下一步。原生1.6／UIUX验收与1.7编译／原生适配器仍未完成。已知 headless 游戏错误被接受为本轮 RC 过渡的非阻断项，不代表游戏零错误。
+## 当前状态
 
-## 库提供什么
+| 项目 | 状态 |
+| --- | --- |
+| 版本 | 0.8.0，API 区间 `[0.8.0, 0.9.0)` |
+| 已发布 | [v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1)（GitHub 预发布，非 latest） |
+| 准备中 | v0.8.0-rc2，本地准备，尚未发布；见[发布说明](docs/release-notes/v0.8.0-rc2.md) |
+| RimWorld 1.6 | 主要目标 |
+| RimWorld 1.7 | 基础兼容候选：复用 1.6 载荷，尚未经实机验收；没有独立的 1.7 adapter |
 
-两层，刻意分离：
+逐项证据与已知偏差不写在 README，见[实现与开放偏差](docs/openspec/implementation.md)。
 
-1. **声明式页面引擎**——XML 清单、受约束布局、类型化绑定、按窗口会话、控件注册表、创建期契约校验、
-   逐控件失败恢复，以及一个自带 chrome（背景、标题、关闭按钮）的窗口外壳，让消费者无需跳出树就能开页。
-   消费者代码只写业务逻辑与绑定，结构活在 XML 里。
-2. **视觉核心**——主题令牌、绘制助手、文本测量、文本适配审计与版本契约。**不采用页面模型也能单独使用。**
+## 给玩家
 
-两条边界都是门禁，不是口头约定：视觉核心文件不得提及任何页面模型类型；对游戏即时模式界面的每次调用
-都必须落在实际指定的平台适配文件之内。树外的原生 IMGUI 并非被禁止，而是不被支持、也不被度量——它对 harness、
-适配审计与会话恢复三者同时不可见，这正是使用页面树的理由。
+- 只有装了依赖它的模组（例如 Universal Squeaker）时才需要它，并排在这些模组之前。
+- **只装一份。**不要把 `FerriteLib.UiKit.dll` 复制进其他模组目录：两份副本会按加载顺序抢同一个程序集名，输的一方无法察觉。
+- 列表里有它、却没有任何已启用模组依赖它时，可以安全禁用。
 
-## 依赖要求
+## 它是怎么工作的
 
-- RimWorld 1.6
-- 消费者需同时启用本模组与其自身模组；缺本模组时游戏会给出警告。**不要**把 `FerriteLib.UiKit.dll`
-  复制进其他模组的目录——同一程序集只允许一个载体：两份副本会经由游戏唯一的全局 `AssemblyResolve`
-  按加载序绑定，落败的一方毫无察觉。
+一句话：**一套不依赖游戏的界面核心（Kernel），加一层 RimWorld 适配（Adapter），打包在同一个 DLL 里。**
+核心保存界面结构、局部状态和几何；画字、输入、窗口仍交给游戏原生系统执行；
+业务数据、保存以及“这个请求是否被接受”始终归使用它的模组。
+
+### 主线：五个角色
+
+```text
+作者的模组 ─── 业务模型（值、资格、保存）
+   │  经绑定读取值、发出请求
+   ▼
+UiHost ──────── 一个页面的组合入口：采用定义、同步展示、驱动布局与绘制、关闭
+   ├─ UiSession / UiNode ── 局部界面状态：节点身份、草稿、焦点、弹层、滚动
+   ├─ UiBindings ────────── 连接作者模型：读值、写请求、命令；响应式可选
+   ├─ LayoutEngine ──────── 测量与排列、增量复用、几何结果
+   └─ Widgets / Controls ── 默认控件：先处理合格输入，再绘制
+          │
+          ▼  中立端口：IUiExecution / IUiDrawing / ITextMetrics
+RimWorld16 Adapter ── 真实事件、窗口、字体度量、原生编辑与 IME、绘制
+```
+
+| 角色 | 拥有 | 不拥有 |
+| --- | --- | --- |
+| UiHost | 页面定义、布局引擎、展示连接、关闭 | 业务模型 |
+| UiSession / UiNode | 节点身份、草稿、交互、弹层、滚动、帮助状态 | 游戏对象寿命、配置保存 |
+| UiBindings | 读值和发出写请求的通道 | 写入是否被业务接受 |
+| LayoutEngine | 尺寸、位置、裁剪、命中几何 | 应用自己的断点政策（如窄屏切单栏） |
+| Adapter | 原生事件、窗口、字体、IME、纹理引用 | 中立核心逻辑 |
+
+### 一帧里发生了什么
+
+1. 原生窗口回调触发，adapter 捕获本次事件，形成 `UiFrame`。
+2. `UiHost.DrawFrame`：同步展示数据 → 测量与排列 → 按当前布局逐个控件处理输入并绘制。
+3. 控件确认一次合格操作后，经绑定向作者模型发出请求；正常返回或抛错都如实保留，不自动重试。
+
+两个常见误读：名为 Draw 的调用里也会处理输入；`DrawFrame` 是同步调用，不是游戏 tick 或动画时钟，同一显示帧可能被调用多次。
+
+### 不必整套采用
+
+| 你需要 | 用哪部分 |
+| --- | --- |
+| 完整的设置页或窗口 | XML 或 C# 定义 ＋ 绑定 ＋ `UiHost`；`UiPageWindow` 提供窗口外壳 |
+| 嵌入自己的原生窗口 | 自己的宿主 ＋ `UiHost.DrawFrame` |
+| 单个控件 | `UiSession.CreateContext` ＋ Controls |
+| 只要交互语义 | `UiInteractionSession` 等中立状态 |
+| 只要视觉 | `UiThemeDraw` ＋ `IUiDrawing` ＋ `ITextMetrics` |
+
+### 源码地图
+
+| 位置 | 内容 |
+| --- | --- |
+| `Source/FerriteLib.UiKit/Kernel/` | 整个中立核心，不引用游戏：定义与编译、绑定、Host／Session／Node、布局、外观、诊断与恢复 |
+| `Kernel/Neutral/` | 最底层的纯逻辑：布局数学、交互与编辑状态机、响应式运行时、调色板 |
+| `Kernel/Widgets/` | 默认控件：Button、Checkbox、Dropdown、Slider、TextField、WrappedText 等 |
+| `Adapters/RimWorld16/` | 唯一的原生适配：窗口宿主、`VerseUiExecution`、字体度量、时钟与主线程 |
+| `NeutralSources.props` | 把整个 Kernel 同时编进运行时 DLL 和无平台合同测试 |
+| `tools/` | 核心与 adapter 合同测试、作者示例 |
+
+更细的说明见[架构](docs/architecture.md)和[现行规格](docs/specification.md)中的组合图。
+
+## 给模组作者
+
+- **在自己的启动代码里断言版本区间：**`FerriteLibVersion.Require(min, max, packageId, out report)`。RimWorld 的 `modDependencies` 无法表达版本；它会枚举已加载载体、报告冲突，并给出可读的失败信息。
+- 针对 GitHub Release 资产中的 DLL 编译（发布页给出 ZIP 的 SHA-256），目标 `net472`。不要随你的模组复制这个 DLL。
+- 只有 [API 分层](docs/api-tiers.md)中标为 **stable** 的类型在你编译时的 `[min, max)` 区间内保持签名；**public-unstable** 类型每个 minor 都需要重新编译。发布后破坏 stable 合同须升 major，弃用后至少保留两个后续已发布 minor。
+- 起步顺序：[普通设置页配方](docs/consumers/ordinary-settings.md) → [公开作者路径 S1–S7](docs/openspec/specs/policies/public-authoring/spec.md) → [窗口布局指南](docs/consumers/rimworld-window-layout.md) → [0.8 消费指南](docs/consumers/consume-from-0.8.0-dev.md)。
+- 欢迎第三方使用。当你被迫手写了本该由库提供的东西，请附上你自己可运行代码的引用开 issue；缺陷报告随时欢迎。
+
+## 给贡献者
+
+```powershell
+pwsh -NoProfile -File scripts/verify-local.ps1                  # 门禁套件：测试、双配置构建、载荷、无内容、许可、身份
+pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev         # 另外暂存 dist/dev/FerriteLib（不产生归档）
+pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory    # 完整历史隐私门禁，任何 push 之前执行
+```
+
+| 文档 | 用途 |
+| --- | --- |
+| [docs/specification.md](docs/specification.md) | 现行规格入口，行为保证的唯一权威 |
+| [docs/openspec/specs/](docs/openspec/specs/) | 按能力拆分的规格正文 |
+| [docs/openspec/implementation.md](docs/openspec/implementation.md) | 源码与规格的对应及已知偏差 |
+| [docs/api-tiers.md](docs/api-tiers.md) | 公开类型的稳定等级 |
+| [docs/build-and-debug.md](docs/build-and-debug.md) | 构建、诊断与 1.7 基础兼容说明 |
+| [docs/in-game-walkthrough.md](docs/in-game-walkthrough.md) | 只能在游戏里完成的检查 |
+| [docs/release-notes/](docs/release-notes/) | 各版本发布说明 |
+| `AGENTS.md`、`MEMORY.md`、`TODO.md` | 开发代理的工作规则、持久事实与待办，不是用户文档 |
+
+发布流程与 tag 规则见 `.github/workflows/release.yml` 头部注释：`vBASE-rcN` 为试版，正式版 `vBASE` 必须落在最后一个 rc 的同一提交上。
 
 ## 身份
 
 - packageId：`coahuilite.ferritelib`
-- 命名空间根：`FerriteLib.UiKit`（内核表面：`FerriteLib.UiKit.Kernel`）
+- 命名空间根：`FerriteLib.UiKit`（内核：`FerriteLib.UiKit.Kernel`）
 - 日志前缀：`[FerriteLib.UiKit]`
-- 许可证：MPL-2.0，全文随每个包分发（包内 `LICENSE`）
-
-## 给模组开发者
-
-RimWorld 的 `modDependencies` 无法表达版本，消费者必须在自己的构造函数里断言 API 区间——
-`FerriteLibVersion.Require(min, max, packageId, out report)` 会枚举已加载载体并报告冲突，失败信息可读。
-编译请针对本仓库 GitHub Release 资产中的 DLL（发布页正文标注 ZIP 资产的 SHA-256；解压后的
-`version.txt` 另记 DLL 摘要）；程序集目标 `net472`。针对实际验证过的版本与 API 区间编译。
-发布后，破坏受支持的 stable 合同必须升 major；弃用后还须保留两个完整后续已发布 minor，
-该时间下限不允许在 minor 破坏性移除，升至1.x也不能缩短。见[API 分层](docs/api-tiers.md)。
-**API 稳定不再以第二个消费者接入为前提（维护者裁定 2026-09-17）。** 先建立明确、经过验证的兼容承诺，
-让消费者据此接入；接入是验证，不是允许稳定的先决条件。此次裁定不改变现有类型分层，消费者/实机证据
-不足仍须如实说明。
-
-**第三方使用已被邀请（维护者裁决 2026-09-10）。** 请针对 Release 资产编译；当你被迫手写了本库本该提供的
-东西时开一个 issue——指向你自己可用代码的引用就是这个库的成长方式，只有请求不算。缺陷报告始终欢迎。
-「不会破坏什么」是按类型承诺、不是按版本承诺：`docs/api-tiers.md` 把每个导出类型标成 **stable** 或
-**public-unstable**，只有 stable 类型在你编译时所用的 `[min, max)` 区间内保持签名不变，其余类型每个 minor
-都要重新编译。API 暂定期间 PR 不承诺合并，`CONTRIBUTING.md` 等表面冻结时再写。
-
-## 本地验证与构建
-
-```powershell
-pwsh -NoProfile -File scripts/verify-local.ps1            # 门禁套件（harness + 双 flavor 构建 + 载荷 + 无内容 + 许可 + 身份）
-pwsh -NoProfile -File scripts/verify-local.ps1 -PackDev   # + 暂存的 dev 目录 dist/dev/FerriteLib（不产出归档；放哪个 Mods 目录自己动手）
-pwsh -NoProfile -File scripts/privacy-audit.ps1 -FullHistory   # 完整历史隐私门禁，任何 push 前执行
-```
-
-## 文档索引
-
-- 协议 / 不变量：`AGENTS.md` · 已核事实：`MEMORY.md` · 行动面：`TODO.md`
-- 哪些类型承诺不破坏：`docs/api-tiers.md` · 只有你能跑的实机走查清单：`docs/in-game-walkthrough.md`
-- 发布流程与 rc 方案：`.github/workflows/release.yml` 头注释（tag 方言即契约：`vBASE-rcN` 试版，
-  裸 `vBASE` 必须落在最后一个 rc 的同一提交上）
+- 许可：[MPL-2.0](LICENSE)，全文随每个包分发

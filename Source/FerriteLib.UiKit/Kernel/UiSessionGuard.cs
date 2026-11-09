@@ -43,20 +43,23 @@ public static class UiSessionGuard
             ctx.Session.Execution.WithState(() => widget.Draw(rect, ctx));
             node.PresentationFault = display?.Fault;
             node.PresentationUnavailable = false;
+            UiDomainDiagnostics.Reactive(ctx.Session, node, "presentation.fault", node.PresentationFault);
             if (node.ReactiveFault != null)
                 UiThemeDraw.FailureMarker(ctx.Drawing,rect, ctx.Theme, node.ReactiveFault.Identity);
         }
         catch (UiReactiveFault failure)
         {
             node.PresentationFault = failure; node.PresentationUnavailable = true;
+            UiDomainDiagnostics.Reactive(ctx.Session, node, "presentation.fault", failure);
             node.Selection = null;
             ctx.Session.SuspendFailedInput(node);
             if (widget is IUiRetainedDisplay last && last.PaintLast(rect, ctx))
                 UiThemeDraw.FailureMarker(ctx.Drawing,rect, ctx.Theme, failure.Identity);
             else UiThemeDraw.RecoveryBand(ctx.Drawing,rect, ctx.Theme, failure.Identity);
         }
-        catch (UiRequestFailure)
+        catch (UiRequestFailure failure)
         {
+            ctx.Session.RecordRequestFailure(node, failure);
             UiThemeDraw.RecoveryBand(ctx.Drawing,rect, ctx.Theme, node.Path);
         }
         catch (Exception ex) when (ex is not UiReactiveFault)
@@ -115,10 +118,12 @@ public static class UiSessionGuard
         {
             ctx.Node.PresentationFault = failure;
             ctx.Node.PresentationUnavailable = true;
+            UiDomainDiagnostics.Reactive(session, ctx.Node, "presentation.fault", failure);
             fallback?.Invoke(rect);
         }
-        catch (UiRequestFailure)
+        catch (UiRequestFailure failure)
         {
+            session.RecordRequestFailure(ctx.Node, failure);
             fallback?.Invoke(rect);
         }
         catch (Exception ex)
@@ -161,16 +166,28 @@ public static class UiSessionGuard
     private static void Record(UiSession session, UiNode key, string label, string kind, string elementPath, Exception ex)
     {
         bool first = !session.IsTripped(key);
-        string diagnostic = BuildDiagnostic(label, kind, elementPath, ex);
+        string diagnostic;
+        try { diagnostic = BuildDiagnostic(label, kind, elementPath, ex); }
+        catch (Exception reporting) when (UiObservationBoundary.IsOrdinary(reporting))
+        {
+            diagnostic = "[FerriteLib.UiKit] fallback triggered for component '" + label
+                + "' (Kind='" + kind + "', path='" + elementPath + "'): " + ex.GetType().FullName
+                + " (exception diagnostic formatting failed)";
+            session.ReportObservationFailure("recovery diagnostic formatting failed", reporting);
+        }
         session.Trip(key, diagnostic);
         if (first)
         {
-            session.ReportWarning(diagnostic);
+            session.ReportCleanupWarning(diagnostic);
 
             // The session-scoped record is where the trip is attributed: the session owns the subscription,
             // so one window's recovery lands on that window's subscriber and on nobody else's. A session
             // with no subscription no-ops, which is why this adds nothing to the unsubscribed path.
-            UiDiagnosticHub.PublishRecovery(session, key, kind, elementPath, diagnostic);
+            try { UiDiagnosticHub.PublishRecovery(session, key, kind, elementPath, diagnostic); }
+            catch (Exception reporting) when (UiObservationBoundary.IsOrdinary(reporting))
+            { session.ReportObservationFailure("recovery diagnostic publication failed", reporting); }
+            UiDomainDiagnostics.Publish(session.DiagnosticOutput, session, new UiDomainDiagnostic("recovery.trip", UiDiagnosticLevel.Warning,
+                key.Id.Key, kind + "/" + ex.GetType().Name, "recovery-display-input-suspended", "inspect-original-fault-before-reopening"));
         }
     }
 

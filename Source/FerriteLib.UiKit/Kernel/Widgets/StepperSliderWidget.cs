@@ -7,7 +7,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// and writes through the typed <see cref = "IUiBindingAccess"/>; no neutral command bridge.
 /// The typed value-binding key is the <c>Bind</c> attribute when present, otherwise the element Id.
 /// </summary>
-internal sealed class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiLayoutDiagnosticSource, IUiPointerLayout, IUiRetainedDisplay
+internal sealed partial class StepperSliderWidget : IUiWidget, IUiMeasureParticipant, IUiLabelledWidget, IUiLayoutDiagnosticSource, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/stepper-slider";
 
@@ -63,9 +63,10 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         return new UiMeasurement(AtomVocabulary.LabelMeasureInputs(ctx, label), () =>
         {
             float height = ReadHeight();
-            return spec.TryGetAttribute("Height", out _) ? height : Math.Max(height,
-                UiSliderLayout.Measure(label, ctx.ViewWidth, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0,
-                    Math.Max(1, ReadFloat("ButtonWidth", DefaultButtonWidth)) * 2 + Math.Max(1, ReadFloat("FieldWidth", DefaultFieldWidth)) + Gap * 3 + ctx.Theme.Geometry.RowHeight * 2).Height);
+            return spec.TryGetAttribute("Height", out _) ? height : Math.Max(height, UiTextFonts.ControlHeight(ctx,
+                UiSliderLayout.Measure(label, ctx.ViewWidth, UiTextFonts.For(ctx, AtomVocabulary.TextFont(ctx)), UiElementProperties.DensityOf(ctx.Theme), ctx.Node?.SharedLabelWidth ?? 0,
+                    ButtonWidth(ctx) * 2 + Math.Max(1, ReadFloat("FieldWidth", DefaultFieldWidth)) + Gap * 3 + ctx.Theme.Geometry.RowHeight * 2),
+                Math.Max(UiTextFonts.RowHeight(ctx), UiTextFonts.RowHeight(ctx, UiTextPurpose.Editor))));
         });
     }
 
@@ -141,22 +142,24 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         if (label.Length > 0)
         {
             float labelWidth = labelLayout.LabelWidth;
-            UiThemeDraw.Label(ctx.Drawing,new UiLayoutRect(rect.X, rect.Y, labelWidth, labelLayout.Stacked ? labelLayout.LabelHeight : layout.Minus.Height), label, ctx.Theme, ctx.Theme[UiPaletteRole.Foreground], AtomVocabulary.TextFont(ctx));
+            UiTextFonts.Label(ctx,new UiLayoutRect(rect.X, rect.Y, labelWidth, labelLayout.Stacked ? labelLayout.LabelHeight : layout.Minus.Height), label, ctx.Theme.Styles.Resolve(UiStatusTone.Neutral).Text, AtomVocabulary.TextFont(ctx));
         }
 
-        DrawButton(ctx.Drawing,minusRect, "−", ctx.Theme);
-        DrawButton(ctx.Drawing,plusRect, "+", ctx.Theme);
+        DrawButton(ctx,minusRect, "−");
+        DrawButton(ctx,plusRect, "+");
         float paintedValue=ReadModel();
         ctx.Controls.PaintRange(sliderRect, ctx.Theme, paintedValue, min, max);
         AtomVocabulary.PaintEditFeedback(fieldRect, ctx, editor);
+        string retainedDraft = editor.Draft;
+        UiColour? retainedInk = UiTextFonts.AnyInk(ctx.Theme) ? AtomVocabulary.ResolveRole(spec, ctx, writable).Text : null;
         retained.Capture(ctx,(r,c)=>
         {
             UiSliderLayout lastLabel=LabelLayout(c,r.Width,label);
             UiStepperLayout lastLayout=ControlLayout(c,r.Width,r.Height,lastLabel);
-            if(label.Length>0) UiThemeDraw.Label(c.Drawing,new UiLayoutRect(r.X,r.Y,lastLabel.LabelWidth,lastLabel.Stacked?lastLabel.LabelHeight:lastLayout.Minus.Height),label,c.Theme,c.Theme[UiPaletteRole.Foreground],AtomVocabulary.TextFont(c));
-            DrawButton(c.Drawing,Place(lastLayout.Minus,r),"−",c.Theme);DrawButton(c.Drawing,Place(lastLayout.Plus,r),"+",c.Theme);
-            ctx.Controls.PaintRange(Place(lastLayout.Range,r),c.Theme,paintedValue,min,max);
-            UiRetainedPaint.Field(Place(lastLayout.Field,r),c,editor.Draft);
+            if(label.Length>0) UiTextFonts.Label(c,new UiLayoutRect(r.X,r.Y,lastLabel.LabelWidth,lastLabel.Stacked?lastLabel.LabelHeight:lastLayout.Minus.Height),label,c.Theme.Styles.Resolve(UiStatusTone.Neutral).Text,AtomVocabulary.TextFont(c));
+            DrawButton(c,Place(lastLayout.Minus,r),"−");DrawButton(c,Place(lastLayout.Plus,r),"+");
+            c.Controls.PaintRange(Place(lastLayout.Range,r),c.Theme,paintedValue,min,max);
+            UiRetainedPaint.Field(Place(lastLayout.Field,r),c,retainedDraft,retainedInk);
         });
     }
 
@@ -173,7 +176,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
 
     private UiStepperLayout ControlLayout(UiWidgetContext ctx, float width, float height, UiSliderLayout label)
         => UiStepperLayout.Arrange(width, height, label,
-            Math.Max(1, ReadFloat("ButtonWidth", DefaultButtonWidth)),
+            ButtonWidth(ctx),
             Math.Max(1, ReadFloat("FieldWidth", DefaultFieldWidth)), Gap, ctx.Theme.Geometry.Gap);
 
     private static UiLayoutRect Place(UiLayoutRect local, UiLayoutRect outer)
@@ -181,10 +184,10 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     public float MeasureLabel(UiWidgetContext ctx)
     {
         string label = ReadLabel(ctx);
-        return label.Length == 0 ? 0 : ctx.Metrics.MeasureWidth(label, AtomVocabulary.TextFont(ctx)) + ctx.Theme.Geometry.Spacing;
+        return label.Length == 0 ? 0 : UiTextFonts.For(ctx, AtomVocabulary.TextFont(ctx)).MeasureWidth(label) + ctx.Theme.Geometry.Spacing;
     }
 
-    private UiSliderLayout LabelLayout(UiWidgetContext ctx, float width, string? capturedLabel = null) => UiSliderLayout.Measure(capturedLabel ?? ReadLabel(ctx), width, AtomVocabulary.TextFont(ctx), UiElementProperties.DensityOf(ctx.Theme), ctx.Metrics, ctx.Node?.SharedLabelWidth ?? 0, Math.Max(1, ReadFloat("ButtonWidth", DefaultButtonWidth)) * 2 + Math.Max(1, ReadFloat("FieldWidth", DefaultFieldWidth)) + Gap * 3 + ctx.Theme.Geometry.RowHeight * 2);
+    private UiSliderLayout LabelLayout(UiWidgetContext ctx, float width, string? capturedLabel = null) => UiSliderLayout.Measure(capturedLabel ?? ReadLabel(ctx), width, UiTextFonts.For(ctx, AtomVocabulary.TextFont(ctx)), UiElementProperties.DensityOf(ctx.Theme), ctx.Node?.SharedLabelWidth ?? 0, ButtonWidth(ctx) * 2 + Math.Max(1, ReadFloat("FieldWidth", DefaultFieldWidth)) + Gap * 3 + ctx.Theme.Geometry.RowHeight * 2);
 
     private string ReadBindKey()
     {
@@ -206,10 +209,18 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         return spec.TryGetAttribute("Label", out string label) ? label : "";
     }
 
-    private static void DrawButton(IUiDrawing drawing,UiLayoutRect rect, string text, UiTheme theme)
+    private static void DrawButton(UiWidgetContext ctx,UiLayoutRect rect, string text)
     {
-        UiThemeDraw.Solid(drawing,rect, theme[UiPaletteRole.ControlSurface]);
-        UiThemeDraw.Label(drawing,rect, text, theme, theme[UiPaletteRole.Foreground], anchor: UiTextAnchor.MiddleCenter);
+        UiTheme theme = ctx.Theme; UiThemeDraw.Solid(ctx.Drawing,rect, theme[UiPaletteRole.ControlSurface]);
+        UiTextFonts.Label(ctx,rect, text, theme.Styles.Resolve(UiStatusTone.Neutral).Text, anchor: UiTextAnchor.MiddleCenter);
+    }
+
+    private float ButtonWidth(UiWidgetContext ctx)
+    {
+        float width = Math.Max(1, ReadFloat("ButtonWidth", DefaultButtonWidth));
+        UiTextRun run = UiTextFonts.For(ctx);
+        return !spec.TryGetAttribute("ButtonWidth", out _) && run.Font.Size.HasValue
+            ? Math.Max(width, Math.Max(run.MeasureWidth("−"), run.MeasureWidth("+")) + ctx.Theme.Geometry.Spacing * 2) : width;
     }
 
 

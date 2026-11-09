@@ -196,7 +196,7 @@ public static class UiRowBand
         if (labelWidth > 1f)
         {
             string paintedText=capturedText ?? ReadText(row,ctx);
-            UiThemeDraw.Label(ctx.Drawing,new UiLayoutRect(x, band.Y, labelWidth, band.Height), paintedText, theme, ink.Text, AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft, singleLine: true);
+            UiTextFonts.Label(ctx,new UiLayoutRect(x, band.Y, labelWidth, band.Height), paintedText, ink.Text, AtomVocabulary.TextFont(ctx), UiTextAnchor.MiddleLeft, singleLine: true);
             return paintedText;
         }
         return "";

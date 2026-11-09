@@ -8,7 +8,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// presentation observes that result and never recreates the activation rule.
 /// A missing command is diagnosed at host creation, not rendered as a dead control.
 /// </summary>
-internal sealed class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
+internal sealed partial class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
 {
     public const string Kind = "input/button";
 
@@ -30,7 +30,8 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
             // from its content instead of the theme's row height.
             AtomVocabulary.Schema(
                 AtomRoles.ToneAndEmphasis, "ActionBind", "Text", "TextKey", "Height", "PayloadBind", "Chrome"),
-            new[] { "Text", "TextKey" }));
+            new[] { "Text", "TextKey" },
+            naturalBody: (_, ctx) => CaptionInset(ctx) * 2f));
     }
 
     public void Configure(UiElementSpec spec)
@@ -81,10 +82,10 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     }
     private UiMeasurement CaptureCaption(UiWidgetContext ctx,string text,bool automatic)
     {
-        return new UiMeasurement(new UiMeasureInputs(new[] { text }, automatic && text.Length > 0 ? new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx), ctx.Theme.Geometry.Padding } : new[] { ctx.Theme.Geometry.RowHeight }, automatic && text.Length > 0), () =>
+        return new UiMeasurement(new UiMeasureInputs(new[] { text }, automatic && text.Length > 0 ? new[] { ctx.ViewWidth, (float)AtomVocabulary.TextFont(ctx), (float)(UiTextFonts.For(ctx).Font.Size ?? 0), ctx.Theme.Geometry.Padding } : new[] { ctx.Theme.Geometry.RowHeight }, automatic && text.Length > 0), () =>
             automatic && text.Length > 0
-                ? Math.Max(1, ctx.Metrics.MeasureText(text, AtomVocabulary.TextFont(ctx), Math.Max(1, ctx.ViewWidth - ctx.Theme.Geometry.Padding * 2)))
-                : AtomVocabulary.ReadHeight(spec, ctx.Theme.Geometry.RowHeight));
+                ? Math.Max(1, UiTextFonts.For(ctx, AtomVocabulary.TextFont(ctx)).MeasureText(text, Math.Max(1, ctx.ViewWidth - CaptionInset(ctx) * 2)))
+                : AtomVocabulary.ReadHeight(spec, UiTextFonts.RowHeight(ctx)));
     }
 
     public float Measure(UiWidgetContext ctx) => CaptureMeasurement(ctx).Calculate();
@@ -112,33 +113,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
 
         UiInteractionRequests.Activation(ctx.Controls.InteractionTarget(ctx, ReadActionKey()), interaction, () =>
         {
-            // G2: with a PayloadBind the command receives the bound payload - the row's own key, which is what
-            // a repeated row needs to say which item it is. Without one the call is exactly what it was.
-            string payloadKey = AtomVocabulary.Read(spec, "PayloadBind").Trim();
-            string payload = "";
-            bool hasPayload = payloadKey.Length > 0;
-            if (hasPayload)
-            {
-                try
-                {
-                    hasPayload = ctx.Bindings.TryGet(payloadKey, out payload);
-                }
-                catch (InvalidOperationException ex) when (ex is not UiReactiveFault)
-                {
-                    // A key bound to something that is not a string: fail-soft and loud, then fire without it.
-                    AtomVocabulary.ReportUnresolved(ctx, Kind, payloadKey, "no payload");
-                    hasPayload = false;
-                }
-            }
-
-            if (hasPayload)
-            {
-                ctx.Bindings.Invoke(ReadActionKey(), payload);
-            }
-            else
-            {
-                ctx.Bindings.Invoke(ReadActionKey());
-            }
+            RequestActivation(ctx);
         });
         if (ctx.Session.IsActive)
         {
@@ -176,15 +151,47 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
             UiThemeDraw.Surface(ctx.Drawing,rect, shown.Surface, theme.Geometry.Hairline);
         }
 
-        UiThemeDraw.Label(
-ctx.Drawing,            new UiLayoutRect(rect.X + theme.Geometry.Padding, rect.Y, Math.Max(1f, rect.Width - theme.Geometry.Padding * 2f), rect.Height),
+        UiTextFonts.Label(
+ctx,            new UiLayoutRect(rect.X + CaptionInset(ctx), rect.Y, Math.Max(1f, rect.Width - CaptionInset(ctx) * 2f), rect.Height),
             caption,
-            theme,
             shown.Text,
             AtomVocabulary.TextFont(ctx),
             UiTextAnchor.MiddleCenter,
             singleLine: true);
     }
+
+    private void RequestActivation(UiWidgetContext ctx)
+    {
+            // G2: with a PayloadBind the command receives the bound payload - the row's own key, which is what
+            // a repeated row needs to say which item it is. Without one the call is exactly what it was.
+            string payloadKey = AtomVocabulary.Read(spec, "PayloadBind").Trim();
+            string payload = "";
+            bool hasPayload = payloadKey.Length > 0;
+            if (hasPayload)
+            {
+                try
+                {
+                    hasPayload = ctx.Bindings.TryGet(payloadKey, out payload);
+                }
+                catch (InvalidOperationException ex) when (ex is not UiReactiveFault)
+                {
+                    // A key bound to something that is not a string: fail-soft and loud, then fire without it.
+                    AtomVocabulary.ReportUnresolved(ctx, Kind, payloadKey, "no payload");
+                    hasPayload = false;
+                }
+            }
+
+            if (hasPayload)
+            {
+                ctx.Bindings.Invoke(ReadActionKey(), payload);
+            }
+            else
+            {
+                ctx.Bindings.Invoke(ReadActionKey());
+            }
+    }
+
+    private static float CaptionInset(UiWidgetContext ctx) => ctx.Theme.Geometry.Padding;
 
     private string ReadActionKey()
     {

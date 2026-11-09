@@ -26,6 +26,12 @@ public sealed class UiMeasureInputs : IEquatable<UiMeasureInputs>
     }
     public override bool Equals(object? obj) => obj is UiMeasureInputs other && Equals(other);
     public override int GetHashCode() => text.Length * 397 ^ numbers.Length;
+    internal static UiMeasureInputs Join(UiMeasureInputs first, UiMeasureInputs second)
+    {
+        var text = new List<string>(first.text); text.AddRange(second.text);
+        var numbers = new List<float>(first.numbers); numbers.AddRange(second.numbers);
+        return new UiMeasureInputs(text.ToArray(), numbers.ToArray(), first.UsesTextMetrics || second.UsesTextMetrics);
+    }
 }
 
 /// <summary>Optional environment capability. Null revokes text-measure reuse; ITextMetrics is unchanged.</summary>

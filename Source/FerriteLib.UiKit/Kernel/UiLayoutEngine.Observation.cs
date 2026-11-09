@@ -91,12 +91,54 @@ internal sealed partial class UiLayoutEngine
             void Fact(string name, string value, string source = "session", UiObservationStatus state = UiObservationStatus.Sampled, string why = "")
                 => facts.Add(new UiObservedFact(name, budget.Limit(value), state, source, why, value.Length > budget.Text));
             Fact("identity", entry.Node.ElementId, "declaration");
+            for (UiNode? ancestor = entry.Node.Parent; ancestor != null; ancestor = ancestor.Parent)
+                if (ancestor.Kind == "Repeat" && repeatStates.TryGetValue(ancestor.Id, out RepeatState? repeat))
+                {
+                    Fact("author-template", repeat.TemplateName, "manifest/Templates");
+                    int suffix = entry.Spec.Id.IndexOf(UiLayoutManifest.ItemKeySeparator);
+                    if (suffix > 0) Fact("author-element", entry.Spec.Id.Substring(0, suffix), "manifest/Templates/" + repeat.TemplateName);
+                    break;
+                }
+            Fact("mount-lifetime", entry.Node.MountLifetime.ToString(CultureInfo.InvariantCulture), "session/node-incarnation");
+            Fact("interaction-scope", entry.Node.InteractionScope, "owner");
+            Fact("semantic-actions", entry.Widget is IUiSemanticWidget ? "wrapper-owned" : "", "wrapper",
+                entry.Widget is IUiSemanticWidget ? UiObservationStatus.Sampled : UiObservationStatus.Unsupported,
+                entry.Widget is IUiSemanticWidget ? "" : "no-semantic-operation-capability");
             Fact("layout-frame", observationLayoutFrame.ToString(CultureInfo.InvariantCulture), "last-arrangement");
             Fact("layout-time-utc", observationLayoutAtUtc?.ToString("O", CultureInfo.InvariantCulture) ?? "", "last-arrangement");
             Fact("geometry", RectText(entry.Rect), "last-arrangement/page-local", status == UiObservationStatus.Stale ? status : UiObservationStatus.Sampled);
+            // These are UiKit declarations/resolution/arrangement, not a CSS box model.
+            foreach (string attribute in new[] { "Width", "WidthBind", "MinWidth", "MaxWidth", "Height", "Padding", "Gap", "Fill", "Breakpoint", "Narrow", "NarrowCols", "NarrowHidden", "Cols", "VisibleRows", "AlignX", "AlignY", "OffsetX", "OffsetY", "Scheme", "Density" })
+                if (entry.Spec.TryGetAttribute(attribute, out string raw)) Fact("declared." + attribute, raw, "effective-manifest/author-or-materialized-template");
+            Fact("computed.measure-width", entry.MeasureWidth.ToString(CultureInfo.InvariantCulture), "last-arrangement", status, reason);
+            Fact("computed.descendant-count", (entry.SubtreeCount - 1).ToString(CultureInfo.InvariantCulture), "last-arrangement/descendants");
+            UiLayoutInput? dynamicInput = DynamicInput(entry.Spec);
+            if (dynamicInput?.Height is float inputHeight) Fact("input.Height", inputHeight.ToString(CultureInfo.InvariantCulture), "author-prepare/layout-input");
+            if (dynamicInput?.Narrow is bool inputNarrow) Fact("input.Narrow", inputNarrow.ToString(), "author-prepare/layout-input");
+            if (entry.IsContainer)
+            {
+                UiWidgetContext resolved = ContextForEntry(entry, ctx, default);
+                Padding padding = ParsePadding(entry.Spec, resolved.Theme);
+                Fact("resolved.padding.LTRB", string.Format(CultureInfo.InvariantCulture, "{0},{1},{2},{3}", padding.Left, padding.Top, padding.Right, padding.Bottom),
+                    entry.Spec.Attributes.ContainsKey("Padding") ? "manifest/Padding" : "scope-theme/Geometry.Padding", why: "current-resolution; compare layout-frame for arrangement freshness");
+                Fact("resolved.gap", ReadGap(entry.Spec, resolved.Theme).ToString(CultureInfo.InvariantCulture),
+                    entry.Spec.Attributes.ContainsKey("Gap") ? "manifest/Gap" : "scope-theme/Geometry.Gap");
+                Fact("resolved.scheme", styleResolver?.ResolveScheme(entry.StyleChain ?? Array.Empty<UiStyleDeclaration>()) ?? "page-theme", "current-scope-resolution");
+                Fact("resolved.density", styleResolver?.ResolveDensity(entry.StyleChain ?? Array.Empty<UiStyleDeclaration>()) ?? "page-theme", "current-scope-resolution");
+                Fact("resolved.container", ResolveEffectiveKind(entry.Spec, entry.ContainerKind, IsNarrow(entry.Spec, Math.Max(1, entry.MeasureWidth - padding.Left - padding.Right))), "current-resolution/responsive-variant");
+            }
+            if (entry.Node.Parent is UiNode parent && entryIndex.TryGetValue(parent.Id, out int parentIndex))
+            {
+                PlacedEntry parentEntry = lastEntries[parentIndex];
+                Fact("parent.kind", parentEntry.ContainerKind, "last-arrangement/parent");
+                Fact("parent.geometry", RectText(parentEntry.Rect), "last-arrangement/page-local", status, reason);
+                Fact("parent.measure-width", parentEntry.MeasureWidth.ToString(CultureInfo.InvariantCulture), "last-arrangement/parent-width-budget");
+                Fact("parent.height-reference", entry.HasContentHeightReference.ToString(), "last-arrangement/parent-independent-content-reference");
+            }
             Fact("hit", "", "platform", UiObservationStatus.NotSampled, "point-and-current-window-origin-required; rectangle-is-not-hit-result");
             Fact("native-focus", "", "platform", UiObservationStatus.NotSampled, "observation-does-not-query-native-event-loop");
             Fact("pointer-allowed", ctx.Session.PointerInputAllowed.ToString());
+            Fact("composition-active", ctx.Session.Input.Composing.ToString(), "owner-frame/not-a-new-native-query");
             Fact("geometry-reliable", ctx.Session.IsInputGeometryReliable.ToString());
             Fact("pointer-can-receive", "", "platform", UiObservationStatus.NotSampled, "current-event-and-window-point-required");
             bool ownsCapture = ctx.Session.Interactions.CaptureOwner?.Node == entry.Id.Key;
@@ -111,6 +153,11 @@ internal sealed partial class UiLayoutEngine
 
             if (entry.ContentRect.HasValue)
                 Fact("scroll-content", RectText(entry.ContentRect.Value), "last-arrangement/scroll-local");
+            if (entry.ContainerKind == "Scroll")
+            {
+                UiLayoutPoint scroll = ctx.Session.GetScrollPosition(entry.Node);
+                Fact("computed.scroll-position", string.Format(CultureInfo.InvariantCulture, "{0},{1}", scroll.X, scroll.Y), "session/current-scroll");
+            }
             for (UiNode? ancestor = entry.Node.Parent; ancestor != null; ancestor = ancestor.Parent)
                 if (ancestor.Kind == "Scroll" || ancestor.Kind == "Clip")
                     Fact("viewport-ancestor", ancestor.Id.Key, "last-arrangement/ancestor; native-origin-not-sampled");
@@ -148,7 +195,22 @@ internal sealed partial class UiLayoutEngine
 
             foreach (var colour in entry.Node.Properties.ResolvedColours)
                 Fact("colour." + colour.Key, colour.Value.Value.HasValue ? ColourText(colour.Value.Value.Value) : "none", colour.Value.Origin + ":" + colour.Value.Source, UiObservationStatus.Sampled, "last-property-resolution-not-current-pixels");
+            foreach (var colour in UiTextColours.Resolved(entry.Node.Properties))
+                Fact("colour." + colour.Key, colour.Value.Value.HasValue ? ColourText(colour.Value.Value.Value) : "none", colour.Value.Origin + ":" + colour.Value.Source, UiObservationStatus.Sampled, "last-property-resolution-not-current-pixels");
             Fact("font", entry.Node.Properties.ResolvedFont.Value.ToString(), entry.Node.Properties.ResolvedFont.Origin + ":" + entry.Node.Properties.ResolvedFont.Source, UiObservationStatus.Sampled, "last-property-resolution");
+            var size = entry.Node.Properties.ResolvedFontSize;
+            Fact("font-size", size.Value?.ToString(CultureInfo.InvariantCulture) ?? "preset", size.Origin + ":" + size.Source, UiObservationStatus.Sampled, "requested-property-not-pixels");
+            foreach (var run in entry.Node.Properties.TextRuns)
+            {
+                Fact("text-font." + run.Key + ".requested", run.Value.Requested.ToString(), "text-capability-resolution");
+                Fact("text-font." + run.Key + ".effective", run.Value.Font.ToString(), "text-capability-resolution");
+                if (run.Value.Reason != null) Fact("text-font." + run.Key + ".fallback", run.Value.Reason, "host-capability");
+            }
+            foreach (var paint in entry.Node.Properties.TextPaints)
+            {
+                Fact("text-paint." + paint.Key + ".font", paint.Value.Font.ToString(), paint.Value.Source);
+                Fact("text-paint." + paint.Key + ".colour", paint.Value.Colour.HasValue ? ColourText(paint.Value.Colour.Value) : "native-preset", paint.Value.Source);
+            }
             foreach (var metric in entry.Node.Properties.ResolvedMetrics)
                 Fact("metric." + metric.Key, metric.Value.Value.ToString(CultureInfo.InvariantCulture), metric.Value.Origin + ":" + metric.Value.Source, UiObservationStatus.Sampled, "last-property-resolution");
             output.Add(new UiObservedNode(entry.Id.Key, entry.Id.Path, entry.Node.Kind, entry.Node.Parent?.Id.Key, depth, Array.AsReadOnly(facts.ToArray())));
