@@ -1,6 +1,6 @@
 # Optional offline workbench maintenance extension
 
-The normative contract is [developer-tools](../../openspec/specs/contracts/developer-tools/spec.md); this guide owns current API usage and implementation evidence. New native work follows RimWorld 1.7 APIs rather than a fixed minor build; historical build identities below remain evidence, not a support ceiling.
+The normative contract is [developer-tools](../../openspec/specs/contracts/developer-tools/spec.md); this guide owns API usage. Source facts and evidence limits live in [the implementation map](../../openspec/implementation.md). New native work follows RimWorld 1.7 APIs rather than a fixed minor build; historical build identities below remain evidence, not a support ceiling.
 
 Use one author document while iterating a real page: edit the file in your editor, reload it, and keep
 the original Host/Session. This extension is explicitly selected for the 0.8 maintenance line; it does
@@ -12,6 +12,8 @@ The API/build/release axis remains **0.8.0**. `UiOfflineWorkbench.Capability` is
 `uikit.offline-workbench.v1`; `UiOfflineWorkbench.Profile` is `Legacy08`. A workbench selects the
 `[0.8.0,0.9.0)` API range **and** that maintenance capability, and records its exact fixed DLL/MVID.
 Current09 retains its separate `[0.9.0,0.10.0)` gate. Never mix generations in one process.
+The 0.9 window-shell, selection-ink suppression, coordinate-hit and non-committing budget extensions
+are not Legacy08 capabilities. A 0.9 stage report does not validate this 0.8 carrier or accurate 1.6 input.
 
 The new symbols and explicitly listed advanced members are **public-unstable maintenance extensions**,
 authorized as additive development tooling. They do not promote or replace the frozen Stable surface.
@@ -95,6 +97,7 @@ returned, not that business data was accepted or persisted. Custom editor wrappe
 
 The normal default build is still net472/1.6. `-p:UiKitTarget=Neutral` builds the same real Kernel on
 net10.0. `-p:UiKitTarget=RimWorld17 -p:RimWorld17Dir=<exact-local-assemblies>` builds the 0.8 core with
-the existing native adapter compiled against the supplied local 1.7.5000 rev1275 references. Label that
+the existing native adapter compiled against the supplied current 1.7 interfaces. The recorded
+1.7.5000 rev1275 input identifies that reference result, not a supported-build whitelist. Label that
 route **FL0.8 core / 1.7 rendering reference**; it is not an accurate standalone 1.6 host. No game assets
 are copied. C# bindings, controls or logic changes require rebuild and process restart.

@@ -2,7 +2,7 @@
 
 本入口及下列能力／连接／适配／policy 正文是 **0.8.x 当前产品规格**。它面向通用 UI 作者，不只设置页。
 采用现成包装、选择能力组合、独立 native、headless 和 visual-only 均是正常路线。
-普通载荷以 RimWorld 1.6 adapter 为基础，保持维护。已选的[脱机工作台维护扩展](development/0.8/offline-workbench.md)使用0.8核心、显式neutral／1.7构建；不要求普通玩家安装Tools或Dev。新原生开发跟随1.7当前接口、不锁小构建号；原1.7共用GUI候选、独立参考绘制与游戏实机仍分层，完整舞台接入尚待实现。旧候选范围见[构建／诊断说明](build-and-debug.md#basic-17-compatibility-candidate)。
+普通载荷以 RimWorld 1.6 adapter 为基础，保持维护。已选的[脱机工作台维护扩展](development/0.8/offline-workbench.md)使用0.8核心、显式neutral／1.7构建；不要求普通玩家安装Tools或Dev。新原生开发跟随1.7当前接口、不锁小构建号。0.8／Legacy08 的1.7参考绘制与准确1.6／游戏实机仍分层；0.9的完整舞台消费不转记为0.8实现。本线未提供0.9新增的中立窗壳、选择注记抑制、同源坐标命中或非提交预算测量；旧page／provider、MeasureAndArrange及纯测量参与的原条件不变。旧候选范围见[构建／诊断说明](build-and-debug.md#basic-17-compatibility-candidate)。
 
 规格表达应有保证；源码是否全部满足、已知偏差及证据身份在[开发映射](openspec/implementation.md)。
 [Trace／legacy-fit 两项新保证](openspec/specs/contracts/observation-boundary/spec.md)于2026-10-29获准采用，

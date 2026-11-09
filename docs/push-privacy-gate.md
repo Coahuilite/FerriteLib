@@ -26,10 +26,15 @@ hook checks the resulting commit again before transmission. -PrePush adds
 release-oriented clean-tree/main/tag reporting and is not required for a normal
 version-branch push. Output suppresses matched sensitive values.
 
-Image pixels and compressed/opaque binary content are not fully covered by
-metadata scanning. Inspect tracked images before pushing. Historical binary
-metadata is not covered by the historical text vector. Findings do not authorize
-history rewriting; resolve genuine leaks and classify false positives explicitly.
+Image pixels, including visible screenshot content, do not require manual privacy
+review (maintainer decision 2026-11-07). Filename/path, credential, message/identity,
+applicable reachable-history, binary-metadata and game-resource/payload gates remain
+unchanged. Rendering, layout, export and interaction quality checks still apply.
+
+Compressed/opaque binary content is not fully covered by metadata scanning.
+Historical binary metadata is not covered by the historical text vector. Findings
+do not authorize history rewriting; resolve genuine leaks and classify false
+positives explicitly.
 
 Ordinary authorized pushes of an already-public version branch still run the hook and CI. They are not a
 first-push of an unpublished line. Findings still do not authorize rewriting published history.
