@@ -24,17 +24,12 @@ current task and applicable permissions; preserve the separate 1.6/native and 1.
       accepted input; numeric label/editor1.6 and label1.7 native acceptance remain open, and editor1.7
       uses reported preset fallback.
 
-The accepted US ea610fa/FL833c14f4 internal trial permits RC preparation. FL v0.8.0-rc2 is not yet
-published; rc1 remains the published non-latest asset. Release/upgrade notes and the explicit local
-input versus real cloud sequence are in docs/build-and-debug.md.
+FL v0.8.0-rc2 is published as a non-latest prerelease; the exact release/source identity is in MEMORY.md.
+US has actually compiled/run against its asset. Release/upgrade notes and the fixed-input versus
+publication sequence are in docs/build-and-debug.md; native acceptance remains open.
 
 - [ ] Finish the 2026-10-29 contract-repair paired consumer receipt and bounded native menu/input pass;
       current implementation and evidence limits are in docs/openspec/implementation.md.
-- [ ] Under explicit release-task authorization, land the reviewed FL CI/rc2 preparation through PR/main
-      CI and full-history privacy, then resolve real main SHA and publish rc2 through release CI.
-- [ ] Consume the actual published rc2 asset in US by repo/tag/full SHA/asset identity and retain its
-      compiler/runtime receipt. US main integration or publication needs its own authorization;
-      a working-branch baseline task does not include either. Keep the local Dev pair separate.
 - [ ] Keep unrecorded native1.6 details as RC limitations. New1.7 adapter/window capabilities are
       deferred, not RC blockers. Do not install or start the game automatically.
 

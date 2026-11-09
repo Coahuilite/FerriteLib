@@ -119,9 +119,11 @@ The same method can serve a consumer's distinct project variants, but FL's Core,
 native-stub, single-carrier and Dev-instrument assertions remain product-specific. Consumer audio,
 configuration and UI-identity gates belong to that consumer, not a copied FL test platform.
 
-## RC2 local input and later publication
+## RC2 fixed release input and publication route
 
-The planned next prerelease is v0.8.0-rc2, non-latest, with RimWorld1.6 and basic1.7 compatibility.
+The published prerelease is [v0.8.0-rc2](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc2),
+non-latest, built by Release CI run `42591902045` from `197ff6b3ae99bb3e957e22eaa8be70aca5858447` on main.
+Its fixed asset is `FerriteLib-v0.8.0-rc2.zip`, with RimWorld1.6 and basic1.7 compatibility.
 The 1.7 native rendering/interaction acceptance limits below still apply. Its
 [notes](release-notes/v0.8.0-rc2.md) preserve the accepted runtime contracts. A local fixed Release
 input has a real local source commit, not a future merge SHA. Stage it into an unused dist directory
@@ -141,8 +143,8 @@ Under later explicit cloud authorization:
 
 The DLL's base ProductVersion and About.xml remain0.8.0; the tag/archive owns rc2 identity and the DLL
 embeds source HEAD. Keeping the same suffix for rc/final tags preserves the tested-rc/final byte rule.
-Neither future rc2 main SHA nor asset exists during local preparation. No rc1 or moving-branch fallback
-is substituted. Publication and installation remain separate authorized operations.
+The published coordinates above identify the actual rc2 asset, not a later documentation HEAD or local
+rehearsal. No rc1 or moving-branch fallback is substituted. Publication and installation remain separate operations.
 
 ## Basic 1.7 compatibility candidate
 

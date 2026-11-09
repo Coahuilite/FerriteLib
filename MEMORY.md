@@ -94,12 +94,14 @@ The confirmed explicit-only Choice.HelpRef policy, adjacent Ref/Key/Bind naming 
 migration paths are in that contract. Session topic/grace and optional owned endpoint output have
 different lifetimes; docs/openspec/specs/contracts/help-output/spec.md describes them without a panel or access-capture framework.
 PM has accepted that technical contract and US has consumed the fixed source input.
-[v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1) remains the published
-non-latest prerelease from a0b5b983c3c13a099c62d936305eaebaf1deb5a8. The user accepted the overall
-US ea610fa/FL833c14f4 internal trial for RC preparation on2026-10-28; granular unrecorded native
-coverage is a known limit, not a repeat-trial gate. The next planned prerelease is v0.8.0-rc2,
-not yet published. Notes are in docs/release-notes/v0.8.0-rc2.md and the local/cloud separation and
-verification ownership in docs/build-and-debug.md. Known headless errors remain non-blocking.
+[v0.8.0-rc2](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc2) is the published
+non-latest prerelease from final main commit `197ff6b3ae99bb3e957e22eaa8be70aca5858447`, integrated by PR #2.
+PR/main checks and Release CI run `42591902045` passed; the actual downloaded asset passed platform,
+digest, closed-payload and source/configuration checks. US actually compiled and ran against that
+Release asset; its build guide owns the exact consumer pair/receipt. The separate accepted Dev pair
+is not relabelled as the published asset. rc1 remains available as history. The overall internal
+trial and unrecorded native/headless limitations retain their original scope; see
+docs/release-notes/v0.8.0-rc2.md and docs/build-and-debug.md.
 
 Accepted RU1–RU3 production foundations and their applicable evidence remain in the reactive, layout-reuse
 and failure-lifetime contracts. Closeout adds native composite-capture precedence, normal-return-before-
