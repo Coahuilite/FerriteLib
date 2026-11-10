@@ -114,6 +114,30 @@ Used inside a draw, so child phase totals cannot all be assigned back to the ini
 timings are not FPS measurements. Raw events and screenshots are retained in local private evidence;
 physical keyboard, IME, the user's established colony and Steam remain outside these runs.
 
+The same full-key replay was then run against the fixed 84f0/3612 pair on a fresh isolated colony:
+all 150 key-down, 150 character and 150 key-up events arrived, the character sequence was preserved,
+and the final event followed the last key-up by 35.82 ms. The five unprofiled frame windows were 61.57, 56.98, 58.27, 57.20 and 62.47 FPS.
+A same-Host instrumented repeat attributed substantial work to each complete Host pass: key-down,
+character and key-up each invoked Arrange 150 times, averaging 0.633 / 0.619 / 0.775 ms, and Draw
+150 times, averaging 1.464 / 1.640 / 1.777 ms inclusive. The corresponding editor-wrapper self times
+were small; Layout and Repaint also caused Host passes. Further instrumenting the existing paths showed
+repeated `ContextForEntry` work in pointer-layer collection and the drawing walk. Nested inclusive times
+and the phase after a native event becomes Used must not be added or treated as independent frames.
+
+A candidate avoided the intermediate context only when an entry's style chain differs, while keeping the
+same fallback, style and property reads. Existing affected checks passed, but a fresh-colony comparison
+showed no reliable net gain: candidate unprofiled windows were 63.90 / 53.98 / 60.61 / 58.22 / 62.67 FPS;
+instrumented input-related `ContextForEntry` self totals were approximately 213.755 / 210.591 ms. These
+are single runs on different random maps, not precise before/after speedups. The candidate was withdrawn.
+Neither this nor the earlier negative runs reproduces the user's approximately 10-FPS symptom.
+
+An additional bounded profile of the same fixed pair and full-key replay measured the remaining pointer
+queries in the current 25-target / 3-pack page. Across 1,782 instrumented Host Draw passes,
+`ContentLayerOwner` and `IsCovered` each ran 51,678 times and together accounted for 153.913 ms self,
+or 0.0864 ms per Draw against 1.860 ms Draw inclusive (about 4.64%). The parent
+`IsPointerOverHigherLayer` inclusive included those children, popup checking and instrumentation; it is
+not an additional amount to add. On this input and pointer position, an index for owner lookup addresses
+only a small part of Draw, so no new index was retained on this evidence.
 Any optimization must retain ordinary-getter backing changes **without Notify** at their original
 read/synchronization points; it must not poll them at new points either. Shared-label maximum changes,
 unknown rulers at their existing legal revalidation boundary, failed/half candidates, direct standalone
