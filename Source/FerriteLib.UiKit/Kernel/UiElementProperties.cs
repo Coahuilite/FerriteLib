@@ -94,16 +94,19 @@ public sealed partial class UiElementProperties
 
     private sealed class ResolvedSnapshot
     {
-        internal readonly IReadOnlyDictionary<string, UiResolvedProperty<UiColour?>> Colours;
+        internal readonly IReadOnlyDictionary<string, UiResolvedProperty<UiColour?>> Colours, TextColours;
         internal readonly IReadOnlyDictionary<string, UiResolvedProperty<float>> Metrics;
         internal ResolvedSnapshot(Dictionary<string, UiResolvedProperty<UiColour?>> colours,
-            Dictionary<string, UiResolvedProperty<float>> metrics)
+            Dictionary<string, UiResolvedProperty<float>> metrics,
+            Dictionary<string, UiResolvedProperty<UiColour?>> textColours)
         {
             // Detached read-only backups can be shared by captures while the live facts stay unchanged.
             Colours = new ReadOnlyDictionary<string, UiResolvedProperty<UiColour?>>(
                 new Dictionary<string, UiResolvedProperty<UiColour?>>(colours, StringComparer.Ordinal));
             Metrics = new ReadOnlyDictionary<string, UiResolvedProperty<float>>(
                 new Dictionary<string, UiResolvedProperty<float>>(metrics, StringComparer.Ordinal));
+            TextColours = new ReadOnlyDictionary<string, UiResolvedProperty<UiColour?>>(
+                new Dictionary<string, UiResolvedProperty<UiColour?>>(textColours, StringComparer.Ordinal));
         }
     }
 
@@ -114,9 +117,12 @@ public sealed partial class UiElementProperties
         UiResolvedProperty<UiFont> priorFont = ResolvedFont;
         UiResolvedProperty<UiDensity> priorDensity = ResolvedDensity;
         UiResolvedProperty<int?> priorFontSize = ResolvedFontSize;
-        var priorTextRuns = new Dictionary<UiTextPurpose, UiTextFontFact>(TextRuns);
-        ResolvedSnapshot priorResolved = resolvedSnapshot ??= new ResolvedSnapshot(resolvedColours, resolvedMetrics);
-        Action restoreTextColours = CaptureTextColourAuthoring();
+        // Runs can change independently of property resolution. Detach their entries without a
+        // second lookup table; rollback only enumerates them. Resolved text colours share the same
+        // invalidation boundary as the other resolved facts and need just one immutable backup.
+        var priorTextRuns = new KeyValuePair<UiTextPurpose, UiTextFontFact>[TextRuns.Count];
+        ((ICollection<KeyValuePair<UiTextPurpose, UiTextFontFact>>)TextRuns).CopyTo(priorTextRuns, 0);
+        ResolvedSnapshot priorResolved = resolvedSnapshot ??= new ResolvedSnapshot(resolvedColours, resolvedMetrics, resolvedTextColours);
         return () =>
         {
             // Restored derived facts must not reuse a candidate's inputs or rewind runtime writes.
@@ -142,7 +148,8 @@ public sealed partial class UiElementProperties
             ResolvedFontSize = priorFontSize;
             TextRuns.Clear();
             foreach (var pair in priorTextRuns) TextRuns.Add(pair.Key, pair.Value);
-            restoreTextColours();
+            resolvedTextColours.Clear();
+            foreach (var pair in priorResolved.TextColours) resolvedTextColours.Add(pair.Key, pair.Value);
             resolvedColours.Clear();
             foreach (var pair in priorResolved.Colours) resolvedColours.Add(pair.Key, pair.Value);
             resolvedMetrics.Clear();
