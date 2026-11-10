@@ -31,7 +31,31 @@ comparison. It also requested assessment of both adapters. The approved read-onl
 was performed separately; it did not include saves or writes to the formal configuration. The 0.9 line
 remains outside this maintenance change.
 
-### Repeat owner-validation reuse: current local 1.6 pair
+### Clipped display: current local 1.6 pair
+
+The local opt-in `DeferClippedDisplay` policy defers presentation only when an existing Overlay's
+effective clip is empty. It retains ordinary input/operation order, does not treat Deferred as a
+successful paint, and reads current display values when content becomes visible. The 1.6 native
+owner isolates its known mutable label styles for opted-in presentation; unsupported execution
+owners and unselected or custom widgets retain their prior path. The authoring contract and the
+`true`/`false` inheritance rule are in [the consumer guide](../../consumers/consume-from-0.8.0-dev.md#defer-display-work-inside-a-fully-clipped-overlay).
+
+The current private 1.6 pair is `dist/private-clipped-display-20261110/pair`: FL MVID
+`6d8bea0f-75c4-4fb2-bfa6-d8405bf4656f`, US MVID `3fcdb88c-58b5-4bb8-8556-86a8182a1479`.
+Its Source Forms, build inputs, complete roots and rollback to 758/3612 are described in its
+`USE-zh.md`; the tested DLLs were not rebuilt or relabelled after local source integration.
+
+On the same task-created paused colony, 450 complete input passes and their 450 preceding Layout
+passes were compared with the 758/3612 pair using the same parent timers. Host Draw wall was
+1095.5503 / 908.0128 ms and Arrange was 582.2207 / 611.4113 ms for baseline / candidate. The
+single instrumented comparison supports the local cost reduction, not a stable FPS promise. The
+actual native Host adopted the policy and returned Deferred for a fully clipped roster text. Input,
+scroll, capture release and F09 expand/collapse were exercised; F09 performance was not retested.
+Native per-scope exceptional style restoration and physical keyboard/IME remain without runtime
+coverage. Original logs and limits are in `dist/private-layout-20261110/evidence/clipped-display-experiment/`.
+The original approximately 10-FPS report and F09 tail latency remain open.
+
+### Repeat owner-validation reuse: previous local 1.6 pair
 
 A retained Repeat row can reuse a successful reader-subtree owner validation only for the actual sealed
 `UiBindings` owner and the same derived spec, template, registration generation and widget-schema
@@ -50,7 +74,7 @@ and ran predominantly on the main thread; that thread time includes consumer and
 limited observations support the targeted reduction, not a guarantee against tail latency or a solution
 to the original approximately 10-FPS report.
 
-The accepted private pair `dist/private-repeat-20261110/` contains tested FL MVID
+The previous private pair `dist/private-repeat-20261110/` contains tested FL MVID
 `7586240b-275c-489a-b2a0-d1c131d1bd80` and unchanged US MVID
 `361206a0-8ed6-47fb-9b33-cbbe8246e025`, with whole-pair rollback to 017/3612. The FL DLL was built
 from `ee425014f009eac1296922d984ab7ba899a4db5f` plus the recorded four-file dirty patch; the later
@@ -99,7 +123,7 @@ candidate, but unchanged Draw also fell from 1,149.205 to 1,089.388 ms, and the 
 candidate; the source change was withdrawn rather than adding state or further micro-caches. The tested
 binary, exact Source Form, initial failure, existing checks, invalid hidden-window segment and valid
 paired raw data are retained under `dist/private-layout-20261110/evidence/idle-inputs-candidate/`.
-The 758/3612 fixed pair remains the current delivery.
+The 758/3612 fixed pair remains the rollback for the clipped-display delivery above.
 
 ### Cached node identity hash: evaluated and withdrawn
 
@@ -112,8 +136,8 @@ of the two Host parent boundaries did not establish an overall benefit. In F08's
 The four F09 full Arrange observations were 23.837/13.503/54.839/13.009 ms and
 23.603/11.683/49.821/12.054 ms, also with long individual outliers. Those single instrumented runs do
 not establish a regression or a reliable improvement; both new-identity hashing and the larger struct
-can offset fewer repeated hashes. The candidate was withdrawn and the fixed 758/3612 pair remains the
-local delivery. Its source difference, tested binary, checks and native raw records are retained at
+can offset fewer repeated hashes. The candidate was withdrawn; the fixed 758/3612 pair is the rollback
+for the clipped-display delivery. Its source difference, tested binary, checks and native raw records are retained at
 `dist/private-layout-20261110/evidence/f09-nodehash-candidate/`.
 
 ### Current-thread allocation counter is unavailable in this runtime

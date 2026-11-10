@@ -94,6 +94,35 @@ Positions, scroll ranges, clip/hit and popup anchors still change when their act
 Pure tint/hover does not require layout. This is not retained IMGUI pixels: required Repaint continues.
 Use the [layout contract](../openspec/specs/core/layout/spec.md), not an every-frame rebuild or input throttle.
 
+### Defer display work inside a fully clipped Overlay
+
+When a repeated row uses an existing `Overlay` as its native clip, it may opt in to deferred display:
+
+```xml
+<Overlay Id="row-content" DeferClippedDisplay="true">
+  <Widget Id="row-title" Kind="text/wrapped" Bind="title" />
+</Overlay>
+```
+
+The policy is off by default, accepts only `true` or `false`, and is valid only on an `Overlay`.
+Descendant Overlays inherit it when omitted; an explicit `false` disables it for that subtree and an
+explicit `true` can opt a deeper subtree back in. This does not change arrangement, clipping, hit
+layers or which rows exist.
+
+Only while the effective clip is completely empty may the built-in `text/wrapped`, `input/button` and
+`input/checkbox` defer display-only ordinary reads, formatting, fit checks and paint. Those display
+errors and fit findings can therefore surface when the content is shown. When it becomes visible, the
+current display value is read on that pass even if its ordinary getter did not send a notification.
+Input and business operations still run in their original order on every pass, including control
+identity, eligibility, requests, capture and cancellation. Deferred display is not a successful paint:
+it does not clear a presentation fault or replace the last successful retained paint.
+
+The 1.6 native execution owner supports this opt-in by isolating the known mutable label-style fields
+during display. That isolation is a new opt-in behavior; callers must not depend on those fields leaking
+from opted-in display. An execution backend without that capability, an unselected Overlay, custom
+widgets and editors retain the original Draw behavior. This policy does not change standalone drawing or
+grant permission to skip a custom callback.
+
 ## Configure only the appearance you mean
 
 A new UiTheme works without palette assignments. Override one neutral UiColour role or one Font/metric
