@@ -250,8 +250,12 @@ establish an overall benefit. A separate bounded, instrumented replay on the sam
 450 input passes and their 450 immediately preceding Layout passes. The baseline called both
 `ContextForEntry` and `ThemeFor` 331,200 times each; the candidate instead hit its validated context
 331,200 times with no misses or calls to either original method. Instrumentation differed, so its timing
-is not a performance comparison. The clean result therefore does not establish whether validation or
-other FL, consumer and native work absorbed the saved calls. The approximately 10-FPS report and F09 long frames
+is not a performance comparison. A subsequent same-save replay instrumented only the same two Host
+parent boundaries in both runs. Across the 450 input and 450 paired preceding Layout passes, Draw wall
+fell from 1,347.47 to 1,117.84 ms, while Arrange took 590.29 / 599.45 ms; Draw P95 fell from 2.100 to
+1.556 ms per pass. Those parent totals include consumer, native and instrumentation work. The single
+paired run supports a reduction in Host Draw work, whereas the earlier clean A/B/A did not establish
+a reliable end-to-end FPS benefit or identify what limits it. The approximately 10-FPS report and F09 long frames
 remain open. The candidate remains a local experimental branch, not an accepted 0.8.x change; raw
 frames, inputs, screenshots and the task-created fixed save are in local private evidence at
 `dist/private-layout-20261110/evidence/fixed-context-aba/`.
