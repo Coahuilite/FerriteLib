@@ -38,6 +38,8 @@ public sealed class UiElementSpec
     // The declaration is immutable. Retain its exact, ordered plan-key inputs once instead of
     // sorting and serializing every attribute at every natural/final measurement of the subtree.
     private string[]? layoutInputs;
+    // Ordered, nonempty layout-source keys derived from this immutable declaration (duplicates matter).
+    internal string[]? MeasureSourceKeys { get; set; }
     internal void AppendLayoutInputs(List<string> into)
     {
         if (layoutInputs == null)

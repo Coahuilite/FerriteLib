@@ -14,27 +14,49 @@ internal sealed partial class UiLayoutEngine
     }
     private readonly struct SourceSnapshot : IEquatable<SourceSnapshot>
     {
-        private readonly SourceRevision[] entries;
-        internal SourceSnapshot(SourceRevision[] entries) { this.entries = entries; }
+        internal readonly SourceRevision[] Entries;
+        internal SourceSnapshot(SourceRevision[] entries) { Entries = entries; }
         public bool Equals(SourceSnapshot other)
         {
-            if (entries.Length != other.entries.Length) return false;
-            for (int i = 0; i < entries.Length; i++)
-                if (!string.Equals(entries[i].Key, other.entries[i].Key, StringComparison.Ordinal)
-                    || entries[i].Revision != other.entries[i].Revision) return false;
+            if (ReferenceEquals(Entries, other.Entries)) return true;
+            if (Entries.Length != other.Entries.Length) return false;
+            for (int i = 0; i < Entries.Length; i++)
+                if (!string.Equals(Entries[i].Key, other.Entries[i].Key, StringComparison.Ordinal)
+                    || Entries[i].Revision != other.Entries[i].Revision) return false;
             return true;
         }
+    }
+    private readonly struct MeasureContextStamp
+    {
+        private readonly float width, font, size, padding, spacing, gap, row, hairline, label;
+        private readonly bool shared;
+        internal MeasureContextStamp(UiWidgetContext ctx, bool shared)
+        {
+            width = ctx.ViewWidth; font = (float)ctx.Theme.DefaultFont; size = UiTextFonts.For(ctx).Font.Size ?? 0;
+            padding = ctx.Theme.Geometry.Padding; spacing = ctx.Theme.Geometry.Spacing; gap = ctx.Theme.Geometry.Gap;
+            row = ctx.Theme.Geometry.RowHeight; hairline = ctx.Theme.Geometry.Hairline;
+            this.shared = shared; label = shared ? ctx.Node?.SharedLabelWidth ?? 0 : 0;
+            // Preserve the detached-input constructor's validation, after all values have been read.
+            if (!Finite(width) || !Finite(font) || !Finite(size) || !Finite(padding) || !Finite(spacing)
+                || !Finite(gap) || !Finite(row) || !Finite(hairline) || !Finite(label))
+                throw new ArgumentException("Measurement inputs must be finite.");
+        }
+        private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
+        internal bool Equals(MeasureContextStamp other) => width == other.width && font == other.font && size == other.size
+            && padding == other.padding && spacing == other.spacing && gap == other.gap && row == other.row
+            && hairline == other.hairline && label == other.label && shared == other.shared;
     }
     private sealed class LeafMeasure
     {
         internal readonly UiElementSpec Spec;
         internal readonly ITextMetrics Metrics;
-        internal readonly UiMeasureInputs Context, Inputs;
+        internal readonly MeasureContextStamp Context;
+        internal readonly UiMeasureInputs Inputs;
         internal readonly SourceSnapshot Sources;
         internal readonly UiMeasureInputs? Environment;
         internal readonly float Height;
         internal readonly int Pass;
-        internal LeafMeasure(UiElementSpec spec, ITextMetrics metrics, UiMeasureInputs context, SourceSnapshot sources,
+        internal LeafMeasure(UiElementSpec spec, ITextMetrics metrics, MeasureContextStamp context, SourceSnapshot sources,
             UiMeasureInputs inputs, UiMeasureInputs? environment, float height, int pass)
         { Spec = spec; Metrics = metrics; Context = context; Sources = sources; Inputs = inputs; Environment = environment; Height = height; Pass = pass; }
     }
@@ -104,46 +126,69 @@ internal sealed partial class UiLayoutEngine
         return GetContainerKind(spec) == "Repeat" && spec.TryGetAttribute("Template", out string name)
             && templates.TryGetValue(name, out UiElementSpec? template) && ConsumesAvailableHeight(template);
     }
-    private static UiMeasureInputs MeasureContext(UiWidgetContext ctx) => UiMeasureInputs.FromOwnedArrays(numbers: new[]
+    private static MeasureContextStamp MeasureContext(UiWidgetContext ctx) => new(ctx, true);
+    private static SourceSnapshot MeasureSources(UiElementSpec spec, IUiBindingAccess bindings, SourceSnapshot? prior)
     {
-        ctx.ViewWidth, (float)ctx.Theme.DefaultFont, (float)(UiTextFonts.For(ctx).Font.Size ?? 0), ctx.Theme.Geometry.Padding, ctx.Theme.Geometry.Spacing,
-        ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.RowHeight, ctx.Theme.Geometry.Hairline, ctx.Node?.SharedLabelWidth ?? 0
-    });
-    private static SourceSnapshot MeasureSources(UiElementSpec spec, IUiBindingAccess bindings)
-    {
-        string[] keys = { ReadDeclaredBindKey(spec), ReadAttribute(spec, ActionBindAttribute), ReadAttribute(spec, OptionsBindAttribute),
-            ReadAttribute(spec, WidthBindAttribute), ReadAttribute(spec, VisibleBindAttribute), ReadAttribute(spec, "SelectedBind"),
-            ReadAttribute(spec, TabAttribute).Length > 0 ? UiBindings.ActiveTabBind : "" };
-        int count = 0;
-        foreach (string key in keys) if (key.Length > 0) count++;
-        var values = new SourceRevision[count];
-        int index = 0;
+        string[]? keys = spec.MeasureSourceKeys;
+        if (keys == null)
+        {
+            string[] declared = { ReadDeclaredBindKey(spec), ReadAttribute(spec, ActionBindAttribute), ReadAttribute(spec, OptionsBindAttribute),
+                ReadAttribute(spec, WidthBindAttribute), ReadAttribute(spec, VisibleBindAttribute), ReadAttribute(spec, "SelectedBind"),
+                ReadAttribute(spec, TabAttribute).Length > 0 ? UiBindings.ActiveTabBind : "" };
+            var nonempty = new List<string>();
+            foreach (string key in declared) if (key.Length > 0) nonempty.Add(key);
+            spec.MeasureSourceKeys = keys = nonempty.ToArray();
+        }
+        SourceRevision[]? previous = prior?.Entries, values = null;
         // Retain the same ordered reads, including repeated keys and the first throwing read.
-        foreach (string key in keys) if (key.Length > 0) values[index++] = new SourceRevision(key, bindings.GetRevision(key));
-        return new SourceSnapshot(values);
+        for (int i = 0; i < keys.Length; i++)
+        {
+            int revision = bindings.GetRevision(keys[i]);
+            if (values == null && previous != null && previous[i].Revision == revision) continue;
+            if (values == null) values = previous == null ? new SourceRevision[keys.Length] : (SourceRevision[])previous.Clone();
+            values[i] = new SourceRevision(keys[i], revision);
+        }
+        return new SourceSnapshot(values ?? previous ?? Array.Empty<SourceRevision>());
+    }
+    private LeafMeasure? FindLeafMeasure(List<LeafMeasure> records, UiElementSpec spec, MeasureContextStamp context, bool requireContext)
+    {
+        for (int i = records.Count - 1; i >= 0; i--)
+        {
+            LeafMeasure value = records[i];
+            if (ReferenceEquals(value.Spec, spec) && ReferenceEquals(value.Metrics, textMetricsCache!.Source)
+                && (!requireContext || context.Equals(value.Context))) return value;
+        }
+        return null;
     }
     private float MeasureWidgetWithReuse(UiElementSpec spec, IUiWidget widget, UiWidgetContext ctx, UiNode node)
     {
         LayoutScope scope = activeLayoutScope!;
         if (!scope.Leaves.TryGetValue(node.Id, out List<LeafMeasure>? records))
             scope.Leaves.Add(node.Id, records = new List<LeafMeasure>());
-        UiMeasureInputs context = MeasureContext(ctx);
-        LeafMeasure? prior = records.FindLast(value => ReferenceEquals(value.Spec, spec) && ReferenceEquals(value.Metrics, textMetricsCache!.Source) && context.Equals(value.Context));
+        MeasureContextStamp context = MeasureContext(ctx);
+        LeafMeasure? prior = FindLeafMeasure(records, spec, context, true);
         bool enrolled = widget is IUiMeasureParticipant;
         bool contextEqual = prior != null;
-        SourceSnapshot sources = MeasureSources(spec, ctx.Bindings);
-        if (prior == null && enrolled) prior = records.FindLast(value => ReferenceEquals(value.Spec, spec) && ReferenceEquals(value.Metrics, textMetricsCache!.Source));
+        SourceSnapshot sources = MeasureSources(spec, ctx.Bindings, prior?.Sources);
+        if (prior == null && enrolled) prior = FindLeafMeasure(records, spec, context, false);
         if (prior != null && !ctx.Session.IsTripped(node) && !enrolled && prior.Pass == layoutPass) return prior.Height;
         UiMeasureInputs? environment = UiTextFonts.Environment(ctx);
         if (validatedLeaves.TryGetValue(node.Id, out List<LeafMeasure>? validated))
         {
-            LeafMeasure? ready = validated.FindLast(value => value.Pass == layoutPass && ReferenceEquals(value.Spec, spec)
-                && ReferenceEquals(value.Metrics, textMetricsCache!.Source) && context.Equals(value.Context) && sources.Equals(value.Sources)
-                && (!value.Inputs.UsesTextMetrics || value.Environment != null && value.Environment.Equals(environment)));
+            LeafMeasure? ready = null;
+            for (int i = validated.Count - 1; i >= 0; i--)
+            {
+                LeafMeasure value = validated[i];
+                if (value.Pass == layoutPass && ReferenceEquals(value.Spec, spec)
+                    && ReferenceEquals(value.Metrics, textMetricsCache!.Source) && context.Equals(value.Context) && sources.Equals(value.Sources)
+                    && (!value.Inputs.UsesTextMetrics || value.Environment != null && value.Environment.Equals(environment)))
+                { ready = value; break; }
+            }
             if (ready != null)
             {
                 records = WritableLeaves(scope, node, records);
-                records.RemoveAll(value => ReferenceEquals(value.Spec, spec) && context.Equals(value.Context));
+                for (int i = records.Count - 1; i >= 0; i--)
+                    if (ReferenceEquals(records[i].Spec, spec) && context.Equals(records[i].Context)) records.RemoveAt(i);
                 records.Add(ready);
                 return ready.Height;
             }
