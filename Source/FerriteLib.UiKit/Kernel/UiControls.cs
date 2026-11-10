@@ -21,10 +21,18 @@ public sealed partial class UiControls
 
     private bool HasHotControl(UiControlKey key) => Execution.HasCapture(key);
     public bool Button(UiLayoutRect rect, UiWidgetContext ctx) => Activation(rect, ctx).Request;
-    public bool CanReceivePointerPress(UiLayoutRect rect, UiWidgetContext ctx) => CanReceivePointer(ctx) && IsMouseOver(rect);
+    public bool CanReceivePointerPress(UiLayoutRect rect, UiWidgetContext ctx)
+    {
+        RequireOwner(ctx);
+        return IsMouseOver(rect) && CanReceivePointerOwned(ctx);
+    }
     private bool CanReceivePointer(UiWidgetContext ctx)
     {
         RequireOwner(ctx);
+        return CanReceivePointerOwned(ctx);
+    }
+    private bool CanReceivePointerOwned(UiWidgetContext ctx)
+    {
         return !IsInputDisabled(ctx.Node) && session.PointerInputAllowed && session.IsInputGeometryReliable && !session.IsPointerOverHigherLayer(ctx.Node, WindowPointer(ctx)) && session.IsPointInEffectiveClip(WindowPointer(ctx));
     }
 
@@ -124,7 +132,11 @@ public sealed partial class UiControls
     public bool IsMouseUpOver(UiLayoutRect rect) => IsPointerUp() && IsMouseOver(rect);
     public bool IsMouseOver(UiLayoutRect rect) => Input.Phase!=UiFramePhase.None && Input.InputAllowed && rect.Contains(PointerPosition());
     internal bool IsWindowMouseOver(UiLayoutRect rect) => Input.Phase!=UiFramePhase.None && Input.InputAllowed && rect.Contains(Input.Pointer);
-    public bool IsMouseOver(UiLayoutRect rect, UiWidgetContext ctx) => session.IsPointInEffectiveClip(WindowPointer(ctx)) && !session.IsPointerOverHigherLayer(ctx.Node, WindowPointer(ctx)) && IsMouseOver(rect);
+    public bool IsMouseOver(UiLayoutRect rect, UiWidgetContext ctx)
+    {
+        RequireOwner(ctx);
+        return IsMouseOver(rect) && session.IsPointInEffectiveClip(WindowPointer(ctx)) && !session.IsPointerOverHigherLayer(ctx.Node, WindowPointer(ctx));
+    }
     public bool IsEnterPressed() => Input.Phase == UiFramePhase.KeyDown && (Input.Key == UiKey.Return || Input.Key == UiKey.KeypadEnter);
     public bool IsLayoutEvent() => Input.Phase == UiFramePhase.Layout;
     internal bool IsFocusLost(UiLayoutRect rect, UiSession owner) => owner.PassBeganWithPrimaryPress && !IsMouseOver(rect);

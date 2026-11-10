@@ -4,9 +4,10 @@ The local `native-a001-r3` Release carrier keeps API 0.8.0 and the 1.6/net472 ad
 It was built from a dirty Source Form, not the published rc2 artifact. Use its matching Source Form and
 the consumer's recorded fixed input; do not infer its bytes from the rc2 tag or the API version.
 
-The current source and engineering records are committed as a local closeout checkpoint. The fixed
-carrier retains its original dirty-build identity; the new HEAD does not identify the source state
-that produced its bytes. This checkpoint is not a release or performance acceptance.
+The `native-a001-r3` source and engineering records were committed as a local closeout checkpoint.
+The fixed carrier retains its original dirty-build identity; that checkpoint does not identify the
+source state that produced its bytes. Neither the checkpoint nor the pointer change below is a release
+or performance acceptance.
 
 ## Current engineering checkpoint and next owner
 
@@ -25,29 +26,26 @@ Source Forms and whole-pair rollback. Its task archive
 sources, original replay/build recipes and check logs locally; it contains no game or dependencies.
 Do not require that private consumer archive to build a public FL checkout.
 
-This session is closed to implementation, builds, tests and native operation. The next session's
-proposed focus is FL.UiKit performance and its affected existing checks, under a new assignment.
-0.9 is paused for this session, not automatically started or permanently prohibited next session.
-The user has approved read-only copying of formal ModsConfig.xml and US/FL configuration files into
-the isolated directory. It has not been executed; the next session must carry this exact permission
-into its execution scope. No saves, arbitrary other configuration or formal-file writes are included.
-This session remains closed: no formal reads/copies or game operation occur here.
+The subsequent performance assignment authorized the shared pointer change and bounded, isolated 1.6
+comparison. It also requested assessment of both adapters. The approved read-only configuration copy
+was performed separately; it did not include saves or writes to the formal configuration. The 0.9 line
+remains outside this maintenance change.
 
-### First discriminating experiment, after authorization
+### Arrange remains a separate performance question
 
 Start from the existing four-toggle timing and same-sequence raw data, not a new blanket suite.
 The remaining measured hot path is `TryIncremental` visible-entry validation (455.418 ms self),
 `PipelineContext` (263.453 ms) and `UiTextFonts.Environment` (161.252 ms) in the final four-toggle slice;
 `ReusePlan` self is only 6.927 ms. These are instrumented slice totals, not per-frame timings.
 
-The first new measurement should split **collapsed idle versus expanded idle on the same native Host**
+An Arrange-focused measurement can split **collapsed idle versus expanded idle on the same native Host**
 using the existing driver's `timing-start`/`timing-stop` around the existing F09 replay's settled states.
 Keep the candidate, profile, logging/fit policy and environment fixed; leave transition frames outside
 those two idle slices. Compare calls per Arrange pass and self time per call for those three methods,
 then relate them to the already-recorded transition/full-layout cost. This distinguishes recurrent
 visible-tree validation from one-time row materialization before choosing the next edit. Reuse the
 current driver and existing checks; do not create another harness, fixture or generic cache platform.
-This experiment is proposed, not performed by the documentation closeout.
+That comparison was proposed at the earlier closeout; it is separate from the pointer change below.
 
 Any optimization must retain ordinary-getter backing changes **without Notify** at their original
 read/synchronization points; it must not poll them at new points either. Shared-label maximum changes,
@@ -57,6 +55,46 @@ A fallback returned by a guarded measurement is not a successful reusable result
 0.35-second consumer save debounce, field identities and displayed content remain unchanged.
 The [build guide](../../build-and-debug.md#check-the-affected-contract) names the existing commands;
 full suite success is neither required by this handoff nor sufficient for native performance acceptance.
+
+## Pointer eligibility rejects local misses first
+
+The shared controls validate the context owner before testing the pointer against the control's local
+rectangle. A miss no longer queries the effective clip or higher input layers. A hit still follows the
+existing eligibility, clip and layer rules; activation, capture, dragging and editor processing continue
+through their original paths. Point operations and dropdown popup ownership retain their separate paths.
+
+The existing Release host checks cover input layers, clipping, event consumption, capture, popup and
+editing behavior with platform doubles. In an isolated RW 1.6.4871 rev591 comparison, the fixed r3
+carrier and this Release change used the same US assembly and an existing four-toggle replay. The
+instrumented slice made 1,938 / 2,050 Arrange passes. Each of the higher-layer, content-owner and
+covered-layer queries fell from 267,312 / 123,758 calls, or 137.93 / 60.37 per pass. Their respective
+instrumented self times were 0.312 / 0.136, 0.179 / 0.084 and 0.335 / 0.146 ms per pass. Instrumented
+Host Draw inclusive averaged 3.008 / 2.583 ms per pass; method timing adds overhead, and its self
+figures exclude only instrumented child calls. The input trace recorded four expansions in both runs.
+
+In separate, non-method-profiled rapid windows, the F07 input replay measured 80.75 / 80.87 FPS and
+27.47 / 27.89 ms P95; F09 measured 72.12 / 78.64 FPS and 54.97 / 48.34 ms P95. FPS is count divided
+by recorded frame-delta sum; P95 uses the existing sorted-frame convention. Both are single samples,
+with fit enabled but without the operation-cost sample during those windows. The F09 candidate captured
+an expanded screenshot outside the rapid window. The older r3 figures above used an operation-cost
+sample during recording and are not directly comparable. The driver requested a 60 FPS target, but
+the actual runtime pacing behind the higher reported values was not established. These numbers do not
+close native performance acceptance. The isolation used simulated input, an uninitialized Steam client
+and a main-menu settings session, not physical keyboard/IME or a loaded colony.
+
+On the same candidate Host, a further F09 replay compared the existing operation-cost sample off and on
+with detailed logging and fit enabled. In the 4.5-second rapid interval, off / on measured 71.68 / 70.90
+FPS and 48.24 / 49.02 ms P95. Both intervals delivered 36 mouse-down events; the enabled sample counted
+36 expansions. The disabled interval ended collapsed but had no business-operation counter. The enabled
+sample stopped at its 4,096-pass bound after 16.52 seconds, after the rapid interval. This single ordered
+comparison did not show a large sampling penalty in that interval; it does not explain the entire
+difference from the older r3 runs.
+
+The retained 1.6 adapter contract entry passed against its platform doubles. A separate Release build
+against the fixed 1.7.5000 rev1275 reference set also succeeded; it establishes compilation, not 1.7
+native interaction or performance. Both use the shared Kernel change. The 1.7 unknown font environment
+remains conservative and the adapter's editor fallback is unchanged. Further 1.7 validation is deferred
+until the 1.6 work is complete and the local game branch is available.
 
 ## Close ends the current shell lifetime
 
