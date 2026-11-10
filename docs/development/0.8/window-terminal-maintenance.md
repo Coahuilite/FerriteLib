@@ -59,6 +59,21 @@ layout, lifecycle, identity, containment, reactive and API checks passed. Exact 
 failed profiler installation, timing and tail raw data are in local private evidence under
 `dist/private-layout-20261110/evidence/`; no native 1.7 or physical-input acceptance is implied.
 
+### Cached node identity hash: evaluated and withdrawn
+
+The local 1.6 Mono runtime computes the ordinal string hash by scanning the canonical key on each call.
+An experimental `UiNodeId` representation retained the same hash at identity construction, including the
+original default/empty-key result. It passed the existing affected checks, but a same-colony comparison
+of the two Host parent boundaries did not establish an overall benefit. In F08's 450 input passes and
+450 matching preceding Layout passes, Arrange wall was 583.103 / 619.789 ms and Draw wall was
+1,068.133 / 1,093.358 ms for baseline / candidate; the candidate had large individual wall outliers.
+The four F09 full Arrange observations were 23.837/13.503/54.839/13.009 ms and
+23.603/11.683/49.821/12.054 ms, also with long individual outliers. Those single instrumented runs do
+not establish a regression or a reliable improvement; both new-identity hashing and the larger struct
+can offset fewer repeated hashes. The candidate was withdrawn and the fixed 758/3612 pair remains the
+local delivery. Its source difference, tested binary, checks and native raw records are retained at
+`dist/private-layout-20261110/evidence/f09-nodehash-candidate/`.
+
 ### Validated draw-context reuse: local 1.6 handoff
 
 A draw-entry context is reused only after checking its captured inputs, retained style scope, baseline
