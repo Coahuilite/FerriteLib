@@ -209,7 +209,22 @@ instrumented and uninstrumented frames, method logs, driver sources and rejected
 `dist/private-layout-20261110/evidence/f09-full-attribution/`, `f09-container-attribution/` and
 `f09-owner-fastpath-checks/`; they are not a release package.
 
-A later 1.6 baseline run recorded wall time and Windows main-thread CPU at only the Host Arrange and
+A further candidate retained only the last serialized two-declaration style key, validating both current
+array elements by value on every lookup; theme resolution and its failure paths remained unchanged. The
+affected existing style and layout checks passed. In matched instrumented F08 input phases, the key's
+self time fell from 118.760 to 54.965 ms across 248,400 calls, while Host Arrange plus Draw inclusive
+remained 1072.722 / 1070.792 ms across the same 450 input passes. A separate F09 slice did not show a
+key-time reduction. The uninstrumented runs used different random colonies and pacing, so their frame
+differences do not establish a product effect. The candidate was withdrawn for lack of demonstrated
+overall benefit; local raw frames, screenshots, checks and candidate source are retained under
+`dist/private-layout-20261110/evidence/style-key-candidate/`.
+
+In those runs, `Time.unscaledDeltaTime` was fixed at 0.0069375 in every candidate Update sample, despite
+advancing frame timestamps and substantially lower observed Repaint rates; some baseline samples also
+showed that value. The task driver reads the Unity property for each row. The reason for the repeated
+value was not established, so these particular runs use unique Repaint counts and wall time for FPS.
+
+A separate 1.6 baseline run recorded wall time and Windows main-thread CPU at only the Host Arrange and
 Draw boundaries. During a warm F09 four-toggle window, the main thread accumulated 6.96875 seconds of
 CPU in 6.99835 seconds wall; its four revision-matched full arrangements took 31.018, 40.454, 31.122
 and 39.537 ms wall. In the same Host's F08 volume-field run, all 150 key-down, character and key-up
