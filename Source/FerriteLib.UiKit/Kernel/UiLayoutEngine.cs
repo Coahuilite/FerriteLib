@@ -46,6 +46,7 @@ internal sealed partial class UiLayoutEngine
         internal UiLayoutRect Rect;
         internal UiLayoutRect? ContentRect;
         internal int SubtreeCount;
+        internal UiWidgetContext? UnscopedDrawContext;
 
         /// <summary>
         /// Set on the root entry of one MATERIALIZED Repeat row (D4 VisibleRows). The Scroll's counting
@@ -574,7 +575,7 @@ internal sealed partial class UiLayoutEngine
         {
             PlacedEntry entry = entries[index];
             UiLayoutRect rect = ToDrawRect(entry.Rect, viewportPosition, nativeOrigin);
-            UiWidgetContext local = ContextForEntry(entry, ctx, windowOrigin);
+            UiWidgetContext local = DrawContextForEntry(entry, ctx, windowOrigin);
             entry.Node.IsDisabled = ResolveDisabled(entry.Spec, local);
             if (entry.Widget != null)
             {
@@ -637,9 +638,34 @@ internal sealed partial class UiLayoutEngine
     private UiWidgetContext ContextForEntry(PlacedEntry entry, UiWidgetContext ctx, UiLayoutPoint windowOrigin)
     {
         UiWidgetContext local = ctx.WithStyleChain(entry.StyleChain);
-        local = local.WithTheme(ScopeTheme(local, entry.Node));
-        if (entry.MeasureWidth > 0) local = local.WithViewWidth(entry.MeasureWidth);
-        return local.WithWindowOrigin(windowOrigin).WithNode(entry.Node);
+        return local.WithLayout(entry.Node, ScopeTheme(local, entry.Node),
+            entry.MeasureWidth > 0 ? entry.MeasureWidth : local.ViewWidth, windowOrigin, entry.StyleChain);
+    }
+
+    private UiWidgetContext DrawContextForEntry(PlacedEntry entry, UiWidgetContext ctx, UiLayoutPoint windowOrigin)
+    {
+        UiStyleResolver? resolver = styleResolver;
+        UiWidgetContext? unscoped = entry.UnscopedDrawContext;
+        entry.UnscopedDrawContext = null;
+        if (resolver == null || entry.StyleChain == null || entry.StyleChain.Count == 0)
+        {
+            // Resolve on every visit: mutable theme/property changes remain visible between collection
+            // and drawing. Only the immutable context wrapper is retained, never eligibility or values.
+            UiFont font = UiWidgetRegistry.GetFallbackFont(ctx.Source, entry.Node.Kind);
+            UiTheme current = entry.Node.Properties.Apply(entry.Node, resolver?.Baseline ?? ctx.Theme, font);
+            float width = entry.MeasureWidth > 0 ? entry.MeasureWidth : ctx.ViewWidth;
+            if (unscoped == null || !ReferenceEquals(unscoped.Source, ctx.Source)
+                || !ReferenceEquals(unscoped.Session, ctx.Session) || !ReferenceEquals(unscoped.Metrics, ctx.Metrics)
+                || !ReferenceEquals(unscoped.Theme, current) || !ReferenceEquals(unscoped.Translation, ctx.Translation)
+                || !ReferenceEquals(unscoped.Bindings, ctx.Bindings) || !ReferenceEquals(unscoped.Node, entry.Node)
+                || !ReferenceEquals(unscoped.StyleChain, entry.StyleChain) || unscoped.ViewWidth != width
+                || !unscoped.WindowOrigin.Equals(windowOrigin) || !unscoped.ElementId.Equals(entry.Node.Id)
+                || !string.Equals(unscoped.ElementPath, entry.Node.Path, StringComparison.Ordinal))
+                unscoped = ctx.WithLayout(entry.Node, current, width, windowOrigin, entry.StyleChain);
+            entry.UnscopedDrawContext = unscoped;
+            return unscoped;
+        }
+        return ContextForEntry(entry, ctx, windowOrigin);
     }
 
     private static UiLayoutPoint ScopeWindowOrigin(UiLayoutRect rect, UiLayoutPoint? nativeOrigin, UiLayoutPoint windowOrigin)
@@ -674,7 +700,7 @@ internal sealed partial class UiLayoutEngine
             // the same theme instance the Measure half used. The chain is set before the theme because
             // the theme is what the chain resolves to, and the page level (an empty chain) keeps the
             // injected theme rather than a clone of it.
-            UiWidgetContext entryCtx = ContextForEntry(entry, ctx, windowOrigin);
+            UiWidgetContext entryCtx = DrawContextForEntry(entry, ctx, windowOrigin);
 
             // Publish the element's disabled state before anything paints or hit-tests: the funnel's
             // interactive entry points read it, so a disabled element neither executes nor captures the
