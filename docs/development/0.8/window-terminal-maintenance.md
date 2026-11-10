@@ -59,6 +59,27 @@ layout, lifecycle, identity, containment, reactive and API checks passed. Exact 
 failed profiler installation, timing and tail raw data are in local private evidence under
 `dist/private-layout-20261110/evidence/`; no native 1.7 or physical-input acceptance is implied.
 
+### F08 viewport-scoped draw attribution
+
+A bounded 1.6 run of the accepted 758/3612 pair used the same task-created paused colony and 150
+complete numeric key groups. For each of the 450 input passes, its immediately preceding Layout pass
+was also included; all 900 passes were `validated-retained`. With the Host parent boundaries and the
+`voice-list-scroll` scoped-container call instrumented, the complete roster subtree consumed
+754.263 ms of 1,555.629 ms Host Draw wall time (48.486%); Host Arrange was another 621.563 ms.
+The scoped bucket includes visible rows, native and consumer work and necessary input handling; it is
+an upper bound for the whole subtree, not the amount that can safely be skipped. The timer itself and
+other scoped-container checks also perturb the instrumented run.
+
+Before sampling, the actual scroll was at (0, 0): 4 of 12 materialized row roots and 49 of 149
+subtree entries intersected the target scroll's clip after its ancestor clip was applied. Nested clips
+are not resolved by that count. The page and focused 100-value input were inspected, all 150 key
+triplets reached the Host, and the final draft had 153 characters with Live model 1. The initial helper
+installation failed on an ambiguous auxiliary method name; that failed run and the corrected helper,
+geometry table, raw parent timings and actual inputs are retained in
+`dist/private-layout-20261110/evidence/fixed-context-aba/roster-draw-758-v2/README-zh.md`. This
+finding motivates investigation of viewport-aware execution without authorizing skipped callbacks,
+control IDs, focused editors or existing interaction semantics; it is not a virtualisation change or
+an explanation of the original 10-FPS report.
 ### Stable-validation input representation: evaluated and withdrawn
 
 A local candidate avoided materializing a new measurement context or source snapshot when the fully
