@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -7,15 +8,28 @@ public sealed class VerseTextMetrics : ITextMetrics, IUiTextMetricsEnvironment, 
 {
     public VerseTextMetrics(VerseFerriteTextMetrics source) { Source = source ?? throw new ArgumentNullException(nameof(source)); }
     public VerseFerriteTextMetrics Source { get; }
+    private readonly Dictionary<UiTextFont, VerseFerriteTextMetrics.EnvironmentCapture> environments = new();
+    private readonly Dictionary<(UiTextFont, UiTextPurpose), (UiMeasureInputs Original, UiMeasureInputs Result)> purposeEnvironments = new();
     internal static ITextMetrics Compose(ITextMetrics source) => source is VerseFerriteTextMetrics native ? new VerseTextMetrics(native) : source;
     public bool Supports(UiTextPurpose purpose) => VerseTextExecution.SupportsPurpose(purpose);
     public float MeasureText(string text, UiFont font, float width) => Source.MeasureText(text, font, width);
     public float MeasureWidth(string text, UiFont font) => Source.MeasureWidth(text, font);
-    public UiMeasureInputs? CaptureEnvironment(UiFont font) => ((IUiTextMetricsEnvironment)Source).CaptureEnvironment(font);
+    private UiMeasureInputs? CaptureNativeEnvironment(UiTextFont font)
+    {
+        if (!environments.TryGetValue(font, out var capture))
+            environments.Add(font, capture = new VerseFerriteTextMetrics.EnvironmentCapture());
+        return font.Size.HasValue ? Source.NumericEnvironment(font, capture) : Source.CaptureEnvironment(font.Alias, capture);
+    }
+    public UiMeasureInputs? CaptureEnvironment(UiFont font) => CaptureNativeEnvironment(new UiTextFont(font));
     public UiMeasureInputs? CaptureEnvironment(UiTextFont font, UiTextPurpose purpose)
     {
-        UiMeasureInputs? original = font.Size.HasValue ? Source.NumericEnvironment(font) : CaptureEnvironment(font.Alias);
-        return original == null ? null : UiMeasureInputs.Join(original, UiMeasureInputs.FromOwnedArrays(numbers: new[] { (float)(font.Size ?? 0), (float)purpose }));
+        UiMeasureInputs? original = CaptureNativeEnvironment(font);
+        if (original == null) return null;
+        var key = (font, purpose);
+        if (purposeEnvironments.TryGetValue(key, out var prior) && ReferenceEquals(prior.Original, original)) return prior.Result;
+        UiMeasureInputs result = UiMeasureInputs.Join(original, UiMeasureInputs.FromOwnedArrays(numbers: new[] { (float)(font.Size ?? 0), (float)purpose }));
+        purposeEnvironments[key] = (original, result);
+        return result;
     }
     public float MeasureText(string text, UiTextFont font, float width, UiTextPurpose purpose)
         => Calculate(text, font, purpose, width, true);

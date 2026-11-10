@@ -25,9 +25,18 @@ public sealed class UiMeasureInputs : IEquatable<UiMeasureInputs>
     public bool UsesTextMetrics { get; }
     public bool Equals(UiMeasureInputs? other)
     {
+        if (ReferenceEquals(this, other)) return true;
         if (other == null || UsesTextMetrics != other.UsesTextMetrics || text.Length != other.text.Length || numbers.Length != other.numbers.Length) return false;
         for (int i = 0; i < text.Length; i++) if (!string.Equals(text[i], other.text[i], StringComparison.Ordinal)) return false;
         for (int i = 0; i < numbers.Length; i++) if (numbers[i] != other.numbers[i]) return false;
+        return true;
+    }
+    // Compare freshly read environment values without allocating a detached snapshot when unchanged.
+    internal bool Matches(List<string> currentText, float[] currentNumbers)
+    {
+        if (UsesTextMetrics || text.Length != currentText.Count || numbers.Length != currentNumbers.Length) return false;
+        for (int i = 0; i < text.Length; i++) if (!string.Equals(text[i], currentText[i], StringComparison.Ordinal)) return false;
+        for (int i = 0; i < numbers.Length; i++) if (numbers[i] != currentNumbers[i]) return false;
         return true;
     }
     public override bool Equals(object? obj) => obj is UiMeasureInputs other && Equals(other);
