@@ -153,6 +153,18 @@ label path. A dummy `GUI.Label` preserves the OnGUI validity check but not those
 source-contract counterexample, not a build or native-runtime failure; the original state, font and label
 calls remain in place. No corresponding behavior was added to the 1.7 adapter.
 
+A later FPS calibration used the same task-private neutral observer in two isolated colonies: the current
+34 active entries plus the observer, and a minimal Core + five DLC + Harmony + Dubs group plus the
+observer. Both used the real Architect search box, Dubs WindowStack profiling, 1280×900, vSync 1 and
+144 Hz. In complete idle second buckets, unique Repaint and Dubs FPS averaged 142.38 / 142.38 for the
+current group and 143.13 / 143.13 for the minimal group. During approximately 30 full key sequences per
+second, unique Repaint / Dubs averaged 140.80 / 230.60 and 143.50 / 233.00 respectively. Update and
+unique Repaint agreed to within a frame at bucket boundaries; non-scaled delta timings were consistent.
+Dubs' counter includes additional non-Layout GUI calls, so input can inflate its displayed FPS even without
+FL, US or other content mods. The native search box caps text at 30 characters; it is a common counter
+calibration, not an F08 reproduction. Different random maps and the observer leave mod cost and Dubs'
+own overhead unmeasured; a high reading does not explain the user's reported 10 FPS or input backlog.
+
 Any optimization must retain ordinary-getter backing changes **without Notify** at their original
 read/synchronization points; it must not poll them at new points either. Shared-label maximum changes,
 unknown rulers at their existing legal revalidation boundary, failed/half candidates, direct standalone
