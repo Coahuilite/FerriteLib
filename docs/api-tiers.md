@@ -280,7 +280,8 @@ Mutable dependency graphs, queues, caches, default private nodes, geometry stagi
 No ambient UiNative bridge or context-free core hit overload remains. Native controls use explicit
 UiSession.CreateContext and UiControls, with a single callback frame and execution owner. The only
 raw backend contacts are path-pinned and member-pinned in KernelContainmentTests:
-- Adapters/RimWorld16/VerseUiExecution.cs — native input/capture/focus/editing/draw/clip/scroll/resources.
+- Adapters/RimWorld16/VerseUiExecution.cs — native input/capture/focus/editing/draw/clip/scroll/resources;
+  the experimental opt-in clipped-display paint scope also saves and restores `Text.fontStyles` fields.
 - Adapters/RimWorld16/VerseFerriteTextMetrics.cs — real-font measurement and temporary-state restoration.
 - Adapters/RimWorld16/UiWindowHost.cs — window pointer attribution and its own chrome close button.
 The complete Kernel has no backend allowance. The positive control rejects adapter basenames at wrong
