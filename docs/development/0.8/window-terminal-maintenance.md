@@ -61,7 +61,9 @@ failed profiler installation, timing and tail raw data are in local private evid
 
 ### F08 viewport-scoped draw attribution
 
-A bounded 1.6 run of the accepted 758/3612 pair used the same task-created paused colony and 150
+A bounded 1.6 run used the historical FL `ece40178-19f6-4a89-9849-24326502b8be` / US 3612 pair,
+not the accepted FL 758 pair originally recorded here. The identity is corrected from the actual
+runtime load log; the old FL carrier was left in the isolated rig. The run used the same task-created paused colony and 150
 complete numeric key groups. For each of the 450 input passes, its immediately preceding Layout pass
 was also included; all 900 passes were `validated-retained`. With the Host parent boundaries and the
 `voice-list-scroll` scoped-container call instrumented, the complete roster subtree consumed
@@ -79,7 +81,9 @@ geometry table, raw parent timings and actual inputs are retained in
 `dist/private-layout-20261110/evidence/fixed-context-aba/roster-draw-758-v2/README-zh.md`. This
 finding motivates investigation of viewport-aware execution without authorizing skipped callbacks,
 control IDs, focused editors or existing interaction semantics; it is not a virtualisation change or
-an explanation of the original 10-FPS report.
+an explanation of the original 10-FPS report. Its 48.486% is specific to the historical pair and
+does not establish the corresponding cost for 758.
+
 ### Stable-validation input representation: evaluated and withdrawn
 
 A local candidate avoided materializing a new measurement context or source snapshot when the fully
