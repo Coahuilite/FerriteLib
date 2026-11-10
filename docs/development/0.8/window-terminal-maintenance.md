@@ -31,15 +31,17 @@ comparison. It also requested assessment of both adapters. The approved read-onl
 was performed separately; it did not include saves or writes to the formal configuration. The 0.9 line
 remains outside this maintenance change.
 
-### Experimental draw-context candidate: native comparison pending
+### Validated draw-context reuse: local 1.6 handoff
 
-This local experimental branch evaluates reuse of a draw-entry context only after validating its current
-inputs, a successfully retained style scope and the node's full current property resolution. Non-array
-chains and unsuccessful or unretained scopes keep the existing path. Existing Release checks passed;
-the candidate has not been exercised in the native game or accepted for performance, and F08/F09 remain
-open. The candidate DLL in local private evidence was built from base `8327acde6c32cfa40f038b46d849f4c91abf3bdb`
-plus its recorded source difference, with MVID `017ac2c6-de73-4050-a82e-7ed0faf659d7`; the branch commit
-does not re-identify that binary. The previously tested `84f0` / `3612` pair remains the comparison input.
+A draw-entry context is reused only after checking its captured inputs, retained style scope, baseline
+and the node's complete current property resolution. Unsupported chains, unsuccessful construction
+and unretained scopes use the original path. The Release candidate passed 15 existing targeted checks;
+a same-colony two-parent-boundary comparison found lower Host Draw wall cost, while the clean A/B/A
+comparison did not establish an end-to-end FPS gain. The actual tested FL DLL has MVID
+`017ac2c6-de73-4050-a82e-7ed0faf659d7` and was built from base
+`8327acde6c32cfa40f038b46d849f4c91abf3bdb` plus the two-file dirty patch; the later local source
+commit does not re-identify that DLL. Its complete private FL/US pair and layout-pair rollback are at
+`dist/private-context-20261110/`. F08's original approximately 10-FPS report and F09 long frames remain open.
 
 ### Arrange validates every retained entry
 
@@ -266,8 +268,8 @@ fell from 1,347.47 to 1,117.84 ms, while Arrange took 590.29 / 599.45 ms; Draw P
 1.556 ms per pass. Those parent totals include consumer, native and instrumentation work. The single
 paired run supports a reduction in Host Draw work, whereas the earlier clean A/B/A did not establish
 a reliable end-to-end FPS benefit or identify what limits it. The approximately 10-FPS report and F09 long frames
-remain open. The candidate remains a local experimental branch, not an accepted 0.8.x change; raw
-frames, inputs, screenshots and the task-created fixed save are in local private evidence at
+remain open. The validated source change is integrated locally; its tested DLL retains its original
+build identity. Raw frames, inputs, screenshots and the task-created fixed save are in local private evidence at
 `dist/private-layout-20261110/evidence/fixed-context-aba/`.
 
 Any optimization must retain ordinary-getter backing changes **without Notify** at their original
