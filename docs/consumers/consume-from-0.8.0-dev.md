@@ -7,12 +7,12 @@ for partial/custom adoption. Current requirements are in the [specification](../
 
 ## Select the actual input
 
-The published asset is [v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1),
-from a0b5b983c3c13a099c62d936305eaebaf1deb5a8, a non-latest prerelease.
-**rc2 is prepared locally, not published**; see its [notes](../release-notes/v0.8.0-rc2.md).
-Until a real cloud asset exists, rc2 integration uses the explicitly delivered immutable local Release input.
-Record actual source/configuration/DLL identity; do not substitute a moving output, rc1 fallback or relabeled Dev.
-After publication select the real repo/tag/full SHA/asset.
+Select a fixed, delivered DLL that supports the XML and capabilities your page uses. Record its actual
+source, configuration and DLL identity; do not substitute a moving build output or a relabelled carrier.
+The `DeferClippedDisplay` policy described below is available in this task's delivered 1.6 development
+input (FL MVID `6d8bea0f-75c4-4fb2-bfa6-d8405bf4656f`). Older published carriers do not acquire that
+policy merely because their API version is in the same range. The local pair, its source form and rollback
+are identified in `dist/private-clipped-display-20261110/USE-zh.md`.
 
 Only FerriteLib distributes the runtime DLL. Reference it with Private=false and install no second carrier.
 Every consumer checks its own tested range; game dependency metadata cannot express a version:
@@ -96,7 +96,8 @@ Use the [layout contract](../openspec/specs/core/layout/spec.md), not an every-f
 
 ### Defer display work inside a fully clipped Overlay
 
-When a repeated row uses an existing `Overlay` as its native clip, it may opt in to deferred display:
+With the delivered 1.6 development input identified above, a repeated row using an existing `Overlay`
+as its native clip may opt in to deferred display:
 
 ```xml
 <Overlay Id="row-content" DeferClippedDisplay="true">
