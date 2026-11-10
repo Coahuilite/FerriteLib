@@ -70,7 +70,7 @@ public sealed class VerseFerriteTextMetrics : ITextMetrics, IUiTextMetricsEnviro
             if (resource == null) return null;
             var identity = new List<string> { "Verse1.6/IMGUI", resource.GetInstanceID().ToString(CultureInfo.InvariantCulture) };
             identity.AddRange(resource.fontNames);
-            return new UiMeasureInputs(identity.ToArray(), new[] {
+            return UiMeasureInputs.FromOwnedArrays(identity.ToArray(), new[] {
                 (float)Text.Font, resource.fontSize, resource.dynamic ? 1f : 0f,
                 style.fontSize, (float)style.fontStyle, style.richText ? 1f : 0f,
                 style.fixedWidth, style.fixedHeight, style.stretchWidth ? 1f : 0f, style.stretchHeight ? 1f : 0f,

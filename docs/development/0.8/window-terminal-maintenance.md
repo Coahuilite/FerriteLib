@@ -31,21 +31,88 @@ comparison. It also requested assessment of both adapters. The approved read-onl
 was performed separately; it did not include saves or writes to the formal configuration. The 0.9 line
 remains outside this maintenance change.
 
-### Arrange remains a separate performance question
+### Arrange validates every retained entry
 
 Start from the existing four-toggle timing and same-sequence raw data, not a new blanket suite.
 The remaining measured hot path is `TryIncremental` visible-entry validation (455.418 ms self),
 `PipelineContext` (263.453 ms) and `UiTextFonts.Environment` (161.252 ms) in the final four-toggle slice;
 `ReusePlan` self is only 6.927 ms. These are instrumented slice totals, not per-frame timings.
 
-An Arrange-focused measurement can split **collapsed idle versus expanded idle on the same native Host**
-using the existing driver's `timing-start`/`timing-stop` around the existing F09 replay's settled states.
-Keep the candidate, profile, logging/fit policy and environment fixed; leave transition frames outside
-those two idle slices. Compare calls per Arrange pass and self time per call for those three methods,
-then relate them to the already-recorded transition/full-layout cost. This distinguishes recurrent
-visible-tree validation from one-time row materialization before choosing the next edit. Reuse the
-current driver and existing checks; do not create another harness, fixture or generic cache platform.
-That comparison was proposed at the earlier closeout; it is separate from the pointer change below.
+The follow-up split collapsed idle, expanded idle and transition work on the same native Host using the
+existing F09 replay and timing driver. Logging, fit policy and environment were held fixed, with transition
+frames outside the two settled slices. This separates recurring visible-tree validation from full-layout
+work without introducing a new harness or cache platform.
+
+The subsequent 1.6 comparison used the fixed pointer carrier on one Host with detailed logging and fit
+enabled. In instrumented five-second settled slices, collapsed / expanded Arrange averaged 0.717 /
+1.562 ms per pass; the expanded slice visited approximately 269 retained entries per pass, versus 159
+collapsed. Neither idle slice made a full candidate. A four-toggle slice made four full candidates and
+1,984 recursive core measurements; its maximum Arrange was 34.134 ms. These are instrumented observations,
+not a decomposition of a particular frame or a sum of recursive inclusive timings.
+
+The follow-up retains the same validations and all existing reads. Engine-created measurement inputs
+can take ownership of their fresh arrays, while the public constructor still copies caller-owned arrays
+and checks finite values. Binding-source snapshots retain ordered key and exact integer revision pairs
+instead of formatting revisions as strings; repeated keys and each `GetRevision` call remain in order.
+Native font environments are still captured at the original call sites, including unknown environments.
+Compared with the pointer carrier in matching instrumented slices, expanded Arrange averaged 1.562 /
+1.407 ms per pass; the source-snapshot self time averaged 0.135 / 0.087 ms per pass. This single comparison
+supports a reduction in recurring validation cost, not a guarantee of frame rate. Four-toggle full-candidate
+and recursive-measure counts remained unchanged; its maximum Arrange was 40.535 ms, so the full-layout
+peak remains a separate problem rather than a demonstrated improvement.
+
+In one matching, non-method-profiled input replay against the pointer carrier, F07's rapid window measured
+80.87 / 86.55 FPS and 27.89 / 27.26 ms P95; F09 measured 78.64 / 80.79 FPS and 48.34 / 47.96 ms P95.
+F09's maximum frame was 69.59 / 83.50 ms. The edited number received the scripted characters and an
+expanded parameter panel was rendered. These single simulated-input samples show no clear F09 tail fix;
+the candidate's runtime later reported targetFrameRate 60, vSyncCount 1 and refresh rate 144 Hz; the
+request is not an observed 60 FPS cap.
+
+A separate 1.6 F08 replay used a read-only copy of the current configuration and the corresponding
+isolated content load: the actual page showed 25 targets and three selected voice packs. After 20 shell
+close/reopen cycles, the live field was prepared from 4 to 100 before sampling. All 240 scripted
+100↔1009 key events reached the editor; the operation sample recorded 240 write requests, zero model
+changes and an unchanged content revision. In the eight-second input window the recorded rate was
+118.15 FPS with 14.11 ms P95 and 41.95 ms maximum; the sample ended at its 4,096-pass bound after
+13.617 seconds, covering that input window. This short no-op replay does not represent the reported
+continuous, growing draft. The current load
+is an approximation, not a record of the historical incident; the isolated run also reported unresolved
+sound references from the mod stack.
+
+A subsequent full-layout candidate memoized only template-independent `ConsumesAvailableHeight` results
+within an Arrange call, cleared on every exit. In the existing four-toggle profile, the actual recursive
+overload fell from 32,224 to 6,694 calls, but Arrange averaged 0.994 / 1.159 ms per pass and its maximum
+was 40.531 / 53.274 ms; settled slices likewise showed no net improvement. These are single instrumented
+samples, not proof of regression. The memo was removed rather than retaining state without measured benefit.
+
+The consumer clarified F08 as rapid, varied digit key presses in the output-volume field on a loaded
+colony with Dubs Performance Analyzer's GUI window-stack chart active. In isolated, newly generated
+250×250 colonies with the current 25 targets / 3 packs, the fixed candidate and the original response/rc2
+pair each accepted 1,080 identical pseudo-random digits at 30 characters per second, starting at 100;
+all arrived in order and the draft grew to 1,083 characters. The fixed candidate measured 80.65–82.80
+FPS across four input windows and the old pair 67.69–70.35; neither reproduced the approximately 10-FPS
+report. The old run included 20 direct close/reopen calls, unlike the candidate run; their maps also differed,
+so these figures do not establish a before/after improvement. This first sender delivered character messages
+only, not the full key sequence.
+
+On the old pair in another isolated colony, a five-second 30-key/s replay sent key-down and key-up only;
+Unity generated the matching character events. All 150 down, character and up events reached the field
+and the draft grew from 3 to 153 characters. Five one-second frame windows measured 40.59, 42.65, 44.75,
+44.16 and 43.00 FPS; the final input event followed the last key-up by 15.98 ms. That result still does not
+reproduce the reported near-10 FPS or input backlog, and its synthetic rate and fresh colony are not the
+user's original conditions. Dubs' displayed FPS counts GUI calls and is not interchangeable with frame
+counts. On the same Host and map, after returning the draft to 100, a character-only replay of the same
+150 digits produced 78.49, 79.06, 59.16, 79.17 and 75.94 FPS; its last character followed its final post
+by 12.23 ms. This ordered single comparison supports substantial event-processing cost, not an attribution
+of the user's full slowdown.
+
+A separate method-profiled full-key run on the old pair recorded 150 each of key-down, character and
+key-up Host passes. Instrumented Arrange averaged 0.962 / 0.809 / 0.803 ms per pass and Draw inclusive
+averaged 1.808 / 1.808 / 1.852 ms per pass for those phases. Layout and Repaint added further passes.
+The native editor wrapper's measured self time was much smaller in those event phases; events can become
+Used inside a draw, so child phase totals cannot all be assigned back to the initiating phase. Instrumented
+timings are not FPS measurements. Raw events and screenshots are retained in local private evidence;
+physical keyboard, IME, the user's established colony and Steam remain outside these runs.
 
 Any optimization must retain ordinary-getter backing changes **without Notify** at their original
 read/synchronization points; it must not poll them at new points either. Shared-label maximum changes,
@@ -77,8 +144,8 @@ In separate, non-method-profiled rapid windows, the F07 input replay measured 80
 by recorded frame-delta sum; P95 uses the existing sorted-frame convention. Both are single samples,
 with fit enabled but without the operation-cost sample during those windows. The F09 candidate captured
 an expanded screenshot outside the rapid window. The older r3 figures above used an operation-cost
-sample during recording and are not directly comparable. The driver requested a 60 FPS target, but
-the actual runtime pacing behind the higher reported values was not established. These numbers do not
+sample during recording and are not directly comparable. The driver requested a 60 FPS target. A later isolated runtime readback reported targetFrameRate 60,
+vSyncCount 1 and refresh rate 144 Hz, so the request was not an observed 60 FPS cap. These numbers do not
 close native performance acceptance. The isolation used simulated input, an uninitialized Steam client
 and a main-menu settings session, not physical keyboard/IME or a loaded colony.
 

@@ -6,15 +6,35 @@ namespace FerriteLib.UiKit.Kernel;
 
 internal sealed partial class UiLayoutEngine
 {
+    private readonly struct SourceRevision
+    {
+        internal readonly string Key;
+        internal readonly int Revision;
+        internal SourceRevision(string key, int revision) { Key = key; Revision = revision; }
+    }
+    private readonly struct SourceSnapshot : IEquatable<SourceSnapshot>
+    {
+        private readonly SourceRevision[] entries;
+        internal SourceSnapshot(SourceRevision[] entries) { this.entries = entries; }
+        public bool Equals(SourceSnapshot other)
+        {
+            if (entries.Length != other.entries.Length) return false;
+            for (int i = 0; i < entries.Length; i++)
+                if (!string.Equals(entries[i].Key, other.entries[i].Key, StringComparison.Ordinal)
+                    || entries[i].Revision != other.entries[i].Revision) return false;
+            return true;
+        }
+    }
     private sealed class LeafMeasure
     {
         internal readonly UiElementSpec Spec;
         internal readonly ITextMetrics Metrics;
-        internal readonly UiMeasureInputs Context, Inputs, Sources;
+        internal readonly UiMeasureInputs Context, Inputs;
+        internal readonly SourceSnapshot Sources;
         internal readonly UiMeasureInputs? Environment;
         internal readonly float Height;
         internal readonly int Pass;
-        internal LeafMeasure(UiElementSpec spec, ITextMetrics metrics, UiMeasureInputs context, UiMeasureInputs sources,
+        internal LeafMeasure(UiElementSpec spec, ITextMetrics metrics, UiMeasureInputs context, SourceSnapshot sources,
             UiMeasureInputs inputs, UiMeasureInputs? environment, float height, int pass)
         { Spec = spec; Metrics = metrics; Context = context; Sources = sources; Inputs = inputs; Environment = environment; Height = height; Pass = pass; }
     }
@@ -84,19 +104,23 @@ internal sealed partial class UiLayoutEngine
         return GetContainerKind(spec) == "Repeat" && spec.TryGetAttribute("Template", out string name)
             && templates.TryGetValue(name, out UiElementSpec? template) && ConsumesAvailableHeight(template);
     }
-    private static UiMeasureInputs MeasureContext(UiWidgetContext ctx) => new(numbers: new[]
+    private static UiMeasureInputs MeasureContext(UiWidgetContext ctx) => UiMeasureInputs.FromOwnedArrays(numbers: new[]
     {
         ctx.ViewWidth, (float)ctx.Theme.DefaultFont, (float)(UiTextFonts.For(ctx).Font.Size ?? 0), ctx.Theme.Geometry.Padding, ctx.Theme.Geometry.Spacing,
         ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.RowHeight, ctx.Theme.Geometry.Hairline, ctx.Node?.SharedLabelWidth ?? 0
     });
-    private static UiMeasureInputs MeasureSources(UiElementSpec spec, IUiBindingAccess bindings)
+    private static SourceSnapshot MeasureSources(UiElementSpec spec, IUiBindingAccess bindings)
     {
         string[] keys = { ReadDeclaredBindKey(spec), ReadAttribute(spec, ActionBindAttribute), ReadAttribute(spec, OptionsBindAttribute),
             ReadAttribute(spec, WidthBindAttribute), ReadAttribute(spec, VisibleBindAttribute), ReadAttribute(spec, "SelectedBind"),
             ReadAttribute(spec, TabAttribute).Length > 0 ? UiBindings.ActiveTabBind : "" };
-        var values = new List<string>();
-        foreach (string key in keys) if (key.Length > 0) { values.Add(key); values.Add(bindings.GetRevision(key).ToString(CultureInfo.InvariantCulture)); }
-        return new UiMeasureInputs(values.ToArray());
+        int count = 0;
+        foreach (string key in keys) if (key.Length > 0) count++;
+        var values = new SourceRevision[count];
+        int index = 0;
+        // Retain the same ordered reads, including repeated keys and the first throwing read.
+        foreach (string key in keys) if (key.Length > 0) values[index++] = new SourceRevision(key, bindings.GetRevision(key));
+        return new SourceSnapshot(values);
     }
     private float MeasureWidgetWithReuse(UiElementSpec spec, IUiWidget widget, UiWidgetContext ctx, UiNode node)
     {
@@ -107,7 +131,7 @@ internal sealed partial class UiLayoutEngine
         LeafMeasure? prior = records.FindLast(value => ReferenceEquals(value.Spec, spec) && ReferenceEquals(value.Metrics, textMetricsCache!.Source) && context.Equals(value.Context));
         bool enrolled = widget is IUiMeasureParticipant;
         bool contextEqual = prior != null;
-        UiMeasureInputs sources = MeasureSources(spec, ctx.Bindings);
+        SourceSnapshot sources = MeasureSources(spec, ctx.Bindings);
         if (prior == null && enrolled) prior = records.FindLast(value => ReferenceEquals(value.Spec, spec) && ReferenceEquals(value.Metrics, textMetricsCache!.Source));
         if (prior != null && !ctx.Session.IsTripped(node) && !enrolled && prior.Pass == layoutPass) return prior.Height;
         UiMeasureInputs? environment = UiTextFonts.Environment(ctx);

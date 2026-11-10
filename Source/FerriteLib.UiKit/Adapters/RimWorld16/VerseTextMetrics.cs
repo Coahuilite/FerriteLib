@@ -15,7 +15,7 @@ public sealed class VerseTextMetrics : ITextMetrics, IUiTextMetricsEnvironment, 
     public UiMeasureInputs? CaptureEnvironment(UiTextFont font, UiTextPurpose purpose)
     {
         UiMeasureInputs? original = font.Size.HasValue ? Source.NumericEnvironment(font) : CaptureEnvironment(font.Alias);
-        return original == null ? null : UiMeasureInputs.Join(original, new UiMeasureInputs(numbers: new[] { (float)(font.Size ?? 0), (float)purpose }));
+        return original == null ? null : UiMeasureInputs.Join(original, UiMeasureInputs.FromOwnedArrays(numbers: new[] { (float)(font.Size ?? 0), (float)purpose }));
     }
     public float MeasureText(string text, UiTextFont font, float width, UiTextPurpose purpose)
         => Calculate(text, font, purpose, width, true);

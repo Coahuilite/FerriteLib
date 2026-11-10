@@ -9,13 +9,19 @@ public sealed class UiMeasureInputs : IEquatable<UiMeasureInputs>
     private readonly string[] text;
     private readonly float[] numbers;
     public UiMeasureInputs(string[]? text = null, float[]? numbers = null, bool usesTextMetrics = false)
+        : this(text, numbers, usesTextMetrics, false) { }
+
+    private UiMeasureInputs(string[]? text, float[]? numbers, bool usesTextMetrics, bool owned)
     {
-        this.text = text == null ? Array.Empty<string>() : (string[])text.Clone();
-        this.numbers = numbers == null ? Array.Empty<float>() : (float[])numbers.Clone();
+        this.text = text == null ? Array.Empty<string>() : owned ? text : (string[])text.Clone();
+        this.numbers = numbers == null ? Array.Empty<float>() : owned ? numbers : (float[])numbers.Clone();
         UsesTextMetrics = usesTextMetrics;
         foreach (float value in this.numbers)
             if (float.IsNaN(value) || float.IsInfinity(value)) throw new ArgumentException("Measurement inputs must be finite.");
     }
+    // Only pass freshly created arrays that no caller retains or can mutate.
+    internal static UiMeasureInputs FromOwnedArrays(string[]? text = null, float[]? numbers = null, bool usesTextMetrics = false)
+        => new(text, numbers, usesTextMetrics, true);
     public bool UsesTextMetrics { get; }
     public bool Equals(UiMeasureInputs? other)
     {
