@@ -59,6 +59,23 @@ layout, lifecycle, identity, containment, reactive and API checks passed. Exact 
 failed profiler installation, timing and tail raw data are in local private evidence under
 `dist/private-layout-20261110/evidence/`; no native 1.7 or physical-input acceptance is implied.
 
+### Stable-validation input representation: evaluated and withdrawn
+
+A local candidate avoided materializing a new measurement context or source snapshot when the fully
+read current values matched a prior successful record. It retained the existing measurement wrapper,
+source/metric read order, scope lookup and transaction; it did not skip native environment capture or
+change callback timing. The initial build exposed a direct `ReadLayoutRole` dependency, which was fixed
+before the existing Release and targeted layout, failure, reactive, Repeat, item, editing and API checks.
+
+With the same task-created colony at the observed 60 Hz, 450 input passes and their 450 preceding Layout
+passes were all `validated-retained` in both runs. Host Arrange was 617.806 / 576.515 ms for baseline /
+candidate, but unchanged Draw also fell from 1,149.205 to 1,089.388 ms, and the baseline included a
+17.408 ms single-pass outlier. This single comparison does not isolate a reliable improvement from the
+candidate; the source change was withdrawn rather than adding state or further micro-caches. The tested
+binary, exact Source Form, initial failure, existing checks, invalid hidden-window segment and valid
+paired raw data are retained under `dist/private-layout-20261110/evidence/idle-inputs-candidate/`.
+The 758/3612 fixed pair remains the current delivery.
+
 ### Cached node identity hash: evaluated and withdrawn
 
 The local 1.6 Mono runtime computes the ordinal string hash by scanning the canonical key on each call.
