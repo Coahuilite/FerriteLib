@@ -74,6 +74,17 @@ can offset fewer repeated hashes. The candidate was withdrawn and the fixed 758/
 local delivery. Its source difference, tested binary, checks and native raw records are retained at
 `dist/private-layout-20261110/evidence/f09-nodehash-candidate/`.
 
+### Current-thread allocation counter is unavailable in this runtime
+
+The actual 1.6 Mono `GC.GetAllocatedBytesForCurrentThread()` method returned without throwing, but on
+one warm F09 run its main-thread cumulative value stayed at zero across 1,664 Host boundary pairs and
+348 Repaint samples over 6.998 seconds. The same thread's recording path constructed and retained a
+string for each Repaint. Process-wide collection counts rose during the window but do not attribute
+allocation to the main thread. The zero values therefore cannot establish an allocation budget, and the
+planned F08 allocation segment was not run. This runtime reported vSync 1 and refresh 60 Hz in that
+instance. Raw endpoints, thread identity, recorder source and runtime metadata are retained at
+`dist/private-layout-20261110/evidence/fixed-context-aba/alloc-758/`.
+
 ### Validated draw-context reuse: local 1.6 handoff
 
 A draw-entry context is reused only after checking its captured inputs, retained style scope, baseline
