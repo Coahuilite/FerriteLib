@@ -47,15 +47,31 @@ public sealed class VerseFerriteTextMetrics : ITextMetrics, IUiTextMetricsEnviro
         }
         finally { Text.Font = previousFont; Text.Anchor = previousAnchor; Text.WordWrap = previousWrap; }
     }
-    internal UiMeasureInputs? NumericEnvironment(UiTextFont font)
-        => HasUnityFontEnvironment ? WithFontSize(font, true, () => CaptureUnityEnvironment(font.Alias)) : null;
+    // Owned by the composed, window-local ruler, never by the shared legacy singleton. Scratch arrays
+    // are not published: changed snapshots detach them before becoming measurement-cache inputs.
+    internal sealed class EnvironmentCapture
+    {
+        internal readonly List<string> Identity = new();
+        internal readonly float[] Numbers = new float[22];
+        private UiMeasureInputs? last;
+        internal UiMeasureInputs Snapshot()
+        {
+            if (last != null && last.Matches(Identity, Numbers)) return last;
+            return last = new UiMeasureInputs(Identity.ToArray(), (float[])Numbers.Clone());
+        }
+    }
+    internal UiMeasureInputs? NumericEnvironment(UiTextFont font, EnvironmentCapture? capture = null)
+        => HasUnityFontEnvironment ? WithFontSize(font, true, () => CaptureUnityEnvironment(font.Alias, capture)) : null;
+
+    internal UiMeasureInputs? CaptureEnvironment(UiFont font, EnvironmentCapture capture)
+        => HasUnityFontEnvironment ? CaptureUnityEnvironment(font, capture) : null;
 
     UiMeasureInputs? IUiTextMetricsEnvironment.CaptureEnvironment(UiFont font)
         => HasUnityFontEnvironment ? CaptureUnityEnvironment(font) : null;
 
     // Keep unavailable Unity members out of the 1.7 caller's JIT body, including under inlining.
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static UiMeasureInputs? CaptureUnityEnvironment(UiFont font)
+    private static UiMeasureInputs? CaptureUnityEnvironment(UiFont font, EnvironmentCapture? capture = null)
     {
 #if FER_RW17
         // UnityStubs has no complete native font revision. Revoke reuse instead of inventing a stamp.
@@ -68,15 +84,23 @@ public sealed class VerseFerriteTextMetrics : ITextMetrics, IUiTextMetricsEnviro
             GUIStyle style = Text.CurFontStyle;
             Font resource = style.font;
             if (resource == null) return null;
-            var identity = new List<string> { "Verse1.6/IMGUI", resource.GetInstanceID().ToString(CultureInfo.InvariantCulture) };
+            List<string> identity = capture?.Identity ?? new List<string>();
+            identity.Clear();
+            identity.Add("Verse1.6/IMGUI");
+            identity.Add(resource.GetInstanceID().ToString(CultureInfo.InvariantCulture));
             identity.AddRange(resource.fontNames);
-            return new UiMeasureInputs(identity.ToArray(), new[] {
-                (float)Text.Font, resource.fontSize, resource.dynamic ? 1f : 0f,
-                style.fontSize, (float)style.fontStyle, style.richText ? 1f : 0f,
-                style.fixedWidth, style.fixedHeight, style.stretchWidth ? 1f : 0f, style.stretchHeight ? 1f : 0f,
-                (float)style.imagePosition, (float)style.clipping, style.contentOffset.x, style.contentOffset.y,
-                style.padding.left, style.padding.right, style.padding.top, style.padding.bottom,
-                style.border.left, style.border.right, style.border.top, style.border.bottom });
+            float[] values = capture?.Numbers ?? new float[22];
+            values[0] = (float)Text.Font; values[1] = resource.fontSize; values[2] = resource.dynamic ? 1f : 0f;
+            values[3] = style.fontSize; values[4] = (float)style.fontStyle; values[5] = style.richText ? 1f : 0f;
+            values[6] = style.fixedWidth; values[7] = style.fixedHeight;
+            values[8] = style.stretchWidth ? 1f : 0f; values[9] = style.stretchHeight ? 1f : 0f;
+            values[10] = (float)style.imagePosition; values[11] = (float)style.clipping;
+            values[12] = style.contentOffset.x; values[13] = style.contentOffset.y;
+            values[14] = style.padding.left; values[15] = style.padding.right;
+            values[16] = style.padding.top; values[17] = style.padding.bottom;
+            values[18] = style.border.left; values[19] = style.border.right;
+            values[20] = style.border.top; values[21] = style.border.bottom;
+            return capture?.Snapshot() ?? new UiMeasureInputs(identity.ToArray(), values);
         }
         finally { Text.Font = previous; }
 #endif
