@@ -74,6 +74,31 @@ public sealed class UiStyleResolver
     private int observedBaselineRevision;
     private int observedPropertyRevision;
 
+    // A draw entry may avoid repeating a scope lookup only while the exact successful cache entry
+    // and the baseline facts that admitted it are still current.
+    internal readonly struct ScopeReuse
+    {
+        private readonly UiStyleResolver owner;
+        private readonly UiTheme baseline, scoped;
+        private readonly string key;
+        private readonly int layout, colour, properties;
+        internal ScopeReuse(UiStyleResolver owner, string key, UiTheme scoped)
+        {
+            this.owner = owner; baseline = owner.baseline; this.key = key; this.scoped = scoped;
+            layout = baseline.LayoutRevision; colour = baseline.ColourRevision;
+            properties = baseline.PropertyRevision;
+        }
+        internal bool IsCurrent(UiStyleResolver resolver)
+        {
+            if (!ReferenceEquals(owner, resolver) || !ReferenceEquals(baseline, resolver.baseline)) return false;
+            return layout == baseline.LayoutRevision && colour == baseline.ColourRevision
+                && properties == baseline.PropertyRevision
+                && layout == resolver.observedBaselineRevision && colour == resolver.observedBaselineColourRevision
+                && properties == resolver.observedPropertyRevision
+                && resolver.regionThemes.TryGetValue(key, out UiTheme? current) && ReferenceEquals(scoped, current);
+        }
+    }
+
     public UiStyleResolver(UiTheme baseline, UiStyleDocument document)
     {
         this.baseline = baseline ?? throw new ArgumentNullException(nameof(baseline));
@@ -176,6 +201,15 @@ public sealed class UiStyleResolver
 
         regionThemes.Add(key, theme);
         return theme;
+    }
+
+    internal ScopeReuse? CaptureScopeReuse(UiStyleDeclaration[] chain, UiTheme result)
+    {
+        // The original ThemeFor call has completed. A scope rebuilt beyond the budget was not admitted
+        // and must continue to take that original path on every use.
+        string key = ScopeKey(chain);
+        return regionThemes.TryGetValue(key, out UiTheme? retained) && ReferenceEquals(retained, result)
+            ? new ScopeReuse(this, key, result) : null;
     }
 
     /// <summary>

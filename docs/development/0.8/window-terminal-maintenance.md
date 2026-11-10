@@ -31,6 +31,16 @@ comparison. It also requested assessment of both adapters. The approved read-onl
 was performed separately; it did not include saves or writes to the formal configuration. The 0.9 line
 remains outside this maintenance change.
 
+### Experimental draw-context candidate: native comparison pending
+
+This local experimental branch evaluates reuse of a draw-entry context only after validating its current
+inputs, a successfully retained style scope and the node's full current property resolution. Non-array
+chains and unsuccessful or unretained scopes keep the existing path. Existing Release checks passed;
+the candidate has not been exercised in the native game or accepted for performance, and F08/F09 remain
+open. The candidate DLL in local private evidence was built from base `8327acde6c32cfa40f038b46d849f4c91abf3bdb`
+plus its recorded source difference, with MVID `017ac2c6-de73-4050-a82e-7ed0faf659d7`; the branch commit
+does not re-identify that binary. The previously tested `84f0` / `3612` pair remains the comparison input.
+
 ### Arrange validates every retained entry
 
 Start from the existing four-toggle timing and same-sequence raw data, not a new blanket suite.

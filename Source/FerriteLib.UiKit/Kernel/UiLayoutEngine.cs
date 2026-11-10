@@ -46,6 +46,7 @@ internal sealed partial class UiLayoutEngine
         internal UiLayoutRect Rect;
         internal UiLayoutRect? ContentRect;
         internal int SubtreeCount;
+        internal DrawContextReuse? DrawContext;
 
         /// <summary>
         /// Set on the root entry of one MATERIALIZED Repeat row (D4 VisibleRows). The Scroll's counting
@@ -62,6 +63,39 @@ internal sealed partial class UiLayoutEngine
         internal float Width;
         internal float Height;
         internal List<PlacedEntry> Entries = new();
+    }
+
+    private sealed class DrawContextReuse
+    {
+        internal readonly UiWidgetContext Input, Result;
+        internal readonly UiStyleDeclaration[] Chain, Values;
+        internal readonly UiStyleResolver.ScopeReuse Scope;
+        internal readonly UiLayoutPoint WindowOrigin;
+        internal DrawContextReuse(UiWidgetContext input, UiWidgetContext result, UiStyleDeclaration[] chain,
+            UiStyleResolver.ScopeReuse scope, UiLayoutPoint windowOrigin)
+        {
+            Input = input; Result = result; Chain = chain; Values = (UiStyleDeclaration[])chain.Clone();
+            Scope = scope; WindowOrigin = windowOrigin;
+        }
+        internal bool Matches(PlacedEntry entry, UiWidgetContext input, UiStyleDeclaration[] chain, UiLayoutPoint origin)
+        {
+            if (!ReferenceEquals(Chain, chain) || chain.Length != Values.Length || !WindowOrigin.Equals(origin)
+                || !ReferenceEquals(Result.Node, entry.Node) || !ReferenceEquals(Input.Node, input.Node)
+                || !Result.ElementId.Equals(entry.Node.Id)
+                || !string.Equals(Result.ElementPath, entry.Node.Path, StringComparison.Ordinal)
+                || !Result.WindowOrigin.Equals(origin)
+                || !ReferenceEquals(Input.Source, input.Source) || !ReferenceEquals(Input.Session, input.Session)
+                || !ReferenceEquals(Input.Metrics, input.Metrics) || !ReferenceEquals(Input.Theme, input.Theme)
+                || !ReferenceEquals(Input.Translation, input.Translation) || !ReferenceEquals(Input.Bindings, input.Bindings)
+                || !ReferenceEquals(Input.StyleChain, input.StyleChain) || !Input.ElementId.Equals(input.ElementId)
+                || !string.Equals(Input.ElementPath, input.ElementPath, StringComparison.Ordinal)
+                || Input.ViewWidth != input.ViewWidth || !Input.WindowOrigin.Equals(input.WindowOrigin)
+                || Result.ViewWidth != (entry.MeasureWidth > 0 ? entry.MeasureWidth : input.ViewWidth)) return false;
+            for (int i = 0; i < chain.Length; i++)
+                if (!string.Equals(Values[i].Scheme, chain[i].Scheme, StringComparison.Ordinal)
+                    || !string.Equals(Values[i].Density, chain[i].Density, StringComparison.Ordinal)) return false;
+            return true;
+        }
     }
 
     private const float SectionTitleHeight = 22f;
@@ -599,7 +633,7 @@ internal sealed partial class UiLayoutEngine
         {
             PlacedEntry entry = entries[index];
             UiLayoutRect rect = ToDrawRect(entry.Rect, viewportPosition, nativeOrigin);
-            UiWidgetContext local = ContextForEntry(entry, ctx, windowOrigin);
+            UiWidgetContext local = DrawContextForEntry(entry, ctx, windowOrigin);
             entry.Node.IsDisabled = ResolveDisabled(entry.Spec, local);
             if (entry.Widget != null)
             {
@@ -667,6 +701,36 @@ internal sealed partial class UiLayoutEngine
             windowOrigin, entry.StyleChain);
     }
 
+    private UiWidgetContext DrawContextForEntry(PlacedEntry entry, UiWidgetContext ctx, UiLayoutPoint windowOrigin)
+    {
+        DrawContextReuse? previous = entry.DrawContext;
+        // A failed lookup or construction must not leave the previous result admitted for a later pass.
+        entry.DrawContext = null;
+        UiStyleResolver? resolver = styleResolver;
+        if (resolver == null || entry.StyleChain is not UiStyleDeclaration[] chain || chain.Length == 0)
+            return ContextForEntry(entry, ctx, windowOrigin);
+
+        UiFont fallback = UiWidgetRegistry.GetFallbackFont(ctx.Source, entry.Node.Kind);
+        if (previous != null && previous.Matches(entry, ctx, chain, windowOrigin) && previous.Scope.IsCurrent(resolver)
+            && entry.Node.Properties.TryCurrentResolution(entry.Node, resolver.Baseline, fallback, out UiTheme retained)
+            && ReferenceEquals(previous.Result.Theme, retained))
+        {
+            entry.DrawContext = previous;
+            return previous.Result;
+        }
+
+        // A missing or uncached scope must take the original path, including located findings and the
+        // scope budget. Only a successfully retained scope can admit a drawing context for later reuse.
+        UiWidgetContext local = ctx.WithStyleChain(chain);
+        UiTheme scoped = resolver.ThemeFor(chain, entry.Node.Id.Path);
+        UiStyleResolver.ScopeReuse? scope = resolver.CaptureScopeReuse(chain, scoped);
+        UiTheme theme = entry.Node.Properties.Apply(entry.Node, resolver.Baseline, fallback);
+        UiWidgetContext result = local.WithLayout(entry.Node, theme, entry.MeasureWidth > 0 ? entry.MeasureWidth : local.ViewWidth,
+            windowOrigin, chain);
+        entry.DrawContext = scope.HasValue ? new DrawContextReuse(ctx, result, chain, scope.Value, windowOrigin) : null;
+        return result;
+    }
+
     private static UiLayoutPoint ScopeWindowOrigin(UiLayoutRect rect, UiLayoutPoint? nativeOrigin, UiLayoutPoint windowOrigin)
         => nativeOrigin.HasValue ? new UiLayoutPoint(windowOrigin.X + rect.X, windowOrigin.Y + rect.Y) : rect.Position;
 
@@ -699,7 +763,7 @@ internal sealed partial class UiLayoutEngine
             // the same theme instance the Measure half used. The chain is set before the theme because
             // the theme is what the chain resolves to, and the page level (an empty chain) keeps the
             // injected theme rather than a clone of it.
-            UiWidgetContext entryCtx = ContextForEntry(entry, ctx, windowOrigin);
+            UiWidgetContext entryCtx = DrawContextForEntry(entry, ctx, windowOrigin);
 
             // Publish the element's disabled state before anything paints or hit-tests: the funnel's
             // interactive entry points read it, so a disabled element neither executes nor captures the
