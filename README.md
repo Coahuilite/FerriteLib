@@ -10,8 +10,8 @@ mod authors. It adds no Defs, patches, languages or textures; enabling it alone 
 | Item | Status |
 | --- | --- |
 | Version | 0.8.0, API range `[0.8.0, 0.9.0)` |
-| Published | [v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1) (GitHub prerelease, not latest) |
-| In preparation | v0.8.0-rc2, local only, not published; see the [release notes](docs/release-notes/v0.8.0-rc2.md) |
+| Published | [v0.8.0-rc2](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc2) (GitHub prerelease, not latest), source `197ff6b3ae99bb3e957e22eaa8be70aca5858447`; see the [release notes](docs/release-notes/v0.8.0-rc2.md) |
+| Local maintenance | `native-a001-r3`, unpublished; engineering and partial native evidence accepted, performance unfinished. See the [checkpoint](docs/development/0.8/window-terminal-maintenance.md) |
 | RimWorld 1.6 | Primary target |
 | RimWorld 1.7 | Basic-compatibility candidate: reuses the 1.6 payload and has not been verified in game; there is no separate 1.7 adapter |
 

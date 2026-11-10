@@ -35,6 +35,22 @@ public sealed class UiElementSpec
     {
     }
 
+    // The declaration is immutable. Retain its exact, ordered plan-key inputs once instead of
+    // sorting and serializing every attribute at every natural/final measurement of the subtree.
+    private string[]? layoutInputs;
+    internal void AppendLayoutInputs(List<string> into)
+    {
+        if (layoutInputs == null)
+        {
+            var names = new List<string>(Attributes.Keys);
+            names.Sort(StringComparer.Ordinal);
+            var values = new List<string> { Kind, Id, names.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) };
+            foreach (string name in names) { values.Add(name); values.Add(Attributes[name]); }
+            layoutInputs = values.ToArray();
+        }
+        into.AddRange(layoutInputs);
+    }
+
     public bool TryGetAttribute(string name, out string value) => Attributes.TryGetValue(name, out value!);
     public bool TryGetNumber(string name, out float value)
     {

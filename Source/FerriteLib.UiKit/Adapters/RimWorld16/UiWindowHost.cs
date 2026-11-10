@@ -43,6 +43,14 @@ public enum UiWindowNotice
 public abstract class UiWindowHost : Window
 {
     private UiHost? host;
+    // PreOpen distinguishes native lifetimes from the supported independent/off-stack entry.
+    // Once native, a late draw cannot reopen this instance; only its next PreOpen can.
+    private bool nativeLifetime;
+    private bool closed;
+    private int lifetime;
+    private int drawDepth;
+    private int drawLifetime;
+    private int closeDepth;
     protected VerseUiExecution Execution { get; } = new VerseUiExecution();
     private VerseTextExecution? textExecution;
     private VerseTextExecution TextExecution => textExecution ??= new VerseTextExecution(Execution);
@@ -97,7 +105,7 @@ public abstract class UiWindowHost : Window
     protected abstract UiTheme Theme { get; }
 
     /// <summary>
-    /// Builds the page this window hosts. Called at most once per window instance, inside the guarded
+    /// Builds the page this window hosts. Called at most once per window lifetime, inside the guarded
     /// draw pass, so a factory that throws is reported through the failure contract rather than
     /// reaching the window stack.
     /// </summary>
@@ -370,10 +378,43 @@ public abstract class UiWindowHost : Window
     /// </summary>
     public sealed override void DoWindowContents(Rect inRect)
     {
-        using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, host == null ? null : TextMetrics, host?.Session))
+        // Native key dispatch may close before this callback; nativeLifetime keeps that close
+        // terminal. Independent drawing has no stack dispatch of its own and reopens only here,
+        // outside any active contents pass or PreClose callback.
+        if (!EnterDrawPass()) return;
+        try
         {
-            DrawShell(inRect);
+            using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, host == null ? null : TextMetrics, host?.Session))
+            {
+                DrawShell(inRect);
+            }
         }
+        finally { drawDepth--; }
+    }
+
+    private bool PassEnded => closed || closeDepth != 0 || (drawDepth != 0 && drawLifetime != lifetime);
+
+    private bool EnterDrawPass()
+    {
+        if (closeDepth != 0 || (drawDepth != 0 && drawLifetime != lifetime)) return false;
+        if (closed)
+        {
+            // Only the next independent top-level direct call starts another lifetime. Neither a
+            // closing callback nor a nested draw can reopen while the original pass is unwinding.
+            if (nativeLifetime || drawDepth != 0) return false;
+            BeginLifetime();
+        }
+        if (drawDepth == 0) drawLifetime = lifetime;
+        drawDepth++;
+        return true;
+    }
+
+    private void BeginLifetime()
+    {
+        closed = false;
+        lifetime++;
+        pageUnavailable = noticeDueNextFrame = false;
+        lastFailure = null;
     }
 
     /// <summary>
@@ -408,10 +449,11 @@ public abstract class UiWindowHost : Window
     /// </summary>
     public override void OnCancelKeyPressed()
     {
-        if (!displayRequired) return;
+        if (PassEnded || !displayRequired) return;
         UiHost? page = host;
         if(page!=null)page.Session.SetFrame(Execution.CaptureFrame(!IsOpen || Find.WindowStack.GetsInput(this)),TextExecution);
         if (page != null && page.TryHandleCancel()) return;
+        if (PassEnded) return;
 
         if (TryHandleUnansweredCancel())
         {
@@ -422,7 +464,7 @@ public abstract class UiWindowHost : Window
             return;
         }
 
-        base.OnCancelKeyPressed();
+        if (!PassEnded) base.OnCancelKeyPressed();
     }
 
     /// <summary>
@@ -451,19 +493,21 @@ public abstract class UiWindowHost : Window
     /// </summary>
     public sealed override void OnAcceptKeyPressed()
     {
-        if (!displayRequired) return;
+        if (PassEnded || !displayRequired) return;
         UiHost? page = host;
         if(page!=null)page.Session.SetFrame(Execution.CaptureFrame(!IsOpen || Find.WindowStack.GetsInput(this)),TextExecution);
         if (page != null && page.TryHandleAccept()) return;
 
-        base.OnAcceptKeyPressed();
+        if (!PassEnded) base.OnAcceptKeyPressed();
     }
 
     private void DrawShell(Rect inRect)
     {
-        if (!displayRequired) return;
+        if (closed || !displayRequired) return;
+        int passLifetime = lifetime;
         ResolvePointerDown();
-        if (!DrawChrome(inRect)) return;
+        if (closed || lifetime != passLifetime || !DrawChrome(inRect)) return;
+        if (closed || lifetime != passLifetime) return;
 #if FER_DEV
         // DT1 (r2 reading): the shell's chrome joins the instrument's TWO channels from this one place.
         // Keep the geometry the chrome just drew. BeforeDraw may publish the PREVIOUS completed pass;
@@ -473,7 +517,9 @@ public abstract class UiWindowHost : Window
         Rect chromeCloseNow = CloseButtonRect(inRect);
 #endif
         Rect content = ContentRect(inRect);
-        BeforeDraw(content);
+        try { BeforeDraw(content); }
+        catch (Exception error) { RecordDrawFailure(error); return; }
+        if (closed || lifetime != passLifetime) return;
 
         if (pageUnavailable)
         {
@@ -481,7 +527,9 @@ public abstract class UiWindowHost : Window
             return;
         }
 
-        if (!PrerequisiteVerified)
+        bool prerequisite = PrerequisiteVerified;
+        if (closed || lifetime != passLifetime) return;
+        if (!prerequisite)
         {
             DrawNoticeScoped(content, UiWindowNotice.Prerequisite);
             return;
@@ -504,13 +552,21 @@ public abstract class UiWindowHost : Window
             if (host == null)
             {
                 UiHost created = CreateHost();
+                // A factory can synchronously close before returning its owned host. Publish it
+                // only to teardown, so factory-side borrows receive the same release notification.
+                host = created;
+                if (closed || lifetime != passLifetime) { ReleaseHost(); return; }
                 created.AdoptTextMetrics(Metrics, TextMetrics);
                 created.SetDisplayDemand(displayRequired);
-                host = created;
                 // Before the first draw of that host, which is the whole point of the door: a subscription
                 // made here sees the first frame, and a consumer never has to poll for a host that does not
                 // exist yet.
-                HostAttached?.Invoke(created);
+                if (HostAttached is Action<UiHost> attached)
+                    foreach (Action<UiHost> attach in attached.GetInvocationList())
+                    {
+                        attach(created);
+                        if (closed || lifetime != passLifetime || host == null) break;
+                    }
             }
 
             // The announcement door is public, and closing the window is a legitimate thing for a handler to
@@ -518,12 +574,13 @@ public abstract class UiWindowHost : Window
             // close runs PreClose -> ReleaseHost, which nulls this field and disposes the host, so the pass
             // that was about to draw it has nothing left to draw. Re-read the field rather than the local
             // created above: ReleaseHost nulls the field precisely so the close is observable here.
-            if (host == null)
+            if (closed || lifetime != passLifetime || host == null)
             {
                 return;
             }
 
             host.DrawFrame(VerseUiExecution.Rect(content), Execution.CaptureFrame(!IsOpen || Find.WindowStack.GetsInput(this)), TextExecution);
+            if (closed || lifetime != passLifetime || host == null) return;
 #if FER_DEV
             // The host can be created on this first pass, or released by a close during DrawFrame.
             // Resolve its own subscription now; never inherit the outer scope's pre-creation null.
@@ -556,6 +613,8 @@ public abstract class UiWindowHost : Window
     /// </summary>
     public override void PreOpen()
     {
+        nativeLifetime = true;
+        BeginLifetime();
         Vector2? normal = AppliedOptions?.NormalSize;
         if (normal.HasValue)
         {
@@ -635,17 +694,24 @@ public abstract class UiWindowHost : Window
 
     public override void PreClose()
     {
-        // The target is dropped before the page goes away, so no input or capture reaches a closing
-        // window; the catalog then removes the instance for real at PostClose.
-        catalog?.NotifyPreClose(this);
-
-        // Closing disposes the session with the host, so reopening gets a clean retry.
-        try { ReleaseHost(); }
-        finally
+        closed = true;
+        lifetime++;
+        closeDepth++;
+        try
         {
-            try { Execution.Dispose(); }
-            finally { base.PreClose(); }
+            // The target is dropped before the page goes away, so no input or capture reaches a closing
+            // window; the catalog then removes the instance for real at PostClose.
+            catalog?.NotifyPreClose(this);
+
+            // Closing disposes the session with the host, so reopening gets a clean retry.
+            try { ReleaseHost(); }
+            finally
+            {
+                try { Execution.Dispose(); }
+                finally { base.PreClose(); }
+            }
         }
+        finally { closeDepth--; }
     }
 
     public override void PostClose()
@@ -785,6 +851,7 @@ public abstract class UiWindowHost : Window
 
     private bool DrawChromeCore(Rect rect)
     {
+        int chromeLifetime = lifetime;
         UiTheme theme = Theme;
         UiThemeDraw.Workspace(Execution,VerseUiExecution.Rect(rect),theme);
         bool backgroundSucceeded = true;
@@ -797,6 +864,7 @@ public abstract class UiWindowHost : Window
                 backgroundSucceeded = false;
             }
         }
+        if (closed || lifetime != chromeLifetime) return false;
         UiThemeDraw.Solid(Execution,VerseUiExecution.Rect(new Rect(rect.x, rect.y, rect.width, AccentBarHeight)),theme[UiPaletteRole.Accent]);
 
         if (Title.Length > 0)

@@ -21,16 +21,19 @@ internal sealed partial class UiLayoutEngine
     private sealed class LayoutScope
     {
         internal readonly Dictionary<UiNodeId, List<LeafMeasure>> Leaves = new();
+        private readonly HashSet<UiNodeId> sharedLeaves = new();
         internal readonly Dictionary<string, UiLayoutReuse> Plans = new(StringComparer.Ordinal);
         internal readonly Dictionary<string, UiNodeId> PlanNodes = new(StringComparer.Ordinal);
         internal LayoutScope Copy()
         {
             var copy = new LayoutScope();
-            foreach (var pair in Leaves) copy.Leaves.Add(pair.Key, new List<LeafMeasure>(pair.Value));
+            // Records are immutable; fork only the list that a candidate actually changes.
+            foreach (var pair in Leaves) { copy.Leaves.Add(pair.Key, pair.Value); copy.sharedLeaves.Add(pair.Key); }
             foreach (var pair in Plans) copy.Plans.Add(pair.Key, pair.Value);
             foreach (var pair in PlanNodes) copy.PlanNodes.Add(pair.Key, pair.Value);
             return copy;
         }
+        internal bool OwnLeaf(UiNodeId id) => sharedLeaves.Remove(id);
     }
     private Dictionary<UiNodeId, LayoutScope> layoutScopes = new();
     internal void ReleaseLayoutCaches()
@@ -160,7 +163,7 @@ internal sealed partial class UiLayoutEngine
     }
     private List<LeafMeasure> WritableLeaves(LayoutScope scope, UiNode node, List<LeafMeasure> records)
     {
-        if (incrementalValidation && layoutScopes.TryGetValue(node.UpdateScopeRoot, out var committed)
+        if (scope.OwnLeaf(node.Id) || incrementalValidation && layoutScopes.TryGetValue(node.UpdateScopeRoot, out var committed)
             && committed.Leaves.TryGetValue(node.Id, out var original) && ReferenceEquals(original, records))
         {
             records = new List<LeafMeasure>(records);
@@ -191,10 +194,7 @@ internal sealed partial class UiLayoutEngine
 
     private static void AppendDefinition(List<string> into, UiElementSpec spec)
     {
-        into.Add(spec.Kind); into.Add(spec.Id);
-        var names = new List<string>(spec.Attributes.Keys); names.Sort(StringComparer.Ordinal);
-        into.Add(names.Count.ToString(CultureInfo.InvariantCulture));
-        foreach (string name in names) { into.Add(name); into.Add(spec.Attributes[name]); }
+        spec.AppendLayoutInputs(into);
     }
 
     private UiLayoutPlan ReusePlan(UiNode node, UiElementSpec spec, string phase, UiLayoutFrame frame, IReadOnlyList<ChildSlot> visible,
@@ -214,13 +214,15 @@ internal sealed partial class UiLayoutEngine
         }
         string key = node.Id.Key + ":" + phase + ":" + frame.Width.ToString("R", CultureInfo.InvariantCulture);
         LayoutScope scope = activeLayoutScope!;
-        scope.Plans.TryGetValue(key, out UiLayoutReuse? prior);
+        bool newVariant = !scope.Plans.TryGetValue(key, out UiLayoutReuse? prior);
         UiMeasureInputs inputs = new UiMeasureInputs(text.ToArray(), values.ToArray());
         UiLayoutReuse next = UiLayoutReuse.Resolve(prior, inputs, measure, calculate, out bool reused);
         RecordStack(node, phase, frame, visible, children, inputs, next, key);
         if (!reused) node.LayoutArrangeCount++;
         scope.Plans[key] = next;
         scope.PlanNodes[key] = node.Id;
+        // Replacing an existing constraint cannot grow the bounded variant set.
+        if (!newVariant) return next.Plan;
         var variants = new List<string>();
         string prefix = node.Id.Key + ":" + phase + ":";
         foreach (string candidate in scope.Plans.Keys) if (scope.PlanNodes[candidate].Equals(node.Id) && candidate.StartsWith(prefix, StringComparison.Ordinal)) variants.Add(candidate);

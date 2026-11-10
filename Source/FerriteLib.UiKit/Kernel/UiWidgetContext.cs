@@ -196,6 +196,17 @@ public sealed class UiWidgetContext
     /// </summary>
     internal UiWidgetContext WithMetrics(ITextMetrics metrics) => new(Source, Session, metrics, Theme, Translation, Bindings, ViewWidth, ElementPath, WindowOrigin, ElementId, Node, StyleChain);
 
+    // The engine already knows the complete entry context. Construct that result once instead of
+    // allocating the intermediate WithStyleChain/Theme/Width/Origin/Node copies on every pass.
+    internal UiWidgetContext WithLayout(UiNode node, UiTheme theme, float viewWidth,
+        UiLayoutPoint windowOrigin, IReadOnlyList<UiStyleDeclaration>? styleChain)
+    {
+        if (node == null) throw new ArgumentNullException(nameof(node));
+        if (!ReferenceEquals(node.Owner, Session)) throw new InvalidOperationException("Context node belongs to another session.");
+        return new UiWidgetContext(Source, Session, Metrics, theme, Translation, Bindings, viewWidth,
+            node.Path, windowOrigin, node.Id, node, styleChain);
+    }
+
     public UiWidgetContext WithViewWidth(float viewWidth)
     {
         return new UiWidgetContext(Source, Session, Metrics, Theme, Translation, Bindings, viewWidth, ElementPath, WindowOrigin, ElementId, Node, StyleChain);

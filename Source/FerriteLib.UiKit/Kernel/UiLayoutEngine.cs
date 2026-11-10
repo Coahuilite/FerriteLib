@@ -210,7 +210,7 @@ internal sealed partial class UiLayoutEngine
         labelContributions = new Dictionary<UiNodeId, RoleInput>(labelContributions);
         var priorScopes = layoutScopes;
         layoutScopes = new Dictionary<UiNodeId, LayoutScope>();
-        foreach (var pair in priorScopes) { layoutScopes.Add(pair.Key, pair.Value.Copy()); ctx.Session.LayoutWork.CopiedScopes++; foreach(var records in pair.Value.Leaves.Values) ctx.Session.LayoutWork.CopiedLeaves += records.Count; }
+        foreach (var pair in priorScopes) { layoutScopes.Add(pair.Key, pair.Value.Copy()); ctx.Session.LayoutWork.CopiedScopes++; }
         activeLayoutScope = null;
         Action restoreArrangement = ctx.Session.CaptureArrangement();
         var priorKeys = new Dictionary<string, List<UiNode>>(keyNodes, StringComparer.Ordinal);
@@ -662,9 +662,9 @@ internal sealed partial class UiLayoutEngine
     private UiWidgetContext ContextForEntry(PlacedEntry entry, UiWidgetContext ctx, UiLayoutPoint windowOrigin)
     {
         UiWidgetContext local = ctx.WithStyleChain(entry.StyleChain);
-        local = local.WithTheme(ScopeTheme(local, entry.Node));
-        if (entry.MeasureWidth > 0) local = local.WithViewWidth(entry.MeasureWidth);
-        return local.WithWindowOrigin(windowOrigin).WithNode(entry.Node);
+        UiTheme theme = ScopeTheme(local, entry.Node);
+        return local.WithLayout(entry.Node, theme, entry.MeasureWidth > 0 ? entry.MeasureWidth : local.ViewWidth,
+            windowOrigin, entry.StyleChain);
     }
 
     private static UiLayoutPoint ScopeWindowOrigin(UiLayoutRect rect, UiLayoutPoint? nativeOrigin, UiLayoutPoint windowOrigin)
@@ -1098,7 +1098,7 @@ internal sealed partial class UiLayoutEngine
             // widgets (e.g. stacked narrow Mood rows) agree with the Draw pass, which already uses
             // entry.MeasureWidth via WithViewWidth. The element is bound to this context too, so a
             // widget's Measure and Draw report the same identity for the same element.
-            UiWidgetContext measureCtx = ctx.WithViewWidth(width).WithNode(node);
+            UiWidgetContext measureCtx = ctx.WithLayout(node, ctx.Theme, width, ctx.WindowOrigin, ctx.StyleChain);
 
             // The same element scope the draw pass enters, and the same try/finally: the guard recovers
             // a throwing Measure, so the scope must not leak into the sibling measured next.
@@ -1149,7 +1149,7 @@ internal sealed partial class UiLayoutEngine
 
         if (container.Entries.Count > 0)
         {
-            container.Entries[0].LayoutInputs = new LayoutStamp(ctx.WithViewWidth(width).WithNode(node));
+            container.Entries[0].LayoutInputs = new LayoutStamp(ctx.WithLayout(node, ctx.Theme, width, ctx.WindowOrigin, ctx.StyleChain));
             container.Entries[0].HasContentHeightReference = matchContent && reference.HasValue;
         }
         return container;
@@ -1378,10 +1378,31 @@ internal sealed partial class UiLayoutEngine
                 participant.SharedLabelWidth = column;
         }
 
+        // Natural-size discovery, retained-plan validation and final allocation can ask the same
+        // child subtree for the same result several times. Retain only its LAST successful result
+        // inside this one plan invocation. A changed constraint still traverses it; the next arrange
+        // creates a fresh delegate, so ordinary getters and unknown metrics keep their synchronization.
+        var lastWidth = new float[children.Count];
+        var lastAvailable = new float[children.Count];
+        var lastReference = new float?[children.Count];
+        var successful = new bool[children.Count];
         return (index, width, availableHeight, reference) =>
         {
-            MeasuredBox box = MeasureElement(ctx, children[index].Spec, width, availableHeight, nodes[index], reference ?? NoContentHeightReference);
+            UiElementSpec child = children[index].Spec;
+            bool container = GetContainerKind(child).Length > 0;
+            float effectiveAvailable = container && !ConsumesAvailableHeight(child) ? 0 : availableHeight;
+            MeasuredBox box = measured[index];
+            if (container && successful[index] && ctx.Session.TrippedNodes.Count == 0 && box != null && lastWidth[index] == width
+                && lastAvailable[index] == effectiveAvailable && lastReference[index] == reference)
+                return new UiLayoutSize(box.Width, box.Height);
+            box = MeasureElement(ctx, child, width, availableHeight, nodes[index], reference ?? NoContentHeightReference);
             measured[index] = box;
+            lastWidth[index] = width;
+            lastAvailable[index] = effectiveAvailable;
+            lastReference[index] = reference;
+            // A guarded leaf failure returns a fallback box rather than throwing. It is not a
+            // successful subtree result, including if a later callback recovers that leaf.
+            successful[index] = ctx.Session.TrippedNodes.Count == 0;
             return new UiLayoutSize(box.Width, box.Height);
         };
     }
@@ -1819,7 +1840,9 @@ internal sealed partial class UiLayoutEngine
             if (measured[i].Entries.Count > 0)
                 measured[i].Entries[0].IsMaterializedRow = true;
         MeasuredBox box = AssembleLayout(ctx, spec, kind, node, plan, measured);
-        materializedRepeats.Add(new MaterializedRepeat(node.Id, state));
+        // Natural/final or scrollbar-width measurements share this pass's materialization.
+        // Identity pruning needs that row set once, not once per measurement request.
+        if (!IsMaterializedThisPass(node.Id)) materializedRepeats.Add(new MaterializedRepeat(node.Id, state));
         return box;
     }
 

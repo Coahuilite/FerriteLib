@@ -22,6 +22,7 @@ internal sealed partial class StepperSliderWidget : IUiWidget, IUiMeasurePartici
     private const float Gap = 6f;
 
     private UiElementSpec spec = UiElementSpec.Empty;
+    private UiNumericEdit numeric = new(0, 1);
     private readonly UiRetainedPaint retained = new();
     bool IUiRetainedDisplay.PaintLast(UiLayoutRect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
     UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
@@ -42,7 +43,9 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
 
     public void Configure(UiElementSpec spec)
     {
+        if (ReferenceEquals(this.spec, spec)) return;
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
+        numeric = new UiNumericEdit(ReadFloat("Min", 0), ReadFloat("Max", 1), Read("Format"));
     }
 
     public void Validate(IUiBindingAccess bindings, string elementPath)
@@ -88,13 +91,9 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         float min = ReadFloat("Min", 0f);
         float max = ReadFloat("Max", 1f);
         float step = Math.Max(0.0001f, ReadFloat("Step", 1f));
-        string format = Read("Format");
-        if (format.Length == 0)
-            format = "0.##";
         bool live = ReadBool("Live", false);
         string bindKey = ReadBindKey();
         float current = ctx.Bindings.TryGet(bindKey, out float bound) ? bound : min;
-        var numeric = new UiNumericEdit(min, max, format);
         UiEditSession<float> editor = ctx.Controls.Editor<float>(ctx, bindKey, numeric.Format, numeric.Parse);
         editor.Observe(current);
         string label = ReadLabel(ctx);

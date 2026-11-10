@@ -5,6 +5,23 @@ current task and applicable permissions; preserve the separate 1.6/native and 1.
 
 ## 0.8 RC follow-up
 
+- [ ] Continue FL.UiKit performance and affected existing checks in the next separately authorized
+      session. The [native-r3 checkpoint](docs/development/0.8/window-terminal-maintenance.md) owns
+      exact identity, accepted engineering/partial native scope, remaining hot paths, counterexamples
+      and the first discriminating experiment. The current session is documentation/evidence closeout,
+      not permission to build or run. Performance is unfinished; F08's original 10 FPS is unreproduced,
+      F09 rapid P95 did not improve, and physical IME/user-save/restart and the old consumer Packs
+      fixture remain open. Do not promote the 1.7 workbench or old managed checks into 1.6 acceptance.
+      The consumer's existing dist now retains a private raw-evidence index; TEMP is not the only handoff.
+      The user has approved read-only copying of formal ModsConfig.xml and US/FL configuration files
+      into the isolated directory; it has not been executed and belongs to the next session's matching
+      execution scope. No saves, other configuration reads or formal-file changes are authorized.
+      This session remains closed. 0.9 is paused for this session and must be
+      explicitly reassigned next session; it does not start automatically.
+
+Earlier bundle/Report/native acceptance items below keep their original scope and recovery pairs;
+they do not supersede this native-r3 performance checkpoint or erase its partial native evidence.
+
 - [ ] Complete exact 1.6 native acceptance — CO's SUM-FL08-RW16-CONVERGENCE-20261109 r1 records
       actual US consumption of the fixed net472 Release/FER_DEV roots and the complete paired candidate.
       TASK-VC-FL A001 closed the selected existing managed-check gaps on those exact DLLs.
@@ -41,6 +58,20 @@ implemented. Current requirements are reached through `docs/specification.md`; i
 > and `OBLIVIONIS.md`; a closed item is a pointer here, not a paragraph.
 
 ## Local review coverage
+
+### Native-r3 engineering and documentation closeout
+
+- **Owner / reviewed_at:** Astra, ASTRA-UI-ATTACK-20261110 / native-doc-closeout; 2026-11-10T08:58:51.2331124+08:00 (Asia/Hong_Kong).
+- **Reviewed-through:** Retained native-r3 engineering review and PM receipt; this closeout reconciled
+  current TODO/build/development entry points, immutable pair versus current isolated identity, the
+  relevant original checks and raw-evidence/replay archive. Product/test sources and fixed packages
+  were not changed; no build/test/native run was performed for documentation.
+- **Lesson / continuation:** The development record applies the existing legal-caller/failure and
+  evidence-layer rules to the failed PreOpen-only repair and bounded reuse. It names the next
+  collapsed-versus-expanded idle-cost experiment; no new lesson file, Seen count or protocol map.
+  PM records the approved, unexecuted bounded configuration copy for next-session handoff and owns
+  remaining user acceptance. Detailed gaps stay at that
+  checkpoint, not a second state ledger. Earlier independent review scopes below remain historical inputs.
 
 ### RW1.6 validation-closure scope
 

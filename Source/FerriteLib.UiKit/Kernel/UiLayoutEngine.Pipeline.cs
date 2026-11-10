@@ -257,6 +257,6 @@ internal sealed partial class UiLayoutEngine
         UiFont fallback = UiWidgetRegistry.GetFallbackFont(ctx.Source, entry.Node.Kind);
         if (!entry.Node.Properties.TryCurrentResolution(entry.Node, host, fallback, out UiTheme theme))
         { journal.Touch(entry.Node); theme = entry.Node.Properties.Apply(entry.Node, host, fallback); }
-        return ctx.WithStyleChain(entry.StyleChain).WithTheme(theme).WithViewWidth(entry.MeasureWidth).WithNode(entry.Node);
+        return ctx.WithLayout(entry.Node, theme, entry.MeasureWidth, ctx.WindowOrigin, entry.StyleChain);
     }
 }

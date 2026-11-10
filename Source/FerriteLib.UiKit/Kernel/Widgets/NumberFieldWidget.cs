@@ -9,9 +9,8 @@ internal sealed partial class NumberFieldWidget : IUiWidget, IUiMeasureParticipa
 {
     public const string Kind = "input/number-field";
 
-    private const string DefaultFormat = "0.##";
-
     private UiElementSpec spec = UiElementSpec.Empty;
+    private UiNumericEdit numeric = new(0, 1);
     private readonly UiRetainedPaint retained = new();
     bool IUiRetainedDisplay.PaintLast(UiLayoutRect rect, UiWidgetContext ctx) => retained.Paint(rect, ctx);
     UiMeasurement? IUiRetainedDisplay.MeasureLast(UiWidgetContext ctx) => retained.Measure(ctx);
@@ -30,7 +29,9 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
 
     public void Configure(UiElementSpec spec)
     {
+        if (ReferenceEquals(this.spec, spec)) return;
         this.spec = spec ?? throw new ArgumentNullException(nameof(spec));
+        numeric = new UiNumericEdit(AtomVocabulary.ReadFloat(spec, "Min", 0), AtomVocabulary.ReadFloat(spec, "Max", 1), AtomVocabulary.Read(spec, "Format"));
     }
 
     public void Validate(IUiBindingAccess bindings, string elementPath)
@@ -66,9 +67,6 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
 
         string bindKey = AtomVocabulary.ReadBindKey(spec);
         float min = AtomVocabulary.ReadFloat(spec, "Min", 0f);
-        float max = AtomVocabulary.ReadFloat(spec, "Max", 1f);
-        string format = AtomVocabulary.Read(spec, "Format");
-        if (format.Length == 0) format = DefaultFormat;
         bool live = AtomVocabulary.ReadBool(spec, "Live", false);
         float current = ctx.Bindings.TryGet(bindKey, out float bound) ? bound : min;
 
@@ -76,7 +74,6 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         ResolveLabelBand(rect, ctx, out field);
         bool? writable = AtomVocabulary.WritableOf(ctx, bindKey);
         UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, writable);
-        var numeric = new UiNumericEdit(min, max, format);
         ctx.Controls.Edit(field, ctx, bindKey, current, numeric.Format, numeric.Parse,
             live, false, value => ctx.Bindings.Set(bindKey, value), () => ctx.Bindings.Get<float>(bindKey));
         if (!ctx.Session.IsActive) return;

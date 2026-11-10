@@ -72,6 +72,35 @@ renamed into this capability.
 
 ## Check the affected contract
 
+The local [window/layout maintenance checkpoint](development/0.8/window-terminal-maintenance.md)
+owns the current `native-a001-r3` identity, partial native acceptance, next performance question and
+counterexample constraints. Earlier `a001-r3` (without `native`) is a different pre-native checkpoint.
+The fixed Source Form does not replace published rc2; a docs-only closeout does not rebuild it.
+
+For an authorized change, from the selected isolated FL build root, these are the existing Release
+commands used for native-r3. The main harness must already be built against that source/input set:
+
+```powershell
+$FlHarness = 'tools/FerriteLib.UiKit.Tests/bin/Release/net472/FerriteLib.UiKit.Tests.exe'
+& $FlHarness --suite KernelLayoutReuseTests
+& $FlHarness --suite KernelLayoutTests
+& $FlHarness --suite KernelPageLifecycleTests
+& $FlHarness --suite KernelFailureLifetimeTests
+& $FlHarness --suite KernelSharedEditingTests
+& $FlHarness --suite KernelCloseoutEditingTests
+& $FlHarness --suite KernelStyleScopeTests
+& $FlHarness --suite KernelItemBindingTests
+& $FlHarness --suite KernelIdentityTests
+& $FlHarness --readonly-api
+```
+
+Select affected entries rather than automatically rerunning this whole list. LayoutReuse's existing
+`SharedResults` and `EnvironmentAndLegacy` cases retain shared-column changes and unknown-ruler conditions;
+PageLifecycle retains independent reopening. Failure checks do not make every native fault branch
+an observed pass. The consumer's existing ordinary-getter/Live entry remains a separate fixed-pair check.
+Original invocation recipes/logs are in the consumer's local evidence archive linked by the checkpoint;
+no cases or assertions were added. No command in this section was run by the documentation closeout.
+
 For a change to the platform-neutral Kernel, this existing entry compiles and exercises the production
 sources without a game or a carrier:
 
@@ -130,7 +159,8 @@ input has a real local source commit, not a future merge SHA. Stage it into an u
 with the existing stage-package.ps1 and RequireReleaseIdentity; use a local preparation label.
 Do not create a tag or relax ancestry checks just to invoke the formal cloud path.
 
-Under later explicit cloud authorization:
+Historical rc2 publication sequence (the FL publication is complete; do not recreate the tag).
+US main integration/publication remains a separate, explicitly authorized action:
 1. Push/review the FL branch and PR; main CI and the full-history privacy gate must pass.
 2. Resolve the actual final main SHA, then create v0.8.0-rc2 there. The existing ordered-tag/ancestry
    checks remain. Release CI verifies again, runs privacy, builds a clean base-version Release payload,

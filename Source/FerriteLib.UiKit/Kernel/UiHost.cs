@@ -16,6 +16,7 @@ public sealed partial class UiHost : IDisposable
     private UiBindings bindingOwner;
     private readonly UiTheme theme;
     private ITextMetrics metrics;
+    private UiTextMetricsCache? fitMetrics;
     internal void AdoptTextMetrics(ITextMetrics previous, ITextMetrics composed)
     { if (ReferenceEquals(metrics, previous)) metrics = composed; }
     private readonly IUiTranslation translation;
@@ -302,7 +303,11 @@ public sealed partial class UiHost : IDisposable
         UiDiagnosticSubscription? subscription = diagnostics;
         bool timing = subscription != null && subscription.TimingEnabled;
         long started = timing ? Stopwatch.GetTimestamp() : 0L;
-        UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription, metrics, session);
+        // Fit repeats over unchanged visible text on every native event. Reuse the existing bounded,
+        // environment-checked ruler here without replacing the caller's drawing/context metrics.
+        if (fitMetrics == null || !ReferenceEquals(fitMetrics.Source, metrics))
+            fitMetrics = new UiTextMetricsCache(metrics);
+        UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription, fitMetrics, session);
         try
         {
             // Popups are drawn after content and must clamp themselves into the frame's usable window
@@ -569,6 +574,7 @@ public sealed partial class UiHost : IDisposable
 
     public void Close()
     {
+        fitMetrics = null;
         previewPreparation = null;
         costSampleProvider = null;
         toolConnection?.Dispose();

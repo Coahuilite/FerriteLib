@@ -26,12 +26,19 @@ public sealed class UiMeasureInputs : IEquatable<UiMeasureInputs>
     }
     public override bool Equals(object? obj) => obj is UiMeasureInputs other && Equals(other);
     public override int GetHashCode() => text.Length * 397 ^ numbers.Length;
-    internal static UiMeasureInputs Join(UiMeasureInputs first, UiMeasureInputs second)
+    // Both inputs already own validated, immutable arrays. Copy directly into the two final arrays;
+    // the public constructor must still detach and validate caller-owned arrays.
+    private UiMeasureInputs(UiMeasureInputs first, UiMeasureInputs second)
     {
-        var text = new List<string>(first.text); text.AddRange(second.text);
-        var numbers = new List<float>(first.numbers); numbers.AddRange(second.numbers);
-        return new UiMeasureInputs(text.ToArray(), numbers.ToArray(), first.UsesTextMetrics || second.UsesTextMetrics);
+        text = new string[first.text.Length + second.text.Length];
+        Array.Copy(first.text, text, first.text.Length);
+        Array.Copy(second.text, 0, text, first.text.Length, second.text.Length);
+        numbers = new float[first.numbers.Length + second.numbers.Length];
+        Array.Copy(first.numbers, numbers, first.numbers.Length);
+        Array.Copy(second.numbers, 0, numbers, first.numbers.Length, second.numbers.Length);
+        UsesTextMetrics = first.UsesTextMetrics || second.UsesTextMetrics;
     }
+    internal static UiMeasureInputs Join(UiMeasureInputs first, UiMeasureInputs second) => new(first, second);
 }
 
 /// <summary>Optional environment capability. Null revokes text-measure reuse; ITextMetrics is unchanged.</summary>
