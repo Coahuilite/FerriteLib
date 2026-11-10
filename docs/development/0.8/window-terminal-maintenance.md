@@ -138,6 +138,21 @@ or 0.0864 ms per Draw against 1.860 ms Draw inclusive (about 4.64%). The parent
 `IsPointerOverHigherLayer` inclusive included those children, popup checking and instrumentation; it is
 not an additional amount to add. On this input and pointer position, an index for owner lookup addresses
 only a small part of Draw, so no new index was retained on this evidence.
+
+A separate primitive profile measured the fixed 1.6 pair on the same kind of full-key replay. In 1,324
+non-Repaint Host Draw passes, `TextSized` inclusive was 150.005 ms against 2,436.905 ms Draw inclusive
+(about 6.16%); the inner `Text` timer is already included and must not be added. The profiler patches
+frequently called methods and changes their cost. `Fill` self was 55.585 ms in the same phases and was
+not changed. All 150 key-down, character and key-up events arrived; character order was preserved.
+
+A proposed non-Repaint text fast path was not implemented. Although Unity 1.6 `GUI.Label` does not paint
+or allocate a control ID on that phase, the existing `Verse.Widgets.Label` first reads `Text.CurFontStyle`.
+That getter writes the shared style's alignment and word-wrap fields; a caller holding that style can observe
+those writes after the call. Bypassing it also bypasses its failure behavior and any patches on the original
+label path. A dummy `GUI.Label` preserves the OnGUI validity check but not those effects. The finding is a
+source-contract counterexample, not a build or native-runtime failure; the original state, font and label
+calls remain in place. No corresponding behavior was added to the 1.7 adapter.
+
 Any optimization must retain ordinary-getter backing changes **without Notify** at their original
 read/synchronization points; it must not poll them at new points either. Shared-label maximum changes,
 unknown rulers at their existing legal revalidation boundary, failed/half candidates, direct standalone
