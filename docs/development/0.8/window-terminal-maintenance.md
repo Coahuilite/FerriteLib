@@ -55,6 +55,22 @@ Native per-scope exceptional style restoration and physical keyboard/IME remain 
 coverage. Original logs and limits are in `dist/private-layout-20261110/evidence/clipped-display-experiment/`.
 The original approximately 10-FPS report and F09 tail latency remain open.
 
+### F09 full Arrange: ReusePlan's local budget
+
+On the current 6d8/3fc pair, two groups of four warmed toggles produced eight full Arrange passes.
+Host Arrange wall totalled 234.8592 ms, including 153.8193 ms at the top-level `MeasureElement`.
+Across 1,480 `ReusePlan` calls and 4,736 direct child-measure callbacks, subtracting each plan's own
+callbacks from its inclusive time and then summing the plan-local remainders gave 17.0763 ms (7.27% of Host Arrange).
+Nested inclusive spans are not additive. One full pass had all three GC counters increment; the
+seven other passes totalled 181.7338 ms Host and 12.2111 ms plan-local wall (6.72%). GC is recorded at
+the Host boundary, not attributed to an inner method.
+
+These are instrumented wall times and the local remainder includes necessary work and timer overhead;
+it is not a saving that a new cache could entirely claim. The result does not justify a new cross-pass
+plan cache as the next major optimization. Child order, ordinary reads, unknown metrics, faults and
+arrangement rollback remain unchanged. Inputs, callsite instrumentation and all eight rows are in
+`dist/private-layout-20261110/evidence/fixed-context-aba/f09-reuseplan-current/README-zh.md`.
+
 ### Repeat owner-validation reuse: previous local 1.6 pair
 
 A retained Repeat row can reuse a successful reader-subtree owner validation only for the actual sealed
