@@ -165,6 +165,19 @@ FL, US or other content mods. The native search box caps text at 30 characters; 
 calibration, not an F08 reproduction. Different random maps and the observer leave mod cost and Dubs'
 own overhead unmeasured; a high reading does not explain the user's reported 10 FPS or input backlog.
 
+A further isolated 1.6 run measured the actual US volume editor on one map and Host, with the Dubs
+WindowStack panel kept open: profiling active, paused and inactive, then active again. Each segment
+started with draft 100 and delivered the same 150 complete key sequences. During input, FPS calculated
+from unscaled delta was 64.29 / 69.58 / 70.80; unique Repaint per wall second was 63.88 / 69.42 /
+70.50. The measures agree closely over the observed approximately 64–71 FPS range. After input stopped,
+the corresponding three-second Repaint rates were 120.33 / 126.67 / 119.67. The paused panel's displayed
+number was frozen, although its separate raw GUI counter continued; this comparison did not uninstall
+Dubs. The active segments also drifted, so this one ordered comparison cannot resolve a small profiling
+cost. It does show a real input-period decline, rather than merely a counter error. US, the FL Host,
+Unity and other GUI work all participate; this measurement does not apportion their individual costs or
+reproduce the reported approximately 10 FPS. The first preparation snapshot's content revision was 7
+and its end snapshot was 9; the exact change time was not recorded, while the later segments stayed at 9.
+
 Any optimization must retain ordinary-getter backing changes **without Notify** at their original
 read/synchronization points; it must not poll them at new points either. Shared-label maximum changes,
 unknown rulers at their existing legal revalidation boundary, failed/half candidates, direct standalone
