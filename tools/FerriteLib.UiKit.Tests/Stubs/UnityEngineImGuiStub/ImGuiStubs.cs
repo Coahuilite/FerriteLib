@@ -241,6 +241,8 @@ public enum ImagePosition { ImageLeft, ImageAbove, ImageOnly, TextOnly }
 public enum TextClipping { Overflow, Clip }
 public sealed class GUIStyle
 {
+    public TextAnchor alignment { get; set; }
+    public bool wordWrap { get; set; }
     public Font font { get; set; } = new();
     public int fontSize { get; set; }
     public FontStyle fontStyle { get; set; }

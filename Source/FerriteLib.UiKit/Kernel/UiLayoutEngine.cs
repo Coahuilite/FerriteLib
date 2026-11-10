@@ -616,7 +616,7 @@ internal sealed partial class UiLayoutEngine
             var contentLayers = new List<UiPointerLayer>();
             CollectPointerLayers(lastEntries, 0, lastEntries.Count, ctx, new UiLayoutPoint(viewport.X, viewport.Y), null, UiLayoutPoint.Zero, ctx.Session.CurrentClip, contentLayers);
             ctx.Session.SetContentInputLayers(contentLayers);
-            DrawEntries(lastEntries, 0, lastEntries.Count, ctx, new UiLayoutPoint(viewport.X, viewport.Y), null, UiLayoutPoint.Zero,ctx);
+            DrawEntries(lastEntries, 0, lastEntries.Count, ctx, new UiLayoutPoint(viewport.X, viewport.Y), null, UiLayoutPoint.Zero,ctx, null);
             if (ctx.Session.IsActive) ctx.Session.EndHitPass();
         }
         catch
@@ -750,7 +750,7 @@ internal sealed partial class UiLayoutEngine
         UiWidgetContext ctx,
         UiLayoutPoint viewportPosition,
         UiLayoutPoint? nativeOrigin,
-        UiLayoutPoint windowOrigin,UiWidgetContext rootContext)
+        UiLayoutPoint windowOrigin,UiWidgetContext rootContext, IUiIsolatedPaint? isolatedPaint)
     {
         int index = start;
         while (index < end)
@@ -828,7 +828,7 @@ internal sealed partial class UiLayoutEngine
                     index + entry.SubtreeCount,
                     viewportPosition,
                     nativeOrigin,
-                    windowOrigin,rootContext);
+                    windowOrigin,rootContext,isolatedPaint);
                 if (!ctx.Session.IsActive) return;
 #if FER_DEV || FER_TOOLS
                 // DT1: the viewport's OWN band is outlined here, after its content has drawn and in this
@@ -888,7 +888,13 @@ internal sealed partial class UiLayoutEngine
                                 ctx.Session.PublishHelp(helpKey);
                             }
 
-                            UiSessionGuard.DrawWidget(entry.Widget, drawRect, entryCtx, entry.Node);
+                            if (isolatedPaint != null && entry.Widget is IUiDeferredDisplay)
+                            {
+                                UiLayoutRect? clip = ctx.Session.CurrentClip;
+                                bool clipped = clip.HasValue && (clip.Value.Width <= 0f || clip.Value.Height <= 0f);
+                                UiSessionGuard.DrawWidgetForClip(entry.Widget, drawRect, entryCtx, entry.Node, isolatedPaint, clipped);
+                            }
+                            else UiSessionGuard.DrawWidget(entry.Widget, drawRect, entryCtx, entry.Node);
                             if (!ctx.Session.IsActive) return;
                         }
                         finally
@@ -926,7 +932,7 @@ internal sealed partial class UiLayoutEngine
         int childEnd,
         UiLayoutPoint viewportPosition,
         UiLayoutPoint? nativeOrigin,
-        UiLayoutPoint windowOrigin,UiWidgetContext rootContext)
+        UiLayoutPoint windowOrigin,UiWidgetContext rootContext, IUiIsolatedPaint? isolatedPaint)
     {
         string kind = entry.ContainerKind;
 
@@ -956,7 +962,7 @@ internal sealed partial class UiLayoutEngine
                 }
                 // BeginScrollView may consume a wheel event and change the offset in this very pass.
                 UiLayoutPoint childWindowOrigin = new(scopeWindowOrigin.X - scrollPosition.X, scopeWindowOrigin.Y - scrollPosition.Y);
-                DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.Position, childWindowOrigin,rootContext);
+                DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.Position, childWindowOrigin,rootContext,isolatedPaint);
                 });
             }
             finally
@@ -978,10 +984,17 @@ internal sealed partial class UiLayoutEngine
         UiLayoutPoint groupWindowOrigin = ScopeWindowOrigin(outRect, nativeOrigin, windowOrigin);
         UiLayoutRect? outerClip = ctx.Session.CurrentClip;
         ctx.Session.ConstrainClip(new UiLayoutRect(groupWindowOrigin.X, groupWindowOrigin.Y, outRect.Width, outRect.Height));
+        if (isolatedPaint == null && string.Equals(kind, "Overlay", StringComparison.Ordinal)
+            && entry.Spec.TryGetBoolean("DeferClippedDisplay", out bool defer) && defer)
+        {
+            IUiExecution execution = ctx.Session.Execution;
+            if (execution is IUiExecutionOwner owner) execution = owner.NativeOwner;
+            if (execution is IUiIsolatedPaint candidate && candidate.CanIsolatePaint) isolatedPaint = candidate;
+        }
         try
         {
             ctx.Drawing.Clip(outRect, () => {
-            DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.Position, groupWindowOrigin,rootContext);
+            DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.Position, groupWindowOrigin,rootContext,isolatedPaint);
             });
         }
         finally

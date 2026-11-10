@@ -66,7 +66,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// per-item binding scope, so "not yet bound" is a legal frame there and must not take the page down.
 /// </para>
 /// </summary>
-internal sealed partial class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
+internal sealed partial class CheckboxWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay, IUiDeferredDisplay
 {
     internal const string Kind = "input/checkbox";
 
@@ -267,9 +267,14 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         yield return new UiPointerRegion(bounds);
     }
 
-    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx) => DrawCore(rect, ctx, false, null);
+
+    UiDisplayResult IUiDeferredDisplay.DrawForClip(UiLayoutRect rect, UiWidgetContext ctx, bool clipped, IUiIsolatedPaint paint)
+        => DrawCore(rect, ctx, clipped, paint);
+
+    private UiDisplayResult DrawCore(UiLayoutRect rect, UiWidgetContext ctx, bool clipped, IUiIsolatedPaint? paint)
     {
-        if (rect.Width <= 1f || rect.Height <= 1f) return;
+        if (rect.Width <= 1f || rect.Height <= 1f) return clipped ? UiDisplayResult.Deferred : UiDisplayResult.Completed;
 
         string key = ReadBindKey();
         bool? writable = AtomVocabulary.WritableOf(ctx, key);
@@ -286,7 +291,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         // pointer's proximity.
         UiInteractionResult interaction = ctx.Controls.Activation(rect, ctx, key, "", writable: writable != false);
         TakeInput(ctx, key, state, interaction);
-        if (!ctx.Session.IsActive) return;
+        if (!ctx.Session.IsActive) return UiDisplayResult.Completed;
         bool armed = interaction.Captured;
         bool hovered = !armed && ctx.Controls.IsMouseOver(rect, ctx);
 
@@ -303,11 +308,18 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
 
         // One resolved look for the whole frame, through the same shared seam measurement used: the paint
         // below reads this value and never re-parses the attribute.
+        if (clipped) return UiDisplayResult.Deferred;
+        if (paint == null) Present(); else paint.IsolatePaint(Present);
+        return UiDisplayResult.Completed;
+
+        void Present()
+        {
         string look = Looks.Resolve(spec).Value;
         string retainedLabel=AtomVocabulary.ResolveText(spec,ctx,"Label","LabelKey");
         float retainedBand=AtomVocabulary.ReadHeight(spec,NaturalHeight(ctx));
         Paint(rect, shown, state, look, ctx,retainedLabel,retainedBand);
         retained.Capture(ctx, (r,c) => Paint(r, shown, state, look, c,retainedLabel,retainedBand));
+        }
     }
 
     /// <summary>

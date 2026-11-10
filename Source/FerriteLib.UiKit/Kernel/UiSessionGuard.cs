@@ -32,6 +32,14 @@ public static class UiSessionGuard
     /// node, so the recovery slot is the element - not a display path, which two elements can share.
     /// </summary>
     public static void DrawWidget(IUiWidget widget, UiLayoutRect rect, UiWidgetContext ctx, UiNode node)
+        => DrawWidgetCore(widget, rect, ctx, node, null, false);
+
+    internal static void DrawWidgetForClip(IUiWidget widget, UiLayoutRect rect, UiWidgetContext ctx, UiNode node,
+        IUiIsolatedPaint paint, bool clipped)
+        => DrawWidgetCore(widget, rect, ctx, node, paint, clipped);
+
+    private static void DrawWidgetCore(IUiWidget widget, UiLayoutRect rect, UiWidgetContext ctx, UiNode node,
+        IUiIsolatedPaint? paint, bool clipped)
     {
         if (widget == null) throw new ArgumentNullException(nameof(widget));
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
@@ -40,7 +48,14 @@ public static class UiSessionGuard
         using UiBindings.DisplayScope? display = UiWidgetCapabilities.Description(widget) != null && UiWidgetCapabilities.Pointer(widget) == null ? UiBindings.OwnerOf(ctx.Bindings).DisplayOnly() : null;
         try
         {
-            ctx.Session.Execution.WithState(() => widget.Draw(rect, ctx));
+            UiDisplayResult result = UiDisplayResult.Completed;
+            ctx.Session.Execution.WithState(() =>
+            {
+                if (paint != null && widget is IUiDeferredDisplay deferred)
+                    result = deferred.DrawForClip(rect, ctx, clipped, paint);
+                else widget.Draw(rect, ctx);
+            });
+            if (result == UiDisplayResult.Deferred) return;
             node.PresentationFault = display?.Fault;
             node.PresentationUnavailable = false;
             UiDomainDiagnostics.Reactive(ctx.Session, node, "presentation.fault", node.PresentationFault);

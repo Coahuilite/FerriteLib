@@ -85,12 +85,15 @@ internal sealed class UiDefinitionCompiler
         // FL-IC2: see the widget list; UiLayoutEngine's mirrored pair carries the same addition, and the drift
         // lane refuses one-sided edits.
         "CancelBind",
-        "UpdateScope"
+        "UpdateScope", "DeferClippedDisplay"
     };
 
     private static readonly UiAttributeSchema ContainerSchema=UiAttributeSchema.FromNames(ContainerAttributes), CommonSchema=UiAttributeSchema.FromNames(CommonWidgetAttributes);
     private void ValidateElement(UiElementSpec spec, string path, bool parentNarrowCapable, UiElementSpec? parent)
     {
+        if (spec.TryGetAttribute("DeferClippedDisplay", out _)
+            && (!string.Equals(spec.Kind, "Overlay", StringComparison.Ordinal) || !spec.TryGetBoolean("DeferClippedDisplay", out _)))
+            throw new UiContractException("DeferClippedDisplay is an Overlay-only true or false policy.", source, spec.Id, spec.Kind, path);
         // CP-1/CP-2 placement contract, checked here because this is the creation-time door: a placement
         // attribute is valid only inside a placement container, and a flow container's child accepts the
         // cross-axis subset without an offset. The rule lives in UiPlacement so the engine can share it.

@@ -8,7 +8,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// presentation observes that result and never recreates the activation rule.
 /// A missing command is diagnosed at host creation, not rendered as a dead control.
 /// </summary>
-internal sealed partial class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
+internal sealed partial class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay, IUiDeferredDisplay
 {
     public const string Kind = "input/button";
 
@@ -94,9 +94,14 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     {
         yield return new UiPointerRegion(bounds);
     }
-    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx) => DrawCore(rect, ctx, false, null);
+
+    UiDisplayResult IUiDeferredDisplay.DrawForClip(UiLayoutRect rect, UiWidgetContext ctx, bool clipped, IUiIsolatedPaint paint)
+        => DrawCore(rect, ctx, clipped, paint);
+
+    private UiDisplayResult DrawCore(UiLayoutRect rect, UiWidgetContext ctx, bool clipped, IUiIsolatedPaint? paint)
     {
-        if (rect.Width <= 1f || rect.Height <= 1f) return;
+        if (rect.Width <= 1f || rect.Height <= 1f) return clipped ? UiDisplayResult.Deferred : UiDisplayResult.Completed;
 
         // A held operation wins over hover. Capture comes from shared behavior rather than raw
         // MouseDown geometry; painting neither infers an established activation nor requests it.
@@ -116,6 +121,13 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
             RequestActivation(ctx);
         });
         if (ctx.Session.IsActive)
+        {
+            if (clipped) return UiDisplayResult.Deferred;
+            if (paint == null) Present(); else paint.IsolatePaint(Present);
+        }
+        return UiDisplayResult.Completed;
+
+        void Present()
         {
             string caption=AtomVocabulary.ResolveText(spec,ctx,"Text","TextKey");
             Paint(rect, armed, hovered, idle, ctx,caption);

@@ -22,7 +22,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// widget — which is the author's explicit override of this contract, not a second contract.
 /// </para>
 /// </summary>
-internal sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiRetainedDisplay
+internal sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiRetainedDisplay, IUiDeferredDisplay
 {
     public const string Kind = "text/wrapped";
 
@@ -103,10 +103,21 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
 
     public UiDescription Describe(UiWidgetContext ctx) => AtomVocabulary.DescribeText(spec, ctx, UiDescriptionRole.Text, "Text", "TextKey");
 
-    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
-    {
-        if (rect.Width <= 1f || rect.Height <= 1f) return;
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx) => DrawCore(rect, ctx, false, null);
 
+    UiDisplayResult IUiDeferredDisplay.DrawForClip(UiLayoutRect rect, UiWidgetContext ctx, bool clipped, IUiIsolatedPaint paint)
+        => DrawCore(rect, ctx, clipped, paint);
+
+    private UiDisplayResult DrawCore(UiLayoutRect rect, UiWidgetContext ctx, bool clipped, IUiIsolatedPaint? paint)
+    {
+        if (clipped) return UiDisplayResult.Deferred;
+        if (rect.Width <= 1f || rect.Height <= 1f) return UiDisplayResult.Completed;
+
+        if (paint == null) Present(); else paint.IsolatePaint(Present);
+        return UiDisplayResult.Completed;
+
+        void Present()
+        {
         // Resolved before the empty-string return: an authored role typo is recorded on the pass that
         // draws this element, whether or not it has text to paint.
         UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, writable: null);
@@ -115,6 +126,7 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         if (text.Length == 0) return;
         PaintText(rect,ctx,text,style);
         retained.Capture(ctx,(r,c)=>PaintText(r,c,text,style));
+        }
     }
     private void PaintText(UiLayoutRect rect,UiWidgetContext ctx,string text,UiResolvedStyle style)
     {

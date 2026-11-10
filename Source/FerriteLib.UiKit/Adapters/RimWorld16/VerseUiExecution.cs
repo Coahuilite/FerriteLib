@@ -7,7 +7,36 @@ using Verse;
 namespace FerriteLib.UiKit.Kernel;
 /// <summary>Explicit 1.6 execution owner. Native identities and supplier resources never enter the retained core.</summary>
 public sealed class VerseUiExecution : IUiExecution, IDisposable
+#if !FER_RW17
+    , IUiIsolatedPaint
+#endif
 {
+#if !FER_RW17
+    // The opt-in display path isolates the mutable label styles that Verse.Text.CurFontStyle
+    // changes. It deliberately does not own native focus, hot control, or editor styles.
+    bool IUiIsolatedPaint.CanIsolatePaint => Verse.Text.fontStyles.Length == 3
+        && Verse.Text.fontStyles[0] != null && Verse.Text.fontStyles[1] != null && Verse.Text.fontStyles[2] != null;
+
+    void IUiIsolatedPaint.IsolatePaint(Action paint)
+    {
+        var a = new LabelStyleState(Verse.Text.fontStyles[0]);
+        var b = new LabelStyleState(Verse.Text.fontStyles[1]);
+        var c = new LabelStyleState(Verse.Text.fontStyles[2]);
+        try { paint(); }
+        finally { c.Restore(); b.Restore(); a.Restore(); }
+    }
+
+    private readonly struct LabelStyleState
+    {
+        private readonly GUIStyle style;
+        private readonly TextAnchor alignment;
+        private readonly bool wrap;
+        private readonly int size;
+        internal LabelStyleState(GUIStyle style)
+        { this.style = style; alignment = style.alignment; wrap = style.wordWrap; size = style.fontSize; }
+        internal void Restore() { style.alignment = alignment; style.wordWrap = wrap; style.fontSize = size; }
+    }
+#endif
     private readonly Dictionary<UiControlKey, int> controls = new();
     private UiFrame? frame;
     private UiControlKey? captureOwner;
