@@ -238,6 +238,20 @@ thread and is not merely the monitor's FPS display; the original approximately 1
 Raw cumulative counters, window boundaries, events and screenshots are retained in local private evidence
 at `dist/private-layout-20261110/evidence/thread-cpu/`.
 
+A later local experiment retained a placed entry's validated drawing context rather than repeatedly
+constructing its style-derived context. It kept the original fallback read and full node/ancestor and
+scope validation, and passed 15 existing targeted checks. With one task-created colony loaded from the
+same isolated save in A/B/A runs, F08's 150 complete key chains produced 40.43 / 46.30 / 46.21 unique
+Repaints per second on the input windows; each reached a 153-character draft. F09's four-toggle record
+windows produced 53.30 / 54.99 / 54.10 FPS, with frame-interval P95 32.00 / 32.00 / 32.04 ms. All
+three used the same paused tick and camera, 25 targets / three packs, and an active Dubs WindowStack
+monitor. The candidate and second baseline were almost equal, so this single comparison does not
+establish an overall benefit. These runs did not instrument cache hit rate or divide the remaining work
+between FL, consumer widgets and native code. The approximately 10-FPS report and F09 long frames
+remain open. The candidate remains a local experimental branch, not an accepted 0.8.x change; raw
+frames, inputs, screenshots and the task-created fixed save are in local private evidence at
+`dist/private-layout-20261110/evidence/fixed-context-aba/`.
+
 Any optimization must retain ordinary-getter backing changes **without Notify** at their original
 read/synchronization points; it must not poll them at new points either. Shared-label maximum changes,
 unknown rulers at their existing legal revalidation boundary, failed/half candidates, direct standalone
