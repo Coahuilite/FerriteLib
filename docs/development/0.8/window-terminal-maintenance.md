@@ -85,6 +85,18 @@ overload fell from 32,224 to 6,694 calls, but Arrange averaged 0.994 / 1.159 ms 
 was 40.531 / 53.274 ms; settled slices likewise showed no net improvement. These are single instrumented
 samples, not proof of regression. The memo was removed rather than retaining state without measured benefit.
 
+A later candidate retained only successfully computed, template-independent Fill-consumption facts on the
+immutable element declaration, without a per-pass dictionary. It kept the original template lookup and
+short-circuit paths and passed the affected existing layout, Repeat and failure checks. In one matching
+four-toggle, non-method-profiled window, the earlier fixed pair / candidate measured 78.27 / 79.55 FPS
+and 27.990 / 28.039 ms P95; the colonies were different random maps. Method-profiled full arrangements
+also varied, including a collection during one candidate pass. The results did not establish a material
+net gain, so this separate candidate was withdrawn as well. Its source difference, build, checks and
+native records are retained locally in `dist/private-layout-20261110/evidence/spec-fill-fact/`.
+The candidate also received the 150 complete F08 key sequences on the real volume field, with the live
+value unchanged at 100 and the draft reaching 153 characters; this was an interaction check, not a
+cross-map performance comparison or a reproduction of the original approximately 10-FPS symptom.
+
 The consumer clarified F08 as rapid, varied digit key presses in the output-volume field on a loaded
 colony with Dubs Performance Analyzer's GUI window-stack chart active. In isolated, newly generated
 250×250 colonies with the current 25 targets / 3 packs, the fixed candidate and the original response/rc2
