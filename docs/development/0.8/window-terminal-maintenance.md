@@ -178,6 +178,25 @@ Unity and other GUI work all participate; this measurement does not apportion th
 reproduce the reported approximately 10 FPS. The first preparation snapshot's content revision was 7
 and its end snapshot was 9; the exact change time was not recorded, while the later segments stayed at 9.
 
+The next bounded profiles separated the actual current-page widget and engine work, then followed F09
+warm expansion through its content revision. In one four-toggle slice, each action advanced the revision
+and was followed on the same Unity frame by a full arrangement; the real consumer projection's
+`VoicePacksPageModel.BuildView` was not called. Two expanded arrangements measured 56.993 and 52.110 ms
+with method instrumentation; only the latter recorded a GC collection during the measured arrangement.
+The corresponding collapsed arrangements measured 17.952 and 18.438 ms. These are individual parent
+timings, not a sum of nested maxima or uninstrumented FPS.
+
+On a separate fresh colony with the same fixed pair and replay, further instrumentation measured expanded
+full arrangements of 55.015 and 33.008 ms. `VisibleChildren` accounted for 8.012 and 5.969 ms self;
+its work includes visibility reads and binding-owner checks. `OffsetBox` accounted for 1.207 and 0.617 ms
+self, so a geometry representation change was not justified by that sample. An exact-`UiBindings`
+owner-check shortcut passed the affected existing checks but did not demonstrate a reliable net native
+gain across two separate random maps and variable pacing, and was withdrawn. The original owner checks,
+ordinary-reader behavior and product binary remain in place. Local private artifacts, including the
+instrumented and uninstrumented frames, method logs, driver sources and rejected candidate, are under
+`dist/private-layout-20261110/evidence/f09-full-attribution/`, `f09-container-attribution/` and
+`f09-owner-fastpath-checks/`; they are not a release package.
+
 Any optimization must retain ordinary-getter backing changes **without Notify** at their original
 read/synchronization points; it must not poll them at new points either. Shared-label maximum changes,
 unknown rulers at their existing legal revalidation boundary, failed/half candidates, direct standalone
