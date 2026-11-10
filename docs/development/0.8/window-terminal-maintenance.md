@@ -246,8 +246,12 @@ Repaints per second on the input windows; each reached a 153-character draft. F0
 windows produced 53.30 / 54.99 / 54.10 FPS, with frame-interval P95 32.00 / 32.00 / 32.04 ms. All
 three used the same paused tick and camera, 25 targets / three packs, and an active Dubs WindowStack
 monitor. The candidate and second baseline were almost equal, so this single comparison does not
-establish an overall benefit. These runs did not instrument cache hit rate or divide the remaining work
-between FL, consumer widgets and native code. The approximately 10-FPS report and F09 long frames
+establish an overall benefit. A separate bounded, instrumented replay on the same saved colony counted
+450 input passes and their 450 immediately preceding Layout passes. The baseline called both
+`ContextForEntry` and `ThemeFor` 331,200 times each; the candidate instead hit its validated context
+331,200 times with no misses or calls to either original method. Instrumentation differed, so its timing
+is not a performance comparison. The clean result therefore does not establish whether validation or
+other FL, consumer and native work absorbed the saved calls. The approximately 10-FPS report and F09 long frames
 remain open. The candidate remains a local experimental branch, not an accepted 0.8.x change; raw
 frames, inputs, screenshots and the task-created fixed save are in local private evidence at
 `dist/private-layout-20261110/evidence/fixed-context-aba/`.
