@@ -1785,6 +1785,24 @@ internal sealed partial class UiLayoutEngine
         internal string Key = "";
         internal int Index;
         internal UiElementSpec Spec = UiElementSpec.Empty;
+        internal DerivedRow Derived = null!;
+    }
+
+    // Immutable so a failed Arrange cannot mutate the prior RepeatState's successful credential.
+    private sealed class DerivedRow
+    {
+        internal readonly UiElementSpec Spec;
+        private readonly UiElementSpec? template;
+        private readonly UiBindings? owner;
+        private readonly object? registrations, schemas;
+
+        internal DerivedRow(UiElementSpec spec, UiElementSpec? template = null, UiBindings? owner = null,
+            object? registrations = null, object? schemas = null)
+        { Spec = spec; this.template = template; this.owner = owner; this.registrations = registrations; this.schemas = schemas; }
+
+        internal bool Verified(UiElementSpec currentTemplate, UiBindings currentOwner, object currentRegistrations, object currentSchemas)
+            => ReferenceEquals(template, currentTemplate) && ReferenceEquals(owner, currentOwner)
+                && ReferenceEquals(registrations, currentRegistrations) && ReferenceEquals(schemas, currentSchemas);
     }
 
     /// <summary>
@@ -1799,7 +1817,7 @@ internal sealed partial class UiLayoutEngine
         internal bool Initialized;
         internal int MaterializedPass, ItemsRevision;
         internal readonly List<ItemRow> Rows = new();
-        internal readonly Dictionary<string, UiElementSpec> DerivedByKey = new(StringComparer.Ordinal);
+        internal readonly Dictionary<string, DerivedRow> DerivedByKey = new(StringComparer.Ordinal);
         internal RepeatState Copy()
         {
             var copy = new RepeatState
@@ -1809,7 +1827,7 @@ internal sealed partial class UiLayoutEngine
                 Initialized = Initialized, MaterializedPass = MaterializedPass, ItemsRevision = ItemsRevision
             };
             copy.Rows.AddRange(Rows);
-            foreach (KeyValuePair<string, UiElementSpec> entry in DerivedByKey)
+            foreach (KeyValuePair<string, DerivedRow> entry in DerivedByKey)
                 copy.DerivedByKey.Add(entry.Key, entry.Value);
             return copy;
         }
@@ -1943,20 +1961,34 @@ internal sealed partial class UiLayoutEngine
         }
 
         IReadOnlyList<string> keys = ReadItemKeys(ctx, node, itemsKey);
+        UiBindings? registry = ctx.Bindings as UiBindings;
+        if (registry != null && !ReferenceEquals(ctx.Bindings, UiBindings.OwnerOf(ctx.Bindings))) registry = null;
         var seen = new HashSet<string>(StringComparer.Ordinal);
         for (int i = 0; i < keys.Count; i++)
         {
             string key = keys[i] == null ? "" : keys[i].Trim();
             if (!AcceptItemKey(ctx, node, key, seen)) continue;
 
-            if (!state.DerivedByKey.TryGetValue(key, out UiElementSpec? derived))
+            if (!state.DerivedByKey.TryGetValue(key, out DerivedRow? derived))
             {
-                derived = BuildItemSpec(template, itemsKey, key, i);
+                derived = new DerivedRow(BuildItemSpec(template, itemsKey, key, i));
                 state.DerivedByKey.Add(key, derived);
             }
 
-            UiDefinitionCompiler.VerifyReaderSubtree(scope,ctx.Bindings,derived,node.Path+"/"+derived.Id);
-            state.Rows.Add(new ItemRow { Key = key, Index = i, Spec = derived });
+            object? registrations = registry?.RegistrationGeneration;
+            object? schemas = registry != null ? UiWidgetRegistry.SchemaGeneration : null;
+            if (registry == null || !derived.Verified(template, registry, registrations!, schemas!))
+            {
+                UiDefinitionCompiler.VerifyReaderSubtree(scope,ctx.Bindings,derived.Spec,node.Path+"/"+derived.Spec.Id);
+                // Only a complete successful verification against unchanged inputs is reusable.
+                if (registry != null && ReferenceEquals(registrations, registry.RegistrationGeneration)
+                    && ReferenceEquals(schemas, UiWidgetRegistry.SchemaGeneration))
+                {
+                    derived = new DerivedRow(derived.Spec, template, registry, registrations, schemas);
+                    state.DerivedByKey[key] = derived;
+                }
+            }
+            state.Rows.Add(new ItemRow { Key = key, Index = i, Spec = derived.Spec, Derived = derived });
         }
 
         // A key the binding no longer supplies keeps no derived subtree: the session's prune releases its
@@ -1966,7 +1998,7 @@ internal sealed partial class UiLayoutEngine
             state.DerivedByKey.Clear();
             for (int i = 0; i < state.Rows.Count; i++)
             {
-                state.DerivedByKey.Add(state.Rows[i].Key, state.Rows[i].Spec);
+                state.DerivedByKey.Add(state.Rows[i].Key, state.Rows[i].Derived);
             }
         }
     }

@@ -98,6 +98,7 @@ public sealed partial class UiBindings
             throw new ArgumentNullException(nameof(get));
         if (options.ContainsKey(key))
             throw new InvalidOperationException("Duplicate choices binding '" + key + "'.");
+        registrationGeneration = new object();
         options.Add(key, new ChoiceDescriptor<T>(get));
         DeclareInvalidation(key, invalidates);
     }

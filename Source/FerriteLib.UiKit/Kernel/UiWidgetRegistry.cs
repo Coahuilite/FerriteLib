@@ -43,6 +43,8 @@ public static class UiWidgetRegistry
     public const string CoreScope = "core";
     private static readonly object Gate = new();
     private static readonly Dictionary<string, Dictionary<string, UiWidgetDefinition>> definitions = new(StringComparer.Ordinal);
+    private static object schemaGeneration = new();
+    internal static object SchemaGeneration { get { lock (Gate) return schemaGeneration; } }
     private static bool coreInitialized;
     public static void InitializeCore()
     {
@@ -65,6 +67,7 @@ public static class UiWidgetRegistry
                 definitions.Add(definition.Scope, scope = new Dictionary<string, UiWidgetDefinition>(StringComparer.Ordinal));
             if (scope.ContainsKey(definition.Kind))
                 throw new InvalidOperationException("Widget kind '" + definition.Kind + "' is already defined in scope '" + definition.Scope + "'.");
+            schemaGeneration = new object();
             scope.Add(definition.Kind, definition);
         }
     }
@@ -168,6 +171,7 @@ public static class UiWidgetRegistry
     {
         lock (Gate)
         {
+            schemaGeneration = new object();
             definitions.Clear();
             coreInitialized = false;
         }

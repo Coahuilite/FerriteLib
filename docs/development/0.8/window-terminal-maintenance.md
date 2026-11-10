@@ -31,6 +31,34 @@ comparison. It also requested assessment of both adapters. The approved read-onl
 was performed separately; it did not include saves or writes to the formal configuration. The 0.9 line
 remains outside this maintenance change.
 
+### Repeat owner-validation reuse: current local 1.6 pair
+
+A retained Repeat row can reuse a successful reader-subtree owner validation only for the actual sealed
+`UiBindings` owner and the same derived spec, template, registration generation and widget-schema
+generation. Registration/removal and schema changes invalidate the credential; notifications do not.
+Custom or forwarding readers still validate on the original path, and failed validation is not cached.
+Immutable credentials follow the existing RepeatState transaction, so failed arrangement restores the
+previous successful state. Row keys, ordinary getters, visibility and measurement still run normally.
+
+On the fixed task-created 1.6 colony, four warm F09 changes retained 52 rows and created no derived
+rows. Instrumented `MaterializeRows` time less its `ReadItemKeys` call fell from 25.550 to 0.343 ms
+across four changes; that residual includes row coordination as well as validation. One clean candidate
+fold had a 106.089 ms Repaint interval; its cause was not recorded. In a subsequent two-by-four matched
+run, fold intervals were 94.883/52.691/53.217/51.813 ms for the baseline and
+53.423/42.198/42.620/41.703 ms for the candidate. The long baseline fold had no observed collection
+and ran predominantly on the main thread; that thread time includes consumer and native work. These
+limited observations support the targeted reduction, not a guarantee against tail latency or a solution
+to the original approximately 10-FPS report.
+
+The accepted private pair `dist/private-repeat-20261110/` contains tested FL MVID
+`7586240b-275c-489a-b2a0-d1c131d1bd80` and unchanged US MVID
+`361206a0-8ed6-47fb-9b33-cbbe8246e025`, with whole-pair rollback to 017/3612. The FL DLL was built
+from `ee425014f009eac1296922d984ab7ba899a4db5f` plus the recorded four-file dirty patch; the later
+source commit does not change that identity. Existing Release, Repeat, binding, registry, failure,
+layout, lifecycle, identity, containment, reactive and API checks passed. Exact setup, screenshots,
+failed profiler installation, timing and tail raw data are in local private evidence under
+`dist/private-layout-20261110/evidence/`; no native 1.7 or physical-input acceptance is implied.
+
 ### Validated draw-context reuse: local 1.6 handoff
 
 A draw-entry context is reused only after checking its captured inputs, retained style scope, baseline

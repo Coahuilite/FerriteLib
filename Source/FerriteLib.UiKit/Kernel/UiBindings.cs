@@ -198,6 +198,9 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
     private readonly Dictionary<string, OptionsDescriptor> options = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ActionDescriptor> actions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CommandDescriptor> commands = new(StringComparer.Ordinal);
+    // Binding-owner validation depends on registration shape, not value notifications.
+    private object registrationGeneration = new();
+    internal object RegistrationGeneration => registrationGeneration;
     private readonly HashSet<UiBindingPresentation> presentations = new();
     internal void AttachPresentation(UiBindingPresentation value) => presentations.Add(value);
     internal void DetachPresentation(UiBindingPresentation value) => presentations.Remove(value);
@@ -218,6 +221,7 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
     internal void RemoveItemBinding(string key)
     {
         Reactive.AssertWritable();
+        registrationGeneration = new object();
         trackedReads = null; ordinaryReads = null;
         values.Remove(key); options.Remove(key); actions.Remove(key); commands.Remove(key);
         declaredInvalidation.Remove(key); revisions.Remove(key);
@@ -257,6 +261,7 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
             throw new InvalidOperationException($"Duplicate options binding '{binding}'.");
         }
 
+        registrationGeneration = new object();
         options.Add(binding, new OptionsDescriptor<T>(get));
         DeclareInvalidation(binding, invalidates);
     }
@@ -271,6 +276,7 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
             throw new InvalidOperationException($"Duplicate action binding '{actionBind}'.");
         }
 
+        registrationGeneration = new object();
         actions.Add(actionBind, new ActionDescriptor<T>(action));
         DeclareInvalidation(actionBind, invalidates);
     }
@@ -288,6 +294,7 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
             throw new InvalidOperationException($"Duplicate command binding '{actionBind}'.");
         }
 
+        registrationGeneration = new object();
         commands.Add(actionBind, new CommandDescriptor(action, canExecute));
         DeclareInvalidation(actionBind, invalidates);
     }
@@ -335,6 +342,7 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
             for (int i = 0; i < left.Count; i++) if (!equal(left[i], right[i])) return false;
             return true;
         };
+        registrationGeneration = new object();
         options.Add(key, descriptor); reactiveEnabled = true;
         DeclareInvalidation(key, UiInvalidation.Everything);
     }
@@ -756,6 +764,7 @@ internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => 
             throw new InvalidOperationException($"Duplicate value binding '{binding}'.");
         }
 
+        registrationGeneration = new object();
         values.Add(binding, descriptor);
         DeclareInvalidation(binding, invalidates);
     }
