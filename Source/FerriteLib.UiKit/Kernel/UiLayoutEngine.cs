@@ -47,6 +47,7 @@ internal sealed partial class UiLayoutEngine
         internal UiLayoutRect? ContentRect;
         internal int SubtreeCount;
         internal DrawContextReuse? DrawContext;
+        internal UiWidgetContext? UnscopedDrawContext;
 
         /// <summary>
         /// Set on the root entry of one MATERIALIZED Repeat row (D4 VisibleRows). The Scroll's counting
@@ -707,6 +708,26 @@ internal sealed partial class UiLayoutEngine
         // A failed lookup or construction must not leave the previous result admitted for a later pass.
         entry.DrawContext = null;
         UiStyleResolver? resolver = styleResolver;
+        UiWidgetContext? unscoped = entry.UnscopedDrawContext;
+        entry.UnscopedDrawContext = null;
+        if (resolver == null || entry.StyleChain == null || entry.StyleChain.Count == 0)
+        {
+            // Resolve on every visit: mutable theme/property changes remain visible between collection
+            // and drawing. Only the immutable context wrapper is retained, never eligibility or values.
+            UiFont font = UiWidgetRegistry.GetFallbackFont(ctx.Source, entry.Node.Kind);
+            UiTheme current = entry.Node.Properties.Apply(entry.Node, resolver?.Baseline ?? ctx.Theme, font);
+            float width = entry.MeasureWidth > 0 ? entry.MeasureWidth : ctx.ViewWidth;
+            if (unscoped == null || !ReferenceEquals(unscoped.Source, ctx.Source)
+                || !ReferenceEquals(unscoped.Session, ctx.Session) || !ReferenceEquals(unscoped.Metrics, ctx.Metrics)
+                || !ReferenceEquals(unscoped.Theme, current) || !ReferenceEquals(unscoped.Translation, ctx.Translation)
+                || !ReferenceEquals(unscoped.Bindings, ctx.Bindings) || !ReferenceEquals(unscoped.Node, entry.Node)
+                || !ReferenceEquals(unscoped.StyleChain, entry.StyleChain) || unscoped.ViewWidth != width
+                || !unscoped.WindowOrigin.Equals(windowOrigin) || !unscoped.ElementId.Equals(entry.Node.Id)
+                || !string.Equals(unscoped.ElementPath, entry.Node.Path, StringComparison.Ordinal))
+                unscoped = ctx.WithLayout(entry.Node, current, width, windowOrigin, entry.StyleChain);
+            entry.UnscopedDrawContext = unscoped;
+            return unscoped;
+        }
         if (resolver == null || entry.StyleChain is not UiStyleDeclaration[] chain || chain.Length == 0)
             return ContextForEntry(entry, ctx, windowOrigin);
 
