@@ -209,6 +209,20 @@ instrumented and uninstrumented frames, method logs, driver sources and rejected
 `dist/private-layout-20261110/evidence/f09-full-attribution/`, `f09-container-attribution/` and
 `f09-owner-fastpath-checks/`; they are not a release package.
 
+A later 1.6 baseline run recorded wall time and Windows main-thread CPU at only the Host Arrange and
+Draw boundaries. During a warm F09 four-toggle window, the main thread accumulated 6.96875 seconds of
+CPU in 6.99835 seconds wall; its four revision-matched full arrangements took 31.018, 40.454, 31.122
+and 39.537 ms wall. In the same Host's F08 volume-field run, all 150 key-down, character and key-up
+events arrived. Main-thread CPU / elapsed time was approximately 99.96%, 99.44% and 99.07% in the
+pre-input, input and post-input windows, while unique Repaint rates were 102.31, 65.44 and 124.00 FPS.
+Host Arrange and Draw occupied 61.96%, 72.54% and 59.90% of those observed spans as wall time. The
+native CPU clock was quantized in approximately 15.625 ms steps, so per-call CPU is not a reliable
+fine-grained breakdown. The Host figures include consumer widgets, native/Unity work and instrumentation;
+they do not apportion that cost to FL core alone. The observed input slowdown coincided with a busy main
+thread and is not merely the monitor's FPS display; the original approximately 10-FPS symptom remains unreproduced.
+Raw cumulative counters, window boundaries, events and screenshots are retained in local private evidence
+at `dist/private-layout-20261110/evidence/thread-cpu/`.
+
 Any optimization must retain ordinary-getter backing changes **without Notify** at their original
 read/synchronization points; it must not poll them at new points either. Shared-label maximum changes,
 unknown rulers at their existing legal revalidation boundary, failed/half candidates, direct standalone
