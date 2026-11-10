@@ -35,6 +35,9 @@ public sealed class UiElementSpec
     {
     }
 
+    // Ordered, nonempty source keys derived from this immutable declaration (duplicates matter).
+    internal string[]? MeasureSourceKeys { get; set; }
+
     public bool TryGetAttribute(string name, out string value) => Attributes.TryGetValue(name, out value!);
     public bool TryGetNumber(string name, out float value)
     {

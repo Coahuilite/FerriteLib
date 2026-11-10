@@ -15,7 +15,7 @@ internal sealed partial class UiLayoutEngine
     private sealed class RoleInput
     {
         internal UiElementSpec Spec = null!;
-        internal UiMeasureInputs Context = null!;
+        internal MeasureContextStamp Context;
         internal UiMeasureInputs? Environment;
         internal ITextMetrics Metrics = null!;
         internal IUiTranslation Translation = null!;
@@ -28,9 +28,7 @@ internal sealed partial class UiLayoutEngine
     private float ReadLayoutRole(Dictionary<UiNodeId, RoleInput> records, UiElementSpec spec, UiWidgetContext ctx, bool shared, Func<float> calculate)
     {
         if (ctx.Node == null) return calculate();
-        UiMeasureInputs context = shared ? MeasureContext(ctx) : new UiMeasureInputs(numbers: new[] {
-            ctx.ViewWidth, (float)ctx.Theme.DefaultFont, (float)(UiTextFonts.For(ctx).Font.Size ?? 0), ctx.Theme.Geometry.Padding, ctx.Theme.Geometry.Spacing,
-            ctx.Theme.Geometry.Gap, ctx.Theme.Geometry.RowHeight, ctx.Theme.Geometry.Hairline });
+        MeasureContextStamp context = new(ctx, shared);
         UiMeasureInputs? environment = UiTextFonts.Environment(ctx);
         if (!layoutRequested && !ctx.Node.IsDirty && records.TryGetValue(ctx.Node.Id, out RoleInput? prior)
             && ReferenceEquals(prior.Spec, spec) && ReferenceEquals(prior.Metrics, textMetricsCache!.Source)
