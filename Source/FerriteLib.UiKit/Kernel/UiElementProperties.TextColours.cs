@@ -17,15 +17,6 @@ public sealed partial class UiElementProperties
     internal UiPropertyDeclaration<UiColour?> TextColourDeclaration(string property, bool local)
         => UiTextColourProperties.Declaration(local ? localTextColours : textColours, property, InvalidateResolution);
 
-    private Action CaptureTextColourAuthoring()
-    {
-        var prior = new Dictionary<string, UiResolvedProperty<UiColour?>>(resolvedTextColours, StringComparer.Ordinal);
-        return () =>
-        {
-            resolvedTextColours.Clear();
-            foreach (var pair in prior) resolvedTextColours.Add(pair.Key, pair.Value);
-        };
-    }
     private void AuthorTextColours(UiElementSpec spec, UiStyleDocument? document)
     {
         inlineTextColours.Clear();
