@@ -984,15 +984,21 @@ internal sealed partial class UiLayoutEngine
         UiLayoutPoint groupWindowOrigin = ScopeWindowOrigin(outRect, nativeOrigin, windowOrigin);
         UiLayoutRect? outerClip = ctx.Session.CurrentClip;
         ctx.Session.ConstrainClip(new UiLayoutRect(groupWindowOrigin.X, groupWindowOrigin.Y, outRect.Width, outRect.Height));
-        if (isolatedPaint == null && string.Equals(kind, "Overlay", StringComparison.Ordinal)
-            && entry.Spec.TryGetBoolean("DeferClippedDisplay", out bool defer) && defer)
-        {
-            IUiExecution execution = ctx.Session.Execution;
-            if (execution is IUiExecutionOwner owner) execution = owner.NativeOwner;
-            if (execution is IUiIsolatedPaint candidate && candidate.CanIsolatePaint) isolatedPaint = candidate;
-        }
         try
         {
+            // An explicit false ends the inherited policy for this subtree. Capability lookup stays
+            // inside the clip lifetime: a throwing owner or adapter must not strand the narrowed clip.
+            if (string.Equals(kind, "Overlay", StringComparison.Ordinal)
+                && entry.Spec.TryGetBoolean("DeferClippedDisplay", out bool defer))
+            {
+                if (!defer) isolatedPaint = null;
+                else if (isolatedPaint == null)
+                {
+                    IUiExecution execution = ctx.Session.Execution;
+                    if (execution is IUiExecutionOwner owner) execution = owner.NativeOwner;
+                    if (execution is IUiIsolatedPaint candidate && candidate.CanIsolatePaint) isolatedPaint = candidate;
+                }
+            }
             ctx.Drawing.Clip(outRect, () => {
             DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.Position, groupWindowOrigin,rootContext,isolatedPaint);
             });
