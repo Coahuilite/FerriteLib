@@ -12,8 +12,8 @@ FerriteLib 是 RimWorld 的**无内容前置模组**，只携带一个程序集 
 | 开发线 | 0.9.0，API 区间 `[0.9.0, 0.10.0)`；见[当前工具合同](docs/development/0.9/tools.md) |
 | 已发布 | [v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1)（GitHub 预发布，非 latest） |
 | 本地候选 | 0.9 正常单载体，尚未发布；0.8 维护候选单独保留 |
-| RimWorld 1.6 | 0.8 维护／恢复线；r6 仍待原生验收 |
-| RimWorld 1.7 | 0.9 net10.0 已对本机 1.7.4998 rev1299 编译完整库及公共 Window／Settings 作者路径；native 未验证 |
+| RimWorld 1.6 | 独立0.8维护／恢复线；c3-dev继承r6原生未验责任 |
+| RimWorld 1.7 | 0.9 net10.0已有隔离完整窗Native17消费；Game17仅构建／包装，真实游戏、物理输入与IME未验。详见实现映射。 |
 
 逐项证据与已知偏差不写在 README，见[实现与开放偏差](docs/openspec/implementation.md)。
 

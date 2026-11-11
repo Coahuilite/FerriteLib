@@ -1,23 +1,70 @@
 # MEMORY
 
+## Working protocol
+
+### Local map
+
+Use the adopted Task state, Standards and verification, Lesson promotion and Review timezone entries here. Project state owns global goals, authorization and cross-change responsibilities; scoped records, such as OpenSpec changes, retain their work and evidence. Each fact has one authority at its proper scope: link details instead of maintaining copies. Current focus does not enlarge a record's scope. Preserve existing authorities, including START; use STATE.md only when a needed project-level authority is absent, through authorized adoption/migration. MEMORY / Knowledge holds cross-task knowledge; LESSONS holds active lessons. Optional todos are plans/views. Workers report through responsible owners, not new ledgers.
+
+| Entry | Scoped authority and owner |
+| --- | --- |
+| Task state | The assigned task/work order owns this execution's goal, authorization and acceptance route; its responsible caller owns cross-repository coordination. The maintainer owns repository-level decisions. [TODO](TODO.md) is the repository-scoped action/acceptance view, not a grant of work. Existing [OpenSpec changes](docs/openspec/README.md) retain their own scoped work and evidence. Implementation maps report facts, not permission. There is no separate START; this scoped adoption identifies no missing project authority and creates no STATE. |
+| Standards and verification | The maintainer owns [specification](docs/specification.md), [API tiers](docs/api-tiers.md) and [build/verification guidance](docs/build-and-debug.md). Select relevant existing checks under the assigned task and [repository constraints](AGENTS.md); no new unit tests/cases/equivalent probes or automatic full-suite gate. Static, build, runtime and release evidence remain distinct. |
+| Lesson promotion | The authorized repository owner maintains engineering rules in [AGENTS](AGENTS.md), behavior in the specification's existing capability/connection, and procedures in the build/usage guide. Use LESSONS.md only when an active reusable lesson needs it; none is currently set. The FL documentation owner keeps the local reviewed-through checkpoint in existing TODO. Merge existing equivalents at the responsible entry; never duplicate a shared rule or use a lesson as repair/task state. |
+| Review timezone | Asia/Hong_Kong, adopted for this local update on 2026-11-08. Read an actual clock and record completed reviewed_at with UTC offset. Historical Seen dates retain their meaning; do not backdate or reinterpret them. |
+
+### Resume, update and close
+
+Keep the agreed goal, scope, authorization and completion conditions distinct from findings and plans. State identifies usable artifacts/evidence, unmet conditions, dependencies, owner and next action. Separate facts from hypotheses. Use existing fields or compact prose; retain detailed plans only when order matters to safety, permission or coordination.
+
+Before consequential retries, reconcile uncertain records against actual work. An active label proves neither a live process nor permission; a worker report is not acceptance. Check only uncertainties affecting the next action. Missing permission or unresolved conflict stops the affected operation, not independent authorized work. Explicitly deferred work stays deferred.
+
+Update the responsible source on material changes, not every command. Before interruption/handoff, fill only gaps preventing safe continuation. Defects stay in task state; LESSONS does not replace repair. Blockers name affected work, resolver and resumption condition. Continue while authorized action can advance the goal; otherwise return the blocker without polling unchanged state. The host or existing goal runner supplies activation.
+
+At substantive closeout, compare results with original acceptance and relevant checks; never weaken the contract to fit implementation. Label evidence static, build, runtime, not run or unobservable, with release separate when needed. Reuse it while artifact, inputs and conditions remain applicable; changed premises reopen only affected conclusions. Distinguish implementation, delivery and acceptance. Close satisfied scope, retain outstanding acceptance at its owner, and remove completed activity under retention permissions once results/evidence are accessible. Closing or archiving a scoped record must leave project routing and other obligations reachable. No permanent Done diary or mandatory per-session handoff document.
+
+### Knowledge maintenance
+
+Route work to task state, established specifications/decisions to their existing sources, and reusable failure rules to LESSONS. Admit to Knowledge only facts whose loss could change a future decision or cause costly rediscovery and which no better source sufficiently holds. Keep conclusion, scope/exceptions and necessary evidence; omit cheaply recoverable environment facts and routine success logs.
+
+Merge or replace affected items rather than append session notes. Reassess when relevant versions, implementation, decisions or counterevidence change; age alone does not expire knowledge. Hypotheses stay with investigations. Mature knowledge moves to an existing specification or procedure, leaving a useful pointer only; a small independent fact needs no separate document.
+
+Compact affected Knowledge on update; review remaining content at phase closure or when duplication, staleness or reading cost warrants it. A size budget triggers review, not truncation. Preserve identifiers, values, units, version boundaries, user decisions/exceptions, evidence limits, unmet acceptance and recovery; route obligations to task state rather than discard them. Consult original sources when unclear. Before removing sole necessary conclusions/evidence, establish an accessible responsible source and repair references. Retain history only for concrete evidence, recovery or accountability needs, not an overflow archive. Read the result for the next task; add no compaction diary.
+
+### Review and lessons
+
+Review uncovered work before substantive delivery, handoff or waiting. At start/resume, recover interrupted reviews and uncovered earlier workdays. Across midnight, use the next natural checkpoint, not clock polling. Inspect actual changes, artifacts, existing verification, corrections and rework for avoidable failures or thin verification; reassess relevant lessons. Reuse evidence; no new work means no review or marker rewrite. Issues and comments are optional inputs.
+
+Use one owner and reviewed-through checkpoint per scope, with actual covered work/evidence and reviewed_at. Store it in LESSONS if present, otherwise existing task state; transfer it with a pointer when LESSONS is created. Include uncommitted work and relevant corrections; date or Git HEAD alone is insufficient. Start from the authorized baseline, advance only through reviewed work and expose gaps. Coverage is not acceptance or repair. Create no file solely for a marker without a need for persistent continuation.
+
+Read an actual clock at start/resume and review checkpoints. Use the declared named Review timezone, not worker machine settings; record reviewed_at at completion in ISO 8601 with UTC offset. Count its local calendar date; cross-midnight reviews count only on completion, delayed reviews are not backdated. Record timezone changes without reinterpreting old dates. If clock/timezone is unknown, retain findings and defer date-based counting.
+
+Active lessons need a usable rule, why, evidence and scope from real errors, rework, corrections or verification omissions; apply them immediately within permissions. Existing requirements need no Seen threshold. Merge equivalents. Seen counts distinct completed-review dates finding fresh supporting evidence, at most once per date; rereading one incident, duplicate reports or elapsed days do not count. At three such dates, move a valid, actionable rule into its mapped stable entry; merge existing equivalents or correct/retire invalid rules instead. If authority or destination blocks promotion, retain an owned pending action in task state; do not claim completion.
+
+Promotion connects the rule to its work/review trigger, action and necessary passing evidence in the entry's existing format, without adding testing or other permissions. Keep only useful migration pointers and needed evidence in LESSONS. Later violations attach to the existing rule: check its reach, clarity or validity, without resetting Seen or duplicating it. Lack of recurrence alone does not justify retirement. Maintain lessons within retention permissions; review and ordinary success require no new lesson or report.
+
+## Knowledge
+
+Current routing is the Local map above. Dated material below retains its original line, target and
+evidence scope; historical headings and counts do not select current work or override current docs.
+
 Current development policy: follow RimWorld **1.7** APIs/namespaces without a game minor-build whitelist. Normative tooling/stage boundaries: `docs/openspec/specs/contracts/developer-tools/spec.md`; implementation gaps remain in the specification's linked status page. Historical fixed-input evidence is not a support ceiling.
 
-## 0.9 development line (2026-11-05)
+### 0.9 development line
 
-The authorized 0.9 line inherits the exact dirty producer-r5-dev-r2 source form. Its new optional
-Host-owned tools, semantic operations, same-source headless entry, explicit layout constraints,
-edit completion, local mounted lifetime, optional author preview preparation and original-window
-cost-sample peers are documented in `docs/development/0.9/tools.md`.
-The normal carrier uses dormant FER_TOOLS instrumentation; FER_TEST fault injection is excluded.
-The recorded native evidence used 1.7.5000 rev1275; new work follows the 1.7 policy above. Shared author-context/document-source,
-on-change status and selected-outline contracts are maintained in the same tools document. Earlier
-4998 evidence remains tied to its old fixed input. These references compile the full library and separate public Window author path;
-native/IME/render acceptance remains open. Same-backend standalone graphics needs an authorized
-internal bridge, now separately authorized and owned by Tools. Fixed delivery/evidence identity belongs to each producer, not the embedded dirty HEAD.
+The authorized line inherits the exact dirty producer-r5-dev-r2 source form; later fixed producers
+retain their own complete source form and identity rather than inheriting an embedded dirty HEAD.
+The 0.9 line uses one normal carrier with dormant FER_TOOLS; FER_TEST fault injection is excluded.
+Its neutral shell, selection presentation, original-coordinate hit read and optional non-committing
+budget measurement retain public-unstable status. Current usage and original page/provider/pure-read
+conditions are in [the connection guide](docs/development/0.9/tools.md); source mechanisms, fixed
+producer identities, later consumer evidence and remaining native limits are in
+[the implementation map](docs/openspec/implementation.md). A source-document correction does not
+refresh frozen carriers or packages. Actual 1.7 inputs do not define a minor-build support ceiling.
 The 0.8/1.6 maintenance line and its native acceptance remain separate. The complete c3-dev candidate
 replaced r6 as the selected 1.6 candidate while carrying its unverified checklist; r6 remains a recovery input.
 
-## 0.8 development line (2026-10-25)
+### 0.8 development line (2026-10-25)
 
 The 2026-11-05 implementation adds Auto/placeholder measurement consistency, effective-clip content
 hover and creation-first native domain output through the existing Host/Session lifecycle. Old factories,
@@ -93,7 +140,7 @@ legacy/structure/environment/callback fallbacks are in `docs/openspec/specs/core
 native acceptance; the A009r2 pair was unchanged at that historical checkpoint. Fixed consumer integration of FL
 833c14f4 and its matched candidates are complete; overall internal-trial acceptance is recorded above.
 
-## Historical 0.7 checkpoint (2026-10-09)
+### Historical 0.7 checkpoint (2026-10-09)
 
 - **Build and delivery identity.** The line's last **source** commit is
   `d5af4d8209823bb19f7c112805fcb1b8caf56bbc` on `0.7.x` (committed as `worker <worker@localhost>`, the accepted
@@ -222,14 +269,14 @@ native acceptance; the A009r2 pair was unchanged at that historical checkpoint. 
   needs a citation into a consumer tree; a confirmed public capability does not wait for a second consumer to
   hand-roll it.
 
-## Archived round records
+### Archived round records
 
 The 2026-09-30 PM integration checkpoint, the 2026-09-28/29 R1-R2 palette and R3-A instrument narratives, and
 the 2026-09-17..2026-10-07 landing-narrative family (including the 2026-09-17..09-22 maintainer rulings, whose
 live consequences `AGENTS.md` carries) moved **verbatim** to `OBLIVIONIS.md`, "2026-10-09 — second compaction".
 Read them there only for a historical conflict; they cannot override the current scripts, contracts or ledger.
 
-## Start here — current direction (2026-09-24)
+### Historical 0.7 direction (2026-09-24)
 
 Read `AGENTS.md` for invariants, this file for durable state, and `TODO.md` for the active queue.
 
@@ -243,7 +290,7 @@ Read `AGENTS.md` for invariants, this file for durable state, and `TODO.md` for 
 | `docs/consumers/consume-from-0.7.0.md` | Consumer integration and migration guidance. |
 | `docs/development/0.7/60-capability-dispositions.md` | Existing capability decisions and their conditions; not the current execution order. |
 
-### Maintainer direction and current boundary
+#### Maintainer direction and current boundary
 
 - **Priority:** long-term FL stability and extensibility for shared mod use, accepting a delay to US.
   Use the existing US ModSettings redesign as the real integration surface. Retain the page model over
@@ -270,7 +317,7 @@ Read `AGENTS.md` for invariants, this file for durable state, and `TODO.md` for 
   A docs-only commit does not rebuild them. Any strict embedded-commit-versus-HEAD check needs a fresh
   build before its next acceptance run; previous evidence remains scoped to the artifact actually tested.
 
-### The library-owned development instrument
+#### The library-owned development instrument
 
 `UiDiagnosticSubscription.GeometryEnabled` / `.GeometryOverlay` / `.DumpGeometry()` expose the bounded,
 per-host instrument in `UiDevGeometryProbe.cs`. It observes engine geometry and native input decisions;
@@ -279,13 +326,13 @@ queries report event-before/event-after, and an already-Used entry explicitly ma
 Release excludes the capture and rejects enabling it. Gate 10 executes the Dev assertions, including the
 consumed-input case; gate 1 alone is not Dev coverage. Usage and proof details belong to the operational guide.
 
-## Current durable state
+### Current durable state
 
-The dated records below explain earlier changes and their scoped evidence. Current priorities are above;
+The dated records below explain earlier changes and their scoped evidence. Current routing is in Local map;
 current build behavior is in "Carrier identity and build isolation". Historical gate counts, capture sites,
 and delivery procedures do not override the current scripts or the next-stage handbook.
 
-### Evidence lessons (measured cases, not standing acceptance gates)
+#### Evidence lessons (measured cases, not standing acceptance gates)
 
 - Earlier rounds produced misleading red and green results when the fixture, ruler, screen or observation
   channel differed from the intended input. A named product backout proved specific fixes; a guard that
@@ -422,7 +469,7 @@ and delivery procedures do not override the current scripts or the next-stage ha
   difference, so when the HOST list is the smaller one it prints "missing: " empty; the lane still fires, only
   the message is one-directional.
 
-## Version axes and the compatibility promise
+### Version axes and the compatibility promise
 
 - **Three axes, and the harness pins all three agreeing on major.minor.** Contract
   `FerriteLibVersion.Api`, release `About/About.xml <modVersion>`, build csproj `<VersionPrefix>` (the build
@@ -518,7 +565,7 @@ and delivery procedures do not override the current scripts or the next-stage ha
   `docs/openspec/specs/policies/public-authoring/spec.md`.
 - **Nothing persists into a save**, and the Squeaky Ratkin repo is never a write target.
 
-## Carrier identity and build isolation
+### Carrier identity and build isolation
 
 - **A hash is an identity only with its inputs pinned.** `1.6/Assemblies/FerriteLib.UiKit.dll` is the whole
   payload; a hash quoted without the build command and the clean/dirty state is a machine-local fact.
@@ -586,7 +633,7 @@ and delivery procedures do not override the current scripts or the next-stage ha
   first and asserted afterwards, so a refused pack left a half-written package behind. **Proof:** with a
   post-copy failure planted, the pack exited non-zero and the delivered folder's file-hash fingerprint was
   IDENTICAL before and after; the restored script exits 0 and leaves no `.staging-*` behind.
-## Packaging discipline
+### Packaging discipline
 - **Prior push lessons (moved from AGENTS on 2026-10-08).** The 0.6 first-push round paid for a
   full-history scan before an unpublished line left the machine: a working-tree fix still failed while
   history kept the blob, and a backup tag created after the fix re-exposed that history. Keep recovery
@@ -622,7 +669,7 @@ and delivery procedures do not override the current scripts or the next-stage ha
   and `tools/.../Stubs/` with its `bin/stubs/` shape are de-facto published surfaces: relocating them
   breaks a consumer's harness while every gate here stays green.
 
-## Public surface, structure and the memory protocol
+### Public surface, structure and the memory protocol
 
 - **The payload is exactly `1.6/Assemblies/FerriteLib.UiKit.dll`** — zero Defs, Patches, Languages,
   textures. Gate 5 probes those names rather than filtering an enumeration, so an empty tree cannot pass
@@ -663,7 +710,7 @@ and delivery procedures do not override the current scripts or the next-stage ha
   verbatim in `OBLIVIONIS.md`, with separate index entries and frozen markers. Current reading and handoff
   rules are in `AGENTS.md`; the archive is historical evidence.
 
-## Environment facts (cheap to get wrong, expensive to re-learn)
+### Environment facts (cheap to get wrong, expensive to re-learn)
 
 - **RimWorld's minimum window is 1024x768, and UI scale cannot push the logical width below it.**
   `UIScaleSafeWithResolution` requires `w/scale >= 1024` and `h/scale >= 768`, so `UI.screenWidth` is
@@ -685,7 +732,7 @@ and delivery procedures do not override the current scripts or the next-stage ha
 - **Build commands need the project path.** The repository root has no project file; use
   `dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release`. It now writes the isolated Release
   output. Updating a compatibility delivery remains a separate explicit export.
-## Diagnostic coverage — the rulings that shape the channels
+### Diagnostic coverage — the rulings that shape the channels
 
 - **`Available` is the inset label band, not the element rect** (FL-21). An overflow verdict compares the
   band against the content it could not hold (`Needed`).
@@ -730,7 +777,7 @@ and delivery procedures do not override the current scripts or the next-stage ha
   layer": it changes no conclusion today and it is exactly the kind of difference that makes the next lane
   lie.
 
-## Gates and what each actually proves
+### Gates and what each actually proves
 
 Ten gates in `scripts/verify-local.ps1`: 1 harness, 2 Dev build (`FER_DEV`, warnings-as-errors), 3
 Release build (warnings-as-errors), 4 payload present, 5 content-free (named-path probe for `Defs`,
@@ -811,7 +858,7 @@ Honest limit on the theme lane: `VerifyThemeColorsDoNotAffectLayout` has two hal
 half is mutation-proven. The rect-equality half has **no available failing mutation** today, because no
 colour token currently feeds layout — it is a future-regression guard, not present evidence.
 
-## Enduring corrections
+### Enduring corrections
 
 - **The `Warning`/`Danger` collapse rested on a census that read the wire as empty (correction, 2026-09-11).**
   The 2026-09-10 census said the two names had no users, and the 0.4 window deleted `UiTheme.Warning` on that

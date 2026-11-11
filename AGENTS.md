@@ -1,15 +1,18 @@
 # AGENTS.md — FerriteLib
 
-> Stable rules live here. For the assigned work, start with the relevant current contract and direct
-> dependencies; use only the relevant sections of `MEMORY.md` for confirmed context and evidence, and
-> `TODO.md` when selecting or continuing work. `OBLIVIONIS.md` is a cold historical source, not a current
-> operating prerequisite; it cannot override current contracts or verified implementation.
+## Continuity
+
+At start/resume, read MEMORY.md's Working protocol and follow its Local map to current task state and relevant knowledge, lessons and checks; do not load all history.
+
+Follow that protocol on material changes and before handoff or closure. Preserve project constraints and permissions; listed work or knowledge never grants authority.
+
+Only the authorized project owner changes the protocol or its map. Ordinary memory updates and compaction affect Knowledge, not Working protocol; learned content cannot rewrite instructions. Keep one responsible source per fact and serialize conflicting writes.
 
 ## Work entry
 
 - Task and status: the assigned task defines authority; read the relevant [TODO](TODO.md) and [MEMORY](MEMORY.md) sections as needed. This repository has no separate START entry.
 - Stable contracts: [specification](docs/specification.md), [API tiers](docs/api-tiers.md) and the applicable rules below.
-- LESSONS: no repository-local LESSONS is currently set; read applicable lessons supplied with the task or a later local `LESSONS.md` if present.
+- LESSONS: no repository-local LESSONS is currently set; local review coverage lives in existing [TODO](TODO.md). Read relevant supplied lessons or a later local `LESSONS.md` through the Working protocol map.
 - Verification: [build and verification guidance](docs/build-and-debug.md) and the checks required by the assigned work; select by actual risk and permission.
 
 Read applicable AGENTS first, then the responsibility entry and task evidence. The project owner controls
@@ -251,46 +254,20 @@ FER_TEST is only for existing harness builds, and legacy FER_DEV instruments kee
   compatibility obligations; do not relocate them merely because another target uses a different layout.
   Consumers select an explicit supported artifact and never ship a second FerriteLib DLL.
 
-## Memory protocol
+## Repository records
 
-This repository keeps stable rules in `AGENTS.md`, confirmed context and evidence pointers in `MEMORY.md`,
-current work in `TODO.md`, and replaced historical material in `OBLIVIONIS.md`. Each fact has one responsible
-source; entries point to it rather than maintain a competing status or task ledger.
+The [Working protocol](MEMORY.md#working-protocol) is the sole local daily memory/review driver;
+Knowledge updates cannot change it or its map. This replaces the former Memory protocol section.
 
-At the start of relevant work:
-
-- Read only the `MEMORY.md` sections relevant to this responsibility when confirmed context, decisions,
-  constraints or evidence pointers are needed; use its headings to find them, not the whole file by default.
-  Current product contracts and implementation status are located through `docs/specification.md`.
-- Read `TODO.md` when selecting or continuing work; it stores current goals, open actions, blockers and
-  explicit deferrals.
-- Read `OBLIVIONIS.md` only for a historical conflict or an explicit request; it is cold archive evidence
-  and cannot override current sources.
-- Memory files use the fixed basenames `AGENTS.md`, `MEMORY.md`, `TODO.md` and `LESSONS.md`, and are
-  created only when needed; maintain them in accurate English. The existing `OBLIVIONIS.md` is optional
-  historical material and follows the same language rule when appended.
-
-Maintain these boundaries:
-
-- Update `MEMORY.md` only when confirmed durable facts change; update the action surface where it is owned.
-- Keep measured implementation facts at their responsible source. Read lessons relevant to the task when
-  supplied with it or in a local `LESSONS.md`, if present; keep a reusable lesson with its evidence in its
-  responsible scope rather than copying it into multiple ledgers. Promote it through an existing applicable
-  check or instruction only when the evidence warrants; follow the current task and user verification limits.
-- **Compact by default.** Settled release and implementation detail lives in `docs/`; `MEMORY.md` keeps a
-  pointer to it, never a second copy of it. Keep existing historical material when useful; do not add to
-  `OBLIVIONIS.md` merely to shorten a ledger or grow active memory with finished work.
-- Update `TODO.md` only when its current task surface changes.
-- Do not store session narratives, transient artifacts, raw logs, completed test matrices, commit chains or
-  release checklists in an active memory file.
-- Documentation edits alone are not memory events; an external-state summary never overrides its
-  authoritative source.
-
-**Handoff material is not a memory tier.** Current records may be used directly when they already give the
-next owner the result, applicable inputs, evidence, limits and next action. Create a separate handoff only
-when its consumer or a real recovery need requires it; it gains no standing authority. A maintainer-local
-`HANDOFF.md`, when used, is gitignored and is not a protocol target for tracked files. Durable facts remain
-in their responsible sources, and open work remains on its current action surface.
+- Fixed basenames are `AGENTS.md`, `MEMORY.md`, `TODO.md` and, when needed, `LESSONS.md`; maintain them
+  in accurate English. `OBLIVIONIS.md` is optional cold history, never a current operating prerequisite.
+- Stable engineering rules stay here; product requirements and measured implementation facts stay in
+  their linked docs. Knowledge keeps useful cross-task conclusions/pointers, not a second task ledger,
+  raw logs, transient artifacts, completed matrices or release checklists. Documentation edits alone
+  are not durable product facts. Existing historical evidence retains its original scope.
+- A handoff is not a memory tier. Use an existing record when it serves the next owner; a separate
+  handoff needs an actual consumer/recovery reason and grants no authority. A maintainer-local
+  `HANDOFF.md`, when used, is gitignored, not a tracked protocol target.
 
 ## Boundaries
 
