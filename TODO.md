@@ -80,18 +80,21 @@ implemented. Current requirements are reached through `docs/specification.md`; i
 
 ## Local review coverage
 
-### FL09 retained-region implementation candidate
+### FL09 retained-region engineering delivery
 
-- **Owner / reviewed_at:** sol-tiering, 2026-11-12T01:59:47.8851024+08:00 (Asia/Hong_Kong).
+- **Owner / reviewed_at:** sol-tiering, 2026-11-12T02:10:21.3857130+08:00 (Asia/Hong_Kong).
 - **Reviewed-through:** The committed `d707ddf` API carrier and the region execution candidate:
   actual source-boundary capture, independent typed channels, item identity, scope/span reuse,
   real font/reader/theme invalidation, unchanged operation order, enforced pure-paint clip,
   fault/static recovery, budget workspace, detach/reentry/document seal/mount/Close, and current
-  API/usage/implementation routing. The ordinary RW1.6 execution carrier is the remaining local
-  delivery step; production source freshness and native acceptance stay with US and Terra/PM.
+  API/usage/implementation routing. The fixed ordinary RW1.6 producer is `f5e022e`, MVID
+  `00b1ed28-9ff5-4d5a-b876-90c82d75a56c`, built from clean committed source with no test hooks.
+  Production source freshness and native acceptance stay with US and Terra/PM.
   Post-READY review includes container contexts, bounded real Scroll variants, no idle cache-table
   copy, inherited private-control region membership, node/mount identity and latched pure reactive
   failure with its original exception. The follow-up remains within the adopted interface.
+  READY/DELIVERY preserve the fixed source/target/identity and actual limitations; later docs-only
+  HEAD does not identify a rebuilt carrier. The consumer short-field seam was freshly read as fixed.
 - **Evidence / corrections:** Existing scoped regression checks, readonly API/containment,
   Core 391, adapter 140 and execution-lifetime 20 pass. Later edits were checked by affected
   existing font/layout/binding/input lanes; test sources/assertions are unchanged. An invalid

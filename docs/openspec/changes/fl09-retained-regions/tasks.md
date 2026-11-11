@@ -1,6 +1,6 @@
 # Tasks — 已采用、实施中
 
-状态：WO r3 已核定 FL／US 正式采用并放行 RETAIN／CONSUME。FL 的区域源码和既有 managed 检查已完成；固定普通 Release 身份在交付中，消费／原生及 PM 验收继续开放。
+状态：WO r3 已核定 FL／US 正式采用并放行 RETAIN／CONSUME。FL 的工程候选、固定普通 Release 及受影响既有检查已交付；源码／managed 结果不代签新区域游戏行为，消费／原生及 PM 验收继续开放。
 
 - [x] SPEC-1 PM 按 WO r2 选用 bb7da49，整个新增闭包定为 Public-unstable；补齐独立 choices／paint footprint 与未变 source 不逐字段重算。
 - [x] SPEC-2 原 owner 将含 r2 补充的 ADDED／MODIFIED 并入唯一 current，更新真实入口及未导出 API 计划；
@@ -9,7 +9,7 @@
   停止后代重复派生／验证，保 unknown 洞和真实输入。完成释放与失败／重入路径。
 - [x] RETAIN-2 同一几何 owner 支持变化成员／局部 plan、后续兄弟及 Scroll／共享依赖传播；
   首次 materialize 保完整。不是只给叶增缓存或只更换 full/sparse 标签。
-- [ ] RETAIN-3 交付外部可采用 participant、内置表示消费和适配器支持／回退；独立 embedded
+- [x] RETAIN-3 交付外部可采用 participant、内置表示消费和适配器支持／回退；独立 embedded
   与手动 phase 成立，UI 状态和原生控件仍走原 owner。正常 Release 无 FER_TEST。
 - [x] RETAIN-4 运行受影响的既有中性、布局、绑定、Repeat、失败、输入、手动／窗口、API／
   containment 检查；不新增单测／case／等价 probe，不弱化断言。新增 API 按采用决定分类，

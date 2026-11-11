@@ -46,7 +46,9 @@ WO-FL09-RETAINED-DISPLAY-20261111 r3 在 FL `8f02776`／US `3e32a57` 的独立�
 新 editor、formatter/parser 改变和焦点挂起也使已采用节点失效。custom 其他状态仍由原 Invalidate 写边负责。
 私有 ctx.Child 控件沿实际 Parent 找到所属 attachment；证明还核对真实 node／mount incarnation，
 不凭同一逻辑 ID 把已退出节点的几何／状态借给新 mount。
-Build／Paint 新纯阶段拒绝控件、editor 创建、UI mutation／帮助；旧调用不获得该纯度前提。
+Build／Paint 的新契约禁止普通业务读、UI mutation／帮助／请求；guard 拦截控件／editor／state 创建、
+Node invalidation／PublishHelp 及经原 bindings 的写／命令。作者仍须遵守纯 callback 合同，
+没有拦截普通 Get 来改变其含义；旧调用不获得新纯度前提。
 Build 失败保最后成功 Paint 的不可变资料或恢复带，停止该失败片段的 Operate；不凭相同失败输入反复 Build。
 纯 Paint 失败锁存，相关输入／环境／UI／Retry 才重新派生；操作失败仍沿原 request／guard 回复，不自动重发。
 来源或几何失败丢候选，恢复绘制不运行旧 Draw／Operate、普通 source read、popup/native editor；
@@ -64,13 +66,16 @@ Attachment.Status 与原 Host.Observe／Tools 的 `region-status` facts 来自�
 BoundaryCaptures、Builds、ReusedRegions、ScheduleReuses、InteractiveCalls、UnknownCalls、PaintCalls、
 ClippedDisplays；否则 NotSampled。PaintCalls 不是 native 调用、GPU 提交或 FPS。
 
-普通 net472／RW1.6 Release 中间 API 载体 `d707ddf` 已独立固定，执行候选另有不可覆盖目录／MVID；
-具体身份由 producer 的 READY／DELIVERY 记录，不从后续 HEAD 推断。针对性既有布局／Repeat／编辑／输入／
-API／containment 检查、中性 391 检查、adapter 140 assertions 与 execution-lifetime 20 已有通过记录；
+普通 net472／RW1.6 Release 当前 producer 为 `f5e022ee56a981f7d2fd2d09b339654ee6ae65c6`，
+实际 MVID `00b1ed28-9ff5-4d5a-b876-90c82d75a56c`，InformationalVersion 为该完整 SHA 的 `0.9.0-dev+` 值；
+干净提交源、UiKitTarget 留空、FerriteTestHooks=false、--no-incremental 构建零警告／错误。
+固定目录由 producer READY／DELIVERY 持有，不从后续 docs-only HEAD 推断或覆盖；早期 `d707ddf` API 载体和 `d2a2e82` 中间载体保历史。
+针对性既有布局／Repeat／编辑／输入／API／containment 检查、中性 391 检查、
+adapter 140 assertions 与 execution-lifetime 20 已有通过记录；
 最终候选与检查范围随 owner delivery 一起交付。未新增测试／case／等价 probe。
 
-本节是源码及 managed 证据，不是 F09 原生签收。US 须以实际 item packet 的短字段接入纯 Build，
-旧 Operate 保完整绑定地址；完整生产 source 的可信鲜验与分项复用由 US owner 负责。
+本节是源码及 managed 证据，不是 F09 原生签收。交接前已鲜读 US 的纯 Build 短字段接线，
+旧 Operate 仍保完整绑定地址；实际消费引用与完整生产 source 的可信鲜验／分项复用由 US owner 负责。
 CONSUME、同代固定配对 NATIVE、整帧／首次及暖态性能和 165 FPS 仍由各原 owner／PM 继续。
 历史 1.6 A/C-r2、144 Hz、独立60Hz 或编译通过不签0.9原生，更不签1.7；GPU／scanout 未测保持未知。
 
