@@ -75,6 +75,11 @@ public sealed partial class UiHost : IDisposable
     private int lastLayoutRevision = -1;
     private int presentationRevision;
     private UiLayoutSnapshot? lastSuccessfulSnapshot;
+    private UiLayoutSnapshot? cycleSnapshot;
+    private UiLayoutRect cycleViewport;
+    private bool cycleOpen;
+    private int cycleDemandRevision;
+    private long cycleOperationRevision;
 
     public UiHost(
         string source,
@@ -251,6 +256,7 @@ public sealed partial class UiHost : IDisposable
 
     public UiLayoutSnapshot MeasureAndArrange(UiLayoutPoint available)
     {
+        cycleSnapshot = null; // explicit/manual synchronization also retires any DrawFrame reuse
         RequireOutsideBudget();
         session.InvalidatePointerRead();
         RefreshBindingOwner(allowPresentationEnrollment: true);
@@ -322,7 +328,7 @@ public sealed partial class UiHost : IDisposable
 #endif
             session.SetHostViewport(viewport);
             UiWidgetContext ctx = CreateContext(viewport.Width);
-            engine.Draw(ctx, snapshot, viewport);
+            engine.Draw(ctx, snapshot, viewport, manifest.TieredEvents);
             if (!session.IsActive) return;
 
             // Session-owned popups draw after normal content in the same OnGUI pass.
@@ -402,6 +408,7 @@ public sealed partial class UiHost : IDisposable
         if (!DisplayRequired) return;
         if (preparingPreview) throw new InvalidOperationException("Author preparation cannot recursively advance its Host.");
         session.SetFrame(frame, execution);
+        bool repaint = frame.Phase == UiFramePhase.Repaint;
         BeginFrame();
         try
         {
@@ -410,14 +417,22 @@ public sealed partial class UiHost : IDisposable
             // re-derive it from string-keyed snapshot views.
             var available = new UiLayoutPoint(viewport.Width, viewport.Height);
             if (!PreparePreview(available)) return;
-            UiLayoutSnapshot snapshot = MeasureAndArrange(available);
+            RefreshBindingOwner(allowPresentationEnrollment: true);
+            bool reuse = manifest.TieredEvents && cycleOpen && !repaint && cycleSnapshot != null && LayoutFault == null
+                && cycleViewport.Equals(viewport)
+                && cycleOperationRevision == bindingOwner.CompletedOperationRevision
+                && cycleDemandRevision == (reactivePresentation?.DemandRevision ?? 0)
+                && engine.CanReuseSynchronization(CreateContext(available.X), available, manifest.Roots);
+            UiLayoutSnapshot snapshot;
+            if (reuse) snapshot = cycleSnapshot!;
+            else snapshot = SynchronizeCycle(available, viewport);
             PumpTools();
             if (!session.IsActive) return;
             // A semantic operation may change structure. Pair drawing with the current arrangement.
             if (toolOperationAttempted)
             {
                 if (!PreparePreview(available)) return;
-                snapshot = MeasureAndArrange(available);
+                snapshot = SynchronizeCycle(available, viewport);
             }
             Draw(viewport, snapshot);
         }
@@ -442,13 +457,31 @@ public sealed partial class UiHost : IDisposable
         }
         catch
         {
+            cycleSnapshot = null;
+            cycleOpen = false;
             session.AbortHitPass();
             throw;
         }
         finally
         {
+            if (repaint) cycleOpen = false;
             if (session.IsActive) EndFrame();
         }
+    }
+
+    private UiLayoutSnapshot SynchronizeCycle(UiLayoutPoint available, UiLayoutRect viewport)
+    {
+        // Requests made during synchronization, like announcements raised by a getter, are not
+        // acknowledged by sampling a later clock. They require the next legal synchronization.
+        long operations = bindingOwner.CompletedOperationRevision;
+        if (manifest.TieredEvents) engine.RequestInputValidation();
+        UiLayoutSnapshot snapshot = MeasureAndArrange(available);
+        cycleSnapshot = snapshot;
+        cycleViewport = viewport;
+        cycleOperationRevision = operations;
+        cycleDemandRevision = reactivePresentation?.DemandRevision ?? 0;
+        cycleOpen = true;
+        return snapshot;
     }
 
     /// <summary>

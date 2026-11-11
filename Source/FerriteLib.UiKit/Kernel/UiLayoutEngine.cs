@@ -47,6 +47,8 @@ internal sealed partial class UiLayoutEngine
         internal UiLayoutRect? ContentRect;
         internal int SubtreeCount;
         internal UiWidgetContext? UnscopedDrawContext;
+        internal UiWidgetContext? EventDrawContext;
+        internal int EventContextGeneration;
 
         /// <summary>
         /// Set on the root entry of one MATERIALIZED Repeat row (D4 VisibleRows). The Scroll's counting
@@ -125,6 +127,12 @@ internal sealed partial class UiLayoutEngine
     private int cachedDefinitionRevision;
     private int cachedTranslationRevision = int.MinValue;
     private PageTable<PlacedEntry> lastEntries = new PageTable<PlacedEntry>(Array.Empty<PlacedEntry>());
+    private int drawContextGeneration;
+    private bool tieredDraw, repaintDraw;
+    private IUiIsolatedPaint? displayIsolation;
+    private List<UiPointerLayer>? contentLayers;
+    private UiLayoutRect contentViewport;
+    private int contentScrollRevision;
 
     // keyNodes and committedRevisions describe this engine's successful dependency publication.
     // Candidate revisions are sampled before reads, never acknowledged merely by receiving a notice.
@@ -176,6 +184,8 @@ internal sealed partial class UiLayoutEngine
         if (roots == null)
             throw new ArgumentNullException(nameof(roots));
         ctx.Session.LayoutWork.Passes++;
+        drawContextGeneration++;
+        contentLayers = null;
         layoutPass++;
         candidateRevisions.Clear();
         validatedLeaves.Clear(); invalidatedInputs.Clear(); notificationsCommitted = false; layoutInputChanged = false;
@@ -534,10 +544,15 @@ internal sealed partial class UiLayoutEngine
         }
     }
 
-    public void Draw(UiWidgetContext ctx, UiLayoutSnapshot snapshot, UiLayoutRect viewport)
+    public void Draw(UiWidgetContext ctx, UiLayoutSnapshot snapshot, UiLayoutRect viewport, bool tieredEvents = false)
     {
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
         if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
+        tieredDraw = tieredEvents;
+        repaintDraw = ctx.Session.Input.Phase == UiFramePhase.Repaint;
+        IUiExecution execution = ctx.Session.Execution;
+        if (execution is IUiExecutionOwner owner) execution = owner.NativeOwner;
+        displayIsolation = execution is IUiIsolatedPaint paint && paint.CanIsolatePaint ? paint : null;
 
         // One hit pass per draw: the previous pass's complete paint order becomes the stack input dispatch
         // reads, and this pass builds the next one as its elements draw.
@@ -555,14 +570,21 @@ internal sealed partial class UiLayoutEngine
 
         try
         {
-            var contentLayers = new List<UiPointerLayer>();
-            CollectPointerLayers(lastEntries, 0, lastEntries.Count, ctx, new UiLayoutPoint(viewport.X, viewport.Y), null, UiLayoutPoint.Zero, ctx.Session.CurrentClip, contentLayers);
+            if (!tieredDraw || contentLayers == null || !contentViewport.Equals(viewport)
+                || contentScrollRevision != ctx.Session.ScrollRevision)
+            {
+                contentLayers = new List<UiPointerLayer>();
+                CollectPointerLayers(lastEntries, 0, lastEntries.Count, ctx, new UiLayoutPoint(viewport.X, viewport.Y), null, UiLayoutPoint.Zero, ctx.Session.CurrentClip, contentLayers);
+                contentViewport = viewport;
+                contentScrollRevision = ctx.Session.ScrollRevision;
+            }
             ctx.Session.SetContentInputLayers(contentLayers);
-            DrawEntries(lastEntries, 0, lastEntries.Count, ctx, new UiLayoutPoint(viewport.X, viewport.Y), null, UiLayoutPoint.Zero,ctx);
+            DrawEntries(lastEntries, 0, lastEntries.Count, ctx, new UiLayoutPoint(viewport.X, viewport.Y), null, UiLayoutPoint.Zero,ctx, null);
             if (ctx.Session.IsActive) ctx.Session.EndHitPass();
         }
         catch
         {
+            contentLayers = null;
             ctx.Session.AbortHitPass();
             throw;
         }
@@ -644,6 +666,17 @@ internal sealed partial class UiLayoutEngine
 
     private UiWidgetContext DrawContextForEntry(PlacedEntry entry, UiWidgetContext ctx, UiLayoutPoint windowOrigin)
     {
+        UiWidgetContext? current = entry.EventDrawContext;
+        if (tieredDraw && entry.EventContextGeneration == drawContextGeneration && current != null
+            && current.WindowOrigin.Equals(windowOrigin) && ReferenceEquals(current.Metrics, ctx.Metrics)) return current;
+        entry.EventDrawContext = null;
+        UiWidgetContext result = ResolveDrawContext(entry, ctx, windowOrigin);
+        if (tieredDraw) { entry.EventDrawContext = result; entry.EventContextGeneration = drawContextGeneration; }
+        return result;
+    }
+
+    private UiWidgetContext ResolveDrawContext(PlacedEntry entry, UiWidgetContext ctx, UiLayoutPoint windowOrigin)
+    {
         UiStyleResolver? resolver = styleResolver;
         UiWidgetContext? unscoped = entry.UnscopedDrawContext;
         entry.UnscopedDrawContext = null;
@@ -687,7 +720,7 @@ internal sealed partial class UiLayoutEngine
         UiWidgetContext ctx,
         UiLayoutPoint viewportPosition,
         UiLayoutPoint? nativeOrigin,
-        UiLayoutPoint windowOrigin,UiWidgetContext rootContext)
+        UiLayoutPoint windowOrigin,UiWidgetContext rootContext, bool? deferClipped)
     {
         int index = start;
         while (index < end)
@@ -765,7 +798,7 @@ internal sealed partial class UiLayoutEngine
                     index + entry.SubtreeCount,
                     viewportPosition,
                     nativeOrigin,
-                    windowOrigin,rootContext);
+                    windowOrigin,rootContext,deferClipped);
                 if (!ctx.Session.IsActive) return;
 #if FER_DEV || FER_TOOLS
                 // DT1: the viewport's OWN band is outlined here, after its content has drawn and in this
@@ -825,8 +858,20 @@ internal sealed partial class UiLayoutEngine
                                 ctx.Session.PublishHelp(helpKey);
                             }
 
-                            UiSessionGuard.DrawWidget(entry.Widget, drawRect, entryCtx, entry.Node);
+                            bool unavailableBeforeDraw = entry.Node.PresentationUnavailable;
+                            if (displayIsolation != null && entry.Widget is IUiDeferredDisplay)
+                            {
+                                UiLayoutRect? clip = ctx.Session.CurrentClip;
+                                bool clipped = deferClipped == true && clip.HasValue && (clip.Value.Width <= 0f || clip.Value.Height <= 0f);
+                                UiSessionGuard.DrawWidgetForEvent(entry.Widget, drawRect, entryCtx, entry.Node, displayIsolation, clipped, tieredDraw, repaintDraw);
+                            }
+                            else UiSessionGuard.DrawWidget(entry.Widget, drawRect, entryCtx, entry.Node);
                             if (!ctx.Session.IsActive) return;
+                            // A failed or newly recovered pointer producer changes which geometry may
+                            // participate. Admit that transition at the next pass, like other pending
+                            // input validation, rather than retaining its old operation layers.
+                            if (entry.Node.PresentationUnavailable != unavailableBeforeDraw)
+                                RequestInputValidation();
                         }
                         finally
                         {
@@ -863,7 +908,7 @@ internal sealed partial class UiLayoutEngine
         int childEnd,
         UiLayoutPoint viewportPosition,
         UiLayoutPoint? nativeOrigin,
-        UiLayoutPoint windowOrigin,UiWidgetContext rootContext)
+        UiLayoutPoint windowOrigin,UiWidgetContext rootContext, bool? deferClipped)
     {
         string kind = entry.ContainerKind;
 
@@ -889,11 +934,13 @@ internal sealed partial class UiLayoutEngine
                 {
                     var layers=new List<UiPointerLayer>();
                     CollectPointerLayers(lastEntries,0,lastEntries.Count,rootContext,viewportPosition,null,UiLayoutPoint.Zero,ctx.Session.HostViewport,layers);
+                    contentLayers = layers;
+                    contentScrollRevision = ctx.Session.ScrollRevision;
                     ctx.Session.SetContentInputLayers(layers);
                 }
                 // BeginScrollView may consume a wheel event and change the offset in this very pass.
                 UiLayoutPoint childWindowOrigin = new(scopeWindowOrigin.X - scrollPosition.X, scopeWindowOrigin.Y - scrollPosition.Y);
-                DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.Position, childWindowOrigin,rootContext);
+                DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.Position, childWindowOrigin,rootContext,deferClipped);
                 });
             }
             finally
@@ -917,8 +964,15 @@ internal sealed partial class UiLayoutEngine
         ctx.Session.ConstrainClip(new UiLayoutRect(groupWindowOrigin.X, groupWindowOrigin.Y, outRect.Width, outRect.Height));
         try
         {
+            // Explicit overrides inherit through every container. Schema 3 enables the policy at
+            // an Overlay, not at arbitrary Clip/Scroll roots; a nested false remains authoritative.
+            if (string.Equals(kind, "Overlay", StringComparison.Ordinal))
+            {
+                if (entry.Spec.TryGetBoolean("DeferClippedDisplay", out bool defer)) deferClipped = defer;
+                else deferClipped ??= tieredDraw;
+            }
             ctx.Drawing.Clip(outRect, () => {
-            DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.Position, groupWindowOrigin,rootContext);
+            DrawEntries(entries, childStart, childEnd, ctx, viewportPosition, entry.Rect.Position, groupWindowOrigin,rootContext,deferClipped);
             });
         }
         finally

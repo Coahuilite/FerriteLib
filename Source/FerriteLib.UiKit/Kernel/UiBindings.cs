@@ -215,6 +215,8 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
         }
     }
     internal bool ContainsBinding(string key) => values.ContainsKey(key) || options.ContainsKey(key) || actions.ContainsKey(key) || commands.ContainsKey(key);
+    internal bool IsTrackedValue(string key) => values.TryGetValue(key, out ValueDescriptor? value) && value.Tracked;
+    internal long CompletedOperationRevision { get; private set; }
     internal void RemoveItemBinding(string key)
     {
         Reactive.AssertWritable();
@@ -345,7 +347,7 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
         IDisposable batch = Reactive.Batch();
         UiBindingPresentation? previous = presentation;
         presentation = null;
-        return new UiReactiveScope(() => { try { batch.Dispose(); } finally { presentation = previous; } });
+        return new UiReactiveScope(() => { try { batch.Dispose(); } finally { presentation = previous; CompletedOperationRevision++; } });
     }
     internal void RunOperation(Action action) => RunOperation(() => { action(); return true; });
     private T RunOperation<T>(Func<T> action, string? operation = null, string? binding = null)
@@ -353,7 +355,8 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
         if (!reactiveEnabled)
         {
             UiReactiveRuntime.Current?.AssertWritable();
-            return action();
+            try { return action(); }
+            finally { CompletedOperationRevision++; }
         }
         IDisposable scope = BeginOperation();
         T result;

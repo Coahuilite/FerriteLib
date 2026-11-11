@@ -17,7 +17,7 @@ internal static class KernelContainmentTests
         ["Adapters/RimWorld16/VerseUiExecution.cs"] = new[] {
             "Event.current", "Input.compositionString", "GUIUtility.GetControlID", "GUIUtility.hotControl",
             "GUI.GetNameOfFocusedControl", "GUI.FocusControl", "GUI.SetNextControlName",
-            "Text.Font", "Text.Anchor", "Text.WordWrap", "Text.CurTextFieldStyle", "Text.CurTextAreaStyle", "GUI.color", "GUI.backgroundColor", "GUI.contentColor", "GUI.enabled",
+            "Text.Font", "Text.Anchor", "Text.WordWrap", "Text.CurTextFieldStyle", "Text.CurTextAreaStyle", "Text.fontStyles", "GUI.color", "GUI.backgroundColor", "GUI.contentColor", "GUI.enabled",
             "VerseWidgets.TextArea", "VerseWidgets.TextField", "VerseWidgets.BeginScrollView", "VerseWidgets.EndScrollView",
             "GUI.BeginGroup", "GUI.EndGroup", "VerseWidgets.DrawBoxSolid", "VerseWidgets.Label", "VerseWidgets.DrawLine", "GUI.DrawTexture" },
         ["Adapters/RimWorld16/VerseFerriteTextMetrics.cs"] = new[] {

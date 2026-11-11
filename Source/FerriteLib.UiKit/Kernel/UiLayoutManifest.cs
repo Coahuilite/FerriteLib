@@ -6,7 +6,7 @@ using System.Xml;
 namespace FerriteLib.UiKit.Kernel;
 
 /// <summary>
-/// Schema=2 layout manifest parser. The parser is strict and safe: DTD/external entities are
+/// Schema=2/3 layout manifest parser. The parser is strict and safe: DTD/external entities are
 /// prohibited, depth/node limits are enforced, and text content is rejected. Kind registration and
 /// typed binding validation happen later in <see cref="UiHost"/> so parsing stays independent.
 /// <para>
@@ -67,6 +67,12 @@ public sealed class UiLayoutManifest
 
     public string SchemaVersion { get; }
 
+    internal bool TieredEvents { get; }
+
+    /// <summary>Returns this immutable page with an explicit event-execution policy, independent of its schema default.</summary>
+    public UiLayoutManifest WithTieredEvents(bool enabled)
+        => new(Source, SchemaVersion, Roots, Styles, Templates, Background, enabled);
+
     public UiWindowBackground? Background { get; }
 
     public IReadOnlyList<UiElementSpec> Roots { get; }
@@ -97,11 +103,12 @@ public sealed class UiLayoutManifest
         string schemaVersion,
         IReadOnlyList<UiElementSpec> roots,
         UiStyleDocument styles,
-        IReadOnlyDictionary<string, UiElementSpec> templates, UiWindowBackground? background)
+        IReadOnlyDictionary<string, UiElementSpec> templates, UiWindowBackground? background, bool tieredEvents = false)
     {
         Source = source;
         Background = background;
         SchemaVersion = schemaVersion;
+        TieredEvents = tieredEvents;
         Roots = roots;
         Styles = styles;
         Templates = templates;
@@ -206,6 +213,7 @@ public sealed class UiLayoutManifest
         int pageLine = 0;
         string source = "";
         string schema = "";
+        bool tieredEvents = false;
         UiWindowBackground? background = null;
 
         while (reader.Read())
@@ -236,10 +244,16 @@ public sealed class UiLayoutManifest
                 throw ParseError(lineInfo, "Root <UiPage> is missing the required Schema attribute.");
             }
 
-            if (!string.Equals(schema, "2", StringComparison.Ordinal))
+            if (!string.Equals(schema, "2", StringComparison.Ordinal) && !string.Equals(schema, "3", StringComparison.Ordinal))
             {
-                throw ParseError(lineInfo, $"Unsupported UiPage Schema '{schema}'; expected '2'.");
+                throw ParseError(lineInfo, $"Unsupported UiPage Schema '{schema}'; expected '2' or '3'.");
             }
+
+            tieredEvents = schema == "3";
+            if (reader.GetAttribute("TieredEvents") is string executionPolicy && !bool.TryParse(executionPolicy, out tieredEvents))
+                throw ParseError(lineInfo, "TieredEvents must be true or false on the UiPage root.");
+            if (reader.GetAttribute("DeferClippedDisplay") != null)
+                throw ParseError(lineInfo, "DeferClippedDisplay is an Overlay-only true or false policy.");
 
             if (source.Length == 0)
             {
@@ -248,7 +262,7 @@ public sealed class UiLayoutManifest
 
             if (reader.IsEmptyElement)
             {
-                return Create(source, Array.Empty<UiElementSpec>(), null, null, background);
+                return ParsedPage(source, schema, tieredEvents, Array.Empty<UiElementSpec>(), null, null, background);
             }
 
             break;
@@ -273,6 +287,7 @@ public sealed class UiLayoutManifest
             switch (reader.NodeType)
             {
                 case XmlNodeType.Element:
+                    ValidateExecutionAttributes(reader, lineInfo);
                     if (reader.Depth > MaxDepth)
                     {
                         throw ParseError(lineInfo, $"UI layout exceeds the maximum depth of {MaxDepth}.");
@@ -323,7 +338,7 @@ public sealed class UiLayoutManifest
                     {
                         ValidateIdentitySegments(roots, pageLine);
                         ValidateTemplateReferences(roots, templates);
-                        return Create(source, roots, styles, templates, background);
+                        return ParsedPage(source, schema, tieredEvents, roots, styles, templates, background);
                     }
 
                     throw ParseError(lineInfo, $"Unexpected end element </{reader.Name}>.");
@@ -338,6 +353,23 @@ public sealed class UiLayoutManifest
         }
 
         throw new FormatException("UI layout XML ended before the <UiPage> element was closed.");
+    }
+
+    private static UiLayoutManifest ParsedPage(string source, string schema, bool tiered,
+        IReadOnlyList<UiElementSpec> roots, UiStyleDocument? styles,
+        IReadOnlyDictionary<string, UiElementSpec>? templates, UiWindowBackground? background)
+    {
+        UiLayoutManifest page = Create(source, roots, styles, templates, background);
+        return new UiLayoutManifest(source, schema, page.Roots, page.Styles, page.Templates, background, tiered);
+    }
+
+    private static void ValidateExecutionAttributes(XmlReader reader, IXmlLineInfo lineInfo)
+    {
+        if (reader.GetAttribute("TieredEvents") != null)
+            throw ParseError(lineInfo, "TieredEvents is only legal on the UiPage root.");
+        if (reader.GetAttribute("DeferClippedDisplay") is string defer
+            && (reader.Name != "Overlay" || !bool.TryParse(defer, out _)))
+            throw ParseError(lineInfo, "DeferClippedDisplay is an Overlay-only true or false policy.");
     }
 
     /// <summary>
@@ -531,6 +563,7 @@ public sealed class UiLayoutManifest
 
     private static UiElementSpec ReadElement(XmlReader reader, IXmlLineInfo lineInfo, ref int nodeCount, HashSet<string> ids)
     {
+        ValidateExecutionAttributes(reader, lineInfo);
         string elementName = reader.Name;
         int elementLine = lineInfo.LineNumber;
         string id = reader.GetAttribute("Id") ?? reader.GetAttribute("id") ?? "";

@@ -702,6 +702,7 @@ FerriteLib.UiKit.Kernel.UiLayoutManifest FerriteLib.UiKit.Kernel.UiLayoutManifes
 FerriteLib.UiKit.Kernel.UiLayoutManifest FerriteLib.UiKit.Kernel.UiLayoutManifest CreateWithBackground(System.String, System.Collections.Generic.IReadOnlyList`1[FerriteLib.UiKit.Kernel.UiElementSpec], FerriteLib.UiKit.Kernel.UiWindowBackground, FerriteLib.UiKit.Kernel.UiStyleDocument, System.Collections.Generic.IReadOnlyDictionary`2[System.String,FerriteLib.UiKit.Kernel.UiElementSpec]) defaults[styles=null,templates=null]
 FerriteLib.UiKit.Kernel.UiLayoutManifest FerriteLib.UiKit.Kernel.UiLayoutManifest Parse(System.String)
 FerriteLib.UiKit.Kernel.UiLayoutManifest FerriteLib.UiKit.Kernel.UiLayoutManifest ParseFile(System.String)
+FerriteLib.UiKit.Kernel.UiLayoutManifest FerriteLib.UiKit.Kernel.UiLayoutManifest WithTieredEvents(Boolean)
 FerriteLib.UiKit.Kernel.UiLayoutManifest FerriteLib.UiKit.Kernel.UiStyleDocument get_Styles()
 FerriteLib.UiKit.Kernel.UiLayoutManifest FerriteLib.UiKit.Kernel.UiWindowBackground get_Background()
 FerriteLib.UiKit.Kernel.UiLayoutManifest System.Collections.Generic.IReadOnlyDictionary`2[System.String,FerriteLib.UiKit.Kernel.UiElementSpec] get_Templates()

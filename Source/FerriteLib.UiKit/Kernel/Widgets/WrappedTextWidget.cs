@@ -22,7 +22,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// widget — which is the author's explicit override of this contract, not a second contract.
 /// </para>
 /// </summary>
-internal sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiRetainedDisplay
+internal sealed class WrappedTextWidget : IUiWidget, IUiMeasureParticipant, IUiDescriptiveWidget, IUiRetainedDisplay, IUiDeferredDisplay
 {
     public const string Kind = "text/wrapped";
 
@@ -103,18 +103,39 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
 
     public UiDescription Describe(UiWidgetContext ctx) => AtomVocabulary.DescribeText(spec, ctx, UiDescriptionRole.Text, "Text", "TextKey");
 
-    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx) => DrawCore(rect, ctx, false, null);
+
+    UiDisplayResult IUiDeferredDisplay.DrawForEvent(UiLayoutRect rect, UiWidgetContext ctx, bool clipped, bool tiered, bool repaint, IUiIsolatedPaint paint)
     {
-        if (rect.Width <= 1f || rect.Height <= 1f) return;
+        string key = AtomVocabulary.Read(spec, "Bind");
+        UiBindings owner = UiBindings.OwnerOf(ctx.Bindings);
+        // A forwarding reader may add ordinary work. Only the actual tracked registry proves this
+        // read getter-free; literal/translation-only text has no value read at all.
+        bool getterFree = key.Length == 0 || ReferenceEquals(ctx.Bindings, owner) && owner.IsTrackedValue(key);
+        return DrawCore(rect, ctx, clipped || !repaint && (tiered || getterFree), paint,
+            !clipped && !repaint && !tiered && getterFree && AtomVocabulary.RoleHasOrdinaryRead(spec, ctx));
+    }
 
-        // Resolved before the empty-string return: an authored role typo is recorded on the pass that
-        // draws this element, whether or not it has text to paint.
-        UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, writable: null);
+    private UiDisplayResult DrawCore(UiLayoutRect rect, UiWidgetContext ctx, bool clipped, IUiIsolatedPaint? paint, bool preserveRoleRead = false)
+    {
+        if (preserveRoleRead && rect.Width > 1f && rect.Height > 1f) AtomVocabulary.ResolveRole(spec, ctx, writable: null);
+        if (clipped) return UiDisplayResult.Deferred;
+        if (rect.Width <= 1f || rect.Height <= 1f) return UiDisplayResult.Completed;
 
-        string text = ResolveText(ctx);
-        if (text.Length == 0) return;
-        PaintText(rect,ctx,text,style);
-        retained.Capture(ctx,(r,c)=>PaintText(r,c,text,style));
+        if (paint == null) Present(); else paint.IsolatePaint(Present);
+        return UiDisplayResult.Completed;
+
+        void Present()
+        {
+            // Resolved before the empty-string return: an authored role typo is recorded on the pass that
+            // draws this element, whether or not it has text to paint.
+            UiResolvedStyle style = AtomVocabulary.ResolveRole(spec, ctx, writable: null);
+
+            string text = ResolveText(ctx);
+            if (text.Length == 0) return;
+            PaintText(rect,ctx,text,style);
+            retained.Capture(ctx,(r,c)=>PaintText(r,c,text,style));
+        }
     }
     private void PaintText(UiLayoutRect rect,UiWidgetContext ctx,string text,UiResolvedStyle style)
     {

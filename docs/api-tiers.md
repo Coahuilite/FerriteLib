@@ -106,7 +106,7 @@ The type census and stable set are pinned in `FerriteLibApiTierTests`. Its depen
 - `UiTheme` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
 - `UiThemeDraw` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
 - `UiFitAudit` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
-- `UiLayoutManifest` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
+- `UiLayoutManifest` — supported 0.8 usage; the additive 0.9 `WithTieredEvents(bool)` returns a page with explicit execution policy (existing factories keep Schema 2 semantics); ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
 - `UiLayoutSnapshot` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
 - `UiWindowHost` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
 - `UiWindowChrome` — supported 0.8 usage; ownership and behavior are in [S1–S7](development/0.8/public-contract.md).
@@ -282,7 +282,8 @@ Mutable dependency graphs, queues, caches, default private nodes, geometry stagi
 No ambient UiNative bridge or context-free core hit overload remains. Native controls use explicit
 UiSession.CreateContext and UiControls, with a single callback frame and execution owner. The only
 raw backend contacts are path-pinned and member-pinned in KernelContainmentTests:
-- Adapters/RimWorld16/VerseUiExecution.cs — native input/capture/focus/editing/draw/clip/scroll/resources.
+- Adapters/RimWorld16/VerseUiExecution.cs — native input/capture/focus/editing/draw/clip/scroll/resources;
+  the built-in display-isolation scope also saves and restores `Text.fontStyles` fields.
 - Adapters/RimWorld16/VerseFerriteTextMetrics.cs — real-font measurement and temporary-state restoration.
 - Adapters/RimWorld16/UiWindowHost.cs — window pointer attribution and its own chrome close button.
 The complete Kernel has no backend allowance. The positive control rejects adapter basenames at wrong

@@ -8,7 +8,7 @@ namespace FerriteLib.UiKit.Kernel.Widgets;
 /// presentation observes that result and never recreates the activation rule.
 /// A missing command is diagnosed at host creation, not rendered as a dead control.
 /// </summary>
-internal sealed partial class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay
+internal sealed partial class ButtonWidget : IUiWidget, IUiMeasureParticipant, IUiPointerLayout, IUiRetainedDisplay, IUiDeferredDisplay
 {
     public const string Kind = "input/button";
 
@@ -94,9 +94,15 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
     {
         yield return new UiPointerRegion(bounds);
     }
-    public void Draw(UiLayoutRect rect, UiWidgetContext ctx)
+    public void Draw(UiLayoutRect rect, UiWidgetContext ctx) => DrawCore(rect, ctx, false, null);
+
+    UiDisplayResult IUiDeferredDisplay.DrawForEvent(UiLayoutRect rect, UiWidgetContext ctx, bool clipped, bool tiered, bool repaint, IUiIsolatedPaint paint)
+        => DrawCore(rect, ctx, clipped || !repaint, paint,
+            !clipped && !repaint && !tiered && AtomVocabulary.RoleHasOrdinaryRead(spec, ctx));
+
+    private UiDisplayResult DrawCore(UiLayoutRect rect, UiWidgetContext ctx, bool clipped, IUiIsolatedPaint? paint, bool preserveRoleRead = false)
     {
-        if (rect.Width <= 1f || rect.Height <= 1f) return;
+        if (rect.Width <= 1f || rect.Height <= 1f) return clipped ? UiDisplayResult.Deferred : UiDisplayResult.Completed;
 
         // A held operation wins over hover. Capture comes from shared behavior rather than raw
         // MouseDown geometry; painting neither infers an established activation nor requests it.
@@ -109,13 +115,20 @@ UiWidgetRegistry.Define(new UiWidgetDefinition(
         // side's writability read answers "not writable" for anything that is not a value binding — so
         // asking would paint every bound button disabled. Command presence is a creation-time contract
         // instead (a missing ActionBind fails the host).
-        UiResolvedStyle idle = AtomVocabulary.ResolveRole(spec, ctx, writable: null);
+        UiResolvedStyle idle = clipped && !preserveRoleRead ? default : AtomVocabulary.ResolveRole(spec, ctx, writable: null);
 
         UiInteractionRequests.Activation(ctx.Controls.InteractionTarget(ctx, ReadActionKey()), interaction, () =>
         {
             RequestActivation(ctx);
         });
         if (ctx.Session.IsActive)
+        {
+            if (clipped) return UiDisplayResult.Deferred;
+            if (paint == null) Present(); else paint.IsolatePaint(Present);
+        }
+        return UiDisplayResult.Completed;
+
+        void Present()
         {
             string caption=AtomVocabulary.ResolveText(spec,ctx,"Text","TextKey");
             Paint(rect, armed, hovered, idle, ctx,caption);

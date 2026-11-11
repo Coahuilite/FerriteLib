@@ -118,6 +118,16 @@ internal static class AtomVocabulary
         return Read(spec, literalAttribute);
     }
 
+    // SelectedBind is the only value read made by ResolveRole. Do not treat a forwarding
+    // reader as getter-free merely because its backing registry enrolled the endpoint.
+    internal static bool RoleHasOrdinaryRead(UiElementSpec spec, UiWidgetContext ctx)
+    {
+        string key = Read(spec, "SelectedBind").Trim();
+        if (key.Length == 0) return false;
+        UiBindings owner = UiBindings.OwnerOf(ctx.Bindings);
+        return !ReferenceEquals(ctx.Bindings, owner) || !owner.IsTrackedValue(key);
+    }
+
     /// <summary>
     /// The one font a text atom measures and writes with. It is the theme's resolved font rather than a
     /// literal of the kind's own, which is this vocabulary's density landing point: moving

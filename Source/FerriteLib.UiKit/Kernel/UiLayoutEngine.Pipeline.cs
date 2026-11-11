@@ -104,9 +104,11 @@ internal sealed partial class UiLayoutEngine
         candidateStackRecipes[node.Id] = new StackRecipe { Node = node, Frame = frame, Slots = slots, Children = children,
             Inputs = inputs, Reuse = reuse, Scope = activeUpdateScope, Key = key };
     }
-    private bool TryIncremental(UiWidgetContext ctx, UiLayoutPoint available, IReadOnlyList<UiElementSpec> roots, bool externalContentChanged, out UiLayoutSnapshot snapshot)
+    // Shared admission facts: a cycle reuse must not drift from incremental layout's identity,
+    // size, definition, translation and theme invalidation conditions. Environment/legacy work
+    // remains at synchronization points, never polled on an intervening event.
+    private bool PipelineInputsCurrent(UiWidgetContext ctx, UiLayoutPoint available, IReadOnlyList<UiElementSpec> roots, bool externalContentChanged)
     {
-        snapshot = null!;
         float width = Normalize(available.X, 1f), height = Normalize(available.Y, 1f);
         if (!ReferenceEquals(roots, pipelineRoots) || roots.Count != rootDefinitions.Length) return false;
         for (int i = 0; i < roots.Count; i++) if (!ReferenceEquals(roots[i], rootDefinitions[i])) return false;
@@ -115,7 +117,25 @@ internal sealed partial class UiLayoutEngine
             || cachedDefinitionRevision != DefinitionRevision(ctx) || cachedTranslationRevision != ctx.Translation.TranslationRevision
             || cachedHostLayoutRevision != ctx.Theme.LayoutRevision || pipelinePropertyRevision != ctx.Theme.PropertyRevision
             || !ReferenceEquals(pipelineBindings, ctx.Bindings) || !ReferenceEquals(pipelineMetrics, ctx.Metrics)
-            || !ReferenceEquals(pipelineTheme, ctx.Theme) || !ReferenceEquals(pipelineTranslation, ctx.Translation)
+            || !ReferenceEquals(pipelineTheme, ctx.Theme) || !ReferenceEquals(pipelineTranslation, ctx.Translation)) return false;
+        return true;
+    }
+
+    internal bool CanReuseSynchronization(UiWidgetContext ctx, UiLayoutPoint available, IReadOnlyList<UiElementSpec> roots)
+    {
+        if (pendingInputValidation || ctx.Session.HasDirtyNodes || ctx.Session.TrippedNodes.Count != 0
+            || ctx.Session.ScrollTargetElementId != null
+            || !PipelineInputsCurrent(ctx, available, roots, cachedContentRevision != ctx.Session.ContentRevision)) return false;
+        foreach (var pair in committedRevisions)
+            if (ctx.Bindings.GetRevision(pair.Key) != pair.Value) return false;
+        return true;
+    }
+
+    private bool TryIncremental(UiWidgetContext ctx, UiLayoutPoint available, IReadOnlyList<UiElementSpec> roots, bool externalContentChanged, out UiLayoutSnapshot snapshot)
+    {
+        snapshot = null!;
+        float width = Normalize(available.X, 1f), height = Normalize(available.Y, 1f);
+        if (cachedSnapshot == null || textMetricsCache == null || !PipelineInputsCurrent(ctx, available, roots, externalContentChanged)
             || hasCustomDemand || hasDiagnosticCallbacks || hasLegacyMeasure && pendingInputValidation) return false;
         if (hasReferenceHeight && (pendingInputValidation || ctx.Session.HasDirtyNodes)) return false;
         if (pendingInputValidation && (visibleInputs.Count != 0 || widthInputs.Count != 0 || tabInputs.Count != 0 || repeatStates.Count != 0)) return false;

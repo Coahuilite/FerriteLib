@@ -32,6 +32,14 @@ public static class UiSessionGuard
     /// node, so the recovery slot is the element - not a display path, which two elements can share.
     /// </summary>
     public static void DrawWidget(IUiWidget widget, UiLayoutRect rect, UiWidgetContext ctx, UiNode node)
+        => DrawWidgetCore(widget, rect, ctx, node, null, false, false, false);
+
+    internal static void DrawWidgetForEvent(IUiWidget widget, UiLayoutRect rect, UiWidgetContext ctx, UiNode node,
+        IUiIsolatedPaint paint, bool clipped, bool tiered, bool repaint)
+        => DrawWidgetCore(widget, rect, ctx, node, paint, clipped, tiered, repaint);
+
+    private static void DrawWidgetCore(IUiWidget widget, UiLayoutRect rect, UiWidgetContext ctx, UiNode node,
+        IUiIsolatedPaint? paint, bool clipped, bool tiered, bool repaint)
     {
         if (widget == null) throw new ArgumentNullException(nameof(widget));
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
@@ -40,12 +48,22 @@ public static class UiSessionGuard
         using UiBindings.DisplayScope? display = UiWidgetCapabilities.Description(widget) != null && UiWidgetCapabilities.Pointer(widget) == null ? UiBindings.OwnerOf(ctx.Bindings).DisplayOnly() : null;
         try
         {
-            ctx.Session.Execution.WithState(() => widget.Draw(rect, ctx));
+            UiDisplayResult result = UiDisplayResult.Completed;
+            ctx.Session.Execution.WithState(() =>
+            {
+                if (paint != null && widget is IUiDeferredDisplay deferred)
+                    result = deferred.DrawForEvent(rect, ctx, clipped, tiered, repaint, paint);
+                else widget.Draw(rect, ctx);
+            });
+            if (result == UiDisplayResult.Deferred) return;
             node.PresentationFault = display?.Fault;
             node.PresentationUnavailable = false;
             UiDomainDiagnostics.Reactive(ctx.Session, node, "presentation.fault", node.PresentationFault);
             if (node.ReactiveFault != null)
-                UiThemeDraw.FailureMarker(ctx.Drawing,rect, ctx.Theme, node.ReactiveFault.Identity);
+            {
+                void MarkFailure() => UiThemeDraw.FailureMarker(ctx.Drawing,rect, ctx.Theme, node.ReactiveFault.Identity);
+                if (paint == null) MarkFailure(); else paint.IsolatePaint(MarkFailure);
+            }
         }
         catch (UiReactiveFault failure)
         {
@@ -53,19 +71,25 @@ public static class UiSessionGuard
             UiDomainDiagnostics.Reactive(ctx.Session, node, "presentation.fault", failure);
             node.Selection = null;
             ctx.Session.SuspendFailedInput(node);
-            if (widget is IUiRetainedDisplay last && last.PaintLast(rect, ctx))
-                UiThemeDraw.FailureMarker(ctx.Drawing,rect, ctx.Theme, failure.Identity);
-            else UiThemeDraw.RecoveryBand(ctx.Drawing,rect, ctx.Theme, failure.Identity);
+            void Recover()
+            {
+                if (widget is IUiRetainedDisplay last && last.PaintLast(rect, ctx))
+                    UiThemeDraw.FailureMarker(ctx.Drawing,rect, ctx.Theme, failure.Identity);
+                else UiThemeDraw.RecoveryBand(ctx.Drawing,rect, ctx.Theme, failure.Identity);
+            }
+            if (paint == null) Recover(); else paint.IsolatePaint(Recover);
         }
         catch (UiRequestFailure failure)
         {
             ctx.Session.RecordRequestFailure(node, failure);
-            UiThemeDraw.RecoveryBand(ctx.Drawing,rect, ctx.Theme, node.Path);
+            void Recover() => UiThemeDraw.RecoveryBand(ctx.Drawing,rect, ctx.Theme, node.Path);
+            if (paint == null) Recover(); else paint.IsolatePaint(Recover);
         }
         catch (Exception ex) when (ex is not UiReactiveFault)
         {
             Record(ctx.Session, node, node.Path, widget.Kind, node.Path, ex);
-            UiThemeDraw.RecoveryBand(ctx.Drawing,rect, ctx.Theme, node.Path);
+            void Recover() => UiThemeDraw.RecoveryBand(ctx.Drawing,rect, ctx.Theme, node.Path);
+            if (paint == null) Recover(); else paint.IsolatePaint(Recover);
         }
     }
 

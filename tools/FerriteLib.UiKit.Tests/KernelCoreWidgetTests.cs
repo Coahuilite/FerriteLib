@@ -516,7 +516,15 @@ internal static class KernelCoreWidgetTests
                 + "</UiPage>"),
             bindings, UiTheme.Vanilla, new StubMetrics(), new StubTranslation());
         host.MeasureAndArrange(new UiLayoutPoint(300f, 100f));
-        NativeFixture.DrawFrame(        host,new UiLayoutRect(0f, 0f, 300f, 100f));
+        // A pixel assertion must request the phase that paints. Earlier input cases can leave
+        // Layout/Used behind; getter-free display is now correctly omitted on those events.
+        Event? previous = Event.current;
+        try
+        {
+            Event.current = new Event { type = EventType.Repaint };
+            NativeFixture.DrawFrame(host, new UiLayoutRect(0f, 0f, 300f, 100f));
+        }
+        finally { Event.current = previous; }
         return ((IList)StubField("DrawBoxSolidColors")).Count;
     }
 

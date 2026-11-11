@@ -25,3 +25,17 @@ public interface IUiWidget
     /// <summary>Draws into the arranged rect and handles the current IMGUI event synchronously.</summary>
     void Draw(UiLayoutRect rect, UiWidgetContext ctx);
 }
+
+// Library-owned split only. An operation still runs on every pass; Deferred says only that
+// presentation did not run and therefore must not replace the last successful presentation.
+internal enum UiDisplayResult { Completed, Deferred }
+internal interface IUiDeferredDisplay
+{
+    UiDisplayResult DrawForEvent(UiLayoutRect rect, UiWidgetContext ctx, bool clipped, bool tiered, bool repaint, IUiIsolatedPaint paint);
+}
+
+internal interface IUiIsolatedPaint
+{
+    bool CanIsolatePaint { get; }
+    void IsolatePaint(System.Action paint);
+}

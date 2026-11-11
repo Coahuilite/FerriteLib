@@ -1288,13 +1288,15 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
         return node != null && scrollPositions.TryGetValue(node, out UiLayoutPoint pos) ? pos : UiLayoutPoint.Zero;
     }
 
+    internal int ScrollRevision { get; private set; }
+
     /// <summary>Writes one scroll container's position, keyed by its node.</summary>
     public void SetScrollPosition(UiNode node, UiLayoutPoint position)
     {
         if (IsBudgetMeasuring) throw new InvalidOperationException("Budget measurement cannot change scroll positions.");
         if (node == null) throw new ArgumentNullException(nameof(node));
         EnsureActive();
-        if (GetScrollPosition(node) != position) InvalidatePointerRead();
+        if (GetScrollPosition(node) != position) { ScrollRevision++; InvalidatePointerRead(); }
         scrollPositions[node] = position;
     }
 

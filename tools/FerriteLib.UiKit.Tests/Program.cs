@@ -71,6 +71,7 @@ internal static class Program
     private static void RunAll()
     {
         Console.WriteLine("0.8 S0/S1 production shared behavior...");
+        failures += RunSuite(()=>KernelEventTieringTests.RunAll(),"KernelEventTieringTests.RunAll");
         failures += RunSuite(()=>KernelNativeEventConsumptionTests.RunAll(),"KernelNativeEventConsumptionTests.RunAll");
         failures += RunSuite(()=>KernelFailureLifetimeTests.RunAll(),"KernelFailureLifetimeTests.RunAll");
         failures += RunSuite(()=>KernelLayoutReuseTests.RunAll(),"KernelLayoutReuseTests.RunAll");
