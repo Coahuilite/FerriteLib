@@ -3,7 +3,24 @@
 本表追踪有效条款／稳定 ID／值和条件，不另立规范。源基线为
 cf1cf6456096171fb47c012369bcd0c2f29e968f；被替代正文在[完整归档](../archive/specs-before-20261029/INDEX.md)。
 表中旧文件名均指该归档内原同名文件。后续已确认的细则优先于旧文中的准备／pending措辞；
-实现错误不削弱要求。原基线核心行为是整理与补录，不产生新行为 delta；本次FL09真正新增的已采用目标另归下节change，尚未实施。
+实现错误不削弱要求。原基线核心行为是整理与补录，不产生新行为 delta；基础能力 change 仍未实施，事件分层的独立采用与实现见下节。
+
+## FL09事件分层：2026-11-11采用对账
+
+采用来源为 [fl09-event-tiering](changes/fl09-event-tiering/proposal.md)，proposal／design／delta
+由用户于2026-11-11采用。delta 已并入现行能力页；change 保采用来源和跨线任务边界。
+
+| 来源／条款 | 唯一现行正文 | 实现与证据 |
+| --- | --- | --- |
+| design D1–D3，FL09-TIERED | [展示执行](specs/contracts/presentation-execution/spec.md) | Host 的 Repaint 周期、T2 复用与声明变化重同步；T1 保逐 pass；[实现映射](implementation.md#fl09-event-tiering) |
+| design D4，FL09-TIER-SAFE | 同上 | 库内部三个 wrapper 的 getter-free 展示分段；普通 SelectedBind 条件保留；managed 新语义检查 |
+| design D6，FL09-CLIPPED-DISPLAY | 同上 | Overlay-only true／false、继承与反向 override；无隔离回退、复显鲜读、Deferred 不清 fault |
+| MODIFIED FL08-ORDINARY | [绑定响应](specs/core/binding-reactivity/spec.md) | 两种合法执行方式、普通布局／展示与业务读取分界；不据复用推 pure |
+| design D5，FL09-PAGE-EXECUTION | [结构](specs/core/structure/spec.md) | Schema 2 默认逐 pass、3 默认分层；根属性 TieredEvents、定位错误与 WithTieredEvents(bool) 程序同义入口 |
+| design D7，FL16-DISPLAY-ISOLATION | [保留1.6 adapter](specs/adapters/rimworld16/spec.md) | 三个 label style 字段 finally 恢复；custom widget／editor Draw 不改；FER_RW17 display 保守回退 |
+
+本线新 managed cases 获用户限域授权。0.8 兼容回补与消费启用归各自 owner；native扫描／实体键盘／IME
+保 task 7，不能以这些源码／stub 检查代签。完整范围及开放项仍在同 change 的 tasks。
 
 <a id="fl09-capability-adoption"></a>
 ## FL09基础能力：2026-11-08采用对账
@@ -93,7 +110,7 @@ RPT-DEMO-NIVARIAN-A001 r3／当前CAPABILITIES及v3/v4/v5/v6原状态说明：Bu
 
 | 原条款／来源事实 | 值／单位／条件 | 当前归属 |
 |---|---|---|
-| Manifest及public S1 | Schema2、depth16、nodes512、inline styles32768字符 | structure DECLARATION |
+| Manifest及public S1；FL09-PAGE-EXECUTION | Schema2／3、depth16、nodes512、inline styles32768字符；2默认逐pass、3默认分层，root TieredEvents可显式覆盖 | structure DECLARATION／PAGE-EXECUTION |
 | Theme／P1 | Small；Padding6/Spacing4/Gap6/RowHeight28/Hairline1逻辑单位；banner无声明fallback Tiny | default DEFAULT-LOOK |
 | default editor | Live=false；Multiline=false；numeric invariant0.## | default E1/E3 |
 | chart | radius6逻辑单位；normalized差量tolerance0.0001 | default COLLECTION-DISPLAY |

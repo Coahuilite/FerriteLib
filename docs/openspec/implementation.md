@@ -5,6 +5,43 @@
 cf1cf6456096171fb47c012369bcd0c2f29e968f。FL-F01/F02/F03 已在该 HEAD 的 dirty 工作树修复；
 下列对应段落区分实际源码机制、已执行既有检查及未执行原生／精确故障组合。
 
+<a id="fl09-event-tiering"></a>
+## FL09 事件分层执行（2026-11-11）
+
+[采用来源](changes/fl09-event-tiering/proposal.md)及其 design D1–D7 已进入 0.9 源码；
+现行正文归 presentation-execution FL09-TIERED／TIER-SAFE／CLIPPED-DISPLAY、structure
+FL09-PAGE-EXECUTION、binding FL08-ORDINARY 与 adapter FL16-DISPLAY-ISOLATION。
+本节只记录实现和证据，不把保留 1.6 的隔离能力扩成 1.7 支持声明。
+
+- `UiHost.DrawFrame` 持每 Host 的 Repaint 周期，使用输入 `UiFrame.Phase`，不读平台帧计数。
+  首 pass／Repaint／已宣告变化后的 pass 同步，其他 pass 复用该周期最近的成功 snapshot。
+  `PipelineInputsCurrent` 与 `TryIncremental` 共用尺寸、definition、translation、theme 和身份检查；
+  pending validation、dirty nodes、当前依赖 revisions、tracked demand、已完成业务请求另使周期重同步。
+  同步点请求输入验证，保证普通布局输入、旧 Measure 与未知 ruler 在该合法点鲜验。
+  手动 `MeasureAndArrange` 保原入口并退休 DrawFrame 的周期复用；Tools prepare 仍逐 pass 调用。
+- `UiLayoutEngine.Draw` 复用同步后的内容命中几何与 entry context；scroll 位置改变仍同 pass 重收集。
+  hit pass、命中层发布、即时资格、Cancel、help 与 widget `Draw` 保逐事件执行。
+  pointer producer 的 presentation 可用性改变请求下一 pass 的输入验证；失败不留半份 layer cache。
+- 库内部 `IUiDeferredDisplay` 只分开三个内置 wrapper 的 operate 与 display。
+  `UiSessionGuard` 把 Deferred 与成功区分，保 presentation fault 和最后成功 paint；恢复展示同样隔离样式。
+  Schema 2 的普通 `SelectedBind` 仍在原 pass 读取；静态／tracked 文本和 button／checkbox 的 getter-free
+  展示段才取得默认省略。转发 reader 不因 owner 的 tracked 标记被擅自认作 getter-free。
+- `UiLayoutManifest` 接受 Schema 2／3，保解析后的 SchemaVersion，定位拒绝非法／非 root TieredEvents
+  及非 Overlay／非布尔 DeferClippedDisplay。`WithTieredEvents(bool)` 是唯一新增公开签名，
+  返回不改原页的显式策略；旧 Create overload、其默认值与 stable 签名保持。
+- 保留的 1.6 `VerseUiExecution` 隔离 `Text.fontStyles` 三个 label style 的 alignment／wordWrap／fontSize，
+  `finally` 恢复，不恢复合法焦点／hotControl 变化；沿用该单项 containment allowance。
+  FER_RW17 不声明隔离，内置 display 保逐 pass 回退；T2 周期仍可使用。
+- 四项 candidate-C 实现分别移植：unscoped draw context wrapper、window-local 相等字体环境 snapshot、
+  leaf context/source representation、full-layout authoring snapshot。
+  0.9 专属非提交预算检查保留；0.8 原生性能数字只属于原候选，不作为本线测量。
+
+新增 `KernelEventTieringTests` 覆盖周期边界、T1/T2/T3、声明变化、Repaint 普通鲜读／未知 ruler、
+Schema 与程序入口、隔离回退、clip 继承／复显、fault retained paint、control 顺序、Cancel 与 help grace。
+既有相关 suites 和 readonly-api 的 managed 结果随 change tasks 记录；
+正常 Release Neutral／RimWorld17 与 Core 使用项目原入口。native 对比、实体键盘和 IME 接受仍归 task 7，
+没有在本工作中运行游戏或据此宣称原生性能提升。
+
 <a id="fl09-reliability"></a>
 ## FL09 R1 修复与已采用目标（2026-11-09）
 

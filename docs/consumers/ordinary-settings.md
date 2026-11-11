@@ -13,6 +13,49 @@ The guide deliberately links the file instead of pasting a second listing that c
 own fixture is not consumption evidence — it proves the recipe compiles and arranges, not that a player
 uses it.)
 
+## Start a 0.9 page with Schema 3
+
+```xml
+<UiPage Schema="3" Source="my-settings">
+  <Widget Id="note" Kind="text/wrapped" TextKey="MySettings.Note" />
+</UiPage>
+```
+
+Schema 3 uses event-tiered execution by default: interaction, editing, IME, eligibility, Cancel,
+help and control identities still run on every event. Layout and context inputs synchronize on the
+first event after a Repaint, on Repaint itself, and on the next event after a declared change or
+completed business request. Built-in `text/wrapped`, `input/button` and `input/checkbox` display
+work runs on Repaint, where ordinary display and layout inputs are read fresh. No business clock is
+created by this policy.
+
+Schema 2 keeps its existing per-pass default. Set `TieredEvents="true"` on its `UiPage` root to opt in,
+or set `TieredEvents="false"` on a Schema 3 root when you depend on per-pass ordinary display reads.
+Both schemas use the same remaining vocabulary. `TieredEvents` accepts only `true` or `false` and is
+root-only. Existing C# factories retain Schema 2 behavior; use
+`manifest.WithTieredEvents(true)` (or `false`) for the synonymous explicit programmatic policy.
+
+On either schema, the library omits getter-free built-in display work on non-Repaint events when
+the execution owner supports display isolation. Ordinary `SelectedBind` reads on a per-pass page
+remain per pass, as do checkbox input reads. An execution backend without isolation keeps the
+original per-pass display path. Custom widgets and editors keep their per-pass `Draw`; this policy
+does not give custom renderers a new deferred-display interface.
+
+`IUiTranslation.Translate` call counts are not guaranteed. Return a stable result for a key until
+`TranslationRevision` changes; do not use translation calls to advance business state.
+
+### Defer display in fully clipped Overlay subtrees
+
+`<Overlay DeferClippedDisplay="true">` may defer built-in display reads, formatting, fit and paint
+while its effective clip is empty. Input/control calls keep their order, and the first visible pass
+reads the current display value without requiring a notification. This policy requires display
+isolation; custom widgets and editors keep their existing behavior.
+
+The default is off on a per-pass page and on for Overlays in a tiered page. Descendant Overlays
+inherit; an explicit `false` disables the policy for that subtree, and a deeper `true` re-enables it.
+The attribute is Overlay-only and accepts only `true` or `false`. This is the same explicit policy
+as on the 0.8 maintenance line. The retained 1.6 execution owner declares isolation; the 1.7 adapter
+keeps its conservative per-pass display fallback until it declares that capability separately.
+
 ## The four parts, and which ones you write
 
 1. **The page (XML)** — one manifest. A labeled numeric setting is one `Row` containing `input/slider` and
@@ -37,9 +80,11 @@ bindings.BindValue("level", () => model.Level, v => model.SetLevel(v), UiInvalid
 // a settings preset, a keybind, a save-load path: model.SetLevel(x) — same door, same announcement
 ```
 
-If you skip the announcement, a *value* change is still read live on the next paint (values are pulled per
-pass), but anything geometry depends on keeps its stale arrangement. Which brings the one distinction an
-author must keep in mind:
+If you skip the announcement, ordinary interactive values still follow their existing input reads.
+On a tiered page, built-in display and ordinary layout inputs are refreshed at Repaint; other events
+may use the most recent synchronized geometry. A per-pass page retains its original ordinary layout
+synchronization conditions. Announce changes so the next event can adopt them rather than waiting for
+Repaint. Choose the invalidation class according to what the value can affect:
 
 - **Paint-only content** — a value that moves no rect: a slider thumb, a number field's text, a progress
   fill. Announce with `UiInvalidation.Paint`; the arranged snapshot is reused as it stands.

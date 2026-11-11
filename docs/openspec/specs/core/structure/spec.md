@@ -14,7 +14,7 @@ FL SHALL 平行区分 Structure、Layout、Semantics、Appearance；它们分别
 - **AND** 外观不复制一套激活／编辑状态机，也不因无默认绘制而失去行为
 
 ### Requirement: FL08-DECLARATION XML 与程序定义同义
-XML 与 C# SHALL 使用同一不可变定义和编译／验证规则。构造输入的属性、子项、choices SHALL 被复制为只读定义；实例状态不写回定义。XML SHALL 不执行表达式、反射或任意 C#，并拒绝 DTD／外部实体／非允许文字内容。页面 Schema 为2；定义深度上限16、节点数512、inline Styles 文本32768字符。未知 kind、属性、矛盾布局、无效模板／引用及非法子项 SHALL 给可定位错误。
+XML 与 C# SHALL 使用同一不可变定义和编译／验证规则。构造输入的属性、子项、choices SHALL 被复制为只读定义；实例状态不写回定义。XML SHALL 不执行表达式、反射或任意 C#，并拒绝 DTD／外部实体／非允许文字内容。页面 Schema 接受2与3，执行默认值见 FL09-PAGE-EXECUTION；定义深度上限16、节点数512、inline Styles 文本32768字符。未知 kind、属性、矛盾布局、无效模板／引用及非法子项 SHALL 给可定位错误。
 
 #### Scenario: 构造后修改原集合
 - **WHEN** 作者修改用于构造定义的字典或子项列表

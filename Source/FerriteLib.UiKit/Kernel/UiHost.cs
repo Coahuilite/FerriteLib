@@ -256,8 +256,8 @@ public sealed partial class UiHost : IDisposable
 
     public UiLayoutSnapshot MeasureAndArrange(UiLayoutPoint available)
     {
-        cycleSnapshot = null; // explicit/manual synchronization also retires any DrawFrame reuse
         RequireOutsideBudget();
+        cycleSnapshot = null; // explicit/manual synchronization also retires any DrawFrame reuse
         session.InvalidatePointerRead();
         RefreshBindingOwner(allowPresentationEnrollment: true);
         reactivePresentation?.Synchronize(false);
@@ -617,6 +617,8 @@ public sealed partial class UiHost : IDisposable
 
     public void Close()
     {
+        cycleSnapshot = null;
+        cycleOpen = false;
         previewPreparation = null;
         costSampleProvider = null;
         toolConnection?.Dispose();

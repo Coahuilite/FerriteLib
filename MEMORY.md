@@ -55,6 +55,7 @@ Current development policy: follow RimWorld **1.7** APIs/namespaces without a ga
 The authorized line inherits the exact dirty producer-r5-dev-r2 source form; later fixed producers
 retain their own complete source form and identity rather than inheriting an embedded dirty HEAD.
 The 0.9 line uses one normal carrier with dormant FER_TOOLS; FER_TEST fault injection is excluded.
+The event-execution defaults and programmatic policy are documented in the [ordinary page recipe](docs/consumers/ordinary-settings.md#start-a-09-page-with-schema-3), with source/evidence in the [event-tiering map](docs/openspec/implementation.md#fl09-event-tiering).
 Its neutral shell, selection presentation, original-coordinate hit read and optional non-committing
 budget measurement retain public-unstable status. Current usage and original page/provider/pure-read
 conditions are in [the connection guide](docs/development/0.9/tools.md); source mechanisms, fixed

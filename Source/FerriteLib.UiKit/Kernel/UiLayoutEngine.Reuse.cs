@@ -78,6 +78,7 @@ internal sealed partial class UiLayoutEngine
     internal void ReleaseLayoutCaches()
     {
         ReleasePipeline();
+        contentLayers = null;
         layoutScopes.Clear(); textMetricsCache = null; activeLayoutScope = null;
         cachedSnapshot = null; lastEntries = new PageTable<PlacedEntry>(Array.Empty<PlacedEntry>()); widgetInstances.Clear(); repeatStates.Clear();
         materializedRepeats.Clear(); keyNodes.Clear(); committedRevisions.Clear(); candidateRevisions.Clear();

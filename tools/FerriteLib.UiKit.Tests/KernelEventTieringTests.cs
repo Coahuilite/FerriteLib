@@ -154,7 +154,8 @@ internal static class KernelEventTieringTests
         b.BindValue("check", () => { checkReads++; return check; }, v => check = v);
         b.BindValue("edit", () => { editorReads++; return edit; }, v => edit = v);
         bool allowed = true; b.BindCommand("go", () => { }, () => allowed);
-        using var host = Host("<Column Padding=\"0\" Gap=\"0\"><Widget Id=\"button\" Kind=\"input/button\" ActionBind=\"go\" Text=\"Go\" Height=\"20\"/><Widget Id=\"check\" Kind=\"input/checkbox\" Bind=\"check\" Label=\"Check\" Height=\"20\"/><Widget Id=\"edit\" Kind=\"input/text-field\" Bind=\"edit\" Height=\"20\"/></Column>", b);
+        const string body = "<Column Padding=\"0\" Gap=\"0\"><Widget Id=\"button\" Kind=\"input/button\" ActionBind=\"go\" Text=\"Go\" Height=\"20\"/><Widget Id=\"check\" Kind=\"input/checkbox\" Bind=\"check\" Label=\"Check\" Height=\"20\"/><Widget Id=\"edit\" Kind=\"input/text-field\" Bind=\"edit\" Height=\"20\"/></Column>";
+        using var host = Host(body, b);
         var execution = new Isolated(); string[]? order = null;
         foreach (UiFramePhase phase in new[] { UiFramePhase.Layout, UiFramePhase.KeyDown, UiFramePhase.KeyUp, UiFramePhase.Repaint })
         {
@@ -169,6 +170,26 @@ internal static class KernelEventTieringTests
         Pump(host, execution, UiFramePhase.KeyDown); // first pass after Repaint
         passes = host.Session.LayoutWork.Passes; allowed = true; Pump(host, execution, UiFramePhase.KeyUp);
         Check(!Node(host, "button").IsDisabled && host.Session.LayoutWork.Passes == passes, "Eligibility froze between synchronization points");
+
+        // Also reach the existing native allocator/editor doubles: key order alone would not
+        // detect an accidentally omitted native call that shifts all following numeric IDs.
+        using var nativeHost = Host(body, b);
+        var field = typeof(VerseUiExecution).GetField("controls", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var editorCalls = typeof(Verse.Widgets).GetField("TextControlCalls")!;
+        int before = (int)editorCalls.GetValue(null)!;
+        string[]? allocated = null;
+        foreach (EventType phase in new[] { EventType.Layout, EventType.KeyDown, EventType.KeyUp, EventType.Repaint })
+        {
+            Event.current = new Event { type = phase, mousePosition = new Vector2(-20, -20) };
+            NativeFixture.DrawFrame(nativeHost, View);
+            IUiExecution native = nativeHost.Session.Execution;
+            if (native is IUiExecutionOwner owner) native = owner.NativeOwner;
+            var ids = (Dictionary<UiControlKey, int>)field.GetValue(native)!;
+            string[] current = ids.OrderBy(pair => pair.Key.Key, StringComparer.Ordinal).Select(pair => pair.Key.Key + "=" + pair.Value).ToArray();
+            if (allocated == null) allocated = current;
+            else Check(Enumerable.SequenceEqual(allocated, current), "Native numeric control IDs changed at " + phase);
+        }
+        Check(allocated!.Length >= 2 && (int)editorCalls.GetValue(null)! == before + 4, "Native ID/editor counterexample did not reach all four passes");
     }
     private static void SafeDefault()
     {

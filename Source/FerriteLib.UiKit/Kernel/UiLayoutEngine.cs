@@ -588,6 +588,7 @@ internal sealed partial class UiLayoutEngine
             ctx.Session.AbortHitPass();
             throw;
         }
+        finally { displayIsolation = null; }
     }
 
     private void CollectPointerLayers(IReadOnlyList<PlacedEntry> entries, int start, int end, UiWidgetContext ctx,

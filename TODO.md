@@ -16,6 +16,13 @@ current task and applicable permissions; preserve the separate 1.6/native and 1.
 - Keep unresolved TEMP positive-control evidence distinct from valid checks. Adopted capability goals and later extensions
   remain unimplemented and require their own product authority: `docs/development/0.9/extension-plan.md`.
 
+## 0.9 event-tiering handoff
+
+The adopted [event-tiering change](docs/openspec/changes/fl09-event-tiering/tasks.md) owns the scoped
+implementation/evidence and cross-line tasks. The 0.9 source, managed checks and consumer guide are complete;
+PM reviews the one additive `UiLayoutManifest.WithTieredEvents(bool)` signature. The compatibility/consumer
+ports and native comparison retain their separate owners; native acceptance is not inferred from managed checks.
+
 ## 0.9 adopted capability work
 
 WO-UIKIT-CAPABILITY-SPEC-20261108 r2 adopted the [change targets](docs/openspec/changes/fl09-basic-ui-capabilities/proposal.md),
@@ -59,6 +66,22 @@ implemented. Current requirements are reached through `docs/specification.md`; i
 > and `OBLIVIONIS.md`; a closed item is a pointer here, not a paragraph.
 
 ## Local review coverage
+
+### FL09 event-tiering scope
+
+- **Owner / reviewed_at:** sol-tiering, 2026-11-11T11:36:17.6331164+08:00 (Asia/Hong_Kong).
+- **Reviewed-through:** Adopted event-tiering source from `27b5a03`, documentation adoption, the four separate
+  candidate-C ports, the runtime/wrapper/manifest/isolation implementation, and the final uncommitted cache
+  release/budget-guard placement and native-ID counterexample. Reviewed the relevant diff, current contract,
+  consumer recipe and direct mappings; no other owner's implementation or runtime acceptance is included.
+- **Evidence / corrections:** The new semantic lane, selected existing suites, readonly API, Core and adapter
+  entries pass. New-fixture failures were corrected from the actual path: explicit net472-compatible overloads,
+  real native editor/control allocation, and pointer recovery already completed by successful synchronization.
+  The existing pixel fixture now supplies Repaint without changing its assertions. Ordinary `SelectedBind`
+  remains outside the getter-free omission, and failed/recovered input producers request fresh layer validation.
+  These are covered by existing contract/fixture rules; no new standing lesson or protocol change is needed.
+- **Continuation:** The completion report owns final committed Release build identities and PM signature review;
+  task 7 native measurements, physical keyboard and IME remain with the runtime owner/user.
 
 ### R1 implementation scope
 
