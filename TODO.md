@@ -26,6 +26,15 @@ owner's ce0028d/a3d4616 mechanism, retaining 0.9 reader/budget/legacy conditions
 demand-order allocation. The scoped change records the implementation and round-3 evidence route.
 The compatibility/consumer ports, total-FPS investigation and 0.9 native acceptance retain their separate owners.
 
+## 0.9 retained-region specification candidate
+
+WO-FL09-RETAINED-DISPLAY-20261111 r1 has a [proposed change](docs/openspec/changes/fl09-retained-regions/proposal.md)
+for explicit region inputs, shared immutable presentation and retained work scheduling. It is not adopted
+or implemented. PM reviews the true deltas, independent-author API and Public-unstable recommendation;
+the original owner adopts the selected text into current before product work. The F09 RW1.6 input is
+historical evidence, not a 0.9 or 1.7 performance result. Source, tests, build settings and API inventories
+are unchanged by this SPEC delivery.
+
 ## 0.9 adopted capability work
 
 WO-UIKIT-CAPABILITY-SPEC-20261108 r2 adopted the [change targets](docs/openspec/changes/fl09-basic-ui-capabilities/proposal.md),
@@ -69,6 +78,22 @@ implemented. Current requirements are reached through `docs/specification.md`; i
 > and `OBLIVIONIS.md`; a closed item is a pointer here, not a paragraph.
 
 ## Local review coverage
+
+### FL09 retained-region SPEC candidate
+
+- **Owner / reviewed_at:** sol-tiering, 2026-11-11T23:13:44.3072309+08:00 (Asia/Hong_Kong).
+- **Reviewed-through:** The work order and four supplied F09 evidence documents; current layout,
+  binding, structure, presentation/manual-phase, adapter, Tools/budget, failure/lifetime, appearance,
+  editing/help and author contracts; actual US `1ee2ae0` source for BuildView, row results and sparse
+  layout/native editor. Reviewed candidate proposal/design/API/tasks and complete MODIFIED sections
+  against `d07cdc0`, including the new pure-Build budget alternative and unchanged old callers.
+- **Evidence / decision:** This is source/document review only. The preferred design uses an explicit
+  representation port and real region-boundary work elimination, not a view token or another leaf cache.
+  API tier is a Public-unstable recommendation pending PM adoption, not a current classification.
+  No production, test or build-parameter edit, build, harness, game or 1.7 run belongs to this scope.
+- **Continuation:** PM decides the candidate; the original owner adopts selected deltas before code.
+  US consumption and native acceptance remain separately gated. Existing rules cover source freshness,
+  unknown holes and evidence-layer distinctions; no new standing protocol or lesson is introduced.
 
 ### FL09 IDLE-SYNC round 3
 
