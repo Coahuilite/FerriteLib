@@ -164,14 +164,18 @@ internal sealed partial class UiRegionRuntime
         LayoutFailed = !success;
         try
         {
+            if (!closed && !success)
+                foreach (UiRegionAttachment region in attachments)
+                    if (!region.Detaching && !region.Faulted)
+                        region.Report(UiRegionState.Failed, "arrangement-candidate-not-published", current: false);
             if (!closed && success)
                 foreach (UiRegionAttachment region in attachments)
                 {
                     if (region.CandidateRetire) { region.Detaching = true; continue; }
                     if (region.Detaching) continue;
-                    if (!ReferenceEquals(region.Committed, region.Candidate)) region.SourceClock++;
+                    if (region.Candidate != null && !ReferenceEquals(region.Committed, region.Candidate)) region.SourceClock++;
                     region.Committed = region.Candidate; region.Declaration = region.CandidateDeclaration!;
-                    region.LayoutClock++;
+                    if (region.ValidatedUiClock.HasValue) region.LayoutClock++;
                     bool currentUi = region.ValidatedUiClock.HasValue && session.GetNodeByElementId(region.RootId)?.RegionRevision == region.ValidatedUiClock;
                     if (!region.Faulted) region.Report(region.Committed == null ? UiRegionState.Unknown : region.Used ? UiRegionState.Active : UiRegionState.Fallback,
                         region.Committed == null ? "source-unknown" : !currentUi ? "local-invalidation-pending" : region.Used ? "retained-layout; ordinary operation holes remain live" : "unproved-layout",

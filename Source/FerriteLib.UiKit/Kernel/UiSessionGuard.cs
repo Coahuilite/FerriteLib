@@ -191,6 +191,16 @@ public static class UiSessionGuard
     /// diagnostic prints - the engine passes the element's display path, a consumer passes its own id -
     /// while <paramref name="key"/> is what decides which slot is occupied.
     /// </summary>
+    internal static void RecordRegionFailure(UiWidgetContext ctx, IUiWidget widget, Exception error)
+    {
+        if (error is UiReactiveFault failure)
+        {
+            ctx.Node.PresentationFault = failure;
+            UiDomainDiagnostics.Reactive(ctx.Session, ctx.Node, "presentation.fault", failure);
+        }
+        else Record(ctx.Session, ctx.Node, ctx.ElementPath, widget.Kind, ctx.ElementPath, error);
+    }
+
     private static void Record(UiSession session, UiNode key, string label, string kind, string elementPath, Exception ex)
     {
         bool first = !session.IsTripped(key);

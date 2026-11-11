@@ -47,6 +47,8 @@ internal sealed partial class UiLayoutEngine
         internal UiRegionAttachment Attachment = null!;
         internal UiRegionSnapshot Inputs = null!;
         internal UiElementSpec Spec = null!;
+        internal UiNode Node = null!;
+        internal long Mount;
         internal IUiRegionParticipant? Participant;
         internal UiRegionDisplay? Display;
         internal UiRegionDisplay? LastPaintDisplay;
@@ -69,7 +71,10 @@ internal sealed partial class UiLayoutEngine
     {
         internal RegionLeaf Proof = null!;
         internal MeasuredBox Box = null!;
-        internal float AvailableHeight, ReferenceHeight;
+        internal float ConstraintWidth, AvailableHeight, ReferenceHeight;
+        internal RegionBox? Alternate;
+        internal RegionBox TerminalCopy()
+        { var copy = (RegionBox)MemberwiseClone(); copy.Alternate = null; return copy; }
         internal List<MaterializedRepeat> Repeats = new();
         internal Dictionary<string, List<UiNode>> Keys = new(StringComparer.Ordinal);
         internal Dictionary<UiNode, float> Labels = new();
@@ -115,7 +120,7 @@ internal sealed partial class UiLayoutEngine
         UiWidgetContext env = regionEnvironment ?? local;
         if (!ReferenceEquals(local.Theme, env.Theme) && !ReferenceEquals(local.Theme, styleResolver?.Baseline))
             local.Theme.ObserveRegionOwner(local.Node);
-        var proof = new RegionLeaf { Attachment = attachment, Inputs = packet, Spec = spec, Layout = new LayoutStamp(local),
+        var proof = new RegionLeaf { Attachment = attachment, Inputs = packet, Spec = spec, Node = local.Node, Mount = local.Node.MountLifetime, Layout = new LayoutStamp(local),
             State = local.Node.RegionRevision, Retry = attachment.RetryClock, Language = env.Translation.TranslationRevision,
             Translation = env.Translation, Properties = env.Theme.PropertyRevision, Colours = env.Theme.ColourRevision,
             HostLayout = env.Theme.LayoutRevision, Constraints = regionConstraintRevision, Definition = DefinitionRevision(env),
@@ -137,6 +142,7 @@ internal sealed partial class UiLayoutEngine
     {
         if (proof.Attachment.Owner == null || proof.Attachment.Detaching || packet == null
             || !ReferenceEquals(proof.Inputs, packet) || !ReferenceEquals(proof.Spec, spec)
+            || !ReferenceEquals(proof.Node, node) || proof.Mount != node.MountLifetime
             || proof.State != node.RegionRevision || proof.Retry != proof.Attachment.RetryClock
             || proof.Language != env.Translation.TranslationRevision || !ReferenceEquals(proof.Translation, env.Translation)
             || proof.Properties != env.Theme.PropertyRevision || proof.Colours != env.Theme.ColourRevision || proof.HostLayout != env.Theme.LayoutRevision
@@ -230,7 +236,7 @@ internal sealed partial class UiLayoutEngine
             ctx.Node.PresentationUnavailable = true; ctx.Session.SuspendFailedInput(ctx.Node);
             attachment!.Faulted = true;
             attachment.Report(UiRegionState.Failed, "build:" + ctx.ElementPath + ":" + error.Message, current: false);
-            UiSessionGuard.MeasureOrFallback(ctx, ctx.ElementPath, widget.Kind, ctx.ElementPath, 0, () => throw error);
+            UiSessionGuard.RecordRegionFailure(ctx, widget, error);
         }
         finally { if (metricCache != null) metricCache.RegionEnvironmentRead = previousReads; }
         leaf.State = ctx.Node.RegionRevision;
@@ -244,14 +250,27 @@ internal sealed partial class UiLayoutEngine
     {
         UiRegionAttachment? attachment = Regions?.For(spec, node);
         UiRegionSnapshot? packet = attachment == null ? null : RegionPacket(attachment, spec);
-        if (packet == null || !RegionBackend(ctx)) return MeasureElementCore(ctx, spec, width, availableHeight, node, contentHeightReference);
+        if (packet == null || !RegionBackend(ctx))
+        {
+            regionBoxes.Remove(node.Id); regionLeaves.Remove(node.Id);
+            return MeasureElementCore(ctx, spec, width, availableHeight, node, contentHeightReference);
+        }
         node.RegionAttachment = attachment;
         UiWidgetContext local = ElementScope(ctx, spec, node).WithNode(node).WithViewWidth(width);
         UiWidgetContext env = regionEnvironment ?? ctx;
-        if (regionBoxes.TryGetValue(node.Id, out RegionBox? cached)
+        regionBoxes.TryGetValue(node.Id, out RegionBox? previousBox);
+        RegionBox? cached = previousBox;
+        while (cached != null && !(cached.ConstraintWidth == width
             && RegionCurrent(cached.Proof, env, spec, node, packet) && cached.Proof.Layout.Matches(local)
-            && cached.AvailableHeight == availableHeight && cached.ReferenceHeight == contentHeightReference)
+            && cached.AvailableHeight == availableHeight && cached.ReferenceHeight == contentHeightReference)) cached = cached.Alternate;
+        if (cached != null)
         {
+            if (!ReferenceEquals(cached, previousBox))
+            {
+                RegionBox promoted = cached.TerminalCopy();
+                promoted.Alternate = previousBox?.TerminalCopy();
+                regionBoxes[node.Id] = cached = promoted;
+            }
             if (regionFrame != null) MergeFonts(regionFrame.Fonts, cached.Proof.Fonts);
             // Restore only retained topology/receipts. No Configure, source getter, context per child,
             // presentation demand, Build, label calculation or measurement occurs in this branch.
@@ -292,9 +311,21 @@ internal sealed partial class UiLayoutEngine
             foreach (RegionFont font in frame.Fonts) if (font.Environment == null) frame.Complete = false;
             if (frame.Complete)
             {
-                var record = new RegionBox { Proof = RegionProof(local, spec, attachment!, packet),
-                    Box = OffsetBox(box, 0, 0), AvailableHeight = availableHeight, ReferenceHeight = contentHeightReference };
-                record.Proof.Fonts = frame.Fonts;
+                RegionLeaf proof = RegionProof(local, spec, attachment!, packet);
+                proof.Fonts = frame.Fonts;
+                // Containers also have an immutable prepared context, not just participant leaves.
+                // Native groups/qualification still execute with the current origin every event.
+                if (box.Entries.Count > 0 && box.Entries[0].IsContainer) box.Entries[0].Region = proof;
+                var record = new RegionBox { Proof = proof,
+                    Box = OffsetBox(box, 0, 0), ConstraintWidth = width, AvailableHeight = availableHeight, ReferenceHeight = contentHeightReference };
+                // Scroll has two real constraint variants (unreserved/reserved width). Retain both,
+                // so changing one row does not rebuild every unchanged row twice. Never mutate a
+                // committed variant while staging; this bounded pair is still published atomically.
+                RegionBox? other = previousBox;
+                if (other != null && other.ConstraintWidth == width && other.AvailableHeight == availableHeight && other.ReferenceHeight == contentHeightReference)
+                    other = other.Alternate;
+                if (other != null && ReferenceEquals(other.Proof.Attachment, attachment) && ReferenceEquals(other.Proof.Inputs, packet)
+                    && other.Proof.State == node.RegionRevision) record.Alternate = other.TerminalCopy();
                 var members = new HashSet<UiNode>(); foreach (PlacedEntry entry in box.Entries) members.Add(entry.Node);
                 foreach (UiNode member in members) record.Labels.Add(member, member.SharedLabelWidth);
                 foreach (var pair in keyNodes)
@@ -377,18 +408,26 @@ internal sealed partial class UiLayoutEngine
                 if (didPaint && !failed) leaf.LastPaintDisplay = display;
             });
             if (ctx.Session.IsActive && !failed) entry.Node.PresentationUnavailable = false;
-            if (didPaint && ctx.Session.IsActive && !leaf.Attachment.Faulted)
-                leaf.Attachment.Report(failed ? UiRegionState.Failed : UiRegionState.Active,
-                    failed ? "retained-static-recovery" : "paired-display", ctx.Session.Frame,
-                    !failed && entry.Node.RegionRevision == leaf.State);
+            if (didPaint && ctx.Session.IsActive)
+            {
+                bool faulted = failed || leaf.Attachment.Faulted;
+                leaf.Attachment.Report(faulted ? UiRegionState.Failed : UiRegionState.Active,
+                    faulted ? leaf.Attachment.Status.Reason : "paired-display", ctx.Session.Frame,
+                    !faulted && entry.Node.RegionRevision == leaf.State);
+            }
         }
         catch (UiRequestFailure failure)
-        { ctx.Session.RecordRequestFailure(entry.Node, failure); UiThemeDraw.RecoveryBand(ctx.Drawing, bounds, ctx.Theme, entry.Node.Path); }
+        {
+            leaf.Attachment.Faulted = true;
+            leaf.Attachment.Report(UiRegionState.Failed, "request-failure:" + entry.Node.Path, current: false);
+            ctx.Session.RecordRequestFailure(entry.Node, failure); UiThemeDraw.RecoveryBand(ctx.Drawing, bounds, ctx.Theme, entry.Node.Path);
+        }
         catch (Exception error) when (UiObservationBoundary.IsOrdinary(error))
         {
             // Only pure display failure is retained; an Operate failure keeps the original retry
             // condition on the next operation and is never replayed as a command.
             entry.Node.PresentationUnavailable = true; ctx.Session.SuspendFailedInput(entry.Node);
+            leaf.Attachment.Faulted = true;
             if (purePhase)
             {
                 leaf.Failed = true; leaf.Attachment.Faulted = true;
@@ -397,8 +436,8 @@ internal sealed partial class UiLayoutEngine
                 for (UiNode? node = entry.Node; node != null; node = node.Parent) regionBoxes.Remove(node.Id);
             }
             leaf.Attachment.Report(UiRegionState.Failed, "region-dispatch:" + entry.Node.Path + ":" + error.Message, current: false);
-            UiSessionGuard.DrawOrFallback(ctx, entry.Node.Path, entry.Widget!.Kind, entry.Node.Path, bounds,
-                () => throw error, rect => UiThemeDraw.RecoveryBand(ctx.Drawing, rect, ctx.Theme, entry.Node.Path));
+            UiSessionGuard.RecordRegionFailure(ctx, entry.Widget!, error);
+            UiThemeDraw.RecoveryBand(ctx.Drawing, bounds, ctx.Theme, entry.Node.Path);
         }
     }
     private static bool PaintRegionDisplay(RegionLeaf leaf, UiRegionDisplay display, UiLayoutRect bounds, UiWidgetContext ctx)
@@ -427,13 +466,17 @@ internal sealed partial class UiLayoutEngine
     }
     private bool RegionNeedsFull(UiWidgetContext env)
     {
+        if (RegionBackend(env) && !ReferenceEquals(env.Bindings, UiBindings.OwnerOf(env.Bindings))) return true;
         for (int i = 0; i < lastEntries.Count; i++)
         {
             PlacedEntry entry = lastEntries[i];
             if (regionBoxes.ContainsKey(entry.Id))
             { if (!RegionRangeCurrent(entry, env)) return true; i += entry.SubtreeCount - 1; }
-            else if (entry.Region != null && !RegionCurrent(entry.Region, env, entry.Spec, entry.Node,
-                RegionPacket(entry.Region.Attachment, entry.Spec))) return true;
+            else if (entry.Region != null)
+            {
+                if (entry.Region.Failed) entry.Region.Attachment.Faulted = true;
+                if (!RegionCurrent(entry.Region, env, entry.Spec, entry.Node, RegionPacket(entry.Region.Attachment, entry.Spec))) return true;
+            }
         }
         // Root source changes can expose members which were previously hidden, including an empty Repeat.
         if (Regions != null && Regions.SourceChanged) return true;
@@ -497,11 +540,13 @@ internal sealed partial class UiLayoutEngine
     {
         var gone = new List<UiNodeId>();
         foreach (var pair in regionBoxes)
-            if (pair.Value.Proof.Attachment.Owner == null || pair.Value.Proof.Attachment.Detaching || session.GetNode(pair.Key) == null) gone.Add(pair.Key);
+            if (pair.Value.Proof.Attachment.Owner == null || pair.Value.Proof.Attachment.Detaching
+                || !ReferenceEquals(session.GetNode(pair.Key), pair.Value.Proof.Node) || pair.Value.Proof.Mount != pair.Value.Proof.Node.MountLifetime) gone.Add(pair.Key);
         foreach (UiNodeId key in gone) regionBoxes.Remove(key);
         gone.Clear();
         foreach (var pair in regionLeaves)
-            if (pair.Value.Attachment.Owner == null || pair.Value.Attachment.Detaching || session.GetNode(pair.Key) == null) gone.Add(pair.Key);
+            if (pair.Value.Attachment.Owner == null || pair.Value.Attachment.Detaching
+                || !ReferenceEquals(session.GetNode(pair.Key), pair.Value.Node) || pair.Value.Mount != pair.Value.Node.MountLifetime) gone.Add(pair.Key);
         foreach (UiNodeId key in gone) regionLeaves.Remove(key);
     }
     internal void ReleaseRegions()

@@ -28,11 +28,13 @@ WO-FL09-RETAINED-DISPLAY-20261111 r3 在 FL `8f02776`／US `3e32a57` 的独立�
 - 分项 packet 改变或 UI 脏时，原 full 几何事务计算变化闭包，未变 item／子分支 box 仍复用。
   原 Repeat reader 校验保留；成员／次序、共享列、后续位置、Scroll 双宽度遍历／范围／clamp 沿原 owner，
   不用静止外框代替尺寸证明。缓存只在候选成功时保留；异常恢复原缓存及几何，不回滚已完成业务操作。
+  每个作用域最多保留两个实际约束变体，避免 Scroll 的预留／未预留宽度互相挤掉未变行；
+  当前采用的变体保持在 head，后续验证不误用另一宽度的字体／环境证明。idle 增量成功不复制 region 缓存表。
 - 自定义 `IUiRegionParticipant` 的 Build／局部 pointer／自然高共享同一 display；Operate 保每事件原次序。
   内置 wrapped text、button、rule 有明确表示端口。Dropdown 的无业务天然测量可随布局保留，
   其旧 Draw／choices／资格／pointer 仍是实时洞。未映射消费、未知 widget、旧 diagnostic／自定义 natural-body
   回调保原读取／计算域；它们不因旁边接入 participant 就变 pure。
-- Draw 仍通过原事件／hit／help／disabled／popup 漏斗。已配对 participant 可复用已准备 context，
+- Draw 仍通过原事件／hit／help／disabled／popup 漏斗。已证明容器和 participant 均复用已准备 context，
   不复用资格或命令结果；滚动时转换当前 origin。native editor、输入、help 和 unknown Draw 不省略。
   有展示隔离的后端只在 Repaint 调用纯 Paint；有效 clip 非空且没有完整输出证明时，屏外 layout rect 也照画。
   PaintClip 通过现有 drawing.Clip 强制，平移 drawing outlet（含 numeric text／嵌套 clip）以保原逻辑坐标；
@@ -42,6 +44,8 @@ WO-FL09-RETAINED-DISPLAY-20261111 r3 在 FL `8f02776`／US `3e32a57` 的独立�
 
 原 edit owner 比较已有 draft／focus／modified／conflict／composition，不额外读取 Valid／parser；
 新 editor、formatter/parser 改变和焦点挂起也使已采用节点失效。custom 其他状态仍由原 Invalidate 写边负责。
+私有 ctx.Child 控件沿实际 Parent 找到所属 attachment；证明还核对真实 node／mount incarnation，
+不凭同一逻辑 ID 把已退出节点的几何／状态借给新 mount。
 Build／Paint 新纯阶段拒绝控件、editor 创建、UI mutation／帮助；旧调用不获得该纯度前提。
 Build 失败保最后成功 Paint 的不可变资料或恢复带，停止该失败片段的 Operate；不凭相同失败输入反复 Build。
 纯 Paint 失败锁存，相关输入／环境／UI／Retry 才重新派生；操作失败仍沿原 request／guard 回复，不自动重发。

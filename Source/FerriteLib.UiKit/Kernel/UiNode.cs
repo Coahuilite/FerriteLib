@@ -201,12 +201,22 @@ public sealed partial class UiNode
     }
     internal long RegionRevision;
     internal UiRegionAttachment? RegionAttachment;
-    internal bool HasRegion => RegionAttachment?.Owner != null && !RegionAttachment.Detaching;
+    private UiRegionAttachment? CurrentRegion
+    {
+        get
+        {
+            for (UiNode? node = this; node != null; node = node.Parent)
+                if (node.RegionAttachment?.Owner != null && !node.RegionAttachment.Detaching) return node.RegionAttachment;
+            return null;
+        }
+    }
+    internal bool HasRegion => CurrentRegion != null;
     internal void RegionThemeChanged()
     { if (!released && session.IsActive && HasRegion) MarkDirty(); }
     internal void InvalidateRegion()
     {
-        if (HasRegion) RegionAttachment!.Report(RegionAttachment.Status.State, "local-ui-dirty", current: false);
+        UiRegionAttachment? region = CurrentRegion;
+        if (region != null) region.Report(region.Status.State, "local-ui-dirty", current: false);
         // The state owner propagates once at the write, not by polling every descendant at capture.
         for (UiNode? current = this; current != null; current = current.Parent) current.RegionRevision++;
     }

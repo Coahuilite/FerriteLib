@@ -1,6 +1,6 @@
 # Spec Delta — 采用来源（非 current）
 
-0.9 已采用、未实施；来源为 bb7da49 及 WO-FL09-RETAINED-DISPLAY-20261111 r2 的 choices／paint证明与源捕获补充。
+以下为0.9 r2采用时的 delta；r3 源码与证据见实现账。来源为 bb7da49 及 WO-FL09-RETAINED-DISPLAY-20261111 r2 的 choices／paint证明与源捕获补充。
 本文保留采用时完整 delta，不作为第二份 current；唯一正文见 [对应能力](../../../../../specs/contracts/developer-tools/spec.md)。
 
 ## MODIFIED Requirements

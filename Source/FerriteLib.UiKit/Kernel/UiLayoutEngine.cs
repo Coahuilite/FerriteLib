@@ -187,11 +187,6 @@ internal sealed partial class UiLayoutEngine
         refreshInputs = synchronizeInputs;
         regionEnvironment = ctx;
         var priorRegionBoxes = regionBoxes; var priorRegionLeaves = regionLeaves;
-        if (Regions != null)
-        {
-            regionBoxes = RegionBackend(ctx) ? new(regionBoxes) : new();
-            regionLeaves = RegionBackend(ctx) ? new(regionLeaves) : new();
-        }
         ctx.Session.LayoutWork.Passes++;
         drawContextGeneration++;
         contentLayers = null;
@@ -201,6 +196,13 @@ internal sealed partial class UiLayoutEngine
         bool externalContentChanged = cachedSnapshot != null && cachedContentRevision != ctx.Session.ContentRevision;
         try { if (TryIncremental(ctx, available, roots, externalContentChanged, out UiLayoutSnapshot retained)) return retained; }
         catch { ctx.Session.AbortHitPass(); throw; }
+        // Stable span validation publishes no region-cache writes. Allocate the candidate tables
+        // only when a real full transaction needs them, not once per idle synchronization.
+        if (Regions != null || regionBoxes.Count != 0 || regionLeaves.Count != 0)
+        {
+            regionBoxes = Regions != null && RegionBackend(ctx) ? new(regionBoxes) : new();
+            regionLeaves = Regions != null && RegionBackend(ctx) ? new(regionLeaves) : new();
+        }
         candidateStackRecipes = new();
         ctx.Session.LayoutWork.FullCandidates++;
         ctx.Session.LayoutWork.Last = "full";
@@ -711,7 +713,7 @@ internal sealed partial class UiLayoutEngine
     {
         RegionLeaf? region = entry.Region;
         UiWidgetContext? prepared = region?.DrawContext;
-        if (region?.Participant != null && prepared != null && entry.Node.RegionRevision == region.State
+        if (region != null && prepared != null && entry.Node.RegionRevision == region.State
             && regionDrawEnvironment?.Theme.PropertyRevision == region.Properties
             && regionDrawEnvironment.Theme.ColourRevision == region.Colours && regionDrawEnvironment.Theme.LayoutRevision == region.HostLayout
             && RegionAncestorsCurrent(region, entry.Node)
@@ -728,7 +730,7 @@ internal sealed partial class UiLayoutEngine
             && current.WindowOrigin.Equals(windowOrigin) && ReferenceEquals(current.Metrics, ctx.Metrics)) return current;
         entry.EventDrawContext = null;
         UiWidgetContext result = ResolveDrawContext(entry, ctx, windowOrigin);
-        if (region?.Participant != null) region.DrawContext = result;
+        if (region != null) region.DrawContext = result;
         if (tieredDraw) { entry.EventDrawContext = result; entry.EventContextGeneration = drawContextGeneration; }
         return result;
     }
