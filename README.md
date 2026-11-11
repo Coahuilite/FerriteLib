@@ -12,10 +12,15 @@ mod authors. It adds no Defs, patches, languages or textures; enabling it alone 
 | Development | 0.9.0, API range `[0.9.0, 0.10.0)`; [Tools/semantic/headless guide](docs/development/0.9/tools.md) |
 | Published | [v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1) (GitHub prerelease, not latest) |
 | Local only | 0.9 normal carrier; not published. The separate 0.8 maintenance candidate remains unreleased. |
-| RimWorld 1.6 | 0.8 maintenance/recovery only; retained r6 native acceptance remains open |
-| RimWorld 1.7 | 0.9 net10.0 target compiled against local 1.7.4998 rev1299; public Window/Settings path compiled, native execution not verified |
+| RimWorld 1.6 | Separate 0.8 maintenance/recovery; c3-dev inherits r6 native acceptance gaps |
+| RimWorld 1.7 | 0.9 net10.0; isolated full-window Native17 consumption recorded. Game17 is build/package only; game, physical input and IME remain unverified. See the implementation map. |
 
 Per-item evidence and known deviations live in [implementation and open deviations](docs/openspec/implementation.md), not here.
+
+Ordinary `NotifyChanged` still permits redundant, same-value and off-page keys. A notification/layout-observation
+convergence gap remains [open](docs/openspec/implementation.md#fl09-reliability); consumer workarounds do not establish a core fix.
+[Dual-axis scrolling and a limited pan/zoom viewport](docs/openspec/changes/fl09-basic-ui-capabilities/proposal.md)
+are adopted development targets, not implemented features. The [0.9 plan](docs/development/0.9/extension-plan.md) separates them from existing APIs and later focus/accessibility work.
 
 ## For players
 

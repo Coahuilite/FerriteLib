@@ -8,10 +8,21 @@
 ### Requirement: FL08-ORDINARY 普通读取保持原采用条件
 普通值／只读／options 注册、手写访问器和旧自定义 Measure SHALL 保持原通知及合法执行条件；Set 请求业务 mutation，不等于存储成功，也不自动 NotifyChanged。显式通知默认 Everything；None=0、Paint=1、Measure=2、Structure=4，Everything 为后三者并集。公告须到达真实消费者声明的 binding；尺寸／可见性等依赖不能被误归为纯 paint。未登记 getter 不因快路获得 pure、订阅或创建线程前提。
 
+普通公告 SHALL 容纳已注册键的同值、冗余、批内重复及非当前布局键，不要求作者过滤当前可见项；
+这不把tracked equality的抑制政策加给普通通知。每Host按其实际完整依赖验证，不由共享bindings的一次公告／另一Host提交代确认。
+待布局义务属于该 engine 最后成功 publication 的当前依赖域；只有成功 publication 才确认其读取前
+采样的 revision，并退休已退出该域的键。隐藏不清模型通知，复显读取当前值；读取或测量期间的
+新公告、失败候选均不能冒充已成功覆盖的 revision。
+
 #### Scenario: 普通字段在 UI 外改变
 - **WHEN** 业务改变影响文字测量的普通字段并按原注册 key 通知
 - **THEN** 真实依赖在下次合法同步验证
 - **AND** 不通过扫描任意对象字段或暗中启用 tracking 发现变化
+
+#### Scenario: 曾显示的键离开当前布局后仍收到公告
+- **WHEN** 同一Host隐藏祖先后，作者合法公告其后代旧键，包括未变值或重复键
+- **THEN** 当前无布局依赖的历史键不永久阻塞其他有效布局；仍存的同键依赖继续同步
+- **AND** 复显时验证最新值，不要求换定义／重建Host或只公告可见键
 
 ### Requirement: FL08-TRACKED 显式纯来源与相等政策
 新 tracked 计算 SHALL 只读一个 runtime 的已连接来源，投影所有实际使用的可变属性为不可变展示值。Int、Text、Boolean 分别用整数、ordinal 字符串、布尔相等；通用 Value/List 要求作者指定 equality。相等写入 SHALL 保留旧存储值且不失效；相同最终值的独立命令／选择仍为独立请求。换分支或同结果换源 SHALL 更新真实依赖，不保留旧成功分支。

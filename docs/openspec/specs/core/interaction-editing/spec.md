@@ -131,3 +131,9 @@ flags are consumed before the semantic attempt; callback failure cannot leave on
 replay. Focus bookkeeping/release and invalidation run on exit, including ordinary callback failure;
 no normal frame work is resumed after Host disposal. Existing native Edit/Live/Accept/Cancel callers do
 not gain a Tools prerequisite. A handled result is distinct from business acceptance or persistence.
+
+## 已采用、未实施的新输入目标
+
+[新轴仲裁／画布输入及后续详情焦点ADDED](../../../changes/fl09-basic-ui-capabilities/specs/core/interaction-editing/spec.md)
+持新增目标，不改本文旧capture／TEXT／请求条件；完整K1仍延后。仅失焦、可靠隐藏和丢原生capture按真实事实区分，
+隐藏／退休后的稿与输入仍按[寿命](../lifetime-recovery/spec.md)归属，不从同key推续命。

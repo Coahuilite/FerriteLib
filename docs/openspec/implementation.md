@@ -5,9 +5,180 @@
 cf1cf6456096171fb47c012369bcd0c2f29e968f。FL-F01/F02/F03 已在该 HEAD 的 dirty 工作树修复；
 下列对应段落区分实际源码机制、已执行既有检查及未执行原生／精确故障组合。
 
-## 2026-11-06 工具合同归并与舞台接续
+<a id="fl09-reliability"></a>
+## FL09 R1 修复与已采用目标（2026-11-09）
 
-[开发工具连接](specs/contracts/developer-tools/spec.md)是语义／headless、作者文档、prepare与cost的唯一规范正文；[指南](../development/0.9/tools.md)保签名和用法。正常单一载体已有休眠接缝；独立工具已有原生预览，但完整虚拟游戏视口接入尚未实施。跟随当前1.7接口、取消外部工具小构建号锁定是已采用目标，不重标历史编译／运行证据。旧TEMP阳性对照拒绝与native输入／游戏宿主缺口保持，本文以下阶段事实保原输入。
+本节依据实际dirty源码与冻结v3完整source-form，不沿用上文历史源基线。采用来源见
+[来源覆盖](source-coverage.md#fl09-capability-adoption)；[change](changes/fl09-basic-ui-capabilities/proposal.md)的扩展目标仍未实施。
+R1 已按 WO-RELIABILITY-CLOSEOUT-20261109 r1 落源码；下文原运行保其历史身份，新工件不覆盖旧包。
+
+### R1 通知依赖生命周期／布局提交与观察资格不一致
+
+**状态：源码修复、生产构建／既有检查及原宽通知 caller 的准确新工件 after-success 完成，交 CO／PM 接受。**
+允许普通宽松通知，不加“当前布局／实变值”条件。修复只改变内部通知／publication 账：
+
+- `CommitNotifications` 对当前 `keyNodes` 采样并标 dirty，不再提前确认 `committedRevisions`。
+  本次稀疏 `candidateRevisions` 经 full 或 stable incremental 的成功边界才发布。
+- full 成功才退休退出当前依赖域的历史键；失败保旧成功域。新／复显键首次读取前采样，
+  visibility／width／tab 同步采用；同键多位置和增量转 full 保最早采样，晚通知仍待后续合法成功。
+- bindings 的业务值与 revision 不清零，其他 Host 独立确认。Close 的原 cache release 也清候选账。
+  旧 observation 失效条件和 last-good／输入可靠性分离不变；没有新增公开 API、版本或采用前提。
+
+隔离交付 `dist/reliability-20261109/fl-a001-r1/` 含 Release Neutral／RimWorld17 固定载体、
+完整实际 source-form、IDENTITY 和日志。两目标生产构建通过；既有 Core 391 项通过；既有 net472
+LayoutReuse／Visibility／FailureLifetime／Observation／Invalidation／ContainerTab／API tier suites
+通过。net472 harness 使用 FER_TEST，区别于交付的无 FER_TEST 正常载体；它是 managed stub 证据。
+RPT-RELIABILITY-TOOLS-A001 r2 已由获准 caller owner 对接新载体；FL owner 核对了实际载入身份及原件。
+原 `slice-001` provider MVID `9c47da59-e64d-43d3-ae58-f87c943e24c6`，保原宽
+`NotifyChanged(notifications.ToArray())`／`Host.Invalidate` 和未改的概率 timeline；实际载入
+本线 Native17 MVID `54659e82-7b01-4e3b-b338-9b40a95a11a2`。原04死亡0.8时121个Stale几何／
+targets0，现同一时点121节点／30能力、Stale几何0，仍可请求发狂0.9；实际预算值保持死亡0.8／
+发狂0.19999999／成功0%。新进程九时点均同Session、Host4／definition0、Sampled、未截断；
+条件关开节点121→79→121、能力30→20→30，七个动作均各有同request终态及实际读回。
+证据为 `r1-raven-slice001/identity.json`、`comparison-and-action-chain.json`、02～10原始moments；
+旧before仍为 `raven-slice001-consume02/04-death-eighty.json`，不是005／006的consumer过滤后成功。
+Tools也更换为本批构建，且旧逐键账缺失，故具体历史pending键仍未唯一定位。
+
+该after是独立Background Native17：visible=false／focused=false，正常close的cleanupCompleted=true、
+exit0及descriptor closed。没有扩成Neutral真实caller、Game17、准确1.6、物理输入／IME或异常Dispose证据。
+本次未发现需追加代码修复的反例，未重跑未变检查；旧冻结载体及包未更新。
+
+以下为**修复前** Kernel／冻结 carrier-v3 的 Phase A 文本对照，保留缺陷与旧运行的可追溯范围：
+
+| 实际路径／符号（一基行号） | 机制／影响 |
+| --- | --- |
+| `Kernel/UiBindings.cs:670–693 NotifyChanged` | 只验非空key；重复公告推进revision，注释容纳generous通知；不验当前可见或值是否变化。 |
+| `UiLayoutEngine.cs:404–447 CommitNotifications` | 只确认当前keyNodes；`:216–231`full重建当前键表，`:301–320`剪布局输入缓存但未剪历史revision。 |
+| `UiLayoutEngine.cs:1231–1243 VisibleChildren` | 隐藏祖先仅记录自身声明，不递归后代；直接隐藏叶与隐藏整段不同。 |
+| `UiLayoutEngine.Observation.cs:225–243` | pending遍历历史committedRevisions；layout公告落后即整体Stale，reason还合并dirty／content／definition等其他分支。 |
+| `UiHost.cs:752–769,980–997` | 合法UpdateDefinition走prepare/stage/seal并重建engine，能改变历史域；不应强制消费者用它代替合法Tab隐藏。 |
+| `UiLayoutEngine.Tools.cs:7–36` | 非Sampled观察不给新targets；这解释工具能力受阻，不证明物理输入／Rect数值／业务写失败。 |
+
+具体静态成立条件：同engine曾见k，k退出当前提交域，后有Measure/Structure公告令历史revision落后；
+在k不重进域／不换engine且无其他确认路径时，可持续pending。只清历史账也可能漏掉复显或其他同key真实依赖，
+故修复须保每Host／多owner、成功publication、提交期新公告、失败／Close的完整义务。
+
+### 原运行与反证（转录，不要求外部仓库）
+
+固定FL v3 Native17 MVID `76ae2e76-4b33-406d-853e-977a7f4fd44c`，Neutral `5ea548d4-5a81-4650-97d5-e1225442f1b6`；
+Release/net10.0/x64、FER_TOOLS，API0.9.0／`[0.9.0,0.10.0)`；其库内IDENTITY／USE／完整source-form入口在下文stage-evidence。
+
+| 原件身份与局部文件 | 原观察／可用结论 | 不得扩大 |
+| --- | --- | --- |
+| Raven slice-001，RPT-DEMO-RAVEN-A001 r1；`raven-slice001-consume02/03-ember-scrolled.json`、`04-death-eighty.json`、`unavailable-emberBloodBerserkChance.control.json` | death0.8／berserk0.19999999／成功0%；121个geometry全Stale、targets空、observation与targets均未截断。layout-frame82→120→442仍未恢复。 | 高可信指向上列机制，未运行记录实际pending key／两表及完整通知时序，非唯一根因证成；layout frame也不证明k已commit。不能怪默认128或称物理输入冻结／漏绘。 |
+| scene-002；A002基线COVERAGE更正；`raven-scene002-consume02/21-Base-before-conditional.json`、`22-Base-mimicry-off.json`、`23-Base-mimicry-restored.json` | 全量通知仍在，targets51→41→51、geometry222→180→222均Sampled，definition11；切页换engine。 | 推翻“全通知必失败／必须先换002”；非单变量实验，未复验旧概率连续路径。 |
+| scene-003；A001 r1 | 通知收敛候选已构建，自身native未验 | 不借后续版回填其after-success。 |
+| scene-005/006；RPT-DEMO-RAVEN-A002 r2；`key-state-series.json`／`mimicry-state-series.json` | 005死亡0.8后发狂0.1／成功10%，targets54／stale0；006拟声关开52→42→52／stale0；consumer成功可复用。 | 继续同v3，定义／通知过滤也变，不证明FL核心修好；18项Drawn不等于全像素、物理输入／IME或Game17。 |
+
+Nivarian原r3与v3/v4/v5/v6状态支持既有布局／详情组合：v3进度0.35／0.2及scroll156，v4作者Cols3→1→3保态，
+v5分页／XML详情／六处HitTest后独立owner动作，v6窄栏Small/16全文高53、原动作0.35→0.45。
+物理鼠标0；Button平移／缩放和Rule组合不等于通用视口输入。固定v6 MVID `f3e27ba6-f64e-4454-941d-76ae6c31c89d`，
+v5 `7f21668d-b219-446e-a8a0-5add5bf964b4`，不同Session不拼接。
+
+### 新能力实现差距
+
+当前`UiLayoutEngine.MeasureScroll:1481–1537`按自然纵高／纵条预留测量，无作者横extent合同；
+`UiExecution.cs:6–31 UiFrame.Wheel`为标量，`Adapters/RimWorld16/VerseUiExecution.cs:26`取delta.y。
+新双轴完整范围／轴仲裁、有限transform／空白抓取、变换内editor/caret、交互详情／完整K1及OS桥都未因本次采用而实现。
+inline详情用既有结构；shader、研究拓扑／业务及运行期InfoCard／Def保持库外owner。实施顺序和退出条件由
+[0.9计划](../development/0.9/extension-plan.md)持有，不以本表授权实施。
+
+<a id="fl09-tools-semantics"></a>
+### FQ1–FQ6公开语义与实际来源
+
+| 交接项 | 现行合同与实际来源 | 当前可用／限制 |
+| --- | --- | --- |
+| FQ1通知 | ORDINARY、RU2-B/E、R9-FACTS；上列R1机制 | 旧宽松公告保留；R1源码及原caller准确新载体after-success完成，待CO／PM接受。Tools不在Capture里推进或无视Stale。 |
+| FQ2缺席／寿命 | END/H1/H2、PREPARE/STAGE/SEAL；`UiLayoutEngine.Observation.cs:23–49`、`UiLayoutEngine.Tools.cs:53–99` | 存活Host的未知／未物化子树可NotFound；retained稿可读但geometry/value NotSampled。真实退休新mount不继承旧能力；definition变化重捕，不改投。Tools的“NotFound都已关闭”反馈应在其产品修，FL不改义。 |
+| FQ3空间 | DEV-02、R9-FACTS；`UiTools.HitTest.cs:25–104`、`UiLayoutEngine.cs:552–615,826–860`、`UiToolSelection.cs` | 已有CoordinateHitTestVersion=1用completed-draw Host-window区域／clip，popup优先；selection读原Window/Clip。R9 page-local不能当Host点，`UiWidgetContext.ToWindowRect:263–265`只适用真实draw context，不是任意R9投影服务。 |
+| FQ4预算 | R9-STATUS/DISCOVERY、DEV-02/04；`UiTools.cs:130–181,211–229`、`UiLayoutEngine.Tools.cs:7–36` | R9默认64/8/512/32，上限512/32/4096/128；targets512／queue64／ledger256各独立。新Capture换未排队地址，pending保原能力再重核；精确满额也可保守提示截断。MeasureBudget v1纯participant仅限新预算，不倒灌Observe／旧Measure／provider。 |
+| FQ5新增 | 本change的layout／interaction／1.7 adapter ADDED；上列当前Scroll／frame | 已采用未实施，不猜API／版本。neutral持语义／UI寿命，adapter持真实输入／资源，Tools持观看；深平台证据单列。 |
+| FQ6退出 | END/RELEASE、STAGE/SEAL、DEV-01/03/05/06；`UiTools.cs:248–270`、`UiWindowShell.cs:220–269`、`UiPreviewInstance` | detach在Host活时、随后释放Host／自身preview资源；后台断开关闭queue而owner回调恢复仪器。Host不Dispose借用execution；platform owner释放自建execution。原native同实例重开保留，isolated Dispose终局。 |
+
+content区域用`Neutral/UiPointerLayers`的正尺寸、左上含／右下不含与clip交集；disabled配置区仍阻挡，未知custom外框不猜。
+HitTest只读、不选择／执行／转移capture，不是操作地址；同frame/definition/content/mount和有效完整draw条件只属于该新读取。
+旧Capture／R9和独立Session条件不变。新viewing反算与Tools自有资源释放归Tools，实际输入／资格仍由原owner重核。
+
+本节是静态交接；原Native17离线证据、Game17构建、物理输入／IME及旧1.6/c3-dev欠验仍按下文原边界。
+
+## 0.9 舞台连接现状
+
+[开发工具连接](specs/contracts/developer-tools/spec.md)持要求；[指南](../development/0.9/tools.md)持签名／用法。
+正常单一载体包含休眠FER_TOOLS；工具产品、目标视口与观看合成归Tools。完整窗口的隔离Native17
+纵切已有后续消费，不再待实施。新原生开发跟随当前1.7接口，不锁小build；0.8／1.6、Neutral、
+Native17与Game17分别判断。下列为2026-11-08静态对账，未构建、运行或刷新冻结包。
+
+### 已有保证、真实新增与恢复
+
+| 连接／实际源码 | 合同差量及保留条件 | 直接消费者 |
+| --- | --- | --- |
+| `Adapters/RimWorld16/UiWindowHost.cs` → `Kernel/UiWindowShell.cs` → `UiPreviewInstance.WindowShell` | 原native外框／内容几何／fit与Host寿命抽到单一实现是既有保证恢复／共享；七参preview显式采用同一Host是新增可选能力。原virtual/event、关闭veto、catalog、键盘资格及旧page/provider构造保留；native同实例关闭后重开已恢复，isolated Dispose终局。 | 正式US窗与隔离shell共享作者presentation；Tools的`ToolsApplication.DrawNativePreview (ToolsApplication.Windows.cs)`每次只调用一个shell/page分支，不另建树。 |
+| `UiToolSelection.cs`原draw walk → 抑制scope | 新增仅控制所选注记墨迹；selection／mount、frame／definition、Window／Clip仍先更新，默认框及诊断overlay各保原义。失败／取消用finally退出；断开立即使遗留scope失效。 | Tools工作区clean scope包住实际目标draw，不是只包texture读回；检查draw在scope外。 |
+| `UiTools.HitTest.cs` → 原`UiPointerLayers`／Session层表 | 新增只读坐标查询，复用完成draw的真实区域／popup／clip和canonical node，非第二命中树。只对该新读取要求完成draw；旧Capture／选择／独立Session不变。Stale／NotSampled／NotFound不返回旧命中，命中不授予操作资格。 | Tools `VirtualStage.QueryPoint`只反算一次观看与有效UI缩放，再经Workspace调用原连接；操作仍Capture／Queue原opaque地址。 |
+| `UiLayoutInput.MeasureBudget` → `UiLayoutBudget.cs` → 共享`MeasureRoots/MeasureElement` | 新增可选非提交测量：当前绑定／Styles／真实字体与scroll宽度重测，fresh派生工作区、不发布／clamp／恢复scroll／消费target。自然叶仅用原可选纯participant；临时node及context不逃逸，失败清理、Close优先。旧Measure／MeasureAndArrange保原条件和成功后立即合法clamp。 | US `PreparePageCore/PrepareHelpBudget`在US_LAYOUT_BUDGET分支先取候选，再于reader外写最终预算；自然叶共享原测量并采用IUiMeasureParticipant，普通Measure/Draw仍持缓存发布。 |
+
+窗壳、注记、命中与预算均为此前授权实现的public-unstable新增／扩展，不是本次文档任务新造的运行
+保证。原page/provider ABI、纯读与measure participant的原适用条件不变；只给采用新预算者规定纯读
+及同步借用条件。原scroll问题的恢复是去掉作者准备阶段的中间成功整页，不是撤销合法钳制。
+
+<a id="stage-evidence"></a>
+### 固定输入与后续消费证据
+
+库内原件（可选本地交付证据，不是公开使用前置）：
+
+- `dist/virtual-stage-20261107/fl09-selection-a001/REPORT.md`，RPT-VS-FL09-SELECTION-A001 r1：
+  冻结carrier-v1、两目标生产构建、既有WindowHost／Catalog／CancelLadder／API及Dev geometry检查。
+  初次closed-shell阻断旧Window重开的实际失败已纠正；PageLifecycle整体及containment整体仍因TEMP
+  fixture／阳性控制创建拒绝fail，未改ACL或断言。原报告保持partial。
+- `dist/virtual-stage-20261107/fl09-hit-scroll-a001/REPORT.md`及`report-r2-20261108/REPORT.md`：
+  坐标接口与原scroll责任；中间viewport141为原源码／几何推断，不是首写栈或中间帧。
+- `dist/virtual-stage-20261107/fl09-hit-scroll-a001/measure-v3-20261108/REPORT.md`，
+  RPT-VS-FL09-HIT-SCROLL-A001 r3：carrier-v3完整source-form／USE／IDENTITY，两目标最终生产构建；
+  原391项Neutral检查覆盖共享／旧行为，不是新预算异常／首次挂载的专门动态覆盖。最终额外Pure scope
+  只由最终生产构建覆盖。原报告保持partial，提交时的下游未验不回填为producer通过。
+
+外部消费证据转录（不依赖私有管理路径或同级仓库存在）：RPT-VS-TOOLS-A001 r13的实际输入是
+US RPT-VS-US09-A001 r6与FL预算r3。FL v3 Neutral MVID为`5ea548d4-5a81-4650-97d5-e1225442f1b6`，
+native17为`76ae2e76-4b33-406d-853e-977a7f4fd44c`；US完整provider为
+`db8e5a70-b391-4e61-8c77-dfc318c49fb4`，Tools Offline Core／Native17为
+`b26b370c-decf-42fc-876b-f64d6b88991d`／`3792f10f-6614-43ad-802c-dce6f2fcb091`。
+实际1.7.5000.1275只定位该输入，不是支持上限。不同v1／v2／v3、p2／p5和目标DLL不可混标。
+
+| 证据层／原件身份 | 支持的实际范围 | 仍未覆盖／复用边界 |
+| --- | --- | --- |
+| FL08／1.6维护；原c3-dev承接r6 | 原维护与恢复材料及其当时人验 | 不由FL09接缝或1.7隔离图形签准确1.6投影、UI缩放、输入／IME、生命周期、UI层级、浏览B录制A、高级参数采样、Report连续链／原位32-pass／partial。 |
+| FL09 v3 Release/net10/x64；FER_TOOLS，无FER_DEV/FER_TEST | Neutral与RimWorld17生产编译；原共享Neutral／adapter检查按原输入复用 | 构建不等于新接口运行；TEMP两lane fail仍在。Dev geometry原检查不是新Release模块的动态实测。 |
+| Tools r13 默认嵌入完整窗；session `681f60b0845d46d2b0e817e090981fd7` | Host4／definition0；clean frame39800与inspection39804分别关联同帧Host／geometry／selection，mount22保持。原opaque操作100→75及invalid draft“-”有原owner读回。 | 背景隔离Native17，不是Game17。两图不是同一个帧；不把默认嵌入与作者会话合并。 |
+| Tools r13 `target-sequence.json`／`author-live-coordinate-state.json` | 同filter mount40的scroll7跨三个目标保留；帮助关闭后viewport221／content136合法clamp0。Hit与imageSource同帧10180／10200／10218／10240。 | 原r10的scroll7→0仍fail；新v3结果不重写它。物理输入、popup／disabled／capture动态组合未实测。 |
+| r13作者session `76afb368846d41b5be44d62e16fc37d8`；`style18-observation/adoption-and-first-pump.json`／`style16-final/restore-adoption.json` | 同作者inline Styles Font16→18→16，definition1→2→3，frame104000／191450对应图／geometry／selection，保草稿、scroll与展开。 | 旧Gap8→错误拒绝保last-good→Gap6属于旧session `f8e67856d4f0495d92b8e38bbe691159`，仅按原输入复用，没有在v3新session重演错误链。 |
+| r13 `style16-final/normal-close-and-release.json` | measure stop后计数不推进；Host NotFound、Hit／Capture Closed、旧地址attempted=false，随后断开及正常进程退出／资源Dispose返回。 | 不覆盖所有专门异常／重入／原生退出组合；运行后旧地址与live session不可复用。 |
+| Tools r14用法修复／r15当前账和最终双包 | 文档及无编译重包；r13运行身份保留，Game17只构建／包装 | r15为冻结交付；本次新源文档未进入旧包，不当作新运行、安装或release。 |
+
+上述后续消费由舞台WO r6技术／产品核收；用户最终验收仍由负责PM／用户处理。本次新文档Goal
+不重开已结束实施。US原报告partial、历史UiLogic fail及资源清单后续独立纠正、原r10失败、TEMP
+两lane fail及基线流程fail各保原对象。独立CPU／prepare／GPU／GC／Kernel／FPS仍未知，原cost
+Unsupported不记零；RPC或同步elapsed不换算这些指标。新增协议和静态文字不签任何未验宿主。
+
+## 0.9 formal window shell and selection presentation (2026-11-07)
+
+`UiWindowShell` v1 is the single neutral implementation of the original formal window face,
+content geometry and Host attach/detach/failure lifecycle. The existing native `UiWindowHost`
+forwards its policy and native primitives into it; its public/protected signatures remain unchanged.
+An additive seven-argument `UiPreviewInstance` constructor transfers the existing page Host into
+that shell and exposes `WindowShell`; old constructors/providers remain page-only and legal.
+Documents and last-good publication still belong to the existing author service.
+
+`UiToolConnection.SuppressSelectionOutline()` v1 scopes only selected-node ink. The original draw
+walk updates frame/definition/Window/Clip before the suppression decision, using the same selection
+and mount. Nested scope disposal and connection closure restore presentation without altering
+SetInstruments' independent diagnostic overlay.
+
+Usage/ownership: [the connection guide](../development/0.9/tools.md#draw-the-formal-window-around-the-existing-preview-host).
+The isolated producer output is `dist/virtual-stage-20261107/fl09-selection-a001/`; its identity and
+report own the exact carrier/source form and actual checks. Native stub checks are not game or
+standalone graphics acceptance. That producer report retains its submission-time downstream gap;
+[the later paired consumer evidence](#stage-evidence) now supplies the isolated full-window, Styles,
+selection-preserving export and normal-close observations under their actual identities.
 
 ## 0.9 preview preparation and original-window cost peers (consumer feedback)
 

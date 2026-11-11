@@ -3,7 +3,39 @@
 本表追踪有效条款／稳定 ID／值和条件，不另立规范。源基线为
 cf1cf6456096171fb47c012369bcd0c2f29e968f；被替代正文在[完整归档](../archive/specs-before-20261029/INDEX.md)。
 表中旧文件名均指该归档内原同名文件。后续已确认的细则优先于旧文中的准备／pending措辞；
-实现错误不削弱要求。核心行为是整理与补录，不由本次文档产生新行为 delta。
+实现错误不削弱要求。原基线核心行为是整理与补录，不产生新行为 delta；本次FL09真正新增的已采用目标另归下节change，尚未实施。
+
+<a id="fl09-capability-adoption"></a>
+## FL09基础能力：2026-11-08采用对账
+
+采用依据：WO-UIKIT-CAPABILITY-SPEC-20261108 r2及其PM PLAN（2026-11-08T23:26:09+08:00）；
+r3正式采用FL Phase A r2的寿命／焦点与IME限定（PM于23:28:43消费），不改变r2放行范围，
+输入RPT-UIKIT-SPEC-FL09-A001 r1/r2、RPT-UIKIT-SPEC-TOOLS-A001 r1。它们是文档目标采用，不是实现或native接受；
+以下转录足以让clone理解来源，不要求私有协调目录或另一产品树存在。
+
+r3采纳FL补充r2的原合同限定；现有寿命／交互正文、change及FQ已符合，故保留其语义。既有composition与确认／取消优先仍是旧保证；新跨层文本索引要求仅约束实际新增selection/replacement/caret接缝。
+
+| 来源／决定 | 唯一正文／含义 | 状态 |
+| --- | --- | --- |
+| 冻结v3 UiBindings.NotifyChanged注释；既有ORDINARY、RU2-B/E、R9-FACTS；可靠性WO r1双线修复 | binding普通公告、layout完整依赖验证、observation当前资格；同值／冗余／离页键不加可见过滤条件 | 旧保证澄清与源码修复；[R1现状](implementation.md#fl09-reliability)含构建／既有检查及原caller准确新载体after，待CO／PM接受，不造ADDED |
+| END/H1/H2、CAPTURE/TEXT、DEV-02/04/06；WO r3采用FL补充r2 | 隐藏保相容稿、实际退休新mount不复活稿／地址；同Host／多Host义务分开；晚公告／失败／Close不漏义务；读取不执行 | 旧保证保留；反例是规格推演，未新增执行case |
+| R9-STATUS、DEV-02；Tools分析FQ1–FQ6 | NotFound子树不等于Host关闭；prefix缺席不证不存在；HitTest空间、Capture更替、借用退出各保原义 | 旧语义澄清，源码／版本见[语义对账](implementation.md#fl09-tools-semantics)；Tools产品修复另归其owner |
+| WO r2新双轴端点／范围采用 | [FL09-SCROLL-2D](changes/fl09-basic-ui-capabilities/specs/core/layout/spec.md)、[FL09-AXIS-INPUT](changes/fl09-basic-ui-capabilities/specs/core/interaction-editing/spec.md) | 已采用ADDED、未实施；仅显式新能力，旧纵Scroll不变 |
+| WO r2有限画布／输入采用 | 同change的FL09-VIEWPORT、FL09-VIEWPORT-INPUT；[FL17-CAPABILITY-INPUT](changes/fl09-basic-ui-capabilities/specs/adapters/rimworld17/spec.md) | 已采用ADDED、未实施；正比例缩放／平移，单一几何，编辑留视口外，不先定签名 |
+| WO r2 inline优先、K1／modal／OS桥后续 | FL09-DETAIL-FOCUS、FL17-ADVANCED-EDIT；inline本身用现有结构 | 后续ADDED、未实施；K1延期不改签完成，游戏InfoCard／Def与shader不纳入基础核心 |
+
+原运行来源转录：RPT-DEMO-RAVEN-A001 r1、A002 r2及a002-input-baseline/COVERAGE的更正；
+slice-001 provider MVID `9c47da59-e64d-43d3-ae58-f87c943e24c6`失败；scene-002 `efa37169-9aa5-4636-b222-4c3ae0745765`全通知成功反例；
+scene-003 `92b3f0a4-05f1-4790-a529-6e86bed2efcf`仅候选构建／native未验；scene-005 `6253d424-6051-449b-a2e9-0942cb9e800f`、
+006 `82b67f3a-c09c-45d1-b227-4fb47c7ca701`后续consumer成功。均按实际固定v3，不用当前HEAD代载体；
+[实现账](implementation.md#fl09-reliability)保关键值、强度和未知。
+
+RPT-DEMO-NIVARIAN-A001 r3／当前CAPABILITIES及v3/v4/v5/v6原状态说明：Button平移／缩放、Rule连线、
+分页与inline XML详情可组合；v6窄栏全文修复已有原生定点证据，不能泛称库不支持信息展示。
+缺的是通用横向内容／空白画布抓取与变换接缝，不是研究业务／shader。原图与游戏运行期Def来源缺口保原owner。
+这组真实consumer证据支持一般能力需要，不用于晋级新specialized kind。
+
+官方机制来源与采纳取舍见[change design](changes/fl09-basic-ui-capabilities/design.md)；只作机制比较，不整套采用Qt/WPF/Web规范。
 
 ## 条款和稳定 ID
 

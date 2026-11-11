@@ -5,14 +5,30 @@ current task and applicable permissions; preserve the separate 1.6/native and 1.
 
 ## 0.9 current integration
 
-- Connect the approved virtual stage through genuinely needed neutral seams; Tools owns its products,
-  viewport and viewing transform. Contract: `docs/openspec/specs/contracts/developer-tools/spec.md`.
+- The approved isolated 1.7 full-window stage has downstream consumption evidence; it is not pending
+  implementation. Retain producer partial reports and their later consumer evidence separately in
+  `docs/openspec/implementation.md#stage-evidence`. Tools owns viewport/viewing composition.
+  User acceptance remains with the responsible PM/user, not this documentation task.
 - Follow current RimWorld 1.7 APIs/namespaces without a minor-build whitelist; preserve the single
   carrier and FL API contract. Historical builds and accepted workflows keep their actual identities.
-- Retain outstanding native Window/Settings, physical input/IME and actual window-cost acceptance.
+- Retain outstanding actual game Window/Settings, physical input/IME and original window-cost acceptance.
   Reuse valid delivered Tools/semantic/headless and performance evidence; do not restart completed work.
-- Keep unresolved TEMP positive-control evidence distinct from valid checks. Capability extensions
-  beyond the approved stage remain planning-only: `docs/development/0.9/extension-plan.md`.
+- Keep unresolved TEMP positive-control evidence distinct from valid checks. Adopted capability goals and later extensions
+  remain unimplemented and require their own product authority: `docs/development/0.9/extension-plan.md`.
+
+## 0.9 adopted capability work
+
+WO-UIKIT-CAPABILITY-SPEC-20261108 r2 adopted the [change targets](docs/openspec/changes/fl09-basic-ui-capabilities/proposal.md),
+not product implementation. The single [development order](docs/development/0.9/extension-plan.md) owns dependencies and exit conditions.
+
+- [ ] R1 acceptance — Source repair, isolated builds/existing checks and the exact new-carrier original Raven slice-001 broad-notification after-success are complete. CO/PM acceptance remains pending. Keep the old runtime's specific pending key qualified; the new evidence is the original caller, not the later consumer workaround. See [repair and evidence](docs/openspec/implementation.md#fl09-reliability).
+- [ ] I0/S1 — FL interaction and 1.7 adapter deliver input/cancel together with explicit dual-axis ranges, axis handoff, complete geometry and one real caller. Old vertical behavior remains.
+- [ ] V1 — FL viewport/input owner delivers finite positive proportional zoom/pan, one geometry authority and pointer/keyboard/resize anchors; native editing stays outside transformed content in the first slice.
+- [ ] D1/G1 — actual consumer composes inline details; game adapter/consumer separately owns runtime InfoCard/Def adoption. Do not migrate research/business/shader into the core.
+- [ ] I1/D2 — keep transformed native editing/caret, interactive popup/modal, complete K1 and OS bridge as later ADDED work with their own platform scope/evidence; current K1 deferral remains.
+
+Tools owns its feedback/budget/space and self-created resources, using the [existing FL semantics](docs/openspec/implementation.md#fl09-tools-semantics);
+this repository does not acquire a second Tools task ledger. Existing native1.6/c3-dev, Game17, physical input/IME and TEMP failures below remain separate.
 
 ## 0.8 RC follow-up
 
@@ -41,6 +57,55 @@ implemented. Current requirements are reached through `docs/specification.md`; i
 
 > The action surface only. Settled rulings, done work and the release/round history live in `MEMORY.md`
 > and `OBLIVIONIS.md`; a closed item is a pointer here, not a paragraph.
+
+## Local review coverage
+
+### R1 implementation scope
+
+- **Owner / reviewed_at:** TASK-RELIABILITY-FL / A001, 2026-11-09T11:21:43.6650087+08:00 (Asia/Hong_Kong).
+- **Reviewed-through:** This scope's four layout-source edits against the actual dirty baseline, notification
+  contract clarification and dependent current entries, fixed dirty-source Release Neutral/RimWorld17
+  artifacts, Core and seven affected existing suites, and the original Raven caller's launch/write boundaries.
+  Continued through Tools RPT-RELIABILITY-TOOLS-A001 r2: original slice-001 before/after, actual loaded-MVID,
+  unchanged broad notification/timeline, same-session nine moments, request/readback and normal-close
+  raw records; reviewed the exchange contract and corrected FL r2 format without changing r1.
+  The existing shell/budget/hit/selection work and prior documentation review below retain their own scope.
+- **Evidence / continuation:** Builds and existing managed checks pass; the FER_TEST net472 harness is not
+  the delivered normal carrier. The original-caller exact-carrier Native17 after-success is now verified
+  from Tools originals; no code change or repeat execution was needed. CO/PM acceptance is pending;
+  the old Raven failure still lacks a unique pending-key trace. Existing instrument-input/evidence and
+  machine-contract rules cover the corrections; no new lesson. Native/game/physical-input/IME obligations remain open.
+
+### Prior documentation scope
+
+- **Owner:** FL documentation owner, TASK-UIKIT-SPEC-FL09 / A001, continuing the prior checkpoint for this FL09 scope only.
+- **reviewed_at:** 2026-11-08T23:52:39.0257348+08:00 (Asia/Hong_Kong; r3 adoption/source review, no product run).
+- **reviewed-through:** Retains the prior 2026-11-08 06:04 checkpoint: from the authorized
+  2026-11-07–08 baseline, reviewed actual dirty/untracked shell/preview/selection,
+  pointer-layer/hit, binding/Host/Session and non-committing measurement sources; the v1 producer report's
+  native-reopen failure/correction and two TEMP lane failures; hit/scroll r1 and report-format r2;
+  budget r3, frozen carrier-v3 USE and the pure natural-leaf requirement; direct US/Tools consumers;
+  Tools r13 original downstream report, CO SUM r3 and PM stage WO r6; relevant historical/shared lessons;
+  and this task's local protocol, retained producer-r5-dev-r2 origin, current-entry corrections, requirement scenarios and direct guides.
+  Source/consumer mechanisms and evidence identities are in [the implementation map](docs/openspec/implementation.md#stage-evidence).
+  Continued through WO-UIKIT-CAPABILITY-SPEC-20261108 r2: frozen/current notification and observation paths,
+  Raven slice/002 counterexample/003 unverified/005-006 consumer success, Nivarian v3-v6 boundaries,
+  PM research/plan and the adopted Phase A conclusions, FQ1-FQ6 source/contract handoff, current requirements,
+  ADDED candidates and their entry/implementation/plan links. This is document/source review, not a new product run.
+  WO r3 continuation: the existing B/FQ lifetime, focus and native-IME limits already match the adopted Phase A r2; only adoption provenance was added, with no new analysis or execution.
+- **Lesson decision / Seen:** Existing DEV-04 and layout RU2-B already distinguish pure participation
+  from legacy Measure; the new budget cannot roll back arbitrary cache/business effects or remove
+  legal committed scroll clamp. Existing native-lifetime rules cover same-instance reopen. These rules
+  were applied directly, without a new equivalent lesson. Shared lessons already own delivery/current-
+  ledger drift; report-format r2 follows the assigned report contract. Historical Knowledge dates are
+  not Seen; shared dates remain unchanged, and no active local three-date promotion is due. No new
+  LESSONS file is needed. This review also includes the current static comparator's heading-boundary
+  correction; the canonical text was retained, not relaxed to fit that check.
+- **Limits / continuation:** Earlier unrelated history was not reviewed. Producer partial and TEMP
+  PageLifecycle/containment fail remain; later downstream evidence is separate, not producer regrading.
+  Existing native/game/physical-input/IME and unknown performance boundaries remain open at their owners.
+  This WO r2 document-only closeout returns for receipt and PM/user acceptance; adopted targets are not implemented. Frozen r15 and
+  carriers were not refreshed. No new product verification or extension implementation is authorized.
 
 ## Retained 0.7 checkpoint objective and execution order
 

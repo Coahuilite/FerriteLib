@@ -24,6 +24,10 @@
 ### Requirement: R9-FACTS 来源、时间与未知分别呈现
 观察 SHALL 分清模型当前值、独立 editor 草稿／validity/conflict/focus、last wrapper selection 与当前可选值；保留 Host/Session/key/path/part/item/definition 归因。几何是 last-arrangement page-local，标 scroll/clip 祖先；layout time/revision、query time、当前定义不同。属性来源为 last-property-resolution；native focus、window origin、当点遮挡、像素等未采样不得由 page rect 推断。已公告 dirty 标 stale，未公告变化不能自动推断。
 
+观察资格 SHALL 对应当前完整布局实际依赖及其已验证版本，不以无当前布局依赖的历史公告永久否定其他有效几何。
+有真实更新义务仍未验证时保持Stale；复显／重挂按当前成员验证。查询不为取得Sampled自行提交、测排或绘制，
+frame推进也不单独证明某依赖已提交。相关实现差距单列于[实现账](../../../implementation.md#fl09-reliability)，不改变旧通知条件。
+
 #### Scenario: 布局尚未跟上声明变化
 - **WHEN** 观察得到旧几何及当前 invalidation
 - **THEN** 旧几何标 Stale 并保自己的时间／revision
@@ -36,6 +40,16 @@ Sampled、NotFound、Unsupported、NotSampled、Stale、Failed SHALL 不互换�
 - **WHEN** 默认预算查询其 prefix
 - **THEN** 可报实际总数及截断的前缀，保留源索引
 - **AND** 不复制全部 options／chart series 来回答一个有界请求
+
+#### Scenario: 存活Host查询未知或尚未物化的子树
+- **WHEN** Host仍存活，而指定子树没有当前runtime节点
+- **THEN** 该子树的NotFound不能被解释为Host已关闭；未物化声明不伪造成节点
+- **AND** 已知retained节点可保已有draft事实，geometry/value未采样与Host终局分开
+
+#### Scenario: 有界prefix没有读到某控件
+- **WHEN** 结果被节点／深度／文字／collection预算截断
+- **THEN** 缺项不作为完整不存在证明；保持各自截断及来源
+- **AND** 不扩大为无界发现、不为读取推进成员物化
 
 ### Requirement: R9-DISCOVERY 发现索引不能成为第二权威
 live discovery SHALL 只保最多512弱 Host 引用，复用既有身份，成功构造后登记、Close/Dispose移除、查询可清 dead。不得保强 Host、node/model copy、业务状态或第二身份。容量拒绝及 caller truncation 须明确；曾拒绝后缺 id 是 unknown/NotSampled，不谎报 NotFound。已持 Host 的查询不依赖此索引。

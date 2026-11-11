@@ -1,9 +1,29 @@
 # Connect a tool to the real page
 
-The normative contract is [developer-tools](../../openspec/specs/contracts/developer-tools/spec.md); this guide owns current API usage and implementation evidence. New native work follows RimWorld 1.7 APIs rather than a fixed minor build; historical build identities below remain evidence, not a support ceiling.
+The normative contract is [developer-tools](../../openspec/specs/contracts/developer-tools/spec.md); this guide owns API usage. Source facts, fixed producer/consumer identities and unverified conditions live in [the implementation map](../../openspec/implementation.md#stage-evidence). New native work follows RimWorld 1.7 APIs rather than a fixed minor build; historical build identities below remain evidence, not a support ceiling.
 
 API 0.9.0. The tool/preview surface is public-unstable. Existing Host, standalone controls,
-visual-only, R9 reads and bounded diagnostics do not require Tools.
+visual-only, R9 reads and bounded diagnostics do not require Tools. Select a fixed carrier with the
+capability actually needed: shell v1, selection-presentation v1, coordinate-hit v1 and budget-measurement
+v1 are additive development capabilities, not a promise made by every API 0.9.0 DLL.
+
+Use a [formal shell](#draw-the-formal-window-around-the-existing-preview-host) for a complete window,
+[coordinate hit](#inspect-the-original-pointer-owner-at-a-coordinate) to inspect its original draw,
+[budget measurement](#measure-a-proposed-budget-before-committing-layout) before final layout, and
+[selection-ink suppression](#export-without-selection-ink-keeping-selection-facts) during a clean draw.
+Old page-only providers and normal MeasureAndArrange callers need none of these new opt-ins.
+
+## Adopted targets do not change these entry points
+
+The [basic-capability change](../../openspec/changes/fl09-basic-ui-capabilities/proposal.md) adopts new dual-axis
+scrolling, a limited pan/zoom viewport and later focus/platform targets; implementation has not started and no new signatures are fixed.
+Use the existing v1 seams below. The [FQ1–FQ6 source/semantic map](../../openspec/implementation.md#fl09-tools-semantics)
+records the carrier and the limits Tools can consume now.
+
+Ordinary `NotifyChanged` allows redundant, same-value and off-page registered keys. The
+[R1 repair and original-caller evidence](../../openspec/implementation.md#fl09-reliability) do not impose a current-layout notification rule.
+Capture remains a read: it does not prepare/arrange/draw to repair Stale results. A subtree NotFound does not mean the Host closed;
+retained draft facts, unmaterialized declarations, truncated prefixes and current geometry each keep their own status.
 
 ## Select, capture, queue, advance, read back
 
@@ -52,6 +72,62 @@ The queue holds 64 intents and the idempotency/result ledger holds 256 requests 
 The ledger is never evicted while connected; budget exhaustion refuses new requests. Disconnect,
 retain/export the final results, and explicitly reconnect when a new development session is needed.
 
+A new Capture replaces the latest unqueued addresses. Already queued requests retain their original capability and
+are rechecked by the owner; they are not retargeted to a same-named node in the new capture. R9's defaults are
+nodes64/depth8/text512/items32 and maxima512/32/4096/128; an external tool's default128 nodes does not change that contract.
+For a known runtime subtree, use its node key and a finite budget rather than treating a truncated root prefix as a census.
+
+## Inspect the original pointer owner at a coordinate
+
+After the original owner completes its draw, call on that Host's thread:
+
+```csharp
+UiHostObservation hit = connection.HitTest(windowPoint);
+if (hit.Status == UiObservationStatus.Sampled)
+{
+    string canonicalKey = hit.Nodes[0].Key;
+    // Read/select explicitly using this key; HitTest itself changes neither selection nor input.
+}
+```
+
+`UiToolConnection.CoordinateHitTestVersion` is 1. `HitTest(UiLayoutPoint windowPoint)` returns the
+existing detached `UiHostObservation` shape, with at most one `UiObservedNode`. Both ReadOnly and
+Operate connections may read it, without Capture or SetInstruments. Use the selected matching carrier;
+API 0.9.0 alone does not identify this additive development capability.
+
+The point is in the same **logical Host-window space as UiFrame.Pointer** and the draw's Window
+geometry. It includes the original page/window origin; it is not page-local, scroll-content-local,
+target physical pixels or Tools desktop pixels. The adapter/tool owns inversion of its existing
+viewing transform and effective UI scale before calling. FL adds no second coordinate transform.
+
+The read uses the original draw's contentInputLayers and popup hitLayers, not geometry rectangles
+from an observation capture. Popup coverage wins; content uses the same region/clip predicate as
+IsPointerOverHigherLayer. Configured disabled regions still obstruct and return their owner;
+decoration and unconfigured regions pass through. Unknown custom private regions are not guessed
+from an outer rectangle: the existing IUiPointerLayout support boundary is unchanged. Popup results
+identify the original node, not an invented option/item operation.
+This is a Host page-node query; window-shell chrome keeps its original shell owner and does not
+acquire an invented page-node identity.
+
+The result carries Host, Frame, Definition and LayoutDefinition; its node facts include mount-lifetime,
+interaction-scope, pointer-region and clip (window-logical), popup, pointer-allowed, input-disabled,
+capture-owner and native-capture-owner. These are geometry/qualification facts, **not activation
+permission or a capture dispatch**. An existing capture remains with its original owner, even outside
+this point; native capture availability, phase/consumption, writability and business predicates are
+still rechecked only by the original operation path. To operate, Capture the desired node and Queue
+its current opaque target normally. A key alone never revives an old definition/mount/part address.
+
+Sampled means one declared topmost owner; NotFound/no-declared-pointer-region means none in the
+supported declared regions. NotSampled means no successful arrangement. Stale reports a newer
+invalidation, hidden Host, missing completed current draw, failed draw, intervening arrangement,
+scroll write, frame/definition/mount change or retired owner. It returns no stale node and never
+arranges/draws to make the answer available. Headless-only advancement supplies no pointer draw.
+Non-finite points throw ArgumentOutOfRangeException; a closed connection/Host throws
+ObjectDisposedException, and live reads off the owner thread throw InvalidOperationException.
+
+Only this new read requires a completed draw. Existing drawing, observation, semantic capture,
+selection, partial adoption and independent Session callers retain their entry points and conditions.
+
 ## Native instruments remain dormant until selected
 
 The normal carrier includes `FER_TOOLS` instrumentation. It does not imply FER_DEV, DevMode, automatic
@@ -99,6 +175,86 @@ replay the operation/result already produced; the caller must not generate a new
 Closing during prepare stops subsequent arrange/pump/draw and closes pending work normally. Dispose
 clears the callback with the Host, then releases the preview resources; it never recreates the Host.
 The independently compiled ToolPreviewExample shows an actual container budget, not a copied page.
+
+### Measure a proposed budget before committing layout
+
+When an author's next container budget depends on current layout geometry, calculate it without
+calling MeasureAndArrange for a temporary page allocation:
+
+```csharp
+UiLayoutSnapshot candidate = UiLayoutInput.MeasureBudget(host, available);
+if (candidate.ScrollContents.TryGetValue("details", out UiLayoutRect content))
+    host.SetLayoutInput("details", new UiLayoutInput(height: Math.Min(available.Y, content.Height)));
+// The ordinary owner boundary now calls MeasureAndArrange with the final inputs.
+```
+
+`UiLayoutInput.BudgetMeasurementVersion` is 1. Its public-unstable signature is:
+
+```csharp
+public static UiLayoutSnapshot MeasureBudget(UiHost host, UiLayoutPoint available,
+    Action<UiLayoutSnapshot>? readPrepared = null);
+```
+
+Call on the Host thread, outside Draw, an existing arrangement or document staging. The normal
+preview prepare callback is a supported place. It requires finite positive current logical width
+and height, and the actual borrowed metrics/font environment for that target. It needs neither a
+Tools connection nor a previous successful arrangement. It does not run prepare or advance a frame.
+The original Host/Session, manifest/templates, current binding reader/owner, layout inputs and
+effective properties/styles supply the inputs; a frozen presentation from an earlier pass is not
+substituted for current reads.
+
+The same MeasureRoots/MeasureElement/container/text/scroll-width implementation calculates the
+candidate, including current visibility, repeats, shared labels, responsive constraints, natural
+scroll content and the scrollbar-width remeasurement. RectById remains page-local; Viewports and
+ScrollContents use their original keys/spaces. Hidden/unmaterialized requested IDs are absent,
+never filled from the last successful snapshot. Diagnostics describe this candidate allocation.
+This detached snapshot is not a committed layout or hit/draw sample; do not pass it to Draw as a
+replacement for the original owner's arrangement.
+
+**Natural leaf measurement uses the existing pure IUiMeasureParticipant contract.** A leaf whose
+height must be measured and lacks that capability throws NotSupportedException with its path/kind;
+this entry never invokes an arbitrary legacy Measure and then tries to undo its effects. Fixed
+heights retain the original rule that no natural height is requested. All participating factories,
+layout readers, diagnostic callbacks and readPrepared must be effect-free; they may read existing
+local inputs and prepare initial local read slots, but may not mutate existing state/cache objects,
+business data, properties, resources, input or services. Calculate uses captured inputs only. A
+custom widget can share one captured calculation between its normal Measure and this optional
+contract; its normal owner remains responsible for any later draw-cache publication. Ordinary
+MeasureAndArrange still accepts legacy widgets under their original conditions.
+
+For first-use font/property inspection, readPrepared runs synchronously after current nodes have
+been provisionally prepared. Within it, GetNodeByElementId plus the original CreateContext/WithNode
+and UiTextFonts.Apply can read the current node's effective font/environment. Only detached values
+or the candidate snapshot may leave this callback. Provisional nodes/contexts/state handles must
+not escape. After return, first-use nodes are removed; formal arrangement creates their real
+mounted incarnation. Existing nodes retain their identities, geometry, local state and dirty flags.
+
+Each call owns a fresh private calculation workspace and text/layout caches; no cross-call or
+committed-cache reuse is claimed. Within-call reuse still follows the real measure-input and
+metric-environment rules. Changing width/height, bindings, manifest/styles or font environment is
+therefore measured from the current inputs on the next call, not from a previous target's footer
+or content. The workspace contains derived calculation records, not a second business/runtime tree.
+
+The candidate does not publish node rectangles, acknowledge layout notifications, prune mounted
+nodes, consume scroll targets, update last-successful/diagnostic arrangement, or create hit layers.
+It never calls clamp or restores a clamped scroll value. A synchronous preparation scope discards
+provisional nodes/slots and restores derived authoring/parent/geometry/dirty/measure-count facts;
+it does not clone or roll back arbitrary business objects. Observe/HitTest report Stale within the
+scope, and Capture/selection changes, recursive measurement, Host advancement, layout-input changes and
+scroll writes are refused. Outside it, prior committed hit facts keep their original validity;
+separate author invalidation still makes them stale normally.
+
+Measurement errors propagate with their original cause and a located path, rather than publishing
+a recovery-height budget or tripping/suspending the committed node. Binding pure-read faults also
+fail the candidate before readPrepared. A throwing reader discards preparation; cleanup failures
+are reported, together with the original failure when both occur. Host/Session Close wins and is
+never undone. Calling a closed Host throws ObjectDisposedException; wrong thread, reentry/staging
+or forbidden in-scope mutation throws InvalidOperationException; invalid constraints throw
+ArgumentOutOfRangeException. The caller retains the existing owner failure/close policy.
+
+The final ordinary MeasureAndArrange still publishes and immediately legally clamps on success.
+This new capability's purity, thread and synchronous-borrow conditions apply only to this new use;
+no old Host, widget, Session, shell, selection or Tools entry acquires an enrollment prerequisite.
 
 ## Build and targets
 
@@ -309,3 +465,105 @@ route). The settings adapter forwards the actual native rectangle/input qualific
 CounterPage Host with VerseUiExecution and releases its Host before its execution owner on detach.
 It owns sample UI data only, not ModSettings persistence or game state. These are compilable public
 caller paths; their native rendering and lifecycle still need actual owner interaction evidence.
+
+## Draw the formal window around the existing preview Host
+
+Use the optional window capability when a preview represents a complete window, rather than a page.
+`UiWindowShell` contract version 1 is the formal face/page-lifetime implementation used by
+`UiWindowHost`. Its background, accent, title/subtitle, measured close button, content arithmetic,
+fit scopes and Host release path now live in the neutral Kernel. The native adapter forwards its
+existing virtuals and primitive hit tests; it has no second face renderer. Existing native subclasses
+and compiled callers keep their signatures, defaults and input/close/catalog conditions.
+
+The author derives `UiWindowShell`, supplying Theme, Metrics and DrawNotice and the original window's
+vocabulary/policy through Title, Subtitle, CloseText, geometry, BeforeDraw and RequestClose as needed.
+Share that author policy with the production window; do not paint another frame. DrawBackground is an
+optional guarded underlay. RequestClose defaults to Dispose; an author veto must leave it alive when
+refusing. The native bridge still invokes the original native Close/CanClose and stack lifecycle.
+
+The author explicitly transfers its already-built page to the shell with the additive constructor:
+
+```csharp
+// page, documents and authorShell come from the author's actual isolated window composition.
+var preview = new UiPreviewInstance(page, sampleSource, measurementSource,
+    resources: documents, prepare: preparePage, documents: documents, windowShell: authorShell);
+// preview.Host and preview.WindowShell.Host are the same object, with the same Session/doc attachment.
+```
+
+The original four-, five- and six-argument constructors remain page-only. The registration factory,
+three-argument provider and UiPreviewContext overloads keep their conditions. Window/Settings kind
+alone never promises a complete window; only a non-null WindowShell declares this capability.
+
+On each actual owner callback, use the shell INSTEAD OF separately drawing/advancing the page:
+
+```csharp
+var shell = preview.WindowShell;
+if (shell != null)
+    shell.Draw(face, qualifiedFrame, textExecution, windowOrigin);
+else
+    preview.Host.DrawFrame(face, qualifiedFrame, textExecution);
+```
+
+`face` and the supplied pointer use the same logical, local coordinates. `windowOrigin` translates
+that coordinate origin into window/screen space for completed chrome geometry; it is not a viewing
+transform. Pass the owner's existing IUiExecution, including paired text capabilities. Native Window
+still captures the page frame after its original chrome/BeforeDraw/attach boundary and retains native
+keyboard first-refusal and close-veto hooks. Independent adapters own their equivalent input routing.
+No backend is created or disposed by Draw. Do not also AdvanceHeadless on that native Host.
+
+`ContentRect(face)` is the actual local page box. `GetChrome(outer)` reports current geometry in the
+outer rectangle's space; it is not a completed frame record. Outside Draw, pass the actual text drawing
+capability to `ContentRect(face, drawing)` or `GetChrome(outer, drawing)` for paired numeric font
+measurement (or override TextDrawing with the owner's borrowed pair). Draw itself always uses its
+supplied pair. Completed diagnostic chrome remains attached to the original completed Host pass.
+
+Ownership and exits:
+
+- Native factory usage remains lazy: BeforeDraw receives the actual content box before CreateHost;
+  HostAttached runs before that Host's first draw. The preview constructor instead adopts its existing
+  Host immediately and raises HostAttached there. It does not call CreateHost, arrange, draw, prepare
+  or attach another document transaction. Wire author attach/detach callbacks before construction.
+- The shell alone disposes the adopted Host. HostDetached sees a live Host on failure/close and the
+  Host is disposed even if a handler throws. A close from HostAttached prevents that first draw.
+  A failure retains LastFailure, releases Host and shows PageUnavailable on the next pass without retry.
+- The preview owns resources; Documents is borrowed and disposed only if included in resources.
+  Dispose releases shell/Host first and resources in finally. Closing the isolated shell also disposes
+  its preview resources exactly once. A failed page releases per-Host attachments; whole-preview
+  resources remain available to the terminal notice until close. Execution/metrics/business owners
+  are borrowed, and are not silently moved into the shell. Keep them alive through that notice.
+- Isolated Dispose is terminal. The native adapter preserves the old ability to draw the same Window
+  instance after PreClose and create a fresh Host; failure notice/retry conditions remain unchanged.
+  Closing never commits a draft or changes the author service's last-good transaction.
+
+This interface is public-unstable in API [0.9.0,0.10.0). Select a carrier that advertises window-shell v1;
+API 0.9.0 by itself does not identify which development candidate contains this additive interface.
+
+## Export without selection ink, keeping selection facts
+
+`UiToolConnection.SelectionOutlinePresentationVersion` is 1. On the connected Host's owner thread,
+wrap the actual clean-target draw (not just the later texture readback) in the new scope:
+
+```csharp
+using (connection.SuppressSelectionOutline())
+{
+    // The original owner draw: shell.Draw(...) for a complete window, Host.DrawFrame(...) for a page.
+    drawOriginalTarget();
+}
+// The next ordinary inspection draw keeps the original selected-node outline.
+var currentSelection = connection.ReadSelection();
+```
+
+The method returns IDisposable, accepts ReadOnly or Operate connections and adds no diagnostic
+subscription. Nesting is supported. Dispose once or repeatedly is safe, including background scope
+cleanup; begin belongs to the owner thread. Always use using/finally so exceptions and cancellation
+restore presentation. Connection close invalidates outstanding suppression immediately, even before
+owner-side detach; Host/Session close follows the existing connection cleanup. Other Hosts/connections
+are unaffected. An unclosed scope remains an explicit presentation choice until disposed or disconnected.
+
+SelectNode/ReadSelection do not change. The original draw walk still updates the same selection's
+mount qualification, frame/definition, Window/Clip and clipping/retirement status before deciding whether
+to paint its four lines. No clear/reselect, invalidation, extra arrangement or tree is involved.
+SetInstruments geometry/overlay/timing retains its independent diagnostic meaning. For a clean target,
+the exporter must also manage any diagnostic overlay it previously enabled under that existing contract;
+SuppressSelectionOutline only removes selected-node ink. Keep inspection and clean-target draws/frame
+identities distinct in the consumer's export metadata.

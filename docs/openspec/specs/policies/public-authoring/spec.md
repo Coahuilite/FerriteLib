@@ -108,3 +108,10 @@ UiPageWindow SHALL 可直接构造，Catalog 可选按 UiWindowKey/Options/Focus
 - **WHEN** 其他游戏 UI 保持库外
 - **THEN** 本编辑器仍按其显式合法 context 工作
 - **AND** 不要求把全部窗口、业务或原生调用迁入 FL 才获得该能力保证
+
+## FL09已采用目标的范围
+
+[基础能力change](../../../changes/fl09-basic-ui-capabilities/proposal.md)持显式新双轴、有限画布和后续输入／详情／可访问目标，
+均未实施；一般能力不等于新specialized kind。现有inline详情可组合，游戏InfoCard／运行期Def接线仍归consumer/game adapter。
+shader不属基础补齐；通用仿射、变换内原生编辑／caret、完整modal／K1与OS桥不因本次文档而成为当前可用承诺。
+旧合法入口／兼容、单载体及各目标边界不变；当前1.7目标仍沿[DEV-06/07](../../contracts/developer-tools/spec.md)，不跟改保留0.8／1.6合同。

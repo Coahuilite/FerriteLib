@@ -56,6 +56,10 @@ root SHALL 有 update scope；默认 Section／Surface／Scroll／Clip／Repeat 
 ### Requirement: RU2-B 完整实际测量输入决定复用
 默认包装 SHALL 自持真实输入。新可选 measure participant 的 capture SHALL 无副作用、完整包含宽度／文本／有效属性／共享结果／局部状态／服务环境，Calculate 只用已捕获事实。通知到达后先同步来源，再按实际相等输入复用；源被标 Paint 也不能覆盖其真实尺寸依赖。旧 Measure SHALL 在原合法同步验证，不推断跨同步 pure；相同同步同约束可复用已验证结果。null capture／非有限输入或高度 SHALL 走定位恢复。
 
+普通成功同步 SHALL 将当前完整布局实际依赖和已验证版本对齐；过去访问过不等于永久当前依赖。
+重新进入布局的成员须验证当前来源；同key多owner／多Host各保其真实义务。提交／测量期间的新公告不能被较早验证结果吞掉；
+失败保持原完整结果及真实失效，不以清通知或改状态伪造成功。
+
 #### Scenario: 通知后输出尺寸未变
 - **WHEN** 来源真实变化但测得相同宽高
 - **THEN** 该输入被验证，父 plan 可保留
@@ -115,3 +119,8 @@ focus and scroll identity remains. Runtime height outranks the declaration's siz
 The initial implementation deliberately takes the conservative full fallback. Removing or incompatibly
 replacing a declaration removes its constraint. Existing calls without runtime input retain their meaning.
 Public usage: [owner layout input](../../../../development/0.9/tools.md#owner-layout-budgets-and-edit-completion).
+
+## 已采用的后续能力
+
+[双轴Scroll与有限画布ADDED](../../../changes/fl09-basic-ui-capabilities/specs/core/layout/spec.md)已采用、未实施，
+由该change持唯一目标正文；旧纵Scroll／普通测量和布局条件继续由本文持有。实现差距见[实现账](../../../implementation.md#fl09-reliability)。
