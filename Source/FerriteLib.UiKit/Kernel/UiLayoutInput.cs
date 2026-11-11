@@ -3,9 +3,17 @@ using System.Collections.Generic;
 
 namespace FerriteLib.UiKit.Kernel;
 
-/// <summary>Explicit structural-container constraints. Null fields retain XML/automatic behavior.</summary>
+/// <summary>Explicit structural-container constraints and their non-committing measurement companion.
+/// Null constraint fields retain XML/automatic behavior.</summary>
 public sealed class UiLayoutInput
 {
+    public const int BudgetMeasurementVersion = 1;
+
+    /// <summary>Measures current constraints without publishing layout or changing scroll. The optional
+    /// reader may inspect provisional nodes synchronously; only the detached snapshot may escape.</summary>
+    public static UiLayoutSnapshot MeasureBudget(UiHost host, UiLayoutPoint available, Action<UiLayoutSnapshot>? readPrepared = null)
+        => (host ?? throw new ArgumentNullException(nameof(host))).MeasureBudget(available, readPrepared);
+
     public UiLayoutInput(float? height = null, bool? narrow = null)
     {
         if (height.HasValue && (float.IsNaN(height.Value) || float.IsInfinity(height.Value) || height.Value < 0)) throw new ArgumentOutOfRangeException(nameof(height));
@@ -33,6 +41,7 @@ public sealed partial class UiHost
     /// <summary>Changes a height budget or responsive variant without replacing the definition or Session.</summary>
     public void SetLayoutInput(string elementId, UiLayoutInput? input)
     {
+        RequireOutsideBudget();
         RequireToolThread();
         if (!session.IsActive) throw new ObjectDisposedException(nameof(UiHost));
         UiElementSpec? found = null;

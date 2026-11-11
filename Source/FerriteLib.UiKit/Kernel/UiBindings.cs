@@ -390,7 +390,7 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
     // A graph evaluation is a business/derived read even if external application occurs inside Draw.
     // Only ordinary presentation consumers use the frozen view; responses never observe stale UI input.
     private bool UsesPresentation => presentation != null && Reactive.Observer == null;
-    internal IDisposable UsePresentation(UiBindingPresentation value)
+    internal IDisposable UsePresentation(UiBindingPresentation? value)
     {
         UiBindingPresentation? previous = presentation;
         presentation = value;

@@ -147,6 +147,10 @@ public static class UiSessionGuard
         if (string.IsNullOrEmpty(elementId)) throw new ArgumentException("Element id is required.", nameof(elementId));
         if (measure == null) throw new ArgumentNullException(nameof(measure));
 
+        // A speculative budget must fail with its original cause, not trip/suspend a committed owner
+        // or make recovery geometry look like a successful measurement.
+        if (session.IsBudgetMeasuring) return measure();
+
         try
         {
             return measure();

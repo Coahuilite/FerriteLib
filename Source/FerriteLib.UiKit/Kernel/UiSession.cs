@@ -355,6 +355,7 @@ public sealed partial class UiSession : IDisposable
     internal void BeginHitPass()
     {
         EnsureActive();
+        InvalidatePointerRead();
         hitPassOpen = true;
         popupOwnerDrawn = false;
         captureOwnerDrawn = false;
@@ -415,10 +416,13 @@ public sealed partial class UiSession : IDisposable
         return element.Id.Key;
     }
     internal bool IsPointerOverPopup(UiLayoutPoint windowPoint)
+        => TopmostPopupIndex(dispatchLayers, windowPoint) >= 0;
+
+    private static int TopmostPopupIndex(IReadOnlyList<UiHitLayer> layers, UiLayoutPoint windowPoint)
     {
-        for (int i = dispatchLayers.Count - 1; i >= 0; i--)
-            if (dispatchLayers[i].IsPopup && Contains(dispatchLayers[i].Rect, windowPoint)) return true;
-        return false;
+        for (int i = layers.Count - 1; i >= 0; i--)
+            if (layers[i].IsPopup && Contains(layers[i].Rect, windowPoint)) return i;
+        return -1;
     }
     /// <summary>
     /// Same dispatch as <see cref="IsPointerOverHigherLayer(UiNode,Vector2)"/>, with the caller's own popup id
@@ -517,6 +521,7 @@ public sealed partial class UiSession : IDisposable
     // An aborted traversal must not publish its partial hit list or reconcile unvisited identities.
     internal void AbortHitPass()
     {
+        InvalidatePointerRead();
         contentInputLayers.Clear();
         if (!IsActive) return;
         if (hitPassOpen)
@@ -850,6 +855,7 @@ public sealed partial class UiSession : IDisposable
     {
         if (ownerId == null) throw new ArgumentNullException(nameof(ownerId));
         EnsureActive();
+        InvalidatePointerRead();
         if (openPopupId != null) ClosePopup();
         popupTarget = null;
         popupCaptureTarget = null;
@@ -1285,8 +1291,10 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
     /// <summary>Writes one scroll container's position, keyed by its node.</summary>
     public void SetScrollPosition(UiNode node, UiLayoutPoint position)
     {
+        if (IsBudgetMeasuring) throw new InvalidOperationException("Budget measurement cannot change scroll positions.");
         if (node == null) throw new ArgumentNullException(nameof(node));
         EnsureActive();
+        if (GetScrollPosition(node) != position) InvalidatePointerRead();
         scrollPositions[node] = position;
     }
 

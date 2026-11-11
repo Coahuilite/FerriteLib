@@ -178,6 +178,9 @@ public sealed partial class UiHost : IDisposable
     /// <summary>Reads current model facts and the last committed layout; never arranges or paints.</summary>
     public UiHostObservation Observe(UiObservationBudget? budget = null, string? nodeKey = null)
     {
+        if (session.IsBudgetMeasuring)
+            return new UiHostObservation(session.Identity, source, session.Frame, session.DefinitionRevision, null,
+                DateTime.UtcNow, UiObservationStatus.Stale, "budget-measurement-in-progress", false, Array.Empty<UiObservedNode>());
         try
         {
             return engine.Observe(CreateContext(0), budget ?? new UiObservationBudget(), nodeKey,
@@ -248,6 +251,8 @@ public sealed partial class UiHost : IDisposable
 
     public UiLayoutSnapshot MeasureAndArrange(UiLayoutPoint available)
     {
+        RequireOutsideBudget();
+        session.InvalidatePointerRead();
         RefreshBindingOwner(allowPresentationEnrollment: true);
         reactivePresentation?.Synchronize(false);
         if (reactivePresentation != null && presentationRevision != reactivePresentation.DemandRevision)
@@ -263,6 +268,7 @@ public sealed partial class UiHost : IDisposable
         bool timing = subscription != null && subscription.TimingEnabled;
         long started = timing ? Stopwatch.GetTimestamp() : 0L;
         UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription, metrics, session);
+        budgetArrangeDepth++;
         try
         {
             // The engine validates effective inputs per stage; presentation changes no longer bump
@@ -284,6 +290,7 @@ public sealed partial class UiHost : IDisposable
         }
         finally
         {
+            budgetArrangeDepth--;
             scope.Dispose();
             if (timing)
             {
@@ -294,6 +301,8 @@ public sealed partial class UiHost : IDisposable
 
     public void Draw(UiLayoutRect viewport, UiLayoutSnapshot snapshot)
     {
+        RequireOutsideBudget();
+        session.InvalidatePointerRead();
         RefreshBindingOwner();
         using IDisposable? inputs = reactivePresentation?.Enter();
         // The draw runs inside this host's diagnostic scope: a fit-audit finding comes out of a static text
@@ -303,6 +312,7 @@ public sealed partial class UiHost : IDisposable
         bool timing = subscription != null && subscription.TimingEnabled;
         long started = timing ? Stopwatch.GetTimestamp() : 0L;
         UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription, metrics, session);
+        budgetDrawDepth++;
         try
         {
             // Popups are drawn after content and must clamp themselves into the frame's usable window
@@ -322,9 +332,11 @@ public sealed partial class UiHost : IDisposable
                 if (!session.IsActive) return;
             }
             session.EndPopupPass();
+            session.CompletePointerRead();
         }
         finally
         {
+            budgetDrawDepth--;
             scope.Dispose();
             if (timing)
             {
@@ -369,12 +381,14 @@ public sealed partial class UiHost : IDisposable
     /// </summary>
     public void BeginFrame()
     {
+        RequireOutsideBudget();
         documentService?.Pump();
         session.BeginFrame();
     }
 
     public void EndFrame()
     {
+        RequireOutsideBudget();
         session.EndFrame();
     }
 
@@ -384,6 +398,7 @@ public sealed partial class UiHost : IDisposable
     /// </summary>
     public void DrawFrame(UiLayoutRect viewport, UiFrame frame, IUiExecution execution)
     {
+        RequireOutsideBudget();
         if (!DisplayRequired) return;
         if (preparingPreview) throw new InvalidOperationException("Author preparation cannot recursively advance its Host.");
         session.SetFrame(frame, execution);

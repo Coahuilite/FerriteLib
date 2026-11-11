@@ -38,7 +38,7 @@ internal sealed partial class UiLayoutEngine
         ReleasePipeline();
         layoutScopes.Clear(); textMetricsCache = null; activeLayoutScope = null;
         cachedSnapshot = null; lastEntries = new PageTable<PlacedEntry>(Array.Empty<PlacedEntry>()); widgetInstances.Clear(); repeatStates.Clear();
-        materializedRepeats.Clear(); keyNodes.Clear(); committedRevisions.Clear();
+        materializedRepeats.Clear(); keyNodes.Clear(); committedRevisions.Clear(); candidateRevisions.Clear();
         visibleInputs.Clear(); widthInputs.Clear(); tabInputs.Clear(); autoWidths.Clear(); labelContributions.Clear();
     }
     private UiNodeId activeUpdateScope;
@@ -72,6 +72,10 @@ internal sealed partial class UiLayoutEngine
             if (kind.Length > 0 && !ConsumesAvailableHeight(spec)) availableHeight = 0;
             return MeasureElementCore(ctx, spec, width, availableHeight, node, contentHeightReference);
         }
+        catch (Exception error) when (ctx.Session.IsBudgetMeasuring && error is not NotSupportedException && UiObservationBoundary.IsOrdinary(error))
+        {
+            throw new InvalidOperationException("Budget measurement failed at '" + node.Path + "' (" + spec.Kind + ").", error);
+        }
         finally { activeLayoutScope = parent; activeUpdateScope = parentId; }
     }
     private bool ConsumesAvailableHeight(UiElementSpec spec)
@@ -103,6 +107,8 @@ internal sealed partial class UiLayoutEngine
         UiMeasureInputs context = MeasureContext(ctx);
         LeafMeasure? prior = records.FindLast(value => ReferenceEquals(value.Spec, spec) && ReferenceEquals(value.Metrics, textMetricsCache!.Source) && context.Equals(value.Context));
         bool enrolled = widget is IUiMeasureParticipant;
+        if (ctx.Session.IsBudgetMeasuring && !enrolled)
+            throw new NotSupportedException("Non-committing measurement requires IUiMeasureParticipant at '" + node.Path + "' (" + widget.Kind + "). Legacy Measure remains supported by MeasureAndArrange.");
         bool contextEqual = prior != null;
         UiMeasureInputs sources = MeasureSources(spec, ctx.Bindings);
         if (prior == null && enrolled) prior = records.FindLast(value => ReferenceEquals(value.Spec, spec) && ReferenceEquals(value.Metrics, textMetricsCache!.Source));

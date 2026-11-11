@@ -198,7 +198,7 @@ The type census and stable set are pinned in `FerriteLibApiTierTests`. Its depen
 
 - `UiToolDiagnostics` — detached 0.9 tool instrument results; same-host geometry carries its own pass identity.
 
-- `UiLayoutInput` — 0.9 owner height/variant candidate; see [tool contract](development/0.9/tools.md).
+- `UiLayoutInput` — 0.9 owner height/variant candidate, including BudgetMeasurementVersion 1 / MeasureBudget over the original Host measurement owner; see [tool contract](development/0.9/tools.md).
 
 - `UiToolAccess` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
 - `UiToolOperation` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
@@ -209,10 +209,11 @@ The type census and stable set are pinned in `FerriteLibApiTierTests`. Its depen
 - `UiToolTarget` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
 - `UiToolSnapshot` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
 - `UiToolRequestResult` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
-- `UiToolConnection` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
+- `UiToolConnection` — 0.9 tool/preview candidate, including CoordinateHitTestVersion 1 / HitTest over original completed-draw pointer facts; see [tool contract](development/0.9/tools.md).
 - `UiPreviewKind` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
 - `UiPreviewRegistration` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
 - `UiPreviewInstance` — 0.9 tool/preview candidate; see [tool contract](development/0.9/tools.md).
+- `UiWindowShell` — 0.9 formal window face/page-lifetime candidate, shared with the unchanged native window entry; see [tool contract](development/0.9/tools.md).
 
 - `VerseUiDiagnosticLog` — optional adapter-owned native output; creation-first and existing-Host adoption,
   standalone callbacks and lifecycle are in [domain diagnostics](development/0.8/ui-diagnostics.md).

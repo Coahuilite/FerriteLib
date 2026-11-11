@@ -43,11 +43,19 @@ public static class UiPointerLayers
         for (int i = bottomToTop.Count - 1; i > ownOrder; i--)
         {
             UiPointerLayer layer = bottomToTop[i];
-            if (layer.Owner == owner || !layer.HasOperation || !Contains(layer.Bounds, x, y)) continue;
-            if (!layer.Clip.HasValue || Contains(layer.Clip.Value, x, y)) return true;
+            if (layer.Owner != owner && Hits(layer, x, y)) return true;
         }
         return false;
     }
+    internal static int TopmostIndex(IReadOnlyList<UiPointerLayer> bottomToTop, float x, float y)
+    {
+        for (int i = bottomToTop.Count - 1; i >= 0; i--)
+            if (Hits(bottomToTop[i], x, y)) return i;
+        return -1;
+    }
+    private static bool Hits(UiPointerLayer layer, float x, float y)
+        => layer.HasOperation && Contains(layer.Bounds, x, y)
+            && (!layer.Clip.HasValue || Contains(layer.Clip.Value, x, y));
     private static bool Contains(UiLayoutRect rect, float x, float y)
         => rect.Width > 0 && rect.Height > 0 && x >= rect.X && x < rect.X + rect.Width && y >= rect.Y && y < rect.Y + rect.Height;
 }

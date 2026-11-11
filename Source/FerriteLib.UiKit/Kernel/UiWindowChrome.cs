@@ -6,11 +6,11 @@ namespace FerriteLib.UiKit.Kernel;
 /// One window shell's own geometry, in window (screen) space, as the shell computed it (DT1).
 /// <para>
 /// <b>Why this exists.</b> The shell paints its frame, title band and close affordance from its
-/// <see cref="UiWindowHost"/> chrome virtuals, and the Dev instrument outlines and records those same
+/// <see cref="UiWindowShell"/> chrome virtuals (the native window forwards its existing overrides), and the Dev instrument outlines and records those same
 /// rects; a consumer that needs the shell's numbers used to have to mirror the constants, and a mirror is
 /// a second copy of an arithmetic that can drift. This struct is the shell answering once. Two channels,
 /// deliberately different in tense: <c>UiWindowHost.ShellChrome</c> is the PRESENT measurement (act on the
-/// window as it is now, retire your mirrors with it), while
+/// window as it is now, retire your mirrors with it); isolated owners use <c>UiWindowShell.GetChrome</c>. Meanwhile
 /// <c>UiDevGeometrySnapshot.ShellChrome</c> / the dump's <c>chrome</c> line is the record of a COMPLETED
 /// pass, written into the same capture buffer as the node samples when the chrome drew - a report of a
 /// pass quotes the record, never a present-tense read spliced onto a finished dump.

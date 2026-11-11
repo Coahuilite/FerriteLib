@@ -120,6 +120,7 @@ public sealed partial class UiHost
     /// <summary>Explicit non-rendering product advance. Uses the real page/registry/bindings; metrics are author-supplied, not native glyph evidence.</summary>
     public void AdvanceHeadless(UiLayoutPoint available)
     {
+        RequireOutsideBudget();
         RequireToolThread();
         if (!session.IsActive) throw new ObjectDisposedException(nameof(UiHost));
         if (preparingPreview) throw new InvalidOperationException("Author preparation cannot recursively advance its Host.");

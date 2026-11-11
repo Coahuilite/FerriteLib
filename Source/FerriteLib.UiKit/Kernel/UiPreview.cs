@@ -31,20 +31,51 @@ public sealed class UiPreviewInstance : IDisposable
     /// <summary>Optional borrowed author document owner. Dispose it through resources when this sample owns it.</summary>
     public UiPreviewInstance(UiHost host, string sampleSource, string measurementSource, IDisposable? resources,
         Action<UiLayoutPoint>? prepare, UiDocumentService? documents)
+        : this(host, sampleSource, measurementSource, resources, prepare, documents, null) { }
+    /// <summary>Explicit formal window capability. The shell adopts this same Host and owns its disposal.</summary>
+    public UiPreviewInstance(UiHost host, string sampleSource, string measurementSource, IDisposable? resources,
+        Action<UiLayoutPoint>? prepare, UiDocumentService? documents, UiWindowShell? windowShell)
     {
+        windowShell?.RequireAvailable();
         Host = host ?? throw new ArgumentNullException(nameof(host)); SampleSource = sampleSource;
         MeasurementSource = measurementSource; this.resources = resources;
         Documents = documents;
         if (prepare != null) Host.AttachPreviewPreparation(prepare);
+        WindowShell = windowShell;
+        if (windowShell != null)
+        {
+            windowShell.Closed += WindowClosed;
+            try
+            {
+                windowShell.AdoptPreviewHost(host);
+                if (windowShell.IsClosed) throw new ObjectDisposedException(nameof(windowShell), "The window closed during page attachment.");
+            }
+            catch { Dispose(); throw; }
+        }
     }
     public UiHost Host { get; }
     public string SampleSource { get; }
     public string MeasurementSource { get; }
     public UiDocumentService? Documents { get; }
-    public void Dispose()
+    public UiWindowShell? WindowShell { get; }
+    private void WindowClosed()
     {
         if (disposed) return;
         disposed = true;
-        try { Host.Dispose(); } finally { resources?.Dispose(); }
+        WindowShell!.Closed -= WindowClosed;
+        resources?.Dispose();
+    }
+    public void Dispose()
+    {
+        if (disposed) return;
+        if (WindowShell != null)
+        {
+            // Closed runs after Host disposal, including a Dispose re-entered from HostDetached.
+            WindowShell.Dispose();
+            return;
+        }
+        disposed = true;
+        try { Host.Dispose(); }
+        finally { resources?.Dispose(); }
     }
 }

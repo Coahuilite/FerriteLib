@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -16,7 +17,8 @@ public sealed class UiToolSelection
 
 internal sealed class UiToolSelectionState
 {
-    internal UiToolSelectionState(UiNode node) { Key = node.Id.Key; Mount = node.MountLifetime; }
+    internal UiToolSelectionState(UiNode node, UiToolConnection connection) { Key = node.Id.Key; Mount = node.MountLifetime; Connection = connection; }
+    internal readonly UiToolConnection Connection;
     internal readonly string Key;
     internal readonly long Mount;
     internal string Status = "await-current-draw";
@@ -42,13 +44,37 @@ public sealed partial class UiSession
 
 public sealed partial class UiToolConnection
 {
+    public const int SelectionOutlinePresentationVersion = 1;
+    private int selectionOutlineSuppressions;
+    internal bool SelectionOutlineSuppressed => !IsClosed && Volatile.Read(ref selectionOutlineSuppressions) != 0;
+
+    /// <summary>Suppress only this connection's selected-node ink for a synchronous draw scope. Facts and diagnostics remain live.</summary>
+    public IDisposable SuppressSelectionOutline()
+    {
+        RequireThread();
+        if (IsClosed || !host.TryGetTarget(out UiHost? owner) || !owner.Session.IsActive) throw new ObjectDisposedException(nameof(UiToolConnection));
+        return new SelectionOutlineScope(this);
+    }
+    private sealed class SelectionOutlineScope : IDisposable
+    {
+        private UiToolConnection? connection;
+        internal SelectionOutlineScope(UiToolConnection connection)
+        { this.connection = connection; Interlocked.Increment(ref connection.selectionOutlineSuppressions); }
+        public void Dispose()
+        {
+            UiToolConnection? owner = Interlocked.Exchange(ref connection, null);
+            if (owner != null) Interlocked.Decrement(ref owner.selectionOutlineSuppressions);
+        }
+    }
+
     public UiToolSelection? SelectNode(string? nodeKey)
     {
         RequireThread();
         if (IsClosed || !host.TryGetTarget(out UiHost? owner) || !owner.Session.IsActive) throw new ObjectDisposedException(nameof(UiToolConnection));
+        if (owner.Session.IsBudgetMeasuring) throw new InvalidOperationException("Budget measurement cannot change selection.");
         if (string.IsNullOrEmpty(nodeKey)) { owner.Session.ToolSelection = null; return null; }
         UiNode node = owner.Session.FindObservationNode(nodeKey!) ?? throw new ArgumentException("Node no longer exists; read the target again.", nameof(nodeKey));
-        owner.Session.ToolSelection = new UiToolSelectionState(node);
+        owner.Session.ToolSelection = new UiToolSelectionState(node, this);
         return owner.Session.ToolSelection.Snapshot();
     }
     public UiToolSelection? ReadSelection()
@@ -81,6 +107,7 @@ internal sealed partial class UiLayoutEngine
         if (clip.Width <= 0 || clip.Height <= 0) { selected.Status = "outside-current-clip"; return; }
         selected.Window = window;
         selected.Status = clip.Width < window.Width || clip.Height < window.Height ? "drawn-partly-clipped" : "drawn";
+        if (selected.Connection.SelectionOutlineSuppressed) return;
         // Same original walk and native clipping as the control. No capture, second renderer or hit layer.
         UiColour ink = ctx.Theme[UiPaletteRole.Accent];
         float line = Math.Max(1, ctx.Theme.Geometry.Hairline * 2);

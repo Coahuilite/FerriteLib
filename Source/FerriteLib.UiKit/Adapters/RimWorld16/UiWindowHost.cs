@@ -5,20 +5,6 @@ using Verse;
 namespace FerriteLib.UiKit.Kernel;
 
 /// <summary>
-/// Why a window shell is not showing its page. The distinction is the consumer's to phrase: this
-/// library ships zero translation keys, so the strings belong to whoever overrides
-/// <see cref="UiWindowHost.DrawNotice"/>.
-/// </summary>
-public enum UiWindowNotice
-{
-    /// <summary>The kernel page cannot be entered at all; see <see cref="UiWindowHost.PrerequisiteVerified"/>.</summary>
-    Prerequisite,
-
-    /// <summary>Creating or drawing the page failed; the host has been disposed and will not be retried.</summary>
-    PageUnavailable
-}
-
-/// <summary>
 /// Library-owned window chrome: a <see cref="Verse.Window"/> that hosts exactly one <see cref="UiHost"/>
 /// and owns nothing else (US→FL round 1, P2).
 /// <para>
@@ -42,7 +28,9 @@ public enum UiWindowNotice
 /// </summary>
 public abstract class UiWindowHost : Window
 {
-    private UiHost? host;
+    private Shell? shell;
+    private Shell WindowShell => shell ??= new Shell(this);
+    private UiHost? host => shell?.Host;
     protected VerseUiExecution Execution { get; } = new VerseUiExecution();
     private VerseTextExecution? textExecution;
     private VerseTextExecution TextExecution => textExecution ??= new VerseTextExecution(Execution);
@@ -59,9 +47,6 @@ public abstract class UiWindowHost : Window
     }
     /// <summary>Window-owned native image references. Bind the returned neutral tokens; closing drops references, never supplier textures.</summary>
     public VerseUiImages Images => Execution.Images;
-    private bool pageUnavailable;
-    private bool noticeDueNextFrame;
-    private Exception? lastFailure;
     private bool activeTarget = true;
     private UiWindowCatalog? catalog;
     private bool displayRequired = true;
@@ -70,14 +55,8 @@ public abstract class UiWindowHost : Window
     public void SetDisplayDemand(bool required)
     {
         displayRequired = required;
-        host?.SetDisplayDemand(required);
+        WindowShell.SetDisplayDemand(required);
     }
-
-    // Identity the shell's own text is attributed to in the fit audit: built lazily and cached, because
-    // the concrete type is known here but the window key is attached by the catalog after construction,
-    // and a per-frame string would be a per-frame allocation. See BuildScope for the identity itself.
-    private string? chromeScope;
-    private string? noticeScope;
 
     protected UiWindowHost()
     {
@@ -136,7 +115,7 @@ public abstract class UiWindowHost : Window
     protected virtual bool PrerequisiteVerified => true;
 
     /// <summary>The exception behind a <see cref="UiWindowNotice.PageUnavailable"/>, for the notice body.</summary>
-    protected Exception? LastFailure => lastFailure;
+    protected Exception? LastFailure => shell?.LastFailure;
 
     /// <summary>Runs once per pass before the page or the notice, for consumer-side frame bookkeeping.</summary>
     protected virtual void BeforeDraw(Rect contentRect)
@@ -151,9 +130,7 @@ public abstract class UiWindowHost : Window
     // ---- chrome geometry: this shell's own layout, overridable, not consumer policy ----
 
     /// <summary>Vertical space reserved for title, subtitle and close affordance.</summary>
-    protected virtual float TitleBarHeight => Theme.ReadFontSize.HasValue
-        ? Math.Max(56f, Math.Max(6f + ChromeTextHeight(TitleFont, 30f) + (Subtitle.Length > 0 ? ChromeTextHeight(SubtitleFont, 18f) : 0f), ChromeTextHeight(CloseFont, CloseButtonHeight) + 16f))
-        : 56f;
+    protected virtual float TitleBarHeight => WindowShell.DefaultTitleBarHeight;
 
     /// <summary>Left/right/bottom inset of the page inside the window.</summary>
     protected virtual float SidePadding => 20f;
@@ -170,19 +147,9 @@ public abstract class UiWindowHost : Window
     /// </summary>
     protected virtual ITextMetrics Metrics => VerseFerriteTextMetrics.Instance;
 
-    /// <summary>Narrowest the close affordance may be: the shipped width for a short label.</summary>
-    private const float CloseButtonMinWidth = 110f;
-
-    /// <summary>Preset minimum height. Explicit numeric text can grow the natural band.</summary>
-    private const float CloseButtonHeight = 30f;
-
-    /// <summary>Breathing room left around the close label, per side.</summary>
-    private const float CloseButtonPadding = 10f;
-
     /// <summary>
     /// Size of the close affordance, derived from the label it has to hold: at least
-    /// <see cref="CloseButtonMinWidth"/> wide, otherwise the measured label plus
-    /// <see cref="CloseButtonPadding"/> on each side.
+    /// 110 logical units wide, otherwise the measured label plus 10 units on each side.
     /// <para>
     /// A fixed box was this shell's shipped shape and it is the wrong default <b>for a library</b>:
     /// <see cref="CloseText"/> is the consumer's string, so any consumer whose wording or translation
@@ -198,17 +165,7 @@ public abstract class UiWindowHost : Window
     /// consumer with its own chrome geometry, and it is the only supported way to keep a fixed size.
     /// </para>
     /// </summary>
-    protected virtual Vector2 CloseButtonSize
-    {
-        get
-        {
-            UiTextRun text = UiTextFonts.Resolve(TextMetrics, TextExecution, new UiTextFont(CloseFont, Theme.ReadFontSize), elementPath: ChromeScope);
-            float measured = text.MeasureWidth(CloseText);
-            return new Vector2(
-                Math.Max(CloseButtonMinWidth, measured + CloseButtonPadding * 2f),
-                text.Font.Size.HasValue ? Math.Max(CloseButtonHeight, text.MeasureText("Ag", 100000) + Theme.Geometry.Spacing * 2) : CloseButtonHeight);
-        }
-    }
+    protected virtual Vector2 CloseButtonSize => VerseUiExecution.Point(WindowShell.DefaultCloseButtonSize);
 
     /// <summary>Font size of the title line.</summary>
     protected virtual UiFont TitleFont => UiFont.Medium;
@@ -255,7 +212,11 @@ public abstract class UiWindowHost : Window
     /// borrowed Model or VM is borrowed for exactly as long as the subscription the consumer made here.
     /// </para>
     /// </summary>
-    public event Action<UiHost>? HostAttached;
+    public event Action<UiHost>? HostAttached
+    {
+        add => WindowShell.HostAttached += value;
+        remove => WindowShell.HostAttached -= value;
+    }
 
     /// <summary>
     /// Raised immediately before this window disposes the page host it owns - on close, and when a failed
@@ -267,7 +228,11 @@ public abstract class UiWindowHost : Window
     /// this releases the page's connection, never the consumer's objects.
     /// </para>
     /// </summary>
-    public event Action<UiHost>? HostDetached;
+    public event Action<UiHost>? HostDetached
+    {
+        add => WindowShell.HostDetached += value;
+        remove => WindowShell.HostDetached -= value;
+    }
 
     /// <summary>
     /// The key this window is addressed by, or null when no catalog attached it. A window created
@@ -370,10 +335,12 @@ public abstract class UiWindowHost : Window
     /// </summary>
     public sealed override void DoWindowContents(Rect inRect)
     {
-        using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, host == null ? null : TextMetrics, host?.Session))
-        {
-            DrawShell(inRect);
-        }
+        if (!displayRequired) return;
+        ResolvePointerDown();
+        WindowShell.ReopenNative();
+        // The native adapter keeps its original chrome hit/close and late event qualification.
+        WindowShell.Draw(VerseUiExecution.Rect(inRect), new UiFrame(UiFramePhase.None), TextExecution,
+            new UiLayoutPoint(windowRect.x, windowRect.y));
     }
 
     /// <summary>
@@ -459,96 +426,6 @@ public abstract class UiWindowHost : Window
         base.OnAcceptKeyPressed();
     }
 
-    private void DrawShell(Rect inRect)
-    {
-        if (!displayRequired) return;
-        ResolvePointerDown();
-        if (!DrawChrome(inRect)) return;
-#if FER_DEV || FER_TOOLS
-        // DT1 (r2 reading): the shell's chrome joins the instrument's TWO channels from this one place.
-        // Keep the geometry the chrome just drew. BeforeDraw may publish the PREVIOUS completed pass;
-        // do not overwrite its capture here. Publish these bands after this host's DrawFrame completes.
-        UiWindowChrome chromeNow = ShellChrome;
-        Rect chromeTitleNow = TitleBandRect(inRect);
-        Rect chromeCloseNow = CloseButtonRect(inRect);
-#endif
-        Rect content = ContentRect(inRect);
-        BeforeDraw(content);
-
-        if (pageUnavailable)
-        {
-            DrawNoticeScoped(content, UiWindowNotice.PageUnavailable);
-            return;
-        }
-
-        if (!PrerequisiteVerified)
-        {
-            DrawNoticeScoped(content, UiWindowNotice.Prerequisite);
-            return;
-        }
-
-        // A failed pass must not switch pages inside the IMGUI pass that threw: that pass has already
-        // claimed layout state for the page. Trip the notice on the NEXT pass, drawn from a clean one.
-        // This is the non-obvious part of the contract and it is deliberately not "improved" into a
-        // synchronous retry.
-        if (noticeDueNextFrame)
-        {
-            noticeDueNextFrame = false;
-            pageUnavailable = true;
-            DrawNoticeScoped(content, UiWindowNotice.PageUnavailable);
-            return;
-        }
-
-        try
-        {
-            if (host == null)
-            {
-                UiHost created = CreateHost();
-                created.AdoptTextMetrics(Metrics, TextMetrics);
-                created.SetDisplayDemand(displayRequired);
-                host = created;
-                // Before the first draw of that host, which is the whole point of the door: a subscription
-                // made here sees the first frame, and a consumer never has to poll for a host that does not
-                // exist yet.
-                HostAttached?.Invoke(created);
-            }
-
-            // The announcement door is public, and closing the window is a legitimate thing for a handler to
-            // do there - a page opened to answer one question closes itself when there is nothing to show. A
-            // close runs PreClose -> ReleaseHost, which nulls this field and disposes the host, so the pass
-            // that was about to draw it has nothing left to draw. Re-read the field rather than the local
-            // created above: ReleaseHost nulls the field precisely so the close is observable here.
-            if (host == null)
-            {
-                return;
-            }
-
-            host.DrawFrame(VerseUiExecution.Rect(content), Execution.CaptureFrame(!IsOpen || Find.WindowStack.GetsInput(this)), TextExecution);
-#if FER_DEV || FER_TOOLS
-            // The host can be created on this first pass, or released by a close during DrawFrame.
-            // Resolve its own subscription now; never inherit the outer scope's pre-creation null.
-            using (UiDiagnosticHub.EnterHost(host?.CurrentDiagnostics, TextMetrics))
-            {
-                UiDevGeometryProbe.RecordShellChrome(chromeNow);
-                UiDevGeometryProbe.OutlineShellChrome(Execution, VerseUiExecution.Rect(inRect), VerseUiExecution.Rect(chromeTitleNow), VerseUiExecution.Rect(chromeCloseNow));
-            }
-#endif
-        }
-        catch (Exception ex)
-        {
-            RecordDrawFailure(ex);
-        }
-    }
-
-    private void RecordDrawFailure(Exception error)
-    {
-        noticeDueNextFrame = true;
-        lastFailure = error;
-        host?.PublishWindowFailure(error);
-        ReleaseHost();
-        OnDrawFailure(error);
-    }
-
     /// <summary>
     /// A window is about to enter the stack. The normal size is restored here so a reopened window comes
     /// back at its resting size, and the catalog is told before anything else runs so the instance is
@@ -598,41 +475,6 @@ public abstract class UiWindowHost : Window
         return true;
     }
 
-    /// <summary>
-    /// Announces the page host is going away and then disposes it: the one place teardown happens, so a close
-    /// and a failed pass cannot drift apart in what they tell the consumer.
-    /// <para>
-    /// <b>Disposal is not conditional on the handler behaving.</b> <see cref="HostDetached"/> is contracted
-    /// not to throw, and if it does the exception must not defeat the teardown: the host is disposed in a
-    /// <c>finally</c>, so the session dies either way. The throw is recorded as this window's failure rather
-    /// than escaping into the game's window-stack code, and the pass's own failure wins if there already is
-    /// one - a page that threw is reported as the page that threw, not as its teardown handler.
-    /// </para>
-    /// </summary>
-    private void ReleaseHost()
-    {
-        UiHost? released = host;
-        host = null;
-        if (released == null)
-        {
-            return;
-        }
-
-        try
-        {
-            HostDetached?.Invoke(released);
-        }
-        catch (Exception detachError)
-        {
-            if (lastFailure == null) lastFailure = detachError;
-            released.PublishWindowFailure(detachError, cleanup: true);
-        }
-        finally
-        {
-            released.Dispose();
-        }
-    }
-
     public override void PreClose()
     {
         // The target is dropped before the page goes away, so no input or capture reaches a closing
@@ -640,7 +482,7 @@ public abstract class UiWindowHost : Window
         catalog?.NotifyPreClose(this);
 
         // Closing disposes the session with the host, so reopening gets a clean retry.
-        try { ReleaseHost(); }
+        try { shell?.Dispose(); }
         finally
         {
             try { Execution.Dispose(); }
@@ -652,79 +494,6 @@ public abstract class UiWindowHost : Window
     {
         base.PostClose();
         catalog?.NotifyPostClose(this);
-    }
-
-    private Rect ContentRect(Rect inRect)
-    {
-        return new Rect(
-            inRect.x + SidePadding,
-            inRect.y + TitleBarHeight,
-            Math.Max(1f, inRect.width - SidePadding * 2f),
-            Math.Max(1f, inRect.height - TitleBarHeight - SidePadding));
-    }
-
-    /// <summary>
-    /// The shell's own text is drawn inside a named scope, so a fit finding about it is addressable.
-    /// <para>
-    /// It exists because of what an unscoped finding costs: two windows can be on screen at once, and a
-    /// report that only says <c>"(unscoped)"</c> cannot say which window or which band produced it — the
-    /// ambiguity that made a real-machine investigation attribute a 128px finding to the wrong window.
-    /// The chrome is drawn before the page and outside every element scope, so it is exactly the text this
-    /// scope has to name; the notice is the consumer's own drawing but the shell is what calls it, so the
-    /// shell is what can say whose notice it is.
-    /// </para>
-    /// <para>
-    /// Identity, recorded rather than hidden: the concrete window TYPE plus the window key when a catalog
-    /// attached one, because the shell has no manifest element id when it paints chrome. The key was
-    /// added in the 0.5.x window round: a single generic page shell serves every ordinary page, so
-    /// type-only identity would put two open panels on the same chrome path and a finding about one would
-    /// read as a finding about the other. Findings are keyed by path and text, so with the key in the path
-    /// two instances are told apart instead of deduplicated into one. The <c>/chrome</c> and
-    /// <c>/notice</c> suffixes keep the two bands apart.
-    /// </para>
-    /// </summary>
-    private bool DrawChrome(Rect rect)
-    {
-        UiFitAudit.BeginElement(ChromeScope);
-        try
-        {
-            return DrawChromeCore(rect);
-        }
-        finally
-        {
-            UiFitAudit.EndElement();
-        }
-    }
-
-    /// <summary>Draws the notice inside the shell's notice scope; see <see cref="DrawChrome"/>.</summary>
-    private void DrawNoticeScoped(Rect content, UiWindowNotice notice)
-    {
-        UiFitAudit.BeginElement(NoticeScope);
-        try
-        {
-            DrawNotice(content, notice);
-        }
-        finally
-        {
-            UiFitAudit.EndElement();
-        }
-    }
-
-    /// <summary>The fit-audit scope the chrome is drawn inside; see <see cref="DrawChrome"/>.</summary>
-    private string ChromeScope => chromeScope ??= BuildScope("chrome");
-
-    /// <summary>The fit-audit scope the notice is drawn inside; see <see cref="DrawChrome"/>.</summary>
-    private string NoticeScope => noticeScope ??= BuildScope("notice");
-
-    /// <summary>
-    /// The audit identity for one of the shell's own bands: the concrete type, plus the window key in
-    /// brackets when a catalog attached one. Built lazily and cached because the key is attached after
-    /// construction, so the string cannot be decided once in the constructor.
-    /// </summary>
-    private string BuildScope(string band)
-    {
-        string identity = Key is UiWindowKey key ? GetType().Name + "[" + key + "]" : GetType().Name;
-        return identity + "/" + band;
     }
 
     /// <summary>
@@ -783,124 +552,41 @@ public abstract class UiWindowHost : Window
     /// <summary>Optional bottom image, above the shell base and below all chrome/content. It must not take input.</summary>
     protected virtual void DrawBackground(Rect rect) { }
 
-    private bool DrawChromeCore(Rect rect)
-    {
-        UiTheme theme = Theme;
-        UiThemeDraw.Workspace(Execution,VerseUiExecution.Rect(rect),theme);
-        bool backgroundSucceeded = true;
-        if (!pageUnavailable && !noticeDueNextFrame)
-        {
-            try { UiSessionGuard.DrawWindowBackground(Execution, VerseUiExecution.Rect(rect), r => DrawBackground(VerseUiExecution.Rect(r))); }
-            catch (Exception error)
-            {
-                RecordDrawFailure(error);
-                backgroundSucceeded = false;
-            }
-        }
-        UiThemeDraw.Solid(Execution,VerseUiExecution.Rect(new Rect(rect.x, rect.y, rect.width, AccentBarHeight)),theme[UiPaletteRole.Accent]);
-
-        if (Title.Length > 0)
-        {
-            DrawShellText(new Rect(rect.x + SidePadding, rect.y + 6f, Math.Max(1f, rect.width * 0.6f), ChromeTextHeight(TitleFont, 30f)),
-                Title, theme.Styles.Resolve(UiStatusTone.Neutral).Text, TitleFont, ChromeScope);
-        }
-
-        if (Subtitle.Length > 0)
-        {
-            DrawShellText(new Rect(rect.x + SidePadding, rect.y + 6f + ChromeTextHeight(TitleFont, 30f), Math.Max(1f, rect.width * 0.6f), ChromeTextHeight(SubtitleFont, 18f)),
-                Subtitle, theme.Styles.Resolve(UiStatusTone.Neutral, UiEmphasis.Muted).Text, SubtitleFont, ChromeScope);
-        }
-
-        DrawCloseButton(rect);
-        return backgroundSucceeded;
-    }
-
-    private void DrawCloseButton(Rect rect)
-    {
-        UiTheme theme = Theme;
-        Rect button = CloseButtonRect(rect);
-        bool hovered = Mouse.IsOver(button);
-        UiThemeDraw.Surface(
-Execution,VerseUiExecution.Rect(button),            theme,            hovered ? theme[UiPaletteRole.HoverSurface] : theme[UiPaletteRole.PanelSurface],            hovered ? theme[UiPaletteRole.StrongBorder] : theme[UiPaletteRole.Border]);
-        DrawShellText(button, CloseText, theme.Styles.Resolve(UiStatusTone.Neutral, hovered ? UiEmphasis.Normal : UiEmphasis.Muted).Text,
-            CloseFont, ChromeScope, UiTextAnchor.MiddleCenter);
-
-        if (Verse.Widgets.ButtonInvisible(button))
-        {
-            Close();
-        }
-    }
-
-    private void DrawShellText(Rect rect, string text, UiColour colour, UiFont alias, string path,
-        UiTextAnchor anchor = UiTextAnchor.MiddleLeft, bool singleLine = true)
-    {
-        UiTextRun run = UiTextFonts.Resolve(TextMetrics, TextExecution, new UiTextFont(alias, Theme.ReadFontSize), elementPath: path);
-        run.Draw(VerseUiExecution.Rect(rect), text, colour, anchor, singleLine);
-    }
-
-    private float ChromeTextHeight(UiFont alias, float minimum)
-    {
-        if (!Theme.ReadFontSize.HasValue) return minimum;
-        UiTextRun text = UiTextFonts.Resolve(TextMetrics, TextExecution, new UiTextFont(alias, Theme.ReadFontSize), elementPath: ChromeScope);
-        return text.Font.Size.HasValue ? Math.Max(minimum, text.MeasureText("Ag", 100000) + Theme.Geometry.Spacing * 2) : minimum;
-    }
-
     internal void DrawPageNotice(Rect rect, string text)
-        => DrawShellText(rect, text, Theme.Styles.Resolve(UiStatusTone.Neutral).Text, Theme.Styles.Font, NoticeScope, singleLine: false);
+        => WindowShell.DrawPageNotice(VerseUiExecution.Rect(rect), text);
 
-    /// <summary>
-    /// Where the close affordance sits for a given window-face rect: the ONE arithmetic the shell uses -
-    /// drawn by <see cref="DrawCloseButton"/>, outlined by the Dev instrument, and reported through
-    /// <see cref="ShellChrome"/>. Size comes from <see cref="CloseButtonSize"/>, itself metric-driven.
-    /// </summary>
-    private Rect CloseButtonRect(Rect face)
-    {
-        Vector2 size = CloseButtonSize;
-        return new Rect(
-            face.xMax - size.x - SidePadding,
-            face.y + (TitleBarHeight - size.y) * 0.5f,
-            size.x,
-            size.y);
-    }
+    /// <summary>Present screen-space geometry computed by the same shell that paints this window.</summary>
+    public UiWindowChrome ShellChrome => WindowShell.GetChrome(VerseUiExecution.Rect(windowRect));
 
-    /// <summary>The title band the shell reserves: full width, from the face top to <see cref="TitleBarHeight"/>.</summary>
-    private Rect TitleBandRect(Rect face)
+    /// <summary>Native policy/primitive forwarding; face, page geometry and lifetime are not duplicated.</summary>
+    private sealed class Shell : UiWindowShell
     {
-        return new Rect(face.x, face.y, face.width, TitleBarHeight);
-    }
-
-    /// <summary>
-    /// The shell's own geometry in window (screen) space, answered by the SAME arithmetic that paints the
-    /// chrome (DT1). A consumer reads this INSTEAD of mirroring <see cref="TitleBarHeight"/>/
-    /// <see cref="SidePadding"/> into its own constants - the drift risk the chrome-mirror observation
-    /// recorded - for anything acting on the window as it is NOW.
-    /// <para>
-    /// <b>This accessor is the present measurement, and it is not the capture.</b> The record of a
-    /// COMPLETED pass - the one a report must quote - is <c>UiDevGeometrySnapshot.ShellChrome</c> (and the
-    /// dump's <c>chrome</c> line), written by the shell at its own draw time into the same buffer as the
-    /// node samples; gluing this present-tense value onto a finished pass would misreport a drag or a
-    /// resize, which is exactly what the instrument's one-buffer rule exists to prevent.
-    /// </para>
-    /// <para>
-    /// Space: <see cref="UiWindowChrome.Outer"/> is <c>windowRect</c> as the game moved it (drag and resize
-    /// included, read at whatever moment the caller asks); the inner rects are that face plus the shell's
-    /// insets, because <c>Margin</c> is sealed to zero and the draw group origin is the window origin
-    /// (see <see cref="ToWindowSpace"/>).
-    /// </para>
-    /// </summary>
-    public UiWindowChrome ShellChrome
-    {
-        get
-        {
-            Rect face = windowRect.AtZero();
-            return new UiWindowChrome(
-VerseUiExecution.Rect(windowRect),VerseUiExecution.Rect(ToWindowRect(TitleBandRect(face))),VerseUiExecution.Rect(ToWindowRect(CloseButtonRect(face))),VerseUiExecution.Rect(ToWindowRect(ContentRect(face))),                SidePadding,                TitleBarHeight);
-        }
-    }
-
-    /// <summary>A face-local rect lifted into window (screen) space; Margin is sealed to zero.</summary>
-    private Rect ToWindowRect(Rect local)
-    {
-        return new Rect(windowRect.x + local.x, windowRect.y + local.y, local.width, local.height);
+        private readonly UiWindowHost owner;
+        internal Shell(UiWindowHost owner) => this.owner = owner;
+        protected override UiTheme Theme => owner.Theme;
+        protected override ITextMetrics Metrics => owner.Metrics;
+        protected override ITextMetrics TextMetrics => owner.TextMetrics;
+        protected override IUiDrawing TextDrawing => owner.TextExecution;
+        protected override UiHost CreateHost() => owner.CreateHost();
+        protected override void DrawNotice(UiLayoutRect rect, UiWindowNotice notice) => owner.DrawNotice(VerseUiExecution.Rect(rect), notice);
+        protected override string Title => owner.Title;
+        protected override string Subtitle => owner.Subtitle;
+        protected override string CloseText => owner.CloseText;
+        protected override bool PrerequisiteVerified => owner.PrerequisiteVerified;
+        protected override string ScopeIdentity => owner.Key is UiWindowKey key ? owner.GetType().Name + "[" + key + "]" : owner.GetType().Name;
+        protected override void BeforeDraw(UiLayoutRect rect) => owner.BeforeDraw(VerseUiExecution.Rect(rect));
+        protected override void OnDrawFailure(Exception error) => owner.OnDrawFailure(error);
+        protected override void DrawBackground(UiLayoutRect rect) => owner.DrawBackground(VerseUiExecution.Rect(rect));
+        protected override void RequestClose() => owner.Close();
+        protected override UiFont TitleFont => owner.TitleFont;
+        protected override UiFont SubtitleFont => owner.SubtitleFont;
+        protected override UiFont CloseFont => owner.CloseFont;
+        protected override float SidePadding => owner.SidePadding;
+        protected override float AccentBarHeight => owner.AccentBarHeight;
+        protected override float TitleBarHeight => owner.TitleBarHeight;
+        protected override UiLayoutPoint CloseButtonSize => VerseUiExecution.Point(owner.CloseButtonSize);
+        protected override UiFrame CaptureFrame() => owner.Execution.CaptureFrame(!owner.IsOpen || Find.WindowStack.GetsInput(owner));
+        protected override bool CloseHovered(UiLayoutRect button) => Mouse.IsOver(VerseUiExecution.Rect(button));
+        protected override bool ClosePressed(UiLayoutRect button) => Verse.Widgets.ButtonInvisible(VerseUiExecution.Rect(button));
     }
 }

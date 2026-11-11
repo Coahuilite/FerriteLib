@@ -131,6 +131,7 @@ public sealed partial class UiToolConnection : IDisposable
     {
         RequireThread();
         if (!host.TryGetTarget(out UiHost? owner) || !owner.Session.IsActive || IsClosed) throw new ObjectDisposedException(nameof(UiToolConnection));
+        if (owner.Session.IsBudgetMeasuring) throw new InvalidOperationException("Capture cannot mint addresses during budget measurement.");
         UiObservationBudget limit = budget ?? new UiObservationBudget();
         HashSet<string>? previous = InterestedNodes();
         UiHostObservation observed = owner.Observe(limit, nodeKey);

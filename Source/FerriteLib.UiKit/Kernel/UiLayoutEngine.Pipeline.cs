@@ -216,7 +216,8 @@ internal sealed partial class UiLayoutEngine
             ctx.Session.LayoutWork.PublishedEntries += changes.Count;
             if (staged.Count == 0 && changes.Count == 0) { ctx.Session.LayoutWork.Reused++; ctx.Session.LayoutWork.Last = "validated-retained"; }
             else { ctx.Session.LayoutWork.SparseCandidates++; ctx.Session.LayoutWork.Last = "stable-candidate"; }
-            journal.Commit(); committed = true; snapshot = result; return true;
+            journal.Commit(); PublishBindingRevisions(retireAbsent: false);
+            committed = true; snapshot = result; return true;
         }
         finally
         {

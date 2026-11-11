@@ -11,29 +11,13 @@ internal sealed partial class UiLayoutEngine
     internal UiHostObservation Observe(UiWidgetContext ctx, UiObservationBudget budget, string? nodeKey, bool hostLayoutInvalidated)
     {
         var output = new List<UiObservedNode>();
-        UiObservationStatus status = UiObservationStatus.Sampled;
-        string reason = "";
+        UiObservationStatus status = ObservationLayoutStatus(ctx, hostLayoutInvalidated, out string reason);
         bool truncated = false;
         int start = 0;
         int end = lastEntries.Count;
         if (!ctx.Session.IsActive)
         {
-            status = UiObservationStatus.Stale;
-            reason = "host-closed";
             end = 0;
-        }
-        else if (cachedSnapshot == null)
-        {
-            status = UiObservationStatus.NotSampled;
-            reason = "no-successful-arrangement";
-        }
-        else if (hostLayoutInvalidated || ObservationHasPendingLayoutNotification(ctx.Bindings)
-            || cachedSnapshot.DefinitionRevision != ctx.Session.DefinitionRevision || ctx.Session.HasDirtyNodes
-            || cachedContentRevision != ctx.Session.ContentRevision
-            || cachedTranslationRevision != ctx.Translation.TranslationRevision)
-        {
-            status = UiObservationStatus.Stale;
-            reason = "declared-invalidation-newer-than-layout";
         }
 
         if (nodeKey != null && end > 0)
@@ -236,6 +220,19 @@ internal sealed partial class UiLayoutEngine
         return new UiHostObservation(ctx.Session.Identity, ctx.Source, ctx.Session.Frame, ctx.Session.DefinitionRevision,
             cachedSnapshot?.DefinitionRevision, DateTime.UtcNow, status, reason, truncated,
             Array.AsReadOnly(output.ToArray()), Array.AsReadOnly(hostFacts));
+    }
+
+    internal UiObservationStatus ObservationLayoutStatus(UiWidgetContext ctx, bool hostLayoutInvalidated, out string reason)
+    {
+        reason = "";
+        if (!ctx.Session.IsActive) { reason = "host-closed"; return UiObservationStatus.Stale; }
+        if (cachedSnapshot == null) { reason = "no-successful-arrangement"; return UiObservationStatus.NotSampled; }
+        if (hostLayoutInvalidated || ObservationHasPendingLayoutNotification(ctx.Bindings)
+            || cachedSnapshot.DefinitionRevision != ctx.Session.DefinitionRevision || ctx.Session.HasDirtyNodes
+            || cachedContentRevision != ctx.Session.ContentRevision
+            || cachedTranslationRevision != ctx.Translation.TranslationRevision)
+        { reason = "declared-invalidation-newer-than-layout"; return UiObservationStatus.Stale; }
+        return UiObservationStatus.Sampled;
     }
 
     private bool ObservationHasPendingLayoutNotification(IUiBindingAccess bindings)

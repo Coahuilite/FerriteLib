@@ -125,13 +125,12 @@ internal sealed partial class UiLayoutEngine
     private int cachedTranslationRevision = int.MinValue;
     private PageTable<PlacedEntry> lastEntries = new PageTable<PlacedEntry>(Array.Empty<PlacedEntry>());
 
-    // Per-key notification state. keyNodes is the last arrange's map from an announced binding key to the
-    // nodes whose elements declare it; committedRevisions is the revision this engine has already folded
-    // into the arrangement. Together they are what makes an announcement target the elements that
-    // declared the key instead of the page: a key no arranged element declares is never polled, and one
-    // that is polled marks only its own nodes.
+    // keyNodes and committedRevisions describe this engine's successful dependency publication.
+    // Candidate revisions are sampled before reads, never acknowledged merely by receiving a notice.
+    // Only successful publication retires absent keys; other Hosts keep their own obligations.
     private readonly Dictionary<string, List<UiNode>> keyNodes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> committedRevisions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> candidateRevisions = new(StringComparer.Ordinal);
 
     // The three attribute names below are the page vocabulary the atoms and the consumer kinds read when
     // they resolve a binding (Bind, ActionBind, OptionsBind), plus the declared Id as the documented
@@ -177,6 +176,7 @@ internal sealed partial class UiLayoutEngine
             throw new ArgumentNullException(nameof(roots));
         ctx.Session.LayoutWork.Passes++;
         layoutPass++;
+        candidateRevisions.Clear();
         validatedLeaves.Clear(); invalidatedInputs.Clear(); notificationsCommitted = false; layoutInputChanged = false;
         bool externalContentChanged = cachedSnapshot != null && cachedContentRevision != ctx.Session.ContentRevision;
         try { if (TryIncremental(ctx, available, roots, externalContentChanged, out UiLayoutSnapshot retained)) return retained; }
@@ -228,32 +228,7 @@ internal sealed partial class UiLayoutEngine
             layoutDiagnostics.Clear();
             keyNodes.Clear();
             materializedRepeats.Clear();
-            var box = new MeasuredBox
-            {
-                Width = width,
-                Height = 0f
-            };
-            float y = 0f;
-            for (int i = 0; i < roots.Count; i++)
-            {
-                UiElementSpec root = roots[i];
-                if (IsHidden(root, ctx, narrow: false, parent: null, declaredIndex: i))
-                {
-                    // A hidden root has no arranged ancestor, so its declared keys report to the session-level
-                    // node - the same owner a host-level caller's state resolves into. That is what lets its
-                    // VisibleBind/Tab come back and re-arrange the page when the model says so.
-                    RecordDeclaredKeys(root, ctx.Session.ActiveNode, ctx.Bindings);
-                    continue;
-                }
-
-                UiNode rootNode = ctx.Session.GetOrCreateElementNode(UiNodeId.Root(root, i), root, i);
-                MeasuredBox child = MeasureElement(ctx, root, width, Math.Max(0f, height - y), rootNode);
-                child = OffsetBox(child, 0f, y);
-                box.Entries.AddRange(child.Entries);
-                y += child.Height;
-            }
-
-            box.Height = Math.Max(1f, y);
+            MeasuredBox box = MeasureRoots(ctx, roots, width, height);
             var rects = new Dictionary<string, UiLayoutRect>(StringComparer.Ordinal);
             var visible = new List<string>();
             var viewports = new Dictionary<string, UiLayoutRect>(StringComparer.Ordinal);
@@ -343,6 +318,7 @@ internal sealed partial class UiLayoutEngine
             ctx.Session.ClearDirtyNodes();
             stableVisibleIds = visible; stableDiagnostics = nextDiagnostics; stableScrollContents = scrollContents;
             RetainPipeline(ctx, roots);
+            PublishBindingRevisions(retireAbsent: true);
             return cachedSnapshot;
         }
         catch
@@ -440,7 +416,7 @@ internal sealed partial class UiLayoutEngine
             }
 
             NotePipelineNotification(entry.Key, entry.Value);
-            committedRevisions[entry.Key] = current;
+            candidateRevisions[entry.Key] = current;
 
             UiInvalidation invalidates = ctx.Bindings.GetInvalidation(entry.Key);
             if ((invalidates & (UiInvalidation.Measure | UiInvalidation.Structure)) == 0)
@@ -482,12 +458,7 @@ internal sealed partial class UiLayoutEngine
     private void RecordKey(string key, UiNode owner, IUiBindingAccess bindings)
     {
         if (key.Length == 0) return;
-        if (!committedRevisions.ContainsKey(key))
-        {
-            // First sight: this arrange is already using the key's current value, so its revision is
-            // committed here and only a later announcement invalidates the element.
-            committedRevisions[key] = bindings.GetRevision(key);
-        }
+        CaptureBindingRevision(key, bindings);
 
         if (!keyNodes.TryGetValue(key, out List<UiNode>? owners))
         {
@@ -499,6 +470,28 @@ internal sealed partial class UiLayoutEngine
         {
             owners.Add(owner);
         }
+    }
+
+    private void CaptureBindingRevision(string key, IUiBindingAccess bindings)
+    {
+        // Preserve the earliest sample across all positions and an incremental-to-full fallback.
+        // A notice raised by a getter/measure after that sample still needs a later successful pass.
+        if (!committedRevisions.ContainsKey(key) && !candidateRevisions.ContainsKey(key))
+            candidateRevisions.Add(key, bindings.GetRevision(key));
+    }
+
+    private void PublishBindingRevisions(bool retireAbsent)
+    {
+        foreach (var candidate in candidateRevisions)
+            if (keyNodes.ContainsKey(candidate.Key)) committedRevisions[candidate.Key] = candidate.Value;
+        if (retireAbsent)
+        {
+            var retired = new List<string>();
+            foreach (string key in committedRevisions.Keys)
+                if (!keyNodes.ContainsKey(key)) retired.Add(key);
+            foreach (string key in retired) committedRevisions.Remove(key);
+        }
+        candidateRevisions.Clear();
     }
 
     /// <summary>
@@ -2401,6 +2394,8 @@ internal sealed partial class UiLayoutEngine
     /// </summary>
     private float MeasuredHeight(UiElementSpec spec, IUiWidget widget, UiWidgetContext ctx, UiNode node)
     {
+        if (ctx.Session.IsBudgetMeasuring)
+            return Math.Max(0f, MeasureWidgetWithReuse(spec, widget, ctx, node));
         // The guard is here rather than in each widget because a measurement that dies takes the whole
         // arrange pass with it, and the tree — not the control — owns whether the page survives that.
         // The fallback keeps the element's slot instead of collapsing it, so a trip cannot reshuffle
