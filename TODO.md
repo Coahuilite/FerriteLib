@@ -88,7 +88,7 @@ implemented. Current requirements are reached through `docs/specification.md`; i
 
 ### FL09 Repeat declaration delivery
 
-- **Owner / reviewed_at:** sol-tiering, 2026-11-12T03:50:22.2415043+08:00 (Asia/Hong_Kong).
+- **Owner / reviewed_at:** sol-tiering, 2026-11-12T03:52:38.8006393+08:00 (Asia/Hong_Kong).
 - **Reviewed-through:** The independent 51dceef/6cc62e0 specification gate and WO r9's narrow source
   increment: immutable row declaration results, actual owner/spec/template/canonical identity and
   mount checks, cold recursion/warm merging, candidate-only dictionaries, timely key retirement,
@@ -96,8 +96,9 @@ implemented. Current requirements are reached through `docs/specification.md`; i
   The original nested-Repeat template refusal and editor-function invalidation remain unchanged.
 - **Evidence / continuation:** Existing Repeat/item-binding/visibility/failure-lifetime/reload/layout
   reuse/shared-editing/window-host and readonly-api checks pass; Core 391 passes. No new tests,
-  assertions, probes or resident instrument counters. Ordinary Release identity is delivered in
-  the producer record; US rebuild and Terra's scoped warm-open time/recursive-count comparison
+  assertions, probes or resident instrument counters. Clean ordinary RW1.6 Release producer a9d9f5f,
+  MVID 83d7162b-c701-4032-8800-aad838b76447, built with zero warnings/errors and no test hooks.
+  US rebuild and Terra's scoped warm-open time/recursive-count comparison
   remain pending. The 9.820 ms r4 boundary selects the repair, not a promised net saving.
 ### FL09 retained-region engineering delivery
 

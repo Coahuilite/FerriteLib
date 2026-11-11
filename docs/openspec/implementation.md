@@ -31,6 +31,12 @@ cf1cf6456096171fb47c012369bcd0c2f29e968f。FL-F01/F02/F03 已在该 HEAD 的 dir
 window host、readonly-api 与 Core 391 检查通过，无新增用例。普通 RW1.6 net472 固定载体由 owner
 交付记录持 producer／MVID；本条实现不改变原 r4 配对的已接受停手行为。
 
+固定普通 Release producer 为 `a9d9f5f3a1d87044987a8bf6d77cbc27ecdde01f`，实际 MVID
+`83d7162b-c701-4032-8800-aad838b76447`，InformationalVersion 为 `0.9.0-dev+` 加该完整 SHA。
+从干净提交源 --no-incremental 构建，UiKitTarget留空、FerriteTestHooks=false，零警告／错误；
+实际引用 Krafs.Rimworld.Ref1.6.4871／Assembly-CSharp1.6.9676.17735，FER_TOOLS且无FER_TEST／FER_DEV。
+后继 docs-only HEAD不刷新该载体；旧 r3／r4 固定配对保留作原生基线，新载体先供 US 重编。
+
 原生选择依据仍为 HOT-R4 的一次暖开58.449 ms中声明收集9.820 ms；候选尚未取得新暖开时间或
 递归次数。原 `CollectRepeatItemIdentities`、`CollectHiddenRepeatIdentities`、`CollectChildIdentities`
 边界保留供既有仪器按调用祖先归因；页面静态 `CollectDeclaredIdentities` 的递归仍存在，不能混算为行子树。
@@ -97,7 +103,7 @@ Attachment.Status 与原 Host.Observe／Tools 的 `region-status` facts 来自�
 BoundaryCaptures、Builds、ReusedRegions、ScheduleReuses、InteractiveCalls、UnknownCalls、PaintCalls、
 ClippedDisplays；否则 NotSampled。PaintCalls 不是 native 调用、GPU 提交或 FPS。
 
-普通 net472／RW1.6 Release 当前 producer 为 `f5e022ee56a981f7d2fd2d09b339654ee6ae65c6`，
+原 r3／r4 普通 net472／RW1.6 Release producer 为 `f5e022ee56a981f7d2fd2d09b339654ee6ae65c6`，
 实际 MVID `00b1ed28-9ff5-4d5a-b876-90c82d75a56c`，InformationalVersion 为该完整 SHA 的 `0.9.0-dev+` 值；
 干净提交源、UiKitTarget 留空、FerriteTestHooks=false、--no-incremental 构建零警告／错误。
 固定目录由 producer READY／DELIVERY 持有，不从后续 docs-only HEAD 推断或覆盖；早期 `d707ddf` API 载体和 `d2a2e82` 中间载体保历史。
