@@ -1,7 +1,7 @@
-# Spec Delta — 区域采用，候选未采用
+# Spec Delta — 采用来源（非 current）
 
-基准：`d07cdc0`。FL08-IDENTITY／REPEAT／LATE-ITEM 与 FL09-PAGE-EXECUTION 保持；
-以下新增区域选择正交于页面执行方式，不是第三种 Schema 或混用 TieredEvents。
+0.9 已采用、未实施；来源为 bb7da49 及 WO-FL09-RETAINED-DISPLAY-20261111 r2 的 choices／paint证明与源捕获补充。
+本文保留采用时完整 delta，不作为第二份 current；唯一正文见 [对应能力](../../../../../specs/core/structure/spec.md)。
 
 ## ADDED Requirements
 

@@ -1,13 +1,16 @@
-# Spec Delta — 保留1.6后端的区域提交，候选未采用
+# Spec Delta — 采用来源（非 current）
 
-基准：`d07cdc0`。以下是0.9中保留1.6执行后端的新能力；不同adapter分别声明与验证。
-FL16-REPAINT／COORDINATES／EXECUTION／DISPOSE 继续适用，不更改1.7支持声明。
+0.9 已采用、未实施；来源为 bb7da49 及 WO-FL09-RETAINED-DISPLAY-20261111 r2 的 choices／paint证明与源捕获补充。
+本文保留采用时完整 delta，不作为第二份 current；唯一正文见 [对应能力](../../../../../specs/adapters/rimworld16/spec.md)。
 
 ## ADDED Requirements
 
 ### Requirement: FL16-REGION-PAINT 复用结果仍实际提交可见内容
 采用区域 participant 的1.6路径 SHALL 沿原 execution／绘制与有效坐标链，
 每适用 Repaint 真实提交当前可见显示；只能省略已证明纯且隔离的派生／调度／裁剪展示。
+Repaint 仅在 effective clip 真空，或全部实际可能 paint footprint 已证明／由原后端强制限制且
+全部在 clip 外时省纯 Paint；layout rect 不相交不构成证明，不能证明仍实际调用。
+显式 PaintClip 只约束新纯 Paint，沿原 drawing clip 强制执行并保持坐标／finally；不自动裁旧 custom。
 原生 editor、control ID、资格、事件消费、滚动、popup、焦点／IME 与捕获结束 SHALL 仍由原 owner 每事件操作。
 纯 Paint 的临时样式／group／font／enabled SHALL 在 finally 恢复，合法焦点与 hotControl 不回滚。
 布局、实际主线程绘制调用、GPU、scanout SHALL 分别报告，方法数或保留几何不证明省后两者。

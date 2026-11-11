@@ -3,6 +3,10 @@
 ## Purpose
 定义页面中什么存在、它属于谁，以及相容更新时保留哪些身份。定义不持运行状态，业务目标不由视觉顺序推断。此能力的直接消费者是布局、交互及[定义更新连接](../../contracts/definition-update/spec.md)。
 
+0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、未实施；本页新增区域条款及
+相关显式例外仅适用于主动采用的新能力，不表示当前 API 已可调用。行为唯一正文归本页，
+采用来源见 [fl09-retained-regions](../../../changes/fl09-retained-regions/proposal.md)。
+
 ## Requirements
 
 ### Requirement: FL08-STRUCTURE 四项职责共用事实而不互相代管
@@ -82,3 +86,28 @@ Repeat 的 Items SHALL 是有序稳定 key 的 `IReadOnlyList<string>` value，T
 #### Scenario: 作者依赖每 pass 调用
 - **WHEN** Schema 3 页面声明 `TieredEvents="false"`
 - **THEN** 页面逐 pass 执行，与 Schema 2 默认相同
+
+## 0.9 区域保留：已采用、未实施
+
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable，尚无对应导出。
+
+### Requirement: FL09-REGION-ENROLL 作者在原树上明确选择区域
+作者 SHALL 可在原 Host 的唯一声明结构容器登记表示源及明确消费 map，包含 Scroll／Repeat，
+不要求新 kind、Overlay、Catalog、Tools、reactive runtime 或迁移整个页面。
+登记 SHALL 先验证再生效；首版重叠附件、歧义模板目标、无效类型／角色定位拒绝而不改原连接。
+原 UpdateScope 嵌套不受附件重叠限制。缺登记的默认值为关闭，Schema 2／3 及 TieredEvents 意义不变；
+逐 pass 页明确登记后仍每 pass 捕获来源，未采用消费保持原读取条件。
+
+区域 SHALL 复用原节点／key／part／mount 身份，表示 item packet 不成为另一棵身份树。
+相容重排／定义更新保相容 UI 状态；隐藏、移除、retarget、重挂和不兼容替换按原寿命处理。
+登记或 packet 相同不能免除原绑定 reader 类型／owner 验证，旧 Repeat 的合法晚绑定条件继续适用。
+
+#### Scenario: F09 只采用 b-actions
+- **WHEN** 作者在原 Scroll 内的 Repeat 上登记新表示，其他页和部分 widget 未迁移
+- **THEN** 只改变已明确选择的区域消费；既有 Items 向量及原字段仍完整存在
+- **AND** 不要求删掉屏外／折叠 key，也不以注册整个产品作为采用门槛
+
+#### Scenario: 同 key 在实际释放后重挂
+- **WHEN** 同名节点取得新 mount
+- **THEN** 旧区域记录／请求不复活，按当前源建立新记录
+- **AND** 其他区域和 Host 的状态不被迁移或释放

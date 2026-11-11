@@ -1,6 +1,9 @@
 # Design — 区域表示与实际操作分离
 
-状态：**候选，供采用决定**。以下签名是本候选的最小公开草案，不是当前可调用 API。
+状态：**0.9 已采用、未实施**，WO-FL09-RETAINED-DISPLAY-20261111 r2 选用 bb7da49 并补全独立 choices、
+实际 paint footprint 证明和生产源捕获要求。本文件是采用时设计来源，不是另一份 current；
+行为归 [现行入口](../../../specification.md)，计划接口唯一归 [region-api](../../specs/contracts/presentation-execution/region-api.md)。
+本文代码是采用记录，尚未导出；本次仅正式采用规格，产品源码继续停在 PM 两库确认门。
 
 ## D1 两种输入、一个 Host
 
@@ -15,12 +18,12 @@
 没有第二棵 UI 树。snapshot 的 item packet 是业务表示分组，不拥有节点／mount／焦点；
 成员仍来自原声明／Repeat keys。FL 在原 retained records 上编译区域纯工作片段、
 interactive／unknown 操作片段及有效位置，复用原 journal、Session 与成功 publication。
-UpdateScope 继续持记录，不成为独立 scheduler。
+UpdateScope 继续持记录，不成为独立 scheduler；不扩为通用跨 Host 缓存平台。
 
-## D2 最小 API 草案与参数
+## D2 采用时接口记录与参数（非 current）
 
-全部新增接缝建议 Public-unstable；不改旧接口 implements、构造默认或 XML。
-名称待采用后按此一组实现，不再并存 snapshot／epoch 两套入口。
+整个新增闭包已定 Public-unstable；原有 Stable 依赖不降级，不改旧接口 implements、构造默认或 XML。
+以下保留采用时的接口设计；实施以唯一 current region-api 为准，不并存 snapshot／epoch 两套入口。
 下列仅列 public／protected 表面；未列出的构造不公开，附件只能由 Attach 创建。
 
 ```csharp
@@ -30,6 +33,7 @@ public sealed class UiRegionSnapshot
 {
     public static UiRegionSnapshot Create(Action<UiRegionValues> fill);
     public T Get<T>(string key);
+    public IReadOnlyList<UiChoice<T>> Choices<T>(string key);
     public UiRegionSnapshot Item(string source, string item);
 }
 public sealed class UiRegionValues // 仅 Create 的同步 builder，不得带出
@@ -79,10 +83,11 @@ public interface IUiRegionParticipant // 与 IUiWidget 并存的可选能力
 public abstract class UiRegionDisplay
 {
     protected UiRegionDisplay(float naturalHeight, float? labelWidth,
-        IReadOnlyList<UiPointerRegion> pointerRegions);
+        IReadOnlyList<UiPointerRegion> pointerRegions, UiLayoutRect? paintClip = null);
     public float NaturalHeight { get; }
     public float? LabelWidth { get; }
     public IReadOnlyList<UiPointerRegion> PointerRegions { get; }
+    public UiLayoutRect? PaintClip { get; }
 }
 ```
 
@@ -94,13 +99,22 @@ public abstract class UiRegionDisplay
   函数只读当前源并返回完整 immutable 表示；`null` 是明确 Unknown，走原区域路径。
   抛错是当前 Failed，不转换成 Unknown／空成功；不自动写 source 或装 tracking。
 - snapshot 以**同一不可变实例**表示同一完整业务表示；新实例保守失效，FL 不做任意对象
-  深相等。源 owner 可在鲜读其全部实际来源后返回原实例；不能只查 view/Bump 而遗漏 rowResults。
+  深相等。源 owner 可核对覆盖全部实际来源的可信不变证据后返回原实例，不要求重读每个字段；
+  证据须归真实 source owner、覆盖全部写边和有效期（包括失败 rowResults），不是只查 view/Bump。
   这是可检查的数据表示，不是仅有整数／hash／版本号的凭据。
 - Create 复制封存键表，Choices 复制封存其外层及 caption／help 事实；Value 的集合及其他
   payload 必须由源提供 detached 不可变值，不承诺对任意 T 做反射深拷贝；字符串／值类型按值，
-  不能把可变 view、普通对象字段或延迟枚举藏进去。重复 key／错型定位拒绝；缺项 Get 失败，
+  不能把可变 view、普通对象字段或延迟枚举藏进去。同一通道重复 key／错型定位拒绝；缺项读取失败，
   合法 null value 与 source 返回 Unknown 分开。`Item` 按原 UiBindingAddress source/item
   命名，包内 field 为 key；可复用未变 item packet，不按 ordinal 绑定 UI 身份。
+- Value 和 Choices 在 builder、read map、root／item snapshot 都是独立通道；同名 key 可各有一个，
+  Get<T> 只取 Value，Choices<T> 只取独立 choices，不把 Value 中的列表转作 choices 或反向回退。
+  Choices<T> 返回 defensive immutable 的 IReadOnlyList<UiChoice<T>>，保 Text／Value／HelpRef／TextKey，
+  与当前 readonly struct UiChoice<T> 一致；T 的实际消费数据仍须不可变，不深克隆任意业务对象。
+  缺目标通道／key／item 抛 KeyNotFoundException；目标通道存在但精确声明 T 不符抛
+  InvalidOperationException；同通道重复登记抛 ArgumentException，choices 外层 null 抛 ArgumentNullException，
+  明确空列表是成功空值。Build 的错误归原路径定位，不能借普通 Get／Choices 补资料。
+  Operate 的实时 choices／资格／请求仍走原 endpoint，不从冻结列表取得执行授权。
 - `reads` 是**新端口的明确采用表**，Attach 复制冻结。Layout 覆盖该 key 的结构／测量角色，
   Display 覆盖支持表示消费的纯展示角色；二者可并用。Items 用 Value 的有序 key 列表，
   Choices 是独立通道；ItemValue/ItemChoices 精确匹配 source/field，不是字符串通配符。
@@ -115,6 +129,17 @@ public abstract class UiRegionDisplay
   `inputs` 对非 Repeat 项是区域根包，对项内节点是当前最内层 source/item 的 packet；
   由原 Repeat 地址解析选择，不从行号／caption猜测。所需共享业务事实须显式放进该包，
   不隐式向外查普通 getter；更深嵌套可继续用 Item 分组，包不授予请求目标权威。
+- effective clip 是实际裁剪栈的共同区域，不是 layout rect 与祖先 clip 的交集；
+  无法证明全部输出时，不因布局框不相交而省略 Repaint。
+- `PaintClip` 默认 null，表示没有额外绘制边界证明，不能用 layout rect 不相交省 Paint。
+  非 null 是作者对**新纯 Paint**显式选择的局部绘制约束，不是一个“信任布局框”的标志。
+  FL 必须借原 drawing／adapter 的 clip 强制限制该 Paint 的全部实际输出，并保持原逻辑坐标，
+  才能把该约束转换为有效 footprint 证明；该 clip 不包住 Operate／native editor／旧 Draw。
+  作者须给出包含其应展示内容（含文字外溢、线宽、装饰等）的有限局部范围；不得自动取 layout rect。
+  PaintClip 以当前 widget bounds 左上为局部原点，可负偏移以包含外溢，宽高须有限非负；
+  由原坐标 owner 映射到当前 scroll／window clip 空间，不能缓存过时的绝对位置。
+  不得以过小约束或删内容缩减真实场景；只有新纯 Paint 受该显式边界约束。
+  不能强制覆盖全部输出的后端不使用此证明并走明确原路径；没有证明时仍调用适用 Repaint。
 - `Operate` 使用同一 display 给出的局部几何，但所有模型读／资格／native editor／命令走
   原通道，保每事件次数及原全局顺序。`Paint` 是新纯展示，只读 display 和当前 FL 外观／
   drawing，不 Get 模型、不创建控件／帮助／请求。没有把 IUiWidget.Draw 自动当成此接口。
@@ -132,7 +157,7 @@ public abstract class UiRegionDisplay
 
 ## D3 作者先采用一个现有区域
 
-示意使用上述候选 API；领域 capture 由消费 owner 实现，不是 FL 要增加的业务接口：
+采用时的实施接线示例（尚未导出）；领域 capture 由消费 owner 实现，不是 FL 的业务接口：
 
 ```csharp
 // IUiBindingAccess、普通命令和原 source 公开入口全部保留。
@@ -151,6 +176,9 @@ using var region = UiRetainedRegions.Attach(host, "b-actions",
 并另外核对真实 rowResults、展开／details／target 和贡献数据；未变分项复用 item packet。
 失败结果的所有原 mutation 入口由 source owner 纳入 capture 的实际输入或内部完整修订，
 **不向原调用者追加 Notify/Bump 条件**。原 source 无法证明的来源返回 Unknown 或留成洞。
+生产 owner 已能提供完整不变证据时，未变 capture 只核这些来源域证据并返回原包；
+只有变化才投影相应分项。不得在 CaptureCurrent 内逐字段 Get／重算 effective、格式化、
+CompactLayout 或重建完整展示，再把后代 Build=0 冒称区域收益。
 
 外部 sparse 作者保留原 kind／Validate／Draw，另外实现 participant：
 
@@ -175,6 +203,17 @@ request codec 不从 display 取得。原 Help 每 pass、下拉／编辑 native
 已配对错误布局进入 FieldDisplay，自然高度变化在原下一合法排列采用。
 目标是一次纯区域派生共享给 Measure／Pointer／Paint，而不是三个位置各查同一叶缓存。
 不采用新接口时仍调用原 IUiWidget 的完整实现；仅增加接口而没有 Attach 也不生效。
+
+独立 choices 的读取采用同一包，不补业务读：
+
+```csharp
+// root 或 inputs.Item(source, item) 都支持这两个独立通道。
+string selected = inputs.Get<string>("mode");
+IReadOnlyList<UiChoice<string>> choices = inputs.Choices<string>("mode");
+```
+
+源构造时分别 Value("mode", selected) 与 Choices("mode", copiedChoices)；read map 也分别声明。
+该例只展示读取，实际候选值仍须由 Operate 当前资格／endpoint 决定。
 
 ## D4 区域边界做实际工作减法
 
@@ -227,7 +266,9 @@ Scroll 内容增减、clamp、后续兄弟、clip/hit/popup 位置必须同一�
 调用点不变。新区域登记不把手动 phase 改成可重复 draw 的替代对象。
 
 1.6 IMGUI 每实际可见 Repaint 仍通过原 drawing 提交；隔离按原 owner finally 恢复。
-纯显示完全裁剪时可延后 Paint，但原操作／资格／help／capture／editor 调度保留。
+仅当 effective clip 本身为空，或全部实际可能 Paint footprint 已由具体实现证明／原后端强制
+限制且在当前 clip 外，才可延后纯 Paint；layout rect 不相交不是覆盖证明。未知 footprint、
+未知 clip 或证明过期时仍调用 Repaint。原操作／资格／help／capture／editor 调度保留。
 几何所需的 Build／首次自然测量不因屏外延期；同一有效 UiImage 的供应者只更新像素时，
 Repaint 仍画当前资源，尺寸变化才参与真实测量失效，不把供应资源复制进表示或抢其寿命。
 滚动、resize、隐藏后重显在首个适用 Repaint 实画当前内容，不能靠上次 framebuffer。
@@ -261,6 +302,9 @@ Repaint 仍画当前资源，尺寸变化才参与真实测量失效，不把供
 | model未变，invalid draft／composition／focus发生变化 | 编辑原时序、即时 native 稿与局部表示同步；不靠业务 token 压掉 |
 | 源仅给旧整数、闭包之后读可变对象，或遗漏实际贡献字段 | 不可作为完整证明；留原读取／明确拒绝该登记，不冻结整页 |
 | Unknown widget/来源混在已证明区域，或缺度量环境 | 未知段继续原条件；仅使实际依赖闭包回退，不要求删控件或贡献 |
+| layout rect 在 clip 外，但文字／装饰可能画进 clip，且无全输出证明 | Repaint 调用 Paint，不能由布局框推断屏外 |
+| value/choices 同名或缺 choices／类型错误 | 独立通道精确读取；缺失／错型定位失败，不借普通 reader 补齐 |
+| 未变 CaptureCurrent 仍逐字段派生，只让后代 Build=0 | 不满足区域更新，不能把成本搬家叫复用 |
 | 父关、tab切换、Repeat移除后才读旧后代 getter | 拒收；按当前父条件停止，再由原成员事务协调 |
 | scroll/resize/字体/语言/共享列变，旧packet相同 | 传播当前几何／环境，paint/hit/popup同位 |
 | 已裁剪编辑器仍持capture、弹层覆盖滚轮、help grace经过 | 保逐事件操作及原顺序／结束／pass计数；不能整体跳过 |
@@ -278,5 +322,6 @@ Status 和既有 Tools/R9 只读同一 owner 记录，标 source epoch／layout 
 后续以固定0.9开／关配对观察：边界captures和跳过的区域工作、实际交互／未知调用、
 首次／暖开合、展开／收起完整帧、Host父段、实际目标绘制调用时间、GC和分配。
 保留实际分母及不同计时场，不相加 inclusive/self 或不同列中位数，不用方法次数换算FPS。
-先验证完整功能路径，再裁定整帧6.060606ms目标；现有144Hz私有环境可以否决预算，
-不能签发165Hz物理显示保证。SPEC阶段只有文本／源码证据，无产品性能结论。
+先验证完整功能路径，再裁定整帧6.060606ms目标。历史主扫144Hz与后续独立IMGUI账的60Hz
+现场分开，不是新0.9对照；同代测量按实际节奏配对，不变更显示设置，也不签发165Hz物理显示保证。
+SPEC采用阶段只有文本／源码证据，无产品性能结论。

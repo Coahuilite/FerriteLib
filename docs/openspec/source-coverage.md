@@ -3,7 +3,26 @@
 本表追踪有效条款／稳定 ID／值和条件，不另立规范。源基线为
 cf1cf6456096171fb47c012369bcd0c2f29e968f；被替代正文在[完整归档](../archive/specs-before-20261029/INDEX.md)。
 表中旧文件名均指该归档内原同名文件。后续已确认的细则优先于旧文中的准备／pending措辞；
-实现错误不削弱要求。原基线核心行为是整理与补录，不产生新行为 delta；基础能力 change 仍未实施，事件分层的独立采用与实现见下节。
+实现错误不削弱要求。原基线核心行为是整理与补录，不产生新行为 delta；基础能力 change 仍未实施，区域保留与事件分层的独立采用／实现边界见下节。
+
+## FL09显式区域保留：2026-11-11 r2采用对账
+
+来源为 WO-FL09-RETAINED-DISPLAY-20261111 r2 及 bb7da49；PM 核定整个新增闭包 Public-unstable。
+下列正文已并入唯一 current，均为**0.9已采用、未实施**；change 的 delta／design 是采用来源，
+不另持 current。已导出 API／Stable 清单未改；[计划接口](specs/contracts/presentation-execution/region-api.md)明确未导出。
+
+| 采用条款／决定 | 唯一 current | 适用与状态 |
+| --- | --- | --- |
+| ORDINARY 显式新端口；REGION-SOURCE | [绑定](specs/core/binding-reactivity/spec.md) | root/item Value／Choices独立、公开 defensive immutable Choices、完整源证据；旧 Get／Operate资格不变 |
+| RU2-B/D、FULL-FALLBACK 例外；REGION-UPDATE | [布局](specs/core/layout/spec.md) | 区域边界省纯后代工作，变化闭包同事务传播；不得把逐字段成本移进capture |
+| REGION-ENROLL／REGION-LIFETIME | [结构](specs/core/structure/spec.md)、[寿命](specs/core/lifetime-recovery/spec.md) | 原身份／mount、显式附件、退出／重入／失败／Close，不改Schema默认 |
+| U3／SPLIT-PHASE／TIERED／TIER-SAFE／CLIPPED；REGION-PARTICIPANT | [展示执行](specs/contracts/presentation-execution/spec.md) | 新纯Build／实时Operate／Paint；真实clip或全部footprint证明，不以layout rect代替 |
+| FL16-REGION-PAINT | [保留1.6](specs/adapters/rimworld16/spec.md) | 真实提交／强制clip／finally，不以1.6签1.7 |
+| DEV-04 新纯Build预算；DEV-09-REGION | [Tools连接](specs/contracts/developer-tools/spec.md) | 非提交候选、只读同源状态；查询不推进 |
+| REGION-AUTHOR／新增闭包Public-unstable | [作者政策](specs/policies/public-authoring/spec.md)、[计划接口](specs/contracts/presentation-execution/region-api.md) | 完整新闭包已决定、未导出；旧Stable不降级、不退休 |
+
+实施／消费／原生门仍在 [tasks](changes/fl09-retained-regions/tasks.md)，本轮只做规格采用。
+历史F09与新独立60Hz IMGUI账各保来源，不能充作0.9同代基线或GPU／scanout证据。
 
 ## FL09事件分层：2026-11-11采用对账
 

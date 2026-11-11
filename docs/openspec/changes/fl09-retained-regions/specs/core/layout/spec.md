@@ -1,6 +1,7 @@
-# Spec Delta — 候选，未采用
+# Spec Delta — 采用来源（非 current）
 
-基准：d07cdc04f9985bb6818a34f5f90ba20c345f0206 的唯一 current。MODIFIED 保留完整原要求与全部仍适用场景；新增的显式区域义务仅适用于本 change 的主动采用。
+0.9 已采用、未实施；来源为 bb7da49 及 WO-FL09-RETAINED-DISPLAY-20261111 r2 的 choices／paint证明与源捕获补充。
+本文保留采用时完整 delta，不作为第二份 current；唯一正文见 [对应能力](../../../../../specs/core/layout/spec.md)。
 
 ## MODIFIED Requirements
 
@@ -65,6 +66,8 @@
 当前完整源、定义／reader owner、边界约束、有效字体／样式／语言／服务环境和局部 UI 状态相等时，
 SHALL 在区域边界停止后代纯 Build／Capture／Measure、上下文解析及局部 pointer 几何再生成，
 复用该区域调度；不能进入全部叶命中各自缓存后称为区域保留。
+也不得把同样逐字段投影／格式化／几何工作移入 CaptureCurrent；有完整不变证据的生产源应在边界
+核对来源域，只投影实际变化分项，源捕获成本仍计入更新工作。
 真实 interactive／unknown 操作与当次有效位置／clip 变换继续，不能把总成本承诺为任意图 O(变化节点)。
 
 部分表示变化 SHALL 利用真实未变分项／分支记录保留其纯结果，只重建实际变化闭包；

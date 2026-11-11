@@ -1,6 +1,7 @@
-# Spec Delta — 候选，未采用
+# Spec Delta — 采用来源（非 current）
 
-基准：d07cdc04f9985bb6818a34f5f90ba20c345f0206 的唯一 current。MODIFIED 保留完整原要求与全部仍适用场景；新增的显式区域义务仅适用于本 change 的主动采用。
+0.9 已采用、未实施；来源为 bb7da49 及 WO-FL09-RETAINED-DISPLAY-20261111 r2 的 choices／paint证明与源捕获补充。
+本文保留采用时完整 delta，不作为第二份 current；唯一正文见 [对应能力](../../../../../specs/core/binding-reactivity/spec.md)。
 
 ## MODIFIED Requirements
 
@@ -53,6 +54,18 @@
 snapshot 容器 SHALL detached 且只读，实际被消费的 payload 不可变；不保存延迟读取可变业务的闭包。
 独立 Host SHALL 各自确认其成功版本；中途新变化和失败不得被较早捕获吞掉。
 
+Value／Choices SHALL 在 builder、read map 和 root／item snapshot 各为独立通道，同名 key 不冲突。
+snapshot SHALL 公开 Choices<T>(key)，返回 defensive immutable 的 IReadOnlyList<UiChoice<T>>，
+保留实际 UiChoice<T> 的 Text／Value／HelpRef／TextKey；Get<T> 只读 Value，不跨通道补读。
+缺通道／key／item SHALL 抛 KeyNotFoundException；精确声明 T 不匹配 SHALL 抛 InvalidOperationException；
+同通道重复登记 SHALL 抛 ArgumentException，空 choices 为合法值、null 外层 SHALL 抛 ArgumentNullException。纯 Build 不得借普通 reader 填补缺项。
+Operate 的即时资格与原 endpoint 不因快照 choices 改变；它不是当前可执行集合的业务权威。
+
+生产源 owner 能提供覆盖全部实际来源／写边／有效期的不变证据时，未变边界捕获 SHALL 核这些
+源域证据并复用原 immutable 包，仅对变化分项重做投影；不得把逐字段 Get／派生／格式化／几何
+计算移入 CaptureCurrent 再称省略。证据必须含失败结果、选择／展开及真实贡献，不用旧 view／
+Bump 替代；未知来源仍保原路径，不要求旧调用者增加公告。
+
 #### Scenario: 失败只改变行错误
 - **WHEN** 原公开 TryCommitActionField 失败写 rowResults，而 view／configuration／Bump 未改变
 - **THEN** 下一合法捕获包含错误文字／存在性，使相应展示与高度更新
@@ -67,3 +80,13 @@ snapshot 容器 SHALL detached 且只读，实际被消费的 payload 不可变�
 - **WHEN** 源明确无法证明当前表示，或实际捕获失败
 - **THEN** 前者走原消费并报告 Unknown，后者保当前 Failed 和原恢复原因
 - **AND** 不把失败改成 Unknown／空值，也不使旧读取看到过时表示
+
+#### Scenario: root与item的value和choices同名
+- **WHEN** 同一包在两个独立通道登记 mode 的 string value 与 UiChoice<string> 列表
+- **THEN** Get<string> 与 Choices<string> 分别读回本通道的只读事实，不互相覆盖
+- **AND** 删除 choices 或读错 T 明确失败，不从 value 列表或普通业务读补齐
+
+#### Scenario: 未变生产捕获不重做字段工作
+- **WHEN** 完整源域证据仍有效且无变化
+- **THEN** CaptureCurrent 返回原 immutable 表示，不逐字段重建业务投影／展示准备
+- **AND** 边界捕获与后代 Build 成本一并观察，不能转移成本后声称复用

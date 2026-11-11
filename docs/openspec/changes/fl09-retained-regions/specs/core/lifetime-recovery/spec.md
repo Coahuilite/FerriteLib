@@ -1,6 +1,7 @@
-# Spec Delta — 区域记录寿命，候选未采用
+# Spec Delta — 采用来源（非 current）
 
-基准：`d07cdc0`。现行 H1/H2、RU3、FAILURE-GEOMETRY、END／RELEASE／RECOVERY 继续适用。
+0.9 已采用、未实施；来源为 bb7da49 及 WO-FL09-RETAINED-DISPLAY-20261111 r2 的 choices／paint证明与源捕获补充。
+本文保留采用时完整 delta，不作为第二份 current；唯一正文见 [对应能力](../../../../../specs/core/lifetime-recovery/spec.md)。
 
 ## ADDED Requirements
 

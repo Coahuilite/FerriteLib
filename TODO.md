@@ -26,14 +26,15 @@ owner's ce0028d/a3d4616 mechanism, retaining 0.9 reader/budget/legacy conditions
 demand-order allocation. The scoped change records the implementation and round-3 evidence route.
 The compatibility/consumer ports, total-FPS investigation and 0.9 native acceptance retain their separate owners.
 
-## 0.9 retained-region specification candidate
+## 0.9 retained-region adopted specification — not implemented
 
-WO-FL09-RETAINED-DISPLAY-20261111 r1 has a [proposed change](docs/openspec/changes/fl09-retained-regions/proposal.md)
-for explicit region inputs, shared immutable presentation and retained work scheduling. It is not adopted
-or implemented. PM reviews the true deltas, independent-author API and Public-unstable recommendation;
-the original owner adopts the selected text into current before product work. The F09 RW1.6 input is
-historical evidence, not a 0.9 or 1.7 performance result. Source, tests, build settings and API inventories
-are unchanged by this SPEC delivery.
+WO-FL09-RETAINED-DISPLAY-20261111 r2 adopts the selected [region change](docs/openspec/changes/fl09-retained-regions/proposal.md)
+into the sole current capability pages, including independent choices, complete paint-footprint proof
+and no per-field work relocation into CaptureCurrent. The whole new closure is Public-unstable;
+[planned interfaces](docs/openspec/specs/contracts/presentation-execution/region-api.md) are not exported.
+This delivery is docs-only. Product code remains gated on PM's FL/US confirmation; implementation,
+consumption and native acceptance are incomplete. Historical RW1.6 measurements do not certify 0.9/1.7;
+the later independent 60 Hz IMGUI evidence is separate from the earlier 144 Hz runs.
 
 ## 0.9 adopted capability work
 
@@ -79,6 +80,23 @@ implemented. Current requirements are reached through `docs/specification.md`; i
 
 ## Local review coverage
 
+### FL09 retained-region formal adoption
+
+- **Owner / reviewed_at:** sol-tiering, 2026-11-11T23:42:44.9386969+08:00 (Asia/Hong_Kong).
+- **Reviewed-through:** WO r2 selection of bb7da49, the actual readonly UiChoice<T> fields, the two
+  amended design/delta boundaries, and their merge into the sole current capability pages. The planned
+  current API includes independent root/item Choices reads and optional enforced pure-Paint clip;
+  the whole new closure is Public-unstable but not exported. Reviewed entry, API-plan, source-coverage,
+  implementation-state and change/task routing without replacing any old caller contract.
+- **Evidence / corrections:** Document-only review and relative file links/whitespace checks. The paint
+  rule uses the actual clipping stack/full output, not layout-rectangle intersection; unknown proof
+  still paints. Current source credentials may avoid per-field capture, and source work stays in the
+  update cost. Historical 144 Hz and independent 60 Hz IMGUI evidence keep their own scopes.
+  No source, test, build configuration or binary was edited; no build/harness/native check was run.
+- **Continuation:** Specification adoption is complete; implementation, US consumption and native
+  acceptance are not. PM confirms both libraries before releasing product code. No new standing
+  protocol or lesson is needed; existing single-current and evidence-layer rules cover this adoption.
+
 ### FL09 retained-region SPEC candidate
 
 - **Owner / reviewed_at:** sol-tiering, 2026-11-11T23:13:44.3072309+08:00 (Asia/Hong_Kong).
@@ -91,8 +109,8 @@ implemented. Current requirements are reached through `docs/specification.md`; i
   representation port and real region-boundary work elimination, not a view token or another leaf cache.
   API tier is a Public-unstable recommendation pending PM adoption, not a current classification.
   No production, test or build-parameter edit, build, harness, game or 1.7 run belongs to this scope.
-- **Continuation:** PM decides the candidate; the original owner adopts selected deltas before code.
-  US consumption and native acceptance remain separately gated. Existing rules cover source freshness,
+- **Continuation at that dispatch:** PM then reviewed the candidate; the formal-adoption checkpoint
+  above now owns that continuation. US consumption and native acceptance remain separately gated. Existing rules cover source freshness,
   unknown holes and evidence-layer distinctions; no new standing protocol or lesson is introduced.
 
 ### FL09 IDLE-SYNC round 3

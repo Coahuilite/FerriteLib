@@ -3,6 +3,10 @@
 ## Purpose
 使作者按需要采用完整能力切片，知道依赖、寿命、等级和升级边界。FL0.8.x 是首条面向公开作者的基线；更早内部版本是历史材料，不是先升级旧框架才能学习当前用法的前提。
 
+0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、未实施；本页新增区域条款及
+相关显式例外仅适用于主动采用的新能力，不表示当前 API 已可调用。行为唯一正文归本页，
+采用来源见 [fl09-retained-regions](../../../changes/fl09-retained-regions/proposal.md)。
+
 ## Requirements
 
 <a id="s1"></a>
@@ -115,3 +119,28 @@ UiPageWindow SHALL 可直接构造，Catalog 可选按 UiWindowKey/Options/Focus
 均未实施；一般能力不等于新specialized kind。现有inline详情可组合，游戏InfoCard／运行期Def接线仍归consumer/game adapter。
 shader不属基础补齐；通用仿射、变换内原生编辑／caret、完整modal／K1与OS桥不因本次文档而成为当前可用承诺。
 旧合法入口／兼容、单载体及各目标边界不变；当前1.7目标仍沿[DEV-06/07](../../contracts/developer-tools/spec.md)，不跟改保留0.8／1.6合同。
+
+## 0.9 区域保留：已采用、未实施
+
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable，尚无对应导出。
+
+### Requirement: FL09-REGION-AUTHOR 新能力主动选择，旧语义不退休
+公开作者 SHALL 可在普通／embedded Host 上选择单个已声明区域、明确表示读取 map，
+并为现有自定义 kind 实现公开 participant，不依赖 internal、Tools、Catalog、模型基类或整页 reactive。
+XML／程序定义继续共用原声明；新增附件不重解释 Schema 2／3、不增加全页默认、不替换旧绑定注册。
+旧签名、旧调用／override、旧读取与释放语义 SHALL 保留，无弃用或退休；退出新能力恢复原调用路线。
+无Host视觉／Session独立控件保持原合法入口，新区域保留不成为其前提。
+
+本组整个新增 API／必要新类型／实现接口闭包 SHALL 按 PM 的 r2 决定为 Public-unstable；
+现有 Stable 依赖不降级，后续迁移不解除功能合同或旧 Stable 保护。0.9 采用是实施目标，
+未实现的名字不得列为已导出／当前可调用 API；不以换minor免除既有兼容义务。
+
+#### Scenario: 作者只迁移一个 sparse kind
+- **WHEN** 新 participant 只在一个区域被明确采用
+- **THEN** 未采用实例仍运行原 IUiWidget，普通 Get／Set／命令不被新源拦截
+- **AND** 可以不迁其他页、未证明贡献或独立原生控件
+
+#### Scenario: 新增闭包已采用但尚未导出
+- **WHEN** 采用记录明确等级和依赖闭包
+- **THEN** 后续源码／文档据其实现并提供真实迁移，旧 Stable 入口持续合法
+- **AND** 采用文本与性能目标本身不宣告API已可用或native已通过

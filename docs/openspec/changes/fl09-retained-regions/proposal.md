@@ -1,7 +1,10 @@
-# FL09 显式区域保留：候选变更
+# FL09 显式区域保留：已采用变更
 
-状态：**proposed，未采用、未实施**。SPEC 来源为 WO-FL09-RETAINED-DISPLAY-20261111 r1；
-基准 `d07cdc04f9985bb6818a34f5f90ba20c345f0206`。本目录不覆盖 current；采用前产品工作停止。
+状态：**0.9 已采用、未实施**。WO-FL09-RETAINED-DISPLAY-20261111 r2 选中 bb7da49，
+新增整个闭包定为 Public-unstable，含独立 choices 读取、paint footprint 与生产源捕获补充。
+现行行为已并入各能力 [specs](../../specs)，计划接口唯一归 [region-api](../../specs/contracts/presentation-execution/region-api.md)。
+本目录只保采用来源，不作为第二套 current。此次仅文档采用，产品仍待 PM 确认两库后放行。
+基准 d07cdc0，候选来源 bb7da49；未修改产品、构建设置、二进制或已导出 API。
 
 ## Why
 
@@ -30,7 +33,7 @@ TryCommitActionField 解析失败可改变 row-result 的文字／可见性／�
 Operate 保原 editor／endpoint，Paint 每可见 Repaint 消费同一结果。
 这比整页可信 token 小，也比只公开 internal deferred-display 更完整。
 
-## What changes / 拟采用到哪里
+## What changes / 已采用归属
 
 | current 能力 | 真正 delta | owner／公开接缝 |
 | --- | --- | --- |
@@ -41,7 +44,7 @@ Operate 保原 editor／endpoint，Paint 每可见 Repaint 消费同一结果。
 | core/lifetime-recovery | ADDED FL09-REGION-LIFETIME | 候选成功才发布；退订、失败、重入、关闭沿原 owner |
 | adapters/rimworld16 | ADDED FL16-REGION-PAINT | 保留后端的实际 Repaint／样式隔离；不推断 GPU 保留或1.7能力 |
 | contracts/developer-tools | MODIFIED DEV-04；ADDED DEV-09-REGION | 新纯表示可用于非提交预算；同源有界观察，不为查询构建或刷新 |
-| policies/public-authoring | ADDED FL09-REGION-AUTHOR | 最小独立作者路线及 Public-unstable 建议；旧签名／调用／语义不退休 |
+| policies/public-authoring | ADDED FL09-REGION-AUTHOR | 最小独立作者路线及 Public-unstable 决定；旧签名／调用／语义不退休 |
 
 appearance、interaction-editing、help-output、observation 的现行状态／权威继续适用，
 不以本 change 改 palette、编辑政策、help grace、请求接受或观察预算。
@@ -58,11 +61,10 @@ US 1.6 消费 owner 在独立0.9分支把真实 `b-actions`（Scroll 内的 Repe
 
 ## Compatibility and decision
 
-推荐本组**新增接缝 Public-unstable**：源分组、表示／操作分界与适配器消费需真实 F09 验证，
-现在冻结 Stable 会把尚未验证的组合形状长期固定。仍提供完整可采用合同和明确迁移，
-不把“实验”当作允许丢请求／改旧语义。若 PM 选择 Stable，须在采用时把完整依赖闭包一并
-列入 API tiers／stable inventory，承担同目标的签名与行为保护；不能只稳定 Attach 名称。
-本候选不修改当前 API 分类、版本轴、Stable 清单或任何已发布状态。
+PM 已核定本组整个新增闭包为 **Public-unstable**：支持实际采用并保护所选行为，后续形状变更
+须明确迁移；旧 Stable 类型、依赖、签名和使用条件保持。此为尚未实施的 API 计划，不列作已导出。
+选择依据是源分组／表示与操作分界尚需实现和真实 F09 验证，不是消费者数量门槛；
+不以“实验”免除功能责任，不改变版本轴、Stable 清单或已发布状态。
 
 不实施0.8 A/B/C-r2移植，不退役旧 API，不增加“外部调用者必须 Notify/Bump”的条件。
 同源中性目标和各 adapter 分别交付；RW1.6 是此次事实输入，1.7 未获本轮实机授权。
@@ -76,6 +78,9 @@ US 1.6 消费 owner 在独立0.9分支把真实 `b-actions`（Scroll 内的 Repe
 `UI/Kernel/UsSparseFieldWidget.cs` 及 `.Layout.cs`，相对根为 `Source/UniversalSqueaker/`。
 新0.9必须用固定同代开／关或功能等价基线测量；上述历史A/C不是新基线。
 
-PM 核定 delta 与 API 等级后，由原 owner 把所选条款采用到唯一 current，再开始产品。
-本次只作文档／源码事实核对；不加测试／probe、不构建、不运行游戏。后续验证继续使用既有
-检查和获授权的真实 UI 脚本；方案场景不表示执行通过。任务分期见 [tasks](tasks.md)。
+此次完成正式文档采用，尚无 build／harness／产品／native 证据。r2 两项补充已先写回 delta／design
+再并入 current：root/item 独立 choices 的公开 defensive immutable 读取，以及不能以 layout rect
+代替实际 paint footprint 的裁剪证明。生产 source 未变时核可信来源域证据，不允许逐字段重算搬家。
+后续使用既有检查和获授权真实 UI 脚本；不新增测试／probe。PM 确认 FL／US 两库后才放行产品。
+历史主扫144Hz与新增独立IMGUI账60Hz分开，均不是新0.9对照；不更改显示设置。
+任务分期见 [tasks](tasks.md)。

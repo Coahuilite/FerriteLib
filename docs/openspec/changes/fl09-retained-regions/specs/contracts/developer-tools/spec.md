@@ -1,6 +1,7 @@
-# Spec Delta — 候选，未采用
+# Spec Delta — 采用来源（非 current）
 
-基准：d07cdc04f9985bb6818a34f5f90ba20c345f0206 的唯一 current。MODIFIED 保留完整原要求与全部仍适用场景；新增的显式区域义务仅适用于本 change 的主动采用。
+0.9 已采用、未实施；来源为 bb7da49 及 WO-FL09-RETAINED-DISPLAY-20261111 r2 的 choices／paint证明与源捕获补充。
+本文保留采用时完整 delta，不作为第二份 current；唯一正文见 [对应能力](../../../../../specs/contracts/developer-tools/spec.md)。
 
 ## MODIFIED Requirements
 

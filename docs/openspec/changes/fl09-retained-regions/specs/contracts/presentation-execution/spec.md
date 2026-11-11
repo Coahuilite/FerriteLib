@@ -1,6 +1,7 @@
-# Spec Delta — 候选，未采用
+# Spec Delta — 采用来源（非 current）
 
-基准：d07cdc04f9985bb6818a34f5f90ba20c345f0206 的唯一 current。MODIFIED 保留完整原要求与全部仍适用场景；新增的显式区域义务仅适用于本 change 的主动采用。
+0.9 已采用、未实施；来源为 bb7da49 及 WO-FL09-RETAINED-DISPLAY-20261111 r2 的 choices／paint证明与源捕获补充。
+本文保留采用时完整 delta，不作为第二份 current；唯一正文见 [对应能力](../../../../../specs/contracts/presentation-execution/spec.md)。
 
 ## MODIFIED Requirements
 
@@ -102,7 +103,7 @@ Repaint pass SHALL 先同步再绘制，所以逐 pass 执行与分层执行产�
 
 本要求把 0.8.x 已采用的同名 XML 词汇及语义带入 0.9。以 0.8.x 编写的 manifest 在 0.9 中含义不变。
 
-以上 XML 的合法位置／默认／旧 custom 条件 SHALL 保持。明确采用区域 participant 的纯 Paint 另按其新合同可在有效 clip 为空时延期，不把该权限授予旧 Draw，也不扩张 DeferClippedDisplay 的 XML 合法位置。其 Operate、help、编辑及 capture 结束仍逐事件执行，滚入后第一个适用 Repaint 消费当前表示并实画。
+以上 XML 的合法位置／默认／旧 custom 条件 SHALL 保持。明确采用区域 participant 的纯 Paint 另按其新合同只在 effective clip 真空，或全部实际可能 paint footprint 已证明／强制限制且在 clip 外时延期；layout rect 不相交不是证明。不把该权限授予旧 Draw，也不扩张 DeferClippedDisplay 的 XML 合法位置。其 Operate、help、编辑及 capture 结束仍逐事件执行，滚入后第一个适用 Repaint 消费当前表示并实画。
 
 #### Scenario: 行滚出视口后又露出
 - **WHEN** 行所在 Overlay 的有效 clip 先为空，后在一次滚动后可见
@@ -126,11 +127,17 @@ Measure、pointer、paint SHALL 使用同一完整结果与当前有效位置，
 Operate SHALL 保原每事件 native 控件顺序、资格、编辑／IME、capture／结束、Cancel、help 和 endpoint；
 cached display 不授权业务操作。FL edit owner SHALL 使相关 draft／validity／conflict／focus／composition
 改变参与局部表示失效；其他 custom local state 由其实际 mutation owner Invalidate 或保旧路径。
-Paint SHALL 纯消费显示事实，不包含普通模型读／控件／命令。原 IUiWidget 与独立入口默认不变，
+Paint SHALL 纯消费显示事实，输出沿原 drawing 漏斗，不包含普通模型读／控件／命令／help或Tooltip发布。
+不得绕过所选强制 clip 直接原生绘制。原 IUiWidget 与独立入口默认不变，
 仅实现新接口或注册源不会隐式切换。
 
-具有对应隔离／绘制能力的后端 SHALL 可省略非 Repaint／完全裁剪的纯展示，
-但在每个实际需要的 Repaint 提交当前可见内容；未知后端明确回退原调用。
+具有对应隔离／绘制能力的后端可省略非 Repaint 的纯展示。Repaint 的纯 Paint 延期 SHALL 仅在
+effective clip 真空，或全部实际可能 paint footprint 被证明／强制限制并全部在该 clip 外时成立；
+layout rect 不相交、上次画面或相同输入均不是覆盖证明。不能证明 SHALL 调用该 Repaint Paint；
+未知后端明确回退原调用，旧 custom／native ID／输入不因该选择省略。
+effective clip SHALL 指实际生效裁剪栈的共同区域，不是先与 widget layout rect 相交得到的区域。
+新 UiRegionDisplay.PaintClip 可显式约束纯 Paint，但必须由原后端强制覆盖全部输出、维持逻辑坐标，
+才构成 footprint 证明；默认 null 不声明边界，不自动采用 layout rect，也不约束 Operate／旧 Draw。
 几何所需的 Build／首次测量 SHALL 不因屏外延期，图像供应者的当前资源与寿命仍归原 owner。
 滚入、重显、尺寸／字体／语言改变后的首个适用 Repaint SHALL 使用当前完整表示。
 复用只证明少派生／少调度，不证明 framebuffer、GPU 或显示器保留像素。
@@ -149,3 +156,8 @@ Paint SHALL 纯消费显示事实，不包含普通模型读／控件／命令�
 - **WHEN** 原业务操作或 native 回调令 Host 逻辑关闭
 - **THEN** 不继续正常 Paint／其他节点调度或发布候选
 - **AND** Close 的清理义务仍由原 owner 完成
+
+#### Scenario: 布局框屏外但实际paint可能可见
+- **WHEN** effective clip 非空，layout rect 不相交，但文字外溢／装饰等 footprint 未被完整证明或强制限制
+- **THEN** Repaint 仍调用纯 Paint
+- **AND** 不能用布局相交表或忽略交叠的布局框代替实际输出覆盖证明

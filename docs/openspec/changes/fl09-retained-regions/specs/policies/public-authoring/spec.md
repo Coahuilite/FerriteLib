@@ -1,6 +1,7 @@
-# Spec Delta — 区域作者路线，候选未采用
+# Spec Delta — 采用来源（非 current）
 
-基准：`d07cdc0`。S1–S7、FL08-COMPAT、平台中立／单载体及既有独立视觉路线保持。
+0.9 已采用、未实施；来源为 bb7da49 及 WO-FL09-RETAINED-DISPLAY-20261111 r2 的 choices／paint证明与源捕获补充。
+本文保留采用时完整 delta，不作为第二份 current；唯一正文见 [对应能力](../../../../../specs/policies/public-authoring/spec.md)。
 
 ## ADDED Requirements
 
@@ -11,16 +12,16 @@ XML／程序定义继续共用原声明；新增附件不重解释 Schema 2／3�
 旧签名、旧调用／override、旧读取与释放语义 SHALL 保留，无弃用或退休；退出新能力恢复原调用路线。
 无Host视觉／Session独立控件保持原合法入口，新区域保留不成为其前提。
 
-新增 API 的公开等级 SHALL 在采用时由 PM 明确决定，并同步其必要类型／实现接口闭包；
-Public-unstable 的后续迁移不解除功能合同或旧 Stable 保护。Stable 若被选择，保护完整输入、
-phase／失败／寿命行为而非仅方法名，不以换minor免除既有兼容义务。
+本组整个新增 API／必要新类型／实现接口闭包 SHALL 按 PM 的 r2 决定为 Public-unstable；
+现有 Stable 依赖不降级，后续迁移不解除功能合同或旧 Stable 保护。0.9 采用是实施目标，
+未实现的名字不得列为已导出／当前可调用 API；不以换minor免除既有兼容义务。
 
 #### Scenario: 作者只迁移一个 sparse kind
 - **WHEN** 新 participant 只在一个区域被明确采用
 - **THEN** 未采用实例仍运行原 IUiWidget，普通 Get／Set／命令不被新源拦截
 - **AND** 可以不迁其他页、未证明贡献或独立原生控件
 
-#### Scenario: PM核定新增接缝为Public-unstable
+#### Scenario: 新增闭包已采用但尚未导出
 - **WHEN** 采用记录明确等级和依赖闭包
 - **THEN** 后续源码／文档据其实现并提供真实迁移，旧 Stable 入口持续合法
-- **AND** 候选文本与性能目标本身不宣告API已可用或native已通过
+- **AND** 采用文本与性能目标本身不宣告API已可用或native已通过

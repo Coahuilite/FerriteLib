@@ -3,6 +3,10 @@
 ## Purpose
 让隐藏、目标替换、删除、可协商关闭、实际销毁和异常恢复保持不同结果。Host／Session 持 UI 状态及其自有连接；业务服务、借用 execution 和供应纹理由各自 owner 持有。
 
+0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、未实施；本页新增区域条款及
+相关显式例外仅适用于主动采用的新能力，不表示当前 API 已可调用。行为唯一正文归本页，
+采用来源见 [fl09-retained-regions](../../../changes/fl09-retained-regions/proposal.md)。
+
 ## Requirements
 
 ### Requirement: FL08-END 生命周期结束不补业务动作
@@ -75,3 +79,36 @@ An owner may explicitly end a named subtree's UI lifetime. The existing Session 
 subtree's editor/capture/popup/output/custom resources without business completion. Its next mount has
 a new incarnation, even when the declaration key is unchanged; old requests close rather than move.
 Siblings keep compatible state. The Host retains its identity and takes a complete layout fallback.
+
+## 0.9 区域保留：已采用、未实施
+
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable，尚无对应导出。
+
+### Requirement: FL09-REGION-LIFETIME 表示、几何和调度共同成功
+区域候选 SHALL 在原成功事务共同发布输入版本、成员、纯结果、plan／位置及有效性；
+失败丢候选，保上一完整结果与真实待处理失效，不回滚业务、已结束交互或运行声明。
+几何不可靠 SHALL 暂停相关输入并沿原路径结束 capture；纯 Paint 可用最后成功 immutable
+资料作 fault 标识的静态展示，不运行旧 Draw／Operate／普通业务读，不把 retained 当当前成功。
+纯 Build 的相同失败输入只在相关变化或 Retry 后重试，普通源鲜读失败仍保其原恢复条件。
+
+新能力 SHALL 在 owner 上串行；capture／Build 重入同 Host 推进在修改候选前拒绝，
+期间新失效不能被早期版本确认，Close 后不能复活／继续正常工作。
+Dispose attachment SHALL 幂等退出新路径，释放本能力记录及 source 引用，下一安全边界
+完整重验原路径，保相容稿／身份而不隐式 Save／blur／Cancel；不释放借用 execution 或外部业务。
+Host Close、root删除／不兼容替换及显式 mount结束 SHALL 退休对应记录；可靠折叠不冒充销毁。
+清理逐项尝试并聚合实际原因，不新增进程全局 cache 或保留所有历史表示。
+
+#### Scenario: 区域候选已变化而后续排列失败
+- **WHEN** 新成员／纯结果已进入候选，但共享几何无法完成
+- **THEN** 所有旧完整事实仍只读可用，新记录不混入发布，可靠恢复前不开放不可靠输入
+- **AND** 已完成业务操作不撤销、不重试
+
+#### Scenario: 附件退出后继续原页面
+- **WHEN** 作者 Dispose 区域 attachment 而 Host 仍存活
+- **THEN** 原 reader／Measure／Draw 路径恢复原条件并验证当前输入
+- **AND** 不关闭业务、销毁 Session 或提交稿来模拟退出
+
+#### Scenario: 关闭与重入发生在捕获回调
+- **WHEN** callback 关闭 Host 或尝试递归推进同一 Host
+- **THEN** 关闭立即终止后续正常工作，递归推进在修改本候选前定位拒绝
+- **AND** finally 只清理、不使旧记录重新有效，也不对未采用调用追加新 purity 条件
