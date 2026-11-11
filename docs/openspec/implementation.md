@@ -29,6 +29,9 @@ FL09-PAGE-EXECUTION、binding FL08-ORDINARY 与 adapter FL16-DISPLAY-ISOLATION�
 - `UiLayoutManifest` 接受 Schema 2／3，保解析后的 SchemaVersion，定位拒绝非法／非 root TieredEvents
   及非 Overlay／非布尔 DeferClippedDisplay。`WithTieredEvents(bool)` 是唯一新增公开签名，
   返回不改原页的显式策略；旧 Create overload、其默认值与 stable 签名保持。
+  PAGE-ATTRIBUTE 返修在页面的 `ReadSubtree` 边界用 `XElement.Load(..., SetLineInfo)` 保留原坐标，
+  对内嵌 Styles 的全部后代检查保留属性 TieredEvents，再交原样式解析器处理外观词汇。
+  错置属性成为带原页行／列的定义错误；独立 UiStyleDocument 与其他未知样式属性保持原宽容策略。
 - 保留的 1.6 `VerseUiExecution` 隔离 `Text.fontStyles` 三个 label style 的 alignment／wordWrap／fontSize，
   `finally` 恢复，不恢复合法焦点／hotControl 变化；沿用该单项 containment allowance。
   FER_RW17 不声明隔离，内置 display 保逐 pass 回退；T2 周期仍可使用。
@@ -41,6 +44,10 @@ Schema 与程序入口、隔离回退、clip 继承／复显、fault retained pa
 既有相关 suites 和 readonly-api 的 managed 结果随 change tasks 记录；
 正常 Release Neutral／RimWorld17 与 Core 使用项目原入口。native 对比、实体键盘和 IME 接受仍归 task 7，
 没有在本工作中运行游戏或据此宣称原生性能提升。
+
+PM 的 2026-11-11 验收裁决已接受 `WithTieredEvents(bool)` 为 Stable，但未接受原 T 的静置／低速回归。
+WO-UIKIT-IDLE-REGRESSION-20261111 的 PAGE-ATTRIBUTE 修法先独立交付；IDLE-SYNC 的唯一机制设计由
+1.6 owner 提供，0.9 等待其差量后适配。本轮不涉及 1.7 或原生运行。
 
 <a id="fl09-reliability"></a>
 ## FL09 R1 修复与已采用目标（2026-11-09）

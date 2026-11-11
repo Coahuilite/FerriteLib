@@ -16,7 +16,7 @@
 
 Tasks 0–4 and 8 are implemented on the 0.9 branch. The single additive signature is
 `UiLayoutManifest WithTieredEvents(bool enabled)`; it is recorded in API tiers and the stable
-signature inventory for PM review under the Round 2 authorization. Existing signatures and optional
+signature inventory and was accepted as Stable by PM on 2026-11-11. Existing signatures and optional
 defaults remain. Task 4 ports the already adopted 0.8 single-item `Text.fontStyles` allowance;
 no other native contact is added.
 
@@ -31,3 +31,15 @@ per-wrapper getter-free proofs, individual port decisions and resolved check fai
 
 Tasks 5–6 remain with sol-compat; task 7 remains with uikit-terra and the user. This scope runs no game
 and claims no native performance, physical-keyboard or IME acceptance.
+
+## PAGE-ATTRIBUTE correction and IDLE-SYNC continuation
+
+WO-UIKIT-IDLE-REGRESSION-20261111 requires page-reserved TieredEvents placement to fail at the
+located manifest boundary even inside an embedded Styles subtree. ReadStylesSection now retains
+original XmlReader coordinates before validating every descendant and handing the captured section
+to UiStyleDocument. Standalone style parsing and all other unknown-style-attribute fallback remain.
+No public API or schema default changes; no new test or case is added for this correction.
+
+The original T native idle/low-speed regression is not accepted. The 1.6 owner designs the IDLE-SYNC
+mechanism; 0.9 adaptation waits for that owner's concise delta. PAGE-ATTRIBUTE is an independent
+delivery and does not close IDLE-SYNC or task 7. This round excludes 1.7 work.

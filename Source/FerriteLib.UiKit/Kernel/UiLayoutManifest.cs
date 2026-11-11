@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Xml;
+using System.Xml.Linq;
 
 namespace FerriteLib.UiKit.Kernel;
 
@@ -365,16 +366,21 @@ public sealed class UiLayoutManifest
 
     private static void ValidateExecutionAttributes(XmlReader reader, IXmlLineInfo lineInfo)
     {
-        if (reader.GetAttribute("TieredEvents") != null)
-            throw ParseError(lineInfo, "TieredEvents is only legal on the UiPage root.");
+        ValidateNestedPageExecutionAttribute(reader.GetAttribute("TieredEvents"), lineInfo);
         if (reader.GetAttribute("DeferClippedDisplay") is string defer
             && (reader.Name != "Overlay" || !bool.TryParse(defer, out _)))
             throw ParseError(lineInfo, "DeferClippedDisplay is an Overlay-only true or false policy.");
     }
 
+    private static void ValidateNestedPageExecutionAttribute(string? value, IXmlLineInfo lineInfo)
+    {
+        if (value != null)
+            throw ParseError(lineInfo, "TieredEvents is only legal on the UiPage root.");
+    }
+
     /// <summary>
     /// Captures the <c>&lt;Styles&gt;</c> subtree and hands it to the one style parser. The manifest owns
-    /// only the capture: the section's vocabulary, its validation and its failures belong to
+    /// the capture and page-reserved attribute placement: the style vocabulary and its failures belong to
     /// <see cref="UiStyleDocument"/>. A malformed section is not appearance-class here, because the section
     /// is part of this XML text - a manifest that cannot be read is the existing page-level failure.
     /// </summary>
@@ -384,7 +390,13 @@ public sealed class UiLayoutManifest
         using (XmlReader subtree = reader.ReadSubtree())
         {
             subtree.MoveToContent();
-            xml = subtree.ReadOuterXml();
+            // Preserve original page coordinates before detaching the section for the fail-soft
+            // style parser. A page execution policy is not an unknown appearance declaration.
+            XElement section = XElement.Load(subtree, LoadOptions.SetLineInfo);
+            foreach (XElement element in section.DescendantsAndSelf())
+                if (element.Attribute("TieredEvents") is XAttribute attribute)
+                    ValidateNestedPageExecutionAttribute(attribute.Value, (IXmlLineInfo)attribute);
+            xml = section.ToString(SaveOptions.DisableFormatting);
         }
 
         if (xml.Length > MaxStylesChars)

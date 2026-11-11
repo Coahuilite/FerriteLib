@@ -19,9 +19,10 @@ current task and applicable permissions; preserve the separate 1.6/native and 1.
 ## 0.9 event-tiering handoff
 
 The adopted [event-tiering change](docs/openspec/changes/fl09-event-tiering/tasks.md) owns the scoped
-implementation/evidence and cross-line tasks. The 0.9 source, managed checks and consumer guide are complete;
-PM reviews the one additive `UiLayoutManifest.WithTieredEvents(bool)` signature. The compatibility/consumer
-ports and native comparison retain their separate owners; native acceptance is not inferred from managed checks.
+implementation/evidence and cross-line tasks. PM accepted `UiLayoutManifest.WithTieredEvents(bool)` as Stable,
+but did not accept the original T native idle/low-speed regression. Under WO-UIKIT-IDLE-REGRESSION-20261111,
+PAGE-ATTRIBUTE is an independent parser delivery; IDLE-SYNC adaptation waits for the sole 1.6 mechanism owner.
+The compatibility/consumer ports and native comparison retain their separate owners.
 
 ## 0.9 adopted capability work
 
@@ -66,6 +67,19 @@ implemented. Current requirements are reached through `docs/specification.md`; i
 > and `OBLIVIONIS.md`; a closed item is a pointer here, not a paragraph.
 
 ## Local review coverage
+
+### FL09 PAGE-ATTRIBUTE round 3
+
+- **Owner / reviewed_at:** sol-tiering, 2026-11-11T13:07:21.7740083+08:00 (Asia/Hong_Kong).
+- **Reviewed-through:** The located embedded-style parser correction against clean `c4e1b50`, actual
+  Parse/ParseFile/default document-service routing, unchanged standalone style policy and Schema defaults,
+  and the PM-accepted Stable signature/status correction. No synchronization mechanism was changed.
+- **Evidence:** The supplied normal Parse shape returned an issue at line 0 before the fix; the changed
+  entry refuses it at original page line 3, position 26. The same standalone style still returns its
+  original unknown-attribute issue. Existing style, manifest, reload, tiering, readonly API and Core checks pass;
+  no test/case was added or weakened. The scoped parser handoff owns the candidate Release identity.
+- **Continuation:** PAGE-ATTRIBUTE is independently delivered. IDLE-SYNC waits for sol-compat's mechanism
+  delta; native recheck belongs to uikit-terra. This scope excludes 1.7 and holds no lock while waiting.
 
 ### FL09 event-tiering scope
 
