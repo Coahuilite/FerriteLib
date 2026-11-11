@@ -5,6 +5,18 @@ cf1cf6456096171fb47c012369bcd0c2f29e968f；被替代正文在[完整归档](../a
 表中旧文件名均指该归档内原同名文件。后续已确认的细则优先于旧文中的准备／pending措辞；
 实现错误不削弱要求。原基线核心行为是整理与补录，不产生新行为 delta；基础能力 change 仍未实施，区域保留与事件分层的独立采用／实现边界见下节。
 
+## FL09 Repeat 声明身份：2026-11-12 r8补充采用
+
+来源为 WO-FL09-RETAINED-DISPLAY-20261111 r8、真实 HOT-R4 的声明身份热点及
+[独立候选](changes/fl09-repeat-declarations/proposal.md) `51dceef`，随后单独文档采用。
+唯一 ADDED `FL09-REPEAT-DECLARATIONS` 在[结构 current](specs/core/structure/spec.md#requirement-fl09-repeat-declarations-未变声明不因值或开合递归重建)：
+完整 row／spec／模板／身份／mount 依据未变时，full 不因值／开合递归重新派生全部未变行子身份。
+[寿命 current](specs/core/lifetime-recovery/spec.md#requirement-fl09-region-lifetime-表示几何和调度共同成功)只连接该输出，
+原隐藏、真正释放／新 mount、嵌套成员、失败事务及普通 reader 条件保留；不复制这些旧条款为新能力。
+change 的 delta／design 仅保采用来源。适用0.9显式区域、已采用未实施，无新增公开 API或通知；
+PM 核对前不放行源码，后续检查／普通载体／原生证据归 [tasks](changes/fl09-repeat-declarations/tasks.md)。
+HOT-R4 的9.820 ms声明收集是选择范围的墙钟证据，不是净收益或 net10／1.7／165 FPS接受。
+
 ## FL09显式区域保留：2026-11-11 r2采用对账
 
 来源为 WO-FL09-RETAINED-DISPLAY-20261111 r2 及 bb7da49；PM 核定整个新增闭包 Public-unstable。

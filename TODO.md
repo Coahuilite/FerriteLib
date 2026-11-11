@@ -36,6 +36,10 @@ PM released product implementation in WO r3. The scoped tasks and implementation
 Release/check evidence; US consumption and native acceptance remain open. Historical RW1.6 measurements do not certify 0.9/1.7;
 the later independent 60 Hz IMGUI evidence is separate from the earlier 144 Hz runs.
 
+WO r8's narrow [Repeat declaration supplement](docs/openspec/changes/fl09-repeat-declarations/tasks.md)
+is adopted into the sole structure current, with the original lifetime transaction linked unchanged.
+It remains unimplemented pending PM's code gate; the saved editor experiment is not adopted.
+
 ## 0.9 adopted capability work
 
 WO-UIKIT-CAPABILITY-SPEC-20261108 r2 adopted the [change targets](docs/openspec/changes/fl09-basic-ui-capabilities/proposal.md),
@@ -79,6 +83,17 @@ implemented. Current requirements are reached through `docs/specification.md`; i
 > and `OBLIVIONIS.md`; a closed item is a pointer here, not a paragraph.
 
 ## Local review coverage
+
+### FL09 Repeat declaration specification
+
+- **Owner / reviewed_at:** sol-tiering, 2026-11-12T03:37:18.4259364+08:00 (Asia/Hong_Kong).
+- **Reviewed-through:** WO r8's selected declaration-identity work, actual collect/hidden/prune
+  boundaries, existing structure/layout/lifetime clauses, candidate 51dceef and its separate current
+  adoption. Only the missing repeat-work guarantee is ADDED; original keep, hidden/nested state,
+  removal/new mount, failure transaction and reader conditions stay intact. No API or product change.
+- **Evidence / continuation:** Static source and document review plus HOT-R4 transcription;
+  current requirement/scenarios match the selected delta and routes resolve. No build, tests or game
+  run for this supplement. Await PM's code gate; do not adopt the editor experiment.
 
 ### FL09 retained-region engineering delivery
 

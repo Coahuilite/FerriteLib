@@ -1,7 +1,7 @@
 # Spec Delta — Repeat 声明身份
 
-状态：独立候选，待另次文档提交采用。仅含真正新增保证；旧身份、读取和寿命要求保持。
-采用后本文件只保来源，唯一 current 归 [结构](../../../../../specs/core/structure/spec.md)。
+状态：0.9 已采用、未实施；独立候选 `51dceef` 后另次文档采用。仅含真正新增保证；旧身份、读取和寿命要求保持。
+本文件只保采用来源，唯一 current 归 [结构](../../../../../specs/core/structure/spec.md)。
 
 ## ADDED Requirements
 
