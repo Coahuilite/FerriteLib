@@ -1841,6 +1841,8 @@ internal sealed partial class UiLayoutEngine
     /// </summary>
     private sealed class RepeatState
     {
+        internal UiElementSpec? Declaration;
+        internal RepeatDeclarations? Declarations;
         internal string ItemsKey = "";
         internal string TemplateName = "";
         internal bool Initialized;
@@ -1851,6 +1853,7 @@ internal sealed partial class UiLayoutEngine
         {
             var copy = new RepeatState
             {
+                Declaration = Declaration, Declarations = Declarations?.Copy(),
                 ItemsKey = ItemsKey,
                 TemplateName = TemplateName,
                 Initialized = Initialized, MaterializedPass = MaterializedPass, ItemsRevision = ItemsRevision
@@ -1900,6 +1903,7 @@ internal sealed partial class UiLayoutEngine
     private MeasuredBox MeasureRepeat(UiWidgetContext ctx, UiElementSpec spec, string kind, float width, Padding padding, float gap, float titleHeight, float innerWidth, float innerY, float availableHeight, UiNode node, bool narrow)
     {
         RepeatState state = GetOrCreateRepeatState(node);
+        state.Declaration = spec;
         bool regionItems = RegionBackend(ctx) && Regions != null && Regions.TryValue(Regions.For(spec, node), ReadAttribute(spec, RepeatItemsAttribute), UiRegionUse.Layout, out IReadOnlyList<string> _);
         if (!regionItems && candidateFreshRepeats != null && candidateFreshRepeats.Add(node.Id))
             candidateFreshReads!.Add(new FreshRead { Kind = FreshReadKind.Repeat, Node = node.Id });
@@ -1912,6 +1916,7 @@ internal sealed partial class UiLayoutEngine
             // rather than reused under a scope they were not built for.
             state.Rows.Clear();
             state.DerivedByKey.Clear();
+            state.Declarations = null;
             state.ItemsKey = itemsKey;
             state.TemplateName = templateName;
             state.Initialized = false;
@@ -2016,6 +2021,7 @@ internal sealed partial class UiLayoutEngine
             {
                 state.DerivedByKey.Add(state.Rows[i].Key, state.Rows[i].Spec);
             }
+            state.Declarations?.Retain(state.DerivedByKey);
         }
     }
 
@@ -2144,13 +2150,7 @@ internal sealed partial class UiLayoutEngine
         for (int r = 0; r < materializedRepeats.Count; r++)
         {
             MaterializedRepeat repeat = materializedRepeats[r];
-            List<ItemRow> rows = repeat.State.Rows;
-            for (int i = 0; i < rows.Count; i++)
-            {
-                UiNodeId id = repeat.Node.Child(rows[i].Spec, rows[i].Index);
-                into.Add(id);
-                CollectChildIdentities(rows[i].Spec, id, into);
-            }
+            CollectRepeatDeclarations(repeat.Node, repeat.State.Declaration, repeat.State, into);
         }
     }
 
@@ -2177,13 +2177,7 @@ internal sealed partial class UiLayoutEngine
             && !IsMaterializedThisPass(id)
             && repeatStates.TryGetValue(id, out RepeatState? state))
         {
-            List<ItemRow> rows = state!.Rows;
-            for (int r = 0; r < rows.Count; r++)
-            {
-                UiNodeId rowId = id.Child(rows[r].Spec, rows[r].Index);
-                into.Add(rowId);
-                CollectChildIdentities(rows[r].Spec, rowId, into);
-            }
+            CollectRepeatDeclarations(id, spec, state!, into);
         }
 
         for (int i = 0; i < spec.Children.Count; i++)

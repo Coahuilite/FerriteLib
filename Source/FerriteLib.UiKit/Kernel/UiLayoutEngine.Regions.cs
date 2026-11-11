@@ -550,7 +550,12 @@ internal sealed partial class UiLayoutEngine
         foreach (UiNodeId key in gone) regionLeaves.Remove(key);
     }
     internal void ReleaseRegions()
-    { regionBoxes.Clear(); regionLeaves.Clear(); regionFrame = null; regionEnvironment = regionDrawEnvironment = null; }
+    {
+        regionBoxes.Clear(); regionLeaves.Clear(); regionFrame = null; regionEnvironment = regionDrawEnvironment = null;
+        // A Close during a failed full can restore prior RepeatState in its catch. Do not retain
+        // declaration owners from that rollback after the Session has ended.
+        foreach (RepeatState state in repeatStates.Values) state.Declarations = null;
+    }
 }
 
 internal interface IUiRegionBuiltin

@@ -38,7 +38,9 @@ the later independent 60 Hz IMGUI evidence is separate from the earlier 144 Hz r
 
 WO r8's narrow [Repeat declaration supplement](docs/openspec/changes/fl09-repeat-declarations/tasks.md)
 is adopted into the sole structure current, with the original lifetime transaction linked unchanged.
-It remains unimplemented pending PM's code gate; the saved editor experiment is not adopted.
+PM r9 released only this increment; its source candidate and existing checks are in the implementation map.
+The fixed ordinary carrier is delivered separately for a matched warm-open native check; the saved editor
+experiment is not adopted.
 
 ## 0.9 adopted capability work
 
@@ -84,17 +86,19 @@ implemented. Current requirements are reached through `docs/specification.md`; i
 
 ## Local review coverage
 
-### FL09 Repeat declaration specification
+### FL09 Repeat declaration delivery
 
-- **Owner / reviewed_at:** sol-tiering, 2026-11-12T03:37:18.4259364+08:00 (Asia/Hong_Kong).
-- **Reviewed-through:** WO r8's selected declaration-identity work, actual collect/hidden/prune
-  boundaries, existing structure/layout/lifetime clauses, candidate 51dceef and its separate current
-  adoption. Only the missing repeat-work guarantee is ADDED; original keep, hidden/nested state,
-  removal/new mount, failure transaction and reader conditions stay intact. No API or product change.
-- **Evidence / continuation:** Static source and document review plus HOT-R4 transcription;
-  current requirement/scenarios match the selected delta and routes resolve. No build, tests or game
-  run for this supplement. Await PM's code gate; do not adopt the editor experiment.
-
+- **Owner / reviewed_at:** sol-tiering, 2026-11-12T03:50:22.2415043+08:00 (Asia/Hong_Kong).
+- **Reviewed-through:** The independent 51dceef/6cc62e0 specification gate and WO r9's narrow source
+  increment: immutable row declaration results, actual owner/spec/template/canonical identity and
+  mount checks, cold recursion/warm merging, candidate-only dictionaries, timely key retirement,
+  hidden keep sets, unchanged reader validation, reload/lifetime/Close and conservative fallback.
+  The original nested-Repeat template refusal and editor-function invalidation remain unchanged.
+- **Evidence / continuation:** Existing Repeat/item-binding/visibility/failure-lifetime/reload/layout
+  reuse/shared-editing/window-host and readonly-api checks pass; Core 391 passes. No new tests,
+  assertions, probes or resident instrument counters. Ordinary Release identity is delivered in
+  the producer record; US rebuild and Terra's scoped warm-open time/recursive-count comparison
+  remain pending. The 9.820 ms r4 boundary selects the repair, not a promised net saving.
 ### FL09 retained-region engineering delivery
 
 - **Owner / reviewed_at:** sol-tiering, 2026-11-12T02:10:21.3857130+08:00 (Asia/Hong_Kong).

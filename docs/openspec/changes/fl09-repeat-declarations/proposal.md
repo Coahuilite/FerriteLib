@@ -1,10 +1,11 @@
 # FL09 Repeat 声明身份：有界补充
 
-状态：**0.9 已采用、未实施，待 PM 核对后开代码门。** 按 WO-FL09-RETAINED-DISPLAY-20261111 r8
+状态：**0.9 已采用，PM r9已放行本项，工程候选的原生暖开待验。** 按 WO-FL09-RETAINED-DISPLAY-20261111 r8
 及本轮采用授权，先独立提交候选 `51dceef`，再作单独 docs-only 采用提交。
 唯一正文已并入 [结构 current](../../specs/core/structure/spec.md#requirement-fl09-repeat-declarations-未变声明不因值或开合递归重建)，
 [寿命 current](../../specs/core/lifetime-recovery/spec.md#requirement-fl09-region-lifetime-表示几何和调度共同成功)只连接原责任。
-本目录为采用来源，不是另一份 current；仅适用0.9已显式采用区域能力的 Repeat，不包含产品实现、构建或验证执行。
+本目录为采用来源，不是另一份 current；仅适用0.9已显式采用区域能力的 Repeat。
+采用提交不包含产品实现／构建／验证；r9后继源码和既有检查另见[实现账](../../implementation.md#fl09-repeat-declarations)。
 
 ## Why / 实际缺口
 
@@ -46,6 +47,6 @@ Session 的 prune 按声明身份及私有子节点真实 owner 决定寿命，�
 
 完整 delta 见 [structure](specs/core/structure/spec.md)，决定性边界见 [design](design.md)。
 候选与正式采用已分为两个文档提交；正式条文只由上述 current 持有。
-目前停在代码门，由 PM 核对后才实施。已有检查、普通载体和真实暖开／寿命证据分别交付；
+PM r9已核定并放行本项，已有检查、普通载体和真实暖开／寿命证据分别交付；
 不新增单测／case／等价 probe，不把规格、编译或 RW1.6 的 r4 证据当作 net10／1.7 或165 FPS签收。
 任务与状态归 [tasks](tasks.md)。

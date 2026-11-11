@@ -112,12 +112,13 @@ Repeat 的 Items SHALL 是有序稳定 key 的 `IReadOnlyList<string>` value，T
 - **THEN** 旧区域记录／请求不复活，按当前源建立新记录
 - **AND** 其他区域和 Host 的状态不被迁移或释放
 
-## 0.9 Repeat 声明身份：已采用、未实施
+## 0.9 Repeat 声明身份：已采用，r9 实施候选
 
 本补充按 WO-FL09-RETAINED-DISPLAY-20261111 r8 及本轮采用授权纳入唯一 current，
 只适用于已显式采用区域能力的 Repeat，不改变公开 API、原 reader／通知或寿命条件。
 采用来源为 [fl09-repeat-declarations](../../../changes/fl09-repeat-declarations/proposal.md)；
-产品实现仍待 PM 核对放行，采用不等于已有载体或原生性能通过。
+PM 已在 r9 放行本项实现；源码与受影响既有检查见[实现账](../../../implementation.md#fl09-repeat-declarations)，
+固定载体和原生暖开／递归工作证据分别记录，采用或源码不等于性能通过。
 
 ### Requirement: FL09-REPEAT-DECLARATIONS 未变声明不因值或开合递归重建
 0.9 中按 FL09-REGION-ENROLL 显式采用的区域内，Repeat 的实际声明身份依据完备且未变时，

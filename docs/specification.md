@@ -19,11 +19,12 @@ Paint 延期须有实际 effective clip／全部输出 footprint 证明，layout
 [实现账](openspec/implementation.md#fl09-retained-regions)区分采用、代码与实机证据。
 
 WO r8 的 [Repeat 声明身份补充](openspec/changes/fl09-repeat-declarations/proposal.md)已正式采用，
-**适用0.9显式区域，已采用、未实施，停在 PM 核对后的代码门**。
+**适用0.9显式区域；r9已放行这一增量，源码候选／既有检查与原生验收分列**。
 唯一新行为归[结构 FL09-REPEAT-DECLARATIONS](openspec/specs/core/structure/spec.md#requirement-fl09-repeat-declarations-未变声明不因值或开合递归重建)：
 完备声明依据未变时，值／纯开合引发 full 也不递归重新派生整套相同子身份；
 完整 keep 与原[寿命事务](openspec/specs/core/lifetime-recovery/spec.md#requirement-fl09-region-lifetime-表示几何和调度共同成功)保持。
-无新 API或通知义务，后续实施与验收归该补充的 [tasks](openspec/changes/fl09-repeat-declarations/tasks.md)。
+无新 API或通知义务，当前机制／限制见[实现账](openspec/implementation.md#fl09-repeat-declarations)，
+固定交付与验收归该补充的 [tasks](openspec/changes/fl09-repeat-declarations/tasks.md)。
 
 ## 当前保证与已采用目标分开阅读
 

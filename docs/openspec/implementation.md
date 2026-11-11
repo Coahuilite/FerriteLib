@@ -5,6 +5,37 @@
 cf1cf6456096171fb47c012369bcd0c2f29e968f。FL-F01/F02/F03 已在该 HEAD 的 dirty 工作树修复；
 下列对应段落区分实际源码机制、已执行既有检查及未执行原生／精确故障组合。
 
+<a id="fl09-repeat-declarations"></a>
+## FL09 Repeat 声明身份：r9 工程候选，暖开原生待验
+
+规格候选 `51dceef`、正式采用 `6cc62e0` 后，WO-FL09-RETAINED-DISPLAY-20261111 r9 仅放行
+[FL09-REPEAT-DECLARATIONS](specs/core/structure/spec.md#requirement-fl09-repeat-declarations-未变声明不因值或开合递归重建)。
+源码只在原 RepeatState 保存声明结果，未采用 editor 实验、未改公开 API／原 reader／prune条件。
+
+- `CollectRepeatItemIdentities` 与隐藏路径均经 `CollectRepeatDeclarations` 处理完整实际 rows。
+  仅显式附件仍有效、源已知、隔离后端且直持 UiBindings 时建立新记录；Unknown、forwarding reader、
+  未采用及无隔离路径保原完整递归。实际 MaterializeRows／VerifyReaderSubtree 未省略或改凭据。
+- Repeat 层核实际附件、node／parent 与 mount、声明及实际模板对象；每行核稳定 key 对应的
+  immutable 派生 spec、规范 rowId 和仍存 node／mount。检查不深遍历子定义，不依赖 packet 引用相同、
+  view／值／draft／开合或尺寸未变。相容重排沿原规范身份；新身份／模板／mount需重建相应声明记录。
+- 冷首建仍调用原 `CollectChildIdentities` 完整递归，保存行根及全部声明后代的身份数组，包含隐藏后代。
+  暖命中只做行边界核对和完整身份合并，不递归派生子身份；未把递归挪进 proof。
+  仍复制候选 row-record 字典／合并全部 keep 身份，未承诺事务 O(变化节点)，冷建有额外记录分配。
+- full 的 RepeatState 副本只共享不可变行结果；候选字典增删不污染 rollback。实际 key移除同步退休记录，
+  `PruneNodesExcept` 的完整 keep 和调用时点不变。定义重建、显式 EndElementLifetime 沿原引擎退休；
+  Close 中失败回滚恢复旧 state 时额外清掉声明 owner 引用，不复活已退出寿命。
+- 当前合法 Host 模板在 `ValidateTemplateIdentityGrammar` 拒绝内含 Repeat，原既有拒收检查保持；
+  本次不放开嵌套 Repeat 词汇，也不以静态外层证明给未知动态嵌套背书。嵌套容器／区域沿原身份树处理。
+
+已有 Repeat／item binding／visibility／failure-lifetime／document reload／layout reuse／shared editing／
+window host、readonly-api 与 Core 391 检查通过，无新增用例。普通 RW1.6 net472 固定载体由 owner
+交付记录持 producer／MVID；本条实现不改变原 r4 配对的已接受停手行为。
+
+原生选择依据仍为 HOT-R4 的一次暖开58.449 ms中声明收集9.820 ms；候选尚未取得新暖开时间或
+递归次数。原 `CollectRepeatItemIdentities`、`CollectHiddenRepeatIdentities`、`CollectChildIdentities`
+边界保留供既有仪器按调用祖先归因；页面静态 `CollectDeclaredIdentities` 的递归仍存在，不能混算为行子树。
+未新增常驻计数。US 重编／Terra 同代暖开复验后才判收益；MeasureRegion余数、Draw、net10／1.7和165 FPS不由本项签收。
+
 <a id="fl09-retained-regions"></a>
 ## FL09 显式区域保留：实现候选，原生待验
 

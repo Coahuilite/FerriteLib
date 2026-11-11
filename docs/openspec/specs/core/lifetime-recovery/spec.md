@@ -87,7 +87,7 @@ Siblings keep compatible state. The Host retains its identity and takes a comple
 ### Requirement: FL09-REGION-LIFETIME 表示、几何和调度共同成功
 Repeat 声明结果的避免重复派生及完整 keep 依据归结构能力的
 [FL09-REPEAT-DECLARATIONS](../structure/spec.md#requirement-fl09-repeat-declarations-未变声明不因值或开合递归重建)；
-该0.9补充已采用、未实施，仍受下列原成功／失败／退出边界约束，不另设寿命 owner。
+该0.9补充已采用、r9实施候选，仍受下列原成功／失败／退出边界约束，不另设寿命 owner。
 
 区域候选 SHALL 在原成功事务共同发布输入版本、成员、纯结果、plan／位置及有效性；
 失败丢候选，保上一完整结果与真实待处理失效，不回滚业务、已结束交互或运行声明。

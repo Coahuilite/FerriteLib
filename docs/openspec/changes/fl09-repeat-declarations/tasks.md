@@ -6,12 +6,14 @@
   仅为缺失的工作避免保证提出 ADDED delta；原隐藏／移除／失败／reader 保证不变。独立 docs-only 候选提交。
 - [x] SPEC-2 按本次 PM 授权，候选 `51dceef` 后另作 docs-only 正式采用：并入唯一 core/structure current，
   lifetime 只连接原事务责任，更新 specification／来源路由；注明0.9、已采用未实施。
-- [ ] GATE PM 核对采用提交及 owner 的 DECL-SPEC 交付，再放行实现；在此之前不改 Source、tests、构建配置或二进制。
-- [ ] IMPL 获准后由原 FL owner 完成声明结果的实际复用／局部更新，保持完整 keep、嵌套／隐藏、
+- [x] GATE PM 在 WO r9 核对采用 `6cc62e0`，仅放行该声明身份增量；不放开 editor 实验或其他热点。
+- [x] IMPL 原 FL owner 在已有 RepeatState 内保留不可变行声明结果，保持完整 keep、原嵌套限制／隐藏、
   真正移除／新 mount、模板变更与失败回退；不合入 editor 实验、不新增 API或通知前提。
-- [ ] CHECK 实施后按影响选择既有 Repeat／visibility／failure／lifetime／reload 与 readonly-api 等入口，
-  普通 net472／RW1.6 交付另记真实身份；不新增单测／case／等价 probe，不以本任务启动检查。
+- [x] CHECK 已运行受影响既有 Repeat、item binding、visibility、failure-lifetime、reload、layout reuse、
+  shared editing、window host、readonly-api 及 Core 391；通过且未改测试／断言。普通 net472／RW1.6
+  固定交付另记真实身份；不新增单测／case／等价 probe。
 - [ ] NATIVE Terra／PM 使用同代真实 r4 基线复验暖开工作与寿命，区分声明派生／keep 合并／prune及仍需执行的工作；
   普通构建与条文采用不计作游戏、net10／1.7或165 FPS验收。
 
-当前材料只有源码静态调查、已有实机记录的转录和规格 prose；没有本 change 的产品实现或新增执行证据。
+源码机制、冷建／暖命中工作及限制见 [实现账](../../implementation.md#fl09-repeat-declarations)。
+当前有源码及相关既有检查证据；新候选的原生暖开与实际递归次数仍待 US／Terra 配对，未新增仪器或测试。

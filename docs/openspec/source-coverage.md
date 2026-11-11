@@ -13,8 +13,9 @@ cf1cf6456096171fb47c012369bcd0c2f29e968f；被替代正文在[完整归档](../a
 完整 row／spec／模板／身份／mount 依据未变时，full 不因值／开合递归重新派生全部未变行子身份。
 [寿命 current](specs/core/lifetime-recovery/spec.md#requirement-fl09-region-lifetime-表示几何和调度共同成功)只连接该输出，
 原隐藏、真正释放／新 mount、嵌套成员、失败事务及普通 reader 条件保留；不复制这些旧条款为新能力。
-change 的 delta／design 仅保采用来源。适用0.9显式区域、已采用未实施，无新增公开 API或通知；
-PM 核对前不放行源码，后续检查／普通载体／原生证据归 [tasks](changes/fl09-repeat-declarations/tasks.md)。
+change 的 delta／design 仅保采用来源。适用0.9显式区域，无新增公开 API或通知；r9已放行并提供
+声明记录的源码候选与相关既有检查，[机制与限制](implementation.md#fl09-repeat-declarations)、
+普通固定载体／原生证据归 [tasks](changes/fl09-repeat-declarations/tasks.md)。
 HOT-R4 的9.820 ms声明收集是选择范围的墙钟证据，不是净收益或 net10／1.7／165 FPS接受。
 
 ## FL09显式区域保留：2026-11-11 r2采用对账
