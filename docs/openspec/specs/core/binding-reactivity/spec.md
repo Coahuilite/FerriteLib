@@ -14,6 +14,8 @@
 采样的 revision，并退休已退出该域的键。隐藏不清模型通知，复显读取当前值；读取或测量期间的
 新公告、失败候选均不能冒充已成功覆盖的 revision。
 
+“合法执行条件”取决于页面的执行方式。逐 pass 执行时，普通展示读取与旧 Measure 按每个 pass 的同步执行。[分层执行](../../contracts/presentation-execution/spec.md)生效时：普通布局输入与旧 Measure SHALL 在同步点执行；内置展示 wrapper 的普通展示读取 SHALL 只在 Repaint 执行；业务请求、执行资格与 operate 中的读取仍逐 pass 执行。在这两种方式下，普通 getter 都 SHALL 在被同步点读到之后才被视为已采用，且 SHALL 不因复用而被推断为 pure。普通 getter 的调用次数与时点在两种方式之间可以不同；依赖每 pass 调用次数的作者 SHALL 选择逐 pass 执行。
+
 #### Scenario: 普通字段在 UI 外改变
 - **WHEN** 业务改变影响文字测量的普通字段并按原注册 key 通知
 - **THEN** 真实依赖在下次合法同步验证
@@ -23,6 +25,12 @@
 - **WHEN** 同一Host隐藏祖先后，作者合法公告其后代旧键，包括未变值或重复键
 - **THEN** 当前无布局依赖的历史键不永久阻塞其他有效布局；仍存的同键依赖继续同步
 - **AND** 复显时验证最新值，不要求换定义／重建Host或只公告可见键
+
+#### Scenario: 分层页面的普通展示值在帧内改变
+- **GIVEN** 页面启用分层执行，一个 `text/wrapped` 绑定普通 getter
+- **WHEN** 该 getter 的值在同一帧的两个非 Repaint 事件之间改变，且没有通知
+- **THEN** 非 Repaint pass 不调用该 getter
+- **AND** Repaint 调用它并绘制当前值，与逐 pass 执行的像素一致
 
 ### Requirement: FL08-TRACKED 显式纯来源与相等政策
 新 tracked 计算 SHALL 只读一个 runtime 的已连接来源，投影所有实际使用的可变属性为不可变展示值。Int、Text、Boolean 分别用整数、ordinal 字符串、布尔相等；通用 Value/List 要求作者指定 equality。相等写入 SHALL 保留旧存储值且不失效；相同最终值的独立命令／选择仍为独立请求。换分支或同结果换源 SHALL 更新真实依赖，不保留旧成功分支。

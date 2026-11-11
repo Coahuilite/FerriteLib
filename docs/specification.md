@@ -7,6 +7,8 @@
 [Trace／legacy-fit 两项新保证](openspec/specs/contracts/observation-boundary/spec.md)于2026-10-29获准采用，
 [变更记录](openspec/changes/isolate-observation/proposal.md)保存采用来源；实现证据与固定产物仍分别记录，不替代原生接受。
 
+2026-11-11采用的[事件分层变更](openspec/changes/fl09-event-tiering/proposal.md)已并入现行的展示执行、结构、绑定及保留1.6 adapter能力页；实现与验证进度由该change清单及开发映射分别记录。
+
 ## 当前保证与已采用目标分开阅读
 
 2026-11-08的[基础能力change](openspec/changes/fl09-basic-ui-capabilities/proposal.md)已采用、未实施：
