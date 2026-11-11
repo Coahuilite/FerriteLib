@@ -12,7 +12,7 @@ cf1cf6456096171fb47c012369bcd0c2f29e968f；被替代正文在[完整归档](../a
 
 | 来源／条款 | 唯一现行正文 | 实现与证据 |
 | --- | --- | --- |
-| design D1–D3，FL09-TIERED | [展示执行](specs/contracts/presentation-execution/spec.md) | Host 的 Repaint 周期、T2 复用与声明变化重同步；T1 保逐 pass；[实现映射](implementation.md#fl09-event-tiering) |
+| design D1–D3，FL09-TIERED | [展示执行](specs/contracts/presentation-execution/spec.md) | Host 的 Repaint 周期、T2 复用与声明变化重同步；鲜读不等于失效，按实际需求顺序鲜验、首个控制变化回 full；T1 保逐 pass；[实现映射](implementation.md#fl09-event-tiering) |
 | design D4，FL09-TIER-SAFE | 同上 | 库内部三个 wrapper 的 getter-free 展示分段；普通 SelectedBind 条件保留；managed 新语义检查 |
 | design D6，FL09-CLIPPED-DISPLAY | 同上 | Overlay-only true／false、继承与反向 override；无隔离回退、复显鲜读、Deferred 不清 fault |
 | MODIFIED FL08-ORDINARY | [绑定响应](specs/core/binding-reactivity/spec.md) | 两种合法执行方式、普通布局／展示与业务读取分界；不据复用推 pure |

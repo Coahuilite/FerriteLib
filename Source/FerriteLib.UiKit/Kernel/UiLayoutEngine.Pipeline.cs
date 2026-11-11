@@ -52,6 +52,7 @@ internal sealed partial class UiLayoutEngine
     private int pipelinePropertyRevision;
     private bool hasLegacyMeasure, hasCustomDemand, hasReferenceHeight, hasDiagnosticCallbacks, notificationsCommitted, layoutInputChanged;
     private bool incrementalValidation, conservativeValidation, validationRequiresFull;
+    private bool widthSensitiveFreshDomain;
     // This memo lives only within one synchronization: a conservative fallback must not replay a getter
     // already captured at the same constraints. It is never a cross-pass legacy purity assumption.
     private readonly Dictionary<UiNodeId, List<LeafMeasure>> validatedLeaves = new();
@@ -63,6 +64,10 @@ internal sealed partial class UiLayoutEngine
         pipelineBindings = ctx.Bindings; pipelineMetrics = textMetricsCache!.Source;
         pipelineTheme = ctx.Theme; pipelineTranslation = ctx.Translation;
         pipelinePropertyRevision = ctx.Theme.PropertyRevision;
+        widthSensitiveFreshDomain = false;
+        if (refreshInputs)
+            foreach (UiElementSpec root in roots)
+                widthSensitiveFreshDomain |= WidthSensitiveReadDomain(root, false, false, new HashSet<UiElementSpec>());
         entryIndex.Clear(); rootEntries.Clear(); visibleDemand.Clear();
         namedIndex = new(StringComparer.Ordinal); scrollIndex = new(StringComparer.Ordinal); contentIndex = new(StringComparer.Ordinal);
         hasLegacyMeasure = false; hasCustomDemand = false; hasReferenceHeight = false; hasDiagnosticCallbacks = false;
@@ -88,6 +93,24 @@ internal sealed partial class UiLayoutEngine
         stackRecipes = candidateStackRecipes;
     }
     private static bool FixedLeaf(UiElementSpec spec) => spec.TryGetNumber("Height", out _);
+    private bool WidthSensitiveReadDomain(UiElementSpec spec, bool inScroll, bool responsive, HashSet<UiElementSpec> path)
+    {
+        if (!path.Add(spec)) return false;
+        try
+        {
+            inScroll |= GetContainerKind(spec) == "Scroll";
+            responsive |= spec.TryGetAttribute("Breakpoint", out _);
+            // A fresh leaf height can remove/add the second, scrollbar-width traversal. Its
+            // responsive visibility/width-read domain cannot be proved by the old demand order.
+            if (inScroll && (spec.TryGetAttribute("NarrowHidden", out _) || spec.TryGetAttribute("WideHidden", out _)
+                || responsive && spec.TryGetAttribute(WidthBindAttribute, out _))) return true;
+            foreach (UiElementSpec child in spec.Children)
+                if (WidthSensitiveReadDomain(child, inScroll, responsive, path)) return true;
+            return GetContainerKind(spec) == "Repeat" && templates.TryGetValue(ReadAttribute(spec, RepeatTemplateAttribute), out UiElementSpec? template)
+                && WidthSensitiveReadDomain(template, inScroll, responsive, path);
+        }
+        finally { path.Remove(spec); }
+    }
     private void NotePipelineNotification(string key, IReadOnlyList<UiNode> owners)
     {
         if (visibleInputs.ContainsKey(key) || widthInputs.ContainsKey(key) || tabInputs.ContainsKey(key)) layoutInputChanged = true;
@@ -164,6 +187,7 @@ internal sealed partial class UiLayoutEngine
         foreach (RoleInput role in autoWidths.Values) if (!RoleEnvironmentCurrent(role, ctx)) return false;
         foreach (RoleInput role in labelContributions.Values) if (!RoleEnvironmentCurrent(role, ctx)) return false;
         foreach (PlacedEntry entry in lastEntries) if (ctx.Session.IsTripped(entry.Node)) return false;
+        if (refreshInputs && widthSensitiveFreshDomain) return false;
 
         UiTextMetricsCache committedText = textMetricsCache;
         UiSession.ArrangementJournal journal = ctx.Session.BeginIncrementalArrangement();
@@ -171,11 +195,14 @@ internal sealed partial class UiLayoutEngine
         var heights = new Dictionary<int, float>();
         var changes = new Dictionary<int, PlacedEntry>();
         var plans = new Dictionary<UiNodeId, StackRecipe>();
+        bool measurementInputsChanged = false;
         bool committed = false;
         try
         {
             textMetricsCache = committedText.Copy();
             UiWidgetContext baseContext = ctx.WithMetrics(textMetricsCache);
+            if (refreshInputs && !RefreshStructuralInputs(baseContext, journal))
+            { pendingInputValidation = true; return false; }
             var validationScope = new LayoutScope();
             incrementalValidation = true; conservativeValidation = ordinaryBoundary; validationRequiresFull = false;
             for (int index = 0; index < lastEntries.Count; index++)
@@ -196,12 +223,22 @@ internal sealed partial class UiLayoutEngine
                 if (validationRequiresFull) return false;
                 List<LeafMeasure> nextRecords = validationScope.Leaves[entry.Id];
                 if (!ReferenceEquals(nextRecords, records))
-                { staged[entry.Id] = nextRecords; validatedLeaves[entry.Id] = nextRecords; }
+                {
+                    validatedLeaves[entry.Id] = nextRecords;
+                    MeasureContextStamp context = MeasureContext(local);
+                    bool unchanged = refreshInputs && SameMeasurement(
+                        FindLeafMeasure(records, entry.Spec, context, true),
+                        FindLeafMeasure(nextRecords, entry.Spec, context, true));
+                    // A fresh read/legacy calculation is not a changed stored measurement merely
+                    // because its pass differs. Keep that receipt for this pass's fallback only.
+                    if (!unchanged) staged[entry.Id] = nextRecords;
+                    if (refreshInputs && hasReferenceHeight && !unchanged) measurementInputsChanged = true;
+                }
                 if (measured != entry.Rect.Height) heights[index] = measured;
             }
             // A retained MatchContent allocation is valid on idle, but any newly validated result can
             // change its independent reference. Do not infer that dependency from an outer rectangle.
-            if (hasReferenceHeight && (staged.Count != 0 || heights.Count != 0 || invalidatedInputs.Count != 0)) return false;
+            if (hasReferenceHeight && ((!refreshInputs && staged.Count != 0) || measurementInputsChanged || heights.Count != 0 || invalidatedInputs.Count != 0)) return false;
             if (heights.Count > 0 && !ReflowStableStacks(heights, changes, plans)) return false;
             PageTable<PlacedEntry> next = changes.Count == 0 ? lastEntries : lastEntries.Replace(changes);
             foreach (var pair in changes)
@@ -245,6 +282,27 @@ internal sealed partial class UiLayoutEngine
             if (!committed) { journal.Rollback(); textMetricsCache = committedText; }
         }
     }
+    private static bool SameMeasurement(LeafMeasure? before, LeafMeasure? after)
+        => before != null && after != null && ReferenceEquals(before.Spec, after.Spec)
+            && ReferenceEquals(before.Metrics, after.Metrics) && before.Context.Equals(after.Context)
+            && before.Sources.Equals(after.Sources) && before.Inputs.Equals(after.Inputs)
+            && Equals(before.Environment, after.Environment) && before.Height == after.Height;
+
+    private bool FreshRepeatMatches(PlacedEntry entry, UiWidgetContext ctx)
+    {
+        if (entry.ContainerKind != "Repeat" || !repeatStates.TryGetValue(entry.Id, out RepeatState? state)) return true;
+        IReadOnlyList<string> keys = ReadItemKeys(ctx, entry.Node, state.ItemsKey);
+        if (keys.Count != state.Rows.Count || !templates.TryGetValue(state.TemplateName, out UiElementSpec? template)) return false;
+        for (int i = 0; i < keys.Count; i++)
+        {
+            ItemRow row = state.Rows[i];
+            if (!string.Equals(keys[i]?.Trim(), row.Key, StringComparison.Ordinal)) return false;
+            // 0.9 keeps its original reader verification; matching keys are not a credential.
+            UiDefinitionCompiler.VerifyReaderSubtree(scope, ctx.Bindings, row.Spec, entry.Node.Path + "/" + row.Spec.Id);
+        }
+        return true;
+    }
+
     private bool RoleEnvironmentCurrent(RoleInput input, UiWidgetContext ctx)
     {
         if (!ReferenceEquals(input.Metrics, ctx.Metrics) || !ReferenceEquals(input.Translation, ctx.Translation)
@@ -263,6 +321,7 @@ internal sealed partial class UiLayoutEngine
         stackRecipes.Clear(); candidateStackRecipes.Clear(); entryIndex.Clear();
         namedIndex = new(StringComparer.Ordinal); scrollIndex = new(StringComparer.Ordinal); contentIndex = new(StringComparer.Ordinal);
         rootEntries.Clear(); visibleDemand.Clear(); validatedLeaves.Clear(); invalidatedInputs.Clear();
+        freshReads = null; candidateFreshReads = null; candidateFreshScalars = null; candidateFreshRepeats = null;
         pipelineRoots = null; rootDefinitions = Array.Empty<UiElementSpec>();
         publishedRects = new PageTable<UiLayoutRect>(Array.Empty<UiLayoutRect>());
         stableVisibleIds = Array.Empty<string>(); stableDiagnostics = Array.Empty<UiLayoutDiagnostic>();

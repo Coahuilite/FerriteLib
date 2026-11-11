@@ -40,6 +40,22 @@ original XmlReader coordinates before validating every descendant and handing th
 to UiStyleDocument. Standalone style parsing and all other unknown-style-attribute fallback remain.
 No public API or schema default changes; no new test or case is added for this correction.
 
-The original T native idle/low-speed regression is not accepted. The 1.6 owner designs the IDLE-SYNC
-mechanism; 0.9 adaptation waits for that owner's concise delta. PAGE-ATTRIBUTE is an independent
-delivery and does not close IDLE-SYNC or task 7. This round excludes 1.7 work.
+The original T native idle/low-speed regression is not accepted. PAGE-ATTRIBUTE was independently
+delivered. IDLE-SYNC now adapts the sole 1.6 owner's ce0028d/a3d4616 mechanism: synchronization
+requests fresh reads without declaring invalidation, and the successful traversal supplies the
+ordered admission domain. The first changed controller returns to full before reading old descendants.
+The 0.9 port keeps the original Repeat reader verification, budget guard, recovery and non-tiered
+entry conditions; demand-order allocations are tiered-only. No 0.8 schema/publication restriction or
+DerivedRow credential is imported. No new test/case is added. The scoped round-3 delivery records
+existing-check results and the final committed ordinary net472/RW1.6 Release identity.
+
+IDLE-SYNC managed evidence: 18 affected existing suites pass, including EventTiering (12 groups),
+Layout/Auto/shared-label, LayoutReuse, Visibility, Tab, Repeat/ItemBinding, failure, input/edit/cancel,
+window and ordinary-recipe paths. Unchanged readonly-api passes; Core reports 391 neutral checks;
+the existing adapter reports 140 protocol assertions and 20 execution-lifetime checks. Both harness
+and adapter Release builds have zero warnings/errors. An invalid initial suite name failed before
+entry (TypeLoadException); the actual KernelLayoutTests entry was then located and passed without
+changing any fixture/assertion. This is managed/stub evidence, not native or new counterexample execution.
+
+Task 7 remains open. PM's supplied 1.6 stable-page/C15 evidence belongs to that candidate;
+overall FPS investigation and 0.9 native acceptance remain separate. This round runs no game or 1.7.

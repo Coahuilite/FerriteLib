@@ -21,8 +21,10 @@ current task and applicable permissions; preserve the separate 1.6/native and 1.
 The adopted [event-tiering change](docs/openspec/changes/fl09-event-tiering/tasks.md) owns the scoped
 implementation/evidence and cross-line tasks. PM accepted `UiLayoutManifest.WithTieredEvents(bool)` as Stable,
 but did not accept the original T native idle/low-speed regression. Under WO-UIKIT-IDLE-REGRESSION-20261111,
-PAGE-ATTRIBUTE is an independent parser delivery; IDLE-SYNC adaptation waits for the sole 1.6 mechanism owner.
-The compatibility/consumer ports and native comparison retain their separate owners.
+PAGE-ATTRIBUTE is independently delivered; IDLE-SYNC source adaptation now follows the sole 1.6
+owner's ce0028d/a3d4616 mechanism, retaining 0.9 reader/budget/legacy conditions and tiered-only
+demand-order allocation. The scoped change records the implementation and round-3 evidence route.
+The compatibility/consumer ports, total-FPS investigation and 0.9 native acceptance retain their separate owners.
 
 ## 0.9 adopted capability work
 
@@ -68,6 +70,22 @@ implemented. Current requirements are reached through `docs/specification.md`; i
 
 ## Local review coverage
 
+### FL09 IDLE-SYNC round 3
+
+- **Owner / reviewed_at:** sol-tiering, 2026-11-11T14:25:56.9587340+08:00 (Asia/Hong_Kong).
+- **Reviewed-through:** The ce0028d/a3d4616 source/patch adaptation against `d8690bb`, the real Host
+  synchronization entry, actual-traversal admission order, first-controller-change full fallback,
+  Repeat reader validation, tiered-only allocation and candidate-record transaction lifetime.
+  Existing notification, recovery, budget and non-tiered entry conditions remain; schema/parser,
+  API signatures and test sources were not changed. Reviewed the complete diff and direct mappings.
+- **Evidence / corrections:** 18 affected existing suites, readonly-api, Core (391 neutral checks)
+  and adapter (140 protocol assertions plus 20 lifetime checks) pass. One nonexistent suite name
+  failed before entry; located and ran the actual Layout suite, with no fixture/assertion change.
+  The scoped round-3 delivery owns the final committed ordinary net472/RW1.6 Release identity.
+- **Continuation:** PM relays the shared implementation's optional allocation/lifetime narrow changes
+  to its owner. The supplied 1.6 native result retains its candidate identity; total-FPS investigation
+  and 0.9 native acceptance remain with the runtime owner/PM. No game or 1.7 was run here.
+
 ### FL09 PAGE-ATTRIBUTE round 3
 
 - **Owner / reviewed_at:** sol-tiering, 2026-11-11T13:07:21.7740083+08:00 (Asia/Hong_Kong).
@@ -78,8 +96,9 @@ implemented. Current requirements are reached through `docs/specification.md`; i
   entry refuses it at original page line 3, position 26. The same standalone style still returns its
   original unknown-attribute issue. Existing style, manifest, reload, tiering, readonly API and Core checks pass;
   no test/case was added or weakened. The scoped parser handoff owns the candidate Release identity.
-- **Continuation:** PAGE-ATTRIBUTE is independently delivered. IDLE-SYNC waits for sol-compat's mechanism
-  delta; native recheck belongs to uikit-terra. This scope excludes 1.7 and holds no lock while waiting.
+- **Continuation at that handoff:** PAGE-ATTRIBUTE was independently delivered; IDLE-SYNC then awaited
+  sol-compat's delta. The later IDLE-SYNC checkpoint above owns that continuation. Native recheck belongs
+  to uikit-terra; the parser scope excluded 1.7.
 
 ### FL09 event-tiering scope
 

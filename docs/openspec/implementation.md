@@ -17,8 +17,16 @@ FL09-PAGE-EXECUTION、binding FL08-ORDINARY 与 adapter FL16-DISPLAY-ISOLATION�
   首 pass／Repaint／已宣告变化后的 pass 同步，其他 pass 复用该周期最近的成功 snapshot。
   `PipelineInputsCurrent` 与 `TryIncremental` 共用尺寸、definition、translation、theme 和身份检查；
   pending validation、dirty nodes、当前依赖 revisions、tracked demand、已完成业务请求另使周期重同步。
-  同步点请求输入验证，保证普通布局输入、旧 Measure 与未知 ruler 在该合法点鲜验。
+  同步点以独立的 `synchronizeInputs` 要求鲜读，不把一次同步本身记为外部失效；已宣告变化
+  仍走原 pending validation／dirty／revision 路径。普通布局输入、旧 Measure 与未知 ruler
+  在合法同步点鲜验，相等结果可保留几何，不再仅因测量 Pass 改变而提交新的 measurement。
   手动 `MeasureAndArrange` 保原入口并退休 DrawFrame 的周期复用；Tools prepare 仍逐 pass 调用。
+- IDLE-SYNC 采用 1.6 owner 的 `ce0028d`／`a3d4616` 机制。成功 full 遍历记录实际需求顺序，
+  鲜验按该顺序检查 Visible／Width／Tab、Repeat、Auto 与共享 label；首个控制条件变化立即回 full，
+  不枚举历史字典去探读已隐藏或退出的后代。滚动条可改变响应式读取域的情形保守回 full。
+  0.9 的同键 Repeat 仍调用原 `VerifyReaderSubtree`，不引入 0.8 的 DerivedRow 凭据。
+  demand-order 集合、记录及额外宽度域扫描仅在 tiered 同步收集；旧非 tiered 入口不承担这些分配。
+  候选记录由 full 事务的 try/finally 管理，失败不发布；非提交 budget guard 与原失败恢复保留。
 - `UiLayoutEngine.Draw` 复用同步后的内容命中几何与 entry context；scroll 位置改变仍同 pass 重收集。
   hit pass、命中层发布、即时资格、Cancel、help 与 widget `Draw` 保逐事件执行。
   pointer producer 的 presentation 可用性改变请求下一 pass 的输入验证；失败不留半份 layer cache。
@@ -42,12 +50,16 @@ FL09-PAGE-EXECUTION、binding FL08-ORDINARY 与 adapter FL16-DISPLAY-ISOLATION�
 新增 `KernelEventTieringTests` 覆盖周期边界、T1/T2/T3、声明变化、Repaint 普通鲜读／未知 ruler、
 Schema 与程序入口、隔离回退、clip 继承／复显、fault retained paint、control 顺序、Cancel 与 help grace。
 既有相关 suites 和 readonly-api 的 managed 结果随 change tasks 记录；
-正常 Release Neutral／RimWorld17 与 Core 使用项目原入口。native 对比、实体键盘和 IME 接受仍归 task 7，
+初版的 Release Neutral／RimWorld17 与 Core 使用项目原入口；这些是历史构建证据。
+native 对比、实体键盘和 IME 接受仍归 task 7，
 没有在本工作中运行游戏或据此宣称原生性能提升。
 
 PM 的 2026-11-11 验收裁决已接受 `WithTieredEvents(bool)` 为 Stable，但未接受原 T 的静置／低速回归。
-WO-UIKIT-IDLE-REGRESSION-20261111 的 PAGE-ATTRIBUTE 修法先独立交付；IDLE-SYNC 的唯一机制设计由
-1.6 owner 提供，0.9 等待其差量后适配。本轮不涉及 1.7 或原生运行。
+WO-UIKIT-IDLE-REGRESSION-20261111 的 PAGE-ATTRIBUTE 修法已先独立交付；IDLE-SYNC 在保留
+0.9 Schema／发布状态的前提下适配上述唯一 1.6 设计。当前修复的受影响既有检查与普通
+net472／RW1.6 Release 身份由该轮交付记录；本轮不构建 1.7，也不运行游戏。
+PM 提供的 1.6 stable-page full=0 和 C15 编辑恢复属于其原生候选，不证明 0.9 原生性能；
+总 FPS 的其他父段帧节奏及本线 native 接受仍待各自 owner。
 
 <a id="fl09-reliability"></a>
 ## FL09 R1 修复与已采用目标（2026-11-09）

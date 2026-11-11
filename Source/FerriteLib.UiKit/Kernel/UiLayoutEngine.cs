@@ -177,12 +177,13 @@ internal sealed partial class UiLayoutEngine
         }
     }
 
-    public UiLayoutSnapshot ArrangeRoots(UiWidgetContext ctx, UiLayoutPoint available, IReadOnlyList<UiElementSpec> roots)
+    public UiLayoutSnapshot ArrangeRoots(UiWidgetContext ctx, UiLayoutPoint available, IReadOnlyList<UiElementSpec> roots, bool synchronizeInputs = false)
     {
         if (ctx == null)
             throw new ArgumentNullException(nameof(ctx));
         if (roots == null)
             throw new ArgumentNullException(nameof(roots));
+        refreshInputs = synchronizeInputs;
         ctx.Session.LayoutWork.Passes++;
         drawContextGeneration++;
         contentLayers = null;
@@ -207,7 +208,7 @@ internal sealed partial class UiLayoutEngine
         if (!notificationsCommitted) CommitNotifications(ctx);
         // A dirty node is the per-element invalidation signal: a widget that marked its own node dirty
         // asks for a re-measure even when size, content revision, definition and language all stand still.
-        layoutRequested = pendingInputValidation || cachedSnapshot == null || ctx.Session.HasDirtyNodes || cachedContentRevision != ctx.Session.ContentRevision
+        layoutRequested = refreshInputs || pendingInputValidation || cachedSnapshot == null || ctx.Session.HasDirtyNodes || cachedContentRevision != ctx.Session.ContentRevision
             || cachedAvailable.X != width || cachedAvailable.Y != height || cachedDefinitionRevision != DefinitionRevision(ctx)
             || cachedTranslationRevision != ctx.Translation.TranslationRevision || cachedHostLayoutRevision != ctx.Theme.LayoutRevision;
         forceMeasurement = cachedSnapshot != null && (externalContentChanged || cachedDefinitionRevision != DefinitionRevision(ctx)
@@ -232,6 +233,11 @@ internal sealed partial class UiLayoutEngine
             repeatStates[entry.Key] = entry.Value.Copy();
         try
         {
+            // Only tiered synchronization consumes demand-order receipts. Keep their lifetime
+            // inside this transaction's finally; legacy callers collect no unused records/keys.
+            candidateFreshReads = refreshInputs ? new() : null;
+            candidateFreshScalars = refreshInputs ? new(StringComparer.Ordinal) : null;
+            candidateFreshRepeats = refreshInputs ? new() : null;
             // Stage calculations and local plans are retained independently from page-space publication.
             // Rebuild declared relationships and effective geometry, preserving private sub-nodes. A key no longer
             // declared by any arranged element stops being polled instead of invalidating a page forever.
@@ -330,6 +336,7 @@ internal sealed partial class UiLayoutEngine
             stableVisibleIds = visible; stableDiagnostics = nextDiagnostics; stableScrollContents = scrollContents;
             RetainPipeline(ctx, roots);
             PublishBindingRevisions(retireAbsent: true);
+            freshReads = candidateFreshReads;
             return cachedSnapshot;
         }
         catch
@@ -351,6 +358,8 @@ internal sealed partial class UiLayoutEngine
             PruneWidgetInstances(ctx.Session);
             throw;
         }
+        finally
+        { candidateFreshReads = null; candidateFreshScalars = null; candidateFreshRepeats = null; }
     }
 
     /// <summary>
@@ -1824,6 +1833,8 @@ internal sealed partial class UiLayoutEngine
     private MeasuredBox MeasureRepeat(UiWidgetContext ctx, UiElementSpec spec, string kind, float width, Padding padding, float gap, float titleHeight, float innerWidth, float innerY, float availableHeight, UiNode node, bool narrow)
     {
         RepeatState state = GetOrCreateRepeatState(node);
+        if (candidateFreshRepeats != null && candidateFreshRepeats.Add(node.Id))
+            candidateFreshReads!.Add(new FreshRead { Kind = FreshReadKind.Repeat, Node = node.Id });
         string itemsKey = ReadAttribute(spec, RepeatItemsAttribute);
         string templateName = ReadAttribute(spec, RepeatTemplateAttribute);
         if (!string.Equals(state.ItemsKey, itemsKey, StringComparison.Ordinal) || !string.Equals(state.TemplateName, templateName, StringComparison.Ordinal))

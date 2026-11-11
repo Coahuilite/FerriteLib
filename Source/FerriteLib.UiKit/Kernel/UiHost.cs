@@ -280,7 +280,7 @@ public sealed partial class UiHost : IDisposable
             // The engine validates effective inputs per stage; presentation changes no longer bump
             // a global cache key. Unknown legacy Measure still receives its original synchronization.
             UiWidgetContext ctx = CreateContext(available.X);
-            UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, available, manifest.Roots);
+            UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, available, manifest.Roots, manifest.TieredEvents);
             LayoutFault = null;
 
             // A region scope is resolved the first time the engine meets it, and that resolution can drop a
@@ -474,7 +474,8 @@ public sealed partial class UiHost : IDisposable
         // Requests made during synchronization, like announcements raised by a getter, are not
         // acknowledged by sampling a later clock. They require the next legal synchronization.
         long operations = bindingOwner.CompletedOperationRevision;
-        if (manifest.TieredEvents) engine.RequestInputValidation();
+        // A synchronization reads current inputs; it does not itself announce a change.
+        // The engine may retain geometry only after those inputs still validate it.
         UiLayoutSnapshot snapshot = MeasureAndArrange(available);
         cycleSnapshot = snapshot;
         cycleViewport = viewport;

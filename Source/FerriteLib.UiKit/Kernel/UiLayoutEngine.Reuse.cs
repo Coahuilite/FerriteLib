@@ -86,7 +86,7 @@ internal sealed partial class UiLayoutEngine
     }
     private UiNodeId activeUpdateScope;
     private LayoutScope? activeLayoutScope;
-    private bool layoutRequested, forceMeasurement;
+    private bool layoutRequested, forceMeasurement, refreshInputs;
     private int layoutPass;
     private bool pendingInputValidation;
     internal void RequestInputValidation() { pendingInputValidation = true; }
@@ -200,14 +200,14 @@ internal sealed partial class UiLayoutEngine
 
 
         bool environmentEqual = prior != null && (!prior.Inputs.UsesTextMetrics || environment != null && environment.Equals(prior.Environment));
-        bool validation = ctx.Session.IsTripped(node) || pendingInputValidation && !incrementalValidation || forceMeasurement || node.IsDirty || incrementalValidation && invalidatedInputs.Contains(node) || prior == null || !contextEqual || !environmentEqual || enrolled && !sources.Equals(prior.Sources);
+        bool validation = refreshInputs || ctx.Session.IsTripped(node) || pendingInputValidation && !incrementalValidation || forceMeasurement || node.IsDirty || incrementalValidation && invalidatedInputs.Contains(node) || prior == null || !contextEqual || !environmentEqual || enrolled && !sources.Equals(prior.Sources);
         if (prior != null && !validation && (enrolled || !layoutRequested)) return prior.Height;
         // Preserve the pre-existing idle snapshot, for numeric and legacy alike. No synchronization
         // was requested here. At a synchronization (layoutRequested), unknown environments still
         // cannot authorize text reuse; the normal environment/CanReuse guards above and below apply.
-        if (contextEqual && prior != null && !ctx.Session.IsTripped(node) && !layoutRequested && !forceMeasurement && !node.IsDirty && (!enrolled || sources.Equals(prior.Sources)) && prior.Environment == null && environment == null) return prior.Height;
+        if (contextEqual && prior != null && !ctx.Session.IsTripped(node) && !refreshInputs && !layoutRequested && !forceMeasurement && !node.IsDirty && (!enrolled || sources.Equals(prior.Sources)) && prior.Environment == null && environment == null) return prior.Height;
 
-        if (incrementalValidation && (conservativeValidation || !enrolled))
+        if (incrementalValidation && !refreshInputs && (conservativeValidation || !enrolled))
         { validationRequiresFull = true; return prior?.Height ?? 0; }
 
         UiMeasurement? request = enrolled ? ((IUiMeasureParticipant)widget).CaptureMeasurement(ctx) : null;
