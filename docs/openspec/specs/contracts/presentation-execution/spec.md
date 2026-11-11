@@ -3,8 +3,8 @@
 ## Purpose
 明确 registry／reader → presentation → measure/layout → draw/hit → business endpoint 的双方义务。模型持即时值，Host 持一轮展示，layout 持有效几何；没有第二个业务快照权威或自动异步派发器。
 
-0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、未实施；本页新增区域条款及
-相关显式例外仅适用于主动采用的新能力，不表示当前 API 已可调用。行为唯一正文归本页，
+0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、r3 放行实施；本页新增区域条款及
+相关显式例外仅适用于主动采用的新能力。接口及执行源码已提供，支持／证据见实现账；行为唯一正文归本页，
 采用来源见 [fl09-retained-regions](../../../changes/fl09-retained-regions/proposal.md)。
 
 ## Requirements
@@ -147,10 +147,10 @@ Repaint pass SHALL 先同步再绘制，所以逐 pass 执行与分层执行产�
 - **THEN** 可延期其纯 Paint／纯展示计算，原 native 控件与生命周期操作继续原次序
 - **AND** 滚入后首个适用 Repaint 同步并实际提交，不拿旧像素代替
 
-## 0.9 区域保留：已采用、未实施
+## 0.9 区域保留：已采用的显式新能力
 
-本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable；接口／数据层先行导出，完整执行仍实施中，支持状态以实现账为准。
-已采用的计划接口与参数见 [region-api](region-api.md)，不是当前可调用 API。
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包为 Public-unstable；接口及执行源码已提供，实际支持与验证状态以实现账为准。
+已采用的接口与参数见 [region-api](region-api.md)；固定载体及原生证据以实现账为准。
 
 ### Requirement: FL09-REGION-PARTICIPANT 纯表示共享不取代操作
 外部作者 SHALL 可用可选新 participant 在已登记区域提供完整纯 Build、原次序 Operate 与纯 Paint，

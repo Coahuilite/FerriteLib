@@ -217,9 +217,12 @@ public virtual IReadOnlyList<UiChoice<object?>> ChoicePrefix(object list,int max
     internal bool ContainsBinding(string key) => values.ContainsKey(key) || options.ContainsKey(key) || actions.ContainsKey(key) || commands.ContainsKey(key);
     internal bool IsTrackedValue(string key) => values.TryGetValue(key, out ValueDescriptor? value) && value.Tracked;
     internal long CompletedOperationRevision { get; private set; }
+    // Actual registration lifetime, used only by the explicitly enrolled region port.
+    internal long RegionSchemaRevision { get; private set; }
     internal void RemoveItemBinding(string key)
     {
         Reactive.AssertWritable();
+        RegionSchemaRevision++;
         trackedReads = null; ordinaryReads = null;
         values.Remove(key); options.Remove(key); actions.Remove(key); commands.Remove(key);
         declaredInvalidation.Remove(key); revisions.Remove(key);
@@ -765,6 +768,7 @@ internal bool TrySetTypedValue(string key, object? value) => RunOperation(() => 
 
     private void DeclareInvalidation(string key, UiInvalidation invalidates)
     {
+        RegionSchemaRevision++;
         trackedReads = null; ordinaryReads = null;
         declaredInvalidation[key] = invalidates;
     }

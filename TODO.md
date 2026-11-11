@@ -26,14 +26,14 @@ owner's ce0028d/a3d4616 mechanism, retaining 0.9 reader/budget/legacy conditions
 demand-order allocation. The scoped change records the implementation and round-3 evidence route.
 The compatibility/consumer ports, total-FPS investigation and 0.9 native acceptance retain their separate owners.
 
-## 0.9 retained-region implementation in progress
+## 0.9 retained-region delivery and native acceptance
 
 WO-FL09-RETAINED-DISPLAY-20261111 r2 adopts the selected [region change](docs/openspec/changes/fl09-retained-regions/proposal.md)
 into the sole current capability pages, including independent choices, complete paint-footprint proof
 and no per-field work relocation into CaptureCurrent. The whole new closure is Public-unstable;
-[planned interfaces](docs/openspec/specs/contracts/presentation-execution/region-api.md) have an initial API/data-plane implementation.
-PM released product implementation in WO r3; the initial carrier is for consumer compilation, not full RETAIN acceptance. Implementation,
-consumption and native acceptance are incomplete. Historical RW1.6 measurements do not certify 0.9/1.7;
+[interfaces](docs/openspec/specs/contracts/presentation-execution/region-api.md) have API/data-plane, Host, layout, participant, clip, budget and lifecycle implementation.
+PM released product implementation in WO r3. The scoped tasks and implementation map own fixed ordinary
+Release/check evidence; US consumption and native acceptance remain open. Historical RW1.6 measurements do not certify 0.9/1.7;
 the later independent 60 Hz IMGUI evidence is separate from the earlier 144 Hz runs.
 
 ## 0.9 adopted capability work
@@ -79,6 +79,27 @@ implemented. Current requirements are reached through `docs/specification.md`; i
 > and `OBLIVIONIS.md`; a closed item is a pointer here, not a paragraph.
 
 ## Local review coverage
+
+### FL09 retained-region implementation candidate
+
+- **Owner / reviewed_at:** sol-tiering, 2026-11-12T01:27:28.5833410+08:00 (Asia/Hong_Kong).
+- **Reviewed-through:** The committed `d707ddf` API carrier and the region execution candidate:
+  actual source-boundary capture, independent typed channels, item identity, scope/span reuse,
+  real font/reader/theme invalidation, unchanged operation order, enforced pure-paint clip,
+  fault/static recovery, budget workspace, detach/reentry/document seal/mount/Close, and current
+  API/usage/implementation routing. The ordinary RW1.6 execution carrier is the remaining local
+  delivery step; production source freshness and native acceptance stay with US and Terra/PM.
+- **Evidence / corrections:** Existing scoped regression checks, readonly API/containment,
+  Core 391, adapter 140 and execution-lifetime 20 pass. Later edits were checked by affected
+  existing font/layout/binding/input lanes; test sources/assertions are unchanged. An invalid
+  `KernelToolsTests` selector was identified as a nonexistent type, not a product failure;
+  actual observation/Tools coverage uses KernelObservationTests and the existing Core/adapter
+  entries. A CS8602 build failure in the already-guarded builtin route was repaired without
+  weakening warning policy. New region behavior has source/control-flow evidence here; its
+  matched real-page native path, timings and FPS are not yet verified.
+- **Continuation:** Use the fixed ordinary carrier and producer READY/DELIVERY, not moving build
+  output. Consumer packet fields and original operation addresses remain distinct. The new
+  scope proof does not replace original Repeat reader verification with a DerivedRow credential.
 
 ### FL09 retained-region formal adoption
 

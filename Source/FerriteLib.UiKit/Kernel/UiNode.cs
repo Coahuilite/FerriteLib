@@ -35,7 +35,7 @@ public sealed partial class UiNode
     {
         if(!session.IsActive||released)throw new ObjectDisposedException(nameof(UiNode));
         if(create==null)throw new ArgumentNullException(nameof(create));
-        if(!customState.TryGetValue(name,out object? state)){state=create()??throw new InvalidOperationException("Node state factory returned null.");customState.Add(name,state);if(release!=null){T owned=(T)state;customRelease.Add(name,()=>release(owned));}}
+        if(!customState.TryGetValue(name,out object? state)){session.RequireRegionOperation();state=create()??throw new InvalidOperationException("Node state factory returned null.");customState.Add(name,state);if(release!=null){T owned=(T)state;customRelease.Add(name,()=>release(owned));}}
         return state as T??throw new InvalidOperationException("Node state '"+name+"' has another declared type.");
     }
     internal void ResetCustomState(List<Exception>? errors = null)
@@ -193,15 +193,29 @@ public sealed partial class UiNode
     public void MarkDirty()
     {
         if(released||!session.IsActive)throw new ObjectDisposedException(nameof(UiNode));
+        session.RequireRegionOperation();
+        InvalidateRegion();
         if (IsDirty) return;
         IsDirty = true;
         session.NodeMarkedDirty(this);
+    }
+    internal long RegionRevision;
+    internal UiRegionAttachment? RegionAttachment;
+    internal bool HasRegion => RegionAttachment?.Owner != null && !RegionAttachment.Detaching;
+    internal void RegionThemeChanged()
+    { if (!released && session.IsActive && HasRegion) MarkDirty(); }
+    internal void InvalidateRegion()
+    {
+        if (HasRegion) RegionAttachment!.Report(RegionAttachment.Status.State, "local-ui-dirty", current: false);
+        // The state owner propagates once at the write, not by polling every descendant at capture.
+        for (UiNode? current = this; current != null; current = current.Parent) current.RegionRevision++;
     }
 internal UiControlState GetOrCreateState(string stateKey)
     {
         if (stateKey == null) throw new ArgumentNullException(nameof(stateKey));
         if (!slots.TryGetValue(stateKey, out UiControlState? state))
         {
+            session.RequireRegionOperation();
             state = new UiControlState();
             slots.Add(stateKey, state);
         }

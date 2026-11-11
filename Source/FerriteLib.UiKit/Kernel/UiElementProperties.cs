@@ -27,6 +27,7 @@ public sealed partial class UiElementProperties
     private readonly Action changed;
     private object inputGeneration = new();
     private ResolutionReuse? resolutionReuse;
+    internal object RegionInputGeneration => inputGeneration;
 
     private void InvalidateResolution()
     {

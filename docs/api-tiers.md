@@ -13,14 +13,14 @@ Consumer `[min,max)` checks remain binding even when old signatures are retained
 
 The type census and stable set are pinned in `FerriteLibApiTierTests`. Its dependency-closure check covers exported/protected signatures, generic arguments and extension interfaces; explicit advanced-member exceptions are listed below. A stable implementation never requires those advanced members.
 
-## Adopted 0.9 region interfaces — implementation in progress
+## Adopted 0.9 region interfaces — explicit opt-in
 
 WO-FL09-RETAINED-DISPLAY-20261111 r2 adopts the entire **new** region API/type/implementation-interface
-closure as **Public-unstable**. Its sole planned signature and usage contract is the
+closure as **Public-unstable**. Its sole signature and usage contract is the
 [adopted region interface](openspec/specs/contracts/presentation-execution/region-api.md).
 It includes independent snapshot Choices access and the optional enforced pure-Paint clip.
-The API/data-plane and Host attachment are now implemented; region execution/optimization is still in progress.
-The new exported types are classified below; the actual interim carrier and its limits are recorded in the owner delivery.
+The API/data-plane, Host attachment and region execution are implemented in the development source.
+The new exported types are classified below; fixed ordinary Release carriers, checks and native gaps are recorded in the implementation map and owner delivery.
 Existing Stable dependencies/signatures/defaults keep their tier and meaning. The stable inventory and version axes remain unchanged; implementation follows PM's r3 release.
 
 ## Stable

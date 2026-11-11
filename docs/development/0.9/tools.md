@@ -13,6 +13,30 @@ Use a [formal shell](#draw-the-formal-window-around-the-existing-preview-host) f
 [selection-ink suppression](#export-without-selection-ink-keeping-selection-facts) during a clean draw.
 Old page-only providers and normal MeasureAndArrange callers need none of these new opt-ins.
 
+## Retain an explicitly selected region
+
+Use [the region API](../../openspec/specs/contracts/presentation-execution/region-api.md) to attach a
+complete immutable representation to one declared container in the existing Host. Keep the ordinary
+binding registrations and operation reader. The source is called at the original synchronization
+boundaries; return the same packet only after checking the actual complete source boundary. Reuse
+unchanged item packets instead of re-projecting every field in CaptureCurrent.
+
+Map structural inputs with Layout; a bound wrapped string whose natural height and paint both use
+the new port needs Layout | Display. Value and Choices are independent channels. A participant
+inside Repeat receives the innermost item packet: Get/Choices use its short field keys, not the full
+derived binding address. Its Operate still uses the original live address and qualification.
+Unknown/unmapped segments keep their original callbacks; the current builtin dropdown keeps its
+live Draw/choices/pointer path. No-isolation backends and ordinary measurement without an execution
+keep the old path. See the [implementation map](../../openspec/implementation.md#fl09-retained-regions)
+for the fixed-carrier and native evidence boundary.
+
+Read Attachment.Status for the last observed source/layout/paint state. Existing Host.Observe and
+Tools observations also include bounded `region-status` facts; they do not capture or arrange.
+With the existing timing/detail instrument enabled, `region-work` reports actual boundary, Build,
+region/context reuse, operation and Paint callback counts. Otherwise it is NotSampled. These are
+owner work facts, not GPU/FPS measurements. MeasureBudget can use the new pure Build in its private
+non-committing workspace; a read does not accept layout inputs, submit a draft or retry a failure.
+
 ## Adopted targets do not change these entry points
 
 The [basic-capability change](../../openspec/changes/fl09-basic-ui-capabilities/proposal.md) adopts new dual-axis

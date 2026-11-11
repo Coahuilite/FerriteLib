@@ -13,6 +13,10 @@ The guide deliberately links the file instead of pasting a second listing that c
 own fixture is not consumption evidence — it proves the recipe compiles and arranges, not that a player
 uses it.)
 
+For an expensive page, the optional 0.9 [region port](../openspec/specs/contracts/presentation-execution/region-api.md)
+can retain pure preparation for one explicit scope. The ordinary recipe below does not require it;
+old bindings, widget callbacks and standalone controls keep their original conditions.
+
 ## Start a 0.9 page with Schema 3
 
 ```xml

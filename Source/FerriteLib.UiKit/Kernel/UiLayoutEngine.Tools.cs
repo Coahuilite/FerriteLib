@@ -54,6 +54,7 @@ internal sealed partial class UiLayoutEngine
     {
         attempted = false;
         if (!context.Session.IsActive) return "host-closed";
+        if (Regions?.LayoutFailed == true) return "region-layout-unavailable";
         if (target.Host != context.Session.Identity) return "foreign-session";
         UiNode? node = context.Session.FindObservationNode(target.Node);
         if (node == null || node.MountLifetime != target.Mount) return "mount-closed-or-replaced";

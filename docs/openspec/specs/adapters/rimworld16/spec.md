@@ -3,8 +3,8 @@
 ## Purpose
 将 Verse IMGUI 原生窗口、事件、坐标、文字及资源事实接到中性核心。原生 WindowStack 持窗口资格／焦点／遮挡／模态，FL 持 adopted UI 状态；Catalog 不是另一个原生 z-order authority。当前以1.6为主要交付目标，1.7共用 GUI 路线仅有基础兼容候选，其原生渲染与主要交互仍待用户验收。
 
-0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、未实施；本页新增区域条款及
-相关显式例外仅适用于主动采用的新能力，不表示当前 API 已可调用。行为唯一正文归本页，
+0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、r3 放行实施；本页新增区域条款及
+相关显式例外仅适用于主动采用的新能力。接口及执行源码已提供，支持／证据见实现账；行为唯一正文归本页，
 采用来源见 [fl09-retained-regions](../../../changes/fl09-retained-regions/proposal.md)。
 
 ## Requirements
@@ -109,9 +109,9 @@ UiPageWindow SHALL 可直接构造；Catalog 注册非采用前提，UiWindowHos
 - **WHEN** 隔离作用域内的展示失败
 - **THEN** 样式字段在 `finally` 中恢复，失败按现有 presentation fault 合同处理
 
-## 0.9 区域保留：已采用、未实施
+## 0.9 区域保留：已采用的显式新能力
 
-本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable；接口／数据层先行导出，完整执行仍实施中，支持状态以实现账为准。
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包为 Public-unstable；接口及执行源码已提供，实际支持与验证状态以实现账为准。
 
 ### Requirement: FL16-REGION-PAINT 复用结果仍实际提交可见内容
 采用区域 participant 的1.6路径 SHALL 沿原 execution／绘制与有效坐标链，

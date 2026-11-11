@@ -14,6 +14,7 @@ public sealed partial class UiControls
 
     public UiControlKey GetControlId(string key)
     {
+        session.RequireRegionOperation();
         var result = new UiControlKey(key);
         Execution.PrepareControl(result);
         return result;
@@ -30,6 +31,7 @@ public sealed partial class UiControls
 
     private void RequireOwner(UiWidgetContext ctx)
     {
+        session.RequireRegionOperation();
         ctx.Node.RequireActive();
         if (ctx.Node.Id.IsNone)
             throw new InvalidOperationException("Pointer/native controls require an owner-created element context; use headless behaviors for semantic operations.");

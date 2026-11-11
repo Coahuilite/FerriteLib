@@ -37,6 +37,8 @@ public sealed class UiElementSpec
 
     // Ordered, nonempty source keys derived from this immutable declaration (duplicates matter).
     internal string[]? MeasureSourceKeys { get; set; }
+    // Assigned only by actual Repeat materialization, never inferred from an ordinal or caption.
+    internal string? RegionItemSource, RegionItemKey;
 
     public bool TryGetAttribute(string name, out string value) => Attributes.TryGetValue(name, out value!);
     public bool TryGetNumber(string name, out float value)

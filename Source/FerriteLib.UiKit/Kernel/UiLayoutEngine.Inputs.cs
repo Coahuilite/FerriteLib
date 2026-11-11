@@ -119,6 +119,7 @@ internal sealed partial class UiLayoutEngine
                 default:
                     if (!entryIndex.TryGetValue(read.Node, out int index)) return false;
                     PlacedEntry entry = lastEntries[index];
+                    if (Regions != null && RegionAncestorCurrent(entry, ctx)) continue;
                     UiWidgetContext local = PipelineContext(entry, ctx, journal);
                     if (!entry.LayoutInputs.Matches(local)) return false;
                     if (read.Kind == FreshReadKind.Repeat)

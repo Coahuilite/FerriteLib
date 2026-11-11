@@ -79,6 +79,7 @@ internal sealed partial class UiLayoutEngine
     {
         ReleasePipeline();
         contentLayers = null;
+        regionBoxes.Clear(); regionLeaves.Clear(); regionEnvironment = null; Regions = null;
         layoutScopes.Clear(); textMetricsCache = null; activeLayoutScope = null;
         cachedSnapshot = null; lastEntries = new PageTable<PlacedEntry>(Array.Empty<PlacedEntry>()); widgetInstances.Clear(); repeatStates.Clear();
         materializedRepeats.Clear(); keyNodes.Clear(); committedRevisions.Clear(); candidateRevisions.Clear();
@@ -113,7 +114,7 @@ internal sealed partial class UiLayoutEngine
             // Natural flow without Fill does not consume a parent's remaining height. A position change
             // therefore cannot turn into a measurement constraint change for an otherwise identical region.
             if (kind.Length > 0 && !ConsumesAvailableHeight(spec)) availableHeight = 0;
-            return MeasureElementCore(ctx, spec, width, availableHeight, node, contentHeightReference);
+            return MeasureRegion(ctx, spec, width, availableHeight, node, contentHeightReference);
         }
         catch (Exception error) when (ctx.Session.IsBudgetMeasuring && error is not NotSupportedException && UiObservationBoundary.IsOrdinary(error))
         {

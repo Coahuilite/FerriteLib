@@ -1,9 +1,9 @@
 # Design — 区域表示与实际操作分离
 
-状态：**0.9 已采用、未实施**，WO-FL09-RETAINED-DISPLAY-20261111 r2 选用 bb7da49 并补全独立 choices、
+状态：**0.9 已采用，r3 已放行实施**，WO-FL09-RETAINED-DISPLAY-20261111 r2 选用 bb7da49 并补全独立 choices、
 实际 paint footprint 证明和生产源捕获要求。本文件是采用时设计来源，不是另一份 current；
-行为归 [现行入口](../../../specification.md)，计划接口唯一归 [region-api](../../specs/contracts/presentation-execution/region-api.md)。
-本文代码是采用记录，尚未导出；本次仅正式采用规格，产品源码继续停在 PM 两库确认门。
+行为归 [现行入口](../../../specification.md)，接口唯一归 [region-api](../../specs/contracts/presentation-execution/region-api.md)。
+本文代码保采用时记录；实际导出、执行支持和证据归实现账，不以采用文本充作产品验收。
 
 ## D1 两种输入、一个 Host
 

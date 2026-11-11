@@ -3,8 +3,8 @@
 ## Purpose
 定义页面中什么存在、它属于谁，以及相容更新时保留哪些身份。定义不持运行状态，业务目标不由视觉顺序推断。此能力的直接消费者是布局、交互及[定义更新连接](../../contracts/definition-update/spec.md)。
 
-0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、未实施；本页新增区域条款及
-相关显式例外仅适用于主动采用的新能力，不表示当前 API 已可调用。行为唯一正文归本页，
+0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、r3 放行实施；本页新增区域条款及
+相关显式例外仅适用于主动采用的新能力。接口及执行源码已提供，支持／证据见实现账；行为唯一正文归本页，
 采用来源见 [fl09-retained-regions](../../../changes/fl09-retained-regions/proposal.md)。
 
 ## Requirements
@@ -87,9 +87,9 @@ Repeat 的 Items SHALL 是有序稳定 key 的 `IReadOnlyList<string>` value，T
 - **WHEN** Schema 3 页面声明 `TieredEvents="false"`
 - **THEN** 页面逐 pass 执行，与 Schema 2 默认相同
 
-## 0.9 区域保留：已采用、未实施
+## 0.9 区域保留：已采用的显式新能力
 
-本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable；接口／数据层先行导出，完整执行仍实施中，支持状态以实现账为准。
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包为 Public-unstable；接口及执行源码已提供，实际支持与验证状态以实现账为准。
 
 ### Requirement: FL09-REGION-ENROLL 作者在原树上明确选择区域
 作者 SHALL 可在原 Host 的唯一声明结构容器登记表示源及明确消费 map，包含 Scroll／Repeat，

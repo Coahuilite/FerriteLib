@@ -83,7 +83,9 @@ public readonly struct UiColour : IEquatable<UiColour>
 public sealed class UiPalette
 {
     private readonly Dictionary<UiPaletteRole, UiColour> declarations = new();
-    public int Revision { get; private set; }
+    private int revision;
+    internal Action? RegionChanged;
+    public int Revision { get => revision; private set { revision = value; RegionChanged?.Invoke(); } }
     public UiColour this[UiPaletteRole role]
     {
         get

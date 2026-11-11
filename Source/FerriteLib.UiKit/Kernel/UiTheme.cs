@@ -113,8 +113,18 @@ public sealed partial class UiTheme
         return declaration;
     }
     internal bool HasMetricOverride(string name) => densityDeclared || (metrics.TryGetValue(name, out var value) && value.IsDeclared);
-    private int applicationRevision;
-    internal int PropertyRevision { get; private set; }
+    private int applicationClock, propertyClock, layoutClock;
+    private int applicationRevision { get => applicationClock; set { applicationClock = value; RegionThemeChanged(); } }
+    internal int PropertyRevision { get => propertyClock; private set { propertyClock = value; RegionThemeChanged(); } }
+    private WeakReference<UiNode>? regionOwner;
+    internal void ObserveRegionOwner(UiNode node)
+    {
+        if (regionOwner?.TryGetTarget(out UiNode? current) == true && ReferenceEquals(current, node)) return;
+        regionOwner = new WeakReference<UiNode>(node);
+        Palette.RegionChanged = RegionThemeChanged;
+    }
+    private void RegionThemeChanged()
+    { if (regionOwner?.TryGetTarget(out UiNode? node) == true) node.RegionThemeChanged(); }
     public UiTheme()
     {
         Palette = new UiPalette();
@@ -133,7 +143,7 @@ public sealed partial class UiTheme
     private static UiPaletteRole ParseRole(string name)
         => UiPalette.TryRole(name, out UiPaletteRole role) ? role : throw new ArgumentException("Unknown palette role '" + name + "'.");
     public int ColourRevision => Palette.Revision + applicationRevision;
-    public int LayoutRevision { get; private set; }
+    public int LayoutRevision { get => layoutClock; private set { layoutClock = value; RegionThemeChanged(); } }
     public bool HasFontOverride => fontDeclared;
     public bool HasDensityOverride => densityDeclared;
     public UiFont DefaultFont

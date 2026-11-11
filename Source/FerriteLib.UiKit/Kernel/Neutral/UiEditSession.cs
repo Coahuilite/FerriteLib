@@ -41,6 +41,8 @@ public sealed class UiEditSession<T> : IUiEditState
     public bool Conflict { get; private set; }
     public bool Valid => parse(Draft, out _);
     public bool HasDraft => Modified || Conflict;
+    internal bool RegionFunctionsMatch(Func<T, string> formatter, UiEditParser<T> parser)
+        => format.Equals(formatter) && parse.Equals(parser);
 
     public void Configure(Func<T, string> formatter, UiEditParser<T> parser)
     {

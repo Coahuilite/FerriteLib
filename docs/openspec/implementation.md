@@ -6,21 +6,69 @@ cf1cf6456096171fb47c012369bcd0c2f29e968f。FL-F01/F02/F03 已在该 HEAD 的 dir
 下列对应段落区分实际源码机制、已执行既有检查及未执行原生／精确故障组合。
 
 <a id="fl09-retained-regions"></a>
-## FL09 显式区域保留：实施中
+## FL09 显式区域保留：实现候选，原生待验
 
-WO-FL09-RETAINED-DISPLAY-20261111 r3 已核定 FL 8f02776／US 3e32a57 并放行代码。
-当前第一片交付实现完整公开数据／接口形状：immutable Value／Choices／item snapshot、独立 typed map、
-防御复制、display／pointer／PaintClip 数据、detached Status 和 Host attachment／捕获／退出／Close。
-普通 net472／RW1.6 Release 首次编译已通过，零警告／错误。新增导出按决定列为 Public-unstable；旧 Stable 清单不变。
+WO-FL09-RETAINED-DISPLAY-20261111 r3 在 FL `8f02776`／US `3e32a57` 的独立采用提交后放行代码。
+新增闭包为 Public-unstable，旧 Stable inventory／签名／默认不变。接口和作者规则唯一归
+[region-api](specs/contracts/presentation-execution/region-api.md)及各能力 current；change 保留采用来源。
 
-**中间能力限制：** 当前运行仍走 legacy layout／Draw（Status 明确 Fallback/legacy-layout）；
-participant Build／Operate／Paint、区域边界跳过和新端口的布局／内置消费尚在集成。
-这片供 US 先编译，不能用于签收 RETAIN 或原生性能。固定 carrier／commit／MVID 由 producer READY 记录；
-后续 build 不覆盖该固定目录。RETAIN／CONSUME／NATIVE 未完成，不将编译当游戏验收。
+### 实际执行链
 
-现行行为仍归各能力 [specs](../specification.md)；[接口](specs/contracts/presentation-execution/region-api.md)
-是单一已采用 API 约定，change 仅保采用来源。历史1.6 A/C-r2、viewport及独立60Hz IMGUI账保原候选，
-不签0.9／1.7性能。实现继续沿原 owner，无新Tools前端、游戏或显示设置改动。
+- `UiHost.MeasureAndArrange → UiRegionRuntime.Begin → captureCurrent → UiLayoutEngine.ArrangeRoots`。
+  Capture 在每个原合法同步边界实际调用；普通 getter／request reader 不被包装或替换。Value／Choices
+  为独立 typed root/item 通道；显式结构端口消费 mapped Visible／Width／Tab／Items，错误不伪装成旧读取洞。
+- `UiLayoutEngine.Regions` 在实际结构作用域保存局部 box、分项 display、原 topology／Repeat／依赖收据。
+  当前 root/item 不可变对象、reader owner、定义、约束、继承属性 generation、有效字体及其度量环境、
+  language／theme 和 UI revision 均有效时，从作用域边界返回，不进入后代 Configure、需求准备、Build 或测量。
+  增量入口在建立 PipelineContext 前跳过整个已证明 span。环境按实际使用的不同字体合并验证，
+  包含 Build 直接调用 ctx.Metrics 的字体；未知 ruler 不获此证明。
+  可变 resolved theme 的真实 revision 写边用弱 node owner 推进失效，不为察看样式重走后代 context；
+  全局 theme 保原时钟。直持 UiBindings 的新区域另核其实际注册寿命；任意 forwarding reader
+  不获端点稳定证明，保原真实遍历校验。没有移植0.8 DerivedRow 凭据，也不改旧 reader 使用条件。
+- 分项 packet 改变或 UI 脏时，原 full 几何事务计算变化闭包，未变 item／子分支 box 仍复用。
+  原 Repeat reader 校验保留；成员／次序、共享列、后续位置、Scroll 双宽度遍历／范围／clamp 沿原 owner，
+  不用静止外框代替尺寸证明。缓存只在候选成功时保留；异常恢复原缓存及几何，不回滚已完成业务操作。
+- 自定义 `IUiRegionParticipant` 的 Build／局部 pointer／自然高共享同一 display；Operate 保每事件原次序。
+  内置 wrapped text、button、rule 有明确表示端口。Dropdown 的无业务天然测量可随布局保留，
+  其旧 Draw／choices／资格／pointer 仍是实时洞。未映射消费、未知 widget、旧 diagnostic／自定义 natural-body
+  回调保原读取／计算域；它们不因旁边接入 participant 就变 pure。
+- Draw 仍通过原事件／hit／help／disabled／popup 漏斗。已配对 participant 可复用已准备 context，
+  不复用资格或命令结果；滚动时转换当前 origin。native editor、输入、help 和 unknown Draw 不省略。
+  有展示隔离的后端只在 Repaint 调用纯 Paint；有效 clip 非空且没有完整输出证明时，屏外 layout rect 也照画。
+  PaintClip 通过现有 drawing.Clip 强制，平移 drawing outlet（含 numeric text／嵌套 clip）以保原逻辑坐标；
+  不包住 Operate。没有隔离能力／当前无原生执行的普通入口保持旧 Measure／Draw。
+
+### UI 状态、故障与退出
+
+原 edit owner 比较已有 draft／focus／modified／conflict／composition，不额外读取 Valid／parser；
+新 editor、formatter/parser 改变和焦点挂起也使已采用节点失效。custom 其他状态仍由原 Invalidate 写边负责。
+Build／Paint 新纯阶段拒绝控件、editor 创建、UI mutation／帮助；旧调用不获得该纯度前提。
+Build 失败保最后成功 Paint 的不可变资料或恢复带，停止该失败片段的 Operate；不凭相同失败输入反复 Build。
+纯 Paint 失败锁存，相关输入／环境／UI／Retry 才重新派生；操作失败仍沿原 request／guard 回复，不自动重发。
+来源或几何失败丢候选，恢复绘制不运行旧 Draw／Operate、普通 source read、popup/native editor；
+只画最后完整静态结果／恢复带并保 fault，可靠同步后恢复输入。纯恢复自身失败不会每 pass 重试。
+
+候选删除不提前 detach；文档 Seal 后的 root 删除／不兼容替换、显式 mount 结束和 Close 退休记录。
+附件退出请求原路径完整重验，保相容 editor／Session，不 Save／blur／Cancel；Close 终止后续回调和发布。
+同 Host 的 Capture／Build 重入在推进前拒绝。`MeasureBudget` 在原非提交 scope 内使用私有计算 engine／
+region workspace：可用新纯 Build，但不改实际 attachment 状态、source/layout clock、缓存、clamp 或业务。
+
+### 观察、载体与证据边界
+
+Attachment.Status 与原 Host.Observe／Tools 的 `region-status` facts 来自同一有界 owner 记录；
+只描述已观察边界，读不 Capture／Build／arrange。`region-work` 在原 timing／detail 仪器显式启用时统计
+BoundaryCaptures、Builds、ReusedRegions、ScheduleReuses、InteractiveCalls、UnknownCalls、PaintCalls、
+ClippedDisplays；否则 NotSampled。PaintCalls 不是 native 调用、GPU 提交或 FPS。
+
+普通 net472／RW1.6 Release 中间 API 载体 `d707ddf` 已独立固定，执行候选另有不可覆盖目录／MVID；
+具体身份由 producer 的 READY／DELIVERY 记录，不从后续 HEAD 推断。针对性既有布局／Repeat／编辑／输入／
+API／containment 检查、中性 391 检查、adapter 140 assertions 与 execution-lifetime 20 已有通过记录；
+最终候选与检查范围随 owner delivery 一起交付。未新增测试／case／等价 probe。
+
+本节是源码及 managed 证据，不是 F09 原生签收。US 须以实际 item packet 的短字段接入纯 Build，
+旧 Operate 保完整绑定地址；完整生产 source 的可信鲜验与分项复用由 US owner 负责。
+CONSUME、同代固定配对 NATIVE、整帧／首次及暖态性能和 165 FPS 仍由各原 owner／PM 继续。
+历史 1.6 A/C-r2、144 Hz、独立60Hz 或编译通过不签0.9原生，更不签1.7；GPU／scanout 未测保持未知。
 
 <a id="fl09-event-tiering"></a>
 ## FL09 事件分层执行（2026-11-11）

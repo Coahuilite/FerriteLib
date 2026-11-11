@@ -66,6 +66,6 @@ internal sealed partial class UiLayoutEngine
         Widget = entry.Widget, IsContainer = entry.IsContainer, ContainerKind = entry.ContainerKind,
         MeasureWidth = entry.MeasureWidth, Rect = rect, ContentRect = entry.ContentRect,
         SubtreeCount = entry.SubtreeCount, IsMaterializedRow = entry.IsMaterializedRow, LayoutInputs = entry.LayoutInputs,
-        HasContentHeightReference = entry.HasContentHeightReference
+        HasContentHeightReference = entry.HasContentHeightReference, Region = entry.Region
     };
 }

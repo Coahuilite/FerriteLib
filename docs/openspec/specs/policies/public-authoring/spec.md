@@ -3,8 +3,8 @@
 ## Purpose
 使作者按需要采用完整能力切片，知道依赖、寿命、等级和升级边界。FL0.8.x 是首条面向公开作者的基线；更早内部版本是历史材料，不是先升级旧框架才能学习当前用法的前提。
 
-0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、未实施；本页新增区域条款及
-相关显式例外仅适用于主动采用的新能力，不表示当前 API 已可调用。行为唯一正文归本页，
+0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、r3 放行实施；本页新增区域条款及
+相关显式例外仅适用于主动采用的新能力。接口及执行源码已提供，支持／证据见实现账；行为唯一正文归本页，
 采用来源见 [fl09-retained-regions](../../../changes/fl09-retained-regions/proposal.md)。
 
 ## Requirements
@@ -120,9 +120,9 @@ UiPageWindow SHALL 可直接构造，Catalog 可选按 UiWindowKey/Options/Focus
 shader不属基础补齐；通用仿射、变换内原生编辑／caret、完整modal／K1与OS桥不因本次文档而成为当前可用承诺。
 旧合法入口／兼容、单载体及各目标边界不变；当前1.7目标仍沿[DEV-06/07](../../contracts/developer-tools/spec.md)，不跟改保留0.8／1.6合同。
 
-## 0.9 区域保留：已采用、未实施
+## 0.9 区域保留：已采用的显式新能力
 
-本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable；接口／数据层先行导出，完整执行仍实施中，支持状态以实现账为准。
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包为 Public-unstable；接口及执行源码已提供，实际支持与验证状态以实现账为准。
 
 ### Requirement: FL09-REGION-AUTHOR 新能力主动选择，旧语义不退休
 公开作者 SHALL 可在普通／embedded Host 上选择单个已声明区域、明确表示读取 map，

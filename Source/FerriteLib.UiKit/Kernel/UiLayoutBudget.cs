@@ -29,16 +29,21 @@ public sealed partial class UiHost
         // the same measurement implementation and original session nodes; no caches are promoted.
         Exception? failure = null;
         UiLayoutSnapshot? result = null;
+        UiRegionRuntime? budgetRegions = null;
         try
         {
+            UiWidgetContext context = CreateContext(available.X);
+            budgetRegions = regions?.Budget(context, manifest);
             var calculation = new UiLayoutEngine(source, new UiStyleResolver(theme, styleResolver.Document), manifest.Templates, layoutInputs);
-            result = calculation.CalculateBudget(CreateContext(available.X), available, manifest.Roots);
+            calculation.Regions = budgetRegions;
+            result = calculation.CalculateBudget(context, available, manifest.Roots);
             if (pure.Fault != null) throw pure.Fault;
             readPrepared?.Invoke(result);
             if (!session.IsActive) throw new ObjectDisposedException(nameof(UiHost));
             if (pure.Fault != null) throw pure.Fault;
         }
         catch (Exception error) { failure = error; }
+        finally { budgetRegions?.Close(); }
         try { prepared.Dispose(); }
         catch (Exception cleanup) when (failure != null && UiObservationBoundary.IsOrdinary(cleanup))
         { throw new AggregateException("Budget measurement and provisional cleanup both failed.", failure, cleanup); }
@@ -160,6 +165,8 @@ public sealed partial class UiNode
     {
         Action restore = CaptureArrangement();
         bool dirty = IsDirty;
+        long regionRevision = RegionRevision;
+        UiRegionAttachment? regionAttachment = RegionAttachment;
         int measures = LayoutMeasureCount, arrangements = LayoutArrangeCount;
         var stateKeys = new HashSet<string>(customState.Keys, StringComparer.Ordinal);
         var slotKeys = new HashSet<string>(slots.Keys, StringComparer.Ordinal);
@@ -184,6 +191,7 @@ public sealed partial class UiNode
             foreach (string key in new List<string>(slots.Keys)) if (!slotKeys.Contains(key)) slots.Remove(key);
             restore();
             IsDirty = dirty;
+            RegionRevision = regionRevision; RegionAttachment = regionAttachment;
             LayoutMeasureCount = measures;
             LayoutArrangeCount = arrangements;
             if (failures != null) throw new AggregateException("Provisional node state cleanup failed at '" + Path + "'.", failures);

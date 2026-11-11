@@ -77,7 +77,11 @@ public sealed partial class UiControls
         UiNode node = ctx.Node;
         UiControlState state = ctx.Session.GetControlState(node.Id, binding);
         if (state.Editor is IUiEditState editor)
+        {
+            bool focused = editor.Focused;
             editor.Suspend();
+            if (focused && node.HasRegion) node.MarkDirty();
+        }
         state.CommitRequested = false;
         ReleaseEditFocus(state, ctx.Session);
         ctx.Session.NoteEditClosed(state);
@@ -108,8 +112,10 @@ public sealed partial class UiControls
             state.Editor = editor;
             state.EditorTarget = target;
             state.CommitRequested = state.DiscardRequested = false;
+            if (node.HasRegion) node.MarkDirty();
         }
 
+        if (node.HasRegion && !editor.RegionFunctionsMatch(format, parse)) node.MarkDirty();
         editor.Configure(format, parse);
         return editor;
     }
@@ -152,6 +158,8 @@ public sealed partial class UiControls
         UiTextFont font = textRun.Font;
         state.EditorMultiline = multiline;
         string previousDraft = editor.Draft;
+        bool previousFocus = editor.Focused, previousModified = editor.Modified, previousConflict = editor.Conflict;
+        bool previousComposition = state.RegionComposition;
         editor.Observe(model);
         UiControlKey controlName = EditControlName(session, state);
         if (Execution.HasFocus(controlName))
@@ -229,6 +237,10 @@ public sealed partial class UiControls
                 ReleaseEditFocus(state, session);
             if (session.IsActive)
             {
+                state.RegionComposition = Input.Composing;
+                if (!string.Equals(previousDraft, editor.Draft, StringComparison.Ordinal) || previousFocus != editor.Focused
+                    || previousModified != editor.Modified || previousConflict != editor.Conflict || previousComposition != state.RegionComposition)
+                    if (node.HasRegion) node.MarkDirty();
                 if (multiline && !string.Equals(previousDraft, editor.Draft, StringComparison.Ordinal))
                     node.MarkDirty();
                 if (editor.Focused)

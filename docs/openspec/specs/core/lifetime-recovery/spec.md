@@ -3,8 +3,8 @@
 ## Purpose
 让隐藏、目标替换、删除、可协商关闭、实际销毁和异常恢复保持不同结果。Host／Session 持 UI 状态及其自有连接；业务服务、借用 execution 和供应纹理由各自 owner 持有。
 
-0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、未实施；本页新增区域条款及
-相关显式例外仅适用于主动采用的新能力，不表示当前 API 已可调用。行为唯一正文归本页，
+0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、r3 放行实施；本页新增区域条款及
+相关显式例外仅适用于主动采用的新能力。接口及执行源码已提供，支持／证据见实现账；行为唯一正文归本页，
 采用来源见 [fl09-retained-regions](../../../changes/fl09-retained-regions/proposal.md)。
 
 ## Requirements
@@ -80,9 +80,9 @@ subtree's editor/capture/popup/output/custom resources without business completi
 a new incarnation, even when the declaration key is unchanged; old requests close rather than move.
 Siblings keep compatible state. The Host retains its identity and takes a complete layout fallback.
 
-## 0.9 区域保留：已采用、未实施
+## 0.9 区域保留：已采用的显式新能力
 
-本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable；接口／数据层先行导出，完整执行仍实施中，支持状态以实现账为准。
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包为 Public-unstable；接口及执行源码已提供，实际支持与验证状态以实现账为准。
 
 ### Requirement: FL09-REGION-LIFETIME 表示、几何和调度共同成功
 区域候选 SHALL 在原成功事务共同发布输入版本、成员、纯结果、plan／位置及有效性；

@@ -52,14 +52,19 @@ public sealed class UiRegionSnapshot
     private static IReadOnlyList<UiChoice<T>> ReadChoices<T>(Dictionary<string, Slot> channel, string key)
     { Slot slot = Find(channel, key, "Choices"); RequireType<T>(slot, key, "Choices"); return (IReadOnlyList<UiChoice<T>>)slot.Data!; }
 
-    internal bool TryItem(string source, string item, out UiRegionSnapshot result)
+    internal bool TryAddressedItem(string source, string item, out UiRegionSnapshot result)
     {
+        if (Address(source, out string outer, out string owner, out string field))
+        {
+            if (TryAddressedItem(outer, owner, out UiRegionSnapshot packet)) return packet.TryAddressedItem(field, item, out result);
+            result = null!; return false;
+        }
         if (items.TryGetValue(source, out var rows) && rows.TryGetValue(item, out result!)) return true;
-        foreach (var group in items.Values) foreach (UiRegionSnapshot row in group.Values)
-            if (row.TryItem(source, item, out result)) return true;
         result = null!; return false;
     }
-    internal bool Has(string key, bool choice) => (choice ? choices : values).ContainsKey(key);
+    internal UiRegionSnapshot AddressedItem(string source, string item)
+        => Address(source, out string outer, out string owner, out string field)
+            ? AddressedItem(outer, owner).Item(field, item) : Item(source, item);
     internal static bool Address(string key, out string source, out string item, out string field)
     {
         source = item = field = "";

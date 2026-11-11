@@ -26,7 +26,7 @@ public static class UiTextFonts
         => For(context, context.Theme.Styles.Font, purpose);
     internal static UiTextRun For(UiWidgetContext ctx, UiFont? alias = null, UiTextPurpose purpose = UiTextPurpose.Label)
     {
-        var run = Resolve(ctx.Metrics, ctx.Session.CurrentExecution, new UiTextFont(alias ?? ctx.Theme.Styles.Font, ctx.Theme.ReadFontSize), purpose, ctx.ElementPath);
+        var run = Resolve(ctx.Metrics, ctx.Session.CurrentDrawing, new UiTextFont(alias ?? ctx.Theme.Styles.Font, ctx.Theme.ReadFontSize), purpose, ctx.ElementPath);
         ctx.Properties.TextRuns[purpose] = new UiTextFontFact(run);
         return run;
     }

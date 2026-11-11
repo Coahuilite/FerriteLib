@@ -3,8 +3,8 @@
 ## Purpose
 用相同真实输入得到可供 paint、hit、clip、scroll 和 popup 消费的一份完整有效几何。复用是少做未变计算与候选发布，不是新的树、线程、业务时钟或保留旧像素。
 
-0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、未实施；本页新增区域条款及
-相关显式例外仅适用于主动采用的新能力，不表示当前 API 已可调用。行为唯一正文归本页，
+0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、r3 放行实施；本页新增区域条款及
+相关显式例外仅适用于主动采用的新能力。接口及执行源码已提供，支持／证据见实现账；行为唯一正文归本页，
 采用来源见 [fl09-retained-regions](../../../changes/fl09-retained-regions/proposal.md)。
 
 ## Requirements
@@ -150,9 +150,9 @@ Public usage: [owner layout input](../../../../development/0.9/tools.md#owner-la
 [双轴Scroll与有限画布ADDED](../../../changes/fl09-basic-ui-capabilities/specs/core/layout/spec.md)已采用、未实施，
 由该change持唯一目标正文；旧纵Scroll／普通测量和布局条件继续由本文持有。实现差距见[实现账](../../../implementation.md#fl09-reliability)。
 
-## 0.9 区域保留：已采用、未实施
+## 0.9 区域保留：已采用的显式新能力
 
-本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable；接口／数据层先行导出，完整执行仍实施中，支持状态以实现账为准。
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包为 Public-unstable；接口及执行源码已提供，实际支持与验证状态以实现账为准。
 
 ### Requirement: FL09-REGION-UPDATE 未变区域在边界停止重复工作
 已显式采用区域 SHALL 在原 Host／几何 owner 内保留完整不可变纯结果与工作片段。

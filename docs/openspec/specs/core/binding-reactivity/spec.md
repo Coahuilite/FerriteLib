@@ -3,8 +3,8 @@
 ## Purpose
 使模型读取、失效、响应和 UI 投影各有明确权威。此能力既支持普通显式通知，也支持自愿接入的 tracked 图；向[展示执行连接](../../contracts/presentation-execution/spec.md)提供输入，而不取得业务调度或线程派发权。
 
-0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、未实施；本页新增区域条款及
-相关显式例外仅适用于主动采用的新能力，不表示当前 API 已可调用。行为唯一正文归本页，
+0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、r3 放行实施；本页新增区域条款及
+相关显式例外仅适用于主动采用的新能力。接口及执行源码已提供，支持／证据见实现账；行为唯一正文归本页，
 采用来源见 [fl09-retained-regions](../../../changes/fl09-retained-regions/proposal.md)。
 
 ## Requirements
@@ -138,9 +138,9 @@ Attach handle/Detach/Dispose SHALL 退订但不 Dispose source。distinct pendin
 - **THEN** 记录 unmapped 而不扩大公告
 - **AND** off-owner 通知仍拒绝、不排队重放
 
-## 0.9 区域保留：已采用、未实施
+## 0.9 区域保留：已采用的显式新能力
 
-本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable；接口／数据层先行导出，完整执行仍实施中，支持状态以实现账为准。
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包为 Public-unstable；接口及执行源码已提供，实际支持与验证状态以实现账为准。
 
 ### Requirement: FL09-REGION-SOURCE 完整表示必须在真实边界鲜取
 显式区域源 SHALL 在每个原合法同步边界真实捕获当前不可变表示；相同实例仅可代表全部实际表示输入仍相同。

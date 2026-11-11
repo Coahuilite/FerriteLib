@@ -4,8 +4,8 @@
 ## Purpose
 让开发工具读取和操作作者的真实页面，复用原 Host、布局、编辑和寿命；库提供中立接缝，不内置工具产品。
 
-0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、未实施；本页新增区域条款及
-相关显式例外仅适用于主动采用的新能力，不表示当前 API 已可调用。行为唯一正文归本页，
+0.9 区域保留已按 WO-FL09-RETAINED-DISPLAY-20261111 r2 采用、r3 放行实施；本页新增区域条款及
+相关显式例外仅适用于主动采用的新能力。接口及执行源码已提供，支持／证据见实现账；行为唯一正文归本页，
 采用来源见 [fl09-retained-regions](../../../changes/fl09-retained-regions/proposal.md)。
 
 ## Requirements
@@ -131,9 +131,9 @@ headless SHALL复用正式manifest、registry、binding、layout与操作，显�
 [实现对账](../../../implementation.md#fl09-tools-semantics)分别覆盖通知、缺席／寿命、空间、预算、新能力、退出。
 Tools不以新目标发明签名，不绕过Stale／在读中推进，也不取得借用execution的释放权。
 
-## 0.9 区域保留：已采用、未实施
+## 0.9 区域保留：已采用的显式新能力
 
-本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable；接口／数据层先行导出，完整执行仍实施中，支持状态以实现账为准。
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包为 Public-unstable；接口及执行源码已提供，实际支持与验证状态以实现账为准。
 
 ### Requirement: DEV-09-REGION 区域观察只读同源实际记录
 区域 status／Tools 投影 SHALL 来自原 Host 的有界记录，区分 source／layout／最后实际 Paint

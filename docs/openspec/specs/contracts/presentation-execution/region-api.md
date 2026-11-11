@@ -1,14 +1,14 @@
-# 0.9 区域保留：已采用接口（执行集成中）
+# 0.9 区域保留：显式采用接口
 
 状态：WO-FL09-RETAINED-DISPLAY-20261111 r2 正式采用，整个新增闭包 Public-unstable。
-本文是本组计划接口的唯一现行约定；行为／phase／paint证明归 [展示执行](spec.md)，
+本文是本组接口的唯一现行约定；行为／phase／paint证明归 [展示执行](spec.md)，
 来源完整性及 Value／Choices 独立通道归 [绑定](../../core/binding-reactivity/spec.md)，
 事务及局部传播归 [布局](../../core/layout/spec.md)。既有签名／使用条件保持；新增导出不等于完整区域行为或原生验收完成。
 
 ## 公开接口与参数
 
 整个新增闭包已定 Public-unstable；原有 Stable 依赖不降级，不改旧接口 implements、构造默认或 XML。
-本组接口／数据层已导出；完整区域执行仍集成中，当前限制见实现账，不另建 snapshot／epoch 两套入口。
+本组接口已导出并接入 Host／布局／执行；当前支持、普通 Release 及未验原生项目见实现账，不另建 snapshot／epoch 两套入口。
 下列仅列 public／protected 表面；未列出的构造不公开，附件只能由 Attach 创建。
 
 ```csharp
@@ -142,7 +142,7 @@ public abstract class UiRegionDisplay
 
 ## 作者采用示例
 
-以下为已采用接口的接线形状；完整区域优化尚在集成，见实现账。领域 capture 由消费 owner 实现，不是 FL 的业务接口：
+以下为显式接口的接线形状；实际支持与验证范围见实现账。领域 capture 由消费 owner 实现，不是 FL 的业务接口：
 
 ```csharp
 // IUiBindingAccess、普通命令和原 source 公开入口全部保留。
@@ -150,7 +150,7 @@ var reads = new UiRegionReadMap()
     .Value<IReadOnlyList<string>>("b-action-keys", UiRegionUse.Layout)
     .ItemValue<bool>("b-action-keys", "field-visible", UiRegionUse.Layout)
     .ItemValue<bool>("b-action-keys", "has-row-result", UiRegionUse.Layout)
-    .ItemValue<string>("b-action-keys", "row-result", UiRegionUse.Display);
+    .ItemValue<string>("b-action-keys", "row-result", UiRegionUse.Layout | UiRegionUse.Display);
 using var region = UiRetainedRegions.Attach(host, "b-actions",
     source.CaptureActionDisplay, reads);
 ```

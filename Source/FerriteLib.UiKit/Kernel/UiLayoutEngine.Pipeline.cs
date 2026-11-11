@@ -81,9 +81,10 @@ internal sealed partial class UiLayoutEngine
             { scrollIndex[ScrollKey(entry)] = i; if (entry.ContentRect.HasValue) contentIndex[ScrollKey(entry)] = i; }
             hasReferenceHeight |= UiPlacement.IsMatchContentHeight(entry.Spec);
             if (entry.Widget == null) continue;
-            hasLegacyMeasure |= entry.Widget is not IUiMeasureParticipant && !FixedLeaf(entry.Spec);
-            hasCustomDemand |= entry.Widget is IUiPresentationDemand;
+            hasLegacyMeasure |= entry.Region == null && entry.Widget is not IUiMeasureParticipant && !FixedLeaf(entry.Spec);
+            hasCustomDemand |= entry.Region == null && entry.Widget is IUiPresentationDemand;
             hasDiagnosticCallbacks |= entry.Widget is IUiLayoutDiagnosticSource;
+            if (entry.Region?.Participant != null) continue;
             string key = ReadDeclaredBindKey(entry.Spec); if (key.Length > 0) visibleDemand.Add(key);
             foreach (var attribute in entry.Spec.Attributes)
                 if (UiDefinitionCompiler.BindingRole(scope, entry.Spec, attribute.Key) != UiBindingRole.None)
@@ -157,6 +158,8 @@ internal sealed partial class UiLayoutEngine
     private bool TryIncremental(UiWidgetContext ctx, UiLayoutPoint available, IReadOnlyList<UiElementSpec> roots, bool externalContentChanged, out UiLayoutSnapshot snapshot)
     {
         snapshot = null!;
+        if (Regions == null && (regionBoxes.Count != 0 || regionLeaves.Count != 0)) return false;
+        if (Regions != null && RegionNeedsFull(ctx)) return false;
         float width = Normalize(available.X, 1f), height = Normalize(available.Y, 1f);
         if (cachedSnapshot == null || textMetricsCache == null || !PipelineInputsCurrent(ctx, available, roots, externalContentChanged)
             || hasCustomDemand || hasDiagnosticCallbacks || hasLegacyMeasure && pendingInputValidation) return false;
@@ -208,6 +211,8 @@ internal sealed partial class UiLayoutEngine
             for (int index = 0; index < lastEntries.Count; index++)
             {
                 PlacedEntry entry = lastEntries[index];
+                if (Regions != null && RegionRangeCurrent(entry, baseContext))
+                { UiRegionWork.Count(ctx.Session, UiRegionWork.Kind.Reuse); index += entry.SubtreeCount - 1; continue; }
                 UiWidgetContext local = PipelineContext(entry, baseContext, journal);
                 if (!entry.LayoutInputs.Matches(local)) return false;
                 if (entry.Widget == null || FixedLeaf(entry.Spec) || entry.HasContentHeightReference) continue;

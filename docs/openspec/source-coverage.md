@@ -8,8 +8,8 @@ cf1cf6456096171fb47c012369bcd0c2f29e968f；被替代正文在[完整归档](../a
 ## FL09显式区域保留：2026-11-11 r2采用对账
 
 来源为 WO-FL09-RETAINED-DISPLAY-20261111 r2 及 bb7da49；PM 核定整个新增闭包 Public-unstable。
-下列正文已并入唯一 current，均为**0.9已采用、未实施**；change 的 delta／design 是采用来源，
-不另持 current。已导出 API／Stable 清单未改；[计划接口](specs/contracts/presentation-execution/region-api.md)明确未导出。
+下列正文已并入唯一 current，均适用**0.9 显式新能力**；r3 已放行并有接口／执行源码，change 的 delta／design 是采用来源，
+不另持 current。新增导出按决定进入 Public-unstable；[接口](specs/contracts/presentation-execution/region-api.md)与实际源码对应，旧 Stable 清单未改。
 
 | 采用条款／决定 | 唯一 current | 适用与状态 |
 | --- | --- | --- |
@@ -19,9 +19,9 @@ cf1cf6456096171fb47c012369bcd0c2f29e968f；被替代正文在[完整归档](../a
 | U3／SPLIT-PHASE／TIERED／TIER-SAFE／CLIPPED；REGION-PARTICIPANT | [展示执行](specs/contracts/presentation-execution/spec.md) | 新纯Build／实时Operate／Paint；真实clip或全部footprint证明，不以layout rect代替 |
 | FL16-REGION-PAINT | [保留1.6](specs/adapters/rimworld16/spec.md) | 真实提交／强制clip／finally，不以1.6签1.7 |
 | DEV-04 新纯Build预算；DEV-09-REGION | [Tools连接](specs/contracts/developer-tools/spec.md) | 非提交候选、只读同源状态；查询不推进 |
-| REGION-AUTHOR／新增闭包Public-unstable | [作者政策](specs/policies/public-authoring/spec.md)、[计划接口](specs/contracts/presentation-execution/region-api.md) | 完整新闭包已决定、未导出；旧Stable不降级、不退休 |
+| REGION-AUTHOR／新增闭包Public-unstable | [作者政策](specs/policies/public-authoring/spec.md)、[接口](specs/contracts/presentation-execution/region-api.md) | 完整新闭包按决定导出；旧Stable不降级、不退休 |
 
-实施／消费／原生门仍在 [tasks](changes/fl09-retained-regions/tasks.md)，本轮只做规格采用。
+源码／managed 检查映射归 [实现账](implementation.md#fl09-retained-regions)；固定普通 Release、消费与原生门仍在 [tasks](changes/fl09-retained-regions/tasks.md)。
 历史F09与新独立60Hz IMGUI账各保来源，不能充作0.9同代基线或GPU／scanout证据。
 
 ## FL09事件分层：2026-11-11采用对账

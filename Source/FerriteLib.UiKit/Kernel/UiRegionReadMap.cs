@@ -55,4 +55,5 @@ public sealed class UiRegionReadMap
         foreach (var pair in itemChoices) result.itemChoices.Add(pair.Key, new Dictionary<string, Route>(pair.Value, StringComparer.Ordinal));
         return result;
     }
+    internal bool HasItemSource(string source) => itemValues.ContainsKey(source) || itemChoices.ContainsKey(source);
 }

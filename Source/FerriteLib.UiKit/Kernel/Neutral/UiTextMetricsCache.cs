@@ -13,6 +13,7 @@ internal sealed class UiTextMetricsCache : ITextMetrics, IUiTextMetricsEnvironme
         internal int Entries;
     }
     internal ITextMetrics Source { get; }
+    internal Action<UiTextFont, UiTextPurpose, UiMeasureInputs?>? RegionEnvironmentRead;
     private readonly Dictionary<(UiTextFont, UiTextPurpose), FontCache> fonts = new();
     private readonly HashSet<(UiTextFont, UiTextPurpose)> owned = new();
     internal UiTextMetricsCache(ITextMetrics source) { Source = source; }
@@ -24,9 +25,14 @@ internal sealed class UiTextMetricsCache : ITextMetrics, IUiTextMetricsEnvironme
         return copy;
     }
     public bool Supports(UiTextPurpose purpose) => (Source as IUiTextFontMetrics)?.Supports(purpose) == true;
-    public UiMeasureInputs? CaptureEnvironment(UiFont font) => (Source as IUiTextMetricsEnvironment)?.CaptureEnvironment(font);
-    public UiMeasureInputs? CaptureEnvironment(UiTextFont font, UiTextPurpose purpose) => font.Size.HasValue
-        ? (Source as IUiTextFontMetrics)?.CaptureEnvironment(font, purpose) : CaptureEnvironment(font.Alias);
+    public UiMeasureInputs? CaptureEnvironment(UiFont font) => CaptureEnvironment(new UiTextFont(font), UiTextPurpose.Label);
+    public UiMeasureInputs? CaptureEnvironment(UiTextFont font, UiTextPurpose purpose)
+    {
+        UiMeasureInputs? value = font.Size.HasValue ? (Source as IUiTextFontMetrics)?.CaptureEnvironment(font, purpose)
+            : (Source as IUiTextMetricsEnvironment)?.CaptureEnvironment(font.Alias);
+        RegionEnvironmentRead?.Invoke(font, purpose, value);
+        return value;
+    }
     private FontCache Writable((UiTextFont, UiTextPurpose) key, FontCache cache)
     {
         if (owned.Add(key))

@@ -91,7 +91,26 @@ public sealed partial class UiSession : IDisposable
     private IUiExecution? execution;
     internal IUiExecution? CurrentExecution => execution;
     public IUiExecution Execution => execution ?? throw new InvalidOperationException("Drawing or native input requires an explicit execution scope.");
-    public IUiDrawing Drawing => Execution;
+    public IUiDrawing Drawing => regionDrawing ?? Execution;
+    private IUiDrawing? regionDrawing;
+    internal IUiDrawing? CurrentDrawing => regionDrawing ?? execution;
+    internal IDisposable RegionDrawing(IUiDrawing drawing)
+    {
+        IUiDrawing? prior = regionDrawing; regionDrawing = drawing;
+        return new UiReactiveScope(() => regionDrawing = IsActive ? prior : null);
+    }
+    internal void RegionBuildRecovered(UiNode node) { trippedNodes.Remove(node); }
+    private string? regionPurePhase;
+    internal IDisposable RegionPure(string phase)
+    {
+        string? previous = regionPurePhase; regionPurePhase = phase;
+        return new UiReactiveScope(() => regionPurePhase = IsActive ? previous : null);
+    }
+    internal void RequireRegionOperation()
+    {
+        if (IsActive && regionPurePhase != null)
+            throw new InvalidOperationException("Region " + regionPurePhase + " is pure; perform UI mutation/native controls/help in Operate.");
+    }
     /// <summary>
     /// Borrows execution for one actual callback. Idle replacement is legal; active capture/edit or an
     /// open hit pass must finish on the old execution. Rejection changes neither input nor ownership.
@@ -1019,6 +1038,7 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
         UiNodeId id = parent.Id.SubNode(name);
         if (!nodes.TryGetValue(id, out UiNode? node))
         {
+            RequireRegionOperation();
             node = new UiNode(this, id, "", -1, needsMeasure: false);
             nodes.Add(id, node);
         }
@@ -1349,6 +1369,7 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
 
     internal void PublishHelp(UiNode source, string helpRef)
     {
+        RequireRegionOperation();
         if (helpRef == null) throw new ArgumentNullException(nameof(helpRef));
         EnsureActive();
         if (!ReferenceEquals(source.Owner, this)) throw new ArgumentException("Help source belongs to another Session.", nameof(source));
@@ -1455,12 +1476,14 @@ internal UiControlState GetControlState(UiNodeId element, string stateKey)
 
     private static void SuspendNodeEditors(UiNode node)
     {
+        bool changed = false;
         foreach (UiControlState state in node.ValueStates.Values)
         {
-            if (state.Editor is IUiEditState editor) editor.Suspend();
+            if (state.Editor is IUiEditState editor) { changed |= editor.Focused; editor.Suspend(); }
             state.CommitRequested = state.DiscardRequested = false;
         }
         node.EditingState = null;
+        if (changed && node.HasRegion && node.Owner.IsActive) node.MarkDirty();
     }
     internal void SuspendFailedInput(UiNode node)
     {

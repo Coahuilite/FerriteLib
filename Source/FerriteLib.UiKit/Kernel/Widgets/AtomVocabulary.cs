@@ -244,12 +244,17 @@ internal static class AtomVocabulary
     /// </summary>
     internal static UiResolvedStyle ResolveRole(
         UiElementSpec spec, UiWidgetContext ctx, bool? writable, UiEmphasis defaultEmphasis = UiEmphasis.Normal)
+        => ResolveRegionRole(spec, ctx, Selected(spec, ctx), writable, defaultEmphasis);
+
+    // Selected comes from the explicit new port; ordinary callers retain their original read.
+    internal static UiResolvedStyle ResolveRegionRole(UiElementSpec spec, UiWidgetContext ctx, bool selected,
+        bool? writable = null, UiEmphasis defaultEmphasis = UiEmphasis.Normal)
     {
         // SelectedBind (0.7.x) is the binding-driven SELECTED state, and state beats the author for the same
         // reason writability does: a consumer that knows the element is selected must not have to re-author
         // its Tone per state. Deliberately not a ToneKey - a binding that hands back "Active" would
         // re-authorise a name this line retired, and the treatment is a state the library already owns.
-        if (Selected(spec, ctx))
+        if (selected)
         {
             return ctx.Theme.Styles.Resolve(UiStatusTone.Active, ParseEmphasis(spec, ctx, defaultEmphasis), writable);
         }

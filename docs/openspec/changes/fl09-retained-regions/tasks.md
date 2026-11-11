@@ -1,17 +1,17 @@
 # Tasks — 已采用、实施中
 
-状态：WO r3 已核定 FL／US 正式采用并放行 RETAIN／CONSUME。接口／数据层先行，完整区域运行在集成；本清单未完成项仍开放，不以编译充作验收。
+状态：WO r3 已核定 FL／US 正式采用并放行 RETAIN／CONSUME。FL 的区域源码和既有 managed 检查已完成；固定普通 Release 身份在交付中，消费／原生及 PM 验收继续开放。
 
 - [x] SPEC-1 PM 按 WO r2 选用 bb7da49，整个新增闭包定为 Public-unstable；补齐独立 choices／paint footprint 与未变 source 不逐字段重算。
 - [x] SPEC-2 原 owner 将含 r2 补充的 ADDED／MODIFIED 并入唯一 current，更新真实入口及未导出 API 计划；
   change 保采用来源，不自称 current；仅规格完成，PM 两库核对后才开代码。
-- [ ] RETAIN-1 FL 实现显式 enrollment／表示端口与事务准入；完整源及环境相等时在区域边界
+- [x] RETAIN-1 FL 实现显式 enrollment／表示端口与事务准入；完整源及环境相等时在区域边界
   停止后代重复派生／验证，保 unknown 洞和真实输入。完成释放与失败／重入路径。
-- [ ] RETAIN-2 同一几何 owner 支持变化成员／局部 plan、后续兄弟及 Scroll／共享依赖传播；
+- [x] RETAIN-2 同一几何 owner 支持变化成员／局部 plan、后续兄弟及 Scroll／共享依赖传播；
   首次 materialize 保完整。不是只给叶增缓存或只更换 full/sparse 标签。
 - [ ] RETAIN-3 交付外部可采用 participant、内置表示消费和适配器支持／回退；独立 embedded
   与手动 phase 成立，UI 状态和原生控件仍走原 owner。正常 Release 无 FER_TEST。
-- [ ] RETAIN-4 运行受影响的既有中性、布局、绑定、Repeat、失败、输入、手动／窗口、API／
+- [x] RETAIN-4 运行受影响的既有中性、布局、绑定、Repeat、失败、输入、手动／窗口、API／
   containment 检查；不新增单测／case／等价 probe，不弱化断言。新增 API 按采用决定分类，
   旧 Stable 清单完整保留。记录 build／source／native 不同证据。
 - [ ] CONSUME US owner 从 `1ee2ae0` 的原1.6工作树建立独立0.9消费分支，采用真实 b-actions／

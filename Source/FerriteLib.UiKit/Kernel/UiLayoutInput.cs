@@ -57,6 +57,7 @@ public sealed partial class UiHost
             layoutInputs[elementId] = input;
         }
         // The established full transaction is the deliberate conservative fallback for changed constraints.
+        engine.RegionConstraintsChanged();
         session.BumpContentRevision();
         engine.RequestInputValidation();
     }
@@ -73,6 +74,7 @@ public sealed partial class UiHost
         RequireToolThread();
         if (!session.IsActive) throw new ObjectDisposedException(nameof(UiHost));
         UiNode root = Element(elementId);
+        regions?.EndLifetime(root);
         try { session.EndSubtreeLifetime(root); }
         finally
         {

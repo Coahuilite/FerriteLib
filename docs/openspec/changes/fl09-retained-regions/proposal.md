@@ -1,10 +1,11 @@
 # FL09 显式区域保留：已采用变更
 
-状态：**0.9 已采用、未实施**。WO-FL09-RETAINED-DISPLAY-20261111 r2 选中 bb7da49，
+状态：**0.9 已采用，r3 已放行实施**。WO-FL09-RETAINED-DISPLAY-20261111 r2 选中 bb7da49，
 新增整个闭包定为 Public-unstable，含独立 choices 读取、paint footprint 与生产源捕获补充。
-现行行为已并入各能力 [specs](../../specs)，计划接口唯一归 [region-api](../../specs/contracts/presentation-execution/region-api.md)。
-本目录只保采用来源，不作为第二套 current。此次仅文档采用，产品仍待 PM 确认两库后放行。
-基准 d07cdc0，候选来源 bb7da49；未修改产品、构建设置、二进制或已导出 API。
+现行行为已并入各能力 [specs](../../specs)，接口唯一归 [region-api](../../specs/contracts/presentation-execution/region-api.md)。
+本目录只保采用来源，不作为第二套 current。采用时仅改文档（FL 8f02776）；r3 的实现／检查／
+普通载体和原生待验归 [实现账](../../implementation.md#fl09-retained-regions)及 tasks。
+采用基准 d07cdc0，候选来源 bb7da49；不把后续源码或性能结果倒计入采用证据。
 
 ## Why
 

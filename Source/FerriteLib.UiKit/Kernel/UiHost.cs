@@ -188,8 +188,10 @@ public sealed partial class UiHost : IDisposable
                 DateTime.UtcNow, UiObservationStatus.Stale, "budget-measurement-in-progress", false, Array.Empty<UiObservedNode>());
         try
         {
-            return engine.Observe(CreateContext(0), budget ?? new UiObservationBudget(), nodeKey,
-                lastLayoutRevision != theme.LayoutRevision);
+            UiObservationBudget limits = budget ?? new UiObservationBudget();
+            UiHostObservation observation = engine.Observe(CreateContext(0), limits, nodeKey,
+                lastLayoutRevision != theme.LayoutRevision || regions?.LayoutFailed == true);
+            return regions?.Observe(observation, limits) ?? observation;
         }
         catch (Exception ex)
         {
@@ -256,6 +258,7 @@ public sealed partial class UiHost : IDisposable
 
     public UiLayoutSnapshot MeasureAndArrange(UiLayoutPoint available)
     {
+        regions?.RequireIdle();
         RequireOutsideBudget();
         cycleSnapshot = null; // explicit/manual synchronization also retires any DrawFrame reuse
         session.InvalidatePointerRead();
@@ -276,14 +279,19 @@ public sealed partial class UiHost : IDisposable
         UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription, metrics, session);
         budgetArrangeDepth++;
         bool regionSuccess = false;
+        bool regionBegan = false;
+        UiRegionRuntime? arrangingRegions = regions?.HasAttachments == true ? regions : null;
         try
         {
             // The engine validates effective inputs per stage; presentation changes no longer bump
             // a global cache key. Unknown legacy Measure still receives its original synchronization.
             UiWidgetContext ctx = CreateContext(available.X);
-            regions?.Begin(ctx, manifest);
+            arrangingRegions?.Begin(ctx, manifest);
+            regionBegan = arrangingRegions != null;
+            engine.Regions = arrangingRegions;
             UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, available, manifest.Roots, manifest.TieredEvents);
             regionSuccess = true;
+            if (regionBegan) { arrangingRegions!.End(true); regionBegan = false; }
             LayoutFault = null;
 
             // A region scope is resolved the first time the engine meets it, and that resolution can drop a
@@ -299,7 +307,7 @@ public sealed partial class UiHost : IDisposable
         }
         finally
         {
-            regions?.End(regionSuccess);
+            if (regionBegan) arrangingRegions!.End(regionSuccess);
             budgetArrangeDepth--;
             scope.Dispose();
             if (timing)
@@ -311,6 +319,7 @@ public sealed partial class UiHost : IDisposable
 
     public void Draw(UiLayoutRect viewport, UiLayoutSnapshot snapshot)
     {
+        regions?.RequireIdle();
         RequireOutsideBudget();
         session.InvalidatePointerRead();
         RefreshBindingOwner();
@@ -332,6 +341,12 @@ public sealed partial class UiHost : IDisposable
 #endif
             session.SetHostViewport(viewport);
             UiWidgetContext ctx = CreateContext(viewport.Width);
+            if (regions?.LayoutFailed == true)
+            {
+                engine.DrawRegionRecovery(ctx, viewport);
+                session.AbortHitPass();
+                return;
+            }
             engine.Draw(ctx, snapshot, viewport, manifest.TieredEvents);
             if (!session.IsActive) return;
 
@@ -391,6 +406,7 @@ public sealed partial class UiHost : IDisposable
     /// </summary>
     public void BeginFrame()
     {
+        regions?.RequireIdle();
         RequireOutsideBudget();
         documentService?.Pump();
         session.BeginFrame();
@@ -398,6 +414,7 @@ public sealed partial class UiHost : IDisposable
 
     public void EndFrame()
     {
+        regions?.RequireIdle();
         RequireOutsideBudget();
         session.EndFrame();
     }
@@ -408,6 +425,7 @@ public sealed partial class UiHost : IDisposable
     /// </summary>
     public void DrawFrame(UiLayoutRect viewport, UiFrame frame, IUiExecution execution)
     {
+        regions?.RequireIdle();
         RequireOutsideBudget();
         if (!DisplayRequired) return;
         if (preparingPreview) throw new InvalidOperationException("Author preparation cannot recursively advance its Host.");
@@ -440,6 +458,13 @@ public sealed partial class UiHost : IDisposable
             }
             Draw(viewport, snapshot);
         }
+        catch (UiRegionSourceFailure)
+        {
+            cycleSnapshot = null; cycleOpen = false;
+            session.AbortHitPass();
+            if (session.IsActive) engine.DrawRegionRecovery(CreateContext(viewport.Width), viewport);
+            session.AbortHitPass();
+        }
         catch (UiReactiveFault failure)
         {
             // The layout engine restores the complete previous geometry transaction. It is not
@@ -451,7 +476,8 @@ public sealed partial class UiHost : IDisposable
             {
                 if (lastSuccessfulSnapshot != null)
                 {
-                    Draw(viewport, lastSuccessfulSnapshot);
+                    if (regions?.HasAttachments == true) engine.DrawRegionRecovery(CreateContext(viewport.Width), viewport);
+                    else Draw(viewport, lastSuccessfulSnapshot);
                     UiThemeDraw.FailureMarker(session.Drawing,viewport, theme, failure.Identity);
                 }
                 else UiThemeDraw.RecoveryBand(session.Drawing,viewport, theme, failure.Identity);
@@ -792,6 +818,7 @@ public sealed partial class UiHost : IDisposable
     /// <summary>Replace an immutable XML/program definition through the existing prepare/stage/seal boundary.</summary>
     public void UpdateDefinition(UiLayoutManifest candidate)
     {
+        regions?.RequireIdle();
         if (candidate == null) throw new ArgumentNullException(nameof(candidate));
         if (SessionDisposed) throw new ObjectDisposedException(nameof(UiHost));
         ValidateManifest(candidate);
@@ -853,6 +880,7 @@ public sealed partial class UiHost : IDisposable
     /// </summary>
     internal void CommitLayoutCandidate(UiLayoutManifest candidate)
     {
+        regions?.RequireIdle();
         UiLayoutManifest previous = manifest;
         manifest = candidate;
         pendingDocumentCommit = true;
@@ -867,6 +895,7 @@ public sealed partial class UiHost : IDisposable
     /// </summary>
     internal void CommitStyleCandidate(UiStyleDocument candidate)
     {
+        regions?.RequireIdle();
         attachedStyleDocument = candidate ?? throw new ArgumentNullException(nameof(candidate));
         // Initial Attach may stage layout and style together. Do not discard its pending retirement.
         if (!pendingDocumentCommit) pendingPrune = null;
@@ -888,6 +917,7 @@ public sealed partial class UiHost : IDisposable
         pendingDocumentCommit = false;
         if (SessionDisposed) return;
         if (committed) session.DefinitionRevision++;
+        if (committed) regions?.DefinitionCommitted(manifest);
         var cleanupFailures = new List<(string Context, Exception Error)>();
 
         if (previous != null)

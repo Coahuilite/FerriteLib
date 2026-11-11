@@ -10,12 +10,12 @@
 2026-11-11采用的[事件分层变更](openspec/changes/fl09-event-tiering/proposal.md)已并入现行的展示执行、结构、绑定及保留1.6 adapter能力页；实现与验证进度由该change清单及开发映射分别记录。
 
 WO-FL09-RETAINED-DISPLAY-20261111 r2 选中的[显式区域保留](openspec/changes/fl09-retained-regions/proposal.md)
-已正式采用到下列唯一 current 能力页，**适用0.9、未实施**。完整表示的源边界证明可省区域纯派生，
+已正式采用到下列唯一 current 能力页，**适用0.9，r3 已放行实现**。完整表示的源边界证明可省区域纯派生，
 不是跳过原生输入或实际 Repaint；Value／Choices 为独立通道，纯 Build 不借旧 reader 补资料。
 Paint 延期须有实际 effective clip／全部输出 footprint 证明，layout rect 不相交不够。
 未变生产源不得把逐字段重算移进 capture。整个新增闭包已定 Public-unstable，
-[已采用接口约定](openspec/specs/contracts/presentation-execution/region-api.md)供后续实施，**尚未导出／不可调用**。
-本次只完成规格采用，产品须待 PM 核对 FL／US 两库后放行；[任务状态](openspec/changes/fl09-retained-regions/tasks.md)与
+[接口约定](openspec/specs/contracts/presentation-execution/region-api.md)对应实际 Public-unstable 导出和执行源码。
+普通 Release 候选与 managed 检查不等于原生验收；[任务状态](openspec/changes/fl09-retained-regions/tasks.md)与
 [实现账](openspec/implementation.md#fl09-retained-regions)区分采用、代码与实机证据。
 
 ## 当前保证与已采用目标分开阅读
@@ -55,7 +55,7 @@ Structure／Layout／Semantics／Appearance 是四项平行职责，不是新建
 | bounded diagnostics、R9 facts／budgets、fit | [观察能力](openspec/specs/core/observation/spec.md) |
 | 可选Tools、agent语义、同源headless、文档／prepare／cost与虚拟视口接缝 | [开发工具连接](openspec/specs/contracts/developer-tools/spec.md) |
 | reader/owner → 一致展示 → 当前执行 | [展示执行连接](openspec/specs/contracts/presentation-execution/spec.md) |
-| 0.9显式区域表示／独立choices／纯工作片段与实际Paint（已采用未实施） | [绑定](openspec/specs/core/binding-reactivity/spec.md)、[布局](openspec/specs/core/layout/spec.md)、[展示执行](openspec/specs/contracts/presentation-execution/spec.md)；[计划接口](openspec/specs/contracts/presentation-execution/region-api.md) |
+| 0.9显式区域表示／独立choices／纯工作片段与实际Paint（源码候选，原生待验） | [绑定](openspec/specs/core/binding-reactivity/spec.md)、[布局](openspec/specs/core/layout/spec.md)、[展示执行](openspec/specs/contracts/presentation-execution/spec.md)；[接口](openspec/specs/contracts/presentation-execution/region-api.md) |
 | definition/style producer → prepare/stage/seal → 所有 Host | [更新连接](openspec/specs/contracts/definition-update/spec.md) |
 | opaque topic／Session grace／owned endpoint → 消费者帮助 | [帮助连接](openspec/specs/contracts/help-output/spec.md) |
 | callback 分类、实际结果权威、窄观察异常隔离 | [观察连接](openspec/specs/contracts/observation-boundary/spec.md) |
@@ -72,7 +72,7 @@ Structure／Layout／Semantics／Appearance 是四项平行职责，不是新建
 
 - **普通页面作者：** [settings recipe](consumers/ordinary-settings.md) → S1/S2/S6 → 默认包装。
 - **自定义／部分采用：** S3/S4/S5 → 所选能力及其直接连接；本线native用[1.7连接／目标指南](development/0.9/tools.md)，保留1.6 adapter正文不自动承诺1.7行为。
-- **区域能力实施／US接线：** [0.9已采用接口（未导出）](openspec/specs/contracts/presentation-execution/region-api.md) → 各 current 区域条款；正式源码放行前不改产品。
+- **区域能力实施／US接线：** [0.9显式接口](openspec/specs/contracts/presentation-execution/region-api.md) → 各 current 区域条款及实现账；选择固定普通 Release，不从版本号推原生通过。
 - **修复或扩展维护者：** [来源覆盖](openspec/source-coverage.md) → 对应现行要求 →
   [实现与开放项](openspec/implementation.md) → [手工变更方法](openspec/README.md)。
 - **窗口和实际 fit：** [窗口指南](consumers/rimworld-window-layout.md)；应用 breakpoint、筛选／分页和可读尺寸不变成 FL 默认。

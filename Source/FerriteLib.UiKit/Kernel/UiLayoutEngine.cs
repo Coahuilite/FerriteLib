@@ -58,6 +58,7 @@ internal sealed partial class UiLayoutEngine
         /// already produced instead of re-deriving anything.
         /// </summary>
         internal bool IsMaterializedRow;
+        internal RegionLeaf? Region;
     }
 
     private sealed class MeasuredBox
@@ -184,6 +185,13 @@ internal sealed partial class UiLayoutEngine
         if (roots == null)
             throw new ArgumentNullException(nameof(roots));
         refreshInputs = synchronizeInputs;
+        regionEnvironment = ctx;
+        var priorRegionBoxes = regionBoxes; var priorRegionLeaves = regionLeaves;
+        if (Regions != null)
+        {
+            regionBoxes = RegionBackend(ctx) ? new(regionBoxes) : new();
+            regionLeaves = RegionBackend(ctx) ? new(regionLeaves) : new();
+        }
         ctx.Session.LayoutWork.Passes++;
         drawContextGeneration++;
         contentLayers = null;
@@ -246,6 +254,7 @@ internal sealed partial class UiLayoutEngine
             keyNodes.Clear();
             materializedRepeats.Clear();
             MeasuredBox box = MeasureRoots(ctx, roots, width, height);
+            if (!ctx.Session.IsActive) throw new ObjectDisposedException(nameof(UiHost));
             var rects = new Dictionary<string, UiLayoutRect>(StringComparer.Ordinal);
             var visible = new List<string>();
             var viewports = new Dictionary<string, UiLayoutRect>(StringComparer.Ordinal);
@@ -335,12 +344,14 @@ internal sealed partial class UiLayoutEngine
             ctx.Session.ClearDirtyNodes();
             stableVisibleIds = visible; stableDiagnostics = nextDiagnostics; stableScrollContents = scrollContents;
             RetainPipeline(ctx, roots);
+            PruneRegions(ctx.Session);
             PublishBindingRevisions(retireAbsent: true);
             freshReads = candidateFreshReads;
             return cachedSnapshot;
         }
         catch
         {
+            regionBoxes = priorRegionBoxes; regionLeaves = priorRegionLeaves;
             visibleInputs = priorVisibleInputs; widthInputs = priorWidthInputs; tabInputs = priorTabInputs;
             autoWidths = priorAutoWidths; labelContributions = priorContributions;
             textMetricsCache = priorTextMetrics;
@@ -359,7 +370,10 @@ internal sealed partial class UiLayoutEngine
             throw;
         }
         finally
-        { candidateFreshReads = null; candidateFreshScalars = null; candidateFreshRepeats = null; }
+        {
+            candidateFreshReads = null; candidateFreshScalars = null; candidateFreshRepeats = null;
+            if (!ctx.Session.IsActive) ReleaseRegions();
+        }
     }
 
     /// <summary>
@@ -537,18 +551,20 @@ internal sealed partial class UiLayoutEngine
     /// rule for every kind instead of a per-widget branch.
     /// </summary>
     private static bool ResolveDisabled(UiElementSpec spec, UiWidgetContext ctx)
+        => ResolveDisabled(spec, ctx.Bindings, ctx.Node, ctx.Session);
+    private static bool ResolveDisabled(UiElementSpec spec, IUiBindingAccess bindings, UiNode node, UiSession session)
     {
         string commandKey = ReadAttribute(spec, ActionBindAttribute);
         try
         {
-            bool disabled = commandKey.Length > 0 && !ctx.Bindings.CanExecute(commandKey);
-            if (ctx.Node != null) ctx.Node.QualificationFault = null;
+            bool disabled = commandKey.Length > 0 && !bindings.CanExecute(commandKey);
+            if (node != null) node.QualificationFault = null;
             return disabled;
         }
         catch (UiReactiveFault failure)
         {
-            if (ctx.Node != null) ctx.Node.QualificationFault = failure;
-            UiDomainDiagnostics.Reactive(ctx.Session, ctx.Node, "qualification.fault", failure);
+            if (node != null) node.QualificationFault = failure;
+            UiDomainDiagnostics.Reactive(session, node, "qualification.fault", failure);
             return true;
         }
     }
@@ -558,6 +574,7 @@ internal sealed partial class UiLayoutEngine
         if (ctx == null) throw new ArgumentNullException(nameof(ctx));
         if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
         tieredDraw = tieredEvents;
+        regionDrawEnvironment = ctx;
         repaintDraw = ctx.Session.Input.Phase == UiFramePhase.Repaint;
         IUiExecution execution = ctx.Session.Execution;
         if (execution is IUiExecutionOwner owner) execution = owner.NativeOwner;
@@ -607,13 +624,29 @@ internal sealed partial class UiLayoutEngine
         {
             PlacedEntry entry = entries[index];
             UiLayoutRect rect = ToDrawRect(entry.Rect, viewportPosition, nativeOrigin);
+            if (entry.Region?.Participant != null)
+            {
+                // The schedule is immutable Build output. Only current placement/clip conversion
+                // remains; do not resolve a context or call the old pointer producer again.
+                entry.Node.IsDisabled = entry.Region.Failed || ResolveDisabled(entry.Spec, ctx.Bindings, entry.Node, ctx.Session);
+                layers.Add(new UiPointerLayer(entry.Node.Id.Key, default, hasOperation: false));
+                if (!entry.Region.Failed && !ctx.Session.IsTripped(entry.Node) && !entry.Node.PresentationUnavailable)
+                    foreach (UiPointerRegion pointer in entry.Region.Display!.PointerRegions)
+                    {
+                        UiLayoutRect b = pointer.Bounds;
+                        layers.Add(new UiPointerLayer(entry.Node.Id.Key,
+                            new UiLayoutRect(rect.X + windowOrigin.X + b.X, rect.Y + windowOrigin.Y + b.Y, b.Width, b.Height), clip, pointer.HasOperation));
+                    }
+                continue;
+            }
             UiWidgetContext local = DrawContextForEntry(entry, ctx, windowOrigin);
             entry.Node.IsDisabled = ResolveDisabled(entry.Spec, local);
             if (entry.Widget != null)
             {
                 // Even an undescribed node has a paint-order marker; it does not acquire an opaque hit box.
                 layers.Add(new UiPointerLayer(entry.Node.Id.Key, default, hasOperation: false));
-                if (UiWidgetCapabilities.Pointer(entry.Widget) is IUiPointerLayout layout && !ctx.Session.IsTripped(entry.Node) && !entry.Node.PresentationUnavailable)
+                IUiPointerLayout? layout = UiWidgetCapabilities.Pointer(entry.Widget);
+                if (layout != null && !ctx.Session.IsTripped(entry.Node) && !entry.Node.PresentationUnavailable)
                 {
                     var regions = new List<UiPointerRegion>();
                     UiNode previous = ctx.Session.EnterNode(entry.Node);
@@ -676,11 +709,26 @@ internal sealed partial class UiLayoutEngine
 
     private UiWidgetContext DrawContextForEntry(PlacedEntry entry, UiWidgetContext ctx, UiLayoutPoint windowOrigin)
     {
+        RegionLeaf? region = entry.Region;
+        UiWidgetContext? prepared = region?.DrawContext;
+        if (region?.Participant != null && prepared != null && entry.Node.RegionRevision == region.State
+            && regionDrawEnvironment?.Theme.PropertyRevision == region.Properties
+            && regionDrawEnvironment.Theme.ColourRevision == region.Colours && regionDrawEnvironment.Theme.LayoutRevision == region.HostLayout
+            && RegionAncestorsCurrent(region, entry.Node)
+            && ReferenceEquals(prepared.Metrics, ctx.Metrics) && ReferenceEquals(prepared.Bindings, ctx.Bindings)
+            && ReferenceEquals(prepared.Translation, ctx.Translation))
+        {
+            if (!prepared.WindowOrigin.Equals(windowOrigin)) prepared = prepared.WithWindowOrigin(windowOrigin);
+            region.DrawContext = prepared;
+            UiRegionWork.Count(ctx.Session, UiRegionWork.Kind.Schedule);
+            return prepared;
+        }
         UiWidgetContext? current = entry.EventDrawContext;
         if (tieredDraw && entry.EventContextGeneration == drawContextGeneration && current != null
             && current.WindowOrigin.Equals(windowOrigin) && ReferenceEquals(current.Metrics, ctx.Metrics)) return current;
         entry.EventDrawContext = null;
         UiWidgetContext result = ResolveDrawContext(entry, ctx, windowOrigin);
+        if (region?.Participant != null) region.DrawContext = result;
         if (tieredDraw) { entry.EventDrawContext = result; entry.EventContextGeneration = drawContextGeneration; }
         return result;
     }
@@ -748,7 +796,7 @@ internal sealed partial class UiLayoutEngine
             // Publish the element's disabled state before anything paints or hit-tests: the funnel's
             // interactive entry points read it, so a disabled element neither executes nor captures the
             // pointer. Resolved once per element per draw from the command the element declares.
-            entry.Node.IsDisabled = ResolveDisabled(entry.Spec, entryCtx);
+            entry.Node.IsDisabled = entry.Region?.Failed == true || ResolveDisabled(entry.Spec, entryCtx);
 
             // FL-IC2: the same one-per-draw publication for the Cancel ladder. Read from the entry's own spec,
             // which inside a Repeat row is the item-scoped one, so a row's Cancel names that row's command and
@@ -863,19 +911,26 @@ internal sealed partial class UiLayoutEngine
                             // (ctx.Controls.Button). Only widgets claim: a container is not a hit surface, which is
                             // why the attribute is refused on one at creation instead of being inert here.
                             string helpKey = ReadAttribute(entry.Spec, HelpRefAttribute);
-                            if (helpKey.Length > 0 && entryCtx.Controls.IsMouseOver(drawRect, entryCtx))
+                            if (entry.Region?.Failed != true && helpKey.Length > 0 && entryCtx.Controls.IsMouseOver(drawRect, entryCtx))
                             {
                                 ctx.Session.PublishHelp(helpKey);
                             }
 
                             bool unavailableBeforeDraw = entry.Node.PresentationUnavailable;
-                            if (displayIsolation != null && entry.Widget is IUiDeferredDisplay)
+                            if (entry.Region?.Participant == null && Regions?.For(entry.Spec, entry.Node) != null)
+                                UiRegionWork.Count(ctx.Session, UiRegionWork.Kind.Unknown);
+                            if (displayIsolation != null && entry.Region?.Participant != null)
+                                DrawRegion(entry, drawRect, entryCtx);
+                            else if (displayIsolation != null && entry.Widget is IUiDeferredDisplay)
                             {
                                 UiLayoutRect? clip = ctx.Session.CurrentClip;
                                 bool clipped = deferClipped == true && clip.HasValue && (clip.Value.Width <= 0f || clip.Value.Height <= 0f);
                                 UiSessionGuard.DrawWidgetForEvent(entry.Widget, drawRect, entryCtx, entry.Node, displayIsolation, clipped, tieredDraw, repaintDraw);
                             }
-                            else UiSessionGuard.DrawWidget(entry.Widget, drawRect, entryCtx, entry.Node);
+                            else
+                            {
+                                UiSessionGuard.DrawWidget(entry.Widget, drawRect, entryCtx, entry.Node);
+                            }
                             if (!ctx.Session.IsActive) return;
                             // A failed or newly recovered pointer producer changes which geometry may
                             // participate. Admit that transition at the next pass, like other pending
@@ -1144,12 +1199,15 @@ internal sealed partial class UiLayoutEngine
         if (containerKind.Length == 0)
         {
             IUiWidget widget = GetOrCreateWidget(spec, node.Id);
+            UiWidgetContext measureCtx = ctx.WithViewWidth(width).WithNode(node);
+            bool regionParticipant = TryRegionLeaf(spec, widget, measureCtx, out RegionLeaf? regionLeaf);
             UiBindings reactive = UiBindings.OwnerOf(ctx.Bindings);
             {
                 // Freeze every known consumer input before any input request in Draw. Hidden elements
                 // never reach here. Custom readers declare demand through schema roles or the
                 // explicit presentation-demand capability; a forwarding reader keeps its backing.
-                if (widget is IUiPresentationDemand declared)
+                if (regionParticipant) { }
+                else if (widget is IUiPresentationDemand declared)
                     foreach (string key in declared.PresentationKeys(ctx.WithNode(node))) reactive.PreparePresentation(key);
                 else
                 {
@@ -1163,7 +1221,6 @@ internal sealed partial class UiLayoutEngine
             // widgets (e.g. stacked narrow Mood rows) agree with the Draw pass, which already uses
             // entry.MeasureWidth via WithViewWidth. The element is bound to this context too, so a
             // widget's Measure and Draw report the same identity for the same element.
-            UiWidgetContext measureCtx = ctx.WithViewWidth(width).WithNode(node);
 
             // The same element scope the draw pass enters, and the same try/finally: the guard recovers
             // a throwing Measure, so the scope must not leak into the sibling measured next.
@@ -1171,7 +1228,8 @@ internal sealed partial class UiLayoutEngine
             float height;
             try
             {
-                height = ResolveHeight(spec, widget, measureCtx, width, node, matchContent ? reference : null);
+                height = regionParticipant ? RegionHeight(spec, regionLeaf!, matchContent ? reference : null)
+                    : ResolveHeight(spec, widget, measureCtx, width, node, matchContent ? reference : null);
                 if (!ctx.Session.IsTripped(node) && widget is IUiLayoutDiagnosticSource diagnosticSource)
                 {
                     UiSessionGuard.MeasureOrFallback(measureCtx, node.Path, widget.Kind, node.Path, 0, () =>
@@ -1200,6 +1258,7 @@ internal sealed partial class UiLayoutEngine
                 MeasureWidth = width,
                 Rect = new UiLayoutRect(0f, 0f, width, height),
                 SubtreeCount = 1
+                , Region = regionLeaf
             };
             var box = new MeasuredBox { Width = width, Height = height };
             box.Entries.Add(leaf);
@@ -1416,7 +1475,7 @@ internal sealed partial class UiLayoutEngine
             layoutDiagnostics.Add(new UiLayoutDiagnostic(node.Path, "Truncated", "Additional layout diagnostics omitted."));
     }
 
-    private UiLayoutMeasure ChildMeasure(UiWidgetContext ctx, UiNode parent, UiElementSpec parentSpec, IReadOnlyList<ChildSlot> children, MeasuredBox[] measured)
+    private UiLayoutMeasure ChildMeasure(UiWidgetContext ctx, UiNode parent, UiElementSpec parentSpec, IReadOnlyList<ChildSlot> children, MeasuredBox[] measured, IReadOnlyList<UiLayoutChild> allocated)
     {
         var nodes = new UiNode[children.Count];
         for (int i = 0; i < children.Count; i++)
@@ -1431,10 +1490,16 @@ internal sealed partial class UiLayoutEngine
                 if (GetContainerKind(child).Length > 0)
                     continue;
                 IUiWidget widget = GetOrCreateWidget(child, nodes[i].Id);
-                if (widget is not IUiLabelledWidget labelled)
-                    continue;
+                if (widget is not IUiLabelledWidget && (Regions == null || widget is not IUiRegionParticipant || !RegionBackend(ctx))) continue;
                 UiWidgetContext childContext = ElementScope(ctx.WithNode(nodes[i]), child, nodes[i]);
-                demands.Add(ReadLayoutRole(labelContributions, child, childContext, false, () => labelled.MeasureLabel(childContext)));
+                if (TryRegionLeaf(child, widget, childContext.WithViewWidth(allocated[i].Width), out RegionLeaf? regionLabel) && regionLabel!.Display?.LabelWidth is float labelWidth)
+                    demands.Add(labelWidth);
+                else
+                {
+                    if (widget is not IUiLabelledWidget labelled) continue;
+                    if (regionFrame != null) regionFrame.Complete = false; // null is not a shared-label proof.
+                    demands.Add(ReadLayoutRole(labelContributions, child, childContext, false, () => labelled.MeasureLabel(childContext)));
+                }
                 participants.Add(nodes[i]);
             }
 
@@ -1503,7 +1568,7 @@ internal sealed partial class UiLayoutEngine
         }
 
         UiLayoutFrame frame = LayoutFrame(spec, width, availableHeight, padding, titleHeight, gap);
-        UiLayoutPlan plan = ReusePlan(node, spec, "Stack", frame, visible, children, ChildMeasure(ctx, node, spec, visible, measured), m => UiLayout.Stack(frame, children, m));
+        UiLayoutPlan plan = ReusePlan(node, spec, "Stack", frame, visible, children, ChildMeasure(ctx, node, spec, visible, measured, children), m => UiLayout.Stack(frame, children, m));
         return AssembleLayout(ctx, spec, kind, node, plan, measured);
     }
 
@@ -1516,7 +1581,7 @@ internal sealed partial class UiLayoutEngine
         for (int i = 0; i < visible.Count; i++)
             children[i] = LayoutChild(visible[i].Spec, widths[i]);
         UiLayoutFrame frame = LayoutFrame(spec, width, availableHeight, padding, titleHeight, gap);
-        UiLayoutPlan plan = ReusePlan(node, spec, "Row", frame, visible, children, ChildMeasure(ctx, node, spec, visible, measured), m => UiLayout.Row(frame, children, m));
+        UiLayoutPlan plan = ReusePlan(node, spec, "Row", frame, visible, children, ChildMeasure(ctx, node, spec, visible, measured, children), m => UiLayout.Row(frame, children, m));
         return AssembleLayout(ctx, spec, kind, node, plan, measured);
     }
 
@@ -1536,7 +1601,7 @@ internal sealed partial class UiLayoutEngine
         }
 
         UiLayoutFrame frame = LayoutFrame(spec, width, availableHeight, padding, titleHeight, gap);
-        UiLayoutPlan plan = ReusePlan(node, spec, "Wrap" + columns.ToString(CultureInfo.InvariantCulture), frame, visible, children, ChildMeasure(ctx, node, spec, visible, measured), m => UiLayout.Wrap(frame, children, columns, m));
+        UiLayoutPlan plan = ReusePlan(node, spec, "Wrap" + columns.ToString(CultureInfo.InvariantCulture), frame, visible, children, ChildMeasure(ctx, node, spec, visible, measured, children), m => UiLayout.Wrap(frame, children, columns, m));
         return AssembleLayout(ctx, spec, kind, node, plan, measured);
     }
 
@@ -1578,7 +1643,7 @@ internal sealed partial class UiLayoutEngine
         UiLayoutPlan plan;
         try
         {
-            plan = ReusePlan(node, spec, "Overlay", frame, visible, children, ChildMeasure(ctx, node, spec, visible, measured),
+            plan = ReusePlan(node, spec, "Overlay", frame, visible, children, ChildMeasure(ctx, node, spec, visible, measured, children),
                 m => UiLayout.Anchored(UiLayout.Overlay(frame, children, m), frame, ReadAnchors(visible, UiPlacement.Axis.Horizontal), ReadAnchors(visible, UiPlacement.Axis.Vertical)));
         }
         catch (ArgumentException ex) { throw new FormatException("Overlay '" + node.Path + "': " + ex.Message, ex); }
@@ -1670,7 +1735,7 @@ internal sealed partial class UiLayoutEngine
         }
 
         var frame = new UiLayoutFrame(contentInnerWidth + padding.Left + padding.Right, availableHeight, padding.Left, padding.Top, padding.Right, padding.Bottom, innerY - padding.Top, gap, new UiLayoutHeight(null, false));
-        UiLayoutPlan plan = ReusePlan(node, spec, "ScrollContent", frame, visible, children, ChildMeasure(ctx, node, spec, visible, measured), m => UiLayout.VerticalContent(frame, children, m));
+        UiLayoutPlan plan = ReusePlan(node, spec, "ScrollContent", frame, visible, children, ChildMeasure(ctx, node, spec, visible, measured, children), m => UiLayout.VerticalContent(frame, children, m));
         for (int i = 0; i < visible.Count; i++)
         {
             UiElementSpec child = visible[i].Spec;
@@ -1833,7 +1898,8 @@ internal sealed partial class UiLayoutEngine
     private MeasuredBox MeasureRepeat(UiWidgetContext ctx, UiElementSpec spec, string kind, float width, Padding padding, float gap, float titleHeight, float innerWidth, float innerY, float availableHeight, UiNode node, bool narrow)
     {
         RepeatState state = GetOrCreateRepeatState(node);
-        if (candidateFreshRepeats != null && candidateFreshRepeats.Add(node.Id))
+        bool regionItems = RegionBackend(ctx) && Regions != null && Regions.TryValue(Regions.For(spec, node), ReadAttribute(spec, RepeatItemsAttribute), UiRegionUse.Layout, out IReadOnlyList<string> _);
+        if (!regionItems && candidateFreshRepeats != null && candidateFreshRepeats.Add(node.Id))
             candidateFreshReads!.Add(new FreshRead { Kind = FreshReadKind.Repeat, Node = node.Id });
         string itemsKey = ReadAttribute(spec, RepeatItemsAttribute);
         string templateName = ReadAttribute(spec, RepeatTemplateAttribute);
@@ -1881,7 +1947,7 @@ internal sealed partial class UiLayoutEngine
         }
 
         UiLayoutFrame frame = LayoutFrame(spec, width, availableHeight, padding, titleHeight, gap);
-        UiLayoutPlan plan = ReusePlan(node, spec, "VerticalContent", frame, rows, children, ChildMeasure(ctx, node, spec, rows, measured), m => UiLayout.VerticalContent(frame, children, m));
+        UiLayoutPlan plan = ReusePlan(node, spec, "VerticalContent", frame, rows, children, ChildMeasure(ctx, node, spec, rows, measured, children), m => UiLayout.VerticalContent(frame, children, m));
         for (int i = 0; i < measured.Length; i++)
             if (measured[i].Entries.Count > 0)
                 measured[i].Entries[0].IsMaterializedRow = true;
@@ -1958,6 +2024,8 @@ internal sealed partial class UiLayoutEngine
     /// </summary>
     private IReadOnlyList<string> ReadItemKeys(UiWidgetContext ctx, UiNode node, string itemsKey)
     {
+        if (RegionBackend(ctx) && Regions != null && Regions.TryValue(Regions.For(null, node), itemsKey, UiRegionUse.Layout, out IReadOnlyList<string> captured)) return captured;
+        if (Regions?.For(null, node) != null && regionFrame != null) regionFrame.Complete = false;
         try
         {
             if (ctx.Bindings.TryGet<IReadOnlyList<string>>(itemsKey, out IReadOnlyList<string> keys) && keys != null)
@@ -2048,7 +2116,8 @@ internal sealed partial class UiLayoutEngine
             children[i] = BuildItemSpec(template.Children[i], itemsKey, itemKey, i);
         }
 
-        return new UiElementSpec(id, template.Kind, attributes, children, template.Choices);
+        return new UiElementSpec(id, template.Kind, attributes, children, template.Choices)
+        { RegionItemSource = itemsKey, RegionItemKey = itemKey };
     }
 
     /// <summary>
@@ -2205,6 +2274,7 @@ internal sealed partial class UiLayoutEngine
                 SubtreeCount = entry.SubtreeCount,
                 // The row stamp must survive the offset copy, or the counting budget sees no rows.
                 IsMaterializedRow = entry.IsMaterializedRow
+                , Region = entry.Region
             };
             result.Entries.Add(copy);
         }
@@ -2301,6 +2371,13 @@ internal sealed partial class UiLayoutEngine
         string key = ReadAttribute(spec, WidthBindAttribute);
         if (key.Length == 0) return false;
 
+        if (RegionValue(spec, ctx, key, out float captured))
+        {
+            if (float.IsNaN(captured) || float.IsInfinity(captured) || captured <= 0)
+                throw new InvalidOperationException("Region WidthBind must be finite and positive: " + key + ".");
+            width = captured; return true;
+        }
+
         try
         {
             if (TryLayoutFloat(ctx.Bindings, key, out float bound) && !float.IsNaN(bound) && !float.IsInfinity(bound) && bound > 0f)
@@ -2334,7 +2411,21 @@ internal sealed partial class UiLayoutEngine
     /// caller falls back to the unsized distribution.
     /// </summary>
     private float MeasureLabelWidth(UiElementSpec spec, UiWidgetContext ctx)
-        => ReadLayoutRole(autoWidths, spec, ctx, true, () => MeasureLabelWidthCore(spec, ctx));
+    {
+        if (Regions?.For(spec, ctx.Node) != null && GetContainerKind(spec).Length == 0)
+        {
+            IUiWidget widget = GetOrCreateWidget(spec, ctx.Node.Id);
+            if (widget is not IUiRegionBuiltin && UiWidgetRegistry.GetNaturalBody(ctx.Source, spec.Kind) != null && regionFrame != null)
+                regionFrame.Complete = false;
+            if (TryRegionLeaf(spec, widget, ctx, out RegionLeaf? leaf) && leaf!.Display?.LabelWidth is float contribution)
+            {
+                Func<UiElementSpec, UiWidgetContext, float>? body = UiWidgetRegistry.GetNaturalBody(ctx.Source, spec.Kind);
+                if (body != null && widget is not IUiRegionBuiltin && regionFrame != null) regionFrame.Complete = false;
+                return contribution + Math.Max(0, body?.Invoke(spec, ctx) ?? 0);
+            }
+        }
+        return ReadLayoutRole(autoWidths, spec, ctx, true, () => MeasureLabelWidthCore(spec, ctx));
+    }
 
     private static float MeasureLabelWidthCore(UiElementSpec spec, UiWidgetContext ctx)
     {
@@ -2679,7 +2770,8 @@ internal sealed partial class UiLayoutEngine
             return false;
         }
 
-        string activeTab = TryLayoutTab(ctx.Bindings, out string current) ? current : "";
+        string activeTab = RegionValue(spec, ctx, UiBindings.ActiveTabBind, out string captured, parent) ? captured
+            : TryLayoutTab(ctx.Bindings, out string current) ? current : "";
         return !string.Equals(tab.Trim(), activeTab, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -2700,6 +2792,7 @@ internal sealed partial class UiLayoutEngine
 
         string key = ReadAttribute(spec, VisibleBindAttribute);
         if (key.Length == 0) return true;
+        if (RegionValue(spec, ctx, key, out bool captured, parent)) return captured;
         if (TryLayoutBool(ctx.Bindings, key, out bool boundVisible)) return boundVisible;
 
         UiNodeId id = parent == null ? UiNodeId.Root(spec, declaredIndex) : parent.Id.Child(spec, declaredIndex);
