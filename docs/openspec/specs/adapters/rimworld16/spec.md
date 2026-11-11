@@ -111,7 +111,7 @@ UiPageWindow SHALL 可直接构造；Catalog 注册非采用前提，UiWindowHos
 
 ## 0.9 区域保留：已采用、未实施
 
-本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable，尚无对应导出。
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable；接口／数据层先行导出，完整执行仍实施中，支持状态以实现账为准。
 
 ### Requirement: FL16-REGION-PAINT 复用结果仍实际提交可见内容
 采用区域 participant 的1.6路径 SHALL 沿原 execution／绘制与有效坐标链，

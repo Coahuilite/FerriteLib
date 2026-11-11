@@ -140,7 +140,7 @@ Attach handle/Detach/Dispose SHALL 退订但不 Dispose source。distinct pendin
 
 ## 0.9 区域保留：已采用、未实施
 
-本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable，尚无对应导出。
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable；接口／数据层先行导出，完整执行仍实施中，支持状态以实现账为准。
 
 ### Requirement: FL09-REGION-SOURCE 完整表示必须在真实边界鲜取
 显式区域源 SHALL 在每个原合法同步边界真实捕获当前不可变表示；相同实例仅可代表全部实际表示输入仍相同。

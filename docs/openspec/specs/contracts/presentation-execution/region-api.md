@@ -1,14 +1,14 @@
-# 0.9 区域保留：已采用接口（未实施／未导出）
+# 0.9 区域保留：已采用接口（执行集成中）
 
 状态：WO-FL09-RETAINED-DISPLAY-20261111 r2 正式采用，整个新增闭包 Public-unstable。
 本文是本组计划接口的唯一现行约定；行为／phase／paint证明归 [展示执行](spec.md)，
 来源完整性及 Value／Choices 独立通道归 [绑定](../../core/binding-reactivity/spec.md)，
-事务及局部传播归 [布局](../../core/layout/spec.md)。未改任何已导出签名或既有使用条件。
+事务及局部传播归 [布局](../../core/layout/spec.md)。既有签名／使用条件保持；新增导出不等于完整区域行为或原生验收完成。
 
 ## 公开接口与参数
 
 整个新增闭包已定 Public-unstable；原有 Stable 依赖不降级，不改旧接口 implements、构造默认或 XML。
-本组是0.9已采用的待实施接口约定，不是已导出 API；不另建 snapshot／epoch 两套入口。
+本组接口／数据层已导出；完整区域执行仍集成中，当前限制见实现账，不另建 snapshot／epoch 两套入口。
 下列仅列 public／protected 表面；未列出的构造不公开，附件只能由 Attach 创建。
 
 ```csharp
@@ -140,9 +140,9 @@ public abstract class UiRegionDisplay
   PaintCalls、ClippedDisplays；未采样为 NotSampled，不把 PaintCalls 当 native/GPU/FPS。
   返回不含 live snapshot／node／source／callback。重试不重发操作，Dispose 幂等。
 
-## 作者采用示例（待实现）
+## 作者采用示例
 
-以下仅为实施接线示例，当前源码不可调用；领域 capture 由消费 owner 实现，不是 FL 的业务接口：
+以下为已采用接口的接线形状；完整区域优化尚在集成，见实现账。领域 capture 由消费 owner 实现，不是 FL 的业务接口：
 
 ```csharp
 // IUiBindingAccess、普通命令和原 source 公开入口全部保留。

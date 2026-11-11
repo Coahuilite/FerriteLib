@@ -13,15 +13,15 @@ Consumer `[min,max)` checks remain binding even when old signatures are retained
 
 The type census and stable set are pinned in `FerriteLibApiTierTests`. Its dependency-closure check covers exported/protected signatures, generic arguments and extension interfaces; explicit advanced-member exceptions are listed below. A stable implementation never requires those advanced members.
 
-## Adopted 0.9 region plan — not exported
+## Adopted 0.9 region interfaces — implementation in progress
 
 WO-FL09-RETAINED-DISPLAY-20261111 r2 adopts the entire **new** region API/type/implementation-interface
 closure as **Public-unstable**. Its sole planned signature and usage contract is the
 [adopted region interface](openspec/specs/contracts/presentation-execution/region-api.md).
 It includes independent snapshot Choices access and the optional enforced pure-Paint clip.
-These types/members are **not implemented or exported**; they are not entries in the delivered type census below.
-Existing Stable dependencies/signatures/defaults keep their tier and meaning. No stable inventory,
-version axis or binary is changed by this docs-only adoption; product work awaits PM's paired-library gate.
+The API/data-plane and Host attachment are now implemented; region execution/optimization is still in progress.
+The new exported types are classified below; the actual interim carrier and its limits are recorded in the owner delivery.
+Existing Stable dependencies/signatures/defaults keep their tier and meaning. The stable inventory and version axes remain unchanged; implementation follows PM's r3 release.
 
 ## Stable
 
@@ -192,6 +192,17 @@ version axis or binary is changed by this docs-only adoption; product work await
 - `UiSession` — explicit standalone control ownership; only the member subset below is stable.
 
 ## Public-unstable
+
+- `UiRegionSnapshot` — 0.9 explicit immutable representation port; independent Value/Choices and item packets.
+- `UiRegionValues` — scoped snapshot construction, not a business registry.
+- `UiRegionReadMap` — explicit layout/display routing; never overrides ordinary Get or request endpoints.
+- `UiRegionUse` — the selected representation-consumption channels.
+- `UiRetainedRegions` — explicit Host attachment entry.
+- `UiRegionAttachment` — Host-owned attachment lifetime, pure status and retry request.
+- `UiRegionState` — last-observed region state.
+- `UiRegionStatus` — detached state/versions, not an advance operation.
+- `IUiRegionParticipant` — opt-in pure Build, original event Operate and pure Paint.
+- `UiRegionDisplay` — immutable shared result and optional enforced pure-Paint clip.
 
 - `UiToolSelection` — selected original draw-walk geometry/clip/status; no per-frame capture.
 

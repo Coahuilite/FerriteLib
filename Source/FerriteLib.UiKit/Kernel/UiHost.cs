@@ -275,12 +275,15 @@ public sealed partial class UiHost : IDisposable
         long started = timing ? Stopwatch.GetTimestamp() : 0L;
         UiDiagnosticHub.UiDiagnosticScope scope = UiDiagnosticHub.EnterHost(subscription, metrics, session);
         budgetArrangeDepth++;
+        bool regionSuccess = false;
         try
         {
             // The engine validates effective inputs per stage; presentation changes no longer bump
             // a global cache key. Unknown legacy Measure still receives its original synchronization.
             UiWidgetContext ctx = CreateContext(available.X);
+            regions?.Begin(ctx, manifest);
             UiLayoutSnapshot snapshot = engine.ArrangeRoots(ctx, available, manifest.Roots, manifest.TieredEvents);
+            regionSuccess = true;
             LayoutFault = null;
 
             // A region scope is resolved the first time the engine meets it, and that resolution can drop a
@@ -296,6 +299,7 @@ public sealed partial class UiHost : IDisposable
         }
         finally
         {
+            regions?.End(regionSuccess);
             budgetArrangeDepth--;
             scope.Dispose();
             if (timing)
@@ -638,6 +642,7 @@ public sealed partial class UiHost : IDisposable
         UiBindingPresentation? presentation = reactivePresentation;
         reactivePresentation = null;
         Cleanup(() => presentation?.Dispose());
+        Cleanup(() => regions?.Close());
         ForgetObservationHost(this);
         // A closed host must not stay referenced by a live document service, and the service's documents
         // must survive the host: the dependency is released, the last valid version is not.

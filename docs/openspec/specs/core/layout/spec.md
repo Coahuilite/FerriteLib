@@ -152,7 +152,7 @@ Public usage: [owner layout input](../../../../development/0.9/tools.md#owner-la
 
 ## 0.9 区域保留：已采用、未实施
 
-本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable，尚无对应导出。
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable；接口／数据层先行导出，完整执行仍实施中，支持状态以实现账为准。
 
 ### Requirement: FL09-REGION-UPDATE 未变区域在边界停止重复工作
 已显式采用区域 SHALL 在原 Host／几何 owner 内保留完整不可变纯结果与工作片段。

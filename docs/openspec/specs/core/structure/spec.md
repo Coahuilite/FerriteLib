@@ -89,7 +89,7 @@ Repeat 的 Items SHALL 是有序稳定 key 的 `IReadOnlyList<string>` value，T
 
 ## 0.9 区域保留：已采用、未实施
 
-本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable，尚无对应导出。
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable；接口／数据层先行导出，完整执行仍实施中，支持状态以实现账为准。
 
 ### Requirement: FL09-REGION-ENROLL 作者在原树上明确选择区域
 作者 SHALL 可在原 Host 的唯一声明结构容器登记表示源及明确消费 map，包含 Scroll／Repeat，

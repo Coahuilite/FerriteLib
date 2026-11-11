@@ -133,7 +133,7 @@ Tools不以新目标发明签名，不绕过Stale／在读中推进，也不取�
 
 ## 0.9 区域保留：已采用、未实施
 
-本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable，尚无对应导出。
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable；接口／数据层先行导出，完整执行仍实施中，支持状态以实现账为准。
 
 ### Requirement: DEV-09-REGION 区域观察只读同源实际记录
 区域 status／Tools 投影 SHALL 来自原 Host 的有界记录，区分 source／layout／最后实际 Paint

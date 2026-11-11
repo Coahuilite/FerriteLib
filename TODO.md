@@ -26,13 +26,13 @@ owner's ce0028d/a3d4616 mechanism, retaining 0.9 reader/budget/legacy conditions
 demand-order allocation. The scoped change records the implementation and round-3 evidence route.
 The compatibility/consumer ports, total-FPS investigation and 0.9 native acceptance retain their separate owners.
 
-## 0.9 retained-region adopted specification — not implemented
+## 0.9 retained-region implementation in progress
 
 WO-FL09-RETAINED-DISPLAY-20261111 r2 adopts the selected [region change](docs/openspec/changes/fl09-retained-regions/proposal.md)
 into the sole current capability pages, including independent choices, complete paint-footprint proof
 and no per-field work relocation into CaptureCurrent. The whole new closure is Public-unstable;
-[planned interfaces](docs/openspec/specs/contracts/presentation-execution/region-api.md) are not exported.
-This delivery is docs-only. Product code remains gated on PM's FL/US confirmation; implementation,
+[planned interfaces](docs/openspec/specs/contracts/presentation-execution/region-api.md) have an initial API/data-plane implementation.
+PM released product implementation in WO r3; the initial carrier is for consumer compilation, not full RETAIN acceptance. Implementation,
 consumption and native acceptance are incomplete. Historical RW1.6 measurements do not certify 0.9/1.7;
 the later independent 60 Hz IMGUI evidence is separate from the earlier 144 Hz runs.
 

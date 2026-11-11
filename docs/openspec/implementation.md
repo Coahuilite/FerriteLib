@@ -6,19 +6,21 @@ cf1cf6456096171fb47c012369bcd0c2f29e968f。FL-F01/F02/F03 已在该 HEAD 的 dir
 下列对应段落区分实际源码机制、已执行既有检查及未执行原生／精确故障组合。
 
 <a id="fl09-retained-regions"></a>
-## FL09 显式区域保留：已采用、未实施
+## FL09 显式区域保留：实施中
 
-WO-FL09-RETAINED-DISPLAY-20261111 r2 选择 bb7da49 及两项采用前补充；
-正文已并入 current 绑定、布局、结构、展示执行、寿命、Tools、保留1.6 adapter与作者政策。
-[计划接口](specs/contracts/presentation-execution/region-api.md)为整个新增 Public-unstable 闭包，
-尚未导出；[change](changes/fl09-retained-regions/proposal.md)只保采用来源，不是第二份 current。
-独立 Value／Choices 与公开 snapshot Choices 读取、全输出 footprint／强制 clip 证明，以及
-未变 capture 不逐字段重算，均属于已采用要求。本次仅文档，无新源码、build／harness、二进制或原生结果。
+WO-FL09-RETAINED-DISPLAY-20261111 r3 已核定 FL 8f02776／US 3e32a57 并放行代码。
+当前第一片交付实现完整公开数据／接口形状：immutable Value／Choices／item snapshot、独立 typed map、
+防御复制、display／pointer／PaintClip 数据、detached Status 和 Host attachment／捕获／退出／Close。
+普通 net472／RW1.6 Release 首次编译已通过，零警告／错误。新增导出按决定列为 Public-unstable；旧 Stable 清单不变。
 
-产品仍停在 PM 核对 FL／US 两库之后的代码门；US接线与实机分别归原消费 owner／Terra。
-历史 A/C-r2／viewport 的1.6证据保原候选；新增独立IMGUI账来自60Hz场，非较早144Hz主扫、
-非新0.9对照，不把Host.Draw全段当静态提交／GPU／scanout。后续固定同代对照按实际节奏匹配，
-不更改显示设置。既有其他源码／构建证据不签新区域能力完成。
+**中间能力限制：** 当前运行仍走 legacy layout／Draw（Status 明确 Fallback/legacy-layout）；
+participant Build／Operate／Paint、区域边界跳过和新端口的布局／内置消费尚在集成。
+这片供 US 先编译，不能用于签收 RETAIN 或原生性能。固定 carrier／commit／MVID 由 producer READY 记录；
+后续 build 不覆盖该固定目录。RETAIN／CONSUME／NATIVE 未完成，不将编译当游戏验收。
+
+现行行为仍归各能力 [specs](../specification.md)；[接口](specs/contracts/presentation-execution/region-api.md)
+是单一已采用 API 约定，change 仅保采用来源。历史1.6 A/C-r2、viewport及独立60Hz IMGUI账保原候选，
+不签0.9／1.7性能。实现继续沿原 owner，无新Tools前端、游戏或显示设置改动。
 
 <a id="fl09-event-tiering"></a>
 ## FL09 事件分层执行（2026-11-11）

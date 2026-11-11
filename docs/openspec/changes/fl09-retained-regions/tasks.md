@@ -1,6 +1,6 @@
-# Tasks — 已采用、未实施
+# Tasks — 已采用、实施中
 
-状态：0.9 正式规格已采用、产品未实施。此次只完成 SPEC；产品源码／tests／构建／二进制继续停在 PM 两库确认门。
+状态：WO r3 已核定 FL／US 正式采用并放行 RETAIN／CONSUME。接口／数据层先行，完整区域运行在集成；本清单未完成项仍开放，不以编译充作验收。
 
 - [x] SPEC-1 PM 按 WO r2 选用 bb7da49，整个新增闭包定为 Public-unstable；补齐独立 choices／paint footprint 与未变 source 不逐字段重算。
 - [x] SPEC-2 原 owner 将含 r2 补充的 ADDED／MODIFIED 并入唯一 current，更新真实入口及未导出 API 计划；

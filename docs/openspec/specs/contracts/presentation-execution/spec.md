@@ -149,7 +149,7 @@ Repaint pass SHALL 先同步再绘制，所以逐 pass 执行与分层执行产�
 
 ## 0.9 区域保留：已采用、未实施
 
-本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable，尚无对应导出。
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable；接口／数据层先行导出，完整执行仍实施中，支持状态以实现账为准。
 已采用的计划接口与参数见 [region-api](region-api.md)，不是当前可调用 API。
 
 ### Requirement: FL09-REGION-PARTICIPANT 纯表示共享不取代操作

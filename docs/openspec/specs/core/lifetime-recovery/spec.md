@@ -82,7 +82,7 @@ Siblings keep compatible state. The Host retains its identity and takes a comple
 
 ## 0.9 区域保留：已采用、未实施
 
-本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable，尚无对应导出。
+本节仅约束主动采用的新能力；其余原条件保持。新增闭包已定 Public-unstable；接口／数据层先行导出，完整执行仍实施中，支持状态以实现账为准。
 
 ### Requirement: FL09-REGION-LIFETIME 表示、几何和调度共同成功
 区域候选 SHALL 在原成功事务共同发布输入版本、成员、纯结果、plan／位置及有效性；
