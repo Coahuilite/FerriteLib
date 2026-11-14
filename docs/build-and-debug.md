@@ -6,14 +6,14 @@ is [the 0.9 specification](specification.md).
 
 ## 0.9 normal carrier and explicit targets
 
-Use [the current target/connection guide](development/0.9/tools.md) for Neutral/net10.0 headless
-compilation and RimWorld17/net10.0 compilation against an explicit local game directory. Both compile
+Use [the current target/connection guide](development/0.9/tools.md#select-a-game-payload-or-a-dual-target-archive)
+for default net472/1.6, Neutral/net10.0 headless and RimWorld17/net10.0 compilation against explicit original references. All compile
 the same Kernel. Normal Release includes FER_TOOLS but no FER_DEV or FER_TEST; it keeps instruments
 dormant until a selected compatible connection opts in. Legacy basic logging, timing, R9 and Dev calls
 retain their conditions. `-p:FerriteTestHooks=true` belongs only to existing harness builds, never a
 normal delivered carrier. The exact 0.9 fixed producer carries its own complete root/source/check/USE.
-No 0.9 installation/publication pack is inferred from the legacy packer commands below. New 0.9 roots
-contain one 1.7 carrier, and do not replace the old 0.8/1.6 r6 native acceptance/recovery responsibility.
+The 0.9 stager now selects RimWorld16, RimWorld17 or Dual; metadata and actual TFM must match, with one
+carrier loaded per game. This does not replace the old 0.8 maintenance acceptance/recovery responsibility.
 
 The retained packers share `scripts/Release.Identity.psm1`: Dev reads the same build axis,
 GitHub/Steam and the release workflow share tag grammar, and both publication channels share source
@@ -21,10 +21,9 @@ attribution. GitHub alone permits the explicit `-AllowDirtyTree` local rehearsal
 clean tree and never archives. `-StageDir 'dist/<fresh-attempt>/FerriteLib'` can select a new local
 destination without changing the original channel defaults or pwsh/.NET prerequisites.
 
-These legacy packers still write a `1.6` carrier layout. Staging now refuses metadata without that
-load root before writing, so this line's current 1.7-only metadata cannot produce an unreachable
-legacy package. Use the explicit target delivery described above; the shared identity refactor does
-not supply a new 0.9/1.7 release packer. No Node dependency is introduced.
+The old default remains the 1.6 layout; explicit targets use the corresponding output and load root.
+Dual archives require matching actual source identities. Stage inputs may be isolated through BuildRoot;
+closed-file, content, licence, configuration and transfer-integrity gates remain. No Node dependency is introduced.
 
 ## Check the affected neutral contract
 

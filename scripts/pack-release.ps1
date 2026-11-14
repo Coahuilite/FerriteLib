@@ -4,7 +4,9 @@ param(
     # Local rehearsal only. The release workflow never passes it, so a published asset is always
     # attributable to a commit; without the flag this is exactly the CI path.
     [switch]$AllowDirtyTree,
-    [string]$StageDir = 'dist/github/FerriteLib'
+    [string]$StageDir = 'dist/github/FerriteLib',
+    [ValidateSet('RimWorld16', 'RimWorld17', 'Dual')][string]$Target = 'RimWorld16',
+    [string]$BuildRoot = 'dist/build'
 )
 
 Set-StrictMode -Version Latest
@@ -26,13 +28,17 @@ $ErrorActionPreference = "Stop"
 
 $root = [System.IO.Path]::GetFullPath($ProjectRoot)
 $projectFile = Join-Path $root 'Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj'
-$payloadDll = Join-Path $root 'dist\build\Release\FerriteLib.UiKit.dll'
+$buildDirectory = [IO.Path]::GetFullPath($BuildRoot, $root)
 $stageDir = [IO.Path]::GetFullPath($StageDir, $root)
 
 Import-Module (Join-Path $PSScriptRoot 'Release.Identity.psm1')
 $releaseVersion = Get-FerriteReleaseVersion -Version $Version
 Assert-FerriteReleaseAxis -ProjectFile $projectFile -BaseVersion $releaseVersion.Base
-$commit = Get-FerriteReleaseCommit -Root $root -PayloadDll $payloadDll -Channel github -AllowDirtyTree:$AllowDirtyTree
+$targets = if ($Target -eq 'Dual') { @('RimWorld16', 'RimWorld17') } else { @($Target) }
+foreach ($selected in $targets) {
+    $buildPath = if ($selected -eq 'RimWorld16') { 'Release/FerriteLib.UiKit.dll' } else { 'Release/RimWorld17/FerriteLib.UiKit.dll' }
+    $commit = Get-FerriteReleaseCommit -Root $root -PayloadDll (Join-Path $buildDirectory $buildPath) -Channel github -AllowDirtyTree:$AllowDirtyTree
+}
 
 $stageArgs = @{
     ProjectRoot            = $root
@@ -42,6 +48,8 @@ $stageArgs = @{
     CommitLabel            = $commit.Substring(0, 12)
     RequireReleaseIdentity = $true
     CreateZip              = $true
+    Target                 = $Target
+    BuildRoot              = $buildDirectory
 }
 & (Join-Path $PSScriptRoot 'stage-package.ps1') @stageArgs
 if ($LASTEXITCODE -ne 0) { throw "stage-package failed with exit code $LASTEXITCODE." }

@@ -2,7 +2,7 @@
 
 [English](./README.md) | **中文**
 
-FerriteLib 是 RimWorld 的**无内容前置模组**，只携带一个程序集 `FerriteLib.UiKit.dll`：一套给模组作者用的界面工具包。
+FerriteLib 是 RimWorld 的**无内容前置模组**，每个游戏版本只加载一个匹配的 `FerriteLib.UiKit.dll`：一套给模组作者用的界面工具包。
 它不添加任何 Def、补丁、语言或贴图，单独启用不会改变游戏。
 
 ## 当前状态
@@ -11,8 +11,8 @@ FerriteLib 是 RimWorld 的**无内容前置模组**，只携带一个程序集 
 | --- | --- |
 | 开发线 | 0.9.0，API 区间 `[0.9.0, 0.10.0)`；见[当前工具合同](docs/development/0.9/tools.md) |
 | 已发布 | [v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1)（GitHub 预发布，非 latest） |
-| 本地候选 | 0.9 正常单载体，尚未发布；0.8 维护候选单独保留 |
-| RimWorld 1.6 | 独立0.8维护／恢复线；c3-dev继承r6原生未验责任 |
+| 本地候选 | 0.9按目标选择的普通载体与本地归档，未发布；0.8维护候选单独保留 |
+| RimWorld 1.6 | 0.9 net472，有限原生工程证据见实现账；0.8维护／恢复线仍独立 |
 | RimWorld 1.7 | 0.9 net10.0已有隔离完整窗Native17消费；Game17仅构建／包装，真实游戏、物理输入与IME未验。详见实现映射。 |
 
 逐项证据与已知偏差不写在 README，见[实现与开放偏差](docs/openspec/implementation.md)。
@@ -87,7 +87,7 @@ UiHost ──────── 一个页面的组合入口：采用定义、同
 ## 给模组作者
 
 - **在自己的启动代码里断言版本区间：**`FerriteLibVersion.Require(min, max, packageId, out report)`。RimWorld 的 `modDependencies` 无法表达版本；它会枚举已加载载体、报告冲突，并给出可读的失败信息。
-- 0.9 针对提供的固定 1.7 DLL 编译，目标 `net10.0`；已发布 0.8 资产仍是 `net472` 维护输入。不要随你的模组复制这个 DLL。
+- 0.9选择对应固定DLL：RimWorld1.6/net472 或RimWorld1.7/net10.0；已发布0.8资产仍是独立维护输入。不要随你的模组复制这个DLL。
 - 只有 [API 分层](docs/api-tiers.md)中标为 **stable** 的类型在你编译时的 `[min, max)` 区间内保持签名；**public-unstable** 类型每个 minor 都需要重新编译。发布后破坏 stable 合同须升 major，弃用后至少保留两个后续已发布 minor。
 - 起步顺序：[普通设置页配方](docs/consumers/ordinary-settings.md) → [公开作者路径 S1–S7](docs/openspec/specs/policies/public-authoring/spec.md) → [窗口布局指南](docs/consumers/rimworld-window-layout.md) → [0.9 连接／目标指南](docs/development/0.9/tools.md)。
 - 欢迎第三方使用。当你被迫手写了本该由库提供的东西，请附上你自己可运行代码的引用开 issue；缺陷报告随时欢迎。

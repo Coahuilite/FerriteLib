@@ -4,6 +4,8 @@ param(
     [Parameter(Mandatory = $true)][string]$VersionLabel,
     [ValidateSet('dev', 'github', 'steam')][string]$BuildFlavor = 'dev',
     [string]$CommitLabel = 'unknown',
+    [ValidateSet('RimWorld16', 'RimWorld17', 'Dual')][string]$Target = 'RimWorld16',
+    [string]$BuildRoot = 'dist/build',
     # The github and steam channels publish to strangers, so their payload must not carry the dev
     # suffix and its base version must equal the label on the box. The dev channel skips this: a dev
     # rehearsal is by definition an unnamed build.
@@ -29,122 +31,122 @@ $ErrorActionPreference = "Stop"
 $root = [System.IO.Path]::GetFullPath($ProjectRoot)
 $projectFile = Join-Path $root 'Source\FerriteLib.UiKit\FerriteLib.UiKit.csproj'
 $configuration = if ($BuildFlavor -eq 'dev') { 'Dev' } else { 'Release' }
-$payloadDll = Join-Path $root "dist\build\$configuration\FerriteLib.UiKit.dll"
+$buildDirectory = [IO.Path]::GetFullPath($BuildRoot, $root)
+$targets = if ($Target -eq 'Dual') { @('RimWorld16', 'RimWorld17') } else { @($Target) }
+$payloads = @(foreach ($selected in $targets) {
+    $game = if ($selected -eq 'RimWorld16') { '1.6' } else { '1.7' }
+    $buildPath = if ($selected -eq 'RimWorld16') { "$configuration/FerriteLib.UiKit.dll" } else { "$configuration/RimWorld17/FerriteLib.UiKit.dll" }
+    [pscustomobject]@{ Target = $selected; Game = $game; Source = Join-Path $buildDirectory $buildPath
+        Relative = "$game/Assemblies/FerriteLib.UiKit.dll"; Metadata = $null; Hash = '' }
+})
 $aboutXml = Join-Path $root 'About\About.xml'
 $loadFolders = Join-Path $root 'LoadFolders.xml'
 $license = Join-Path $root 'LICENSE'
 $deliveryDir = [System.IO.Path]::GetFullPath($StageDir, $root)
 $distPrefix = [System.IO.Path]::GetFullPath((Join-Path $root 'dist')) + [IO.Path]::DirectorySeparatorChar
-if (-not $deliveryDir.StartsWith($distPrefix, [StringComparison]::OrdinalIgnoreCase)) {
-    throw 'StageDir must be a child of this repository''s dist directory.'
+function Assert-DistributionPath([string]$Path) {
+    if (-not ([IO.Path]::GetFullPath($Path)).StartsWith($distPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'StageDir must be a child of this repository''s dist directory.'
+    }
 }
+Assert-DistributionPath $deliveryDir
 # Candidate-then-commit (2026-09-22, adopted from the demo's packer): the copy and every assertion below
 # run against a SCRATCH tree; the delivered folder is replaced only after all of them pass, so a refused
 # pack leaves the previous package byte-identical instead of a half-written one.
 $stageDir = Join-Path (Split-Path -Parent $deliveryDir) ('.staging-' + (Split-Path -Leaf $deliveryDir))
+Assert-DistributionPath $stageDir
 
-$dllRelative = '1.6/Assemblies/FerriteLib.UiKit.dll'
 $expectedFiles = @(
     'About/About.xml',
     'LoadFolders.xml',
     'LICENSE',
-    'version.txt',
-    $dllRelative
-)
+    'version.txt'
+) + @($payloads | ForEach-Object { $_.Relative })
 # What an assemblies-only prerequisite mod must never carry. Named paths rather than a filtered
 # enumeration: an empty enumeration would let a filter-based check pass vacuously, which is the bug
 # class this repository has been burned by twice.
 $forbiddenContent = @('Defs', 'Patches', 'Languages', 'Sounds', 'Textures', 'ThingSets')
 
 # --- inputs, before anything is deleted ----------------------------------------------------------
-foreach ($required in @($projectFile, $payloadDll, $aboutXml, $loadFolders, $license)) {
+foreach ($required in (@($projectFile, $aboutXml, $loadFolders, $license) + @($payloads | ForEach-Object { $_.Source }))) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
         throw "Missing packaging input: $required"
     }
 }
-# This retained stager writes the 1.6 carrier layout. Do not produce an unreachable
-# package when a development line's metadata selects only a different target.
 [xml] $loadMap = Get-Content -LiteralPath $loadFolders -Raw
-$legacyFolders = @($loadMap.SelectNodes('/loadFolders/v1.6/li') | ForEach-Object { $_.InnerText.Trim().Trim('/') })
-if ('1.6' -notin $legacyFolders) {
-    throw 'This retained packer requires a 1.6 load root; use the selected target delivery path, not a relabelled legacy package.'
+[xml] $about = Get-Content -LiteralPath $aboutXml -Raw
+foreach ($payload in $payloads) {
+    $folders = @($loadMap.SelectNodes("/loadFolders/v$($payload.Game)/li") | ForEach-Object { $_.InnerText.Trim().Trim('/') })
+    if ($payload.Game -notin $folders -or @($folders | Where-Object { $_ -notin @('', $payload.Game) }).Count -ne 0) {
+        throw "Target $($payload.Target) requires only its own $($payload.Game) load root (and optional shared root)."
+    }
+    if ($payload.Game -notin @($about.SelectNodes('/ModMetaData/supportedVersions/li') | ForEach-Object { $_.InnerText.Trim() })) {
+        throw "About.xml does not support the selected target $($payload.Game)."
+    }
 }
-# --- measure the flavor, do not trust the caller's word ------------------------------------------
-# -BuildFlavor is a claim made by whichever packer invoked this engine; the DLL has its own record of
-# which configuration produced it (MSBuild stamps AssemblyConfigurationAttribute from $(Configuration)).
-# Comparing the two is what makes version.txt's `build=` line a measurement. Without it, a channel can
-# label a Release-configured assembly `dev` — which is exactly what this repository's own pack-dev did
-# from 0.2.0 until 2026-09-07, while the consumer's build-dev was compiling the sibling with -c Dev.
-#
-# Read in a child process rather than in this one: the payload is copied moments later and, on the dev
-# path, rebuilt by the next gate — an Assembly.LoadFile here would keep a handle on the shipped DLL for
-# the rest of the session. MetadataReader is not an option either: the Store build of PowerShell ships a
-# trimmed System.Reflection.Metadata whose PEReader has no GetMetadataReader (measured 2026-09-07), and a
-# packaging gate that works only on the maintainer's host is worse than no gate.
-function Get-AssemblyConfiguration {
-    param([Parameter(Mandatory = $true)][string]$Path)
-    $env:FERRITELIB_STAMP_TARGET = $Path
-    try {
-        $shell = Join-Path $PSHOME 'pwsh.exe'
-        if (-not (Test-Path -LiteralPath $shell -PathType Leaf)) { $shell = 'pwsh' }
-        $probe = '$a=[System.Reflection.Assembly]::LoadFile($env:FERRITELIB_STAMP_TARGET); foreach ($t in [System.Reflection.CustomAttributeData]::GetCustomAttributes($a)) { if ($t.AttributeType.Name -eq "AssemblyConfigurationAttribute") { $t.ConstructorArguments[0].Value; break } }'
-        $out = @(& $shell -NoProfile -NonInteractive -Command $probe)
-        if ($LASTEXITCODE -ne 0) { throw "Reading the payload's configuration stamp failed (exit $LASTEXITCODE)." }
-        return (@($out | ForEach-Object { "$_".Trim() } | Where-Object { $_ }) -join '')
-    } finally { Remove-Item Env:FERRITELIB_STAMP_TARGET -ErrorAction SilentlyContinue }
-}
-
-$stamp = Get-AssemblyConfiguration -Path $payloadDll
-$expectedStamp = if ($BuildFlavor -eq 'dev') { 'Dev' } else { 'Release' }
-if ([string]::IsNullOrWhiteSpace($stamp)) {
-    throw "Payload has no AssemblyConfigurationAttribute; cannot verify it was built as $expectedStamp."
-}
-if ($stamp -ne $expectedStamp) {
-    throw "Channel '$BuildFlavor' requires a $expectedStamp-configured payload, but $payloadDll reports '$stamp'. Build the matching configuration: pack-dev forces -c Dev --no-incremental, the publish channels build -c Release."
-}
-
+Import-Module (Join-Path $PSScriptRoot 'Release.Identity.psm1')
 $releaseBase = ($VersionLabel -replace '^v', '') -replace '[-+].*$', ''
-
-if ($RequireReleaseIdentity) {
-    $informational = ([System.Diagnostics.FileVersionInfo]::GetVersionInfo($payloadDll)).ProductVersion
-    if ([string]::IsNullOrWhiteSpace($informational)) {
-        throw 'The payload carries no ProductVersion; it cannot be attributed to a source commit.'
+foreach ($payload in $payloads) {
+    $metadata = Get-FerritePayloadMetadata -Path $payload.Source
+    Assert-FerritePayloadTarget -Metadata $metadata -Target $payload.Target
+    if ($metadata.configuration -ne $configuration) {
+        throw "Channel '$BuildFlavor' requires a $configuration-configured payload; found '$($metadata.configuration)'."
     }
-
-    if ($informational -match '-dev') {
-        throw "Payload is a dev build ('$informational'); a published asset must come from a build without the dev suffix: dotnet build -c Release -p:VersionSuffix="
+    $informational = $metadata.informationalVersion
+    if ([string]::IsNullOrWhiteSpace($informational)) { throw 'The payload carries no source identity.' }
+    if ($RequireReleaseIdentity) {
+        if ($informational -match '-dev') {
+            throw "Payload is a dev build ('$informational'); a published asset must come from a build without the dev suffix: dotnet build -c Release -p:VersionSuffix="
+        }
+        if (($informational -replace '[-+].*$', '') -ne $releaseBase) {
+            throw "Payload identity '$informational' does not match '$VersionLabel'."
+        }
     }
-
-    $infoBase = $informational -replace '[-+].*$', ''
-    if ($infoBase -ne $releaseBase) {
-        throw "Payload identity is '$informational' (base $infoBase) but this channel is packing '$VersionLabel' (base $releaseBase). The build is stale or the label is wrong."
-    }
+    $payload.Metadata = $metadata
+    $payload.Hash = (Get-FileHash -LiteralPath $payload.Source -Algorithm SHA256).Hash
+}
+if (@($payloads | ForEach-Object { $_.Metadata.informationalVersion } | Select-Object -Unique).Count -ne 1) {
+    throw 'Dual payloads must share the same actual informational/source identity.'
 }
 
 # --- stage from scratch --------------------------------------------------------------------------
 if (Test-Path -LiteralPath $stageDir) { Remove-Item -LiteralPath $stageDir -Recurse -Force }
-$null = New-Item -ItemType Directory -Path (Join-Path $stageDir '1.6\Assemblies') -Force
+foreach ($payload in $payloads) { $null = New-Item -ItemType Directory -Path (Join-Path $stageDir "$($payload.Game)/Assemblies") -Force }
 $null = New-Item -ItemType Directory -Path (Join-Path $stageDir 'About') -Force
 
 # About.xml is copied as one file, never as the About directory: a locally generated
 # About/PublishedFileId.txt is Workshop identity and must not ride into a GitHub or dev package.
-Copy-Item -LiteralPath $aboutXml -Destination (Join-Path $stageDir 'About\About.xml') -Force
-Copy-Item -LiteralPath $loadFolders -Destination (Join-Path $stageDir 'LoadFolders.xml') -Force
+# A single-target archive must not advertise the other version's absent payload.
+$games = @($payloads | ForEach-Object { $_.Game })
+foreach ($node in @($about.SelectNodes('/ModMetaData/supportedVersions/li'))) {
+    if ($node.InnerText.Trim() -notin $games) { $null = $node.ParentNode.RemoveChild($node) }
+}
+foreach ($node in @($loadMap.DocumentElement.ChildNodes)) {
+    if ($node.NodeType -eq 'Element' -and $node.Name -notin @($games | ForEach-Object { "v$_" })) { $null = $node.ParentNode.RemoveChild($node) }
+}
+$about.Save((Join-Path $stageDir 'About/About.xml'))
+$loadMap.Save((Join-Path $stageDir 'LoadFolders.xml'))
 
 # MPL-2.0 section 3.2: a distributed Executable Form must say how to obtain the Source Code Form, so
 # the licence text travels inside the package rather than living only in the repository.
 Copy-Item -LiteralPath $license -Destination (Join-Path $stageDir 'LICENSE') -Force
-Copy-Item -LiteralPath $payloadDll -Destination (Join-Path $stageDir '1.6\Assemblies\FerriteLib.UiKit.dll') -Force
+foreach ($payload in $payloads) { Copy-Item -LiteralPath $payload.Source -Destination (Join-Path $stageDir $payload.Relative) -Force }
 
 # Package identity, written after the last structural copy so nothing can filter it out. It answers
 # "how fresh is this folder" without opening the DLL: flavor, commit, and the source location MPL 3.2
 # asks for. On the release runner the platform names the repository; locally the 2026-09-07 naming
 # ruling is the source of truth.
-$payloadHash = (Get-FileHash -LiteralPath $payloadDll -Algorithm SHA256).Hash
 $sourceUrl = if ($env:GITHUB_REPOSITORY) { "$($env:GITHUB_SERVER_URL)/$env:GITHUB_REPOSITORY" } else { 'https://github.com/Coahuilite/FerriteLib' }
+$identityLines = @("FerriteLib $VersionLabel", "build=$BuildFlavor", "commit=$CommitLabel", "target=$Target")
+foreach ($payload in $payloads) {
+    $identityLines += "payload-$($payload.Game)-sha256=$($payload.Hash)", "framework-$($payload.Game)=$($payload.Metadata.framework)",
+        "mvid-$($payload.Game)=$($payload.Metadata.mvid)", "identity-$($payload.Game)=$($payload.Metadata.informationalVersion)"
+}
+if ($payloads.Count -eq 1) { $identityLines += "payload-sha256=$($payloads[0].Hash)" }
+$identityLines += "source $sourceUrl"
 [System.IO.File]::WriteAllText(
     (Join-Path $stageDir 'version.txt'),
-    "FerriteLib $VersionLabel`r`nbuild=$BuildFlavor`r`ncommit=$CommitLabel`r`npayload-sha256=$payloadHash`r`nsource $sourceUrl`r`n")
+    ($identityLines -join "`r`n") + "`r`n")
 
 # --- assertions on the finished tree -------------------------------------------------------------
 foreach ($directory in $forbiddenContent) {
@@ -173,12 +175,15 @@ if ($unexpected.Count -gt 0) {
 }
 
 $assemblyCount = @($stagedFiles | Where-Object { $_ -like '*.dll' }).Count
-if ($assemblyCount -ne 1) {
-    throw "The payload must be exactly one assembly; found $assemblyCount."
+if ($assemblyCount -ne $payloads.Count) {
+    throw "The payload must contain exactly one assembly per selected target; found $assemblyCount."
 }
 
-$stagedHash = (Get-FileHash -LiteralPath (Join-Path $stageDir $dllRelative) -Algorithm SHA256).Hash
-if ($stagedHash -ne $payloadHash) { throw 'Payload changed during staging; refusing the candidate.' }
+foreach ($payload in $payloads) {
+    if ((Get-FileHash -LiteralPath (Join-Path $stageDir $payload.Relative) -Algorithm SHA256).Hash -ne $payload.Hash) {
+        throw 'Payload changed during staging; refusing the candidate.'
+    }
+}
 
 # --- commit: every assertion above passed, so replace the delivered folder now ---------------------
 if (Test-Path -LiteralPath $deliveryDir) { Remove-Item -LiteralPath $deliveryDir -Recurse -Force }
@@ -198,6 +203,7 @@ Write-Host "[stage-package] staged $($stagedFiles.Count) files -> $stageDir"
 if ($CreateZip) {
     $commitDate = [DateTimeOffset]::Parse((& git -C $root log -1 --format=%aI)).ToUniversalTime()
     $zipPath = Join-Path (Split-Path -Parent $stageDir) "FerriteLib-$VersionLabel.zip"
+    Assert-DistributionPath $zipPath
     if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
 
     Add-Type -AssemblyName System.IO.Compression

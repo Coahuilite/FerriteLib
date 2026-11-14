@@ -5,8 +5,24 @@
 cf1cf6456096171fb47c012369bcd0c2f29e968f。FL-F01/F02/F03 已在该 HEAD 的 dirty 工作树修复；
 下列对应段落区分实际源码机制、已执行既有检查及未执行原生／精确故障组合。
 
+## 0.9 双目标载荷：编译与本地试分发
+
+正式采用提交 `5d12091` 先更新唯一 current 的 FL08-CARRIER／DEV-07，随后才接线包元数据与脚本。
+0.9 保留普通默认 RW1.6/net472 和显式 RimWorld17/net10.0 两个实际编译入口；Neutral不进游戏包。
+原 stager／exporter／release packer增加目标选择，实际读取DLL的configuration、TFM、游戏引用、
+来源身份及MVID；单目标只公告其版本，Dual要求相同源码身份、分别置于1.6／1.7目录。
+每个游戏只选匹配版本的一个DLL，归档不含游戏引用或共享根DLL。0.8源文件和原1.7编译路径未改。
+
+两个普通Release均从干净 `5d12091` 构建，零警告／错误、无测试钩子；后续改动仅在包／脚本／文档，
+未改变产品C#或构建配置。固定载荷及来源／MVID收据在本地忽略目录 `dist/pub14-dual-target/`，
+程序集producer与后继包装脚本commit分开记录，不用docs-only HEAD冒充DLL来源。
+实际Dual归档、两个单目标stage、1.7 export及原有carrier-export／license／Version／readonly-api检查通过。
+export首次因PowerShell参数与旧destination局部变量同名失败，改用独立变量后原检查通过，断言未改。
+这是普通编译／本地包路由证据，不是发布、安装、1.7游戏输入／绘制或165FPS验收。
+使用方法见[目标选择](../development/0.9/tools.md#select-a-game-payload-or-a-dual-target-archive)。
+
 <a id="fl09-repeat-declarations"></a>
-## FL09 Repeat 声明身份：r9 工程候选，暖开原生待验
+## FL09 Repeat 声明身份：1.6 r5工程证据，165 FPS未达
 
 规格候选 `51dceef`、正式采用 `6cc62e0` 后，WO-FL09-RETAINED-DISPLAY-20261111 r9 仅放行
 [FL09-REPEAT-DECLARATIONS](specs/core/structure/spec.md#requirement-fl09-repeat-declarations-未变声明不因值或开合递归重建)。
@@ -37,10 +53,12 @@ window host、readonly-api 与 Core 391 检查通过，无新增用例。普通 
 实际引用 Krafs.Rimworld.Ref1.6.4871／Assembly-CSharp1.6.9676.17735，FER_TOOLS且无FER_TEST／FER_DEV。
 后继 docs-only HEAD不刷新该载体；旧 r3／r4 固定配对保留作原生基线，新载体先供 US 重编。
 
-原生选择依据仍为 HOT-R4 的一次暖开58.449 ms中声明收集9.820 ms；候选尚未取得新暖开时间或
-递归次数。原 `CollectRepeatItemIdentities`、`CollectHiddenRepeatIdentities`、`CollectChildIdentities`
+选择范围的原始证据是一次r4暖开58.449 ms中的声明收集9.820 ms，不把它当作净节省。
+后续1.6 r5真实暖开未重派未变行子身份；Host p50为7.398 ms，1413/1413样本仍超过6.06 ms，
+165 FPS未过。该工程证据不扩展为net10／1.7原生验收。
+原 `CollectRepeatItemIdentities`、`CollectHiddenRepeatIdentities`、`CollectChildIdentities`
 边界保留供既有仪器按调用祖先归因；页面静态 `CollectDeclaredIdentities` 的递归仍存在，不能混算为行子树。
-未新增常驻计数。US 重编／Terra 同代暖开复验后才判收益；MeasureRegion余数、Draw、net10／1.7和165 FPS不由本项签收。
+未新增常驻计数；MeasureRegion余数、Draw及总帧节奏的后续工作保原责任边界。
 
 <a id="fl09-retained-regions"></a>
 ## FL09 显式区域保留：实现候选，原生待验

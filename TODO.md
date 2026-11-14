@@ -5,6 +5,10 @@ current task and applicable permissions; preserve the separate 1.6/native and 1.
 
 ## 0.9 current integration
 
+- The adopted [dual-target carrier change](docs/openspec/changes/fl09-dual-target-carriers/tasks.md)
+  preserves default RW1.6/net472 and explicit RW1.7/net10.0, with actual target-selected staging.
+  Fixed ordinary Release inputs and local trial archives are not a release or 1.7 game acceptance;
+  source/receipt boundaries and the scoped 1.6 r5 evidence remain in the implementation map.
 - The approved isolated 1.7 full-window stage has downstream consumption evidence; it is not pending
   implementation. Retain producer partial reports and their later consumer evidence separately in
   `docs/openspec/implementation.md#stage-evidence`. Tools owns viewport/viewing composition.
@@ -39,8 +43,8 @@ the later independent 60 Hz IMGUI evidence is separate from the earlier 144 Hz r
 WO r8's narrow [Repeat declaration supplement](docs/openspec/changes/fl09-repeat-declarations/tasks.md)
 is adopted into the sole structure current, with the original lifetime transaction linked unchanged.
 PM r9 released only this increment; its source candidate and existing checks are in the implementation map.
-The fixed ordinary carrier is delivered separately for a matched warm-open native check; the saved editor
-experiment is not adopted.
+The fixed ordinary carrier and later 1.6 r5 warm-open engineering evidence are recorded separately;
+165 FPS remains unmet. The saved editor experiment is not adopted.
 
 ## 0.9 adopted capability work
 
@@ -85,6 +89,20 @@ implemented. Current requirements are reached through `docs/specification.md`; i
 > and `OBLIVIONIS.md`; a closed item is a pointer here, not a paragraph.
 
 ## Local review coverage
+
+### FL09 dual-target carrier wiring
+
+- **Owner / reviewed_at:** sol-tiering, 2026-11-14T14:15:26.1034845+08:00 (Asia/Hong_Kong).
+- **Reviewed-through:** Spec-only adoption 5d12091 before any wiring; actual 1.6/net472 and
+  1.7/net10.0 compiler inputs, fixed ordinary Release metadata, version-selecting About/LoadFolders,
+  actual-identity/TFM/native-reference checks, closed-set single/Dual staging, exporter and release
+  packer parameter routing. No C# source, project settings or test source changed; 0.8 is untouched.
+- **Evidence / correction:** Both ordinary builds pass with zero warnings/errors and no test hooks.
+  Dual and both single stages, 1.7 export, existing carrier-export/license/Version/readonly-api
+  checks pass. The first export exposed a PowerShell case-insensitive parameter/local-variable
+  collision; the destination variable was renamed and the unchanged existing check passed.
+  Actual archive and payload receipts stay local; game/input/IME and 165 FPS are not certified.
+  Candidate/index privacy and normal branch push remain separate gates in the scoped tasks.
 
 ### FL09 Repeat declaration delivery
 

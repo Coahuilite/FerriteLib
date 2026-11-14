@@ -24,8 +24,8 @@ entry only when responsibilities or structure change, not for each task.
 ## Project identity
 
 - RimWorld prerequisite mod `coahuilite.ferritelib` (display **FerriteLib**, MPL-2.0).
-  This 0.9 development line targets RimWorld 1.7 with one `1.7/Assemblies/FerriteLib.UiKit.dll`
-  game carrier; Neutral is a separate build target, not a game mod payload. The 0.8/1.6 maintenance
+  This 0.9 line supports RimWorld 1.6/net472 and 1.7/net10.0, selecting one matching
+  `<game-version>/Assemblies/FerriteLib.UiKit.dll` per game. Neutral is not a game payload. The 0.8/1.6 maintenance
   contract remains independent. Follow 1.7 API/namespace changes rather than pinning a game patch number.
   The library owns no consumer Defs, Patches, Languages or product textures; consumer strings stay
   with their renderer. Target guarantees and implementation evidence start at `docs/specification.md`.
@@ -229,9 +229,9 @@ is a maintainer-side number, never a measurement a clone can reproduce.
 
 Use [build and verification guidance](docs/build-and-debug.md) for executable commands, selected inputs,
 output paths and the affected existing checks; do not copy release versions or gate counts into this file.
-For this 0.9 line, select Neutral or RimWorld17 explicitly through
-[the target/connection guide](docs/development/0.9/tools.md). The retained default net472 path and 0.8
-packers are not evidence of a complete 0.9/1.7 delivery. Normal Release includes dormant FER_TOOLS;
+For this 0.9 line, preserve the default net472/1.6, explicit RimWorld17 and Neutral entries through
+[the target/connection guide](docs/development/0.9/tools.md). Staging selects an actual target or Dual
+and verifies the payloads; one target's build never certifies the other. Normal Release includes dormant FER_TOOLS;
 FER_TEST is only for existing harness builds, and legacy FER_DEV instruments keep their own conditions.
 
 - Use pwsh 7, including child processes; never invoke Windows PowerShell 5.x.

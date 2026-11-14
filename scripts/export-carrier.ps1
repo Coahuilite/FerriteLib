@@ -1,4 +1,8 @@
-param([string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot))
+param(
+    [string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot),
+    [ValidateSet('RimWorld16', 'RimWorld17')][string]$Target = 'RimWorld16',
+    [string]$BuildRoot = 'dist/build'
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -6,30 +10,32 @@ $ErrorActionPreference = 'Stop'
 # Explicit local delivery for consumers using the published mod layout as their HintPath.
 # Ordinary builds, harnesses and packers never call this. This is neither a build nor publication.
 $root = [IO.Path]::GetFullPath($ProjectRoot)
-$source = Join-Path $root 'dist/build/Release/FerriteLib.UiKit.dll'
+$buildDirectory = [IO.Path]::GetFullPath($BuildRoot, $root)
+$buildPath = if ($Target -eq 'RimWorld16') { 'Release/FerriteLib.UiKit.dll' } else { 'Release/RimWorld17/FerriteLib.UiKit.dll' }
+$source = Join-Path $buildDirectory $buildPath
 if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw 'Build Release before exporting the carrier.' }
-$env:FERRITELIB_EXPORT_SOURCE = $source
-try {
-    $configuration = & pwsh -NoProfile -NonInteractive -Command '$a=[Reflection.Assembly]::LoadFile($env:FERRITELIB_EXPORT_SOURCE); foreach($t in [Reflection.CustomAttributeData]::GetCustomAttributes($a)) { if($t.AttributeType.Name -eq "AssemblyConfigurationAttribute") { $t.ConstructorArguments[0].Value; break } }'
-    if ($LASTEXITCODE -ne 0 -or $configuration -ne 'Release') { throw 'The export source must be a Release assembly.' }
-} finally { Remove-Item Env:FERRITELIB_EXPORT_SOURCE -ErrorAction SilentlyContinue }
-$directory = Join-Path $root '1.6/Assemblies'
+Import-Module (Join-Path $PSScriptRoot 'Release.Identity.psm1')
+$metadata = Get-FerritePayloadMetadata -Path $source
+if ($metadata.configuration -ne 'Release') { throw 'The export source must be a Release assembly.' }
+Assert-FerritePayloadTarget -Metadata $metadata -Target $Target
+$game = if ($Target -eq 'RimWorld16') { '1.6' } else { '1.7' }
+$directory = Join-Path $root "$game/Assemblies"
 $null = New-Item -ItemType Directory -Path $directory -Force
-$target = Join-Path $directory 'FerriteLib.UiKit.dll'
+$destination = Join-Path $directory 'FerriteLib.UiKit.dll'
 $candidate = Join-Path $directory ('.carrier-' + [guid]::NewGuid().ToString('N') + '.tmp')
 try {
     Copy-Item -LiteralPath $source -Destination $candidate
     $hash = (Get-FileHash -LiteralPath $source).Hash
     if ((Get-FileHash -LiteralPath $candidate).Hash -ne $hash) { throw 'Carrier copy differs from build input.' }
-    if (Test-Path -LiteralPath $target) {
-        [IO.File]::Replace($candidate, $target, [NullString]::Value)
+    if (Test-Path -LiteralPath $destination) {
+        [IO.File]::Replace($candidate, $destination, [NullString]::Value)
     } else {
-        [IO.File]::Move($candidate, $target)
+        [IO.File]::Move($candidate, $destination)
     }
     $pdb = Join-Path $directory 'FerriteLib.UiKit.pdb'
     if (Test-Path -LiteralPath $pdb) { Remove-Item -LiteralPath $pdb -Force }
-    $identity = [Diagnostics.FileVersionInfo]::GetVersionInfo($target).ProductVersion
-    Write-Host "[carrier] identity=$identity sha256=$hash mtime=$((Get-Item -LiteralPath $target).LastWriteTimeUtc.ToString('o'))"
+    $identity = [Diagnostics.FileVersionInfo]::GetVersionInfo($destination).ProductVersion
+    Write-Host "[carrier] identity=$identity sha256=$hash mtime=$((Get-Item -LiteralPath $destination).LastWriteTimeUtc.ToString('o'))"
 } finally {
     if (Test-Path -LiteralPath $candidate) { Remove-Item -LiteralPath $candidate -Force }
 }

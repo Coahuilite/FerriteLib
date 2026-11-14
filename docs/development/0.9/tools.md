@@ -438,14 +438,48 @@ This is net10.0 and references the chosen local Assembly-CSharp / UnityStubs / R
 assemblies with Private=false. It reuses the public Verse Window/Settings adapter source rather than
 creating another renderer. The 1.7 build excludes the unavailable Unity fontNames environment body;
 unknown native font revision disables optional metric reuse. Numeric Editor size retains the reported
-preset fallback. The explicit legacy default target is maintenance compilation, not the 0.9 installable
-1.7 carrier. Target outputs and restore intermediates are isolated.
+preset fallback. The default blank UiKitTarget remains the 0.9 net472/1.6 build, not a 1.7 carrier.
+Target outputs and restore intermediates are isolated.
 
 The current selected local reference is 1.7.5000 rev1275. Earlier 4998 observations remain bound to
 their original fixed input. Game execution, physical IME/input and wrapper appearance remain separate
 acceptance work. The game's internal ImGui host/backend/dispatch/IME path is handled by the separately
 authorized Tools bridge owner; standalone native evidence belongs to that owner. No reflection, copied game implementation, alternative renderer or game bootstrap
 is supplied by this library.
+
+## Select a game payload or a dual-target archive
+
+0.9 supports both game targets. Compile ordinary Release separately; the default target remains 1.6:
+
+```powershell
+dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release -p:FerriteTestHooks=false
+dotnet build Source/FerriteLib.UiKit/FerriteLib.UiKit.csproj -c Release -p:UiKitTarget=RimWorld17 -p:RimWorld17Dir=<original-1.7-assembly-directory> -p:FerriteTestHooks=false
+```
+
+Use `stage-package.ps1 -Target RimWorld16`, `RimWorld17` or `Dual`. The default remains RimWorld16;
+single-target output advertises only its selected version. Dual keeps both version folders but each
+game loads only its matching TFM. The stager reads actual configuration, TFM, required game references,
+source identity and MVID before replacing any delivery; Neutral is refused. Unused compiler references
+need not appear in a DLL's emitted reference list. Game/reference DLLs never enter the package.
+
+For a local ordinary Release trial archive (no tag, Release publication or installation):
+
+```powershell
+pwsh -NoProfile -File scripts/stage-package.ps1 -Target Dual -StageDir dist/local-dual/FerriteLib -VersionLabel 0.9.0-dev-local -BuildFlavor github -CommitLabel <packaging-source-commit> -CreateZip
+```
+
+Here `github` selects the existing Release-configured archive channel, not an upload. A published pack
+still uses `pack-release.ps1 -Version <approved-version> -Target Dual` and its unchanged clean-source,
+release-axis and non-dev identity gates. Publishing remains a separately authorized operation.
+`-BuildRoot <build-directory>` optionally selects isolated inputs with the same Release and
+Release/RimWorld17 subpaths. Version receipts identify both actual payloads, not just the folder label.
+CommitLabel identifies the packaging source; each payload's informational version separately identifies
+its assembly producer. A later scripts/docs-only commit does not rebuild a held DLL.
+
+`export-carrier.ps1` preserves its default Release→1.6 path; `-Target RimWorld17` selects only the
+actual 1.7 Release output and 1.7 carrier path. Export/stage do not build, run the game or install a mod.
+The 0.8 branch and its existing support remain independent. Compilation/archiving is not 1.7 native
+rendering, input/IME or 165 FPS acceptance.
 
 ## Author documents and same-screen selection
 

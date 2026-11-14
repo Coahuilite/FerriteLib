@@ -49,4 +49,33 @@ function Get-FerriteReleaseCommit {
     }
     $commit
 }
-Export-ModuleMember -Function Get-FerriteReleaseVersion, Get-FerriteBuildAxis, Assert-FerriteReleaseAxis, Get-FerriteReleaseCommit
+function Get-FerritePayloadMetadata {
+    param([Parameter(Mandatory = $true)][string] $Path)
+    $shell = Join-Path $PSHOME 'pwsh.exe'
+    if (-not (Test-Path -LiteralPath $shell -PathType Leaf)) { $shell = 'pwsh' }
+    $output = @(& $shell -NoProfile -NonInteractive -File (Join-Path $PSScriptRoot 'read-carrier-metadata.ps1') -Path $Path)
+    if ($LASTEXITCODE -ne 0) { throw "Reading carrier metadata failed (exit $LASTEXITCODE)." }
+    ($output -join [Environment]::NewLine) | ConvertFrom-Json
+}
+
+function Assert-FerritePayloadTarget {
+    param([Parameter(Mandatory = $true)] $Metadata,
+        [ValidateSet('RimWorld16', 'RimWorld17')][string] $Target)
+    if ($Metadata.name -ne 'FerriteLib.UiKit') { throw 'The payload must be the FerriteLib.UiKit assembly.' }
+    if ($Metadata.informationalVersion -notmatch '\+[0-9a-fA-F]{40}($|[-.])') {
+        throw 'The carrier must retain its committed source identity in InformationalVersion.'
+    }
+    $framework = if ($Target -eq 'RimWorld16') { '.NETFramework,Version=v4.7.2' } else { '.NETCoreApp,Version=v10.0' }
+    if ($Metadata.framework -ne $framework) {
+        throw "Target $Target requires $framework; payload reports '$($Metadata.framework)'."
+    }
+    # The compiler omits unused references: RimWorld/Waylith are real build inputs but need not
+    # survive in a carrier which only uses the Verse/UnityStubs surface.
+    $required = if ($Target -eq 'RimWorld16') { @('Assembly-CSharp') } else { @('Assembly-CSharp', 'UnityStubs') }
+    foreach ($reference in $required) {
+        if ($reference -notin $Metadata.references) { throw "Target $Target is missing its game reference '$reference'." }
+    }
+    if ($Target -eq 'RimWorld16' -and 'UnityStubs' -in $Metadata.references) { throw 'The 1.6 payload cannot use the 1.7 UnityStubs backend.' }
+}
+
+Export-ModuleMember -Function Get-FerriteReleaseVersion, Get-FerriteBuildAxis, Assert-FerriteReleaseAxis, Get-FerriteReleaseCommit, Get-FerritePayloadMetadata, Assert-FerritePayloadTarget

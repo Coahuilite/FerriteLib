@@ -2,7 +2,7 @@
 
 **English** | [中文](./README.zh-CN.md)
 
-FerriteLib is a **no-content prerequisite mod** for RimWorld. It carries one assembly, `FerriteLib.UiKit.dll`: a UI toolkit for
+FerriteLib is a **no-content prerequisite mod** for RimWorld. Each game version loads one matching `FerriteLib.UiKit.dll`: a UI toolkit for
 mod authors. It adds no Defs, patches, languages or textures; enabling it alone changes nothing in the game.
 
 ## Status
@@ -11,8 +11,8 @@ mod authors. It adds no Defs, patches, languages or textures; enabling it alone 
 | --- | --- |
 | Development | 0.9.0, API range `[0.9.0, 0.10.0)`; [Tools/semantic/headless guide](docs/development/0.9/tools.md) |
 | Published | [v0.8.0-rc1](https://github.com/Coahuilite/FerriteLib/releases/tag/v0.8.0-rc1) (GitHub prerelease, not latest) |
-| Local only | 0.9 normal carrier; not published. The separate 0.8 maintenance candidate remains unreleased. |
-| RimWorld 1.6 | Separate 0.8 maintenance/recovery; c3-dev inherits r6 native acceptance gaps |
+| Local only | 0.9 target-selected normal carriers and local archives; not a published release. The separate 0.8 maintenance candidate remains unreleased. |
+| RimWorld 1.6 | 0.9 net472; scoped native engineering evidence in the implementation map. The 0.8 maintenance/recovery line remains independent. |
 | RimWorld 1.7 | 0.9 net10.0; isolated full-window Native17 consumption recorded. Game17 is build/package only; game, physical input and IME remain unverified. See the implementation map. |
 
 Per-item evidence and known deviations live in [implementation and open deviations](docs/openspec/implementation.md), not here.
@@ -98,7 +98,7 @@ For more detail see the [architecture page](docs/architecture.md) and the compos
 
 - **Assert the version range in your own startup code:** `FerriteLibVersion.Require(min, max, packageId, out report)`.
   RimWorld's `modDependencies` cannot express a version; this call enumerates loaded carriers, reports collisions and fails readably.
-- For 0.9, compile against the supplied fixed 1.7 DLL, targeting `net10.0`. Published 0.8 assets remain the `net472` maintenance input.
+- For 0.9, select the matching fixed DLL: RimWorld1.6/net472 or RimWorld1.7/net10.0. Published 0.8 assets remain an independent maintenance input.
   Do not ship a copy of the DLL with your mod.
 - Only types marked **stable** in the [API tiers](docs/api-tiers.md) keep their signatures inside the `[min, max)` range you
   compiled against; **public-unstable** types need a recompile at each minor. After publication, breaking a stable contract
@@ -111,7 +111,7 @@ For more detail see the [architecture page](docs/architecture.md) and the compos
 
 ## For contributors
 
-The 0.9 target commands are in the connection guide. The following retained maintenance verification/packing commands do not stage a 0.9 1.7 delivery.
+The 0.9 target and Dual archive commands are in the connection guide. The retained commands below default to 1.6; that default does not certify 1.7.
 
 ```powershell
 pwsh -NoProfile -File scripts/verify-local.ps1                  # gate suite: tests, both build flavors, payload, content-free, licence, identity

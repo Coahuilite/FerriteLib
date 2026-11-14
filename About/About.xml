@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   FerriteLib is a prerequisite mod: it ships no Defs, no Languages and no content. Its whole payload
-  is 1.7/Assemblies/FerriteLib.UiKit.dll, which consumer mods compile against by a relative sibling
+  is one version-selected Assemblies/FerriteLib.UiKit.dll (1.6/net472 or 1.7/net10.0), which consumer mods compile against by a relative sibling
   reference (Private=false, so the DLL ships only here) and bind to at runtime.
 
   The two version axes live apart on purpose:
@@ -23,8 +23,8 @@
   <author>Coahuilite</author>
   <modVersion>0.9.0</modVersion>
   <url>https://github.com/Coahuilite/FerriteLib</url>
-  <supportedVersions><li>1.7</li></supportedVersions>
-  <description>FerriteLib 是无内容前置模组：它不添加任何游戏内容（无 Def、无补丁、无贴图），全部载荷只有一个程序集 1.7/Assemblies/FerriteLib.UiKit.dll，供使用其 UI 内核的 Coahuilite 模组（目前为 Universal Squeaker）在运行时绑定。有模组依赖它时请勿卸载或禁用本模组。
+  <supportedVersions><li>1.6</li><li>1.7</li></supportedVersions>
+  <description>FerriteLib 是无内容前置模组：它不添加任何游戏内容（无 Def、无补丁、无贴图），游戏按版本只加载对应目录中的一个 FerriteLib.UiKit.dll，供使用其 UI 内核的 Coahuilite 模组（目前为 Universal Squeaker）在运行时绑定。有模组依赖它时请勿卸载或禁用本模组。
 
-FerriteLib is a no-content prerequisite mod: it adds nothing to the game (no Defs, no patches, no textures). Its entire payload is one assembly, 1.7/Assemblies/FerriteLib.UiKit.dll, bound at runtime by Coahuilite mods that use its UI kernel (currently Universal Squeaker). Do not uninstall or disable it while a mod depends on it.</description>
+FerriteLib is a no-content prerequisite mod: it adds nothing to the game (no Defs, no patches, no textures). Each game version loads one matching FerriteLib.UiKit.dll from its own version folder, bound at runtime by Coahuilite mods that use its UI kernel (currently Universal Squeaker). Do not uninstall or disable it while a mod depends on it.</description>
 </ModMetaData>

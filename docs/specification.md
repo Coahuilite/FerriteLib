@@ -4,7 +4,7 @@
 
 0.9起同时支持 **RimWorld1.6/net472 与1.7/net10.0**，新原生开发面向1.7、跟随当前命名空间／API，不锁小构建号；0.8维护线独立。
 [双目标载荷变更](openspec/changes/fl09-dual-target-carriers/proposal.md)已按2026-11-14用户授权正式采用，
-本次采用时尚未接线：唯一载荷规则归[FL08-CARRIER](openspec/specs/policies/public-authoring/spec.md#requirement-fl08-carrier-单载体与版本轴明确)，
+采用先于接线；唯一载荷规则归[FL08-CARRIER](openspec/specs/policies/public-authoring/spec.md#requirement-fl08-carrier-单载体与版本轴明确)，
 不能以元数据标签或已有某一目标编译宣称双版本交付。独立Tools承担脱机图形宿主、游戏内工具和虚拟舞台，FL只提供中立接缝。
 中立窗壳、选择注记控制、同源坐标命中及可选非提交预算已进入本线；隔离Native17消费、Game17构建和未验按
 [实现记录](openspec/implementation.md#stage-evidence)分列。原page／provider／MeasureAndArrange及纯读条件保原适用范围；

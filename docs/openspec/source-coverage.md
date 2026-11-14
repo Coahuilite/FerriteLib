@@ -5,6 +5,16 @@ cf1cf6456096171fb47c012369bcd0c2f29e968f；被替代正文在[完整归档](../a
 表中旧文件名均指该归档内原同名文件。后续已确认的细则优先于旧文中的准备／pending措辞；
 实现错误不削弱要求。原基线核心行为是整理与补录，不产生新行为 delta；基础能力 change 仍未实施，区域保留与事件分层的独立采用／实现边界见下节。
 
+## FL09双目标载荷：2026-11-14采用
+
+用户确认0.9同时支持1.6与1.7；独立规格提交 `5d12091` 先于包／配置接线。
+[完整delta](changes/fl09-dual-target-carriers/proposal.md)保留来源，唯一current为
+[FL08-CARRIER](specs/policies/public-authoring/spec.md#requirement-fl08-carrier-单载体与版本轴明确)
+及[DEV-07](specs/contracts/developer-tools/spec.md#requirement-dev-07-新原生开发跟随-17)。
+变化是版本选择后单载体、双目标完整归档、真实载荷身份校验与单目标元数据过滤；
+原1.6默认、显式1.7编译入口、Neutral不作游戏包及0.8支持独立保留。
+源码接线、实际构建／归档及原生验收边界见[实现映射](implementation.md#09-双目标载荷编译与本地试分发)。
+
 ## FL09 Repeat 声明身份：2026-11-12 r8补充采用
 
 来源为 WO-FL09-RETAINED-DISPLAY-20261111 r8、真实 HOT-R4 的声明身份热点及
