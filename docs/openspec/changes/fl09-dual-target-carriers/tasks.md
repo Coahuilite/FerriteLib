@@ -5,6 +5,7 @@
   不编辑0.8，不新增C# API，不修改游戏安装。
 - [x] BUILD 用实际原始引用构建两个普通Release，读取各自来源／TFM／MVID；固定供US引用，不覆盖旧配对。
 - [x] STAGE 运行原stager的双目标及单目标路径，核实际闭合包／选择；运行受影响既有检查，不加用例。
-- [ ] PUSH 实际index隐私门、既有pre-push hook、仅origin/0.9.x正常快进及远端ref回读；不发tag或Release。
+- [x] PUSH 实际index隐私门、既有pre-push hook、仅origin/0.9.x正常快进及远端ref回读；不发tag或Release。
+  规格 `5d12091` → 接线 `50fce78` 已正常快进并回读；后继文稿同样走候选index和hook门，不刷新固定DLL。
 
 规格采用不是二进制交付；1.7游戏、物理输入／IME与165FPS不在本轮验收中。

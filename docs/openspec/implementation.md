@@ -7,7 +7,7 @@ cf1cf6456096171fb47c012369bcd0c2f29e968f。FL-F01/F02/F03 已在该 HEAD 的 dir
 
 ## 0.9 双目标载荷：编译与本地试分发
 
-正式采用提交 `5d12091` 先更新唯一 current 的 FL08-CARRIER／DEV-07，随后才接线包元数据与脚本。
+正式采用提交 `5d12091` 先更新唯一 current 的 FL08-CARRIER／DEV-07，随后 `50fce78` 才接线包元数据与脚本。
 0.9 保留普通默认 RW1.6/net472 和显式 RimWorld17/net10.0 两个实际编译入口；Neutral不进游戏包。
 原 stager／exporter／release packer增加目标选择，实际读取DLL的configuration、TFM、游戏引用、
 来源身份及MVID；单目标只公告其版本，Dual要求相同源码身份、分别置于1.6／1.7目录。
@@ -18,6 +18,8 @@ cf1cf6456096171fb47c012369bcd0c2f29e968f。FL-F01/F02/F03 已在该 HEAD 的 dir
 程序集producer与后继包装脚本commit分开记录，不用docs-only HEAD冒充DLL来源。
 实际Dual归档、两个单目标stage、1.7 export及原有carrier-export／license／Version／readonly-api检查通过。
 export首次因PowerShell参数与旧destination局部变量同名失败，改用独立变量后原检查通过，断言未改。
+候选index及既有pre-push全历史隐私门通过，`50fce78` 已正常快进到 `origin/0.9.x` 并回读一致；
+普通Release DLL只在本地固定目录交接，未上传二进制、原生证据或游戏引用。
 这是普通编译／本地包路由证据，不是发布、安装、1.7游戏输入／绘制或165FPS验收。
 使用方法见[目标选择](../development/0.9/tools.md#select-a-game-payload-or-a-dual-target-archive)。
 

@@ -92,7 +92,7 @@ implemented. Current requirements are reached through `docs/specification.md`; i
 
 ### FL09 dual-target carrier wiring
 
-- **Owner / reviewed_at:** sol-tiering, 2026-11-14T14:15:26.1034845+08:00 (Asia/Hong_Kong).
+- **Owner / reviewed_at:** sol-tiering, 2026-11-14T14:18:49.8195720+08:00 (Asia/Hong_Kong).
 - **Reviewed-through:** Spec-only adoption 5d12091 before any wiring; actual 1.6/net472 and
   1.7/net10.0 compiler inputs, fixed ordinary Release metadata, version-selecting About/LoadFolders,
   actual-identity/TFM/native-reference checks, closed-set single/Dual staging, exporter and release
@@ -102,7 +102,9 @@ implemented. Current requirements are reached through `docs/specification.md`; i
   checks pass. The first export exposed a PowerShell case-insensitive parameter/local-variable
   collision; the destination variable was renamed and the unchanged existing check passed.
   Actual archive and payload receipts stay local; game/input/IME and 165 FPS are not certified.
-  Candidate/index privacy and normal branch push remain separate gates in the scoped tasks.
+  Actual staged-index and pre-push full-history privacy gates passed for 50fce78; its normal
+  origin/0.9.x fast-forward and remote readback agree. The local archive records packaging source
+  50fce78 separately from both DLL producers at 5d12091; docs-only closeout does not rebuild them.
 
 ### FL09 Repeat declaration delivery
 
