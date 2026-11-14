@@ -107,6 +107,8 @@ headless SHALL复用正式manifest、registry、binding、layout与操作，显�
 - **AND** 失败不自动重试；isolated Dispose终局，原native同实例关闭后重开条件仍保留；借用执行／metrics／业务owner不被转移
 
 ### Requirement: DEV-07 新原生开发跟随 1.7
+0.9同时支持1.6与1.7的目标载荷与选择归[FL08-CARRIER](../../policies/public-authoring/spec.md#requirement-fl08-carrier-单载体与版本轴明确)；
+以下新原生开发方向不取消本线1.6支持，也不将两个TFM混为同一游戏载荷。
 新原生适配 SHALL以RimWorld 1.7为目标，跟进当前命名空间、程序集和API，不按小构建号／rev／游戏MVID白名单锁定支持。实际缺少接口或资源时报告具体不兼容并修复适配，不静默载旧游戏依赖或换近似绘制。该政策不放宽FL API区间、同进程单载体或旧1.6合同。自动记录实际输入只用于诊断／证据，不给用户增加小版本管理步骤。
 #### Scenario: 官方移动接口命名空间
 - **WHEN** 1.7更新使旧引用不再编译

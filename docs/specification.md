@@ -2,7 +2,13 @@
 
 0.9开发线采用[开发工具连接](openspec/specs/contracts/developer-tools/spec.md)：可选Tools、agent语义访问、同源headless、作者文档、prepare、动态布局输入和原window-cost接缝；签名与用法在[连接指南](development/0.9/tools.md)。正常单一载体含休眠工具能力，不要求第二份Dev库。既有Stable、部分采用、原观察和独立合法入口保持。
 
-新原生开发统一面向 **RimWorld 1.7**，跟随当前命名空间／API，不锁小构建号；0.8／1.6另行维护。独立Tools承担脱机图形宿主、游戏内工具和虚拟舞台，FL只提供中立接缝。中立窗壳、选择注记控制、同源坐标命中及可选非提交预算已进入本线；完整窗的隔离Native17消费、Game17构建和未验按[实现记录](openspec/implementation.md#stage-evidence)分列。原page／provider／MeasureAndArrange及纯读条件保各自原适用范围；准确1.6、物理输入／IME与真实游戏宿主不由隔离舞台代签。
+0.9起同时支持 **RimWorld1.6/net472 与1.7/net10.0**，新原生开发面向1.7、跟随当前命名空间／API，不锁小构建号；0.8维护线独立。
+[双目标载荷变更](openspec/changes/fl09-dual-target-carriers/proposal.md)已按2026-11-14用户授权正式采用，
+本次采用时尚未接线：唯一载荷规则归[FL08-CARRIER](openspec/specs/policies/public-authoring/spec.md#requirement-fl08-carrier-单载体与版本轴明确)，
+不能以元数据标签或已有某一目标编译宣称双版本交付。独立Tools承担脱机图形宿主、游戏内工具和虚拟舞台，FL只提供中立接缝。
+中立窗壳、选择注记控制、同源坐标命中及可选非提交预算已进入本线；隔离Native17消费、Game17构建和未验按
+[实现记录](openspec/implementation.md#stage-evidence)分列。原page／provider／MeasureAndArrange及纯读条件保原适用范围；
+物理输入／IME与真实游戏宿主不由隔离舞台或载荷归档代签。
 规格表达应有保证；源码是否全部满足、已知偏差及证据身份在[开发映射](openspec/implementation.md)。
 [Trace／legacy-fit 两项新保证](openspec/specs/contracts/observation-boundary/spec.md)于2026-10-29获准采用，
 [变更记录](openspec/changes/isolate-observation/proposal.md)保存采用来源；实现证据与固定产物仍分别记录，不替代原生接受。
